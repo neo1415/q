@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  createProblemDetails,
+  PROBLEM_CONTENT_TYPE,
   QInterviewTurnRequestSchema,
   QInterviewTurnResponseSchema,
 } from "@capital-q/contracts";
@@ -17,6 +19,7 @@ import {
 import type { QVoiceRoutesDependencies } from "./routes.js";
 import type { InterviewAgent } from "./interview-agent.js";
 import { signupContextFromToken } from "./interview-steps.js";
+import { AccountPausedError } from "./standing.js";
 
 /**
  * One turn of the Q interview, over HTTP (QX-004 core gate: one Q).
@@ -77,27 +80,48 @@ export function registerQInterviewRoute(
 
       const actor = getActorContext(request);
       const input = QInterviewTurnRequestSchema.parse(request.body ?? {});
-      const outcome = await dependencies.agent.turn({
-        actor,
-        session: { baseUrl: dependencies.apiBaseUrl, accessToken },
-        onboardingSessionId: input.onboardingSessionId,
-        journeyType: input.journeyType === "investor" ? "investor" : "founder",
-        channel: input.channel,
-        // Attribution: the person, resolved server-side like every other Q
-        // route — never a placeholder. A constant tenant failed every
-        // usage-ledger write on its foreign key and, worse, made the typed
-        // interview recall memory for nobody, so Q forgot between sessions
-        // what the person had told it. Authority is still the bearer above;
-        // the onboarding service re-derives everything from it.
-        attribution: {
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          correlationId: dependencies.correlation(),
-        },
-        signup: signupContextFromToken(accessToken),
-        utterance: input.utterance,
-        recentTurns: [...input.recentTurns],
-      });
+      const outcome = await dependencies.agent
+        .turn({
+          actor,
+          session: { baseUrl: dependencies.apiBaseUrl, accessToken },
+          onboardingSessionId: input.onboardingSessionId,
+          journeyType:
+            input.journeyType === "investor" ? "investor" : "founder",
+          channel: input.channel,
+          // Attribution: the person, resolved server-side like every other Q
+          // route — never a placeholder. A constant tenant failed every
+          // usage-ledger write on its foreign key and, worse, made the typed
+          // interview recall memory for nobody, so Q forgot between sessions
+          // what the person had told it. Authority is still the bearer above;
+          // the onboarding service re-derives everything from it.
+          attribution: {
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            correlationId: dependencies.correlation(),
+          },
+          signup: signupContextFromToken(accessToken),
+          utterance: input.utterance,
+          recentTurns: [...input.recentTurns],
+        })
+        .catch((error: unknown) => {
+          if (error instanceof AccountPausedError) return null;
+          throw error;
+        });
+      if (outcome === null) {
+        // Founder direction 2026-09-30: a paused account is refused here,
+        // whatever the screen shows; the screen reads the code.
+        const problem = createProblemDetails({
+          code: "PERMISSION_DENIED",
+          requestId: request.id,
+          detail:
+            "Your account is paused. Someone from the Capital Q team will be in touch.",
+        });
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .header("Cache-Control", "no-store")
+          .send({ ...problem, paused: true });
+      }
 
       void reply.header("Cache-Control", "no-store");
       return QInterviewTurnResponseSchema.parse({
@@ -135,6 +159,7 @@ export function registerQInterviewRoute(
           recommendations: [...(outcome.pending?.recommendations ?? [])],
           held: [...(outcome.pending?.held ?? [])],
         },
+        ...(outcome.conduct === undefined ? {} : { conduct: outcome.conduct }),
       });
     },
   );

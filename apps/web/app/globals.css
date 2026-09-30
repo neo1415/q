@@ -136,6 +136,15 @@
     }
   }
 
+  /* Q's patience (founder direction 2026-09-30): Q alone turns orange,
+     then red; the rest of the page keeps its accent. */
+  :root[data-q-mood="IMPATIENT"] {
+    --cq-q-colour: var(--cq-warning);
+  }
+  :root[data-q-mood="STERN"] {
+    --cq-q-colour: var(--cq-danger);
+  }
+
   .cq-shell {
     display: flex;
     min-height: 100dvh;

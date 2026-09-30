@@ -1,5 +1,7 @@
 "use client";
 
+import type { QConduct } from "@capital-q/contracts";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   OnboardingResponseValue,
@@ -49,6 +51,8 @@ export type OnboardingTurn = {
    * turn would start, then returns to the interview.
    */
   readonly researching: string | null;
+  /** Q's patience after the turn (founder direction 2026-09-30). */
+  readonly conduct?: QConduct | undefined;
 };
 
 export type OnboardingState<TView> = {
@@ -383,6 +387,7 @@ export function useOnboardingJourney<
             reply: outcome.reply,
             navigate: outcome.navigate,
             researching: outcome.researching,
+            conduct: outcome.conduct,
           };
         } catch {
           return null;
@@ -397,6 +402,7 @@ export function useOnboardingJourney<
           reply: outcome.reply,
           navigate: outcome.navigate,
           researching: outcome.researching,
+          conduct: outcome.conduct,
         };
         return outcome.view;
       }, true);

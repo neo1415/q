@@ -69,6 +69,9 @@ import {
   createErrandStartAction,
   createPostgresErrandStore,
 } from "./composition/errands.js";
+import { loadAppEmailConfig } from "@capital-q/config/app-email";
+
+import { createPostgresStandingStore } from "./voice/standing.js";
 import {
   createRehearsalComposer,
   createRehearsalService,
@@ -343,6 +346,8 @@ import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeGoogleIntegrations,
   createPostgresCounterpartDirectory,
+  createBrevoApiEmailSender,
+  createSmtpAppEmailSender,
   unavailableAppEmailSender,
 } from "@capital-q/integrations";
 import {
@@ -2183,7 +2188,61 @@ logger.info(
   },
   "investor research composed",
 );
+// Q's standing with each person (founder direction 2026-09-30): the
+// personality they chose and Q's patience with small talk. A paused
+// account is told to Capital Q's operators, in the app and by email.
+const standingStore = createPostgresStandingStore(database.sql);
+const operatorEmailConfig = loadAppEmailConfig(process.env);
+const operatorEmail =
+  operatorEmailConfig.brevoApi !== undefined
+    ? createBrevoApiEmailSender(operatorEmailConfig.brevoApi)
+    : operatorEmailConfig.smtp === undefined
+      ? unavailableAppEmailSender
+      : createSmtpAppEmailSender(operatorEmailConfig.smtp);
+const reportPausedAccount = async (
+  actor: ActorContext,
+  strikes: number,
+): Promise<void> => {
+  const operators = await database.sql<
+    { user_id: string; tenant_id: string; email: string | null }[]
+  >`
+    select a.user_id, coalesce(
+             (select m.tenant_id from identity.organisation_memberships m
+               where m.user_id = a.user_id limit 1),
+             ${actor.tenantId}) as tenant_id,
+           u.email
+      from identity.platform_admins a
+      join identity.user_profiles p on p.id = a.user_id
+      left join auth.users u on u.id = p.auth_user_id`;
+  const who = await database.sql<{ display_name: string | null }[]>`
+    select display_name from identity.user_profiles where id = ${actor.userId}`;
+  const name = who[0]?.display_name ?? "A new member";
+  for (const operator of operators) {
+    await database.sql`
+      insert into communication.notifications
+        (tenant_id, user_id, kind, title, body, link_path, dedupe_key)
+      values
+        (${operator.tenant_id}, ${operator.user_id}, 'ACCOUNT_PAUSED',
+         ${`Q paused ${name}'s account`.slice(0, 200)},
+         ${`After ${strikes} warnings about steering onboarding to small talk. Review and reinstate from the admin console.`},
+         '/admin', ${`paused:${actor.userId}`})
+      on conflict do nothing`;
+    if (operator.email !== null && operatorEmail.available) {
+      await operatorEmail
+        .send({
+          to: operator.email,
+          subject: `Capital Q: Q paused ${name}'s account`,
+          text: `Q paused ${name}'s account after ${strikes} warnings about steering onboarding to small talk.\n\nReview it and reinstate it from the admin console: /admin\n\n-- Capital Q`,
+        })
+        .catch((error: unknown) => {
+          logger.warn({ err: error }, "operator email about a pause not sent");
+        });
+    }
+  }
+};
 const interviewAgent = createInterviewAgent({
+  standing: standingStore,
+  onPaused: reportPausedAccount,
   gateway: modelGateway,
   firewall,
   logger,
@@ -2309,6 +2368,7 @@ const { app, logger: appLogger } = createApp(
     meetingAssistant,
     errands,
     rehearsals,
+    standing: standingStore,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     continueApproved,

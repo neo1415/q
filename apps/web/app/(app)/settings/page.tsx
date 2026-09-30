@@ -12,6 +12,8 @@ import {
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { GmailConnection } from "@/features/integrations/gmail-connection";
 import { QMotionToggle } from "@/features/q-aperture";
+import { resolveQStanding } from "@/features/q/context";
+import { PersonalitySetting } from "@/features/settings/personality-setting";
 import { VoiceSetting } from "@/features/settings/voice-setting";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -31,6 +33,9 @@ export default async function SettingsPage({
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const google = (await searchParams)["google"];
+  // Who Q is with them is kept by Capital Q, so it follows them to every
+  // device (founder direction 2026-09-30).
+  const standing = await resolveQStanding();
   return (
     <PageContainer width="reading">
       <PageHeader title="Settings" />
@@ -50,6 +55,9 @@ export default async function SettingsPage({
           <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             <SettingRow term="Voice">
               <VoiceSetting />
+            </SettingRow>
+            <SettingRow term="Personality">
+              <PersonalitySetting initial={standing?.personality ?? "AUTO"} />
             </SettingRow>
           </dl>
         </PageSection>

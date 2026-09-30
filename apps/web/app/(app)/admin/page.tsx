@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import {
   getAdminAttribution,
   getAdminDisputes,
+  getAdminPaused,
   getAdminOverview,
 } from "@capital-q/api-client";
+import { PausedAccounts } from "@/features/admin/paused-accounts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 
@@ -53,11 +55,14 @@ export default async function AdminPage() {
   if (session === null) notFound();
   const overview = await getAdminOverview(session).catch(() => null);
   if (overview === null) notFound();
-  const [attribution, disputes] = await Promise.all([
+  const [attribution, disputes, paused] = await Promise.all([
     getAdminAttribution(session)
       .then((result) => result.rows)
       .catch(() => []),
     getAdminDisputes(session)
+      .then((result) => result.rows)
+      .catch(() => []),
+    getAdminPaused(session)
       .then((result) => result.rows)
       .catch(() => []),
   ]);
@@ -92,6 +97,10 @@ export default async function AdminPage() {
               </div>
             ))}
           </dl>
+        </PageSection>
+
+        <PageSection id="paused" title="Paused accounts">
+          <PausedAccounts rows={paused} />
         </PageSection>
 
         <PageSection id="attribution" title="Attribution">

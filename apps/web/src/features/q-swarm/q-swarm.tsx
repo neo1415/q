@@ -54,17 +54,21 @@ export function QSwarm({
     canvas.height = Math.round(pixels * dpr);
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     const engine = createSwarmEngine(context, pixels);
+    // Q's own colour: the accent, unless Q's patience is running out
+    // (founder direction 2026-09-30): orange when impatient, red when
+    // stern, set on the document as data-q-mood.
     const readColour = () => {
-      const value = getComputedStyle(canvas)
-        .getPropertyValue("--cq-accent")
-        .trim();
+      const style = getComputedStyle(canvas);
+      const mood = style.getPropertyValue("--cq-q-colour").trim();
+      const value =
+        mood.length > 0 ? mood : style.getPropertyValue("--cq-accent").trim();
       engine.setColour(value.length > 0 ? value : "#6aa8ff");
     };
     readColour();
     const themeWatch = new MutationObserver(readColour);
     themeWatch.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-theme"],
+      attributeFilter: ["data-theme", "data-q-mood"],
     });
 
     // What Q is saying, as it says it: a cue for the moment.

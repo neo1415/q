@@ -461,6 +461,7 @@ export function registerOnboardingRoutes(
         degraded: turn.degraded,
         askingAbout: turn.askingAbout,
         pending: turn.pending,
+        ...(turn.conduct === undefined ? {} : { conduct: turn.conduct }),
       });
     },
   );

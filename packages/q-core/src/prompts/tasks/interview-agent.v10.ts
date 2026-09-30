@@ -41,7 +41,7 @@ export const INTERVIEW_AGENT_V10: PromptDefinition<
     untrusted: [...INTERVIEW_AGENT_V5_UNTRUSTED],
   },
   version: 10,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "BIZ-009 / R13: research-first onboarding — public-source recommendations said together as one short 'here's what I found, is this right?' with the source named and details on request; a finding that differs from what the person said is put to them and both stand until they decide; their own links go to research_public_links; the research notice is said once.",
   effectiveFrom: "2026-09-27",

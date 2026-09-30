@@ -42,6 +42,10 @@ import {
   type ErrandRoutesDependencies,
 } from "./http/errands.js";
 import {
+  registerStandingRoutes,
+  type StandingRoutesDependencies,
+} from "./http/standing.js";
+import {
   registerRehearsalRoutes,
   type RehearsalRoutesDependencies,
 } from "./http/rehearsals.js";
@@ -106,6 +110,8 @@ export type QApiModules = {
   /** Errands: the person's own, read and stopped. */
   readonly errands?: ErrandRoutesDependencies["errands"] | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
+  /** Q's standing with each person: personality and patience. */
+  readonly standing?: StandingRoutesDependencies["standing"] | undefined;
   /** Q in a meeting: bring it to a call, read its notes. */
   readonly meetingAssistant?:
     MeetingAssistantRoutesDependencies["assistant"] | undefined;
@@ -448,6 +454,14 @@ export function createApp(
         agent: interviewAgent,
         apiBaseUrl: interviewApiBaseUrl,
         correlation: () => randomUUID(),
+      });
+    }
+    if (modules.standing !== undefined) {
+      registerStandingRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        standing: modules.standing,
       });
     }
     if (

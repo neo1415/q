@@ -141,3 +141,36 @@ export const InterviewAgentResultSchema = z
   })
   .strict();
 export type InterviewAgentResult = z.infer<typeof InterviewAgentResultSchema>;
+
+/**
+ * v11 variables (founder direction 2026-09-30): v9's, plus who Q is being
+ * (the personality the person chose, or Auto), what Capital Q decided
+ * about small talk this turn, and how Q's recent replies began, so no two
+ * sound alike. All TRUSTED: written by code, never the person's text.
+ */
+export const InterviewAgentV11VariablesSchema =
+  InterviewAgentV9VariablesSchema.extend({
+    personality: z.string().max(1_200).default(""),
+    conduct: z.string().max(600).default(""),
+    openings: z.string().max(600).default(""),
+  }).strict();
+export type InterviewAgentV11Variables = z.infer<
+  typeof InterviewAgentV11VariablesSchema
+>;
+
+/**
+ * v11 result: v10's, plus Q's reading of the turn for its patience and
+ * manners. `chatter`: PERSON when their turn was small talk rather than
+ * the setup, Q when Q's own reply opens a light moment, NONE otherwise.
+ * `hurt`: they seem put out by something Q said. Readings only: code
+ * decides what follows from them.
+ */
+export const InterviewAgentV11ResultSchema = InterviewAgentResultSchema.extend(
+  {
+    chatter: z.enum(["NONE", "PERSON", "Q"]).default("NONE"),
+    hurt: z.boolean().default(false),
+  },
+).strict();
+export type InterviewAgentV11Result = z.infer<
+  typeof InterviewAgentV11ResultSchema
+>;

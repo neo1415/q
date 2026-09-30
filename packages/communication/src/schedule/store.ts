@@ -89,7 +89,10 @@ export type NotificationKind =
   | "MEETING_PREP_READY"
   | "MEETING_NOTES_READY"
   | "Q_SCOUT"
-  | "Q_ERRAND";
+  | "Q_ERRAND"
+  | "MEETING_RECORDING_DECLINED"
+  | "COMMITMENT_DETECTED"
+  | "ACCOUNT_PAUSED";
 
 export type NewNotification = {
   readonly tenantId: string;

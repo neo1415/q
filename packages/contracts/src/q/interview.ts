@@ -5,6 +5,7 @@ import {
   OnboardingJourneyTypeSchema,
   OnboardingTurnPendingSchema,
 } from "../http/onboarding.js";
+import { QConductSchema } from "./conduct.js";
 
 /**
  * One turn of the Q interview, over HTTP (QX-004 core gate: one Q).
@@ -111,6 +112,12 @@ export const QInterviewTurnResponseSchema = z
     askingAbout: OnboardingAskingAboutSchema,
     /** What is waiting on the person's decision, as Q would say it. */
     pending: OnboardingTurnPendingSchema,
+    /**
+     * Q's patience after this turn (founder direction 2026-09-30): the
+     * screen sends them to look around (ROUTE_AWAY) or shows the account
+     * paused (SUSPEND); the mood colours Q. Absent from older servers.
+     */
+    conduct: QConductSchema.optional(),
   })
   .strict();
 export type QInterviewTurnResponse = z.infer<

@@ -131,7 +131,10 @@ import {
   TaxonomyVocabularyNotFoundError,
 } from "@capital-q/taxonomy";
 
-import { QInterviewUnavailableError } from "../q/interview-client.js";
+import {
+  QAccountPausedError,
+  QInterviewUnavailableError,
+} from "../q/interview-client.js";
 
 /**
  * Fastify wiring for the Capital Q problem contract.
@@ -539,6 +542,15 @@ function toProblem(
   // step. No provider, host or status detail is echoed.
   if (error instanceof QInterviewUnavailableError) {
     return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
+  }
+
+  // Founder direction 2026-09-30: a paused account is told so plainly.
+  if (error instanceof QAccountPausedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
   }
 
   if (error instanceof EvidenceRuleError) {

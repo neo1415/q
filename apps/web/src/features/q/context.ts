@@ -7,9 +7,11 @@ import {
   getCompany,
   getCurrentInvestorOrganisation,
   getCurrentOnboardingSession,
+  getQStanding,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
+import type { QStandingDto } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
 
@@ -59,6 +61,29 @@ export async function apiSession(): Promise<ApiSession | null> {
   const accessToken = await getSessionAccessToken();
   return accessToken === null ? null : { baseUrl: apiBaseUrl, accessToken };
 }
+
+/** The same person's session against the Q API. */
+export async function qApiSession(): Promise<ApiSession | null> {
+  const { qApiBaseUrl } = loadWebServerConfig();
+  if (qApiBaseUrl === undefined) {
+    return null;
+  }
+  const accessToken = await getSessionAccessToken();
+  return accessToken === null ? null : { baseUrl: qApiBaseUrl, accessToken };
+}
+
+/**
+ * Q's standing with this person (founder direction 2026-09-30): their
+ * chosen personality and whether Q paused the account. Null when the Q API
+ * could not be asked; a pause is then enforced by Q itself, never guessed.
+ */
+export const resolveQStanding = cache(
+  async (): Promise<QStandingDto | null> => {
+    const session = await qApiSession();
+    if (session === null) return null;
+    return getQStanding(session).catch(() => null);
+  },
+);
 
 /**
  * One lookup's outcome. ABSENT is the API's statement that this person has

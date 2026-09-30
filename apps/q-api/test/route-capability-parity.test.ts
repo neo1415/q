@@ -212,6 +212,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/admin.ts GET ADMIN_DISPUTES_PATH": exempt(
     "disputed commitments for Capital Q's operators: platform operators only",
   ),
+  "api/http/admin.ts GET ADMIN_PAUSED_PATH": exempt(
+    "accounts Q paused, for Capital Q's operators: platform operators only",
+  ),
+  "api/http/admin.ts POST ADMIN_REINSTATE_PATH": exempt(
+    "an operator lifting a pause Q put on an account: a person's decision, never Q's",
+  ),
 
   // Spec 6.6.14: money is stated and confirmed by a person on each side;
   // Q never states, confirms or withdraws a commitment on anyone's behalf.
@@ -469,6 +475,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/errands.ts DELETE Q_ERRAND_PATH": exempt(
     "the person's own click stopping an errand they approved; stopping never needs Q",
   ),
+  "q-api/http/standing.ts GET Q_STANDING_PATH": exempt(
+    "the person reading their own Q personality and whether their account is paused; shown in Settings and on arrival",
+  ),
+  "q-api/http/standing.ts PUT Q_STANDING_PERSONALITY_PATH": exempt(
+    "the Settings choice of who Q is; a stated preference about how Q talks is already kept by Q itself",
+  ),
   "q-api/http/rehearsals.ts POST Q_REHEARSALS_PATH": exempt(
     "the rehearsal screen's own start; Q takes them there with open_page INVESTOR_REHEARSAL, and the rehearsal itself is Q playing the investor",
   ),
@@ -584,6 +596,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "the investor interview: Q's own onboarding loop (voice INTERVIEW_INVESTOR)",
   ),
   "/welcome": exempt("the first-run welcome shown once after sign-up"),
+  "/paused": exempt(
+    "what an account Q paused sees until an operator reinstates it; nothing to do there",
+  ),
   "/home": cap("navigate.HOME"),
   "/profile": cap("navigate.PROFILE"),
   "/capital": cap("navigate.CAPITAL"),

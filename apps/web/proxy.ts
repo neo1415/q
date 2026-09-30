@@ -29,6 +29,7 @@ export const config = {
     "/settings/:path*",
     "/gateway/:path*",
     "/admin/:path*",
+    "/paused/:path*",
     "/auth/:path*",
   ],
 };

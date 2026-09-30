@@ -25,14 +25,14 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  type InterviewAgentV9Variables,
+  type InterviewAgentV11Variables,
   INITIAL_CONVERSATION_STATE,
   isExhausted,
   reduceConversation,
   type ConversationState,
-  InterviewAgentResultSchema,
+  InterviewAgentV11ResultSchema,
   renderPrompt,
-  type InterviewAgentResult,
+  type InterviewAgentV11Result,
   type InterviewAgentVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -60,6 +60,13 @@ import {
   type InterviewTurnInput,
   type InterviewTurnOutcome,
 } from "./interview-steps.js";
+import { conductNote, decideConduct, INITIAL_CONDUCT } from "./conduct.js";
+import {
+  AccountPausedError,
+  openingsOf,
+  PERSONALITY_NOTES,
+  type StandingStore,
+} from "./standing.js";
 import {
   createOnboardingPort,
   type RecommendationStore,
@@ -227,6 +234,15 @@ export type InterviewAgentDependencies = {
    * with their source. Absent: an investor is simply asked.
    */
   readonly investorResearch?: InvestorResearch | undefined;
+  /**
+   * Q's standing with the person across visits (founder direction
+   * 2026-09-30): their chosen personality and Q's patience with small
+   * talk. Absent: Auto, and small talk is never counted.
+   */
+  readonly standing?: StandingStore | undefined;
+  /** Told when Q pauses an account, to let Capital Q's operators know. */
+  readonly onPaused?:
+    ((actor: ActorContext, strikes: number) => Promise<void>) | undefined;
   /** Milliseconds now; injectable so a test can run out the clock. */
   readonly now?: (() => number) | undefined;
   /** The whole turn's deadline; tests shorten it. */
@@ -437,6 +453,34 @@ export function createInterviewAgent(
             text: t.text.slice(0, 2_000),
           }));
     const lastQTurn = thread.findLast((t) => t.role === "Q")?.text;
+    const standing =
+      dependencies.standing === undefined
+        ? null
+        : await dependencies.standing
+            .read(actor.userId, actor.tenantId, new Date(now()))
+            .catch((error: unknown) => {
+              logger.warn({ err: error }, "Q's standing was not read");
+              return null;
+            });
+    const personality = standing?.personality ?? "AUTO";
+    const conductBefore = standing?.conduct ?? INITIAL_CONDUCT;
+    // A paused account talks to nobody until a person at Capital Q has
+    // looked at it: refused here, before any model is called.
+    if (conductBefore.suspended) throw new AccountPausedError();
+    // What Q is told before it reads the turn: what to do if this turn is
+    // small talk. Code decides again from Q's reading afterwards.
+    const ifChatter = decideConduct(conductBefore, "PERSON");
+    const conductText =
+      standing === null || opening
+        ? ""
+        : `If their latest words are small talk rather than the setup: ${
+            conductNote(ifChatter) ||
+            "that is fine; enjoy it briefly and warmly."
+          } If they are not, carry on with the setup.${
+            conductBefore.strikes >= 3
+              ? " You are short on patience with this person today."
+              : ""
+          }`;
     const journeySteps = definitionFor(input.journeyType).steps;
     // Read once the plan authorises the run; nothing handed over until then.
     let delegationRead: Promise<QTurnAuthority | null> =
@@ -668,7 +712,7 @@ export function createInterviewAgent(
     // turn must survive its first model failing half way.
     const actions: { tool: string; input: unknown; result: unknown }[] = [];
     const render = () =>
-      renderPrompt<InterviewAgentV9Variables>(registry, {
+      renderPrompt<InterviewAgentV11Variables>(registry, {
         task: "INTERVIEW_AGENT",
         charter: input.channel === "voice" ? "Q_SYSTEM_VOICE" : "Q_SYSTEM",
         operatingMode: "ASSESSMENT",
@@ -693,6 +737,9 @@ export function createInterviewAgent(
           approved,
           declined,
           turnNotes,
+          personality: PERSONALITY_NOTES[personality],
+          conduct: conductText.slice(0, 600),
+          openings: openingsOf(thread).slice(0, 600),
         },
       });
 
@@ -732,7 +779,7 @@ export function createInterviewAgent(
       input.onSentence === undefined
         ? undefined
         : createReplySentenceStream(input.onSentence);
-    let result: InterviewAgentResult | undefined;
+    let result: InterviewAgentV11Result | undefined;
     let rounds = 0;
     let calls = 0;
     let timedOut = false;
@@ -760,7 +807,7 @@ export function createInterviewAgent(
         if (response.output.kind === "TEXT") {
           const accepted = acceptStructuredOutput(
             response.output.text,
-            InterviewAgentResultSchema,
+            InterviewAgentV11ResultSchema,
           );
           if (accepted.ok) result = accepted.value;
           break;
@@ -784,21 +831,22 @@ export function createInterviewAgent(
       if (result === undefined && remaining() > MIN_REPLY_MS) {
         // The reply, written after every result so far, with no tools left.
         const rendered = render();
-        const response = await gateway.execute<InterviewAgentResult>(
+        const response = await gateway.execute<InterviewAgentV11Result>(
           {
             ...base,
             messages: [...rendered.messages],
             output: rendered.output,
           },
           {
-            schema: InterviewAgentResultSchema,
+            schema: InterviewAgentV11ResultSchema,
             firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
             signal,
           },
         );
         if (response.output.kind === "STRUCTURED") {
-          result = (response.output as { readonly value: InterviewAgentResult })
-            .value;
+          result = (
+            response.output as { readonly value: InterviewAgentV11Result }
+          ).value;
         }
       }
     } catch (error: unknown) {
@@ -838,6 +886,35 @@ export function createInterviewAgent(
       (recorded.length > 0
         ? "That's on your record. I lost my train of thought for a second — say that last part again?"
         : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
+
+    // Q's patience, decided by code from Q's reading of the turn.
+    const conduct =
+      standing === null || result === undefined || opening
+        ? decideConduct(conductBefore, "NONE")
+        : decideConduct(conductBefore, result.chatter);
+    if (standing !== null && dependencies.standing !== undefined) {
+      await dependencies.standing
+        .saveConduct(actor.userId, actor.tenantId, conduct.state)
+        .catch((error: unknown) => {
+          logger.warn({ err: error }, "Q's standing was not kept");
+        });
+      if (conduct.action === "SUSPEND" && !conductBefore.suspended) {
+        const paused = await dependencies.standing
+          .suspend(
+            actor.userId,
+            actor.tenantId,
+            "Kept steering the onboarding interview to small talk after five warnings.",
+          )
+          .catch(() => false);
+        if (paused) {
+          await dependencies
+            .onPaused?.(actor, conduct.state.strikes)
+            .catch((error: unknown) => {
+              logger.warn({ err: error }, "the pause was not reported");
+            });
+        }
+      }
+    }
 
     // Code checks the step the model says it asked is one still open.
     const steps = new Map(
@@ -982,11 +1059,14 @@ export function createInterviewAgent(
         view.session.status === "COMPLETED"
           ? input.journeyType === "investor"
             ? "DISCOVER"
-            : "HOME"
-          : null,
+            : "PROFILE"
+          : conduct.action === "ROUTE_AWAY"
+            ? "DISCOVER"
+            : null,
       handoff: null,
       pronounce,
-      warnings: 0,
+      warnings: conduct.state.strikes,
+      conduct: { action: conduct.action, mood: conduct.mood },
       view,
       degraded: result === undefined,
       reading: null,

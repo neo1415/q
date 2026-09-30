@@ -71,3 +71,31 @@ export type DisputeRowDto = z.infer<typeof DisputeRowDtoSchema>;
 export const DisputeListDtoSchema = z
   .object({ rows: z.array(DisputeRowDtoSchema).max(100) })
   .strict();
+
+/** Accounts Q paused (founder direction 2026-09-30), for an operator. */
+export const ADMIN_PAUSED_PATH = "/v1/admin/paused" as const;
+/** An operator reinstates one paused account. */
+export const ADMIN_REINSTATE_PATH =
+  "/v1/admin/paused/:userId/reinstate" as const;
+export const adminReinstatePath = (userId: string) =>
+  ADMIN_REINSTATE_PATH.replace(":userId", encodeURIComponent(userId));
+
+export const PausedRowDtoSchema = z
+  .object({
+    userId: UuidSchema,
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+    strikes: z.number().int().min(0),
+    pausedAt: z.string(),
+    reason: z.string().nullable(),
+  })
+  .strict();
+export type PausedRowDto = z.infer<typeof PausedRowDtoSchema>;
+
+export const PausedListDtoSchema = z
+  .object({ rows: z.array(PausedRowDtoSchema).max(100) })
+  .strict();
+
+export const ReinstatedDtoSchema = z
+  .object({ reinstated: z.literal(true) })
+  .strict();

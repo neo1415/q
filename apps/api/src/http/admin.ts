@@ -4,6 +4,11 @@ import {
   ADMIN_ATTRIBUTION_PATH,
   ADMIN_DISPUTES_PATH,
   ADMIN_OVERVIEW_PATH,
+  ADMIN_PAUSED_PATH,
+  ADMIN_REINSTATE_PATH,
+  PausedListDtoSchema,
+  ReinstatedDtoSchema,
+  UuidSchema,
   AdminOverviewDtoSchema,
   AttributionListDtoSchema,
   createProblemDetails,
@@ -78,6 +83,36 @@ export function registerAdminRoutes(
       if (rows === null) return notFound(request, reply);
       void reply.header("Cache-Control", "no-store");
       return DisputeListDtoSchema.parse({ rows });
+    },
+  );
+
+  app.get(
+    ADMIN_PAUSED_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const rows = await admin.paused(getActorContext(request).userId);
+      if (rows === null) return notFound(request, reply);
+      void reply.header("Cache-Control", "no-store");
+      return PausedListDtoSchema.parse({ rows });
+    },
+  );
+
+  // An operator lifts a pause Q put on an account (founder direction
+  // 2026-09-30). Anyone else gets the same 404 as for the whole console.
+  app.post(
+    ADMIN_REINSTATE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const params = request.params as { readonly userId?: unknown };
+      const paused = UuidSchema.safeParse(params.userId);
+      if (!paused.success) return notFound(request, reply);
+      const done = await admin.reinstate(
+        getActorContext(request).userId,
+        paused.data,
+      );
+      if (done !== true) return notFound(request, reply);
+      void reply.header("Cache-Control", "no-store");
+      return ReinstatedDtoSchema.parse({ reinstated: true });
     },
   );
 }

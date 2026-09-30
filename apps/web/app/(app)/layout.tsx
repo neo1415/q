@@ -4,10 +4,13 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { requireSessionUser } from "@/auth/session";
 import { AppShell, type ShellContext } from "@/components/app-shell/app-shell";
+import { redirect } from "next/navigation";
+
 import {
   onboardingPath,
   resolveOnboardingState,
   resolveOwnContext,
+  resolveQStanding,
 } from "@/features/q/context";
 import type { QSubject } from "@/features/q/q-subject";
 import { QSwarmPointer } from "@/features/q-swarm/q-swarm-pointer";
@@ -61,6 +64,11 @@ export default async function ApplicationLayout({
   // Founder direction 2026-09-30: nobody uses Capital Q before Q has onboarded
   // them. Until then the navigation is one way back to Q; a page Q sent them
   // to while they are not ready stays readable, nothing else is offered.
+  // An account Q paused sees nothing but that it is paused, until a person
+  // at Capital Q reinstates it.
+  if (qConnected && (await resolveQStanding())?.paused === true) {
+    redirect("/paused");
+  }
   const unfinished = qConnected
     ? onboardingPath(await resolveOnboardingState())
     : null;

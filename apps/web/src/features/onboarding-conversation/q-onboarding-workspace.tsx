@@ -788,6 +788,29 @@ export function QOnboardingWorkspace({
         );
         handleUnderstanding(turn.understood);
       }
+      // Q's patience (founder direction 2026-09-30): Q alone turns orange,
+      // then red; being sent away, or paused, happens once Q's words have
+      // been read.
+      const conduct = turn.conduct;
+      if (conduct !== undefined) {
+        if (conduct.mood === "CALM") {
+          delete document.documentElement.dataset["qMood"];
+        } else {
+          document.documentElement.dataset["qMood"] = conduct.mood;
+        }
+        if (conduct.action === "SUSPEND") {
+          window.setTimeout(() => {
+            router.push("/paused");
+          }, 6_000);
+          return;
+        }
+        if (conduct.action === "ROUTE_AWAY") {
+          window.setTimeout(() => {
+            router.push("/discover");
+          }, 6_000);
+          return;
+        }
+      }
       // Q may take the person somewhere from a typed turn exactly as it
       // does from a spoken one (QX-004 D): the same destination map, the
       // same hand-over to the form. Before this a typed "open Discover"

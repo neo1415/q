@@ -232,8 +232,72 @@ export function createPlatformAdmin(options: {
         disputedAt: iso(row.disputed_at),
       }));
     },
+
+    /**
+     * Accounts Q paused (founder direction 2026-09-30), newest first, for
+     * an operator to look at and reinstate.
+     */
+    paused: async (userId: string): Promise<readonly PausedRow[] | null> => {
+      if (!(await isAdmin(userId))) return null;
+      const rows = await sql<
+        {
+          user_id: string;
+          display_name: string | null;
+          email: string | null;
+          strikes: number;
+          suspended_at: Date;
+          suspended_reason: string | null;
+        }[]
+      >`
+        select s.user_id, p.display_name, u.email::text as email, s.strikes,
+               s.suspended_at, s.suspended_reason
+          from q_runtime.person_standing s
+          join identity.user_profiles p on p.id = s.user_id
+          left join auth.users u on u.id = p.auth_user_id
+         where s.suspended_at is not null
+         order by s.suspended_at desc
+         limit 100`;
+      return rows.map((row) => ({
+        userId: row.user_id,
+        name: row.display_name,
+        email: row.email,
+        strikes: row.strikes,
+        pausedAt: iso(row.suspended_at),
+        reason: row.suspended_reason,
+      }));
+    },
+
+    /**
+     * An operator reinstates a paused account: the pause is lifted, the
+     * strikes start again from zero, and who reinstated it is kept.
+     * Null when the caller is not an operator; false when not paused.
+     */
+    reinstate: async (
+      userId: string,
+      pausedUserId: string,
+    ): Promise<boolean | null> => {
+      if (!(await isAdmin(userId))) return null;
+      const rows = await sql<{ user_id: string }[]>`
+        update q_runtime.person_standing
+           set suspended_at = null, suspended_reason = null, strikes = 0,
+               rounds = 0, streak = 0, q_started = false,
+               reinstated_at = clock_timestamp(), reinstated_by = ${userId},
+               updated_at = clock_timestamp()
+         where user_id = ${pausedUserId} and suspended_at is not null
+        returning user_id`;
+      return rows.length > 0;
+    },
   };
 }
+
+export type PausedRow = {
+  readonly userId: string;
+  readonly name: string | null;
+  readonly email: string | null;
+  readonly strikes: number;
+  readonly pausedAt: string;
+  readonly reason: string | null;
+};
 
 export type PlatformAdmin = ReturnType<typeof createPlatformAdmin>;
 

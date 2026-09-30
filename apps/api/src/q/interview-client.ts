@@ -40,6 +40,20 @@ export class QInterviewUnavailableError extends Error {
   }
 }
 
+/**
+ * Q refused the turn because the account is paused (founder direction
+ * 2026-09-30). Passed on as itself so the screen can say so, never as
+ * "Q is unavailable".
+ */
+export class QAccountPausedError extends Error {
+  constructor() {
+    super(
+      "Your account is paused. Someone from the Capital Q team will be in touch.",
+    );
+    this.name = "QAccountPausedError";
+  }
+}
+
 export function createQInterviewClient(options: {
   readonly baseUrl: string;
   /** A slow model must not hold an HTTP worker open indefinitely. */
@@ -83,6 +97,17 @@ export function createQInterviewClient(options: {
         clearTimeout(timer);
       }
 
+      if (response.status === 403) {
+        const refusal: unknown = await response.json().catch(() => null);
+        if (
+          typeof refusal === "object" &&
+          refusal !== null &&
+          "paused" in refusal &&
+          refusal.paused === true
+        ) {
+          throw new QAccountPausedError();
+        }
+      }
       if (!response.ok) {
         throw new QInterviewUnavailableError(
           `the interviewer answered ${String(response.status)}`,

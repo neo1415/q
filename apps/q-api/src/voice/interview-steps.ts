@@ -156,6 +156,22 @@ export type InterviewTurnOutcome = {
   readonly pronounce: { readonly term: string; readonly sayAs: string } | null;
   /** Warnings issued so far in this session about derailing the interview. */
   readonly warnings: number;
+  /**
+   * Q's patience after this turn (founder direction 2026-09-30): what the
+   * screen does (send them to look around, or show the account paused)
+   * and how Q looks and sounds. Absent from paths that do not count.
+   */
+  readonly conduct?:
+    | {
+        readonly action:
+          | "NONE"
+          | "STEER_BACK"
+          | "STEER_BACK_FIRMLY"
+          | "ROUTE_AWAY"
+          | "SUSPEND";
+        readonly mood: "CALM" | "IMPATIENT" | "STERN";
+      }
+    | undefined;
   /** The session after this turn. */
   readonly view: OnboardingSessionView;
   /** True when the model could not be reached and Q spoke a fallback line. */
