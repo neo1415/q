@@ -444,7 +444,7 @@ export function turnNotesFor(input: {
     }
   }
   notes.push(
-    'An optional question they have not answered after you asked it twice is passed over: move on, never press it. Record a number as the number they said, in any words; never ask them to say it another way. When their answer fits none of a step\'s choices (a country not listed, "Founder" for a role), record their own words for it with ownWords true; they are kept, never forced into a near choice. Ask only when their words are unclear.',
+    'An optional question they have not answered after you asked it twice is passed over: move on, never press it. Record a number as the number they said, in any words; never ask them to repeat anything in particular words or another form. When their answer fits none of a step\'s choices (a country not listed, "Founder" for a role), record their own words for it with ownWords true; they are kept, never forced into a near choice. Ask only when their words are unclear.',
   );
   if (open?.passedOver !== undefined && open.passedOver.length > 0) {
     notes.push(
@@ -804,7 +804,11 @@ export function createInterviewAgent(
     // the record at once, so nothing that depends on it waits, and Q says
     // it back for them to correct rather than asking it.
     const signupOrganisation = input.signup?.organisationName?.trim() ?? "";
-    if (signupOrganisation.length > 0) {
+    // Again after each tool round: an investor's firm can be recorded only
+    // once their investor type is (bench 2026-09-30: Q asked a partner for
+    // the firm they had typed at sign-up).
+    const prefillFromSignup = async (): Promise<void> => {
+      if (signupOrganisation.length === 0) return;
       await port
         .recordFromSignup(
           input.journeyType === "investor"
@@ -813,7 +817,8 @@ export function createInterviewAgent(
           signupOrganisation.slice(0, 160),
         )
         .catch(() => false);
-    }
+    };
+    await prefillFromSignup();
     let state = await port.state();
     if (research !== undefined) {
       considerResearch(port.view());
@@ -1171,6 +1176,7 @@ export function createInterviewAgent(
             result: resultOf(toolResultMessage(call, outcome)),
           });
         }
+        await prefillFromSignup();
         state = await port.state();
       }
       if (result === undefined && remaining() > MIN_REPLY_MS) {

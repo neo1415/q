@@ -47,5 +47,21 @@
     "I11.additional_context": "no, that's everything",
     "I0.business_title": "Angel investor and co-founder"
   },
-  "fallback": "no preference, move on"
+  "fallback": "no preference, move on",
+  "answers": [
+    [
+      "main (investment )?strategy|different mandate|mandate",
+      "my personal angel investing"
+    ],
+    ["currency", "US dollars"],
+    ["minimum", "twenty five thousand"],
+    ["typical", "fifty thousand"],
+    ["maximum", "one hundred thousand"],
+    ["stage", "pre-seed"],
+    ["discovery|strict|exploratory", "balanced"],
+    ["reach you|inbound|closed, qualified, or open", "open"],
+    ["deploy|actively", "actively investing"],
+    ["firm", "Voltron Capital"],
+    ["review|right\\?|correct|look right|summary|finish", "yes"]
+  ]
 }

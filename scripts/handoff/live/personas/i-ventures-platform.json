@@ -47,5 +47,20 @@
     "I8.portfolio": "Paystack, PiggyVest, Thepeer",
     "I11.additional_context": "no, that's everything"
   },
-  "fallback": "no preference, move on"
+  "fallback": "no preference, move on",
+  "answers": [
+    [
+      "main (investment )?strategy|different mandate|mandate",
+      "our main strategy"
+    ],
+    ["currency", "US dollars"],
+    ["minimum", "two hundred and fifty thousand"],
+    ["typical", "five hundred thousand"],
+    ["maximum", "one million"],
+    ["stage", "pre-seed and seed"],
+    ["discovery|strict|exploratory", "balanced"],
+    ["reach you|inbound|closed, qualified, or open", "qualified"],
+    ["deploy|actively", "actively investing"],
+    ["review|right\\?|correct|look right|summary|finish", "yes, that's right"]
+  ]
 }

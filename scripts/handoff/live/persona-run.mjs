@@ -14,14 +14,26 @@ import { readFileSync } from "node:fs";
 
 const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE ??
-    new URL("../../../node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/index.mjs", import.meta.url).href,
+    new URL(
+      "../../../node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/index.mjs",
+      import.meta.url,
+    ).href
 );
 
 const WEB = process.env.WEB ?? "https://capital-qweb-production.up.railway.app";
 const persona = JSON.parse(readFileSync(process.env.PERSONA, "utf8"));
 const EMAIL = persona.email;
 
-const sql = async (query) => {
+const sql = async (query, tries = 3) => {
+  try {
+    return await sqlOnce(query);
+  } catch (error) {
+    if (tries <= 1) throw error;
+    await new Promise((r) => setTimeout(r, 2000));
+    return sql(query, tries - 1);
+  }
+};
+const sqlOnce = async (query) => {
   const r = await fetch(
     "https://api.supabase.com/v1/projects/vcohxiqsmnkzxnvawgri/database/query",
     {
@@ -38,7 +50,11 @@ const sql = async (query) => {
 };
 const WHO = `from onboarding.interview_turns t join onboarding.sessions s on s.id=t.session_id join identity.user_profiles p on p.id=s.user_id join auth.users u on u.id=p.auth_user_id where u.email='${EMAIL}'`;
 const lastQ = async () =>
-  (await sql(`select t.text, t.step_key ${WHO} and t.role='Q' order by t.created_at desc limit 1`))[0] ?? {
+  (
+    await sql(
+      `select t.text, t.step_key ${WHO} and t.role='Q' order by t.created_at desc limit 1`,
+    )
+  )[0] ?? {
     text: "",
     step_key: null,
   };
@@ -66,12 +82,18 @@ await ctx.addInitScript(() => {
   } catch {}
 });
 const page = await ctx.newPage();
-await page.goto(`${WEB}/auth/sign-in`, { waitUntil: "domcontentloaded", timeout: 60000 });
+await page.goto(`${WEB}/auth/sign-in`, {
+  waitUntil: "domcontentloaded",
+  timeout: 60000,
+});
 await page.waitForSelector("input[type=email]", { timeout: 60000 });
 await page.fill("input[type=email]", EMAIL);
 await page.fill("input[type=password]", process.env.CQ_SEED_ACCOUNT_PASSWORD);
 await Promise.all([
-  page.waitForURL((u) => !u.pathname.includes("sign-in"), { timeout: 30000, waitUntil: "commit" }),
+  page.waitForURL((u) => !u.pathname.includes("sign-in"), {
+    timeout: 30000,
+    waitUntil: "commit",
+  }),
   page.keyboard.press("Enter"),
 ]);
 await page.waitForTimeout(8000);
@@ -117,7 +139,9 @@ const say = async (text) => {
     if ((await turnCount()) >= before + 2) break;
   }
   const q = await lastQ();
-  console.log(`\n>> ${text}\n<< [${q.step_key ?? "-"}] (${((Date.now() - t0) / 1000).toFixed(1)}s) ${q.text}`);
+  console.log(
+    `\n>> ${text}\n<< [${q.step_key ?? "-"}] (${((Date.now() - t0) / 1000).toFixed(1)}s) ${q.text}`,
+  );
   return q;
 };
 
@@ -125,13 +149,18 @@ for (const line of persona.script ?? []) {
   if ((await status()) === "COMPLETED") break;
   await say(line);
 }
-const facts = (persona.answers ?? []).map(([re, text]) => [new RegExp(re, "i"), text]);
+const facts = (persona.answers ?? []).map(([re, text]) => [
+  new RegExp(re, "i"),
+  text,
+]);
 for (let i = 0; i < Number(process.env.TURNS ?? 30); i += 1) {
   if ((await status()) === "COMPLETED") break;
   const q = await lastQ();
   const byStep = persona.byStep?.[q.step_key ?? ""];
   const hit = facts.find(([re]) => re.test(q.text));
-  await say(byStep ?? (hit ? hit[1] : (persona.fallback ?? "Yes, that's right.")));
+  await say(
+    byStep ?? (hit ? hit[1] : (persona.fallback ?? "Yes, that's right.")),
+  );
 }
 console.log("\nSTATUS:", await status(), "URL:", page.url());
 await browser.close();
