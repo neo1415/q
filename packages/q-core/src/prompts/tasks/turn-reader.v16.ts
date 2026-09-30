@@ -13,7 +13,7 @@ import { TURN_READER_V15 } from "./turn-reader.v15.js";
  * itself; when a particular company, investor, person or chat is named, the
  * reader leaves it to the run, whose tools open that record.
  */
-export const TURN_READER_V16_RECORDS = `NAMED RECORDS: NAVIGATE is only for a whole screen asked for by itself ("take me to Discover", "open my relationships"). When the words name a particular company, investor, person, chat, call or document to open or look at ("open my chat with X", "show me X's page", "take me to the call with X"), do not return NAVIGATE: leave it to the answer, which opens that record.
+export const TURN_READER_V16_RECORDS = `NAMED RECORDS: NAVIGATE is only for a whole screen asked for by itself ("take me to Discover", "open my relationships"). When the words name a particular company, investor, person, chat, call or document to open or look at ("open my chat with X", "show me X's page", "take me to the call with X"), do not return NAVIGATE at all -- neither a screen nor an unknown screen, even when the name is unclear or misheard: leave it to the answer, which finds the record (by close name if need be) and opens it.
 `;
 
 const V15_TRANSCRIPT_ANCHOR = "TRANSCRIPT (modality {{modality}}):";
