@@ -95,21 +95,22 @@ const MAX_CALLS = 8;
 /**
  * A person is waiting (ACC 2026-09-25: one luna attempt ran 5.5 minutes
  * and the person got an HTTP 503). The whole turn ends by this deadline,
- * well inside the voice route's own 20 s (live 2026-09-30: at 25 s the
+ * inside the voice route's own 20 s (live 2026-09-30: at 25 s the
  * route cut Q off first, "that was taking too long", and the answer was
  * lost); every model call in it is cut off by it.
  */
-const TURN_DEADLINE_MS = 16_000;
+const TURN_DEADLINE_MS = 18_000;
 /** Tool rounds stop while this much is left, so the reply can be written. */
 const REPLY_RESERVE_MS = 7_000;
 /** Below this, no reply call is started; the turn degrades honestly. */
 const MIN_REPLY_MS = 2_000;
 /**
  * The first model's patience when another waits behind it. The loop's own
- * luna calls measured p95 5.1 s and never above 6.7 s locally; 8 s leaves
- * room above every call seen, and then the next model takes the round.
+ * luna calls measured p95 5.1 s; hosted rounds run about 2 s (2026-09-30),
+ * so 6 s leaves room above them and still leaves time for the next model
+ * to take the round inside the turn's deadline.
  */
-const FIRST_ATTEMPT_MS = 8_000;
+const FIRST_ATTEMPT_MS = 6_000;
 
 const BUDGET = {
   maxAttempts: 2,
@@ -426,7 +427,7 @@ export function turnNotesFor(input: {
   );
   if (open !== undefined && open.unasked.length > 0) {
     notes.push(
-      `Still unasked, ask before the final review, one at a time (a skip is fine): ${open.unasked.map((u) => u.stepKey).join(", ")}`,
+      `Still unasked, ask each once before the final review, one at a time; one they pass over is never asked again: ${open.unasked.map((u) => u.stepKey).join(", ")}`,
     );
   }
   // Every turn: the registry's view of what Q does beyond this loop.
@@ -485,6 +486,9 @@ export function createInterviewAgent(
   const deadlineMs = dependencies.turnDeadlineMs ?? TURN_DEADLINE_MS;
   const raisedChecks =
     dependencies.raisedChecks ?? createInMemoryRaisedChecks();
+  // Optional questions already put to each person: asked once, never
+  // pressed again (live 2026-09-30: the website was asked every turn).
+  const askedOptional = createInMemoryRaisedChecks();
   const researchAvailable = dependencies.researchAvailable ?? true;
   /** The conversation core's state per session: the research ledger. */
   const conversations = new Map<string, ConversationState>();
@@ -750,6 +754,7 @@ export function createInterviewAgent(
       research?.unsaid(input.onboardingSessionId) ?? new Set<string>();
     // What the journey still holds open, from the record: what sign-up
     // gave, findings not yet put to them, questions never asked.
+    const askedBefore = askedOptional.get(input.onboardingSessionId);
     const journeyOpenings = async (): Promise<JourneyOpenings> => {
       const view = port.view();
       const answered = new Set(view?.responses.map((r) => r.stepKey) ?? []);
@@ -807,6 +812,7 @@ export function createInterviewAgent(
               !answered.has(step.stepKey) &&
               !setAside.has(step.stepKey) &&
               !pendingSteps.has(step.stepKey) &&
+              !askedBefore.has(step.stepKey) &&
               (view?.progress.eligibleSteps.some(
                 (e) => e.stepKey === step.stepKey,
               ) ??
@@ -1105,6 +1111,9 @@ export function createInterviewAgent(
           "the streamed reply and the settled reply differ; the rest was not streamed",
         );
       }
+    }
+    if (result?.asking !== undefined && result.asking !== null) {
+      askedOptional.add(input.onboardingSessionId, [result.asking]);
     }
     if (result !== undefined && result.raised.length > 0) {
       const open = new Set(state.checks.map((check) => check.checkId));
