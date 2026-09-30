@@ -422,7 +422,7 @@ export function turnNotesFor(input: {
   if (open !== undefined) {
     if (open.signupName !== null) {
       notes.push(
-        `Their ${open.signupNameIs}, "${open.signupName.slice(0, 80)}", is on their record from sign-up (${open.signupStepKey}): say it back once in passing so they can correct it; never ask for it. If they correct it, record their correction.`,
+        `Their ${open.signupNameIs}, "${open.signupName.slice(0, 80)}", comes from their sign-up and goes on their record (${open.signupStepKey}) as soon as it can: say it back once in passing so they can correct it; never ask for it. If they correct it, record their correction.`,
       );
     }
     if (open.givenEarlier !== undefined && open.givenEarlier.length > 0) {

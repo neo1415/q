@@ -126,7 +126,7 @@ export function createInvestorResearchReader(dependencies: {
             correlationId: request.correlationId,
           },
         },
-        { schema: InvestorResearchReaderResultSchema },
+        { schema: LENIENT_INVESTOR_READING },
       );
       return result.output.kind === "STRUCTURED" ? result.output.value : null;
     } catch (error: unknown) {
@@ -337,22 +337,35 @@ export function founderResearchReadFrom(
  * description and country with it). Only a field's own value is ever
  * dropped to null; nothing is repaired or rewritten.
  */
-const LENIENT_FOUNDER_READING = z.preprocess((raw) => {
-  const checked = FounderResearchReaderResultSchema.safeParse(raw);
-  if (checked.success || typeof raw !== "object" || raw === null) return raw;
-  const kept: Record<string, unknown> = { ...(raw as Record<string, unknown>) };
-  for (const issue of checked.error.issues) {
-    const field = issue.path[0];
-    if (
-      typeof field === "string" &&
-      field !== "wrongSubject" &&
-      field in kept
-    ) {
-      kept[field] = null;
+function lenientReading<T extends z.ZodType>(schema: T) {
+  return z.preprocess((raw) => {
+    const checked = schema.safeParse(raw);
+    if (checked.success || typeof raw !== "object" || raw === null) return raw;
+    const kept: Record<string, unknown> = {
+      ...(raw as Record<string, unknown>),
+    };
+    for (const issue of checked.error.issues) {
+      const field = issue.path[0];
+      if (
+        typeof field === "string" &&
+        field !== "wrongSubject" &&
+        field in kept
+      ) {
+        kept[field] = null;
+      }
     }
-  }
-  return kept;
-}, FounderResearchReaderResultSchema);
+    return kept;
+  }, schema);
+}
+
+const LENIENT_FOUNDER_READING = lenientReading(
+  FounderResearchReaderResultSchema,
+);
+// The same for investors (bench 2026-09-30: too many geographies refused
+// Ventures Platform's whole reading, and Q "found nothing useful").
+const LENIENT_INVESTOR_READING = lenientReading(
+  InvestorResearchReaderResultSchema,
+);
 
 /** The founder reader model, then code's checks: findings or nothing. */
 export function createFounderResearchReader(dependencies: {
