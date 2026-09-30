@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { qArtifactExportFormats } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -44,8 +44,60 @@ export const EDIT_WITH_Q_PROMPT =
   "Edit this document with me — what would you change first?";
 export const RETRY_PROMPT = "Try preparing that document again.";
 
+/**
+ * A card that arrived while its document was still being prepared asks
+ * where it is until it has settled (founder live 2026-09-30: a new
+ * document needed a refresh to appear). Bounded: every few seconds, for a
+ * few minutes at most.
+ */
+const PREPARING_CHECK_MS = 4_000;
+const PREPARING_CHECKS_MAX = 60;
+
+function useSettledStatus(
+  artifactId: string,
+  initial: ArtifactReference["status"],
+): ArtifactReference["status"] {
+  // What the checks learned, for the status the card was given; a new
+  // status from the answer replaces it.
+  const [settled, setSettled] = useState<{
+    readonly from: ArtifactReference["status"];
+    readonly status: ArtifactReference["status"];
+  }>({ from: initial, status: initial });
+  const status = settled.from === initial ? settled.status : initial;
+  useEffect(() => {
+    if (status !== "PREPARING") return;
+    let checks = 0;
+    let alive = true;
+    const timer = window.setInterval(() => {
+      checks += 1;
+      if (checks > PREPARING_CHECKS_MAX) {
+        window.clearInterval(timer);
+        return;
+      }
+      void fetch(`/api/q-artifact/${encodeURIComponent(artifactId)}/detail`)
+        .then(async (response) => {
+          if (!response.ok) return;
+          const body: unknown = await response.json();
+          const next: unknown = Reflect.get(Object(body), "status");
+          if (
+            alive &&
+            (next === "READY" || next === "FAILED" || next === "PREPARING")
+          ) {
+            setSettled({ from: initial, status: next });
+          }
+        })
+        .catch(() => undefined);
+    }, PREPARING_CHECK_MS);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [artifactId, status, initial]);
+  return status;
+}
+
 export function ArtifactCard({
-  block,
+  block: given,
   onOpen,
   onAsk,
   preview,
@@ -60,6 +112,8 @@ export function ArtifactCard({
   /** The Board draws its own frame around every object. */
   readonly framed?: boolean | undefined;
 }) {
+  const status = useSettledStatus(given.artifactId, given.status);
+  const block = status === given.status ? given : { ...given, status };
   const ready = block.status === "READY";
   const deck = block.type === "PITCH_DECK";
   const TypeIcon = deck ? Presentation : FileText;

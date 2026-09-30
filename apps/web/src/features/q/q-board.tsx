@@ -93,10 +93,20 @@ const LABELS: Readonly<Record<BoardObject["kind"], string>> = {
 };
 
 /** The first slide of a deck, drawn by the Q API, once per deck. */
+// Kept briefly: a deck Q revises is the same id with a new first slide,
+// and a cache kept forever showed the old one until a reload (founder live
+// 2026-09-30).
+const SLIDE_CACHE_MS = 20_000;
 const slideCache = new Map<string, Promise<string | null>>();
+const slideCachedAt = new Map<string, number>();
 function firstSlide(artifactId: string): Promise<string | null> {
+  const at = slideCachedAt.get(artifactId);
+  if (at !== undefined && Date.now() - at > SLIDE_CACHE_MS) {
+    slideCache.delete(artifactId);
+  }
   let pending = slideCache.get(artifactId);
   if (pending === undefined) {
+    slideCachedAt.set(artifactId, Date.now());
     pending = fetch(`/api/q-artifact/${encodeURIComponent(artifactId)}/slides`)
       .then(async (response) => {
         if (!response.ok) return null;

@@ -40,6 +40,9 @@ export const dynamic = "force-dynamic";
 
 /** What may be asked for, and what each one is once it comes back. */
 const FORMATS = {
+  // The document itself: a card still preparing asks until it is ready
+  // (founder live 2026-09-30: a new document needed a refresh to appear).
+  detail: { suffix: "", download: false },
   slides: { suffix: "/slides", download: false },
   pptx: { suffix: "/export/pptx", download: true },
   pdf: { suffix: "/export/pdf", download: true },
@@ -47,7 +50,12 @@ const FORMATS = {
 type Format = keyof typeof FORMATS;
 
 function isFormat(value: string): value is Format {
-  return value === "slides" || value === "pptx" || value === "pdf";
+  return (
+    value === "detail" ||
+    value === "slides" ||
+    value === "pptx" ||
+    value === "pdf"
+  );
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
