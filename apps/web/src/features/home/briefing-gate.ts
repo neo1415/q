@@ -62,8 +62,7 @@ export function decideBriefing(
 ): Briefing | null {
   // A briefing streamed from the server can arrive as undefined; that is
   // "no briefing", never an error that stops Q from talking.
-  if (briefing == null || !Array.isArray(briefing.items)) return null;
-  if (briefing.items.length === 0) return null;
+  if (briefing == null || briefing.items.length === 0) return null;
   const key = briefing.items.map((item) => item.id).join("|");
   const known = decided.get(key);
   if (known !== undefined) return known ? briefing : null;
