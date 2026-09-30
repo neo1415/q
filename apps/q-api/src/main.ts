@@ -1660,10 +1660,17 @@ const qIntelligence = composeQIntelligence({
         company: string | null;
         website_url: string | null;
         business_title: string | null;
+        no_deck: boolean | null;
       }[]
     >`
       select p.display_name, c.canonical_name as company, c.website_url,
-             m.business_title
+             m.business_title,
+             m.company_id is not null and not exists (
+               select 1 from artifacts.artifacts a
+                where a.tenant_id = ${tenantId}
+                  and a.created_by_user_id = p.id
+                  and a.type = 'PITCH_DECK'
+                  and a.archived_at is null) as no_deck
         from identity.user_profiles p
         left join core.company_members m
           on m.user_id = p.id and m.tenant_id = ${tenantId} and m.is_current
@@ -1683,6 +1690,11 @@ const qIntelligence = composeQIntelligence({
         ? ""
         : `, ${row.business_title === null ? "of" : `${row.business_title.slice(0, 60)} of`} their own company ${company}${row.website_url === null ? "" : ` (${row.website_url.slice(0, 200)})`}`,
       ".",
+      // A founder who has no deck yet (often one who put it off until
+      // setup was done): Q offers once to make it, never presses.
+      row.no_deck === true
+        ? " They have no pitch deck yet: when their question is answered, offer once, in one short sentence, to make one with them now."
+        : "",
     ].join("");
   },
   // The attestation is the claim about the data; where it holds, every
