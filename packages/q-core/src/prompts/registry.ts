@@ -40,6 +40,7 @@ import { TURN_READER_V12 } from "./tasks/turn-reader.v12.js";
 import { TURN_READER_V13 } from "./tasks/turn-reader.v13.js";
 import { TURN_READER_V14 } from "./tasks/turn-reader.v14.js";
 import { TURN_READER_V15 } from "./tasks/turn-reader.v15.js";
+import { TURN_READER_V16 } from "./tasks/turn-reader.v16.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
 import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
@@ -259,6 +260,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V13,
     TURN_READER_V14,
     TURN_READER_V15,
+    TURN_READER_V16,
     MEMORY_EXTRACTOR_V1,
     MEETING_NOTES_V1,
     MEETING_NOTES_V2,

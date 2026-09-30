@@ -33,7 +33,7 @@ export const TURN_READER_V15: PromptDefinition<
 > = {
   ...TURN_READER_V14,
   version: 15,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-09-29: addressedToQ says when spoken words were plainly for someone else (a call, a colleague, background), so Q stays silent instead of answering the room.",
   effectiveFrom: "2026-09-29",

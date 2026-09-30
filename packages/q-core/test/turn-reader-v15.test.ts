@@ -13,10 +13,11 @@ import {
  * rules stay; a reading without the field is answered as before.
  */
 describe("TURN_READER v15", () => {
-  it("is the active reader, v14 is deprecated, and nothing of v14 is lost", () => {
+  it("adds its line to v14 and loses nothing of it (v16 now leads)", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(15);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(16);
     expect(TURN_READER_V14.status).toBe("DEPRECATED");
+    expect(TURN_READER_V15.status).toBe("DEPRECATED");
     expect(TURN_READER_V15.template).toContain(
       "ADDRESSED: addressedToQ is false only",
     );
