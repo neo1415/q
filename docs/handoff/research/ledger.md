@@ -223,3 +223,12 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
   - 1443a7f7 documents appear/refresh without reload; 4fc3dc66 branded emails.
   - SPAM: sender is adetimilehin502@gmail.com via Brevo → founder must verify a domain they own in Brevo (SPF/DKIM/DMARC) and set SMTP_SENDER to "Capital Q <q@thatdomain>".
 - NEXT: personality in Home Q too; document look (page background/ink for all documents, slide background for decks) + revision v3; particles tied to speech (head turn, hands); deck creation in onboarding (brand colours/logo/fonts, multi-agent); then earlier list (C18 Q Daily, B-items).
+
+### 2026-09-30 evening — founder live test (Priya/Nixo) root causes, fixed (3ac18a12, 667aa144)
+- Number words rejected by the write check ("say 1") → spoken figures read in the validator (ADR 0011 §4).
+- Confirmations only via confirm_and_finish → a confirmation is recorded on the reading's agreement; once required answers are in, one yes finishes.
+- Company name typed at sign-up asked again; research findings (description, US) held PENDING and never said; website/description/sectors/deck never asked → code-composed turn notes (sign-up name, unsaid findings, unasked optional steps); research starts on the sign-up name and offers the company's own site.
+- "that was taking too long" → agent deadline 16 s inside the voice route's 20 s.
+- Latency (ai_ops.model_usage): reader 1.5-5 s serial before round 1 → now overlapped.
+- Home Q asked "is this the Nixo you mean" → askerOf (name + own company) in environment notes.
+- Open: role options lack "Founder" (definition change needs a new definition version); Home research EVIDENCE_SYNTHESIS INVALID_MODEL_OUTPUT x2 at 13:54.
