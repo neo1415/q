@@ -444,7 +444,7 @@ export function turnNotesFor(input: {
     }
   }
   notes.push(
-    'An optional question they have not answered after you asked it twice is passed over: move on, never press it. Record a number as the number they said, in any words; never ask them to repeat anything in particular words or another form. When their answer fits none of a step\'s choices (a country not listed, "Founder" for a role), record their own words for it with ownWords true; they are kept, never forced into a near choice. Ask only when their words are unclear.',
+    'An optional question they have not answered after you asked it twice is passed over: move on, never press it. Something you could not record is mentioned once, never again in later replies. Record a number as the number they said, in any words; never ask them to repeat anything in particular words or another form. When their answer fits none of a step\'s choices (a country not listed, "Founder" for a role), record their own words for it with ownWords true; they are kept, never forced into a near choice. Ask only when their words are unclear.',
   );
   if (open?.passedOver !== undefined && open.passedOver.length > 0) {
     notes.push(

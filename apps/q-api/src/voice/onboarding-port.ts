@@ -610,6 +610,35 @@ export function createOnboardingPort(input: {
         // Their words name no category: the categories Capital Q records
         // go back to the model, which reads which one means what they
         // said (ADR 0011). Nothing is recorded until it chooses one.
+        // A sibling of the same concept whose own options hold the words
+        // ("crypto tokens" → hard exclusions' "Speculative crypto"; bench
+        // 2026-09-30). The model's words against the journey's labels.
+        const families =
+          input.journeyType === "investor" ? INVESTOR_CONCEPT_FAMILIES : [];
+        const wordsOf = (text: string) =>
+          text
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .filter((w) => w.length >= 4);
+        const wanted = new Set(unmatched.flatMap(wordsOf));
+        const sibling = families
+          .filter((family) => family.stepKeys.includes(step.stepKey))
+          .flatMap((family) => family.stepKeys)
+          .filter((key) => key !== step.stepKey)
+          .flatMap((key) => {
+            const other = steps.get(key);
+            if (other === undefined) return [];
+            return optionsOf(other)
+              .filter((o) => wordsOf(o.label).some((w) => wanted.has(w)))
+              .map((o) => `${key} as "${o.label}"`);
+          })[0];
+        if (sibling !== undefined) {
+          return refuse({
+            stepKey: step.stepKey,
+            outcome: "UNMATCHED",
+            reason: `No category here holds that, but ${sibling} does: record it there instead.`,
+          });
+        }
         return refuse({
           stepKey: step.stepKey,
           outcome: "UNMATCHED",
