@@ -57,6 +57,8 @@ export const PROMPT_IDS = [
   "INVESTOR_TWIN_TURN",
   /** Founder direction 2026-09-30: Q coaches the founder after it. */
   "REHEARSAL_SCORE",
+  /** Founder direction 2026-09-30: a company's own pages, read during setup. */
+  "FOUNDER_RESEARCH_READER",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -84,6 +86,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INVESTOR_PERSONA: "investor-persona",
   INVESTOR_TWIN_TURN: "investor-twin-turn",
   REHEARSAL_SCORE: "rehearsal-score",
+  FOUNDER_RESEARCH_READER: "founder-research-reader",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

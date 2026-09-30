@@ -165,12 +165,10 @@ export type InterviewAgentV11Variables = z.infer<
  * `hurt`: they seem put out by something Q said. Readings only: code
  * decides what follows from them.
  */
-export const InterviewAgentV11ResultSchema = InterviewAgentResultSchema.extend(
-  {
-    chatter: z.enum(["NONE", "PERSON", "Q"]).default("NONE"),
-    hurt: z.boolean().default(false),
-  },
-).strict();
+export const InterviewAgentV11ResultSchema = InterviewAgentResultSchema.extend({
+  chatter: z.enum(["NONE", "PERSON", "Q"]).default("NONE"),
+  hurt: z.boolean().default(false),
+}).strict();
 export type InterviewAgentV11Result = z.infer<
   typeof InterviewAgentV11ResultSchema
 >;

@@ -78,14 +78,30 @@ export type InvestorResearchDependencies = {
         readonly lookup: (firmName: string) => Promise<readonly ResearchPage[]>;
       }[]
     | undefined;
+  /**
+   * Another journey's own reading (founder direction 2026-09-30: the
+   * founder's company researched during setup): the pages read and
+   * checked into findings by that journey's reader and validation. When
+   * given, it replaces the investor reader below.
+   */
+  readonly readFindings?:
+    | ((request: {
+        readonly actor: ActorContext;
+        readonly correlationId: CorrelationId;
+        readonly identity: InvestorResearchIdentity;
+        readonly pages: readonly ResearchPage[];
+      }) => Promise<readonly ResearchFinding[]>)
+    | undefined;
   /** The reader model, through the Model Gateway. Null: nothing read. */
-  readonly reader: (request: {
-    readonly actor: ActorContext;
-    readonly correlationId: CorrelationId;
-    readonly firmName: string;
-    readonly websiteUrl: string | null;
-    readonly pages: readonly ResearchPage[];
-  }) => Promise<InvestorResearchReaderResult | null>;
+  readonly reader?:
+    | ((request: {
+        readonly actor: ActorContext;
+        readonly correlationId: CorrelationId;
+        readonly firmName: string;
+        readonly websiteUrl: string | null;
+        readonly pages: readonly ResearchPage[];
+      }) => Promise<InvestorResearchReaderResult | null>)
+    | undefined;
   /**
    * The person's own onboarding, bound to their session, to hold what was
    * found the moment it is found (so it survives a restart as a durable
@@ -436,17 +452,27 @@ export function createInvestorResearch(
       research.status = "NOTHING_FOUND";
       return;
     }
-    const reading = await dependencies.reader({
-      actor,
-      correlationId,
-      firmName: identity.firmName,
-      websiteUrl: identity.websiteUrl,
-      pages: bounded,
-    });
-    const findings =
-      reading === null
-        ? []
-        : validateReading(reading, bounded, identity.websiteUrl);
+    let findings: readonly ResearchFinding[] = [];
+    if (dependencies.readFindings !== undefined) {
+      findings = await dependencies.readFindings({
+        actor,
+        correlationId,
+        identity,
+        pages: bounded,
+      });
+    } else if (dependencies.reader !== undefined) {
+      const reading = await dependencies.reader({
+        actor,
+        correlationId,
+        firmName: identity.firmName,
+        websiteUrl: identity.websiteUrl,
+        pages: bounded,
+      });
+      findings =
+        reading === null
+          ? []
+          : validateReading(reading, bounded, identity.websiteUrl);
+    }
     // A newer identity (a website given since) supersedes this read.
     if (bySession.get(input.onboardingSessionId) !== research) return;
     research.findings = [...findings];

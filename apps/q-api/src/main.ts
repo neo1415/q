@@ -278,6 +278,8 @@ import {
   createInvestorResearchReader,
   createSecEdgarRegistry,
   investorResearchReadFrom,
+  createFounderResearchReader,
+  founderResearchReadFrom,
 } from "./composition/investor-research.js";
 import { createInvestorResearch } from "./voice/investor-research.js";
 import { createOnboardingPort } from "./voice/onboarding-port.js";
@@ -2180,6 +2182,38 @@ const investorResearch =
           }),
         logger,
       });
+// The founder's own company, read while Q interviews them (founder
+// direction 2026-09-30): the same engine, the founder reader, and what is
+// found held for the founder to confirm.
+const founderResearch =
+  researchComposition.research === undefined
+    ? undefined
+    : createInvestorResearch({
+        read: founderResearchReadFrom(
+          createPresenceReadPort({
+            research: researchComposition.research,
+            ...(researchComposition.profiles === undefined
+              ? {}
+              : { profiles: researchComposition.profiles }),
+            logger,
+          }),
+        ),
+        readFindings: createFounderResearchReader({
+          gateway: modelGateway,
+          dataPosture: demoDataPosture,
+          logger,
+        }),
+        portFor: ({ actor, session, onboardingSessionId }) =>
+          createOnboardingPort({
+            session,
+            onboardingSessionId,
+            journeyType: "founder",
+            ownerUserId: actor.userId,
+            personTurns: [],
+            recommendations: onboardingRecommendations,
+          }),
+        logger,
+      });
 logger.info(
   {
     investorResearch:
@@ -2249,6 +2283,7 @@ const interviewAgent = createInterviewAgent({
   memory: memoryService,
   recommendations: onboardingRecommendations,
   investorResearch,
+  founderResearch,
   // Which choices the person handed to Q, read independently of the
   // acting model: a delegated write is permitted only for those.
   delegation: createQDelegationReader({

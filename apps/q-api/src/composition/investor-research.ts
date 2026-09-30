@@ -4,8 +4,11 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
+  FounderResearchReaderResultSchema,
   InvestorResearchReaderResultSchema,
   renderPrompt,
+  type FounderResearchReaderResult,
+  type FounderResearchReaderVariables,
   type InvestorResearchReaderResult,
   type InvestorResearchReaderVariables,
 } from "@capital-q/q-core";
@@ -16,6 +19,10 @@ import {
   type InvestorResearchDependencies,
   type ResearchPage,
 } from "../voice/investor-research.js";
+import {
+  FOUNDER_READER_OPTIONS,
+  validateFounderReading,
+} from "../voice/founder-research.js";
 
 /**
  * Investor research, composed (BIZ-009).
@@ -280,5 +287,102 @@ export function createSecEdgarRegistry(options: {
         },
       ];
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Founder research (founder direction 2026-09-30): the same engine, reading
+// the founder's own company while Q interviews them.
+// ---------------------------------------------------------------------------
+
+/** The public web and a declared link, about the founder's own company. */
+export function founderResearchReadFrom(
+  presenceRead: PresenceReadPort,
+): InvestorResearchDependencies["read"] {
+  return async ({ actor, correlationId, identity }) => {
+    const pages = await presenceRead.read({
+      actor,
+      correlationId,
+      // The id only labels the read; the query is composed around the
+      // company name the founder gave.
+      subject: { subjectType: "COMPANY", subjectId: actor.userId },
+      identity: {
+        name: identity.firmName.slice(0, 160),
+        websiteUrl: identity.websiteUrl,
+        profileUrl: identity.profileUrls[0] ?? null,
+        qualifier: "startup company",
+      },
+    });
+    return pages.map((page) => ({
+      url: page.url,
+      title: page.title,
+      excerpt: page.excerpt.slice(0, PRESENCE_BOUNDS.maxExcerptChars),
+      provider: page.provider,
+      retrievedAt: page.retrievedAt,
+    }));
+  };
+}
+
+/** The founder reader model, then code's checks: findings or nothing. */
+export function createFounderResearchReader(dependencies: {
+  readonly gateway: ModelGateway;
+  readonly dataPosture?: ModelDataPosture | undefined;
+  readonly logger?: Logger | undefined;
+}): NonNullable<InvestorResearchDependencies["readFindings"]> {
+  const registry = createDefaultPromptRegistry();
+  const { gateway, logger } = dependencies;
+  return async (request) => {
+    const rendered = renderPrompt<FounderResearchReaderVariables>(registry, {
+      task: "FOUNDER_RESEARCH_READER",
+      operatingMode: "ASSESSMENT",
+      communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
+      environmentNotes:
+        "No tools are available to you. Report only what the supplied pages say.",
+      variables: {
+        companyName: request.identity.firmName.slice(0, 160),
+        websiteUrl: request.identity.websiteUrl,
+        ...FOUNDER_READER_OPTIONS,
+        sources: request.pages.slice(0, 12).map((page, index) => ({
+          index,
+          url: page.url.slice(0, 500),
+          title: page.title === null ? null : page.title.slice(0, 300),
+          excerpt: page.excerpt.slice(0, 6_000),
+        })),
+      },
+    });
+    try {
+      const result = await gateway.execute<FounderResearchReaderResult>(
+        {
+          taskClass: "STRUCTURED_EXTRACTION",
+          budget: READER_BUDGET,
+          ...(dependencies.dataPosture === undefined
+            ? {}
+            : { dataPosture: dependencies.dataPosture }),
+          // Public pages about the founder's own company.
+          sensitivity: "INTERNAL",
+          messages: [...rendered.messages],
+          output: rendered.output,
+          attribution: {
+            tenantId: request.actor.tenantId,
+            userId: request.actor.userId,
+            correlationId: request.correlationId,
+          },
+        },
+        { schema: FounderResearchReaderResultSchema },
+      );
+      return result.output.kind === "STRUCTURED"
+        ? validateFounderReading(
+            result.output.value,
+            request.pages,
+            request.identity.websiteUrl,
+          )
+        : [];
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, correlationId: request.correlationId },
+        "founder research reader produced nothing",
+      );
+      return [];
+    }
   };
 }

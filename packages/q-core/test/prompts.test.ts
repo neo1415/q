@@ -120,6 +120,8 @@ describe("registry", () => {
         // Founder direction 2026-09-30: the Investor Twin rehearsal.
         "INVESTOR_TWIN_TURN",
         "REHEARSAL_SCORE",
+        // Founder direction 2026-09-30: founder research during setup.
+        "FOUNDER_RESEARCH_READER",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

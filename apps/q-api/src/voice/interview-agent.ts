@@ -10,6 +10,7 @@ import {
   type ModelMessage,
   type OnboardingSessionView,
 } from "@capital-q/contracts";
+import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import {
   acceptStructuredOutput,
@@ -235,6 +236,11 @@ export type InterviewAgentDependencies = {
    */
   readonly investorResearch?: InvestorResearch | undefined;
   /**
+   * The founder's company read while Q interviews them (founder direction
+   * 2026-09-30), through the same engine. Absent: founders are just asked.
+   */
+  readonly founderResearch?: InvestorResearch | undefined;
+  /**
    * Q's standing with the person across visits (founder direction
    * 2026-09-30): their chosen personality and Q's patience with small
    * talk. Absent: Auto, and small talk is never counted.
@@ -373,6 +379,22 @@ export function turnNotesFor(input: {
 }
 
 /** The firm the investor named, or the one they typed at sign-up. */
+/** A text answer on the record, or "" when there is none. */
+export function textAnswerOf(
+  view: OnboardingSessionView | null,
+  stepKey: string,
+): string {
+  const value: unknown = view?.responses.find(
+    (r) => r.stepKey === stepKey,
+  )?.value;
+  return typeof value === "object" &&
+    value !== null &&
+    "text" in value &&
+    typeof value.text === "string"
+    ? value.text.trim().slice(0, 200)
+    : "";
+}
+
 export function firmNameOf(
   view: OnboardingSessionView | null,
   signupOrganisation: string | null,
@@ -508,10 +530,10 @@ export function createInterviewAgent(
       raisedChecks: raisedChecks.get(input.onboardingSessionId),
       runId,
       // Found by research between turns and not said yet: not approvable.
-      unheardSteps:
-        input.journeyType === "investor"
-          ? dependencies.investorResearch?.unsaid(input.onboardingSessionId)
-          : undefined,
+      unheardSteps: (input.journeyType === "investor"
+        ? dependencies.investorResearch
+        : dependencies.founderResearch
+      )?.unsaid(input.onboardingSessionId),
     });
     // The newest turns verbatim, the older ones as a bounded summary
     // (P0-5): the whole conversation, within a fixed budget.
@@ -588,7 +610,7 @@ export function createInterviewAgent(
     const research =
       input.journeyType === "investor"
         ? dependencies.investorResearch
-        : undefined;
+        : dependencies.founderResearch;
     const considerResearch = (
       view: OnboardingSessionView | null,
       links?: {
@@ -601,8 +623,15 @@ export function createInterviewAgent(
         session: input.session,
         onboardingSessionId: input.onboardingSessionId,
         identity: {
-          firmName: firmNameOf(view, input.signup?.organisationName ?? null),
-          websiteUrl: links?.websiteUrl ?? null,
+          firmName:
+            input.journeyType === "investor"
+              ? firmNameOf(view, input.signup?.organisationName ?? null)
+              : textAnswerOf(view, FOUNDER_STEPS.companyName),
+          websiteUrl:
+            links?.websiteUrl ??
+            (input.journeyType === "investor"
+              ? null
+              : textAnswerOf(view, FOUNDER_STEPS.website) || null),
           profileUrls: links?.profileUrls ?? [],
         },
       }) ?? false;

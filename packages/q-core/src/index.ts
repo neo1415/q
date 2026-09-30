@@ -256,6 +256,16 @@ export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
 export { INVESTOR_PERSONA_V1 } from "./prompts/tasks/investor-persona.v1.js";
 export { INVESTOR_TWIN_TURN_V1 } from "./prompts/tasks/investor-twin-turn.v1.js";
 export { REHEARSAL_SCORE_V1 } from "./prompts/tasks/rehearsal-score.v1.js";
+export { FOUNDER_RESEARCH_READER_V1 } from "./prompts/tasks/founder-research-reader.v1.js";
+export {
+  FOUNDER_RESEARCH_READER_SCHEMA_NAME,
+  FOUNDER_RESEARCH_READER_SCHEMA_VERSION,
+  FOUNDER_RESEARCH_READER_UNTRUSTED,
+  FounderResearchReaderResultSchema,
+  FounderResearchReaderVariablesSchema,
+  type FounderResearchReaderResult,
+  type FounderResearchReaderVariables,
+} from "./prompts/schemas/founder-research-reader.js";
 export {
   INVESTOR_TWIN_TURN_SCHEMA_NAME,
   INVESTOR_TWIN_TURN_SCHEMA_VERSION,
