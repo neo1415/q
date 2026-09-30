@@ -72,7 +72,7 @@ export const INTERVIEW_AGENT_V11: PromptDefinition<
     schema: InterviewAgentV11ResultSchema,
   },
   version: 11,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder direction 2026-09-30: Q as a person -- a chosen personality, varied openings, small talk with laughter and teasing governed by code (CONDUCT), sarcasm and hurt read, answered-is-answered (no repeated question), and a pitch-deck offer that keeps its place.",
   effectiveFrom: "2026-09-30",

@@ -112,6 +112,7 @@ export { INTERVIEW_AGENT_V8 } from "./prompts/tasks/interview-agent.v8.js";
 export { INTERVIEW_AGENT_V9 } from "./prompts/tasks/interview-agent.v9.js";
 export { INTERVIEW_AGENT_V10 } from "./prompts/tasks/interview-agent.v10.js";
 export { INTERVIEW_AGENT_V11 } from "./prompts/tasks/interview-agent.v11.js";
+export { INTERVIEW_AGENT_V12 } from "./prompts/tasks/interview-agent.v12.js";
 export { DELEGATION_READER_V1 } from "./prompts/tasks/delegation-reader.v1.js";
 export { DELEGATION_READER_V2 } from "./prompts/tasks/delegation-reader.v2.js";
 export { DELEGATION_READER_V3 } from "./prompts/tasks/delegation-reader.v3.js";
