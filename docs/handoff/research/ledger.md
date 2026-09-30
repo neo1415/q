@@ -214,3 +214,12 @@ MUST:
 10. Q's abilities stay with Q everywhere, not just onboarding; limit tool calls around the app during onboarding to what onboarding needs.
 11. Emails: Capital Q branding; they land in spam (fix deliverability: SPF/DKIM/DMARC, sender).
 Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality/presence → then back to the earlier list.
+- DONE onboarding (2026-09-30, live-verified with fresh fictional accounts founder.onboard1-4 / investor.onboard1 @fictional.capitalq.local):
+  - dd6e023b arrival: / and PWA start at /welcome; unfinished setup → /onboarding/<journey>?talk=1; /home gated; welcome in (onboarding) group (no sidebar), Skip removed; shell shows only "Continue with Q" until done; founder done → /profile, investor → /discover.
+  - a0e5b2e0 + 72ede4ea INTERVIEW_AGENT v11/v12: personality (Settings: Auto/Warm/Witty/Sharp/Calm, tooltips), varied openings, laughter/teasing, sarcasm/hurt read, answered-is-answered, deck offer that keeps its place. voice/conduct.ts: small-talk policy (2 turns; Q-started 4 steering by 3rd; 3rd round → warn + /discover strike; later visit 1 round; orange ≥3 strikes, red + pause at 5, operators notified in-app + email; /paused page; admin reinstate). Migration 20261101100000 q_runtime.person_standing.
+  - 49c803f8 founder research during onboarding (FOUNDER_RESEARCH_READER v1, cited + quote-checked findings as recommendations).
+  - c3e98160 typed words no longer lost when the voice line never connects (onboarding stage, Home Q, Q sheet).
+  - a4462e70 no "say these exact words" confirmations.
+  - 1443a7f7 documents appear/refresh without reload; 4fc3dc66 branded emails.
+  - SPAM: sender is adetimilehin502@gmail.com via Brevo → founder must verify a domain they own in Brevo (SPF/DKIM/DMARC) and set SMTP_SENDER to "Capital Q <q@thatdomain>".
+- NEXT: personality in Home Q too; document look (page background/ink for all documents, slide background for decks) + revision v3; particles tied to speech (head turn, hands); deck creation in onboarding (brand colours/logo/fonts, multi-agent); then earlier list (C18 Q Daily, B-items).
