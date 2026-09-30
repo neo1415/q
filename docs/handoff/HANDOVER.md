@@ -140,38 +140,59 @@ Earlier sessions (see ledger for evidence): deck generation and PDF, Q Card,
 public @handle page, profile edit by Q, relationships, errands, GateQ embed,
 admin console, investor twin rehearsal, Discover voice next/pass/save.
 
-## 5. Open items (priority order) — keep this list current
+## 5. Real-entity bench (2026-09-30 evening) and open items
 
-1. **Smart interview (founder direction 2026-09-30, IN PROGRESS):** research
-   finishes before or during the first turns and Q **reads out everything
-   it prefilled** for bulk confirm/correct/skip; a person can talk at length
-   and Q extracts many answers from one monologue, confirming them together;
-   **values outside a step's options are kept in the person's words**
-   (e.g. a country not in the list), never forced into a catch-all.
-2. **Real-entity test bench:** seed 3-4 real founders and 3-4 real
-   investors (famous and obscure; tidy and chaotic public info) as test
-   accounts with `@fictional.capitalq.local` emails, run adversarial
-   interviews (monologues, corrections, sarcasm, wrong options, backtracking),
-   fix what breaks. Clear them from the DB afterwards.
-3. Founder role has no "Founder" option (definition change = new definition
-   version + migration); until then Q asks which title fits.
-4. After onboarding, pending research findings (e.g. Nixo's description and
-   US) are not offered anywhere; Home Q should offer them once.
-5. "Signals & verification" empty for new companies (nothing in onboarding
-   feeds it).
-6. Research can match a different company with the same name; pass the
-   founder's name and known site to the search and the reader.
-7. Deck offer on Home for founders without a deck: coded (10158049), not yet
-   seen live.
-8. Latency: turns ~4.5-6 s of model time; next gain is a faster dialogue
-   route for NORMAL_DIALOGUE.
-9. Email spam: the founder must verify a domain in Brevo (SPF/DKIM/DMARC)
-   and set `SMTP_SENDER="Capital Q <q@domain>"`.
+Bench: `scripts/handoff/live/persona-run.mjs` + `personas/*.json` (real
+public companies/investors on `@fictional.capitalq.local` test accounts:
+Flutterwave/Olugbenga Agboola, Nixo/Priya Khandelwal, Chowdeck/Femi Aluko,
+Ventures Platform/Kola Aina, Voltron Capital/Olumide Soyombo). Each starts
+with adversarial scripted lines (monologue, corrections, sarcasm, off-list
+answers, "you find it"), then answers by the step key Q asks. Read
+`ai_ops.model_usage` and the q-api "interview q run traced" log lines
+(decisions per write, reader's stated set) to see WHY a turn went wrong.
+**Clear these accounts from the DB when testing is done** (founder rule).
+Never `pkill -f persona-run` from a command that contains that text (it
+kills its own shell).
+
+Founder runs, after fixes 91e1a455..98693221: Nixo, Flutterwave and
+Chowdeck all COMPLETE. Research prefills and Q reads it out in one line
+("I found United States... and Seed... Is that right?"), one "yep"
+confirms; monologue answers captured; corrections ("make that four and a
+half million", "only two full time", "Series A. Fix it", naira→dollars)
+applied; sarcasm and jokes handled; "use whatever website you found"
+saved; off-list answers kept in their words; one "yes" to the review
+completes.
+
+Open (priority order):
+
+1. Investor bench runs (Ventures Platform, Soyombo): the web composer bug
+   that dropped typed words (fixed 98693221) blocked them; rerun.
+2. Required questions are re-asked every turn while the person talks
+   about other things (Chowdeck: full-time asked 6x).
+3. Research can still find a namesake (Chowdeck: "Telehealth").
+4. "Signals & verification" empty for new companies (nothing feeds it).
+5. Founder role: now kept in their words (ownWords) and shown as their
+   title; a definition v3 with a "Founder" option is optional.
+6. After onboarding, pending research findings are not offered anywhere.
+7. Deck offer on Home for founders without a deck: coded (10158049), not
+   yet seen live.
+8. Latency: 5-10 s per typed turn end to end (model ~2 s/round).
+9. Email spam: founder must verify a domain in Brevo and set SMTP_SENDER.
 10. Earlier list: C18 Q Daily, backgrounds/scroll/minimalism audit, voice
     humanisation (#27), live checks for meetings/Gmail/Recall (#21, #34),
     LangGraph ADR, server-action mismatch safeguard.
 
 ## 6. Lessons learned (do not relearn these)
+
+- The interview's refusals are the product: read the trace's `decisions`
+  (e.g. "Their latest words do not state this", "An active organisation
+  context is required") before touching prompts. Most "Q is dumb" moments
+  were a code gate refusing a correct write, then the model asking the
+  person to rephrase.
+- Tell the model facts code knows (the step it asked, answers given
+  earlier, sign-up name, unasked steps) as trusted notes; it follows them.
+- An interpreted choice from earlier words must be read back; a literal
+  figure or text may be recorded (the reading over-reads monologues).
 
 - Measure before guessing: `ai_ops.model_usage` answers "why is it slow"
   and "which call failed" without logs.
