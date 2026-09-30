@@ -748,52 +748,6 @@ export function createInterviewAgent(
     // What this turn's reply will say for the first time.
     const unsaidShown =
       research?.unsaid(input.onboardingSessionId) ?? new Set<string>();
-    const authority = (await delegationRead) ?? NO_TURN_AUTHORITY;
-    const listed = (keys: ReadonlySet<string>): string =>
-      keys.size === 0
-        ? "none"
-        : JSON.stringify(
-            journeySteps
-              .filter((step) => keys.has(step.stepKey))
-              .map((step) => ({
-                stepKey: step.stepKey,
-                question: (
-                  SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
-                ).slice(0, 300),
-              })),
-          ).slice(0, 2_000);
-    const delegated = listed(authority.handed);
-    const approved = listed(authority.approved);
-    const declined = listed(authority.declined);
-
-    // What else the turn asks, from the independent reading. A look-up
-    // question goes on in the person's own words, never a model's; the
-    // research ledger decides whether it may run.
-    const ledger = conversationOf(input.onboardingSessionId);
-    const lookupWords =
-      authority.lookup === null
-        ? null
-        : textStatedIn(authority.lookup, utterance)
-          ? authority.lookup
-          : utterance.slice(0, 400);
-    const lookup =
-      lookupWords === null || opening
-        ? null
-        : !researchAvailable || isExhausted(ledger.failures, "RESEARCH")
-          ? ({ kind: "UNAVAILABLE" } as const)
-          : ledger.research !== null
-            ? ({ kind: "RUNNING" } as const)
-            : ({ kind: "RUN", question: lookupWords } as const);
-    // A corrected pronunciation must come from what they said; the term
-    // may be one Q just said.
-    const pronounce =
-      authority.pronounce !== null &&
-      textStatedIn(authority.pronounce.sayAs, utterance) &&
-      (textStatedIn(authority.pronounce.term, utterance) ||
-        textStatedIn(authority.pronounce.term, lastQTurn ?? ""))
-        ? authority.pronounce
-        : null;
-    const pausing = authority.pausing && !opening;
     // What the journey still holds open, from the record: what sign-up
     // gave, findings not yet put to them, questions never asked.
     const journeyOpenings = async (): Promise<JourneyOpenings> => {
@@ -868,13 +822,99 @@ export function createInterviewAgent(
       };
     };
     const open = await journeyOpenings();
-    const turnNotes = turnNotesFor({
-      pausing,
-      lookup,
-      pronounce,
-      research: researchNote,
-      open,
+    const ledger = conversationOf(input.onboardingSessionId);
+    // Everything the turn takes from the independent reading of their
+    // words, once that reading is in.
+    const readingOf = (authority: QTurnAuthority) => {
+      const listed = (keys: ReadonlySet<string>): string =>
+        keys.size === 0
+          ? "none"
+          : JSON.stringify(
+              journeySteps
+                .filter((step) => keys.has(step.stepKey))
+                .map((step) => ({
+                  stepKey: step.stepKey,
+                  question: (
+                    SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+                  ).slice(0, 300),
+                })),
+            ).slice(0, 2_000);
+      const delegated = listed(authority.handed);
+      const approved = listed(authority.approved);
+      const declined = listed(authority.declined);
+
+      // What else the turn asks, from the independent reading. A look-up
+      // question goes on in the person's own words, never a model's; the
+      // research ledger decides whether it may run.
+      const lookupWords =
+        authority.lookup === null
+          ? null
+          : textStatedIn(authority.lookup, utterance)
+            ? authority.lookup
+            : utterance.slice(0, 400);
+      const lookup =
+        lookupWords === null || opening
+          ? null
+          : !researchAvailable || isExhausted(ledger.failures, "RESEARCH")
+            ? ({ kind: "UNAVAILABLE" } as const)
+            : ledger.research !== null
+              ? ({ kind: "RUNNING" } as const)
+              : ({ kind: "RUN", question: lookupWords } as const);
+      // A corrected pronunciation must come from what they said; the term
+      // may be one Q just said.
+      const pronounce =
+        authority.pronounce !== null &&
+        textStatedIn(authority.pronounce.sayAs, utterance) &&
+        (textStatedIn(authority.pronounce.term, utterance) ||
+          textStatedIn(authority.pronounce.term, lastQTurn ?? ""))
+          ? authority.pronounce
+          : null;
+      const pausing = authority.pausing && !opening;
+      const turnNotes = turnNotesFor({
+        pausing,
+        lookup,
+        pronounce,
+        research: researchNote,
+        open,
+      });
+      return {
+        authority,
+        delegated,
+        approved,
+        declined,
+        lookup,
+        pronounce,
+        pausing,
+        turnNotes,
+      };
+    };
+    // The reading runs alongside Q's first round rather than before it
+    // (live 2026-09-30: 1.5-5 s of every turn was spent waiting on it).
+    // Until it is in, the round is told so; every write still waits for it
+    // in the port, and a reply is held until it is known the reading asks
+    // nothing different of the turn.
+    let reading: ReturnType<typeof readingOf> | null = null;
+    const readingDone = delegationRead.then((authority) => {
+      reading = readingOf(authority ?? NO_TURN_AUTHORITY);
+      return reading;
     });
+    const NOT_READ_YET =
+      "not read yet this round: record only what they state; accept, delegate or finish nothing until it is listed";
+    const provisional = {
+      ...readingOf(NO_TURN_AUTHORITY),
+      delegated: NOT_READ_YET,
+      approved: NOT_READ_YET,
+      declined: NOT_READ_YET,
+    };
+    const current = () => reading ?? provisional;
+    // A reading already in (a fast reader, an opening) is used from the
+    // first round: one tick lets its settlement land.
+    await Promise.race([
+      readingDone,
+      new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      }),
+    ]);
 
     // Every round is rendered afresh from the onboarding state and what Q
     // has already done this turn, never from a provider's native tool
@@ -904,10 +944,10 @@ export function createInterviewAgent(
           memory: loop.memory.slice(0, 4_000),
           earlier: (compacted.summary ?? "").slice(0, 2_200),
           thisTurn: thisTurnText(actions),
-          delegated,
-          approved,
-          declined,
-          turnNotes,
+          delegated: current().delegated,
+          approved: current().approved,
+          declined: current().declined,
+          turnNotes: current().turnNotes,
           personality: PERSONALITY_NOTES[personality],
           conduct: conductText.slice(0, 600),
           openings: openingsOf(thread).slice(0, 600),
@@ -962,6 +1002,7 @@ export function createInterviewAgent(
         remaining() > REPLY_RESERVE_MS
       ) {
         rounds += 1;
+        const unread = reading === null;
         const response = await gateway.execute(
           {
             ...base,
@@ -972,10 +1013,29 @@ export function createInterviewAgent(
           {
             firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
             signal,
-            ...(stream === undefined ? {} : { onTextDelta: stream.push }),
+            // A reply written before the reading is in is held, not said.
+            ...(stream === undefined || unread
+              ? {}
+              : { onTextDelta: stream.push }),
           },
         );
         if (response.output.kind === "TEXT") {
+          if (unread) {
+            const settled = await readingDone;
+            // The reading asks something of this turn the reply could not
+            // know: write it again with the reading in hand.
+            if (
+              settled.pausing ||
+              settled.lookup !== null ||
+              settled.pronounce !== null ||
+              settled.authority.handed.size > 0 ||
+              settled.authority.approved.size > 0 ||
+              settled.authority.finishing
+            ) {
+              continue;
+            }
+            stream?.push(response.output.text);
+          }
           const accepted = acceptStructuredOutput(
             response.output.text,
             InterviewAgentV11ResultSchema,
@@ -1031,6 +1091,8 @@ export function createInterviewAgent(
       clearTimeout(timer);
     }
 
+    const { authority, lookup, pronounce, pausing } =
+      reading ?? (await readingDone);
     const view = port.view() ?? (await port.state(), port.view());
     if (view === null) {
       throw new Error("the onboarding session could not be read");

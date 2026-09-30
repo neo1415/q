@@ -188,3 +188,58 @@ describe("the review is confirmed only by finishing", () => {
     expect(outcome.view.session.status).toBe("ACTIVE");
   });
 });
+
+describe("the reading runs alongside the first round (live 2026-09-30)", () => {
+  const slowReader = (value: ReturnType<typeof reading>) => ({
+    read: () =>
+      new Promise<ReturnType<typeof reading>>((resolve) => {
+        setTimeout(() => {
+          resolve(value);
+        }, 30);
+      }),
+  });
+  const replying = () => {
+    const prompts: string[] = [];
+    const gateway = {
+      execute: (request: { messages: { content: string }[] }) => {
+        prompts.push(request.messages.map((m) => m.content).join("\n"));
+        return Promise.resolve({
+          output: {
+            kind: "TEXT",
+            text: JSON.stringify({ reply: "What's next?", asking: null }),
+          },
+        });
+      },
+    } as unknown as ModelGateway;
+    return { gateway, prompts };
+  };
+
+  it("a reply written before the reading is kept when the reading asks nothing more", async () => {
+    const world = investorSession({ currentStepKey: "I11.review" });
+    const { gateway, prompts } = replying();
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: slowReader(reading({})),
+    }).turn({ ...turn(world, "Sounds good."), actor });
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain("not read yet this round");
+    expect(outcome.reply).toBe("What's next?");
+  });
+
+  it("is written again when the reading turns out to ask something of the turn", async () => {
+    const world = investorSession({ currentStepKey: "I11.review" });
+    const { gateway, prompts } = replying();
+    await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: slowReader(reading({ pausing: true })),
+    }).turn({ ...turn(world, "Can we stop for today?"), actor });
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain("They want to pause");
+  });
+});
