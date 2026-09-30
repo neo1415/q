@@ -326,6 +326,9 @@ export const ELSEWHERE_NOTE = `Outside onboarding, Q on their Home page can also
  * reading and the research ledger. Code composes the facts; the loop says
  * them in its own words.
  */
+/** Marks an optional step Q has asked twice in the asked-steps memory. */
+const ASKED_AGAIN = "#again";
+
 /** The prompt's bound on the turn notes (INTERVIEW_AGENT variables). */
 const TURN_NOTES_MAX = 1_500;
 
@@ -343,6 +346,8 @@ export type JourneyOpenings = {
     readonly stepKey: string;
     readonly question: string;
   }[];
+  /** Optional steps asked twice and still unanswered: not asked again. */
+  readonly passedOver?: readonly string[] | undefined;
 };
 
 export function turnNotesFor(input: {
@@ -423,8 +428,13 @@ export function turnNotesFor(input: {
     }
   }
   notes.push(
-    'Record a number as the number they said, in any words; never ask them to say it another way. When their words fit none of a step\'s choices ("I\'m the founder" for a role), ask which fits ("so CEO as well?") rather than a catch-all like Something else.',
+    'An optional question they have not answered after you asked it twice is passed over: move on, never press it. Record a number as the number they said, in any words; never ask them to say it another way. When their words fit none of a step\'s choices ("I\'m the founder" for a role), ask which fits ("so CEO as well?") rather than a catch-all like Something else.',
   );
+  if (open?.passedOver !== undefined && open.passedOver.length > 0) {
+    notes.push(
+      `Passed over, never ask again in this conversation: ${open.passedOver.join(", ")}`,
+    );
+  }
   if (open !== undefined && open.unasked.length > 0) {
     notes.push(
       `Still unasked, ask each once before the final review, one at a time; one they pass over is never asked again: ${open.unasked.map((u) => u.stepKey).join(", ")}`,
@@ -804,6 +814,14 @@ export function createInterviewAgent(
             value: p.value.slice(0, 200),
             because: p.rationale === null ? null : p.rationale.slice(0, 120),
           })),
+        passedOver: journeySteps
+          .filter(
+            (step) =>
+              !step.required &&
+              !answered.has(step.stepKey) &&
+              askedBefore.has(`${step.stepKey}${ASKED_AGAIN}`),
+          )
+          .map((step) => step.stepKey),
         unasked: journeySteps
           .filter(
             (step) =>
@@ -1113,7 +1131,13 @@ export function createInterviewAgent(
       }
     }
     if (result?.asking !== undefined && result.asking !== null) {
-      askedOptional.add(input.onboardingSessionId, [result.asking]);
+      // The second time it is asked is marked too: a third is pressing.
+      askedOptional.add(
+        input.onboardingSessionId,
+        askedBefore.has(result.asking)
+          ? [result.asking, `${result.asking}${ASKED_AGAIN}`]
+          : [result.asking],
+      );
     }
     if (result !== undefined && result.raised.length > 0) {
       const open = new Set(state.checks.map((check) => check.checkId));

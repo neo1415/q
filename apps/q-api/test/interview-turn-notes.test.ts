@@ -53,12 +53,16 @@ describe("the loop is told what the journey still holds open (live 2026-09-30)",
           { stepKey: "F1.website", question: "What's your website?" },
           { stepKey: "F2.materials", question: "Do you have a deck?" },
         ],
+        passedOver: ["F4.functions"],
       },
     });
     expect(notes).toContain("Fictional Co");
     expect(notes).toContain("F1.company_name");
     expect(notes).toContain("Software for field teams");
     expect(notes).toContain("F2.materials");
+    expect(notes).toContain(
+      "never ask again in this conversation: F4.functions",
+    );
     expect(notes.length).toBeLessThanOrEqual(1_500);
   });
 });
