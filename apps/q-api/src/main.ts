@@ -2404,6 +2404,31 @@ const pronunciation =
     : createLoggingPronunciationTeacher(logger);
 // One turn handler for every transport: the websocket channel and the
 // think route both hand it a bound conversation and a speaker.
+// The public presence read that fills a profile's "Signals &
+// verification": one trigger, for the spoken and the typed interview.
+const presenceTrigger =
+  presenceComposition === undefined
+    ? undefined
+    : createPresenceTrigger({
+        presence: presenceComposition.presence,
+        // What a company's own website says it does is offered into an
+        // empty short description, through the same approval as any
+        // change the person asks for (ADR 0011).
+        profileSuggestions: profileBoard,
+        profiles: {
+          shortDescriptionOf: async (companyId) =>
+            (
+              await companies.findCanonicalCompanyProfile(
+                CompanyIdSchema.parse(companyId),
+              )
+            )?.shortDescription ?? null,
+        },
+        // The name to look a person up by, read from their own profile
+        // row. Their own only: the query is keyed on the acting user.
+        people: { displayNameFor },
+        logger,
+      });
+
 const voiceTurn = timedVoiceTurns(
   createVoiceTurnHandler({
     qRuntime,
@@ -2417,29 +2442,7 @@ const voiceTurn = timedVoiceTurns(
     continueApproved,
     // And whether it was a yes is read from their words (ADR 0011).
     decisions: createDecisionReader({ gateway: modelGateway, logger }),
-    ...(presenceComposition === undefined
-      ? {}
-      : {
-          presence: createPresenceTrigger({
-            presence: presenceComposition.presence,
-            // What a company's own website says it does is offered into an
-            // empty short description, through the same approval as any
-            // change the person asks for (ADR 0011).
-            profileSuggestions: profileBoard,
-            profiles: {
-              shortDescriptionOf: async (companyId) =>
-                (
-                  await companies.findCanonicalCompanyProfile(
-                    CompanyIdSchema.parse(companyId),
-                  )
-                )?.shortDescription ?? null,
-            },
-            // The name to look a person up by, read from their own profile
-            // row. Their own only: the query is keyed on the acting user.
-            people: { displayNameFor },
-            logger,
-          }),
-        }),
+    ...(presenceTrigger === undefined ? {} : { presence: presenceTrigger }),
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     ...(config.voice.apiBaseUrl === undefined
       ? {}
@@ -2519,6 +2522,7 @@ const { app, logger: appLogger } = createApp(
             speech: speechSynthesis,
             bindings: voiceBindings,
             interviewAgent,
+            interviewPresence: presenceTrigger,
             apiBaseUrl: config.voice.apiBaseUrl,
             board: voiceTurnBoard,
             welcome: welcomeHost,

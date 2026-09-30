@@ -18,6 +18,7 @@ import {
 } from "../security/actor-context.js";
 import type { QVoiceRoutesDependencies } from "./routes.js";
 import type { InterviewAgent } from "./interview-agent.js";
+import type { PresenceTrigger } from "./presence-trigger.js";
 import { signupContextFromToken } from "./interview-steps.js";
 import { AccountPausedError } from "./standing.js";
 
@@ -55,6 +56,13 @@ export type QInterviewRouteDependencies = ActorContextDependencies & {
   /** Where the onboarding session lives; the interviewer calls it as the person. */
   readonly apiBaseUrl: string;
   readonly correlation: () => string;
+  /**
+   * The public presence read that fills a profile's "Signals &
+   * verification", started when the setup names a subject. Only the voice
+   * path had it, so a typed onboarding never looked the company up (live
+   * 2026-09-30: an empty rail for Nixo).
+   */
+  readonly presence?: PresenceTrigger | undefined;
 };
 
 export function registerQInterviewRoute(
@@ -123,6 +131,16 @@ export function registerQInterviewRoute(
           .send({ ...problem, paused: true });
       }
 
+      // Detached, best effort: never delays or fails the turn.
+      dependencies.presence?.afterInterviewTurn(
+        actor,
+        outcome.view,
+        undefined,
+        {
+          organisationName:
+            signupContextFromToken(accessToken).organisationName ?? null,
+        },
+      );
       void reply.header("Cache-Control", "no-store");
       return QInterviewTurnResponseSchema.parse({
         reply: outcome.reply,

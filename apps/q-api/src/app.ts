@@ -69,6 +69,7 @@ import {
   type QVoiceRoutesDependencies,
 } from "./voice/routes.js";
 import { registerVoiceThinkRoute } from "./voice/think.js";
+import type { PresenceTrigger } from "./voice/presence-trigger.js";
 import { registerQInterviewRoute } from "./voice/interview-route.js";
 import type { VoiceTurnHandler } from "./voice/turn.js";
 
@@ -147,6 +148,8 @@ export type QApiModules = {
     | ({
         /** The turn handler, for the Deepgram think route; absent means no think route. */
         readonly turn?: VoiceTurnHandler | undefined;
+        /** The presence read for the typed interview, as the spoken one has. */
+        readonly interviewPresence?: PresenceTrigger | undefined;
         readonly logger?: Logger | undefined;
       } & Pick<
         QVoiceRoutesDependencies,
@@ -454,6 +457,9 @@ export function createApp(
         agent: interviewAgent,
         apiBaseUrl: interviewApiBaseUrl,
         correlation: () => randomUUID(),
+        ...(modules.voice?.interviewPresence === undefined
+          ? {}
+          : { presence: modules.voice.interviewPresence }),
       });
     }
     if (modules.standing !== undefined) {
