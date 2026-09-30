@@ -28,6 +28,7 @@ import {
   type FakeBehaviour,
 } from "../src/index.js";
 import {
+  CLIENT_ACTION_DONE_LINE,
   createModelGatewayQAnswer,
   Q_TOOL_LOOP_MAX_CALLS,
   Q_TOOL_LOOP_MAX_ROUNDS,
@@ -302,6 +303,37 @@ describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
     });
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
     const last = completed.at(-1) as { message: { blocks?: unknown[] } };
+    expect(last.message.blocks).toEqual([
+      { kind: "UI_INTENT", intent: { kind: "SET_THEME", theme: "dark" } },
+    ]);
+  });
+
+  it("an empty closing answer after a screen action still delivers the action (founder live 2026-09-30)", async () => {
+    const tools = toolPort([SET_THEME_OFFERED], (p) => ({
+      ...succeeded(p, {
+        status: "SCREEN_WILL_DO_IT",
+        clientAction: { kind: "SET_THEME", theme: "dark" },
+      }),
+      toolName: "client.theme.set",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            { callId: "t1", name: "set_theme", arguments: { theme: "dark" } },
+          ],
+        },
+        { kind: "TEXT", text: JSON.stringify(analystResult("")) },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const last = completed.at(-1) as {
+      message: { text: string; blocks?: unknown[] };
+    };
+    expect(last.message.text).toBe(CLIENT_ACTION_DONE_LINE);
     expect(last.message.blocks).toEqual([
       { kind: "UI_INTENT", intent: { kind: "SET_THEME", theme: "dark" } },
     ]);

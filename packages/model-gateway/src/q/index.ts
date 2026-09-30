@@ -221,6 +221,9 @@ export function fixedCommunicationProfile(
   return { profileFor: () => Promise.resolve(profile) };
 }
 
+/** Said when a screen action went through but the model's words did not. */
+export const CLIENT_ACTION_DONE_LINE = "Done, it's on your screen.";
+
 const ANSWER_LIMIT_CHARS = 32_000;
 
 /**
@@ -2433,8 +2436,18 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
               )
               .slice(0, ANSWER_LIMIT_CHARS)
               .trim();
-            if (salvaged.length > 0) {
-              const message = await persistAnswer(salvaged);
+            // Founder live 2026-09-30: open_page opened the chat, then the
+            // model's closing words came back empty and the whole turn
+            // failed, so the screen never moved. What a tool already did
+            // for them stands: it is said in a few plain words.
+            const spoken =
+              salvaged.length > 0
+                ? salvaged
+                : clientActionBlocks.length > 0
+                  ? CLIENT_ACTION_DONE_LINE
+                  : "";
+            if (spoken.length > 0) {
+              const message = await persistAnswer(spoken);
               logger?.warn(
                 {
                   qRunId: request.runId,
@@ -2443,7 +2456,7 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
                   routingPolicy: error.routingPolicyCode,
                   answerComplete: partial.complete(),
                   streamedCharacters: streamedText.length,
-                  answerCharacters: salvaged.length,
+                  answerCharacters: spoken.length,
                   toolCalls: toolCalls.length,
                   modelCalls,
                 },
