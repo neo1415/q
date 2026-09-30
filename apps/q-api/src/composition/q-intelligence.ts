@@ -116,6 +116,13 @@ export type QIntelligenceDependencies = {
   readonly ownOnboarding?: QOwnOnboardingPort | undefined;
   /** Setup reminders at a natural pause (founder directive 2026-09-27). */
   readonly onboardingNudge?: QOnboardingNudgePort | undefined;
+  /** Who Q is with each person (founder direction 2026-09-30). */
+  readonly personalityOf?:
+    | ((request: {
+        readonly tenantId: string;
+        readonly userId: string;
+      }) => Promise<string | null>)
+    | undefined;
   /**
    * Where an answer goes as it is written. Absent means it goes out only
    * when it is finished; the stored message and its completion event are
@@ -254,6 +261,9 @@ export function composeQIntelligence(
     ...(dependencies.onboardingNudge === undefined
       ? {}
       : { onboardingNudge: dependencies.onboardingNudge }),
+    ...(dependencies.personalityOf === undefined
+      ? {}
+      : { personalityOf: dependencies.personalityOf }),
     ...(dependencies.deltas === undefined
       ? {}
       : { deltas: dependencies.deltas }),

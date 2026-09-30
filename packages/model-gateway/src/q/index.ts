@@ -654,6 +654,11 @@ export function environmentNotesFor(
      * whose notes are full simply carries no reminder.
      */
     readonly onboardingNudge?: QOnboardingNudge | undefined;
+    /**
+     * Who Q is with this person (founder direction 2026-09-30): the
+     * personality they chose in Settings, or Auto. Trusted product copy.
+     */
+    readonly personality?: string | undefined;
   } = {},
 ): string {
   const factsNote =
@@ -700,6 +705,11 @@ export function environmentNotesFor(
       ...(options.questionSequence === undefined
         ? []
         : [questionSequenceNote(options.questionSequence)]),
+      ...(options.personality === undefined
+        ? []
+        : [
+            `WHO YOU ARE WITH THIS PERSON: ${options.personality} Speak as that, as a person would: vary how you begin, laugh when something is funny, take a joke, and never begin two replies the same way.`,
+          ]),
       ...(options.openDocumentTitle === undefined
         ? []
         : [
@@ -895,6 +905,16 @@ export type ModelGatewayQAnswerDependencies = {
    */
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly communication?: QCommunicationProfilePort | undefined;
+  /**
+   * The personality this person chose for Q (founder direction
+   * 2026-09-30), as the words Q is told. Null: Q's own default.
+   */
+  readonly personalityOf?:
+    | ((request: {
+        readonly tenantId: string;
+        readonly userId: string;
+      }) => Promise<string | null>)
+    | undefined;
   /** Narrows provider eligibility for this composition; never widens it. */
   readonly tenantPolicy?: TenantModelPolicy | undefined;
   readonly logger?: Logger | undefined;
@@ -1435,6 +1455,15 @@ export function createModelGatewayQAnswer(
           "Nothing was established in advance for this request.",
         memory,
       };
+      const personality =
+        dependencies.personalityOf === undefined
+          ? null
+          : await dependencies
+              .personalityOf({
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+              })
+              .catch(() => null);
       const environmentNotes = environmentNotesFor(
         facts,
         offered,
@@ -1454,6 +1483,7 @@ export function createModelGatewayQAnswer(
             ? {}
             : { questionSequence: request.questionSequence }),
           ...(onboardingNudge === null ? {} : { onboardingNudge }),
+          ...(personality === null ? {} : { personality }),
         },
       );
       const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {

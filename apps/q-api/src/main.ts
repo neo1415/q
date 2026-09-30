@@ -71,7 +71,10 @@ import {
 } from "./composition/errands.js";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
 
-import { createPostgresStandingStore } from "./voice/standing.js";
+import {
+  createPostgresStandingStore,
+  PERSONALITY_NOTES,
+} from "./voice/standing.js";
 import {
   createRehearsalComposer,
   createRehearsalService,
@@ -1640,7 +1643,14 @@ const qArtifacts = createQArtifacts({
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),
 });
+// Q's standing with each person (founder direction 2026-09-30): their chosen
+// personality, which every Q surface speaks with, and Q's patience.
+const standingStore = createPostgresStandingStore(database.sql);
 const qIntelligence = composeQIntelligence({
+  personalityOf: ({ tenantId, userId }) =>
+    standingStore
+      .read(userId, tenantId, new Date())
+      .then((standing) => PERSONALITY_NOTES[standing.personality]),
   // The attestation is the claim about the data; where it holds, every
   // founder, investor and company this process will see was invented.
   dataPosture: demoDataPosture,
@@ -2225,7 +2235,6 @@ logger.info(
 // Q's standing with each person (founder direction 2026-09-30): the
 // personality they chose and Q's patience with small talk. A paused
 // account is told to Capital Q's operators, in the app and by email.
-const standingStore = createPostgresStandingStore(database.sql);
 const operatorEmailConfig = loadAppEmailConfig(process.env);
 const operatorEmail =
   operatorEmailConfig.brevoApi !== undefined
