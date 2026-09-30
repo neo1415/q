@@ -118,3 +118,67 @@ describe("revising a deck", () => {
     expect(revised.content.deck?.cover).toBeUndefined();
   });
 });
+
+describe("a document's look (founder live 2026-09-30)", () => {
+  it("paints every slide of a deck the page background it was asked for", async () => {
+    const { reviser } = reviserReturning({
+      sections: [],
+      slides: [],
+      style: {
+        coverBackground: null,
+        coverTitleInk: null,
+        accent: null,
+        pageBackground: "#c8a27a",
+        ink: null,
+      },
+    });
+    const revised = await revise(reviser);
+    expect(revised.content.deck?.background).toBe("#c8a27a");
+    expect(revised.content.deck?.cover).toBeUndefined();
+  });
+
+  it("gives a document that is not a deck the background and ink it was asked for", async () => {
+    const plain = {
+      sections: content.sections,
+      gaps: [],
+    } as unknown as QArtifactContent;
+    const { reviser } = reviserReturning({
+      sections: [],
+      slides: [],
+      style: {
+        coverBackground: null,
+        coverTitleInk: null,
+        accent: null,
+        pageBackground: "#c8a27a",
+        ink: "#2b1d0e",
+      },
+    });
+    const revised = await reviser.revise({
+      base: { title: "Mandate", summary: "s", content: plain },
+      instruction: "make the background light brown",
+      grounding: [],
+      sensitivity: "CONFIDENTIAL",
+      attribution: {
+        tenantId: "t",
+        userId: "u",
+        qRunId: "r",
+        correlationId: "c",
+      },
+    });
+    expect(revised.content.look).toEqual({
+      background: "#c8a27a",
+      ink: "#2b1d0e",
+    });
+  });
+
+  it("changes nothing when no look was asked for", async () => {
+    const { reviser } = reviserReturning({
+      sections: [],
+      slides: [],
+      style: null,
+    });
+    const revised = await revise(reviser);
+    expect(revised.content.deck?.background).toBeUndefined();
+    expect(revised.content.look).toBeUndefined();
+  });
+});

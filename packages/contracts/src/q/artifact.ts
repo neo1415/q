@@ -338,9 +338,34 @@ export const QDeckSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * Every slide's background the person asked for in words ("make the
+     * background light brown"; founder live 2026-09-30), and the text
+     * colour on it. A cover of their own keeps its own. Absent: the
+     * direction's own. Text without a chosen ink reads in black or white,
+     * whichever is clearer on the background.
+     */
+    background: QDeckColourSchema.optional(),
+    ink: QDeckColourSchema.optional(),
   })
   .strict();
 export type QDeck = z.infer<typeof QDeckSchema>;
+
+/**
+ * A document's own look, when the person asked for one in words (founder
+ * live 2026-09-30: "make the background light brown" changed nothing on a
+ * mandate). Page background, text colour and an accent for its headings.
+ * Content, like a deck's colours: it describes their document, never the
+ * Capital Q chrome, and it travels into the PDF.
+ */
+export const QDocumentLookSchema = z
+  .object({
+    background: QDeckColourSchema.optional(),
+    ink: QDeckColourSchema.optional(),
+    accent: QDeckColourSchema.optional(),
+  })
+  .strict();
+export type QDocumentLook = z.infer<typeof QDocumentLookSchema>;
 
 /**
  * The whole of one version's content.
@@ -371,6 +396,8 @@ export const QArtifactContentSchema = z
      * than two that drifted apart.
      */
     deck: QDeckSchema.optional(),
+    /** The document's look, when the person asked for one. */
+    look: QDocumentLookSchema.optional(),
   })
   .strict();
 export type QArtifactContent = z.infer<typeof QArtifactContentSchema>;

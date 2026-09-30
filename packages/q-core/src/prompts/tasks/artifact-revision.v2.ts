@@ -37,7 +37,7 @@ export const ARTIFACT_REVISION_V2: PromptDefinition<
 > = {
   ...ARTIFACT_REVISION_V1,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-09-29 (ADR 0025): revises a deck's slide text under v1's rules and sets the cover background, title ink and accent the person named; style is null unless asked for.",
   effectiveFrom: "2026-09-29",

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
-import type { QArtifactDetail } from "@capital-q/contracts";
+import type { QArtifactDetail, QDocumentLook } from "@capital-q/contracts";
 import { buttonClassName, IconButton } from "@capital-q/ui/button";
 import {
   ChevronLeft,
@@ -105,6 +105,48 @@ const whenLabel = formatDayTime;
 const typeLabel = artifactTypeLabel;
 
 /** An SVG slide the browser can show without being allowed to run it. */
+/** Relative luminance of #rrggbb, 0..1 (WCAG). */
+function luminance(hex: string): number {
+  const channel = (at: number) => {
+    const value = Number.parseInt(hex.slice(at, at + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
+
+/**
+ * The document's own look (founder live 2026-09-30): the page colour the
+ * person asked for, and text in their ink or whichever of black and white
+ * reads best on it. Content, like a deck's colours, so it is applied as
+ * given rather than drawn from the design tokens it temporarily replaces.
+ */
+export function documentLookStyle(
+  look: QDocumentLook | undefined,
+): CSSProperties | undefined {
+  if (look === undefined) return undefined;
+  const ink =
+    look.ink ??
+    (look.background === undefined
+      ? undefined
+      : luminance(look.background) > 0.179
+        ? "#000000"
+        : "#ffffff");
+  return {
+    ...(look.background === undefined ? {} : { background: look.background }),
+    ...(ink === undefined
+      ? {}
+      : {
+          color: ink,
+          ["--cq-text-primary" as string]: ink,
+          ["--cq-text-secondary" as string]: ink,
+          ["--cq-text-tertiary" as string]: ink,
+        }),
+    ...(look.accent === undefined
+      ? {}
+      : { ["--cq-accent" as string]: look.accent }),
+  };
+}
+
 export function slideSource(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
@@ -550,7 +592,12 @@ export function ArtifactViewer({
 
         {current === undefined ? null : (
           <article
-            className="mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5"
+            className={
+              current.content.look?.background === undefined
+                ? "mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5"
+                : "mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5 rounded-lg p-6"
+            }
+            style={documentLookStyle(current.content.look)}
             data-q-artifact-body
           >
             {behind === undefined ? null : (

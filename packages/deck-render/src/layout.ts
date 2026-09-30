@@ -642,15 +642,31 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
       cover !== undefined && index === 0 && slide.layout === "TITLE"
         ? cover
         : undefined;
+    // Every other slide takes the page background the person asked for
+    // (founder live 2026-09-30), with their text colour or whichever of
+    // black and white reads best on it.
+    const page =
+      own === undefined && deck.background !== undefined
+        ? deck.background
+        : undefined;
     const slideTheme =
-      own === undefined
-        ? theme
-        : {
+      own !== undefined
+        ? {
             ...theme,
             background: own.background[0] ?? theme.background,
             ink: own.titleInk ?? readableInk(own.background),
             muted: own.titleInk ?? readableInk(own.background),
-          };
+          }
+        : page !== undefined
+          ? {
+              ...theme,
+              background: page,
+              ink: deck.ink ?? readableInk([page]),
+              muted: deck.ink ?? readableInk([page]),
+            }
+          : deck.ink !== undefined
+            ? { ...theme, ink: deck.ink }
+            : theme;
     // A photograph takes the right 40% of a title or bullet slide; the
     // words keep the left, and still never shrink below the floor.
     const image =
@@ -684,7 +700,11 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
         ],
       };
     }
-    return own === undefined ? laid : { ...laid, background: own.background };
+    return own !== undefined
+      ? { ...laid, background: own.background }
+      : page !== undefined
+        ? { ...laid, background: [page] }
+        : laid;
   });
   return { theme, width: SLIDE_WIDTH, height: SLIDE_HEIGHT, slides };
 }

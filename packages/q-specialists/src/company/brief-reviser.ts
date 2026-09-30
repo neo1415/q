@@ -7,11 +7,11 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type ArtifactRevisionV2Result,
+  type ArtifactRevisionV3Result,
   type ArtifactRevisionVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
-import { ArtifactRevisionV2ResultSchema } from "@capital-q/q-core";
+import { ArtifactRevisionV3ResultSchema } from "@capital-q/q-core";
 import {
   isModelGatewayError,
   type ModelGateway,
@@ -68,7 +68,14 @@ function renderDocument(content: QArtifactContent): string {
     .map((section) => `## ${section.heading}\n${section.body}`)
     .join("\n\n");
   const deck = content.deck;
-  if (deck === undefined) return prose.slice(0, 40_000);
+  if (deck === undefined) {
+    const page = content.look;
+    const look =
+      page === undefined
+        ? ""
+        : `\n\nLook:${page.background === undefined ? "" : ` page background ${page.background}`}${page.ink === undefined ? "" : `, text ${page.ink}`}${page.accent === undefined ? "" : `, accent ${page.accent}`}`;
+    return `${prose}${look}`.slice(0, 40_000);
+  }
   const slides = deck.slides
     .map((slide, index) =>
       [
@@ -78,7 +85,7 @@ function renderDocument(content: QArtifactContent): string {
       ].join("\n"),
     )
     .join("\n");
-  const look = `Look: ${deck.direction}${deck.accent === undefined ? "" : `, accent ${deck.accent}`}${deck.cover === undefined ? "" : `, cover ${deck.cover.background.join(" to ")}${deck.cover.titleInk === undefined ? "" : `, title ${deck.cover.titleInk}`}`}`;
+  const look = `Look: ${deck.direction}${deck.accent === undefined ? "" : `, accent ${deck.accent}`}${deck.background === undefined ? "" : `, page background ${deck.background}`}${deck.ink === undefined ? "" : `, text ${deck.ink}`}${deck.cover === undefined ? "" : `, cover ${deck.cover.background.join(" to ")}${deck.cover.titleInk === undefined ? "" : `, title ${deck.cover.titleInk}`}`}`;
   return `${prose}\n\n# SLIDES\n${slides}\n\n${look}`.slice(0, 40_000);
 }
 
@@ -90,11 +97,11 @@ function renderDocument(content: QArtifactContent): string {
  */
 function applyDeckRevision(
   content: QArtifactContent,
-  result: ArtifactRevisionV2Result,
+  result: ArtifactRevisionV3Result,
   grounding: readonly string[],
 ): QArtifactContent {
   const deck = content.deck;
-  if (deck === undefined) return content;
+  if (deck === undefined) return applyDocumentLook(content, result);
   const known = [
     ...grounding,
     ...deck.slides.flatMap((slide) => [
@@ -140,6 +147,39 @@ function applyDeckRevision(
         ? {}
         : { accent: style.accent }),
       ...(cover === undefined ? {} : { cover }),
+      ...(style?.pageBackground === null || style?.pageBackground === undefined
+        ? {}
+        : { background: style.pageBackground }),
+      ...(style?.ink === null || style?.ink === undefined
+        ? {}
+        : { ink: style.ink }),
+    },
+  };
+}
+
+/**
+ * The look v3 returned, applied to a document that is not a deck
+ * (founder live 2026-09-30): page background, text colour and accent, as
+ * the person named them, over what the document already had.
+ */
+function applyDocumentLook(
+  content: QArtifactContent,
+  result: ArtifactRevisionV3Result,
+): QArtifactContent {
+  const style = result.style;
+  if (style === null) return content;
+  const background = style.pageBackground ?? content.look?.background;
+  const ink = style.ink ?? content.look?.ink;
+  const accent = style.accent ?? content.look?.accent;
+  if (background === undefined && ink === undefined && accent === undefined) {
+    return content;
+  }
+  return {
+    ...content,
+    look: {
+      ...(background === undefined ? {} : { background }),
+      ...(ink === undefined ? {} : { ink }),
+      ...(accent === undefined ? {} : { accent }),
     },
   };
 }
@@ -164,10 +204,10 @@ export function createBriefReviser(dependencies: {
         },
       });
 
-      let result: ArtifactRevisionV2Result | undefined;
+      let result: ArtifactRevisionV3Result | undefined;
       try {
         const executed =
-          await dependencies.gateway.execute<ArtifactRevisionV2Result>(
+          await dependencies.gateway.execute<ArtifactRevisionV3Result>(
             {
               taskClass: "NORMAL_DIALOGUE",
               budget: budgetForTaskClass("NORMAL_DIALOGUE"),
@@ -177,7 +217,7 @@ export function createBriefReviser(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: ArtifactRevisionV2ResultSchema,
+              schema: ArtifactRevisionV3ResultSchema,
               ...(input.signal === undefined ? {} : { signal: input.signal }),
             },
           );

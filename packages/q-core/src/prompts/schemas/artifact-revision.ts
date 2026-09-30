@@ -118,3 +118,29 @@ export type ArtifactRevisionV2Result = z.infer<
   typeof ArtifactRevisionV2ResultSchema
 >;
 export const ARTIFACT_REVISION_V2_SCHEMA_VERSION = 2;
+
+/**
+ * v3 (founder live 2026-09-30): any document's look, not only a deck's
+ * cover. Asked to make a mandate's background light brown, v2 had nowhere
+ * to put it, and Q said it had updated the document. pageBackground paints
+ * every page (every slide of a deck but a cover of its own); ink is the
+ * text colour on it. Still only what the person asked for.
+ */
+export const ArtifactRevisionV3ResultSchema =
+  ArtifactRevisionV2ResultSchema.extend({
+    style: z
+      .object({
+        coverBackground: z.array(HexColourSchema).min(1).max(2).nullable(),
+        coverTitleInk: HexColourSchema.nullable(),
+        accent: HexColourSchema.nullable(),
+        pageBackground: HexColourSchema.nullable().default(null),
+        ink: HexColourSchema.nullable().default(null),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+  }).strict();
+export type ArtifactRevisionV3Result = z.infer<
+  typeof ArtifactRevisionV3ResultSchema
+>;
+export const ARTIFACT_REVISION_V3_SCHEMA_VERSION = 3;

@@ -395,11 +395,15 @@ export {
 } from "./prompts/tasks/company-analyst.v13.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export { ARTIFACT_REVISION_V2 } from "./prompts/tasks/artifact-revision.v2.js";
+export { ARTIFACT_REVISION_V3 } from "./prompts/tasks/artifact-revision.v3.js";
 export {
   ARTIFACT_REVISION_BODY_MAX,
   ARTIFACT_REVISION_SLIDES_MAX,
   ARTIFACT_REVISION_V2_SCHEMA_VERSION,
+  ARTIFACT_REVISION_V3_SCHEMA_VERSION,
   ArtifactRevisionV2ResultSchema,
+  ArtifactRevisionV3ResultSchema,
+  type ArtifactRevisionV3Result,
   type ArtifactRevisionV2Result,
   ARTIFACT_REVISION_SCHEMA_NAME,
   ARTIFACT_REVISION_SCHEMA_VERSION,

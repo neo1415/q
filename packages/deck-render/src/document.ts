@@ -2,6 +2,7 @@ import { PDFDocument, type PDFPage } from "pdf-lib";
 
 import type { QArtifactVersion } from "@capital-q/contracts";
 
+import { contrastRatio } from "./contrast.js";
 import { drawLine, embedFonts, type EmbeddedFont } from "./fonts.js";
 import { colour } from "./pdf.js";
 import { themeFor, type BrandInput } from "./theme.js";
@@ -54,6 +55,17 @@ export type ArtifactDocument = {
   readonly gaps: readonly string[];
   /** The standing sentence about what this document is not. */
   readonly notice: string;
+  /**
+   * The document's own look, when the person asked for one (founder live
+   * 2026-09-30): the page background, text colour and accent.
+   */
+  readonly look?:
+    | {
+        readonly background?: string | undefined;
+        readonly ink?: string | undefined;
+        readonly accent?: string | undefined;
+      }
+    | undefined;
 };
 
 /**
@@ -120,6 +132,9 @@ export function documentFromArtifact(input: {
     })),
     gaps: version.content.gaps,
     notice: NOTICE,
+    ...(version.content.look === undefined
+      ? {}
+      : { look: version.content.look }),
   };
 }
 
@@ -135,10 +150,18 @@ const PAGE = {
   bottom: 84,
 } as const;
 
-const INK = "#101418";
-const SECONDARY = "#39424b";
+const BASE_INK = "#101418";
+const BASE_SECONDARY = "#39424b";
 /** 5.9:1 on white: secondary text that still passes WCAG AA. */
-const MUTED = "#5b6570";
+const BASE_MUTED = "#5b6570";
+
+/** Black or white, whichever reads better on a background. */
+function readableOn(background: string): string {
+  return (contrastRatio("#000000", background) ?? 21) >=
+    (contrastRatio("#ffffff", background) ?? 21)
+    ? "#000000"
+    : "#ffffff";
+}
 
 /**
  * Break text into lines no wider than `width`, with real metrics.
@@ -200,18 +223,30 @@ function wrapWith(
  */
 class Flow {
   private readonly pdf: PDFDocument;
+  private readonly background: string | undefined;
   private page: PDFPage;
   private y: number;
   readonly pages: PDFPage[] = [];
 
-  constructor(pdf: PDFDocument) {
+  constructor(pdf: PDFDocument, background?: string) {
     this.pdf = pdf;
+    this.background = background;
     this.page = this.addPage();
     this.y = PAGE.top;
   }
 
   private addPage(): PDFPage {
     const page = this.pdf.addPage([PAGE.width, PAGE.height]);
+    // The page colour the person asked for, under everything else.
+    if (this.background !== undefined) {
+      page.drawRectangle({
+        x: 0,
+        y: 0,
+        width: PAGE.width,
+        height: PAGE.height,
+        color: colour(this.background),
+      });
+    }
     this.pages.push(page);
     return page;
   }
@@ -302,9 +337,20 @@ export async function documentToPdf(
   pdf.setCreator("Capital Q");
   pdf.setLanguage("en");
   const fonts = await embedFonts(pdf);
-  const accent = themeFor(brand?.direction, brand?.accent).accent;
+  const look = document.look;
+  const accent =
+    look?.accent ?? themeFor(brand?.direction, brand?.accent).accent;
+  // On a page colour of their own, text takes their ink, or whichever of
+  // black and white reads best on it; the greys are for white paper.
+  const pageInk =
+    look?.background === undefined
+      ? look?.ink
+      : (look.ink ?? readableOn(look.background));
+  const INK = pageInk ?? BASE_INK;
+  const SECONDARY = pageInk ?? BASE_SECONDARY;
+  const MUTED = pageInk ?? BASE_MUTED;
 
-  const flow = new Flow(pdf);
+  const flow = new Flow(pdf, look?.background);
   const width = flow.width;
 
   flow.lines(fonts.bold, wrapWith(fonts.bold, document.kind, 10, width), {

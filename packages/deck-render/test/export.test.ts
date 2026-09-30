@@ -397,4 +397,13 @@ describe("BIZ-001 · a deck is slides, as PDF and as PowerPoint", () => {
     });
     expect(isPdf(file?.bytes ?? new Uint8Array())).toBe(true);
   });
+
+  it("paints every slide the page background asked for, with readable text (founder live 2026-09-30)", () => {
+    const laid = layOutDeck({ ...deck, background: "#3b2a1a" });
+    expect(
+      laid.slides.every((slide) => slide.background?.[0] === "#3b2a1a"),
+    ).toBe(true);
+    const light = layOutDeck({ ...deck, background: "#f3e6d4" });
+    expect(light.slides[0]?.background).toEqual(["#f3e6d4"]);
+  });
 });

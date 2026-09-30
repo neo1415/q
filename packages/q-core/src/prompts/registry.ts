@@ -24,6 +24,7 @@ import { COMPANY_ANALYST_V12 } from "./tasks/company-analyst.v12.js";
 import { COMPANY_ANALYST_V13 } from "./tasks/company-analyst.v13.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
+import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
 import { DECISION_READER_V1 } from "./tasks/decision-reader.v1.js";
 import { TURN_READER_V1 } from "./tasks/turn-reader.v1.js";
 import { TURN_READER_V2 } from "./tasks/turn-reader.v2.js";
@@ -249,6 +250,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V13,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
+    ARTIFACT_REVISION_V3,
     FIT_EXPLANATION_V1,
     PRESENCE_READER_V1,
     INVESTOR_RESEARCH_READER_V1,
