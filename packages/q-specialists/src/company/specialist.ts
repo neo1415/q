@@ -26,7 +26,7 @@ import {
   citePublicSources,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV8ResultSchema,
+  CompanyAnalystV12ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -765,7 +765,10 @@ export function createCompanyIntelligenceSpecialist(
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: CompanyAnalystV8ResultSchema,
+            // The active prompt's own result (v12 on): its comparison
+            // cards are a field the prompt asks for, and an older schema
+            // refused every answer that filled it (live 2026-09-30).
+            schema: CompanyAnalystV12ResultSchema,
             // Independent readings: one malformed statement must not throw
             // away the change beside it (CQ-QX-007 A5).
             invalidListItems: "DROP",
