@@ -396,7 +396,7 @@ export const CONTROL_SCREEN = "client.screen.control" as const;
 export const ControlScreenInputSchema = z
   .object({
     act: QScreenActSchema.describe(
-      "SCROLL_TOP / SCROLL_BOTTOM / PAGE_DOWN / PAGE_UP: scroll the page they are on. GO_BACK: the previous page. SHOW_SECTION: bring one section into view (name it in section). OPEN_BOOK_CALL / OPEN_REMINDER: open that dialog on a relationship's page.",
+      "SCROLL_TOP / SCROLL_BOTTOM / PAGE_DOWN / PAGE_UP: scroll the page they are on. GO_BACK: the previous page. SHOW_SECTION: bring one section into view (name it in section). OPEN_BOOK_CALL / OPEN_REMINDER: open that dialog on a relationship's page. On Discover: NEXT_ITEM / PREVIOUS_ITEM move to the next or previous company; PASS_CURRENT passes on the company on screen and moves on; SAVE_CURRENT saves it.",
     ),
     section: QScreenSectionSchema.optional().describe(
       "For SHOW_SECTION: history, commitment, next or context on a relationship; objective or relationships on Capital; share or applications on Gateway.",
@@ -420,7 +420,7 @@ export function createControlScreenTool(): AnyQToolDefinition {
     id: CONTROL_SCREEN,
     providerName: "control_screen",
     description:
-      "Works the page they are on, at once: scroll up or down, to the top or bottom, go back, show a section, or open the book-a-call or reminder dialog on a relationship's page. Use it when they ask you to scroll, show them something on this page, or open one of its dialogs.",
+      "Works the page they are on, at once: scroll up or down, to the top or bottom, go back, show a section, or open the book-a-call or reminder dialog on a relationship's page. On Discover it is the feed's own controls: 'next' / 'back' move between companies, 'pass' passes on the one on screen and moves on, 'save' saves it. Use it whenever they ask you to scroll, move on, pass, save, or show them something on this page.",
     input: ControlScreenInputSchema,
     authorize: (input, { actor, plan }) =>
       Promise.resolve(

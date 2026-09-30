@@ -77,6 +77,9 @@ export function registerClientRouter(
   clientRouterPush = push;
 }
 
+/** Q's moves on Discover's feed, heard by the feed itself. */
+export const Q_FEED_EVENT = "cq:q-feed";
+
 /** The element that scrolls: the shell's main area, else the document. */
 function scroller(): Element {
   const main = document.getElementById("main");
@@ -115,6 +118,15 @@ function screenAct(intent: QScreenActIntent): void {
       return;
     case "OPEN_REMINDER":
       window.location.hash = "reminders";
+      return;
+    // Discover's feed takes these through its own controls.
+    case "NEXT_ITEM":
+    case "PREVIOUS_ITEM":
+    case "PASS_CURRENT":
+    case "SAVE_CURRENT":
+      window.dispatchEvent(
+        new CustomEvent(Q_FEED_EVENT, { detail: intent.act }),
+      );
       return;
   }
 }

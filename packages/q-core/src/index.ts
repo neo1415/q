@@ -243,6 +243,16 @@ export {
 export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
 export { MEETING_NOTES_V2 } from "./prompts/tasks/meeting-notes.v2.js";
 export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
+export { INVESTOR_PERSONA_V1 } from "./prompts/tasks/investor-persona.v1.js";
+export {
+  INVESTOR_PERSONA_SCHEMA_NAME,
+  INVESTOR_PERSONA_SCHEMA_VERSION,
+  INVESTOR_PERSONA_UNTRUSTED,
+  InvestorPersonaResultSchema,
+  InvestorPersonaVariablesSchema,
+  type InvestorPersonaResult,
+  type InvestorPersonaVariables,
+} from "./prompts/schemas/investor-persona.js";
 export {
   ERRAND_REPLY_SCHEMA_NAME,
   ERRAND_REPLY_SCHEMA_VERSION,

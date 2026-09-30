@@ -115,6 +115,8 @@ describe("registry", () => {
         "INVESTOR_RESEARCH_READER",
         // Founder direction 2026-09-29: Q replying inside an approved errand.
         "ERRAND_REPLY",
+        // Founder direction 2026-09-30: an investor, for a rehearsal.
+        "INVESTOR_PERSONA",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

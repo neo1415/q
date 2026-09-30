@@ -420,6 +420,40 @@ async function run(
   }
 }
 
+/**
+ * The mandate a change is about (live 2026-09-30: Q passed the investor
+ * organisation's id as the mandate's, and "omit for their current one"
+ * had nothing behind it, so every mandate edit failed). The id asked for
+ * counts only when it is one of this organisation's mandates; otherwise
+ * the organisation's ACTIVE mandate, else its newest one not closed.
+ * Resolved through the investor service as the approver, so a mandate
+ * they may not see is never found.
+ */
+async function mandateFor(
+  deps: RecordChangeDependencies,
+  actor: ActorContext,
+  investorOrganisationId: string,
+  requested: string | null,
+): Promise<string | null> {
+  const page = await deps.investorService
+    .listInvestorMandates({
+      actor,
+      investorOrganisationId: InvestorOrganisationIdSchema.parse(
+        investorOrganisationId,
+      ),
+      limit: 50,
+    })
+    .catch(() => null);
+  if (page === null) return null;
+  const mandates = page.items;
+  if (requested !== null && mandates.some((m) => m.id === requested)) {
+    return requested;
+  }
+  const active = mandates.find((m) => m.status === "ACTIVE");
+  if (active !== undefined) return active.id;
+  return mandates.find((m) => m.status !== "CLOSED")?.id ?? null;
+}
+
 export function createRecordChangeActions(
   deps: RecordChangeDependencies,
 ): readonly AnyQActionDefinition[] {
@@ -589,19 +623,22 @@ export function createRecordChangeActions(
             },
           ]);
         }
-        if (payload.mandateId === null) {
-          return Promise.resolve<Verdict>({
-            outcome: "DENY",
-            code: "NOT_AVAILABLE",
-          });
-        }
-        return holds(deps, actor, [
-          {
-            code: "investor.mandate.edit",
-            resourceType: "investor_mandate",
-            resourceId: payload.mandateId,
-          },
-        ]);
+        return mandateFor(
+          deps,
+          actor,
+          payload.investorOrganisationId,
+          payload.mandateId,
+        ).then((mandateId) =>
+          mandateId === null
+            ? { outcome: "DENY", code: "NOT_AVAILABLE" }
+            : holds(deps, actor, [
+                {
+                  code: "investor.mandate.edit",
+                  resourceType: "investor_mandate",
+                  resourceId: mandateId,
+                },
+              ]),
+        );
       }),
     executor: {
       execute: (action, context) =>
@@ -627,7 +664,12 @@ export function createRecordChangeActions(
               return { version: created.version };
             }
             const mandateId = InvestorMandateIdSchema.parse(
-              action.payload.mandateId,
+              await mandateFor(
+                deps,
+                actor,
+                action.payload.investorOrganisationId,
+                action.payload.mandateId,
+              ),
             );
             const current = await deps.investorService.getInvestorMandate({
               actor,

@@ -51,6 +51,8 @@ export const PROMPT_IDS = [
   "INVESTOR_RESEARCH_READER",
   /** Founder direction 2026-09-29: Q replying inside an approved errand. */
   "ERRAND_REPLY",
+  /** Founder direction 2026-09-30: an investor, for a rehearsal Q plays. */
+  "INVESTOR_PERSONA",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -75,6 +77,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   DELEGATION_READER: "delegation-reader",
   INVESTOR_RESEARCH_READER: "investor-research-reader",
   ERRAND_REPLY: "errand-reply",
+  INVESTOR_PERSONA: "investor-persona",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

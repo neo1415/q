@@ -296,6 +296,12 @@ export const Q_SCREEN_ACTS = [
   "SHOW_SECTION",
   "OPEN_BOOK_CALL",
   "OPEN_REMINDER",
+  // Discover's feed, through its own controls (founder report 2026-09-30):
+  // the next or previous company, and Pass or Save on the one on screen.
+  "NEXT_ITEM",
+  "PREVIOUS_ITEM",
+  "PASS_CURRENT",
+  "SAVE_CURRENT",
 ] as const;
 export const QScreenActSchema = z.enum(Q_SCREEN_ACTS);
 export type QScreenAct = z.infer<typeof QScreenActSchema>;

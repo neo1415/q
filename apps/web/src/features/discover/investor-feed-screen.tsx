@@ -29,6 +29,7 @@ import { EmptyState } from "@capital-q/ui/states";
 
 import { useGlobalQ, useQMomentSource } from "@/components/app-shell/global-q";
 import { QAperture } from "@/features/q-aperture";
+import { Q_FEED_EVENT } from "@/features/q/client-actions";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { QPageSubject } from "@/features/q/q-subject";
 
@@ -528,7 +529,11 @@ function InvestorFeed({
     () => false,
   );
   const hold = settledAt !== index || tabHidden || tapPaused || splashUp;
-  const effectiveMuted = muted || qOpen || qSpeaking;
+  // While the voice line is open the pitch stays muted, not only while Q
+  // speaks: the microphone heard the video's words as the person's and cut
+  // Q off (live 2026-09-30: runs cancelled mid-"I'm interested").
+  const voiceOpen = session?.voice.active === true;
+  const effectiveMuted = muted || qOpen || qSpeaking || voiceOpen;
 
   /** Space plays or pauses the pitch in view; the element is the truth. */
   const togglePlay = useCallback(() => {
@@ -652,6 +657,31 @@ function InvestorFeed({
     },
     [next, previous, togglePlay, reducedMotion],
   );
+
+  // Q's moves on the feed (founder report 2026-09-30: "say next and it
+  // goes to the next one... pass should go straight to the next video"):
+  // the same controls as the keys and buttons.
+  const cardForQ = feed.card;
+  useEffect(() => {
+    const onQ = (event: Event) => {
+      const act: unknown =
+        event instanceof CustomEvent ? (event.detail as unknown) : null;
+      if (act === "NEXT_ITEM") next();
+      else if (act === "PREVIOUS_ITEM") previous();
+      else if (act === "PASS_CURRENT" && cardForQ !== null) {
+        feed.pass(cardForQ.companyId);
+        next();
+      } else if (
+        act === "SAVE_CURRENT" &&
+        cardForQ !== null &&
+        !feed.decisionFor(cardForQ.companyId).saved
+      ) {
+        feed.save(cardForQ.companyId);
+      }
+    };
+    window.addEventListener(Q_FEED_EVENT, onQ);
+    return () => window.removeEventListener(Q_FEED_EVENT, onQ);
+  }, [next, previous, feed, cardForQ]);
 
   const hasCard = feed.card !== null;
   useEffect(() => {
