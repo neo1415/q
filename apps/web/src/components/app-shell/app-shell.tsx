@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { buttonClassName } from "@capital-q/ui/button";
+
 import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { QDock } from "@/features/q-dock";
@@ -36,6 +38,7 @@ export function AppShell({
   context = UNSET,
   subject = NO_SUBJECT,
   qConnected = false,
+  onboarding = null,
 }: {
   readonly children: ReactNode;
   readonly context?: ShellContext | undefined;
@@ -43,7 +46,29 @@ export function AppShell({
   readonly subject?: QSubject | undefined;
   /** False when this build has no Q API. */
   readonly qConnected?: boolean | undefined;
+  /**
+   * Where their unfinished onboarding continues, or null once it is done.
+   * While set, the shell offers no navigation but the way back to Q.
+   */
+  readonly onboarding?: string | null | undefined;
 }) {
+  if (onboarding !== null) {
+    return (
+      <GlobalQProvider subject={subject} connected={qConnected}>
+        <div className="cq-shell-body">
+          <header className="flex min-h-14 items-center justify-between gap-3 border-b border-(--cq-border-subtle) px-4">
+            <span className="cq-label text-(--cq-text-primary)">Capital Q</span>
+            <a href={onboarding} className={buttonClassName("primary")}>
+              Continue with Q
+            </a>
+          </header>
+          <main id="main" className="cq-shell-main">
+            {children}
+          </main>
+        </div>
+      </GlobalQProvider>
+    );
+  }
   return (
     <GlobalQProvider subject={subject} connected={qConnected} dock={<QDock />}>
       <div className="cq-shell">

@@ -21,7 +21,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Capital Q",
     description:
       "Investment intelligence for private capital. Q helps founders and investors reach a capital objective.",
-    start_url: "/discover",
+    start_url: "/welcome",
     scope: "/",
     display: "standalone",
     orientation: "portrait",

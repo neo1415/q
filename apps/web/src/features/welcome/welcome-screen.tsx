@@ -290,13 +290,6 @@ export function WelcomeScreen({
             >
               Talk with Q instead
             </button>
-            <button
-              type="button"
-              className="cq-stage-quiet"
-              onClick={() => router.push("/home")}
-            >
-              Skip for now
-            </button>
           </div>
         )}
       </div>

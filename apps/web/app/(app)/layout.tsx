@@ -4,7 +4,11 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { requireSessionUser } from "@/auth/session";
 import { AppShell, type ShellContext } from "@/components/app-shell/app-shell";
-import { resolveOwnContext } from "@/features/q/context";
+import {
+  onboardingPath,
+  resolveOnboardingState,
+  resolveOwnContext,
+} from "@/features/q/context";
 import type { QSubject } from "@/features/q/q-subject";
 import { QSwarmPointer } from "@/features/q-swarm/q-swarm-pointer";
 import { InstallPrompt } from "@/pwa/install-prompt";
@@ -54,8 +58,19 @@ export default async function ApplicationLayout({
           }
         : { kind: "NONE", scope: "unset" };
   const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
+  // Founder direction 2026-09-30: nobody uses Capital Q before Q has onboarded
+  // them. Until then the navigation is one way back to Q; a page Q sent them
+  // to while they are not ready stays readable, nothing else is offered.
+  const unfinished = qConnected
+    ? onboardingPath(await resolveOnboardingState())
+    : null;
   return (
-    <AppShell context={shell} subject={subject} qConnected={qConnected}>
+    <AppShell
+      context={shell}
+      subject={subject}
+      qConnected={qConnected}
+      onboarding={unfinished}
+    >
       {children}
       <InstallPrompt />
       <QSwarmPointer />

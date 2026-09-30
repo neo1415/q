@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 
 /**
- * The application has no landing page; the product starts at Discover
- * (founder directive, 2026-09-27). Q stays one tap away: the dock, and the
- * Q tab at /home (also reachable as /q).
+ * The application has no landing page. Arrival decides where it starts:
+ * Q's onboarding for anybody not yet onboarded (founder direction
+ * 2026-09-30), Discover for everybody else (founder directive 2026-09-27).
  */
 export default function RootPage(): never {
-  redirect("/discover");
+  redirect("/welcome");
 }

@@ -182,7 +182,7 @@ export function InvestorOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-6">
         <div className="flex items-center justify-between gap-2">
-          <Link href="/home" className="cq-label text-(--cq-text-tertiary)">
+          <Link href="/discover" className="cq-label text-(--cq-text-tertiary)">
             Save &amp; leave
           </Link>
           <span className="cq-label text-(--cq-text-primary)">

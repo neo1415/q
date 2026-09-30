@@ -157,7 +157,9 @@ export function FounderOnboardingScreen({
   const finishFromQ = async () => {
     await actions.submit({ kind: "snapshot", confirmed: true });
     if (await actions.complete()) {
-      router.push("/home");
+      // Founder direction 2026-09-30: done, the founder checks and edits
+      // what Q put together, on their own profile.
+      router.push("/profile");
     }
   };
 
@@ -166,7 +168,7 @@ export function FounderOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-6">
         <div className="flex items-center justify-between gap-2">
-          <Link href="/home" className="cq-label text-(--cq-text-tertiary)">
+          <Link href="/discover" className="cq-label text-(--cq-text-tertiary)">
             Save &amp; leave
           </Link>
           <span className="cq-label text-(--cq-text-primary)">
@@ -265,7 +267,9 @@ export function FounderOnboardingScreen({
     // journey completion only; Home decides what comes next.
     await actions.submit({ kind: "snapshot", confirmed: true });
     if (await actions.complete()) {
-      router.push("/home");
+      // Founder direction 2026-09-30: done, the founder checks and edits
+      // what Q put together, on their own profile.
+      router.push("/profile");
     }
   };
 

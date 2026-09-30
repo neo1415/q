@@ -253,6 +253,55 @@ export const resolveUnfinishedSetup = cache(
   },
 );
 
+/**
+ * Where this person stands with onboarding (founder direction 2026-09-30:
+ * "the user must always onboard"). DONE once either journey completed, or
+ * when an account from before onboarding existed has a context and no
+ * session at all. UNKNOWN when Capital Q could not be asked: routing then
+ * never traps anybody.
+ */
+export type OnboardingState =
+  | { readonly kind: "DONE" }
+  | { readonly kind: "UNFINISHED"; readonly journey: "founder" | "investor" }
+  | { readonly kind: "NEW" }
+  | { readonly kind: "UNKNOWN" };
+
+export const resolveOnboardingState = cache(
+  async (): Promise<OnboardingState> => {
+    const session = await apiSession();
+    if (session === null) return { kind: "UNKNOWN" };
+    let active: "founder" | "investor" | null = null;
+    let failed = false;
+    for (const journey of ["founder", "investor"] as const) {
+      try {
+        const view = await getCurrentOnboardingSession(session, journey);
+        if (view.session.status === "COMPLETED") return { kind: "DONE" };
+        if (view.session.status === "ACTIVE" && active === null) {
+          active = journey;
+        }
+      } catch (error: unknown) {
+        // No such journey for this person is a normal 404; anything else
+        // means Capital Q was not asked successfully.
+        if (!(error instanceof ApiProblemError && error.status === 404)) {
+          failed = true;
+        }
+      }
+    }
+    if (active !== null) return { kind: "UNFINISHED", journey: active };
+    if (failed) return { kind: "UNKNOWN" };
+    const context = await resolveOwnContext();
+    return context.kind === "NONE" ? { kind: "NEW" } : { kind: "DONE" };
+  },
+);
+
+/** Where somebody who has not finished onboarding continues it, with Q. */
+export function onboardingPath(state: OnboardingState): string | null {
+  if (state.kind === "UNFINISHED") {
+    return `/onboarding/${state.journey}?talk=1`;
+  }
+  return state.kind === "NEW" ? "/welcome" : null;
+}
+
 export const resolveOwnContext = cache(async (): Promise<OwnContext> =>
   resolveOwnContextWith(await apiSession()),
 );

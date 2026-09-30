@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 
+import { redirect } from "next/navigation";
+
 import { HomeScreen } from "@/features/home/home-screen";
+import { onboardingPath, resolveOnboardingState } from "@/features/q/context";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -33,6 +36,10 @@ export default async function HomePage({
    * The page already renders per request and already has the parameter.
    * Passing it down means the panel is mounted once, with the answer.
    */
+  // Founder direction 2026-09-30: Q's page is the interview until the
+  // person has been onboarded; general Q knows nothing to work from yet.
+  const unfinished = onboardingPath(await resolveOnboardingState());
+  if (unfinished !== null) redirect(unfinished);
   const params = await searchParams;
   const raw = params["c"];
   const conversationId = typeof raw === "string" && raw.length > 0 ? raw : null;

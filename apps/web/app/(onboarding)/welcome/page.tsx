@@ -3,11 +3,7 @@ import { redirect } from "next/navigation";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 
-import { arrivalFor } from "@/features/home/returning";
-import {
-  resolveOwnContext,
-  resolveUnfinishedSetup,
-} from "@/features/q/context";
+import { resolveOnboardingState } from "@/features/q/context";
 import { WelcomeScreen } from "@/features/welcome/welcome-screen";
 import { fetchMe, updateMe } from "@capital-q/api-client";
 import { accountDetails } from "@/auth/account-details";
@@ -21,9 +17,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Arrival (CQ-Q-VOICE-001 rework). A person Capital Q already knows goes
- * straight to Discover; a new person meets Q first. `?again=1` lets anyone
- * come back to it.
+ * Arrival (CQ-Q-VOICE-001 rework). A person Capital Q has onboarded goes
+ * straight to Discover; anyone else meets Q, which onboards them first.
+ * `?again=1` lets anyone come back to it.
  */
 export default async function WelcomePage({
   searchParams,
@@ -35,20 +31,14 @@ export default async function WelcomePage({
   if (config.qApiBaseUrl === undefined) {
     redirect("/discover");
   }
-  const context = await resolveOwnContext();
+  // Founder direction 2026-09-30: whoever has not finished onboarding goes
+  // straight back into it, with Q; whoever has is at home in Discover.
+  const state = await resolveOnboardingState();
   if (params["again"] !== "1") {
-    // Somebody part-way through a setup that has not named a company yet
-    // is back too, and Home is where Q welcomes them back (CQ-WEB-030).
-    const unfinished =
-      context.kind === "NONE" ? await resolveUnfinishedSetup() : null;
-    if (arrivalFor(context, unfinished) === "RETURNING") {
-      // Discover is home (founder directive, 2026-09-27). A setup left
-      // part-way with no company or organisation yet has nothing to
-      // discover from, so Q welcomes that person back on its own page.
-      redirect(
-        unfinished !== null && context.kind === "NONE" ? "/home" : "/discover",
-      );
+    if (state.kind === "UNFINISHED") {
+      redirect(`/onboarding/${state.journey}?talk=1&from=home`);
     }
+    if (state.kind === "DONE") redirect("/discover");
   }
   let knownName: string | null = null;
   let knownOrganisation: string | null = null;

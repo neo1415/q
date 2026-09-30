@@ -152,8 +152,9 @@ function decisionsOf(
         typeof (from as Record<string, unknown>)[key] === "string"
           ? String((from as Record<string, unknown>)[key]).slice(0, 80)
           : "-";
+      const reason = field(result, "reason");
       out.push(
-        `${action.tool}:${field(result, "stepKey")}:${field(item, "basis")}:${field(result, "outcome")}`,
+        `${action.tool}:${field(result, "stepKey")}:${field(item, "basis")}:${field(result, "outcome")}${reason === "-" ? "" : `:${reason}`}`,
       );
     }
   }
