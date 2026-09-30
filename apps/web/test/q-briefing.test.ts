@@ -398,5 +398,8 @@ describe("decideBriefing (once a day, per browser)", () => {
   it("without storage, still gives it (never lost)", () => {
     expect(decideBriefing(briefing, NOW)).toBe(briefing);
     expect(decideBriefing(null, NOW)).toBeNull();
+    // Founder report 2026-09-30: a briefing streamed as undefined stopped
+    // "Talk with Q" dead. It is simply no briefing.
+    expect(decideBriefing(undefined, NOW)).toBeNull();
   });
 });

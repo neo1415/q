@@ -323,9 +323,14 @@ export function QConversationPanel({
     rememberEnded(false);
     // Over a welcome still on screen, Q says that welcome and nothing
     // before it: one greeting, not the page's and then the call's.
+    // The greeting is a nicety: if it cannot be put together, Q still
+    // answers the press with the plain welcome (founder report 2026-09-30:
+    // "I keep clicking Talk with Q and nothing happens").
     const greeting =
       welcomeLine !== undefined && turns.length === 0 && spoken.length === 0
-        ? await spokenWelcome(welcomeLine, welcomeLead, briefing)
+        ? await spokenWelcome(welcomeLine, welcomeLead, briefing).catch(
+            () => welcomeLine,
+          )
         : undefined;
     await sessionTalk(greeting === undefined ? undefined : { greeting });
   }, [
