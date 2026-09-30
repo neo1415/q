@@ -235,17 +235,20 @@ export function QSheetConversation({
           }
           {...(connected
             ? {
-                onSubmit: voice.active
-                  ? (text: string) => {
-                      voice.client.sendText(text);
-                    }
-                  : (text: string) =>
-                      q.ask(
-                        text,
-                        moment === null
-                          ? undefined
-                          : { viewing: viewingOf(moment) },
-                      ),
+                // Only a connected line carries typed words (live
+                // 2026-09-30); otherwise they are asked as a question.
+                onSubmit:
+                  voice.active && voice.client.connected
+                    ? (text: string) => {
+                        voice.client.sendText(text);
+                      }
+                    : (text: string) =>
+                        q.ask(
+                          text,
+                          moment === null
+                            ? undefined
+                            : { viewing: viewingOf(moment) },
+                        ),
               }
             : {})}
         />

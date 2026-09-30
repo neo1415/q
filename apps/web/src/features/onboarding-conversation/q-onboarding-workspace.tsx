@@ -718,12 +718,12 @@ export function QOnboardingWorkspace({
   );
 
   const say = useCallback(
-    async (text: string) => {
+    async (text: string, typed = false) => {
       const trimmed = text.trim();
       if (trimmed.length === 0) {
         return;
       }
-      if (voiceActive) {
+      if (voiceActive && !typed) {
         // The spoken thread carries it: same runtime path, Q answers aloud.
         voiceSendText(trimmed);
         return;
@@ -1345,7 +1345,17 @@ export function QOnboardingWorkspace({
           notice={voice.notice}
           onDismissNotice={voice.clearNotice}
           asking={voice.turn?.asking ?? null}
-          onSay={(text) => voiceSendText(text)}
+          onSay={(text) => {
+            // Live 2026-09-30: with no microphone the line never connects,
+            // and typed words sent into it were lost. Typing then leaves the
+            // voice stage and goes through the typed interview instead.
+            if (voice.client.connected) {
+              voiceSendText(text);
+              return;
+            }
+            void voice.end();
+            void say(text, true);
+          }}
           onUpload={uploadWhileTalking}
           uploadNote={uploadNote}
           onUseForm={

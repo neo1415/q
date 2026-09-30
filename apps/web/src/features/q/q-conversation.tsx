@@ -539,13 +539,16 @@ export function QConversationPanel({
 
   // One way to say something to Q from the page: down the open line when
   // there is one (answered aloud), otherwise as a question.
+  // A line that never connected (no microphone) carries nothing: typed
+  // words then go to Q as a question (live 2026-09-30).
   const sendText = client.sendText;
+  const lineOpen = voiceActive && client.connected;
   const sayOrAsk = useCallback(
     (text: string) => {
-      if (voiceActive) sendText(text);
+      if (lineOpen) sendText(text);
       else void q.ask(text);
     },
-    [voiceActive, sendText, q],
+    [lineOpen, sendText, q],
   );
 
   // What the welcome's cards do, in this surface rather than elsewhere.
@@ -1062,7 +1065,7 @@ export function QConversationPanel({
                   : {})}
                 {...(connected
                   ? {
-                      onSubmit: voice.active
+                      onSubmit: lineOpen
                         ? (text: string) => {
                             client.sendText(text);
                           }
