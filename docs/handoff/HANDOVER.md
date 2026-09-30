@@ -163,26 +163,51 @@ applied; sarcasm and jokes handled; "use whatever website you found"
 saved; off-list answers kept in their words; one "yes" to the review
 completes.
 
+Investor runs, after d03aca25..0bda48f0: Ventures Platform COMPLETE →
+/discover (monologue, "strike education", "never gambling" saved as a
+hard exclusion, health kept in their words, all optional mandate
+questions). Soyombo (obscure angel) ran through the whole mandate;
+research found his public cheque range; "angel and co-founder" kept as
+"Co-founder" in his words.
+
+Smart-interview mechanics now in place (see §3): sign-up name recorded
+and said back (never asked); reader told the step Q asked (v4); what an
+earlier utterance stated stays theirs (figures/text recorded, choices held
+as pending recommendations for a yes); answers given but not yet saved
+are listed to the loop; off-list answers kept with `ownWords`; one bad
+answer never sinks a batch; research readers drop only an unusable field;
+presence read runs for typed onboarding too (Signals & verification);
+Home Q offers unconfirmed findings once and knows who is asking.
+
 Open (priority order):
 
-1. Investor bench runs (Ventures Platform, Soyombo): the web composer bug
-   that dropped typed words (fixed 98693221) blocked them; rerun.
-2. Required questions are re-asked every turn while the person talks
-   about other things (Chowdeck: full-time asked 6x).
-3. Research can still find a namesake (Chowdeck: "Telehealth").
-4. "Signals & verification" empty for new companies (nothing feeds it).
-5. Founder role: now kept in their words (ownWords) and shown as their
-   title; a definition v3 with a "Founder" option is optional.
-6. After onboarding, pending research findings are not offered anywhere.
-7. Deck offer on Home for founders without a deck: coded (10158049), not
-   yet seen live.
-8. Latency: 5-10 s per typed turn end to end (model ~2 s/round).
-9. Email spam: founder must verify a domain in Brevo and set SMTP_SENDER.
-10. Earlier list: C18 Q Daily, backgrounds/scroll/minimalism audit, voice
-    humanisation (#27), live checks for meetings/Gmail/Recall (#21, #34),
-    LangGraph ADR, server-action mismatch safeguard.
+1. Required questions are re-asked every turn while the person talks
+   about other things (Chowdeck: full-time asked 6x); acceptable but could
+   vary or defer.
+2. Research can still find a namesake (Chowdeck: "Telehealth").
+3. A bare "invest" was briefly recorded as a VC fund (Soyombo, corrected
+   next turn): the reader over-reads very short first answers.
+4. Deck offer on Home for founders without a deck and the unconfirmed
+   findings offer: coded (10158049, d726fbe0), not yet seen live.
+5. "Signals & verification": presence trigger now runs for typed
+   onboarding (42c9a4a4); confirm it fills for a new bench company.
+6. Latency: 5-15 s per typed turn end to end (model ~2 s/round; more when
+   a write is refused). Next: a faster dialogue route.
+7. Email spam: founder must verify a domain in Brevo and set SMTP_SENDER.
+8. Earlier list: C18 Q Daily, backgrounds/scroll/minimalism audit, voice
+   humanisation (#27), live checks for meetings/Gmail/Recall (#21, #34),
+   LangGraph ADR, server-action mismatch safeguard.
+9. Clear the bench accounts (bench._@fictional.capitalq.local,
+   founder.onboard_, investor.onboard*) when testing is done.
 
 ## 6. Lessons learned (do not relearn these)
+
+- The cloud worker gets restarted during long foreground browser runs:
+  run `persona-run.mjs` with `run_in_background` and read the transcript
+  from the DB (`transcript.sh <email>`); at most one browser at a time.
+- Research readers' strict schemas refused whole readings over one bad
+  field (empty team size, too many geographies): make readers lenient per
+  field, and grep "structured output refused" in the logs first.
 
 - The interview's refusals are the product: read the trace's `decisions`
   (e.g. "Their latest words do not state this", "An active organisation
