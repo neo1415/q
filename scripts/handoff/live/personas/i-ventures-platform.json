@@ -1,5 +1,5 @@
 {
-  "email": "bench.venturesplatform@fictional.capitalq.local",
+  "email": "bench.venturesplatform2@fictional.capitalq.local",
   "name": "Kola Aina",
   "org": "Ventures Platform",
   "journey": "investor",
@@ -28,7 +28,24 @@
     "I9.discovery_mode": "show me a curated set",
     "I10.inbound_preference": "open to inbound from founders that fit",
     "I11.review": "yes that's right",
-    "I12.handoff": "yes"
+    "I12.handoff": "yes",
+    "I3.geography_strength": "strong preference",
+    "I3.sector_strength": "strong preference",
+    "I3.sectors_avoid": "nothing in particular",
+    "I4.business_models": "SaaS, marketplaces, transaction-based",
+    "I4.customer_types": "small businesses and consumers",
+    "I4.capital_intensity": "prefer capital-light",
+    "I4.regulatory_appetite": "regulated markets are fine",
+    "I4.revenue_state": "pre-revenue is fine at pre-seed",
+    "I5.founder_preferences": "technical founders with deep market insight",
+    "I5.founder_strength": "strong preference",
+    "I6.green_flags": "fast shipping, strong retention, capital efficiency",
+    "I6.green_flag_strength": "strong preference",
+    "I6.custom_criteria": "no",
+    "I7.avoid": "gambling",
+    "I7.sector_exclusions": "gambling",
+    "I8.portfolio": "Paystack, PiggyVest, Thepeer",
+    "I11.additional_context": "no, that's everything"
   },
-  "fallback": "yes that's right"
+  "fallback": "no preference, move on"
 }

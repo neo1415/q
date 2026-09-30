@@ -991,13 +991,30 @@ export function createOnboardingPort(input: {
    * or a mention of a place, sector or amount never is, however the
    * acting model labels it. Null: permitted.
    */
+  /**
+   * Whether the reading found this step stated, or another step of the
+   * same concept (journey data): "never gambling, that's a hard no" read
+   * as sector exclusions is also the hard-exclusions step whose option it
+   * names (bench 2026-09-30).
+   */
+  const statedIn = (stated: ReadonlySet<string>, stepKey: string): boolean => {
+    if (stated.has(stepKey)) return true;
+    const families =
+      input.journeyType === "investor" ? INVESTOR_CONCEPT_FAMILIES : [];
+    return families.some(
+      (family) =>
+        family.stepKeys.includes(stepKey) &&
+        family.stepKeys.some((other) => stated.has(other)),
+    );
+  };
+
   const notStated = async (
     stepKey: string,
     quote?: string,
   ): Promise<OnboardingRecordResult | null> => {
     if (input.authority === undefined) return null;
     const authority = await input.authority();
-    if (authority?.stated.has(stepKey) === true) return null;
+    if (authority !== null && statedIn(authority.stated, stepKey)) return null;
     if (quote !== undefined && input.statedEarlier?.(stepKey, quote) === true) {
       return null;
     }
@@ -1163,7 +1180,8 @@ export function createOnboardingPort(input: {
     const resolved = await resolve(answer);
     if (!resolved.ok) return resolved.result;
     const reading = (await input.authority?.()) ?? null;
-    const latestStated = reading?.stated.has(resolved.step.stepKey) === true;
+    const latestStated =
+      reading !== null && statedIn(reading.stated, resolved.step.stepKey);
     const readerStated =
       latestStated ||
       input.statedEarlier?.(resolved.step.stepKey, answer.quote) === true;
@@ -1179,6 +1197,30 @@ export function createOnboardingPort(input: {
         resolved.value.type === "MULTI_SELECT" ||
         resolved.value.type === "RESOURCE_REFERENCE")
     ) {
+      // Held for their yes, the way research findings are: read back with
+      // any others in one line, accepted on their agreement (bench
+      // 2026-09-30: a bare "yes" to a read-back of several choices never
+      // stated them, and the interview stalled).
+      if (store !== undefined) {
+        try {
+          await store.recommend({
+            userId,
+            sessionId: input.onboardingSessionId,
+            stepKey: resolved.step.stepKey,
+            value: resolved.value,
+            rationale: `from what they said earlier: "${answer.quote.slice(0, 120)}"`,
+            runId: input.runId ?? null,
+          });
+          return {
+            stepKey: resolved.step.stepKey,
+            outcome: "REJECTED",
+            reason:
+              "Held for their confirmation, not recorded yet: it is your reading of something they said earlier. Read it back with any others in one short line; when they agree, accept_recommendation records it.",
+          };
+        } catch {
+          // Falls through to asking them.
+        }
+      }
       return {
         stepKey: resolved.step.stepKey,
         outcome: "REJECTED",
@@ -1723,8 +1765,20 @@ export function createOnboardingPort(input: {
     },
     record: async (answers) => {
       const results: OnboardingRecordResult[] = [];
+      // One answer that cannot be processed never loses the others (bench
+      // 2026-09-30: a category lookup's 400 threw out an investor's whole
+      // ten-answer monologue as "the profile save didn't complete").
+      const safely = async (
+        answer: (typeof answers)[number],
+      ): Promise<OnboardingRecordResult> => {
+        try {
+          return await recordOne(answer);
+        } catch (error: unknown) {
+          return refused(answer.stepKey, error);
+        }
+      };
       // In order: a prerequisite said in the same breath lands first.
-      for (const answer of answers) results.push(await recordOne(answer));
+      for (const answer of answers) results.push(await safely(answer));
       // A refused step whose prerequisite landed later in the batch gets
       // one more try, so the order they spoke in does not matter.
       for (const [index, result] of results.entries()) {
@@ -1735,7 +1789,7 @@ export function createOnboardingPort(input: {
           result.needsStepKey !== undefined &&
           written.includes(result.needsStepKey)
         ) {
-          results[index] = await recordOne(answer);
+          results[index] = await safely(answer);
         }
       }
       return results;

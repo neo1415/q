@@ -419,5 +419,11 @@ describe("a choice read from earlier words is said back, not recorded (live 2026
       actor,
     });
     expect(world.recordedValue("I0.investor_type")).toBeUndefined();
+    // Held for their yes, with where it came from.
+    const pending = await world.recommendations.pending({
+      userId: actor.userId,
+      sessionId: "f0000000-0000-4000-8000-000000000010",
+    });
+    expect(pending.map((p) => p.stepKey)).toContain("I0.investor_type");
   });
 });

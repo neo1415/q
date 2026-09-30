@@ -1,5 +1,5 @@
 {
-  "email": "bench.soyombo@fictional.capitalq.local",
+  "email": "bench.soyombo2@fictional.capitalq.local",
   "name": "Olumide Soyombo",
   "org": "Voltron Capital",
   "journey": "investor",
@@ -26,7 +26,26 @@
     "I9.discovery_mode": "curated",
     "I10.inbound_preference": "yes open to inbound",
     "I11.review": "yes",
-    "I12.handoff": "yes"
+    "I12.handoff": "yes",
+    "I2.investment_role": "we lead or co-lead",
+    "I3.geography_strength": "strong preference",
+    "I3.sector_strength": "strong preference",
+    "I3.sectors_avoid": "nothing in particular",
+    "I4.business_models": "SaaS, marketplaces, transaction-based",
+    "I4.customer_types": "small businesses and consumers",
+    "I4.capital_intensity": "prefer capital-light",
+    "I4.regulatory_appetite": "regulated markets are fine",
+    "I4.revenue_state": "pre-revenue is fine at pre-seed",
+    "I5.founder_preferences": "technical founders with deep market insight",
+    "I5.founder_strength": "strong preference",
+    "I6.green_flags": "fast shipping, strong retention, capital efficiency",
+    "I6.green_flag_strength": "strong preference",
+    "I6.custom_criteria": "no",
+    "I7.avoid": "crypto tokens",
+    "I7.sector_exclusions": "crypto tokens",
+    "I8.portfolio": "a few dozen early stage companies",
+    "I11.additional_context": "no, that's everything",
+    "I0.business_title": "Angel investor and co-founder"
   },
-  "fallback": "yes"
+  "fallback": "no preference, move on"
 }
