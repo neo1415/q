@@ -188,3 +188,9 @@ Onboarding status: founder/investor interviews live; presence read (Q looks the 
 - DONE #9 GateQ in the wild (bd09085b): /gateway (open with one press, link, QR, website snippet, inbox), /g/<id> public apply with Q, /g/<id>/embed frameable (only path without X-Frame-Options), public/gateq-embed.js.
 - Fixed: meeting record privacy (Q's analysis owner-only, spec 6.9.6); flaky GateQ throttle test (random request id containing "20").
 - LATER: admin console (#12), KYB vetting (#13), learning pipeline (#14), Q speaking in calls, other side's debrief, Q tools for commitments/gateway, "Record this" from meeting money-mentioned.
+
+## 2026-09-30 — FOUNDER DIRECTION: build all of it (order)
+A (trust): 1 Q mandatory in Capital Q meetings (declining recording = logged event, meeting still counts); 2 Q auto-detects money in calls/chats → DETECTED commitment both sides confirm/correct, never deletable; 3 attribution ledger (intro source, meetings held/declined, detected+confirmed money).
+B (unfinished): 4 Q speaks when addressed in calls; 5 other side's debrief; 6 live checks (Brevo, Gmail, Recall); 7 admin console; 8 KYB/KYC vetting; 9 learning pipeline (consent, de-identified corpus, evals); 10 minimalism/backgrounds/scroll; 11 Q tools for commitments/gateway.
+C (wow): 12 Investor Twin rehearsal (persona from mandate + public presence + platform comments + engagement with THIS founder; never the investor's private Q chats; voice, interruptions, scoring — cf. kuuza.ai); 13 live shared notes; 14 raise autopilot; 15 warm-intro graph; 16 weekly voice brief; 17 term sheet + e-sign; 18 The Q Daily (agent newspaper with real photos, dashboard + email); 19 diligence room; 20 comps & valuation desk.
+Runtime: LangGraph.js for long-running agents, model calls through the Q Model Gateway adapter (ADR needed: amends "no agent orchestration").
