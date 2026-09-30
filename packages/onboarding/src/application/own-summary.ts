@@ -119,8 +119,19 @@ function promptOf(step: OnboardingStepDefinition | undefined): string | null {
 function roleOf(
   step: OnboardingStepDefinition | undefined,
   value: OnboardingResponseValue | undefined,
+  note: string | null = null,
 ): string | null {
   if (step === undefined || value === undefined) return null;
+  // Their own words where the options could not hold them ("Founder"),
+  // rather than the catch-all's label.
+  if (
+    value.type === "SINGLE_SELECT" &&
+    value.optionKey === "other" &&
+    note !== null &&
+    note.trim().length > 0
+  ) {
+    return note.trim().slice(0, PROMPT_MAX);
+  }
   if (value.type === "TEXT") {
     const text = value.text.trim();
     return text.length === 0 ? null : text.slice(0, PROMPT_MAX);
@@ -266,6 +277,7 @@ export function createOwnOnboardingSummaryReader(options: {
               : roleOf(
                   aggregate.stepsByKey.get(roleKey),
                   aggregate.currentResponses.get(roleKey)?.value,
+                  aggregate.currentResponses.get(roleKey)?.note ?? null,
                 ),
           answeredCount: progress.completedEligibleStepCount,
           eligibleCount: progress.eligibleStepCount,

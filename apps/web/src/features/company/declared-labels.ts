@@ -21,7 +21,18 @@ export function stageLabel(code: string | null): string | null {
 
 /** Option keys are lowercase ISO codes; companies store them uppercase. */
 export function countryLabel(code: string | null): string | null {
-  return code === null
-    ? null
-    : (COUNTRY_LABELS.get(code.toLowerCase()) ?? code);
+  if (code === null) return null;
+  const listed = COUNTRY_LABELS.get(code.toLowerCase());
+  if (listed !== undefined) return listed;
+  // A country outside the short list (kept in the person's words, stored
+  // as its ISO code) is named by the platform's region names.
+  try {
+    return (
+      new Intl.DisplayNames(["en"], { type: "region" }).of(
+        code.toUpperCase(),
+      ) ?? code
+    );
+  } catch {
+    return code;
+  }
 }

@@ -36,6 +36,8 @@ export type InvestorWorld = {
   readonly recordedValue: (
     stepKey: string,
   ) => OnboardingResponseValue | undefined;
+  /** The person's own words kept with an answer, if any. */
+  readonly recordedNote: (stepKey: string) => string | undefined;
   /** Put a value on the record directly, standing in for an earlier turn. */
   readonly record: (stepKey: string, value: OnboardingResponseValue) => void;
   readonly skippedSteps: () => readonly string[];
@@ -484,6 +486,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
   return {
     fetch: fetchFake,
     recordedValue: (stepKey) => held.get(stepKey),
+    recordedNote: (stepKey) => notes.get(stepKey),
     record: (stepKey, value) => {
       held.set(stepKey, value);
       version += 1;

@@ -283,9 +283,43 @@ async function bootstrapCompany(
 // company.basics (F1.website / country / stage / description)
 // ---------------------------------------------------------------------------
 
+/**
+ * A country named in the person's words, as its ISO code: "Uzbekistan"
+ * outside the short list is still a country (founder direction
+ * 2026-09-30: an answer outside the options is kept, never lost to
+ * "Somewhere else"). A validator's normalisation over the platform's own
+ * region names (ADR 0011 §4); null when the words name no country.
+ */
+export function countryCodeOf(words: string | null): string | null {
+  if (words === null) return null;
+  const wanted = words.trim().toLowerCase();
+  if (wanted.length === 0) return null;
+  const names = new Intl.DisplayNames(["en"], { type: "region" });
+  for (let a = 65; a <= 90; a += 1) {
+    for (let b = 65; b <= 90; b += 1) {
+      const code = String.fromCharCode(a, b);
+      let name: string | undefined;
+      try {
+        name = names.of(code);
+      } catch {
+        continue;
+      }
+      if (
+        name !== undefined &&
+        name !== code &&
+        name.toLowerCase() === wanted
+      ) {
+        return code;
+      }
+    }
+  }
+  return null;
+}
+
 function companyBasicsChanges(
   stepKey: string,
   values: ResponseValues,
+  note: string | null = null,
 ): Record<string, string | null> {
   switch (stepKey) {
     case FOUNDER_STEPS.website: {
@@ -296,9 +330,11 @@ function companyBasicsChanges(
       const code = singleSelect(values, stepKey);
       return {
         headquartersCountry:
-          code === null || code === COUNTRY_OTHER_OPTION
+          code === null
             ? null
-            : code.toUpperCase(),
+            : code === COUNTRY_OTHER_OPTION
+              ? countryCodeOf(note)
+              : code.toUpperCase(),
       };
     }
     case FOUNDER_STEPS.stage: {
@@ -536,6 +572,7 @@ export function createFounderWriteTargets(
           companyBasicsChanges(
             response.stepKey,
             responseValues(context.currentResponses, response),
+            response.note,
           ),
           context.correlationId,
         );
@@ -582,8 +619,13 @@ export function createFounderWriteTargets(
             UpsertMyCompanyMembershipRequestSchema,
             {
               relationshipType: "team_member",
+              // A role outside the options is their own title, in their
+              // words ("Founder"), not "Something else".
               businessTitle:
-                role === null ? null : (FOUNDER_ROLE_TITLES[role] ?? null),
+                role === null
+                  ? null
+                  : (FOUNDER_ROLE_TITLES[role] ??
+                    (response.note?.trim().slice(0, 80) || null)),
               isFounder: true,
             },
             "The role is not valid.",

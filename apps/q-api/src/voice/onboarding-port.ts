@@ -411,7 +411,14 @@ export function createOnboardingPort(input: {
         value:
           stored === undefined
             ? null
-            : (await spoken(step, stored.value, view)).slice(0, 600) || null,
+            : // Their own words where the options could not hold them.
+              (stored.value.type === "SINGLE_SELECT" &&
+              stored.value.optionKey === "other" &&
+              stored.note !== null &&
+              stored.note.length > 0
+                ? `${stored.note} (in their words)`
+                : await spoken(step, stored.value, view)
+              ).slice(0, 600) || null,
         ...(open?.options === undefined || open.options.length === 0
           ? {}
           : {
@@ -484,6 +491,8 @@ export function createOnboardingPort(input: {
         readonly ok: true;
         readonly step: OnboardingStepManifest;
         readonly value: OnboardingResponseValue;
+        /** Their own words where the options could not hold them. */
+        readonly note?: string | undefined;
       }
     | { readonly ok: false; readonly result: OnboardingRecordResult };
 
@@ -517,6 +526,7 @@ export function createOnboardingPort(input: {
   const resolve = async (answer: {
     readonly stepKey: string;
     readonly value: string | readonly string[] | number | boolean;
+    readonly ownWords?: boolean | undefined;
   }): Promise<Resolved> => {
     const refuse = (result: OnboardingRecordResult): Resolved => ({
       ok: false,
@@ -531,6 +541,7 @@ export function createOnboardingPort(input: {
       });
     }
     let value: OnboardingResponseValue | null;
+    let otherWords: string | undefined;
     const c = step.configuration;
     if (
       c.stepType === "reference_select" &&
@@ -611,19 +622,35 @@ export function createOnboardingPort(input: {
           ? answer.value
           : [String(answer.value)];
       const keys: string[] = [];
+      const unnamed: string[] = [];
       for (const phrase of phrases) {
         const key = named(phrase);
         if (key !== undefined) keys.push(key);
+        else if (phrase.trim().length > 0) unnamed.push(phrase.trim());
+      }
+      // Founder direction 2026-09-30: an answer outside the options is
+      // kept in their words ("Uzbekistan", "Founder"), on the step's own
+      // catch-all, never lost or forced into a near option. Only where the
+      // step has one; the words are checked as theirs before writing.
+      const catchAll = options.find((o) => o.key === "other")?.key;
+      if (
+        answer.ownWords === true &&
+        unnamed.length > 0 &&
+        catchAll !== undefined
+      ) {
+        keys.push(catchAll);
+        otherWords = unnamed.join(", ").slice(0, 200);
       }
       const [only] = keys;
       value =
-        keys.length !== phrases.length || only === undefined
+        (keys.length !== phrases.length && otherWords === undefined) ||
+        only === undefined
           ? null
           : c.stepType === "single_select"
             ? keys.length === 1
               ? toResponseValue(step, only)
               : null
-            : toResponseValue(step, keys);
+            : toResponseValue(step, [...new Set(keys)]);
     } else {
       const raw =
         typeof answer.value === "number" ? String(answer.value) : answer.value;
@@ -637,7 +664,7 @@ export function createOnboardingPort(input: {
               stepKey: step.stepKey,
               outcome: "UNMATCHED",
               reason:
-                "That names none of this step's options. Choose the option below that means what they said and record it by its key; say which you chose. If none fits, ask them.",
+                "That names none of this step's options. Choose the option below that means what they said and record it by its key. If none fits and their words are a real answer, record their own words with ownWords true; they are kept as they said them. If their words are unclear, ask them.",
               candidates: options
                 .slice(0, 40)
                 .map((o) => `${o.label} (${o.key})`.slice(0, 160)),
@@ -654,7 +681,12 @@ export function createOnboardingPort(input: {
             },
       );
     }
-    return { ok: true, step, value };
+    return {
+      ok: true,
+      step,
+      value,
+      ...(otherWords === undefined ? {} : { note: otherWords }),
+    };
   };
 
   const withdraw = async (stepKey: string): Promise<void> => {
@@ -788,12 +820,13 @@ export function createOnboardingPort(input: {
   const write = async (
     step: OnboardingStepManifest,
     resolvedValue: OnboardingResponseValue,
+    note?: string,
   ): Promise<OnboardingRecordResult> => {
     const prepared = await prepareSiblings(step, resolvedValue);
     if (!prepared.ok) return prepared.result;
     const value = prepared.value;
     try {
-      await submit(step.stepKey, value);
+      await submit(step.stepKey, value, note);
       written.push(step.stepKey);
       const after = await current();
       return {
@@ -802,7 +835,10 @@ export function createOnboardingPort(input: {
         question: (
           SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
         ).slice(0, 400),
-        recorded: (await spoken(step, value, after)).slice(0, 600),
+        recorded: (note === undefined
+          ? await spoken(step, value, after)
+          : `${note} (in their words)`
+        ).slice(0, 600),
         ...(prepared.movedFrom === undefined
           ? {}
           : { movedFrom: prepared.movedFrom }),
@@ -1020,6 +1056,7 @@ export function createOnboardingPort(input: {
     readonly value: string | readonly string[] | number | boolean;
     readonly quote: string;
     readonly basis?: "STATED" | "DELEGATED" | undefined;
+    readonly ownWords?: boolean | undefined;
   }): Promise<OnboardingRecordResult> => {
     if (!said(answer.quote)) return unsaid(answer.stepKey);
     // A delegation is an instruction given now, "in the same instruction"
@@ -1064,7 +1101,23 @@ export function createOnboardingPort(input: {
     if (!resolved.ok) return resolved.result;
     const refused = unsupported(resolved.step, resolved.value, answer);
     if (refused !== null) return refused;
-    const written = await write(resolved.step, resolved.value);
+    if (
+      resolved.note !== undefined &&
+      answer.basis !== "DELEGATED" &&
+      !textStatedIn(resolved.note, answer.quote) &&
+      !(
+        input.lastQTurn !== undefined &&
+        textStatedIn(resolved.note, input.lastQTurn)
+      )
+    ) {
+      return {
+        stepKey: resolved.step.stepKey,
+        outcome: "REJECTED",
+        reason:
+          "That is none of this step's options and not in their words, so nothing was recorded. Record their own words for it, or the option that means what they said.",
+      };
+    }
+    const written = await write(resolved.step, resolved.value, resolved.note);
     if (written.outcome === "COMMITTED") {
       noteFigure(resolved.step, resolved.value, answer.quote);
     }

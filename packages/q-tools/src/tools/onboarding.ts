@@ -147,6 +147,12 @@ export const RecordOnboardingAnswersInputSchema = z
               .describe(
                 "STATED: they said this answer. DELEGATED: they explicitly asked you to choose it for them in the same instruction; the quote is that instruction.",
               ),
+            ownWords: z
+              .boolean()
+              .default(false)
+              .describe(
+                "True when their answer is a real answer that none of the step's options holds (a country not listed, a title like Founder): value is their own words for it, and it is kept as they said it. Never for vague, negative or unclear words; ask them instead.",
+              ),
           })
           .strict(),
       )

@@ -428,7 +428,7 @@ export function turnNotesFor(input: {
     }
   }
   notes.push(
-    'An optional question they have not answered after you asked it twice is passed over: move on, never press it. Record a number as the number they said, in any words; never ask them to say it another way. When their words fit none of a step\'s choices ("I\'m the founder" for a role), ask which fits ("so CEO as well?") rather than a catch-all like Something else.',
+    'An optional question they have not answered after you asked it twice is passed over: move on, never press it. Record a number as the number they said, in any words; never ask them to say it another way. When their answer fits none of a step\'s choices (a country not listed, "Founder" for a role), record their own words for it with ownWords true; they are kept, never forced into a near choice. Ask only when their words are unclear.',
   );
   if (open?.passedOver !== undefined && open.passedOver.length > 0) {
     notes.push(
@@ -714,6 +714,7 @@ export function createInterviewAgent(
               ? null
               : textAnswerOf(view, FOUNDER_STEPS.website) || null),
           profileUrls: links?.profileUrls ?? [],
+          personName: input.signup?.displayName ?? null,
         },
       }) ?? false;
     const linksTool =

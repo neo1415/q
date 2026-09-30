@@ -59,6 +59,12 @@ export type InvestorResearchIdentity = {
   readonly firmName: string;
   readonly websiteUrl: string | null;
   readonly profileUrls: readonly string[];
+  /**
+   * The person's own name from sign-up: searching the company together
+   * with its founder or partner keeps a same-named company out (live
+   * 2026-09-30: "Greenbox" found an unrelated solar maker).
+   */
+  readonly personName?: string | null | undefined;
 };
 
 export type InvestorResearchDependencies = {

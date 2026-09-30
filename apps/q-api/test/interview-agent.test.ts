@@ -964,3 +964,58 @@ describe("P0-3 · the loop streams its final reply as sentences", () => {
     expect(outcome.reply).toBe(reply);
   });
 });
+
+describe("an answer outside the options is kept in their words (founder direction 2026-09-30)", () => {
+  const recording = (value: string, quote: string) =>
+    model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                { stepKey: "I0.investor_type", value, quote, ownWords: true },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted.", asking: null },
+    ]);
+
+  it("records the catch-all with their own words beside it", async () => {
+    const world = investorSession({ currentStepKey: "I0.investor_type" });
+    const { gateway } = recording(
+      "sovereign wealth fund",
+      "I run a sovereign wealth fund",
+    );
+    await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    }).turn({ ...turn(world, "I run a sovereign wealth fund"), actor });
+    expect(world.recordedValue("I0.investor_type")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "other",
+    });
+    expect(world.recordedNote("I0.investor_type")).toBe(
+      "sovereign wealth fund",
+    );
+  });
+
+  it("records nothing when the words are not theirs", async () => {
+    const world = investorSession({ currentStepKey: "I0.investor_type" });
+    const { gateway } = recording(
+      "sovereign wealth fund",
+      "I invest my own money",
+    );
+    await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    }).turn({ ...turn(world, "I invest my own money"), actor });
+    expect(world.recordedValue("I0.investor_type")).toBeUndefined();
+  });
+});

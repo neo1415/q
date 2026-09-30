@@ -62,7 +62,10 @@ export function investorResearchReadFrom(
         profileUrl: identity.profileUrls[0] ?? null,
         // The one extra public term that finds an investor's own pages
         // rather than a namesake's.
-        qualifier: "investors portfolio",
+        qualifier:
+          identity.personName === undefined || identity.personName === null
+            ? "investors portfolio"
+            : `${identity.personName.slice(0, 80)} investor`,
       },
     });
     return pages.map((page) => ({
@@ -310,7 +313,10 @@ export function founderResearchReadFrom(
         name: identity.firmName.slice(0, 160),
         websiteUrl: identity.websiteUrl,
         profileUrl: identity.profileUrls[0] ?? null,
-        qualifier: "startup company",
+        qualifier:
+          identity.personName === undefined || identity.personName === null
+            ? "startup company"
+            : `startup ${identity.personName.slice(0, 80)}`,
       },
     });
     return pages.map((page) => ({
