@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createBrevoApiEmailSender } from "../src/index.js";
+import { brandedEmailHtml, createBrevoApiEmailSender } from "../src/index.js";
 
 /**
  * App email over HTTPS (founder live 2026-09-29): the deployment blocks
@@ -10,7 +10,7 @@ import { createBrevoApiEmailSender } from "../src/index.js";
 const key = { reveal: () => "disabled-locally-000000000000" };
 
 describe("Brevo API email sender", () => {
-  it("posts one plain-text message from the configured sender", async () => {
+  it("posts one message, plain text and Capital Q's branded HTML, from the configured sender", async () => {
     const fetch = vi.fn(() =>
       Promise.resolve(new Response("{}", { status: 201 })),
     );
@@ -26,12 +26,39 @@ describe("Brevo API email sender", () => {
     });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.brevo.com/v3/smtp/email");
-    expect(JSON.parse(init.body as string)).toEqual({
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({
       sender: { email: "q@example.test", name: "Capital Q" },
       to: [{ email: "founder@example.test" }],
       subject: "Reminder: follow up",
       textContent: "Follow up",
     });
+    expect(String(body["htmlContent"])).toContain("Capital Q");
+    expect(String(body["htmlContent"])).toContain("Follow up");
+  });
+
+  it("names a bare sender address Capital Q (founder direction 2026-09-30)", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve(new Response("{}", { status: 201 })),
+    );
+    await createBrevoApiEmailSender({
+      apiKey: key,
+      sender: "q@example.test",
+      fetch,
+    }).send({ to: "a@b.test", subject: "s", text: "t" });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(
+      (JSON.parse(init.body as string) as { sender: unknown }).sender,
+    ).toEqual({ email: "q@example.test", name: "Capital Q" });
+  });
+
+  it("escapes the words it frames and links only https addresses", () => {
+    const html = brandedEmailHtml({
+      subject: "Hi",
+      text: "<script>x</script> see https://capitalq.app/profile",
+    });
+    expect(html).not.toContain("<script>x");
+    expect(html).toContain('href="https://capitalq.app/profile"');
   });
 
   it("refuses header injection and throws with the status on refusal", async () => {
