@@ -56,7 +56,11 @@ export type InvalidListItems = "REFUSE" | "DROP";
 const DROP_PASSES_MAX = 4;
 const DROPPED_MAX = 8;
 
-type Issue = { readonly path: readonly PropertyKey[]; readonly code: string };
+type Issue = {
+  readonly path: readonly PropertyKey[];
+  readonly code: string;
+  readonly keys?: readonly string[];
+};
 
 /** The innermost array element an issue sits in, as [array, index]. */
 function containingElement(
@@ -80,8 +84,19 @@ function containingElement(
   return found;
 }
 
+// Which field names were unexpected, when that is the refusal: a field
+// name, bounded, never a value the model wrote (live 2026-09-30: every
+// ASSESS answer refused as "(root):unrecognized_keys", with no way to see
+// which key without it).
 const describe = (issue: Issue): string =>
-  `${issue.path.map(String).join(".") || "(root)"}:${issue.code}`;
+  `${issue.path.map(String).join(".") || "(root)"}:${issue.code}${
+    issue.code === "unrecognized_keys" && issue.keys !== undefined
+      ? `(${issue.keys
+          .slice(0, 4)
+          .map((key) => key.replace(/[^A-Za-z0-9_]/g, "").slice(0, 40))
+          .join(",")})`
+      : ""
+  }`;
 
 export function acceptStructuredOutput<T>(
   text: string,
