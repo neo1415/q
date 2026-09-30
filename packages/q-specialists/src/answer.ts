@@ -1016,6 +1016,8 @@ export function createSpecialistQAnswer(
     /** The screens this run can open, from the capability registry. */
     navigable: readonly QNavigateDestination[],
     moreDocuments: readonly TurnToolV14[] = [],
+    /** The answer can open one record's page itself (open_page). */
+    opensRecords = false,
   ): Promise<QAnswerOutcome | null> {
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
@@ -1029,6 +1031,12 @@ export function createSpecialistQAnswer(
       );
     }
     if (tool.kind === "NAVIGATE" && tool.unknownScreen !== null) {
+      // Founder report 2026-09-30: "open my chat with young field agro"
+      // was read as an unknown screen and answered here, before the tools
+      // that find the record could run. When the answer can open a record
+      // itself, it answers: it finds the name among their own records and
+      // opens it, or says the screen does not exist.
+      if (opensRecords) return null;
       logger?.info(
         { qRunId: request.runId, nearest: tool.unknownScreen.nearest },
         "q was asked for a screen Capital Q does not have",
@@ -1347,6 +1355,11 @@ export function createSpecialistQAnswer(
         history,
         manifestOf(capabilities).navigate,
         read?.moreDocuments ?? [],
+        capabilities.some(
+          (capability) =>
+            capability.performedBy.kind === "TOOL" &&
+            capability.performedBy.providerName === "open_page",
+        ),
       );
       if (acted !== null) {
         remember(

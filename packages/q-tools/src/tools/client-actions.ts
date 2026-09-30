@@ -332,12 +332,84 @@ export const OpenPageInputSchema = z
     id: z
       .string()
       .uuid()
+      .optional()
       .describe(
         "The company's or investor organisation's id, exactly as a tool or the screen gave it. Never guessed from a name.",
+      ),
+    name: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe(
+        "Instead of id, for a relationship or its chat: the counterpart's name as they said it, even misheard ('young field agro'). It is matched against their own relationships only.",
       ),
   })
   .strict();
 export type OpenPageInput = z.infer<typeof OpenPageInputSchema>;
+
+/** Letters and digits only, lower case: how a spoken name is compared. */
+function nameKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function bigrams(key: string): Map<string, number> {
+  const grams = new Map<string, number>();
+  for (let index = 0; index < key.length - 1; index += 1) {
+    const gram = key.slice(index, index + 2);
+    grams.set(gram, (grams.get(gram) ?? 0) + 1);
+  }
+  return grams;
+}
+
+/** Dice similarity over letter pairs, 0..1: tolerant of a misheard name. */
+export function nameSimilarity(left: string, right: string): number {
+  const a = nameKey(left);
+  const b = nameKey(right);
+  if (a.length === 0 || b.length === 0) return 0;
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  const gramsA = bigrams(a);
+  const gramsB = bigrams(b);
+  let shared = 0;
+  for (const [gram, count] of gramsA) {
+    shared += Math.min(count, gramsB.get(gram) ?? 0);
+  }
+  return (2 * shared) / (a.length - 1 + (b.length - 1));
+}
+
+/** Below this a spoken name is not taken to mean a record. */
+const NAME_MATCH_FLOOR = 0.45;
+/** The best match must lead the next by this much, or it is ambiguous. */
+const NAME_MATCH_LEAD = 0.1;
+
+/**
+ * The one counterpart of their own relationships a spoken name means, or
+ * null when none is close enough or two are too close to tell apart. Only
+ * their own relationships are searched, so a name can never open, or
+ * reveal, a record they are not a party to.
+ */
+export function matchCounterpart(
+  name: string,
+  candidates: readonly { readonly id: string; readonly name: string }[],
+): string | null {
+  const scored = candidates
+    .map((candidate) => ({
+      id: candidate.id,
+      score: nameSimilarity(name, candidate.name),
+    }))
+    .sort((left, right) => right.score - left.score);
+  const best = scored[0];
+  if (best === undefined || best.score < NAME_MATCH_FLOOR) return null;
+  const next = scored.find((entry) => entry.id !== best.id);
+  if (next !== undefined && best.score - next.score < NAME_MATCH_LEAD) {
+    return null;
+  }
+  return best.id;
+}
 
 /**
  * Open one record's page (R33). The page authorises the read server-side,
@@ -357,15 +429,36 @@ export function createOpenPageTool(
     id: OPEN_PAGE,
     providerName: "open_page",
     description:
-      "Opens one record's own page on their screen: a company's page, their relationship with a company or an investor organisation, or the chat with them. Use the id a tool or the screen gave. NOT_AVAILABLE means that page is not theirs to open.",
+      "Opens one record's own page on their screen, at once: a company's page, their relationship with a company or an investor organisation, or the chat with them. Use the id a tool or the screen gave, or, for a relationship or its chat, just the name they said (misheard names are matched against their own relationships). 'Open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES or RELATIONSHIP_INVESTOR_MESSAGES with name X -- call it directly, never send them to the relationships list instead. NOT_AVAILABLE means no relationship of theirs matches, or that page is not theirs to open.",
     input: OpenPageInputSchema,
     authorize: async (input, { actor, plan }) => {
       if (!ownConversation(actor, plan)) {
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
+      const companySide =
+        input.page === "COMPANY" ||
+        input.page === "RELATIONSHIP_COMPANY" ||
+        input.page === "RELATIONSHIP_COMPANY_MESSAGES";
+      let recordId = input.id ?? null;
+      if (recordId === null && input.name !== undefined) {
+        const own = await ports.relationships
+          ?.ownRelationships?.(actor)
+          .catch(() => null);
+        recordId = matchCounterpart(
+          input.name,
+          (own?.items ?? [])
+            .map((item) => item.counterpart)
+            .filter(
+              (counterpart) => (counterpart.kind === "COMPANY") === companySide,
+            ),
+        );
+      }
+      if (recordId === null) {
+        return deny<QClientActionToolResult>("NOT_AVAILABLE");
+      }
       let openable = false;
       if (input.page === "COMPANY") {
-        const id = CompanyIdSchema.safeParse(input.id);
+        const id = CompanyIdSchema.safeParse(recordId);
         const profile = id.success
           ? await ports.companies
               .findCanonicalCompanyProfile(id.data)
@@ -373,19 +466,17 @@ export function createOpenPageTool(
           : null;
         openable = profile !== null && profile.tenantId === actor.tenantId;
       } else if (ports.relationships !== undefined) {
-        const standing =
-          input.page === "RELATIONSHIP_COMPANY" ||
-          input.page === "RELATIONSHIP_COMPANY_MESSAGES"
-            ? await ports.relationships
-                .withCompany(actor, input.id)
-                .catch(() => null)
-            : await ports.relationships
-                .withInvestor(actor, input.id)
-                .catch(() => null);
+        const standing = companySide
+          ? await ports.relationships
+              .withCompany(actor, recordId)
+              .catch(() => null)
+          : await ports.relationships
+              .withInvestor(actor, recordId)
+              .catch(() => null);
         openable = standing !== null;
       }
       return openable
-        ? allowed({ kind: "OPEN_RECORD_PAGE", page: input.page, id: input.id })
+        ? allowed({ kind: "OPEN_RECORD_PAGE", page: input.page, id: recordId })
         : deny<QClientActionToolResult>("NOT_AVAILABLE");
     },
   });

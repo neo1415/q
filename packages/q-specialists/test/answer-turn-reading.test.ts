@@ -268,6 +268,25 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(run.stored[0]?.blocks ?? []).toEqual([]);
   });
 
+  it("a named record read as an unknown screen goes to the answer, which can open it (founder report 2026-09-30)", async () => {
+    const run = seam({
+      said: "open my chat with young field agro",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: null,
+        unknownScreen: {
+          named: "chat with young field agro",
+          nearest: "RELATIONSHIPS",
+        },
+        visibility: null,
+      }),
+      outcomes: [],
+      offeredTools: ["open_page", "list_my_relationships"],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+  });
+
   it("offers only a screen this run can open; otherwise names the ones it can", () => {
     expect(
       unknownScreenLine("settings <b>", "COMPANY_VISIBILITY", [

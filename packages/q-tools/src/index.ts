@@ -90,6 +90,8 @@ export {
   SIGN_OUT,
   OPEN_PAGE,
   createOpenPageTool,
+  matchCounterpart,
+  nameSimilarity,
   CONTROL_SCREEN,
   ControlScreenInputSchema,
   createControlScreenTool,

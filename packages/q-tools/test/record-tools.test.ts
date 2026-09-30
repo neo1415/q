@@ -13,11 +13,14 @@ import {
   createQToolExecutor,
   createQToolRegistry,
   createRecordChangeTools,
+  matchCounterpart,
+  nameSimilarity,
   type ConversationProposal,
   type OwnRecordsPort,
   type PendingProposalPort,
   type RecordChange,
   type RecordChangePort,
+  type RelationshipIntelligencePort,
 } from "../src/index.js";
 import {
   COMPANY_A,
@@ -210,6 +213,125 @@ describe("opening a record's page", () => {
       contextFor(actorA, ownPlan()),
     );
     expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+});
+
+describe("opening a chat by a spoken name (founder report 2026-09-30)", () => {
+  const YAMFIELD = "5b1f3c1e-8a55-4d8e-9d1c-0a1b2c3d4e5f";
+  const KOLA = "6c2f4d2f-9b66-4e9f-8e2d-1b2c3d4e5f60";
+  const FUND = "7d3a5e3a-ac77-4fa0-9f3e-2c3d4e5f6071";
+  const opened: string[] = [];
+  const counterpart = (
+    kind: "COMPANY" | "INVESTOR_ORGANISATION",
+    id: string,
+    name: string,
+  ) => ({
+    relationshipId: id,
+    counterpart: { kind, id, name },
+    state: "CONNECTED" as const,
+    stateSince: "2026-09-20T10:00:00.000Z",
+    nextStep: "SCHEDULE_MEETING" as const,
+    milestones: [],
+  });
+  const relationships: RelationshipIntelligencePort = {
+    ownRelationships: (actor) =>
+      Promise.resolve(
+        actor.userId === actorA.userId
+          ? {
+              side: "INVESTOR" as const,
+              items: [
+                counterpart("COMPANY", YAMFIELD, "Yamfield Agro"),
+                counterpart("COMPANY", KOLA, "Kola Logistics"),
+                counterpart("INVESTOR_ORGANISATION", FUND, "Agro Fund"),
+              ],
+            }
+          : null,
+      ),
+    withCompany: (_actor, companyId) => {
+      opened.push(companyId);
+      return Promise.resolve(
+        companyId === YAMFIELD || companyId === KOLA ? ({} as never) : null,
+      );
+    },
+    withInvestor: () => Promise.resolve(null),
+    byRelationship: () => Promise.resolve(null),
+    incomingInterest: () => Promise.resolve([]),
+    mayExpressInterest: () => Promise.resolve(false),
+    mayAnswerInterest: () => Promise.resolve(false),
+    prepareForApproval: () => "PREPARED",
+  };
+  const executor = createQToolExecutor({
+    registry: createQToolRegistry([
+      createOpenPageTool({ ...fakePorts(), relationships }),
+    ]),
+  });
+
+  it("a misheard name opens the chat with their own counterpart, straight away", async () => {
+    for (const heard of ["young field agro", "yamfield", "Yam Field Agro"]) {
+      const outcome = await executor.execute(
+        call("open_page", {
+          page: "RELATIONSHIP_COMPANY_MESSAGES",
+          name: heard,
+        }),
+        contextFor(actorA, ownPlan()),
+      );
+      expect(
+        QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+      ).toEqual({
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_COMPANY_MESSAGES",
+        id: YAMFIELD,
+      });
+    }
+  });
+
+  it("an investor organisation is never matched for a company page", () => {
+    expect(
+      matchCounterpart("agro fund", [
+        { id: YAMFIELD, name: "Yamfield Agro" },
+        { id: KOLA, name: "Kola Logistics" },
+      ]),
+    ).toBeNull();
+  });
+
+  it("a name nothing of theirs resembles opens nothing", async () => {
+    const outcome = await executor.execute(
+      call("open_page", {
+        page: "RELATIONSHIP_COMPANY_MESSAGES",
+        name: "Tesla",
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+
+  it("someone else's relationships are never searched", async () => {
+    const outcome = await executor.execute(
+      call("open_page", {
+        page: "RELATIONSHIP_COMPANY_MESSAGES",
+        name: "Yamfield Agro",
+      }),
+      contextFor(actorB, ownPlan(actorB)),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+
+  it("neither an id nor a name opens nothing", async () => {
+    const outcome = await executor.execute(
+      call("open_page", { page: "RELATIONSHIP_COMPANY" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+
+  it("two names too close to tell apart are ambiguous", () => {
+    expect(
+      matchCounterpart("agro", [
+        { id: YAMFIELD, name: "Agro One" },
+        { id: KOLA, name: "Agro Two" },
+      ]),
+    ).toBeNull();
+    expect(nameSimilarity("Yamfield Agro", "yamfield agro")).toBe(1);
   });
 });
 
