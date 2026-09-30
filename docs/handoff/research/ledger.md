@@ -198,3 +198,19 @@ Runtime: LangGraph.js for long-running agents, model calls through the Q Model G
 - DONE Talk-with-Q button (946a3ed6); in-app nav without reload, mic survives, control_screen tool (53ac145e); fuzzy company names (498d3820); admin console /admin live (53b5541c); Discover voice next/pass/save + mandate id fix (c296c703); turn reader v16 named records (f8b76a69).
 - DONE open_page by spoken name (14dd1e54): "open my chat with young field agro" matches their own relationships only; unknown-screen readings fall through to the tool-using answer.
 - NEXT: live-verify named chat + Discover voice + mandate edit; C12 Investor Twin (persona prompt ready), C18 Q Daily.
+
+## 2026-09-30 — FOUNDER URGENT: onboarding is broken + Q must be far better (verbatim intent, nothing to drop)
+Live repro (new founder "Priya"): sign-in landed on Discover, not Q; the "Talk to Q" button then opened Q; Q answered "I'm here to raise capital" as a generic analyst ("no authorised information… provide company name"), only later said "Are you here to raise capital, or to invest it?". Onboarding interview did not run.
+MUST:
+1. New user always lands on Q first (not Discover). Q asks why they're here (raise vs invest) and routes on the same Q page; then runs the spec interview to completion. Hide the sidebar until onboarding is done (consider).
+2. Founder: asks spec questions; asks for a pitch deck; reads the upload; proposes facts to other profile parts, confirms before saving. A parallel background agent researches the founder/company online and surfaces a finding ONLY when it answers a question Q will ask; Q confirms it without losing its place.
+3. Investor: same — background builds the online profile, Q confirms findings, keeps asking the remaining interview questions until complete unless told to skip.
+4. Fully context/memory aware: what it knows, what it can save and how, what it saved, what it asked, what remains; can correct, backtrack, handle small talk.
+5. Small talk policy: up to 2 turns then steer back; if the user keeps steering to small talk after 2 sets of 2 turns, warn on the 3rd and route them elsewhere in the app till ready; memory persists across visits (on return, it says so and routes again). Agitation escalates: orange (audible+visible) from the 3rd, fully red at the 5th → suspend the account and notify an admin (email/notification), admin can reinstate. When Q itself initiates small talk, the limit is 4 turns but it steers back by the 3rd. Real laughter/teasing, takes a joke, knows when it offended, tells sarcasm from sincerity. Replies must vary (not always "Got it").
+6. Personalities: multiple Q personalities, switchable; Settings choice: pick one / stick to one / Auto, each with a tooltip.
+7. On completion: founder → their profile to confirm/edit; investor → Discover. Afterwards, gentle occasional reminders for anything left.
+8. Particles must follow what is said (head turns, hands, mouth) — presence tied to speech.
+9. Pitch deck: if the founder has none, Q offers to create one (questions, or read an uploaded document); brand colours, logo, fonts (ask, or find & download); Pexels + Gemini/OpenAI images, illustrations, graphs; multiple agents (audit/optimise, industry design research, imagery, words/anti-AI-look). Q opens and shows the deck, user edits by voice or typing; saves when satisfied. Never loses its place in the interview; the deck can be moved to the end or later. BUG: deck edits don't change colours; a new document needs a refresh to appear.
+10. Q's abilities stay with Q everywhere, not just onboarding; limit tool calls around the app during onboarding to what onboarding needs.
+11. Emails: Capital Q branding; they land in spam (fix deliverability: SPF/DKIM/DMARC, sender).
+Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality/presence → then back to the earlier list.
