@@ -28,6 +28,7 @@ export const config = {
     "/relationships/:path*",
     "/settings/:path*",
     "/gateway/:path*",
+    "/admin/:path*",
     "/auth/:path*",
   ],
 };

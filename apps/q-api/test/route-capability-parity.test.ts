@@ -556,6 +556,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // GateQ: a gateway's public page and the embed another site frames.
   "/g/[publicId]": PUBLIC,
   "/g/[publicId]/embed": PUBLIC,
+  "/admin": exempt(
+    "Capital Q's admin console: platform operators only, never a place Q sends anyone",
+  ),
   "/gateway": exempt(
     "the investor's gateway (link, QR, snippet, inbox), opened from Capital; a navigate capability comes with the Q gateway tool",
   ),

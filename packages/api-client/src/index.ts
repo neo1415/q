@@ -287,3 +287,8 @@ export {
   startApplication,
   submitApplication,
 } from "./gateq.js";
+export {
+  getAdminAttribution,
+  getAdminDisputes,
+  getAdminOverview,
+} from "./admin.js";
