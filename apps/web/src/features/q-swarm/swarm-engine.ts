@@ -163,6 +163,31 @@ export function createSwarmEngine(
     input: SwarmFrameInput,
   ): { x: number; y: number } => {
     let { x, y } = point;
+    if (
+      input.mode === "FACE" &&
+      (point.part === "HAND_LEFT" || point.part === "HAND_RIGHT")
+    ) {
+      // Hands (founder live 2026-09-30): they come up and gesture with
+      // Q's voice, open and close a little on emphasis, and rest out of
+      // sight when Q is quiet.
+      const side = point.part === "HAND_LEFT" ? -1 : 1;
+      const speaking =
+        input.activity === "SPEAKING" || input.activity === "LAUGHING";
+      const energy = speaking ? 0.35 + smoothedOutput : 0;
+      const beat = Math.sin(t * 2.6 + (side > 0 ? 0 : 1.7));
+      const rest = speaking ? 0 : 0.45;
+      const lift = energy * (0.16 + beat * 0.06);
+      // Each hand turns a little about its own centre as it moves.
+      const cx = side * 0.62;
+      const cy = 0.86;
+      const angle = side * (0.18 * beat * energy);
+      const dx = x - cx;
+      const dy = y - cy;
+      x =
+        cx + dx * Math.cos(angle) - dy * Math.sin(angle) + side * energy * 0.04;
+      y = cy + dx * Math.sin(angle) + dy * Math.cos(angle) - lift + rest;
+      return { x, y };
+    }
     if (input.mode === "FACE") {
       const speaking = input.activity === "SPEAKING";
       const laughing = input.activity === "LAUGHING";
@@ -181,13 +206,29 @@ export function createSwarmEngine(
       }
       if (point.part === "EYE" && laughing) y = -0.1 + (y + 0.1) * 0.35;
       if (point.part === "BROW" && input.activity === "ASKING") y -= 0.03;
-      // The head: a look around, a nod while talking, a tilt when asking.
-      const look =
-        Math.sin(t * 0.45) * 0.07 +
-        (input.activity === "LISTENING" ? Math.sin(t * 0.9) * 0.02 : 0);
-      const depth =
-        point.part === "OUTLINE" || point.part === "HAIR" ? 0.35 : 1;
-      x += look * depth * 0.5;
+      // The head turns (founder live 2026-09-30: "the head doesn't even
+      // turn"): a yaw, so the features swing across the face while the
+      // outline narrows, as a real head does. Towards the person while
+      // they talk, glancing aside and back while Q speaks, up and away
+      // while it thinks.
+      const yaw =
+        input.activity === "LISTENING"
+          ? Math.sin(t * 0.5) * 0.12 + input.input * 0.1
+          : input.activity === "SPEAKING"
+            ? Math.sin(t * 0.7) * 0.28 + Math.sin(t * 1.9) * 0.06
+            : input.activity === "THINKING"
+              ? -0.3 + Math.sin(t * 0.4) * 0.05
+              : Math.sin(t * 0.45) * 0.18;
+      const front =
+        point.part === "OUTLINE" || point.part === "HAIR"
+          ? 0.15
+          : point.part === "BRAIN"
+            ? 0.3
+            : 1;
+      x =
+        x * (1 - 0.12 * Math.abs(Math.sin(yaw)) * (1 - front)) +
+        Math.sin(yaw) * 0.16 * front;
+      if (input.activity === "THINKING") y -= 0.03 * front;
       const roll =
         (input.activity === "ASKING" ? 0.12 : 0) +
         (speaking ? Math.sin(t * 2.3) * 0.035 * (0.4 + smoothedOutput) : 0) +
@@ -339,6 +380,9 @@ export function createSwarmEngine(
       case "MOUTH_UPPER":
       case "MOUTH_LOWER":
         return 1;
+      case "HAND_LEFT":
+      case "HAND_RIGHT":
+        return 0.7;
     }
   };
 

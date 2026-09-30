@@ -23,7 +23,10 @@ export type SwarmPart =
   | "BRAIN"
   | "GLYPH"
   /** A point of a free figure the engine keeps moving (wave, galaxy, bloom). */
-  | "FIELD";
+  | "FIELD"
+  /** Q's hands, below the face: they gesture while Q speaks. */
+  | "HAND_LEFT"
+  | "HAND_RIGHT";
 
 export type SwarmPoint = {
   readonly x: number;
@@ -214,10 +217,69 @@ function portrait(face: SwarmFace): readonly SwarmPoint[] {
  * rather than a diagram of one. Parts are labelled so the eyes, brows,
  * mouth and the brain above them can move and light on their own.
  */
+/**
+ * One open hand, palm towards the person, as dots: a palm and five
+ * fingers, the thumb out to the side (founder live 2026-09-30: "I don't
+ * see hands"). Centred on (cx, cy); mirrored for the other hand.
+ */
+function handPoints(
+  count: number,
+  cx: number,
+  cy: number,
+  mirror: 1 | -1,
+  part: "HAND_LEFT" | "HAND_RIGHT",
+  random: () => number,
+): SwarmPoint[] {
+  const fingers = [
+    { dx: -0.06, len: 0.13 },
+    { dx: -0.02, len: 0.16 },
+    { dx: 0.02, len: 0.15 },
+    { dx: 0.06, len: 0.12 },
+  ];
+  return Array.from({ length: count }, (_, i) => {
+    const pick = i % 10;
+    let x: number;
+    let y: number;
+    if (pick < 4) {
+      // The palm: a soft oval.
+      const angle = random() * Math.PI * 2;
+      const r = Math.sqrt(random());
+      x = Math.cos(angle) * r * 0.085;
+      y = Math.sin(angle) * r * 0.075;
+    } else if (pick < 9) {
+      const finger = fingers[pick - 4] ?? fingers[0];
+      const along = random();
+      x = (finger?.dx ?? 0) + (random() - 0.5) * 0.012;
+      y = -0.06 - along * (finger?.len ?? 0.13);
+    } else {
+      // The thumb, out to the side and up.
+      const along = random();
+      x = 0.08 + along * 0.07;
+      y = 0.01 - along * 0.07;
+    }
+    return { x: cx + x * mirror, y: cy + y, part };
+  });
+}
+
 export function faceShape(face: SwarmFace, count: number): SwarmPoint[] {
   const source = portrait(face);
   if (source.length === 0) return qShape(count);
   const random = seeded(face === "FEMALE" ? 17 : 29);
+  // A share of the swarm makes the hands; the rest, the face.
+  const perHand = Math.floor(count * 0.07);
+  const hands = [
+    ...handPoints(perHand, -0.62, 0.86, -1, "HAND_LEFT", random),
+    ...handPoints(perHand, 0.62, 0.86, 1, "HAND_RIGHT", random),
+  ];
+  const faceCount = count - hands.length;
+  return [...faceOnly(source, faceCount, random), ...hands];
+}
+
+function faceOnly(
+  source: readonly SwarmPoint[],
+  count: number,
+  random: () => number,
+): SwarmPoint[] {
   return Array.from({ length: count }, (_, i) => {
     // Evenly through the cloud, so any swarm size keeps every part.
     const at = source[Math.floor((i * source.length) / count)] ?? source[0];
