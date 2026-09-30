@@ -75,9 +75,41 @@ export function validateFounderReading(
   reading: FounderResearchReaderResult,
   pages: readonly ResearchPage[],
   websiteUrl: string | null,
+  companyName = "",
 ): readonly ResearchFinding[] {
   if (reading.wrongSubject) return [];
   const findings: ResearchFinding[] = [];
+  // Their own site, when research met it and they have not given one
+  // (live 2026-09-30: Q asked a YC founder for the website it had just
+  // read). Structural: a web page whose host is named for the company,
+  // offered as its home page for them to confirm.
+  const named = companyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (websiteUrl === null && named.length >= 3) {
+    const own = pages.find((page) => {
+      if (
+        page.provider === "public_registry" ||
+        page.provider === "public_profile"
+      ) {
+        return false;
+      }
+      const host = domainOf(page.url);
+      if (host === null) return false;
+      const label = host.split(".")[0] ?? "";
+      return (
+        label === named || label === `get${named}` || label === `${named}hq`
+      );
+    });
+    const host = own === undefined ? null : domainOf(own.url);
+    if (own !== undefined && host !== null) {
+      findings.push({
+        stepKey: FOUNDER_STEPS.website,
+        value: `https://${host}`,
+        because: `found on a public page (${host})`,
+        sources: [{ sourceType: "PUBLIC_WEB", url: own.url }],
+        after: FOUNDER_STEPS.companyName,
+      });
+    }
+  }
   const push = (
     stepKey: string,
     value: ResearchFinding["value"],

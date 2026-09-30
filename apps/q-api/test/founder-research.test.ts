@@ -89,3 +89,31 @@ describe("founder research findings", () => {
     ).toEqual([]);
   });
 });
+
+describe("the company's own site, when they have not given one (live 2026-09-30)", () => {
+  it("offers a page whose host is named for the company as its website", () => {
+    const findings = validateFounderReading(EMPTY, PAGES, null, "Greenbox");
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        stepKey: "F1.website",
+        value: "https://greenbox.africa",
+      }),
+    );
+  });
+
+  it("offers nothing when the host is not the company's, or a site is known", () => {
+    expect(
+      validateFounderReading(EMPTY, PAGES, null, "Bluecrate").some(
+        (f) => f.stepKey === "F1.website",
+      ),
+    ).toBe(false);
+    expect(
+      validateFounderReading(
+        EMPTY,
+        PAGES,
+        "https://greenbox.africa",
+        "Greenbox",
+      ).some((f) => f.stepKey === "F1.website"),
+    ).toBe(false);
+  });
+});

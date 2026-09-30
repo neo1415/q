@@ -869,8 +869,17 @@ export function createOnboardingPort(input: {
     }
     // An address said aloud is rewritten into its written form by the
     // step itself ("bridge dot com"), so it is not the words verbatim.
+    // Text Q read back to them ("Nixo, right?") and they agreed to in
+    // their latest words is theirs, as a read-back figure is.
+    const readBack =
+      value.type === "TEXT" &&
+      input.lastQTurn !== undefined &&
+      textStatedIn(value.text, input.lastQTurn) &&
+      input.personTurns[0] !== undefined &&
+      quoteOccursIn(answer.quote, input.personTurns[0]);
     if (
       value.type === "TEXT" &&
+      !readBack &&
       !step.stepKey.endsWith(".website") &&
       !textStatedIn(value.text, answer.quote)
     ) {
@@ -917,6 +926,95 @@ export function createOnboardingPort(input: {
     figuresUsed.set(key, used);
   };
 
+  /**
+   * A confirmation step they agreed to, on their word as read
+   * independently of the acting model (the reader's "stated" or
+   * "finishing"). Live 2026-09-30, "Yes. Go ahead. That's exactly what it
+   * is." for the capital objective was refused four times because only
+   * confirm_and_finish could confirm anything, and it wanted the whole
+   * setup finished. A mid-journey confirmation is its own answer; the
+   * last one finishes the setup, as confirm_and_finish would.
+   */
+  const confirmStep = async (
+    step: OnboardingStepManifest,
+    value: string | readonly string[] | number | boolean,
+  ): Promise<OnboardingRecordResult> => {
+    const question = (
+      SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+    ).slice(0, 400);
+    if (value === false || value === "false") {
+      return {
+        stepKey: step.stepKey,
+        outcome: "REJECTED",
+        question,
+        reason:
+          "They did not confirm it. Ask what should change, correct it, then read it back.",
+      };
+    }
+    if (input.authority !== undefined) {
+      const authority = await input.authority();
+      if (
+        authority === null ||
+        (!authority.finishing && !authority.stated.has(step.stepKey))
+      ) {
+        return {
+          stepKey: step.stepKey,
+          outcome: "REJECTED",
+          question,
+          reason:
+            "Their latest words do not agree to this yet, so nothing was confirmed. Read it back in one sentence and ask if it is right.",
+        };
+      }
+    }
+    try {
+      await submit(step.stepKey, { type: "CONFIRMATION", confirmed: true });
+      written.push(step.stepKey);
+      let view = await current();
+      // Once every required answer is in, what remains are read-backs of
+      // what they just agreed to: confirming one is finishing, so the rest
+      // are confirmed in order and the setup completes, rather than the
+      // same yes being asked for once per review step.
+      const answersLeft = view.progress.eligibleSteps.some(
+        (e) =>
+          e.status !== "COMPLETED" &&
+          e.required &&
+          steps.get(e.stepKey)?.configuration.stepType !== "confirmation",
+      );
+      if (!answersLeft) {
+        for (let guard = 0; guard < 4; guard += 1) {
+          const open = view.progress.eligibleSteps.find(
+            (e) =>
+              e.status !== "COMPLETED" &&
+              steps.get(e.stepKey)?.configuration.stepType === "confirmation",
+          );
+          if (open === undefined) break;
+          await submit(open.stepKey, { type: "CONFIRMATION", confirmed: true });
+          written.push(open.stepKey);
+          view = await current();
+        }
+        if (view.progress.canComplete) {
+          latest = await completeOnboardingSession(
+            input.session,
+            input.onboardingSessionId,
+            { expectedSessionVersion: view.session.version },
+          );
+          view = latest;
+        }
+      }
+      return {
+        stepKey: step.stepKey,
+        outcome: "COMMITTED",
+        question,
+        recorded:
+          view.session.status === "COMPLETED"
+            ? "Confirmed, and their setup is complete."
+            : "Confirmed.",
+      };
+    } catch (error: unknown) {
+      return refused(step.stepKey, error);
+    }
+  };
+
   const recordOne = async (answer: {
     readonly stepKey: string;
     readonly value: string | readonly string[] | number | boolean;
@@ -960,12 +1058,7 @@ export function createOnboardingPort(input: {
     // left the mandate ACTIVE and the session open).
     const confirming = steps.get(answer.stepKey);
     if (confirming?.configuration.stepType === "confirmation") {
-      return {
-        stepKey: confirming.stepKey,
-        outcome: "REJECTED",
-        reason:
-          "Confirming the review is finishing. When they confirm the record is right and want to finish, use confirm_and_finish; it completes their setup.",
-      };
+      return confirmStep(confirming, answer.value);
     }
     const resolved = await resolve(answer);
     if (!resolved.ok) return resolved.result;
@@ -1421,7 +1514,14 @@ export function createOnboardingPort(input: {
       // decision, read from their latest words, never the acting model's.
       if (input.authority !== undefined) {
         const authority = await input.authority();
-        if (authority?.finishing !== true) {
+        // Agreeing to the review Q just put to them is finishing too.
+        const agreedToReview = view.progress.eligibleSteps.some(
+          (e) =>
+            e.status !== "COMPLETED" &&
+            steps.get(e.stepKey)?.configuration.stepType === "confirmation" &&
+            authority?.stated.has(e.stepKey) === true,
+        );
+        if (authority?.finishing !== true && !agreedToReview) {
           return {
             completed: false,
             missing: [],

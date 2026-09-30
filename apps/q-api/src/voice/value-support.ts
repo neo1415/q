@@ -13,9 +13,19 @@
  * here.
  */
 
-/** Digit sequences in text, with grouping and decimal marks between digits removed. */
+import { spokenFiguresIn } from "./interview-steps.js";
+
+/**
+ * Digit sequences in text, with grouping and decimal marks between digits
+ * removed, and figures said in words as their digits: the recogniser
+ * writes "one" and "five million" as often as "1" and "5,000,000", and a
+ * founder was asked to say "1" for the form (live 2026-09-30).
+ */
 function digitRuns(text: string): string[] {
   const runs: string[] = [];
+  for (const figure of spokenFiguresIn(text)) {
+    if (Number.isInteger(figure)) runs.push(String(figure));
+  }
   for (const match of text.matchAll(/\d(?:[\d\s,.'\u00a0\u202f]*\d)?/g)) {
     // "25 to 100" is two figures; "25 000" (a space-grouped thousand) is one.
     for (const part of match[0].split(/\s(?!\d{3}(?!\d))/)) {
@@ -39,8 +49,8 @@ function significant(digits: string): string {
  * without its scale is the ambiguity the conversation asks about — but a
  * figure the quote does not contain at all is refused.
  *
- * `null`: the quote states no figure in digits (a number said in words),
- * so this cannot be checked from it.
+ * `null`: the quote states no figure at all, in digits or in words, so
+ * this cannot be checked from it.
  */
 export function figureStatedIn(value: string, quote: string): boolean | null {
   const wanted = significant(value.replace(/\D/g, ""));

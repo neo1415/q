@@ -86,3 +86,23 @@ describe("free text is recorded only in the person's own words", () => {
     expect(textStatedIn("", "anything")).toBe(false);
   });
 });
+
+describe("a figure said in words is a figure stated (live 2026-09-30)", () => {
+  it("reads the figure the words give, and only that figure", () => {
+    expect(figureStatedIn("1", "There's only one founder.")).toBe(true);
+    expect(figureStatedIn("12", "Correct me if I'm on twelve.")).toBe(true);
+    expect(
+      figureStatedIn(
+        "5000000",
+        "We're looking for about five million dollars.",
+      ),
+    ).toBe(true);
+    expect(
+      figureStatedIn("62500", "cheques from twenty five to a hundred thousand"),
+    ).toBe(false);
+    expect(
+      figureStatedIn("3", "We're looking for about five million dollars."),
+    ).toBe(false);
+    expect(figureStatedIn("1", "we are backed by Y Combinator")).toBe(null);
+  });
+});

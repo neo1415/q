@@ -665,6 +665,42 @@ function spokenNumber(text: string): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Every figure a sentence states in words: "there's only one founder"
+ * states 1, "about five million dollars" states 5,000,000. Figures in
+ * digits are read by the caller, so none is counted twice. A
+ * validator's normalisation (ADR 0011 §4), so the write check can tell a
+ * figure said aloud from one nobody said; it decides nothing about
+ * meaning.
+ */
+export function spokenFiguresIn(text: string): readonly number[] {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
+  const figures: number[] = [];
+  for (let start = 0; start < tokens.length; start += 1) {
+    const first = tokens[start] ?? "";
+    const opens = NUMBER_WORDS[first.replace(/-.*/, "")] !== undefined;
+    // Only where a figure begins: "five million" is 5,000,000, not also
+    // the "million" read from its second word.
+    if (!opens) continue;
+    const previous = tokens[start - 1] ?? "";
+    if (
+      start > 0 &&
+      (NUMBER_WORDS[previous.replace(/-.*/, "")] !== undefined ||
+        SCALE_WORDS[previous] !== undefined ||
+        /^[$€£₦]?\d/.test(previous))
+    ) {
+      continue;
+    }
+    const figure = spokenNumber(tokens.slice(start).join(" "));
+    if (figure !== null) figures.push(figure);
+  }
+  return figures;
+}
+
 function asNumberString(value: unknown): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return String(value);

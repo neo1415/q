@@ -659,6 +659,8 @@ export function environmentNotesFor(
      * personality they chose in Settings, or Auto. Trusted product copy.
      */
     readonly personality?: string | undefined;
+    /** Who is asking: their own company, from their record. */
+    readonly asker?: string | undefined;
   } = {},
 ): string {
   const factsNote =
@@ -705,6 +707,11 @@ export function environmentNotesFor(
       ...(options.questionSequence === undefined
         ? []
         : [questionSequenceNote(options.questionSequence)]),
+      ...(options.asker === undefined
+        ? []
+        : [
+            `WHO IS ASKING: ${options.asker} "My company", "us" and its name mean this company: never ask whether it is the one they mean, and never ask them for anything given here.`,
+          ]),
       ...(options.personality === undefined
         ? []
         : [
@@ -910,6 +917,18 @@ export type ModelGatewayQAnswerDependencies = {
    * 2026-09-30), as the words Q is told. Null: Q's own default.
    */
   readonly personalityOf?:
+    | ((request: {
+        readonly tenantId: string;
+        readonly userId: string;
+      }) => Promise<string | null>)
+    | undefined;
+  /**
+   * Who is asking, in their own record's words: their own company and its
+   * site (founder live 2026-09-30: Q asked a founder whether "the Nixo
+   * founded by Priya Khandelwal" was the company she meant, and for a
+   * website it had). Trusted server text. Null: nothing known.
+   */
+  readonly askerOf?:
     | ((request: {
         readonly tenantId: string;
         readonly userId: string;
@@ -1464,6 +1483,15 @@ export function createModelGatewayQAnswer(
                 userId: request.actorUserId,
               })
               .catch(() => null);
+      const asker =
+        dependencies.askerOf === undefined
+          ? null
+          : await dependencies
+              .askerOf({
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+              })
+              .catch(() => null);
       const environmentNotes = environmentNotesFor(
         facts,
         offered,
@@ -1484,6 +1512,7 @@ export function createModelGatewayQAnswer(
             : { questionSequence: request.questionSequence }),
           ...(onboardingNudge === null ? {} : { onboardingNudge }),
           ...(personality === null ? {} : { personality }),
+          ...(asker === null ? {} : { asker }),
         },
       );
       const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {

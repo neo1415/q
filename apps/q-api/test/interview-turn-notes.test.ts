@@ -31,3 +31,34 @@ describe("the loop's notes carry the registry's view of Home Q", () => {
     expect(notes.length).toBeLessThanOrEqual(1_500);
   });
 });
+
+describe("the loop is told what the journey still holds open (live 2026-09-30)", () => {
+  it("names the sign-up name, unsaid findings and unasked steps, within the bound", () => {
+    const notes = turnNotesFor({
+      pausing: false,
+      lookup: null,
+      pronounce: null,
+      open: {
+        signupName: "Fictional Co",
+        signupNameIs: "company's name",
+        signupStepKey: "F1.company_name",
+        unsaidFindings: [
+          {
+            stepKey: "F1.description",
+            value: "Software for field teams",
+            because: "found on a public page (example.test)",
+          },
+        ],
+        unasked: [
+          { stepKey: "F1.website", question: "What's your website?" },
+          { stepKey: "F2.materials", question: "Do you have a deck?" },
+        ],
+      },
+    });
+    expect(notes).toContain("Fictional Co");
+    expect(notes).toContain("F1.company_name");
+    expect(notes).toContain("Software for field teams");
+    expect(notes).toContain("F2.materials");
+    expect(notes.length).toBeLessThanOrEqual(1_500);
+  });
+});

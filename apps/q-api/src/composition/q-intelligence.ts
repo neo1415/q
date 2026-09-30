@@ -123,6 +123,13 @@ export type QIntelligenceDependencies = {
         readonly userId: string;
       }) => Promise<string | null>)
     | undefined;
+  /** Who is asking: their own name and company (founder live 2026-09-30). */
+  readonly askerOf?:
+    | ((request: {
+        readonly tenantId: string;
+        readonly userId: string;
+      }) => Promise<string | null>)
+    | undefined;
   /**
    * Where an answer goes as it is written. Absent means it goes out only
    * when it is finished; the stored message and its completion event are
@@ -264,6 +271,9 @@ export function composeQIntelligence(
     ...(dependencies.personalityOf === undefined
       ? {}
       : { personalityOf: dependencies.personalityOf }),
+    ...(dependencies.askerOf === undefined
+      ? {}
+      : { askerOf: dependencies.askerOf }),
     ...(dependencies.deltas === undefined
       ? {}
       : { deltas: dependencies.deltas }),

@@ -95,9 +95,11 @@ const MAX_CALLS = 8;
 /**
  * A person is waiting (ACC 2026-09-25: one luna attempt ran 5.5 minutes
  * and the person got an HTTP 503). The whole turn ends by this deadline,
- * inside the voice route's own; every model call in it is cut off by it.
+ * well inside the voice route's own 20 s (live 2026-09-30: at 25 s the
+ * route cut Q off first, "that was taking too long", and the answer was
+ * lost); every model call in it is cut off by it.
  */
-const TURN_DEADLINE_MS = 25_000;
+const TURN_DEADLINE_MS = 16_000;
 /** Tool rounds stop while this much is left, so the reply can be written. */
 const REPLY_RESERVE_MS = 7_000;
 /** Below this, no reply call is started; the turn degrades honestly. */
@@ -323,6 +325,25 @@ export const ELSEWHERE_NOTE = `Outside onboarding, Q on their Home page can also
  * reading and the research ledger. Code composes the facts; the loop says
  * them in its own words.
  */
+/** The prompt's bound on the turn notes (INTERVIEW_AGENT variables). */
+const TURN_NOTES_MAX = 1_500;
+
+/** What the journey still holds open, for the turn notes. */
+export type JourneyOpenings = {
+  readonly signupName: string | null;
+  readonly signupNameIs: string;
+  readonly signupStepKey: string;
+  readonly unsaidFindings: readonly {
+    readonly stepKey: string;
+    readonly value: string;
+    readonly because: string | null;
+  }[];
+  readonly unasked: readonly {
+    readonly stepKey: string;
+    readonly question: string;
+  }[];
+};
+
 export function turnNotesFor(input: {
   readonly pausing: boolean;
   /** Research first (BIZ-009): what to say about it this turn, once. */
@@ -333,6 +354,13 @@ export function turnNotesFor(input: {
     | { readonly kind: "UNAVAILABLE" }
     | null;
   readonly pronounce: { readonly term: string; readonly sayAs: string } | null;
+  /**
+   * What the journey still holds open, composed by code from the record
+   * (founder live test 2026-09-30: Q asked the company name typed at
+   * sign-up, never said what research found, and went to the review with
+   * the website, description and pitch deck never asked).
+   */
+  readonly open?: JourneyOpenings | undefined;
 }): string {
   const notes: string[] = [];
   if (input.pausing) {
@@ -373,9 +401,45 @@ export function turnNotesFor(input: {
       `They corrected how to say "${input.pronounce.term.slice(0, 80)}": say it as "${input.pronounce.sayAs.slice(0, 120)}" from now on, and acknowledge it in a few words.`,
     );
   }
+  // What the journey still holds open comes after what this turn itself
+  // asks, and the notes are fitted to the prompt's budget in that order.
+  const open = input.open;
+  if (open !== undefined) {
+    if (open.signupName !== null) {
+      notes.push(
+        `They typed "${open.signupName.slice(0, 80)}" as their ${open.signupNameIs} at sign-up: never ask it cold; put it to them ("${open.signupName.slice(0, 80)}, right?") and on their yes record ${open.signupStepKey}, quoting their yes.`,
+      );
+    }
+    if (open.unsaidFindings.length > 0) {
+      notes.push(
+        `Research found, not yet said to them; say it now in one short line with its source and ask if right: ${open.unsaidFindings
+          .map(
+            (f) =>
+              `${f.stepKey} = ${f.value.slice(0, 120)}${f.because === null ? "" : ` (${f.because.slice(0, 60)})`}`,
+          )
+          .join("; ")}`,
+      );
+    }
+  }
+  notes.push(
+    'Record a number as the number they said, in any words; never ask them to say it another way. When their words fit none of a step\'s choices ("I\'m the founder" for a role), ask which fits ("so CEO as well?") rather than a catch-all like Something else.',
+  );
+  if (open !== undefined && open.unasked.length > 0) {
+    notes.push(
+      `Still unasked, ask before the final review, one at a time (a skip is fine): ${open.unasked.map((u) => u.stepKey).join(", ")}`,
+    );
+  }
   // Every turn: the registry's view of what Q does beyond this loop.
   notes.push(ELSEWHERE_NOTE);
-  return notes.join("\n").slice(0, 1_500);
+  // Fitted to the prompt's budget in order: a note that does not fit is
+  // left out whole rather than cut mid-sentence, the first one excepted.
+  let fitted = "";
+  for (const note of notes) {
+    const next = fitted.length === 0 ? note : `${fitted}\n${note}`;
+    if (next.length <= TURN_NOTES_MAX) fitted = next;
+    else if (fitted.length === 0) fitted = note.slice(0, TURN_NOTES_MAX);
+  }
+  return fitted;
 }
 
 /** The firm the investor named, or the one they typed at sign-up. */
@@ -626,7 +690,10 @@ export function createInterviewAgent(
           firmName:
             input.journeyType === "investor"
               ? firmNameOf(view, input.signup?.organisationName ?? null)
-              : textAnswerOf(view, FOUNDER_STEPS.companyName),
+              : // Research starts on the name typed at sign-up, so it is
+                // back before the company is even discussed.
+                textAnswerOf(view, FOUNDER_STEPS.companyName) ||
+                (input.signup?.organisationName?.trim() ?? "").slice(0, 160),
           websiteUrl:
             links?.websiteUrl ??
             (input.journeyType === "investor"
@@ -727,11 +794,86 @@ export function createInterviewAgent(
         ? authority.pronounce
         : null;
     const pausing = authority.pausing && !opening;
+    // What the journey still holds open, from the record: what sign-up
+    // gave, findings not yet put to them, questions never asked.
+    const journeyOpenings = async (): Promise<JourneyOpenings> => {
+      const view = port.view();
+      const answered = new Set(view?.responses.map((r) => r.stepKey) ?? []);
+      const setAside = new Set(
+        view?.progress.eligibleSteps
+          .filter((e) => e.status === "SKIPPED")
+          .map((e) => e.stepKey) ?? [],
+      );
+      const pending = await port.pendingRecommendations().catch(() => []);
+      const pendingSteps = new Set(pending.map((p) => p.stepKey));
+      const qSaid = thread
+        .filter((t) => t.role === "Q")
+        .map((t) => t.text)
+        .join(" ");
+      // Whether Q's own earlier words carried it: the value itself, or
+      // most of its distinctive words when Q put it in its own.
+      const saidByQ = (value: string): boolean => {
+        if (textStatedIn(value, qSaid)) return true;
+        const words = value
+          .toLowerCase()
+          .split(/[^\p{L}\p{N}]+/u)
+          .filter((w) => w.length > 3);
+        if (words.length === 0) return false;
+        const heard = words.filter((w) => textStatedIn(w, qSaid)).length;
+        return heard / words.length >= 0.5;
+      };
+      const signupStepKey =
+        input.journeyType === "investor"
+          ? INVESTOR_STEPS.organisationName
+          : FOUNDER_STEPS.companyName;
+      const signupName = input.signup?.organisationName?.trim() ?? "";
+      return {
+        signupName:
+          signupName.length > 0 &&
+          !answered.has(signupStepKey) &&
+          !pendingSteps.has(signupStepKey)
+            ? signupName
+            : null,
+        signupNameIs:
+          input.journeyType === "investor" ? "firm's name" : "company's name",
+        signupStepKey,
+        unsaidFindings: pending
+          .filter((p) => p.rationale !== null && !saidByQ(p.value))
+          .slice(0, 6)
+          .map((p) => ({
+            stepKey: p.stepKey,
+            value: p.value.slice(0, 200),
+            because: p.rationale === null ? null : p.rationale.slice(0, 120),
+          })),
+        unasked: journeySteps
+          .filter(
+            (step) =>
+              !step.required &&
+              step.configuration.stepType !== "confirmation" &&
+              !answered.has(step.stepKey) &&
+              !setAside.has(step.stepKey) &&
+              !pendingSteps.has(step.stepKey) &&
+              (view?.progress.eligibleSteps.some(
+                (e) => e.stepKey === step.stepKey,
+              ) ??
+                false),
+          )
+          .slice(0, 12)
+          .map((step) => ({
+            stepKey: step.stepKey,
+            question: (
+              SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+            ).slice(0, 160),
+          })),
+      };
+    };
+    const open = await journeyOpenings();
     const turnNotes = turnNotesFor({
       pausing,
       lookup,
       pronounce,
       research: researchNote,
+      open,
     });
 
     // Every round is rendered afresh from the onboarding state and what Q

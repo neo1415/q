@@ -375,6 +375,7 @@ export function createFounderResearchReader(dependencies: {
             result.output.value,
             request.pages,
             request.identity.websiteUrl,
+            request.identity.firmName,
           )
         : [];
     } catch (error: unknown) {

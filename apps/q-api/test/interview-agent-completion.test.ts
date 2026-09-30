@@ -128,7 +128,10 @@ describe("finishing completes the session whenever every required step is done",
 });
 
 describe("the review is confirmed only by finishing", () => {
-  it("record_answers and correct_answer never confirm a review step", async () => {
+  // Live 2026-09-30: a review agreed to through record_answers was refused
+  // over and over. Agreeing to the last review now finishes, all the way to
+  // a completed session, so it never leaves the setup half-activated.
+  it("record_answers and correct_answer confirming the last review finish the setup", async () => {
     for (const [name, args] of [
       [
         "record_answers",
@@ -159,8 +162,29 @@ describe("the review is confirmed only by finishing", () => {
         delegation: readerOf(reading({ stated: ["I11.review"] })),
       }).turn({ ...turn(world, "Yes, that's right."), actor });
 
-      expect(world.recordedValue("I11.review"), name).toBeUndefined();
-      expect(outcome.view.session.status, name).toBe("ACTIVE");
+      expect(world.recordedValue("I11.review"), name).toBeDefined();
+      expect(outcome.view.session.status, name).toBe("COMPLETED");
     }
+  });
+
+  it("a review they have not agreed to is never confirmed", async () => {
+    const world = investorSession({
+      currentStepKey: "I11.review",
+      recorded: REQUIRED,
+    });
+    const outcome = await createInterviewAgent({
+      gateway: calling("record_answers", {
+        answers: [
+          { stepKey: "I11.review", value: true, quote: "What happens next?" },
+        ],
+      }),
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({})),
+    }).turn({ ...turn(world, "What happens next?"), actor });
+
+    expect(world.recordedValue("I11.review")).toBeUndefined();
+    expect(outcome.view.session.status).toBe("ACTIVE");
   });
 });

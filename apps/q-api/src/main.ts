@@ -1651,6 +1651,40 @@ const qIntelligence = composeQIntelligence({
     standingStore
       .read(userId, tenantId, new Date())
       .then((standing) => PERSONALITY_NOTES[standing.personality]),
+  // Their own name and company, from their own record in their own
+  // tenant: what they would be annoyed to be asked.
+  askerOf: async ({ tenantId, userId }) => {
+    const rows = await database.sql<
+      {
+        display_name: string | null;
+        company: string | null;
+        website_url: string | null;
+        business_title: string | null;
+      }[]
+    >`
+      select p.display_name, c.canonical_name as company, c.website_url,
+             m.business_title
+        from identity.user_profiles p
+        left join core.company_members m
+          on m.user_id = p.id and m.tenant_id = ${tenantId} and m.is_current
+        left join core.companies c
+          on c.id = m.company_id and c.tenant_id = ${tenantId}
+       where p.id = ${userId}
+       order by m.is_founder desc nulls last
+       limit 1`;
+    const row = rows[0];
+    if (row === undefined) return null;
+    const name = row.display_name?.trim().slice(0, 80) ?? "";
+    const company = row.company?.trim().slice(0, 120) ?? "";
+    if (name.length === 0 && company.length === 0) return null;
+    return [
+      name.length === 0 ? "This person" : name,
+      company.length === 0
+        ? ""
+        : `, ${row.business_title === null ? "of" : `${row.business_title.slice(0, 60)} of`} their own company ${company}${row.website_url === null ? "" : ` (${row.website_url.slice(0, 200)})`}`,
+      ".",
+    ].join("");
+  },
   // The attestation is the claim about the data; where it holds, every
   // founder, investor and company this process will see was invented.
   dataPosture: demoDataPosture,
