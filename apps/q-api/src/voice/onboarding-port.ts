@@ -640,10 +640,27 @@ export function createOnboardingPort(input: {
       const options = optionsOf(step);
       const named = (text: string): string | undefined => {
         const wanted = text.trim().toLowerCase();
-        return options.find(
+        const exact = options.find(
           (o) =>
             o.key.toLowerCase() === wanted || o.label.toLowerCase() === wanted,
         )?.key;
+        if (exact !== undefined) return exact;
+        // The model's short name for one option ("deck" for "Pitch deck",
+        // live 2026-09-30): the one option whose label holds all its
+        // words. Only when exactly one does; this reads the model's value
+        // against the journey's own labels, never the person's words.
+        const words = (s: string) =>
+          s
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .filter((w) => w.length > 0);
+        const value = words(wanted);
+        if (value.length === 0) return undefined;
+        const holding = options.filter((o) => {
+          const label = new Set(words(o.label));
+          return value.every((w) => label.has(w));
+        });
+        return holding.length === 1 ? holding[0]?.key : undefined;
       };
       const phrases =
         typeof answer.value === "object"
@@ -1146,9 +1163,29 @@ export function createOnboardingPort(input: {
     const resolved = await resolve(answer);
     if (!resolved.ok) return resolved.result;
     const reading = (await input.authority?.()) ?? null;
+    const latestStated = reading?.stated.has(resolved.step.stepKey) === true;
     const readerStated =
-      reading?.stated.has(resolved.step.stepKey) === true ||
+      latestStated ||
       input.statedEarlier?.(resolved.step.stepKey, answer.quote) === true;
+    // From earlier words only, a choice is Q's reading of what they meant:
+    // it is said back and agreed, never recorded silently (live
+    // 2026-09-30: "we did YC summer 25" became "pilots running"). A figure
+    // or their own text is checked against their words below.
+    if (
+      input.authority !== undefined &&
+      !latestStated &&
+      answer.basis !== "DELEGATED" &&
+      (resolved.value.type === "SINGLE_SELECT" ||
+        resolved.value.type === "MULTI_SELECT" ||
+        resolved.value.type === "RESOURCE_REFERENCE")
+    ) {
+      return {
+        stepKey: resolved.step.stepKey,
+        outcome: "REJECTED",
+        reason:
+          "That comes from something they said earlier, and which choice it is was your reading. Say back what you understood in a few words and record it when they agree.",
+      };
+    }
     const refused = unsupported(
       resolved.step,
       resolved.value,

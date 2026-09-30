@@ -248,7 +248,7 @@ describe("what an earlier utterance stated stays theirs (live 2026-09-30)", () =
   it("an answer from their monologue is recorded on a later turn, quoting it", async () => {
     const world = investorSession({ currentStepKey: "I0.investor_type" });
     const monologue =
-      "We're a venture capital fund based in Lagos and we back pre-seed.";
+      "Our firm is Kola Capital, based in Lagos, and we back pre-seed.";
     let turnNo = 0;
     const gateway = {
       execute: () => {
@@ -266,9 +266,9 @@ describe("what an earlier utterance stated stays theirs (live 2026-09-30)", () =
                   arguments: {
                     answers: [
                       {
-                        stepKey: "I0.investor_type",
-                        value: "vc",
-                        quote: "We're a venture capital fund",
+                        stepKey: "I0.organisation_name",
+                        value: "Kola Capital",
+                        quote: "Our firm is Kola Capital",
                       },
                     ],
                   },
@@ -294,12 +294,12 @@ describe("what an earlier utterance stated stays theirs (live 2026-09-30)", () =
       delegation: readerOf(() => {
         readings += 1;
         return readings === 1
-          ? reading({ stated: ["I0.investor_type"] })
+          ? reading({ stated: ["I0.organisation_name"] })
           : reading({});
       }),
     });
     await agent.turn({ ...turn(world, monologue), actor });
-    expect(world.recordedValue("I0.investor_type")).toBeUndefined();
+    expect(world.recordedValue("I0.organisation_name")).toBeUndefined();
     await agent.turn({
       ...turn(world, "sure"),
       recentTurns: [
@@ -308,9 +308,9 @@ describe("what an earlier utterance stated stays theirs (live 2026-09-30)", () =
       ],
       actor,
     });
-    expect(world.recordedValue("I0.investor_type")).toEqual({
-      type: "SINGLE_SELECT",
-      optionKey: "vc",
+    expect(world.recordedValue("I0.organisation_name")).toEqual({
+      type: "TEXT",
+      text: "Kola Capital",
     });
   });
 
@@ -353,6 +353,69 @@ describe("what an earlier utterance stated stays theirs (live 2026-09-30)", () =
       recentTurns: [
         { role: "person", text: "is a venture capital fund common here?" },
       ],
+      actor,
+    });
+    expect(world.recordedValue("I0.investor_type")).toBeUndefined();
+  });
+});
+
+describe("a choice read from earlier words is said back, not recorded (live 2026-09-30)", () => {
+  it("does not record an option from an earlier utterance without their agreement now", async () => {
+    const world = investorSession({ currentStepKey: "I0.investor_type" });
+    const monologue = "We did Y Combinator summer 25 and we move fast.";
+    let calls = 0;
+    const gateway = {
+      execute: () => {
+        calls += 1;
+        return Promise.resolve(
+          calls === 2
+            ? {
+                output: {
+                  kind: "TOOL_CALLS",
+                  text: "",
+                  calls: [
+                    {
+                      callId: "c1",
+                      name: "record_answers",
+                      arguments: {
+                        answers: [
+                          {
+                            stepKey: "I0.investor_type",
+                            value: "accelerator",
+                            quote: "We did Y Combinator summer 25",
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              }
+            : {
+                output: {
+                  kind: "TEXT",
+                  text: JSON.stringify({ reply: "Ok.", asking: null }),
+                },
+              },
+        );
+      },
+    } as unknown as ModelGateway;
+    let readings = 0;
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(() => {
+        readings += 1;
+        return readings === 1
+          ? reading({ stated: ["I0.investor_type"] })
+          : reading({});
+      }),
+    });
+    await agent.turn({ ...turn(world, monologue), actor });
+    await agent.turn({
+      ...turn(world, "anyway"),
+      recentTurns: [{ role: "person", text: monologue }],
       actor,
     });
     expect(world.recordedValue("I0.investor_type")).toBeUndefined();
