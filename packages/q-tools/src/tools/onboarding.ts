@@ -138,7 +138,7 @@ export const RecordOnboardingAnswersInputSchema = z
               "The step this answers, as listed in the onboarding state.",
             ),
             value: AnswerValueSchema.describe(
-              "The answer in the person's terms: an option key or label, a list of them, a number (plain, in the step's unit), free text, or category words for a CATEGORIES step.",
+              "The answer in the person's terms: an option key or label, a list of them, a number (plain, in the step's unit), free text, or category words for a CATEGORIES step. For a yes/no confirmation step: true when they confirm in any words, false when they do not; never their sentence.",
             ),
             quote: QuoteSchema,
             basis: z

@@ -645,7 +645,12 @@ export function createOnboardingPort(input: {
           : {
               stepKey: step.stepKey,
               outcome: "REJECTED",
-              reason: "That does not fit what this step records.",
+              // Never answered by asking the person for set words (live
+              // 2026-09-30: "Please say explicitly: 'Yes, save it.'").
+              reason:
+                step.configuration.stepType === "confirmation"
+                  ? "A confirmation is recorded as true or false, never as their sentence. If their words confirm it, record it again now with true; do not ask them to repeat themselves in particular words."
+                  : "That does not fit what this step records.",
             },
       );
     }
