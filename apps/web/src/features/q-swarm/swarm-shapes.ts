@@ -230,32 +230,38 @@ function handPoints(
   part: "HAND_LEFT" | "HAND_RIGHT",
   random: () => number,
 ): SwarmPoint[] {
+  // Four fingers splayed a little, the thumb out wide: an open palm reads
+  // as a hand at any size.
   const fingers = [
-    { dx: -0.06, len: 0.13 },
-    { dx: -0.02, len: 0.16 },
-    { dx: 0.02, len: 0.15 },
-    { dx: 0.06, len: 0.12 },
+    { dx: -0.075, len: 0.2, lean: -0.12 },
+    { dx: -0.025, len: 0.25, lean: -0.04 },
+    { dx: 0.025, len: 0.24, lean: 0.04 },
+    { dx: 0.072, len: 0.19, lean: 0.12 },
   ];
   return Array.from({ length: count }, (_, i) => {
-    const pick = i % 10;
+    const pick = i % 12;
     let x: number;
     let y: number;
     if (pick < 4) {
-      // The palm: a soft oval.
+      // The palm: a rounded square, denser at its edge.
       const angle = random() * Math.PI * 2;
-      const r = Math.sqrt(random());
-      x = Math.cos(angle) * r * 0.085;
-      y = Math.sin(angle) * r * 0.075;
-    } else if (pick < 9) {
-      const finger = fingers[pick - 4] ?? fingers[0];
+      const r = 0.6 + Math.sqrt(random()) * 0.4;
+      x = Math.cos(angle) * r * 0.1;
+      y = Math.sin(angle) * r * 0.09;
+    } else if (pick < 10) {
+      const finger = fingers[(pick - 4) % 4] ?? fingers[0];
       const along = random();
-      x = (finger?.dx ?? 0) + (random() - 0.5) * 0.012;
-      y = -0.06 - along * (finger?.len ?? 0.13);
+      const len = finger?.len ?? 0.2;
+      x =
+        (finger?.dx ?? 0) +
+        along * len * (finger?.lean ?? 0) +
+        (random() - 0.5) * 0.01;
+      y = -0.08 - along * len;
     } else {
       // The thumb, out to the side and up.
       const along = random();
-      x = 0.08 + along * 0.07;
-      y = 0.01 - along * 0.07;
+      x = 0.1 + along * 0.1;
+      y = 0.02 - along * 0.1;
     }
     return { x: cx + x * mirror, y: cy + y, part };
   });
@@ -266,10 +272,10 @@ export function faceShape(face: SwarmFace, count: number): SwarmPoint[] {
   if (source.length === 0) return qShape(count);
   const random = seeded(face === "FEMALE" ? 17 : 29);
   // A share of the swarm makes the hands; the rest, the face.
-  const perHand = Math.floor(count * 0.07);
+  const perHand = Math.floor(count * 0.1);
   const hands = [
-    ...handPoints(perHand, -0.62, 0.86, -1, "HAND_LEFT", random),
-    ...handPoints(perHand, 0.62, 0.86, 1, "HAND_RIGHT", random),
+    ...handPoints(perHand, -0.7, 0.72, -1, "HAND_LEFT", random),
+    ...handPoints(perHand, 0.7, 0.72, 1, "HAND_RIGHT", random),
   ];
   const faceCount = count - hands.length;
   return [...faceOnly(source, faceCount, random), ...hands];

@@ -175,11 +175,11 @@ export function createSwarmEngine(
         input.activity === "SPEAKING" || input.activity === "LAUGHING";
       const energy = speaking ? 0.35 + smoothedOutput : 0;
       const beat = Math.sin(t * 2.6 + (side > 0 ? 0 : 1.7));
-      const rest = speaking ? 0 : 0.45;
+      const rest = speaking ? 0 : 0.8;
       const lift = energy * (0.16 + beat * 0.06);
       // Each hand turns a little about its own centre as it moves.
-      const cx = side * 0.62;
-      const cy = 0.86;
+      const cx = side * 0.7;
+      const cy = 0.72;
       const angle = side * (0.18 * beat * energy);
       const dx = x - cx;
       const dy = y - cy;
@@ -382,7 +382,7 @@ export function createSwarmEngine(
         return 1;
       case "HAND_LEFT":
       case "HAND_RIGHT":
-        return 0.7;
+        return 0.9;
     }
   };
 
