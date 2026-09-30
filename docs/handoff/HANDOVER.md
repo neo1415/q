@@ -179,6 +179,13 @@ answer never sinks a batch; research readers drop only an unusable field;
 presence read runs for typed onboarding too (Signals & verification);
 Home Q offers unconfirmed findings once and knows who is asking.
 
+Final regression (bench.flutterwave2, after 42c9a4a4): COMPLETE; company
+row written (flutterwave.com, US, description in their words, Series C+).
+Still imperfect there: "a deck and audited financials" not saved to
+materials (the model should record Pitch deck + ownWords "audited
+financials"), and the review took three yeses (F3.review, then
+F8.snapshot asked separately after an optional question in between).
+
 Open (priority order):
 
 1. Required questions are re-asked every turn while the person talks
