@@ -80,6 +80,14 @@ if (await start.isVisible().catch(() => false)) {
   await start.click();
   await page.waitForTimeout(6000);
 }
+// The welcome preselects "Raising capital"; an investor picks theirs.
+if (persona.journey === "investor") {
+  const investing = page.locator('button:has-text("Investing")').first();
+  if (await investing.isVisible().catch(() => false)) {
+    await investing.click();
+    await page.waitForTimeout(1500);
+  }
+}
 const journey = page.getByRole("button", {
   name: new RegExp(`Continue as ${persona.journey}`, "i"),
 });
@@ -96,7 +104,7 @@ if (await typeButton.isVisible().catch(() => false)) {
 // Waits until Q has answered the line just sent (a new Q turn), bounded.
 const say = async (text) => {
   const before = await turnCount();
-  const typed = page.getByPlaceholder("Type instead");
+  const typed = page.getByPlaceholder(/Type instead|in your own words/).last();
   const box = (await typed.isVisible().catch(() => false))
     ? typed
     : page.locator("textarea").last();

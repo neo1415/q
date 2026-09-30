@@ -281,6 +281,10 @@ export function QOnboardingWorkspace({
     },
   });
   const voiceActive = voice.active;
+  // Only a connected line carries typed words; one that never connected
+  // (no microphone) would drop them (live bench 2026-09-30: an investor's
+  // typed answers in the composer below the voice stage went nowhere).
+  const voiceConnected = voice.client.connected;
   const voiceSendText = voice.client.sendText;
 
   const prompt: QPrompt | null = useMemo(
@@ -723,7 +727,7 @@ export function QOnboardingWorkspace({
       if (trimmed.length === 0) {
         return;
       }
-      if (voiceActive && !typed) {
+      if (voiceActive && voiceConnected && !typed) {
         // The spoken thread carries it: same runtime path, Q answers aloud.
         voiceSendText(trimmed);
         return;
@@ -850,6 +854,7 @@ export function QOnboardingWorkspace({
       handleUnderstanding,
       actions,
       voiceActive,
+      voiceConnected,
       voiceSendText,
     ],
   );
