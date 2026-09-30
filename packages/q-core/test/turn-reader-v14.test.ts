@@ -17,7 +17,7 @@ import {
 describe("TURN_READER v14", () => {
   it("is the active reader and v13 is deprecated", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(16);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(17);
     expect(TURN_READER_V13.status).toBe("DEPRECATED");
     expect(TURN_READER_V14.template).toContain("SEQUENCE (null unless");
     expect(TURN_READER_V14.template).toContain("unknownScreen is set");
@@ -35,7 +35,17 @@ describe("TURN_READER v14", () => {
   });
 
   it("still names every contract destination exactly once", () => {
-    for (const destination of Q_NAVIGATE_DESTINATIONS) {
+    // The screens v17 added are named from v17 on.
+    const V17_SCREENS: readonly string[] = [
+      "INVESTORS",
+      "SEARCH",
+      "GATEWAY",
+      "MEMORY",
+      "NEW_PITCH",
+    ];
+    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+      (entry) => !V17_SCREENS.includes(entry),
+    )) {
       expect(
         TURN_READER_V14.template.split(`${destination} (`).length - 1,
         destination,

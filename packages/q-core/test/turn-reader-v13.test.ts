@@ -24,7 +24,17 @@ describe("TURN_READER v13", () => {
   });
 
   it("names every contract destination exactly once", () => {
-    for (const destination of Q_NAVIGATE_DESTINATIONS) {
+    // The screens v17 added are named from v17 on.
+    const V17_SCREENS: readonly string[] = [
+      "INVESTORS",
+      "SEARCH",
+      "GATEWAY",
+      "MEMORY",
+      "NEW_PITCH",
+    ];
+    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+      (entry) => !V17_SCREENS.includes(entry),
+    )) {
       expect(
         TURN_READER_V13.template.split(`${destination} (`).length - 1,
         destination,

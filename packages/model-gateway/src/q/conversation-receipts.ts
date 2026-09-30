@@ -150,6 +150,11 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   PITCH: "their pitch (video and deck)",
   COMPANY_INTEREST: "their company's incoming interest",
   SAVED: "their Saved list",
+  INVESTORS: "Investors",
+  SEARCH: "Search",
+  GATEWAY: "their GateQ gateway",
+  MEMORY: "what Q remembers about them",
+  NEW_PITCH: "a new pitch video",
 };
 
 /** Where the person is, in their terms (R21). */

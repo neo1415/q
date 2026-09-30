@@ -152,9 +152,11 @@ function intentLabel(intent: QUiIntent): string {
     case "OPEN_RECORD_PAGE":
       return intent.page === "COMPANY"
         ? "Open the company"
-        : intent.page.endsWith("_MESSAGES")
-          ? "Open the chat"
-          : "Open the relationship";
+        : intent.page === "INVESTOR"
+          ? "Open the investor"
+          : intent.page.endsWith("_MESSAGES")
+            ? "Open the chat"
+            : "Open the relationship";
     case "SCREEN_ACT":
       return "On this page";
     case "OPEN_SETUP":
@@ -180,6 +182,11 @@ const DESTINATION_LABELS: Readonly<
   PITCH: "Open Pitch & media",
   COMPANY_INTEREST: "Open investor interest",
   SAVED: "Open Saved",
+  INVESTORS: "Open Investors",
+  SEARCH: "Open Search",
+  GATEWAY: "Open your gateway",
+  MEMORY: "Open what Q remembers",
+  NEW_PITCH: "Add a pitch video",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

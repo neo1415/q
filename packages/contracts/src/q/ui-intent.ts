@@ -118,6 +118,12 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "COMPANY_INTEREST",
   // R30 #7: the Saved list (/discover/saved).
   "SAVED",
+  // Founder direction 2026-09-30: "Q can take me anywhere".
+  "INVESTORS",
+  "SEARCH",
+  "GATEWAY",
+  "MEMORY",
+  "NEW_PITCH",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
@@ -227,6 +233,8 @@ export const Q_RECORD_PAGES = [
   // The chat itself (founder report 2026-09-30: "open the chat for me").
   "RELATIONSHIP_COMPANY_MESSAGES",
   "RELATIONSHIP_INVESTOR_MESSAGES",
+  // An investor organisation's own page (/investors/<id>).
+  "INVESTOR",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;

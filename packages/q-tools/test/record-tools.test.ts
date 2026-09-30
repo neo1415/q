@@ -316,6 +316,27 @@ describe("opening a chat by a spoken name (founder report 2026-09-30)", () => {
     expect(outcome.status).not.toBe("SUCCEEDED");
   });
 
+  it("an investor's own page opens by name from what they can see", async () => {
+    const outcome = await executor.execute(
+      call("open_page", { page: "INVESTOR", name: "agro fun" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+    ).toEqual({ kind: "OPEN_RECORD_PAGE", page: "INVESTOR", id: FUND });
+  });
+
+  it("an investor nobody showed them does not open by id", async () => {
+    const outcome = await executor.execute(
+      call("open_page", {
+        page: "INVESTOR",
+        id: "8e4b6f4b-bd88-40b1-8a4f-3d4e5f607182",
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+
   it("neither an id nor a name opens nothing", async () => {
     const outcome = await executor.execute(
       call("open_page", { page: "RELATIONSHIP_COMPANY" }),

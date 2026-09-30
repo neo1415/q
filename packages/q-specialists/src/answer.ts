@@ -198,6 +198,11 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   PITCH: "Opening Pitch & media.",
   COMPANY_INTEREST: "Opening your investor interest.",
   SAVED: "Opening Saved.",
+  INVESTORS: "Opening Investors.",
+  SEARCH: "Opening Search.",
+  GATEWAY: "Opening your gateway.",
+  MEMORY: "Opening what I remember about you.",
+  NEW_PITCH: "Opening a new pitch video.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -213,6 +218,11 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   PITCH: "Pitch & media",
   COMPANY_INTEREST: "your investor interest",
   SAVED: "Saved",
+  INVESTORS: "Investors",
+  SEARCH: "Search",
+  GATEWAY: "your gateway",
+  MEMORY: "what Q remembers",
+  NEW_PITCH: "a new pitch video",
 };
 
 /**

@@ -61,6 +61,8 @@ export function recordPagePath(page: QRecordPage, id: string): string {
       return `/relationships/company/${safe}/messages`;
     case "RELATIONSHIP_INVESTOR_MESSAGES":
       return `/relationships/investor/${safe}/messages`;
+    case "INVESTOR":
+      return `/investors/${safe}`;
   }
 }
 

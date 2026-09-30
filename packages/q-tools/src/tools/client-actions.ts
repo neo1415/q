@@ -28,6 +28,8 @@ import {
 import { actorWideScope, scopesOfKind } from "../plan.js";
 import type { QToolPorts } from "../ports.js";
 
+import { networkVisibleCompanies } from "./network-companies.js";
+
 /**
  * Client actions (R20/R33; founder live test 2026-09-27 #4): what the app
  * itself does in the person's own browser — the theme, a reload, opening
@@ -327,7 +329,7 @@ export function createSignOutTool(): AnyQToolDefinition {
 export const OpenPageInputSchema = z
   .object({
     page: QRecordPageSchema.describe(
-      "COMPANY: a company's page. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation.",
+      "COMPANY: a company's page. INVESTOR: an investor organisation's page. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation.",
     ),
     id: z
       .string()
@@ -342,7 +344,7 @@ export const OpenPageInputSchema = z
       .max(200)
       .optional()
       .describe(
-        "Instead of id, for a relationship or its chat: the counterpart's name as they said it, even misheard ('young field agro'). It is matched against their own relationships only.",
+        "Instead of id: the company's or investor's name as they said it, even misheard ('young field agro'). It is matched against the records they can already see.",
       ),
   })
   .strict();
@@ -418,8 +420,57 @@ export function matchCounterpart(
  * not a party to -- so Q never takes them to a dead end.
  */
 export function createOpenPageTool(
-  ports: Pick<QToolPorts, "companies" | "relationships">,
+  ports: Pick<
+    QToolPorts,
+    "companies" | "relationships" | "disclosure" | "discovery" | "investorFeed"
+  >,
 ): AnyQToolDefinition {
+  /**
+   * Every record of a kind this person may already see, by name: their own
+   * relationships, their own Saves and Passes, and what the network shows
+   * them (network-visible companies; the investors Discover lists to a
+   * founder). Nothing private to someone else is a candidate, so a name
+   * can never open, or reveal, a record they could not reach by hand.
+   */
+  async function candidates(
+    actor: ActorContext,
+    kind: "COMPANY" | "INVESTOR_ORGANISATION",
+    name: string | null,
+  ): Promise<{ readonly id: string; readonly name: string }[]> {
+    const found: { id: string; name: string }[] = [];
+    const own = await ports.relationships
+      ?.ownRelationships?.(actor)
+      .catch(() => null);
+    for (const item of own?.items ?? []) {
+      if (item.counterpart.kind === kind) found.push(item.counterpart);
+    }
+    if (kind === "COMPANY") {
+      const decisions = await ports.investorFeed
+        ?.decisions(actor, 100)
+        .catch(() => []);
+      for (const entry of decisions ?? []) {
+        found.push({ id: entry.companyId, name: entry.name });
+      }
+      if (name !== null) {
+        const network = await networkVisibleCompanies(ports, actor, {
+          text: name,
+          limit: 10,
+        }).catch(() => null);
+        for (const item of network?.items ?? []) {
+          found.push({ id: item.id, name: item.canonicalName });
+        }
+      }
+    } else if (ports.discovery !== undefined) {
+      const slate = await ports.discovery
+        .discoverInvestors({ actor, limit: 50 })
+        .catch(() => null);
+      for (const item of slate?.items ?? []) {
+        found.push({ id: item.investorOrganisationId, name: item.displayName });
+      }
+    }
+    return found;
+  }
+
   return defineQTool<
     OpenPageInput,
     QClientActionToolResult,
@@ -429,7 +480,7 @@ export function createOpenPageTool(
     id: OPEN_PAGE,
     providerName: "open_page",
     description:
-      "Opens one record's own page on their screen, at once: a company's page, their relationship with a company or an investor organisation, or the chat with them. Use the id a tool or the screen gave, or, for a relationship or its chat, just the name they said (misheard names are matched against their own relationships). 'Open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES or RELATIONSHIP_INVESTOR_MESSAGES with name X -- call it directly, never send them to the relationships list instead. NOT_AVAILABLE means no relationship of theirs matches, or that page is not theirs to open.",
+      "Opens any one record's own page on their screen, at once: a company's page, an investor organisation's page, their relationship with a company or investor, or the chat with them. Give the id a tool or the screen gave, or just the name they said -- misheard names are matched against the records they can already see (their relationships, Saves, the network). 'Open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES (X a company) or RELATIONSHIP_INVESTOR_MESSAGES (X an investor) with name X; 'show me X' is COMPANY or INVESTOR. Call it directly, never send them to a list instead. NOT_AVAILABLE means nothing they can see matches, or that page is not theirs to open.",
     input: OpenPageInputSchema,
     authorize: async (input, { actor, plan }) => {
       if (!ownConversation(actor, plan)) {
@@ -439,18 +490,12 @@ export function createOpenPageTool(
         input.page === "COMPANY" ||
         input.page === "RELATIONSHIP_COMPANY" ||
         input.page === "RELATIONSHIP_COMPANY_MESSAGES";
-      let recordId = input.id ?? null;
+      const kind = companySide ? "COMPANY" : "INVESTOR_ORGANISATION";
+      let recordId = input.id?.toLowerCase() ?? null;
       if (recordId === null && input.name !== undefined) {
-        const own = await ports.relationships
-          ?.ownRelationships?.(actor)
-          .catch(() => null);
         recordId = matchCounterpart(
           input.name,
-          (own?.items ?? [])
-            .map((item) => item.counterpart)
-            .filter(
-              (counterpart) => (counterpart.kind === "COMPANY") === companySide,
-            ),
+          await candidates(actor, kind, input.name),
         );
       }
       if (recordId === null) {
@@ -465,6 +510,13 @@ export function createOpenPageTool(
               .catch(() => null)
           : null;
         openable = profile !== null && profile.tenantId === actor.tenantId;
+      } else if (input.page === "INVESTOR") {
+        const id = recordId;
+        openable =
+          actor.organisationId === id ||
+          (await candidates(actor, kind, null)).some(
+            (candidate) => candidate.id.toLowerCase() === id,
+          );
       } else if (ports.relationships !== undefined) {
         const standing = companySide
           ? await ports.relationships
@@ -646,7 +698,14 @@ export function createSetDiscoverFiltersTool(): AnyQToolDefinition {
 }
 
 export function createClientActionTools(
-  ports: Pick<QToolPorts, "companies" | "relationships">,
+  ports: Pick<
+    QToolPorts,
+    | "companies"
+    | "relationships"
+    | "disclosure"
+    | "discovery"
+    | "investorFeed"
+  >,
 ): readonly AnyQToolDefinition[] {
   return [
     createSetThemeTool(),

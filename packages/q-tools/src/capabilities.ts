@@ -161,6 +161,13 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   COMPANY_INTEREST:
     "Opens their company's incoming investor interest, to read and answer it.",
   SAVED: "Opens Saved: the companies they saved from Discover to come back to.",
+  INVESTORS:
+    "Opens Investors: for a founder, the discoverable investors to request a connection with; for an investor, the connection requests founders sent them.",
+  SEARCH: "Opens Search: people by name or handle, and pitch videos.",
+  GATEWAY:
+    "Opens their GateQ gateway: its public link, QR code, website snippet and the applications that came in.",
+  MEMORY: "Opens what Q remembers about them, to review or forget it.",
+  NEW_PITCH: "Opens the page to add a new pitch video.",
 };
 
 /** Screens that belong to a company's own people. */
@@ -169,6 +176,7 @@ const COMPANY_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
   "VERIFICATION",
   "PITCH",
   "COMPANY_INTEREST",
+  "NEW_PITCH",
 ]);
 
 const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(

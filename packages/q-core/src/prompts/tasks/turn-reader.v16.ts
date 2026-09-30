@@ -30,7 +30,7 @@ export const TURN_READER_V16: PromptDefinition<
 > = {
   ...TURN_READER_V15,
   version: 16,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-09-30: a named company, person or chat is not a whole screen; the reader leaves it to the run, which opens that record, instead of navigating to the list.",
   effectiveFrom: "2026-09-30",
