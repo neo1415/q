@@ -663,6 +663,33 @@ export function createPostgresCompanyQueryPort(options: {
                 or (c.canonical_name, c.id) > (${after?.n ?? null}::text, ${after?.id ?? null}::uuid))
          order by c.canonical_name, c.id
          limit ${limit + 1}`;
+      // A name heard by voice is often misheard ("young field agro" for
+      // Yamfield Agro; founder report 2026-09-30). When the exact search
+      // finds nothing on a first page, the closest names by letter
+      // trigrams (spaces and punctuation ignored) stand in, best first;
+      // the same visibility rule applies.
+      if (rows.length === 0 && pattern !== null && after === null) {
+        const letters = (text ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (letters.length >= 4) {
+          const close = await sql`
+            select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
+                   c.headquarters_country, c.short_description, c.marketplace_visibility
+              from core.companies c
+             where c.company_status = 'active'
+               and (c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
+                    or (${viewerOrganisation}::uuid is not null
+                        and c.tenant_id = ${query.viewer.tenantId}
+                        and c.organisation_id = ${viewerOrganisation}::uuid))
+               and extensions.similarity(
+                     regexp_replace(lower(c.canonical_name), '[^a-z0-9]', '', 'g'),
+                     ${letters}::text) >= 0.3
+             order by extensions.similarity(
+                     regexp_replace(lower(c.canonical_name), '[^a-z0-9]', '', 'g'),
+                     ${letters}::text) desc, c.canonical_name, c.id
+             limit ${Math.min(limit, 5)}`;
+          rows.push(...close);
+        }
+      }
       const page = rows.slice(0, limit).map((row): CompanySearchCandidate => {
         const p = SearchRowSchema.parse(row);
         return {
