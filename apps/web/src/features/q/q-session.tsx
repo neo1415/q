@@ -28,7 +28,7 @@ import {
 } from "./active-conversation";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
-import { performClientAction } from "./client-actions";
+import { performClientAction, registerClientRouter } from "./client-actions";
 import { followOfTurns } from "./follow-navigation";
 import { useQSubject, type QSubject } from "./q-subject";
 import { setOpenDocument } from "./screen";
@@ -304,7 +304,14 @@ export function QSessionProvider({
     window.setTimeout(() => setActing(false), ACTION_MS);
   }, []);
 
-  // "Take me to my profile", said anywhere: followed once Q has said so.
+  // Q's moves go through the client router, never a full page load, so
+  // the voice line and the page's state survive every move.
+  useEffect(() => {
+    registerClientRouter((path) => router.push(path));
+    return () => registerClientRouter(null);
+  }, [router]);
+
+  // "Take me to my profile", said anywhere: followed at once.
   // The line stays open -- the dock carries it to the next page with its
   // mic-live mark and Stop (ADR 0017 C11) -- unless Q hands back to typing.
   const voiceEnd = voice.end;

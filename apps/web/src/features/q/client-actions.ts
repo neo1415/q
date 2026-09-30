@@ -2,6 +2,8 @@ import {
   QClientActionIntentSchema,
   QWebsiteUrlSchema,
   type QClientActionIntent,
+  type QScreenActIntent,
+  type QRecordPage,
   type QSetDiscoverFiltersIntent,
 } from "@capital-q/contracts";
 
@@ -34,6 +36,8 @@ export type ClientActionEffects = {
    * brings Discover up when they are elsewhere (ux/discover-filters).
    */
   readonly setDiscoverFilters: (intent: QSetDiscoverFiltersIntent) => void;
+  /** Works the page on screen: scroll, back, a section, a dialog. */
+  readonly screen: (intent: QScreenActIntent) => void;
 };
 
 /** Their own unfinished setup, from the fixed route map. */
@@ -44,10 +48,7 @@ export function setupPath(journey: "founder" | "investor"): string {
 }
 
 /** R33: a record's own page, from its kind and a validated id only. */
-export function recordPagePath(
-  page: "COMPANY" | "RELATIONSHIP_COMPANY" | "RELATIONSHIP_INVESTOR",
-  id: string,
-): string {
+export function recordPagePath(page: QRecordPage, id: string): string {
   const safe = encodeURIComponent(id.toLowerCase());
   switch (page) {
     case "COMPANY":
@@ -56,6 +57,65 @@ export function recordPagePath(
       return `/relationships/company/${safe}`;
     case "RELATIONSHIP_INVESTOR":
       return `/relationships/investor/${safe}`;
+    case "RELATIONSHIP_COMPANY_MESSAGES":
+      return `/relationships/company/${safe}/messages`;
+    case "RELATIONSHIP_INVESTOR_MESSAGES":
+      return `/relationships/investor/${safe}/messages`;
+  }
+}
+
+/**
+ * The app's own client router, registered by the Q session. Moving through
+ * it keeps the page's JavaScript -- and Q's open voice line -- alive; a full
+ * page load (the fallback before it registers) drops both and is slow
+ * (founder report 2026-09-30: "3 to 5 seconds... it stops listening").
+ */
+let clientRouterPush: ((path: string) => void) | null = null;
+export function registerClientRouter(
+  push: ((path: string) => void) | null,
+): void {
+  clientRouterPush = push;
+}
+
+/** The element that scrolls: the shell's main area, else the document. */
+function scroller(): Element {
+  const main = document.getElementById("main");
+  if (main !== null && main.scrollHeight > main.clientHeight + 1) return main;
+  return document.scrollingElement ?? document.documentElement;
+}
+
+function screenAct(intent: QScreenActIntent): void {
+  const area = scroller();
+  switch (intent.act) {
+    case "SCROLL_TOP":
+      area.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    case "SCROLL_BOTTOM":
+      area.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
+      return;
+    case "PAGE_DOWN":
+      area.scrollBy({ top: area.clientHeight * 0.85, behavior: "smooth" });
+      return;
+    case "PAGE_UP":
+      area.scrollBy({ top: -area.clientHeight * 0.85, behavior: "smooth" });
+      return;
+    case "GO_BACK":
+      window.history.back();
+      return;
+    case "SHOW_SECTION":
+      if (intent.section !== undefined) {
+        document
+          .getElementById(intent.section)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      return;
+    // The relationship page's own dialogs open from their hash.
+    case "OPEN_BOOK_CALL":
+      window.location.hash = "calls";
+      return;
+    case "OPEN_REMINDER":
+      window.location.hash = "reminders";
+      return;
   }
 }
 
@@ -82,8 +142,10 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   // The Sign out button's own steps: forget which chats were open on this
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
-    window.location.assign(path);
+    if (clientRouterPush !== null) clientRouterPush(path);
+    else window.location.assign(path);
   },
+  screen: screenAct,
   setDiscoverFilters: (intent) => {
     queueDiscoverFiltersIntent(intent);
     // Elsewhere, Discover takes the queued intent when it opens.
@@ -133,6 +195,9 @@ export function performClientAction(
       return true;
     case "SET_DISCOVER_FILTERS":
       effects.setDiscoverFilters(action);
+      return true;
+    case "SCREEN_ACT":
+      effects.screen(action);
       return true;
   }
 }

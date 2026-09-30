@@ -7,6 +7,8 @@ import {
   QClientActionToolResultSchema,
   QMotionChoiceSchema,
   QRecordPageSchema,
+  QScreenActSchema,
+  QScreenSectionSchema,
   QThemeChoiceSchema,
   QWebsiteUrlSchema,
   type PermittedContextPlan,
@@ -325,7 +327,7 @@ export function createSignOutTool(): AnyQToolDefinition {
 export const OpenPageInputSchema = z
   .object({
     page: QRecordPageSchema.describe(
-      "COMPANY: a company's page. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation.",
+      "COMPANY: a company's page. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation.",
     ),
     id: z
       .string()
@@ -355,7 +357,7 @@ export function createOpenPageTool(
     id: OPEN_PAGE,
     providerName: "open_page",
     description:
-      "Opens one record's own page on their screen: a company's page, or their relationship with a company or an investor organisation. Use the id a tool or the screen gave. NOT_AVAILABLE means that page is not theirs to open.",
+      "Opens one record's own page on their screen: a company's page, their relationship with a company or an investor organisation, or the chat with them. Use the id a tool or the screen gave. NOT_AVAILABLE means that page is not theirs to open.",
     input: OpenPageInputSchema,
     authorize: async (input, { actor, plan }) => {
       if (!ownConversation(actor, plan)) {
@@ -372,7 +374,8 @@ export function createOpenPageTool(
         openable = profile !== null && profile.tenantId === actor.tenantId;
       } else if (ports.relationships !== undefined) {
         const standing =
-          input.page === "RELATIONSHIP_COMPANY"
+          input.page === "RELATIONSHIP_COMPANY" ||
+          input.page === "RELATIONSHIP_COMPANY_MESSAGES"
             ? await ports.relationships
                 .withCompany(actor, input.id)
                 .catch(() => null)
@@ -385,6 +388,53 @@ export function createOpenPageTool(
         ? allowed({ kind: "OPEN_RECORD_PAGE", page: input.page, id: input.id })
         : deny<QClientActionToolResult>("NOT_AVAILABLE");
     },
+  });
+}
+
+export const CONTROL_SCREEN = "client.screen.control" as const;
+
+export const ControlScreenInputSchema = z
+  .object({
+    act: QScreenActSchema.describe(
+      "SCROLL_TOP / SCROLL_BOTTOM / PAGE_DOWN / PAGE_UP: scroll the page they are on. GO_BACK: the previous page. SHOW_SECTION: bring one section into view (name it in section). OPEN_BOOK_CALL / OPEN_REMINDER: open that dialog on a relationship's page.",
+    ),
+    section: QScreenSectionSchema.optional().describe(
+      "For SHOW_SECTION: history, commitment, next or context on a relationship; objective or relationships on Capital; share or applications on Gateway.",
+    ),
+  })
+  .strict();
+export type ControlScreenInput = z.infer<typeof ControlScreenInputSchema>;
+
+/**
+ * Q works the screen the person is on (founder report 2026-09-30): scroll,
+ * go back, show a section, open the page's own call or reminder dialog.
+ * Their own screen only; nothing is read or written.
+ */
+export function createControlScreenTool(): AnyQToolDefinition {
+  return defineQTool<
+    ControlScreenInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
+    ...COMMON,
+    id: CONTROL_SCREEN,
+    providerName: "control_screen",
+    description:
+      "Works the page they are on, at once: scroll up or down, to the top or bottom, go back, show a section, or open the book-a-call or reminder dialog on a relationship's page. Use it when they ask you to scroll, show them something on this page, or open one of its dialogs.",
+    input: ControlScreenInputSchema,
+    authorize: (input, { actor, plan }) =>
+      Promise.resolve(
+        ownConversation(actor, plan) &&
+          (input.act !== "SHOW_SECTION" || input.section !== undefined)
+          ? allowed({
+              kind: "SCREEN_ACT",
+              act: input.act,
+              ...(input.section === undefined
+                ? {}
+                : { section: input.section }),
+            })
+          : deny<QClientActionToolResult>("NOT_AVAILABLE"),
+      ),
   });
 }
 
@@ -515,6 +565,7 @@ export function createClientActionTools(
     createSetVoiceTool(),
     createSignOutTool(),
     createOpenPageTool(ports),
+    createControlScreenTool(),
     createSetDiscoverFiltersTool(),
   ];
 }

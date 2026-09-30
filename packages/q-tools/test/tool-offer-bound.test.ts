@@ -46,6 +46,8 @@ const CORE = [
   "set_voice",
   "sign_out",
   "open_page",
+  // Founder report 2026-09-30: scroll, go back, open a page's dialog.
+  "control_screen",
   "set_discover_filters",
   "approve_pending_proposal",
   "decline_pending_proposal",

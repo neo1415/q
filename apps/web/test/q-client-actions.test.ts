@@ -31,6 +31,8 @@ function effects() {
       done.push(
         `filters:${intent.sectorCodes.join("+")}:${intent.countryCodes.join("+")}`,
       ),
+    screen: (intent) =>
+      done.push(`screen:${intent.act}:${intent.section ?? ""}`),
   };
   return { port, done };
 }
@@ -50,6 +52,42 @@ function qTurn(id: string, blocks: Extract<QTurn, { kind: "Q" }>["blocks"]) {
 }
 
 describe("performing a client action", () => {
+  it("opens the chat itself, and works the screen (founder report 2026-09-30)", () => {
+    const { port, done } = effects();
+    const id = "11111111-1111-4111-8111-111111111111";
+    expect(
+      performClientAction(
+        {
+          kind: "OPEN_RECORD_PAGE",
+          page: "RELATIONSHIP_INVESTOR_MESSAGES",
+          id,
+        },
+        port,
+      ),
+    ).toBe(true);
+    expect(
+      performClientAction({ kind: "SCREEN_ACT", act: "PAGE_DOWN" }, port),
+    ).toBe(true);
+    expect(
+      performClientAction(
+        { kind: "SCREEN_ACT", act: "SHOW_SECTION", section: "commitment" },
+        port,
+      ),
+    ).toBe(true);
+    // A section the pages do not have is refused, never guessed.
+    expect(
+      performClientAction(
+        { kind: "SCREEN_ACT", act: "SHOW_SECTION", section: "anything" },
+        port,
+      ),
+    ).toBe(false);
+    expect(done).toEqual([
+      `go:/relationships/investor/${id}/messages`,
+      "screen:PAGE_DOWN:",
+      "screen:SHOW_SECTION:commitment",
+    ]);
+  });
+
   it("sets the Discover filters, and refuses a malformed filter intent (ux/discover-filters)", () => {
     const { port, done } = effects();
     const intent = {

@@ -516,7 +516,13 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "open_page",
     "NAVIGATION",
-    "Opens one company's page, or their relationship with a company or an investor, by id.",
+    "Opens one company's page, their relationship with a company or an investor, or the chat with them, by id.",
+    { acts: true },
+  ),
+  tool(
+    "control_screen",
+    "NAVIGATION",
+    "Scrolls the page they are on, goes back, shows a section, or opens its book-a-call or reminder dialog.",
     { acts: true },
   ),
   tool(

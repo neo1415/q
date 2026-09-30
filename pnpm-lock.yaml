@@ -119,6 +119,9 @@ importers:
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../../packages/permissions
+      '@capital-q/platform-admin':
+        specifier: workspace:*
+        version: link:../../packages/platform-admin
       '@capital-q/public-identity':
         specifier: workspace:*
         version: link:../../packages/public-identity
@@ -1306,6 +1309,25 @@ importers:
       '@capital-q/config':
         specifier: workspace:*
         version: link:../config
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/platform-admin:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+    devDependencies:
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

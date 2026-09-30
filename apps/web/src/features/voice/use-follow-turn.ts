@@ -7,14 +7,14 @@ import type { QVoiceTurnState } from "@capital-q/contracts";
 import type { VoiceSessionClient } from "./session";
 
 /**
- * Follow where Q is taking the person, after Q has finished saying so.
+ * Follow where Q is taking the person.
  *
- * The turn state names a destination before Q's sentence is spoken; acting
- * on it at once cuts the goodbye. So a destination waits until the client
- * is no longer speaking or thinking, with a floor so speech has started
- * and a ceiling so a silent turn still moves on. Each turn is followed at
- * most once, and a later turn without a destination does not cancel one
- * already waiting.
+ * A destination or a screen action is followed the moment the turn names
+ * it; the voice line is above every page, so Q's sentence carries on
+ * while the page changes. A handoff back to typing waits until Q is no
+ * longer speaking or thinking (a floor so speech has started, a ceiling so
+ * a silent turn still moves on), since it closes the line. Each turn is
+ * followed at most once.
  */
 
 const SPEECH_FLOOR_MS = 1_500;
@@ -50,6 +50,13 @@ export function useFollowTurn(
       return;
     }
     followed.current = turn.sequence;
+    // Founder direction 2026-09-30: moving is instant. The voice line lives
+    // above every page, so Q keeps talking while the screen changes under
+    // it; only handing back to typing waits for Q to finish the sentence.
+    if (turn.handoff === null) {
+      followRef.current(turn);
+      return;
+    }
     const at = Date.now();
     if (timer.current !== null) window.clearTimeout(timer.current);
     const check = () => {

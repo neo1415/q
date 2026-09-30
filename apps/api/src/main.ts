@@ -23,6 +23,7 @@ import {
 } from "@capital-q/audit";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { CorrelationIdSchema } from "@capital-q/contracts";
+import { createPlatformAdmin } from "@capital-q/platform-admin";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createCorrelationId,
@@ -1123,6 +1124,7 @@ const { app, logger } = createApp(config, security, {
   interests,
   connections,
   commitments,
+  admin: createPlatformAdmin({ sql: database.sql }),
   chat,
   chatSafety,
   schedule,

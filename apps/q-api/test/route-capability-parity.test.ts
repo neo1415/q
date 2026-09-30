@@ -202,6 +202,17 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "the organisation reading applications submitted to its own gateway, on its gateway page",
   ),
 
+  // Capital Q's own operators; never Q's to act on, never a tenant's.
+  "api/http/admin.ts GET ADMIN_OVERVIEW_PATH": exempt(
+    "Capital Q's admin console: platform operators only, not a person's own action",
+  ),
+  "api/http/admin.ts GET ADMIN_ATTRIBUTION_PATH": exempt(
+    "Capital Q's attribution and fee ledger: platform operators only",
+  ),
+  "api/http/admin.ts GET ADMIN_DISPUTES_PATH": exempt(
+    "disputed commitments for Capital Q's operators: platform operators only",
+  ),
+
   // Spec 6.6.14: money is stated and confirmed by a person on each side;
   // Q never states, confirms or withdraws a commitment on anyone's behalf.
   "api/http/commitments.ts GET NETWORK_RELATIONSHIP_COMMITMENTS_PATH": exempt(

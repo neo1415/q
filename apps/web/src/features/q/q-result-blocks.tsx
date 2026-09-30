@@ -63,6 +63,7 @@ const INTENT_ROUTES: Readonly<
       | "OPEN_RECORD_PAGE"
       | "OPEN_SETUP"
       | "SET_DISCOVER_FILTERS"
+      | "SCREEN_ACT"
     >,
     string | null
   >
@@ -86,7 +87,9 @@ function intentHref(intent: QUiIntent): string | null {
     intent.kind === "OPEN_WEBSITE" ||
     intent.kind === "SET_Q_MOTION" ||
     intent.kind === "SET_VOICE" ||
-    intent.kind === "SIGN_OUT"
+    intent.kind === "SIGN_OUT" ||
+    // Done on the page as the answer arrives; there is nowhere to link.
+    intent.kind === "SCREEN_ACT"
   ) {
     return null;
   }
@@ -149,7 +152,11 @@ function intentLabel(intent: QUiIntent): string {
     case "OPEN_RECORD_PAGE":
       return intent.page === "COMPANY"
         ? "Open the company"
-        : "Open the relationship";
+        : intent.page.endsWith("_MESSAGES")
+          ? "Open the chat"
+          : "Open the relationship";
+    case "SCREEN_ACT":
+      return "On this page";
     case "OPEN_SETUP":
       return intent.journey === "investor"
         ? "Continue your mandate"

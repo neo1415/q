@@ -224,6 +224,9 @@ export const Q_RECORD_PAGES = [
   "COMPANY",
   "RELATIONSHIP_COMPANY",
   "RELATIONSHIP_INVESTOR",
+  // The chat itself (founder report 2026-09-30: "open the chat for me").
+  "RELATIONSHIP_COMPANY_MESSAGES",
+  "RELATIONSHIP_INVESTOR_MESSAGES",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;
@@ -277,7 +280,49 @@ export type QSetDiscoverFiltersIntent = z.infer<
   typeof QSetDiscoverFiltersIntentSchema
 >;
 
+/**
+ * Q working the screen the person is on (founder report 2026-09-30: "it
+ * would be nice if it could even scroll for me... take me anywhere"):
+ * scroll, go back, bring a section of the page into view, or open one of
+ * the page's own dialogs. Every target is a fixed name the page defines;
+ * a name the page does not have does nothing.
+ */
+export const Q_SCREEN_ACTS = [
+  "SCROLL_TOP",
+  "SCROLL_BOTTOM",
+  "PAGE_DOWN",
+  "PAGE_UP",
+  "GO_BACK",
+  "SHOW_SECTION",
+  "OPEN_BOOK_CALL",
+  "OPEN_REMINDER",
+] as const;
+export const QScreenActSchema = z.enum(Q_SCREEN_ACTS);
+export type QScreenAct = z.infer<typeof QScreenActSchema>;
+
+export const Q_SCREEN_SECTIONS = [
+  "history",
+  "commitment",
+  "next",
+  "context",
+  "objective",
+  "relationships",
+  "share",
+  "applications",
+] as const;
+export const QScreenSectionSchema = z.enum(Q_SCREEN_SECTIONS);
+
+export const QScreenActIntentSchema = z
+  .object({
+    kind: z.literal("SCREEN_ACT"),
+    act: QScreenActSchema,
+    section: QScreenSectionSchema.optional(),
+  })
+  .strict();
+export type QScreenActIntent = z.infer<typeof QScreenActIntentSchema>;
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
+  QScreenActIntentSchema,
   QSetDiscoverFiltersIntentSchema,
   QOpenRecordPageIntentSchema,
   QSetThemeIntentSchema,
@@ -302,6 +347,7 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "set_voice",
   "sign_out",
   "open_page",
+  "control_screen",
   "continue_onboarding",
   "set_discover_filters",
 ] as const;
@@ -353,6 +399,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QOpenRecordPageIntentSchema,
   QOpenSetupIntentSchema,
   QSetDiscoverFiltersIntentSchema,
+  QScreenActIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

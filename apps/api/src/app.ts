@@ -11,6 +11,10 @@ import {
 } from "@capital-q/observability";
 
 import {
+  registerAdminRoutes,
+  type AdminRoutesDependencies,
+} from "./http/admin.js";
+import {
   registerCommitmentRoutes,
   type CommitmentRoutesDependencies,
 } from "./http/commitments.js";
@@ -162,6 +166,8 @@ export type ApiModules = {
   /** CQ-NET-010: Express Interest. Absent: no interest route registers. */
   readonly interests?:
     NetworkInterestRoutesDependencies["interests"] | undefined;
+  /** Capital Q's admin console. Absent: those routes do not register. */
+  readonly admin?: AdminRoutesDependencies["admin"] | undefined;
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
     CommitmentRoutesDependencies["commitments"] | undefined;
@@ -319,6 +325,14 @@ export function createApp(
         interactions: modules.discovery.interactions,
       });
     }
+  }
+
+  if (modules.admin !== undefined) {
+    registerAdminRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      admin: modules.admin,
+    });
   }
 
   if (modules.commitments !== undefined) {

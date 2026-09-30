@@ -1,0 +1,33 @@
+{
+  "name": "@capital-q/platform-admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q's own operations: who is a platform admin, and the read models an operator needs -- the attribution and fee ledger, disputes, usage and model spend. Read-only over other contexts' records; it never writes them.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/security": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}
