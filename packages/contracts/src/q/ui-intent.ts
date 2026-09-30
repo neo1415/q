@@ -235,6 +235,8 @@ export const Q_RECORD_PAGES = [
   "RELATIONSHIP_INVESTOR_MESSAGES",
   // An investor organisation's own page (/investors/<id>).
   "INVESTOR",
+  // A founder's rehearsal with that investor, played by Q (the Investor Twin).
+  "INVESTOR_REHEARSAL",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;

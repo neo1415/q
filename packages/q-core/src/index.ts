@@ -249,6 +249,25 @@ export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
 export { MEETING_NOTES_V2 } from "./prompts/tasks/meeting-notes.v2.js";
 export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
 export { INVESTOR_PERSONA_V1 } from "./prompts/tasks/investor-persona.v1.js";
+export { INVESTOR_TWIN_TURN_V1 } from "./prompts/tasks/investor-twin-turn.v1.js";
+export { REHEARSAL_SCORE_V1 } from "./prompts/tasks/rehearsal-score.v1.js";
+export {
+  INVESTOR_TWIN_TURN_SCHEMA_NAME,
+  INVESTOR_TWIN_TURN_SCHEMA_VERSION,
+  INVESTOR_TWIN_TURN_UNTRUSTED,
+  InvestorTwinTurnResultSchema,
+  InvestorTwinTurnVariablesSchema,
+  REHEARSAL_RATINGS,
+  REHEARSAL_SCORE_SCHEMA_NAME,
+  REHEARSAL_SCORE_SCHEMA_VERSION,
+  REHEARSAL_SCORE_UNTRUSTED,
+  RehearsalScoreResultSchema,
+  RehearsalScoreVariablesSchema,
+  type InvestorTwinTurnResult,
+  type InvestorTwinTurnVariables,
+  type RehearsalScoreResult,
+  type RehearsalScoreVariables,
+} from "./prompts/schemas/rehearsal.js";
 export {
   INVESTOR_PERSONA_SCHEMA_NAME,
   INVESTOR_PERSONA_SCHEMA_VERSION,

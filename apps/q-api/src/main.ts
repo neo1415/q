@@ -69,6 +69,10 @@ import {
   createErrandStartAction,
   createPostgresErrandStore,
 } from "./composition/errands.js";
+import {
+  createRehearsalComposer,
+  createRehearsalService,
+} from "./composition/rehearsals.js";
 import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
 import {
   createProfileAnswerAction,
@@ -105,6 +109,7 @@ import {
   createPostgresInvestorOrganisationQueryPort,
   createPostgresInvestorOrganisationRepository,
   createPostgresInvestorProfileQueryPort,
+  InvestorOrganisationIdSchema,
 } from "@capital-q/investors";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
@@ -1892,6 +1897,103 @@ setInterval(() => {
   });
 }, 60 * 1000).unref();
 
+// The Investor Twin (founder direction 2026-09-30, C12): a founder
+// rehearses a meeting with an investor Q plays. Every read below answers
+// for the founder's own side: the investor as Discover or their own
+// relationship shows them, the other side's messages in their own chat,
+// and calls the founder was on. Never the investor's mandate or Q chats.
+const rehearsalDiscovery = createDiscoveryService({
+  repository: createPostgresDiscoveryRepository({ sql: database.sql }),
+});
+const rehearsals = createRehearsalService({
+  sql: database.sql,
+  material: {
+    companyName: async (actor) => {
+      const companyId = await runtimeDependencies.ownCompany(actor);
+      if (companyId === null) return null;
+      const profile = await companies
+        .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
+        .catch(() => null);
+      return profile?.canonicalName ?? null;
+    },
+    investor: async (actor, investorOrganisationId) => {
+      const [relationship, seen] = await Promise.all([
+        errandRelationships
+          .withInvestor(actor, investorOrganisationId)
+          .catch(() => null),
+        rehearsalDiscovery
+          .findInvestor(actor, investorOrganisationId)
+          .catch(() => null),
+      ]);
+      if (relationship === null && seen === null) return null;
+      const name =
+        seen?.displayName ??
+        (
+          await investors
+            .findCanonicalInvestorOrganisation(
+              InvestorOrganisationIdSchema.parse(investorOrganisationId),
+            )
+            .catch(() => null)
+        )?.displayName ??
+        null;
+      if (name === null) return null;
+      const profile = [
+        `Name: ${name}`,
+        seen === null ? null : `Type: ${seen.investorType}`,
+        seen?.hqCountry == null ? null : `Based in: ${seen.hqCountry}`,
+        seen?.deploymentState == null
+          ? null
+          : `Deploying: ${seen.deploymentState}`,
+        seen?.publicDescription == null
+          ? null
+          : `In their own words: ${seen.publicDescription}`,
+        relationship === null
+          ? null
+          : `Where things stand with this founder: ${relationship.state}`,
+      ]
+        .filter((line): line is string => line !== null)
+        .join("\n");
+      return {
+        name,
+        profile,
+        relationshipId: relationship?.relationshipId ?? null,
+      };
+    },
+    theirMessages: async (actor, relationshipId) => {
+      const read = await chat.readForQ({ actor, relationshipId, limit: 60 });
+      return read.messages
+        .filter((message) => message.from === "OTHER_SIDE")
+        .flatMap((message) =>
+          message.text === null
+            ? []
+            : [`${message.senderName}: ${message.text}`],
+        )
+        .join("\n");
+    },
+    theirCalls: async (actor, relationshipId) => {
+      const meetings =
+        (await schedule.listMeetings(actor, relationshipId)) ?? [];
+      const calls = await Promise.all(
+        meetings
+          .slice(0, 5)
+          .map((meeting) =>
+            meetingAssistant.read(actor, meeting.id).catch(() => null),
+          ),
+      );
+      return calls
+        .flatMap((call) => call?.transcript ?? [])
+        .map((line) => `${line.speaker ?? "Someone"}: ${line.text}`)
+        .join("\n");
+    },
+  },
+  composer: createRehearsalComposer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  logger,
+});
+
 // Q's scout (founder direction 2026-09-29): every six hours, what is new on
 // the public web about each recently active founder's own company, each at
 // most once a day; the first run waits a few minutes after a deploy.
@@ -2206,6 +2308,7 @@ const { app, logger: appLogger } = createApp(
     memory: memoryService,
     meetingAssistant,
     errands,
+    rehearsals,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     continueApproved,

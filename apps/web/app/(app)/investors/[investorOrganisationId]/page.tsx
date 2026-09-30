@@ -128,6 +128,12 @@ export default async function InvestorPage({
           avatarLabel: "logo",
         }}
       />
+      <Link
+        href={`/investors/${encodeURIComponent(investor.investorOrganisationId)}/rehearse`}
+        className={`${buttonClassName("secondary")} self-start`}
+      >
+        Rehearse a meeting with them
+      </Link>
       <section
         aria-labelledby="investor-reach"
         className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"

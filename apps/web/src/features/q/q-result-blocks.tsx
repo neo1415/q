@@ -154,9 +154,11 @@ function intentLabel(intent: QUiIntent): string {
         ? "Open the company"
         : intent.page === "INVESTOR"
           ? "Open the investor"
-          : intent.page.endsWith("_MESSAGES")
-            ? "Open the chat"
-            : "Open the relationship";
+          : intent.page === "INVESTOR_REHEARSAL"
+            ? "Rehearse the meeting"
+            : intent.page.endsWith("_MESSAGES")
+              ? "Open the chat"
+              : "Open the relationship";
     case "SCREEN_ACT":
       return "On this page";
     case "OPEN_SETUP":

@@ -41,6 +41,10 @@ import {
   registerErrandRoutes,
   type ErrandRoutesDependencies,
 } from "./http/errands.js";
+import {
+  registerRehearsalRoutes,
+  type RehearsalRoutesDependencies,
+} from "./http/rehearsals.js";
 import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
@@ -101,6 +105,7 @@ export type QApiModules = {
   readonly memory?: MemoryRoutesDependencies["memory"] | undefined;
   /** Errands: the person's own, read and stopped. */
   readonly errands?: ErrandRoutesDependencies["errands"] | undefined;
+  readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
   /** Q in a meeting: bring it to a call, read its notes. */
   readonly meetingAssistant?:
     MeetingAssistantRoutesDependencies["assistant"] | undefined;
@@ -314,6 +319,19 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       errands: modules.errands,
+    });
+  }
+
+  if (modules.rehearsals !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: rehearsal routes require an actor context resolver",
+      );
+    }
+    registerRehearsalRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      rehearsals: modules.rehearsals,
     });
   }
 

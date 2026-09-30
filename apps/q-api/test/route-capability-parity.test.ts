@@ -469,6 +469,21 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/errands.ts DELETE Q_ERRAND_PATH": exempt(
     "the person's own click stopping an errand they approved; stopping never needs Q",
   ),
+  "q-api/http/rehearsals.ts POST Q_REHEARSALS_PATH": exempt(
+    "the rehearsal screen's own start; Q takes them there with open_page INVESTOR_REHEARSAL, and the rehearsal itself is Q playing the investor",
+  ),
+  "q-api/http/rehearsals.ts GET Q_INVESTOR_REHEARSALS_PATH": exempt(
+    "the founder reading their own past rehearsals, shown on the rehearsal screen",
+  ),
+  "q-api/http/rehearsals.ts GET Q_REHEARSAL_PATH": exempt(
+    "the founder reading their own rehearsal, shown on the rehearsal screen",
+  ),
+  "q-api/http/rehearsals.ts POST Q_REHEARSAL_TURNS_PATH": exempt(
+    "the founder answering the investor Q plays; the turn is already Q",
+  ),
+  "q-api/http/rehearsals.ts POST Q_REHEARSAL_FINISH_PATH": exempt(
+    "the founder ending their rehearsal for Q's coaching; the scoring is already Q",
+  ),
   "q-api/http/meeting-assistant.ts GET Q_MEETING_ASSISTANT_PATH": exempt(
     "the organiser reading whether Q is in their call and its notes; shown on the meeting itself",
   ),
@@ -593,6 +608,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "search by @handle and founders' videos; the People tab opens public Q Cards and Q links them directly",
   ),
   "/investors/[investorOrganisationId]": cap("offer.connection_request"),
+  "/investors/[investorOrganisationId]/rehearse": exempt(
+    "the founder's rehearsal with an investor, which is Q playing them; Q opens it with open_page INVESTOR_REHEARSAL",
+  ),
   "/pitch/[mediaAssetId]": cap("navigate.PITCH"),
   "/company/[companyId]": cap("tool.open_page"),
   "/relationships/company/[companyId]": cap("tool.open_page"),

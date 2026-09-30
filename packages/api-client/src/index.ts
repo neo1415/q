@@ -292,3 +292,10 @@ export {
   getAdminDisputes,
   getAdminOverview,
 } from "./admin.js";
+export {
+  finishRehearsal,
+  getRehearsal,
+  listInvestorRehearsals,
+  sayInRehearsal,
+  startRehearsal,
+} from "./rehearsals.js";
