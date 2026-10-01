@@ -18,11 +18,12 @@ import type { ActorContext } from "@capital-q/security";
  * - Nothing pending: nothing is read; the turn is answered as any other.
  * - One pending, read YES with nothing more: approved (payload-bound,
  *   idempotent, expiry checked by the engine); the line is its result.
- * - Read YES but asking for something different ("yes, but at 3"): not
- *   approved. The altered change is a new proposal with its own approval;
- *   the turn is answered, and the real status of the waiting one follows.
+ * - The question is whether to go ahead with exactly this, unchanged, so
+ *   a yes that asks for something different ("yes, but at 3") reads as
+ *   not this one: declined, and the change they want is answered as a
+ *   new proposal with its own approval.
  * - Read NO: declined through the engine; anything more they said is
- *   answered after.
+ *   answered after. A YES with more: approved, and the rest answered.
  * - Several pending and a decision read: Q asks which, by name.
  * - Read as something else, or not read at all: answered as any other.
  */
@@ -150,7 +151,12 @@ export async function decidePending(
   const question =
     only === undefined
       ? `${whichLine(pending.map((proposal) => proposal.summary))}`
-      : `${named(only.summary)}. Shall I go ahead?`;
+      : // "Exactly this, unchanged": a yes that asks for something
+        // different ("yes, but at 3") is not a yes to this payload, and
+        // the reader says so from meaning (live 2026-10-01: with a plain
+        // "Shall I go ahead?", "yes, go ahead" came back with a remainder
+        // and could not be told apart from a change).
+        `${named(only.summary)}. Shall I go ahead with exactly this, unchanged?`;
   const read = await port.read({
     question,
     utterance: input.utterance,
@@ -168,17 +174,12 @@ export async function decidePending(
     };
   }
   if (read.decision === "YES") {
-    if (read.remainder !== null) {
-      // A yes that asks for something else is not a yes to this payload:
-      // the altered change needs its own approval.
-      return {
-        kind: "ANSWER_THEN",
-        before: null,
-        after: statusLine("PENDING", only.summary),
-      };
-    }
     const { status } = await port.approve(input.context, only.proposalId);
-    return { kind: "REPLY", line: statusLine(status, only.summary) };
+    const line = statusLine(status, only.summary);
+    // Anything more they said is answered after the decision.
+    return read.remainder === null
+      ? { kind: "REPLY", line }
+      : { kind: "ANSWER_THEN", before: line, after: null };
   }
   const { status } = await port.decline(input.context, only.proposalId);
   const line = statusLine(status, only.summary);

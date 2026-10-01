@@ -116,20 +116,45 @@ describe("a typed decision on a waiting change", () => {
     expect(calls.approve).toEqual([]);
   });
 
-  it("does not approve a yes that asks for a different change ('yes but change the time'): it needs its own approval", async () => {
+  it("asks whether to go ahead with exactly this, unchanged, so a yes that changes it is not approved ('yes but change the time')", async () => {
+    let asked = "";
     const { value, calls } = port({
       proposals: [REMINDER],
-      reading: { decision: "YES", remainder: "but change the time to 3pm" },
+      // How the reader reads a change to the proposal under that question.
+      reading: { decision: "NO", remainder: "make it 30 minutes instead" },
     });
     const outcome = await decidePending(
-      value,
-      turn("yes but change the time to 3pm"),
+      {
+        ...value,
+        read: (input) => {
+          asked = input.question;
+          return value.read(input);
+        },
+      },
+      turn("yes but make it 30 minutes instead"),
     );
+    expect(asked).toContain("exactly this, unchanged");
     expect(calls.approve).toEqual([]);
+    expect(calls.decline).toEqual(["p1"]);
     expect(outcome).toEqual({
       kind: "ANSWER_THEN",
-      before: null,
-      after: statusLine("PENDING", REMINDER.summary),
+      before:
+        "Declined: Reminder: Send Savanna the updated deck. Nothing was changed.",
+      after: null,
+    });
+  });
+
+  it("approves a yes with more said, then answers the rest", async () => {
+    const { value, calls } = port({
+      proposals: [REMINDER],
+      reading: { decision: "YES", remainder: "go ahead" },
+    });
+    const outcome = await decidePending(value, turn("yes, go ahead"));
+    expect(calls.approve).toEqual(["p1"]);
+    expect(outcome).toEqual({
+      kind: "ANSWER_THEN",
+      before: "Done: Reminder: Send Savanna the updated deck.",
+      after: null,
     });
   });
 
