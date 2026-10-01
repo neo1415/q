@@ -35,6 +35,7 @@ import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
 import { createVisibilityTools } from "./tools/visibility.js";
+import { createQDailyTools } from "./tools/daily.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 import { createClientActionTools } from "./tools/client-actions.js";
 import {
@@ -147,6 +148,8 @@ export function createDefaultQTools(
     ...createOwnWorkTools(ports),
     // DOCS block: brand kit, a document's audit, their brand applied.
     ...createDocumentStudioTools(ports),
+    // DAILY block: The Q Daily, read and set by their own Q.
+    ...(ports.daily === undefined ? [] : createQDailyTools(ports.daily)),
     // R33: the record forms as Prepare → Approve, and their own records.
     ...(ports.recordChanges === undefined
       ? []

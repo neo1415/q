@@ -489,3 +489,15 @@ export {
   SUGGEST_BRAND_KIT,
   type DocumentStudioPort,
 } from "./tools/documents.js";
+
+// DAILY block: The Q Daily tools.
+export {
+  createGetQDailyTool,
+  createQDailyTools,
+  createSetQDailyPreferencesTool,
+  GET_Q_DAILY,
+  GetQDailyOutputSchema,
+  SET_Q_DAILY_PREFERENCES,
+  SetQDailyPreferencesInputSchema,
+  type QDailyToolPort,
+} from "./tools/daily.js";

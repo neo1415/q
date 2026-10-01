@@ -853,6 +853,19 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RESEARCH",
     "Looks up a public professional profile.",
   ),
+  // --- DAILY block: The Q Daily (docs/specs/2026-10/daily.md) -----------
+  tool(
+    "get_q_daily",
+    "RESEARCH",
+    "Reads their latest edition of The Q Daily (their personal newspaper of cited news about their sectors, markets, deals and people they know, with Q's take labelled as inference) and where to read it.",
+  ),
+  tool(
+    "set_q_daily_preferences",
+    "SETTINGS",
+    "Changes how they receive The Q Daily (weekly, daily or off; emailed or dashboard only; which sections), at once and reversibly, as Settings does.",
+    { acts: true },
+  ),
+  // --- end DAILY block -----------------------------------------------------
   // Setup reminders (founder directive 2026-09-27), text and voice alike.
   tool(
     "set_onboarding_reminders",

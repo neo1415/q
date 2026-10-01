@@ -63,6 +63,8 @@ const EVERY_PORT: QToolPorts = {
   onboardingReminders: STUB,
   // AUTO (ADR 0030)
   work: STUB,
+  // DAILY block
+  daily: STUB,
 };
 
 const EVERY_TOOL = [

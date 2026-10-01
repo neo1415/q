@@ -400,6 +400,8 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "suggest_brand_kit",
   "apply_my_brand",
   "illustrate_my_document",
+  // DAILY: how they receive The Q Daily, reversible in Settings.
+  "set_q_daily_preferences",
 ] as const;
 
 /**

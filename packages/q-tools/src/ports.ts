@@ -30,6 +30,7 @@ import type { QWorkIntelligencePort } from "./tools/q-work.js";
 import type { ResultsToolPort } from "./tools/results.js";
 // DOCS block.
 import type { DocumentStudioPort } from "./tools/documents.js";
+import type { QDailyToolPort } from "./tools/daily.js";
 
 /** One company as the investor's feed shows it. */
 export type InvestorFeedCompany = {
@@ -343,6 +344,8 @@ export type QToolPorts = {
   readonly onboardingReminders?: OnboardingRemindersPort | undefined;
   // AUTO block (ADR 0030): Q's delegated work; absent means no work tool.
   readonly work?: QWorkIntelligencePort | undefined;
+  // DAILY block: The Q Daily, read and set by the person's own Q.
+  readonly daily?: QDailyToolPort | undefined;
 };
 
 /**
