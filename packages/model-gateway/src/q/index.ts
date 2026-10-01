@@ -380,6 +380,18 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
     'LOOK IT UP FIRST. If the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given, then get_company with the returned companyId). If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier). Call the tool through the function-calling interface and write nothing else in that turn. THEN ANSWER IN THE SAME TURN. When nothing needs looking up, or once results are in front of you, write the JSON object and nothing else: at minimum {"answer": "...", "responseShape": "CONCISE" or "ANALYTICAL", "insufficientEvidence": true or false}, plus any other field of the schema that applies. Leave out every field you are not certain of the exact shape of: a field in the wrong shape (null for a list, a string where the schema has an object, a renamed key) loses the whole answer, and an absent one costs nothing. Never reply with prose outside the object, and never reply that you are about to answer.',
 };
 
+/**
+ * Trusted, once per turn: the answer said it would do (or needed to do)
+ * something instead of doing it. Never a script and never about words: it
+ * asks the model to act through the tools it holds, or to answer without
+ * promising.
+ */
+export const SAY_DO_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "Your reply described doing something (looking something up, fetching a list, preparing or changing something) instead of doing it. If a tool offered here does it, call that tool now through the function-calling interface and write nothing else; then answer from what it returns. If no tool does it, write the answer from what you have, without saying you will do it.",
+};
+
 /** Said when an answer about their own records had to use the public web. */
 /**
  * Below this many platform prospects, public research names candidates
@@ -1932,8 +1944,11 @@ export function createModelGatewayQAnswer(
           // made me" called relationship.get, was denied, and the answer
           // could only promise "I'll check"). Costs a call only then.
           let recoveryRounds = 0;
+          // One more round, once, when the answer described doing
+          // something instead of calling the tool that does it.
+          let sayDoRounds = 0;
           while (
-            rounds < Q_TOOL_LOOP_MAX_ROUNDS + recoveryRounds &&
+            rounds < Q_TOOL_LOOP_MAX_ROUNDS + recoveryRounds + sayDoRounds &&
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
@@ -1997,8 +2012,52 @@ export function createModelGatewayQAnswer(
               const accepted = acceptStructuredOutput(
                 result.output.text,
                 CompanyAnalystV12ResultSchema,
-                { invalidListItems: "DROP" },
+                { invalidListItems: "DROP", lenientFields: ["actionTalk"] },
               );
+              /**
+               * Said instead of done. The answer talks about doing
+               * something (actionTalk) while tools that could do it are in
+               * hand and nothing was called: one more round, with a trusted
+               * note to do it rather than describe it (founder live
+               * 2026-10-01: "what are these companies, can you list them"
+               * was answered "I need to retrieve your discovery slate
+               * first" instead of calling discovery_slate). Read from the
+               * answer's own structure, never from its words; once.
+               */
+              const talkedInsteadOfActing =
+                accepted.ok &&
+                (accepted.value.actionTalk.length > 0 ||
+                  (accepted.dropped ?? []).some((path) =>
+                    path.startsWith("actionTalk"),
+                  ));
+              // Talk about a change that was in fact prepared this turn
+              // (a PREPARE or SIDE_EFFECT tool succeeded) is not a gap.
+              const acted = toolCalls.some(
+                (call) =>
+                  call.status === "SUCCEEDED" &&
+                  offeredByName.get(call.providerName)?.classification !==
+                    undefined &&
+                  offeredByName.get(call.providerName)?.classification !==
+                    "READ_ONLY" &&
+                  offeredByName.get(call.providerName)?.classification !==
+                    "ANALYTICAL",
+              );
+              if (
+                talkedInsteadOfActing &&
+                !acted &&
+                sayDoRounds === 0 &&
+                calls < Q_TOOL_LOOP_MAX_CALLS &&
+                request.signal?.aborted !== true
+              ) {
+                sayDoRounds = 1;
+                rounds += 1;
+                messages = [
+                  ...messages,
+                  { role: "ASSISTANT", content: result.output.text },
+                  SAY_DO_NOTE,
+                ];
+                continue;
+              }
               if (accepted.ok) {
                 final = result;
                 analyst = accepted.value;
