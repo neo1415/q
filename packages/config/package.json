@@ -37,6 +37,10 @@
       "types": "./dist/app-email.d.ts",
       "default": "./dist/app-email.js"
     },
+    "./web-push": {
+      "types": "./dist/web-push.d.ts",
+      "default": "./dist/web-push.js"
+    },
     "./speech-providers": {
       "types": "./dist/speech-providers.d.ts",
       "default": "./dist/speech-providers.js"

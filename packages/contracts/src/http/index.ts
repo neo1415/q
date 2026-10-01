@@ -1138,3 +1138,21 @@ export {
   type AttributionRowDto,
   type DisputeRowDto,
 } from "./admin.js";
+// AUTO block: Web Push and notification settings (ADR 0029).
+export {
+  NOTIFICATION_SETTINGS_PATH,
+  NotificationSettingsDtoSchema,
+  NotificationSettingsRequestSchema,
+  PUSH_KEY_PATH,
+  PUSH_SUBSCRIPTION_PATH,
+  PUSH_SUBSCRIPTION_REMOVE_PATH,
+  PushKeyDtoSchema,
+  PushSubscriptionRequestSchema,
+  PushUnsubscribeRequestSchema,
+  type NotificationSettingsDto,
+  type NotificationSettingsRequest,
+  type PushKeyDto,
+  type PushSubscriptionRequest,
+  type PushUnsubscribeRequest,
+} from "./push.js";
+// end AUTO block

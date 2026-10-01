@@ -376,9 +376,10 @@ export function createPostgresScheduleStore(options: {
           link_path: string | null;
           read_at: Date | null;
           created_at: Date;
+          priority: "NEEDS_YOU" | "UPDATE";
         }[]
       >`
-        select id, kind, title, body, link_path, read_at, created_at
+        select id, kind, title, body, link_path, read_at, created_at, priority
           from communication.notifications
          where user_id = ${userId}
          order by created_at desc limit ${limit}`;
@@ -394,6 +395,7 @@ export function createPostgresScheduleStore(options: {
           linkPath: row.link_path,
           readAt: row.read_at === null ? null : new Date(row.read_at),
           createdAt: new Date(row.created_at),
+          priority: row.priority,
         })),
         unread: unread[0]?.count ?? 0,
       };

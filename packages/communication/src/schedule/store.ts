@@ -92,7 +92,10 @@ export type NotificationKind =
   | "Q_ERRAND"
   | "MEETING_RECORDING_DECLINED"
   | "COMMITMENT_DETECTED"
-  | "ACCOUNT_PAUSED";
+  | "ACCOUNT_PAUSED"
+  // AUTO block (ADR 0029)
+  | "Q_WORK"
+  | "Q_STAND_IN";
 
 export type NewNotification = {
   readonly tenantId: string;
@@ -114,6 +117,8 @@ export type NotificationRecord = {
   readonly linkPath: string | null;
   readonly readAt: Date | null;
   readonly createdAt: Date;
+  /** AUTO: "Needs you" notices may push and email; updates stay in the app. */
+  readonly priority?: "NEEDS_YOU" | "UPDATE" | undefined;
 };
 
 export type ScheduleStore = {

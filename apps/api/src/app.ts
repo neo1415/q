@@ -78,6 +78,11 @@ import {
   type InvestorRoutesDependencies,
 } from "./http/investors.js";
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
+// AUTO block (ADR 0029)
+import {
+  registerPushRoutes,
+  type PushRoutesDependencies,
+} from "./http/push.js";
 import {
   registerProfileImageRoutes,
   type ProfileImageRoutesDependencies,
@@ -200,6 +205,9 @@ export type ApiModules = {
   readonly chatSafety?: ChatRoutesDependencies["safety"] | undefined;
   /** BIZ-008: meetings, reminders, notifications. Absent: none register. */
   readonly schedule?: ScheduleRoutesDependencies["schedule"] | undefined;
+  /** AUTO: Web Push subscriptions and notification settings. */
+  readonly push?:
+    Pick<PushRoutesDependencies, "subscriptions" | "publicKey"> | undefined;
   /** BIZ-004: handles and the Q Card. Absent: no card or /@handle route. */
   readonly publicIdentity?:
     QCardRoutesDependencies["publicIdentity"] | undefined;
@@ -371,6 +379,15 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       schedule: modules.schedule,
+    });
+  }
+
+  // AUTO block (ADR 0029): Web Push and notification settings.
+  if (modules.push !== undefined) {
+    registerPushRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      ...modules.push,
     });
   }
 

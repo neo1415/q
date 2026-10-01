@@ -157,7 +157,16 @@ import { composeWorkerPresence } from "./presence/composition.js";
 import { runGmailReplyPoller } from "./integrations/gmail-poller.js";
 import { runScheduleTicker } from "./integrations/schedule-ticker.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
-import { composeSchedule } from "@capital-q/communication";
+import {
+  composeSchedule,
+  // AUTO block (ADR 0029)
+  createNotificationDelivery,
+  createPostgresMeetingDirectory,
+  createWebPushSender,
+  unavailableWebPushSender,
+} from "@capital-q/communication";
+import { loadWebPushConfig } from "@capital-q/config/web-push";
+import { runNoticeDeliveryTicker } from "./integrations/notice-delivery-ticker.js";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import {
   composeGoogleIntegrations,
@@ -857,6 +866,41 @@ const schedule = composeSchedule({
   logger,
 });
 
+// AUTO block (ADR 0029): notices beyond the app -- Web Push to the
+// person's devices (VAPID, free) and email for "Needs you" left unread.
+const webPush = loadWebPushConfig(process.env);
+if (webPush.vapid === undefined) {
+  logger.info(
+    { missing: webPush.missing },
+    "web push disabled: VAPID not configured (in-app and email continue)",
+  );
+}
+const noticeEmailDirectory = createPostgresMeetingDirectory({
+  sql: database.sql,
+});
+const noticeDelivery = createNotificationDelivery({
+  sql: database.sql,
+  push:
+    webPush.vapid === undefined
+      ? unavailableWebPushSender
+      : createWebPushSender({
+          publicKey: webPush.vapid.publicKey,
+          privateKey: webPush.vapid.privateKey.reveal(),
+          subject: webPush.vapid.subject,
+        }),
+  email:
+    appEmail.brevoApi !== undefined
+      ? createBrevoApiEmailSender(appEmail.brevoApi)
+      : appEmail.smtp === undefined
+        ? unavailableAppEmailSender
+        : createSmtpAppEmailSender(appEmail.smtp),
+  emailOf: async (userId) =>
+    (await noticeEmailDirectory.person(userId))?.email ?? null,
+  appOrigin: googleWorkspace.webOrigin ?? null,
+  logger,
+});
+// end AUTO block
+
 const shutdownController = new AbortController();
 
 function shutdown(signal: NodeJS.Signals): void {
@@ -889,6 +933,11 @@ await Promise.all([
     : []),
   runScheduleTicker({
     schedule,
+    signal: shutdownController.signal,
+    logger,
+  }),
+  runNoticeDeliveryTicker({
+    delivery: noticeDelivery,
     signal: shutdownController.signal,
     logger,
   }),

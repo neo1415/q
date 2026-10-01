@@ -174,6 +174,9 @@ export const NotificationKindSchema = z.enum([
   "MEETING_RECORDING_DECLINED",
   "COMMITMENT_DETECTED",
   "ACCOUNT_PAUSED",
+  // AUTO block (ADR 0029)
+  "Q_WORK",
+  "Q_STAND_IN",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 
@@ -186,6 +189,8 @@ export const NotificationDtoSchema = z
     linkPath: z.string().nullable(),
     read: z.boolean(),
     createdAt: UtcTimestampSchema,
+    /** AUTO: what needs the person vs an update. */
+    priority: z.enum(["NEEDS_YOU", "UPDATE"]).default("UPDATE"),
   })
   .strict();
 export type NotificationDto = z.infer<typeof NotificationDtoSchema>;

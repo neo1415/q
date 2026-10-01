@@ -17,6 +17,7 @@ import {
   platformGoogleHttp,
 } from "@capital-q/integrations";
 import { requireSupabaseAuthConfig } from "@capital-q/config/supabase-auth";
+import { loadWebPushConfig } from "@capital-q/config/web-push";
 import {
   createPostgresMaterialActionAuditWriter,
   createPostgresSecurityEventWriter,
@@ -171,6 +172,7 @@ import {
   composeChat,
   composeChatSafety,
   composeSchedule,
+  createPushSubscriptionStore,
 } from "@capital-q/communication";
 import {
   createCloudflareStreamVideoProvider,
@@ -1128,6 +1130,12 @@ const { app, logger } = createApp(config, security, {
   chat,
   chatSafety,
   schedule,
+  // AUTO block (ADR 0029): Web Push; the key is public, the private half
+  // stays with the workers that send.
+  push: {
+    subscriptions: createPushSubscriptionStore(database.sql),
+    publicKey: loadWebPushConfig(process.env).vapid?.publicKey ?? null,
+  },
   gateq,
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),

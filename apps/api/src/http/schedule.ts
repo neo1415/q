@@ -344,6 +344,7 @@ export function registerScheduleRoutes(
           linkPath: item.linkPath,
           read: item.readAt !== null,
           createdAt: item.createdAt.toISOString(),
+          priority: item.priority ?? "UPDATE",
         })),
       });
     },

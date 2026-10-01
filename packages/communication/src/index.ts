@@ -105,3 +105,23 @@ export {
   type MeetingNotesComposer,
   type MeetingTranscriptLine,
 } from "./meeting-assistant/service.js";
+
+// AUTO block: Web Push (VAPID) and notice delivery (ADR 0029).
+export {
+  createWebPushSender,
+  encryptPushPayload,
+  unavailableWebPushSender,
+  vapidAuthorization,
+  type PushMessage,
+  type PushOutcome,
+  type PushSubscriptionKeys,
+  type WebPushSender,
+} from "./push/web-push.js";
+export {
+  createNotificationDelivery,
+  createPushSubscriptionStore,
+  type NotificationDelivery,
+  type NotificationSettings,
+  type PushSubscriptionStore,
+} from "./push/delivery.js";
+// end AUTO block
