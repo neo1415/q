@@ -15,7 +15,7 @@ export const ADMIN_ROLES = [
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 // 2: BILLING permissions added (ADR 0034).
-export const ADMIN_PERMISSIONS_VERSION = 2 as const;
+export const ADMIN_PERMISSIONS_VERSION = 3 as const;
 
 const ALL: readonly AdminRole[] = ADMIN_ROLES;
 const OWNER_OPERATOR_TS: readonly AdminRole[] = [
@@ -92,6 +92,14 @@ export const ADMIN_PERMISSIONS = {
   },
   "billing.fees.rate": { roles: ["platform_owner"], stepUp: true },
   // end BILLING block
+  // ADMIN-3 block: appeals Stage 4 (PADL #050). Support sees the queue;
+  // a decision is a write (step-up, audited).
+  "reviews.read": {
+    roles: ["platform_owner", "operator", "trust_and_safety", "support"],
+    stepUp: false,
+  },
+  "reviews.decide": { roles: OWNER_OPERATOR_TS, stepUp: true },
+  // end ADMIN-3 block
 } as const satisfies Record<
   string,
   { readonly roles: readonly AdminRole[]; readonly stepUp: boolean }

@@ -1165,3 +1165,7 @@ export * from "./results.js";
 // BILLING block (ADR 0034)
 export * from "./billing.js";
 // end BILLING block
+
+// ADMIN-3 block
+export * from "./reviews-kyb.js";
+// end ADMIN-3 block

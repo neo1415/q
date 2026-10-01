@@ -4,11 +4,15 @@ import Link from "next/link";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
+import { getKyb } from "@capital-q/api-client";
+
 import {
   PageContainer,
   PageHeader,
+  PageSection,
 } from "@/components/app-shell/page-container";
-import { resolveOwnContext } from "@/features/q/context";
+import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { KybSection } from "@/features/reviews/kyb-form";
 import {
   loadCompanyVerification,
   type VerificationNotice,
@@ -54,6 +58,9 @@ export default async function VerificationPage({
     context.kind === "FOUNDER"
       ? await loadCompanyVerification(context.companyId)
       : null;
+  // ADMIN-3: KYB for the active organisation (founder or investor).
+  const session = context.kind === "NONE" ? null : await apiSession();
+  const kyb = session === null ? null : await getKyb(session).catch(() => null);
 
   return (
     <PageContainer>
@@ -61,7 +68,7 @@ export default async function VerificationPage({
         title="Verification"
         description={
           context.kind === "INVESTOR"
-            ? "Capital Q verifies founders' identities and their organisations. Your own organisation's standing is on your profile."
+            ? "Capital Q verifies your organisation's registered business details before it can represent itself as verified."
             : "Capital Q verifies a founder's identity and your organisation before your company can appear in investor recommendations."
         }
       />
@@ -78,17 +85,7 @@ export default async function VerificationPage({
             </Link>
           }
         />
-      ) : context.kind === "INVESTOR" ? (
-        <EmptyState
-          title="This is a founder's page."
-          description="What Capital Q has verified about your organisation is on your profile."
-          action={
-            <Link href="/profile" className={buttonClassName("secondary")}>
-              Go to Profile
-            </Link>
-          }
-        />
-      ) : (
+      ) : context.kind === "INVESTOR" ? null : (
         <EmptyState
           title="Verification belongs to a company."
           description="Founders ask Capital Q to verify their identity and their organisation once their company is set up."
@@ -98,6 +95,27 @@ export default async function VerificationPage({
             </Link>
           }
         />
+      )}
+      {kyb === null ? null : (
+        <PageSection
+          id="business"
+          title="Verify your business"
+          description="Your organisation's registered details, checked by a person at Capital Q. Verification is not an endorsement."
+        >
+          <KybSection kyb={kyb} />
+        </PageSection>
+      )}
+      {context.kind === "NONE" ? null : (
+        <p className="cq-body-sm mt-8 text-(--cq-text-secondary)">
+          Disagree with a verification decision?{" "}
+          <Link
+            href="/reviews?subject=VERIFICATION_DECISION"
+            className="underline underline-offset-4"
+          >
+            Ask a person to review it
+          </Link>
+          .
+        </p>
       )}
     </PageContainer>
   );

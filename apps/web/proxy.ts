@@ -34,6 +34,7 @@ export const config = {
     "/gateway/:path*",
     "/rehearsals/:path*",
     "/results/:path*",
+    "/reviews/:path*",
     "/documents/:path*",
     "/admin/:path*",
     "/paused/:path*",

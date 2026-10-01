@@ -218,6 +218,19 @@ export const AdminVerificationRowDtoSchema = z
     synthetic: z.boolean(),
     evidenceSourceId: UuidSchema.nullable(),
     requestedAt: Iso,
+    // ADMIN-3: the KYB details submitted with this request, if any.
+    kyb: z
+      .object({
+        submissionId: UuidSchema,
+        legalName: z.string().max(300),
+        registrationNumber: z.string().max(100),
+        jurisdictionCode: z.string().max(2),
+        registeredAddress: z.string().max(500).nullable(),
+        websiteUrl: z.string().max(500).nullable(),
+        hasDocument: z.boolean(),
+      })
+      .strict()
+      .nullable(),
   })
   .strict();
 export const AdminVerificationListDtoSchema = z

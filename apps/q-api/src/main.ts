@@ -435,6 +435,7 @@ import {
 // ADMIN block
 import { createResultsReader, resultsWindow } from "@capital-q/results";
 import {
+  createPlatformAdmin,
   createFlagReader,
   isSuspended as isAccountSuspended,
   recordingEmailSender,
@@ -442,6 +443,12 @@ import {
 } from "@capital-q/platform-admin";
 import { withSuspension } from "./composition/suspension.js";
 // end ADMIN block
+// ADMIN-3 block
+import {
+  createHumanReviewBoard,
+  createReviewRequestAction,
+} from "./composition/human-review-action.js";
+// end ADMIN-3 block
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -1125,6 +1132,13 @@ const publicIdentity = createPublicIdentityService({
 });
 // "Make me a Q card" waits here for approval (BIZ-004).
 const handleClaimBoard = createHandleClaimBoard({ publicIdentity, logger });
+// ADMIN-3 block: appeals Stage 4 -- Q prepares, the person approves.
+const humanReviewBoard = createHumanReviewBoard();
+const humanReviews = createPlatformAdmin({
+  sql: database.sql,
+  transactions: database.transactions,
+});
+// end ADMIN-3 block
 
 // Who can see what (CQ-BIZ-003): the permissions context's visibility
 // centre, composed as the application API composes it -- the same
@@ -1385,6 +1399,9 @@ const qTools = createQTools({
       prepareForApproval: visibilityBoard.prepareForApproval,
     },
     handleClaims: handleClaimBoard,
+    // ADMIN-3 block
+    humanReviews: humanReviewBoard,
+    // end ADMIN-3 block
     // Approval by conversation: the one change waiting for this person in
     // this conversation, approved as the card approves it (live test
     // 2026-09-27 #1). The engine and orchestrator are composed below.
@@ -1689,6 +1706,9 @@ const qActionRegistry = createQActionRegistry([
   createPersonProfileUpdateAction({ people, logger }),
   // The investor organisation's declared profile (BIZ-002).
   // The organisation's public handle and Q Card (BIZ-004).
+  // ADMIN-3 block
+  createReviewRequestAction({ reviews: humanReviews, logger }),
+  // end ADMIN-3 block
   createHandleClaimAction({
     publicIdentity,
     subjects: cardSubjects,
@@ -1772,6 +1792,7 @@ const qActionPort = createQActionPort({
     profileChangeBoard.proposer,
     visibilityBoard.proposer,
     handleClaimBoard.proposer,
+    humanReviewBoard.proposer,
     recordChangeBoard.proposer,
     profileBoard,
   ),

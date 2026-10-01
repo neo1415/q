@@ -26,6 +26,16 @@ export type VerificationQueueRow = {
   readonly synthetic: boolean;
   readonly evidenceSourceId: string | null;
   readonly requestedAt: string;
+  /** The KYB details submitted with this request, when there are any. */
+  readonly kyb: {
+    readonly submissionId: string;
+    readonly legalName: string;
+    readonly registrationNumber: string;
+    readonly jurisdictionCode: string;
+    readonly registeredAddress: string | null;
+    readonly websiteUrl: string | null;
+    readonly hasDocument: boolean;
+  } | null;
 };
 
 export async function verificationQueue(
@@ -50,6 +60,13 @@ export async function verificationQueue(
       synthetic: boolean;
       evidence_source_id: string | null;
       created_at: Date;
+      kyb_id: string | null;
+      kyb_legal_name: string | null;
+      kyb_registration_number: string | null;
+      kyb_jurisdiction: string | null;
+      kyb_address: string | null;
+      kyb_website: string | null;
+      kyb_has_document: boolean | null;
     }[]
   >`
     select c.id, c.tenant_id, c.claim_type, c.subject_type,
@@ -59,8 +76,13 @@ export async function verificationQueue(
            o.website_url as website, o.country_code as country,
            rp.display_name as requester_name, ru.email::text as requester_email,
            coalesce(ru.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false) as synthetic,
-           c.evidence_source_id, c.created_at
+           c.evidence_source_id, c.created_at,
+           k.id as kyb_id, k.legal_name as kyb_legal_name,
+           k.registration_number as kyb_registration_number,
+           k.jurisdiction_code as kyb_jurisdiction, k.registered_address as kyb_address,
+           k.website_url as kyb_website, (k.document_id is not null) as kyb_has_document
       from evidence.verification_claims c
+      left join core.kyb_submissions k on k.claim_id = c.id and k.status = 'SUBMITTED'
       join identity.organisations o on o.id = c.organisation_id
       left join core.companies co on co.organisation_id = c.organisation_id
       left join identity.user_profiles sp on c.subject_type = 'PERSON' and sp.id = c.subject_id
@@ -89,6 +111,18 @@ export async function verificationQueue(
     synthetic: row.synthetic,
     evidenceSourceId: row.evidence_source_id,
     requestedAt: new Date(row.created_at).toISOString(),
+    kyb:
+      row.kyb_id === null
+        ? null
+        : {
+            submissionId: row.kyb_id,
+            legalName: row.kyb_legal_name ?? "",
+            registrationNumber: row.kyb_registration_number ?? "",
+            jurisdictionCode: row.kyb_jurisdiction ?? "",
+            registeredAddress: row.kyb_address,
+            websiteUrl: row.kyb_website,
+            hasDocument: row.kyb_has_document === true,
+          },
   }));
 }
 
@@ -100,4 +134,35 @@ export async function claimTenant(
   const rows = await sql<{ tenant_id: string }[]>`
     select tenant_id from evidence.verification_claims where id = ${claimId}`;
   return rows[0]?.tenant_id ?? null;
+}
+
+/**
+ * The document a KYB submission points at, for a one-minute signed read by
+ * the operator deciding it. Null when the submission has none or is not
+ * open.
+ */
+export async function kybDocument(
+  sql: DatabaseExecutor,
+  _grant: AdminGrant,
+  submissionId: string,
+): Promise<{
+  readonly tenantId: string;
+  readonly documentId: string;
+  readonly versionId: string;
+} | null> {
+  const rows = await sql<
+    { tenant_id: string; document_id: string; version_id: string }[]
+  >`
+    select k.tenant_id, d.id as document_id, d.current_version_id as version_id
+      from core.kyb_submissions k
+      join evidence.documents d on d.id = k.document_id and d.tenant_id = k.tenant_id
+     where k.id = ${submissionId} and d.current_version_id is not null`;
+  const row = rows[0];
+  return row === undefined
+    ? null
+    : {
+        tenantId: row.tenant_id,
+        documentId: row.document_id,
+        versionId: row.version_id,
+      };
 }

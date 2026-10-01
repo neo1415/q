@@ -165,7 +165,9 @@ import {
 } from "@capital-q/public-identity";
 import {
   createCompanyVerificationService,
+  closeKybForClaim,
   createDecideByOperator,
+  createKybService,
   createPostgresVerificationClaimRepository,
   createPublicVerificationReader,
   createVerificationClaimsReadinessPort,
@@ -1295,6 +1297,32 @@ const { app, logger } = createApp(config, security, {
     audit,
   }),
   // end ADMIN block
+  // ADMIN-3 block: manual KYB and the console's side of it.
+  kyb: createKybService({
+    sql: database.sql,
+    transactions: database.transactions,
+    authorization,
+    repository: createPostgresVerificationClaimRepository(),
+    audit,
+    outbox,
+  }),
+  adminCloseKyb: (input) => closeKybForClaim(database.transactions, input),
+  adminKybDownload:
+    storage === undefined
+      ? undefined
+      : async (document) => {
+          const link = await createSharedDocumentDownloads({
+            sql: database.sql,
+            storage,
+          }).authorizeSharedVersion({
+            documentTenantId: document.tenantId,
+            documentId: document.documentId,
+            documentVersionId: document.versionId,
+            disposition: "ATTACHMENT",
+          });
+          return { url: link.url, expiresAt: link.expiresAt };
+        },
+  // end ADMIN-3 block
   chat,
   chatSafety,
   schedule,

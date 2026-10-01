@@ -66,6 +66,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'investor_portfolio_references', 'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objectives',            'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_events',      'RLS_REQUIRED',         '{SELECT}'),
+  ('core', 'human_reviews',                 'RLS_REQUIRED',         '{SELECT}'),
+  ('core', 'kyb_submissions',               'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationships',            'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationship_events',      'INTERNAL_SERVER_ONLY', '{}'),

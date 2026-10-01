@@ -300,6 +300,22 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   // end ADMIN block
 
+  // ADMIN-3 block
+  "api/http/admin.ts GET ADMIN_REVIEWS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_REVIEW_DECISION_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_KYB_DOCUMENT_PATH": OPERATIONS_CONSOLE,
+  "api/http/reviews-kyb.ts GET REVIEWS_PATH": exempt(
+    "the person's own review cases, read on their Reviews page; Q's side is propose_human_review",
+  ),
+  "api/http/reviews-kyb.ts POST REVIEWS_PATH": cap("tool.propose_human_review"),
+  "api/http/reviews-kyb.ts GET KYB_PATH": exempt(
+    "the organisation's own KYB submission, read on the Verification page",
+  ),
+  "api/http/reviews-kyb.ts POST KYB_PATH": exempt(
+    "business details and a document a person enters and uploads themselves on the Verification page; Q offers the page (navigate.VERIFICATION)",
+  ),
+  // end ADMIN-3 block
+
   // Spec 6.6.14: money is stated and confirmed by a person on each side;
   // Q never states, confirms or withdraws a commitment on anyone's behalf.
   "api/http/commitments.ts GET NETWORK_RELATIONSHIP_COMMITMENTS_PATH": exempt(
@@ -739,6 +755,10 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/admin/email": OPERATIONS_CONSOLE,
   "/admin/team": OPERATIONS_CONSOLE,
   "/results": cap("navigate.RESULTS"),
+  // ADMIN-3 block
+  "/admin/reviews": OPERATIONS_CONSOLE,
+  "/reviews": cap("tool.propose_human_review"),
+  // end ADMIN-3 block
   // end ADMIN block
   "/admin": exempt(
     "Capital Q's admin console: platform operators only, never a place Q sends anyone",

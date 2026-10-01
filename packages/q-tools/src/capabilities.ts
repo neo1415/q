@@ -540,6 +540,14 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Gives download links for their own results report for a period: a branded PDF and a CSV for their business.",
   ),
   // end ADMIN block
+  // ADMIN-3 block
+  tool(
+    "propose_human_review",
+    "RECORDS",
+    "Prepares a request for a Capital Q person to review a decision they disagree with (readiness, verification, an account action, an assessment), for their approval; a person answers within 3 days.",
+    { approval: "PREPARE_APPROVE", executes: ["review.request"] },
+  ),
+  // end ADMIN-3 block
   // BILLING block (ADR 0034)
   tool(
     "get_my_plan",

@@ -35,7 +35,9 @@ import {
   createCompanyVerificationService,
   createPostgresPendingSyntheticClaimSource,
   createSyntheticAutoVerifySweep,
+  closeKybForClaim,
   createDecideByOperator,
+  createKybService,
   createPostgresVerificationClaimRepository,
   createSyntheticVerificationDecider,
   syntheticAutoVerifyAttestation,
@@ -498,6 +500,96 @@ describe("@capital-q/verification against local PostgreSQL", () => {
          where tenant_id = ${world.tenantA} and action_type = 'verification.claim.decided'
            and actor_type = 'human'`;
       expect(audits?.n).toBe(2);
+    });
+  });
+
+  it("takes an organisation's KYB once, records the ORGANISATION claim, and closes it with the operator's decision (ADMIN-3)", async () => {
+    await withWorld(async (world) => {
+      const kyb = createKybService({
+        sql: world.tx.sql,
+        transactions: nestedTransactions(world.tx),
+        authorization: createAuthorizationService(
+          createPostgresAuthorizationPolicySource({ sql: world.tx.sql }),
+        ),
+        repository: createPostgresVerificationClaimRepository(),
+        audit: createPostgresMaterialActionAuditWriter(),
+        outbox: createOutboxWriter({ registry }),
+      });
+      const details = {
+        legalName: "Company A Ltd",
+        registrationNumber: "RC 0001",
+        jurisdictionCode: "NG",
+        registeredAddress: null,
+        websiteUrl: "https://a.example",
+        documentId: null,
+      };
+      const submit = (key: string, documentId: string | null = null) =>
+        kyb.submit({
+          actor: world.realMemberA.actor,
+          input: { ...details, documentId },
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        });
+      // A document that is not the organisation's is refused.
+      expect((await submit("kyb-key-0000", randomUUID())).kind).toBe(
+        "DOCUMENT_NOT_FOUND",
+      );
+      const first = await submit("kyb-key-0001");
+      expect(first.kind).toBe("SUBMITTED");
+      if (first.kind !== "SUBMITTED") throw new Error(first.kind);
+      expect(first.view.standing).toBe("PENDING");
+      expect(first.view.submission?.status).toBe("SUBMITTED");
+      expect((await submit("kyb-key-0001")).kind).toBe("REPLAYED");
+      expect((await submit("kyb-key-0002")).kind).toBe("ALREADY_OPEN");
+      // Another tenant's member sees only their own organisation.
+      const other = await kyb.current(world.adminB.actor);
+      expect(other).toEqual({ standing: "NOT_REQUESTED", submission: null });
+
+      const [claim] = await world.tx.sql<{ id: string }[]>`
+        select claim_id as id from core.kyb_submissions
+         where organisation_id = ${world.orgA}`;
+      const [operator] = await world.tx.sql<{ id: string }[]>`
+        select user_id as id from identity.organisation_memberships
+         where id = ${world.adminB.membershipId}`;
+      const decide = createDecideByOperator({
+        transactions: nestedTransactions(world.tx),
+        repository: createPostgresVerificationClaimRepository(),
+        outbox: createOutboxWriter({ registry }),
+        audit: createPostgresMaterialActionAuditWriter(),
+      });
+      expect(
+        (
+          await decide({
+            tenantId: world.tenantA,
+            claimId: claim?.id ?? "",
+            operatorUserId: operator?.id ?? "",
+            status: "REVOKED",
+            decisionBasis: "Registry has no such number",
+            revocationReason: "No matching registration",
+            correlationId: CORRELATION(),
+          })
+        ).kind,
+      ).toBe("DECIDED");
+      expect(
+        await closeKybForClaim(nestedTransactions(world.tx), {
+          claimId: claim?.id ?? "",
+          approved: false,
+          reason: "No matching registration",
+          decidedByUserId: operator?.id ?? "",
+        }),
+      ).toBe(true);
+      const after = await kyb.current(world.realMemberA.actor);
+      expect(after?.standing).toBe("REVOKED");
+      expect(after?.submission?.status).toBe("REJECTED");
+      expect(after?.submission?.decisionReason).toBe(
+        "No matching registration",
+      );
+      const [notice] = await world.tx.sql<{ kind: string }[]>`
+        select kind from communication.notifications
+         where user_id = ${world.realMemberA.actor.userId} and kind = 'VERIFICATION_DECIDED'`;
+      expect(notice?.kind).toBe("VERIFICATION_DECIDED");
+      // A rejected organisation may submit again.
+      expect((await submit("kyb-key-0003")).kind).toBe("SUBMITTED");
     });
   });
 

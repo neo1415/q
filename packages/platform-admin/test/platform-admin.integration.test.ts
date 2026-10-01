@@ -408,4 +408,84 @@ describe("@capital-q/platform-admin against local Postgres", () => {
       }
     });
   });
+
+  // ADMIN-3: appeals Stage 4.
+  it("records a person's review once, holds the open limit, and an operator decides it once with a notice", async () => {
+    await scenario(async (admin, w, tx) => {
+      const [membership] = await tx.sql<
+        { tenant_id: string; organisation_id: string }[]
+      >`
+        select tenant_id, organisation_id from identity.organisation_memberships
+         where user_id = ${w.member}`;
+      const requester = {
+        tenantId: membership?.tenant_id ?? "",
+        userId: w.member,
+        organisationId: membership?.organisation_id,
+      };
+      const ask = (key: string) =>
+        admin.requestReview(requester, {
+          subjectType: "VERIFICATION_DECISION",
+          subjectRef: "verification_claim:abc",
+          reason: "The registry lists us under our old name.",
+          idempotencyKey: key,
+        });
+      const first = await ask("review-key-0001");
+      expect(first.kind).toBe("CREATED");
+      expect((await ask("review-key-0001")).kind).toBe("REPLAYED");
+      for (let i = 2; i <= 5; i += 1) await ask(`review-key-000${String(i)}`);
+      expect((await ask("review-key-0006")).kind).toBe("TOO_MANY_OPEN");
+      expect(
+        (
+          await admin.requestReview(requester, {
+            subjectType: "OTHER",
+            subjectRef: "drop table; --",
+            reason: "A reference that is not an id",
+            idempotencyKey: "review-key-bad1",
+          })
+        ).kind,
+      ).toBe("INVALID");
+      if (first.kind !== "CREATED") throw new Error(first.kind);
+      const reviewId = first.review.reviewId;
+
+      await stepUp(admin, tx, w.ts);
+      const grant = await granted(admin, w.ts, "reviews.decide");
+      const queue = await admin.reviewQueue(grant, false);
+      expect(queue.map((row) => row.reviewId)).toContain(reviewId);
+      expect(queue.every((row) => !row.overdue)).toBe(true);
+      expect(
+        await admin.decideReview(grant, {
+          reviewId,
+          outcome: "NEEDS_EVIDENCE",
+          reason: "Upload the registry extract showing the name change.",
+        }),
+      ).toEqual({ kind: "DECIDED" });
+      expect(
+        (
+          await admin.decideReview(grant, {
+            reviewId,
+            outcome: "CHANGED",
+            reason: "again",
+          })
+        ).kind,
+      ).toBe("NOT_FOUND");
+      const [notice] = await tx.sql<
+        { kind: string; priority: string; link_path: string }[]
+      >`
+        select kind, priority, link_path from communication.notifications
+         where user_id = ${w.member} and kind = 'HUMAN_REVIEW'`;
+      expect(notice).toEqual({
+        kind: "HUMAN_REVIEW",
+        priority: "NEEDS_YOU",
+        link_path: "/reviews",
+      });
+      const mine = await admin.ownReviews(w.member);
+      expect(mine.find((row) => row.reviewId === reviewId)?.outcome).toBe(
+        "NEEDS_EVIDENCE",
+      );
+      // An analyst cannot even see the queue.
+      expect((await admin.authorize(w.analyst, "reviews.read")).kind).toBe(
+        "NOT_FOUND",
+      );
+    });
+  });
 });

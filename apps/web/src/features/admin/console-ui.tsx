@@ -285,6 +285,7 @@ const SECTIONS: readonly {
     label: "Verification",
     permission: "verification.read",
   },
+  { href: "/admin/reviews", label: "Reviews", permission: "reviews.read" },
   { href: "/admin/safety", label: "Safety", permission: "safety.read" },
   { href: "/admin/q", label: "Q monitor", permission: "q.monitor.read" },
   { href: "/admin/audit", label: "Audit", permission: "audit.read" },
