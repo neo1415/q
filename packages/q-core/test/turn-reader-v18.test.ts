@@ -11,10 +11,10 @@ import {
  * (harden spec §4). Nothing of v17 is lost.
  */
 describe("TURN_READER v18", () => {
-  it("is the active reader", () => {
+  it("is superseded by v19, which only adds a screen", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(18);
+    ).toBe(19);
   });
 
   it("keeps every v17 line and adds only the acceptance rule", () => {

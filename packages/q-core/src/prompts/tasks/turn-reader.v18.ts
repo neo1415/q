@@ -31,7 +31,7 @@ export const TURN_READER_V18: PromptDefinition<
 > = {
   ...TURN_READER_V17,
   version: 18,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder direction 2026-10-01: accepting what Q offered to do in its last turn reads as the request it offered, not as an answer.",
   effectiveFrom: "2026-10-01",

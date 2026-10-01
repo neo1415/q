@@ -31,6 +31,8 @@ describe("TURN_READER v13", () => {
       "GATEWAY",
       "MEMORY",
       "NEW_PITCH",
+      // Named from v19 on (REHEARSE).
+      "REHEARSALS",
     ];
     for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
       (entry) => !V17_SCREENS.includes(entry),
