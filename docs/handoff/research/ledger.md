@@ -267,3 +267,8 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - Removed bench.nixo, nixo2 and nixo3 (fictional duplicates). There are 10 more fictional "Zino Aviation" investor orgs (qx004-*, rw-*@example.com) to clear later.
 - REAL-ACCOUNT RUN (founder-approved): made Nixo network_visible via its visibility page. Zino asked Q on Nixo's page "get me a meeting with this person" → card → Approve → interest 18:07:26 → Nixo accepted 18:08:17 → booked 18:08:39 with Meet https://meet.google.com/xke-cckh-szx, Fri 2 Oct 12:30 UTC. Notices sent to both sides, rehearsal suggested, prep brief ready.
 - Defect found: after a reload the dock starts a new conversation, so a typed "yes" misses the pending card. Sent to QA.
+
+## 2026-10-01 night — lead
+- Deployed 5eb4fef2 (all 4 SUCCESS 20:41): rehearsal never fails to start (field-by-field readings, minimal persona fallback, holding line, provisional review with retries, "rehearsal degraded" log); gateway enumFallbacks + label normalisation; camera presence (opt-in) + look-on-demand; time-zone order (no silent UTC); approved-action sweep; dock resume + cross-conversation typed approval; branded emails (packages/email) + per-person meeting emails with Meet link/.ics; meet-host (Recall output audio + ElevenLabs; greet, intros, roster, no-show/one-side paths, injection refusals; ADR 0037 Proposed). Hosted migrations 112/112.
+- Real Zino↔Nixo call Fri 2 Oct 12:30 UTC (cfccb9a9): bot joins T-3; someone must Admit "Q (Capital Q notes)".
+- Pending founder: load supabase/templates into hosted Auth (magic_link shows {{ .Token }}); ADR 0037 accept; billing decisions; hide overheard lines / retire "Neo" memory.
