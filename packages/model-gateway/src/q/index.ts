@@ -609,7 +609,7 @@ export function clearsOnPurpose(update: {
  * gives the model authority it did not have.
  */
 export const NEXT_STEP_NOTE =
-  'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn) and then the single most useful next step for them, offered as something you will do ("Want me to draft the intro to Ada?"). Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it.';
+  'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn) and then the single most useful next step for them, offered as something you will do ("Want me to draft the intro to Ada?"). Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
 
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
@@ -1926,8 +1926,14 @@ export function createModelGatewayQAnswer(
           took("prepare");
           let rounds = 0;
           let calls = 0;
+          // One more round, once, when every call of a round was refused
+          // or failed: the model picked the wrong tool and has no way to
+          // pick again (live smoke 2026-10-01: "which documents have you
+          // made me" called relationship.get, was denied, and the answer
+          // could only promise "I'll check"). Costs a call only then.
+          let recoveryRounds = 0;
           while (
-            rounds < Q_TOOL_LOOP_MAX_ROUNDS &&
+            rounds < Q_TOOL_LOOP_MAX_ROUNDS + recoveryRounds &&
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
@@ -2061,6 +2067,14 @@ export function createModelGatewayQAnswer(
               results.push(toolResultMessage(call, outcome));
             }
             messages = [...messages, assistant, ...results];
+            const roundOutcomes = toolCalls.slice(-proposals.length);
+            if (
+              recoveryRounds === 0 &&
+              proposals.length > 0 &&
+              roundOutcomes.every((outcome) => outcome.status !== "SUCCEEDED")
+            ) {
+              recoveryRounds = 1;
+            }
             // The next round continues the real transcript: the small
             // gathering prompt existed only to ask the first question.
             if (request.signal?.aborted === true) {

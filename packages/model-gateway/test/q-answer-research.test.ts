@@ -799,3 +799,61 @@ describe("gap 1 · prospects: the platform first, then cited public research", (
     }
   });
 });
+
+describe("answer seam: a round whose every call was refused gets one more", () => {
+  const denied = (proposal: QToolProposal): QToolCallOutcome => ({
+    callId: proposal.callId,
+    toolName: "company.get",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    status: "DENIED",
+    failureCode: "NOT_AVAILABLE",
+    sensitivity: null,
+    result: {
+      ok: false,
+      error: { code: "NOT_AVAILABLE", safeMessage: "Not available." },
+    },
+    latencyMs: 1,
+  });
+
+  it("lets the model pick again after a wrong tool (live smoke 2026-10-01)", async () => {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      p.name === "get_company"
+        ? denied(p)
+        : researchOutcome(p, "Northstar operates in Kenya."),
+    );
+    const { seam, request } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "g1", name: "get_company", arguments: {} }],
+        },
+        researchCall,
+        { kind: "JSON", value: analystResult("found it") },
+      ],
+      tools: tools.port,
+      userText: "Where does Northstar operate?",
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed.map((e) => e.proposal.name)).toEqual([
+      "get_company",
+      "research_public_web",
+    ]);
+  });
+
+  it("gives that extra round only once", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => denied(p));
+    const wrong: FakeBehaviour = {
+      kind: "TOOL_CALLS",
+      calls: [{ callId: "g", name: "get_company", arguments: {} }],
+    };
+    const { seam, request } = build({
+      script: [wrong, wrong, { kind: "JSON", value: analystResult("no") }],
+      tools: tools.port,
+      userText: "Where does Northstar operate?",
+    });
+    await seam.answer(request);
+    expect(tools.executed).toHaveLength(2);
+  });
+});

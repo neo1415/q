@@ -164,22 +164,20 @@ const CASES = [
 ].slice(0, 10);
 
 let failures = 0;
-let previousRun = null;
-let previousCount = 0;
+// A finished run takes no new messages: a follow-up is a new run in the
+// same conversation, as the Home Q page sends it.
+let previousConversation = null;
 for (const testCase of CASES) {
   const t0 = Date.now();
-  const created =
-    testCase.followUp === true && previousRun !== null
-      ? await api("POST", `/v1/q/runs/${previousRun}/messages`, {
-          message: { text: testCase.ask },
-        })
-      : await api("POST", "/v1/q/runs", {
-          capability: "ANSWER",
-          message: { text: testCase.ask },
-          modality: "TEXT",
-        });
-  const followingUp = testCase.followUp === true && previousRun !== null;
-  const runId = followingUp ? previousRun : created.json?.runId;
+  const followingUp =
+    testCase.followUp === true && previousConversation !== null;
+  const created = await api("POST", "/v1/q/runs", {
+    capability: "ANSWER",
+    message: { text: testCase.ask },
+    modality: "TEXT",
+    ...(followingUp ? { conversationId: previousConversation } : {}),
+  });
+  const runId = created.json?.runId;
   if (created.status >= 300 || runId === undefined || runId === null) {
     failures += 1;
     console.log(
@@ -187,10 +185,9 @@ for (const testCase of CASES) {
     );
     continue;
   }
-  const before = followingUp ? previousCount : 0;
-  const run = await settle(runId, before);
-  previousCount = qMessages(run).length;
-  previousRun = runId;
+  const run = await settle(runId, 0);
+  previousConversation =
+    created.json?.conversationId ?? run.conversationId ?? null;
   const ms = Date.now() - t0;
   const reply = String(lastAssistant(run));
   const problem = !ANSWERED.has(run.status)
