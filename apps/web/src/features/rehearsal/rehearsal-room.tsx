@@ -34,7 +34,7 @@ import {
 
 import { startVoiceSessionAction } from "@/features/voice/actions";
 import { useVoiceSession } from "@/features/voice/use-voice-session";
-import type { VoiceTranscriptLine } from "@/features/voice/session";
+import { isLineLive, type VoiceTranscriptLine } from "@/features/voice/session";
 
 import {
   clockLabel,
@@ -195,6 +195,13 @@ export function RehearsalRoom({
     },
   });
 
+  // The line as it really is: LIVE only while it can carry a turn. A line
+  // that dropped falls back to typing (live 2026-10-01: a typed answer went
+  // into a dead socket and nothing came back).
+  const lineLive = voiceLive === "LIVE" && isLineLive(voice);
+  const typedMode =
+    voiceLive === "TYPED" || (voiceLive === "LIVE" && !lineLive);
+
   const leave = useCallback(async () => {
     if (left.current) return;
     left.current = true;
@@ -250,7 +257,7 @@ export function RehearsalRoom({
   // once (asks if they are there, rephrases) -- a cue, never their words.
   const nudged = useRef(false);
   useEffect(() => {
-    if (voiceLive !== "LIVE") return;
+    if (!lineLive) return;
     const id = window.setInterval(() => {
       if (
         shouldNudgeSilence({
@@ -268,7 +275,7 @@ export function RehearsalRoom({
       }
     }, 3_000);
     return () => window.clearInterval(id);
-  }, [voiceLive, voice, micOn, ended]);
+  }, [lineLive, voice, micOn, ended]);
 
   // The clock and the timer.
   useEffect(() => {
@@ -352,7 +359,7 @@ export function RehearsalRoom({
       return;
     }
     setHand(true);
-    if (voiceLive === "LIVE") {
+    if (lineLive) {
       voice.sendText(REHEARSAL_HAND_RAISED_SIGNAL);
       return;
     }
@@ -366,7 +373,7 @@ export function RehearsalRoom({
     if (text.length === 0 || sending) return;
     setDraft("");
     setHand(false);
-    if (voiceLive === "LIVE") {
+    if (lineLive) {
       // Typed while the line is open: the same turn, answered aloud.
       voice.sendText(text);
       return;
@@ -454,14 +461,13 @@ export function RehearsalRoom({
   // Captions: the newest line, from the voice line or the typed turns.
   const spoken = voice.transcript.at(-1);
   const lastTurn = rehearsal.turns.at(-1);
-  const caption =
-    voiceLive === "LIVE"
-      ? spoken === undefined
-        ? null
-        : { who: spoken.role === "q" ? name : "You", text: spoken.text }
-      : lastTurn === undefined
-        ? null
-        : { who: lastTurn.from === "THEM" ? name : "You", text: lastTurn.text };
+  const caption = lineLive
+    ? spoken === undefined
+      ? null
+      : { who: spoken.role === "q" ? name : "You", text: spoken.text }
+    : lastTurn === undefined
+      ? null
+      : { who: lastTurn.from === "THEM" ? name : "You", text: lastTurn.text };
   const thinking = voice.state === "THINKING" || sending;
 
   const personaView = (
@@ -655,7 +661,7 @@ export function RehearsalRoom({
           className="cq-body-sm mx-auto mb-2 flex max-w-xl items-center gap-2 rounded-(--cq-radius-md) bg-(--cq-stage-surface-strong) px-3 py-2"
         >
           <span>{notice}</span>
-          {voiceLive === "TYPED" && !ended ? (
+          {typedMode && !ended ? (
             <button
               type="button"
               onClick={() => {
@@ -696,7 +702,7 @@ export function RehearsalRoom({
             icon={micOn ? Mic : MicOff}
             off={!micOn}
             onClick={toggleMic}
-            disabled={voiceLive !== "LIVE"}
+            disabled={!lineLive}
           />
           <RoundButton
             label={camOn ? "Turn off camera" : "Turn on camera"}
