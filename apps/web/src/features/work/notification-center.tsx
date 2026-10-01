@@ -90,8 +90,10 @@ export function NotificationCenter() {
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
-    const result = await listNoticesAction();
-    if (result.ok) {
+    // A thrown action (deploy skew, signed-out tab) is a failed load,
+    // never an unhandled rejection.
+    const result = await listNoticesAction().catch(() => null);
+    if (result?.ok === true) {
       setItems(result.value.items);
       setUnread(result.value.unread);
       setFailed(false);
