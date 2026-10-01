@@ -923,12 +923,22 @@ const noticeDelivery = createNotificationDelivery({
           privateKey: webPush.vapid.privateKey.reveal(),
           subject: webPush.vapid.subject,
         }),
+  // ADMIN block: each notice email's outcome feeds the console's Email
+  // panel too (audit 2026-10-01: notices were emailed but never recorded).
   email:
     appEmail.brevoApi !== undefined
-      ? createBrevoApiEmailSender(appEmail.brevoApi)
+      ? recordingEmailSender(createBrevoApiEmailSender(appEmail.brevoApi), {
+          sql: database.sql,
+          source: "workers.notices",
+          provider: "BREVO_API",
+        })
       : appEmail.smtp === undefined
         ? unavailableAppEmailSender
-        : createSmtpAppEmailSender(appEmail.smtp),
+        : recordingEmailSender(createSmtpAppEmailSender(appEmail.smtp), {
+            sql: database.sql,
+            source: "workers.notices",
+            provider: "SMTP",
+          }),
   emailOf: async (userId) =>
     (await noticeEmailDirectory.person(userId))?.email ?? null,
   appOrigin: googleWorkspace.webOrigin ?? null,

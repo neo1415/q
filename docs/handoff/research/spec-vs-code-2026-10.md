@@ -104,3 +104,19 @@ See billing.md §4-§9:
 - `/settings/plan` and `/admin/billing`.
 - The Stripe adapter (off until keys are set).
 - The fee ledger.
+
+## 4. Verified against code, tests and live data (2026-10-01 evening)
+
+The full verification is in `product-verification-2026-10-01.md`, against base 260c0b91.
+
+- **Tests:** 6,661/6,661 unit, 1,468/1,468 pgTAP, and 97/97 of the relevant integration tests after
+  one out-of-date test was fixed.
+- **Live rows** confirm Q's end-to-end loop: scout → hand-over errand → interest → meeting booked →
+  prep brief and reminders → rehearsal reviewed → emails, the Daily and notices.
+- **Status changes since the table above:**
+  - Rehearsal is now WORKS. Screen share has no live use yet.
+  - Q Daily is WORKS.
+  - Errands are WORKS.
+  - Delegated work (LangGraph), push to a real device, AI images and admin writes are still
+    WORKS-OFFLINE.
+  - A Q-booked meeting can lack a Meet link (P1, AUTO).
