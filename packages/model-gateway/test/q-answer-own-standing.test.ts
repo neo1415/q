@@ -61,6 +61,31 @@ const STANDING_TOOL: QOfferedTool = {
   },
 };
 
+const COMPANY_TOOL: QOfferedTool = {
+  ...RELATIONSHIP_TOOL,
+  toolName: "company.get",
+  definition: {
+    name: "get_company",
+    description: "The canonical profile of one company.",
+    inputJsonSchema: { type: "object", properties: {} },
+  },
+};
+const ON_SCREEN = {
+  companyId: COMPANY,
+  canonicalName: "Ajopot",
+  legalName: null,
+  websiteUrl: null,
+  foundedDate: null,
+  headquartersCountry: "NG",
+  headquartersCity: "Lagos",
+  currentStageCode: "SEED",
+  shortDescription: "Digital savings circles.",
+  primaryDescription: null,
+  companyStatus: "ACTIVE",
+  relationToYou: "SHARED",
+  truthClass: "USER_CLAIM",
+};
+
 const OTHER = randomUUID();
 const STANDING = {
   yourSide: "INVESTOR",
@@ -146,7 +171,8 @@ function build(
   const inFlight = { now: 0, max: 0 };
   const reads = { history: 0 };
   const tools: QToolPort = {
-    offer: () => Promise.resolve([RELATIONSHIP_TOOL, STANDING_TOOL]),
+    offer: () =>
+      Promise.resolve([RELATIONSHIP_TOOL, STANDING_TOOL, COMPANY_TOOL]),
     execute: async (proposal) => {
       inFlight.now += 1;
       inFlight.max = Math.max(inFlight.max, inFlight.now);
@@ -175,7 +201,9 @@ function build(
                 data:
                   proposal.name === "list_my_relationships"
                     ? STANDING
-                    : read.data,
+                    : proposal.name === "get_company"
+                      ? ON_SCREEN
+                      : read.data,
               },
         latencyMs: 2,
       } as QToolCallOutcome;
@@ -264,9 +292,15 @@ describe("Q knows who it is talking to", () => {
     });
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
     expect(executed.map((call) => call.name).sort()).toEqual([
+      "get_company",
       "get_relationship",
       "list_my_relationships",
     ]);
+    // The company on their screen is known before the model is asked
+    // (speed sweep 2026-10-01: "this company is not identified").
+    expect(
+      executed.find((call) => call.name === "get_company")?.arguments,
+    ).toEqual({ companyId: COMPANY });
     const sent = sentTo(alpha);
     const facts = sent.slice(sent.indexOf("AUTHORISED FACTS"));
     expect(facts).toContain(
@@ -274,6 +308,13 @@ describe("Q knows who it is talking to", () => {
     );
     expect(facts).toContain("interest expressed, awaiting an answer: Kora");
     expect(facts).toContain("Saved in Discover: Kora.");
+    expect(facts).toContain(
+      "The company on their screen (the one they mean by",
+    );
+    expect(facts).toContain("Ajopot -- stage SEED; based in Lagos, NG.");
+    expect(facts).toContain(
+      "As the company describes itself: Digital savings circles.",
+    );
     // The guidance: answer the question behind a "no", and do the
     // expressive thing asked for rather than an emoji.
     expect(sent).toContain("ANSWER WHAT THEY MEAN");

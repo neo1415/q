@@ -82,6 +82,7 @@ import { ownProfileFact } from "./own-profile.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
 import { ownStandingFact } from "./own-standing.js";
+import { onScreenCompanyFact } from "./company-fact.js";
 import {
   ownOnboardingFacts,
   type QOwnOnboardingPort,
@@ -1423,6 +1424,38 @@ export function createModelGatewayQAnswer(
           (subject.kind === "INVESTOR_ORGANISATION" &&
             subject.investorOrganisationId !== ownInvestor),
       );
+    /**
+     * The company on their screen or asked about, read for them (speed
+     * sweep 2026-10-01): "this company" is known before the model is
+     * asked, so the commonest Discover question needs no tool round to
+     * learn its name. Same tool, same plan as the model's own call.
+     */
+    let onScreenCompany: AuthorisedFact | null = null;
+    let onScreenCompanyCall: QToolCallObservation | null = null;
+    const companyRead = (async (): Promise<void> => {
+      if (
+        counterparty?.kind !== "COMPANY" ||
+        !prefetchTools.has("get_company")
+      ) {
+        return;
+      }
+      const call = {
+        callId: "q-on-screen-company",
+        name: "get_company",
+        arguments: { companyId: counterparty.companyId },
+      };
+      const outcome = await tools.execute(call, toolContext);
+      onScreenCompanyCall = {
+        toolName: outcome.toolName,
+        providerName: call.name,
+        status: outcome.status,
+        failureCode: outcome.failureCode,
+        latencyMs: outcome.latencyMs,
+      };
+      if (outcome.result.ok) {
+        onScreenCompany = onScreenCompanyFact(outcome.result.data);
+      }
+    })();
     const relationshipRead = (async (): Promise<void> => {
       if (counterparty !== undefined && prefetchTools.has("get_relationship")) {
         const call = {
@@ -1539,6 +1572,7 @@ export function createModelGatewayQAnswer(
       standingDone,
       pitchRead,
       onboardingRead,
+      companyRead,
     ]);
     return {
       history,
@@ -1556,6 +1590,8 @@ export function createModelGatewayQAnswer(
       ownInvestor,
       relationship,
       relationshipCall,
+      onScreenCompany,
+      onScreenCompanyCall,
       asked,
       counterparty,
       ownStanding,
@@ -1637,6 +1673,8 @@ export function createModelGatewayQAnswer(
         ownProfileCall,
         relationship,
         relationshipCall,
+        onScreenCompany,
+        onScreenCompanyCall,
         ownStanding,
         ownStandingCall,
         pitchMoment,
@@ -1699,6 +1737,7 @@ export function createModelGatewayQAnswer(
       const facts: readonly AuthorisedFact[] = [
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
+        ...(onScreenCompany === null ? [] : [onScreenCompany]),
         ...(relationship === null ? [] : [relationship]),
         ...(ownStanding === null ? [] : [ownStanding]),
         ...(pitchMoment === null ? [] : [pitchMoment]),
@@ -2154,6 +2193,9 @@ export function createModelGatewayQAnswer(
       }
       if (relationshipCall !== null) {
         toolCalls.push(relationshipCall);
+      }
+      if (onScreenCompanyCall !== null) {
+        toolCalls.push(onScreenCompanyCall);
       }
       if (ownStandingCall !== null) {
         toolCalls.push(ownStandingCall);
