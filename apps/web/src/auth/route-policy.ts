@@ -39,6 +39,7 @@ export const PROTECTED_PATH_PREFIXES = [
   "/gateway",
   "/rehearsals",
   "/results",
+  "/reviews",
   // DOCS: their documents and brand kit.
   "/documents",
   "/admin",

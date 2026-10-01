@@ -6,6 +6,8 @@ import { z } from "zod";
 import {
   ApiProblemError,
   decideAdminBreakGlass,
+  decideAdminReview,
+  getAdminKybDocument,
   decideAdminVerification,
   getAdminQErrors,
   grantAdminRole,
@@ -373,3 +375,38 @@ export async function qErrorsAction(): Promise<AdminQErrorsDto["rows"] | null> {
     .then((result) => result.rows)
     .catch(() => null);
 }
+
+// ADMIN-3 block --------------------------------------------------------------
+
+export async function decideReviewAction(input: {
+  readonly reviewId: string;
+  readonly outcome: "UPHELD" | "CHANGED" | "NEEDS_EVIDENCE";
+  readonly reason: string;
+}): Promise<ConsoleResult> {
+  const id = Id.safeParse(input.reviewId);
+  const reason = z.string().trim().min(3).max(2000).safeParse(input.reason);
+  if (!id.success || !reason.success) {
+    return { ok: false, message: "Give a reason of at least 3 characters." };
+  }
+  return run(
+    (session) =>
+      decideAdminReview(session, id.data, {
+        outcome: input.outcome,
+        reason: reason.data,
+      }),
+    "Decided. They have been told.",
+  );
+}
+
+/** A one-minute signed link to a KYB document, for the operator deciding it. */
+export async function kybDocumentAction(
+  submissionId: string,
+): Promise<{ readonly url: string } | null> {
+  const id = Id.safeParse(submissionId);
+  const session = await apiSession();
+  if (!id.success || session === null) return null;
+  return getAdminKybDocument(session, id.data)
+    .then((link) => ({ url: link.url }))
+    .catch(() => null);
+}
+// end ADMIN-3 block

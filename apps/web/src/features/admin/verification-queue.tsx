@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
 import type { AdminVerificationRowDto } from "@capital-q/contracts";
 
-import { decideVerificationAction } from "./console-actions";
+import { decideVerificationAction, kybDocumentAction } from "./console-actions";
 import { ReasonAction } from "./console-ui";
 
 const CLAIM_WORDS: Readonly<Record<string, string>> = {
@@ -49,10 +51,11 @@ export function VerificationQueue({
                 ·{" "}
                 {`asked ${new Date(row.requestedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
                 {row.synthetic ? " · Fictional account" : ""}
-                {row.evidenceSourceId === null
-                  ? " · No document attached"
-                  : " · Document attached"}
+                {row.kyb !== null || row.evidenceSourceId === null
+                  ? ""
+                  : " · Evidence source attached"}
               </span>
+              {row.kyb === null ? null : <KybDetails kyb={row.kyb} />}
             </div>
             {canDecide ? (
               <div className="flex flex-wrap gap-2">
@@ -92,5 +95,50 @@ export function VerificationQueue({
         );
       })}
     </ul>
+  );
+}
+
+/** ADMIN-3: the business details sent with this request, and its document. */
+function KybDetails({
+  kyb,
+}: {
+  readonly kyb: NonNullable<AdminVerificationRowDto["kyb"]>;
+}) {
+  const [note, setNote] = useState<string | null>(null);
+  return (
+    <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-(--cq-border-subtle) px-3 py-2">
+      <span className="cq-body-sm text-(--cq-text-primary)">
+        {kyb.legalName} · {kyb.registrationNumber} · {kyb.jurisdictionCode}
+      </span>
+      <span className="cq-caption text-(--cq-text-secondary)">
+        {[kyb.registeredAddress, kyb.websiteUrl]
+          .filter((part) => part !== null)
+          .join(" · ") || "No address or website given"}
+      </span>
+      {kyb.hasDocument ? (
+        <button
+          type="button"
+          className="cq-body-sm inline-flex min-h-11 items-center self-start underline underline-offset-4"
+          onClick={() => {
+            setNote(null);
+            void kybDocumentAction(kyb.submissionId).then((link) => {
+              if (link === null) setNote("The document couldn't be opened.");
+              else window.open(link.url, "_blank", "noopener,noreferrer");
+            });
+          }}
+        >
+          Open the registration document
+        </button>
+      ) : (
+        <span className="cq-caption text-(--cq-text-secondary)">
+          No document sent
+        </span>
+      )}
+      {note === null ? null : (
+        <span role="alert" className="cq-caption text-(--cq-text-secondary)">
+          {note}
+        </span>
+      )}
+    </div>
   );
 }

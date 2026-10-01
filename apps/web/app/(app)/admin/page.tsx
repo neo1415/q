@@ -8,6 +8,7 @@ import {
   getAdminPaused,
   getAdminOverview,
   getAdminQMonitor,
+  getAdminReviews,
   getAdminSafety,
   getAdminVerificationQueue,
 } from "@capital-q/api-client";
@@ -98,6 +99,13 @@ export default async function AdminPage() {
         ? getAdminQMonitor(session, "24h").catch(() => null)
         : null,
     ]);
+  // ADMIN-3: the human appeal queue (PADL #051).
+  const reviews = can("reviews.read")
+    ? await getAdminReviews(session).then(
+        (r) => r.rows.length,
+        () => null,
+      )
+    : null;
   const queues = [
     {
       term: "Verification waiting",
@@ -105,6 +113,7 @@ export default async function AdminPage() {
       href: "/admin/verification",
     },
     { term: "Reports to review", value: safety, href: "/admin/safety" },
+    { term: "Reviews to answer", value: reviews, href: "/admin/reviews" },
     {
       term: "Break-glass to decide",
       value: glass,
