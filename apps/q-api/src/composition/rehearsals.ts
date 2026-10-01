@@ -161,6 +161,8 @@ export type RehearsalImage = {
 };
 
 export type RehearsalComposer = {
+  /** The active INVESTOR_PERSONA version: older stored readings are rebuilt. */
+  readonly personaVersion: number;
   readonly persona: (
     actor: ActorContext,
     variables: Omit<CounterpartPersonaVariables, FrameKeys>,
@@ -1075,7 +1077,13 @@ export function createRehearsalService(dependencies: {
       existing === null
         ? null
         : CounterpartPersonaStoredSchema.safeParse(existing.profile);
-    const heldProfile = held?.success === true ? held.data : null;
+    // A reading by an older persona prompt is neither reused nor handed
+    // on as the previous reading: it is rebuilt from the material.
+    const heldProfile =
+      held?.success === true &&
+      (held.data.readBy ?? 0) >= composer.personaVersion
+        ? held.data
+        : null;
     const webDue =
       existing?.webReadAt == null ||
       now().getTime() - existing.webReadAt.getTime() > WEB_READ_EVERY_MS;
@@ -1158,7 +1166,7 @@ export function createRehearsalService(dependencies: {
           id,
           name: counterpart.name,
           relationshipId,
-          profile,
+          profile: { ...profile, readBy: composer.personaVersion },
           sources: sources.slice(0, 24),
           signalDigest: digest,
           webReadAt: webDue ? now() : (existing?.webReadAt ?? null),
@@ -1171,9 +1179,10 @@ export function createRehearsalService(dependencies: {
       return null;
     });
     if (saved === null) {
-      // A refresh that failed keeps the reading already held.
-      return existing !== null && heldProfile !== null
-        ? built(existing, heldProfile)
+      // A refresh that failed keeps the reading already held, even one by
+      // an older prompt: a dated reading beats no rehearsal.
+      return existing !== null && held?.success === true
+        ? built(existing, held.data)
         : "Q_UNAVAILABLE";
     }
     const parsed = CounterpartPersonaStoredSchema.safeParse(saved.profile);
@@ -1682,6 +1691,8 @@ export function createRehearsalComposer(dependencies: {
   readonly logger?: Logger | undefined;
 }): RehearsalComposer {
   const registry = createDefaultPromptRegistry();
+  const personaVersion =
+    registry.getActive("INVESTOR_PERSONA").definition.version;
 
   async function run<V extends Record<string, unknown>, R>(
     actor: ActorContext,
@@ -1747,6 +1758,7 @@ export function createRehearsalComposer(dependencies: {
   }
 
   return {
+    personaVersion,
     // Lenient shapes from the model, trimmed here to what is stored.
     persona: async (actor, variables) => {
       const loose = await run(

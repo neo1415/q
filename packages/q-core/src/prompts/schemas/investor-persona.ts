@@ -282,6 +282,12 @@ export const CounterpartPersonaStoredSchema =
     forwardness: z.enum(PERSONA_FORWARDNESS).optional(),
     forwardnessWhy: z.string().trim().max(300).optional(),
     knownTraits: z.array(KnownTrait).max(8).optional(),
+    /**
+     * The INVESTOR_PERSONA version that wrote this reading, set by code.
+     * A reading by an older prompt is rebuilt from scratch (live
+     * 2026-10-01: a v3 reading of a founder described the investor).
+     */
+    readBy: z.number().int().min(1).optional(),
   }).strict();
 export type CounterpartPersonaStored = z.infer<
   typeof CounterpartPersonaStoredSchema

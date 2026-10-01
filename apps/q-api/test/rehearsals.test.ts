@@ -253,7 +253,11 @@ function setup(options: { messages?: () => string } = {}) {
       ),
   };
   let closeNext = false;
+  const prompt = { version: 5 };
   const composer: RehearsalComposer = {
+    get personaVersion() {
+      return prompt.version;
+    },
     persona: (_a, variables) => {
       seen.personaVariables.push({ ...variables });
       seen.personaInputs.push(
@@ -328,6 +332,7 @@ function setup(options: { messages?: () => string } = {}) {
     service,
     store,
     seen,
+    prompt,
     closeNextTurn: () => {
       closeNext = true;
     },
@@ -444,6 +449,54 @@ describe("rehearsals", () => {
         url: "https://example.com/news",
       },
     );
+  });
+
+  it("rebuilds a reading made by an older persona prompt from scratch, then reuses it (live 2026-10-01)", async () => {
+    const { service, store, seen, prompt } = setup();
+    prompt.version = 4;
+    await service.persona(actor(FOUNDER), "INVESTOR_ORGANISATION", INVESTOR);
+    expect(store.counts.personas).toBe(1);
+    // The reading records the prompt that wrote it.
+    const stored = await store.findPersona(
+      actor(FOUNDER),
+      "INVESTOR_ORGANISATION",
+      INVESTOR,
+    );
+    expect((stored?.profile as { readBy?: number }).readBy).toBe(4);
+    // A newer prompt is deployed: same material, but the reading is rebuilt,
+    // and the old reading is not handed on as the previous one.
+    prompt.version = 5;
+    await service.persona(actor(FOUNDER), "INVESTOR_ORGANISATION", INVESTOR);
+    expect(store.counts.personas).toBe(2);
+    expect(seen.personaInputs[1]?.endsWith("|(none)")).toBe(true);
+    // Then it is reused while nothing changes.
+    await service.persona(actor(FOUNDER), "INVESTOR_ORGANISATION", INVESTOR);
+    expect(store.counts.personas).toBe(2);
+  });
+
+  it("rebuilds a reading stored before prompt versions were recorded", async () => {
+    const { service, store } = setup();
+    await service.persona(actor(FOUNDER), "INVESTOR_ORGANISATION", INVESTOR);
+    const row = await store.findPersona(
+      actor(FOUNDER),
+      "INVESTOR_ORGANISATION",
+      INVESTOR,
+    );
+    if (row === null) throw new Error("no row");
+    // A reading as stored before readBy existed.
+    await store.savePersona(actor(FOUNDER), {
+      kind: "INVESTOR_ORGANISATION",
+      id: INVESTOR,
+      name: row.subjectName,
+      relationshipId: RELATIONSHIP,
+      profile: PERSONA,
+      sources: [],
+      signalDigest: row.signalDigest,
+      webReadAt: row.webReadAt,
+    });
+    const before = store.counts.personas;
+    await service.persona(actor(FOUNDER), "INVESTOR_ORGANISATION", INVESTOR);
+    expect(store.counts.personas).toBe(before + 1);
   });
 
   it("answers, yields to a raised hand, and never lets another person in", async () => {
