@@ -516,7 +516,9 @@ export function toOpenStep(
         kind: "DOCUMENT",
         note: [
           base.note,
-          "An upload, not a question to press: ask once what they already have (a deck, a financial model, accounts) and put whatever they say in answers for this step, whether it is a document or 'nothing yet'. Never ask this step a second time.",
+          // Words never fill this step (onboarding-port's UPLOAD_ONLY_REASON);
+          // telling the loop to record them made it retry every turn.
+          "An upload, not a question to press: ask once what they already have (a deck, a financial model, accounts). Their words do not fill this step and are not recorded for it; an upload does. Say they can add anything with the upload button whenever they like (for a founder with no deck, offer to make one), and move on. Never ask this step a second time.",
         ]
           .filter((n): n is string => n !== undefined)
           .join(" "),

@@ -30,7 +30,7 @@ export const INTERVIEW_AGENT_V12: PromptDefinition<
 > = {
   ...INTERVIEW_AGENT_V11,
   version: 12,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live test 2026-09-30: small talk is read by who started it (their words), so playing along never lengthens the person's allowance.",
   effectiveFrom: "2026-09-30",

@@ -57,6 +57,14 @@ import {
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 
 /**
+ * What the loop is told when it tries to fill an upload step with words.
+ * It answers the loop's real question (what now?) so it stops retrying:
+ * nothing is wrong, nothing more is needed this turn.
+ */
+export const UPLOAD_ONLY_REASON =
+  "Nothing to record here, and nothing went wrong: this step is filled only by an upload. What they said they have is noted for this conversation. Do not record this step again; say once that they can add it with the upload button whenever they like (for a founder with no deck, offer to make one), then move on.";
+
+/**
  * The onboarding tools' port over the onboarding service's existing APIs,
  * bound to one person's own session for one turn (ADR 0016).
  *
@@ -751,7 +759,12 @@ export function createOnboardingPort(input: {
               reason:
                 step.configuration.stepType === "confirmation"
                   ? "A confirmation is recorded as true or false, never as their sentence. If their words confirm it, record it again now with true; do not ask them to repeat themselves in particular words."
-                  : "That does not fit what this step records.",
+                  : step.configuration.stepType === "document_upload"
+                    ? // Words never fill an upload step (live 2026-10-01: "a
+                      // deck and audited financials" was retried on eight
+                      // turns, one model round each, refused every time).
+                      UPLOAD_ONLY_REASON
+                    : "That does not fit what this step records.",
             },
       );
     }

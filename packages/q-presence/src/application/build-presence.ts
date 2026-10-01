@@ -232,8 +232,28 @@ export function createPresenceService(
         );
         for (const [index, outcome] of registrations.entries()) {
           if (outcome.status !== "fulfilled") {
+            // Why, by class and code only, never the message (it can carry
+            // the page or the subject): live 2026-09-30 a second build of a
+            // company that had just completed failed on every page, and the
+            // log could not say why.
+            const reason: unknown = outcome.reason;
+            const code =
+              typeof reason === "object" &&
+              reason !== null &&
+              "code" in reason &&
+              typeof reason.code === "string"
+                ? reason.code.slice(0, 80)
+                : null;
             logger?.warn(
-              { correlationId, subjectType: subject.data.subjectType },
+              {
+                correlationId,
+                subjectType: subject.data.subjectType,
+                errorName:
+                  reason instanceof Error
+                    ? reason.name.slice(0, 80)
+                    : typeof reason,
+                errorCode: code,
+              },
               "a public page could not be recorded as evidence",
             );
             continue;

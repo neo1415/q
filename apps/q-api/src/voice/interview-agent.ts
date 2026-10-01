@@ -174,6 +174,37 @@ function decisionsOf(
 }
 
 /**
+ * Steps a write was refused for this turn, other than an answer held for
+ * the person's confirmation (which is progress, not a refusal).
+ */
+export function refusedStepsOf(
+  actions: readonly { tool: string; input: unknown; result: unknown }[],
+): readonly string[] {
+  const refused = new Set<string>();
+  for (const decision of decisionsOf(actions)) {
+    const [tool, stepKey, , outcome, reason] = decision.split(":");
+    if (
+      tool !== "record_answers" ||
+      stepKey === undefined ||
+      stepKey === "-" ||
+      (outcome !== "REJECTED" && outcome !== "UNMATCHED") ||
+      reason?.startsWith("Held for") === true
+    ) {
+      continue;
+    }
+    refused.add(stepKey);
+  }
+  return [...refused];
+}
+
+/**
+ * A step refused on this many turns is no longer put to the loop as
+ * "given earlier, record it now" (live 2026-10-01: the same refused write
+ * was retried on eight turns, a model round each).
+ */
+export const REFUSALS_BEFORE_LETTING_GO = 2;
+
+/**
  * What Q has done this turn, for the next round's prompt. Oldest actions
  * give way first when it is long: the newest results decide what is left.
  */
@@ -350,6 +381,12 @@ export type JourneyOpenings = {
   /** Optional steps asked twice and still unanswered: not asked again. */
   readonly passedOver?: readonly string[] | undefined;
   /**
+   * A required question asked on each of the last two replies and still
+   * unanswered while they talk about something else: rested this turn,
+   * asked again later (HANDOVER §5.1: "full-time" asked six times running).
+   */
+  readonly resting?: string | null | undefined;
+  /**
    * Answers their earlier words gave (as read when said) that are not on
    * the record yet, with those words: recorded from them, never asked
    * again (live 2026-09-30: "$5 million on a post-money SAFE" from an
@@ -451,6 +488,11 @@ export function turnNotesFor(input: {
       `Passed over, never ask again in this conversation: ${open.passedOver.join(", ")}`,
     );
   }
+  if (open?.resting !== undefined && open.resting !== null) {
+    notes.push(
+      `You asked ${open.resting} on each of your last two replies and they are talking about something else: this turn, answer what they are saying and do not ask ${open.resting}; ask another open question or none. It comes back on a later turn.`,
+    );
+  }
   if (open !== undefined && open.unasked.length > 0) {
     notes.push(
       `Still unasked, ask each once before the final review, one at a time; one they pass over is never asked again: ${open.unasked.map((u) => u.stepKey).join(", ")}`,
@@ -518,6 +560,20 @@ export function createInterviewAgent(
   // The step each session's last reply asked, for the independent reading
   // of the answer to it (DELEGATION_READER v4).
   const lastAsked = new Map<string, string>();
+  // The steps each session's last replies asked, newest last ("" for a
+  // reply that asked nothing), to rest a question pressed twice running.
+  const recentAsks = new Map<string, string[]>();
+  const rememberAsk = (sessionId: string, asking: string | null) => {
+    const list = recentAsks.get(sessionId) ?? [];
+    list.push(asking ?? "");
+    recentAsks.delete(sessionId);
+    recentAsks.set(sessionId, list.slice(-2));
+    while (recentAsks.size > 2_000) {
+      const oldest = recentAsks.keys().next().value;
+      if (oldest === undefined) break;
+      recentAsks.delete(oldest);
+    }
+  };
   // What each earlier utterance stated, as the independent reading found
   // it when it was said: a monologue's answers stay theirs on later turns
   // (live 2026-09-30). Bounded per session and across sessions.
@@ -539,6 +595,22 @@ export function createInterviewAgent(
       const oldest = statedBySession.keys().next().value;
       if (oldest === undefined) break;
       statedBySession.delete(oldest);
+    }
+  };
+  // Steps each session's writes were refused for, counted by turn.
+  const refusedBySession = new Map<string, Map<string, number>>();
+  const rememberRefused = (sessionId: string, stepKeys: readonly string[]) => {
+    if (stepKeys.length === 0) return;
+    const counts = refusedBySession.get(sessionId) ?? new Map<string, number>();
+    for (const stepKey of stepKeys) {
+      counts.set(stepKey, (counts.get(stepKey) ?? 0) + 1);
+    }
+    refusedBySession.delete(sessionId);
+    refusedBySession.set(sessionId, counts);
+    while (refusedBySession.size > 2_000) {
+      const oldest = refusedBySession.keys().next().value;
+      if (oldest === undefined) break;
+      refusedBySession.delete(oldest);
     }
   };
   const researchAvailable = dependencies.researchAvailable ?? true;
@@ -835,6 +907,14 @@ export function createInterviewAgent(
     // What the journey still holds open, from the record: what sign-up
     // gave, findings not yet put to them, questions never asked.
     const askedBefore = askedOptional.get(input.onboardingSessionId);
+    const refusedCounts =
+      refusedBySession.get(input.onboardingSessionId) ??
+      new Map<string, number>();
+    const uploadOnly = new Set(
+      journeySteps
+        .filter((step) => step.configuration.stepType === "document_upload")
+        .map((step) => step.stepKey),
+    );
     const journeyOpenings = async (): Promise<JourneyOpenings> => {
       const view = port.view();
       const answered = new Set(view?.responses.map((r) => r.stepKey) ?? []);
@@ -894,7 +974,10 @@ export function createInterviewAgent(
               if (
                 seen.has(stepKey) ||
                 answered.has(stepKey) ||
-                setAside.has(stepKey)
+                setAside.has(stepKey) ||
+                // Words never fill an upload; what they have is noted.
+                uploadOnly.has(stepKey) ||
+                (refusedCounts.get(stepKey) ?? 0) >= REFUSALS_BEFORE_LETTING_GO
               ) {
                 continue;
               }
@@ -903,6 +986,17 @@ export function createInterviewAgent(
             }
           }
           return given.slice(0, 6);
+        })(),
+        resting: (() => {
+          const [before, last] =
+            recentAsks.get(input.onboardingSessionId) ?? [];
+          if (last === undefined || last === "" || before !== last) {
+            return null;
+          }
+          const step = journeySteps.find((s) => s.stepKey === last);
+          return step !== undefined && step.required && !answered.has(last)
+            ? last
+            : null;
         })(),
         passedOver: journeySteps
           .filter(
@@ -1226,6 +1320,9 @@ export function createInterviewAgent(
         );
       }
     }
+    if (result !== undefined) {
+      rememberAsk(input.onboardingSessionId, result.asking);
+    }
     // A reply that asks nothing leaves no step for the next answer.
     if (result !== undefined && result.asking === null) {
       lastAsked.delete(input.onboardingSessionId);
@@ -1382,6 +1479,7 @@ export function createInterviewAgent(
       );
     });
 
+    rememberRefused(input.onboardingSessionId, refusedStepsOf(actions));
     logger.info(
       {
         rounds,

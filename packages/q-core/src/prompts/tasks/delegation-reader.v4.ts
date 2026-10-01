@@ -41,7 +41,7 @@ export const DELEGATION_READER_V4: PromptDefinition<
 > = {
   ...DELEGATION_READER_V3,
   version: 4,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-09-30: the reader is told which step Q was asking, so a short yes or correction to a read-back states that step (and a yes to the review is finishing); asking Q to find their own answer is a look-up.",
   effectiveFrom: "2026-09-30",
