@@ -219,7 +219,29 @@ export type QConversationMessageRepository = {
     tenantId: TenantId,
     conversationId: QConversationId,
     limit: number,
+    /**
+     * readBack: what Q may read back (memory learning): marked lines --
+     * speech for someone else, lines the person hid -- are left out. The
+     * person's own history view keeps them.
+     */
+    options?: { readonly readBack?: boolean | undefined },
   ) => Promise<readonly QConversationMessage[]>;
+  /**
+   * Keep the person's own lines out of what Q reads back, append-only
+   * (20261110030000). Only USER lines of this conversation are marked;
+   * marking twice is a no-op.
+   */
+  readonly mark?: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly conversationId: string;
+      readonly messageIds: readonly string[];
+      readonly mark: "NOT_ADDRESSED_TO_Q" | "HIDDEN_BY_PERSON";
+      readonly markedBy: "Q_READING" | "PERSON";
+      readonly runId?: string | undefined;
+    },
+  ) => Promise<void>;
 };
 
 export type QRunEventRepository = {

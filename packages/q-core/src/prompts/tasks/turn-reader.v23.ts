@@ -33,7 +33,7 @@ export const TURN_READER_V23: PromptDefinition<
 > = {
   ...TURN_READER_V22,
   version: 23,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     'QA live 2026-10-01: varied examples in the hand-over line (short, another language or register, implied), so "handle this for me" is read as a hand-over; questions about meetings still are not.',
   effectiveFrom: "2026-10-01",

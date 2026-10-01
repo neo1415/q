@@ -29,7 +29,10 @@ type CompanyRead = {
 const text = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
-export function onScreenCompanyFact(data: unknown): AuthorisedFact | null {
+export function onScreenCompanyFact(
+  data: unknown,
+  label = 'The company on their screen (the one they mean by "this company")',
+): AuthorisedFact | null {
   if (typeof data !== "object" || data === null) return null;
   const read = data as CompanyRead;
   const name = text(read.canonicalName);
@@ -55,7 +58,7 @@ export function onScreenCompanyFact(data: unknown): AuthorisedFact | null {
   return {
     scope: "COMPANY_PROFILE",
     statement:
-      `${own ? "Their own company" : 'The company on their screen (the one they mean by "this company")'}: ${name}${
+      `${own ? "Their own company" : label}: ${name}${
         parts.length === 0 ? "" : ` -- ${parts.join("; ")}`
       }.${description === null ? "" : ` As the company describes itself: ${description}`}`.slice(
         0,

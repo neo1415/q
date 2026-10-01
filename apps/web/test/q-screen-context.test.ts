@@ -24,6 +24,7 @@ const ID = "c0000000-0000-4000-8000-000000000001";
 describe("the screen context the web sends with a question", () => {
   it("maps each screen and the ids its route names", () => {
     expect(screenOf("/home")).toEqual({ route: "HOME" });
+    expect(screenOf("/daily")).toEqual({ route: "DAILY" });
     expect(screenOf("/profile/")).toEqual({ route: "PROFILE" });
     expect(screenOf("/company/visibility")).toEqual({
       route: "COMPANY_VISIBILITY",

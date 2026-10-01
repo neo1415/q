@@ -129,6 +129,7 @@ type Subject =
 function build(
   read: { status: "SUCCEEDED" | "DENIED"; data?: unknown },
   subject: Subject = { kind: "COMPANY", companyId: COMPANY },
+  deps: Partial<Parameters<typeof createModelGatewayQAnswer>[0]> = {},
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -230,6 +231,7 @@ function build(
     runEvents: { append: () => Promise.resolve({}) },
   } as unknown as QRuntimeRepositories;
   const seam = createModelGatewayQAnswer({
+    ...deps,
     gateway,
     repositories,
     sql: {} as never,
@@ -292,14 +294,22 @@ describe("Q knows who it is talking to", () => {
     });
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
     expect(executed.map((call) => call.name).sort()).toEqual([
+      // The on-screen company, and Kora, which the question names and
+      // which is one of their own (founder live 2026-10-01, P0-3).
+      "get_company",
       "get_company",
       "get_relationship",
       "list_my_relationships",
     ]);
+    expect(
+      executed
+        .filter((call) => call.callId.startsWith("q-named-company"))
+        .map((call) => call.arguments),
+    ).toEqual([{ companyId: OTHER }]);
     // The company on their screen is known before the model is asked
     // (speed sweep 2026-10-01: "this company is not identified").
     expect(
-      executed.find((call) => call.name === "get_company")?.arguments,
+      executed.find((call) => call.callId === "q-on-screen-company")?.arguments,
     ).toEqual({ companyId: COMPANY });
     const sent = sentTo(alpha);
     const facts = sent.slice(sent.indexOf("AUTHORISED FACTS"));
@@ -400,5 +410,31 @@ describe("ownStandingFact", () => {
         null,
       ),
     ).toBeNull();
+  });
+});
+
+describe("Q calls them by their profile name (founder live 2026-10-01)", () => {
+  it("an overheard 'Neo' in what is remembered never wins over the profile name 'Zino'", async () => {
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {
+        askerOf: () => Promise.resolve("Zino."),
+        memory: {
+          recall: () => Promise.resolve("- The name is Neo, spelled N-E-U."),
+        },
+      },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const sent = sentTo(alpha);
+    // Their profile name leads, and the rule that it is the only name
+    // Q uses travels with it, ahead of what is remembered.
+    expect(sent).toContain("WHO IS ASKING: Zino.");
+    expect(sent).toContain(
+      "Call them only by the name given first here: a name in memory or said in the conversation never replaces it",
+    );
+    expect(sent.indexOf("WHO IS ASKING: Zino.")).toBeLessThan(
+      sent.indexOf("The name is Neo"),
+    );
   });
 });

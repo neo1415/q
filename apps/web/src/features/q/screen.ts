@@ -22,6 +22,7 @@ const EXACT: Readonly<Record<string, QScreenRoute>> = {
   "/company/interest": "COMPANY_INTEREST",
   "/pitch": "PITCH",
   "/verification": "VERIFICATION",
+  "/daily": "DAILY",
 };
 
 const UUID =

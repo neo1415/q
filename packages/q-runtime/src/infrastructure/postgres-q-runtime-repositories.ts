@@ -554,6 +554,19 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         return created;
       },
       findById: findMessageById,
+      mark: async (tx, input) => {
+        await tx.sql`
+          insert into q_runtime.conversation_message_marks
+            (tenant_id, conversation_id, message_id, mark, marked_by, run_id)
+          select m.tenant_id, m.conversation_id, m.id, ${input.mark},
+                 ${input.markedBy}, ${input.runId ?? null}::uuid
+            from q_runtime.conversation_messages m
+           where m.tenant_id = ${input.tenantId}
+             and m.conversation_id = ${input.conversationId}
+             and m.id = any(${input.messageIds}::uuid[])
+             and m.role = 'USER'
+          on conflict (message_id, mark) do nothing`;
+      },
       listForRun: async (executor, tenantId, runId, limit) => {
         const rows = await executor`
           ${selectMessage(executor)}
@@ -567,11 +580,16 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         tenantId,
         conversationId,
         limit,
+        options = {},
       ) => {
+        const readBack = options.readBack === true;
         const rows = await executor`
           ${selectMessage(executor)}
            where m.tenant_id = ${tenantId}
              and m.conversation_id = ${conversationId}
+             and (${!readBack} or not exists (
+               select 1 from q_runtime.conversation_message_marks k
+                where k.message_id = m.id and k.tenant_id = m.tenant_id))
            order by m.created_at desc, m.id desc
            limit ${limit}`;
         return withoutSupersededUtterances(rows.map(toMessage).reverse());
@@ -593,6 +611,12 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
                  from q_runtime.conversation_messages c
                 where c.run_id = ${runId} and c.tenant_id = ${tenantId}
                 limit 1)
+             -- A marked line is not read back (20261110030000): speech
+             -- meant for someone else, or a line the person hid. This
+             -- run's own message is read before any mark exists for it.
+             and not exists (
+               select 1 from q_runtime.conversation_message_marks k
+                where k.message_id = m.id and k.tenant_id = m.tenant_id)
            order by m.created_at desc, m.id desc
            limit ${limit}`;
         return withoutSupersededUtterances(rows.map(toMessage).reverse());

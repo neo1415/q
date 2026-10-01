@@ -16,7 +16,7 @@ import {
 describe("TURN_READER v17", () => {
   it("is superseded by v18, which only adds a screen", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(23);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(24);
   });
 
   it("names every contract destination exactly once", () => {

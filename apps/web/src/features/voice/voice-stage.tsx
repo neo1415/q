@@ -216,8 +216,17 @@ export function VoiceStage({
           />
           <div className="flex flex-col items-center gap-1" role="status">
             <span className="cq-label text-(--cq-text-primary)">
-              {client.muted ? "Muted" : VOICE_STATE_LABELS[client.state]}
+              {client.pausedAway === true
+                ? "Paused while you were away"
+                : client.muted
+                  ? "Muted"
+                  : VOICE_STATE_LABELS[client.state]}
             </span>
+            {client.pausedAway === true ? (
+              <span className="cq-caption text-(--cq-text-secondary)">
+                Q isn&apos;t listening. Tap Unmute when you want to talk.
+              </span>
+            ) : null}
             {thinkingNote !== null ? (
               <span className="cq-caption text-(--cq-text-secondary)">
                 {thinkingNote}

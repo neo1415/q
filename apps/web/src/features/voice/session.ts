@@ -119,6 +119,13 @@ export type VoiceSessionClient = {
   readonly state: VoiceState;
   readonly connected: boolean;
   readonly muted: boolean;
+  /**
+   * The microphone was paused because the person left: the tab was
+   * hidden, the device locked, or the window lost focus for a while
+   * (founder live 2026-10-01: an open line heard a dictation meant for
+   * someone else). Only the person's own Unmute resumes it.
+   */
+  readonly pausedAway?: boolean | undefined;
   readonly transcript: readonly VoiceTranscriptLine[];
   readonly start: (input: VoiceSessionStart) => Promise<void>;
   readonly end: () => Promise<void>;
