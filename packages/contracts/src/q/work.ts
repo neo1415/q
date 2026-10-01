@@ -76,8 +76,14 @@ export const QWorkLaneDtoSchema = z
       .max(5),
     /** Times Q offers when it needs the person to choose. */
     offered: z.array(QWorkSlotSchema).max(3),
-    /** The first-stage report (a Q document), when written. */
-    reportArtifactId: UuidSchema.nullable(),
+    /** The first-stage report's verdict, when written. */
+    report: z
+      .object({
+        headline: z.string().max(200),
+        recommendation: z.enum(["PROCEED", "MAYBE", "PASS"]),
+      })
+      .strict()
+      .nullable(),
     /** The person's own chat page with them, when connected. */
     chatPath: z
       .string()
@@ -136,6 +142,58 @@ export const QWorkAcceptedDtoSchema = z
   .object({ accepted: z.literal(true) })
   .strict();
 export type QWorkAcceptedDto = z.infer<typeof QWorkAcceptedDtoSchema>;
+
+/** The first-stage interview report (spec auto.md §3.1 step 7). */
+export const QWorkReportDtoSchema = z
+  .object({
+    counterpartName: z.string().max(200),
+    writtenAt: UtcTimestampSchema,
+    headline: z.string().max(200),
+    howItWent: z.string().max(800),
+    strengths: z
+      .array(
+        z
+          .object({
+            point: z.string().max(300),
+            basis: z.enum(["CLAIM", "INFERENCE"]),
+          })
+          .strict(),
+      )
+      .max(5),
+    concerns: z
+      .array(
+        z
+          .object({
+            point: z.string().max(300),
+            basis: z.enum(["CLAIM", "INFERENCE"]),
+          })
+          .strict(),
+      )
+      .max(5),
+    openQuestions: z.array(z.string().max(300)).max(5),
+    recommendation: z.enum(["PROCEED", "MAYBE", "PASS"]),
+    why: z.string().max(500),
+    interview: z
+      .array(
+        z
+          .object({
+            question: z.string().max(400),
+            answer: z.string().max(1_500),
+          })
+          .strict(),
+      )
+      .max(8),
+  })
+  .strict();
+export type QWorkReportDto = z.infer<typeof QWorkReportDtoSchema>;
+
+export const Q_WORK_LANE_REPORT_PATH =
+  "/v1/q/work/:delegationId/lanes/:laneId/report" as const;
+export const qWorkLaneReportPath = (delegationId: string, laneId: string) =>
+  Q_WORK_LANE_REPORT_PATH.replace(
+    ":delegationId",
+    encodeURIComponent(delegationId),
+  ).replace(":laneId", encodeURIComponent(laneId));
 
 export const QPresenceRequestSchema = z.object({ away: z.boolean() }).strict();
 export type QPresenceRequest = z.infer<typeof QPresenceRequestSchema>;

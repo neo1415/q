@@ -509,9 +509,7 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
       MAYBE: "Q is unsure",
       PASS: "Q suggests you pass",
     }[filed.recommendation];
-    await label(state, "REPORT_READY", `Report ready: ${words}.`, {
-      reportArtifactId: filed.artifactId,
-    });
+    await label(state, "REPORT_READY", `Report ready: ${words}.`);
     await ports.step(
       state.ref,
       state.laneId,
@@ -522,7 +520,7 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
       key: `report:${state.laneId}`,
       title: `First-stage report on ${state.counterpartName}: ${words}`,
       body: filed.headline,
-      link: `/api/q-artifact/${filed.artifactId}/pdf`,
+      link: filed.path,
       priority: "NEEDS_YOU",
     });
     if (state.grant.call === null) {

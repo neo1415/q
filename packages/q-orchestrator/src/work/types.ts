@@ -179,7 +179,6 @@ export type LanePatch = {
   readonly learned?: readonly { topic: string; words: string }[];
   readonly interview?: readonly { question: string; answer: string }[];
   readonly needs?: { kind: "TIMES"; offered: readonly Slot[] } | null;
-  readonly reportArtifactId?: string;
   readonly meetingId?: string;
   readonly repliesSent?: number;
 };
@@ -322,9 +321,10 @@ export type QWorkPorts = {
       readonly transcript: string;
     },
   ) => Promise<{
-    readonly artifactId: string;
     readonly recommendation: "PROCEED" | "MAYBE" | "PASS";
     readonly headline: string;
+    /** Where the person reads it (same-origin; the PDF is one tap on). */
+    readonly path: string;
   } | null>;
   readonly slots: (
     ref: DelegationRef,

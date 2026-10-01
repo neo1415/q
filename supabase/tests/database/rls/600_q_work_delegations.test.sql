@@ -18,7 +18,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(26);
+select plan(27);
 
 insert into q_runtime.delegations (id, tenant_id, user_id, kind, q_action_id, grant_plan, thread_id, expires_at) values
   ('00000000-0000-4000-8000-00000000d001', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_b'), 'INVESTOR_OUTREACH',
@@ -80,6 +80,9 @@ select throws_ok(
   $$ insert into communication.notifications (tenant_id, user_id, kind, title, dedupe_key, priority)
      values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'), 'Q_WORK', 'x', 'work:fixture-1', 'URGENT') $$,
   '23514', null, 'priority is NEEDS_YOU or UPDATE');
+select throws_ok(
+  $$ update q_runtime.delegation_lanes set report = '{"headline": "x"}'::jsonb $$,
+  '23514', null, 'a report carries the time it was written');
 select lives_ok(
   $$ insert into communication.notifications (tenant_id, user_id, kind, title, dedupe_key, priority)
      values (pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_b'), 'Q_WORK', 'Q needs your times', 'work:fixture-2', 'NEEDS_YOU') $$,

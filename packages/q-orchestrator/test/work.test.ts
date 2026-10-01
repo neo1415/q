@@ -131,8 +131,8 @@ function fakePorts(script: Script = {}): { ports: QWorkPorts; rec: Recorder } {
         })),
     report: () =>
       Promise.resolve({
-        artifactId: "a0000000-0000-4000-8000-000000000001",
         recommendation: "PROCEED",
+        path: "/work/d0000000-0000-4000-8000-000000000001/lanes/lane-1/report",
         headline: "Strong early customers; revenue is their own claim.",
       }),
     slots: () =>
@@ -423,7 +423,7 @@ describe("lane: accept → chat → interview → report → times → book", ()
     const report = first.rec.notices.find((n) => n.key === "report:lane-1");
     expect(report?.priority).toBe("NEEDS_YOU");
     expect(report?.link).toBe(
-      "/api/q-artifact/a0000000-0000-4000-8000-000000000001/pdf",
+      "/work/d0000000-0000-4000-8000-000000000001/lanes/lane-1/report",
     );
     expect(first.rec.notices.some((n) => n.key === "times:lane-1:0")).toBe(
       true,
