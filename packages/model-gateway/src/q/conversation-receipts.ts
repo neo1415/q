@@ -157,6 +157,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   NEW_PITCH: "a new pitch video",
   REHEARSALS: "Rehearsals",
   DOCUMENTS: "their documents and brand kit",
+  DAILY: "The Q Daily",
 };
 
 /** Where the person is, in their terms (R21). */

@@ -192,6 +192,7 @@ const DESTINATION_LABELS: Readonly<
   NEW_PITCH: "Add a pitch video",
   REHEARSALS: "Open Rehearsals",
   DOCUMENTS: "Open Documents",
+  DAILY: "Open The Q Daily",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

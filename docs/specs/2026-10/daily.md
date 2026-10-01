@@ -246,11 +246,15 @@ Live (after the lead deploys): one fictional investor
 - Newspaper PDF is `layOutNewspaper` in `packages/deck-render/src/newspaper.ts`
   over the existing boxes and PDF renderer (DOCS §7 interface), since the
   DOCS branch is not on the lead head; it only adds a file and an export.
-- Runtime is the worker loop, not LangGraph (AUTO not on the lead head).
+- Runtime is the worker loop, not LangGraph (ADR 0032 says why).
 - Cluster issues are keyed per UTC day; editions per local day.
 - "People you know" = CONNECTED relationships only (both sides agreed).
 - The research tool also gains `PAST_WEEK`/`PAST_DAY` freshness.
 - Q's take uses EVIDENCE_SYNTHESIS at CONFIDENTIAL sensitivity; story
   writing STRUCTURED_EXTRACTION at PUBLIC.
-- No `navigate.DAILY` hand (would need a TURN_READER version, which DOCS
-  also bumps); `get_q_daily` returns the `/daily/<id>` link instead.
+- Ported onto the lead head (f4184aed): The Q Daily is a navigation
+  destination (`navigate.DAILY`, TURN_READER v21); the `q.daily` kill
+  switch (ADR 0033) is checked before generating and before emailing;
+  jsonb writes use `jsonbParam`; the newspaper uses DOCS's A4
+  `DOCUMENT_PAGE` and image `fit`; Pexels is read from `PEXELS_API`.
+  Decision record: ADR 0032.

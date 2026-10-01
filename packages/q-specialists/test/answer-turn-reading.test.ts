@@ -686,6 +686,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "REHEARSALS",
           // DOCS: their documents and brand kit.
           "DOCUMENTS",
+          // DAILY: The Q Daily.
+          "DAILY",
         ],
         documents: [],
         visibilityChange: false,

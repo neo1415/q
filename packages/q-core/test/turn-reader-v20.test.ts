@@ -10,13 +10,18 @@ import {
 
 /** TURN_READER v20 (DOCS, on REHEARSE's v19): Documents is a destination. */
 describe("TURN_READER v20", () => {
-  it("is the active reader", () => {
+  it("stays resolvable by its exact version once v21 replaces it", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(20);
+    expect(registry.get("TURN_READER", 20)?.definition.status).toBe(
+      "DEPRECATED",
+    );
   });
 
-  it("names every contract destination exactly once", () => {
-    for (const destination of Q_NAVIGATE_DESTINATIONS) {
+  it("names every contract destination of its time exactly once", () => {
+    // DAILY arrived with v21.
+    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+      (name) => name !== "DAILY",
+    )) {
       expect(
         TURN_READER_V20.template.split(
           new RegExp(`(?<![A-Z_])${destination} \\(`),

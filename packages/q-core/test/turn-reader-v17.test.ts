@@ -16,13 +16,14 @@ import {
 describe("TURN_READER v17", () => {
   it("is superseded by v18, which only adds a screen", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(20);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(21);
   });
 
   it("names every contract destination exactly once", () => {
     // REHEARSALS is named from v19 on.
     for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
-      (entry) => entry !== "REHEARSALS" && entry !== "DOCUMENTS",
+      (entry) =>
+        entry !== "REHEARSALS" && entry !== "DOCUMENTS" && entry !== "DAILY",
     )) {
       expect(
         // NEW_PITCH contains PITCH: a name counts only on its own.

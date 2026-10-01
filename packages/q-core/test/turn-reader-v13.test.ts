@@ -35,6 +35,8 @@ describe("TURN_READER v13", () => {
       "REHEARSALS",
       // DOCUMENTS arrived with v20.
       "DOCUMENTS",
+      // DAILY arrived with v21.
+      "DAILY",
     ];
     for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
       (entry) => !V17_SCREENS.includes(entry),

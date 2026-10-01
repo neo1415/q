@@ -24,6 +24,7 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   NEW_PITCH: "/pitch/new",
   REHEARSALS: "/rehearsals",
   DOCUMENTS: "/documents",
+  DAILY: "/daily",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

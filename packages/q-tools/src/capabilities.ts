@@ -175,6 +175,9 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // DOCS block.
   DOCUMENTS:
     "Opens Documents: every document Q made for them (open, download PDF or PowerPoint) and their brand kit (logo, colours, fonts; confirm a suggestion).",
+  // DAILY block.
+  DAILY:
+    "Opens The Q Daily: their latest edition (news about their sectors, markets, deals and people they know, every story with its source, Q's take labelled), its archive and the PDF edition.",
 };
 
 /** Screens that belong to a company's own people. */

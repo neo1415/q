@@ -276,6 +276,8 @@ export const Q_VOICE_DESTINATIONS = [
   "REHEARSALS",
   // DOCS: their documents and brand kit.
   "DOCUMENTS",
+  // DAILY: The Q Daily, their newspaper and its archive.
+  "DAILY",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

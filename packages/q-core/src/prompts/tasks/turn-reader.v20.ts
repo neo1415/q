@@ -29,7 +29,7 @@ export const TURN_READER_V20: PromptDefinition<
 > = {
   ...TURN_READER_V19,
   version: 20,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "DOCS 2026-10-01: Documents (their documents and brand kit) is a destination.",
   effectiveFrom: "2026-10-01",

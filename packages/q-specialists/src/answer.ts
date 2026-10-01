@@ -209,6 +209,7 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   NEW_PITCH: "Opening a new pitch video.",
   REHEARSALS: "Opening Rehearsals.",
   DOCUMENTS: "Opening your documents.",
+  DAILY: "Opening The Q Daily.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -231,6 +232,7 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   NEW_PITCH: "a new pitch video",
   REHEARSALS: "Rehearsals",
   DOCUMENTS: "Documents",
+  DAILY: "The Q Daily",
 };
 
 /**
