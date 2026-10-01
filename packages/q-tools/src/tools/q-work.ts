@@ -325,7 +325,7 @@ export function createQWorkTools(
       id: PROPOSE_Q_OUTREACH,
       providerName: "propose_q_outreach",
       description:
-        "An investor hands Q their outreach ('Q, handle it', 'find me founders and set up calls'): for ONE approval, Q goes through their own Discover feed (profiles and pitch transcripts), picks the closest fits to their mandate up to a limit, expresses interest, and when each founder accepts sends the opening message, chats to answer from an approved brief and learn the topics, optionally runs a first-stage interview and sends a report, asks which times work (or books inside their windows if allowed), books the call with a Meet link, and tells them at each step. Draft the plan from what they said; they approve it exactly and can stop it any time.",
+        "An investor hands Q their outreach ('Q, handle it', 'find me founders and set up calls'): for ONE approval, Q goes through their own Discover feed (profiles and pitch transcripts), picks the closest fits to their mandate up to a limit, expresses interest, and when each founder accepts sends the opening message, chats to answer from an approved brief and learn the topics, optionally runs a first-stage interview and sends a report, asks which times work (or books inside their windows if allowed), books the call with a Meet link, and tells them at each step. Choosing the founders is Q's job inside this plan (done after approval, from the feed, each pick quoting its material): call this at once with the number they gave, never ask them which company first. Draft the plan from what they said; they approve it exactly and can stop it any time.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       approval: "NONE",

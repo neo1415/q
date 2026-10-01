@@ -142,6 +142,57 @@ describe("Google Calendar adapter", () => {
     expect(result.meetLink).toBeNull();
   });
 
+  // AUTO (2026-10-02): a Meet link Google attached late.
+  it("re-reads the conference, asking for one first when told to", async () => {
+    const pending = scripted([{ status: 200, body: { id: EVENT_ID } }]);
+    expect(
+      await createGoogleCalendarProvider(pending).conference(ACCESS, EVENT_ID, {
+        ask: false,
+      }),
+    ).toEqual({ status: "PENDING" });
+    expect(pending.calls.map((call) => call.request.method)).toEqual(["GET"]);
+
+    const asked = scripted([
+      { status: 200, body: { id: EVENT_ID } },
+      {
+        status: 200,
+        body: {
+          id: EVENT_ID,
+          hangoutLink: "https://meet.google.com/abc-defg-hij",
+        },
+      },
+    ]);
+    expect(
+      await createGoogleCalendarProvider(asked).conference(ACCESS, EVENT_ID, {
+        ask: true,
+      }),
+    ).toEqual({
+      status: "READY",
+      meetLink: "https://meet.google.com/abc-defg-hij",
+    });
+    expect(asked.calls[0]?.request.method).toBe("PATCH");
+    expect(asked.calls[0]?.url).toContain("conferenceDataVersion=1");
+    expect(String(asked.calls[0]?.request.body)).toContain(`${EVENT_ID}-retry`);
+
+    const gone = scripted([{ status: 404 }]);
+    expect(
+      await createGoogleCalendarProvider(gone).conference(ACCESS, EVENT_ID, {
+        ask: false,
+      }),
+    ).toEqual({ status: "MISSING" });
+  });
+
+  it("announces the link to every guest with sendUpdates=all", async () => {
+    const http = scripted([{ status: 200, body: { id: EVENT_ID } }]);
+    await createGoogleCalendarProvider(http).announceLink(
+      ACCESS,
+      EVENT_ID,
+      "https://meet.google.com/abc-defg-hij",
+    );
+    expect(http.calls[0]?.request.method).toBe("PATCH");
+    expect(http.calls[0]?.url).toContain("sendUpdates=all");
+  });
+
   it("cancels with sendUpdates=all and treats already-gone as done", async () => {
     const http = scripted([{ status: 410 }]);
     await createGoogleCalendarProvider(http).cancel(ACCESS, EVENT_ID);

@@ -44,7 +44,10 @@ export type InMemoryScheduleStore = ScheduleStore & {
   readonly briefs: { meetingId: string; userId: string; body: string }[];
 };
 
-export function createInMemoryScheduleStore(): InMemoryScheduleStore {
+export function createInMemoryScheduleStore(
+  options: { readonly now?: () => Date } = {},
+): InMemoryScheduleStore {
+  const created = new Map<string, Date>();
   const meetings: MutableMeeting[] = [];
   const reminders: MutableReminder[] = [];
   const notifications: (NewNotification & {
@@ -74,6 +77,7 @@ export function createInMemoryScheduleStore(): InMemoryScheduleStore {
         prepBriefAt: null,
       };
       meetings.push(record);
+      created.set(record.id, options.now?.() ?? new Date());
       return Promise.resolve({ record: copy(record), created: true });
     },
     findMeeting: (id) => {
@@ -124,6 +128,30 @@ export function createInMemoryScheduleStore(): InMemoryScheduleStore {
         return Promise.resolve(false);
       }
       m.status = "CANCELLED";
+      return Promise.resolve(true);
+    },
+    meetingsAwaitingLink: (now) =>
+      Promise.resolve(
+        meetings
+          .filter(
+            (m) =>
+              m.status === "SCHEDULED" &&
+              m.meetLink === null &&
+              m.startsAt > now &&
+              (created.get(m.id)?.getTime() ?? 0) >
+                now.getTime() - 24 * 3_600_000,
+          )
+          .map((m) => ({
+            meeting: copy(m),
+            createdAt: created.get(m.id) ?? new Date(0),
+          })),
+      ),
+    setMeetLink: (id, meetLink) => {
+      const m = meetings.find((x) => x.id === id);
+      if (m === undefined || m.status !== "SCHEDULED" || m.meetLink !== null) {
+        return Promise.resolve(false);
+      }
+      m.meetLink = meetLink;
       return Promise.resolve(true);
     },
     meetingsNeedingBrief: (now, until) =>
@@ -303,6 +331,13 @@ export type FakeCalendar = OrganiserCalendar & {
   /** How many times free/busy was read from this calendar. */
   busyQueries: number;
   failInsert: Error | null;
+  /** The link the insert returns; null: Google attaches it later. */
+  insertLink: string | null;
+  /** AUTO: re-reads of the conference, and whether a new one was asked. */
+  readonly conferenceReads: { eventId: string; ask: boolean }[];
+  /** The link a later read finds; null: still pending. */
+  laterLink: string | null;
+  readonly announced: { eventId: string; meetLink: string }[];
 };
 
 export function createFakeCalendar(
@@ -318,6 +353,10 @@ export function createFakeCalendar(
     busyTimes: [],
     busyQueries: 0,
     failInsert: null,
+    insertLink: "https://meet.google.com/abc-defg-hij",
+    conferenceReads: [],
+    laterLink: null,
+    announced: [],
     busy: () => {
       fake.busyQueries += 1;
       return Promise.resolve(fake.busyTimes);
@@ -328,9 +367,20 @@ export function createFakeCalendar(
       // Google dedupes by event id: a retry is the same event.
       if (!events.has(event.eventId)) fake.inserted.push(event);
       events.add(event.eventId);
-      return Promise.resolve({
-        meetLink: "https://meet.google.com/abc-defg-hij",
-      });
+      return Promise.resolve({ meetLink: fake.insertLink });
+    },
+    conference: (eventId, options) => {
+      fake.conferenceReads.push({ eventId, ask: options.ask });
+      if (!events.has(eventId)) return Promise.resolve({ status: "MISSING" });
+      return Promise.resolve(
+        fake.laterLink === null
+          ? { status: "PENDING" }
+          : { status: "READY", meetLink: fake.laterLink },
+      );
+    },
+    announceLink: (eventId, meetLink) => {
+      fake.announced.push({ eventId, meetLink });
+      return Promise.resolve();
     },
     move: (eventId) => {
       fake.moved.push(eventId);

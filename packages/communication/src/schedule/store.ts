@@ -147,6 +147,21 @@ export type ScheduleStore = {
     meetLink: string | null,
   ) => Promise<void>;
   readonly markMeetingFailed: (meetingId: string) => Promise<void>;
+  /**
+   * AUTO (2026-10-02): scheduled meetings still without a Meet link, not
+   * yet started, booked within the last day, oldest first.
+   */
+  readonly meetingsAwaitingLink: (
+    now: Date,
+    limit: number,
+  ) => Promise<
+    readonly { readonly meeting: MeetingRecord; readonly createdAt: Date }[]
+  >;
+  /** Sets the link once; false when it was already set (or not scheduled). */
+  readonly setMeetLink: (
+    meetingId: string,
+    meetLink: string,
+  ) => Promise<boolean>;
   /** False when the meeting is not SCHEDULED (nothing moved). */
   readonly moveMeeting: (
     tx: TransactionContext,
