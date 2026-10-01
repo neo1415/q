@@ -124,6 +124,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "GATEWAY",
   "MEMORY",
   "NEW_PITCH",
+  // REHEARSE: the Rehearsals page (people to rehearse with, history).
+  "REHEARSALS",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
@@ -237,6 +239,8 @@ export const Q_RECORD_PAGES = [
   "INVESTOR",
   // A founder's rehearsal with that investor, played by Q (the Investor Twin).
   "INVESTOR_REHEARSAL",
+  // REHEARSE: an investor's rehearsal with a company they are connected to.
+  "COMPANY_REHEARSAL",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;

@@ -681,28 +681,9 @@ export {
   type QErrandListDto,
   type QErrandStoppedDto,
 } from "./errands.js";
-export {
-  Q_INVESTOR_REHEARSALS_PATH,
-  Q_REHEARSAL_FINISH_PATH,
-  Q_REHEARSAL_PATH,
-  Q_REHEARSAL_TURNS_PATH,
-  Q_REHEARSALS_PATH,
-  qInvestorRehearsalsPath,
-  qRehearsalFinishPath,
-  qRehearsalPath,
-  qRehearsalTurnsPath,
-  QRehearsalDtoSchema,
-  QRehearsalListDtoSchema,
-  QRehearsalScorecardDtoSchema,
-  QRehearsalTurnDtoSchema,
-  RehearsalTurnRequestSchema,
-  StartRehearsalRequestSchema,
-  type QRehearsalDto,
-  type QRehearsalListDto,
-  type QRehearsalScorecardDto,
-  type RehearsalTurnRequest,
-  type StartRehearsalRequest,
-} from "./rehearsals.js";
+// REHEARSE block (2026-10-01)
+export * from "./rehearsals.js";
+// end REHEARSE block
 export {
   Q_CONDUCT_ACTIONS,
   Q_CONDUCT_MOODS,

@@ -202,6 +202,12 @@ export const CreateQVoiceSessionRequestSchema = z
      * browser that shows it.
      */
     resume: z.literal(true).optional(),
+    /**
+     * REHEARSE: the line carries a rehearsal, so every spoken turn goes to
+     * that rehearsal (Q plays the other person) and nothing else. Ownership
+     * is checked by the rehearsal service on every turn.
+     */
+    rehearsal: z.object({ rehearsalId: UuidSchema }).strict().optional(),
   })
   .strict();
 
@@ -267,6 +273,7 @@ export const Q_VOICE_DESTINATIONS = [
   "GATEWAY",
   "MEMORY",
   "NEW_PITCH",
+  "REHEARSALS",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",
