@@ -51,6 +51,7 @@ const EVERY_PORT: QToolPorts = {
   clientActions: true,
   approvalInbox: STUB,
   results: STUB,
+  humanReviews: STUB,
   discoveryDecisions: STUB,
   documents: STUB,
   documentRevision: STUB,

@@ -515,3 +515,12 @@ export {
 } from "./tools/plan.js";
 export { Q_TOOL_GATES } from "./default-tools.js";
 // end BILLING block
+
+// ADMIN-3 block
+export {
+  createProposeHumanReviewTool,
+  PROPOSE_HUMAN_REVIEW,
+  ProposeHumanReviewInputSchema,
+  type HumanReviewPort,
+} from "./tools/human-review.js";
+// end ADMIN-3 block

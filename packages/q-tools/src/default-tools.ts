@@ -29,6 +29,7 @@ import {
 } from "./tools/pending-proposal.js";
 import { createOwnWorkTools } from "./tools/own-work.js";
 import { createResultsTools } from "./tools/results.js";
+import { createProposeHumanReviewTool } from "./tools/human-review.js";
 // DOCS block.
 import { createDocumentStudioTools } from "./tools/documents.js";
 import { createOwnRecordTools } from "./tools/own-records.js";
@@ -197,6 +198,10 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...createOwnRecordTools(ports),
     // ADMIN block: "how is my raise going", "download my pipeline report".
     ...createResultsTools(ports),
+    // ADMIN-3: "want a person to look at this?"
+    ...(ports.humanReviews === undefined
+      ? []
+      : [createProposeHumanReviewTool(ports.humanReviews)]),
     // end ADMIN block
   ];
 }

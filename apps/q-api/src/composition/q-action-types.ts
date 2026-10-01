@@ -24,6 +24,7 @@ import {
   DISCLOSURE_RAISE_SHARE,
   DISCLOSURE_SHARE_REVOKE,
 } from "./visibility-actions.js";
+import { REVIEW_REQUEST } from "./human-review-action.js";
 
 /**
  * Every Approval Engine action type q-api composes. The capability
@@ -57,6 +58,8 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   // AUTO block (ADR 0030): Q's delegated work, one approval each.
   WORK_OUTREACH_START,
   WORK_STANDIN_START,
+  // ADMIN-3 block: appeals Stage 4 (PADL #050).
+  REVIEW_REQUEST,
 ]);
 
 export function assertComposedActionTypes(registry: QActionRegistry): void {
