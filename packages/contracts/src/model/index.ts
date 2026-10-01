@@ -329,10 +329,10 @@ export type ModelToolName = z.infer<typeof ModelToolNameSchema>;
 /**
  * Tools on one attempt. R33 (Q can do everything the app can) put 30+
  * eligible tools in a Home Q run; at 16 the gateway refused the whole
- * request. Every provider routed to accepts 128; 64 leaves headroom while
+ * request. Every provider routed to accepts 128; 80 (R33 + work, results, documents tools, 2026-10-01) leaves headroom while
  * keeping a bound on the prompt the tool list costs.
  */
-export const MODEL_TOOLS_MAX = 64;
+export const MODEL_TOOLS_MAX = 80;
 export const MODEL_TOOL_DESCRIPTION_MAX_CHARS = 1_000;
 /** Bounded tool result text handed back to a model (JSON). */
 export const MODEL_TOOL_RESULT_MAX_CHARS = 32_000;
