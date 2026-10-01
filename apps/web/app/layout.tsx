@@ -8,6 +8,7 @@ import { THEME_COLORS } from "@capital-q/ui/tokens";
 import { THEME_BOOT_SCRIPT } from "@/features/appearance/theme";
 import { SplashOverlay } from "@/features/splash/splash-overlay";
 import { SPLASH_BOOT_SCRIPT } from "@/features/splash/splash-policy";
+import { DeploySkewGuard } from "@/pwa/deploy-skew-guard";
 import { ServiceWorkerRegistration } from "@/pwa/service-worker-registration";
 
 import "./globals.css";
@@ -96,6 +97,7 @@ export default function RootLayout({
       <body>
         <SplashOverlay />
         <ServiceWorkerRegistration />
+        <DeploySkewGuard />
         {children}
       </body>
     </html>
