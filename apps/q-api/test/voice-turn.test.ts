@@ -1222,6 +1222,49 @@ describe("a spoken question for Q", () => {
     expect(said).not.toMatch(/snag|ask (?:me|it) again|try it another way/i);
   });
 
+  it.each([
+    "Change my website to thevaultlyne.com",
+    "Please make my company visible to investors",
+    "Call me Dan",
+  ])(
+    "takes %j to Q, never to a word pattern that writes on its own say-so (ADR 0011/0016)",
+    async (words) => {
+      // Live before: a regex read these, asked its own yes/no and wrote
+      // through the API outside the approval ledger. Now Q reads them like
+      // any turn and the platform's approval binds the exact change.
+      const runtime = fakeRuntime();
+      const apiCalls: string[] = [];
+      const handle = createVoiceTurnHandler({
+        qRuntime: runtime.service,
+        qStream: fakeStream([
+          event("q.message.delta", { messageId: "m1", text: "Sure. " }),
+        ]),
+        onboarding: {
+          apiBaseUrl: "http://api.test",
+          fetch: ((url: string) => {
+            apiCalls.push(String(url));
+            return Promise.resolve(new Response("{}", { status: 500 }));
+          }) as never,
+        },
+        logger,
+      });
+      const speaker = fakeSpeaker();
+      await handle(
+        binding({
+          conversationId: undefined,
+          subjects: undefined,
+          onboarding: undefined,
+        }),
+        [{ role: "user", content: words }],
+        new AbortController().signal,
+        speaker,
+      );
+      expect(runtime.calls.createRun).toHaveLength(1);
+      expect(apiCalls).toEqual([]);
+      expect(speaker.spoken.join(" ")).not.toMatch(/Just to confirm/);
+    },
+  );
+
   it("speaks what Q prepared, and a spoken yes is the approval (CQ-Q-008, ADR 0011)", async () => {
     const runtime = fakeRuntime();
     const approvals = { approve: [] as unknown[], reject: [] as unknown[] };

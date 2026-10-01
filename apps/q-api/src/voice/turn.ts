@@ -2,14 +2,9 @@ import type { InterviewAgent } from "./interview-agent.js";
 import { randomUUID } from "node:crypto";
 
 import {
-  getCompany,
-  updateCompany,
-  getCurrentInvestorOrganisation,
   getOnboardingSession,
   resolveOnboardingSuggestion,
   sayToOnboarding,
-  setCompanyVisibility,
-  setInvestorVisibility,
   type ApiSession,
   updateMe,
 } from "@capital-q/api-client";
@@ -44,8 +39,6 @@ import {
   declines,
   endsUnfinished,
   followOfAnswer,
-  spokenVisibility,
-  type SpokenVisibility,
   isNonLexical,
   recoveryLine,
   recoverySettled,
@@ -53,12 +46,6 @@ import {
   wantsToEndVoice,
   withoutContinueSignal,
 } from "./navigation.js";
-import {
-  profileEditDone,
-  profileEditQuestion,
-  spokenProfileEdit,
-  type SpokenProfileEdit,
-} from "./profile-edit.js";
 import {
   recognitionQuestion,
   RIGHT_PERSON_LINE,
@@ -169,23 +156,6 @@ const VOICE_TURN_MAX_CHARS = 2_000;
  * person can tap. The labels are what somebody would have said, so a tap
  * and a sentence arrive as the same answer.
  */
-/** The one field this change touches, in the company API's own words. */
-function fieldFor(edit: SpokenProfileEdit): Record<string, string> {
-  switch (edit.field) {
-    case "companyName":
-      return { canonicalName: edit.value };
-    case "websiteUrl":
-      return { websiteUrl: edit.value };
-    case "headquartersCity":
-      return { headquartersCity: edit.value };
-    case "shortDescription":
-      return { shortDescription: edit.value };
-    case "displayName":
-      // Handled before this is reached; a person is not a company field.
-      return {};
-  }
-}
-
 const WELCOME_CHOICE = {
   stepKey: "welcome.journey",
   kind: "ONE_OF" as const,
@@ -206,11 +176,6 @@ const WELCOME_CHOICE = {
 const AFFIRMATIVE =
   /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|please)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|go ahead|go on|do it|do that|please do|proceed|confirm(?:ed)?|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*(?:please[.!\s]*)?$/i;
 
-/** Whose visibility a spoken change is about: a company, or an investor. */
-type VisibilitySubject =
-  | { readonly kind: "COMPANY"; readonly id: string }
-  | { readonly kind: "INVESTOR"; readonly id: string };
-
 /**
  * Whether the last Q run this line started ended in failure, so that a
  * research run carried for the interviewer can be reported back to it
@@ -223,48 +188,6 @@ const pendingApproval = new WeakMap<
   VoiceSessionBinding,
   { readonly approvalId: string; readonly summary: string | null }
 >();
-
-/** A visibility change Q has asked about and not yet heard yes or no to. */
-const pendingVisibility = new WeakMap<
-  VoiceSessionBinding,
-  {
-    readonly subject: VisibilitySubject;
-    readonly visibility: SpokenVisibility;
-  }
->();
-
-const VISIBILITY_QUESTION: Readonly<
-  Record<VisibilitySubject["kind"], Record<SpokenVisibility, string>>
-> = {
-  COMPANY: {
-    network_visible:
-      "Just to confirm: you'd like your company visible to investors on Capital Q, so they can find it and ask me about it. Shall I switch that on?",
-    organisation_private:
-      "Just to confirm: you'd like your company private again, so investors can no longer find it. Shall I switch that off?",
-  },
-  INVESTOR: {
-    network_visible:
-      "Just to confirm: you'd like your investor profile visible to founders on Capital Q, so they can find you. Your mandate stays private either way. Shall I switch that on?",
-    organisation_private:
-      "Just to confirm: you'd like your investor profile private again, so founders can no longer find you. Shall I switch that off?",
-  },
-};
-const VISIBILITY_DONE: Readonly<
-  Record<VisibilitySubject["kind"], Record<SpokenVisibility, string>>
-> = {
-  COMPANY: {
-    network_visible:
-      "Done. Investors on Capital Q can now find your company and ask me about it. You can change that any time.",
-    organisation_private:
-      "Done. Your company is private again; investors can't find it until you say otherwise.",
-  },
-  INVESTOR: {
-    network_visible:
-      "Done. Founders on Capital Q can now find your profile. Your mandate is still yours alone.",
-    organisation_private:
-      "Done. Your profile is private again; founders can't find you until you say otherwise.",
-  },
-};
 
 /** What Q says when a chat is ended aloud; the screen stays on the typed thread. */
 const END_LINE =
@@ -1561,59 +1484,6 @@ export function createVoiceTurnHandler(
   };
 
   /**
-   * Whose profile the person means. The thread's own subject first, then
-   * the setup they are in, then whichever canonical subject their
-   * organisation has. Never a guess: null means Q asks instead.
-   */
-  const ownVisibilitySubject = async (
-    binding: VoiceSessionBinding,
-    session: ApiSession,
-  ): Promise<VisibilitySubject | null> => {
-    for (const subject of binding.thread.subjects ?? []) {
-      if (subject.kind === "COMPANY") {
-        return { kind: "COMPANY", id: subject.companyId };
-      }
-      if (subject.kind === "INVESTOR_ORGANISATION") {
-        return { kind: "INVESTOR", id: subject.investorOrganisationId };
-      }
-    }
-    const onboarding = binding.thread.onboarding;
-    if (onboarding !== undefined) {
-      try {
-        const view = await getOnboardingSession(session, onboarding.sessionId);
-        const bound = view.session.subject;
-        if (bound !== null && bound.type === "COMPANY") {
-          return { kind: "COMPANY", id: bound.id };
-        }
-        if (bound !== null && bound.type === "INVESTOR_ORGANISATION") {
-          return { kind: "INVESTOR", id: bound.id };
-        }
-      } catch {
-        // Fall through to the organisation's own investor row.
-      }
-    }
-    try {
-      const investor = await getCurrentInvestorOrganisation(session);
-      return { kind: "INVESTOR", id: investor.id };
-    } catch {
-      return null;
-    }
-  };
-
-  /** A spoken yes to a visibility question: the change, then the word. */
-  /**
-   * A change to somebody's own details, waiting on their yes.
-   *
-   * Same shape as the visibility question next door and for the same
-   * reason: a change to what Capital Q holds is proposed, approved and
-   * then performed. Nothing here is applied from a sentence alone.
-   */
-  const pendingProfileEdit = new WeakMap<
-    VoiceSessionBinding,
-    SpokenProfileEdit
-  >();
-
-  /**
    * What Capital Q found about this person, waiting for Q to say it.
    *
    * The lookup happens the moment there is a name and something to tell
@@ -1624,95 +1494,6 @@ export function createVoiceTurnHandler(
   const foundPerson = new WeakMap<VoiceSessionBinding, PresenceFound>();
   /** Set while the recognition question is on the table. */
   const awaitingRecognition = new WeakSet<VoiceSessionBinding>();
-
-  const applyProfileEdit = async (
-    binding: VoiceSessionBinding,
-    session: ApiSession,
-    edit: SpokenProfileEdit,
-    signal: AbortSignal,
-    speaker: VoiceSpeaker,
-  ): Promise<VoiceTurnOutcome> => {
-    let line: string;
-    try {
-      if (edit.field === "displayName") {
-        await updateMe({
-          baseUrl: session.baseUrl,
-          accessToken: session.accessToken,
-          ...(session.fetch === undefined ? {} : { fetch: session.fetch }),
-          body: { displayName: edit.value },
-        });
-      } else {
-        // Their own company, resolved from their own session and their own
-        // onboarding — never from anything they said. A person with no
-        // company to edit is told so rather than shown somebody else's.
-        const subject = await ownVisibilitySubject(binding, session);
-        if (subject === null || subject.kind !== "COMPANY") {
-          return (await speakLine(
-            speaker,
-            "I can change that once your company is set up on Capital Q. Shall we do the setup first?",
-            signal,
-          ))
-            ? { kind: "SPOKEN", path: "MOVE" }
-            : { kind: "INTERRUPTED", path: "MOVE" };
-        }
-        const company = await getCompany(session, subject.id);
-        await updateCompany(session, subject.id, {
-          expectedVersion: company.version,
-          ...fieldFor(edit),
-        });
-      }
-      line = profileEditDone(edit);
-    } catch (error: unknown) {
-      logger.warn(
-        { err: error, qVoiceSessionId: binding.voiceSessionId },
-        "spoken profile change was not accepted",
-      );
-      line =
-        "I couldn't change that just now. You can do it from your profile, or ask me again in a moment.";
-    }
-    return (await speakLine(speaker, line, signal))
-      ? { kind: "SPOKEN", path: "MOVE" }
-      : { kind: "INTERRUPTED", path: "MOVE" };
-  };
-
-  const applyVisibility = async (
-    binding: VoiceSessionBinding,
-    session: ApiSession,
-    change: {
-      readonly subject: VisibilitySubject;
-      readonly visibility: SpokenVisibility;
-    },
-    signal: AbortSignal,
-    speaker: VoiceSpeaker,
-  ): Promise<VoiceTurnOutcome> => {
-    let line: string;
-    try {
-      if (change.subject.kind === "COMPANY") {
-        const company = await getCompany(session, change.subject.id);
-        await setCompanyVisibility(session, change.subject.id, {
-          visibility: change.visibility,
-          expectedVersion: company.version,
-        });
-      } else {
-        const investor = await getCurrentInvestorOrganisation(session);
-        await setInvestorVisibility(session, change.subject.id, {
-          visibility: change.visibility,
-          expectedVersion: investor.version,
-        });
-      }
-      line = VISIBILITY_DONE[change.subject.kind][change.visibility];
-    } catch (error: unknown) {
-      logger.warn(
-        { err: error, qVoiceSessionId: binding.voiceSessionId },
-        "spoken visibility change was not accepted",
-      );
-      line =
-        "I couldn't change that just now. You can do it from your visibility page, or ask me again in a moment.";
-    }
-    return (await speakLine(speaker, line, signal))
-      ? { kind: "SPOKEN", path: "MOVE" }
-      : { kind: "INTERRUPTED", path: "MOVE" };
-  };
 
   /**
    * What the person's reply to Q's closed question means (ADR 0011). The
@@ -1855,40 +1636,6 @@ export function createVoiceTurnHandler(
       // be decided; the conversation moves on.
       pendingApproval.delete(binding);
     }
-    // A visibility question waiting for yes or no.
-    const api = dependencies.onboarding;
-    const awaiting = pendingVisibility.get(binding);
-    if (awaiting !== undefined && api !== undefined) {
-      const session: ApiSession = {
-        baseUrl: api.apiBaseUrl,
-        accessToken: binding.accessToken,
-        ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
-      };
-      const read = await decide(
-        binding,
-        VISIBILITY_QUESTION[awaiting.subject.kind][awaiting.visibility],
-        text,
-        signal,
-      );
-      if (read.decision === "YES") {
-        pendingVisibility.delete(binding);
-        return carryOn(
-          read,
-          await applyVisibility(binding, session, awaiting, signal, speaker),
-        );
-      }
-      if (read.decision === "NO") {
-        pendingVisibility.delete(binding);
-        return carryOn(
-          read,
-          (await speakLine(speaker, "Alright, leaving it as it is.", signal))
-            ? { kind: "SPOKEN", path: "MOVE" }
-            : { kind: "INTERRUPTED", path: "MOVE" },
-        );
-      }
-      // Anything else moves on; the question can be asked again.
-      pendingVisibility.delete(binding);
-    }
     // "Is this you?", answered.
     if (awaitingRecognition.has(binding)) {
       awaitingRecognition.delete(binding);
@@ -1919,89 +1666,11 @@ export function createVoiceTurnHandler(
       // Anything else is them carrying on; the question is not asked again.
     }
 
-    // A change to their own details waiting on a yes or a no.
-    const pendingEdit = pendingProfileEdit.get(binding);
-    if (pendingEdit !== undefined && api !== undefined) {
-      const session: ApiSession = {
-        baseUrl: api.apiBaseUrl,
-        accessToken: binding.accessToken,
-        ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
-      };
-      pendingProfileEdit.delete(binding);
-      const read = await decide(
-        binding,
-        profileEditQuestion(pendingEdit),
-        text,
-        signal,
-      );
-      if (read.decision === "YES") {
-        return carryOn(
-          read,
-          await applyProfileEdit(
-            binding,
-            session,
-            pendingEdit,
-            signal,
-            speaker,
-          ),
-        );
-      }
-      if (read.decision === "NO") {
-        return carryOn(
-          read,
-          (await speakLine(speaker, "Alright, leaving it as it is.", signal))
-            ? { kind: "SPOKEN", path: "MOVE" }
-            : { kind: "INTERRUPTED", path: "MOVE" },
-        );
-      }
-      // Anything else moves on; they can ask again.
-    }
-    /**
-     * Not while somebody else is conducting the conversation.
-     *
-     * "My name is Daniel" is an introduction during the first minute, not
-     * a request to change a record, and the welcome host is already
-     * listening for it. Caught live: Q answered its own opening question
-     * with "I'll set what I call you to Daniel. Shall I?", which is a
-     * machine talking to itself.
-     *
-     * The same is true inside an interview, and it read worse there
-     * (hosted, 2026-09-22): asked what kind of investor they were, the
-     * person said "Oh, right. My name is Joe", and Q abandoned its own
-     * unanswered question to ask permission to write down a name. A name
-     * offered mid-interview is a tangent — the interviewer takes it and
-     * comes back to what it was asking, which is what a person does
-     * (QX-004 §0.6).
-     */
-    const edit =
-      binding.thread.welcome === true || binding.thread.onboarding !== undefined
-        ? null
-        : spokenProfileEdit(text);
-    if (edit !== null && api !== undefined) {
-      pendingProfileEdit.set(binding, edit);
-      return (await speakLine(speaker, profileEditQuestion(edit), signal))
-        ? { kind: "SPOKEN", path: "MOVE" }
-        : { kind: "INTERRUPTED", path: "MOVE" };
-    }
-    const wanted = spokenVisibility(text);
-    if (wanted !== null && api !== undefined) {
-      const session: ApiSession = {
-        baseUrl: api.apiBaseUrl,
-        accessToken: binding.accessToken,
-        ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
-      };
-      const subject = await ownVisibilitySubject(binding, session);
-      const line =
-        subject === null
-          ? "I can switch that on once your company or your investor profile is set up on Capital Q. Shall we do the setup first?"
-          : VISIBILITY_QUESTION[subject.kind][wanted];
-      if (subject !== null) {
-        pendingVisibility.set(binding, { subject, visibility: wanted });
-      }
-      return (await speakLine(speaker, line, signal))
-        ? { kind: "SPOKEN", path: "MOVE" }
-        : { kind: "INTERRUPTED", path: "MOVE" };
-    }
+    // "Change my website to …", "make us visible to investors" are not
+    // matched here from the words (ADR 0011/0016, as navigation is not):
+    // they reach Q like any turn, Q's reading names the change
+    // (propose_profile_change, SET_VISIBILITY) and the platform's approval
+    // asks for the yes, spoken or tapped, bound to the exact change.
     const paused = held.get(binding);
     // A cough, a laugh, a bare "uh", or the browser's cue after a false
     // interruption: not a turn. If something was cut, it carries on;
