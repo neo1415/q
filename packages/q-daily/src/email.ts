@@ -1,3 +1,4 @@
+import { EMAIL_COLOURS, escapeHtml, renderEmail } from "@capital-q/email";
 import type {
   QDailyEdition,
   QDailyImage,
@@ -15,24 +16,17 @@ import type {
  * the only literal colours in The Q Daily, chosen to match the light theme.
  */
 
-const INK = "#14171a";
-const MUTED = "#5b636b";
-const RULE = "#d9dde1";
-const PAPER = "#ffffff";
-const PAGE = "#f3f2ee";
-const ACCENT = "#1d4ed8";
+// DOCS: the Capital Q email colours (packages/email), one source of truth;
+// the layout's dark-mode rules recolour these exact values.
+const INK = EMAIL_COLOURS.light.text;
+const MUTED = EMAIL_COLOURS.light.tertiary;
+const RULE = EMAIL_COLOURS.light.border;
+const ACCENT = EMAIL_COLOURS.light.accent;
 const SERIF = "Georgia,'Times New Roman',Times,serif";
 const SANS =
   "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
-export function escapeHtml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
+export { escapeHtml };
 
 /** Long date in English, from the edition's own YYYY-MM-DD. */
 export function longDate(editionDate: string): string {
@@ -203,19 +197,66 @@ export function editionEmail(
     !edition.sections.some((section) => section.code === "DEALS")
       ? `${kicker("Deals and rounds")}${chartBlock(edition)}`
       : "";
-  const footerLinks =
-    links === null
-      ? `<div>Open Capital Q and choose The Q Daily to read the full edition.</div>`
-      : `<div>${link(links.edition, "Read the full edition", `color:${ACCENT};font-weight:bold`)} &nbsp;·&nbsp; ${link(links.settings, "Change how often it comes", `color:${MUTED}`)}</div>`;
   const pexels = usesStock(edition)
-    ? `<div style="padding-top:6px">${link("https://www.pexels.com", "Photos provided by Pexels", `color:${MUTED}`)}</div>`
+    ? `<div style="font:12px/1.5 ${SANS};color:${MUTED};padding-top:12px">${link("https://www.pexels.com", "Photos provided by Pexels", `color:${MUTED}`)}</div>`
     : "";
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head><body style="margin:0;padding:0;background:${PAGE}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${PAGE}"><tr><td align="center" style="padding:20px 8px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:${PAPER}"><tr><td style="padding:24px 24px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="font:bold 40px/1.1 ${SERIF};color:${INK};padding-bottom:6px">The Q Daily</td></tr><tr><td align="center" style="font:12px/1.5 ${SANS};color:${MUTED};padding:8px 0;border-top:3px double ${INK};border-bottom:1px solid ${INK}">${escapeHtml(dateline(edition))}</td></tr>${
+  // The newspaper itself, inside the shared Capital Q layout (DOCS email
+  // packet): masthead line, stories, Q's take; then the layout's button
+  // and footer.
+  const body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="font:12px/1.5 ${SANS};color:${MUTED};padding:8px 0;border-top:3px double ${INK};border-bottom:1px solid ${INK}">${escapeHtml(dateline(edition))}</td></tr>${
     edition.topics.length === 0
       ? ""
       : `<tr><td align="center" style="font:12px/1.5 ${SANS};color:${MUTED};padding:6px 0 18px">Following ${escapeHtml(edition.topics.join(", "))}</td></tr>`
-  }${edition.lead === null ? `<tr><td style="font:17px/1.5 ${SERIF};color:${INK};padding:12px 0">A quiet ${edition.frequency === "DAILY" ? "day" : "week"} in your markets: nothing new we could cite.</td></tr>` : leadBlock(edition.lead)}${sectionRows}${dealsWithoutSection}${briefsBlock(edition)}${takeBlock(edition)}</table></td></tr><tr><td style="padding:24px;font:13px/1.6 ${SANS};color:${MUTED}">${footerLinks}<div style="padding-top:8px">Every story names its source. Q's take is Q's inference.</div>${pexels}<div style="padding-top:8px">Capital Q · investment intelligence for founders and investors.</div></td></tr></table></td></tr></table></body></html>`;
-  return { subject, text: editionText(edition, links), html };
+  }${edition.lead === null ? `<tr><td style="font:17px/1.5 ${SERIF};color:${INK};padding:12px 0">A quiet ${edition.frequency === "DAILY" ? "day" : "week"} in your markets: nothing new we could cite.</td></tr>` : `<tr><td style="padding-top:16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${leadBlock(edition.lead)}</table></td></tr>`}${sectionRows}${dealsWithoutSection}${briefsBlock(edition)}${takeBlock(edition)}<tr><td style="font:12px/1.5 ${SANS};color:${MUTED};padding-top:20px">Every story names its source. Q's take is Q's inference.${pexels}</td></tr></table>`;
+  const text = editionText(edition, null)
+    .split("\n")
+    .slice(1)
+    .join("\n")
+    .replace(
+      "Open Capital Q and choose The Q Daily to read the full edition.",
+      "",
+    )
+    .trim();
+  const rendered = renderEmail({
+    subject,
+    preheader:
+      edition.lead !== null && edition.lead.standfirst.length > 0
+        ? edition.lead.standfirst
+        : headline,
+    heading: "The Q Daily",
+    blocks: [
+      { kind: "trusted", html: { trustedHtml: body }, text },
+      ...(links === null
+        ? [
+            {
+              kind: "note",
+              text: "Open Capital Q and choose The Q Daily to read the full edition.",
+            } as const,
+          ]
+        : [
+            { kind: "divider" } as const,
+            {
+              kind: "button",
+              label: "Read the full edition",
+              href: links.edition,
+            } as const,
+            {
+              kind: "link",
+              label: "Change how often it comes",
+              href: links.settings,
+            } as const,
+          ]),
+    ],
+    reason:
+      "You're receiving this because you follow The Q Daily on Capital Q.",
+    origin: links === null ? null : new URL(links.edition).origin,
+    density: "editorial",
+  });
+  return {
+    subject: rendered.subject,
+    text: rendered.text,
+    html: rendered.html,
+  };
 }
 
 /** The plain-text part, always sent beside the HTML. */

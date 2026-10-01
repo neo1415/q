@@ -36,3 +36,6 @@ packages/taxonomy/evals/reports/
 docs/handoff/memory
 docs/handoff/transcripts
 docs/handoff/vault
+
+# Generated email HTML (packages/email, kept in step by its test).
+supabase/templates

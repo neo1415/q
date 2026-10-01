@@ -139,3 +139,6 @@ export {
   type CounterpartNoticeKind,
   type CounterpartNotices,
 } from "./counterpart-notices.js";
+
+// DOCS block: emails on the shared Capital Q layout.
+export { noticeEmail, reminderEmail } from "./email-templates.js";

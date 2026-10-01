@@ -127,6 +127,8 @@ export function composeSchedule(options: {
   readonly interests: Pick<InterestService, "relationshipById">;
   readonly calendars: CalendarDirectory;
   readonly email: AppEmailPort;
+  /** DOCS: the web origin, for links in reminder emails. */
+  readonly appOrigin?: string | null | undefined;
   readonly logger?: ScheduleServiceDependencies["logger"];
 }): ScheduleService {
   return createScheduleService({
@@ -140,6 +142,7 @@ export function composeSchedule(options: {
     calendars: options.calendars,
     activity: createNetworkMeetingActivityWriter(),
     email: options.email,
+    appOrigin: options.appOrigin ?? null,
     logger: options.logger,
   });
 }

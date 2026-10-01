@@ -1,5 +1,6 @@
 import type { DatabaseExecutor } from "@capital-q/database";
 
+import { noticeEmail } from "../email-templates.js";
 import type { AppEmailPort } from "../schedule/service.js";
 import type { PushSubscriptionKeys, WebPushSender } from "./web-push.js";
 
@@ -176,19 +177,17 @@ export function createNotificationDelivery(dependencies: {
         dependencies.appOrigin === null || notice.link_path === null
           ? null
           : `${dependencies.appOrigin}${notice.link_path}`;
+      const message = noticeEmail({
+        title: notice.title,
+        body: notice.body,
+        link,
+        origin: dependencies.appOrigin,
+      });
       await email.send({
         to,
-        subject: notice.title.replace(/[\r\n]+/g, " "),
-        text: [
-          notice.title,
-          notice.body ?? "",
-          "",
-          link === null ? "Open Capital Q to act on it." : `Open it: ${link}`,
-          "",
-          "You get this because Q needs you. Turn emails off in Settings, Notifications.",
-        ]
-          .filter((line, index) => index !== 1 || line.length > 0)
-          .join("\n"),
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
       });
     }
     await sql`

@@ -28,6 +28,7 @@
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
+    "@capital-q/email": "workspace:*",
     "@capital-q/network": "workspace:*",
     "@capital-q/security": "workspace:*",
     "zod": "4.5.4"
