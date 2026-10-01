@@ -2,16 +2,7 @@
 
 import { setFlagAction } from "./console-actions";
 import { ReasonAction } from "./console-ui";
-
-const NAMES: Readonly<Record<string, string>> = {
-  "q.autonomy.errands": "Let Q handle this (errands)",
-  "q.autonomy.delegations": "Standing delegations",
-  "q.daily": "The Q Daily",
-};
-
-export function flagName(key: string): string {
-  return NAMES[key] ?? key;
-}
+import { flagName } from "./flag-names";
 
 export function FlagToggle({
   flagKey,
