@@ -112,6 +112,14 @@ export const FOUNDER_UTTERANCE_ALIASES: OnboardingUtteranceAliases = {
     ],
     waitlist: ["waitlist", "wait list", "waiting list", "signups"],
     users: ["users", "active users", "free users", "not paying"],
+    // v3 options (founder-v3.ts).
+    paying: ["paying customers", "paying users", "customers paying"],
+    partnerships: [
+      "partnership",
+      "partnerships",
+      "distribution deal",
+      "distribution partner",
+    ],
     none: ["nothing yet", "nothing measurable", "no traction", "none"],
   },
   [FOUNDER_STEPS.revenueStatus]: {

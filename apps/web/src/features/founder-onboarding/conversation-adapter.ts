@@ -1,6 +1,6 @@
 import type { OnboardingResponseValue } from "@capital-q/contracts";
 import {
-  FOUNDER_DEFINITION_V2,
+  FOUNDER_DEFINITION_CURRENT,
   FOUNDER_STEPS,
 } from "@capital-q/founder-onboarding";
 
@@ -48,7 +48,7 @@ const TITLES: Readonly<Record<string, string>> = {
 };
 
 const STEPS = new Map(
-  FOUNDER_DEFINITION_V2.steps.map((step) => [step.stepKey, step]),
+  FOUNDER_DEFINITION_CURRENT.steps.map((step) => [step.stepKey, step]),
 );
 
 type OptionsConfiguration = {

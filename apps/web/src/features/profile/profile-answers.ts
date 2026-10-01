@@ -3,7 +3,7 @@ import type {
   OnboardingSessionView,
 } from "@capital-q/contracts";
 import {
-  FOUNDER_DEFINITION_V2,
+  FOUNDER_DEFINITION_CURRENT,
   FOUNDER_STEPS,
   instrumentLabel,
   STAGE_OPTIONS,
@@ -242,7 +242,7 @@ function moneyValue(
 
 function stepOf(journey: ProfileJourney, stepKey: string) {
   return (
-    journey === "founder" ? FOUNDER_DEFINITION_V2 : INVESTOR_DEFINITION_V1
+    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_V1
   ).steps.find((step) => step.stepKey === stepKey);
 }
 

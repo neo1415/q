@@ -6,7 +6,7 @@ import type {
 import {
   COUNTRY_OTHER_OPTION,
   CURRENCY_OPTIONS,
-  FOUNDER_DEFINITION_V2,
+  FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V2_VERSION,
   FOUNDER_STEPS,
   FounderRaiseContextSchema,
@@ -199,7 +199,7 @@ const GROUP_BY_ID = new Map(GROUPS.map((group) => [group.id, group]));
 const STEP_CONFIG = new Map(
   // v2 is the published journey. Every step v2 did not replace carries v1's
   // configuration verbatim, so reading from v2 changes nothing but F2.
-  FOUNDER_DEFINITION_V2.steps.map((step) => [step.stepKey, step]),
+  FOUNDER_DEFINITION_CURRENT.steps.map((step) => [step.stepKey, step]),
 );
 
 export function groupOf(stepKey: string): Group | undefined {
