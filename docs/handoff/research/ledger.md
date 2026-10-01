@@ -254,3 +254,9 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - Hosted migrations 20261111010000 (rehearsal difficulty) and 20261116010000 (billing) applied. The billing file was flagged only by a comment match; its real grants are service_role only. Hosted now 106/106.
 - Checks: root tsc 0 errors; vitest on web, q-core, q-tools, billing, q-runtime, q-specialists, model-gateway, contracts, q-api, api, workers all green; prettier and eslint clean on the lead-changed files.
 - Open decisions for the founder (BILLING): prices, which features are paid and their limits, the facilitation fee (needs a PADL amendment and legal advice), and Stripe keys.
+
+## 2026-10-01 afternoon: lead merges after founder's "test everything, behave like a human"
+- Merged and deployed: AUTO-3 (wake on acceptance; live 2.9 s, previously 48 s), AUTO-4 (booking without Google via in-chat slots plus .ics; founder-side notices; migration 20261112020000 applied, hosted 107/107), QA-2 (typed approval via DECISION_READER, card carried on reload, TURN_READER v22 hand-over route, one-tap "Let Q handle this", relative times), HARDEN-6 (own-standing prefetch, likely-intent and expressive notes, v15 proposalStatus, OpenAI account-exhausted skip, Gemini mid-conversation note fix, reader 2.5 s, parallel and early reads per ADR 0035, fewer lifecycle transactions), REHEARSE (raise hand yields, device locale).
+- 13:25 UTC: OpenAI credit_balance_exhausted. Live testing paused; Q runs on Gemini fallback (2/2 live turns pass). OpenAI over the last 24 h: ~2,270 calls, ~$2.77 logged. The founder must top up.
+- Waiting on credit: QA live re-checks (hand-over card, decline case, choice question), AUTO slot negotiation on lagoon's errands, HARDEN 30-turn sweep, rehearsal voice turns, speed measurement.
+- Needs the founder's real browser and mic: laugh audio, barge-in, "Zino Aviation" STT, FR/Yoruba voice.
