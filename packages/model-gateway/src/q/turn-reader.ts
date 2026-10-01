@@ -4,10 +4,11 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV15ResultSchema,
+  TurnReaderV22ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
+  type TurnReaderV22Result,
   type TurnReaderV7Variables,
 } from "@capital-q/q-core";
 
@@ -58,6 +59,8 @@ export type QTurnReading = Omit<
   readonly addressedToQ?: boolean | undefined;
   readonly moreDocuments?: TurnReaderV14Result["moreDocuments"] | undefined;
   readonly sequence?: TurnReaderV14Result["sequence"] | undefined;
+  /** v22: they asked Q for a meeting with someone, or to take it over. */
+  readonly handOver?: TurnReaderV22Result["handOver"] | undefined;
 };
 
 /**
@@ -134,7 +137,7 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderV15Result>(
+        const response = await gateway.execute<TurnReaderV22Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             // A closed classification needs little thought; left unset, a
@@ -150,7 +153,7 @@ export function createQTurnReader(dependencies: {
             attribution: input.attribution,
           },
           {
-            schema: TurnReaderV15ResultSchema,
+            schema: TurnReaderV22ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
             ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
               ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
@@ -158,7 +161,7 @@ export function createQTurnReader(dependencies: {
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV15ResultSchema.safeParse(
+        const parsed = TurnReaderV22ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

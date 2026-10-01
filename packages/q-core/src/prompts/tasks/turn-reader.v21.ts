@@ -29,7 +29,7 @@ export const TURN_READER_V21: PromptDefinition<
 > = {
   ...TURN_READER_V20,
   version: 21,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "DAILY 2026-10-01: The Q Daily (their newspaper and archive) is a destination.",
   effectiveFrom: "2026-10-01",

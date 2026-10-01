@@ -211,3 +211,12 @@ export {
   type PendingDecisionPort,
   type PendingDecisionStatus,
 } from "./pending-decision.js";
+export {
+  actOnHandOver,
+  createToolHandOverPort,
+  handOverSubjectOf,
+  HAND_OVER_CALL_PURPOSE,
+  type HandOverOutcome,
+  type HandOverSubject,
+  type QHandOverPort,
+} from "./hand-over.js";
