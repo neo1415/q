@@ -129,6 +129,7 @@ type Subject =
 function build(
   read: { status: "SUCCEEDED" | "DENIED"; data?: unknown },
   subject: Subject = { kind: "COMPANY", companyId: COMPANY },
+  deps: Partial<Parameters<typeof createModelGatewayQAnswer>[0]> = {},
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -230,6 +231,7 @@ function build(
     runEvents: { append: () => Promise.resolve({}) },
   } as unknown as QRuntimeRepositories;
   const seam = createModelGatewayQAnswer({
+    ...deps,
     gateway,
     repositories,
     sql: {} as never,
@@ -400,5 +402,31 @@ describe("ownStandingFact", () => {
         null,
       ),
     ).toBeNull();
+  });
+});
+
+describe("Q calls them by their profile name (founder live 2026-10-01)", () => {
+  it("an overheard 'Neo' in what is remembered never wins over the profile name 'Zino'", async () => {
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {
+        askerOf: () => Promise.resolve("Zino."),
+        memory: {
+          recall: () => Promise.resolve("- The name is Neo, spelled N-E-U."),
+        },
+      },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const sent = sentTo(alpha);
+    // Their profile name leads, and the rule that it is the only name
+    // Q uses travels with it, ahead of what is remembered.
+    expect(sent).toContain("WHO IS ASKING: Zino.");
+    expect(sent).toContain(
+      "Call them only by the name given first here: a name in memory or said in the conversation never replaces it",
+    );
+    expect(sent.indexOf("WHO IS ASKING: Zino.")).toBeLessThan(
+      sent.indexOf("The name is Neo"),
+    );
   });
 });

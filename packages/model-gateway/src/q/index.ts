@@ -690,6 +690,15 @@ export const LIKELY_INTENT_NOTE =
 export const EXPRESSIVE_NOTE =
   'ASKED TO LAUGH, CLAP, WHISPER OR SOUND EXCITED: do it as a person would, in words (a laugh as "Ha!" plus one short warm line of your own, never the laugh alone), with the matching gesture (LAUGH, CLAP, EXCLAIM); never a bare emoji, never describe it instead.';
 
+/**
+ * What Q calls the person (founder live 2026-10-01: a name said to someone
+ * else in the room, "Neo, n e u", was remembered and Q called the founder
+ * "Neo" for a day). Their profile name is the only source; a new one goes
+ * through their profile with their confirmation (displayName).
+ */
+export const NAME_NOTE =
+  "Call them only by the name given first here: a name in memory or said in the conversation never replaces it (a new name is a displayName for their confirmation).";
+
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
 
@@ -805,7 +814,7 @@ export function environmentNotesFor(
       ...(options.asker === undefined
         ? []
         : [
-            `WHO IS ASKING: ${options.asker} "My company", "us" and its name mean this company: never ask whether it is the one they mean, and never ask them for anything given here.`,
+            `WHO IS ASKING: ${options.asker} "My company", "us" and its name mean this company: never ask whether it is the one they mean, and never ask them for anything given here. ${NAME_NOTE}`,
           ]),
       ...(options.personality === undefined
         ? []
