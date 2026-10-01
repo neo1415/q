@@ -6,6 +6,8 @@ updated: 2026-09-30 (kept current by the cloud lead after every step)
 
 # Capital Q — current handover
 
+> **2026-10-01:** active build plan and agent owners are in `docs/specs/2026-10/MASTER-PLAN.md` (rules: `WORKER-RULES.md`). Lead works from session branch `recovery/2026-09-12-8y2j4w` and also pushes `claude/rana-account-setup-8esh9e` and the deploy branch.
+
 This file is the **single current entry point**. It supersedes the state
 sections of `CLOUD-START.md` and `HANDOFF-2026-09-25.md` (their rules and
 tooling notes still apply). The chronological record is
