@@ -128,7 +128,9 @@ const tables = await sql(
 const fks = await sql(
   `select conrelid::regclass::text as child, confrelid::regclass::text as parent,
           (select array_agg(a.attname::text) from unnest(conkey) k join pg_attribute a
-             on a.attrelid = conrelid and a.attnum = k) as cols
+             on a.attrelid = conrelid and a.attnum = k) as cols,
+          (select array_agg(a.attname::text) from unnest(confkey) k join pg_attribute a
+             on a.attrelid = confrelid and a.attnum = k) as parent_cols
      from pg_constraint where contype = 'f'`,
 );
 const profileRefs = fks.filter((f) => f.parent === "identity.user_profiles");
@@ -171,7 +173,9 @@ for (let changed = true; changed;) {
     ) {
       continue;
     }
-    const clause = `${fk.cols[0]} in (select id from ${fk.parent} where ${predicateOf.get(fk.parent)})`;
+    // The column the key references, not always "id" (a flag's events
+    // reference the flag's key).
+    const clause = `${fk.cols[0]} in (select ${fk.parent_cols?.[0] ?? "id"} from ${fk.parent} where ${predicateOf.get(fk.parent)})`;
     const current = predicateOf.get(fk.child);
     if (current !== undefined && current.includes(clause)) continue;
     predicateOf.set(
