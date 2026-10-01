@@ -1,4 +1,4 @@
-import type { ModelSensitivity } from "@capital-q/contracts";
+import type { ModelDataPosture, ModelSensitivity } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
@@ -80,6 +80,13 @@ export function createQTurnReader(dependencies: {
   readonly registry?: PromptRegistry | undefined;
   /** The person's words; CONFIDENTIAL keeps them off ineligible providers. */
   readonly sensitivity?: ModelSensitivity | undefined;
+  /**
+   * Doc 15 §62, as every other Q caller declares it: on a deployment that
+   * attested its material is synthetic, a faster shared model may read the
+   * turn (the routing policy prefers one for FAST_CLASSIFICATION). Absent
+   * is REAL_CUSTOMER, where the sensitivity ceiling keeps it off them.
+   */
+  readonly dataPosture?: ModelDataPosture | undefined;
 }): QTurnReader {
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const { gateway, logger } = dependencies;
@@ -123,6 +130,9 @@ export function createQTurnReader(dependencies: {
             // reasoning model thinks at length before a one-line answer.
             reasoning: "LOW",
             sensitivity,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
             budget: TURN_READER_BUDGET,
             messages: [...rendered.messages],
             output: rendered.output,

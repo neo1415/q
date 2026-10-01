@@ -366,7 +366,15 @@ export function composeQIntelligence(
     // to, and the reading is skipped rather than failing silently.
     ...(logger === undefined
       ? {}
-      : { turns: createQTurnReader({ gateway, logger }) }),
+      : {
+          turns: createQTurnReader({
+            gateway,
+            logger,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+          }),
+        }),
   });
 
   return {

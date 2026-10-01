@@ -2740,7 +2740,11 @@ const voiceTurn = timedVoiceTurns(
     approvals: qActions,
     continueApproved,
     // And whether it was a yes is read from their words (ADR 0011).
-    decisions: createDecisionReader({ gateway: modelGateway, logger }),
+    decisions: createDecisionReader({
+      gateway: modelGateway,
+      logger,
+      dataPosture: demoDataPosture,
+    }),
     ...(presenceTrigger === undefined ? {} : { presence: presenceTrigger }),
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     ...(config.voice.apiBaseUrl === undefined

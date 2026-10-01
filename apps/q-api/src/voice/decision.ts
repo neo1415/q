@@ -1,4 +1,4 @@
-import type { ModelSensitivity } from "@capital-q/contracts";
+import type { ModelDataPosture, ModelSensitivity } from "@capital-q/contracts";
 import {
   isModelGatewayError,
   type ModelGateway,
@@ -59,6 +59,8 @@ export type DecisionReaderDependencies = {
   readonly registry?: PromptRegistry | undefined;
   /** A person's reply on a call; CONFIDENTIAL keeps it off ineligible providers. */
   readonly sensitivity?: ModelSensitivity | undefined;
+  /** Doc 15 §62, declared as every Q caller declares it (see turn-reader). */
+  readonly dataPosture?: ModelDataPosture | undefined;
 };
 
 /** A reply that is only the word: nothing to read, and nothing to wait for. */
@@ -129,6 +131,9 @@ export function createDecisionReader(
           {
             taskClass: "FAST_CLASSIFICATION",
             sensitivity,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
             budget: DECISION_BUDGET,
             messages: [...rendered.messages],
             output: rendered.output,
