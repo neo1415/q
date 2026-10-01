@@ -43,6 +43,7 @@ import {
   budgetForTaskClass,
   PROFILE_UPDATE_NOTE,
   DISPLAY_NAME_NOTE,
+  NEXT_STEP_NOTE,
   clearsOnPurpose,
   withoutActionTalk,
   requestedChangeValues,
@@ -726,6 +727,10 @@ export function createCompanyIntelligenceSpecialist(
           STATEMENT_NOTE,
           PROFILE_UPDATE_NOTE,
           DISPLAY_NAME_NOTE,
+          // How every reply ends, here too (live smoke 2026-10-01: a raise
+          // summary from this seam ended with no next step). With no tools
+          // here, the offer is taken up on their next turn.
+          NEXT_STEP_NOTE,
           ...(researchRead !== null && researchRead.sources.length > 0
             ? [PUBLIC_RESEARCH_NOTE]
             : []),
