@@ -59,7 +59,8 @@ import { QHistorySheet } from "./q-history-sheet";
 import { QNow } from "./q-now";
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
-import type { SpokenLine } from "./spoken";
+import { useFollowNewest } from "./follow-newest";
+import { threadInOrder, type SpokenLine } from "./spoken";
 
 /**
  * The Q page: talking with Q (founder direction, 2026-09-25 and
@@ -438,14 +439,17 @@ export function QConversationPanel({
       ? { id: turn.id, role: "person", text: turn.text }
       : { id: turn.id, role: "q", text: turn.text, turn },
   );
-  const lines: Line[] = [
-    ...stored,
-    ...spokenOnly.map((line): Line => ({
+  const lines: readonly Line[] = threadInOrder(
+    stored,
+    spokenOnly.map((line) => ({
       id: line.id,
-      role: line.role === "user" ? "person" : "q",
+      role: line.role === "user" ? ("person" as const) : ("q" as const),
       text: line.text,
+      after: line.after,
     })),
-  ];
+  ).map((line): Line =>
+    "after" in line ? { id: line.id, role: line.role, text: line.text } : line,
+  );
   // While the person is speaking their words are the thread's newest
   // bubble, growing in place; the same words once stored are not shown
   // twice.
@@ -486,14 +490,20 @@ export function QConversationPanel({
     !latestAnswer.streaming &&
     latestAnswer.blocks.some((block) => block.kind === "COMPARISON_CARDS");
   const bigPresence = !conversing || (view === "presence" && !structured);
+  // Before anything is said the top of the stage -- Q -- is what must be
+  // in view (R24); the welcome beneath it can scroll. Once there is a
+  // conversation, its newest words are followed while the person is at
+  // the bottom, and their own new words always bring them there.
   useEffect(() => {
     const body = bodyRef.current;
-    if (body === null) return;
-    // Before anything is said the top of the stage -- Q -- is what must be
-    // in view (R24); the welcome beneath it can scroll. Once there is a
-    // conversation, its newest words are where the eye is.
-    body.scrollTop = conversing ? body.scrollHeight : 0;
-  }, [newest, conversing]);
+    if (body !== null && !conversing) body.scrollTop = 0;
+  }, [conversing]);
+  const threadEnd = useRef<HTMLDivElement>(null);
+  useFollowNewest(
+    threadEnd,
+    conversing ? newest : "",
+    lines.at(-1)?.role === "person" || liveIsPerson,
+  );
   const wide = useWide();
   // The Board is closed until its icon is pressed: what Q makes is in the
   // thread, inline (founder direction A, 2026-09-28).
@@ -1004,6 +1014,7 @@ export function QConversationPanel({
                 {notices}
               </div>
             )}
+            <div ref={threadEnd} aria-hidden="true" />
           </div>
 
           {/* The controls: always on screen, and compact -- one line that

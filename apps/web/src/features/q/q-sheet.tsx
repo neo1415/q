@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
 import { cx } from "@capital-q/ui";
 import { Button, IconButton } from "@capital-q/ui/button";
@@ -30,6 +30,7 @@ import { QAperture, QLumen } from "../q-aperture";
 import { useDockMenu } from "../q-dock/use-dock-menu";
 import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
+import { useFollowNewest } from "./follow-newest";
 import { QAnswer } from "./q-answer";
 import { QBoard } from "./q-board";
 import { viewingOf, type QMoment } from "./q-moment";
@@ -60,9 +61,12 @@ export function QSheetConversation({
   const endRef = useRef<HTMLDivElement>(null);
   const dockMenu = useDockMenu();
 
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [turns.length, spokenOnly.length, q.state.partial?.text]);
+  // Followed while the reader is at the bottom (`follow-newest`).
+  useFollowNewest(
+    endRef,
+    `${String(turns.length)}:${String(spokenOnly.length)}:${q.state.partial?.text ?? ""}`,
+    turns.at(-1)?.kind === "PERSON",
+  );
 
   const label = presence.label ?? "Ready";
   // What is being said now: the person's latest words (spoken or typed)

@@ -383,10 +383,24 @@ export function QSessionProvider({
     setArtifactId(null);
   }
 
+  // Where each spoken line was heard: after the thread's last stored turn
+  // at that moment (`threadInOrder`). Recorded once per line.
+  const newestTurnId = turns.at(-1)?.id ?? null;
+  const [heardAfter, setHeardAfter] = useState<
+    ReadonlyMap<string, string | null>
+  >(new Map());
+  const unplaced = spoken.some((line) => !heardAfter.has(line.id));
+  if (unplaced) {
+    const next = new Map(heardAfter);
+    for (const line of spoken) {
+      if (!next.has(line.id)) next.set(line.id, newestTurnId);
+    }
+    setHeardAfter(next);
+  }
   const spokenOnly = spokenNotYetStored(
     spoken,
     turns.map((turn) => ({ kind: turn.kind, text: turn.text })),
-  );
+  ).map((line) => ({ ...line, after: heardAfter.get(line.id) }));
 
   const state = apertureStateFor({
     voice: voice.active ? voice.client.state : null,
