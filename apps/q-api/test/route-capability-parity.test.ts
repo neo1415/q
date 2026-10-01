@@ -746,6 +746,10 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/admin/email": OPERATIONS_CONSOLE,
   "/admin/team": OPERATIONS_CONSOLE,
   "/results": cap("navigate.RESULTS"),
+  // ADMIN-3 block
+  "/admin/reviews": OPERATIONS_CONSOLE,
+  "/reviews": cap("tool.propose_human_review"),
+  // end ADMIN-3 block
   // end ADMIN block
   "/admin": exempt(
     "Capital Q's admin console: platform operators only, never a place Q sends anyone",
