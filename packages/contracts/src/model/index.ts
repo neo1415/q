@@ -211,6 +211,9 @@ export const MODEL_TYPES = [
   "EMBEDDING",
   "REALTIME",
   "RERANKING",
+  // 20261113010000 seeds the image models (gpt-image-1, gemini image) with
+  // this type; the catalog loader must accept it or every Q run fails.
+  "IMAGE_GENERATION",
 ] as const;
 export const ModelTypeSchema = z.enum(MODEL_TYPES);
 export type ModelType = z.infer<typeof ModelTypeSchema>;
