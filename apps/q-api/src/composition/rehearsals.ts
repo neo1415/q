@@ -1776,6 +1776,31 @@ const REVIEW_BUDGET: Budget = {
   attemptTimeoutMs: 40_000,
 };
 
+/**
+ * Stand-ins for a label the model wrote outside its fixed set, by path.
+ * Each is the plain, unremarkable value: an unknown mood is NEUTRAL, an
+ * unknown appraisal is NEUTRAL. Code still applies every bound.
+ */
+const REHEARSAL_LABEL_FALLBACKS: Readonly<Record<string, string>> = {
+  // persona reading
+  "temperament.baseline": "NEUTRAL",
+  grounding: "THIN",
+  forwardness: "TYPICAL",
+  "knownTraits.source": "PUBLIC",
+  // a played line
+  move: "FOLLOW_UP",
+  mood: "NEUTRAL",
+  intensity: "NORMAL",
+  appraisal: "NEUTRAL",
+  // camera presence
+  "presence.gaze": "UNCLEAR",
+  "presence.framing": "UNCLEAR",
+  "presence.lighting": "UNCLEAR",
+  "presence.background": "UNCLEAR",
+  // the review
+  "dimensions.rating": "SOLID",
+};
+
 export function createRehearsalComposer(dependencies: {
   readonly gateway: ModelGateway;
   readonly dataPosture?: ModelDataPosture | undefined;
@@ -1840,7 +1865,15 @@ export function createRehearsalComposer(dependencies: {
             correlationId: `cor_${randomUUID()}`,
           },
         },
-        { schema, ...(signal === undefined ? {} : { signal }) },
+        {
+          schema,
+          // A reading or a line is never lost to one label outside its set
+          // or one bad list item (live 2026-10-01: a mood one word off the
+          // list refused the whole persona, and the lobby could not open).
+          invalidListItems: "DROP",
+          enumFallbacks: REHEARSAL_LABEL_FALLBACKS,
+          ...(signal === undefined ? {} : { signal }),
+        },
       );
       if (response.output.kind !== "STRUCTURED") return null;
       const parsed = schema.safeParse(

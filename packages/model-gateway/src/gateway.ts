@@ -130,11 +130,14 @@ export type ModelGatewayExecuteOptions<T> = {
    * are wrong. Dropped paths ride on the result.
    */
   readonly lenientFields?: readonly string[] | undefined;
+  /** STRUCTURED output only: stand-ins for enum labels outside the set, by dotted path. */
+  readonly enumFallbacks?: Readonly<Record<string, string>> | undefined;
 };
 
 type AcceptOptions = {
   readonly invalidListItems: InvalidListItems | undefined;
   readonly lenientFields: readonly string[] | undefined;
+  readonly enumFallbacks: Readonly<Record<string, string>> | undefined;
 };
 
 export type ModelGateway = {
@@ -394,6 +397,7 @@ export function createModelGateway(
             const accepted = acceptStructuredOutput(result.text, schema, {
               invalidListItems: accept.invalidListItems,
               lenientFields: accept.lenientFields,
+              enumFallbacks: accept.enumFallbacks,
             });
             if (accepted.ok && (accepted.dropped?.length ?? 0) > 0) {
               // Paths and codes only, never a value the model wrote.
@@ -628,6 +632,7 @@ export function createModelGateway(
             {
               invalidListItems: options.invalidListItems,
               lenientFields: options.lenientFields,
+              enumFallbacks: options.enumFallbacks,
             },
           );
         } finally {

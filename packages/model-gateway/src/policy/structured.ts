@@ -112,6 +112,15 @@ export function acceptStructuredOutput<T>(
      * tool-less fallback that said what Q "needed to retrieve".
      */
     readonly lenientFields?: readonly string[] | undefined;
+    /**
+     * Fixed-set labels (enums) by dotted path, with the value that stands
+     * in when the model wrote a label outside the set. A label that only
+     * differs in case, spacing or hyphens is always mapped to the set's
+     * own spelling. Live 2026-10-01: a rehearsal persona whose mood was
+     * one word outside the list was refused whole, six times running, and
+     * the lobby could not open.
+     */
+    readonly enumFallbacks?: Readonly<Record<string, string>> | undefined;
   } = {},
 ): StructuredOutcome<T> {
   const fenced = FENCE.exec(text);
@@ -164,6 +173,9 @@ export function acceptStructuredOutput<T>(
       decoded = record;
     }
   }
+  const repaired = repairLabels(schema, decoded, options.enumFallbacks);
+  decoded = repaired.value;
+  lenientDropped.push(...repaired.replaced);
   let parsed = schema.safeParse(decoded);
   if (parsed.success && lenientDropped.length > 0) {
     return {
@@ -215,4 +227,57 @@ export function acceptStructuredOutput<T>(
     value: parsed.data,
     dropped: [...lenientDropped, ...dropped].slice(0, 8),
   };
+}
+
+/**
+ * Labels outside an enum: the set's own spelling when only case, spaces or
+ * hyphens differ; otherwise the configured stand-in for that path. Works
+ * on a copy and reports each path it changed (never the value written).
+ */
+function repairLabels<T>(
+  schema: z.ZodType<T>,
+  decoded: unknown,
+  fallbacks: Readonly<Record<string, string>> | undefined,
+): { readonly value: unknown; readonly replaced: readonly string[] } {
+  const first = schema.safeParse(decoded);
+  if (first.success || decoded === null || typeof decoded !== "object") {
+    return { value: decoded, replaced: [] };
+  }
+  const labelIssues = first.error.issues.filter(
+    (issue) => issue.code === "invalid_value" && issue.path.length > 0,
+  );
+  if (labelIssues.length === 0) return { value: decoded, replaced: [] };
+  const working: unknown = structuredClone(decoded);
+  const replaced: string[] = [];
+  for (const issue of labelIssues) {
+    const path = issue.path;
+    let parent: unknown = working;
+    for (const key of path.slice(0, -1)) {
+      if (parent === null || typeof parent !== "object") break;
+      parent = (parent as Record<PropertyKey, unknown>)[key];
+    }
+    if (parent === null || typeof parent !== "object") continue;
+    const last = path[path.length - 1] as PropertyKey;
+    const current = (parent as Record<PropertyKey, unknown>)[last];
+    const allowed = (issue as { values?: readonly unknown[] }).values ?? [];
+    const spelled =
+      typeof current === "string"
+        ? current
+            .trim()
+            .toUpperCase()
+            .replace(/[\s-]+/g, "_")
+        : null;
+    const dotted = path
+      .filter((key) => typeof key !== "number")
+      .map(String)
+      .join(".");
+    const stand =
+      spelled !== null && allowed.includes(spelled)
+        ? spelled
+        : fallbacks?.[dotted];
+    if (stand === undefined) continue;
+    (parent as Record<PropertyKey, unknown>)[last] = stand;
+    replaced.push(`${dotted}:label`);
+  }
+  return { value: working, replaced };
 }
