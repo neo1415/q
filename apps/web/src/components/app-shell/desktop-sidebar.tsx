@@ -10,6 +10,7 @@ import { ICON_SIZE, ICON_STROKE, PanelLeft } from "@capital-q/ui/icons";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { ThemeMenu } from "@/features/appearance/theme-menu";
+import { NotificationCenter } from "@/features/work/notification-center";
 import { useHomeHref } from "@/features/q/active-conversation";
 
 import type { ShellContext } from "./app-shell";
@@ -147,6 +148,8 @@ export function DesktopSidebar({
             compact={collapsed}
           />
         </div>
+        {/* AUTO: notices from Q and the push switch, one bell. */}
+        <NotificationCenter />
         {/* The appearance choice, one icon (R24; ADR 0017 F4). */}
         <ThemeMenu align={collapsed ? "start" : "end"} />
         <Tooltip content={SETTINGS_NAVIGATION.label} side="right">

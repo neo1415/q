@@ -21,6 +21,12 @@ type LoadedWorker = {
   readonly deniedPrefixes: readonly string[];
   readonly listeners: readonly string[];
   readonly source: string;
+  readonly safePath: (path: unknown) => string;
+  readonly readPush: (event: unknown) => {
+    title: string;
+    body: string;
+    path: string;
+  };
 };
 
 function loadServiceWorker(): LoadedWorker {
@@ -36,6 +42,12 @@ function loadServiceWorker(): LoadedWorker {
           ALLOWED_PREFIXES: string[];
           ALLOWED_EXACT: string[];
           DENIED_PREFIXES: string[];
+          safePath?: (path: unknown) => string;
+          readPush?: (event: unknown) => {
+            title: string;
+            body: string;
+            path: string;
+          };
         }
       | undefined,
     location: { origin: "https://app.capitalq.test" },
@@ -56,6 +68,8 @@ function loadServiceWorker(): LoadedWorker {
     deniedPrefixes: self.__cq.DENIED_PREFIXES,
     listeners,
     source,
+    safePath: self.__cq.safePath ?? (() => ""),
+    readPush: self.__cq.readPush ?? (() => ({ title: "", body: "", path: "" })),
   };
 }
 
@@ -68,8 +82,46 @@ const get = (path: string, origin = ORIGIN) => ({
 describe("service worker cache policy", () => {
   const worker = loadServiceWorker();
 
-  it("registers install, activate and fetch handlers only", () => {
-    expect(worker.listeners).toEqual(["install", "activate", "fetch"]);
+  it("registers install, activate, fetch and the Web Push handlers only", () => {
+    expect(worker.listeners).toEqual([
+      "install",
+      "activate",
+      "fetch",
+      // AUTO (ADR 0029): show a push, open its same-origin path on tap.
+      "push",
+      "notificationclick",
+    ]);
+  });
+
+  it("opens only a same-origin app path from a push", () => {
+    expect(worker.safePath("/work/abc-123")).toBe("/work/abc-123");
+    expect(worker.safePath("https://evil.example/")).toBe("/home");
+    expect(worker.safePath("//evil.example/x")).toBe("/home");
+    expect(worker.safePath("//localhost/x")).toBe("/home");
+    expect(worker.safePath("/work?x=1")).toBe("/home");
+    expect(worker.safePath(undefined)).toBe("/home");
+  });
+
+  it("always has something to show for a push, even an unreadable one", () => {
+    const pushed = worker.readPush({
+      data: {
+        json: () => ({
+          title: "Q needs your time",
+          body: "Mon 11:00",
+          path: "/work",
+        }),
+      },
+    });
+    expect(pushed).toMatchObject({ title: "Q needs your time", path: "/work" });
+    const broken = worker.readPush({
+      data: {
+        json: () => {
+          throw new Error("not json");
+        },
+      },
+    });
+    expect(broken.title).toBe("Capital Q");
+    expect(worker.readPush({ data: null }).path).toBe("/home");
   });
 
   it.each([

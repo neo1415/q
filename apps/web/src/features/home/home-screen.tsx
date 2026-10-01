@@ -13,6 +13,7 @@ import {
   type QSurfaceContext,
 } from "@/features/q/q-conversation";
 import { PersonaCards } from "@/features/persona/persona-cards";
+import { WorkPanel } from "@/features/work/work-panel";
 import type { QSubjectInput } from "@/features/q/actions";
 
 import {
@@ -240,6 +241,16 @@ export async function HomeScreen({
         fires in a hidden tab, and Home's whole Q surface stayed blank in a
         background tab until it was removed.
       */}
+      {/*
+        AUTO (ADR 0029): what Q is doing under an approved plan, above the
+        conversation, only while something is running (renders nothing
+        otherwise, so Home stays Q first).
+      */}
+      {qConnected && !headed ? (
+        <div className="mx-auto w-full max-w-(--cq-layout-reading) px-(--cq-page-gutter) pt-4">
+          <WorkPanel variant="home" />
+        </div>
+      ) : null}
       <section aria-label="Ask Q" className="flex flex-col" data-q-surface>
         {/* A conversation view still has a page heading (R30 #34). */}
         {headed ? null : <h1 className="sr-only">Q</h1>}

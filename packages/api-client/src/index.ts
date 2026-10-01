@@ -309,3 +309,19 @@ export {
 } from "./rehearsals.js";
 // end REHEARSE block
 export { getQStanding, setQPersonality } from "./standing.js";
+// AUTO block: Q's delegated work, Web Push, notification settings.
+export {
+  answerQWork,
+  getNotificationSettings,
+  getPushKey,
+  getQWork,
+  getQWorkReport,
+  getQWorkReportPdf,
+  listQWork,
+  saveNotificationSettings,
+  setQPresence,
+  stopQWork,
+  subscribePush,
+  unsubscribePush,
+} from "./work.js";
+// end AUTO block

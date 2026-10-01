@@ -153,3 +153,81 @@ self.addEventListener("fetch", (event) => {
     }),
   );
 });
+
+/*
+ * Web Push (AUTO, ADR 0029). The payload is small JSON from Capital Q's
+ * own server (title, one line, a same-origin path, a tag). Every push shows
+ * a notification -- iOS revokes a subscription that receives pushes
+ * without one. A tap focuses an open Capital Q window on that path, or
+ * opens one. Nothing here is cached, and nothing but a same-origin path is
+ * ever opened.
+ */
+
+/** A same-origin app path, or the home page. */
+function safePath(path) {
+  return typeof path === "string" && /^\/(?!\/)[A-Za-z0-9/_-]{0,200}$/.test(path)
+    ? path
+    : "/home";
+}
+
+function readPush(event) {
+  try {
+    const data = event.data ? event.data.json() : null;
+    if (data && typeof data.title === "string") {
+      return {
+        title: data.title.slice(0, 120),
+        body: typeof data.body === "string" ? data.body.slice(0, 240) : "",
+        path: safePath(data.path),
+        tag: typeof data.tag === "string" ? data.tag.slice(0, 64) : undefined,
+      };
+    }
+  } catch {
+    // An unreadable push still shows something rather than nothing.
+  }
+  return {
+    title: "Capital Q",
+    body: "Q has an update for you.",
+    path: "/home",
+  };
+}
+
+self.__cq.safePath = safePath;
+self.__cq.readPush = readPush;
+
+self.addEventListener("push", (event) => {
+  const push = readPush(event);
+  event.waitUntil(
+    self.registration.showNotification(push.title, {
+      body: push.body,
+      tag: push.tag,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { path: push.path },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const path = safePath(
+    event.notification.data && event.notification.data.path,
+  );
+  const target = new URL(path, self.location.origin).href;
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((windows) => {
+        for (const client of windows) {
+          if (
+            new URL(client.url).origin === self.location.origin &&
+            "focus" in client
+          ) {
+            return client
+              .navigate(target)
+              .then((navigated) => (navigated || client).focus());
+          }
+        }
+        return self.clients.openWindow(target);
+      }),
+  );
+});

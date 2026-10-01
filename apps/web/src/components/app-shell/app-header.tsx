@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
 import { ThemeMenu } from "@/features/appearance/theme-menu";
+import { NotificationCenter } from "@/features/work/notification-center";
 
 import { AccountMenu } from "./account-menu";
 import type { ShellContext } from "./app-shell";
@@ -28,6 +29,7 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
             detail={context.label}
             compact
           />
+          <NotificationCenter />
           <ThemeMenu align="end" />
           <AccountMenu
             founder={context.scope === "founder_private"}

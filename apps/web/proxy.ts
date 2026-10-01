@@ -27,6 +27,8 @@ export const config = {
     "/onboarding/:path*",
     "/relationships/:path*",
     "/settings/:path*",
+    // AUTO (ADR 0029): Q's work.
+    "/work/:path*",
     "/gateway/:path*",
     "/rehearsals/:path*",
     "/admin/:path*",

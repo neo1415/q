@@ -254,7 +254,7 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
     ): Promise<void> => {
       // Same-origin paths only (the column's own check repeats this).
       const link =
-        notice.link !== null && /^\/[A-Za-z0-9/_-]{0,200}$/.test(notice.link)
+        notice.link !== null && /^\/(?!\/)[A-Za-z0-9/_-]{0,200}$/.test(notice.link)
           ? notice.link
           : null;
       await sql`

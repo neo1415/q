@@ -507,7 +507,10 @@ export function RelationshipChat({
                 </>
               )}
               <span className="cq-caption flex justify-end gap-1.5 pt-0.5 text-(--cq-text-tertiary)">
-                {message.viaQ ? <span>via Q</span> : null}
+                {/* AUTO (ADR 0029): every message Q sent is labelled as Q's. */}
+                {message.viaQ ? (
+                  <span>Sent by Q for {message.senderName}</span>
+                ) : null}
                 {message.edited && !message.unsent ? <span>Edited</span> : null}
                 <time dateTime={message.sentAt} className="cq-numeric">
                   {formatRelationshipDate(message.sentAt)}

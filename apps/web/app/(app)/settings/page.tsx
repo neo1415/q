@@ -15,6 +15,7 @@ import { QMotionToggle } from "@/features/q-aperture";
 import { resolveQStanding } from "@/features/q/context";
 import { PersonalitySetting } from "@/features/settings/personality-setting";
 import { VoiceSetting } from "@/features/settings/voice-setting";
+import { PushSetting } from "@/features/work/push-setting";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -24,8 +25,9 @@ export const metadata: Metadata = { title: "Settings" };
  * Every choice here is a per-device preference the browser keeps (theme,
  * Q motion, Q's voice); nothing is fetched to render the page, so it opens
  * at once. Connected accounts (BIZ-007: Gmail) read their own status after
- * the page opens. Notifications (reminders, Q's notices) need no setting,
- * and the page offers no switch that does nothing.
+ * the page opens. Notifications (AUTO): a push on this device and email
+ * for what needs them; in-app notices always show. The page offers no
+ * switch that does nothing.
  */
 export default async function SettingsPage({
   searchParams,
@@ -58,6 +60,23 @@ export default async function SettingsPage({
             </SettingRow>
             <SettingRow term="Personality">
               <PersonalitySetting initial={standing?.personality ?? "AUTO"} />
+            </SettingRow>
+          </dl>
+        </PageSection>
+
+        <PageSection id="notifications" title="Notifications">
+          <PushSetting />
+        </PageSection>
+
+        <PageSection id="q-work" title="Q's work">
+          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+            <SettingRow term="Outreach and stand-in">
+              <Link
+                href="/work"
+                className={buttonClassName("secondary", "compact")}
+              >
+                Open
+              </Link>
             </SettingRow>
           </dl>
         </PageSection>
