@@ -43,6 +43,7 @@ import {
   createRetrievalEvidencePort,
   createSpecialistQAnswer,
   createToolCanonicalPort,
+  createToolHandOverPort,
   createToolOwnMandatePort,
   createToolOwnRecordsPort,
   type ArtifactPreparation,
@@ -331,6 +332,12 @@ export function composeQIntelligence(
     ...(dependencies.pendingDecisions === undefined
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),
+    // A hand-over read by the turn reader (v22), prepared as Q's errand
+    // for the subject on screen through the run's own propose_errand.
+    handOver: createToolHandOverPort({
+      tools,
+      ...(logger === undefined ? {} : { logger }),
+    }),
     repositories,
     sql,
     transactions,

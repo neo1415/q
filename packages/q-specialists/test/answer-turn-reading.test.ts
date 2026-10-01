@@ -6,6 +6,7 @@ import {
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
+import type { QHandOverPort } from "../src/hand-over.js";
 import type { PendingDecisionPort } from "../src/pending-decision.js";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
@@ -87,6 +88,8 @@ function seam(options: {
   readonly specialistSupports?: boolean;
   /** A typed decision on a waiting change (founder fixture #1). */
   readonly pendingDecisions?: PendingDecisionPort;
+  /** A hand-over prepared by code (TURN_READER v22). */
+  readonly handOver?: QHandOverPort;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -192,6 +195,7 @@ function seam(options: {
     ...(options.pendingDecisions === undefined
       ? {}
       : { pendingDecisions: options.pendingDecisions }),
+    ...(options.handOver === undefined ? {} : { handOver: options.handOver }),
     ...(options.offeredTools === undefined
       ? {}
       : { offeredTools: () => Promise.resolve(options.offeredTools ?? []) }),
@@ -943,5 +947,116 @@ describe("the turn read early, beside the firewall (ADR 0035)", () => {
     early(run, first);
     await run.answer.answer(first);
     expect(run.reads()).toBe(1);
+  });
+});
+
+describe("a hand-over is prepared by code for the subject on screen (TURN_READER v22)", () => {
+  const COMPANY = "94ec9c88-d157-49d1-9bf4-fc01d1e7b8d3";
+  const handOverPort = (prepared: unknown[]): QHandOverPort => ({
+    prepare: (_request, subject) => {
+      prepared.push(subject);
+      return Promise.resolve({
+        status: "PREPARED",
+        awaitingApprovalOf: "Q looks after Tarmacly for you",
+      });
+    },
+    candidates: () =>
+      Promise.resolve([
+        {
+          name: "Kazikit",
+          subject: { kind: "RELATIONSHIP", relationshipId: "r-kazikit" },
+        },
+        {
+          name: "Tarmacly",
+          subject: { kind: "RELATIONSHIP", relationshipId: "r-tarmacly" },
+        },
+      ]),
+  });
+  const reading = (
+    handOver: {
+      kind: "MEETING" | "HAND_OVER";
+      counterpartName: string | null;
+    } | null,
+    kind: TurnReaderResult["kind"] = "TOOL_REQUEST",
+  ) =>
+    ({
+      kind,
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver,
+    }) as TurnReaderResult;
+  const onCompanyPage = (): QAnswerRequest => {
+    const base = request();
+    return {
+      ...base,
+      plan: { ...base.plan, screen: { route: "COMPANY", companyId: COMPANY } },
+    };
+  };
+
+  it.each([
+    ["get me a meeting with this person", "MEETING"],
+    ["occupe-toi de ça pour moi", "HAND_OVER"],
+  ] as const)(
+    "%j on a company's page: Q's errand for that company, for approval, and the model is not asked",
+    async (said, kind) => {
+      const prepared: unknown[] = [];
+      const { answer, stored, delegated } = seam({
+        said,
+        reading: reading({ kind, counterpartName: null }),
+        outcomes: [],
+        handOver: handOverPort(prepared),
+      });
+      await answer.answer(onCompanyPage());
+      expect(prepared).toEqual([{ kind: "COMPANY", companyId: COMPANY }]);
+      expect(stored.at(-1)?.content).toMatch(
+        /^Q looks after Tarmacly for you: once you approve/,
+      );
+      expect(delegated()).toBe(0);
+    },
+  );
+
+  it("a question about meetings is not a hand-over ('what is a meeting?')", async () => {
+    const prepared: unknown[] = [];
+    const { answer, delegated } = seam({
+      said: "what is a meeting?",
+      reading: reading(null, "QUESTION_TO_Q"),
+      outcomes: [],
+      handOver: handOverPort(prepared),
+    });
+    await answer.answer(onCompanyPage());
+    expect(prepared).toEqual([]);
+    expect(delegated()).toBe(1);
+  });
+
+  it("with no subject on screen, asks one short question naming their own likely ones", async () => {
+    const prepared: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "get me a meeting with them",
+      reading: reading({ kind: "MEETING", counterpartName: null }),
+      outcomes: [],
+      handOver: handOverPort(prepared),
+    });
+    await answer.answer(request());
+    expect(prepared).toEqual([]);
+    expect(stored.at(-1)?.content).toBe(
+      "Who should I set this up with: Kazikit or Tarmacly?",
+    );
+  });
+
+  it("with no subject on screen, a name that is one of their relationships is that one", async () => {
+    const prepared: unknown[] = [];
+    const { answer } = seam({
+      said: "book me a call with kazikit",
+      reading: reading({ kind: "MEETING", counterpartName: "kazikit" }),
+      outcomes: [],
+      handOver: handOverPort(prepared),
+    });
+    await answer.answer(request());
+    expect(prepared).toEqual([
+      { kind: "RELATIONSHIP", relationshipId: "r-kazikit" },
+    ]);
   });
 });

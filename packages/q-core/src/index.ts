@@ -188,6 +188,10 @@ export { TURN_READER_V19 } from "./prompts/tasks/turn-reader.v19.js";
 export { TURN_READER_V20 } from "./prompts/tasks/turn-reader.v20.js";
 export { TURN_READER_V21 } from "./prompts/tasks/turn-reader.v21.js";
 export {
+  TURN_READER_V22,
+  TURN_READER_V22_HAND_OVER,
+} from "./prompts/tasks/turn-reader.v22.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -220,6 +224,12 @@ export {
   TURN_READER_V14_SCHEMA_VERSION,
   TurnReaderV14ResultSchema,
   TurnReaderV15ResultSchema,
+  TURN_HAND_OVER_KINDS,
+  TURN_READER_V22_SCHEMA_VERSION,
+  TurnHandOverSchema,
+  TurnReaderV22ResultSchema,
+  type TurnHandOver,
+  type TurnReaderV22Result,
   TurnToolV14Schema,
   type TurnDocumentTypeV14,
   type TurnReaderV14Result,

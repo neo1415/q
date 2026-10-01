@@ -439,3 +439,33 @@ export const TurnReaderV15ResultSchema = TurnReaderV14ResultSchema.extend({
   addressedToQ: z.boolean().default(true),
 }).strict();
 export type TurnReaderV15Result = z.infer<typeof TurnReaderV15ResultSchema>;
+
+/**
+ * v22 (founder live 2026-10-01): a hand-over. On a company's page "get me
+ * a meeting with this person" and "handle this for me" were met with
+ * "which person?" and a menu: the answer's model had to pick one of sixty
+ * tools and kept asking instead. The reader now says, from meaning in any
+ * language, when the person asks Q to get them a meeting with someone or
+ * to take a relationship over, and code prepares Q's errand for the
+ * subject on their screen, for their approval.
+ *
+ *   MEETING    get them a call or meeting with someone
+ *   HAND_OVER  take it over / look after it / handle it for them
+ */
+export const TURN_HAND_OVER_KINDS = ["MEETING", "HAND_OVER"] as const;
+
+export const TurnHandOverSchema = z
+  .object({
+    kind: z.enum(TURN_HAND_OVER_KINDS),
+    /** Who, as they named them; null when they pointed ("this person", "them"). */
+    counterpartName: z.string().trim().min(1).max(120).nullable().default(null),
+  })
+  .strict();
+export type TurnHandOver = z.infer<typeof TurnHandOverSchema>;
+
+export const TURN_READER_V22_SCHEMA_VERSION = 22;
+
+export const TurnReaderV22ResultSchema = TurnReaderV15ResultSchema.extend({
+  handOver: TurnHandOverSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV22Result = z.infer<typeof TurnReaderV22ResultSchema>;

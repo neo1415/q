@@ -56,6 +56,7 @@ import type {
   QSpecialistProbe,
   QSpecialistTurnReading,
 } from "./contracts.js";
+import { actOnHandOver, type QHandOverPort } from "./hand-over.js";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import { decidePending, type PendingDecisionPort } from "./pending-decision.js";
 import {
@@ -176,6 +177,12 @@ export type SpecialistQAnswerDependencies = {
    * Absent: approval by conversation is left to the answer's tools.
    */
   readonly pendingDecisions?: PendingDecisionPort | undefined;
+  /**
+   * A hand-over read by the turn reader (v22), prepared by code as Q's
+   * errand for the subject on screen (hand-over.ts). Absent: the answer's
+   * own tools decide, as before.
+   */
+  readonly handOver?: QHandOverPort | undefined;
   /** Whether public research exists in this composition at all. */
   readonly researchAvailable?: boolean | undefined;
   /**
@@ -1563,6 +1570,34 @@ export function createSpecialistQAnswer(
           reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
         );
         return acted;
+      }
+    }
+    // A hand-over (TURN_READER v22): "get me a meeting with this person",
+    // "handle this for me", in any language. Code prepares Q's errand for
+    // the subject they are looking at, for their approval, instead of the
+    // answer asking who (founder live 2026-10-01).
+    if (
+      dependencies.handOver !== undefined &&
+      read !== null &&
+      read.confidence !== "LOW" &&
+      read.handOver !== undefined &&
+      read.handOver !== null &&
+      tool === null &&
+      !writingDocument
+    ) {
+      const handed = await actOnHandOver(
+        dependencies.handOver,
+        request,
+        read.handOver,
+      ).catch((error: unknown) => {
+        logger?.warn(
+          { err: error, qRunId: request.runId },
+          "a hand-over was not prepared; answering normally",
+        );
+        return { kind: "NONE" } as const;
+      });
+      if (handed.kind !== "NONE") {
+        return recordAnswer(request, conversationId, handed.line);
       }
     }
     // Where a requested series of questions stands, decided from the
