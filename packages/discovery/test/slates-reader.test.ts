@@ -190,6 +190,8 @@ function harness(
     readonly cards?: readonly string[];
     readonly investor?: boolean;
     readonly mandate?: "FOUND" | "NONE";
+    /** BILLING-2: the plan's recommendation volume (a rank cut). */
+    readonly volume?: number | null;
     /** Companies this organisation has passed on (CQ-REC-009R). */
     readonly passed?: readonly string[];
     /** A proven reason to offer one of them again; nothing produces one in V1. */
@@ -400,6 +402,9 @@ function harness(
     pool,
     requester: options.requester === false ? undefined : requester,
     filterFacts: options.filterFacts,
+    ...(options.volume === undefined
+      ? {}
+      : { volume: () => Promise.resolve(options.volume ?? null) }),
     clock: () => now,
   });
   return {
@@ -1038,5 +1043,53 @@ describe("Discover filters narrow the served slate (ux/discover-filters)", () =>
     expect(compareAmounts("0500", "500.00")).toBe(0);
     expect(compareAmounts("0.1", "0.10")).toBe(0);
     expect(compareAmounts("12.5", "12.50001")).toBe(-1);
+  });
+});
+
+describe("plan recommendation volume (BILLING-2, ADR 0036): volume only, never position", () => {
+  it("cuts the feed at the plan's rank and keeps the order above it exactly", async () => {
+    const full = harness();
+    await publish(full.store, KEY, 6);
+    const everything = await full.reader.pageCompanies({ actor, limit: 10 });
+
+    const capped = harness({ volume: 4 });
+    await publish(capped.store, KEY, 6);
+    const first = await capped.reader.pageCompanies({ actor, limit: 3 });
+    const second = await capped.reader.pageCompanies({
+      actor,
+      limit: 3,
+      cursor: first.nextCursor,
+    });
+    const served = [...first.items, ...second.items].map((i) => i.companyId);
+    expect(served).toEqual(
+      everything.items.slice(0, 4).map((i) => i.companyId),
+    );
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it("a filtered feed is cut at the same rank, never refilled from below it", async () => {
+    const h = harness({ volume: 3 });
+    await publish(h.store, KEY, 6);
+    const page = await h.reader.pageCompanies({
+      actor,
+      limit: 10,
+      filters: {
+        sectorNodeIds: [],
+        stageCodes: [],
+        countryCodes: ["NG"],
+        raise: null,
+        raiseDisclosedOnly: false,
+        verifiedOnly: false,
+        hasPitch: false,
+      },
+    });
+    expect(page.items.map((i) => i.companyId)).toEqual([id(1), id(2), id(3)]);
+  });
+
+  it("no plan value (null) serves the whole slate, as today", async () => {
+    const h = harness({ volume: null });
+    await publish(h.store, KEY, 6);
+    const page = await h.reader.pageCompanies({ actor, limit: 10 });
+    expect(page.items).toHaveLength(6);
   });
 });

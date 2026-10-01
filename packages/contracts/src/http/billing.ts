@@ -27,7 +27,13 @@ export const BillingPlanKeySchema = z
   .regex(/^[a-z][a-z0-9_]*$/)
   .max(40);
 
-export const BillingFeatureKindSchema = z.enum(["ACCESS", "MONTHLY", "COUNT"]);
+export const BillingFeatureKindSchema = z.enum([
+  "ACCESS",
+  "MONTHLY",
+  "COUNT",
+  // BILLING-2 (ADR 0036): a number a plan sets, never a refusal.
+  "VALUE",
+]);
 
 export const EntitlementRefusalReasonSchema = z.enum([
   "NOT_IN_PLAN",

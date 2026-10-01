@@ -20,6 +20,7 @@ import { formatDay } from "@/components/date-format";
 
 import { AskQChips } from "./ask-q-chips";
 import { FundraisingPanel } from "./fundraising-panel";
+import { ReadinessBlueprintEntry } from "./readiness-blueprint-entry";
 
 /**
  * Capital: the objective and the relationships behind it (doc 17 §§105-107;
@@ -193,6 +194,10 @@ export async function CapitalScreen() {
           <AskQChips asks={asks} />
         </div>
       </PageSection>
+
+      {/* BILLING-2 block (ADR 0036): the Pro layer's entry point, not built yet. */}
+      {context.kind === "FOUNDER" ? <ReadinessBlueprintEntry /> : null}
+      {/* end BILLING-2 block */}
 
       <PageSection id="relationships" title="Relationships">
         {relationships === undefined ? (

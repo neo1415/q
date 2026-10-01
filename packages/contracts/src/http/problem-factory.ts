@@ -129,6 +129,9 @@ export const PROBLEM_DEFINITIONS: Readonly<
     402,
   ),
   // end BILLING block
+  // BILLING-2 block (ADR 0036)
+  NOT_IMPLEMENTED: define("not-implemented", "This isn't available yet.", 501),
+  // end BILLING-2 block
 };
 
 export type CreateProblemInput = {

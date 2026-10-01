@@ -97,6 +97,7 @@ function fakeEntitlements(allowed: boolean): EntitlementService & {
     consume: () =>
       Promise.resolve({ allowed: true, remaining: null, replayed: false }),
     release: () => Promise.resolve(true),
+    valueOf: () => Promise.resolve(null),
   };
 }
 

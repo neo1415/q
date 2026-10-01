@@ -65,6 +65,10 @@ import {
   registerRehearsalRoutes,
   type RehearsalRoutesDependencies,
 } from "./http/rehearsals.js";
+import {
+  registerReadinessBlueprintRoutes,
+  type ReadinessBlueprintRoutesDependencies,
+} from "./http/readiness-blueprint.js";
 import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
@@ -133,6 +137,10 @@ export type QApiModules = {
   readonly rehearsalEntitlements?:
     RehearsalRoutesDependencies["entitlements"] | undefined;
   // end BILLING block
+  // BILLING-2 block (ADR 0036): the Readiness Blueprint's plan-gated stub.
+  readonly readinessBlueprint?:
+    ReadinessBlueprintRoutesDependencies["entitlements"] | undefined;
+  // end BILLING-2 block
   /** Q's standing with each person: personality and patience. */
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
   // DAILY block: The Q Daily, the person's own editions and preferences.
@@ -406,6 +414,21 @@ export function createApp(
       work: modules.work,
     });
   }
+
+  // BILLING-2 block
+  if (modules.readinessBlueprint !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: readiness blueprint routes require an actor context resolver",
+      );
+    }
+    registerReadinessBlueprintRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      entitlements: modules.readinessBlueprint,
+    });
+  }
+  // end BILLING-2 block
 
   if (modules.rehearsals !== undefined) {
     if (security.resolver === undefined) {

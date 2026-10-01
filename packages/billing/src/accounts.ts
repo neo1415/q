@@ -57,7 +57,7 @@ export function createBillingAccounts(options: {
         plan_id: string;
         key: string;
         name: string;
-        kind: "ACCESS" | "MONTHLY" | "COUNT";
+        kind: "ACCESS" | "MONTHLY" | "COUNT" | "VALUE";
         unit_plural: string;
         included: boolean;
         limit_value: number | null;

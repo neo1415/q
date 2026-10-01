@@ -18,7 +18,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(22);
+select plan(25);
 
 -- Shape ------------------------------------------------------------------------
 select has_schema('billing', 'billing schema exists');
@@ -46,6 +46,20 @@ select is((select key from billing.plans where is_launch_default), 'launch',
 select throws_ok(
   $$update billing.plans set is_launch_default = true where key = 'free'$$,
   '23505', null, 'a second launch default is refused');
+
+-- BILLING-2 (20261116020000): the Blueprint's plan boundary and today's volume
+select is(
+  (select string_agg(p.key || ':' || pf.included::text, ',' order by p.key)
+     from billing.plan_features pf join billing.plans p on p.id = pf.plan_id
+    where pf.feature_key = 'q.readiness_blueprint'),
+  'founder_pro:true,free:false,fund:false,investor_pro:false,launch:true',
+  'the Readiness Blueprint is on Launch and Founder Pro only');
+select is(
+  (select count(*)::int from billing.plan_features
+    where feature_key = 'discover.recommendation_volume' and included and limit_value = 200),
+  5, 'every plan carries today''s recommendation volume (200): nothing changes');
+select is((select kind from billing.features where key = 'discover.recommendation_volume'),
+  'VALUE', 'recommendation volume is a plan value, not a gate or a meter');
 
 -- The meter (server role) --------------------------------------------------------
 select is(

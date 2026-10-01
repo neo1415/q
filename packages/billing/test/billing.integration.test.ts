@@ -16,7 +16,9 @@ import {
   createFeeLedger,
   createWebhookApplier,
   FEATURE_GATEWAYS,
+  FEATURE_READINESS_BLUEPRINT,
   FEATURE_REHEARSALS,
+  VALUE_RECOMMENDATION_VOLUME,
   type BillingAccount,
 } from "../src/index.js";
 
@@ -158,6 +160,70 @@ describe("@capital-q/billing against local Postgres", () => {
         (f) => f.key === FEATURE_REHEARSALS,
       );
       expect(rehearsals).toMatchObject({ included: true, limit: 30, used: 0 });
+    });
+  });
+
+  it("BILLING-2: the blueprint is on Launch and Founder Pro, off on Free; recommendation volume is today's 200 on every plan", async () => {
+    await scenario(async (w, tx) => {
+      const { entitlements, accounts } = services(tx);
+      const account: BillingAccount = {
+        organisationId: w.orgA,
+        userId: w.member,
+      };
+      expect(
+        await entitlements.check(account, FEATURE_READINESS_BLUEPRINT),
+      ).toMatchObject({ allowed: true });
+      expect(
+        await entitlements.valueOf(account, VALUE_RECOMMENDATION_VOLUME),
+      ).toBe(200);
+      const volumes = await tx.sql<
+        { key: string; limit_value: number | null; included: boolean }[]
+      >`
+        select p.key, pf.limit_value, pf.included from billing.plan_features pf
+          join billing.plans p on p.id = pf.plan_id
+         where pf.feature_key = ${VALUE_RECOMMENDATION_VOLUME}`;
+      expect(volumes).toHaveLength(5);
+      expect(
+        volumes.every((row) => row.included && row.limit_value === 200),
+      ).toBe(true);
+
+      await accounts.assignPlan({
+        organisationId: w.orgA,
+        planKey: "free",
+        endsAt: null,
+        byUserId: w.admin,
+        reason: "Fixture: free plan",
+      });
+      const refused = await entitlements.check(
+        account,
+        FEATURE_READINESS_BLUEPRINT,
+      );
+      expect(refused.allowed).toBe(false);
+      if (!refused.allowed) {
+        expect(refused.refusal.reason).toBe("NOT_IN_PLAN");
+        expect(refused.refusal.message).toBe(
+          "Capital Readiness Blueprint isn't included in your Free plan. You can see what each plan includes in Settings → Plan.",
+        );
+      }
+      // A VALUE is configuration: never a refusal, and an operator can set it.
+      expect(
+        await entitlements.check(account, VALUE_RECOMMENDATION_VOLUME),
+      ).toMatchObject({ allowed: true });
+      await accounts.setOverride({
+        organisationId: w.orgA,
+        featureKey: VALUE_RECOMMENDATION_VOLUME,
+        limit: 50,
+        expiresAt: null,
+        revoke: false,
+        byUserId: w.admin,
+        reason: "Fixture: pilot",
+      });
+      expect(
+        await entitlements.valueOf(account, VALUE_RECOMMENDATION_VOLUME),
+      ).toBe(50);
+      await expect(
+        entitlements.valueOf(account, FEATURE_REHEARSALS),
+      ).rejects.toThrow(/not a plan value/);
     });
   });
 

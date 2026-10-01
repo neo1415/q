@@ -72,6 +72,7 @@ function meter(allowed: boolean) {
       : { allowed: false, refusal: REFUSAL };
   const service: EntitlementService = {
     summary: () => Promise.reject(new Error("not under test")),
+    valueOf: () => Promise.resolve(null),
     check: (_account, feature) => {
       calls.push(`check:${feature}`);
       return Promise.resolve(decision());

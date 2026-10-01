@@ -581,6 +581,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/standing.ts PUT Q_STANDING_PERSONALITY_PATH": exempt(
     "the Settings choice of who Q is; a stated preference about how Q talks is already kept by Q itself",
   ),
+  // BILLING-2 block (ADR 0036)
+  "q-api/http/readiness-blueprint.ts POST Q_READINESS_BLUEPRINTS_PATH": exempt(
+    "the Readiness Blueprint's plan-gated stub (501 until built); its Q tool comes with the feature",
+  ),
+  // end BILLING-2 block
   "q-api/http/rehearsals.ts POST Q_REHEARSALS_PATH": exempt(
     "the rehearsal screen's own start; Q takes them there with open_page INVESTOR_REHEARSAL, and the rehearsal itself is Q playing the investor",
   ),
