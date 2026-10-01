@@ -8,6 +8,7 @@ import {
 } from "@capital-q/q-artifacts";
 import {
   createBriefReviser,
+  createDeckPolisher,
   latestArtifactIn,
   type ArtifactPreparation,
   type ArtifactPreparationPort,
@@ -60,6 +61,9 @@ export function createQArtifacts(dependencies: {
   readonly logger?: Logger | undefined;
   /** Stock photos for decks; absent means decks are made without them. */
   readonly photos?: StockPhotoPort | undefined;
+  /** DOCS: the confirmed brand kit and the actor's own company, as the actor. */
+  readonly studio?:
+    Omit<NonNullable<ArtifactPreparation["studio"]>, "polisher"> | undefined;
 }): QArtifactsComposition {
   const service = createArtifactService({
     repository: createPostgresArtifactRepository({ sql: dependencies.sql }),
@@ -214,6 +218,20 @@ export function createQArtifacts(dependencies: {
       port,
       reviser,
       photos: dependencies.photos,
+      // DOCS block: the document studio's steps for new decks.
+      ...(dependencies.studio === undefined
+        ? {}
+        : {
+            studio: {
+              ...dependencies.studio,
+              polisher: createDeckPolisher({
+                gateway: dependencies.gateway,
+                ...(dependencies.logger === undefined
+                  ? {}
+                  : { logger: dependencies.logger }),
+              }),
+            },
+          }),
     },
   };
 }

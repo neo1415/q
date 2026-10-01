@@ -1896,6 +1896,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/deck-render':
+        specifier: workspace:*
+        version: link:../deck-render
       '@capital-q/model-gateway':
         specifier: workspace:*
         version: link:../model-gateway

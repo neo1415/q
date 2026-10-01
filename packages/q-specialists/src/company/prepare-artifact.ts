@@ -11,7 +11,14 @@ import type { ArtifactPreparationPort } from "./artifact-port.js";
 import type { BriefReviser } from "./brief-reviser.js";
 import type { CompanyIntelligenceResult } from "./contracts.js";
 import { composeInvestmentBrief } from "./investment-brief.js";
-import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
+import type { StockPhotoPort } from "./deck-photos.js";
+import {
+  auditDocument,
+  brandDeck,
+  runDocumentStudio,
+  type DeckPolisher,
+  type StudioBrand,
+} from "./document-studio.js";
 import { composePitchDeck } from "./pitch-deck.js";
 
 /**
@@ -41,6 +48,25 @@ export type ArtifactPreparation = {
   readonly reviser: BriefReviser;
   /** Stock photographs for decks; absent means decks go without. */
   readonly photos?: StockPhotoPort | undefined;
+  /**
+   * DOCS: the document studio's inputs. The confirmed brand kit and the
+   * company's taxonomy codes are read as the actor, never from anything a
+   * model said; the polisher is the words step. Absent: decks are filed
+   * as composed (with photos), as before.
+   */
+  readonly studio?:
+    | {
+        readonly brandOf: (
+          actor: QAnswerRequest["actor"],
+        ) => Promise<StudioBrand | null>;
+        /** The actor's own company and its taxonomy industry codes. */
+        readonly ownCompanyOf: (actor: QAnswerRequest["actor"]) => Promise<{
+          readonly companyId: string;
+          readonly sectorCodes: readonly string[];
+        } | null>;
+        readonly polisher?: DeckPolisher | undefined;
+      }
+    | undefined;
 };
 
 type HistoryLike = readonly {
@@ -189,6 +215,23 @@ export async function prepareOrReviseArtifact(input: {
             },
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           });
+          // DOCS: the audit describes this version, not the last one.
+          const audited =
+            revised.content.deck === undefined
+              ? revised
+              : {
+                  ...revised,
+                  content: {
+                    ...revised.content,
+                    audit: auditDocument(revised.content, [
+                      ...current.content.sections.flatMap((section) => [
+                        section.body,
+                        ...section.findings.map((finding) => finding.statement),
+                      ]),
+                      ...findingStatements,
+                    ]),
+                  },
+                };
           return {
             kind: "PREPARED",
             summary: await artifacts.port.revise({
@@ -197,7 +240,7 @@ export async function prepareOrReviseArtifact(input: {
               qRunId: request.runId,
               artifactId: target,
               instruction,
-              content: revised,
+              content: audited,
             }),
           };
         }
@@ -252,6 +295,42 @@ export async function prepareOrReviseArtifact(input: {
   }
   await input.showStage?.("PREPARING_DOCUMENT");
   try {
+    const studio = artifacts.studio;
+    // DOCS: the studio's steps. The brand and the sector's design apply
+    // only to a document about the actor's own company; a deck about
+    // somebody else's company is never dressed in the reader's brand.
+    const own =
+      studio === undefined || company?.kind !== "COMPANY"
+        ? null
+        : await studio.ownCompanyOf(request.actor).catch(() => null);
+    const isOwn =
+      own !== null &&
+      company?.kind === "COMPANY" &&
+      own.companyId === company.companyId;
+    const brand =
+      studio === undefined || !isOwn
+        ? null
+        : await studio.brandOf(request.actor).catch(() => null);
+    const sectorCodes = isOwn ? own.sectorCodes : [];
+    const content =
+      ask.artifactType === "PITCH_DECK"
+        ? await runDocumentStudio(base.content, {
+            grounding: findingStatements,
+            sectorCodes,
+            directionChosen: ask.visualDirection !== null,
+            brand,
+            photos: artifacts.photos,
+            polisher: studio?.polisher,
+            sensitivity: request.plan.maxSensitivity,
+            attribution: {
+              tenantId: request.actor.tenantId,
+              userId: request.actor.userId,
+              qRunId: request.runId,
+              correlationId: request.correlationId,
+            },
+            signal: request.signal,
+          })
+        : brandDeck(base.content, brand);
     return {
       kind: "PREPARED",
       summary: await artifacts.port.prepare({
@@ -260,15 +339,7 @@ export async function prepareOrReviseArtifact(input: {
         qRunId: request.runId,
         ...(company === undefined ? {} : { subject: company }),
         artifactType: ask.artifactType,
-        content:
-          artifacts.photos === undefined || ask.artifactType !== "PITCH_DECK"
-            ? base
-            : {
-                ...base,
-                content: await illustrateDeck(base.content, artifacts.photos, {
-                  signal: request.signal,
-                }),
-              },
+        content: { ...base, content },
       }),
     };
   } catch (error: unknown) {

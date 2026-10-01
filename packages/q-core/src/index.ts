@@ -716,3 +716,15 @@ export {
   type WorkStandInReplyVariables,
 } from "./prompts/schemas/q-work.js";
 // end AUTO block
+
+// DOCS block: the wording pass over a composed deck.
+export { DOCUMENT_POLISH_V1 } from "./prompts/tasks/document-polish.v1.js";
+export {
+  DOCUMENT_POLISH_SCHEMA_NAME,
+  DOCUMENT_POLISH_SCHEMA_VERSION,
+  DOCUMENT_POLISH_UNTRUSTED,
+  DocumentPolishResultSchema,
+  DocumentPolishVariablesSchema,
+  type DocumentPolishResult,
+  type DocumentPolishVariables,
+} from "./prompts/schemas/document-polish.js";

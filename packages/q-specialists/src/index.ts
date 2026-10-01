@@ -179,3 +179,19 @@ export {
   composeAnswerDocument,
   type AnswerDocument,
 } from "./answer-document.js";
+
+// DOCS block: the document studio's steps.
+export {
+  applyPolish,
+  auditDocument,
+  brandDeck,
+  createDeckPolisher,
+  designDeck,
+  keepOnlyGroundedVisuals,
+  refineCharts,
+  runDocumentStudio,
+  ungroundedFigures,
+  type DeckPolisher,
+  type DocumentStudioInput,
+  type StudioBrand,
+} from "./company/document-studio.js";

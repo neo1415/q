@@ -61,7 +61,10 @@ import {
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
-import { createDocumentsModule } from "./composition/documents.js";
+import {
+  createDocumentsModule,
+  ownCompanyOf,
+} from "./composition/documents.js";
 import { createRecallBots } from "./composition/recall-bots.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
 import { createScout } from "./composition/scout.js";
@@ -1740,6 +1743,18 @@ const memoryLearner = createMemoryLearner({
   people: { displayNameFor },
   logger,
 });
+// DOCS block: the document studio (brand kit, answer exports).
+const documentStudio = createDocumentsModule({
+  sql: database.sql,
+  transactions: database.transactions,
+  runMessages: async (actor, runId) =>
+    (
+      await qRuntime.getRun({
+        actor,
+        runId: QRunIdSchema.parse(runId),
+      })
+    ).summary.messages ?? [],
+});
 /**
  * The artifact context (QX-003D; ADR 0013).
  *
@@ -1755,18 +1770,21 @@ const qArtifacts = createQArtifacts({
   photos: createPexelsPhotos(
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),
-});
-// DOCS block: the document studio (brand kit, answer exports).
-const documentStudio = createDocumentsModule({
-  sql: database.sql,
-  transactions: database.transactions,
-  runMessages: async (actor, runId) =>
-    (
-      await qRuntime.getRun({
-        actor,
-        runId: QRunIdSchema.parse(runId),
-      })
-    ).summary.messages ?? [],
+  // DOCS: decks about the actor's own company take their confirmed brand
+  // and their sector's design; read as the actor, never from model output.
+  studio: {
+    brandOf: async (actor) => {
+      const effective = await documentStudio.brandKit.effective(actor);
+      return effective === null
+        ? null
+        : {
+            kitVersion: effective.kitVersion,
+            palette: effective.palette,
+            pairing: effective.pairing,
+          };
+    },
+    ownCompanyOf: (actor) => ownCompanyOf(database.sql, actor),
+  },
 });
 // Q's standing with each person (founder direction 2026-09-30): their chosen
 // personality, which every Q surface speaks with, and Q's patience.

@@ -128,6 +128,8 @@ describe("registry", () => {
         "WORK_INTERVIEW_TURN",
         "WORK_INTERVIEW_REPORT",
         "WORK_STAND_IN_REPLY",
+        // DOCS: the wording pass over a composed deck.
+        "DOCUMENT_POLISH",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

@@ -65,6 +65,8 @@ export const PROMPT_IDS = [
   "WORK_INTERVIEW_TURN",
   "WORK_INTERVIEW_REPORT",
   "WORK_STAND_IN_REPLY",
+  // DOCS block: the wording pass over a composed deck.
+  "DOCUMENT_POLISH",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -99,6 +101,8 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   WORK_INTERVIEW_TURN: "work-interview-turn",
   WORK_INTERVIEW_REPORT: "work-interview-report",
   WORK_STAND_IN_REPLY: "work-stand-in-reply",
+  // DOCS block.
+  DOCUMENT_POLISH: "document-polish",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
