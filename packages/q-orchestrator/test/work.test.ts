@@ -52,6 +52,7 @@ type Recorder = {
   lanes: Map<string, LanePatch[]>;
   finished: { status: string; summary: string }[];
   booked: string[];
+  nudged: string[];
 };
 
 type Script = {
@@ -70,6 +71,7 @@ function fakePorts(script: Script = {}): { ports: QWorkPorts; rec: Recorder } {
     lanes: new Map(),
     finished: [],
     booked: [],
+    nudged: [],
   };
   const postKeys = new Set<string>();
   const noticeKeys = new Set<string>();
@@ -161,6 +163,11 @@ function fakePorts(script: Script = {}): { ports: QWorkPorts; rec: Recorder } {
           forPerson: [],
         })),
     standInLane: () => Promise.resolve("standin-lane-1"),
+    nudgeCounterpart: (_ref, _relationshipId, key) => {
+      if (rec.nudged.includes(key)) return Promise.resolve(false);
+      rec.nudged.push(key);
+      return Promise.resolve(true);
+    },
   };
   return { ports, rec };
 }
@@ -606,6 +613,59 @@ describe("interview answered by the founder's Q", () => {
       (patch) => patch.interview !== undefined,
     );
     expect(answered?.interview?.[0]).toMatchObject({ byQ: true });
+  });
+});
+
+describe("waiting for them to accept, like a person", () => {
+  it("names what it waits for, reminds once at 3 days, tells the owner at 7, and continues on acceptance", async () => {
+    const { ports, rec } = fakePorts();
+    const engine = createQWorkEngine({
+      checkpoints: createInMemoryQCheckpointStore(),
+      ports,
+    });
+    const lane = LANE("lane-w1");
+    expect(await engine.advanceLane(lane, observe({ connected: false }))).toBe(
+      "WAITING",
+    );
+    expect(rec.lanes.get("lane-w1")?.[0]?.lastStep).toBe(
+      "Waiting for Femi Co to accept your interest.",
+    );
+    tick(3 * 24 * 3_600_000);
+    await engine.advanceLane(lane, observe({ connected: false }));
+    await engine.advanceLane(lane, observe({ connected: false }));
+    expect(rec.nudged).toEqual(["lane:lane-w1"]);
+    expect(rec.notices.some((n) => n.key === "waiting-long:lane-w1")).toBe(
+      false,
+    );
+    tick(4 * 24 * 3_600_000);
+    await engine.advanceLane(lane, observe({ connected: false }));
+    const told = rec.notices.filter((n) => n.key === "waiting-long:lane-w1");
+    expect(told).toHaveLength(1);
+    expect(told[0]?.priority).toBe("NEEDS_YOU");
+    expect(rec.posts).toHaveLength(0);
+    // They accept: the same observation twice resumes once.
+    const accepted = observe();
+    await engine.advanceLane(lane, accepted);
+    await engine.advanceLane(lane, accepted);
+    expect(rec.posts.filter((post) => post.key === "open")).toHaveLength(1);
+  });
+
+  it("never resumes after a decline", async () => {
+    const { ports, rec } = fakePorts();
+    const engine = createQWorkEngine({
+      checkpoints: createInMemoryQCheckpointStore(),
+      ports,
+    });
+    const lane = LANE("lane-w2");
+    await engine.advanceLane(lane, observe({ connected: false }));
+    expect(
+      await engine.advanceLane(
+        lane,
+        observe({ connected: false, declined: true }),
+      ),
+    ).toBe("FINISHED");
+    expect(await engine.advanceLane(lane, observe())).toBe("FINISHED");
+    expect(rec.posts).toHaveLength(0);
   });
 });
 

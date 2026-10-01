@@ -57,6 +57,20 @@ export type QWorkIntelligencePort = {
   readonly hasCompany: (actor: ActorContext) => Promise<boolean>;
   /** The person's own work: active first, then the most recent. */
   readonly list: (actor: ActorContext) => Promise<readonly QWorkDto[]>;
+  /**
+   * Their errands (one-relationship jobs, ADR 0028), as they stand now:
+   * what Q is waiting for is the errand's own last step, never a guess.
+   */
+  readonly errands?:
+    | ((actor: ActorContext) => Promise<
+        readonly {
+          readonly errandId: string;
+          readonly counterpartName: string;
+          readonly status: string;
+          readonly lastStep: string | null;
+        }[]
+      >)
+    | undefined;
   /** Their own delegation (or one lane of it); false: not theirs / not active. */
   readonly stop: (
     actor: ActorContext,
@@ -240,6 +254,19 @@ const WorkListOutputSchema = z
           .strict(),
       )
       .max(20),
+    /** One-relationship errands; stop one with its errandId as delegationId. */
+    errands: z
+      .array(
+        z
+          .object({
+            errandId: z.string(),
+            counterpartName: z.string(),
+            status: z.string(),
+            lastStep: z.string().nullable(),
+          })
+          .strict(),
+      )
+      .max(10),
   })
   .strict();
 type WorkListOutput = z.infer<typeof WorkListOutputSchema>;
@@ -392,7 +419,7 @@ export function createQWorkTools(
       core: true,
       providerName: "list_q_work",
       description:
-        "Reads what Q is working on for them: each outreach or stand-in, where it stands, and per founder or investor the stage, the last step, any times waiting for their choice (with ids to answer), and a report's verdict. Call it for 'what are you working on', 'any news', 'who accepted', or before answering or stopping work.",
+        "Reads what Q is working on for them, as it really stands: each outreach or stand-in (per founder or investor the stage, the last step -- e.g. who Q is still waiting on to accept -- any times waiting for their choice, with ids to answer, and a report's verdict), and each errand on one relationship with its last step. Call it for 'what are you working on', 'any news', 'did they accept', 'is my meeting set', or before answering or stopping work. Say only what this returns.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       approval: "NONE",
@@ -407,7 +434,9 @@ export function createQWorkTools(
         ),
       execute: async (_input, context) => {
         const items = await port.list(context.actor);
+        const errands = (await port.errands?.(context.actor)) ?? [];
         return {
+          errands: errands.slice(0, 10).map((errand) => ({ ...errand })),
           items: items.slice(0, 20).map((item) => ({
             delegationId: item.id,
             kind: item.kind,
@@ -436,7 +465,7 @@ export function createQWorkTools(
       core: true,
       providerName: "stop_q_work",
       description:
-        "Stops Q's work for them at once: a whole outreach or stand-in, or one founder in it (laneId). Stopping is always theirs and needs no approval; nothing further is sent. Use the ids from list_q_work.",
+        "Stops Q's work for them at once: a whole outreach or stand-in, one founder in it (laneId), or an errand (its errandId as delegationId). Stopping is always theirs and needs no approval; nothing further is sent. Use the ids from list_q_work.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       approval: "NONE",

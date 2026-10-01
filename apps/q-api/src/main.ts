@@ -89,6 +89,10 @@ import { createWorkComposers } from "./composition/work/composers.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
+  createCounterpartNudger,
+  createWorkWakeListener,
+} from "./composition/waiting.js";
+import {
   createErrandReplyComposer,
   createErrandRunner,
   createErrandStartAction,
@@ -168,6 +172,7 @@ import { researchProviderConfigStatus } from "@capital-q/config/research-provide
 import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
 import {
   QActionProposalIdSchema,
+  Q_WORK_WAKE_CHANNEL,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_THINK_PATH,
   Q_VOICE_WS_PATH,
@@ -1177,6 +1182,11 @@ const workIsInvestor = async (actor: ActorContext): Promise<boolean> =>
 const workOwnCompany = (actor: ActorContext): Promise<string | null> =>
   runtimeDependencies.ownCompany(actor).catch(() => null);
 const workPort = createWorkPort({
+  // Errands are composed further down; read only when a tool asks.
+  errands: {
+    own: (actor) => errands.own(actor),
+    stop: (actor, errandId) => errands.stop(actor, errandId),
+  },
   store: workStore,
   board: workBoard,
   isInvestor: workIsInvestor,
@@ -2257,7 +2267,11 @@ setInterval(
   2 * 60 * 1000,
 ).unref();
 
+// AUTO block (founder direction 2026-10-01): one gentle reminder to a
+// silent counterpart, shared by errands and delegated work.
+const counterpartNudger = createCounterpartNudger(database.sql);
 const errands = createErrandRunner({
+  nudger: counterpartNudger,
   store: createPostgresErrandStore(database.sql),
   resolver: actorContextResolver,
   chat,
@@ -2296,6 +2310,7 @@ const workFeed = createInvestorFeedPort({
   logger,
 });
 const workRuntime = createWorkRuntime({
+  nudger: counterpartNudger,
   // ADMIN block: the operators' kill switch (ADR 0033).
   enabled: () => killSwitches.isEnabled("q.autonomy.delegations"),
   // end ADMIN block
@@ -2368,6 +2383,36 @@ setInterval(() => {
     logger.warn({ err: error }, "q work run failed");
   });
 }, 60 * 1000).unref();
+// Acceptance wakes waiting work at once (founder direction 2026-10-01):
+// the workers' outbox consumer announces the relationship on this channel.
+void createWorkWakeListener({
+  listen: (channel, onNotify, onListen) =>
+    database.listen(channel, onNotify, onListen),
+  channel: Q_WORK_WAKE_CHANNEL,
+  catchUp: () => {
+    void workRuntime.tick().catch(() => undefined);
+  },
+  targets: [
+    {
+      name: "errands",
+      wake: async (relationshipId) =>
+        (await killSwitches.isEnabled("q.autonomy.errands"))
+          ? errands.wake(relationshipId)
+          : 0,
+    },
+    {
+      name: "delegations",
+      wake: (relationshipId) => workRuntime.wake(relationshipId),
+    },
+  ],
+  logger,
+})
+  .start()
+  .then(() => logger.info({}, "q work wake listener started"))
+  .catch((error: unknown) => {
+    // The minute's tick still carries the work; only the instant wake is lost.
+    logger.warn({ err: error }, "q work wake listener not started");
+  });
 // end AUTO block
 
 // The Investor Twin (founder direction 2026-09-30, C12): a founder

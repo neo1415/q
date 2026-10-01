@@ -68,6 +68,8 @@ export {
   OutreachGrantSchema,
   PersonAnswerSchema,
   Q2Q_DAILY_CAP,
+  WAIT_NUDGE_AFTER_DAYS,
+  WAIT_TELL_OWNER_AFTER_DAYS,
   Q2Q_INTENTS,
   QEnvelopeSchema,
   StandInGrantSchema,

@@ -28,6 +28,11 @@ import {
   type RelationshipIntelligencePort,
 } from "@capital-q/q-tools";
 import {
+  TELL_OWNER_AFTER_DAYS,
+  waitingDecision,
+  type CounterpartNudger,
+} from "./waiting.js";
+import {
   AuthUserIdSchema,
   OrganisationIdSchema,
   resolveHumanActorContext,
@@ -292,6 +297,8 @@ export type ErrandRow = {
   replies_sent: number;
   meeting_id: string | null;
   expires_at: Date;
+  /** When the errand was filed: how long Q has been waiting. */
+  created_at?: Date | undefined;
 };
 
 export type ErrandReplyComposer = {
@@ -400,6 +407,9 @@ export type ErrandListRow = {
 /** Everything the runner keeps, behind one port. */
 export type ErrandStore = {
   readonly due: (limit: number) => Promise<readonly ErrandRow[]>;
+  /** AUTO: the active errands on one relationship, to wake at once. */
+  readonly dueFor?:
+    ((relationshipId: string) => Promise<readonly ErrandRow[]>) | undefined;
   readonly authUserOf: (userId: string) => Promise<string | null>;
   /** Only an ACTIVE errand changes; a stopped one stays stopped. */
   readonly update: (id: string, patch: ErrandPatch) => Promise<void>;
@@ -416,6 +426,9 @@ export type ErrandStore = {
     relationshipId: string,
   ) => Promise<readonly ErrandListRow[]>;
   readonly stop: (actor: ActorContext, errandId: string) => Promise<boolean>;
+  /** AUTO: the person's own errands on every relationship, newest first. */
+  readonly own?:
+    ((actor: ActorContext) => Promise<readonly ErrandListRow[]>) | undefined;
 };
 
 export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
@@ -424,11 +437,19 @@ export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
       sql<ErrandRow[]>`
         select id, tenant_id, user_id, organisation_id, q_action_id,
                relationship_id, counterpart_name, plan, stage, seen_until,
-               replies_sent, meeting_id, expires_at
+               replies_sent, meeting_id, expires_at, created_at
           from q_runtime.errands
          where status = 'ACTIVE' and relationship_id is not null
          order by updated_at
          limit ${limit}`,
+    dueFor: async (relationshipId) =>
+      sql<ErrandRow[]>`
+        select id, tenant_id, user_id, organisation_id, q_action_id,
+               relationship_id, counterpart_name, plan, stage, seen_until,
+               replies_sent, meeting_id, expires_at, created_at
+          from q_runtime.errands
+         where status = 'ACTIVE' and relationship_id = ${relationshipId}
+         limit 20`,
     authUserOf: async (userId) => {
       const rows = await sql<{ auth_user_id: string | null }[]>`
         select auth_user_id from identity.user_profiles where id = ${userId}`;
@@ -469,6 +490,13 @@ export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
            and relationship_id = ${relationshipId}
          order by created_at desc
          limit 5`,
+    own: async (actor) =>
+      sql<ErrandListRow[]>`
+        select id, counterpart_name, status, last_step, failure, created_at
+          from q_runtime.errands
+         where user_id = ${actor.userId} and tenant_id = ${actor.tenantId}
+         order by (status = 'ACTIVE') desc, created_at desc
+         limit 10`,
     stop: async (actor, errandId) => {
       const rows = await sql<{ id: string }[]>`
         update q_runtime.errands
@@ -495,11 +523,21 @@ export function createErrandRunner(dependencies: {
   readonly relationships: Pick<RelationshipIntelligencePort, "byRelationship">;
   readonly composer: ErrandReplyComposer;
   readonly nameOf: (userId: string) => Promise<string | null>;
+  /** One gentle reminder to the other side when they stay silent. */
+  readonly nudger?: Pick<CounterpartNudger, "nudge"> | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 }) {
   const { store, chat, schedule, composer, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
+  // One step at a time: the minute's tick and an acceptance waking the
+  // errand never advance it concurrently (a second wake finds it moved on).
+  let chain: Promise<unknown> = Promise.resolve();
+  const serial = <T>(work: () => Promise<T>): Promise<T> => {
+    const next = chain.then(work, work);
+    chain = next.catch(() => undefined);
+    return next;
+  };
 
   async function actorFor(row: ErrandRow): Promise<ActorContext | null> {
     const authUserId = AuthUserIdSchema.safeParse(
@@ -641,6 +679,72 @@ export function createErrandRunner(dependencies: {
     );
   }
 
+  /**
+   * Not connected yet (founder direction 2026-10-01): a declined interest
+   * or request ends the errand; otherwise Q says what it waits for, and if
+   * the other side stays silent, reminds them once after a few days and
+   * then tells the person plainly. Acceptance wakes the errand at once.
+   */
+  async function waiting(
+    actor: ActorContext,
+    row: ErrandRow,
+    link: string | null,
+  ): Promise<void> {
+    const found = await dependencies.relationships
+      .byRelationship(actor, row.relationship_id)
+      .catch(() => null);
+    if (found?.status?.state === "DECLINED") {
+      await update(row.id, {
+        status: "STOPPED",
+        stage: "FINISHED",
+        lastStep: `${row.counterpart_name} declined, so Q stopped.`,
+      });
+      await tell(
+        row,
+        link,
+        "declined",
+        `${row.counterpart_name} declined`,
+        "Q won't contact them for this.",
+      );
+      return;
+    }
+    const waitingFor = `Waiting for ${row.counterpart_name} to accept${found?.side === "COMPANY" ? " your request to connect" : " your interest"}.`;
+    const decision =
+      row.created_at === undefined
+        ? "WAIT"
+        : waitingDecision(row.created_at, now());
+    if (
+      decision !== "WAIT" &&
+      found !== null &&
+      dependencies.nudger !== undefined
+    ) {
+      const reminded = await dependencies.nudger
+        .nudge({
+          relationshipId: row.relationship_id,
+          waitingSide: found.side,
+          waitingName: (await dependencies.nameOf(row.user_id)) ?? "Someone",
+          key: `errand:${row.id}`,
+        })
+        .catch(() => 0);
+      if (reminded > 0) {
+        await update(row.id, {
+          lastStep: `Q reminded ${row.counterpart_name} gently. ${waitingFor}`,
+        });
+        return;
+      }
+    }
+    if (decision === "TELL_OWNER") {
+      await tell(
+        row,
+        link,
+        "waiting-long",
+        `${row.counterpart_name} hasn't accepted yet`,
+        `It's been ${String(TELL_OWNER_AFTER_DAYS)} days and Q reminded them once. Q keeps waiting and will carry on the moment they accept; you can stop this any time.`,
+      );
+    }
+    await update(row.id, { lastStep: waitingFor });
+  }
+
   async function advance(row: ErrandRow): Promise<void> {
     const plan = ErrandStartPayloadSchema.safeParse(row.plan);
     if (!plan.success) {
@@ -689,7 +793,7 @@ export function createErrandRunner(dependencies: {
       return;
     }
     if (!read.connected) {
-      await update(row.id, {});
+      await waiting(actor, row, link);
       return;
     }
 
@@ -801,21 +905,47 @@ export function createErrandRunner(dependencies: {
   }
 
   return {
-    tick: async (limit = 20): Promise<number> => {
-      const rows = await store.due(limit);
-      for (const row of rows) {
-        try {
-          await advance(row);
-        } catch (error: unknown) {
-          logger?.warn({ err: error, errandId: row.id }, "errand step failed");
+    tick: (limit = 20): Promise<number> =>
+      serial(async () => {
+        const rows = await store.due(limit);
+        for (const row of rows) {
+          try {
+            await advance(row);
+          } catch (error: unknown) {
+            logger?.warn(
+              { err: error, errandId: row.id },
+              "errand step failed",
+            );
+          }
         }
-      }
-      return rows.length;
-    },
+        return rows.length;
+      }),
+    /**
+     * The relationship moved (accepted, declined): its errands continue
+     * now, not at the next tick. Idempotent -- each step is keyed, and an
+     * errand that already moved on does nothing again.
+     */
+    wake: (relationshipId: string): Promise<number> =>
+      serial(async () => {
+        const rows = (await store.dueFor?.(relationshipId)) ?? [];
+        for (const row of rows) {
+          try {
+            await advance(row);
+          } catch (error: unknown) {
+            logger?.warn(
+              { err: error, errandId: row.id },
+              "errand wake failed",
+            );
+          }
+        }
+        return rows.length;
+      }),
     /** The person's own errands on one relationship, newest first. */
     list: store.list,
     /** The person stops their own errand; nothing further runs. */
     stop: store.stop,
+    /** The person's own errands everywhere, as their work list shows them. */
+    own: async (actor: ActorContext) => (await store.own?.(actor)) ?? [],
   };
 }
 

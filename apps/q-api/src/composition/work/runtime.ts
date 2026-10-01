@@ -36,6 +36,7 @@ import {
   type ActorContextResolver,
 } from "@capital-q/security";
 
+import type { CounterpartNudger } from "../waiting.js";
 import type { WorkComposers } from "./composers.js";
 import {
   TERMINAL_STAGES,
@@ -109,6 +110,8 @@ export type WorkRuntimeDependencies = {
   readonly mandateText: (actor: ActorContext) => Promise<string | null>;
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
   readonly nameOf: (userId: string) => Promise<string | null>;
+  /** One gentle reminder to the other side when they stay silent. */
+  readonly nudger?: Pick<CounterpartNudger, "nudge"> | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -508,6 +511,18 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
         thread: input.thread,
       }),
 
+    nudgeCounterpart: async (ref, relationshipId, key) =>
+      dependencies.nudger === undefined
+        ? false
+        : (await dependencies.nudger
+            .nudge({
+              relationshipId,
+              waitingSide: "INVESTOR",
+              waitingName: ref.principalName,
+              key: `${ref.delegationId}:${key}`,
+            })
+            .catch(() => 0)) > 0,
+
     standInLane: async (ref, relationshipId, counterpartName) => {
       const actor = await actorFor(ref);
       const found =
@@ -792,48 +807,83 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
     standInPrints.set(row.id, print);
   }
 
+  // One pass at a time: the minute's tick and an acceptance waking the
+  // same work never advance it concurrently.
+  let chain: Promise<unknown> = Promise.resolve();
+  const serial = <T>(work: () => Promise<T>): Promise<T> => {
+    const next = chain.then(work, work);
+    chain = next.catch(() => undefined);
+    return next;
+  };
+
+  async function tickOnce(limit: number): Promise<number> {
+    const rows = await store.active(limit);
+    // ADMIN block: paused platform-wide by an operator. Nothing advances;
+    // each person hears once a day that their work is on hold.
+    if (dependencies.enabled !== undefined && !(await dependencies.enabled())) {
+      const day = now().toISOString().slice(0, 10);
+      for (const row of rows) {
+        const ref = await refOf(row);
+        await store
+          .notify(ref, row.kind, {
+            key: `paused-${day}`,
+            title: "Q paused your delegated work",
+            body: "Capital Q has paused work Q does on its own for a while. Nothing was lost; Q picks up where it left off when it resumes.",
+            link: null,
+            priority: "UPDATE",
+          })
+          .catch(() => undefined);
+      }
+      return 0;
+    }
+    // end ADMIN block
+    for (const row of rows) {
+      try {
+        await advance(row);
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, delegationId: row.id },
+          "q work step failed",
+        );
+      } finally {
+        await store.touch(row.id).catch(() => undefined);
+      }
+    }
+    return rows.length;
+  }
+
   return {
     engine,
     ports,
-    /** One pass over active work, bounded; each delegation in turn. */
-    tick: async (limit = 20): Promise<number> => {
-      const rows = await store.active(limit);
-      // ADMIN block: paused platform-wide by an operator. Nothing advances;
-      // each person hears once a day that their work is on hold.
-      if (
-        dependencies.enabled !== undefined &&
-        !(await dependencies.enabled())
-      ) {
-        const day = now().toISOString().slice(0, 10);
+    /**
+     * The relationship moved (they accepted, declined, or were blocked):
+     * the work waiting on it continues now, not at the next tick. Serial
+     * with the tick, and idempotent: an unchanged observation resumes
+     * nothing, and every step is keyed.
+     */
+    wake: (relationshipId: string): Promise<number> =>
+      serial(async () => {
+        if (
+          dependencies.enabled !== undefined &&
+          !(await dependencies.enabled())
+        ) {
+          return 0;
+        }
+        const rows = await store.waitingOn(relationshipId);
         for (const row of rows) {
-          const ref = await refOf(row);
-          await store
-            .notify(ref, row.kind, {
-              key: `paused-${day}`,
-              title: "Q paused your delegated work",
-              body: "Capital Q has paused work Q does on its own for a while. Nothing was lost; Q picks up where it left off when it resumes.",
-              link: null,
-              priority: "UPDATE",
-            })
-            .catch(() => undefined);
+          try {
+            await advance(row);
+          } catch (error: unknown) {
+            logger?.warn(
+              { err: error, delegationId: row.id },
+              "q work wake failed",
+            );
+          }
         }
-        return 0;
-      }
-      // end ADMIN block
-      for (const row of rows) {
-        try {
-          await advance(row);
-        } catch (error: unknown) {
-          logger?.warn(
-            { err: error, delegationId: row.id },
-            "q work step failed",
-          );
-        } finally {
-          await store.touch(row.id).catch(() => undefined);
-        }
-      }
-      return rows.length;
-    },
+        return rows.length;
+      }),
+    /** One pass over active work, bounded; each delegation in turn. */
+    tick: (limit = 20): Promise<number> => serial(() => tickOnce(limit)),
   };
 }
 

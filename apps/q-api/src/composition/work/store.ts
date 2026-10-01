@@ -146,6 +146,19 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
          order by updated_at
          limit ${limit}`,
 
+    /** Active delegations with a lane still open on this relationship. */
+    waitingOn: async (
+      relationshipId: string,
+    ): Promise<readonly DelegationRow[]> =>
+      sql<DelegationRow[]>`
+        select d.* from q_runtime.delegations d
+         where d.status = 'ACTIVE'
+           and exists (
+             select 1 from q_runtime.delegation_lanes l
+              where l.delegation_id = d.id and l.relationship_id = ${relationshipId}
+                and l.stage not in ('DECLINED', 'DONE', 'STOPPED', 'FAILED'))
+         limit 10`,
+
     touch: async (id: string): Promise<void> => {
       await sql`
         update q_runtime.delegations set updated_at = clock_timestamp()

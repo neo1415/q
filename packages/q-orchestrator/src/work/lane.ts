@@ -9,6 +9,8 @@ import {
 
 import {
   Q2Q_DAILY_CAP,
+  WAIT_NUDGE_AFTER_DAYS,
+  WAIT_TELL_OWNER_AFTER_DAYS,
   type DelegationRef,
   type InterviewAnswer,
   type LaneObservation,
@@ -62,6 +64,8 @@ export type LaneState = {
   interview: InterviewProgress;
   answersHandled: readonly string[];
   bookings: number;
+  /** When Q started waiting for them to accept. */
+  waitingSince: string | null;
 };
 
 const replace = <T>(initial: () => T) =>
@@ -91,6 +95,7 @@ export const LaneAnnotation = Annotation.Root({
   })),
   answersHandled: replace<readonly string[]>(() => []),
   bookings: replace<number>(() => 0),
+  waitingSince: replace<string | null>(() => null),
 });
 
 /** Replies Q sends to one founder before handing the thread back. */
@@ -98,6 +103,7 @@ const MAX_Q_REPLIES = 12;
 /** Founder turns of free chat before Q moves the lane on. */
 const MAX_CHAT_TURNS = 6;
 const NUDGE_AFTER_MS = 24 * 3_600_000;
+const DAY_MS = 24 * 3_600_000;
 const GIVE_UP_AFTER_MS = 72 * 3_600_000;
 
 function fresh(
@@ -300,6 +306,42 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
     };
   };
 
+  // --- waiting for them, like a person would ----------------------------------
+  const waitForAcceptance = async (
+    state: LaneState,
+    obs: LaneObservation,
+  ): Promise<Update> => {
+    const since = state.waitingSince ?? obs.now;
+    if (state.waitingSince === null) {
+      await ports.updateLane(state.laneId, {
+        lastStep: `Waiting for ${state.counterpartName} to accept your interest.`,
+      });
+    }
+    const days = (Date.parse(obs.now) - Date.parse(since)) / DAY_MS;
+    if (days >= WAIT_NUDGE_AFTER_DAYS && state.relationshipId !== null) {
+      const reminded = await ports.nudgeCounterpart(
+        state.ref,
+        state.relationshipId,
+        `lane:${state.laneId}`,
+      );
+      if (reminded) {
+        await ports.updateLane(state.laneId, {
+          lastStep: `Q reminded ${state.counterpartName} gently; still waiting for them to accept.`,
+        });
+      }
+    }
+    if (days >= WAIT_TELL_OWNER_AFTER_DAYS) {
+      await ports.notify(state.ref, {
+        key: `waiting-long:${state.laneId}`,
+        title: `${state.counterpartName} hasn't accepted yet`,
+        body: `It's been ${String(WAIT_TELL_OWNER_AFTER_DAYS)} days and Q reminded them once. Q keeps waiting and carries on the moment they accept; you can stop this one any time.`,
+        link: `/work/${state.ref.delegationId}`,
+        priority: "NEEDS_YOU",
+      });
+    }
+    return { waiting: true, waitingSince: since };
+  };
+
   // --- ACCEPTANCE ------------------------------------------------------------
   const acceptance = async (state: LaneState): Promise<Update> => {
     const obs = state.obs;
@@ -315,7 +357,7 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
       return end(state, "DECLINED", "They declined.");
     }
     if (!obs.connected || state.relationshipId === null) {
-      return { waiting: true };
+      return waitForAcceptance(state, obs);
     }
     await post(state, "open", state.grant.openingMessage, "INFO");
     await ports.step(

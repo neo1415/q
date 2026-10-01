@@ -32,6 +32,14 @@ export const qWorkLaneAnswerPath = (delegationId: string, laneId: string) =>
     encodeURIComponent(delegationId),
   ).replace(":laneId", encodeURIComponent(laneId));
 
+/**
+ * The database notification channel that wakes Q's waiting work when a
+ * relationship moves (founder direction 2026-10-01). The payload is the
+ * relationship id and nothing else; the waking process re-reads every
+ * fact under the owner's own access.
+ */
+export const Q_WORK_WAKE_CHANNEL = "q_work_wake" as const;
+
 export const Q_WORK_KINDS = ["INVESTOR_OUTREACH", "FOUNDER_STAND_IN"] as const;
 export const Q_WORK_STATUSES = [
   "ACTIVE",

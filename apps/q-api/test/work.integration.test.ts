@@ -20,6 +20,8 @@ import {
   type WorkRuntimeDependencies,
 } from "../src/composition/work/runtime.js";
 import { createPostgresWorkStore } from "../src/composition/work/store.js";
+import { createWorkWakeListener } from "../src/composition/waiting.js";
+import { Q_WORK_WAKE_CHANNEL } from "@capital-q/contracts";
 import {
   createWorkPort,
   createWorkActionBoard,
@@ -264,7 +266,39 @@ describe("Q's delegated work against PostgreSQL", () => {
     // A deploy later: a fresh runtime and saver; the founder has accepted.
     connected = true;
     const second = dependencies();
-    await createWorkRuntime(second).tick(50);
+    // Acceptance wakes it through the database channel, not the tick: the
+    // same announcement twice (a redelivered event) resumes it once.
+    const runtime = createWorkRuntime(second);
+    let woke!: () => void;
+    const wokenTwice = new Promise<void>((resolve) => {
+      let count = 0;
+      woke = () => {
+        count += 1;
+        if (count === 2) resolve();
+      };
+    });
+    const listener = createWorkWakeListener({
+      listen: (channel, onNotify) => db.listen(channel, onNotify),
+      channel: Q_WORK_WAKE_CHANNEL,
+      targets: [
+        {
+          name: "delegations",
+          wake: async (relationshipId) => {
+            const woken = await runtime.wake(relationshipId);
+            woke();
+            return woken;
+          },
+        },
+      ],
+    });
+    const listening = (await listener.start()) as {
+      unlisten: () => Promise<void>;
+    };
+    await db.sql`select pg_notify(${Q_WORK_WAKE_CHANNEL}, ${RELATIONSHIP})`;
+    await db.sql`select pg_notify(${Q_WORK_WAKE_CHANNEL}, ${RELATIONSHIP})`;
+    await wokenTwice;
+    await listening.unlisten();
+    expect(posts.filter((post) => post.key.endsWith(":open"))).toHaveLength(1);
     expect(posts[0]?.body).toBe("Hello, I'm Q for Ada. Ada liked your pitch.");
     expect(posts[0]?.envelope).toEqual({
       protocol: "cq.q2q/1",

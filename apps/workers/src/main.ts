@@ -40,6 +40,7 @@ import { loadWorkerConfig } from "@capital-q/config/workers";
 import {
   CONTRACTS_VERSION,
   CorrelationIdSchema,
+  Q_WORK_WAKE_CHANNEL,
   type ModelDataPosture,
 } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
@@ -151,6 +152,7 @@ import {
 import { withVerificationDecisions } from "./verification/decide-handler.js";
 import { withReadinessAfterVerification } from "./verification/readiness-handler.js";
 import { withRelationshipProjection } from "./network/relationship-projection-handler.js";
+import { withQWorkWake } from "./network/q-work-wake-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
@@ -690,49 +692,61 @@ const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
   handle: withRelationshipProjection(
-    withReadinessAfterVerification(
-      withVerificationDecisions(
-        createDomainEventHandler({
-          registry,
-          queues,
-          pipelineVersion: config.documents.pipelineVersion,
-          mediaModeration: {
-            onReady: (event) => {
-              // The message names the asset; the decision re-reads it. An id that
-              // is not one is archived by the handler's own outcome, not thrown.
-              const mediaAssetId = MediaAssetIdSchema.safeParse(
-                event.mediaAssetId,
-              );
-              if (!mediaAssetId.success) {
-                return Promise.resolve({ kind: "SKIPPED" });
-              }
-              return mediaModeration({
-                tenantId: event.tenantId,
-                mediaAssetId: mediaAssetId.data,
-                correlationId: CorrelationIdSchema.parse(
-                  event.correlationId ?? `cor_${randomUUID()}`,
-                ),
-              });
+    // AUTO block (founder direction 2026-10-01): acceptance wakes Q's
+    // waiting work at once, after the state above is projected.
+    withQWorkWake(
+      withReadinessAfterVerification(
+        withVerificationDecisions(
+          createDomainEventHandler({
+            registry,
+            queues,
+            pipelineVersion: config.documents.pipelineVersion,
+            mediaModeration: {
+              onReady: (event) => {
+                // The message names the asset; the decision re-reads it. An id that
+                // is not one is archived by the handler's own outcome, not thrown.
+                const mediaAssetId = MediaAssetIdSchema.safeParse(
+                  event.mediaAssetId,
+                );
+                if (!mediaAssetId.success) {
+                  return Promise.resolve({ kind: "SKIPPED" });
+                }
+                return mediaModeration({
+                  tenantId: event.tenantId,
+                  mediaAssetId: mediaAssetId.data,
+                  correlationId: CorrelationIdSchema.parse(
+                    event.correlationId ?? `cor_${randomUUID()}`,
+                  ),
+                });
+              },
             },
-          },
-          ...(founderReview === undefined ? {} : { founderReview }),
-          ...(mandateReview === undefined ? {} : { mandateReview }),
-          ...(presenceResearch === undefined ? {} : { presenceResearch }),
-          recommendations: {
-            onEvent: (event) =>
-              slateInvalidation.apply(refreshDirectiveFor(event), {
-                correlationId: event.correlationId,
-                causationId: `cau_${event.id}`,
-              }),
-          },
+            ...(founderReview === undefined ? {} : { founderReview }),
+            ...(mandateReview === undefined ? {} : { mandateReview }),
+            ...(presenceResearch === undefined ? {} : { presenceResearch }),
+            recommendations: {
+              onEvent: (event) =>
+                slateInvalidation.apply(refreshDirectiveFor(event), {
+                  correlationId: event.correlationId,
+                  causationId: `cau_${event.id}`,
+                }),
+            },
+            logger,
+          }),
+          { registry, decide: verificationDecider, logger },
+        ),
+        {
+          registry,
+          ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
+          reconcile: readinessCompanies.reconcileMarketplaceReadinessAsSystem,
           logger,
-        }),
-        { registry, decide: verificationDecider, logger },
+        },
       ),
       {
         registry,
-        ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
-        reconcile: readinessCompanies.reconcileMarketplaceReadinessAsSystem,
+        channel: Q_WORK_WAKE_CHANNEL,
+        notify: async (channel, payload) => {
+          await database.sql`select pg_notify(${channel}, ${payload})`;
+        },
         logger,
       },
     ),

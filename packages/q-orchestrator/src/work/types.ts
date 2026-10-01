@@ -48,6 +48,14 @@ export const QEnvelopeSchema = z
   .strict();
 export type QEnvelope = z.infer<typeof QEnvelopeSchema>;
 
+/**
+ * Waiting like a person (founder direction 2026-10-01): one gentle reminder
+ * to the other side after this many days without an answer, then the
+ * owner is told plainly. Acceptance wakes the work at once, not on a tick.
+ */
+export const WAIT_NUDGE_AFTER_DAYS = 3;
+export const WAIT_TELL_OWNER_AFTER_DAYS = 7;
+
 /** At most this many Q-to-Q messages per relationship per day. */
 export const Q2Q_DAILY_CAP = 6;
 
@@ -326,6 +334,15 @@ export type QWorkPorts = {
     ref: DelegationRef,
     input: StandInReplyInput,
   ) => Promise<StandInReplyResult | null>;
+  /**
+   * One gentle reminder to the other side's people about the interest
+   * they already received; true when anyone was reminded (once per key).
+   */
+  readonly nudgeCounterpart: (
+    ref: DelegationRef,
+    relationshipId: string,
+    key: string,
+  ) => Promise<boolean>;
   readonly standInLane: (
     ref: DelegationRef,
     relationshipId: string,

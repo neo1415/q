@@ -349,6 +349,24 @@ export function createWorkPort(dependencies: {
   readonly board: ReturnType<typeof createWorkActionBoard>;
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
+  /** ADR 0028 errands, read and stopped beside delegated work. */
+  readonly errands?:
+    | {
+        readonly own: (actor: ActorContext) => Promise<
+          readonly {
+            readonly id: string;
+            readonly counterpart_name: string;
+            readonly status: string;
+            readonly last_step: string | null;
+            readonly failure: string | null;
+          }[]
+        >;
+        readonly stop: (
+          actor: ActorContext,
+          errandId: string,
+        ) => Promise<boolean>;
+      }
+    | undefined;
 }): QWorkIntelligencePort & {
   readonly detail: (
     actor: ActorContext,
@@ -380,8 +398,21 @@ export function createWorkPort(dependencies: {
       (await dependencies.ownCompany(actor)) !== null,
     list: async (actor) =>
       Promise.all((await store.own(actor)).map((row) => toDto(row))),
-    stop: (actor, delegationId, laneId) =>
-      store.stop(actor, delegationId, laneId),
+    stop: async (actor, delegationId, laneId) =>
+      (await store.stop(actor, delegationId, laneId)) ||
+      (laneId === null &&
+        dependencies.errands !== undefined &&
+        (await dependencies.errands.stop(actor, delegationId))),
+    errands:
+      dependencies.errands === undefined
+        ? undefined
+        : async (actor) =>
+            ((await dependencies.errands?.own(actor)) ?? []).map((row) => ({
+              errandId: row.id,
+              counterpartName: row.counterpart_name,
+              status: row.status,
+              lastStep: row.failure ?? row.last_step,
+            })),
     answer: (actor, delegationId, laneId, answer) =>
       store.answer(actor, delegationId, laneId, answer),
     setAway: (actor, away) => store.setAway(actor, away),
