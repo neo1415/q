@@ -67,6 +67,9 @@ export const PROMPT_IDS = [
   "WORK_STAND_IN_REPLY",
   // DOCS block: the wording pass over a composed deck.
   "DOCUMENT_POLISH",
+  // DAILY block: The Q Daily's story writer and Q's take column.
+  "DAILY_STORY_WRITER",
+  "DAILY_Q_TAKE",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -103,6 +106,9 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   WORK_STAND_IN_REPLY: "work-stand-in-reply",
   // DOCS block.
   DOCUMENT_POLISH: "document-polish",
+  // DAILY block
+  DAILY_STORY_WRITER: "daily-story-writer",
+  DAILY_Q_TAKE: "daily-q-take",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

@@ -105,6 +105,9 @@ import { DELEGATION_READER_V4 } from "./tasks/delegation-reader.v4.js";
 import { DELEGATION_READER_V5 } from "./tasks/delegation-reader.v5.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
+// DAILY block
+import { DAILY_Q_TAKE_V1 } from "./tasks/daily-q-take.v1.js";
+import { DAILY_STORY_WRITER_V1 } from "./tasks/daily-story-writer.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./tasks/investor-mandate-synthesis.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./tasks/investor-mandate-synthesis.v2.js";
@@ -322,6 +325,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     WORK_INTERVIEW_TURN_V1,
     WORK_INTERVIEW_REPORT_V1,
     WORK_STAND_IN_REPLY_V1,
+    // DAILY block
+    DAILY_STORY_WRITER_V1,
+    DAILY_Q_TAKE_V1,
   ];
 
 /** The production registry: the source-controlled definitions above. */

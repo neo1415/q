@@ -730,3 +730,24 @@ export {
   type DocumentPolishResult,
   type DocumentPolishVariables,
 } from "./prompts/schemas/document-polish.js";
+
+// DAILY block (The Q Daily)
+export { DAILY_STORY_WRITER_V1 } from "./prompts/tasks/daily-story-writer.v1.js";
+export { DAILY_Q_TAKE_V1 } from "./prompts/tasks/daily-q-take.v1.js";
+export {
+  DAILY_Q_TAKE_SCHEMA_NAME,
+  DAILY_Q_TAKE_SCHEMA_VERSION,
+  DAILY_Q_TAKE_UNTRUSTED,
+  DAILY_STORY_WRITER_SCHEMA_NAME,
+  DAILY_STORY_WRITER_SCHEMA_VERSION,
+  DAILY_STORY_WRITER_UNTRUSTED,
+  DailyQTakeResultSchema,
+  DailyQTakeVariablesSchema,
+  DailyStoryWriterResultSchema,
+  DailyStoryWriterVariablesSchema,
+  type DailyQTakeResult,
+  type DailyQTakeVariables,
+  type DailyStoryWriterResult,
+  type DailyStoryWriterVariables,
+} from "./prompts/schemas/daily.js";
+// end DAILY block

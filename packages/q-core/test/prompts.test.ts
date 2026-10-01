@@ -130,6 +130,9 @@ describe("registry", () => {
         "WORK_STAND_IN_REPLY",
         // DOCS: the wording pass over a composed deck.
         "DOCUMENT_POLISH",
+        // DAILY: The Q Daily's story writer and Q's take column.
+        "DAILY_STORY_WRITER",
+        "DAILY_Q_TAKE",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
