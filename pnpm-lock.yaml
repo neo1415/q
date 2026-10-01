@@ -458,6 +458,9 @@ importers:
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../../packages/q-core
+      '@capital-q/q-daily':
+        specifier: workspace:*
+        version: link:../../packages/q-daily
       '@capital-q/q-embeddings':
         specifier: workspace:*
         version: link:../../packages/q-embeddings
@@ -1520,6 +1523,9 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

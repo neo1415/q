@@ -31,6 +31,7 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@capital-q/config": "workspace:*",
     "@types/node": "^24.13.3",
     "typescript": "5.9.3"
   }

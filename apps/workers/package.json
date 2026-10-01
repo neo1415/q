@@ -35,6 +35,7 @@
     "@capital-q/permissions": "workspace:*",
     "@capital-q/platform-admin": "workspace:*",
     "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-daily": "workspace:*",
     "@capital-q/q-embeddings": "workspace:*",
     "@capital-q/q-knowledge": "workspace:*",
     "@capital-q/q-presence": "workspace:*",

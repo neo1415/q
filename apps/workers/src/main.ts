@@ -156,6 +156,7 @@ import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
 import { runGmailReplyPoller } from "./integrations/gmail-poller.js";
 import { runScheduleTicker } from "./integrations/schedule-ticker.js";
+import { composeWorkerDaily, runDailyTicker } from "./daily/composition.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeSchedule,
@@ -911,6 +912,40 @@ const noticeDelivery = createNotificationDelivery({
 });
 // end AUTO block
 
+// DAILY block: The Q Daily (docs/specs/2026-10/daily.md). Editions are
+// prepared here only, within the package's hard budget caps.
+const daily =
+  process.env["Q_DAILY_DISABLED"] === "1"
+    ? undefined
+    : composeWorkerDaily({
+        sql: database.sql,
+        gateway: modelGateway,
+        modelsAvailable: modelProviders.length > 0,
+        dataPosture: demoDataPosture,
+        researchSecrets: researchProviderSecrets,
+        // ADMIN block: each send's outcome feeds the console's Email panel.
+        email:
+          appEmail.brevoApi !== undefined
+            ? recordingEmailSender(
+                createBrevoApiEmailSender(appEmail.brevoApi),
+                {
+                  sql: database.sql,
+                  source: "workers.daily",
+                  provider: "BREVO_API",
+                },
+              )
+            : appEmail.smtp === undefined
+              ? unavailableAppEmailSender
+              : recordingEmailSender(createSmtpAppEmailSender(appEmail.smtp), {
+                  sql: database.sql,
+                  source: "workers.daily",
+                  provider: "SMTP",
+                }),
+        env: process.env,
+        logger,
+      });
+// end DAILY block
+
 const shutdownController = new AbortController();
 
 function shutdown(signal: NodeJS.Signals): void {
@@ -951,6 +986,10 @@ await Promise.all([
     signal: shutdownController.signal,
     logger,
   }),
+  // DAILY block
+  ...(daily === undefined
+    ? []
+    : [runDailyTicker({ daily, signal: shutdownController.signal, logger })]),
   ...(syntheticAutoVerifySweep === undefined
     ? []
     : [

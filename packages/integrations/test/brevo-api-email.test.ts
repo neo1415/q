@@ -37,6 +37,26 @@ describe("Brevo API email sender", () => {
     expect(String(body["htmlContent"])).toContain("Follow up");
   });
 
+  it("sends a document's own HTML when it brings one (The Q Daily)", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve(new Response("{}", { status: 201 })),
+    );
+    await createBrevoApiEmailSender({
+      apiKey: key,
+      sender: "q@example.test",
+      fetch,
+    }).send({
+      to: "a@b.test",
+      subject: "The Q Daily",
+      text: "plain",
+      html: "<!doctype html><p>newspaper</p>",
+    });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body["htmlContent"]).toBe("<!doctype html><p>newspaper</p>");
+    expect(body["textContent"]).toBe("plain");
+  });
+
   it("names a bare sender address Capital Q (founder direction 2026-09-30)", async () => {
     const fetch = vi.fn(() =>
       Promise.resolve(new Response("{}", { status: 201 })),

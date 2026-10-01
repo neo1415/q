@@ -15,6 +15,11 @@ export type AppEmail = {
   readonly to: string;
   readonly subject: string;
   readonly text: string;
+  /**
+   * A document's own HTML (The Q Daily's newspaper, DAILY spec §2), sent
+   * instead of the branded frame. The plain text is always sent beside it.
+   */
+  readonly html?: string | undefined;
 };
 
 export type AppEmailSender = {
@@ -123,7 +128,7 @@ export function createSmtpAppEmailSender(config: {
         to: message.to,
         subject: message.subject,
         text: message.text,
-        html: brandedEmailHtml(message),
+        html: message.html ?? brandedEmailHtml(message),
       });
     },
   };
@@ -161,7 +166,7 @@ export function createBrevoApiEmailSender(config: {
           to: [{ email: message.to }],
           subject: message.subject,
           textContent: message.text,
-          htmlContent: brandedEmailHtml(message),
+          htmlContent: message.html ?? brandedEmailHtml(message),
         }),
         signal: AbortSignal.timeout(15_000),
       });
