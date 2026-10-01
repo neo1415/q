@@ -35,6 +35,9 @@ export const CAPITAL_Q_ERROR_CODES = [
   "STEP_UP_REQUIRED",
   "ACCOUNT_SUSPENDED",
   // end ADMIN block
+  // BILLING block (ADR 0034)
+  "ENTITLEMENT_REQUIRED",
+  // end BILLING block
 ] as const;
 
 export type KnownErrorCode = (typeof CAPITAL_Q_ERROR_CODES)[number];
