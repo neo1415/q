@@ -84,7 +84,7 @@ profiles are stored with provenance; facts go through the Write Gate.
    last rehearsal score), "History" (every past rehearsal → review).
 3. **Lobby** (`/rehearsals/investor/<id>` or `/rehearsals/company/<id>`,
    or `/rehearsals/meeting/<meetingId>` which resolves to one of those):
-   Meet's green-room: self-preview (camera optional), the person's tile,
+   Meet's green-room: the person's tile (your camera is turned on in the room),
    "AI rehearsal of X, based on public and shared information", what Q
    knows (grounding THIN/SOME/RICH, sources list), voice choice for their
    voice, **Join now**. The persona profile builds/refreshes here (cached;
