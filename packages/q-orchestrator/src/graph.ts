@@ -184,6 +184,14 @@ export function buildQGraph(
    * (decision, then pre-retrieval revalidation) rather than three times.
    */
   const livePlans = new Map<string, PermittedContextPlan>();
+  /**
+   * Runs whose plan the firewall node made in this same invocation, with
+   * no pause since. Retrieval reuses that plan inside its own
+   * revalidateAfter instead of evaluating policy again milliseconds later
+   * (live 2026-10-01: three evaluations per Home Q turn, ~135 ms each). A
+   * pause, a resume or an expired plan still revalidates.
+   */
+  const plannedThisInvocation = new Set<string>();
 
   async function boundary(state: QGraphState): Promise<QRunRecord> {
     const run = await runtime.readRun(ref(state));
@@ -254,6 +262,7 @@ export function buildQGraph(
       return { context: "DENIED", contextPlan: null };
     }
     livePlans.set(state.runId, decision.plan);
+    plannedThisInvocation.add(state.runId);
     await advance(state, "PLANNING");
     return { context: "AUTHORISED", contextPlan: describe(decision.plan) };
   };
@@ -263,6 +272,8 @@ export function buildQGraph(
     if (!(await pausePolicy.shouldPause(subjectContext(state)))) {
       return {};
     }
+    // A resumed run is planned again, whatever this process remembers.
+    plannedThisInvocation.delete(state.runId);
     interrupt(Q_INTERNAL_PAUSE);
     return {};
   };
@@ -276,7 +287,15 @@ export function buildQGraph(
   ): Promise<Partial<QGraphState>> => {
     await boundary(state);
     await advance(state, "RETRIEVAL");
-    const decision = await plan(state);
+    const held = livePlans.get(state.runId);
+    const reusable =
+      plannedThisInvocation.has(state.runId) &&
+      held !== undefined &&
+      Date.now() < Date.parse(held.revalidateAfter);
+    plannedThisInvocation.delete(state.runId);
+    const decision = reusable
+      ? { outcome: "AUTHORISED" as const, plan: held }
+      : await plan(state);
     if (decision.outcome === "DENIED") {
       livePlans.delete(state.runId);
       return { context: "DENIED", contextPlan: null, retrieval: null };

@@ -2009,8 +2009,17 @@ export function createModelGatewayQAnswer(
                   );
                 }
               } else {
-                logger?.debug(
-                  { qRunId: request.runId, stage: accepted.stage },
+                // Info, not debug: every such turn pays a second full
+                // model call for the structured answer (live 2026-10-01:
+                // ~1.6-2.2 s on most Home Q turns). The stage and the
+                // refused paths say why; never the model's text.
+                logger?.info(
+                  {
+                    qRunId: request.runId,
+                    stage: accepted.stage,
+                    refusals: (accepted.refusals ?? []).slice(0, 8),
+                    chars: result.output.text.length,
+                  },
                   "a tool round answered outside the task's shape",
                 );
               }
