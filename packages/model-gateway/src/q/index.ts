@@ -83,6 +83,7 @@ import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
 import { ownStandingFact } from "./own-standing.js";
 import { onScreenCompanyFact } from "./company-fact.js";
+import { companiesNamedIn, knownCompaniesOf } from "./named-companies.js";
 import {
   ownOnboardingFacts,
   type QOwnOnboardingPort,
@@ -1468,6 +1469,50 @@ export function createModelGatewayQAnswer(
         onScreenCompany = onScreenCompanyFact(outcome.result.data);
       }
     })();
+    /**
+     * Their own companies this turn names, as typed or as speech misheard
+     * them, or as Q's last reply listed them (founder live 2026-10-01:
+     * "compare Yamfield Agro, Tallyloom and Kazikit against my mandate"
+     * got "I don't have enough company evidence"). Resolved against their
+     * own records only, then read through get_company under the plan.
+     */
+    const namedCompanies: AuthorisedFact[] = [];
+    const namedCompanyCalls: QToolCallObservation[] = [];
+    const namedRead = (async (): Promise<void> => {
+      if (standingRead === null || !prefetchTools.has("get_company")) return;
+      const standing = await standingRead.catch(() => null);
+      if (standing === null || !standing.result.ok) return;
+      const lastQ = [...earlier].reverse().find((m) => m.role === "Q");
+      const onScreen =
+        counterparty?.kind === "COMPANY" ? counterparty.companyId : null;
+      const named = companiesNamedIn(
+        `${latest.content}\n${lastQ?.content.slice(0, 4_000) ?? ""}`,
+        knownCompaniesOf(standing.result.data),
+      ).filter((company) => company.companyId !== onScreen);
+      await Promise.all(
+        named.map(async (company, index) => {
+          const call = {
+            callId: `q-named-company-${String(index)}`,
+            name: "get_company",
+            arguments: { companyId: company.companyId },
+          };
+          const outcome = await tools.execute(call, toolContext);
+          namedCompanyCalls.push({
+            toolName: outcome.toolName,
+            providerName: call.name,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+          if (!outcome.result.ok) return;
+          const fact = onScreenCompanyFact(
+            outcome.result.data,
+            "A company of theirs this conversation names",
+          );
+          if (fact !== null) namedCompanies.push(fact);
+        }),
+      );
+    })();
     const relationshipRead = (async (): Promise<void> => {
       if (counterparty !== undefined && prefetchTools.has("get_relationship")) {
         const call = {
@@ -1585,6 +1630,7 @@ export function createModelGatewayQAnswer(
       pitchRead,
       onboardingRead,
       companyRead,
+      namedRead,
     ]);
     return {
       history,
@@ -1604,6 +1650,8 @@ export function createModelGatewayQAnswer(
       relationshipCall,
       onScreenCompany,
       onScreenCompanyCall,
+      namedCompanies,
+      namedCompanyCalls,
       asked,
       counterparty,
       ownStanding,
@@ -1687,6 +1735,8 @@ export function createModelGatewayQAnswer(
         relationshipCall,
         onScreenCompany,
         onScreenCompanyCall,
+        namedCompanies,
+        namedCompanyCalls,
         ownStanding,
         ownStandingCall,
         pitchMoment,
@@ -1750,6 +1800,7 @@ export function createModelGatewayQAnswer(
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
         ...(onScreenCompany === null ? [] : [onScreenCompany]),
+        ...namedCompanies,
         ...(relationship === null ? [] : [relationship]),
         ...(ownStanding === null ? [] : [ownStanding]),
         ...(pitchMoment === null ? [] : [pitchMoment]),
@@ -2209,6 +2260,7 @@ export function createModelGatewayQAnswer(
       if (onScreenCompanyCall !== null) {
         toolCalls.push(onScreenCompanyCall);
       }
+      toolCalls.push(...namedCompanyCalls);
       if (ownStandingCall !== null) {
         toolCalls.push(ownStandingCall);
       }
@@ -2533,7 +2585,13 @@ export function createModelGatewayQAnswer(
           // by three seconds on the web for nothing.
           (research?.mode === "EXPLICIT" ||
             (research?.mode === "ONLY_IF_EMPTY" &&
-              platformLookupFoundNothing) ||
+              platformLookupFoundNothing &&
+              // An empty search is not an empty answer when the companies
+              // the turn is about are already among the facts (live
+              // 2026-10-01: 11-21 s on the public web for companies
+              // Capital Q holds).
+              onScreenCompany === null &&
+              namedCompanies.length === 0) ||
             // The model asked the platform who might invest; it holds too
             // few. Investors exist in the world, so the world is asked too.
             (prospectsThin &&

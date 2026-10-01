@@ -875,3 +875,93 @@ describe("answer seam: a round whose every call was refused gets one more", () =
     expect(modelCalls(tools.executed)).toHaveLength(2);
   });
 });
+
+describe("an empty search is not an empty answer when the company is already known (live 2026-10-01)", () => {
+  const SEARCH: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "company.search",
+    definition: {
+      name: "search_companies",
+      description: "Searches companies.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+  };
+  const searchCall: FakeBehaviour = {
+    kind: "TOOL_CALLS",
+    calls: [
+      {
+        callId: "s1",
+        name: "search_companies",
+        arguments: { query: "Kazakhit" },
+      },
+    ],
+  };
+  const outcome = (
+    proposal: QToolProposal,
+    toolName: string,
+    data: unknown,
+    ok = true,
+  ): QToolCallOutcome =>
+    ({
+      callId: proposal.callId,
+      toolName,
+      toolVersion: 1,
+      classification: "READ_ONLY",
+      status: ok ? "SUCCEEDED" : "DENIED",
+      failureCode: ok ? null : "NOT_AVAILABLE",
+      sensitivity: ok ? "PUBLIC" : null,
+      result: ok
+        ? { ok: true, data }
+        : { ok: false, error: { code: "NOT_AVAILABLE", message: "No." } },
+      latencyMs: 2,
+    }) as QToolCallOutcome;
+
+  const run = (companyReadable: boolean) => {
+    const tools = toolPort([GET_COMPANY, SEARCH, RESEARCH], (p) =>
+      p.name === "get_company"
+        ? outcome(
+            p,
+            "company.get",
+            { canonicalName: "Tarmacly", relationToYou: "SHARED" },
+            companyReadable,
+          )
+        : p.name === "search_companies"
+          ? outcome(p, "company.search", { items: [], nextCursor: null })
+          : researchOutcome(p, "x"),
+    );
+    const built = build({
+      script: [searchCall, { kind: "JSON", value: analystResult("compared") }],
+      tools: tools.port,
+      userText: "How does this company compare with Kazakhit?",
+    });
+    return { tools, built };
+  };
+
+  it("does not go to the public web when the company on screen was read", async () => {
+    const { tools, built } = run(true);
+    await built.seam.answer({
+      ...built.request,
+      research: Promise.resolve({
+        mode: "ONLY_IF_EMPTY",
+        announceSourceChange: false,
+      }),
+    });
+    expect(tools.executed.map((e) => e.proposal.name)).not.toContain(
+      "research_public_web",
+    );
+  });
+
+  it("still does when nothing about the company could be read", async () => {
+    const { tools, built } = run(false);
+    await built.seam.answer({
+      ...built.request,
+      research: Promise.resolve({
+        mode: "ONLY_IF_EMPTY",
+        announceSourceChange: false,
+      }),
+    });
+    expect(tools.executed.map((e) => e.proposal.name)).toContain(
+      "research_public_web",
+    );
+  });
+});
