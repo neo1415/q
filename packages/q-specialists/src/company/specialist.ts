@@ -59,7 +59,7 @@ import type {
   QSpecialistExecutionContext,
   QSpecialistProbe,
 } from "../contracts.js";
-import { isAboutSubjectCompany } from "./about-company.js";
+import { readsAsAboutSubjectCompany } from "./about-company.js";
 import { assembleCompanyContext, type LabelledFact } from "./assembly.js";
 import type {
   CompanyFinding,
@@ -414,7 +414,11 @@ export function createCompanyIntelligenceSpecialist(
       // "that falls outside the scope of the company data I have". The
       // conversational path has the tools, the research and ordinary
       // knowledge, and reaches these same records when it needs them.
-      return isAboutSubjectCompany(probe.question);
+      // A composition without a turn reader (tests, tools) has no reading
+      // to route on; the subject being a company is then the whole signal.
+      return probe.reading === undefined
+        ? true
+        : readsAsAboutSubjectCompany(probe.reading);
     },
 
     investigate: async (

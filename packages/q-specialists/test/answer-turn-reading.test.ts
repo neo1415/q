@@ -119,11 +119,15 @@ function seam(options: {
   const events: { type: string; data: unknown }[] = [];
   let delegated = 0;
   let investigated = 0;
+  const probes: unknown[] = [];
   const answer = createSpecialistQAnswer({
     specialist: {
       id: "company-intelligence",
       version: "v1",
-      supports: () => options.specialistSupports === true,
+      supports: (probe) => {
+        probes.push(probe);
+        return options.specialistSupports === true;
+      },
       investigate: () => {
         investigated += 1;
         return Promise.reject(new Error("not used"));
@@ -188,6 +192,7 @@ function seam(options: {
     stored,
     events,
     delegated: () => delegated,
+    probes,
     investigated: () => investigated,
     unread,
     capabilities,
@@ -794,7 +799,7 @@ describe("a question about their own record takes the fast path (lead 2026-10-01
   });
 
   it("leaves an assessment of their company to the analysis", async () => {
-    const { answer, investigated } = seam({
+    const { answer, investigated, probes } = seam({
       said: "How strong is my company's traction?",
       reading: advice,
       outcomes: [],
@@ -802,5 +807,13 @@ describe("a question about their own record takes the fast path (lead 2026-10-01
     });
     await answer.answer(withCompany()).catch(() => undefined);
     expect(investigated()).toBe(1);
+    // The analysis decides from the reading, never from the words.
+    expect(probes[0]).toMatchObject({
+      reading: {
+        kind: advice.kind,
+        questionKind: advice.question?.kind ?? null,
+        aboutNamedOther: advice.aboutNamedOther,
+      },
+    });
   });
 });

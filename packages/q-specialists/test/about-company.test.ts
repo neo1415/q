@@ -1,86 +1,71 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  isAboutSubjectCompany,
-  readAboutCompany,
-} from "../src/company/about-company.js";
+import { readsAsAboutSubjectCompany } from "../src/company/about-company.js";
+import { createCompanyIntelligenceSpecialist } from "../src/company/specialist.js";
 
 /**
- * Which questions the company specialist may take.
- *
- * The cases in the first two blocks are verbatim from a live session in
- * which every one of them was sent to the specialist and answered "that
- * falls outside the scope of the company data I have".
+ * Which questions the company specialist may take: decided from Q's turn
+ * reader (a model reading, ADR 0011/0016), never from patterns over the
+ * person's words.
  */
+const reading = (
+  kind: string,
+  questionKind: string | null = null,
+  aboutNamedOther = false,
+) => ({ kind, questionKind, aboutNamedOther });
+
 describe("whether a question is about the company in the conversation", () => {
-  it("sends small talk and general questions elsewhere", () => {
-    for (const said of [
-      "whats up?",
-      "how are you?",
-      "cn you hear me?",
-      "who is the president of Nigeria?",
-      "what is a SAFE note?",
-      "thanks",
+  it("takes a request for Q's judgement about the subject", () => {
+    expect(readsAsAboutSubjectCompany(reading("QUESTION_TO_Q", "ADVICE"))).toBe(
+      true,
+    );
+    expect(readsAsAboutSubjectCompany(reading("CORRECTION"))).toBe(true);
+  });
+
+  it("sends small talk, requests, other subjects and the outside world elsewhere", () => {
+    for (const read of [
+      reading("SMALL_TALK"),
+      reading("OFF_TOPIC"),
+      reading("TOOL_REQUEST"),
+      reading("RESEARCH_REQUEST", "PUBLIC_FACTS"),
+      reading("QUESTION_TO_Q", "PUBLIC_FACTS"),
+      reading("QUESTION_TO_Q", "REAL_WORLD_EXAMPLE"),
+      reading("QUESTION_TO_Q", "ABOUT_CAPITAL_Q"),
+      reading("QUESTION_TO_Q", "ADVICE", true),
+      reading("CORRECTION", null, true),
     ]) {
-      const read = readAboutCompany(said);
-      expect(read.about, said).toBe(false);
+      expect(readsAsAboutSubjectCompany(read), JSON.stringify(read)).toBe(
+        false,
+      );
     }
   });
 
-  it("sends a question about somebody else elsewhere", () => {
-    expect(readAboutCompany("who is the current CEO of paystack")).toEqual({
-      about: false,
-      reason: "OTHER_ENTITY",
-    });
-    expect(isAboutSubjectCompany("tell me about Flutterwave")).toBe(false);
-    expect(isAboutSubjectCompany("Compare Paystack and Flutterwave")).toBe(
-      false,
-    );
+  it("sends a turn the reader could not read to the conversational path", () => {
+    expect(readsAsAboutSubjectCompany(null)).toBe(false);
   });
 
-  it("sends the outside world elsewhere, even with a first-person phrasing", () => {
-    expect(readAboutCompany("you can just search online, bro")).toEqual({
-      about: false,
-      reason: "OUTSIDE_WORLD",
-    });
-    expect(isAboutSubjectCompany("search online for our competitors")).toBe(
-      false,
-    );
-    expect(isAboutSubjectCompany("what is the latest news in fintech")).toBe(
-      false,
-    );
-  });
-
-  it("keeps the person's own company for the specialist", () => {
-    for (const said of [
-      "what is our runway",
-      "how much are we raising",
-      "tell me about my deck",
-      "are we ready to raise",
-      "how do we look to an investor",
-      "what does the company do",
-      "what's our business model",
-      // The person measuring themselves against somebody else: "me" on
-      // their own company's page is the company (live, 2026-09-17).
-      "hey, what sthe difference between me and paystack and what can i do to be as big as them",
-      "how do I compare to Flutterwave?",
-      "what can we do to grow faster than Moniepoint",
-      // An analysis asked for outright is the specialist's whole purpose,
-      // whatever the person calls their company.
-      "Analyse Northstar.",
-      "assess the company",
-      "run diligence on this",
-    ]) {
-      expect(isAboutSubjectCompany(said), said).toBe(true);
-    }
-  });
-
-  it("says why, so a wrong reading can be seen rather than guessed at", () => {
-    expect(readAboutCompany("what is our runway").reason).toBe("FIRST_PERSON");
-    expect(readAboutCompany("describe the business model").reason).toBe(
-      "DIMENSION",
-    );
-    expect(readAboutCompany("Analyse Northstar.").reason).toBe("ANALYSIS");
-    expect(readAboutCompany("").reason).toBe("NOTHING_IN_PARTICULAR");
+  it("routes on the reading, not on the words", () => {
+    const specialist = createCompanyIntelligenceSpecialist({} as never);
+    const subjects = [
+      { kind: "COMPANY", companyId: "11111111-1111-4111-8111-111111111111" },
+    ] as never;
+    // Words no pattern would have recognised, read as advice: taken.
+    expect(
+      specialist.supports({
+        capability: "ANSWER",
+        subjects,
+        question: "be honest, would you put money in?",
+        reading: reading("QUESTION_TO_Q", "ADVICE"),
+      }),
+    ).toBe(true);
+    // First-person words read as small talk: not taken.
+    expect(
+      specialist.supports({
+        capability: "ANSWER",
+        subjects,
+        question: "how are we doing today, Q?",
+        reading: reading("SMALL_TALK"),
+      }),
+    ).toBe(false);
   });
 });

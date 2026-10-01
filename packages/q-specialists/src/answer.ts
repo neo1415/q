@@ -50,7 +50,11 @@ import {
   type QRuntimeRepositories,
 } from "@capital-q/q-runtime";
 
-import type { QSpecialist, QSpecialistProbe } from "./contracts.js";
+import type {
+  QSpecialist,
+  QSpecialistProbe,
+  QSpecialistTurnReading,
+} from "./contracts.js";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
   NO_OWN_RECORDS,
@@ -1417,7 +1421,17 @@ export function createSpecialistQAnswer(
         ...(writingDocument ? { writingDocument: true } : {}),
         ...(series.step === null ? {} : { questionSequence: series.step }),
       },
-      { ownRecords },
+      {
+        ownRecords,
+        reading:
+          read === null
+            ? null
+            : {
+                kind: read.kind,
+                questionKind: read.question?.kind ?? null,
+                aboutNamedOther: read.aboutNamedOther,
+              },
+      },
     );
     if (writingDocument && outcome.kind === "ANSWERED") {
       await fileWrittenAnswer(
@@ -1451,7 +1465,11 @@ export function createSpecialistQAnswer(
 
   const answerOnce = async (
     request: QAnswerRequest,
-    route: { readonly ownRecords?: boolean } = {},
+    route: {
+      readonly ownRecords?: boolean;
+      /** The turn reader's reading; absent when no reader is composed. */
+      readonly reading?: QSpecialistTurnReading | null;
+    } = {},
   ): Promise<QAnswerOutcome> => {
     // The conversation, not the run: a voice turn is its own run, and a
     // specialist that sees one sentence cannot follow what is being
@@ -1475,6 +1493,7 @@ export function createSpecialistQAnswer(
       // (CQ-QX-007). The specialist reads their mandate from the plan.
       subjects: askedSubjects(request.subjects, request.plan),
       question: latest.content,
+      ...(route.reading === undefined ? {} : { reading: route.reading }),
     };
     // R18: a question asked while watching a pitch is about the moment in
     // the video, which the conversational path reads (get_pitch_moment);

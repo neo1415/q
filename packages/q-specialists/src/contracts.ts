@@ -44,6 +44,20 @@ export type QSpecialistProbe = {
    * instruction about what it is permitted to do.
    */
   readonly question: string;
+  /**
+   * How Q's turn reader read the message (a model reading, ADR 0011/0016),
+   * when a reader is composed: `null` when it could not read this turn.
+   * A specialist decides whether a question is its kind from this, never
+   * from patterns over the person's words.
+   */
+  readonly reading?: QSpecialistTurnReading | null | undefined;
+};
+
+/** The parts of the turn reader's reading a specialist routes on. */
+export type QSpecialistTurnReading = {
+  readonly kind: string;
+  readonly questionKind: string | null;
+  readonly aboutNamedOther: boolean;
 };
 
 /**

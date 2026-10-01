@@ -1,146 +1,34 @@
-import { focusFromQuestion } from "./dimensions.js";
+import type { QSpecialistTurnReading } from "../contracts.js";
 
 /**
  * Whether a question is about the company in the conversation at all.
  *
  * The company specialist used to take EVERY question asked while a company
- * was the subject, because that is who the person is and what they are
- * here for. Live, that meant "what's up", "who is the CEO of Paystack" and
+ * was the subject. Live, "what's up", "who is the CEO of Paystack" and
  * "just search online" all went to a path that answers only from the
  * company's own records, and the person was told each fell outside the
- * scope of The Vaultlyne's data. None of the general-knowledge, lookup or
- * research behaviour applied, because none of it lives on that path.
+ * scope of the company's data. So the specialist is only for questions
+ * that are about the subject company; everything else goes to the
+ * conversational path, which has the tools, the research and ordinary
+ * knowledge, and reads the company's records through those same tools.
  *
- * So the specialist is only for questions that are actually about the
- * subject company. Everything else goes to the conversational path, which
- * has the tools, the research, ordinary knowledge and streaming, and
- * which can still read the company's records through those same tools
- * when a question turns out to need them.
+ * Decided from Q's turn reader (a model reading of the words in context,
+ * ADR 0011/0016), not from word patterns: a regex over phrasings answered
+ * only the phrasings someone had thought of ("our runway", "how do we
+ * look") and misread every other way of asking.
  *
- * Deterministic, and deliberately tilted: a question that is plainly
- * about the company goes to the deeper analysis; a question that is
- * plainly about something else, or about nothing in particular, does not.
- * The words are data; this reads them and never obeys them.
+ *   - a question asking for Q's judgement (ADVICE) that names nobody
+ *     other than the speaker and the conversation's subject: the analysis.
+ *   - a correction of what Q said about the company: the analysis, which
+ *     reads the corrected fact against the record.
+ *   - anything else -- small talk, a request for Q to do something, a
+ *     question about somebody else, public facts, how Capital Q works, or
+ *     a turn the reader could not read: the conversational path.
  */
-
-/**
- * The person talking about their own company: "our runway", "my deck",
- * "are we ready", "how do we look". The specialist is the right place for
- * these even when no dimension word appears.
- */
-const FIRST_PERSON_COMPANY = new RegExp(
-  String.raw`\b(?:my|our)\s+(?:company|business|startup|firm|venture|deck|pitch|raise|round|runway|team|numbers|metrics|revenue|traction|customers|investors?|valuation|cap ?table|financials?|model|market|product|profile)\b|\b(?:are|do|should|how do|how are|what do)\s+(?:we|us)\b|\bhow\s+(?:we|us)\s+(?:look|stand|compare|do)\b`,
-  "i",
-);
-
-/**
- * The person measuring themselves against somebody: "the difference
- * between me and Paystack", "how do I compare to Flutterwave", "what can I
- * do to be as big as them". A founder on their own company's page who
- * says "me" means the company; live, that question went to the
- * conversational path, which knew of no company and said so.
- */
-const FIRST_PERSON_COMPARISON = new RegExp(
-  String.raw`\b(?:between|compare|comparing|comparison|versus|vs\.?|against|like|unlike|similar to|different from|bigger than|as big as)\s+(?:me|us|myself|ourselves)\b|\b(?:me|us|i|we)\s+(?:and|vs\.?|versus|against|compared)\b[^.?!]*\b[a-z]|\b(?:what|how)\s+(?:can|could|should|do|would|will)\s+(?:i|we)\s+(?:do|need|get|grow|scale|raise|become|reach|compete|improve|stand)\b|\b(?:how|where)\s+do\s+i\s+(?:compare|stand|look|rank)\b`,
-  "i",
-);
-
-/**
- * An analysis asked for outright. "Analyse Northstar", "assess the
- * company", "run diligence". This is the specialist's whole purpose, and
- * a person on their own company's page asking for an analysis means their
- * company, whatever they call it. It is checked before the capitalised
- * name below, which would otherwise read the company's own name as a
- * stranger's.
- */
-const ANALYSIS_REQUEST = new RegExp(
-  String.raw`^\s*(?:please\s+)?(?:analy[sz]e|assess|review|evaluate|investigate|audit|look\s+(?:at|into)|run\s+(?:a\s+)?(?:diligence|review|assessment)|give\s+me\s+(?:an?\s+)?(?:analysis|assessment|review))\b`,
-  "i",
-);
-
-/**
- * Somebody else, by role or by preposition: "the CEO of paystack", "tell
- * me about flutterwave". Speech recognisers lower-case names as often as
- * not, so this does not rely on a capital letter.
- */
-const ABOUT_SOMEONE_ELSE = new RegExp(
-  String.raw`\b(?:ceo|cto|cfo|coo|founders?|co-?founders?|owners?|head|boss|chairman|chair|president|team|valuation|revenue|funding|investors?)\s+(?:of|at|behind)\s+(?!(?:our|my|us|the company|this company)\b)\S+|\b(?:about|on|regarding)\s+(?!(?:us|our|my|the company|this company|it|them|that|this)\b)[a-z][\w.-]+`,
-  "i",
-);
-
-/**
- * Somebody else, named with a capital letter. A capitalised word that is
- * not the start of the sentence and not a common opener is most likely a
- * proper noun, and a question naming another company or person is not a
- * question about this one.
- */
-const OTHER_NAMED_ENTITY = new RegExp(
-  String.raw`(?:^|[\s,;:(])(?!(?:I|I'm|I'd|I'll|I've|Q|OK|Okay|Yes|No|The|A|An|And|But|So|Can|Could|Would|Should|What|Who|Where|When|Why|How|Is|Are|Do|Does|Did|Tell|Give|Show|Please|Let|Search|Look|Find|Check|Compare|Explain)\b)[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*`,
-);
-
-/**
- * Words that say the person wants the outside world, not the records.
- * "current", "latest" and "recent" are not here: "our current runway" is
- * about us, and "the current CEO of Paystack" is somebody else's business
- * for a different reason. The conversational path reads research cues of
- * its own, so nothing is lost by keeping this list to the unambiguous.
- */
-const OUTSIDE_WORLD = new RegExp(
-  String.raw`\b(?:online|internet|the web|google|search|news|public(?:ly)?|competitors?|market rate)\b`,
-  "i",
-);
-
-/** The one outside-world phrasing that is still about us. */
-const OWN_PUBLIC_PROFILE = new RegExp(
-  String.raw`\b(?:our|my)\s+(?:public|online)\s+profile\b`,
-  "i",
-);
-
-export type AboutCompanyReading =
-  | {
-      readonly about: true;
-      readonly reason: "FIRST_PERSON" | "ANALYSIS" | "DIMENSION";
-    }
-  | {
-      readonly about: false;
-      readonly reason:
-        "OTHER_ENTITY" | "OUTSIDE_WORLD" | "NOTHING_IN_PARTICULAR";
-    };
-
-export function readAboutCompany(question: string): AboutCompanyReading {
-  const text = question.trim();
-  if (text.length === 0) {
-    return { about: false, reason: "NOTHING_IN_PARTICULAR" };
-  }
-  // The outside world wins even over a first-person phrasing: "search
-  // online for our competitors" is a research question, and the research
-  // tools live on the other path.
-  if (OUTSIDE_WORLD.test(text) && !OWN_PUBLIC_PROFILE.test(text)) {
-    return { about: false, reason: "OUTSIDE_WORLD" };
-  }
-  if (FIRST_PERSON_COMPANY.test(text) || FIRST_PERSON_COMPARISON.test(text)) {
-    return { about: true, reason: "FIRST_PERSON" };
-  }
-  // Somebody else, by role or preposition, before anything else can claim
-  // the question: "the CEO of Paystack" is not an analysis of us.
-  if (ABOUT_SOMEONE_ELSE.test(text)) {
-    return { about: false, reason: "OTHER_ENTITY" };
-  }
-  if (ANALYSIS_REQUEST.test(text)) {
-    return { about: true, reason: "ANALYSIS" };
-  }
-  // Somebody else named with a capital letter, and not us.
-  const afterFirstWord = text.replace(/^\s*\S+/, "");
-  if (OTHER_NAMED_ENTITY.test(afterFirstWord)) {
-    return { about: false, reason: "OTHER_ENTITY" };
-  }
-  if (focusFromQuestion(text).length > 0) {
-    return { about: true, reason: "DIMENSION" };
-  }
-  return { about: false, reason: "NOTHING_IN_PARTICULAR" };
-}
-
-/** Whether the company specialist should take this question. */
-export function isAboutSubjectCompany(question: string): boolean {
-  return readAboutCompany(question).about;
+export function readsAsAboutSubjectCompany(
+  reading: QSpecialistTurnReading | null,
+): boolean {
+  if (reading === null || reading.aboutNamedOther) return false;
+  if (reading.kind === "CORRECTION") return true;
+  return reading.kind === "QUESTION_TO_Q" && reading.questionKind === "ADVICE";
 }
