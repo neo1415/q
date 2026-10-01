@@ -30,7 +30,7 @@ export const TURN_READER_V17: PromptDefinition<
 > = {
   ...TURN_READER_V16,
   version: 17,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder direction 2026-09-30: every screen of the app is a destination (Investors, Search, Gateway, Memory, new pitch video).",
   effectiveFrom: "2026-09-30",

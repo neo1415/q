@@ -75,8 +75,11 @@ export const TaskFrameSchema = {
   // 2,600 since 2026-09-17: the research guidance and the profile-change
   // instruction (ADR 0011) together did not fit 2,000 on a company
   // conversation. 4,000 since 2026-09-29 (founder: the fixed budget was
-  // crowding out what Q can do). The rendered charter stays bounded.
-  environmentNotes: z.string().max(4_000),
+  // crowding out what Q can do). 7,000 since 2026-10-01: with research
+  // offered (most Home Q runs) what Q can do still never fitted, and how a
+  // reply ends (next step + offer) joined it. The rendered charter stays
+  // bounded.
+  environmentNotes: z.string().max(7_000),
 };
 
 /** A finding as a model may state it: vocabulary only, no ids, no references. */

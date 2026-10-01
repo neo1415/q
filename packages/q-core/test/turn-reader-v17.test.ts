@@ -16,7 +16,7 @@ import {
 describe("TURN_READER v17", () => {
   it("is the active reader", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(17);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(18);
   });
 
   it("names every contract destination exactly once", () => {

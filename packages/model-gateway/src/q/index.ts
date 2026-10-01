@@ -507,7 +507,10 @@ const RESEARCH_NOTE_BRIEF =
  * company conversation, and the alternative was to drop one of them
  * whenever research is offered, which is most of the time.
  */
-export const ENVIRONMENT_NOTES_MAX_CHARS = 4_000;
+// 7,000 since 2026-10-01 (harden spec §4): measured, a Home Q run with
+// research offered rendered ~2,800 characters before what Q can do
+// (~2,000), so at 4,000 CAPABILITIES_NOTE was dropped on nearly every run.
+export const ENVIRONMENT_NOTES_MAX_CHARS = 7_000;
 
 /**
  * What Q can do, so it says so rather than claiming it cannot (founder
@@ -595,6 +598,19 @@ export function clearsOnPurpose(update: {
  * Capital Q could not read this turn (the reader's model was unavailable
  * twice). Trusted text: what the run can and cannot do, never a script.
  */
+/**
+ * How every Home Q, dock and chat reply ends (founder direction 2026-10-01:
+ * "summaries and next steps, offering to do the next steps, and actually
+ * doing them"; harden spec §4). Trusted product guidance, near the head of
+ * the notes so the bound never cuts it. The offer is ordinary words; what
+ * an acceptance does is decided the usual way -- the model calls the tool
+ * that prepares it, and anything consequential still waits for the
+ * person's one-tap approval (Prepare -> Approve -> Execute). Offering never
+ * gives the model authority it did not have.
+ */
+export const NEXT_STEP_NOTE =
+  'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn) and then the single most useful next step for them, offered as something you will do ("Want me to draft the intro to Ada?"). Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it.';
+
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
 
@@ -717,6 +733,13 @@ export function environmentNotesFor(
         : [
             `WHO YOU ARE WITH THIS PERSON: ${options.personality} Speak as that, as a person would: vary how you begin, laugh when something is funny, take a joke, and never begin two replies the same way.`,
           ]),
+      // Not while a requested series of questions is still being asked:
+      // that reply ends with the next question (R35).
+      ...(options.turnUnread === true ||
+      options.questionSequence?.kind === "ASK" ||
+      options.questionSequence?.kind === "REASK"
+        ? []
+        : [NEXT_STEP_NOTE]),
       ...(options.openDocumentTitle === undefined
         ? []
         : [
