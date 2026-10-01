@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveLocalWhen } from "../src/tools/local-time.js";
+import { LocalWhenSchema, resolveLocalWhen } from "../src/tools/local-time.js";
 
 /**
  * "2 PM tomorrow" resolved by code in the person's zone (live test
@@ -139,5 +139,33 @@ describe("resolveLocalWhen", () => {
     expect(resolveLocalWhen({ time: "14:00" }, "Europe/London", now).kind).toBe(
       "NO_DAY",
     );
+  });
+});
+
+describe('a span from now (live 2026-10-01: "remind me in 2 minutes")', () => {
+  const now = new Date("2026-10-01T11:45:00Z");
+  it("resolves to now plus the span, with or without a known zone", () => {
+    expect(
+      resolveLocalWhen({ inMinutes: 2 }, "Africa/Lagos", now),
+    ).toMatchObject({
+      kind: "OK",
+      instant: new Date("2026-10-01T11:47:00Z"),
+      timeZone: "Africa/Lagos",
+    });
+    expect(resolveLocalWhen({ inMinutes: 60 }, undefined, now)).toMatchObject({
+      kind: "OK",
+      instant: new Date("2026-10-01T12:45:00Z"),
+    });
+  });
+
+  it("is a span or a clock time, never both and never neither", () => {
+    expect(LocalWhenSchema.safeParse({ inMinutes: 2 }).success).toBe(true);
+    expect(
+      LocalWhenSchema.safeParse({ inMinutes: 2, time: "11:47" }).success,
+    ).toBe(false);
+    expect(LocalWhenSchema.safeParse({ day: "today" }).success).toBe(false);
+    expect(
+      LocalWhenSchema.safeParse({ day: "today", time: "11:47" }).success,
+    ).toBe(true);
   });
 });

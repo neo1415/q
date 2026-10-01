@@ -55,11 +55,30 @@ export const LocalWhenSchema = z
     time: z
       .string()
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM, 24-hour")
+      .optional()
       .describe(
-        "Their wall-clock time, HH:MM 24-hour (2 PM is 14:00). Never converted to UTC: Capital Q does that in their time zone.",
+        "Their wall-clock time, HH:MM 24-hour (2 PM is 14:00). Never converted to UTC: Capital Q does that in their time zone. Omit only with inMinutes.",
+      ),
+    inMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(60 * 24 * 366)
+      .optional()
+      .describe(
+        "When they gave a span from now instead of a clock time (in 2 minutes, in an hour, in three days): that span in minutes, and nothing else.",
       ),
   })
-  .strict();
+  .strict()
+  .refine(
+    (when) =>
+      when.inMinutes === undefined
+        ? when.time !== undefined
+        : when.time === undefined &&
+          when.day === undefined &&
+          when.date === undefined,
+    { message: "give a clock time (with day or date), or inMinutes alone" },
+  );
 export type LocalWhen = z.infer<typeof LocalWhenSchema>;
 
 export type LocalWhenResolution =
@@ -196,6 +215,17 @@ export function resolveLocalWhen(
   timeZone: string | undefined,
   now: Date,
 ): LocalWhenResolution {
+  // A span from now ("in 2 minutes") needs no zone and no calendar: live
+  // 2026-10-01, "remind me in 2 minutes" could not be expressed at all, and
+  // Q asked the person for a clock time.
+  if (when.inMinutes !== undefined) {
+    return {
+      kind: "OK",
+      instant: new Date(now.getTime() + when.inMinutes * 60_000),
+      timeZone:
+        timeZone !== undefined && isKnownTimeZone(timeZone) ? timeZone : "UTC",
+    };
+  }
   if (timeZone === undefined || !isKnownTimeZone(timeZone)) {
     return { kind: "NO_TIME_ZONE" };
   }
@@ -229,6 +259,7 @@ export function resolveLocalWhen(
   } else {
     return { kind: "NO_DAY" };
   }
+  if (when.time === undefined) return { kind: "NO_DAY" };
   const [hour, minute] = when.time.split(":").map(Number);
   const instants = instantsFor(
     { ...date, hour: hour ?? 0, minute: minute ?? 0 },
