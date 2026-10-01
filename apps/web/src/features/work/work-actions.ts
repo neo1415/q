@@ -30,7 +30,7 @@ import {
 import { apiSession, qApiSession } from "@/features/q/context";
 
 /**
- * Q's delegated work, notices and pushes, server side (AUTO, ADR 0029).
+ * Q's delegated work, notices and pushes, server side (AUTO, ADR 0030).
  * Server actions so the session token never reaches the browser. Ids are
  * input, exactly as they are to the APIs, which answer only for the
  * person's own work, notices and devices.

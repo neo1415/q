@@ -93,7 +93,7 @@ export type NotificationKind =
   | "MEETING_RECORDING_DECLINED"
   | "COMMITMENT_DETECTED"
   | "ACCOUNT_PAUSED"
-  // AUTO block (ADR 0029)
+  // AUTO block (ADR 0030)
   | "Q_WORK"
   | "Q_STAND_IN";
 

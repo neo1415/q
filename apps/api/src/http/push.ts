@@ -21,7 +21,7 @@ import {
 } from "../security/actor-context.js";
 
 /**
- * Web Push and notification settings (AUTO, ADR 0029). A person subscribes
+ * Web Push and notification settings (AUTO, ADR 0030). A person subscribes
  * and unsubscribes their own device and sets their own channels; the
  * endpoint they send is never returned. The public VAPID key is not a
  * secret but is still served to signed-in people only.

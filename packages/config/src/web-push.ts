@@ -4,7 +4,7 @@ import { parseConfig, type EnvironmentInput } from "./common.js";
 import { ProviderCredential } from "./model-providers.js";
 
 /**
- * Web Push (AUTO, ADR 0029): VAPID keys (RFC 8292) for pushes to a
+ * Web Push (AUTO, ADR 0030): VAPID keys (RFC 8292) for pushes to a
  * person's installed PWA or browser. Free: no provider account, the
  * browsers' own push services carry the message.
  *

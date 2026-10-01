@@ -4,7 +4,7 @@ import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 
 /**
- * Q's delegated work (AUTO, ADR 0029): an investor's outreach and a
+ * Q's delegated work (AUTO, ADR 0030): an investor's outreach and a
  * founder's stand-in, as the person follows them. Starting either is an
  * approved action (`q.work.outreach.start`, `q.work.standin.start`), never
  * this API. Ids in paths are input; the server answers only for the
@@ -179,6 +179,8 @@ export const QWorkReportDtoSchema = z
           .object({
             question: z.string().max(400),
             answer: z.string().max(1_500),
+            /** Given by the founder's own Q standing in, not by the founder. */
+            byQ: z.boolean().default(false),
           })
           .strict(),
       )

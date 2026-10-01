@@ -59,7 +59,7 @@ export const PROMPT_IDS = [
   "REHEARSAL_SCORE",
   /** Founder direction 2026-09-30: a company's own pages, read during setup. */
   "FOUNDER_RESEARCH_READER",
-  // AUTO block (ADR 0029): Q's delegated work.
+  // AUTO block (ADR 0030): Q's delegated work.
   "WORK_SHORTLIST",
   "WORK_CONVERSE",
   "WORK_INTERVIEW_TURN",
@@ -93,7 +93,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INVESTOR_TWIN_TURN: "investor-twin-turn",
   REHEARSAL_SCORE: "rehearsal-score",
   FOUNDER_RESEARCH_READER: "founder-research-reader",
-  // AUTO block (ADR 0029)
+  // AUTO block (ADR 0030)
   WORK_SHORTLIST: "work-shortlist",
   WORK_CONVERSE: "work-converse",
   WORK_INTERVIEW_TURN: "work-interview-turn",

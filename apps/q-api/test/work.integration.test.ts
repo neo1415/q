@@ -26,7 +26,7 @@ import {
 } from "../src/composition/work/actions.js";
 
 /**
- * AUTO (ADR 0029) against the local database: the work store, the real
+ * AUTO (ADR 0030) against the local database: the work store, the real
  * LangGraph PostgresSaver on q_runtime.checkpoint*, and a fresh runtime
  * standing in for a deploy. Chat, feed, interest and the model are fakes
  * (no provider calls); everything Q records is read back from the rows.

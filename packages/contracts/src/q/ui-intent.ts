@@ -387,7 +387,7 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "set_onboarding_reminders",
   // A new version of their own private document; the earlier one is kept.
   "revise_my_document",
-  // AUTO block (ADR 0029): inside an approved delegation, the person's own
+  // AUTO block (ADR 0030): inside an approved delegation, the person's own
   // word -- stop, a time they chose, away/back -- acts at once.
   "stop_q_work",
   "answer_q_work",

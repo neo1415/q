@@ -17,7 +17,7 @@ import type {
 } from "./types.js";
 
 /**
- * Q's delegated-work engine (ADR 0029). The only surface the composition
+ * Q's delegated-work engine (ADR 0030). The only surface the composition
  * root sees: start an outreach, advance a lane or a stand-in with a fresh
  * observation. Thread ids are derived here from server-generated ids and
  * never accepted from outside; no graph, node or checkpoint type leaves

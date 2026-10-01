@@ -1,4 +1,4 @@
-# ADR 0029 — LangGraph.js runs Q's long-running delegated work
+# ADR 0030 — LangGraph.js runs Q's long-running delegated work
 
 - Status: Accepted (founder direction 2026-09-30 / 2026-10-01; ledger:
   "LangGraph.js for long-running agents, model calls through the Q Model

@@ -27,7 +27,7 @@ import {
 } from "@capital-q/q-core";
 
 /**
- * The words Q writes inside delegated work (AUTO, ADR 0029), each one
+ * The words Q writes inside delegated work (AUTO, ADR 0030), each one
  * small structured call through the Q Model Gateway by task class, with a
  * versioned prompt and a schema-checked result. A failed or refused call is
  * null: the engine waits and tries again; it never invents a reply.

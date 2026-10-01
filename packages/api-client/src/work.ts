@@ -24,7 +24,7 @@ import { readProblemResponse } from "./problem.js";
 import { call, type ApiSession } from "./request.js";
 
 /**
- * AUTO (ADR 0029): Q's delegated work (a Q API session) and Web Push with
+ * AUTO (ADR 0030): Q's delegated work (a Q API session) and Web Push with
  * notification settings (an API session).
  */
 

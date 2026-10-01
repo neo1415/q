@@ -6,7 +6,7 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import { getSessionAccessToken } from "@/auth/session";
 
 /**
- * A first-stage interview report as PDF (AUTO, ADR 0029). The Q API holds
+ * A first-stage interview report as PDF (AUTO, ADR 0030). The Q API holds
  * the bearer token behind an HttpOnly cookie, so the browser cannot call it
  * directly; this route attaches the token for exactly one read. Not a proxy:
  * GET only, two ids checked as UUIDs, one path. The Q API answers only for

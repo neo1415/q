@@ -9,7 +9,7 @@ import { WorkPanel } from "@/features/work/work-panel";
 export const metadata: Metadata = { title: "Q's work" };
 
 /**
- * Q's work (AUTO, ADR 0029): every outreach and stand-in the person
+ * Q's work (AUTO, ADR 0030): every outreach and stand-in the person
  * approved, with what Q did and the controls that act now. The panel loads
  * after the page opens, so the page itself never waits on Q.
  */

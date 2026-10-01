@@ -1,4 +1,4 @@
--- AUTO (founder direction 2026-10-01, ADR 0029): "let Q handle it".
+-- AUTO (founder direction 2026-10-01, ADR 0030): "let Q handle it".
 --
 -- A delegation is the scoped, revocable authority a person approved once:
 -- an investor's outreach (source -> shortlist -> interest -> chat ->
@@ -38,7 +38,7 @@ create table q_runtime.delegations (
 );
 
 comment on table q_runtime.delegations is
-  'A scoped delegation (ADR 0029): the exact plan and limits a person approved for Q to carry out over days. Not a CRM record; relationships stay the only truth.';
+  'A scoped delegation (ADR 0030): the exact plan and limits a person approved for Q to carry out over days. Not a CRM record; relationships stay the only truth.';
 
 create index delegations_active_idx on q_runtime.delegations (status, updated_at) where status = 'ACTIVE';
 create index delegations_user_idx on q_runtime.delegations (user_id, created_at desc);
@@ -80,7 +80,7 @@ create table q_runtime.delegation_lanes (
 );
 
 comment on table q_runtime.delegation_lanes is
-  'One counterpart inside a delegation (ADR 0029): where Q stands with them, in plain words, and what the person must decide.';
+  'One counterpart inside a delegation (ADR 0030): where Q stands with them, in plain words, and what the person must decide.';
 
 create unique index delegation_lanes_one_per_company
   on q_runtime.delegation_lanes (delegation_id, company_id) where company_id is not null;
@@ -107,7 +107,7 @@ create table q_runtime.delegation_steps (
 );
 
 comment on table q_runtime.delegation_steps is
-  'What Q did under a delegation, step by step, in plain words (ADR 0029). Append-only; the underlying commands keep their own audit.';
+  'What Q did under a delegation, step by step, in plain words (ADR 0030). Append-only; the underlying commands keep their own audit.';
 
 create index delegation_steps_delegation_idx on q_runtime.delegation_steps (delegation_id, created_at);
 

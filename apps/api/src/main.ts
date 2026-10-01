@@ -1130,7 +1130,7 @@ const { app, logger } = createApp(config, security, {
   chat,
   chatSafety,
   schedule,
-  // AUTO block (ADR 0029): Web Push; the key is public, the private half
+  // AUTO block (ADR 0030): Web Push; the key is public, the private half
   // stays with the workers that send.
   push: {
     subscriptions: createPushSubscriptionStore(database.sql),

@@ -24,7 +24,7 @@ import type { ActorContext } from "@capital-q/security";
 import { TERMINAL_STAGES, type LaneRow, type WorkStore } from "./store.js";
 
 /**
- * Starting Q's delegated work (AUTO, ADR 0029): one approved action whose
+ * Starting Q's delegated work (AUTO, ADR 0030): one approved action whose
  * payload IS the grant. The person sees the exact plan -- the limits, the
  * words Q may say, the questions, the call windows, the expiry -- and
  * nothing happens until they approve exactly that. Its execution files the

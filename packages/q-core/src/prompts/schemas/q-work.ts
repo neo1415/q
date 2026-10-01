@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TaskFrameSchema } from "./common.js";
 
 /**
- * Q's delegated work (AUTO, ADR 0029): the words Q writes inside a
+ * Q's delegated work (AUTO, ADR 0030): the words Q writes inside a
  * delegation the person approved. Models write words; code decides what
  * happens. Every output is schema-checked; nothing here is authority.
  *

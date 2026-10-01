@@ -10,6 +10,7 @@ import {
 import {
   Q2Q_DAILY_CAP,
   type DelegationRef,
+  type InterviewAnswer,
   type LaneObservation,
   type LaneStage,
   type ObservedMessage,
@@ -21,7 +22,7 @@ import {
 import { threadText } from "./thread-text.js";
 
 /**
- * One founder inside an investor's outreach (ADR 0029):
+ * One founder inside an investor's outreach (ADR 0030):
  *
  *   acceptance → chat → [interview → report] → times → decide (book / pass)
  *
@@ -39,7 +40,7 @@ type InterviewProgress = {
   readonly askedAt: string | null;
   readonly followUpAsked: boolean;
   readonly nudged: boolean;
-  readonly qa: readonly { question: string; answer: string }[];
+  readonly qa: readonly InterviewAnswer[];
 };
 
 export type LaneState = {
@@ -458,7 +459,9 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
           .join(" ")
           .slice(0, 1_500);
     }
-    const qa = [...progress.qa, { question, answer }];
+    // Answered (wholly or partly) by the founder's own Q standing in.
+    const byQ = since.some((message) => message.viaQ);
+    const qa = [...progress.qa, { question, answer, byQ }];
     await ports.updateLane(state.laneId, { interview: qa });
     const next = progress.index + 1;
     const seenUntil = news.at(-1)?.at ?? state.seenUntil;

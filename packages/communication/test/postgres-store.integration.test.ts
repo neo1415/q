@@ -236,7 +236,7 @@ describe("@capital-q/communication against PostgreSQL", () => {
     ).rejects.toMatchObject({ code: "55000" });
   });
 
-  it("marks Q's messages under a delegation, many per delegation, with the Q-to-Q envelope (ADR 0029)", async () => {
+  it("marks Q's messages under a delegation, many per delegation, with the Q-to-Q envelope (ADR 0030)", async () => {
     const delegation = randomUUID();
     for (const key of ["it-q-0001", "it-q-0002"]) {
       await service.send({

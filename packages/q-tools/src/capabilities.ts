@@ -668,7 +668,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Takes on a multi-step job about one relationship for one approval: express interest, message them once connected, answer from an approved brief, book a call, and report back. Stoppable any time.",
     { approval: "PREPARE_APPROVE", executes: ["q.errand.start"] },
   ),
-  // --- AUTO block (ADR 0029): Q's delegated work; keep together ---------
+  // --- AUTO block (ADR 0030): Q's delegated work; keep together ---------
   tool(
     "propose_q_outreach",
     "RELATIONSHIP",

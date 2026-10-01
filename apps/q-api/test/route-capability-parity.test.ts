@@ -91,7 +91,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/schedule.ts POST NOTIFICATIONS_READ_PATH": exempt(
     "the read marker the notices panel records as notices are seen; not something a person asks for",
   ),
-  // AUTO (ADR 0029): Web Push and notification settings.
+  // AUTO (ADR 0030): Web Push and notification settings.
   "api/http/push.ts GET PUSH_KEY_PATH": exempt(
     "the browser's own push subscription handshake (the public VAPID key); a device setting, not something Q does",
   ),
@@ -488,7 +488,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/errands.ts GET Q_RELATIONSHIP_ERRANDS_PATH": exempt(
     "the person reading their own errands on a relationship, shown on the relationship itself",
   ),
-  // AUTO (ADR 0029): the "Q is working on" panel's own controls.
+  // AUTO (ADR 0030): the "Q is working on" panel's own controls.
   "q-api/http/work.ts GET Q_WORK_PATH": cap("tool.list_q_work"),
   "q-api/http/work.ts GET Q_WORK_ITEM_PATH": cap("tool.list_q_work"),
   "q-api/http/work.ts DELETE Q_WORK_ITEM_PATH": cap("tool.stop_q_work"),
@@ -649,7 +649,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
   "/relationships": cap("navigate.RELATIONSHIPS"),
   "/settings": cap("navigate.SETTINGS"),
-  // AUTO (ADR 0029): Q's work; Q reads the same with list_q_work.
+  // AUTO (ADR 0030): Q's work; Q reads the same with list_q_work.
   "/work": cap("tool.list_q_work"),
   "/work/[delegationId]": cap("tool.list_q_work"),
   "/work/[delegationId]/report/[laneId]": DOWNLOAD,

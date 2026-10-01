@@ -560,7 +560,7 @@ export function createErrandRunner(dependencies: {
       request: { kind: "TEXT", body: parsed.data },
       // Marks the message as Q's (viaQ) under the approved errand. Not the
       // action id: one message per action id is all the chat allows, and
-      // an errand posts several (ADR 0029 fixed this).
+      // an errand posts several (ADR 0030 fixed this).
       qDelegationId: row.id,
       idempotencyKey: `errand:${row.id}:${step}`,
     });

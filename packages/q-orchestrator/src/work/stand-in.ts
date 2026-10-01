@@ -18,7 +18,7 @@ import {
 import { threadText } from "./thread-text.js";
 
 /**
- * A founder's stand-in (ADR 0029): while they are away, Q answers
+ * A founder's stand-in (ADR 0030): while they are away, Q answers
  * investors' new messages from the brief they approved and nothing else,
  * marked as Q; what the brief does not answer waits for them. When they
  * come back, Q hands every thread back and tells them what happened.

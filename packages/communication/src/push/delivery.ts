@@ -4,7 +4,7 @@ import type { AppEmailPort } from "../schedule/service.js";
 import type { PushSubscriptionKeys, WebPushSender } from "./web-push.js";
 
 /**
- * Notice delivery beyond the app (AUTO, ADR 0029; spec auto.md §3.5).
+ * Notice delivery beyond the app (AUTO, ADR 0030; spec auto.md §3.5).
  *
  * In-app notices always show. On top of that:
  * - Web Push: every notice is pushed once, to each of the person's devices,

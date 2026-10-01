@@ -451,7 +451,7 @@ export {
   type QCapabilityRunFacts,
   type QCapabilitySurface,
 } from "./capabilities.js";
-// AUTO block: Q's delegated work tools (ADR 0029).
+// AUTO block: Q's delegated work tools (ADR 0030).
 export {
   ANSWER_Q_WORK,
   createQWorkTools,

@@ -27,7 +27,7 @@ import {
 } from "../security/actor-context.js";
 
 /**
- * Q's delegated work, for the person (AUTO, ADR 0029): read their own work
+ * Q's delegated work, for the person (AUTO, ADR 0030): read their own work
  * (the read is also their presence heartbeat), stop it or one founder in
  * it, give their word on a lane (a time, another time, pass), read and
  * download a first-stage report, and say they are away or back. Ids in
@@ -116,7 +116,10 @@ export function reportDocument(
       {
         heading: "Interview",
         body: report.interview
-          .map((item) => `Q: ${item.question}\nA: ${item.answer}`)
+          .map(
+            (item) =>
+              `Q: ${item.question}\nA${item.byQ ? " (answered by the founder's Q, standing in from their approved brief)" : ""}: ${item.answer}`,
+          )
           .join("\n\n"),
         findings: [],
       },

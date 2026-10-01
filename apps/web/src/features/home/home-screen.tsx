@@ -242,7 +242,7 @@ export async function HomeScreen({
         background tab until it was removed.
       */}
       {/*
-        AUTO (ADR 0029): what Q is doing under an approved plan, above the
+        AUTO (ADR 0030): what Q is doing under an approved plan, above the
         conversation, only while something is running (renders nothing
         otherwise, so Home stays Q first).
       */}

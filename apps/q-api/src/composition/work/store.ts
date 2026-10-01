@@ -10,7 +10,7 @@ import type {
 } from "@capital-q/q-orchestrator";
 
 /**
- * Q's delegated work, as rows (AUTO, ADR 0029; migration 20261112000000).
+ * Q's delegated work, as rows (AUTO, ADR 0030; migration 20261112000000).
  *
  * The person reads their own delegations through the routes and tools that
  * call this store with their own resolved actor; every read and write below

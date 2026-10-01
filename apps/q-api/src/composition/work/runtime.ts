@@ -45,7 +45,7 @@ import {
 } from "./store.js";
 
 /**
- * Q's delegated work, composed (AUTO, ADR 0029): the ports the LangGraph
+ * Q's delegated work, composed (AUTO, ADR 0030): the ports the LangGraph
  * engine acts through, and the runner that wakes it.
  *
  * Every acting port re-resolves the person's own actor context for the
@@ -392,7 +392,10 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
           .join("\n")
           .slice(0, 2_000),
         interview: input.interview
-          .map((item) => `Q: ${item.question}\nA: ${item.answer}`)
+          .map(
+            (item) =>
+              `Q: ${item.question}\nA${item.byQ ? " (from their Q, standing in)" : ""}: ${item.answer}`,
+          )
           .join("\n\n")
           .slice(0, 12_000),
         learned: input.learned

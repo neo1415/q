@@ -3,7 +3,7 @@ import type { NotificationDelivery } from "@capital-q/communication";
 import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
 
 /**
- * Notice delivery (AUTO, ADR 0029): every 30 seconds, push new notices to
+ * Notice delivery (AUTO, ADR 0030): every 30 seconds, push new notices to
  * the person's devices and email the "Needs you" ones still unread after
  * ten minutes. Each notice is marked as it goes, so a restart repeats
  * nothing; a failed pass is retried on the next.

@@ -699,7 +699,7 @@ export {
   type QPersonality,
   type QStandingDto,
 } from "./conduct.js";
-// AUTO block: Q's delegated work (ADR 0029).
+// AUTO block: Q's delegated work (ADR 0030).
 export {
   Q_PRESENCE_PATH,
   Q_WORK_ITEM_PATH,

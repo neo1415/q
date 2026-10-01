@@ -32,7 +32,7 @@ export type ChatMessageRow = {
   readonly voiceDurationMs: number | null;
   readonly revisesMessageId: string | null;
   readonly qActionId: string | null;
-  /** AUTO (ADR 0029): sent by Q under a delegation or errand. */
+  /** AUTO (ADR 0030): sent by Q under a delegation or errand. */
   readonly qDelegationId?: string | null | undefined;
   /** AUTO: the Q-to-Q envelope (cq.q2q/1), as stored; parse before use. */
   readonly qEnvelope?: unknown;
@@ -55,7 +55,7 @@ export type AppendChatMessageInput = {
   readonly voiceDurationMs: number | null;
   readonly revisesMessageId: string | null;
   readonly qActionId: string | null;
-  /** AUTO (ADR 0029): set only by Q's delegated work and errands. */
+  /** AUTO (ADR 0030): set only by Q's delegated work and errands. */
   readonly qDelegationId?: string | null | undefined;
   readonly qEnvelope?: Readonly<Record<string, unknown>> | null | undefined;
   readonly idempotencyKey: string;

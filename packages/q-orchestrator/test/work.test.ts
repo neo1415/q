@@ -19,7 +19,7 @@ import {
 } from "../src/index.js";
 
 /**
- * Deterministic tests of Q's delegated work (ADR 0029): the graphs with
+ * Deterministic tests of Q's delegated work (ADR 0030): the graphs with
  * fake ports and a fake model. No database, no provider.
  */
 
@@ -577,6 +577,35 @@ describe("lane: accept → chat → interview → report → times → book", ()
       (patch) => patch.interview !== undefined,
     );
     expect(answered?.interview?.[0]?.answer).toBe("(No answer.)");
+  });
+});
+
+describe("interview answered by the founder's Q", () => {
+  it("marks the answer as their Q's, so the report can say so", async () => {
+    const grant = OutreachGrantSchema.parse({
+      ...GRANT,
+      topics: [],
+      brief: null,
+      interview: { questions: ["Who are your first customers?"] },
+      call: null,
+    });
+    const { ports, rec } = fakePorts();
+    const engine = createQWorkEngine({
+      checkpoints: createInMemoryQCheckpointStore(),
+      ports,
+    });
+    const lane = LANE("lane-7", grant);
+    await engine.advanceLane(lane, observe({ connected: false }));
+    await engine.advanceLane(lane, observe());
+    const fromTheirQ = message("s1", "Three banks, per Femi's brief.", {
+      viaQ: true,
+      envelope: { protocol: "cq.q2q/1", side: "COMPANY", intent: "ANSWER" },
+    });
+    await engine.advanceLane(lane, observe({ messages: [fromTheirQ] }));
+    const answered = (rec.lanes.get("lane-7") ?? []).find(
+      (patch) => patch.interview !== undefined,
+    );
+    expect(answered?.interview?.[0]).toMatchObject({ byQ: true });
   });
 });
 

@@ -690,7 +690,7 @@ export {
   type SpeechPace,
   type SpeechReaction,
 } from "./speech/delivery.js";
-// AUTO block: Q's delegated work prompts (ADR 0029).
+// AUTO block: Q's delegated work prompts (ADR 0030).
 export {
   WORK_CONVERSE_V1,
   WORK_INTERVIEW_REPORT_V1,

@@ -21,7 +21,7 @@ import {
 import { actorWideScope } from "../plan.js";
 
 /**
- * Q's delegated work, as Q's own tools (AUTO, ADR 0029; founder direction
+ * Q's delegated work, as Q's own tools (AUTO, ADR 0030; founder direction
  * 2026-10-01): "Q, handle it" for an investor's outreach, a founder's
  * stand-in, and following, answering or stopping either -- from any Q
  * surface, because every surface offers the same registry.

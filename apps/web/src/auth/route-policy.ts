@@ -32,7 +32,7 @@ export const PROTECTED_PATH_PREFIXES = [
   "/onboarding",
   "/relationships",
   "/settings",
-  // AUTO (ADR 0029): Q's work.
+  // AUTO (ADR 0030): Q's work.
   "/work",
   "/gateway",
   "/rehearsals",

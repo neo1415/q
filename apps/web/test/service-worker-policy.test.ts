@@ -87,7 +87,7 @@ describe("service worker cache policy", () => {
       "install",
       "activate",
       "fetch",
-      // AUTO (ADR 0029): show a push, open its same-origin path on tap.
+      // AUTO (ADR 0030): show a push, open its same-origin path on tap.
       "push",
       "notificationclick",
     ]);

@@ -17,7 +17,7 @@ import {
 import { createFakeAppEmail } from "../src/testing/index.js";
 
 /**
- * AUTO (ADR 0029): notice delivery against the local database -- push once
+ * AUTO (ADR 0030): notice delivery against the local database -- push once
  * per notice to each device, "gone" devices revoked, "Needs you" emailed
  * once after ten minutes unread, settings honoured.
  */

@@ -213,7 +213,7 @@ export function createChatService(dependencies: ChatServiceDependencies) {
     /** Set only by the approved `chat.message.send` executor. */
     readonly qActionId?: string | undefined;
     /**
-     * AUTO (ADR 0029): set only by Q's delegated work and errands, under
+     * AUTO (ADR 0030): set only by Q's delegated work and errands, under
      * the person's approved delegation; the message shows as sent by Q.
      */
     readonly qDelegationId?: string | undefined;

@@ -41,7 +41,7 @@ import {
   registerErrandRoutes,
   type ErrandRoutesDependencies,
 } from "./http/errands.js";
-// AUTO block (ADR 0029)
+// AUTO block (ADR 0030)
 import {
   registerWorkRoutes,
   type WorkRoutesDependencies,
@@ -339,7 +339,7 @@ export function createApp(
     });
   }
 
-  // AUTO block (ADR 0029)
+  // AUTO block (ADR 0030)
   if (modules.work !== undefined) {
     if (security.resolver === undefined) {
       throw new Error("q-api: work routes require an actor context resolver");

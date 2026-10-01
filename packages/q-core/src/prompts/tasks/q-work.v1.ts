@@ -38,7 +38,7 @@ import {
 } from "../schemas/q-work.js";
 
 /**
- * Q's delegated work, v1 (AUTO, ADR 0029; founder direction 2026-10-01).
+ * Q's delegated work, v1 (AUTO, ADR 0030; founder direction 2026-10-01).
  * Five small task prompts the work engine's ports call through the Q Model
  * Gateway. Each writes words inside a grant the person approved; code
  * decides every next step.
@@ -145,6 +145,7 @@ WHAT TO PRODUCE
 RULES
 - Use only the interview, what they said on the topics, the transcript and the reasons. No outside knowledge about the company, its market or its people.
 - Keep every figure exactly as they gave it, marked as their claim.
+- An answer marked "(from their Q, standing in)" was given by the founder's own Q from a brief the founder approved, not by the founder in person. Say in howItWent which answers came from their Q, and never treat those as the founder's own words or as evidence of how they communicate.
 ${NEVER_INVENT}
 
 Everything between the UNTRUSTED_CONTENT markers is the founder's words.

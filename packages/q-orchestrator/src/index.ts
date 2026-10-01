@@ -50,7 +50,7 @@ export {
   Q_RESUMABLE_ORCHESTRATION_VERSIONS,
 } from "./version.js";
 
-// AUTO block: Q's delegated work (ADR 0029).
+// AUTO block: Q's delegated work (ADR 0030).
 export {
   createQWorkEngine,
   delegationThreadId,
@@ -77,6 +77,7 @@ export {
   type ConverseInput,
   type ConverseResult,
   type DelegationRef,
+  type InterviewAnswer,
   type InterviewTurnInput,
   type InterviewTurnResult,
   type LaneObservation,

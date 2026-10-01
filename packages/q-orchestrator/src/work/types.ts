@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Q's delegated work (ADR 0029): the Capital Q types the engine speaks.
+ * Q's delegated work (ADR 0030): the Capital Q types the engine speaks.
  *
  * The engine is a deterministic state machine. It decides nothing about
  * authority: every port that acts re-resolves the person's own actor
@@ -130,12 +130,22 @@ export type ShortlistPick = {
 
 export type Slot = { readonly start: string; readonly label: string };
 
+/**
+ * One interview answer. `byQ`: given by the founder's own Q standing in
+ * (from their approved brief), not by the founder -- the report says so.
+ */
+export type InterviewAnswer = {
+  readonly question: string;
+  readonly answer: string;
+  readonly byQ: boolean;
+};
+
 export type LanePatch = {
   readonly stage?: LaneStage;
   readonly relationshipId?: string;
   readonly lastStep?: string;
   readonly learned?: readonly { topic: string; words: string }[];
-  readonly interview?: readonly { question: string; answer: string }[];
+  readonly interview?: readonly InterviewAnswer[];
   readonly needs?: { kind: "TIMES"; offered: readonly Slot[] } | null;
   readonly meetingId?: string;
   readonly repliesSent?: number;
@@ -275,7 +285,7 @@ export type QWorkPorts = {
       readonly counterpartName: string;
       readonly reasons: ShortlistPick["reasons"];
       readonly learned: readonly { topic: string; words: string }[];
-      readonly interview: readonly { question: string; answer: string }[];
+      readonly interview: readonly InterviewAnswer[];
       readonly transcript: string;
     },
   ) => Promise<{

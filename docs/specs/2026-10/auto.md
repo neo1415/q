@@ -5,7 +5,7 @@
   ADR 0028 (errands = scoped delegation), ADR 0027 (Q in meetings), ADR 0019
   (chat actions), BIZ-008 (meetings/reminders), R34 (chat), R20 (capability
   registry), ADR 0011/0016 (no word lists over user words).
-- New ADR: `docs/adr/0029-langgraph-delegated-work.md` (amends "no agent
+- New ADR: `docs/adr/0030-langgraph-delegated-work.md` (amends "no agent
   orchestration" for this one purpose).
 
 ## 1. Goals (founder's words, 2026-10-01)

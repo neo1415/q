@@ -106,7 +106,7 @@ export {
   type MeetingTranscriptLine,
 } from "./meeting-assistant/service.js";
 
-// AUTO block: Web Push (VAPID) and notice delivery (ADR 0029).
+// AUTO block: Web Push (VAPID) and notice delivery (ADR 0030).
 export {
   createWebPushSender,
   encryptPushPayload,

@@ -155,7 +155,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 /*
- * Web Push (AUTO, ADR 0029). The payload is small JSON from Capital Q's
+ * Web Push (AUTO, ADR 0030). The payload is small JSON from Capital Q's
  * own server (title, one line, a same-origin path, a tag). Every push shows
  * a notification -- iOS revokes a subscription that receives pushes
  * without one. A tap focuses an open Capital Q window on that path, or

@@ -1,4 +1,4 @@
--- AUTO · ADR 0029 · q_runtime.delegations, delegation_lanes,
+-- AUTO · ADR 0030 · q_runtime.delegations, delegation_lanes,
 -- delegation_steps, presence; communication.push_subscriptions,
 -- notification_settings; messages.q_envelope.
 --

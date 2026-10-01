@@ -78,7 +78,7 @@ import {
   type InvestorRoutesDependencies,
 } from "./http/investors.js";
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
-// AUTO block (ADR 0029)
+// AUTO block (ADR 0030)
 import {
   registerPushRoutes,
   type PushRoutesDependencies,
@@ -382,7 +382,7 @@ export function createApp(
     });
   }
 
-  // AUTO block (ADR 0029): Web Push and notification settings.
+  // AUTO block (ADR 0030): Web Push and notification settings.
   if (modules.push !== undefined) {
     registerPushRoutes(app, {
       authenticator: security.authenticator,

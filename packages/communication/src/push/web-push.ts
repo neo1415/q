@@ -9,7 +9,7 @@ import {
 } from "node:crypto";
 
 /**
- * Web Push without a provider (AUTO, ADR 0029): RFC 8291 message
+ * Web Push without a provider (AUTO, ADR 0030): RFC 8291 message
  * encryption (aes128gcm, RFC 8188) and RFC 8292 VAPID, on node:crypto.
  * The browsers' own push services (FCM, Mozilla autopush, Apple) carry the
  * bytes; nothing here needs an account or a key beyond our VAPID pair.

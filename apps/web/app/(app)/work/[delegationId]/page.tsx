@@ -15,7 +15,7 @@ import { qApiSession } from "@/features/q/context";
 export const metadata: Metadata = { title: "What Q did" };
 
 /**
- * One delegation in full (AUTO, ADR 0029): who Q picked and on what words,
+ * One delegation in full (AUTO, ADR 0030): who Q picked and on what words,
  * and every step Q took, newest first -- the person's own audit trail of
  * what was done under their approval.
  */

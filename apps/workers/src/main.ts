@@ -159,7 +159,7 @@ import { runScheduleTicker } from "./integrations/schedule-ticker.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeSchedule,
-  // AUTO block (ADR 0029)
+  // AUTO block (ADR 0030)
   createNotificationDelivery,
   createPostgresMeetingDirectory,
   createWebPushSender,
@@ -866,7 +866,7 @@ const schedule = composeSchedule({
   logger,
 });
 
-// AUTO block (ADR 0029): notices beyond the app -- Web Push to the
+// AUTO block (ADR 0030): notices beyond the app -- Web Push to the
 // person's devices (VAPID, free) and email for "Needs you" left unread.
 const webPush = loadWebPushConfig(process.env);
 if (webPush.vapid === undefined) {

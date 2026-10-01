@@ -104,6 +104,8 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     evidenceDocuments: port(),
     relationshipMail: port(),
     onboardingReminders: port(),
+    // AUTO (ADR 0030): Q's delegated work.
+    work: port(),
   };
   return {
     ports,

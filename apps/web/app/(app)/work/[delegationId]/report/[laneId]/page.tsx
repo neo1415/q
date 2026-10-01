@@ -22,7 +22,7 @@ const VERDICT = {
 } as const;
 
 /**
- * The first-stage interview report (AUTO, ADR 0029; spec auto.md §3.1):
+ * The first-stage interview report (AUTO, ADR 0030; spec auto.md §3.1):
  * the verdict first, then how it went, strengths and concerns each
  * labelled as the founder's claim or Q's inference, open questions, and
  * the interview word for word. Downloadable as a PDF.
@@ -123,6 +123,11 @@ export default async function WorkReportPage({
                 </dt>
                 <dd className="cq-body whitespace-pre-line text-(--cq-text-secondary)">
                   {item.answer}
+                  {item.byQ ? (
+                    <span className="cq-caption block text-(--cq-text-tertiary)">
+                      Answered by their Q, standing in from their approved brief
+                    </span>
+                  ) : null}
                 </dd>
               </div>
             ))}

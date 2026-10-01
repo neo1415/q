@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Web Push and notification settings (AUTO, ADR 0029).
+ * Web Push and notification settings (AUTO, ADR 0030).
  *
  *   GET  /v1/push/key                   the VAPID public key (or null: push off)
  *   PUT  /v1/push/subscription          this device subscribes

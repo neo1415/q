@@ -507,7 +507,7 @@ export function RelationshipChat({
                 </>
               )}
               <span className="cq-caption flex justify-end gap-1.5 pt-0.5 text-(--cq-text-tertiary)">
-                {/* AUTO (ADR 0029): every message Q sent is labelled as Q's. */}
+                {/* AUTO (ADR 0030): every message Q sent is labelled as Q's. */}
                 {message.viaQ ? (
                   <span>Sent by Q for {message.senderName}</span>
                 ) : null}

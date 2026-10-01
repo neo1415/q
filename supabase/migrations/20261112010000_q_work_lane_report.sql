@@ -1,4 +1,4 @@
--- AUTO (ADR 0029): the first-stage interview report lives with its lane.
+-- AUTO (ADR 0030): the first-stage interview report lives with its lane.
 --
 -- A Q document (q_runtime.artifacts) is prepared inside a Q run under the
 -- Context Firewall's plan for that run; delegated work runs outside any

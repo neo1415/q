@@ -7,7 +7,7 @@ import {
 } from "./work-actions";
 
 /**
- * Web Push on this device (AUTO, ADR 0029; spec auto.md §3.5).
+ * Web Push on this device (AUTO, ADR 0030; spec auto.md §3.5).
  *
  * - iOS/iPadOS 16.4+ allow it only for Capital Q added to the Home Screen
  *   (standalone); in Safari tabs the person is told how, not prompted.

@@ -63,7 +63,7 @@ import { createPexelsPhotos } from "./composition/stock-photos.js";
 import { createRecallBots } from "./composition/recall-bots.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
 import { createScout } from "./composition/scout.js";
-// AUTO block (ADR 0029): Q's delegated work.
+// AUTO block (ADR 0030): Q's delegated work.
 import {
   createWorkActionBoard,
   createWorkPort,
@@ -1110,7 +1110,7 @@ const profileFindingsReader = createProfileFindingsReader({
 // at a natural pause; "later", "stop" and "let's finish it" are tools.
 const onboardingNudges = createOnboardingNudges({ sql: database.sql });
 
-// AUTO block (ADR 0029): "Q, handle it". The store, the approval board
+// AUTO block (ADR 0030): "Q, handle it". The store, the approval board
 // its tools prepare on, and the port every Q surface reads it through.
 const workStore = createPostgresWorkStore(database.sql);
 const workBoard = createWorkActionBoard();
@@ -1130,7 +1130,7 @@ const workPort = createWorkPort({
 
 const qTools = createQTools({
   ports: {
-    // AUTO block (ADR 0029)
+    // AUTO block (ADR 0030)
     work: workPort,
     onboardingReminders: {
       choose: (actor, choice) => onboardingNudges.choose(actor.userId, choice),
@@ -1544,7 +1544,7 @@ const qActionRegistry = createQActionRegistry([
     chat,
     logger,
   }),
-  // AUTO block (ADR 0029): outreach and stand-in, one approval each.
+  // AUTO block (ADR 0030): outreach and stand-in, one approval each.
   ...createWorkStartActions({
     store: workStore,
     isInvestor: workIsInvestor,
@@ -1577,7 +1577,7 @@ const qActionPort = createQActionPort({
     relationshipBoard.proposer,
     emailBoard.proposer,
     chatBoard.proposer,
-    // AUTO block (ADR 0029)
+    // AUTO block (ADR 0030)
     workBoard.proposer,
     profileChangeBoard.proposer,
     visibilityBoard.proposer,
@@ -2033,7 +2033,7 @@ setInterval(() => {
   });
 }, 60 * 1000).unref();
 
-// AUTO block (ADR 0029): Q's delegated work on LangGraph, checkpointed in
+// AUTO block (ADR 0030): Q's delegated work on LangGraph, checkpointed in
 // q_runtime.checkpoint* beside the conversation runs, so a deploy never
 // loses a wait. Every step runs as the person, through their own commands.
 const workFeed = createInvestorFeedPort({
@@ -2926,7 +2926,7 @@ const { app, logger: appLogger } = createApp(
     memory: memoryService,
     meetingAssistant,
     errands,
-    // AUTO block (ADR 0029)
+    // AUTO block (ADR 0030)
     work: workPort,
     rehearsals,
     standing: standingStore,

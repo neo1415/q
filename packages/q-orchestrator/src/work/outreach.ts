@@ -15,7 +15,7 @@ import type {
 } from "./types.js";
 
 /**
- * The investor's outreach, first part (ADR 0029):
+ * The investor's outreach, first part (ADR 0030):
  *
  *   source → shortlist → open lanes (express interest, one batched notice)
  *
