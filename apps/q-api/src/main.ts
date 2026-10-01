@@ -2059,6 +2059,30 @@ const knowledgeText = async (
         sources: [{ kind: "PUBLIC_KNOWLEDGE", label, url: null }],
       };
 };
+/**
+ * An uploaded pitch deck's words: the text chunks document processing
+ * already extracted into Postgres (q_knowledge.chunks), for the current
+ * version of a PITCH_DECK document of this company, in slide order, only
+ * in the visibility scopes the caller names.
+ */
+const uploadedDeckText = async (
+  companyId: string,
+  scopes: readonly string[],
+): Promise<string> => {
+  const rows = await database.sql<{ content: string }[]>`
+    select c.content from q_knowledge.chunks c
+      join evidence.document_versions v on v.id = c.document_version_id
+      join evidence.documents d on d.id = v.document_id
+     where c.subject_type = 'COMPANY' and c.subject_id = ${companyId}
+       and c.status = 'ACTIVE' and c.role = 'LEAF'
+       and d.document_type = 'PITCH_DECK'
+       and c.visibility_scope = any(${scopes as string[]})
+     order by c.chunk_index limit 60`;
+  return rows
+    .map((row) => row.content)
+    .join("\n")
+    .slice(0, 6_000);
+};
 /** Every string in a document's content, in order: the deck's words. */
 const contentWords = (value: unknown, out: string[] = []): string[] => {
   if (typeof value === "string") {
@@ -2201,17 +2225,33 @@ const rehearsals = createRehearsalService({
     },
     counterpartMaterial: async (actor, kind, id) => {
       if (kind !== "COMPANY") return { text: "", sources: [] };
-      const [pitch, known] = await Promise.all([
+      const [pitch, known, uploaded] = await Promise.all([
         transcriptText(actor, id, "Their pitch video"),
         knowledgeText(
           id,
           ["network_visible", "public_external"],
           "What Capital Q shows of them",
         ),
+        // Only a deck they made visible to the network or the public.
+        uploadedDeckText(id, ["network_visible", "public_external"]).catch(
+          () => "",
+        ),
       ]);
       return {
-        text: [pitch.text, known.text].filter((t) => t.length > 0).join("\n\n"),
-        sources: [...pitch.sources, ...known.sources],
+        text: [
+          pitch.text,
+          known.text,
+          uploaded.length === 0 ? "" : `THEIR DECK:\n${uploaded}`,
+        ]
+          .filter((t) => t.length > 0)
+          .join("\n\n"),
+        sources: [
+          ...pitch.sources,
+          ...known.sources,
+          ...(uploaded.length === 0
+            ? []
+            : [{ kind: "DECK" as const, label: "Their deck", url: null }]),
+        ],
       };
     },
     publicWeb: async (_actor, name, kind) => {
@@ -2248,7 +2288,7 @@ const rehearsals = createRehearsalService({
       if (companyId === null || actor.organisationId === undefined) {
         return { text: "", sources: [] };
       }
-      const [company, pitch, known, decks] = await Promise.all([
+      const [company, pitch, known, decks, uploaded] = await Promise.all([
         companies
           .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
           .catch(() => null),
@@ -2277,9 +2317,21 @@ const rehearsals = createRehearsalService({
              and a.organisation_id = ${actor.organisationId}
              and a.type = 'PITCH_DECK' and a.archived_at is null
            order by v.created_at desc limit 1`.catch(() => []),
+        // A deck they uploaded, in every scope but someone's personal notes.
+        uploadedDeckText(companyId, [
+          "organisation_private",
+          "founder_private",
+          "relationship_shared",
+          "specifically_shared",
+          "network_visible",
+          "public_external",
+        ]).catch(() => ""),
       ]);
+      // The deck Q made, else the one they uploaded.
       const deck =
-        decks[0] === undefined ? "" : contentWords(decks[0].content).join(" ");
+        decks[0] === undefined
+          ? uploaded
+          : contentWords(decks[0].content).join(" ");
       return {
         text: [
           company === null
