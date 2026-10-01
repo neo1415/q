@@ -15,6 +15,10 @@ import {
   type AdminRoutesDependencies,
 } from "./http/admin.js";
 import {
+  registerResultsRoutes,
+  type ResultsRoutesDependencies,
+} from "./http/results.js";
+import {
   registerCommitmentRoutes,
   type CommitmentRoutesDependencies,
 } from "./http/commitments.js";
@@ -176,6 +180,7 @@ export type ApiModules = {
   // ADMIN block (ADR 0033)
   readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
   readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
+  readonly results?: ResultsRoutesDependencies["results"] | undefined;
   // end ADMIN block
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
@@ -348,6 +353,16 @@ export function createApp(
       decideVerification: modules.adminVerificationDecider,
     });
   }
+
+  // ADMIN block
+  if (modules.results !== undefined) {
+    registerResultsRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      results: modules.results,
+    });
+  }
+  // end ADMIN block
 
   if (modules.commitments !== undefined) {
     registerCommitmentRoutes(app, {

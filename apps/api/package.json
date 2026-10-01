@@ -37,6 +37,7 @@
     "@capital-q/permissions": "workspace:*",
     "@capital-q/platform-admin": "workspace:*",
     "@capital-q/public-identity": "workspace:*",
+    "@capital-q/results": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",
     "@capital-q/verification": "workspace:*",

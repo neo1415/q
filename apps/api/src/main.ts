@@ -53,9 +53,11 @@ import {
   createSlateReadPipeline,
 } from "@capital-q/discovery";
 import {
+  CapitalObjectiveNotFoundError,
   createCapitalService,
   createPostgresCapitalObjectiveQueryPort,
 } from "@capital-q/capital";
+import { createResultsReader } from "@capital-q/results";
 import {
   CompanyIdSchema,
   createCompanyService,
@@ -795,6 +797,41 @@ const commitments = createCommitmentService({
   }),
   newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
 });
+// ADMIN block (spec §5): a person's own results. The raise is the same
+// view Capital shows: the current objective's target and the commitments
+// both sides stated or confirmed, authorised by the company's own listing.
+const results = createResultsReader({
+  sql: database.sql,
+  raise: async (actor, companyId) => {
+    let target: { amount: string; currencyCode: string } | null = null;
+    try {
+      const objective = await capital.getCurrentCapitalObjective({
+        actor,
+        companyId: CompanyIdSchema.parse(companyId),
+      });
+      target = {
+        amount: objective.target.amount,
+        currencyCode: objective.target.currency,
+      };
+    } catch (error: unknown) {
+      if (!(error instanceof CapitalObjectiveNotFoundError)) throw error;
+    }
+    const view = await commitments.fundraising({ actor, companyId, target });
+    return {
+      target: view.target,
+      totals: view.totals,
+      remaining: view.remaining,
+      pipeline: view.pipeline,
+      investors: view.investors.map((investor) => ({
+        investorName: investor.investorName,
+        amount: investor.amount,
+        currencyCode: investor.currencyCode,
+        bucket: investor.bucket,
+      })),
+    };
+  },
+});
+// end ADMIN block
 
 /**
  * Founder Connection Requests (ADR 0023). The founder's company is their
@@ -1167,6 +1204,7 @@ const { app, logger } = createApp(config, security, {
   commitments,
   // ADMIN block (ADR 0033)
   admin: platformAdmin,
+  results,
   adminFreshTokens: createSupabaseAccessTokenAuthenticator(supabaseAuth),
   adminVerificationDecider: createDecideByOperator({
     transactions: database.transactions,

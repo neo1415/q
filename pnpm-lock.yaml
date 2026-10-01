@@ -125,6 +125,9 @@ importers:
       '@capital-q/public-identity':
         specifier: workspace:*
         version: link:../../packages/public-identity
+      '@capital-q/results':
+        specifier: workspace:*
+        version: link:../../packages/results
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security
@@ -1979,6 +1982,34 @@ importers:
       '@capital-q/q-firewall':
         specifier: workspace:*
         version: link:../q-firewall
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/results:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/deck-render':
+        specifier: workspace:*
+        version: link:../deck-render
+      '@capital-q/discovery':
+        specifier: workspace:*
+        version: link:../discovery
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
