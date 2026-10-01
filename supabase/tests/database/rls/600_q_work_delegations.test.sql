@@ -18,7 +18,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(27);
+select plan(30);
 
 insert into q_runtime.delegations (id, tenant_id, user_id, kind, q_action_id, grant_plan, thread_id, expires_at) values
   ('00000000-0000-4000-8000-00000000d001', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_b'), 'INVESTOR_OUTREACH',
@@ -83,6 +83,19 @@ select throws_ok(
 select throws_ok(
   $$ update q_runtime.delegation_lanes set report = '{"headline": "x"}'::jsonb $$,
   '23514', null, 'a report carries the time it was written');
+select lives_ok(
+  $$ insert into communication.notifications (tenant_id, user_id, kind, title, dedupe_key, priority)
+     values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'), 'TIME_PROPOSED', 'Q proposed times', 'time_proposed:fixture-1', 'NEEDS_YOU') $$,
+  'the other side can be told about a proposed time (2026-10-02)');
+insert into q_runtime.errands (id, tenant_id, user_id, q_action_id, company_id, counterpart_name, plan, expires_at) values
+  ('00000000-0000-4000-8000-00000000f001', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_b'),
+   '00000000-0000-4000-8000-00000000a0f1', '00000000-0000-4000-8000-00000000c001', 'Lane Co', '{}', now() + interval '14 days');
+select throws_ok(
+  $$ update q_runtime.errands set proposed_slots = '[]'::jsonb, proposed_at = now() where id = '00000000-0000-4000-8000-00000000f001' $$,
+  '23514', null, 'an offer names at least one time');
+select throws_ok(
+  $$ update q_runtime.errands set proposed_slots = '["2026-10-05T09:00:00Z"]'::jsonb where id = '00000000-0000-4000-8000-00000000f001' $$,
+  '23514', null, 'an offer carries when it was made');
 select lives_ok(
   $$ insert into communication.notifications (tenant_id, user_id, kind, title, dedupe_key, priority)
      values (pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_b'), 'Q_WORK', 'Q needs your times', 'work:fixture-2', 'NEEDS_YOU') $$,

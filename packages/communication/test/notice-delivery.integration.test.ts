@@ -97,7 +97,9 @@ describe("notice delivery against PostgreSQL", () => {
       appOrigin: "https://app.example.invalid",
       now: () => clock,
     });
-    const first = await delivery.tick();
+    // A shared local database holds other tests' notices too: one pass
+    // wide enough to reach this test's own.
+    const first = await delivery.tick(1000);
     expect(first.pushed).toBeGreaterThanOrEqual(2);
     const mine = pushed.filter((item) => item.endpoint.includes(userId));
     // Both devices get the first notice; the gone one is then put to rest
@@ -112,7 +114,7 @@ describe("notice delivery against PostgreSQL", () => {
     ).toBe(true);
     // Nothing is pushed twice.
     expect((await store.settings(actor)).devices).toBe(1);
-    await delivery.tick();
+    await delivery.tick(1000);
     expect(
       pushed.filter((item) => item.endpoint.includes(userId)),
     ).toHaveLength(3);
@@ -122,8 +124,8 @@ describe("notice delivery against PostgreSQL", () => {
 
     // Ten minutes on, still unread: the Needs you notice is emailed, once.
     clock = new Date(clock.getTime() + 11 * 60_000);
-    await delivery.tick();
-    await delivery.tick();
+    await delivery.tick(1000);
+    await delivery.tick(1000);
     const mails = email.sent.filter(
       (sent) => sent.to === "person@push.example.invalid",
     );

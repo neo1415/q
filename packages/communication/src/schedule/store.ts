@@ -95,7 +95,11 @@ export type NotificationKind =
   | "ACCOUNT_PAUSED"
   // AUTO block (ADR 0030)
   | "Q_WORK"
-  | "Q_STAND_IN";
+  | "Q_STAND_IN"
+  | "INTEREST_RECEIVED"
+  | "CONNECTION_REQUESTED"
+  | "Q_MESSAGE"
+  | "TIME_PROPOSED";
 
 export type NewNotification = {
   readonly tenantId: string;

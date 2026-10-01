@@ -125,3 +125,11 @@ export {
   type PushSubscriptionStore,
 } from "./push/delivery.js";
 // end AUTO block
+// AUTO block: calendar invites without Google (2026-10-02).
+export { meetingIcs, type IcsInvite } from "./schedule/ics.js";
+// end AUTO block
+export {
+  createCounterpartNotices,
+  type CounterpartNoticeKind,
+  type CounterpartNotices,
+} from "./counterpart-notices.js";

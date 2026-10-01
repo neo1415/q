@@ -235,3 +235,47 @@ export const WorkStandInReplyResultSchema = z
 export type WorkStandInReplyResult = z.infer<
   typeof WorkStandInReplyResultSchema
 >;
+
+// ---------------------------------------------------------------------------
+// WORK_SLOT_READER: which offered time the other side chose, by meaning
+// ---------------------------------------------------------------------------
+
+export const WORK_SLOT_READER_SCHEMA_NAME = "WorkSlotReaderResult";
+export const WORK_SLOT_READER_SCHEMA_VERSION = 1;
+
+export const WorkSlotReaderVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    principalName: z.string().max(120),
+    counterpartName: z.string().max(200),
+    /** The times Q offered, numbered, each with its exact UTC instant. Trusted. */
+    offered: z.string().max(1_000),
+    /** The zone the offered times were written in. Trusted. */
+    timeZone: z.string().max(64),
+    /** Now, as an ISO instant, for words like "tomorrow". Trusted. */
+    now: z.string().max(40),
+    /** Their messages since the offer. UNTRUSTED. */
+    reply: z.string().max(6_000),
+  })
+  .strict();
+export type WorkSlotReaderVariables = z.infer<
+  typeof WorkSlotReaderVariablesSchema
+>;
+export const WORK_SLOT_READER_UNTRUSTED = ["counterpartName", "reply"] as const;
+
+export const WorkSlotReaderResultSchema = z
+  .object({
+    /**
+     * PICKED: they chose one offered time; OTHER_TIME: they named a
+     * different time; DECLINED: they don't want a call; NONE: nothing yet.
+     */
+    answer: z.enum(["PICKED", "OTHER_TIME", "DECLINED", "NONE"]),
+    /** 1-based number of the offered time, for PICKED. */
+    pick: z.number().int().min(1).max(5).nullable(),
+    /** For OTHER_TIME: the start they named, ISO 8601 with its offset. */
+    otherTime: z.string().max(40).nullable(),
+    /** Their words that carry the answer, copied exactly. */
+    quote: z.string().max(300).nullable(),
+  })
+  .strict();
+export type WorkSlotReaderResult = z.infer<typeof WorkSlotReaderResultSchema>;

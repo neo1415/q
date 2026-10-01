@@ -9,7 +9,11 @@ import {
   type ModelDataPosture,
   type QSubjectRef,
 } from "@capital-q/contracts";
-import type { ChatService, ScheduleService } from "@capital-q/communication";
+import type {
+  ChatService,
+  CounterpartNotices,
+  ScheduleService,
+} from "@capital-q/communication";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { InterestService } from "@capital-q/network";
@@ -21,12 +25,20 @@ import {
   ErrandReplyResultSchema,
   renderPrompt,
   type ErrandReplyResult,
+  type WorkSlotReaderResult,
   type ErrandReplyVariables,
 } from "@capital-q/q-core";
 import {
   ERRAND_START as ERRAND_START_NAME,
   type RelationshipIntelligencePort,
 } from "@capital-q/q-tools";
+import {
+  insideWindows,
+  DEFAULT_WORKING_HOURS,
+  isKnownZone,
+  slotLabel,
+  workingHourSlots,
+} from "./slots.js";
 import {
   TELL_OWNER_AFTER_DAYS,
   waitingDecision,
@@ -299,6 +311,36 @@ export type ErrandRow = {
   expires_at: Date;
   /** When the errand was filed: how long Q has been waiting. */
   created_at?: Date | undefined;
+  /** Times Q offered in the chat (no calendar), as ISO instants. */
+  proposed_slots?: unknown;
+};
+
+export type ErrandNegotiation = {
+  /** The owner's own time zone (calendar, else profile); null: unknown. */
+  readonly zoneOf: (userId: string) => Promise<string | null>;
+  readonly readSlots: (input: {
+    readonly actor: ActorContext;
+    readonly principalName: string;
+    readonly counterpartName: string;
+    readonly offered: string;
+    readonly timeZone: string;
+    readonly now: string;
+    readonly reply: string;
+  }) => Promise<WorkSlotReaderResult | null>;
+  readonly recordAgreed: ScheduleService["recordAgreed"];
+  /** Email the .ics to the organiser and every invitee; throws on failure. */
+  readonly sendInvites: (input: {
+    readonly meetingId: string;
+    readonly start: Date;
+    readonly end: Date;
+    readonly purpose: string;
+    readonly timeZone: string;
+    readonly organiser: { readonly name: string; readonly email: string };
+    readonly invitees: readonly {
+      readonly name: string;
+      readonly email: string;
+    }[];
+  }) => Promise<void>;
 };
 
 export type ErrandReplyComposer = {
@@ -391,6 +433,8 @@ export type ErrandPatch = {
   readonly lastStep?: string;
   readonly failure?: string;
   readonly seenUntil?: Date;
+  /** The times Q offered in the chat, ISO instants (no calendar). */
+  readonly proposedSlots?: readonly string[];
   readonly repliesSent?: number;
   readonly meetingId?: string;
 };
@@ -437,7 +481,7 @@ export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
       sql<ErrandRow[]>`
         select id, tenant_id, user_id, organisation_id, q_action_id,
                relationship_id, counterpart_name, plan, stage, seen_until,
-               replies_sent, meeting_id, expires_at, created_at
+               replies_sent, meeting_id, expires_at, created_at, proposed_slots
           from q_runtime.errands
          where status = 'ACTIVE' and relationship_id is not null
          order by updated_at
@@ -446,7 +490,7 @@ export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
       sql<ErrandRow[]>`
         select id, tenant_id, user_id, organisation_id, q_action_id,
                relationship_id, counterpart_name, plan, stage, seen_until,
-               replies_sent, meeting_id, expires_at, created_at
+               replies_sent, meeting_id, expires_at, created_at, proposed_slots
           from q_runtime.errands
          where status = 'ACTIVE' and relationship_id = ${relationshipId}
          limit 20`,
@@ -465,6 +509,9 @@ export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
                seen_until = coalesce(${patch.seenUntil ?? null}, seen_until),
                replies_sent = coalesce(${patch.repliesSent ?? null}, replies_sent),
                meeting_id = coalesce(${patch.meetingId ?? null}, meeting_id),
+               proposed_slots = coalesce(proposed_slots, ${patch.proposedSlots === undefined ? null : sql.json([...patch.proposedSlots])}),
+               proposed_at = case when ${patch.proposedSlots !== undefined} and proposed_at is null
+                                  then clock_timestamp() else proposed_at end,
                updated_at = clock_timestamp()
          where id = ${id} and status = 'ACTIVE'`;
     },
@@ -525,6 +572,14 @@ export function createErrandRunner(dependencies: {
   readonly nameOf: (userId: string) => Promise<string | null>;
   /** One gentle reminder to the other side when they stay silent. */
   readonly nudger?: Pick<CounterpartNudger, "nudge"> | undefined;
+  /**
+   * Booking without Google (2026-10-02): Q offers times in the chat, reads
+   * the reply by meaning, records the agreed meeting and emails an invite.
+   * Absent: an owner without Google is asked to connect it, as before.
+   */
+  readonly negotiation?: ErrandNegotiation | undefined;
+  /** Notices for the other side (Q's first message, a proposed time). */
+  readonly counterpartNotices?: Pick<CounterpartNotices, "notify"> | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 }) {
@@ -602,6 +657,245 @@ export function createErrandRunner(dependencies: {
       qDelegationId: row.id,
       idempotencyKey: `errand:${row.id}:${step}`,
     });
+    // The other side hears that Q wrote to them, and for whom: once.
+    if (dependencies.counterpartNotices !== undefined) {
+      const principal = (await dependencies.nameOf(row.user_id)) ?? "Someone";
+      await dependencies.counterpartNotices
+        .notify({
+          relationshipId: row.relationship_id,
+          actingSide: sideOf(row),
+          kind: "Q_MESSAGE",
+          title: `Q, on behalf of ${principal}, sent you a message`.slice(
+            0,
+            200,
+          ),
+          body: parsed.data.slice(0, 200),
+          target: "CHAT",
+          key: `errand:${row.id}`,
+          priority: "UPDATE",
+        })
+        .catch(() => 0);
+    }
+    return true;
+  }
+
+  /** Which side the errand's owner acts for, from its own plan. */
+  const sides = new Map<string, "INVESTOR" | "COMPANY">();
+  function sideOf(row: ErrandRow): "INVESTOR" | "COMPANY" {
+    return sides.get(row.id) ?? "INVESTOR";
+  }
+
+  function offeredOf(row: ErrandRow): Date[] {
+    return Array.isArray(row.proposed_slots)
+      ? (row.proposed_slots as unknown[])
+          .filter((value): value is string => typeof value === "string")
+          .map((value) => new Date(value))
+          .filter((at) => !Number.isNaN(at.getTime()))
+      : [];
+  }
+
+  /**
+   * No Google calendar: offer 2-3 times from the owner's working hours in
+   * their own zone, in the chat, once. The reply is read when it comes.
+   */
+  async function offerTimes(
+    actor: ActorContext,
+    row: ErrandRow,
+    call: NonNullable<ErrandStartPayload["bookCall"]>,
+    link: string | null,
+    negotiation: ErrandNegotiation,
+  ): Promise<void> {
+    if (offeredOf(row).length > 0) {
+      await update(row.id, {
+        lastStep: `Waiting for ${row.counterpart_name} to pick one of the times Q offered.`,
+      });
+      return;
+    }
+    const zone = (await negotiation.zoneOf(row.user_id)) ?? "UTC";
+    const current = now();
+    const slots = workingHourSlots({
+      from: new Date(current.getTime() + CALL_LEAD_MS),
+      until: new Date(current.getTime() + 14 * 24 * 3_600_000),
+      timeZone: zone,
+      durationMinutes: call.durationMinutes,
+      count: 3,
+    });
+    if (slots.length === 0) {
+      await update(row.id, { lastStep: "No time to offer yet." });
+      return;
+    }
+    const principal = (await dependencies.nameOf(row.user_id)) ?? "They";
+    const lines = slots.map(
+      (slot, index) => `${String(index + 1)}. ${slotLabel(slot, zone)}`,
+    );
+    const posted = await post(
+      actor,
+      row,
+      "slots",
+      `${principal} would like a ${String(call.durationMinutes)}-minute call (${call.purpose}). Would one of these suit you?\n${lines.join("\n")}\nReply with the one that works, or suggest another time.`,
+    ).catch(() => false);
+    if (!posted) {
+      await update(row.id, {
+        lastStep: "Waiting to offer times for the call.",
+      });
+      return;
+    }
+    await update(row.id, {
+      proposedSlots: slots.map((slot) => slot.toISOString()),
+      lastStep: `Q offered ${String(slots.length)} times; waiting for ${row.counterpart_name} to pick one.`,
+    });
+    await tell(
+      row,
+      link,
+      "slots-offered",
+      `Q offered ${row.counterpart_name} times for your call`,
+      `${lines.join("\n")}\nNo Google calendar is connected, so Q is arranging it in the chat.`,
+    );
+    await dependencies.counterpartNotices
+      ?.notify({
+        relationshipId: row.relationship_id,
+        actingSide: sideOf(row),
+        kind: "TIME_PROPOSED",
+        title: `Q, on behalf of ${principal}, proposed times for a call`.slice(
+          0,
+          200,
+        ),
+        body: lines.join("\n"),
+        target: "CHAT",
+        key: `errand:${row.id}:slots`,
+        priority: "NEEDS_YOU",
+      })
+      .catch(() => 0);
+  }
+
+  /**
+   * Their reply to the offer, read by meaning. True when it settled a time
+   * (booked), so the brief's reply is not also sent.
+   */
+  async function settleTime(
+    actor: ActorContext,
+    row: ErrandRow,
+    plan: ErrandStartPayload,
+    link: string | null,
+    reply: string,
+    negotiation: ErrandNegotiation,
+  ): Promise<boolean> {
+    const call = plan.bookCall;
+    const offered = offeredOf(row);
+    if (call === null || offered.length === 0 || row.meeting_id !== null) {
+      return false;
+    }
+    const zone = (await negotiation.zoneOf(row.user_id)) ?? "UTC";
+    const principal = (await dependencies.nameOf(row.user_id)) ?? "the person";
+    const read = await negotiation.readSlots({
+      actor,
+      principalName: principal,
+      counterpartName: row.counterpart_name,
+      offered: offered
+        .map(
+          (slot, index) =>
+            `${String(index + 1)}. ${slotLabel(slot, zone)} (${slot.toISOString()})`,
+        )
+        .join("\n"),
+      timeZone: zone,
+      now: now().toISOString(),
+      reply,
+    });
+    if (read === null || read.answer === "NONE") return false;
+    if (read.answer === "DECLINED") {
+      await update(row.id, {
+        lastStep: `${row.counterpart_name} doesn't want a call for now.`,
+      });
+      await tell(
+        row,
+        link,
+        "call-declined",
+        `${row.counterpart_name} doesn't want a call for now`,
+        read.quote,
+      );
+      return false;
+    }
+    let at: Date | null = null;
+    if (read.answer === "PICKED" && read.pick !== null) {
+      at = offered[read.pick - 1] ?? null;
+    } else if (read.answer === "OTHER_TIME" && read.otherTime !== null) {
+      const named = new Date(read.otherTime);
+      // Their own time is taken when it is ahead, and inside the owner's
+      // working hours (the availability the plan allows); otherwise the
+      // owner decides.
+      if (
+        !Number.isNaN(named.getTime()) &&
+        named.getTime() > now().getTime() + 2 * 3_600_000 &&
+        insideWindows(named, call.durationMinutes, DEFAULT_WORKING_HOURS, zone)
+      ) {
+        at = named;
+      } else if (!Number.isNaN(named.getTime())) {
+        await update(row.id, {
+          lastStep: `${row.counterpart_name} suggested ${slotLabel(named, zone)}; waiting for you to agree.`,
+        });
+        await tell(
+          row,
+          link,
+          `call-suggested:${named.toISOString()}`,
+          `${row.counterpart_name} suggested ${slotLabel(named, zone)} for the call`,
+          "That's outside your usual hours, so Q didn't accept it. Reply in the chat if it works.",
+        );
+        return false;
+      }
+    }
+    if (at === null) return false;
+    const recorded = await negotiation.recordAgreed({
+      actor,
+      relationshipId: row.relationship_id,
+      purpose: call.purpose,
+      startsAt: at,
+      durationMinutes: call.durationMinutes,
+      timeZone: isKnownZone(zone) ? zone : "UTC",
+      idempotencyKey: `errand:${row.id}:agreed:${at.toISOString()}`,
+      qActionId: row.q_action_id,
+      correlationId: `cor_${randomUUID()}`,
+    });
+    if (recorded.outcome !== "OK") {
+      await update(row.id, {
+        lastStep: "The agreed time could not be recorded yet.",
+      });
+      return false;
+    }
+    const when = slotLabel(at, zone);
+    let invited = true;
+    if (!recorded.alreadyScheduled) {
+      await negotiation
+        .sendInvites({
+          meetingId: recorded.meeting.id,
+          start: at,
+          end: new Date(at.getTime() + call.durationMinutes * 60_000),
+          purpose: call.purpose,
+          timeZone: zone,
+          organiser: recorded.organiser,
+          invitees: recorded.invitees,
+        })
+        .catch(() => {
+          invited = false;
+        });
+    }
+    await post(
+      actor,
+      row,
+      `agreed:${at.toISOString()}`,
+      `Booked for ${when}. ${invited ? "A calendar invite is in your email. " : ""}A video link will follow.`,
+    ).catch(() => false);
+    await update(row.id, {
+      stage: "CALL_BOOKED",
+      meetingId: recorded.meeting.id,
+      lastStep: `Call agreed for ${when}; waiting for a video link.`,
+    });
+    await tell(
+      row,
+      link,
+      "call",
+      `Call with ${row.counterpart_name} agreed: ${when}`,
+      "Add a video link: connect Google Calendar in Settings so Q can add a Meet link, or paste a link in the chat.",
+    );
     return true;
   }
 
@@ -620,6 +914,14 @@ export function createErrandRunner(dependencies: {
       from: new Date(current.getTime() + CALL_LEAD_MS),
       durationMinutes: call.durationMinutes,
     });
+    if (
+      found.outcome === "REFUSED" &&
+      found.code === "CALENDAR_NOT_CONNECTED" &&
+      dependencies.negotiation !== undefined
+    ) {
+      await offerTimes(actor, row, call, link, dependencies.negotiation);
+      return;
+    }
     if (found.outcome !== "OK") {
       const code = found.outcome === "REFUSED" ? found.code : "UNAVAILABLE";
       await tell(
@@ -760,6 +1062,10 @@ export function createErrandRunner(dependencies: {
       return;
     }
     const link = await linkFor(actor, row.relationship_id);
+    const party = await dependencies.relationships
+      .byRelationship(actor, row.relationship_id)
+      .catch(() => null);
+    if (party !== null) sides.set(row.id, party.side);
     if (now() > row.expires_at) {
       await update(row.id, {
         status: row.stage === "WAITING_CONNECTION" ? "EXPIRED" : "DONE",
@@ -835,6 +1141,23 @@ export function createErrandRunner(dependencies: {
       const newest = new Date(
         Math.max(...fresh.map((message) => Date.parse(message.sentAt))),
       );
+      if (
+        dependencies.negotiation !== undefined &&
+        (await settleTime(
+          actor,
+          current,
+          plan.data,
+          link,
+          fresh
+            .map((message) => message.text ?? "")
+            .join("\n")
+            .slice(0, 6_000),
+          dependencies.negotiation,
+        ))
+      ) {
+        await update(row.id, { seenUntil: newest });
+        return;
+      }
       const brief = plan.data.brief;
       if (brief !== null && current.replies_sent < MAX_REPLIES) {
         const principalName =

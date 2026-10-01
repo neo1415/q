@@ -450,3 +450,79 @@ describe("reminders and briefs", () => {
     expect(await w.service.brief(FOUNDER, meetingId)).toBeNull();
   });
 });
+
+// AUTO (2026-10-02): a time agreed in the chat, without Google.
+describe("recordAgreed", () => {
+  const AGREED = {
+    actor: INVESTOR,
+    relationshipId: REL,
+    purpose: "Intro call",
+    startsAt: new Date("2026-10-06T09:00:00Z"),
+    durationMinutes: 30,
+    timeZone: "Africa/Lagos",
+    idempotencyKey: "errand:0001:agreed:2026-10-06T09:00:00.000Z",
+    correlationId: "cor_00000000-0000-4000-8000-000000000002",
+  };
+
+  it("records the meeting without touching any calendar, with the event, reminder and notices", async () => {
+    const w = world();
+    const result = await w.service.recordAgreed(AGREED);
+    expect(result.outcome).toBe("OK");
+    if (result.outcome !== "OK") return;
+    expect(result.meeting.meetLink).toBeNull();
+    expect(result.meeting.status).toBe("SCHEDULED");
+    expect(result.meeting.timeZone).toBe("Africa/Lagos");
+    expect(result.organiser).toEqual({
+      name: "Ben",
+      email: "ben@vc.example.invalid",
+    });
+    expect(result.invitees).toEqual([
+      { name: "Ada", email: "ada@co.example.invalid" },
+    ]);
+    expect(w.investorCalendar.inserted).toHaveLength(0);
+    expect(w.activity.recorded).toEqual([
+      { eventType: "meeting_scheduled", meetingId: result.meeting.id },
+    ]);
+    expect(
+      w.store.reminders
+        .find((r) => r.meetingId === result.meeting.id)
+        ?.dueAt.toISOString(),
+    ).toBe("2026-10-06T08:45:00.000Z");
+    expect(
+      w.store.notifications
+        .filter((n) => n.kind === "MEETING_SCHEDULED")
+        .map((n) => n.userId),
+    ).toEqual([FOUNDER.userId]);
+  });
+
+  it("is idempotent: the same agreement twice is one meeting", async () => {
+    const w = world();
+    await w.service.recordAgreed(AGREED);
+    const again = await w.service.recordAgreed(AGREED);
+    expect(again.outcome === "OK" && again.alreadyScheduled).toBe(true);
+    expect(w.activity.recorded).toHaveLength(1);
+  });
+
+  it("refuses an unconnected relationship, a stranger and a time in the past, and falls back to UTC for an unknown zone", async () => {
+    expect(
+      (await world({ connected: false }).service.recordAgreed(AGREED)).outcome,
+    ).toBe("REFUSED");
+    expect(
+      (await world().service.recordAgreed({ ...AGREED, actor: STRANGER }))
+        .outcome,
+    ).toBe("REFUSED");
+    expect(
+      (
+        await world().service.recordAgreed({
+          ...AGREED,
+          startsAt: new Date("2026-10-01T09:00:00Z"),
+        })
+      ).outcome,
+    ).toBe("REFUSED");
+    const odd = await world().service.recordAgreed({
+      ...AGREED,
+      timeZone: "Nowhere/Else",
+    });
+    expect(odd.outcome === "OK" && odd.meeting.timeZone).toBe("UTC");
+  });
+});

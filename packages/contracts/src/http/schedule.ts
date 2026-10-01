@@ -177,6 +177,11 @@ export const NotificationKindSchema = z.enum([
   // AUTO block (ADR 0030)
   "Q_WORK",
   "Q_STAND_IN",
+  // AUTO (2026-10-02): what the other side hears about.
+  "INTEREST_RECEIVED",
+  "CONNECTION_REQUESTED",
+  "Q_MESSAGE",
+  "TIME_PROPOSED",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

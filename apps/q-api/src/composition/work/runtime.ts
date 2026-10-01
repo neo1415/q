@@ -8,7 +8,11 @@ import {
   type QWorkOutreachGrant,
   type QWorkStandInGrant,
 } from "@capital-q/contracts";
-import type { ChatService, ScheduleService } from "@capital-q/communication";
+import type {
+  ChatService,
+  CounterpartNotices,
+  ScheduleService,
+} from "@capital-q/communication";
 import type { InterestService } from "@capital-q/network";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import {
@@ -36,6 +40,8 @@ import {
   type ActorContextResolver,
 } from "@capital-q/security";
 
+import type { ErrandNegotiation } from "../errands.js";
+import { slotLabel, workingHourSlots } from "../slots.js";
 import type { CounterpartNudger } from "../waiting.js";
 import type { WorkComposers } from "./composers.js";
 import {
@@ -112,6 +118,12 @@ export type WorkRuntimeDependencies = {
   readonly nameOf: (userId: string) => Promise<string | null>;
   /** One gentle reminder to the other side when they stay silent. */
   readonly nudger?: Pick<CounterpartNudger, "nudge"> | undefined;
+  /** Booking without Google (2026-10-02); the errands' own negotiation parts. */
+  readonly noCalendar?:
+    | Pick<ErrandNegotiation, "zoneOf" | "recordAgreed" | "sendInvites">
+    | undefined;
+  /** The other side hears Q's first message. */
+  readonly counterpartNotices?: Pick<CounterpartNotices, "notify"> | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -357,6 +369,27 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
           qDelegationId: ref.delegationId,
           ...(envelope === null ? {} : { qEnvelope: envelope }),
         });
+        // The other side hears that Q wrote to them, and for whom: once
+        // per delegation and relationship.
+        await dependencies.counterpartNotices
+          ?.notify({
+            relationshipId,
+            actingSide:
+              kindOf.get(ref.delegationId) === "FOUNDER_STAND_IN"
+                ? "COMPANY"
+                : "INVESTOR",
+            kind: "Q_MESSAGE",
+            title:
+              `Q, on behalf of ${ref.principalName}, sent you a message`.slice(
+                0,
+                200,
+              ),
+            body: parsed.data.slice(0, 200),
+            target: "CHAT",
+            key: `work:${ref.delegationId}:${relationshipId}`,
+            priority: "UPDATE",
+          })
+          .catch(() => 0);
         return true;
       } catch (error: unknown) {
         logger?.warn(
@@ -439,6 +472,29 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
         })
         .catch(() => null);
       if (found === null) return { outcome: "REFUSED", code: "UNAVAILABLE" };
+      if (
+        found.outcome === "REFUSED" &&
+        found.code === "CALENDAR_NOT_CONNECTED" &&
+        dependencies.noCalendar !== undefined
+      ) {
+        // No Google: the windows the person approved, in their own zone.
+        const zone =
+          (await dependencies.noCalendar.zoneOf(ref.userId)) ?? "UTC";
+        return {
+          outcome: "OK",
+          slots: workingHourSlots({
+            from: new Date(current.getTime() + CALL_LEAD_MS),
+            until: new Date(current.getTime() + CALL_HORIZON_MS),
+            timeZone: zone,
+            durationMinutes: call.durationMinutes,
+            windows: call.windows,
+            count: 3,
+          }).map((slot) => ({
+            start: slot.toISOString(),
+            label: slotLabel(slot, zone),
+          })),
+        };
+      }
       if (found.outcome !== "OK") {
         return {
           outcome: "REFUSED",
@@ -488,6 +544,58 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
         })
         .catch(() => null);
       if (booked === null) return { outcome: "REFUSED", code: "UNAVAILABLE" };
+      if (
+        booked.outcome === "REFUSED" &&
+        booked.code === "CALENDAR_NOT_CONNECTED" &&
+        dependencies.noCalendar !== undefined
+      ) {
+        // No Google: the time the person chose is recorded as agreed, both
+        // sides get the invite by email, and a video link follows.
+        const zone =
+          (await dependencies.noCalendar.zoneOf(ref.userId)) ?? "UTC";
+        const recorded = await dependencies.noCalendar
+          .recordAgreed({
+            actor,
+            relationshipId,
+            purpose: input.purpose,
+            startsAt,
+            durationMinutes: input.durationMinutes,
+            timeZone: zone,
+            idempotencyKey:
+              `work:${ref.delegationId}:${relationshipId}:agreed:${input.key}`.slice(
+                0,
+                200,
+              ),
+            correlationId: createCorrelationId(),
+          })
+          .catch(() => null);
+        if (recorded?.outcome !== "OK") {
+          return { outcome: "REFUSED", code: "UNAVAILABLE" };
+        }
+        if (!recorded.alreadyScheduled) {
+          await dependencies.noCalendar
+            .sendInvites({
+              meetingId: recorded.meeting.id,
+              start: startsAt,
+              end: new Date(
+                startsAt.getTime() + input.durationMinutes * 60_000,
+              ),
+              purpose: input.purpose,
+              timeZone: zone,
+              organiser: recorded.organiser,
+              invitees: recorded.invitees,
+            })
+            .catch((error: unknown) => {
+              logger?.warn({ err: error }, "meeting invite email failed");
+            });
+        }
+        return {
+          outcome: "OK",
+          meetingId: recorded.meeting.id,
+          when: slotLabel(startsAt, zone),
+          meetLink: null,
+        };
+      }
       if (booked.outcome !== "OK") {
         return {
           outcome: "REFUSED",
