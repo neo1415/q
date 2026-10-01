@@ -178,6 +178,8 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // DAILY block.
   DAILY:
     "Opens The Q Daily: their latest edition (news about their sectors, markets, deals and people they know, every story with its source, Q's take labelled), its archive and the PDF edition.",
+  RESULTS:
+    "Opens Results: what their activity on Capital Q produced (introductions, conversations, meetings and where each stands), with reports to download.",
 };
 
 /** Screens that belong to a company's own people. */

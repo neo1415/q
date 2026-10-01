@@ -193,6 +193,7 @@ const DESTINATION_LABELS: Readonly<
   REHEARSALS: "Open Rehearsals",
   DOCUMENTS: "Open Documents",
   DAILY: "Open The Q Daily",
+  RESULTS: "Open Results",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

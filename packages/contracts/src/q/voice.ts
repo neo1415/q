@@ -286,6 +286,8 @@ export const Q_VOICE_DESTINATIONS = [
   "DOCUMENTS",
   // DAILY: The Q Daily, their newspaper and its archive.
   "DAILY",
+  // Results: what their activity on Capital Q produced, with reports.
+  "RESULTS",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

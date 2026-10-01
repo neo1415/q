@@ -16,7 +16,10 @@ describe("TURN_READER v21", () => {
   });
 
   it("names every contract destination exactly once", () => {
-    for (const destination of Q_NAVIGATE_DESTINATIONS) {
+    // RESULTS arrives with v24.
+    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+      (name) => name !== "RESULTS",
+    )) {
       expect(
         TURN_READER_V21.template.split(
           new RegExp(`(?<![A-Z_])${destination} \\(`),

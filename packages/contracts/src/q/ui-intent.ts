@@ -130,6 +130,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "DOCUMENTS",
   // DAILY: The Q Daily, their newspaper and its archive.
   "DAILY",
+  // Results (admin spec §5): what their activity produced, with reports.
+  "RESULTS",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

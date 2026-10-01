@@ -23,7 +23,10 @@ describe("TURN_READER v17", () => {
     // REHEARSALS is named from v19 on.
     for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
       (entry) =>
-        entry !== "REHEARSALS" && entry !== "DOCUMENTS" && entry !== "DAILY",
+        entry !== "REHEARSALS" &&
+        entry !== "DOCUMENTS" &&
+        entry !== "DAILY" &&
+        entry !== "RESULTS",
     )) {
       expect(
         // NEW_PITCH contains PITCH: a name counts only on its own.

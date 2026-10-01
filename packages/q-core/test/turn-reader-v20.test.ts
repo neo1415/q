@@ -20,7 +20,8 @@ describe("TURN_READER v20", () => {
   it("names every contract destination of its time exactly once", () => {
     // DAILY arrived with v21.
     for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
-      (name) => name !== "DAILY",
+      // RESULTS arrives with v24.
+      (name) => name !== "DAILY" && name !== "RESULTS",
     )) {
       expect(
         TURN_READER_V20.template.split(

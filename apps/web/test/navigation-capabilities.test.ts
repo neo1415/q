@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
 
 import {
+  ACCOUNT_NAVIGATION,
   MOBILE_NAVIGATION,
-  PRIMARY_NAVIGATION,
-  PROFILE_NAVIGATION,
+  moreSectionsFor,
+  sectionsFor,
 } from "../src/components/app-shell/navigation";
 import { destinationPath } from "../src/features/voice/destinations";
 
@@ -25,11 +26,19 @@ describe("every navigation screen is a screen Q can open", () => {
         destinationPath(destination),
       ),
     );
+    // Every section either side can reach, on the desktop and the phone.
+    const scopes = ["founder_private", "investor_private", "unset"] as const;
     const hrefs = new Set(
-      [...PRIMARY_NAVIGATION, PROFILE_NAVIGATION, ...MOBILE_NAVIGATION].map(
-        (item) => item.href,
-      ),
+      scopes
+        .flatMap((scope) => [
+          ...sectionsFor(scope),
+          ...ACCOUNT_NAVIGATION,
+          ...MOBILE_NAVIGATION,
+          ...moreSectionsFor(scope),
+        ])
+        .map((item) => item.href),
     );
+    expect(hrefs).toContain("/results");
     const missing = [...hrefs].filter(
       (href) => !reachable.has(href) && (EXCLUDED[href] ?? "").length === 0,
     );
