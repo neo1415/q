@@ -9,7 +9,6 @@ import {
   createModelGateway,
   createModelProviderRegistry,
   createStaticModelCatalog,
-  ModelGatewayError,
   requiredCapabilitiesFor,
 } from "../src/index.js";
 import {
