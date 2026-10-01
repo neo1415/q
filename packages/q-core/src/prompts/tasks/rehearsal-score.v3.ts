@@ -18,7 +18,7 @@ export const REHEARSAL_SCORE_V3: PromptDefinition<
 > = {
   ...REHEARSAL_SCORE_V2,
   version: 3,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "REHEARSE audit (live 2026-10-01): lenient output bounds, trimmed by code, so a long note never refuses the whole review.",
   effectiveFrom: "2026-10-01",

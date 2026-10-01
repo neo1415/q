@@ -29,6 +29,7 @@ import {
   CounterpartPersonaLenientSchema,
   normaliseCounterpartPersona,
   normaliseRehearsalReview,
+  REHEARSAL_DIMENSIONS_FOR,
   RehearsalReviewLenientSchema,
   RehearsalReviewResultSchema,
   RehearsalTurnV4ResultSchema,
@@ -320,6 +321,60 @@ function transcriptOf(
   return text.length <= REHEARSAL_TEXT_MAX
     ? text
     : text.slice(text.length - REHEARSAL_TEXT_MAX);
+}
+
+const wordsOf = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+
+/**
+ * Whether a quoted moment is the person's own words: most of its words
+ * appear, in order, in one of their lines. A structural check on who said
+ * it, never a reading of what it means.
+ */
+export function quotesThem(
+  moment: string,
+  theirLines: readonly string[],
+): boolean {
+  const quoted = wordsOf(moment);
+  if (quoted.length === 0) return false;
+  return theirLines.some((line) => {
+    const words = wordsOf(line);
+    let at = 0;
+    let found = 0;
+    for (const word of quoted) {
+      const next = words.indexOf(word, at);
+      if (next !== -1) {
+        found += 1;
+        at = next + 1;
+      }
+    }
+    return found / quoted.length >= 0.7;
+  });
+}
+
+/**
+ * The review of the person rehearsing and nobody else (founder live
+ * 2026-10-01: an investor's review quoted and graded the founder Q
+ * played). Moments that are not their own words, and dimensions that are
+ * not their role's, are dropped.
+ */
+export function ownReview(
+  review: RehearsalReviewResult,
+  turns: readonly Turn[],
+  role: ViewerRole,
+): RehearsalReviewResult {
+  const theirs = turns.filter((turn) => turn.from === "YOU").map((t) => t.text);
+  const allowed: readonly string[] = REHEARSAL_DIMENSIONS_FOR[role];
+  return {
+    ...review,
+    dimensions: review.dimensions.filter((d) => allowed.includes(d.name)),
+    wentRight: review.wentRight.filter((w) => quotesThem(w.moment, theirs)),
+    wentWrong: review.wentWrong.filter((w) => quotesThem(w.moment, theirs)),
+  };
 }
 
 /** Ratings in words become a score by a fixed rule, never by a model. */
@@ -1518,14 +1573,19 @@ export function createRehearsalService(dependencies: {
         viewerOrganisation: viewer.organisationName.slice(0, 200),
         counterpartName: row.counterpartName,
         persona: personaText(persona).slice(0, 10_000),
-        rehearsal: transcriptOf(turns, row.counterpartName, row.userRole),
+        rehearsal: transcriptOf(
+          turns,
+          `${row.counterpartName} (played by Q)`,
+          row.userRole,
+        ),
         ending: outcome,
       });
       if (review === null) return { kind: "Q_UNAVAILABLE" };
+      const graded = ownReview(review, turns, row.userRole);
       const saved = await store.finish(actor, row.id, {
         outcome,
-        score: scoreOf(review.dimensions),
-        review,
+        score: scoreOf(graded.dimensions),
+        review: graded,
       });
       return okWithHistory(actor, saved ?? (await store.own(actor, row.id)));
     },

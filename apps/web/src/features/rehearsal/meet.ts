@@ -56,6 +56,11 @@ export const DIMENSION_WORDS: Readonly<
   QUESTION_QUALITY: "Question quality",
   RAPPORT: "Rapport",
   NEXT_STEPS: "Next steps",
+  DILIGENCE: "Diligence",
+  CONTROL: "Control of the meeting",
+  FAIRNESS: "Fairness",
+  DECISION_CLARITY: "Decision clarity",
+  PROFESSIONALISM: "Professionalism",
 };
 
 export const RATING_WORDS = {

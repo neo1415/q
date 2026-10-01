@@ -293,10 +293,12 @@ export { INVESTOR_TWIN_TURN_V3 } from "./prompts/tasks/investor-twin-turn.v3.js"
 export { INVESTOR_TWIN_TURN_V4 } from "./prompts/tasks/investor-twin-turn.v4.js";
 export { INVESTOR_PERSONA_V3 } from "./prompts/tasks/investor-persona.v3.js";
 export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
+export { REHEARSAL_SCORE_V4 } from "./prompts/tasks/rehearsal-score.v4.js";
 export {
   REHEARSAL_CONCLUSIONS,
   REHEARSAL_CUES,
   REHEARSAL_CUES_V3,
+  REHEARSAL_DIMENSIONS_FOR,
   REHEARSAL_APPRAISALS_V4,
   REHEARSAL_LINE_MOODS_V4,
   RehearsalTurnV4ResultSchema,

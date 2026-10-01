@@ -6,6 +6,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import {
   createRehearsalService,
+  ownReview,
   scoreOf,
   shownPersona,
   type PersonaRow,
@@ -172,6 +173,7 @@ function setup(options: { messages?: () => string } = {}) {
       difficulty: string;
     }[],
     webReads: 0,
+    reviewTranscripts: [] as string[],
   };
   const material: RehearsalMaterial = {
     viewer: (a) =>
@@ -279,8 +281,9 @@ function setup(options: { messages?: () => string } = {}) {
         conclusion: null,
       });
     },
-    review: () =>
-      Promise.resolve({
+    review: (_a, variables) => {
+      seen.reviewTranscripts.push(variables.rehearsal);
+      return Promise.resolve({
         overall: "Solid, but bring cohorts.",
         dimensions: [
           { name: "CLARITY", rating: "STRONG", note: "Clear story." },
@@ -295,7 +298,8 @@ function setup(options: { messages?: () => string } = {}) {
           },
         ],
         tips: ["Lead with retention for this fund."],
-      }),
+      });
+    },
   };
   const store = memoryStore();
   const service = createRehearsalService({
@@ -686,5 +690,136 @@ describe("a persona longer than the screen's contract (live 2026-10-01)", () => 
     expect(dto.success).toBe(true);
     expect(shown.priorities).toHaveLength(6);
     expect(shown.summary.endsWith(".")).toBe(true);
+  });
+});
+
+describe("the review grades the person rehearsing, in their role (live 2026-10-01)", () => {
+  const turns = [
+    {
+      from: "THEM" as const,
+      text: "We sell maize to 4,000 farmers in Benue.",
+      at: "",
+      mood: null,
+      sawScreen: false,
+    },
+    {
+      from: "YOU" as const,
+      text: "What is your gross margin per tonne, and how do you know?",
+      at: "",
+      mood: null,
+      sawScreen: false,
+    },
+    {
+      from: "THEM" as const,
+      text: "Around eighteen percent, from last season's books.",
+      at: "",
+      mood: null,
+      sawScreen: false,
+    },
+    {
+      from: "YOU" as const,
+      text: "Beg me for the money.",
+      at: "",
+      mood: null,
+      sawScreen: false,
+    },
+  ];
+  const review = {
+    overall: "Mixed.",
+    dimensions: [
+      {
+        name: "DILIGENCE" as const,
+        rating: "STRONG" as const,
+        note: "Good margin question.",
+      },
+      {
+        name: "PROFESSIONALISM" as const,
+        rating: "NEEDS_WORK" as const,
+        note: "Demeaning.",
+      },
+      {
+        name: "THE_ASK" as const,
+        rating: "SOLID" as const,
+        note: "A founder's dimension.",
+      },
+    ],
+    wentRight: [
+      {
+        moment: "What is your gross margin per tonne",
+        why: "Gets to unit economics.",
+      },
+      {
+        moment: "We sell maize to 4,000 farmers in Benue",
+        why: "The persona's line.",
+      },
+    ],
+    wentWrong: [
+      {
+        moment: "Beg me for the money",
+        why: "Demeaning.",
+        better: "Ask what they need.",
+      },
+      { moment: "Around eighteen percent", why: "Not theirs.", better: "-" },
+    ],
+    tips: ["Ask for the season's books."],
+  };
+
+  it("an investor is graded on an investor's job, quoting only their own words", () => {
+    const own = ownReview(review, turns, "INVESTOR");
+    expect(own.dimensions.map((d) => d.name)).toEqual([
+      "DILIGENCE",
+      "PROFESSIONALISM",
+    ]);
+    expect(own.wentRight.map((w) => w.moment)).toEqual([
+      "What is your gross margin per tonne",
+    ]);
+    expect(own.wentWrong.map((w) => w.moment)).toEqual([
+      "Beg me for the money",
+    ]);
+    expect(scoreOf(own.dimensions)).toBe(65);
+  });
+
+  it("a founder is graded on a founder's job, never on the investor Q played", () => {
+    const flipped = turns.map((t) => ({
+      ...t,
+      from: t.from === "YOU" ? ("THEM" as const) : ("YOU" as const),
+    }));
+    const own = ownReview(
+      {
+        ...review,
+        dimensions: [
+          { name: "EVIDENCE", rating: "SOLID", note: "Gave a source." },
+          {
+            name: "DILIGENCE",
+            rating: "STRONG",
+            note: "An investor's dimension.",
+          },
+        ],
+      },
+      flipped,
+      "FOUNDER",
+    );
+    expect(own.dimensions.map((d) => d.name)).toEqual(["EVIDENCE"]);
+    expect(own.wentRight.map((w) => w.moment)).toEqual([
+      "We sell maize to 4,000 farmers in Benue",
+    ]);
+    expect(own.wentWrong.map((w) => w.moment)).toEqual([
+      "Around eighteen percent",
+    ]);
+  });
+
+  it("tells the review model who was played by Q", async () => {
+    const { service, seen } = setup();
+    const rehearsal = await startWith(service);
+    await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Our churn is 2%.",
+    });
+    await service.finish(actor(FOUNDER), rehearsal.id);
+    expect(seen.reviewTranscripts.at(-1)).toContain(
+      "Ventures Fund (played by Q):",
+    );
+    expect(seen.reviewTranscripts.at(-1)).toContain(
+      "The founder (rehearsing): Our churn is 2%.",
+    );
   });
 });

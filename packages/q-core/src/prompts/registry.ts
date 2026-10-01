@@ -76,6 +76,7 @@ import { INVESTOR_TWIN_TURN_V3 } from "./tasks/investor-twin-turn.v3.js";
 import { INVESTOR_TWIN_TURN_V4 } from "./tasks/investor-twin-turn.v4.js";
 import { INVESTOR_PERSONA_V3 } from "./tasks/investor-persona.v3.js";
 import { REHEARSAL_SCORE_V3 } from "./tasks/rehearsal-score.v3.js";
+import { REHEARSAL_SCORE_V4 } from "./tasks/rehearsal-score.v4.js";
 import { FOUNDER_RESEARCH_READER_V1 } from "./tasks/founder-research-reader.v1.js";
 // DOCS block.
 import { DOCUMENT_POLISH_V1 } from "./tasks/document-polish.v1.js";
@@ -337,6 +338,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INVESTOR_TWIN_TURN_V4,
     INVESTOR_PERSONA_V3,
     REHEARSAL_SCORE_V3,
+    REHEARSAL_SCORE_V4,
     FOUNDER_RESEARCH_READER_V1,
     // DOCS block.
     DOCUMENT_POLISH_V1,

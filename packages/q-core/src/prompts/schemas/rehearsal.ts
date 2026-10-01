@@ -221,7 +221,31 @@ export const REHEARSAL_DIMENSIONS = [
   "QUESTION_QUALITY",
   "RAPPORT",
   "NEXT_STEPS",
+  // An investor running a founder meeting (live 2026-10-01).
+  "DILIGENCE",
+  "CONTROL",
+  "FAIRNESS",
+  "DECISION_CLARITY",
+  "PROFESSIONALISM",
 ] as const;
+
+/** Which dimensions grade which side: the person rehearsing, in their role. */
+export const REHEARSAL_DIMENSIONS_FOR = {
+  FOUNDER: [
+    "CLARITY",
+    "EVIDENCE",
+    "HANDLING_PUSHBACK",
+    "FIT_TO_THIS_PERSON",
+    "THE_ASK",
+  ],
+  INVESTOR: [
+    "DILIGENCE",
+    "CONTROL",
+    "FAIRNESS",
+    "DECISION_CLARITY",
+    "PROFESSIONALISM",
+  ],
+} as const;
 
 export const RehearsalReviewVariablesSchema = z
   .object({

@@ -186,6 +186,11 @@ export const REHEARSAL_DIMENSION_NAMES = [
   "QUESTION_QUALITY",
   "RAPPORT",
   "NEXT_STEPS",
+  "DILIGENCE",
+  "CONTROL",
+  "FAIRNESS",
+  "DECISION_CLARITY",
+  "PROFESSIONALISM",
 ] as const;
 
 export const QRehearsalReviewDtoSchema = z
