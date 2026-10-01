@@ -614,6 +614,40 @@ export {
   type ReviseQArtifactRequest,
 } from "./artifact.js";
 
+// DOCS block: brand kit, audit, pairings, answer exports.
+export {
+  Q_ANSWER_EXPORTS_PATH,
+  Q_BRAND_KIT_CONFIRM_SUFFIX,
+  Q_BRAND_KIT_LOGO_SUFFIX,
+  Q_BRAND_KIT_PATH,
+  Q_BRAND_KIT_SOURCES,
+  Q_BRAND_KIT_STATUSES,
+  Q_BRAND_KIT_SUGGEST_SUFFIX,
+  Q_BRAND_LOGO_MAX_BYTES,
+  Q_DOCUMENT_AUDIT_CHECKS,
+  Q_FONT_PAIRINGS,
+  ConfirmQBrandKitRequestSchema,
+  CreateQAnswerExportRequestSchema,
+  QBrandKitSchema,
+  QBrandKitSourceSchema,
+  QBrandKitStateSchema,
+  QBrandKitStatusSchema,
+  QBrandPaletteSchema,
+  QDocumentAuditSchema,
+  QFontPairingSchema,
+  SetQBrandKitRequestSchema,
+  type ConfirmQBrandKitRequest,
+  type CreateQAnswerExportRequest,
+  type QBrandKit,
+  type QBrandKitSource,
+  type QBrandKitState,
+  type QBrandKitStatus,
+  type QBrandPalette,
+  type QDocumentAudit,
+  type QFontPairing,
+  type SetQBrandKitRequest,
+} from "./artifact.js";
+
 export {
   Q_INTERVIEW_PATH,
   Q_INTERVIEW_TURN_SEGMENT,

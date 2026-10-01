@@ -1,6 +1,7 @@
 import {
   clip,
   endPath,
+  LineCapStyle,
   PDFDocument,
   popGraphicsState,
   pushGraphicsState,
@@ -10,7 +11,7 @@ import {
   type RGB,
 } from "pdf-lib";
 import { backgroundBands } from "./background.js";
-import { imageKind, type SlideImages } from "./images.js";
+import { imageBytesFor, imageKind, type SlideImages } from "./images.js";
 
 import { drawLine, embedFonts, type EmbeddedFonts } from "./fonts.js";
 import type { LaidOutDeck, TextBox } from "./layout.js";
@@ -122,8 +123,23 @@ export async function deckToPdf(
         drawText(page, box, deck.height, fonts);
         continue;
       }
+      if (box.kind === "PATH") {
+        for (let at = 1; at < box.points.length; at += 1) {
+          const from = box.points[at - 1];
+          const to = box.points[at];
+          if (from === undefined || to === undefined) continue;
+          page.drawLine({
+            start: { x: from.x, y: deck.height - from.y },
+            end: { x: to.x, y: deck.height - to.y },
+            thickness: box.strokeWidth,
+            color: colour(box.colour),
+            lineCap: LineCapStyle.Round,
+          });
+        }
+        continue;
+      }
       if (box.kind === "IMAGE") {
-        const bytes = images.get(box.url);
+        const bytes = imageBytesFor(box.url, images);
         const kind = bytes === undefined ? null : imageKind(bytes);
         if (bytes === undefined || kind === null) continue;
         const embedded =
@@ -131,6 +147,24 @@ export async function deckToPdf(
             ? await pdf.embedPng(bytes)
             : await pdf.embedJpg(bytes);
         // Cover the box, cropping the overflow: a photo is never stretched.
+        // A logo is fitted inside its box instead, left-aligned, uncropped.
+        if (box.fit === "contain") {
+          const fitted = Math.min(
+            box.width / embedded.width,
+            box.height / embedded.height,
+          );
+          page.drawImage(embedded, {
+            x: box.x,
+            y:
+              deck.height -
+              box.y -
+              box.height +
+              (box.height - embedded.height * fitted) / 2,
+            width: embedded.width * fitted,
+            height: embedded.height * fitted,
+          });
+          continue;
+        }
         const ratio = Math.max(
           box.width / embedded.width,
           box.height / embedded.height,

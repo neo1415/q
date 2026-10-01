@@ -172,6 +172,12 @@ export const QChartSchema = z
     points: z.array(QChartPointSchema).min(2).max(Q_CHART_POINTS_MAX),
     /** Where these numbers came from, in a sentence a reader can check. */
     grounding: z.string().trim().min(1).max(300),
+    /**
+     * DOCS: the short line printed under the chart ("Source: company
+     * record, stated by the founder"). Charts carry their source on the
+     * slide, bottom left, so a reader of the PDF alone can see it.
+     */
+    source: z.string().trim().min(1).max(120).optional(),
   })
   .strict();
 export type QChart = z.infer<typeof QChartSchema>;
@@ -301,6 +307,27 @@ export const QDeckColourSchema = z
   .trim()
   .regex(/^#[0-9a-fA-F]{6}$/, "expected a hex colour");
 
+// --- DOCS block: type pairings (reference data) ----------------------------
+
+/**
+ * A heading/body type pairing, as a reference code (SIL OFL families).
+ * Reference data, not an enum: an older renderer falls back to its default
+ * faces for a code it has not heard of.
+ */
+export const Q_FONT_PAIRINGS = [
+  "INTER_SOURCE_SERIF",
+  "PLEX_SANS_PLEX_SERIF",
+  "SOURCE_SANS_FRAUNCES",
+  "INTER_ONLY",
+] as const;
+export type QFontPairing = (typeof Q_FONT_PAIRINGS)[number];
+export const QFontPairingSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Z][A-Z0-9_]{2,47}$/, "expected a font pairing code");
+
+// --- end DOCS block ----------------------------------------------------------
+
 export const QDeckSchema = z
   .object({
     slides: z.array(QSlideSchema).min(1).max(Q_DECK_SLIDES_MAX),
@@ -347,6 +374,19 @@ export const QDeckSchema = z
      */
     background: QDeckColourSchema.optional(),
     ink: QDeckColourSchema.optional(),
+    /**
+     * DOCS: the brand the deck was drawn with. `kitVersion` is the
+     * confirmed brand kit version whose logo the cover shows (read by
+     * version, so a version renders the same forever); `pairing` is a
+     * type pairing code from the design reference data. Absent: no brand.
+     */
+    brand: z
+      .object({
+        kitVersion: z.number().int().min(1).optional(),
+        pairing: QFontPairingSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type QDeck = z.infer<typeof QDeckSchema>;
@@ -366,6 +406,41 @@ export const QDocumentLookSchema = z
   })
   .strict();
 export type QDocumentLook = z.infer<typeof QDocumentLookSchema>;
+
+// --- DOCS block: audit -------------------------------------------------------
+
+/** What the audit pass checks. Reference data: the set grows. */
+export const Q_DOCUMENT_AUDIT_CHECKS = [
+  "LAYOUT_FITS",
+  "TEXT_CONTRAST",
+  "FIGURES_GROUNDED",
+  "CHARTS_SOURCED",
+  "IMAGES_CREDITED",
+] as const;
+export const QDocumentAuditSchema = z
+  .object({
+    passed: z.boolean(),
+    checks: z
+      .array(
+        z
+          .object({
+            code: z
+              .string()
+              .trim()
+              .regex(/^[A-Z][A-Z0-9_]{2,47}$/),
+            ok: z.boolean(),
+            note: z.string().trim().max(300).optional(),
+          })
+          .strict(),
+      )
+      .max(24),
+    /** At most three things the person could add; never Q filling them in. */
+    suggestions: z.array(z.string().trim().min(1).max(200)).max(3).default([]),
+  })
+  .strict();
+export type QDocumentAudit = z.infer<typeof QDocumentAuditSchema>;
+
+// --- end DOCS block ----------------------------------------------------------
 
 /**
  * The whole of one version's content.
@@ -398,9 +473,111 @@ export const QArtifactContentSchema = z
     deck: QDeckSchema.optional(),
     /** The document's look, when the person asked for one. */
     look: QDocumentLookSchema.optional(),
+    /**
+     * DOCS: what the audit pass found on this version (layout, contrast,
+     * figure provenance, chart rules) and at most three things the person
+     * could add to make it stronger. Facts about the document, never about
+     * the company.
+     */
+    audit: QDocumentAuditSchema.optional(),
   })
   .strict();
 export type QArtifactContent = z.infer<typeof QArtifactContentSchema>;
+
+// --- DOCS block: brand kit --------------------------------------------------
+
+export const Q_BRAND_KIT_STATUSES = [
+  "RECOMMENDED",
+  "CONFIRMED",
+  "DECLINED",
+] as const;
+export const QBrandKitStatusSchema = z.enum(Q_BRAND_KIT_STATUSES);
+export type QBrandKitStatus = z.infer<typeof QBrandKitStatusSchema>;
+
+export const Q_BRAND_KIT_SOURCES = ["WEBSITE", "PERSON", "Q_DESIGN"] as const;
+export const QBrandKitSourceSchema = z.enum(Q_BRAND_KIT_SOURCES);
+export type QBrandKitSource = z.infer<typeof QBrandKitSourceSchema>;
+
+/** A company's colours by role, as #rrggbb. Only primary is required. */
+export const QBrandPaletteSchema = z
+  .object({
+    primary: QDeckColourSchema,
+    secondary: QDeckColourSchema.optional(),
+    background: QDeckColourSchema.optional(),
+    ink: QDeckColourSchema.optional(),
+  })
+  .strict();
+export type QBrandPalette = z.infer<typeof QBrandPaletteSchema>;
+
+/**
+ * One brand kit version, as a client sees it. The logo itself is served
+ * separately (by version) and never travels in this projection.
+ */
+export const QBrandKitSchema = z
+  .object({
+    version: z.number().int().min(1),
+    status: QBrandKitStatusSchema,
+    source: QBrandKitSourceSchema,
+    sourceUrl: z.string().url().max(2048).optional(),
+    palette: QBrandPaletteSchema,
+    pairing: QFontPairingSchema.optional(),
+    hasLogo: z.boolean(),
+    createdAt: UtcTimestampSchema,
+  })
+  .strict();
+export type QBrandKit = z.infer<typeof QBrandKitSchema>;
+
+/** What applies now (latest confirmed) and what is waiting for a yes. */
+export const QBrandKitStateSchema = z
+  .object({
+    effective: QBrandKitSchema.optional(),
+    suggestion: QBrandKitSchema.optional(),
+  })
+  .strict();
+export type QBrandKitState = z.infer<typeof QBrandKitStateSchema>;
+
+export const Q_BRAND_KIT_PATH = "/v1/q/brand-kit" as const;
+export const Q_BRAND_KIT_SUGGEST_SUFFIX = "/suggest" as const;
+export const Q_BRAND_KIT_CONFIRM_SUFFIX = "/confirm" as const;
+export const Q_BRAND_KIT_LOGO_SUFFIX = "/logo" as const;
+export const Q_BRAND_LOGO_MAX_BYTES = 512 * 1024;
+
+/** PUBLIC. The person's own values: a declaration, confirmed as given. */
+export const SetQBrandKitRequestSchema = z
+  .object({
+    palette: QBrandPaletteSchema,
+    pairing: QFontPairingSchema.optional(),
+    /** base64 PNG or JPEG; absent keeps the current logo. */
+    logoBase64: z
+      .string()
+      .max(Math.ceil((Q_BRAND_LOGO_MAX_BYTES * 4) / 3) + 8)
+      .optional(),
+    removeLogo: z.boolean().optional(),
+  })
+  .strict();
+export type SetQBrandKitRequest = z.infer<typeof SetQBrandKitRequestSchema>;
+
+/** PUBLIC. Confirm exactly this suggestion, or decline it. */
+export const ConfirmQBrandKitRequestSchema = z
+  .object({
+    version: z.number().int().min(1),
+    decision: z.enum(["CONFIRM", "DECLINE"]).default("CONFIRM"),
+  })
+  .strict();
+export type ConfirmQBrandKitRequest = z.infer<
+  typeof ConfirmQBrandKitRequestSchema
+>;
+
+/** PUBLIC. File one of Q's answers in this person's conversation as a PDF. */
+export const Q_ANSWER_EXPORTS_PATH = "/v1/q/answer-exports" as const;
+export const CreateQAnswerExportRequestSchema = z
+  .object({ runId: QRunIdSchema })
+  .strict();
+export type CreateQAnswerExportRequest = z.infer<
+  typeof CreateQAnswerExportRequestSchema
+>;
+
+// --- end DOCS block ----------------------------------------------------------
 
 /** One composed version. Append-only: a later version never edits this one. */
 export const QArtifactVersionSchema = z

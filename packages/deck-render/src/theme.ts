@@ -1,3 +1,5 @@
+import { fontPairing } from "./design.js";
+
 /**
  * What a visual direction means, in numbers (QX-004 §3.3, §5).
  *
@@ -98,6 +100,17 @@ const BY_DIRECTION: Readonly<Record<string, DeckTheme>> = {
 export type BrandInput = {
   readonly direction?: string | undefined;
   readonly accent?: string | undefined;
+  /**
+   * DOCS: the confirmed brand kit's logo, drawn on the cover. Bytes, never
+   * a URL: a renderer fetches nothing a brand kit names (PNG or JPEG,
+   * checked by magic bytes before it is stored and again when drawn).
+   */
+  readonly logo?: BrandLogo | undefined;
+};
+
+export type BrandLogo = {
+  readonly bytes: Uint8Array;
+  readonly contentType: "image/png" | "image/jpeg";
 };
 
 /**
@@ -113,7 +126,16 @@ export function themeFor(
   // falls through to the institutional default below rather than failing.
   direction: string | undefined,
   accent?: string,
+  /** DOCS: a type pairing code; unknown codes keep the direction's faces. */
+  pairing?: string,
 ): DeckTheme {
   const base = BY_DIRECTION[direction ?? ""] ?? INSTITUTIONAL;
-  return accent === undefined ? base : { ...base, accent };
+  const faces = fontPairing(pairing);
+  return {
+    ...base,
+    ...(accent === undefined ? {} : { accent }),
+    ...(faces === undefined
+      ? {}
+      : { headingFont: faces.headingFont, bodyFont: faces.bodyFont }),
+  };
 }

@@ -20,6 +20,7 @@ export {
   type LaidOutBox,
   type LaidOutDeck,
   type LaidOutSlide,
+  type PathBox,
   type RuleBox,
   type TextBox,
 } from "./layout.js";
@@ -62,7 +63,18 @@ export {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
   type BrandInput,
+  type BrandLogo,
   type DeckTheme,
 } from "./theme.js";
 
-export { fetchSlideImages, type SlideImages } from "./images.js";
+// DOCS block: design reference data.
+export {
+  designDirectionFor,
+  fontPairing,
+  FONT_PAIRINGS,
+  type DesignDirection,
+  type FontPairing,
+} from "./design.js";
+export { mix } from "./contrast.js";
+
+export { fetchSlideImages, imageKind, type SlideImages } from "./images.js";

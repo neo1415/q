@@ -8,7 +8,7 @@ import {
   type BrandInput,
   type DeckTheme,
 } from "./theme.js";
-import { contrastRatio } from "./contrast.js";
+import { contrastRatio, mix } from "./contrast.js";
 
 /**
  * Where everything on a slide goes (QX-004 §5, §6, §7).
@@ -89,6 +89,26 @@ export type ImageBox = {
   readonly url: string;
   readonly alt: string;
   readonly credit: string;
+  /**
+   * DOCS: "cover" fills the box and crops (a photo); "contain" fits inside
+   * it uncropped (a logo). Absent is cover.
+   */
+  readonly fit?: "cover" | "contain" | undefined;
+};
+
+/**
+ * DOCS: a stroked polyline through points (a line chart's series).
+ * Decoration like a rule: the numbers it joins are printed beside them.
+ */
+export type PathBox = {
+  readonly kind: "PATH";
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly points: readonly { readonly x: number; readonly y: number }[];
+  readonly colour: string;
+  readonly strokeWidth: number;
 };
 
 /** A filled circle: a step marker in a drawn flow. Decoration, like a rule. */
@@ -101,7 +121,8 @@ export type CircleBox = {
   readonly colour: string;
 };
 
-export type LaidOutBox = TextBox | ChartBox | RuleBox | ImageBox | CircleBox;
+export type LaidOutBox =
+  TextBox | ChartBox | RuleBox | ImageBox | CircleBox | PathBox;
 
 export type LaidOutSlide = {
   readonly index: number;
@@ -290,6 +311,311 @@ function layOutChart(
   };
 }
 
+type Frame = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
+/** "1,200 USD", or "1,200" for a plain count. */
+function formatted(chart: QChart, value: string): string {
+  return `${formatValue(value)}${chart.unit === "count" ? "" : ` ${chart.unit}`}`;
+}
+
+/**
+ * Horizontal bars (DOCS): a label on the left, the bar from a zero
+ * baseline, the value printed at its end. For comparisons whose labels
+ * are long, which columns would have to wrap into three lines.
+ */
+function layOutBars(
+  chart: QChart,
+  theme: DeckTheme,
+  frame: Frame,
+): LaidOutBox[] {
+  const labelSize = Math.max(theme.sizes.label, theme.minimumSize);
+  const values = chart.points.map((point) => Number(point.value));
+  const highest = values.reduce(
+    (most, value) => (Number.isFinite(value) && value > most ? value : most),
+    0,
+  );
+  const labelWidth = Math.round(frame.width * 0.32);
+  const valueWidth =
+    Math.max(
+      ...chart.points.map((point) =>
+        measure(formatted(chart, point.value), labelSize),
+      ),
+    ) + 12;
+  const barLeft = frame.x + labelWidth + 16;
+  const barSpan = Math.max(
+    40,
+    frame.x + frame.width - valueWidth - 8 - barLeft,
+  );
+  const row = Math.min(56, Math.floor(frame.height / chart.points.length));
+  const thickness = Math.max(10, Math.round(row * 0.5));
+  const boxes: LaidOutBox[] = [
+    {
+      kind: "RULE",
+      x: barLeft - 1,
+      y: frame.y,
+      width: 1,
+      height: row * chart.points.length,
+      colour: theme.muted,
+    },
+  ];
+  chart.points.forEach((point, index) => {
+    const value = values[index] ?? 0;
+    const top = frame.y + row * index;
+    const length =
+      highest > 0 && Number.isFinite(value) && value > 0
+        ? Math.max(2, Math.round((value / highest) * barSpan))
+        : 2;
+    const barTop = top + Math.round((row - thickness) / 2);
+    const label = text("LABEL", point.label, {
+      x: frame.x,
+      y: 0,
+      width: labelWidth,
+      size: labelSize,
+      colour: theme.muted,
+    });
+    const shown = label.lines.slice(0, 2);
+    boxes.push({
+      ...label,
+      lines: shown,
+      height: shown.length * label.lineHeight,
+      y: Math.round(top + (row - shown.length * label.lineHeight) / 2),
+    });
+    boxes.push({
+      kind: "RULE",
+      x: barLeft,
+      y: barTop,
+      width: length,
+      height: thickness,
+      colour: theme.accent,
+    });
+    boxes.push(
+      text("LABEL", formatted(chart, point.value), {
+        x: barLeft + length + 8,
+        y: Math.round(top + (row - labelSize * LINE_SPACING) / 2),
+        width: valueWidth,
+        size: labelSize,
+        colour: theme.ink,
+        bold: true,
+      }),
+    );
+  });
+  return boxes;
+}
+
+/**
+ * A line through an ordered sequence (DOCS): one series, every point
+ * marked and its value printed above it, labels along the bottom. Scaled
+ * from zero like a column, so a line never exaggerates a change.
+ */
+function layOutLine(
+  chart: QChart,
+  theme: DeckTheme,
+  frame: Frame,
+): LaidOutBox[] {
+  const labelSize = Math.max(theme.sizes.label, theme.minimumSize);
+  const labelBand = Math.round(labelSize * LINE_SPACING * 2) + 8;
+  const valueBand = Math.round(labelSize * LINE_SPACING) + 18;
+  const plotHeight = Math.max(40, frame.height - labelBand - valueBand);
+  const baseline = frame.y + valueBand + plotHeight;
+  const values = chart.points.map((point) => Number(point.value));
+  const highest = values.reduce(
+    (most, value) => (Number.isFinite(value) && value > most ? value : most),
+    0,
+  );
+  const slot = frame.width / chart.points.length;
+  const points = chart.points.map((_, index) => {
+    const value = values[index] ?? 0;
+    const scaled =
+      highest > 0 && Number.isFinite(value) && value > 0
+        ? (value / highest) * plotHeight
+        : 0;
+    return {
+      x: Math.round(frame.x + slot * index + slot / 2),
+      y: Math.round(baseline - scaled),
+    };
+  });
+  const boxes: LaidOutBox[] = [
+    {
+      kind: "RULE",
+      x: frame.x,
+      y: baseline,
+      width: frame.width,
+      height: 1,
+      colour: theme.muted,
+    },
+    {
+      kind: "PATH",
+      x: frame.x,
+      y: frame.y,
+      width: frame.width,
+      height: frame.height,
+      points,
+      colour: theme.accent,
+      strokeWidth: 3,
+    },
+  ];
+  const marker = 10;
+  chart.points.forEach((point, index) => {
+    const at = points[index];
+    if (at === undefined) return;
+    boxes.push({
+      kind: "CIRCLE",
+      x: at.x - marker / 2,
+      y: at.y - marker / 2,
+      width: marker,
+      height: marker,
+      colour: theme.accent,
+    });
+    boxes.push(
+      text("LABEL", formatted(chart, point.value), {
+        x: Math.round(at.x - slot / 2),
+        y: Math.round(at.y - marker / 2 - 6 - labelSize * LINE_SPACING),
+        width: Math.round(slot),
+        size: labelSize,
+        colour: theme.ink,
+        bold: true,
+        align: "centre",
+      }),
+    );
+    const label = text("LABEL", point.label, {
+      x: Math.round(at.x - slot / 2 + 4),
+      y: baseline + 8,
+      width: Math.round(slot - 8),
+      size: labelSize,
+      colour: theme.muted,
+      align: "centre",
+    });
+    const shown = label.lines.slice(0, 2);
+    boxes.push({
+      ...label,
+      lines: shown,
+      height: shown.length * label.lineHeight,
+    });
+  });
+  return boxes;
+}
+
+/**
+ * Parts of a whole (DOCS): a DONUT is drawn as one stacked bar, because
+ * lengths along one axis are read more accurately than angles and every
+ * renderer can draw a rectangle exactly. One hue in tints, separated by
+ * gaps, each part listed under it with its value and share, so colour
+ * never carries the meaning. Parts that are not all positive are not a
+ * whole: they are drawn as bars instead.
+ */
+function layOutParts(
+  chart: QChart,
+  theme: DeckTheme,
+  frame: Frame,
+): LaidOutBox[] {
+  const values = chart.points.map((point) => Number(point.value));
+  if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
+    return layOutBars(chart, theme, frame);
+  }
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const labelSize = Math.max(theme.sizes.label, theme.minimumSize);
+  const barHeight = 44;
+  const gap = 3;
+  const usable = frame.width - gap * (values.length - 1);
+  const tint = (index: number) =>
+    mix(theme.accent, theme.background, Math.min(0.8, index * 0.16));
+  const boxes: LaidOutBox[] = [];
+  let x = frame.x;
+  values.forEach((value, index) => {
+    const width =
+      index === values.length - 1
+        ? frame.x + frame.width - x
+        : Math.max(2, Math.round((value / total) * usable));
+    boxes.push({
+      kind: "RULE",
+      x,
+      y: frame.y,
+      width,
+      height: barHeight,
+      colour: tint(index),
+    });
+    x += width + gap;
+  });
+  const columns = values.length > 4 ? 2 : 1;
+  const columnWidth = Math.floor((frame.width - 32 * (columns - 1)) / columns);
+  const perColumn = Math.ceil(values.length / columns);
+  const rowHeight = Math.round(labelSize * LINE_SPACING) + 10;
+  chart.points.forEach((point, index) => {
+    const column = Math.floor(index / perColumn);
+    const left = frame.x + column * (columnWidth + 32);
+    const top = frame.y + barHeight + 24 + (index % perColumn) * rowHeight;
+    const share = Math.round(((values[index] ?? 0) / total) * 100);
+    boxes.push({
+      kind: "RULE",
+      x: left,
+      y: top + 3,
+      width: 14,
+      height: 14,
+      colour: tint(index),
+    });
+    const line = text(
+      "LABEL",
+      `${point.label}: ${formatted(chart, point.value)} (${String(share)}%)`,
+      {
+        x: left + 24,
+        y: top,
+        width: columnWidth - 24,
+        size: labelSize,
+        colour: theme.ink,
+      },
+    );
+    boxes.push({
+      ...line,
+      lines: line.lines.slice(0, 1),
+      height: line.lineHeight,
+    });
+  });
+  return boxes;
+}
+
+/**
+ * A chart in the form its kind names, with its source line under it
+ * (DOCS: a chart says where its numbers came from on the slide itself).
+ */
+function layOutChartForm(
+  chart: QChart,
+  theme: DeckTheme,
+  frame: Frame,
+): LaidOutBox[] {
+  const labelSize = Math.max(theme.sizes.label, theme.minimumSize);
+  const sourceBand =
+    chart.source === undefined ? 0 : Math.round(labelSize * LINE_SPACING) + 10;
+  const plot = { ...frame, height: frame.height - sourceBand };
+  const boxes: LaidOutBox[] =
+    chart.kind === "BAR"
+      ? layOutBars(chart, theme, plot)
+      : chart.kind === "LINE"
+        ? layOutLine(chart, theme, plot)
+        : chart.kind === "DONUT"
+          ? layOutParts(chart, theme, plot)
+          : [layOutChart(chart, theme, plot)];
+  if (chart.source !== undefined) {
+    const source = text("LABEL", `Source: ${chart.source}`, {
+      x: frame.x,
+      y: frame.y + frame.height - sourceBand + 10,
+      width: frame.width,
+      size: labelSize,
+      colour: theme.muted,
+    });
+    boxes.push({
+      ...source,
+      lines: source.lines.slice(0, 1),
+      height: source.lineHeight,
+    });
+  }
+  return boxes;
+}
+
 /**
  * One slide, at a given scale.
  *
@@ -400,7 +726,7 @@ function layOutSlide(
     const available = bottom - cursor;
     if (available >= 120) {
       boxes.push(
-        layOutChart(slide.chart, theme, {
+        ...layOutChartForm(slide.chart, theme, {
           x: MARGIN,
           y: cursor,
           width,
@@ -632,7 +958,9 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
   const theme = themeFor(
     brand?.direction ?? deck.direction,
     brand?.accent ?? deck.accent,
+    deck.brand?.pairing,
   );
+  const logo = brand?.logo;
   const cover = deck.cover;
   const slides = deck.slides.map((slide, index) => {
     // The cover the person asked for: the first slide, when it is a title
@@ -696,6 +1024,26 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
             url: image.url,
             alt: image.alt,
             credit: image.credit,
+          },
+        ],
+      };
+    }
+    // DOCS: the company's own logo on the cover, top left, uncropped.
+    if (logo !== undefined && index === 0 && slide.layout === "TITLE") {
+      laid = {
+        ...laid,
+        boxes: [
+          ...laid.boxes,
+          {
+            kind: "IMAGE",
+            x: MARGIN,
+            y: MARGIN,
+            width: 180,
+            height: 48,
+            url: `data:${logo.contentType};base64,${Buffer.from(logo.bytes).toString("base64")}`,
+            alt: "Company logo",
+            credit: "",
+            fit: "contain",
           },
         ],
       };

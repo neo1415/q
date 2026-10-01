@@ -57,3 +57,22 @@ export function imageKind(bytes: Uint8Array): "jpeg" | "png" | null {
   if (bytes[0] === 0x89 && bytes[1] === 0x50) return "png";
   return null;
 }
+
+/**
+ * The bytes an IMAGE box draws: a fetched stock photo by its URL, or a
+ * brand logo carried inline as a PNG/JPEG data URI (DOCS). Anything else
+ * draws nothing.
+ */
+export function imageBytesFor(
+  url: string,
+  images: SlideImages,
+): Uint8Array | undefined {
+  const inline = /^data:image\/(?:png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(
+    url,
+  );
+  if (inline?.[1] !== undefined) {
+    const bytes = new Uint8Array(Buffer.from(inline[1], "base64"));
+    return imageKind(bytes) === null ? undefined : bytes;
+  }
+  return images.get(url);
+}

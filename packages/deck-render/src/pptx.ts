@@ -1,6 +1,6 @@
 import * as pptxgenjs from "pptxgenjs";
 import { backgroundBands } from "./background.js";
-import { imageKind, type SlideImages } from "./images.js";
+import { imageBytesFor, imageKind, type SlideImages } from "./images.js";
 
 import type { LaidOutDeck, TextBox } from "./layout.js";
 
@@ -168,8 +168,27 @@ export async function deckToPptx(
         addText(slide, box, deck.theme);
         continue;
       }
+      if (box.kind === "PATH") {
+        // One straight connector per segment. PowerPoint draws a line
+        // shape from its box's top-left corner to its bottom-right, so a
+        // segment that rises is the same box flipped vertically.
+        for (let at = 1; at < box.points.length; at += 1) {
+          const from = box.points[at - 1];
+          const to = box.points[at];
+          if (from === undefined || to === undefined) continue;
+          slide.addShape("line", {
+            x: inches(Math.min(from.x, to.x)),
+            y: inches(Math.min(from.y, to.y)),
+            w: inches(Math.abs(to.x - from.x)),
+            h: inches(Math.abs(to.y - from.y)),
+            flipV: to.y < from.y,
+            line: { color: hex(box.colour), width: box.strokeWidth },
+          });
+        }
+        continue;
+      }
       if (box.kind === "IMAGE") {
-        const bytes = images.get(box.url);
+        const bytes = imageBytesFor(box.url, images);
         const kind = bytes === undefined ? null : imageKind(bytes);
         if (bytes === undefined || kind === null) continue;
         // Embedded, not linked: the file opens offline and on any machine.
@@ -180,7 +199,7 @@ export async function deckToPptx(
           w: inches(box.width),
           h: inches(box.height),
           sizing: {
-            type: "cover",
+            type: box.fit === "contain" ? "contain" : "cover",
             w: inches(box.width),
             h: inches(box.height),
           },

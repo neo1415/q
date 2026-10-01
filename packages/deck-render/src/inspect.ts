@@ -93,9 +93,14 @@ function inspectSlide(
 
   // Rules and step markers are decoration; a step's number sits on its marker.
   const placed = slide.boxes.filter(
-    (box) => box.kind !== "RULE" && box.kind !== "CIRCLE",
+    // A path's box is its whole chart frame; the labels inside it are
+    // meant to be there (DOCS).
+    (box) =>
+      box.kind !== "RULE" && box.kind !== "CIRCLE" && box.kind !== "PATH",
   );
   for (const box of slide.boxes) {
+    // A photo is full-bleed on its side by design; a logo is not.
+    if (box.kind === "IMAGE" && box.fit !== "contain") continue;
     if (
       box.x < MARGIN - 1 ||
       box.y < MARGIN - 1 ||

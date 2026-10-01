@@ -67,17 +67,29 @@ export function slideToSvg(slide: LaidOutSlide, deck: LaidOutDeck): string {
       continue;
     }
     if (box.kind === "IMAGE") {
-      // The browser fetches it from the stock library's CDN directly.
+      // The browser fetches a photo from the stock library's CDN directly;
+      // a logo arrives inline as a data URI and is fitted, never cropped.
+      const fit = box.fit === "contain" ? "xMinYMid meet" : "xMidYMid slice";
       parts.push(
-        `<image href="${escape(box.url)}" x="${String(box.x)}" y="${String(box.y)}" width="${String(box.width)}" height="${String(box.height)}" preserveAspectRatio="xMidYMid slice"><title>${escape(box.alt)}</title></image>`,
+        `<image href="${escape(box.url)}" x="${String(box.x)}" y="${String(box.y)}" width="${String(box.width)}" height="${String(box.height)}" preserveAspectRatio="${fit}"><title>${escape(box.alt)}</title></image>`,
+      );
+      continue;
+    }
+    if (box.kind === "PATH") {
+      const points = box.points
+        .map((point) => `${String(point.x)},${String(point.y)}`)
+        .join(" ");
+      parts.push(
+        `<polyline points="${points}" fill="none" stroke="${escape(box.colour)}" stroke-width="${String(box.strokeWidth)}" stroke-linejoin="round" stroke-linecap="round"/>`,
       );
       continue;
     }
     if (box.kind === "TEXT") {
-      const family =
+      const family = `${
         box.role === "TITLE" || box.role === "HEADING"
           ? theme.headingFont
-          : theme.bodyFont;
+          : theme.bodyFont
+      }, Helvetica, Arial, sans-serif`;
       parts.push(textElement(box, family));
       continue;
     }

@@ -24,3 +24,27 @@ export function contrastRatio(a: string, b: string): number | null {
   const darker = Math.min(first, second);
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+/**
+ * `from` moved towards `to` by `amount` (0 keeps `from`, 1 is `to`), in
+ * sRGB. For tints of one accent on a chart, so a part-of-whole bar uses
+ * one hue and its labels, not colour, carry which part is which.
+ */
+export function mix(from: string, to: string, amount: number): string {
+  const read = (hex: string): readonly number[] | null => {
+    const digits = /^#([0-9a-f]{6})$/i.exec(hex.trim())?.[1];
+    if (digits === undefined) return null;
+    return [0, 2, 4].map((at) => Number.parseInt(digits.slice(at, at + 2), 16));
+  };
+  const a = read(from);
+  const b = read(to);
+  if (a === null || b === null) return from;
+  const t = Math.min(1, Math.max(0, amount));
+  return `#${a
+    .map((value, index) =>
+      Math.round(value + ((b[index] ?? value) - value) * t)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
