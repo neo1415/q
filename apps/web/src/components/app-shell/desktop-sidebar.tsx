@@ -6,11 +6,7 @@ import { useState } from "react";
 
 import { cx } from "@capital-q/ui";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
-import {
-  ICON_SIZE,
-  ICON_STROKE,
-  PanelLeft,
-} from "@capital-q/ui/icons";
+import { ICON_SIZE, ICON_STROKE, PanelLeft } from "@capital-q/ui/icons";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { ThemeMenu } from "@/features/appearance/theme-menu";
@@ -20,6 +16,7 @@ import type { ShellContext } from "./app-shell";
 import {
   FOUNDER_MEDIA_NAVIGATION,
   FIND_NAVIGATION,
+  REHEARSALS_NAVIGATION,
   FOUNDER_REQUESTS_NAVIGATION,
   INVESTORS_NAVIGATION,
   isActiveRoute,
@@ -62,6 +59,10 @@ export function DesktopSidebar({
       : context.scope === "investor_private"
         ? [FOUNDER_REQUESTS_NAVIGATION]
         : []),
+    ...(context.scope === "founder_private" ||
+    context.scope === "investor_private"
+      ? [REHEARSALS_NAVIGATION]
+      : []),
     FIND_NAVIGATION,
   ];
 

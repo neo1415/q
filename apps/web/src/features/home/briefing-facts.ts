@@ -3,6 +3,7 @@ import "server-only";
 import {
   discoverCompanies,
   getMarketplaceReadiness,
+  getRehearsalPartners,
   listCompanyRelationships,
   listIncomingInterest,
   listInvestorRelationships,
@@ -14,6 +15,7 @@ import type {
   MarketplaceReadinessAssessment,
   OnboardingBriefingNudgeResponse,
   QPendingApprovalList,
+  QRehearsalPartnersDto,
   RelationshipListDto,
 } from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
@@ -31,6 +33,7 @@ import {
   type ReadinessGapFact,
   type RelationshipFact,
   type SetupNudgeFact,
+  type UpcomingCallFact,
 } from "./briefing";
 
 /**
@@ -64,6 +67,9 @@ export type BriefingReads = {
   readonly companySlate: () => Promise<DiscoveryCompanySlateDto>;
   /** Today's setup reminder, if the server's policy gives one (read only). */
   readonly setupNudge: () => Promise<OnboardingBriefingNudgeResponse>;
+  /** REHEARSE: their own upcoming calls, with whom (Q API). */
+  readonly rehearsalPartners?:
+    (() => Promise<QRehearsalPartnersDto>) | undefined;
 };
 
 /** Past this, a read is treated as unanswered rather than waited for. */
@@ -155,6 +161,29 @@ function readinessGaps(
     }));
 }
 
+/** REHEARSE: their own calls in the next week, soonest first. */
+async function partnersWithin(
+  reads: BriefingReads,
+  now: Date,
+): Promise<readonly UpcomingCallFact[] | undefined> {
+  const read = reads.rehearsalPartners;
+  if (read === undefined) return undefined;
+  const partners = await within(read);
+  if (partners === undefined) return undefined;
+  const until = now.getTime() + NEWS_WINDOW_MS;
+  return partners.upcoming
+    .filter((call) => {
+      const at = Date.parse(call.startsAt);
+      return at > now.getTime() && at <= until;
+    })
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
+    .map((call) => ({
+      meetingId: call.meetingId,
+      counterpartName: call.counterpart.name,
+      startsAt: call.startsAt,
+    }));
+}
+
 export async function readBriefingFacts(
   context: OwnContext,
   reads: BriefingReads,
@@ -164,13 +193,14 @@ export async function readBriefingFacts(
   switch (context.kind) {
     case "FOUNDER": {
       const { companyId } = context;
-      const [approvals, relationships, interest, readiness, nudge] =
+      const [approvals, relationships, interest, readiness, nudge, partners] =
         await Promise.all([
           within(reads.pendingApprovals),
           within(() => reads.companyRelationships(companyId)),
           within(() => reads.incomingInterest(companyId)),
           within(() => reads.readiness(companyId)),
           within(reads.setupNudge),
+          partnersWithin(reads, now),
         ]);
       return {
         role: "FOUNDER",
@@ -185,15 +215,18 @@ export async function readBriefingFacts(
           })),
         readinessGaps: readinessGaps(readiness, companyId),
         setupNudge: setupNudgeFact(nudge),
+        upcomingCalls: partners,
       };
     }
     case "INVESTOR": {
-      const [approvals, relationships, slate, nudge] = await Promise.all([
-        within(reads.pendingApprovals),
-        within(reads.investorRelationships),
-        within(reads.companySlate),
-        within(reads.setupNudge),
-      ]);
+      const [approvals, relationships, slate, nudge, partners] =
+        await Promise.all([
+          within(reads.pendingApprovals),
+          within(reads.investorRelationships),
+          within(reads.companySlate),
+          within(reads.setupNudge),
+          partnersWithin(reads, now),
+        ]);
       return {
         role: "INVESTOR",
         since,
@@ -214,6 +247,7 @@ export async function readBriefingFacts(
                 ? "NO_PREFERENCES"
                 : "ACTIVE",
         setupNudge: setupNudgeFact(nudge),
+        upcomingCalls: partners,
       };
     }
     case "NONE":
@@ -253,6 +287,9 @@ export async function resolveBriefing(
         companySlate: () => discoverCompanies(session, { limit: SLATE_LOOK }),
         // A read: the card claims the reminder once it is seen.
         setupNudge: () => resolveSetupReminder().then((nudge) => ({ nudge })),
+        ...(qSession === null
+          ? {}
+          : { rehearsalPartners: () => getRehearsalPartners(qSession) }),
       },
       new Date(),
     );

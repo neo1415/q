@@ -294,11 +294,18 @@ export {
   getAdminPaused,
   reinstatePausedAccount,
 } from "./admin.js";
+// REHEARSE block
 export {
   finishRehearsal,
   getRehearsal,
+  getRehearsalMeeting,
+  getRehearsalPartners,
+  getRehearsalPersona,
   listInvestorRehearsals,
+  listRehearsals,
   sayInRehearsal,
+  sendRehearsalScreen,
   startRehearsal,
 } from "./rehearsals.js";
+// end REHEARSE block
 export { getQStanding, setQPersonality } from "./standing.js";

@@ -154,7 +154,8 @@ function intentLabel(intent: QUiIntent): string {
         ? "Open the company"
         : intent.page === "INVESTOR"
           ? "Open the investor"
-          : intent.page === "INVESTOR_REHEARSAL"
+          : intent.page === "INVESTOR_REHEARSAL" ||
+              intent.page === "COMPANY_REHEARSAL"
             ? "Rehearse the meeting"
             : intent.page.endsWith("_MESSAGES")
               ? "Open the chat"
@@ -189,6 +190,7 @@ const DESTINATION_LABELS: Readonly<
   GATEWAY: "Open your gateway",
   MEMORY: "Open what Q remembers",
   NEW_PITCH: "Add a pitch video",
+  REHEARSALS: "Open Rehearsals",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

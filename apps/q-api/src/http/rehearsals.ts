@@ -318,7 +318,8 @@ export function registerRehearsalRoutes(
           "This rehearsal has finished.",
         );
       }
-      return reply.code(204).header("Cache-Control", "no-store").send();
+      void reply.header("Cache-Control", "no-store");
+      return { accepted: true };
     },
   );
 

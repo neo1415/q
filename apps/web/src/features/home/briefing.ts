@@ -66,6 +66,16 @@ export type SetupNudgeFact = {
   readonly day: string;
 };
 
+/**
+ * REHEARSE: one of their own booked calls in the coming week, with the
+ * person they are meeting, so Q can suggest rehearsing it first.
+ */
+export type UpcomingCallFact = {
+  readonly meetingId: string;
+  readonly counterpartName: string;
+  readonly startsAt: string;
+};
+
 export type FounderBriefingFacts = {
   readonly role: "FOUNDER";
   /** Changes since this instant are news. */
@@ -75,6 +85,7 @@ export type FounderBriefingFacts = {
   readonly interest?: readonly InterestFact[] | undefined;
   readonly readinessGaps?: readonly ReadinessGapFact[] | undefined;
   readonly setupNudge?: SetupNudgeFact | undefined;
+  readonly upcomingCalls?: readonly UpcomingCallFact[] | undefined;
 };
 
 export type InvestorBriefingFacts = {
@@ -87,6 +98,7 @@ export type InvestorBriefingFacts = {
   /** What the slate says about their mandate, when it says anything. */
   readonly mandate?: "ACTIVE" | "NOT_ACTIVE" | "NO_PREFERENCES" | undefined;
   readonly setupNudge?: SetupNudgeFact | undefined;
+  readonly upcomingCalls?: readonly UpcomingCallFact[] | undefined;
 };
 
 export type BriefingFacts = FounderBriefingFacts | InvestorBriefingFacts;
@@ -306,10 +318,34 @@ export function setupNudgeItems(
  * The briefing, or null when there is nothing to say. What needs them
  * comes first, then what changed, then what is worth a look.
  */
+const MAX_REHEARSAL_ITEMS = 2;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** "within a day", "tomorrow", "in 3 days": no clock time a server could misplace. */
+function whenWords(startsAt: string, since: string): string {
+  const now = Date.parse(since) + 7 * DAY_MS;
+  const days = (Date.parse(startsAt) - now) / DAY_MS;
+  if (days < 1) return "within a day";
+  if (days < 2) return "tomorrow";
+  return `in ${String(Math.floor(days))} days`;
+}
+
+/** REHEARSE: suggest rehearsing each call coming up this week. */
+export function rehearsalItems(facts: BriefingFacts): BriefingItem[] {
+  return (facts.upcomingCalls ?? [])
+    .slice(0, MAX_REHEARSAL_ITEMS)
+    .map((call) => ({
+      id: `rehearse:${call.meetingId}`,
+      title: `Rehearse your call with ${call.counterpartName}`,
+      description: `It's ${whenWords(call.startsAt, facts.since)}. Q plays them so you can practise first.`,
+      href: `/rehearsals/meeting/${encodeURIComponent(call.meetingId)}`,
+    }));
+}
+
 export function composeBriefing(facts: BriefingFacts): Briefing | null {
   const needs: BriefingItem[] = [...approvalItems(facts.approvals)];
   const changed: BriefingItem[] = [];
-  const worth: BriefingItem[] = [];
+  const worth: BriefingItem[] = [...rehearsalItems(facts)];
   if (facts.role === "FOUNDER") {
     needs.push(...interestItems(facts.interest));
     changed.push(...relationshipItems(facts));

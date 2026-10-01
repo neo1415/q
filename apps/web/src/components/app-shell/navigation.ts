@@ -7,6 +7,7 @@ import {
   Search,
   Landmark,
   Play,
+  Presentation,
   Settings,
   Users,
 } from "@capital-q/ui/icons";
@@ -32,6 +33,7 @@ export type NavigationItem = {
     | "/pitch"
     | "/investors"
     | "/search"
+    | "/rehearsals"
     | "/settings";
   readonly label: string;
   readonly icon: ComponentType<{
@@ -96,6 +98,16 @@ export const FOUNDER_REQUESTS_NAVIGATION: NavigationItem = {
   href: "/investors",
   label: "Founder requests",
   icon: Handshake,
+};
+
+/**
+ * REHEARSE: rehearse a meeting with someone you are connected to, played by
+ * Q, and every past rehearsal with its review. For founders and investors.
+ */
+export const REHEARSALS_NAVIGATION: NavigationItem = {
+  href: "/rehearsals",
+  label: "Rehearsals",
+  icon: Presentation,
 };
 
 /** Search people by @handle and founders' videos (founder design 2026-09-29). */

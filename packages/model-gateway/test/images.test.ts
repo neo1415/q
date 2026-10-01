@@ -31,7 +31,8 @@ const messages: ModelMessage[] = [
 describe("image input", () => {
   it("is detected so the gateway requires VISION", () => {
     expect(messagesCarryImages(messages)).toBe(true);
-    expect(messagesCarryImages([{ role: "USER", content: "hi" }])).toBe(false);
+    const plain: ModelMessage[] = [{ role: "USER", content: "hi" }];
+    expect(messagesCarryImages(plain)).toBe(false);
   });
 
   it("maps to OpenAI input_image as an inline data URL", () => {

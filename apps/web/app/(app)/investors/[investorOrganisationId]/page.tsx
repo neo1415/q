@@ -129,7 +129,7 @@ export default async function InvestorPage({
         }}
       />
       <Link
-        href={`/investors/${encodeURIComponent(investor.investorOrganisationId)}/rehearse`}
+        href={`/rehearsals/investor/${encodeURIComponent(investor.investorOrganisationId)}`}
         className={`${buttonClassName("secondary")} self-start`}
       >
         Rehearse a meeting with them

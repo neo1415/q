@@ -64,7 +64,9 @@ export function recordPagePath(page: QRecordPage, id: string): string {
     case "INVESTOR":
       return `/investors/${safe}`;
     case "INVESTOR_REHEARSAL":
-      return `/investors/${safe}/rehearse`;
+      return `/rehearsals/investor/${safe}`;
+    case "COMPANY_REHEARSAL":
+      return `/rehearsals/company/${safe}`;
   }
 }
 
