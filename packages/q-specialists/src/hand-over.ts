@@ -1,5 +1,9 @@
 import type { Logger } from "@capital-q/observability";
-import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
+import type {
+  ContextFirewallPort,
+  QAnswerRequest,
+  QToolPort,
+} from "@capital-q/q-runtime";
 
 /**
  * A hand-over, acted on by code (founder live 2026-10-01; TURN_READER v22).
@@ -14,6 +18,14 @@ import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
  *
  * Without a subject on screen or in the conversation, Q asks one short
  * question naming the likely candidates from their own relationships.
+ *
+ * A counterpart they name ("handle an intro to Kazikit") that is one of
+ * their own relationships wins over the screen (QA 2026-10-01, run
+ * 41cdef22: asked from Q's page, the named relationship was found but the
+ * run's plan, built for the screen, did not bind it, so propose_errand was
+ * refused and the answer said the identifier was "not available"). That
+ * relationship is then planned by the Context Firewall on its own -- party
+ * membership decides, as for any subject -- before the tool is called.
  */
 
 export type HandOverSubject =
@@ -94,33 +106,40 @@ export async function actOnHandOver(
   request: QAnswerRequest,
   handOver: { readonly counterpartName: string | null },
 ): Promise<HandOverOutcome> {
-  let subject = handOverSubjectOf(request);
+  let subject: HandOverSubject | null = null;
+  const onScreen = handOverSubjectOf(request);
+  // Their own relationships are read only when a name needs resolving or
+  // there is nothing on screen to act on.
+  const candidates =
+    handOver.counterpartName !== null || onScreen === null
+      ? await port.candidates(request)
+      : [];
+  // A name they gave resolves to one of their own relationships when it
+  // is that relationship's name; never a guess among several.
+  if (handOver.counterpartName !== null) {
+    const wanted = comparable(handOver.counterpartName);
+    const named = candidates.filter((candidate) => {
+      const name = comparable(candidate.name);
+      return (
+        name.length > 0 &&
+        wanted.length > 0 &&
+        (name === wanted || name.includes(wanted) || wanted.includes(name))
+      );
+    });
+    if (named.length === 1 && named[0] !== undefined) {
+      subject = named[0].subject;
+    }
+  }
+  subject ??= onScreen;
   if (subject === null) {
-    const candidates = await port.candidates(request);
-    // A name they gave resolves to one of their own relationships when it
-    // is that relationship's name; never a guess among several.
-    if (handOver.counterpartName !== null) {
-      const wanted = comparable(handOver.counterpartName);
-      const named = candidates.filter((candidate) => {
-        const name = comparable(candidate.name);
-        return (
-          name === wanted || name.includes(wanted) || wanted.includes(name)
-        );
-      });
-      if (named.length === 1 && named[0] !== undefined) {
-        subject = named[0].subject;
-      }
-    }
-    if (subject === null) {
-      const names = candidates.slice(0, 3).map((candidate) => candidate.name);
-      return {
-        kind: "ASK",
-        line:
-          names.length === 0
-            ? "Who should I set this up with?"
-            : `Who should I set this up with: ${listed(names)}?`,
-      };
-    }
+    const names = candidates.slice(0, 3).map((candidate) => candidate.name);
+    return {
+      kind: "ASK",
+      line:
+        names.length === 0
+          ? "Who should I set this up with?"
+          : `Who should I set this up with: ${listed(names)}?`,
+    };
   }
   const prepared = await port.prepare(request, subject);
   if (prepared?.status === "ALREADY_ACTIVE") {
@@ -142,13 +161,43 @@ export async function actOnHandOver(
 /** The port through the run's own tools, under its plan. */
 export function createToolHandOverPort(dependencies: {
   readonly tools: QToolPort;
+  /**
+   * Plans a relationship they named that the run's own plan does not bind.
+   * Without it, such a relationship is refused by the tool, as before.
+   */
+  readonly firewall?: ContextFirewallPort | undefined;
   readonly logger?: Logger | undefined;
 }): QHandOverPort {
-  const { tools, logger } = dependencies;
+  const { tools, firewall, logger } = dependencies;
+  const planFor = async (
+    request: QAnswerRequest,
+    subject: HandOverSubject,
+  ): Promise<QAnswerRequest["plan"] | null> => {
+    if (subject.kind !== "RELATIONSHIP" || firewall === undefined) {
+      return request.plan;
+    }
+    const bound = request.plan.subjects.some(
+      (entry) =>
+        entry.kind === "RELATIONSHIP" &&
+        entry.relationshipId === subject.relationshipId,
+    );
+    if (bound) return request.plan;
+    const decision = await firewall.plan({
+      actor: request.actor,
+      runId: request.runId,
+      correlationId: request.correlationId,
+      capability: request.capability,
+      subjects: [
+        { kind: "RELATIONSHIP", relationshipId: subject.relationshipId },
+      ],
+    });
+    return decision.outcome === "AUTHORISED" ? decision.plan : null;
+  };
   const call = async (
     request: QAnswerRequest,
     name: string,
     args: Record<string, unknown>,
+    plan: QAnswerRequest["plan"] = request.plan,
   ): Promise<unknown> => {
     try {
       const outcome = await tools.execute(
@@ -158,7 +207,7 @@ export function createToolHandOverPort(dependencies: {
           runId: request.runId,
           correlationId: request.correlationId,
           capability: request.capability,
-          plan: request.plan,
+          plan,
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         },
       );
@@ -180,13 +229,26 @@ export function createToolHandOverPort(dependencies: {
           : subject.kind === "INVESTOR_ORGANISATION"
             ? { investorOrganisationId: subject.investorOrganisationId }
             : { relationshipId: subject.relationshipId };
-      const data = await call(request, "propose_errand", {
-        ...ref,
-        expressInterest: true,
-        openingMessage: null,
-        brief: null,
-        callPurpose: HAND_OVER_CALL_PURPOSE,
+      const plan = await planFor(request, subject).catch((error: unknown) => {
+        logger?.warn(
+          { err: error, qRunId: request.runId },
+          "a named relationship was not planned",
+        );
+        return null;
       });
+      if (plan === null) return null;
+      const data = await call(
+        request,
+        "propose_errand",
+        {
+          ...ref,
+          expressInterest: true,
+          openingMessage: null,
+          brief: null,
+          callPurpose: HAND_OVER_CALL_PURPOSE,
+        },
+        plan,
+      );
       if (data === null || typeof data !== "object") return null;
       const record = data as Record<string, unknown>;
       return typeof record["status"] === "string" &&

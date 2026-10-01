@@ -30,6 +30,7 @@ import {
   createQEvidenceRetrieval,
 } from "@capital-q/q-knowledge";
 import type {
+  ContextFirewallPort,
   QAnswerPort,
   QLiveDeltaBus,
   QRetrievalPort,
@@ -90,6 +91,8 @@ export type QIntelligenceDependencies = {
   readonly repositories: QRuntimeRepositories;
   /** The Safe Read tools, already composed. Canonical state is read through them. */
   readonly tools: QToolPort;
+  /** Plans a relationship a hand-over names that the run's plan does not bind. */
+  readonly firewall?: ContextFirewallPort | undefined;
   readonly gateway: ModelGateway;
   /**
    * What kind of material this deployment holds (doc 15 §62). Omitted
@@ -336,6 +339,9 @@ export function composeQIntelligence(
     // for the subject on screen through the run's own propose_errand.
     handOver: createToolHandOverPort({
       tools,
+      ...(dependencies.firewall === undefined
+        ? {}
+        : { firewall: dependencies.firewall }),
       ...(logger === undefined ? {} : { logger }),
     }),
     repositories,

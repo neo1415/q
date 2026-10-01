@@ -1945,6 +1945,8 @@ const qArtifacts = createQArtifacts({
 // personality, which every Q surface speaks with, and Q's patience.
 const standingStore = createPostgresStandingStore(database.sql);
 const qIntelligence = composeQIntelligence({
+  // A relationship a hand-over names, planned on its own (QA 2026-10-01).
+  firewall,
   // A typed yes or no to a waiting change, read and acted on by code
   // through the Approval Engine (founder fixture #1).
   pendingDecisions: createPendingDecisionPort({

@@ -6,14 +6,21 @@ import {
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
-import type { QHandOverPort } from "../src/hand-over.js";
+import {
+  createToolHandOverPort,
+  type QHandOverPort,
+} from "../src/hand-over.js";
 import type { PendingDecisionPort } from "../src/pending-decision.js";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
 import type { TurnReaderV8Result as TurnReaderResult } from "@capital-q/q-core";
 import type {
+  ContextFirewallPort,
   QAnswerOutcome,
   QAnswerRequest,
+  QToolCallOutcome,
+  QToolExecutionContext,
+  QToolProposal,
   QConversationMessage,
   QResearchDirective,
   QRuntimeRepositories,
@@ -1080,5 +1087,138 @@ describe("a hand-over is prepared by code for the subject on screen (TURN_READER
     expect(prepared).toEqual([
       { kind: "RELATIONSHIP", relationshipId: "r-kazikit" },
     ]);
+  });
+  it("a relationship they name wins over the page they are on (QA 2026-10-01, run 41cdef22)", async () => {
+    const prepared: unknown[] = [];
+    const { answer } = seam({
+      said: "handle an intro to Kazikit for me",
+      reading: reading({ kind: "HAND_OVER", counterpartName: "Kazikit" }),
+      outcomes: [],
+      handOver: handOverPort(prepared),
+    });
+    await answer.answer(onCompanyPage());
+    expect(prepared).toEqual([
+      { kind: "RELATIONSHIP", relationshipId: "r-kazikit" },
+    ]);
+  });
+
+  it("a name that is none of their relationships leaves the page's subject", async () => {
+    const prepared: unknown[] = [];
+    const { answer } = seam({
+      said: "handle an intro to them for me",
+      reading: reading({ kind: "HAND_OVER", counterpartName: "Nobody Ltd" }),
+      outcomes: [],
+      handOver: handOverPort(prepared),
+    });
+    await answer.answer(onCompanyPage());
+    expect(prepared).toEqual([{ kind: "COMPANY", companyId: COMPANY }]);
+  });
+});
+
+describe("the hand-over port plans a named relationship before acting (QA 2026-10-01)", () => {
+  const RELATIONSHIP = "11111111-2222-4333-8444-555555555555";
+  const outcome = (data: unknown): QToolCallOutcome => ({
+    callId: "c",
+    toolName: null,
+    toolVersion: 1,
+    classification: null,
+    status: "SUCCEEDED",
+    failureCode: null,
+    sensitivity: null,
+    result: { ok: true, data },
+    latencyMs: 1,
+  });
+  const fakeTools = (data: unknown) => {
+    const calls: { proposal: QToolProposal; context: QToolExecutionContext }[] =
+      [];
+    return {
+      calls,
+      tools: {
+        offer: () => Promise.resolve([]),
+        execute: (proposal: QToolProposal, context: QToolExecutionContext) => {
+          calls.push({ proposal, context });
+          return Promise.resolve(outcome(data));
+        },
+      },
+    };
+  };
+  const firewallGiving = (
+    decision: Awaited<ReturnType<ContextFirewallPort["plan"]>>,
+  ) => {
+    const asked: unknown[] = [];
+    const firewall: ContextFirewallPort = {
+      plan: (input) => {
+        asked.push(input.subjects);
+        return Promise.resolve(decision);
+      },
+    };
+    return { asked, firewall };
+  };
+
+  it("a relationship the run's plan does not bind is planned on its own, and the tool runs under that plan; an errand already running is said, not duplicated", async () => {
+    const base = request();
+    const own = request().plan;
+    const { asked, firewall } = firewallGiving({
+      outcome: "AUTHORISED",
+      plan: own,
+    });
+    const { calls, tools } = fakeTools({
+      status: "ALREADY_ACTIVE",
+      awaitingApprovalOf:
+        "Q is already looking after Kazikit for you (the call is booked).",
+    });
+    const port = createToolHandOverPort({ tools, firewall });
+    const prepared = await port.prepare(base, {
+      kind: "RELATIONSHIP",
+      relationshipId: RELATIONSHIP,
+    });
+    expect(asked).toEqual([
+      [{ kind: "RELATIONSHIP", relationshipId: RELATIONSHIP }],
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.context.plan).toBe(own);
+    expect(calls[0]?.proposal.arguments).toMatchObject({
+      relationshipId: RELATIONSHIP,
+    });
+    expect(prepared).toEqual({
+      status: "ALREADY_ACTIVE",
+      awaitingApprovalOf:
+        "Q is already looking after Kazikit for you (the call is booked).",
+    });
+  });
+
+  it("a relationship the firewall refuses is not acted on: no tool call", async () => {
+    const { firewall } = firewallGiving({
+      outcome: "DENIED",
+      reason: "SUBJECT_UNRESOLVED",
+      denied: [],
+    });
+    const { calls, tools } = fakeTools({});
+    const port = createToolHandOverPort({ tools, firewall });
+    const prepared = await port.prepare(request(), {
+      kind: "RELATIONSHIP",
+      relationshipId: RELATIONSHIP,
+    });
+    expect(prepared).toBeNull();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("a subject on the page runs under the run's own plan, with no second plan", async () => {
+    const base = request();
+    const { asked, firewall } = firewallGiving({
+      outcome: "AUTHORISED",
+      plan: request().plan,
+    });
+    const { calls, tools } = fakeTools({
+      status: "PREPARED",
+      awaitingApprovalOf: "Q looks after Tarmacly for you",
+    });
+    const port = createToolHandOverPort({ tools, firewall });
+    await port.prepare(base, {
+      kind: "COMPANY",
+      companyId: "94ec9c88-d157-49d1-9bf4-fc01d1e7b8d3",
+    });
+    expect(asked).toEqual([]);
+    expect(calls[0]?.context.plan).toBe(base.plan);
   });
 });
