@@ -16,7 +16,7 @@ import { QConversationIdSchema } from "@capital-q/contracts";
 
 import { apertureStateFor, type QApertureState } from "../q-aperture";
 import { destinationPath } from "../voice/destinations";
-import { upsertLine, VOICE_STATE_LABELS } from "../voice/session";
+import { isLineLive, upsertLine, VOICE_STATE_LABELS } from "../voice/session";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import {
   useVoiceInterview,
@@ -337,7 +337,8 @@ export function QSessionProvider({
    * when the conversation opened is never followed.
    */
   const followedTurns = useRef<Set<string> | null>(null);
-  const voiceActive = voice.active;
+  // A dropped line makes no moves; the typed answer's are made here.
+  const voiceActive = voice.active && isLineLive(voice.client);
   useEffect(() => {
     if (q.loading) {
       followedTurns.current = null;

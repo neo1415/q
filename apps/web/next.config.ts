@@ -9,11 +9,14 @@ import type { NextConfig } from "next";
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Microphone stays reservable for Capital Q's own voice capability later;
-  // camera and location are not product features.
+  // Microphone: Q's voice. Camera: the rehearsal room's self-view, which
+  // stays in the browser (REHEARSE; live 2026-10-01 the camera button was
+  // refused by this header). Display capture is not listed, so it keeps
+  // its default of self (the rehearsal's screen share). Location is not a
+  // product feature.
   {
     key: "Permissions-Policy",
-    value: "camera=(), geolocation=(), microphone=(self)",
+    value: "camera=(self), geolocation=(), microphone=(self)",
   },
 ];
 

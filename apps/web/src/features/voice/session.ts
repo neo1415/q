@@ -131,3 +131,15 @@ export type VoiceSessionClient = {
   /** 0..1 output level. */
   readonly outputLevel: () => number;
 };
+
+/**
+ * Whether the line can actually carry a turn: open, and not failed. A line
+ * that dropped is not live even while the session still counts as active
+ * (live 2026-10-01: a typed request's move waited for a dead line and was
+ * never made; a typed rehearsal answer went into a dead socket).
+ */
+export function isLineLive(
+  client: Pick<VoiceSessionClient, "connected" | "state">,
+): boolean {
+  return client.connected && client.state !== "ERROR";
+}

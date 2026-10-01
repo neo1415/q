@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { composeBriefing } from "../src/features/home/briefing";
 import { recordPagePath } from "../src/features/q/client-actions";
+import { isLineLive } from "../src/features/voice/session";
 import { progressWords } from "../src/features/rehearsal/rehearsal-review";
 import {
   elapsedLabel,
@@ -113,5 +114,13 @@ describe("silence on the line", () => {
     expect(shouldNudgeSilence({ ...base, state: "Q_SPEAKING" })).toBe(false);
     expect(shouldNudgeSilence({ ...base, micOn: false })).toBe(false);
     expect(shouldNudgeSilence({ ...base, ended: true })).toBe(false);
+  });
+});
+
+describe("a dropped voice line", () => {
+  it("is not live, so typed answers and Q's moves do not wait on it", () => {
+    expect(isLineLive({ connected: true, state: "LISTENING" })).toBe(true);
+    expect(isLineLive({ connected: true, state: "ERROR" })).toBe(false);
+    expect(isLineLive({ connected: false, state: "LISTENING" })).toBe(false);
   });
 });
