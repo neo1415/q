@@ -41,6 +41,11 @@ import {
   registerErrandRoutes,
   type ErrandRoutesDependencies,
 } from "./http/errands.js";
+// AUTO block (ADR 0029)
+import {
+  registerWorkRoutes,
+  type WorkRoutesDependencies,
+} from "./http/work.js";
 import {
   registerStandingRoutes,
   type StandingRoutesDependencies,
@@ -110,6 +115,8 @@ export type QApiModules = {
   readonly memory?: MemoryRoutesDependencies["memory"] | undefined;
   /** Errands: the person's own, read and stopped. */
   readonly errands?: ErrandRoutesDependencies["errands"] | undefined;
+  /** AUTO: Q's delegated work, the person's own, read, answered, stopped. */
+  readonly work?: WorkRoutesDependencies["work"] | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
   /** Q's standing with each person: personality and patience. */
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
@@ -329,6 +336,18 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       errands: modules.errands,
+    });
+  }
+
+  // AUTO block (ADR 0029)
+  if (modules.work !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error("q-api: work routes require an actor context resolver");
+    }
+    registerWorkRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      work: modules.work,
     });
   }
 

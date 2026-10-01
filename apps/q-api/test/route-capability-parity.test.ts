@@ -91,6 +91,22 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/schedule.ts POST NOTIFICATIONS_READ_PATH": exempt(
     "the read marker the notices panel records as notices are seen; not something a person asks for",
   ),
+  // AUTO (ADR 0029): Web Push and notification settings.
+  "api/http/push.ts GET PUSH_KEY_PATH": exempt(
+    "the browser's own push subscription handshake (the public VAPID key); a device setting, not something Q does",
+  ),
+  "api/http/push.ts PUT PUSH_SUBSCRIPTION_PATH": exempt(
+    "subscribing this device to pushes needs the browser's own permission prompt; only the person's tap can do it",
+  ),
+  "api/http/push.ts POST PUSH_SUBSCRIPTION_REMOVE_PATH": exempt(
+    "unsubscribing this device from pushes is the browser's own device setting",
+  ),
+  "api/http/push.ts GET NOTIFICATION_SETTINGS_PATH": exempt(
+    "the notification settings switches, shown in Settings and the notices panel",
+  ),
+  "api/http/push.ts PUT NOTIFICATION_SETTINGS_PATH": exempt(
+    "the notification settings switches the person flips themselves in Settings",
+  ),
 
   // R34 relationship chat.
   "api/http/chat.ts GET RELATIONSHIP_MESSAGES_PATH": cap("tool.list_messages"),
@@ -472,6 +488,14 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/errands.ts GET Q_RELATIONSHIP_ERRANDS_PATH": exempt(
     "the person reading their own errands on a relationship, shown on the relationship itself",
   ),
+  // AUTO (ADR 0029): the "Q is working on" panel's own controls.
+  "q-api/http/work.ts GET Q_WORK_PATH": cap("tool.list_q_work"),
+  "q-api/http/work.ts GET Q_WORK_ITEM_PATH": cap("tool.list_q_work"),
+  "q-api/http/work.ts DELETE Q_WORK_ITEM_PATH": cap("tool.stop_q_work"),
+  "q-api/http/work.ts DELETE Q_WORK_LANE_PATH": cap("tool.stop_q_work"),
+  "q-api/http/work.ts POST Q_WORK_LANE_ANSWER_PATH": cap("tool.answer_q_work"),
+  "q-api/http/work.ts GET Q_WORK_LANE_REPORT_PATH": DOWNLOAD,
+  "q-api/http/work.ts PUT Q_PRESENCE_PATH": cap("tool.set_away"),
   "q-api/http/errands.ts DELETE Q_ERRAND_PATH": exempt(
     "the person's own click stopping an errand they approved; stopping never needs Q",
   ),

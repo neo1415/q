@@ -12,6 +12,8 @@ import {
 } from "./schedule-actions.js";
 import { RELATIONSHIP_INTEREST_EXPRESS } from "./express-interest-action.js";
 import { ERRAND_START } from "./errands.js";
+// AUTO block (ADR 0029)
+import { WORK_OUTREACH_START, WORK_STANDIN_START } from "./work/actions.js";
 import { HANDLE_CLAIM } from "./handle-claim-action.js";
 import { INVESTOR_PROFILE_UPDATE } from "./investor-profile-action.js";
 import { PERSON_PROFILE_UPDATE } from "./person-profile-action.js";
@@ -52,6 +54,9 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   ONBOARDING_ANSWER_REVISE,
   // Founder direction 2026-09-29: an errand, one approval for a plan.
   ERRAND_START,
+  // AUTO block (ADR 0029): Q's delegated work, one approval each.
+  WORK_OUTREACH_START,
+  WORK_STANDIN_START,
 ]);
 
 export function assertComposedActionTypes(registry: QActionRegistry): void {

@@ -63,6 +63,15 @@ import { createPexelsPhotos } from "./composition/stock-photos.js";
 import { createRecallBots } from "./composition/recall-bots.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
 import { createScout } from "./composition/scout.js";
+// AUTO block (ADR 0029): Q's delegated work.
+import {
+  createWorkActionBoard,
+  createWorkPort,
+  createWorkStartActions,
+} from "./composition/work/actions.js";
+import { createWorkComposers } from "./composition/work/composers.js";
+import { createWorkRuntime } from "./composition/work/runtime.js";
+import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
   createErrandReplyComposer,
   createErrandRunner,
@@ -1101,8 +1110,28 @@ const profileFindingsReader = createProfileFindingsReader({
 // at a natural pause; "later", "stop" and "let's finish it" are tools.
 const onboardingNudges = createOnboardingNudges({ sql: database.sql });
 
+// AUTO block (ADR 0029): "Q, handle it". The store, the approval board
+// its tools prepare on, and the port every Q surface reads it through.
+const workStore = createPostgresWorkStore(database.sql);
+const workBoard = createWorkActionBoard();
+const workIsInvestor = async (actor: ActorContext): Promise<boolean> =>
+  (await slateRead.eligibilityPorts.investorSubject
+    .investorOrganisationFor(actor)
+    .catch(() => null)) !== null;
+const workOwnCompany = (actor: ActorContext): Promise<string | null> =>
+  runtimeDependencies.ownCompany(actor).catch(() => null);
+const workPort = createWorkPort({
+  store: workStore,
+  board: workBoard,
+  isInvestor: workIsInvestor,
+  ownCompany: workOwnCompany,
+});
+// end AUTO block
+
 const qTools = createQTools({
   ports: {
+    // AUTO block (ADR 0029)
+    work: workPort,
     onboardingReminders: {
       choose: (actor, choice) => onboardingNudges.choose(actor.userId, choice),
       unfinished: (actor) => onboardingNudges.continueTarget(actor.userId),
@@ -1515,6 +1544,13 @@ const qActionRegistry = createQActionRegistry([
     chat,
     logger,
   }),
+  // AUTO block (ADR 0029): outreach and stand-in, one approval each.
+  ...createWorkStartActions({
+    store: workStore,
+    isInvestor: workIsInvestor,
+    ownCompany: workOwnCompany,
+    logger,
+  }),
 ]);
 // Every composed action has a capability entry (R20): the list the
 // completeness test reads is the list composed here.
@@ -1541,6 +1577,8 @@ const qActionPort = createQActionPort({
     relationshipBoard.proposer,
     emailBoard.proposer,
     chatBoard.proposer,
+    // AUTO block (ADR 0029)
+    workBoard.proposer,
     profileChangeBoard.proposer,
     visibilityBoard.proposer,
     handleClaimBoard.proposer,
@@ -1994,6 +2032,94 @@ setInterval(() => {
     logger.warn({ err: error }, "errand run failed");
   });
 }, 60 * 1000).unref();
+
+// AUTO block (ADR 0029): Q's delegated work on LangGraph, checkpointed in
+// q_runtime.checkpoint* beside the conversation runs, so a deploy never
+// loses a wait. Every step runs as the person, through their own commands.
+const workFeed = createInvestorFeedPort({
+  reader: slateRead.reader,
+  ports: slateRead.eligibilityPorts,
+  cards: createPostgresCompanyCardPort({ sql: database.sql }),
+  decisions: createPostgresInvestorDecisionReader({ sql: database.sql }),
+  logger,
+});
+const workRuntime = createWorkRuntime({
+  store: workStore,
+  checkpoints,
+  resolver: actorContextResolver,
+  authUserOf: async (userId) =>
+    (
+      await database.sql<{ auth_user_id: string | null }[]>`
+        select auth_user_id from identity.user_profiles where id = ${userId}`
+    )[0]?.auth_user_id ?? null,
+  composers: createWorkComposers({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  chat,
+  schedule,
+  interests: interestService,
+  relationships: errandRelationships,
+  feed: async (actor, limit) =>
+    (await workFeed.page(actor, limit))?.items ?? null,
+  pitchTranscript: async (actor, companyId, mediaAssetId) => {
+    const id = MediaAssetIdSchema.safeParse(mediaAssetId);
+    if (!id.success) return null;
+    const view = await pitchMedia.getPitchTranscript({
+      actor,
+      companyId,
+      mediaAssetId: id.data,
+    });
+    return view.status === "AVAILABLE"
+      ? view.cues.map((cue) => cue.text).join(" ")
+      : null;
+  },
+  mandateText: async (actor) => {
+    const own =
+      await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+        actor,
+      );
+    if (own === null) return null;
+    const tenantId = TenantIdSchema.parse(actor.tenantId);
+    const organisationId = InvestorOrganisationIdSchema.parse(
+      own.investorOrganisationId,
+    );
+    const active = await mandates.listActiveMandates(tenantId, organisationId);
+    const first = active[0];
+    if (first === undefined) return null;
+    const mandate = await mandates.getMandate(
+      tenantId,
+      organisationId,
+      first.id,
+    );
+    // Their own declared mandate, as data for the shortlist; ids dropped.
+    return mandate === null
+      ? null
+      : JSON.stringify(mandate, (key, value: unknown) =>
+          /id$/i.test(key) ? undefined : value,
+        ).slice(0, 3_000);
+  },
+  ownCompany: workOwnCompany,
+  nameOf: (userId) =>
+    database.sql<{ display_name: string | null }[]>`
+      select display_name from identity.user_profiles where id = ${userId} limit 1`.then(
+      (rows) => rows[0]?.display_name ?? null,
+    ),
+  logger,
+});
+setInterval(() => {
+  workRuntime.tick().catch((error: unknown) => {
+    logger.warn({ err: error }, "q work run failed");
+  });
+}, 60 * 1000).unref();
+// end AUTO block
+
+// The Investor Twin (founder direction 2026-09-30, C12): a founder
+// rehearses a meeting with an investor Q plays. Every read below answers
+// for the founder's own side: the investor as Discover or their own
+// relationship shows them, the other side's messages in their own chat,
+// and calls the founder was on. Never the investor's mandate or Q chats.
 
 // REHEARSE block (founder direction 2026-10-01; C12 generalised): a person
 // rehearses a meeting with someone they are connected to, played by Q.
@@ -2800,6 +2926,8 @@ const { app, logger: appLogger } = createApp(
     memory: memoryService,
     meetingAssistant,
     errands,
+    // AUTO block (ADR 0029)
+    work: workPort,
     rehearsals,
     standing: standingStore,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
