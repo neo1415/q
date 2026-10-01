@@ -397,7 +397,36 @@ export function createMeetingHostRuntime(dependencies: {
     return session.chain;
   }
 
+  async function noteSafely(
+    session: Session,
+    note: Parameters<MeetingHostStore["note"]>[2],
+  ): Promise<void> {
+    await store
+      .note(session.meetingId, session.tenantId, note)
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, meetingId: session.meetingId, kind: note.kind },
+          "meeting host note not written",
+        );
+      });
+  }
+
+  /**
+   * One action. A record that fails to write (the roster, a note) is
+   * logged and never stops what Q says or does next in the call.
+   */
   async function perform(session: Session, action: HostAction): Promise<void> {
+    if (action.kind === "ROSTER") {
+      await store
+        .roster(session.meetingId, session.tenantId, action.entry)
+        .catch((error: unknown) => {
+          logger?.warn(
+            { err: error, meetingId: session.meetingId },
+            "meeting roster not written",
+          );
+        });
+      return;
+    }
     switch (action.kind) {
       case "SAY": {
         const audio = await voice.speak(action.text);
@@ -405,30 +434,38 @@ export function createMeetingHostRuntime(dependencies: {
         session.lines.push(`Q: ${action.text}`);
         return;
       }
-      case "ROSTER":
-        await store.roster(session.meetingId, session.tenantId, action.entry);
-        return;
       case "OUTCOME": {
         const outcome = action.outcome;
-        await store.note(session.meetingId, session.tenantId, {
+        await noteSafely(session, {
           kind: outcome.kind,
           body: null,
           requestedByName: null,
           absentSide: outcome.kind === "ONE_SIDED" ? outcome.absentSide : null,
         });
         if (outcome.kind === "ONE_SIDED") {
-          await store.note(session.meetingId, session.tenantId, {
+          await noteSafely(session, {
             kind: outcome.reschedule ? "RESCHEDULE_WANTED" : "NEVER_MIND",
             body: null,
             requestedByName: null,
             absentSide: null,
           });
-          await dependencies.followThrough?.oneSided(
-            session.meetingId,
-            outcome,
-          );
+          await dependencies.followThrough
+            ?.oneSided(session.meetingId, outcome)
+            .catch((error: unknown) => {
+              logger?.warn(
+                { err: error, meetingId: session.meetingId },
+                "one-sided follow-through failed",
+              );
+            });
         } else {
-          await dependencies.followThrough?.noShow(session.meetingId);
+          await dependencies.followThrough
+            ?.noShow(session.meetingId)
+            .catch((error: unknown) => {
+              logger?.warn(
+                { err: error, meetingId: session.meetingId },
+                "no-show follow-through failed",
+              );
+            });
         }
         return;
       }
@@ -469,7 +506,7 @@ export function createMeetingHostRuntime(dependencies: {
         // approve after the call and never acted on in it.
         if (result?.kind === "PROPOSE" && result.proposal !== null) {
           session.proposals += 1;
-          await store.note(session.meetingId, session.tenantId, {
+          await noteSafely(session, {
             kind: "PROPOSAL",
             body: result.proposal.slice(0, 500),
             requestedByName: action.speaker.slice(0, 200),
