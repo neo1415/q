@@ -18,7 +18,11 @@ import {
   type TransactionManager,
 } from "@capital-q/database";
 import { createLogger, type Logger } from "@capital-q/observability";
-import { ActorContextSchema, type ActorContext } from "@capital-q/security";
+import {
+  ActorContextSchema,
+  TenantIdSchema,
+  type ActorContext,
+} from "@capital-q/security";
 
 import {
   appendRunEvent,
@@ -453,6 +457,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
   it("keeps a marked line out of what Q reads back, and never rewrites history", async () => {
     await withWorld(async ({ tx, service, adminA, tenantA }) => {
       const repositories = createPostgresQRuntimeRepositories();
+      const tenant = TenantIdSchema.parse(tenantA);
       const first = await service.createRun({
         actor: adminA.actor,
         input: request({ message: { text: "Hey Q." } }),
@@ -482,7 +487,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       await nested.run(
         (inner) =>
           repositories.messages.mark?.(inner, {
-            tenantId: tenantA,
+            tenantId: tenant,
             conversationId: first.conversation.id,
             messageIds: [overheardId],
             mark: "NOT_ADDRESSED_TO_Q",
@@ -493,7 +498,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       const readBack =
         await repositories.messages.listRecentForConversationOfRun(
           tx.sql,
-          tenantA,
+          tenant,
           latest.run.id,
           64,
         );
@@ -503,7 +508,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       ]);
       const learned = await repositories.messages.listRecentForConversation(
         tx.sql,
-        tenantA,
+        tenant,
         first.conversation.id,
         64,
         { readBack: true },
@@ -512,7 +517,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       // The person's own history still shows what was said.
       const history = await repositories.messages.listRecentForConversation(
         tx.sql,
-        tenantA,
+        tenant,
         first.conversation.id,
         64,
       );
@@ -521,7 +526,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       await nested.run(
         (inner) =>
           repositories.messages.mark?.(inner, {
-            tenantId: tenantA,
+            tenantId: tenant,
             conversationId: first.conversation.id,
             messageIds: [overheardId],
             mark: "NOT_ADDRESSED_TO_Q",

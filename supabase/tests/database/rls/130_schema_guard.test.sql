@@ -139,6 +139,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'daily_preferences',        'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'daily_editions',           'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'daily_cluster_issues',     'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'conversation_message_marks', 'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'commitments',                'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'platform_admins',           'INTERNAL_SERVER_ONLY', '{}'),
   -- BILLING block (ADR 0034): server-only; people read their plan through the API.

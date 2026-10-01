@@ -13,7 +13,10 @@ import {
 import type { PendingDecisionPort } from "../src/pending-decision.js";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
-import type { TurnReaderV8Result as TurnReaderResult } from "@capital-q/q-core";
+import type {
+  TurnReaderV24Result,
+  TurnReaderV8Result as TurnReaderResult,
+} from "@capital-q/q-core";
 import type {
   ContextFirewallPort,
   QAnswerOutcome,
@@ -1249,16 +1252,18 @@ describe("the hand-over port plans a named relationship before acting (QA 2026-1
 });
 
 describe("speech that was not for Q is kept out of what Q reads back (founder live 2026-10-01)", () => {
-  const reading = (extra: Partial<TurnReaderResult>): TurnReaderResult =>
-    ({
-      kind: "SMALL_TALK",
-      confidence: "HIGH",
-      transcript: "CLEAR",
-      question: null,
-      aboutNamedOther: false,
-      tool: null,
-      ...extra,
-    });
+  const reading = (
+    extra: Partial<TurnReaderResult> &
+      Partial<Pick<TurnReaderV24Result, "addressedToQ" | "earlierNotForQ">>,
+  ): TurnReaderResult => ({
+    kind: "SMALL_TALK",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+    ...extra,
+  });
 
   it("marks a spoken line meant for someone else, and says nothing", async () => {
     const run = seam({
