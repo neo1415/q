@@ -735,6 +735,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/work/[delegationId]/report/[laneId]": DOWNLOAD,
   // DOCS: their documents and brand kit.
   "/documents": cap("navigate.DOCUMENTS"),
+  // DAILY block: The Q Daily, read through get_q_daily (its link opens it).
+  "/daily": cap("tool.get_q_daily"),
+  "/daily/[editionId]": cap("tool.get_q_daily"),
   "/settings/memory": exempt(
     "the person reading and correcting what Q remembers; not a place Q sends anyone",
   ),
