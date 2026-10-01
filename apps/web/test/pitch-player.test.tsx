@@ -130,13 +130,15 @@ describe("policy to element state", () => {
     expect(intent.autoplay).toBe(false);
   });
 
-  it("buffers a start without buffering a whole video", () => {
+  it("buffers the next card's start so a swipe plays at once", () => {
     const intent = playbackIntentFor("STARTUP_BUFFER", {
       reducedMotion: false,
     });
 
     expect(intent.attach).toBe(true);
-    expect(intent.preload).toBe("metadata");
+    // `metadata` let native HLS fetch only the manifest; the byte budget
+    // is the engine's short warm buffer (hls-source.ts).
+    expect(intent.preload).toBe("auto");
     expect(intent.autoplay).toBe(false);
   });
 

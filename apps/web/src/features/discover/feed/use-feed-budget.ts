@@ -9,15 +9,19 @@ import {
 } from "./feed-state";
 
 /**
- * Which preload window this connection may afford (doc 20 §50; spec §9.5).
+ * Which preload window this connection may afford (doc 20 §50/§52/§130).
  *
  * The warm tier -- the next pitch buffering a short start while the
- * current one plays -- is billed per delivered minute, so it runs only
- * where the link is fast and the person has not asked to save data: an
- * effective type of 4g and Save-Data off. Anywhere else, and wherever the
- * browser does not say, the constrained window: current ACTIVE, the next
- * one a poster, nothing else.
+ * current one plays -- is billed per delivered minute, so it is withheld
+ * where the browser says the link is slow (an effective type below 4g) or
+ * the person asked to save data. Absence of the Network Information API is
+ * not a constraint: Safari, every iPhone browser and Firefox never say, and
+ * treating silence as "slow" left the next pitch cold on the phones most
+ * people swipe on, so every swipe paid manifest + first segment + decode
+ * (founder report 2026-10-01: "each takes seconds to start").
  */
+
+const SLOW_LINKS: ReadonlySet<string> = new Set(["slow-2g", "2g", "3g"]);
 
 type Connection = {
   readonly effectiveType?: string;
@@ -34,10 +38,11 @@ function connection(): Connection | undefined {
 }
 
 export function budgetFor(link: Connection | undefined): FeedPrefetchBudget {
-  if (link === undefined) return CONSTRAINED_PREFETCH_BUDGET;
-  return link.effectiveType === "4g" && link.saveData !== true
-    ? DEFAULT_PREFETCH_BUDGET
-    : CONSTRAINED_PREFETCH_BUDGET;
+  if (link?.saveData === true) return CONSTRAINED_PREFETCH_BUDGET;
+  const type = link?.effectiveType;
+  return type !== undefined && SLOW_LINKS.has(type)
+    ? CONSTRAINED_PREFETCH_BUDGET
+    : DEFAULT_PREFETCH_BUDGET;
 }
 
 function subscribe(onChange: () => void): () => void {
@@ -50,6 +55,7 @@ export function useFeedBudget(): FeedPrefetchBudget {
   return useSyncExternalStore(
     subscribe,
     () => budgetFor(connection()),
-    () => CONSTRAINED_PREFETCH_BUDGET,
+    // The server cannot know the link; the client's first render decides.
+    () => DEFAULT_PREFETCH_BUDGET,
   );
 }

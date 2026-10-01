@@ -27,6 +27,7 @@ import {
   type PlaybackSource,
 } from "./pitch-playback";
 import { claimActivePlayer, releaseActivePlayer } from "./active-player";
+import { setStreamWarmth } from "./hls-source";
 import { usePitchPlayback } from "./use-pitch-playback";
 
 /**
@@ -191,6 +192,16 @@ export function PitchPlayer({
     reducedMotion,
     initialAuthorization,
   });
+
+  // The controller's tier, told to the stream engine before it attaches
+  // (effects run in order) and again whenever the tier changes: a warm
+  // card buffers a short start, the playing one runs ahead. Same engine,
+  // no re-attach, so the swipe keeps what was already buffered.
+  const warmth = policy === "ACTIVE" ? "active" : "warm";
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video !== null) setStreamWarmth(video, warmth);
+  }, [warmth]);
 
   // Attaching and detaching is the strategy's job, including cancelling an
   // in-flight fetch when this card goes cold (doc 20 §236).

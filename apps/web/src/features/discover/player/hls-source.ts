@@ -31,6 +31,56 @@ function looksLikeHls(url: string): boolean {
 }
 
 /**
+ * How much a stream may buffer ahead, by the controller's tier (doc 20
+ * §48/§51; spec docs/specs/2026-10/harden.md §2).
+ *
+ * hls.js's own limit is the larger of `maxBufferLength` and what
+ * `maxBufferSize` (60 MB) holds at the level's bitrate, capped only by
+ * `maxMaxBufferLength` -- so `maxBufferLength` alone never limited a warm
+ * card: it quietly buffered the whole pitch. The cap is the ceiling that
+ * actually binds. A warm card holds a few seconds, enough for frame one and
+ * an instant start; the playing card may run ahead normally.
+ */
+export type StreamWarmth = "warm" | "active";
+
+const BUFFER_SECONDS: Readonly<
+  Record<StreamWarmth, { readonly ahead: number; readonly cap: number }>
+> = {
+  warm: { ahead: 4, cap: 6 },
+  active: { ahead: 30, cap: 60 },
+};
+
+type BufferConfig = {
+  maxBufferLength: number;
+  maxMaxBufferLength: number;
+};
+
+/** The engine on each element, so the tier can change without re-attaching. */
+const engines = new WeakMap<HTMLVideoElement, BufferConfig>();
+/** The tier asked for before the engine existed (it loads asynchronously). */
+const wanted = new WeakMap<HTMLVideoElement, StreamWarmth>();
+
+function applyWarmth(config: BufferConfig, warmth: StreamWarmth): void {
+  // hls.js reads these on every buffering tick, so changing them on a live
+  // engine takes effect at the next fragment decision.
+  config.maxBufferLength = BUFFER_SECONDS[warmth].ahead;
+  config.maxMaxBufferLength = BUFFER_SECONDS[warmth].cap;
+}
+
+/**
+ * The controller's tier for this element. Native playback (Safari, MP4)
+ * has no such dial and ignores it; the browser's own heuristics apply.
+ */
+export function setStreamWarmth(
+  video: HTMLVideoElement,
+  warmth: StreamWarmth,
+): void {
+  wanted.set(video, warmth);
+  const config = engines.get(video);
+  if (config !== undefined) applyWarmth(config, warmth);
+}
+
+/**
  * The adapter the feed uses.
  *
  * Progressive MP4 and native-HLS browsers take the plain path. Only a
@@ -60,12 +110,20 @@ export const attachHlsOrNativeSource: AttachSource = (video, url) => {
         video.src = url;
         return;
       }
+      const warmth = wanted.get(video) ?? "warm";
       const engine = new Hls({
         // A pitch is about 60 seconds and the preload budget is the
-        // controller's, so the engine is told to keep a short buffer
-        // rather than race ahead filling one.
-        maxBufferLength: 10,
+        // controller's: see BUFFER_SECONDS.
+        maxBufferLength: BUFFER_SECONDS[warmth].ahead,
+        maxMaxBufferLength: BUFFER_SECONDS[warmth].cap,
+        // Fetch the first fragment while the media pipeline is still being
+        // set up, so a warm card has frame one before it is swiped to.
+        startFragPrefetch: true,
+        // The stage is the size of the viewport; a rendition larger than
+        // the element is bytes nobody sees.
+        capLevelToPlayerSize: true,
       });
+      engines.set(video, engine.config);
       // A fatal engine error (a codec this browser cannot decode, a
       // manifest that will not load) never reaches the element on its own:
       // it is said on the element, so the player can show its fallback
@@ -75,7 +133,10 @@ export const attachHlsOrNativeSource: AttachSource = (video, url) => {
       });
       engine.loadSource(url);
       engine.attachMedia(video);
-      destroy = () => engine.destroy();
+      destroy = () => {
+        engines.delete(video);
+        engine.destroy();
+      };
     })
     .catch(() => {
       // The chunk did not load. Nothing to clean up, and the card shows

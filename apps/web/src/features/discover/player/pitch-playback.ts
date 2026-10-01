@@ -84,15 +84,19 @@ export function playbackIntentFor(
       };
 
     case "STARTUP_BUFFER":
-      // `metadata`, not `auto`: doc 20 §48 wants enough for a quick start,
-      // and §51 refuses to buffer two whole videos for someone who may
-      // pass immediately. How much a browser actually fetches under
-      // `metadata` varies, which is the honest reason this is a budget and
-      // not a guarantee.
+      // `auto` for the controller's one next card, so it is ready the
+      // moment it is swiped to (founder report 2026-10-01: every pitch
+      // took seconds to start). `metadata` made native HLS (Safari, iOS)
+      // fetch the manifest and nothing else. The budget doc 20 §51 asks
+      // for is held where the bytes are actually controlled: the hls.js
+      // engine buffers a short start for a warm card (hls-source.ts), and
+      // only one card is ever in this tier. Delivery is billed per minute
+      // (~$1 per 1,000), so one warm minute per swipe is the price of an
+      // instant start.
       return {
         authorize: true,
         attach: true,
-        preload: "metadata",
+        preload: "auto",
         autoplay: false,
         requiresExplicitPlay: false,
       };

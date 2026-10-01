@@ -698,6 +698,61 @@ export function createCloudflareStreamVideoProvider(
     }
   }
 
+  /**
+   * Tokens minted by the vendor's `/token` endpoint, per asset and access
+   * mode, reused for the first half of their life.
+   *
+   * That endpoint is a rate-limited API round trip meant for under ~1,000
+   * tokens a day (Cloudflare, "Secure your Stream"); a feed authorises the
+   * next cards on every swipe, so without a signing key every swipe waited
+   * on Cloudflare and real traffic would exhaust the limit. What a token
+   * grants is playback of one asset until it expires -- its claims name the
+   * asset, never the viewer -- so handing the same live token to two
+   * viewers the server has just authorised, each on their own request,
+   * grants nothing either was not granted. Whether a viewer may watch is
+   * still decided per request before this is reached. Local signing (a
+   * configured key) bypasses this entirely.
+   */
+  const mintedTokens = new Map<
+    string,
+    { readonly token: string; readonly expiresAtSeconds: number }
+  >();
+  const MINTED_TOKEN_LIMIT = 500;
+
+  async function mintedToken(
+    providerAssetId: string,
+    expiresAtSeconds: number,
+    ttlSeconds: number,
+  ): Promise<{ readonly token: string; readonly expiresAtSeconds: number }> {
+    const nowSeconds = Math.floor(now().getTime() / 1_000);
+    const held = mintedTokens.get(providerAssetId);
+    if (
+      held !== undefined &&
+      held.expiresAtSeconds - nowSeconds > ttlSeconds / 2
+    ) {
+      return held;
+    }
+    mintedTokens.delete(providerAssetId);
+    const answer = await request(
+      "playback",
+      "POST",
+      `/${encodeURIComponent(providerAssetId)}/token`,
+      TokenResultSchema,
+      { exp: expiresAtSeconds },
+    );
+    if (answer.kind === "NOT_FOUND") {
+      throw fail("playback", "REJECTED", 404, "ASSET_NOT_FOUND");
+    }
+    const fresh = { token: answer.result.token, expiresAtSeconds };
+    if (mintedTokens.size >= MINTED_TOKEN_LIMIT) {
+      // Oldest first: a Map iterates in insertion order.
+      const oldest = mintedTokens.keys().next();
+      if (oldest.done !== true) mintedTokens.delete(oldest.value);
+    }
+    mintedTokens.set(providerAssetId, fresh);
+    return fresh;
+  }
+
   async function createPlaybackAuthorization(
     raw: PlaybackAuthorizationRequest,
   ): Promise<PlaybackAuthorization> {
@@ -725,6 +780,7 @@ export function createCloudflareStreamVideoProvider(
     }
 
     let token: string;
+    let grantedUntil = expiresAt;
     if (options.signingKey !== undefined) {
       token = signLocally(
         options.signingKey,
@@ -732,29 +788,29 @@ export function createCloudflareStreamVideoProvider(
         expiresAtSeconds,
       );
     } else {
-      const answer = await request(
-        "playback",
-        "POST",
-        `/${encodeURIComponent(authorization.providerAssetId)}/token`,
-        TokenResultSchema,
-        { exp: expiresAtSeconds },
+      // Only SIGNED media reaches here (PUBLIC returned above), so the
+      // cache key is the asset alone.
+      const minted = await mintedToken(
+        authorization.providerAssetId,
+        expiresAtSeconds,
+        authorization.ttlSeconds,
       );
-      if (answer.kind === "NOT_FOUND") {
-        throw fail("playback", "REJECTED", 404, "ASSET_NOT_FOUND");
-      }
-      token = answer.result.token;
+      token = minted.token;
+      grantedUntil = new Date(minted.expiresAtSeconds * 1_000).toISOString();
     }
     return {
       mediaAssetId: authorization.mediaAssetId,
       token,
       playbackUrl: manifestUrl(subdomain, token),
       posterUrl: posterUrl(subdomain, token),
-      expiresAt,
+      expiresAt: grantedUntil,
     };
   }
 
   async function deleteAsset(providerAssetId: string): Promise<void> {
     const uid = ProviderAssetIdSchema.parse(providerAssetId);
+    // A deleted asset's token must not outlive it in this process.
+    mintedTokens.delete(uid);
     // Idempotent by contract: an asset the vendor no longer has is gone,
     // which is the outcome that was asked for.
     await request(

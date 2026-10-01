@@ -404,6 +404,71 @@ describe("createPlaybackAuthorization", () => {
     expect(JSON.stringify(authorization)).not.toContain(TOKEN);
   });
 
+  it("reuses a vendor-minted token for the first half of its life, then mints again", async () => {
+    let minted = 0;
+    const double = httpDouble(() => {
+      minted += 1;
+      return {
+        status: 200,
+        body: envelope({ token: `eyJ.synthetic.token${String(minted)}` }),
+      };
+    });
+    let clock = NOW.getTime();
+    const p = provider(double, { now: () => new Date(clock) });
+
+    const first = await p.createPlaybackAuthorization(request);
+    clock += 299_000; // under half of the 600 s life
+    const second = await p.createPlaybackAuthorization(request);
+    expect(second.token).toBe(first.token);
+    // The answer carries the held token's own expiry, never a longer one.
+    expect(second.expiresAt).toBe(first.expiresAt);
+    expect(double.calls).toHaveLength(1);
+
+    clock += 2_000; // past half
+    const third = await p.createPlaybackAuthorization(request);
+    expect(third.token).not.toBe(first.token);
+    expect(double.calls).toHaveLength(2);
+  });
+
+  it("never shares a minted token across assets, and forgets a deleted asset's", async () => {
+    let minted = 0;
+    const double = httpDouble(() => {
+      minted += 1;
+      return {
+        status: 200,
+        body: envelope({ token: `eyJ.synthetic.token${String(minted)}` }),
+      };
+    });
+    const p = provider(double);
+    const other = "0011223344556677889900aabbccddee";
+
+    const mine = await p.createPlaybackAuthorization(request);
+    const theirs = await p.createPlaybackAuthorization({
+      ...request,
+      providerAssetId: other,
+    });
+    expect(theirs.token).not.toBe(mine.token);
+
+    await p.deleteAsset(UID);
+    const after = await p.createPlaybackAuthorization(request);
+    expect(after.token).not.toBe(mine.token);
+  });
+
+  it("holds no token for an asset the vendor does not have", async () => {
+    const double = httpDouble(() => ({
+      status: 404,
+      body: envelope(null, [{ code: 10003, message: "not found" }]),
+    }));
+    const p = provider(double);
+    await expect(p.createPlaybackAuthorization(request)).rejects.toBeInstanceOf(
+      MediaProviderError,
+    );
+    await expect(p.createPlaybackAuthorization(request)).rejects.toBeInstanceOf(
+      MediaProviderError,
+    );
+    expect(double.calls).toHaveLength(2);
+  });
+
   it("signs locally with the held key and never calls the vendor", async () => {
     const { privateKey, publicKey } = generateKeyPairSync("rsa", {
       modulusLength: 2048,
