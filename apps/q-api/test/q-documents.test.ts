@@ -26,6 +26,7 @@ import {
 
 import { createApp, type QApiSecurityDependencies } from "../src/app.js";
 import { suggestBrandFromWebsite } from "../src/composition/brand-from-website.js";
+import { createDocumentStudioPort } from "../src/composition/documents.js";
 
 /**
  * DOCS: the brand kit routes, filing one answer as a PDF, and a deck's
@@ -370,10 +371,86 @@ describe("reading a brand from the company's own website", () => {
     const local = await suggestBrandFromWebsite({
       websiteUrl: "http://127.0.0.1:54321",
       sectorCodes: [],
-      fetchImpl: (() => {
+      fetchImpl: () => {
         throw new Error("must not be called");
-      }),
+      },
     });
     expect(local).toBeNull();
+  });
+});
+
+describe("the document studio's Q tools port", () => {
+  const plan = {} as never;
+  const studioWith = (effective: boolean) => {
+    const revised: unknown[] = [];
+    const artifacts = {
+      read: () => Promise.resolve(deckDetail()),
+      reviseArtifact: (input: unknown) => {
+        revised.push(input);
+        return Promise.resolve({
+          ...deckDetail(),
+          artifact: { ...deckDetail().artifact, currentVersion: 2 },
+        });
+      },
+    } as unknown as ArtifactService;
+    const port = createDocumentStudioPort({
+      artifacts,
+      studio: {
+        brandKit: {
+          effective: () =>
+            Promise.resolve(
+              effective
+                ? {
+                    kitVersion: 5,
+                    palette: { primary: "#0b6e4f" },
+                    pairing: "INTER_ONLY",
+                    hasLogo: true,
+                  }
+                : null,
+            ),
+        } as unknown as BrandKitService,
+        suggestFromWebsite: () => Promise.resolve({ status: "NO_WEBSITE" }),
+        runMessages: () => Promise.resolve([]),
+      },
+    });
+    return { port, revised };
+  };
+
+  it("applies the confirmed brand as a new version, re-audited", async () => {
+    const { port, revised } = studioWith(true);
+    const outcome = await port.applyBrand({
+      actor: CONTEXT,
+      plan,
+      runId: RUN,
+      artifactId: ARTIFACT,
+    });
+    expect(outcome).toMatchObject({ status: "APPLIED", currentVersion: 2 });
+    expect(revised[0]).toMatchObject({
+      actorContext: CONTEXT,
+      artifactId: ARTIFACT,
+      instruction: "Apply my brand",
+      content: {
+        content: {
+          deck: {
+            accent: "#0b6e4f",
+            brand: { kitVersion: 5, pairing: "INTER_ONLY" },
+          },
+          audit: { passed: true },
+        },
+      },
+    });
+  });
+
+  it("says when there is no confirmed brand, and writes nothing", async () => {
+    const { port, revised } = studioWith(false);
+    expect(
+      await port.applyBrand({
+        actor: CONTEXT,
+        plan,
+        runId: RUN,
+        artifactId: ARTIFACT,
+      }),
+    ).toEqual({ status: "NO_BRAND" });
+    expect(revised).toEqual([]);
   });
 });

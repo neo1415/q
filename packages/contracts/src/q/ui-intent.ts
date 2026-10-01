@@ -126,6 +126,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "NEW_PITCH",
   // REHEARSE: the Rehearsals page (people to rehearse with, history).
   "REHEARSALS",
+  // DOCS: their documents and brand kit.
+  "DOCUMENTS",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
@@ -392,6 +394,11 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "stop_q_work",
   "answer_q_work",
   "set_away",
+  // DOCS: a suggestion filed for the person to confirm (applies nothing),
+  // and their confirmed brand redrawn into a new version of their own
+  // private document; the earlier one is kept.
+  "suggest_brand_kit",
+  "apply_my_brand",
 ] as const;
 
 /**

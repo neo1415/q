@@ -54,6 +54,8 @@ const EVERY_PORT: QToolPorts = {
   discoveryDecisions: STUB,
   documents: STUB,
   documentRevision: STUB,
+  // DOCS block.
+  documentStudio: STUB,
   recordChanges: STUB,
   ownRecords: STUB,
   evidenceDocuments: STUB,

@@ -274,6 +274,8 @@ export const Q_VOICE_DESTINATIONS = [
   "MEMORY",
   "NEW_PITCH",
   "REHEARSALS",
+  // DOCS: their documents and brand kit.
+  "DOCUMENTS",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

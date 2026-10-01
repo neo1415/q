@@ -62,6 +62,7 @@ import {
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
 import {
+  createDocumentStudioPort,
   createDocumentsModule,
   ownCompanyOf,
 } from "./composition/documents.js";
@@ -199,7 +200,7 @@ import {
 } from "@capital-q/q-actions";
 import { Q_ACTION_EVENTS } from "@capital-q/q-actions/events";
 import { createContextFirewall } from "@capital-q/q-firewall";
-import { createQTools } from "@capital-q/q-tools";
+import { createQTools, type DocumentStudioPort } from "@capital-q/q-tools";
 import {
   createLangGraphQOrchestrator,
   createPostgresQCheckpointStore,
@@ -1347,6 +1348,15 @@ const qTools = createQTools({
     documentRevision: {
       revise: (input) => qArtifacts.documentRevision.revise(input),
     },
+    // DOCS block: brand kit, a document's audit, their brand applied. A
+    // closure for the same reason as documentRevision.
+    documentStudio: {
+      brandState: (actor) => documentStudioPort().brandState(actor),
+      suggestBrand: (actor) => documentStudioPort().suggestBrand(actor),
+      audit: (actor, artifactId) =>
+        documentStudioPort().audit(actor, artifactId),
+      applyBrand: (input) => documentStudioPort().applyBrand(input),
+    },
     // R33: Save / Unsave / Pass, recorded by the interaction service the
     // Discover buttons call, with the feed's own eligibility re-run.
     // R33: the record forms as Prepare -> Approve (the board is composed
@@ -1744,6 +1754,16 @@ const memoryLearner = createMemoryLearner({
   logger,
 });
 // DOCS block: the document studio (brand kit, answer exports).
+// The Q tools port is built lazily: the tools are composed before the
+// artifact service exists further down.
+let studioPort: DocumentStudioPort | undefined;
+const documentStudioPort = (): DocumentStudioPort => {
+  studioPort ??= createDocumentStudioPort({
+    studio: documentStudio,
+    artifacts: qArtifacts.service,
+  });
+  return studioPort;
+};
 const documentStudio = createDocumentsModule({
   sql: database.sql,
   transactions: database.transactions,

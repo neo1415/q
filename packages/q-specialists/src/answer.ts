@@ -204,6 +204,7 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   MEMORY: "Opening what I remember about you.",
   NEW_PITCH: "Opening a new pitch video.",
   REHEARSALS: "Opening Rehearsals.",
+  DOCUMENTS: "Opening your documents.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -225,6 +226,7 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   MEMORY: "what Q remembers",
   NEW_PITCH: "a new pitch video",
   REHEARSALS: "Rehearsals",
+  DOCUMENTS: "Documents",
 };
 
 /**

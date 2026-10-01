@@ -679,6 +679,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "GATEWAY",
           "MEMORY",
           "REHEARSALS",
+          // DOCS: their documents and brand kit.
+          "DOCUMENTS",
         ],
         documents: [],
         visibilityChange: false,
@@ -687,11 +689,15 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           // Profile photo and cover (cropped on the profile).
           expect.objectContaining({ destination: "PROFILE" }),
           expect.objectContaining({ destination: "HOME" }),
-          // Unsend, block, unblock, report (chat) and dismiss a reminder.
+          // Unsend, block, unblock, report (chat).
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
+          // DOCS: confirm a brand (Documents) and an answer as a PDF.
+          expect.objectContaining({ destination: "DOCUMENTS" }),
+          expect.objectContaining({ destination: "HOME" }),
+          // Dismiss a reminder.
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
           // Answer founders' Connection Requests (ADR 0023); sending one
           // is a company's own and waits for a company.

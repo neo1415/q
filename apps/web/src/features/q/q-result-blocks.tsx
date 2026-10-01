@@ -191,6 +191,7 @@ const DESTINATION_LABELS: Readonly<
   MEMORY: "Open what Q remembers",
   NEW_PITCH: "Add a pitch video",
   REHEARSALS: "Open Rehearsals",
+  DOCUMENTS: "Open Documents",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

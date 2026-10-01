@@ -28,7 +28,8 @@ export const TURN_READER_V19: PromptDefinition<
 > = {
   ...TURN_READER_V18,
   version: 19,
-  status: "ACTIVE",
+  // Deprecated by v20 (DOCS: Documents is a destination).
+  status: "DEPRECATED",
   changeDescription:
     "REHEARSE (founder direction 2026-10-01): the Rehearsals screen is a destination.",
   effectiveFrom: "2026-10-01",

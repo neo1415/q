@@ -17,7 +17,7 @@ import {
 describe("TURN_READER v14", () => {
   it("is the active reader and v13 is deprecated", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(19);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(20);
     expect(TURN_READER_V13.status).toBe("DEPRECATED");
     expect(TURN_READER_V14.template).toContain("SEQUENCE (null unless");
     expect(TURN_READER_V14.template).toContain("unknownScreen is set");
@@ -44,6 +44,8 @@ describe("TURN_READER v14", () => {
       "NEW_PITCH",
       // Named from v19 on (REHEARSE).
       "REHEARSALS",
+      // DOCUMENTS arrived with v20.
+      "DOCUMENTS",
     ];
     for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
       (entry) => !V17_SCREENS.includes(entry),

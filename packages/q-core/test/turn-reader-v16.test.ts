@@ -14,7 +14,7 @@ import {
 describe("TURN_READER v16", () => {
   it("is the active reader and adds only the named-records rule to v15", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(19);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(20);
     expect(TURN_READER_V16.template).toContain(
       "NAMED RECORDS: NAVIGATE is only for a whole screen",
     );

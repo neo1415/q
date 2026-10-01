@@ -479,3 +479,12 @@ export {
   type ResultsToolPort,
 } from "./tools/results.js";
 // end ADMIN block
+// DOCS block: the document studio's tools.
+export {
+  APPLY_MY_BRAND,
+  AUDIT_MY_DOCUMENT,
+  createDocumentStudioTools,
+  GET_BRAND_KIT,
+  SUGGEST_BRAND_KIT,
+  type DocumentStudioPort,
+} from "./tools/documents.js";

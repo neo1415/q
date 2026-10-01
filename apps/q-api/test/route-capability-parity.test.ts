@@ -622,6 +622,18 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     DOWNLOAD,
   "q-api/http/q-artifacts.ts GET `${artifactPath}${Q_ARTIFACT_VERSIONS_SUFFIX}/:version`":
     DOWNLOAD,
+  // DOCS block: the document studio.
+  "q-api/http/q-documents.ts GET Q_BRAND_KIT_PATH": cap("tool.get_brand_kit"),
+  "q-api/http/q-documents.ts POST Q_BRAND_KIT_PATH": cap("offer.confirm_brand"),
+  "q-api/http/q-documents.ts POST `${Q_BRAND_KIT_PATH}${Q_BRAND_KIT_SUGGEST_SUFFIX}`":
+    cap("tool.suggest_brand_kit"),
+  "q-api/http/q-documents.ts POST `${Q_BRAND_KIT_PATH}${Q_BRAND_KIT_CONFIRM_SUFFIX}`":
+    cap("offer.confirm_brand"),
+  "q-api/http/q-documents.ts GET `${Q_BRAND_KIT_PATH}${Q_BRAND_KIT_LOGO_SUFFIX}`":
+    DOWNLOAD,
+  "q-api/http/q-documents.ts POST Q_ANSWER_EXPORTS_PATH": cap(
+    "document.ANSWER_EXPORT",
+  ),
   "q-api/http/q-conversations.ts GET Q_CONVERSATIONS_PATH": Q_TRANSPORT,
   "q-api/http/q-conversations.ts GET conversationPath": Q_TRANSPORT,
   "q-api/http/q-conversations.ts POST `${conversationPath}${Q_CONVERSATION_ARCHIVE_SUFFIX}`":

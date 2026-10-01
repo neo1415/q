@@ -172,6 +172,9 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   REHEARSALS:
     "Opens Rehearsals: the people they are connected to and their upcoming calls, to rehearse a meeting with one (Q plays that person by voice), and every past rehearsal with its review.",
   // end REHEARSE block
+  // DOCS block.
+  DOCUMENTS:
+    "Opens Documents: every document Q made for them (open, download PDF or PowerPoint) and their brand kit (logo, colours, fonts; confirm a suggestion).",
 };
 
 /** Screens that belong to a company's own people. */
@@ -290,6 +293,24 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIPS",
     "A report is the person's own account of someone else's conduct; Q never files one on their behalf or on inference.",
   ),
+  // --- DOCS block: the person's own say over their brand ------------------
+  offer(
+    "confirm_brand",
+    "DOCUMENT",
+    "Confirm or decline a brand suggestion (colours, fonts, logo), upload their logo, or set their own colours and fonts for their documents",
+    "DOCUMENTS",
+    "A suggestion Q read from their website becomes their brand only when they press Use this brand on Documents; a logo file comes from their own device through the browser's file picker.",
+    false,
+  ),
+  offer(
+    "export_answer_pdf",
+    "DOCUMENT",
+    "Download any one of Q's answers as a PDF (the PDF control under the answer)",
+    "HOME",
+    "The control sits under each answer in their conversation; Q can also file the answer it just gave with the Answer export document.",
+    false,
+  ),
+  // --- end DOCS block -------------------------------------------------------
   // BIZ-008 (B8 worker block).
   offer(
     "reminder_dismiss",
@@ -661,6 +682,30 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RELATIONSHIP",
     "Reads where they stand with a company or investor.",
   ),
+  // --- DOCS block: the document studio ------------------------------------
+  tool(
+    "get_brand_kit",
+    "DOCUMENT",
+    "Reads the brand their documents are drawn with (confirmed colours, type pairing, logo) and any suggestion waiting for them to confirm.",
+  ),
+  tool(
+    "suggest_brand_kit",
+    "DOCUMENT",
+    "Reads their company's own website for its colours, fonts and logo and files them as a suggestion they confirm on Documents; nothing applies before they do.",
+    { acts: true },
+  ),
+  tool(
+    "audit_my_document",
+    "DOCUMENT",
+    "Reads the checks run on one of their documents (layout, contrast, every figure traced to their record, charts sourced, photos credited) and what they could add.",
+  ),
+  tool(
+    "apply_my_brand",
+    "DOCUMENT",
+    "Redraws one of their documents in their confirmed brand as a new version; the earlier version is kept.",
+    { acts: true },
+  ),
+  // --- end DOCS block -------------------------------------------------------
   // --- R34 relationship chat (CHAT worker block; keep together) ---------
   tool(
     "list_messages",

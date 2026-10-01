@@ -21,6 +21,8 @@ import {
 } from "./tools/pending-proposal.js";
 import { createOwnWorkTools } from "./tools/own-work.js";
 import { createResultsTools } from "./tools/results.js";
+// DOCS block.
+import { createDocumentStudioTools } from "./tools/documents.js";
 import { createOwnRecordTools } from "./tools/own-records.js";
 import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
@@ -143,6 +145,8 @@ export function createDefaultQTools(
         : [createSetOnboardingRemindersTool(ports.onboardingReminders)]),
     // R33: their approvals inbox, their documents, Save / Unsave / Pass.
     ...createOwnWorkTools(ports),
+    // DOCS block: brand kit, a document's audit, their brand applied.
+    ...createDocumentStudioTools(ports),
     // R33: the record forms as Prepare → Approve, and their own records.
     ...(ports.recordChanges === undefined
       ? []

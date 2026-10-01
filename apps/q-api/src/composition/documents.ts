@@ -1,9 +1,14 @@
 import type { QMessage } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import {
+  ArtifactNotFoundError,
+  BrandKitAuthorityError,
   createBrandKitService,
+  type ArtifactService,
   type BrandKitService,
 } from "@capital-q/q-artifacts";
+import { auditDocument, brandDeck } from "@capital-q/q-specialists";
+import type { DocumentStudioPort } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
 import type { QDocumentRoutesDependencies } from "../http/q-documents.js";
@@ -92,6 +97,116 @@ export function createDocumentsModule(dependencies: {
       return suggestion === null
         ? { status: "UNREADABLE" }
         : { status: "FOUND", companyId: company.companyId, suggestion };
+    },
+  };
+}
+
+/**
+ * The document studio's Q tools port (DOCS spec §6): every call as the
+ * actor, through the same services the routes use.
+ */
+export function createDocumentStudioPort(dependencies: {
+  readonly studio: DocumentsModule;
+  readonly artifacts: ArtifactService;
+}): DocumentStudioPort {
+  const { studio, artifacts } = dependencies;
+  return {
+    brandState: async (actor) => {
+      try {
+        return await studio.brandKit.state(actor);
+      } catch (error) {
+        if (error instanceof BrandKitAuthorityError) return {};
+        throw error;
+      }
+    },
+    suggestBrand: async (actor) => {
+      if (actor.organisationId === undefined) {
+        return { status: "NO_ORGANISATION" };
+      }
+      const found = await studio.suggestFromWebsite(actor);
+      if (found.status !== "FOUND") return { status: found.status };
+      const kit = await studio.brandKit.suggest(actor, {
+        source: "WEBSITE",
+        sourceUrl: found.suggestion.sourceUrl,
+        companyId: found.companyId,
+        palette: found.suggestion.palette,
+        pairing: found.suggestion.pairing,
+        logo: found.suggestion.logo,
+      });
+      return { status: "SUGGESTED", kit };
+    },
+    audit: async (actor, artifactId) => {
+      try {
+        const detail = await artifacts.read(actor, artifactId);
+        const current = detail.current;
+        if (current === undefined) return { status: "NOT_FOUND" };
+        return {
+          status: "FOUND",
+          title: current.title,
+          version: current.version,
+          audit: current.content.audit,
+        };
+      } catch (error) {
+        if (error instanceof ArtifactNotFoundError) {
+          return { status: "NOT_FOUND" };
+        }
+        throw error;
+      }
+    },
+    applyBrand: async ({ actor, plan, runId, artifactId }) => {
+      let current;
+      try {
+        current = (await artifacts.read(actor, artifactId)).current;
+      } catch (error) {
+        if (error instanceof ArtifactNotFoundError) {
+          return { status: "NOT_FOUND" };
+        }
+        throw error;
+      }
+      if (current === undefined) return { status: "NOT_REVISABLE" };
+      const effective = await studio.brandKit
+        .effective(actor)
+        .catch(() => null);
+      if (effective === null) return { status: "NO_BRAND" };
+      const branded = brandDeck(current.content, {
+        kitVersion: effective.kitVersion,
+        palette: effective.palette,
+        pairing: effective.pairing,
+      });
+      // The audit describes the new version; nothing new is said in it,
+      // so what it rests on is what the document already carries.
+      const grounding = current.content.sections.flatMap((section) => [
+        section.heading,
+        section.body,
+        ...section.findings.map((finding) => finding.statement),
+      ]);
+      const content =
+        branded.deck === undefined
+          ? branded
+          : { ...branded, audit: auditDocument(branded, grounding) };
+      try {
+        const detail = await artifacts.reviseArtifact({
+          actorContext: actor,
+          permittedContextPlan: plan,
+          qRunId: runId,
+          artifactId,
+          instruction: "Apply my brand",
+          content: { title: current.title, summary: current.summary, content },
+        });
+        return {
+          status: "APPLIED",
+          artifactId: detail.artifact.artifactId,
+          type: detail.artifact.type,
+          artifactStatus: detail.artifact.status,
+          title: detail.artifact.title,
+          currentVersion: detail.artifact.currentVersion,
+        };
+      } catch (error) {
+        if (error instanceof ArtifactNotFoundError) {
+          return { status: "NOT_FOUND" };
+        }
+        return { status: "FAILED" };
+      }
     },
   };
 }

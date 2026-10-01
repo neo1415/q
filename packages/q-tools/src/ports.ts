@@ -28,6 +28,8 @@ import type { OnboardingRemindersPort } from "./tools/onboarding-reminders.js";
 // AUTO block (ADR 0030)
 import type { QWorkIntelligencePort } from "./tools/q-work.js";
 import type { ResultsToolPort } from "./tools/results.js";
+// DOCS block.
+import type { DocumentStudioPort } from "./tools/documents.js";
 
 /** One company as the investor's feed shows it. */
 export type InvestorFeedCompany = {
@@ -324,6 +326,8 @@ export type QToolPorts = {
   readonly documents?: OwnDocumentsPort | undefined;
   /** Revising one of their own documents into a new version. */
   readonly documentRevision?: DocumentRevisionPort | undefined;
+  /** DOCS: brand kit, a document's audit, their brand applied. */
+  readonly documentStudio?: DocumentStudioPort | undefined;
   /** R33: changes to their own records, for approval. */
   readonly recordChanges?: RecordChangePort | undefined;
   /** R33: reads of their own records. */

@@ -10,13 +10,18 @@ import {
 
 /** TURN_READER v19 (REHEARSE, on HARDEN's v18): the Rehearsals screen is a destination. */
 describe("TURN_READER v19", () => {
-  it("is the active reader", () => {
+  it("stays resolvable by its exact version once v20 replaces it", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(19);
+    expect(registry.get("TURN_READER", 19)?.definition.status).toBe(
+      "DEPRECATED",
+    );
   });
 
-  it("names every contract destination exactly once", () => {
-    for (const destination of Q_NAVIGATE_DESTINATIONS) {
+  it("names every contract destination of its time exactly once", () => {
+    // DOCUMENTS arrived with v20.
+    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+      (name) => name !== "DOCUMENTS",
+    )) {
       expect(
         TURN_READER_V19.template.split(
           new RegExp(`(?<![A-Z_])${destination} \\(`),
