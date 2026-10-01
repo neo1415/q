@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import type { DatabaseExecutor } from "@capital-q/database";
+import {
+  decodeJsonbString,
+  jsonbParam,
+  type DatabaseExecutor,
+} from "@capital-q/database";
 
 import {
   ApplicationFactSchema,
@@ -120,7 +124,7 @@ function toFact(row: unknown): ApplicationFact {
     // Validated on the way out as well as in: a payload whose shape has
     // drifted is not something to reason about, and failing here is better
     // than judging somebody against it.
-    value: FactValueSchema.parse(r.value),
+    value: FactValueSchema.parse(decodeJsonbString(r.value)),
     provenance: r.provenance,
     recordedAt: iso(r.recorded_at),
     supersededAt: isoOrNull(r.superseded_at),
@@ -290,7 +294,7 @@ export function createPostgresApplicationFactRepository(options: {
             application_id, tenant_id, dimension, value, provenance, recorded_at
           ) values (
             ${input.applicationId}, ${input.tenantId}, ${fact.dimension},
-            ${JSON.stringify(fact.value)}::jsonb, ${fact.provenance}, ${input.at}
+            ${jsonbParam(tx.sql, fact.value)}, ${fact.provenance}, ${input.at}
           )
           returning *`;
         const row = inserted[0];
@@ -338,8 +342,8 @@ export function createPostgresApplicationSubmissionRepository(options: {
           snapshot, qualification, client_request_id, submitted_at
         ) values (
           ${input.applicationId}, ${input.tenantId}, ${input.gatewayVersionId},
-          ${JSON.stringify(input.snapshot)}::jsonb,
-          ${JSON.stringify(input.qualification)}::jsonb,
+          ${jsonbParam(tx.sql, input.snapshot)},
+          ${jsonbParam(tx.sql, input.qualification)},
           ${input.clientRequestId}, ${input.submittedAt}
         )
         returning submitted_at`;

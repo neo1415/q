@@ -29,6 +29,7 @@ export {
   createTransactionManager,
 } from "./transaction.js";
 export { checkDatabaseHealth, type DatabaseHealth } from "./health.js";
+export { decodeJsonbString, jsonbParam } from "./jsonb.js";
 export {
   DATABASE_FAILURE_KINDS,
   DatabaseError,

@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
+import {
+  decodeJsonbString,
+  jsonbParam,
+  type DatabaseExecutor,
+  type TransactionContext,
+} from "@capital-q/database";
 
 import {
   CriterionConfigSchema,
@@ -132,7 +137,7 @@ function toCriterion(row: unknown): GatewayCriterion {
     // Validated on the way out as well as in. A payload that no longer
     // parses is a policy nobody can be judged against, and failing here is
     // better than evaluating a rule whose shape has drifted.
-    config: CriterionConfigSchema.parse(r.config),
+    config: CriterionConfigSchema.parse(decodeJsonbString(r.config)),
   });
 }
 
@@ -214,7 +219,7 @@ async function insertCriteria(
         ${criterion.requiredness},
         ${(criterion.config as { type: string }).type},
         ${criterion.label},
-        ${JSON.stringify(criterion.config)}::jsonb
+        ${jsonbParam(tx.sql, criterion.config)}
       )`;
   }
 }

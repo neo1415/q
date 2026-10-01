@@ -151,8 +151,12 @@ describe("@capital-q/communication schedule against PostgreSQL", () => {
     expect(seenByFounder?.[0]?.meetLink).toBe(
       "https://meet.google.com/abc-defg-hij",
     );
-    expect((await service.listNotifications(founder)).items[0]?.kind).toBe(
-      "MEETING_SCHEDULED",
+    // Booking also suggests a rehearsal (REHEARSE, MEETING_PREP_READY), so
+    // both notices exist; the newest is not necessarily the booking one.
+    expect(
+      (await service.listNotifications(founder)).items.map((n) => n.kind),
+    ).toEqual(
+      expect.arrayContaining(["MEETING_SCHEDULED", "MEETING_PREP_READY"]),
     );
 
     expect(await service.prepareBriefs(`cor_${randomUUID()}`)).toBeGreaterThan(

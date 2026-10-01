@@ -5,7 +5,11 @@ import type {
   QMeetingFlag,
   QMeetingFollowUp,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor } from "@capital-q/database";
+import {
+  decodeJsonbString,
+  jsonbParam,
+  type DatabaseExecutor,
+} from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
 /**
@@ -146,7 +150,10 @@ const ENLIST_AHEAD_MS = 30 * 60_000;
 const TRANSCRIPT_MAX_LINES = 2_000;
 
 function asArray<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
+  // Rows written before 2026-10-01 hold the array as a JSON string (a
+  // pre-stringified parameter cast to jsonb is encoded twice by the driver).
+  const decoded = decodeJsonbString(value);
+  return Array.isArray(decoded) ? (decoded as T[]) : [];
 }
 
 /**
@@ -301,13 +308,25 @@ export function createMeetingAssistantService(dependencies: {
              provider_bot_id = coalesce(${patch.botId ?? null}, provider_bot_id),
              failure = ${patch.failure ?? null},
              summary = coalesce(${patch.notes?.summary ?? null}, summary),
-             flags = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.flags)}::jsonb, flags),
-             follow_ups = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.followUps)}::jsonb, follow_ups),
+             flags = coalesce(${patch.notes === undefined ? null : jsonbParam(sql, patch.notes.flags)}::jsonb, flags),
+             follow_ups = coalesce(${patch.notes === undefined ? null : jsonbParam(sql, patch.notes.followUps)}::jsonb, follow_ups),
              composer_version = coalesce(${patch.notes?.composerVersion ?? null}, composer_version),
-             attendees = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.attendees)}::jsonb, attendees),
-             agreements = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.agreements)}::jsonb, agreements),
-             commitments = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.commitments)}::jsonb, commitments),
-             transcript = coalesce(${patch.transcript === undefined ? null : JSON.stringify(patch.transcript.slice(0, TRANSCRIPT_MAX_LINES).map((line) => ({ speaker: line.speaker?.slice(0, 120) ?? null, text: line.text.slice(0, 8_000) })))}::jsonb, transcript),
+             attendees = coalesce(${patch.notes === undefined ? null : jsonbParam(sql, patch.notes.attendees)}::jsonb, attendees),
+             agreements = coalesce(${patch.notes === undefined ? null : jsonbParam(sql, patch.notes.agreements)}::jsonb, agreements),
+             commitments = coalesce(${patch.notes === undefined ? null : jsonbParam(sql, patch.notes.commitments)}::jsonb, commitments),
+             transcript = coalesce(${
+               patch.transcript === undefined
+                 ? null
+                 : jsonbParam(
+                     sql,
+                     patch.transcript
+                       .slice(0, TRANSCRIPT_MAX_LINES)
+                       .map((line) => ({
+                         speaker: line.speaker?.slice(0, 120) ?? null,
+                         text: line.text.slice(0, 8_000),
+                       })),
+                   )
+             }::jsonb, transcript),
              updated_at = clock_timestamp()
        where id = ${id}`;
   }
