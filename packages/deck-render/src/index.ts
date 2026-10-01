@@ -78,3 +78,11 @@ export {
 export { mix } from "./contrast.js";
 
 export { fetchSlideImages, imageKind, type SlideImages } from "./images.js";
+
+// DAILY block: The Q Daily as a newspaper (a layout over the same boxes).
+export {
+  layOutNewspaper,
+  newspaperToPdf,
+  overflowingBoxes,
+  NEWSPAPER_PAGE,
+} from "./newspaper.js";
