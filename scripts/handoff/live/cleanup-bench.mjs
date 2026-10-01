@@ -128,7 +128,9 @@ const tables = await sql(
 const fks = await sql(
   `select conrelid::regclass::text as child, confrelid::regclass::text as parent,
           (select array_agg(a.attname::text) from unnest(conkey) k join pg_attribute a
-             on a.attrelid = conrelid and a.attnum = k) as cols
+             on a.attrelid = conrelid and a.attnum = k) as cols,
+          (select array_agg(a.attname::text) from unnest(confkey) k join pg_attribute a
+             on a.attrelid = confrelid and a.attnum = k) as pcols
      from pg_constraint where contype = 'f'`,
 );
 const profileRefs = fks.filter((f) => f.parent === "identity.user_profiles");
@@ -167,11 +169,12 @@ for (let changed = true; changed;) {
       fk.cols.length !== 1 ||
       tenantTables.has(fk.child) ||
       fk.child === fk.parent ||
+      fk.parent.startsWith("platform") ||
       !predicateOf.has(fk.parent)
     ) {
       continue;
     }
-    const clause = `${fk.cols[0]} in (select id from ${fk.parent} where ${predicateOf.get(fk.parent)})`;
+    const clause = `${fk.cols[0]} in (select ${fk.pcols[0]} from ${fk.parent} where ${predicateOf.get(fk.parent)})`;
     const current = predicateOf.get(fk.child);
     if (current !== undefined && current.includes(clause)) continue;
     predicateOf.set(
@@ -189,6 +192,18 @@ for (const [table, predicate] of predicateOf) {
     `select count(*)::int as n from ${table} where ${predicate}`,
   );
   if (n > 0) counts.set(table, n);
+}
+
+// Platform-wide records (feature flags, admin settings) are never a bench
+// account's to take with it, even when one authored a row: refuse instead.
+const platformRows = [...counts.keys()].filter((t) => t.startsWith("platform"));
+if (platformRows.length > 0) {
+  console.log(
+    `refused: platform records reference these accounts: ${platformRows
+      .map((t) => `${t} (${counts.get(t)})`)
+      .join(", ")}`,
+  );
+  process.exit(1);
 }
 
 // ---- order: a child before its parent ------------------------------------
@@ -228,7 +243,7 @@ for (const fk of fks) {
   const childPredicate = predicateOf.get(fk.child);
   const [{ n }] = await sql(
     `select count(*)::int as n from ${fk.child} c
-      where c.${fk.cols[0]} in (select id from ${fk.parent} where ${predicateOf.get(fk.parent)})
+      where c.${fk.cols[0]} in (select ${fk.pcols[0]} from ${fk.parent} where ${predicateOf.get(fk.parent)})
         ${childPredicate === undefined ? "" : `and not (${childPredicate.replace(/\b(tenant_id|user_id|owner_user_id|actor_user_id|created_by_user_id|auth_user_id|id)\b/g, "c.$1")})`}`,
   ).catch(() => [{ n: 0 }]);
   if (n > 0)
