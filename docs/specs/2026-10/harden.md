@@ -102,6 +102,32 @@ and the "interview q run traced" logs). Direction:
    task class route, streaming the first sentence (R1), and running the
    reader, the first agent round and the context loads in parallel.
 
+### Measured (2026-10-01, `ai_ops.model_usage`, 2 days)
+
+| Task class (luna)   | Calls | p50 ms | p90 ms | Fails                    | In tok / cached |
+| ------------------- | ----- | ------ | ------ | ------------------------ | --------------- |
+| NORMAL_DIALOGUE     | 1,695 | 1,811  | 3,234  | 34 (23 cancel, 12 t/out) | 9,480 / 3,083   |
+| FAST_CLASSIFICATION | 753   | 1,925  | 3,468  | 86 (79 cancelled)        | 3,299 / 1,442   |
+| STRUCTURED_EXTR.    | 385   | 4,199  | 7,475  | 26 (25 invalid output)   | 3,067 / 1,572   |
+| EVIDENCE_SYNTHESIS  | 8     | 9,480  | 12,535 | 6 invalid output         |                 |
+
+Rounds per interview turn: 1 round 61 turns (~1 s span), 2 rounds 283
+(~4.9 s), 3 rounds 108 (~7.4 s), 4-5 rounds 168 (~11 s). Gemini flash-lite
+(the fallback) served FAST_CLASSIFICATION at p50 1.0 s.
+
+Root causes found in the q-api trace: the upload step (F2.materials) was
+put back as "given earlier" and refused on 8 consecutive turns; the step
+note told the loop to record words an upload step can never take.
+
+Shipped: refused-write let-go after two turns; upload-only reason; rest a
+required question pressed twice running; DELEGATION_READER v5 (short
+answers); INTERVIEW_AGENT v13 (state after the static rules, for the
+prompt cache); presence evidence failures logged by class/code.
+Open: typed-path sentence streaming (needs SSE through web → api →
+q-api); route FAST_CLASSIFICATION to the faster model (lead/founder
+decision: provider credits); STRUCTURED_EXTRACTION invalid outputs (6.5%)
+need the refused field from the logs of the next deployment.
+
 ## 4. Queue item 3 — end of turn, memory, proactive nudges
 
 - **End of turn** (every Q surface: Home Q, dock, chat, voice): after an
