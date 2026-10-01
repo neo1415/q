@@ -109,6 +109,18 @@ export const PROBLEM_DEFINITIONS: Readonly<
     "Something went wrong.",
     500,
   ),
+  // ADMIN block (ADR 0033)
+  STEP_UP_REQUIRED: define(
+    "step-up-required",
+    "Confirm it's you to continue.",
+    403,
+  ),
+  ACCOUNT_SUSPENDED: define(
+    "account-suspended",
+    "This account is suspended.",
+    403,
+  ),
+  // end ADMIN block
 };
 
 export type CreateProblemInput = {

@@ -25,6 +25,7 @@ import {
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { CorrelationIdSchema } from "@capital-q/contracts";
 import { createPlatformAdmin } from "@capital-q/platform-admin";
+import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createCorrelationId,
@@ -148,6 +149,8 @@ import {
 } from "@capital-q/public-identity";
 import {
   createCompanyVerificationService,
+  createDecideByOperator,
+  createPostgresVerificationClaimRepository,
   createPublicVerificationReader,
   createVerificationClaimsReadinessPort,
 } from "@capital-q/verification";
@@ -203,6 +206,10 @@ import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createInvestorCardFacts } from "./investor-card-facts.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
+import {
+  withSuspendedIdentity,
+  withSuspension,
+} from "./security/suspension.js";
 
 // Configuration is validated once here at the composition root. Invalid
 // configuration fails startup rather than surfacing as a runtime error later.
@@ -219,12 +226,44 @@ await telemetry.start();
 const databaseConfig = loadDatabaseConfig();
 const database = createRequestDatabaseClient(databaseConfig);
 
+// ADMIN block: the console's email panel reads which sender this
+// deployment uses (never the key itself).
+function adminEmailConfig() {
+  const email = loadAppEmailConfig(process.env);
+  if (email.brevoApi !== undefined) {
+    return { sender: email.brevoApi.sender, provider: "BREVO_API" as const };
+  }
+  if (email.smtp !== undefined) {
+    return { sender: email.smtp.sender, provider: "SMTP" as const };
+  }
+  return {
+    sender: process.env["SMTP_SENDER"] ?? null,
+    provider: "NONE" as const,
+  };
+}
+// end ADMIN block
+
+// ADMIN block (ADR 0033): Capital Q's operations console, and the
+// suspension check every actor resolution passes through.
+const platformAdmin = createPlatformAdmin({
+  sql: database.sql,
+  transactions: database.transactions,
+  email: adminEmailConfig(),
+});
+// end ADMIN block
+
 const security = {
   authenticator: createSupabaseRequestAuthenticator(
     createSupabaseAccessTokenAuthenticator(supabaseAuth),
   ),
-  resolver: createPostgresActorContextResolver({ sql: database.sql }),
-  identities: createPostgresApplicationIdentityLookup({ sql: database.sql }),
+  resolver: withSuspension(
+    createPostgresActorContextResolver({ sql: database.sql }),
+    platformAdmin.isSuspended,
+  ),
+  identities: withSuspendedIdentity(
+    createPostgresApplicationIdentityLookup({ sql: database.sql }),
+    platformAdmin.isSuspended,
+  ),
   // The person's own profile (BIZ-002); q-api composes the same store for
   // Q's approved person.profile.update.
   people: createPostgresPersonProfileStore({ sql: database.sql }),
@@ -1126,7 +1165,16 @@ const { app, logger } = createApp(config, security, {
   interests,
   connections,
   commitments,
-  admin: createPlatformAdmin({ sql: database.sql }),
+  // ADMIN block (ADR 0033)
+  admin: platformAdmin,
+  adminFreshTokens: createSupabaseAccessTokenAuthenticator(supabaseAuth),
+  adminVerificationDecider: createDecideByOperator({
+    transactions: database.transactions,
+    repository: createPostgresVerificationClaimRepository(),
+    outbox,
+    audit,
+  }),
+  // end ADMIN block
   chat,
   chatSafety,
   schedule,

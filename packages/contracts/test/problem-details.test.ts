@@ -41,10 +41,14 @@ describe("error code registry", () => {
     }
   });
 
-  it("adds only the two transport-level codes", () => {
+  it("adds only the two transport-level codes and ADR 0033's two operator codes", () => {
     expect(CAPITAL_Q_ERROR_CODES).toContain("INVALID_REQUEST");
     expect(CAPITAL_Q_ERROR_CODES).toContain("INTERNAL_SERVER_ERROR");
-    expect(CAPITAL_Q_ERROR_CODES).toHaveLength(14);
+    expect(CAPITAL_Q_ERROR_CODES).toContain("STEP_UP_REQUIRED");
+    expect(CAPITAL_Q_ERROR_CODES).toContain("ACCOUNT_SUSPENDED");
+    expect(PROBLEM_DEFINITIONS.STEP_UP_REQUIRED.status).toBe(403);
+    expect(PROBLEM_DEFINITIONS.ACCOUNT_SUSPENDED.status).toBe(403);
+    expect(CAPITAL_Q_ERROR_CODES).toHaveLength(16);
   });
 
   it("defines every code in the problem registry", () => {

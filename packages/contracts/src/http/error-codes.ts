@@ -31,6 +31,10 @@ export const CAPITAL_Q_ERROR_CODES = [
   "UPLOAD_NOT_READY",
   "INVALID_REQUEST",
   "INTERNAL_SERVER_ERROR",
+  // ADMIN block (ADR 0033)
+  "STEP_UP_REQUIRED",
+  "ACCOUNT_SUSPENDED",
+  // end ADMIN block
 ] as const;
 
 export type KnownErrorCode = (typeof CAPITAL_Q_ERROR_CODES)[number];

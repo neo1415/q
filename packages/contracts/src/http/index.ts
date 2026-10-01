@@ -1156,3 +1156,7 @@ export {
   type PushUnsubscribeRequest,
 } from "./push.js";
 // end AUTO block
+
+// ADMIN block
+export * from "./admin-console.js";
+// end ADMIN block

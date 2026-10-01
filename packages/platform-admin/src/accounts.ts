@@ -84,11 +84,19 @@ export async function isSuspended(
   sql: DatabaseExecutor,
   userId: string,
 ): Promise<boolean> {
-  const rows = await sql<{ action: string }[]>`
-    select action from platform_ops.account_suspensions
-     where user_id = ${userId}
-     order by occurred_at desc, id desc limit 1`;
-  return rows[0]?.action === "SUSPENDED";
+  try {
+    const rows = await sql<{ action: string }[]>`
+      select action from platform_ops.account_suspensions
+       where user_id = ${userId}
+       order by occurred_at desc, id desc limit 1`;
+    return rows[0]?.action === "SUSPENDED";
+  } catch (error: unknown) {
+    // Before migration 20261115000000 is applied nobody can be suspended;
+    // every other failure is a real failure.
+    const shape = error as { sqlState?: unknown; code?: unknown } | null;
+    if (shape?.sqlState === "42P01" || shape?.code === "42P01") return false;
+    throw error;
+  }
 }
 
 export async function searchAccounts(

@@ -173,6 +173,10 @@ export type ApiModules = {
     NetworkInterestRoutesDependencies["interests"] | undefined;
   /** Capital Q's admin console. Absent: those routes do not register. */
   readonly admin?: AdminRoutesDependencies["admin"] | undefined;
+  // ADMIN block (ADR 0033)
+  readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
+  readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
+  // end ADMIN block
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
     CommitmentRoutesDependencies["commitments"] | undefined;
@@ -340,6 +344,8 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       admin: modules.admin,
+      freshTokens: modules.adminFreshTokens,
+      decideVerification: modules.adminVerificationDecider,
     });
   }
 

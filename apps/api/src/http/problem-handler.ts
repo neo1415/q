@@ -135,6 +135,7 @@ import {
   QAccountPausedError,
   QInterviewUnavailableError,
 } from "../q/interview-client.js";
+import { AccountSuspendedError } from "../security/suspension.js";
 
 /**
  * Fastify wiring for the Capital Q problem contract.
@@ -225,6 +226,12 @@ function toProblem(
   if (error instanceof AuthenticationRequiredError) {
     return createProblemDetails({ code: "AUTHENTICATION_REQUIRED", requestId });
   }
+
+  // ADMIN block (ADR 0033): an operator suspended this account.
+  if (error instanceof AccountSuspendedError) {
+    return createProblemDetails({ code: "ACCOUNT_SUSPENDED", requestId });
+  }
+  // end ADMIN block
 
   // A profile that vanished between read and write is the same answer as
   // one that never existed: no access, nothing about why.
