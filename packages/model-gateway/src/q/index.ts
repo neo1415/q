@@ -1972,16 +1972,18 @@ export function createModelGatewayQAnswer(
                   ...base,
                   messages,
                   /**
-                   * Text, not a schema, because no provider we route to
-                   * will enforce a response schema and offer tools in the
-                   * same call. The task's shape is in the prompt, and a
-                   * reply that satisfies it is accepted below exactly as
-                   * the structured path would accept it.
+                   * The answer's schema beside the tools (live 2026-10-01:
+                   * as text, 5 of 8 first rounds came back in a shape the
+                   * schema refused, and each paid a second full call). The
+                   * OpenAI adapter sends both; the Gemini and Groq ones,
+                   * which refuse that pairing, send the tools and leave the
+                   * shape to the prompt. Either way the reply is accepted by
+                   * the same Zod schema as the call below.
                    */
-                  output: { kind: "TEXT" },
+                  output: rendered.output,
                   tools: offered.map((tool) => tool.definition),
                 },
-                { signal: request.signal, onTextDelta },
+                options,
               );
             } catch (error: unknown) {
               // Groq validates a model's tool call against the declared
@@ -2003,6 +2005,12 @@ export function createModelGatewayQAnswer(
               throw error;
             }
             took(`round${String(rounds)}`);
+            if (result.output.kind === "STRUCTURED") {
+              // Nothing to look up, and the answer in the task's shape.
+              final = result;
+              analyst = result.output.value;
+              break;
+            }
             if (result.output.kind === "TEXT") {
               /**
                * Nothing (more) to look up, so this is the answer.

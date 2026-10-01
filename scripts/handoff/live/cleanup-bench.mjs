@@ -128,7 +128,9 @@ const tables = await sql(
 const fks = await sql(
   `select conrelid::regclass::text as child, confrelid::regclass::text as parent,
           (select array_agg(a.attname::text) from unnest(conkey) k join pg_attribute a
-             on a.attrelid = conrelid and a.attnum = k) as cols
+             on a.attrelid = conrelid and a.attnum = k) as cols,
+          (select array_agg(a.attname::text) from unnest(confkey) k join pg_attribute a
+             on a.attrelid = confrelid and a.attnum = k) as pcols
      from pg_constraint where contype = 'f'`,
 );
 const profileRefs = fks.filter((f) => f.parent === "identity.user_profiles");
@@ -141,9 +143,14 @@ for (const row of tables) {
     parts.push(`tenant_id in (${list(ownTenants)})`);
   for (const col of row.person_cols ?? [])
     parts.push(`${col}::text in (${list(personIds)})`);
-  for (const ref of profileRefs.filter((r) => r.child === row.t)) {
-    for (const col of ref.cols)
-      parts.push(`${col}::text in (${list(profileIds)})`);
+  // Platform records a person only authored (a flag they updated) are not
+  // theirs to take with them: those references are checked below instead.
+  // Their own platform rows (decisions about them, by tenant or user) go.
+  if (!row.t.startsWith("platform")) {
+    for (const ref of profileRefs.filter((r) => r.child === row.t)) {
+      for (const col of ref.cols)
+        parts.push(`${col}::text in (${list(profileIds)})`);
+    }
   }
   if (parts.length > 0)
     predicateOf.set(row.t, [...new Set(parts)].join(" or "));
@@ -167,11 +174,12 @@ for (let changed = true; changed;) {
       fk.cols.length !== 1 ||
       tenantTables.has(fk.child) ||
       fk.child === fk.parent ||
+      fk.parent.startsWith("platform") ||
       !predicateOf.has(fk.parent)
     ) {
       continue;
     }
-    const clause = `${fk.cols[0]} in (select id from ${fk.parent} where ${predicateOf.get(fk.parent)})`;
+    const clause = `${fk.cols[0]} in (select ${fk.pcols[0]} from ${fk.parent} where ${predicateOf.get(fk.parent)})`;
     const current = predicateOf.get(fk.child);
     if (current !== undefined && current.includes(clause)) continue;
     predicateOf.set(
@@ -189,6 +197,24 @@ for (const [table, predicate] of predicateOf) {
     `select count(*)::int as n from ${table} where ${predicate}`,
   );
   if (n > 0) counts.set(table, n);
+}
+
+// Platform-wide records (feature flags, admin settings) a bench account
+// authored are never taken with it: they stop the run instead.
+const authored = [];
+for (const ref of profileRefs.filter((r) => r.child.startsWith("platform"))) {
+  for (const col of ref.cols) {
+    const [{ n }] = await sql(
+      `select count(*)::int as n from ${ref.child} where ${col}::text in (${list(profileIds)})`,
+    );
+    if (n > 0) authored.push(`${ref.child}.${col} (${n})`);
+  }
+}
+if (authored.length > 0) {
+  console.log(
+    `refused: platform records were authored by these accounts: ${authored.join(", ")}`,
+  );
+  process.exit(1);
 }
 
 // ---- order: a child before its parent ------------------------------------
@@ -228,7 +254,7 @@ for (const fk of fks) {
   const childPredicate = predicateOf.get(fk.child);
   const [{ n }] = await sql(
     `select count(*)::int as n from ${fk.child} c
-      where c.${fk.cols[0]} in (select id from ${fk.parent} where ${predicateOf.get(fk.parent)})
+      where c.${fk.cols[0]} in (select ${fk.pcols[0]} from ${fk.parent} where ${predicateOf.get(fk.parent)})
         ${childPredicate === undefined ? "" : `and not (${childPredicate.replace(/\b(tenant_id|user_id|owner_user_id|actor_user_id|created_by_user_id|auth_user_id|id)\b/g, "c.$1")})`}`,
   ).catch(() => [{ n: 0 }]);
   if (n > 0)

@@ -554,7 +554,9 @@ export function createGroqModelProvider(
         ...(request.temperature === undefined
           ? {}
           : { temperature: request.temperature }),
-        ...(request.output.kind === "STRUCTURED"
+        // json_schema beside tools is not something every Groq model
+        // accepts; with tools the gateway's own acceptance decides.
+        ...(request.output.kind === "STRUCTURED" && request.tools.length === 0
           ? {
               response_format: {
                 type: "json_schema",

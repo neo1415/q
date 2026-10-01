@@ -128,6 +128,24 @@ q-api); route FAST_CLASSIFICATION to the faster model (lead/founder
 decision: provider credits); STRUCTURED_EXTRACTION invalid outputs (6.5%)
 need the refused field from the logs of the next deployment.
 
+### Live follow-ups (2026-10-01, deploys 508571c4 → f4184aed)
+
+- Readers on gemini-3.5-flash-lite (FAST_CLASSIFICATION): p50 1.3 s vs 1.9 s
+  on luna, 0 failures; needed the readers to declare the attested posture.
+- The drafted reply (v13 text, v14 write_reply) was never produced live:
+  0 of 19 bench turns each; removed in v15.
+- Home Q second model call: 5-6 of 8 first rounds refused by the analyst
+  schema (actionTalk not a list, companyFindings with `text`/`coverage`
+  keys); a prompt note did not move it. The first round now carries the
+  schema beside the tools (contracts allow STRUCTURED + tools; Gemini and
+  Groq adapters send tools alone).
+- Presence builds wait for an actor with an organisation (the first
+  interview turn has none).
+- Founder definition v3 adds Paying customers and Signed partnerships; the
+  web founder screen accepts v2 and v3 (a v2-only check broke new founders
+  on the v3 deploy and was hot-fixed).
+- Bench accounts are cleared with scripts/handoff/live/cleanup-bench.mjs.
+
 ## 4. Queue item 3 — end of turn, memory, proactive nudges
 
 - **End of turn** (every Q surface: Home Q, dock, chat, voice): after an

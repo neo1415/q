@@ -463,9 +463,9 @@ describe("answer seam tool loop", () => {
     expect(alpha.calls).toHaveLength(1);
 
     const only = alpha.calls[0]?.request;
-    // Text output, because no provider we route to enforces a response
-    // schema and offers tools in the same call.
-    expect(only?.output.kind).toBe("TEXT");
+    // The answer's schema rides beside the tools (harden 2026-10-01), so an
+    // answer here arrives in the shape the call below would ask for.
+    expect(only?.output.kind).toBe("STRUCTURED");
     expect(only?.tools.map((t) => t.name)).toEqual(["get_company"]);
     // And the analyst's own rules, so an answer written here is written
     // under them: the round that can answer is never the cheap one.
