@@ -208,3 +208,57 @@ describe("a required question pressed twice running is rested (HANDOVER §5.1)",
     expect(prompts.at(-1)).not.toContain(REST);
   });
 });
+
+describe("an answer no option holds, on a step that cannot keep other words", () => {
+  it("is told to recommend the closest once, never to ask the same choice again", async () => {
+    const world = investorSession({ currentStepKey: "I2.currency" });
+    const prompts: string[] = [];
+    let round = 0;
+    const gateway = {
+      execute: (request: {
+        readonly messages: readonly { readonly content: string }[];
+      }) => {
+        prompts.push(request.messages.map((m) => m.content).join("\n"));
+        round += 1;
+        return Promise.resolve(
+          round === 1
+            ? {
+                output: {
+                  kind: "TOOL_CALLS",
+                  text: "",
+                  calls: [
+                    {
+                      callId: "c1",
+                      name: "record_answers",
+                      arguments: {
+                        answers: [
+                          {
+                            stepKey: "I2.currency",
+                            value: "seashells",
+                            quote: "We write cheques in seashells.",
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              }
+            : {
+                output: {
+                  kind: "TEXT",
+                  text: JSON.stringify({ reply: "Ok.", asking: null }),
+                },
+              },
+        );
+      },
+    } as unknown as ModelGateway;
+    await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({ stated: ["I2.currency"] })),
+    }).turn({ ...turn(world, "We write cheques in seashells."), actor });
+    expect(prompts[1]).toContain("this step cannot keep other words");
+  });
+});
