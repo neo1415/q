@@ -10,7 +10,11 @@ import {
 } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { QUserStatementRecorder } from "@capital-q/model-gateway/q";
-import type { CompanyAnalystV4Result } from "@capital-q/q-core";
+import {
+  createPromptRegistry,
+  PROMPT_DEFINITIONS,
+  type CompanyAnalystV4Result,
+} from "@capital-q/q-core";
 import type {
   QAnswerRequest,
   QConversationMessage,
@@ -156,10 +160,14 @@ function harness(options: {
   readonly withoutResearchPort?: boolean | undefined;
 }) {
   const requests: unknown[] = [];
+  const executeOptions: {
+    schema?: { safeParse: (value: unknown) => { success: boolean } };
+  }[] = [];
   const reads = { canonical: 0, knowledge: 0, evidence: 0 };
   const gateway = {
-    execute: (request: unknown) => {
+    execute: (request: unknown, option: (typeof executeOptions)[number]) => {
       requests.push(request);
+      executeOptions.push(option);
       return Promise.resolve({
         providerCode: "fake",
         modelCode: "fake-model",
@@ -277,6 +285,7 @@ function harness(options: {
     investigate,
     investigatePublic,
     requests,
+    executeOptions,
     researchCalls,
     stages,
     reads,
@@ -645,5 +654,27 @@ describe("a company Capital Q holds no record of (CQ-QACT-002)", () => {
     for (const finding of result.findings) {
       expect(finding.subjects).toEqual([]);
     }
+  });
+});
+
+describe("the specialist reads the answer with the active prompt's own result", () => {
+  // The active COMPANY_ANALYST asks for gestures (v14) and proposalStatus
+  // (v15); a parse schema older than the prompt refused every answer that
+  // filled a field the prompt itself asks for (live 2026-09-30 for v12).
+  it("accepts every field the active COMPANY_ANALYST output carries", async () => {
+    const h = harness({});
+    await h.investigate("How is the company doing?");
+    const active =
+      createPromptRegistry(PROMPT_DEFINITIONS).getActive("COMPANY_ANALYST")
+        .definition.output;
+    expect(active.kind).toBe("STRUCTURED");
+    const full = (
+      active as { schema: { parse: (value: unknown) => unknown } }
+    ).schema.parse({
+      ...analyst("Here is what I found."),
+      gestures: [{ sentence: 0, gesture: "NOD" }],
+      proposalStatus: false,
+    });
+    expect(h.executeOptions[0]?.schema?.safeParse(full).success).toBe(true);
   });
 });

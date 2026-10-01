@@ -440,3 +440,53 @@ export function approvalStatusLine(data: unknown): string | null {
       return null;
   }
 }
+
+const PROPOSAL_STATUS_WORDS: Readonly<Record<string, string>> = {
+  PENDING: "is waiting for your approval, not saved yet",
+  SAVING: "is approved and being saved now",
+  SAVED: "is saved",
+  NOT_SAVED: "was approved but didn't go through, so nothing changed",
+  DECLINED: "was declined, so nothing changed",
+  EXPIRED: "lapsed before a decision, so nothing changed",
+};
+
+function named(summary: string): string {
+  return summary.trim().replace(/[.\s]+$/u, "");
+}
+
+/**
+ * What Capital Q says when an answer is about whether a change is saved,
+ * approved or waiting (COMPANY_ANALYST v15 `proposalStatus`; QA open item
+ * b, live 2026-10-01: "yes, go ahead" with nothing waiting was answered
+ * "The reminder has been saved"). Built from the receipts' CURRENT
+ * statuses, read from the Approval Engine's records; the model's own
+ * status sentences are removed as actionTalk. The waiting ones first,
+ * because those are what the person can act on; otherwise the latest
+ * change; and with none, that nothing is waiting or saved here.
+ */
+export function proposalStatusLine(receipts: readonly QReceipt[]): string {
+  const actions = receipts.filter(
+    (receipt): receipt is Extract<QReceipt, { kind: "ACTION" }> =>
+      receipt.kind === "ACTION",
+  );
+  const pending = actions.filter((action) => action.status === "PENDING");
+  const only = pending.length === 1 ? pending[0] : undefined;
+  if (only !== undefined) {
+    return `${named(only.summary)} is waiting for your approval, not saved yet. Tap Approve on its card, or tell me to go ahead.`;
+  }
+  if (pending.length > 1) {
+    const names = pending
+      .slice(0, 4)
+      .map((action) => `"${named(action.summary)}"`)
+      .join(", ");
+    return `${String(pending.length)} changes are waiting for your approval, none saved yet: ${names}.`;
+  }
+  const latest = actions.at(-1);
+  if (latest === undefined) {
+    return "Nothing is waiting for your approval in this conversation, and nothing has been saved here.";
+  }
+  const words = PROPOSAL_STATUS_WORDS[latest.status];
+  return words === undefined
+    ? `${named(latest.summary)}: ${latest.status.toLowerCase()}.`
+    : `${named(latest.summary)} ${words}.`;
+}

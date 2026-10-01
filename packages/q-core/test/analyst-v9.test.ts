@@ -63,7 +63,7 @@ describe("COMPANY_ANALYST v10", () => {
 describe("COMPANY_ANALYST v11", () => {
   it("was the active analyst version until v12 took over", () => {
     const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(14);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(15);
     expect(COMPANY_ANALYST_V11.status).toBe("DEPRECATED");
   });
 

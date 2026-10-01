@@ -41,8 +41,8 @@ import {
   publicSourceBlockFields,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV14Result,
-  CompanyAnalystV14ResultSchema,
+  type CompanyAnalystV15Result,
+  CompanyAnalystV15ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -115,6 +115,7 @@ export {
   approvalStatusLine,
   capabilityNote,
   collectReceipts,
+  proposalStatusLine,
   PLAIN_KNOWING_LINE,
   POINTING_LINE,
   type QCapabilityManifest,
@@ -126,6 +127,7 @@ import {
   approvalStatusLine,
   capabilityNote,
   collectReceipts,
+  proposalStatusLine,
   type QReceiptPort,
 } from "./conversation-receipts.js";
 export {
@@ -158,7 +160,7 @@ export {
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV14Result → Q message + bundle version on the run
+ *   CompanyAnalystV15Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -662,7 +664,7 @@ export function clearsOnPurpose(update: {
  * gives the model authority it did not have.
  */
 export const NEXT_STEP_NOTE =
-  'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn) and then the single most useful next step for them, offered as something you will do ("Want me to draft the intro to Ada?"). Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
+  'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn; whether a change is saved, approved or waiting is Capital Q\'s to say, never yours) and then the single most useful next step for them, offered as something you will do ("Want me to draft the intro to Ada?"). Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
 
 /**
  * Answer what they mean, not only what they literally asked (founder
@@ -1047,7 +1049,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV14Result;
+  readonly result: CompanyAnalystV15Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -1778,9 +1780,9 @@ export function createModelGatewayQAnswer(
         }
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV14Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV15Result> = {
         signal: request.signal,
-        schema: CompanyAnalystV14ResultSchema,
+        schema: CompanyAnalystV15ResultSchema,
         onTextDelta,
         // The analyst's lists are independent readings: one statement with
         // a malformed knowledge key must not throw away the profile change
@@ -2051,12 +2053,12 @@ export function createModelGatewayQAnswer(
       }
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV14Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV15Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV14Result | undefined;
+        let analyst: CompanyAnalystV15Result | undefined;
 
         if (offered.length > 0) {
           took("prepare");
@@ -2077,10 +2079,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV14Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV15Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV14Result>(
+              result = await gateway.execute<CompanyAnalystV15Result>(
                 {
                   ...base,
                   messages,
@@ -2131,7 +2133,7 @@ export function createModelGatewayQAnswer(
              * is not a gap.
              */
             const saidInsteadOfDone = (
-              value: CompanyAnalystV14Result,
+              value: CompanyAnalystV15Result,
               dropped: readonly string[] | undefined,
             ): boolean =>
               (value.actionTalk.length > 0 ||
@@ -2164,7 +2166,7 @@ export function createModelGatewayQAnswer(
              */
             const screenNote = screenSubjectNote(plan.screen);
             const askedWhatScreenShows = (
-              value: CompanyAnalystV14Result,
+              value: CompanyAnalystV15Result,
             ): boolean =>
               screenNote !== null &&
               value.clarifyingQuestions.length > 0 &&
@@ -2221,7 +2223,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystV14ResultSchema,
+                CompanyAnalystV15ResultSchema,
                 {
                   invalidListItems: "DROP",
                   lenientFields: ANALYST_LENIENT_FIELDS,
@@ -2424,7 +2426,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV14Result>(
+          final = await gateway.execute<CompanyAnalystV15Result>(
             { ...base, messages, output: rendered.output },
             options,
           );
@@ -2574,9 +2576,40 @@ export function createModelGatewayQAnswer(
         // No "I've prepared that change" here (CQ-QACT-001, F7): noting a
         // request is not preparing one. The action port says it, from the
         // proposal it actually created or the refusal it actually got.
+        /**
+         * The answer is about whether a change is saved, approved or
+         * waiting (v15 proposalStatus, the model's reading of meaning):
+         * the status is stated from the Approval Engine's records, never
+         * from the model's words, which went out as actionTalk. Not when
+         * this turn already says it: an approval by conversation has its
+         * own line, and a change prepared this turn shows its own card.
+         */
+        const preparedThisTurn = toolCalls.some((call) => {
+          const kind = offeredByName.get(call.providerName)?.classification;
+          return (
+            call.status === "SUCCEEDED" &&
+            kind !== undefined &&
+            kind !== "READ_ONLY" &&
+            kind !== "ANALYTICAL"
+          );
+        });
+        const statusLine =
+          analyst.proposalStatus &&
+          approvalLine === null &&
+          !preparedThisTurn &&
+          dependencies.receipts !== undefined
+            ? proposalStatusLine(receipts)
+            : null;
+        if (statusLine !== null) {
+          logger?.info(
+            { qRunId: request.runId, actionTalkRemoved: spoken.removed },
+            "an answer about a change's status was given the engine's status",
+          );
+        }
         const content = [
           ...(approvalLine === null ? [] : [approvalLine]),
           guarded.text,
+          ...(statusLine === null ? [] : [statusLine]),
           ...(recordedStatements.length === 0
             ? []
             : [

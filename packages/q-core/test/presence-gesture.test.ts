@@ -55,7 +55,8 @@ describe("PRESENCE gestures beside a reply", () => {
   });
 
   it("COMPANY_ANALYST v14 is v13 plus the presence section, and parses gestures", () => {
-    expect(COMPANY_ANALYST_V14.status).toBe("ACTIVE");
+    // Superseded by v15 (proposal status), which keeps the field.
+    expect(COMPANY_ANALYST_V14.status).toBe("DEPRECATED");
     expect(COMPANY_ANALYST_V14.template).toBe(COMPANY_ANALYST_V13.template);
     // The guidance and the closed set reach the model through the schema.
     const schema = JSON.stringify(

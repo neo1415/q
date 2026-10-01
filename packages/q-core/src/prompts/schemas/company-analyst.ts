@@ -416,6 +416,32 @@ export type CompanyAnalystV14Result = z.infer<
 >;
 export const COMPANY_ANALYST_V14_SCHEMA_VERSION = 14;
 
+/**
+ * What the model is told about `proposalStatus`, in the output schema
+ * (the task text is at its size budget).
+ */
+export const PROPOSAL_STATUS_GUIDANCE =
+  "true when the person asks about, or your reply touches on, whether a change, reminder, message, booking or other action is saved, approved, sent, booked, done, declined or waiting for approval. Never state that status yourself: put any sentence that does in actionTalk; Capital Q adds the real status from its approval records. Otherwise false.";
+
+/**
+ * v15 (live 2026-10-01, QA open item b): "yes, go ahead" with nothing
+ * waiting was answered "The reminder has been saved". Whether a reply is
+ * about the status of a proposal is meaning, so the model reads it into
+ * this closed field (ADR 0011); the status itself is never the model's --
+ * the runtime states it from the Approval Engine's records.
+ */
+export const CompanyAnalystV15ResultSchema =
+  CompanyAnalystV14ResultSchema.extend({
+    proposalStatus: z
+      .boolean()
+      .default(false)
+      .describe(PROPOSAL_STATUS_GUIDANCE),
+  }).strict();
+export type CompanyAnalystV15Result = z.infer<
+  typeof CompanyAnalystV15ResultSchema
+>;
+export const COMPANY_ANALYST_V15_SCHEMA_VERSION = 15;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

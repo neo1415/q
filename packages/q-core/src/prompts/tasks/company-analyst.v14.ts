@@ -21,7 +21,7 @@ export const COMPANY_ANALYST_V14: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V13,
   version: 14,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "PRESENCE 2026-10-01: optional gestures beside the answer (sentence index + closed-set gesture) for Q's particles; v13 otherwise unchanged.",
   effectiveFrom: "2026-10-01",

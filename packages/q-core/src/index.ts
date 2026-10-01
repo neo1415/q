@@ -451,6 +451,7 @@ export {
   COMPANY_ANALYST_V13_FORMAT_SECTION,
 } from "./prompts/tasks/company-analyst.v13.js";
 export { COMPANY_ANALYST_V14 } from "./prompts/tasks/company-analyst.v14.js";
+export { COMPANY_ANALYST_V15 } from "./prompts/tasks/company-analyst.v15.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export { ARTIFACT_REVISION_V2 } from "./prompts/tasks/artifact-revision.v2.js";
 export { ARTIFACT_REVISION_V3 } from "./prompts/tasks/artifact-revision.v3.js";
@@ -517,10 +518,14 @@ export {
   CompanyAnalystV8ResultSchema,
   CompanyAnalystV12ResultSchema,
   CompanyAnalystV14ResultSchema,
+  CompanyAnalystV15ResultSchema,
+  COMPANY_ANALYST_V15_SCHEMA_VERSION,
+  PROPOSAL_STATUS_GUIDANCE,
   COMPANY_ANALYST_V14_SCHEMA_VERSION,
   ModelComparisonCardsSchema,
   type CompanyAnalystV12Result,
   type CompanyAnalystV14Result,
+  type CompanyAnalystV15Result,
   type ModelComparisonCards,
   CompanyAnalystV5VariablesSchema,
   type ArtifactRequest,
