@@ -76,8 +76,10 @@ import {
   PERSONALITY_NOTES,
 } from "./voice/standing.js";
 import {
+  createPostgresRehearsalStore,
   createRehearsalComposer,
   createRehearsalService,
+  type Sourced,
 } from "./composition/rehearsals.js";
 import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
 import {
@@ -311,6 +313,7 @@ import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { Q_VOICE_SPEAK_RELAY_PATH } from "./voice/routes.js";
 import { createSpeechPerformanceBoard } from "./voice/speech-performance.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
+import { createRehearsalAwareTurn } from "./voice/rehearsal-turn.js";
 import {
   createVoiceTurnTimings,
   timedFetch,
@@ -1992,64 +1995,180 @@ setInterval(() => {
   });
 }, 60 * 1000).unref();
 
-// The Investor Twin (founder direction 2026-09-30, C12): a founder
-// rehearses a meeting with an investor Q plays. Every read below answers
-// for the founder's own side: the investor as Discover or their own
-// relationship shows them, the other side's messages in their own chat,
-// and calls the founder was on. Never the investor's mandate or Q chats.
+// REHEARSE block (founder direction 2026-10-01; C12 generalised): a person
+// rehearses a meeting with someone they are connected to, played by Q.
+// Every read below answers for the rehearsing person's own side only: the
+// counterpart as Discover or their own relationship shows them, the other
+// side's messages in their own chat, calls they were on, a company's pitch
+// only under the playback rule and its knowledge only where it is network
+// or publicly visible, and the founder's own material. Never the other
+// person's Q chats, mandate internals or founder-private records.
 const rehearsalDiscovery = createDiscoveryService({
   repository: createPostgresDiscoveryRepository({ sql: database.sql }),
 });
+const transcriptText = async (
+  actor: ActorContext,
+  companyId: string,
+  label: string,
+): Promise<Sourced> => {
+  // Ids only; whether this person may read each pitch is the media
+  // context's own playback rule, applied by getPitchTranscript.
+  const assets = await database.sql<{ id: string }[]>`
+    select id from media.media_assets
+     where owner_type = 'COMPANY' and owner_id = ${companyId}
+       and purpose = 'FOUNDER_PITCH' and deleted_at is null
+       and superseded_at is null
+     order by created_at desc limit 2`;
+  const texts: string[] = [];
+  for (const asset of assets) {
+    const id = MediaAssetIdSchema.safeParse(asset.id);
+    if (!id.success) continue;
+    const view = await pitchMedia
+      .getPitchTranscript({ actor, companyId, mediaAssetId: id.data })
+      .catch(() => null);
+    if (view?.status === "AVAILABLE") {
+      texts.push(view.cues.map((cue) => cue.text).join(" "));
+    }
+  }
+  return texts.length === 0
+    ? { text: "", sources: [] }
+    : {
+        text: `PITCH VIDEO TRANSCRIPT:\n${texts.join("\n---\n")}`.slice(
+          0,
+          9_000,
+        ),
+        sources: [{ kind: "PITCH_TRANSCRIPT", label, url: null }],
+      };
+};
+const knowledgeText = async (
+  companyId: string,
+  scopes: readonly string[],
+  label: string,
+): Promise<Sourced> => {
+  const rows = await database.sql<{ statement: string; truth_class: string }[]>`
+    select statement, truth_class from q_knowledge.objects
+     where subject_type = 'COMPANY' and subject_id = ${companyId}
+       and status = 'ACTIVE' and visibility_scope = any(${scopes as string[]})
+     order by recorded_at desc limit 40`;
+  return rows.length === 0
+    ? { text: "", sources: [] }
+    : {
+        text: `WHAT IS KNOWN (truth class in brackets):\n${rows
+          .map((row) => `- [${row.truth_class}] ${row.statement}`)
+          .join("\n")}`.slice(0, 5_000),
+        sources: [{ kind: "PUBLIC_KNOWLEDGE", label, url: null }],
+      };
+};
+/** Every string in a document's content, in order: the deck's words. */
+const contentWords = (value: unknown, out: string[] = []): string[] => {
+  if (typeof value === "string") {
+    if (value.length > 1 && !/^https?:\/\//.test(value)) out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const item of value) contentWords(item, out);
+  } else if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value)) contentWords(item, out);
+  }
+  return out;
+};
 const rehearsals = createRehearsalService({
-  sql: database.sql,
+  store: createPostgresRehearsalStore(database.sql),
   material: {
-    companyName: async (actor) => {
+    viewer: async (actor) => {
       const companyId = await runtimeDependencies.ownCompany(actor);
-      if (companyId === null) return null;
-      const profile = await companies
-        .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
+      if (companyId !== null) {
+        const profile = await companies
+          .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
+          .catch(() => null);
+        return profile === null
+          ? null
+          : { role: "FOUNDER", organisationName: profile.canonicalName };
+      }
+      const firmId = await runtimeDependencies.ownInvestorOrganisation(actor);
+      if (firmId === null) return null;
+      const firm = await investors
+        .findCanonicalInvestorOrganisation(
+          InvestorOrganisationIdSchema.parse(firmId),
+        )
         .catch(() => null);
-      return profile?.canonicalName ?? null;
+      return firm === null
+        ? null
+        : { role: "INVESTOR", organisationName: firm.displayName };
     },
-    investor: async (actor, investorOrganisationId) => {
-      const [relationship, seen] = await Promise.all([
-        errandRelationships
-          .withInvestor(actor, investorOrganisationId)
-          .catch(() => null),
-        rehearsalDiscovery
-          .findInvestor(actor, investorOrganisationId)
-          .catch(() => null),
+    counterpart: async (actor, kind, id) => {
+      if (kind === "INVESTOR_ORGANISATION") {
+        const [relationship, seen] = await Promise.all([
+          errandRelationships.withInvestor(actor, id).catch(() => null),
+          rehearsalDiscovery.findInvestor(actor, id).catch(() => null),
+        ]);
+        if (relationship === null && seen === null) return null;
+        const name =
+          seen?.displayName ??
+          (
+            await investors
+              .findCanonicalInvestorOrganisation(
+                InvestorOrganisationIdSchema.parse(id),
+              )
+              .catch(() => null)
+          )?.displayName ??
+          null;
+        if (name === null) return null;
+        const profile = [
+          `Name: ${name}`,
+          seen === null ? null : `Type: ${seen.investorType}`,
+          seen?.hqCountry == null ? null : `Based in: ${seen.hqCountry}`,
+          seen?.deploymentState == null
+            ? null
+            : `Deploying: ${seen.deploymentState}`,
+          seen?.publicDescription == null
+            ? null
+            : `In their own words: ${seen.publicDescription}`,
+          relationship === null
+            ? null
+            : `Where things stand with you: ${relationship.state}`,
+        ]
+          .filter((line): line is string => line !== null)
+          .join("\n");
+        return {
+          name,
+          profile,
+          relationshipId: relationship?.relationshipId ?? null,
+        };
+      }
+      const companyId = CompanyIdSchema.safeParse(id);
+      if (!companyId.success) return null;
+      const [relationship, visible] = await Promise.all([
+        errandRelationships.withCompany(actor, id).catch(() => null),
+        subjectView.canView(actor, { type: "company", id }).catch(() => false),
       ]);
-      if (relationship === null && seen === null) return null;
-      const name =
-        seen?.displayName ??
-        (
-          await investors
-            .findCanonicalInvestorOrganisation(
-              InvestorOrganisationIdSchema.parse(investorOrganisationId),
-            )
-            .catch(() => null)
-        )?.displayName ??
-        null;
-      if (name === null) return null;
+      if (relationship === null && !visible) return null;
+      const company = await companies
+        .findCanonicalCompanyProfile(companyId.data)
+        .catch(() => null);
+      if (company === null) return null;
+      // The declared, network-projected fields only (no financials).
       const profile = [
-        `Name: ${name}`,
-        seen === null ? null : `Type: ${seen.investorType}`,
-        seen?.hqCountry == null ? null : `Based in: ${seen.hqCountry}`,
-        seen?.deploymentState == null
+        `Company: ${company.canonicalName}`,
+        company.currentStageCode === null
           ? null
-          : `Deploying: ${seen.deploymentState}`,
-        seen?.publicDescription == null
+          : `Stage: ${company.currentStageCode}`,
+        company.headquartersCountry === null
           ? null
-          : `In their own words: ${seen.publicDescription}`,
+          : `Based in: ${company.headquartersCity ?? ""} ${company.headquartersCountry}`,
+        company.websiteUrl === null ? null : `Website: ${company.websiteUrl}`,
+        company.shortDescription === null
+          ? null
+          : `In their words: ${company.shortDescription}`,
+        company.primaryDescription === null
+          ? null
+          : `About: ${company.primaryDescription.slice(0, 2_000)}`,
         relationship === null
           ? null
-          : `Where things stand with this founder: ${relationship.state}`,
+          : `Where things stand with you: ${relationship.state}`,
       ]
         .filter((line): line is string => line !== null)
         .join("\n");
       return {
-        name,
+        name: company.canonicalName,
         profile,
         relationshipId: relationship?.relationshipId ?? null,
       };
@@ -2080,6 +2199,133 @@ const rehearsals = createRehearsalService({
         .map((line) => `${line.speaker ?? "Someone"}: ${line.text}`)
         .join("\n");
     },
+    counterpartMaterial: async (actor, kind, id) => {
+      if (kind !== "COMPANY") return { text: "", sources: [] };
+      const [pitch, known] = await Promise.all([
+        transcriptText(actor, id, "Their pitch video"),
+        knowledgeText(
+          id,
+          ["network_visible", "public_external"],
+          "What Capital Q shows of them",
+        ),
+      ]);
+      return {
+        text: [pitch.text, known.text].filter((t) => t.length > 0).join("\n\n"),
+        sources: [...pitch.sources, ...known.sources],
+      };
+    },
+    publicWeb: async (_actor, name, kind) => {
+      const provider = researchComposition.provider;
+      if (provider === undefined) return { text: "", sources: [] };
+      const result = await provider.search(
+        {
+          query:
+            `"${name.trim()}" ${kind === "COMPANY" ? "startup founder" : "investor"}`.slice(
+              0,
+              200,
+            ),
+          maxResults: 5,
+          freshness: "ANY",
+          includeDomains: [],
+        },
+        { signal: AbortSignal.timeout(12_000) },
+      );
+      const hits = result.hits.filter((hit) => hit.url.startsWith("https://"));
+      return {
+        text: hits
+          .map((hit) => `${hit.title ?? hit.url}: ${hit.snippet ?? ""}`)
+          .join("\n"),
+        sources: hits.map((hit) => ({
+          kind: "PUBLIC_WEB" as const,
+          label: (hit.title ?? hit.url).slice(0, 200),
+          url: hit.url.slice(0, 2048),
+          excerpt: (hit.snippet ?? "").slice(0, 600),
+        })),
+      };
+    },
+    ownMaterial: async (actor) => {
+      const companyId = await runtimeDependencies.ownCompany(actor);
+      if (companyId === null || actor.organisationId === undefined) {
+        return { text: "", sources: [] };
+      }
+      const [company, pitch, known, decks] = await Promise.all([
+        companies
+          .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
+          .catch(() => null),
+        transcriptText(actor, companyId, "Your pitch video").catch(() => ({
+          text: "",
+          sources: [],
+        })),
+        // Their own company's records, except anyone's personal notes.
+        knowledgeText(
+          companyId,
+          [
+            "organisation_private",
+            "founder_private",
+            "relationship_shared",
+            "specifically_shared",
+            "network_visible",
+            "public_external",
+          ],
+          "Your company record",
+        ).catch(() => ({ text: "", sources: [] })),
+        database.sql<{ content: unknown }[]>`
+          select v.content from artifacts.artifacts a
+            join artifacts.artifact_versions v
+              on v.artifact_id = a.id and v.tenant_id = a.tenant_id
+           where a.tenant_id = ${actor.tenantId}
+             and a.organisation_id = ${actor.organisationId}
+             and a.type = 'PITCH_DECK' and a.archived_at is null
+           order by v.created_at desc limit 1`.catch(() => []),
+      ]);
+      const deck =
+        decks[0] === undefined ? "" : contentWords(decks[0].content).join(" ");
+      return {
+        text: [
+          company === null
+            ? null
+            : `THEIR COMPANY: ${company.canonicalName}. ${company.shortDescription ?? ""} ${company.primaryDescription?.slice(0, 1_500) ?? ""}`,
+          pitch.text || null,
+          deck.length === 0 ? null : `THEIR DECK:\n${deck.slice(0, 5_000)}`,
+          known.text || null,
+        ]
+          .filter((t): t is string => t !== null && t.trim().length > 0)
+          .join("\n\n"),
+        sources: [
+          { kind: "OWN_COMPANY", label: "Your company profile", url: null },
+          ...pitch.sources,
+          ...(deck.length === 0
+            ? []
+            : [{ kind: "DECK" as const, label: "Your deck", url: null }]),
+          ...known.sources,
+        ],
+      };
+    },
+    relationships: async (actor) => {
+      const own = await errandRelationships.ownRelationships?.(actor);
+      if (own === null || own === undefined) return [];
+      return own.items
+        .filter((item) => item.state !== "DECLINED")
+        .map((item) => ({
+          relationshipId: item.relationshipId,
+          kind:
+            item.counterpart.kind === "COMPANY"
+              ? ("COMPANY" as const)
+              : ("INVESTOR_ORGANISATION" as const),
+          id: item.counterpart.id,
+          name: item.counterpart.name,
+          state: item.state,
+        }));
+    },
+    upcomingMeetings: async (actor) =>
+      (await schedule.upcomingMeetings(actor))
+        .filter((meeting) => meeting.status !== "CANCELLED")
+        .map((meeting) => ({
+          meetingId: meeting.id,
+          relationshipId: meeting.relationshipId,
+          startsAt: meeting.startsAt,
+          purpose: meeting.purpose,
+        })),
   },
   composer: createRehearsalComposer({
     gateway: modelGateway,
@@ -2088,6 +2334,7 @@ const rehearsals = createRehearsalService({
   }),
   logger,
 });
+// end REHEARSE block
 
 // Q's scout (founder direction 2026-09-29): every six hours, what is new on
 // the public web about each recently active founder's own company, each at
@@ -2460,6 +2707,11 @@ const voiceTurn = timedVoiceTurns(
   }),
   voiceTimings,
 );
+// REHEARSE: a rehearsal's voice line speaks only as the person Q plays.
+const rehearsalVoiceTurn = createRehearsalAwareTurn({
+  rehearsals,
+  fallback: voiceTurn,
+});
 logger.info(
   {
     speech: speechProviderConfigStatus(
@@ -2526,9 +2778,10 @@ const { app, logger: appLogger } = createApp(
             apiBaseUrl: config.voice.apiBaseUrl,
             board: voiceTurnBoard,
             welcome: welcomeHost,
-            turn: voiceTurn,
+            turn: rehearsalVoiceTurn,
             memory: { termsFor: memoryLearner.termsFor },
             openerFacts: createOpenerFacts({ sql: database.sql }),
+            rehearsals: { opening: rehearsals.opening },
             // Their own records' names, for the recogniser (founder live
             // 2026-09-27, #6): read by the resolved actor's own
             // organisation and user id only, never from anything said.
@@ -2655,7 +2908,7 @@ if (voiceProvider !== undefined) {
   voiceChannel = await attachVoiceChannel(app.server, Q_VOICE_WS_PATH, {
     provider: voiceProvider,
     bindings: voiceBindings,
-    turn: voiceTurn,
+    turn: rehearsalVoiceTurn,
     logger,
   });
   appLogger.info(

@@ -100,6 +100,19 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly deepgram?: DeepgramVoiceProvider | undefined;
   readonly bindings: VoiceSessionBindings;
   /**
+   * REHEARSE: what the person Q plays says first on a rehearsal line (the
+   * rehearsal's latest line), for the person's own rehearsal only; null
+   * when it is not theirs or has ended.
+   */
+  readonly rehearsals?:
+    | {
+        readonly opening: (
+          actor: ActorContext,
+          rehearsalId: string,
+        ) => Promise<{ readonly line: string; readonly name: string } | null>;
+      }
+    | undefined;
+  /**
    * The interview as a tool-calling Q run (ADR 0016): composes Q's
    * opening line for an interview session, when present.
    */
@@ -525,10 +538,31 @@ export function registerQVoiceRoutes(
       const agent = dependencies.interviewAgent;
       const apiBaseUrl = dependencies.apiBaseUrl;
       let knownName: string | null = null;
+      // REHEARSE: a rehearsal line opens with the other person's own line.
+      let rehearsalName: string | null = null;
+      if (input.rehearsal !== undefined) {
+        const opening =
+          dependencies.rehearsals === undefined
+            ? null
+            : await dependencies.rehearsals
+                .opening(actor, input.rehearsal.rehearsalId)
+                .catch(() => null);
+        if (opening === null) {
+          return reply.code(404).send({
+            type: "about:blank",
+            title: "Not Found",
+            status: 404,
+            detail: "This rehearsal isn't available.",
+          });
+        }
+        rehearsalName = opening.name;
+        if (!resume) firstMessage = opening.line;
+      }
       if (
         !resume &&
         apiBaseUrl !== undefined &&
-        input.onboarding === undefined
+        input.onboarding === undefined &&
+        input.rehearsal === undefined
       ) {
         try {
           const me = await fetchMe({ baseUrl: apiBaseUrl, accessToken });
@@ -537,7 +571,9 @@ export function registerQVoiceRoutes(
           // Unknown name is a fine state to open from.
         }
       }
-      if (
+      if (input.rehearsal !== undefined) {
+        // Opened above; nothing else greets on a rehearsal line.
+      } else if (
         !resume &&
         input.welcome === true &&
         dependencies.welcome !== undefined
@@ -606,7 +642,12 @@ export function registerQVoiceRoutes(
       // 2026-09-29) read as Q forgetting what was just said. Q greets
       // only a new conversation.
       const continuing = input.conversationId !== undefined;
-      if (firstMessage === undefined && !resume && !continuing) {
+      if (
+        firstMessage === undefined &&
+        !resume &&
+        !continuing &&
+        input.rehearsal === undefined
+      ) {
         // Q always speaks first. On the open thread there is no interview
         // state to open from, so the line is a plain greeting.
         const first = knownName?.trim().split(/\s+/)[0];
@@ -674,6 +715,7 @@ export function registerQVoiceRoutes(
             // The organisation they typed at sign-up: the one name in this
             // conversation the recogniser could not know.
             terms: [
+              ...(rehearsalName === null ? [] : [rehearsalName]),
               ...ownNames,
               ...(input.organisationHint === undefined
                 ? []
@@ -706,6 +748,9 @@ export function registerQVoiceRoutes(
           ...(input.organisationHint === undefined
             ? {}
             : { organisationHint: input.organisationHint }),
+          ...(input.rehearsal === undefined
+            ? {}
+            : { rehearsal: input.rehearsal }),
         },
         issuedAt,
         connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,

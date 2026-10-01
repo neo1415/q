@@ -168,6 +168,10 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
     "Opens their GateQ gateway: its public link, QR code, website snippet and the applications that came in.",
   MEMORY: "Opens what Q remembers about them, to review or forget it.",
   NEW_PITCH: "Opens the page to add a new pitch video.",
+  // REHEARSE block
+  REHEARSALS:
+    "Opens Rehearsals: the people they are connected to and their upcoming calls, to rehearse a meeting with one (Q plays that person by voice), and every past rehearsal with its review.",
+  // end REHEARSE block
 };
 
 /** Screens that belong to a company's own people. */
@@ -524,7 +528,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "open_page",
     "NAVIGATION",
-    "Opens one company's page, their relationship with a company or an investor, or the chat with them, by id.",
+    "Opens one company's page, their relationship with a company or an investor, the chat with them, or a rehearsal of their meeting with them (Q plays that person), by id or by the name they said.",
     { acts: true },
   ),
   tool(

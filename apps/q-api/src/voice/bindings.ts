@@ -46,6 +46,8 @@ export type VoiceThread = {
    * claim about membership, which is resolved from their session.
    */
   readonly organisationHint?: string | undefined;
+  /** REHEARSE: every turn on this line goes to this rehearsal. */
+  readonly rehearsal?: CreateQVoiceSessionRequest["rehearsal"];
 };
 
 export type VoiceSessionBinding = {

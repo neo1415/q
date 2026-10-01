@@ -624,6 +624,23 @@ export function createScheduleService(
             dedupeKey: `meeting-scheduled:${record.id}`,
           });
         }
+        // REHEARSE (founder direction 2026-10-01): every Capital Q person
+        // on the call is offered a rehearsal of it with the other side,
+        // played by Q. The link names the meeting; the rehearsal service
+        // resolves it for that person only.
+        for (const participant of record.participants) {
+          await store.notify(tx, {
+            tenantId: participant.participantTenantId,
+            userId: participant.userId,
+            kind: "MEETING_PREP_READY",
+            title: `Rehearse your call: ${record.purpose}`.slice(0, 200),
+            body: "Q can play the other side so you can practise first.",
+            linkPath: `/rehearsals/meeting/${record.id}`,
+            reminderId: null,
+            meetingId: record.id,
+            dedupeKey: `rehearse-suggested:${record.id}`,
+          });
+        }
       });
       logger?.info({ meetingId: record.id }, "meeting scheduled");
       const fresh = (await store.findMeeting(record.id)) ?? record;

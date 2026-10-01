@@ -329,7 +329,7 @@ export function createSignOutTool(): AnyQToolDefinition {
 export const OpenPageInputSchema = z
   .object({
     page: QRecordPageSchema.describe(
-      "COMPANY: a company's page. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a practice meeting with that investor, played by Q, with coaching after (the Investor Twin). RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation.",
+      "COMPANY: a company's page. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation.",
     ),
     id: z
       .string()
@@ -480,7 +480,7 @@ export function createOpenPageTool(
     id: OPEN_PAGE,
     providerName: "open_page",
     description:
-      "Opens any one record's own page on their screen, at once: a company's page, an investor organisation's page, their relationship with a company or investor, or the chat with them. Give the id a tool or the screen gave, or just the name they said -- misheard names are matched against the records they can already see (their relationships, Saves, the network). 'Open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES (X a company) or RELATIONSHIP_INVESTOR_MESSAGES (X an investor) with name X; 'show me X' is COMPANY or INVESTOR; 'rehearse / practise my meeting with X' is INVESTOR_REHEARSAL. Call it directly, never send them to a list instead. NOT_AVAILABLE means nothing they can see matches, or that page is not theirs to open.",
+      "Opens any one record's own page on their screen, at once: a company's page, an investor organisation's page, their relationship with a company or investor, or the chat with them. Give the id a tool or the screen gave, or just the name they said -- misheard names are matched against the records they can already see (their relationships, Saves, the network). 'Open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES (X a company) or RELATIONSHIP_INVESTOR_MESSAGES (X an investor) with name X; 'show me X' is COMPANY or INVESTOR; 'rehearse / practise my meeting with X' is INVESTOR_REHEARSAL when X is an investor (they are a founder) and COMPANY_REHEARSAL when X is a company (they are an investor). Call it directly, never send them to a list instead. NOT_AVAILABLE means nothing they can see matches, or that page is not theirs to open.",
     input: OpenPageInputSchema,
     authorize: async (input, { actor, plan }) => {
       if (!ownConversation(actor, plan)) {
@@ -488,6 +488,7 @@ export function createOpenPageTool(
       }
       const companySide =
         input.page === "COMPANY" ||
+        input.page === "COMPANY_REHEARSAL" ||
         input.page === "RELATIONSHIP_COMPANY" ||
         input.page === "RELATIONSHIP_COMPANY_MESSAGES";
       const kind = companySide ? "COMPANY" : "INVESTOR_ORGANISATION";
@@ -520,6 +521,14 @@ export function createOpenPageTool(
           (await candidates(actor, kind, null)).some(
             (candidate) => candidate.id.toLowerCase() === id,
           );
+      } else if (input.page === "COMPANY_REHEARSAL") {
+        // REHEARSE: an investor rehearses only with a company they have a
+        // relationship with; the rehearsal service checks again.
+        openable =
+          ports.relationships !== undefined &&
+          (await ports.relationships
+            .withCompany(actor, recordId)
+            .catch(() => null)) !== null;
       } else if (ports.relationships !== undefined) {
         const standing = companySide
           ? await ports.relationships

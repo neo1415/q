@@ -671,6 +671,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "SEARCH",
           "GATEWAY",
           "MEMORY",
+          "REHEARSALS",
         ],
         documents: [],
         visibilityChange: false,

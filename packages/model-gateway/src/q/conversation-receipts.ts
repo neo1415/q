@@ -155,6 +155,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   GATEWAY: "their GateQ gateway",
   MEMORY: "what Q remembers about them",
   NEW_PITCH: "a new pitch video",
+  REHEARSALS: "Rehearsals",
 };
 
 /** Where the person is, in their terms (R21). */

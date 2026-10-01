@@ -496,6 +496,23 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/rehearsals.ts POST Q_REHEARSAL_FINISH_PATH": exempt(
     "the founder ending their rehearsal for Q's coaching; the scoring is already Q",
   ),
+  // REHEARSE block
+  "q-api/http/rehearsals.ts GET Q_REHEARSALS_PATH": exempt(
+    "the person's own rehearsal history, shown on the Rehearsals page Q opens with navigate REHEARSALS",
+  ),
+  "q-api/http/rehearsals.ts GET Q_REHEARSAL_PARTNERS_PATH": exempt(
+    "who the person can rehearse with and their upcoming calls, shown on the Rehearsals page Q opens with navigate REHEARSALS",
+  ),
+  "q-api/http/rehearsals.ts GET Q_REHEARSAL_PERSONA_PATH": exempt(
+    "the lobby's reading of the person Q will play; Q opens the lobby with open_page",
+  ),
+  "q-api/http/rehearsals.ts GET Q_REHEARSAL_MEETING_PATH": exempt(
+    "which person a booked call is with, for the rehearsal suggested when the call was booked",
+  ),
+  "q-api/http/rehearsals.ts POST Q_REHEARSAL_SCREEN_PATH": exempt(
+    "a frame of the screen the person shares in the rehearsal room; only the person can share their screen",
+  ),
+  // end REHEARSE block
   "q-api/http/meeting-assistant.ts GET Q_MEETING_ASSISTANT_PATH": exempt(
     "the organiser reading whether Q is in their call and its notes; shown on the meeting itself",
   ),
@@ -624,8 +641,19 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "/investors/[investorOrganisationId]": cap("offer.connection_request"),
   "/investors/[investorOrganisationId]/rehearse": exempt(
-    "the founder's rehearsal with an investor, which is Q playing them; Q opens it with open_page INVESTOR_REHEARSAL",
+    "the old address of a founder's rehearsal with an investor; it only redirects",
   ),
+  // REHEARSE block
+  "/rehearsals": cap("navigate.REHEARSALS"),
+  "/rehearsals/investor/[investorOrganisationId]": cap("tool.open_page"),
+  "/rehearsals/company/[companyId]": cap("tool.open_page"),
+  "/rehearsals/meeting/[meetingId]": exempt(
+    "the rehearsal suggested when a call was booked; it resolves to the lobby Q opens with open_page",
+  ),
+  "/rehearsals/r/[rehearsalId]": exempt(
+    "the person's own review of one rehearsal, reached from the room and Rehearsals",
+  ),
+  // end REHEARSE block
   "/pitch/[mediaAssetId]": cap("navigate.PITCH"),
   "/company/[companyId]": cap("tool.open_page"),
   "/relationships/company/[companyId]": cap("tool.open_page"),

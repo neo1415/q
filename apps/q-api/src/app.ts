@@ -166,6 +166,7 @@ export type QApiModules = {
         | "memory"
         | "ownNames"
         | "openerFacts"
+        | "rehearsals"
       >)
     | undefined;
 };
@@ -435,6 +436,7 @@ export function createApp(
       memory: modules.voice.memory,
       ownNames: modules.voice.ownNames,
       openerFacts: modules.voice.openerFacts,
+      rehearsals: modules.voice.rehearsals,
     });
     /**
      * One Q, whatever the input was (QX-004 core gate).

@@ -232,9 +232,20 @@ describe("schedule, reschedule, cancel", () => {
     );
     expect(reminder?.dueAt.toISOString()).toBe("2026-10-06T08:45:00.000Z");
     expect(reminder?.channel).toBe("EMAIL");
-    expect(w.store.notifications.map((n) => [n.userId, n.kind])).toEqual([
-      [FOUNDER.userId, "MEETING_SCHEDULED"],
-    ]);
+    expect(
+      w.store.notifications
+        .filter((n) => n.kind === "MEETING_SCHEDULED")
+        .map((n) => [n.userId, n.kind]),
+    ).toEqual([[FOUNDER.userId, "MEETING_SCHEDULED"]]);
+    // REHEARSE: everyone on the call is offered a rehearsal of it.
+    const rehearse = w.store.notifications.filter(
+      (n) => n.kind === "MEETING_PREP_READY",
+    );
+    expect(rehearse.map((n) => n.linkPath)).toEqual(
+      rehearse.map(() => `/rehearsals/meeting/${result.meeting.id}`),
+    );
+    expect(rehearse.map((n) => n.userId)).toContain(FOUNDER.userId);
+    expect(rehearse.length).toBeGreaterThanOrEqual(2);
   });
 
   it("is idempotent per execution identity: a retry never invites twice", async () => {
