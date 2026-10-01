@@ -113,6 +113,7 @@ export {
   createQActionNarrator,
   failedLine,
   noQActionNarrator,
+  proposalBlocks,
   proposedLine,
   refusedLine,
   type QActionNarrator,
