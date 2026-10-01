@@ -470,6 +470,20 @@ export type ErrandStore = {
     relationshipId: string,
   ) => Promise<readonly ErrandListRow[]>;
   readonly stop: (actor: ActorContext, errandId: string) => Promise<boolean>;
+  /** The person's own ACTIVE errand for a relationship or company, if any. */
+  readonly activeFor?:
+    | ((
+        actor: ActorContext,
+        ref: {
+          readonly relationshipId: string | null;
+          readonly companyId: string | null;
+        },
+      ) => Promise<{
+        readonly counterpartName: string;
+        readonly stage: string;
+        readonly lastStep: string | null;
+      } | null>)
+    | undefined;
   /** AUTO: the person's own errands on every relationship, newest first. */
   readonly own?:
     ((actor: ActorContext) => Promise<readonly ErrandListRow[]>) | undefined;
@@ -537,6 +551,27 @@ export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
            and relationship_id = ${relationshipId}
          order by created_at desc
          limit 5`,
+    activeFor: async (actor, ref) => {
+      const rows = await sql<
+        { counterpart_name: string; stage: string; last_step: string | null }[]
+      >`
+        select counterpart_name, stage, last_step
+          from q_runtime.errands
+         where user_id = ${actor.userId} and tenant_id = ${actor.tenantId}
+           and status = 'ACTIVE'
+           and ((${ref.relationshipId}::uuid is not null and relationship_id = ${ref.relationshipId}::uuid)
+             or (${ref.companyId}::uuid is not null and company_id = ${ref.companyId}::uuid))
+         order by created_at desc
+         limit 1`;
+      const row = rows[0];
+      return row === undefined
+        ? null
+        : {
+            counterpartName: row.counterpart_name,
+            stage: row.stage,
+            lastStep: row.last_step,
+          };
+    },
     own: async (actor) =>
       sql<ErrandListRow[]>`
         select id, counterpart_name, status, last_step, failure, created_at

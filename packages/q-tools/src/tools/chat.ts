@@ -147,6 +147,23 @@ export type ChatIntelligencePort = {
       readonly sentAt: string;
     }[];
   } | null>;
+  /**
+   * The person's own errand already running for this relationship or
+   * company, with its real stage, or null. Absent: not known.
+   */
+  readonly activeErrand?:
+    | ((
+        actor: ActorContext,
+        ref: {
+          readonly relationshipId: string | null;
+          readonly companyId: string | null;
+        },
+      ) => Promise<{
+        readonly counterpartName: string;
+        readonly stage: string;
+        readonly lastStep: string | null;
+      } | null>)
+    | undefined;
   readonly prepareForApproval: (entry: {
     readonly runId: string;
     readonly tenantId: string;
@@ -340,6 +357,8 @@ export const ChatProposalOutputSchema = z
       "NOT_CONNECTED",
       "BLOCKED",
       "CALENDAR_NOT_CONNECTED",
+      /** Q already runs an errand for this subject: nothing new prepared. */
+      "ALREADY_ACTIVE",
     ]),
     awaitingApprovalOf: z.string(),
   })

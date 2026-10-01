@@ -37,6 +37,22 @@ import { actionTarget } from "./relationships.js";
 
 export const PROPOSE_ERRAND = "relationship.errand.propose" as const;
 
+/** An errand's stage, as the person reads it. */
+export function errandStageWords(stage: string): string {
+  switch (stage) {
+    case "WAITING_CONNECTION":
+      return "waiting for them to accept";
+    case "CONVERSING":
+      return "in the chat with them";
+    case "CALL_BOOKED":
+      return "the call is booked";
+    case "FINISHED":
+      return "finished";
+    default:
+      return "under way";
+  }
+}
+
 export const ProposeErrandInputSchema = z
   .object({
     ...RelationshipRef,
@@ -154,13 +170,31 @@ export function createErrandTools(
           return deny("NOT_AVAILABLE");
         }
       },
-      execute: (input, context, grant) => {
+      execute: async (input, context, grant) => {
         if (grant.blocked) {
-          return Promise.resolve({
+          return {
             status: "BLOCKED" as const,
             awaitingApprovalOf:
               "You can't message this relationship right now.",
-          });
+          };
+        }
+        // One errand per subject (QA 2026-10-01: a second card was
+        // prepared for a company Q was already looking after). What Q is
+        // already doing is said from the errand's real state.
+        const running =
+          chat.activeErrand === undefined
+            ? null
+            : await chat
+                .activeErrand(context.actor, {
+                  relationshipId: grant.relationshipId,
+                  companyId: grant.companyId,
+                })
+                .catch(() => null);
+        if (running !== null) {
+          return {
+            status: "ALREADY_ACTIVE" as const,
+            awaitingApprovalOf: `Q is already looking after ${running.counterpartName} for you (${errandStageWords(running.stage)})${running.lastStep === null ? "." : `: ${running.lastStep}`}`,
+          };
         }
         const plan: ErrandPlan = {
           ...(grant.relationshipId === null
@@ -185,10 +219,10 @@ export function createErrandTools(
           actorUserId: context.actor.userId,
           proposal: { actionType: ERRAND_START, payload: plan },
         });
-        return Promise.resolve({
+        return {
           status,
           awaitingApprovalOf: `Q looks after ${grant.counterpartName} for you`,
-        });
+        };
       },
     }),
   ];

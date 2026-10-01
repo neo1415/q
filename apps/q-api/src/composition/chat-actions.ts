@@ -289,6 +289,8 @@ export function createChatIntelligencePort(dependencies: {
     relationshipId: string,
   ) => Promise<string | null>;
   readonly board: ReturnType<typeof createChatActionBoard>;
+  /** The person's running errand for a subject (one errand per subject). */
+  readonly activeErrand?: ChatIntelligencePort["activeErrand"];
 }): ChatIntelligencePort {
   return {
     thread: async (actor, relationshipId) => {
@@ -306,5 +308,8 @@ export function createChatIntelligencePort(dependencies: {
       };
     },
     prepareForApproval: dependencies.board.prepareForApproval,
+    ...(dependencies.activeErrand === undefined
+      ? {}
+      : { activeErrand: dependencies.activeErrand }),
   };
 }

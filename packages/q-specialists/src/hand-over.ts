@@ -123,6 +123,13 @@ export async function actOnHandOver(
     }
   }
   const prepared = await port.prepare(request, subject);
+  if (prepared?.status === "ALREADY_ACTIVE") {
+    // No second card: what Q is already doing there, from its real state.
+    return {
+      kind: "PREPARED",
+      line: `${prepared.awaitingApprovalOf} Want me to change anything?`,
+    };
+  }
   if (prepared === null || prepared.status !== "PREPARED") {
     return { kind: "NONE" };
   }

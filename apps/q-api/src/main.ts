@@ -1264,6 +1264,7 @@ const conversationApprovals = createConversationApprovalPort({
   late: () => ({ actions: qActions, orchestrator, continueApproved }),
   logger,
 });
+const errandStore = createPostgresErrandStore(database.sql);
 const qTools = createQTools({
   ports: {
     // BILLING block
@@ -1354,6 +1355,10 @@ const qTools = createQTools({
     chat: createChatIntelligencePort({
       chat,
       board: chatBoard,
+      // One errand per subject: Q says what it is already doing instead
+      // of preparing a second card (QA 2026-10-01).
+      activeErrand: (actor, ref) =>
+        errandStore.activeFor?.(actor, ref) ?? Promise.resolve(null),
       counterpartName: async (actor, relationshipId) =>
         (await relationshipCounterparts.of(actor, relationshipId))?.name ??
         null,
@@ -2358,7 +2363,7 @@ const errands = createErrandRunner({
   nudger: counterpartNudger,
   counterpartNotices,
   negotiation: errandNegotiation,
-  store: createPostgresErrandStore(database.sql),
+  store: errandStore,
   resolver: actorContextResolver,
   chat,
   schedule,

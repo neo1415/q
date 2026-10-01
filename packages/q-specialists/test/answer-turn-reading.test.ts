@@ -1018,6 +1018,28 @@ describe("a hand-over is prepared by code for the subject on screen (TURN_READER
     },
   );
 
+  it("an errand already running for them: no second card, Q says what it is doing and asks about changes", async () => {
+    const { answer, stored, delegated } = seam({
+      said: "handle this for me",
+      reading: reading({ kind: "HAND_OVER", counterpartName: null }),
+      outcomes: [],
+      handOver: {
+        prepare: () =>
+          Promise.resolve({
+            status: "ALREADY_ACTIVE",
+            awaitingApprovalOf:
+              "Q is already looking after Tarmacly for you (in the chat with them): Offered three times for the call.",
+          }),
+        candidates: () => Promise.resolve([]),
+      },
+    });
+    await answer.answer(onCompanyPage());
+    expect(stored.at(-1)?.content).toBe(
+      "Q is already looking after Tarmacly for you (in the chat with them): Offered three times for the call. Want me to change anything?",
+    );
+    expect(delegated()).toBe(0);
+  });
+
   it("a question about meetings is not a hand-over ('what is a meeting?')", async () => {
     const prepared: unknown[] = [];
     const { answer, delegated } = seam({

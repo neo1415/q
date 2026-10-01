@@ -192,6 +192,10 @@ export {
   TURN_READER_V22_HAND_OVER,
 } from "./prompts/tasks/turn-reader.v22.js";
 export {
+  TURN_READER_V23,
+  TURN_READER_V23_HAND_OVER,
+} from "./prompts/tasks/turn-reader.v23.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,

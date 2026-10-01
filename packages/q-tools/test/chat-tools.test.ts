@@ -49,7 +49,11 @@ function relationshipPlan(
 }
 
 function world(
-  options: { readonly connected?: boolean; readonly blocked?: boolean } = {},
+  options: {
+    readonly connected?: boolean;
+    readonly blocked?: boolean;
+    readonly running?: boolean;
+  } = {},
 ) {
   const prepared: unknown[] = [];
   const reads: string[] = [];
@@ -81,6 +85,16 @@ function world(
       prepared.push(entry.proposal);
       return "PREPARED";
     },
+    activeErrand: () =>
+      Promise.resolve(
+        options.running === true
+          ? {
+              counterpartName: "Apex",
+              stage: "CONVERSING",
+              lastStep: "Offered three times for the call.",
+            }
+          : null,
+      ),
   };
   const relationships = {} as RelationshipIntelligencePort;
   const schedule: ScheduleIntelligencePort = {
@@ -266,5 +280,46 @@ describe("chat proposals", () => {
     expect(
       prepared.map((p) => (p as { actionType: string }).actionType),
     ).toEqual(["meeting.schedule", "reminder.create"]);
+  });
+});
+
+describe("propose_errand, one errand per subject (QA 2026-10-01)", () => {
+  const errand = {
+    callId: "e1",
+    name: "propose_errand",
+    arguments: {
+      relationshipId: RELATIONSHIP,
+      callPurpose: "Introductory call",
+    },
+  };
+
+  it("prepares a card when nothing is running for them", async () => {
+    const { executor, prepared } = world();
+    const outcome = await executor.execute(
+      errand,
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toHaveLength(1);
+  });
+
+  it("prepares no second card, and says what Q is already doing and where it stands", async () => {
+    const { executor, prepared } = world({ running: true });
+    const outcome = await executor.execute(
+      errand,
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "ALREADY_ACTIVE",
+        awaitingApprovalOf:
+          "Q is already looking after Apex for you (in the chat with them): Offered three times for the call.",
+      },
+    });
+    expect(prepared).toEqual([]);
   });
 });

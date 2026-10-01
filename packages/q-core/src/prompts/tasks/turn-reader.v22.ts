@@ -31,7 +31,7 @@ export const TURN_READER_V22: PromptDefinition<
 > = {
   ...TURN_READER_V21,
   version: 22,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-10-01: handOver (MEETING / HAND_OVER, any language) so code prepares Q's errand for the subject on screen instead of the answer asking who.",
   effectiveFrom: "2026-10-01",
