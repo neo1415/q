@@ -540,6 +540,17 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/errands.ts DELETE Q_ERRAND_PATH": exempt(
     "the person's own click stopping an errand they approved; stopping never needs Q",
   ),
+  // DAILY block: The Q Daily.
+  "q-api/http/daily.ts GET Q_DAILY_PATH": cap("tool.get_q_daily"),
+  "q-api/http/daily.ts GET Q_DAILY_EDITION_PATH": cap("tool.get_q_daily"),
+  "q-api/http/daily.ts GET Q_DAILY_EDITION_PDF_PATH": DOWNLOAD,
+  "q-api/http/daily.ts GET Q_DAILY_PREFERENCES_PATH": cap("tool.get_q_daily"),
+  "q-api/http/daily.ts PUT Q_DAILY_PREFERENCES_PATH": cap(
+    "tool.set_q_daily_preferences",
+  ),
+  "q-api/http/daily.ts POST Q_DAILY_REQUESTS_PATH": exempt(
+    "the reader's own Prepare my edition button, rate-limited to one per 20 hours; Q tells them when the next one comes (get_q_daily)",
+  ),
   "q-api/http/standing.ts GET Q_STANDING_PATH": exempt(
     "the person reading their own Q personality and whether their account is paused; shown in Settings and on arrival",
   ),

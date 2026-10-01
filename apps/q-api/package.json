@@ -40,6 +40,7 @@
     "@capital-q/q-artifacts": "workspace:*",
     "@capital-q/q-connectors": "workspace:*",
     "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-daily": "workspace:*",
     "@capital-q/q-embeddings": "workspace:*",
     "@capital-q/q-firewall": "workspace:*",
     "@capital-q/q-knowledge": "workspace:*",

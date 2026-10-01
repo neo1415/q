@@ -234,6 +234,9 @@ importers:
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../../packages/q-core
+      '@capital-q/q-daily':
+        specifier: workspace:*
+        version: link:../../packages/q-daily
       '@capital-q/q-embeddings':
         specifier: workspace:*
         version: link:../../packages/q-embeddings

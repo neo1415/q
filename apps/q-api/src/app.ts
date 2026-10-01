@@ -58,6 +58,10 @@ import {
   type StandingRoutesDependencies,
 } from "./http/standing.js";
 import {
+  registerDailyRoutes,
+  type DailyRoutesDependencies,
+} from "./http/daily.js";
+import {
   registerRehearsalRoutes,
   type RehearsalRoutesDependencies,
 } from "./http/rehearsals.js";
@@ -127,6 +131,8 @@ export type QApiModules = {
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
   /** Q's standing with each person: personality and patience. */
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
+  // DAILY block: The Q Daily, the person's own editions and preferences.
+  readonly daily?: DailyRoutesDependencies["daily"] | undefined;
   /** Q in a meeting: bring it to a call, read its notes. */
   readonly meetingAssistant?:
     MeetingAssistantRoutesDependencies["assistant"] | undefined;
@@ -374,6 +380,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       errands: modules.errands,
+    });
+  }
+  // DAILY block: The Q Daily (the person's own editions and preferences).
+  if (modules.daily !== undefined && security.resolver !== undefined) {
+    registerDailyRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      daily: modules.daily,
     });
   }
 

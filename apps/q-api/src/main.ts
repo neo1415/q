@@ -95,6 +95,10 @@ import {
   createPostgresErrandStore,
 } from "./composition/errands.js";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
+import {
+  createDailyReaderService,
+  createPostgresDailyReaderStore,
+} from "@capital-q/q-daily";
 
 import {
   createPostgresStandingStore,
@@ -1204,6 +1208,19 @@ const ownResults = createResultsReader({
   },
 });
 // end ADMIN block
+// DAILY block: The Q Daily, read and set by the person (routes and Q's
+// tools); editions are prepared by the worker only.
+const dailyReader = createDailyReaderService({
+  store: createPostgresDailyReaderStore(database.sql),
+});
+const ownDaily = (actor: {
+  readonly userId: string;
+  readonly tenantId: string;
+}) => ({
+  userId: actor.userId,
+  tenantId: actor.tenantId,
+});
+// end DAILY block
 
 const qTools = createQTools({
   ports: {
@@ -1217,6 +1234,15 @@ const qTools = createQTools({
     onboardingReminders: {
       choose: (actor, choice) => onboardingNudges.choose(actor.userId, choice),
       unfinished: (actor) => onboardingNudges.continueTarget(actor.userId),
+    },
+    // DAILY block
+    daily: {
+      latest: async (actor) => {
+        const home = await dailyReader.home(ownDaily(actor), null, new Date());
+        return { edition: home.latest, preferences: home.preferences };
+      },
+      setPreferences: (actor, patch) =>
+        dailyReader.setPreferences(ownDaily(actor), patch, new Date()),
     },
     companies,
     capital,
@@ -3126,6 +3152,8 @@ const { app, logger: appLogger } = createApp(
     work: workPort,
     rehearsals,
     standing: standingStore,
+    // DAILY block
+    daily: dailyReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     continueApproved,
