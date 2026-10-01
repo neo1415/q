@@ -4,6 +4,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import type { ContextScope } from "@capital-q/ui/tokens";
 
+import { DocumentReadyCenter } from "@/features/documents/document-ready-center";
 import { QDock } from "@/features/q-dock";
 import { NO_SUBJECT, type QSubject } from "@/features/q/q-subject";
 
@@ -66,6 +67,8 @@ export function AppShell({
             {children}
           </main>
         </div>
+        {/* DOCS: a deck made during setup still pops up when it is ready. */}
+        <DocumentReadyCenter connected={qConnected} />
       </GlobalQProvider>
     );
   }
@@ -88,6 +91,8 @@ export function AppShell({
           <MobileNavigation />
         </div>
       </div>
+      {/* DOCS: the one owner of document-ready cards, on every page. */}
+      <DocumentReadyCenter connected={qConnected} />
     </GlobalQProvider>
   );
 }

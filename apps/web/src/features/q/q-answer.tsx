@@ -9,6 +9,10 @@ import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { QMarkdown } from "./markdown";
 import { evidenceSummary, QEvidenceBody } from "./q-evidence";
 import { QResultBlocks } from "./q-result-blocks";
+import {
+  AnswerPdf,
+  ANSWER_PDF_MIN_CHARS,
+} from "@/features/documents/answer-pdf";
 
 /**
  * One Q reply as a chat row (founder direction A, 2026-09-28; ADR 0018).
@@ -120,6 +124,12 @@ export function QAnswer({
           onAsk={onAsk}
           onOpenArtifact={onOpenArtifact}
         />
+      ) : null}
+      {/* DOCS: any substantive answer, as a PDF. */}
+      {!turn.streaming &&
+      turn.runId !== undefined &&
+      turn.text.length >= ANSWER_PDF_MIN_CHARS ? (
+        <AnswerPdf runId={turn.runId} messageId={turn.id} />
       ) : null}
       {chips.length > 0 ? (
         <div className="flex flex-col gap-2">

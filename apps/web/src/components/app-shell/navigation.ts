@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import {
   ChartColumn,
   CircleUser,
+  FileText,
   Compass,
   Handshake,
   Search,
@@ -36,7 +37,8 @@ export type NavigationItem = {
     | "/search"
     | "/rehearsals"
     | "/results"
-    | "/settings";
+    | "/settings"
+    | "/documents";
   readonly label: string;
   readonly icon: ComponentType<{
     readonly size?: number;
@@ -110,6 +112,11 @@ export const REHEARSALS_NAVIGATION: NavigationItem = {
   href: "/rehearsals",
   label: "Rehearsals",
   icon: Presentation,
+/** DOCS: every document Q made for them, and their brand kit. */
+export const DOCUMENTS_NAVIGATION: NavigationItem = {
+  href: "/documents",
+  label: "Documents",
+  icon: FileText,
 };
 
 // ADMIN block

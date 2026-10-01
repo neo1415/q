@@ -238,6 +238,11 @@ describe("brand kit routes", () => {
     });
     expect(response.statusCode).toBe(422);
     expect(response.json()).toMatchObject({ code: "NO_WEBSITE" });
+    // RFC 9457, as every Capital Q client reads one.
+    expect(response.headers["content-type"]).toContain(
+      "application/problem+json",
+    );
+    expect(response.json()).toHaveProperty("requestId");
     await app.close();
   });
 

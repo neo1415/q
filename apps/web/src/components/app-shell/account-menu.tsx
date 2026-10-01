@@ -16,6 +16,7 @@ import {
 } from "@capital-q/ui/popover";
 
 import {
+  DOCUMENTS_NAVIGATION,
   FOUNDER_MEDIA_NAVIGATION,
   FIND_NAVIGATION,
   REHEARSALS_NAVIGATION,
@@ -46,6 +47,7 @@ export function AccountMenu({
     ...(founder === true || investor === true
       ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION]
       : []),
+    DOCUMENTS_NAVIGATION,
     FIND_NAVIGATION,
   ];
   return (

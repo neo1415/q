@@ -148,6 +148,12 @@ export {
   getQArtifactVersion,
   getProfileFindings,
   listQArtifacts,
+  // DOCS block.
+  confirmQBrandKit,
+  createQAnswerExport,
+  getQBrandKit,
+  setQBrandKit,
+  suggestQBrandKit,
   listQConversations,
   createQVoiceSession,
   getQVoiceTurnState,

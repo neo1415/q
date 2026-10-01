@@ -32,6 +32,7 @@ export const config = {
     "/gateway/:path*",
     "/rehearsals/:path*",
     "/results/:path*",
+    "/documents/:path*",
     "/admin/:path*",
     "/paused/:path*",
     "/auth/:path*",

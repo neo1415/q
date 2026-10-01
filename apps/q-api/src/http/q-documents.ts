@@ -1,9 +1,10 @@
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   ConfirmQBrandKitRequestSchema,
   CreateQAnswerExportRequestSchema,
   parseContract,
+  PROBLEM_CONTENT_TYPE,
   Q_ANSWER_EXPORTS_PATH,
   Q_BRAND_KIT_CONFIRM_SUFFIX,
   Q_BRAND_KIT_LOGO_SUFFIX,
@@ -76,7 +77,7 @@ type Problem = {
   readonly title: string;
   readonly status: number;
   readonly detail: string;
-  readonly code?: string;
+  readonly code: string;
 };
 
 const problem = (
@@ -89,8 +90,22 @@ const problem = (
   title,
   status,
   detail,
-  ...(code === undefined ? {} : { code }),
+  // Clients branch on the code; a refusal without its own is named by
+  // its class.
+  code: code ?? (status === 404 ? "NOT_FOUND" : "DOCUMENT_REFUSED"),
 });
+
+/** An RFC 9457 problem, as every Capital Q client reads one. */
+function refuse(
+  reply: FastifyReply,
+  request: FastifyRequest,
+  body: Problem,
+): FastifyReply {
+  return reply
+    .code(body.status)
+    .type(PROBLEM_CONTENT_TYPE)
+    .send({ ...body, requestId: request.id });
+}
 
 function decodeBase64(raw: string): Uint8Array | null {
   const clean = raw.replace(/^data:image\/(?:png|jpeg);base64,/, "").trim();
@@ -161,16 +176,16 @@ export function registerQDocumentRoutes(
       } else if (body.logoBase64 !== undefined) {
         const decoded = decodeBase64(body.logoBase64);
         if (decoded === null) {
-          return reply
-            .code(422)
-            .send(
-              problem(
-                422,
-                "Logo not readable",
-                "Upload a PNG or JPEG of at most 512 KB.",
-                "LOGO_INVALID",
-              ),
-            );
+          return refuse(
+            reply,
+            request,
+            problem(
+              422,
+              "Logo not readable",
+              "Upload a PNG or JPEG of at most 512 KB.",
+              "LOGO_INVALID",
+            ),
+          );
         }
         logo = decoded;
       }
@@ -183,19 +198,19 @@ export function registerQDocumentRoutes(
         return reply.code(201).send(QBrandKitSchema.parse(kit));
       } catch (error) {
         if (error instanceof BrandLogoInvalidError) {
-          return reply
-            .code(422)
-            .send(
-              problem(
-                422,
-                "Logo not readable",
-                "Upload a PNG or JPEG of at most 512 KB.",
-                "LOGO_INVALID",
-              ),
-            );
+          return refuse(
+            reply,
+            request,
+            problem(
+              422,
+              "Logo not readable",
+              "Upload a PNG or JPEG of at most 512 KB.",
+              "LOGO_INVALID",
+            ),
+          );
         }
         if (error instanceof BrandKitAuthorityError) {
-          return reply.code(409).send(noOrganisation());
+          return refuse(reply, request, noOrganisation());
         }
         throw error;
       }
@@ -208,22 +223,22 @@ export function registerQDocumentRoutes(
     async (request, reply) => {
       const actor = getActorContext(request);
       if (actor.organisationId === undefined) {
-        return reply.code(409).send(noOrganisation());
+        return refuse(reply, request, noOrganisation());
       }
       const found = await dependencies.suggestFromWebsite(actor);
       if (found.status !== "FOUND") {
-        return reply
-          .code(422)
-          .send(
-            problem(
-              422,
-              "Nothing to read",
-              found.status === "NO_WEBSITE"
-                ? "Your company has no website on record."
-                : "Your website could not be read for colours or a logo.",
-              found.status,
-            ),
-          );
+        return refuse(
+          reply,
+          request,
+          problem(
+            422,
+            "Nothing to read",
+            found.status === "NO_WEBSITE"
+              ? "Your company has no website on record."
+              : "Your website could not be read for colours or a logo.",
+            found.status,
+          ),
+        );
       }
       const kit = await brandKit.suggest(actor, {
         source: "WEBSITE",
@@ -251,24 +266,26 @@ export function registerQDocumentRoutes(
         return reply.code(201).send(QBrandKitSchema.parse(kit));
       } catch (error) {
         if (error instanceof BrandKitNotFoundError) {
-          return reply
-            .code(404)
-            .send(problem(404, "Not found", "No such suggestion."));
+          return refuse(
+            reply,
+            request,
+            problem(404, "Not found", "No such suggestion."),
+          );
         }
         if (error instanceof BrandKitAlreadyAnsweredError) {
-          return reply
-            .code(409)
-            .send(
-              problem(
-                409,
-                "Already answered",
-                "That suggestion was already answered.",
-                "ALREADY_ANSWERED",
-              ),
-            );
+          return refuse(
+            reply,
+            request,
+            problem(
+              409,
+              "Already answered",
+              "That suggestion was already answered.",
+              "ALREADY_ANSWERED",
+            ),
+          );
         }
         if (error instanceof BrandKitAuthorityError) {
-          return reply.code(409).send(noOrganisation());
+          return refuse(reply, request, noOrganisation());
         }
         throw error;
       }
@@ -283,12 +300,12 @@ export function registerQDocumentRoutes(
       const raw = query["version"];
       const version = Number(typeof raw === "string" ? raw : Number.NaN);
       if (!Number.isInteger(version) || version < 1) {
-        return reply.code(404).send(problem(404, "Not found", "No logo."));
+        return refuse(reply, request, problem(404, "Not found", "No logo."));
       }
       try {
         const logo = await brandKit.logo(getActorContext(request), version);
         if (logo === null) {
-          return reply.code(404).send(problem(404, "Not found", "No logo."));
+          return refuse(reply, request, problem(404, "Not found", "No logo."));
         }
         return reply
           .header("content-type", logo.contentType)
@@ -297,7 +314,7 @@ export function registerQDocumentRoutes(
           .send(Buffer.from(logo.bytes));
       } catch (error) {
         if (error instanceof BrandKitAuthorityError) {
-          return reply.code(404).send(problem(404, "Not found", "No logo."));
+          return refuse(reply, request, problem(404, "Not found", "No logo."));
         }
         throw error;
       }
@@ -336,19 +353,19 @@ export function registerQDocumentRoutes(
           ? null
           : composeAnswerDocument({ answer: answerText(chosen), question });
       if (document === null) {
-        return reply
-          .code(422)
-          .send(
-            problem(
-              422,
-              "Nothing to file",
-              "That answer has no words to put in a document.",
-              "NOTHING_TO_FILE",
-            ),
-          );
+        return refuse(
+          reply,
+          request,
+          problem(
+            422,
+            "Nothing to file",
+            "That answer has no words to put in a document.",
+            "NOTHING_TO_FILE",
+          ),
+        );
       }
       if (actor.organisationId === undefined) {
-        return reply.code(409).send(noOrganisation());
+        return refuse(reply, request, noOrganisation());
       }
       const detail = await artifacts.fileOwnAnswer({
         actorContext: actor,

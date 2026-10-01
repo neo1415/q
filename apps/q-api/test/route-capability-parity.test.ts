@@ -722,6 +722,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/work": cap("tool.list_q_work"),
   "/work/[delegationId]": cap("tool.list_q_work"),
   "/work/[delegationId]/report/[laneId]": DOWNLOAD,
+  // DOCS: their documents and brand kit.
+  "/documents": cap("navigate.DOCUMENTS"),
   "/settings/memory": exempt(
     "the person reading and correcting what Q remembers; not a place Q sends anyone",
   ),

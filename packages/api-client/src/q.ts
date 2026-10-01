@@ -32,6 +32,16 @@ import {
   ProfileFindingsResponseSchema,
   Q_PROFILE_FINDINGS_PATH,
   type ProfileFindingsQuery,
+  // DOCS block.
+  Q_ANSWER_EXPORTS_PATH,
+  Q_BRAND_KIT_CONFIRM_SUFFIX,
+  Q_BRAND_KIT_PATH,
+  Q_BRAND_KIT_SUGGEST_SUFFIX,
+  QBrandKitSchema,
+  QBrandKitStateSchema,
+  type ConfirmQBrandKitRequest,
+  type CreateQAnswerExportRequest,
+  type SetQBrandKitRequest,
 } from "@capital-q/contracts";
 
 import { readProblemResponse } from "./problem.js";
@@ -331,4 +341,51 @@ export function getProfileFindings(
     `${Q_PROFILE_FINDINGS_PATH}?${params.toString()}`,
     ProfileFindingsResponseSchema,
   );
+}
+
+// --- DOCS block: brand kit and answer exports ------------------------------
+
+/** `GET /v1/q/brand-kit` — what applies and what waits for a yes. */
+export function getQBrandKit(session: ApiSession) {
+  return call(session, "GET", Q_BRAND_KIT_PATH, QBrandKitStateSchema);
+}
+
+/** `POST /v1/q/brand-kit` — the person's own values, confirmed as given. */
+export function setQBrandKit(session: ApiSession, body: SetQBrandKitRequest) {
+  return call(session, "POST", Q_BRAND_KIT_PATH, QBrandKitSchema, { body });
+}
+
+/** `POST /v1/q/brand-kit/suggest` — Q reads their website; applies nothing. */
+export function suggestQBrandKit(session: ApiSession) {
+  return call(
+    session,
+    "POST",
+    `${Q_BRAND_KIT_PATH}${Q_BRAND_KIT_SUGGEST_SUFFIX}`,
+    QBrandKitSchema,
+    { body: {} },
+  );
+}
+
+/** `POST /v1/q/brand-kit/confirm` — confirm or decline exactly one suggestion. */
+export function confirmQBrandKit(
+  session: ApiSession,
+  body: ConfirmQBrandKitRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${Q_BRAND_KIT_PATH}${Q_BRAND_KIT_CONFIRM_SUFFIX}`,
+    QBrandKitSchema,
+    { body },
+  );
+}
+
+/** `POST /v1/q/answer-exports` — one Q answer filed as a PDF document. */
+export function createQAnswerExport(
+  session: ApiSession,
+  body: CreateQAnswerExportRequest,
+) {
+  return call(session, "POST", Q_ANSWER_EXPORTS_PATH, QArtifactDetailSchema, {
+    body,
+  });
 }

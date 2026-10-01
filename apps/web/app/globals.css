@@ -225,6 +225,36 @@
     animation: cq-step-in var(--cq-motion-emphasis) var(--cq-ease) both;
   }
 
+  /* DOCS: a document-ready card rises in from the edge it sits on; with
+     reduced motion it only fades (no movement). */
+  @keyframes cq-document-ready-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes cq-document-ready-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .cq-document-ready {
+    animation: cq-document-ready-in var(--cq-motion-emphasis) var(--cq-ease)
+      both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-document-ready {
+      animation-name: cq-document-ready-fade;
+    }
+  }
+
   /* The appearance choice: three plain options, the current one filled. */
   .cq-appearance-option {
     /* A 44 px touch target (R30 #12). */

@@ -37,6 +37,8 @@ export const PROTECTED_PATH_PREFIXES = [
   "/gateway",
   "/rehearsals",
   "/results",
+  // DOCS: their documents and brand kit.
+  "/documents",
   "/admin",
   "/paused",
   // Setting a new password needs the recovery session the callback created.

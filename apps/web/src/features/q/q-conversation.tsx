@@ -42,6 +42,7 @@ import { QAperture, QLumen } from "../q-aperture";
 import { useQSpeech } from "../voice/use-q-speech";
 import { VoiceMenu } from "../voice/voice-menu";
 import { ArtifactViewer } from "./artifact-viewer";
+import { expectDocument } from "@/features/documents/document-ready";
 import {
   failureMessage,
   recoveryHint,
@@ -503,6 +504,10 @@ export function QConversationPanel({
   const documentStage =
     q.state.stage === "PREPARING_DOCUMENT" ||
     q.state.stage === "REVISING_DOCUMENT";
+  // DOCS: the document-ready card watches closely while Q writes one.
+  useEffect(() => {
+    if (documentStage) expectDocument();
+  }, [documentStage]);
   const showWelcome = welcome !== undefined && lines.length === 0 && !q.loading;
   const showSuggestions =
     welcome === undefined &&

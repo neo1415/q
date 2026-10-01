@@ -2,11 +2,17 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
-import type { QArtifactDetail, QDocumentLook } from "@capital-q/contracts";
+import type {
+  QArtifactDetail,
+  QDocumentAudit,
+  QDocumentLook,
+} from "@capital-q/contracts";
 import { buttonClassName, IconButton } from "@capital-q/ui/button";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
+  CircleAlert,
   FileText,
   ICON_SIZE,
   ICON_STROKE,
@@ -627,6 +633,10 @@ export function ArtifactViewer({
               </section>
             )}
 
+            {current.content.audit === undefined ? null : (
+              <DocumentChecks audit={current.content.audit} />
+            )}
+
             <p className="cq-caption text-(--cq-text-tertiary)">
               Q composed this from what Capital Q holds on record. It is a
               private draft: it is not verified evidence, it does not change
@@ -683,6 +693,71 @@ function DocumentSection({
             ))}
           </dl>
         </SourcesDisclosure>
+      )}
+    </section>
+  );
+}
+
+const CHECK_NAMES: Readonly<Record<string, string>> = {
+  LAYOUT_FITS: "Everything fits on its slide",
+  TEXT_CONTRAST: "Text is readable on its background",
+  FIGURES_GROUNDED: "Every figure comes from your record",
+  CHARTS_SOURCED: "Every chart names its source",
+  IMAGES_CREDITED: "Every photo is credited",
+};
+
+/**
+ * DOCS: what the audit pass found on this version, in words and an icon
+ * (never colour alone), and what the person could add. Facts about the
+ * document; Q never fills a gap in itself.
+ */
+function DocumentChecks({ audit }: { readonly audit: QDocumentAudit }) {
+  const failing = audit.checks.filter((check) => !check.ok);
+  return (
+    <section className="flex flex-col gap-2" data-q-artifact-checks>
+      <h3 className="cq-title-sm text-(--cq-text-primary)">Checks</h3>
+      {failing.length === 0 ? (
+        <p className="cq-body-sm flex items-center gap-2 text-(--cq-text-secondary)">
+          <Check
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
+          All {String(audit.checks.length)} checks passed: layout, contrast,
+          figures traced to your record, chart sources and photo credits.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {failing.map((check) => (
+            <li
+              key={check.code}
+              className="cq-body-sm flex items-start gap-2 text-(--cq-text-secondary)"
+            >
+              <CircleAlert
+                aria-hidden="true"
+                className="mt-0.5 shrink-0"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+              <span>
+                {CHECK_NAMES[check.code] ?? check.code}: not yet.
+                {check.note === undefined ? null : ` ${check.note}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {audit.suggestions.length === 0 ? null : (
+        <ul className="flex list-disc flex-col gap-1 pl-5">
+          {audit.suggestions.map((suggestion) => (
+            <li
+              key={suggestion}
+              className="cq-body-sm text-(--cq-text-secondary)"
+            >
+              {suggestion}
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

@@ -15,6 +15,7 @@ import { useHomeHref } from "@/features/q/active-conversation";
 
 import type { ShellContext } from "./app-shell";
 import {
+  DOCUMENTS_NAVIGATION,
   FOUNDER_MEDIA_NAVIGATION,
   FIND_NAVIGATION,
   REHEARSALS_NAVIGATION,
@@ -65,6 +66,7 @@ export function DesktopSidebar({
     context.scope === "investor_private"
       ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION]
       : []),
+    DOCUMENTS_NAVIGATION,
     FIND_NAVIGATION,
   ];
 

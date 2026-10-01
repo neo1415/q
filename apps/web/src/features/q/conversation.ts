@@ -34,6 +34,8 @@ export type QTurn =
   | {
       readonly kind: "Q";
       readonly id: string;
+      /** DOCS: the run this answer belongs to, for filing it as a PDF. */
+      readonly runId?: string | undefined;
       readonly text: string;
       /** True while more text may still arrive for this message. */
       readonly streaming: boolean;
@@ -275,6 +277,7 @@ export function turnsFrom(
       turn: {
         kind: "Q",
         id: message.messageId,
+        runId: message.runId,
         text,
         streaming: false,
         sourceCount: sourceCountOf(message.blocks),

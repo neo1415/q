@@ -12,6 +12,7 @@ import {
   Presentation,
 } from "@capital-q/ui/icons";
 
+import { expectDocument } from "@/features/documents/document-ready";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { artifactTypeLabel } from "./artifact-type";
@@ -66,6 +67,8 @@ function useSettledStatus(
   const status = settled.from === initial ? settled.status : initial;
   useEffect(() => {
     if (status !== "PREPARING") return;
+    // DOCS: the document-ready card watches closely until it settles.
+    expectDocument();
     let checks = 0;
     let alive = true;
     const timer = window.setInterval(() => {
@@ -78,7 +81,13 @@ function useSettledStatus(
         .then(async (response) => {
           if (!response.ok) return;
           const body: unknown = await response.json();
-          const next: unknown = Reflect.get(Object(body), "status");
+          // The detail route answers the artifact detail, whose status is
+          // on its `artifact` (DOCS fix: reading it from the root never
+          // settled a preparing card).
+          const next: unknown = Reflect.get(
+            Object(Reflect.get(Object(body), "artifact")),
+            "status",
+          );
           if (
             alive &&
             (next === "READY" || next === "FAILED" || next === "PREPARING")
