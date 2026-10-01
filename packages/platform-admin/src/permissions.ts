@@ -88,7 +88,7 @@ export const ADMIN_PERMISSIONS = {
   },
   "billing.fees.accrue": {
     roles: ["platform_owner", "operator"],
-    stepUp: false,
+    stepUp: true,
   },
   "billing.fees.rate": { roles: ["platform_owner"], stepUp: true },
   // end BILLING block

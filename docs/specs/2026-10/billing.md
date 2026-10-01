@@ -153,7 +153,7 @@ reason: NOT_IN_PLAN|LIMIT_REACHED, planKey, planName, limit, used, resetsAt, upg
   - `POST …/plan {planKey, endsAt?, reason}` (assign or trial)
   - `POST …/overrides {featureKey, limit, expiresAt?, reason}`
   - `GET /v1/admin/billing/fees`
-  - `POST /v1/admin/billing/fees/accrue`
+  - `POST /v1/admin/billing/fees/accrue` (step-up)
   - `POST /v1/admin/billing/fee-rate {rateBps, reason}` (platform_owner only)
   - `GET /v1/admin/billing/fees.csv`
 - Q tool `plan.get_mine` (`get_my_plan`, SAFE_READ). Capability registry entry (SETTINGS,
