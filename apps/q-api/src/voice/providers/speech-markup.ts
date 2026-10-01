@@ -51,6 +51,12 @@ export type SpeechMarkup = {
   readonly emphasis: (phrase: string) => string;
   /** A speaking-rate multiplier for the vendor, or undefined for as-is. */
   readonly speed: (pace: SpeechPace) => number | undefined;
+  /**
+   * REHEARSE: the voice's stability for an emotional line (0 is v3's
+   * "Creative", the most expressive); undefined keeps the voice's own.
+   */
+  readonly stability?:
+    ((p: SentencePerformance) => number | undefined) | undefined;
   /** REHEARSE: the tag(s) that open a sentence in this tone and loudness. */
   readonly tone?:
     | ((tone: SpeechTone | null, intensity: SpeechIntensity) => string)
@@ -79,18 +85,22 @@ const V3_TAGS: Readonly<Record<SpeechReaction, string>> = {
   LAUGH: "[laughs]",
   CHUCKLE: "[chuckles]",
   SIGH: "[sighs]",
+  CRY: "[crying]",
 };
 
 /**
  * Eleven v3 audio tags for a rehearsal persona's tone (vendor guide:
  * elevenlabs.io/docs/best-practices/prompting, "Prompting Eleven v3").
  * Measured on 2026-10-01 (docs/specs/2026-10/rehearse.md, "Voice
- * emotion"): each renders as delivery and none is read aloud.
+ * emotion"): each renders as delivery and none is read aloud. A raised
+ * voice is "[shouting]" at Creative stability (0) with the sentence ending
+ * in "!": on the same voice, pitch 87 Hz -> 225 Hz and RMS +24%; at the
+ * default stability "[shouting]" alone was not louder.
  */
 export const V3_TONE_TAGS: Readonly<Record<SpeechTone, string>> = {
   WARM: "[warmly]",
   SKEPTICAL: "[skeptical]",
-  IMPATIENT: "[impatient]",
+  IMPATIENT: "[frustrated]",
   ANNOYED: "[annoyed]",
   ANGRY: "[angry]",
   ENTHUSIASTIC: "[excited]",
@@ -101,6 +111,8 @@ export const V3_TONE_TAGS: Readonly<Record<SpeechTone, string>> = {
   MEEK: "[hesitantly]",
   SARCASTIC: "[sarcastic]",
   AMUSED: "[amused]",
+  HAPPY: "[happy]",
+  DISAPPOINTED: "[disappointed]",
 };
 const V3_INTENSITY_TAGS: Readonly<Record<SpeechIntensity, string>> = {
   SOFT: "[quietly]",
@@ -132,6 +144,12 @@ export const SPEECH_MARKUP: Readonly<
     // design/voice-comparison 07-disagreement decides whether it stays).
     emphasis: (phrase) => phrase.toUpperCase(),
     speed: () => undefined,
+    stability: (p) =>
+      p.intensity === "RAISED" ||
+      p.tone === "ENTHUSIASTIC" ||
+      p.reaction === "CRY"
+        ? 0
+        : undefined,
     tone: (tone, intensity) =>
       [tone === null ? "" : V3_TONE_TAGS[tone], V3_INTENSITY_TAGS[intensity]]
         .filter((tag) => tag.length > 0)
@@ -175,6 +193,8 @@ export function withoutMarkup(text: string): string {
 export type RenderedSpeech = {
   readonly text: string;
   readonly speed: number | undefined;
+  /** REHEARSE: v3 stability for this text, when a cue asks for one. */
+  readonly stability?: number | undefined;
   /** Which cues made it into the audio, for the turn's trace. */
   readonly rendered: readonly (
     "reaction" | "pause" | "pace" | "emphasis" | "tone"
@@ -206,6 +226,7 @@ export function renderSpeech(
   const insertions: Insertion[] = [];
   let body = clean;
   let speed: number | undefined;
+  let stability: number | undefined;
 
   for (const p of performances) {
     const at = body.indexOf(p.sentence);
@@ -245,6 +266,18 @@ export function renderSpeech(
       insertions.push({ at: start, text: `${toneTags} ` });
       rendered.add("tone");
     }
+    if (can.tone === true && markup.stability !== undefined) {
+      stability = stability ?? markup.stability(p);
+    }
+    // A raised voice ends on "!", which v3 delivers harder than ".".
+    if (
+      can.tone === true &&
+      p.intensity === "RAISED" &&
+      isEnd &&
+      body.charAt(end - 1) === "."
+    ) {
+      insertions.push({ at: end - 1, text: "!", remove: 1 });
+    }
     if (can.pause && p.pauseAfter && isEnd) {
       const stop = /[.!?]/.test(body.charAt(end - 1));
       insertions.push(
@@ -269,5 +302,10 @@ export function renderSpeech(
       insertion.text +
       body.slice(insertion.at + (insertion.remove ?? 0));
   }
-  return { text: body.trim(), speed, rendered: [...rendered] };
+  return {
+    text: body.trim(),
+    speed,
+    ...(stability === undefined ? {} : { stability }),
+    rendered: [...rendered],
+  };
 }

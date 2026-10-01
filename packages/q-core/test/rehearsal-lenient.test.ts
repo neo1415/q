@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   CounterpartPersonaLenientSchema,
   CounterpartPersonaResultSchema,
+  CounterpartPersonaStoredSchema,
+  CounterpartPersonaV4LenientSchema,
+  normaliseCounterpartPersonaV4,
   createDefaultPromptRegistry,
   normaliseCounterpartPersona,
   normaliseRehearsalReview,
@@ -65,8 +68,58 @@ describe("lenient rehearsal readings", () => {
 
   it("is what the active persona and review prompts ask for", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(3);
-    expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(3);
-    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(3);
+    expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(4);
+    expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(4);
+    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(5);
+  });
+
+  it("tells the played person who holds the leverage, and reads how forward they are", () => {
+    const registry = createDefaultPromptRegistry();
+    const turn = registry.getActive("INVESTOR_TWIN_TURN").definition.template;
+    expect(turn).toContain("{{stance}}");
+    expect(turn).toContain("you came to win this investor's money");
+    expect(turn).toContain("goodbye in that emotion");
+    expect(turn).not.toContain(
+      "ask the investor your own questions about the fund, process and terms.",
+    );
+    const persona = registry.getActive("INVESTOR_PERSONA").definition.template;
+    expect(persona).toContain("forwardness:");
+    expect(persona).toContain("knownTraits:");
+    expect(persona).toContain("\nRULES\n");
+  });
+
+  it("keeps the v4 reading's stance and traits, trimmed", () => {
+    const loose = CounterpartPersonaV4LenientSchema.parse({
+      summary: "A founder.",
+      style: "Fast.",
+      temperament: { baseline: "WARM", warmsTo: [], coolsOn: [] },
+      priorities: [],
+      likelyQuestions: [{ question: "How big is the fund?", why: "terms" }],
+      likelyAnswers: [],
+      pushbacks: [],
+      howToWin: [],
+      dealbreakers: [],
+      grounding: "SOME",
+      forwardness: "FORWARD",
+      forwardnessWhy: long(200),
+      knownTraits: Array.from({ length: 12 }, () => ({
+        trait: "Quotes customer numbers unprompted",
+        source: "CALLS",
+      })),
+    });
+    const stored = CounterpartPersonaStoredSchema.parse(
+      normaliseCounterpartPersonaV4(loose),
+    );
+    expect(stored.forwardness).toBe("FORWARD");
+    expect(stored.knownTraits).toHaveLength(8);
+    expect(stored.forwardnessWhy?.length).toBeLessThanOrEqual(300);
+    // A v2 reading stored before v4 still parses.
+    const {
+      forwardness: _f,
+      forwardnessWhy: _w,
+      knownTraits: _k,
+      ...v2
+    } = stored;
+    expect(CounterpartPersonaStoredSchema.safeParse(v2).success).toBe(true);
   });
 });

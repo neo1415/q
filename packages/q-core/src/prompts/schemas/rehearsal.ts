@@ -221,7 +221,31 @@ export const REHEARSAL_DIMENSIONS = [
   "QUESTION_QUALITY",
   "RAPPORT",
   "NEXT_STEPS",
+  // An investor running a founder meeting (live 2026-10-01).
+  "DILIGENCE",
+  "CONTROL",
+  "FAIRNESS",
+  "DECISION_CLARITY",
+  "PROFESSIONALISM",
 ] as const;
+
+/** Which dimensions grade which side: the person rehearsing, in their role. */
+export const REHEARSAL_DIMENSIONS_FOR = {
+  FOUNDER: [
+    "CLARITY",
+    "EVIDENCE",
+    "HANDLING_PUSHBACK",
+    "FIT_TO_THIS_PERSON",
+    "THE_ASK",
+  ],
+  INVESTOR: [
+    "DILIGENCE",
+    "CONTROL",
+    "FAIRNESS",
+    "DECISION_CLARITY",
+    "PROFESSIONALISM",
+  ],
+} as const;
 
 export const RehearsalReviewVariablesSchema = z
   .object({
@@ -423,3 +447,73 @@ export function normaliseRehearsalReview(
     tips: loose.tips.slice(0, 6).map((tip) => cutText(tip, 300)),
   };
 }
+
+// ---------------------------------------------------------------------------
+// v4 (REHEARSE, founder ask 2026-10-01: real emotional range): the played
+// person's temperament (patience, warmth, frustration, hurt) is carried
+// across turns by code and handed in as a trusted note with the register
+// to speak in; the model reads the person's latest line as a typed
+// appraisal, which code applies to the state. Crying joins the reactions.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V4_SCHEMA_VERSION = 4;
+export const REHEARSAL_LINE_MOODS_V4 = [
+  ...REHEARSAL_LINE_MOODS_V3,
+  "HAPPY",
+  "DISAPPOINTED",
+] as const;
+export const REHEARSAL_APPRAISALS_V4 = [
+  "STRONG_ANSWER",
+  "CLEAR_BUT_THIN",
+  "EVASIVE",
+  "REPEATED_DODGE",
+  "RUDE",
+  "OVERCLAIM",
+  "HUMBLE_HONEST",
+  "FUNNY",
+  "APOLOGY",
+  "GOOD_NEWS_FOR_THEM",
+  "BAD_NEWS_FOR_THEM",
+  "HARD_NO_FOR_THEM",
+  "NEUTRAL",
+] as const;
+
+export const RehearsalTurnV4VariablesSchema =
+  RehearsalTurnV3VariablesSchema.extend({
+    /** Code-composed: the state and the register to speak in. Trusted. */
+    temperament: z.string().max(1_200),
+  }).strict();
+export type RehearsalTurnV4Variables = z.infer<
+  typeof RehearsalTurnV4VariablesSchema
+>;
+
+export const RehearsalTurnV4ResultSchema = z
+  .object({
+    /** How their latest line lands on the person played (none yet: NEUTRAL). */
+    appraisal: z.enum(REHEARSAL_APPRAISALS_V4),
+    line: z.string().trim().min(1).max(2_000),
+    move: z.enum(REHEARSAL_MOVES),
+    mood: z.enum(REHEARSAL_LINE_MOODS_V4),
+    intensity: z.enum(["SOFT", "NORMAL", "RAISED"]),
+    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullable(),
+    conclusion: z.enum(REHEARSAL_CONCLUSIONS).nullable(),
+  })
+  .strict();
+export type RehearsalTurnV4Result = z.infer<typeof RehearsalTurnV4ResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v5 (REHEARSE, founder live test 2026-10-01): played as a founder, the
+// persona questioned the investor as if it held the leverage, and an angry
+// ending was a flat stop. Code now hands in who holds the leverage in this
+// meeting (from the roles and the persona's forwardness) as a trusted
+// stance note; the result shape is v4's.
+// ---------------------------------------------------------------------------
+
+export const RehearsalTurnV5VariablesSchema =
+  RehearsalTurnV4VariablesSchema.extend({
+    /** Code-composed: who holds the leverage and how forward they are. Trusted. */
+    stance: z.string().max(800),
+  }).strict();
+export type RehearsalTurnV5Variables = z.infer<
+  typeof RehearsalTurnV5VariablesSchema
+>;

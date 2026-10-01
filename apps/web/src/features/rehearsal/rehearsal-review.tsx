@@ -8,6 +8,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import {
   DIMENSION_WORDS,
+  MOOD_WORDS,
   OUTCOME_WORDS,
   RATING_WORDS,
   elapsedLabel,
@@ -229,25 +230,32 @@ export function RehearsalReview({
         </Link>
       </div>
 
-      <details className="flex flex-col gap-2">
-        <summary className="cq-label min-h-11 cursor-pointer py-2 text-(--cq-text-primary)">
+      {/*
+        A plain section, not <details>: a flex <details> rendered its items
+        empty for the founder (live 2026-10-01, 21 blank lines).
+      */}
+      <section className="flex flex-col gap-2">
+        <h2 className="cq-title-sm text-(--cq-text-primary)">
           Transcript ({rehearsal.turns.length} lines)
-        </summary>
-        <ol className="flex flex-col gap-3 pt-2">
+        </h2>
+        <ol aria-label="Transcript" className="flex flex-col gap-3">
           {rehearsal.turns.map((turn, index) => (
-            <li key={`${turn.at}-${String(index)}`} className="cq-body-sm">
-              <span className="cq-caption block text-(--cq-text-tertiary)">
+            <li
+              key={`${turn.at}-${String(index)}`}
+              className="cq-body-sm text-(--cq-text-primary)"
+            >
+              <p className="cq-caption text-(--cq-text-tertiary)">
                 {turn.from === "THEM" ? name : "You"}
                 {turn.mood === null || turn.from !== "THEM"
                   ? ""
-                  : ` · ${turn.mood.toLowerCase()}`}
+                  : ` · ${MOOD_WORDS[turn.mood] ?? turn.mood.toLowerCase()}`}
                 {turn.sawScreen ? " · looking at your screen" : ""}
-              </span>
-              <span className="text-(--cq-text-primary)">{turn.text}</span>
+              </p>
+              <p>{turn.text}</p>
             </li>
           ))}
         </ol>
-      </details>
+      </section>
     </article>
   );
 }

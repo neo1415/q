@@ -20,7 +20,7 @@ export const INVESTOR_PERSONA_V3: PromptDefinition<
 > = {
   ...INVESTOR_PERSONA_V2,
   version: 3,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "REHEARSE audit (live 2026-10-01): lenient output bounds, trimmed by code, so a long list never refuses the whole persona.",
   effectiveFrom: "2026-10-01",

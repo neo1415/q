@@ -29,6 +29,8 @@ import {
   PhoneOff,
   Video,
   VideoOff,
+  Volume2,
+  VolumeX,
   X,
 } from "@capital-q/ui/icons";
 
@@ -43,6 +45,7 @@ import {
   greySignature,
   initialsOf,
   screenChanged,
+  moodWord,
   shouldNudgeSilence,
 } from "./meet";
 import {
@@ -51,6 +54,13 @@ import {
   sayInRehearsalAction,
   shareScreenFrameAction,
 } from "./rehearsal-actions";
+import {
+  meetSoundMs,
+  playMeetSound,
+  readMeetSoundsPreference,
+  saveMeetSoundsPreference,
+  type MeetSound,
+} from "./meet-sounds";
 
 /**
  * The rehearsal room (REHEARSE, founder direction 2026-10-01): a video call
@@ -69,8 +79,12 @@ import {
 const FRAME_EVERY_MS = 6_000;
 const FRAME_MAX_WIDTH = 1280;
 const SIGNATURE_SIZE = { width: 32, height: 18 } as const;
-/** After the other person closes the meeting, a breath before leaving. */
-const CLOSE_PAUSE_MS = 2_500;
+/**
+ * After the other person's goodbye, a short beat, then they leave (founder
+ * live test 2026-10-01: the angry ending must be a spoken goodbye, a
+ * beat, then the leave sound).
+ */
+const CLOSE_PAUSE_MS = 1_400;
 
 type Layout = "SPOTLIGHT" | "TILED";
 
@@ -138,6 +152,13 @@ export function RehearsalRoom({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // The preference lives in this browser; it shows only in the closed
+  // menu, so the server render never disagrees with it on screen.
+  const [soundsOn, setSoundsOn] = useState(readMeetSoundsPreference);
+  const sounds = useRef(soundsOn);
+  const sound = useCallback((which: MeetSound) => {
+    playMeetSound(which, sounds.current);
+  }, []);
   // Screen sharing exists on desktop browsers only; never a dead button.
   const [canShare] = useState(
     () =>
@@ -203,15 +224,24 @@ export function RehearsalRoom({
   const typedMode =
     voiceLive === "TYPED" || (voiceLive === "LIVE" && !lineLive);
 
-  const leave = useCallback(async () => {
-    if (left.current) return;
-    left.current = true;
-    for (const stream of [camStream.current, screenStream.current]) {
-      stream?.getTracks().forEach((track) => track.stop());
-    }
-    await voice.end().catch(() => undefined);
-    router.push(`/rehearsals/r/${encodeURIComponent(initial.id)}`);
-  }, [initial.id, router, voice]);
+  // The person leaving hears the leave sound; when the other side ended
+  // the meeting, their leaving sound plays instead.
+  const leave = useCallback(
+    async (cue: MeetSound = "LEAVE") => {
+      if (left.current) return;
+      left.current = true;
+      for (const stream of [camStream.current, screenStream.current]) {
+        stream?.getTracks().forEach((track) => track.stop());
+      }
+      await voice.end().catch(() => undefined);
+      sound(cue);
+      if (sounds.current) {
+        await new Promise((done) => window.setTimeout(done, meetSoundMs(cue)));
+      }
+      router.push(`/rehearsals/r/${encodeURIComponent(initial.id)}`);
+    },
+    [initial.id, router, voice, sound],
+  );
 
   // Open the voice line once: the other person speaks first.
   // Open the voice line; on a reconnect, resume without a new greeting.
@@ -238,6 +268,7 @@ export function RehearsalRoom({
         });
         lastActivity.current = Date.now();
         setVoiceLive("LIVE");
+        if (!resume) sound("JOIN");
       } catch {
         // A denied microphone lands here: the room still works by typing.
         setNotice(
@@ -247,7 +278,7 @@ export function RehearsalRoom({
         setPanel(true);
       }
     },
-    [initial.id, initial.voice, voice],
+    [initial.id, initial.voice, voice, sound],
   );
   const opened = useRef(false);
   useEffect(() => {
@@ -307,7 +338,7 @@ export function RehearsalRoom({
   // The other person closed the meeting: let them finish, then leave.
   useEffect(() => {
     if (!ended || voice.state === "Q_SPEAKING") return;
-    const id = window.setTimeout(() => void leave(), CLOSE_PAUSE_MS);
+    const id = window.setTimeout(() => void leave("THEY_LEFT"), CLOSE_PAUSE_MS);
     return () => window.clearTimeout(id);
   }, [ended, voice.state, leave]);
 
@@ -362,6 +393,7 @@ export function RehearsalRoom({
       return;
     }
     setHand(true);
+    sound("HAND");
     if (lineLive) {
       voice.sendText(REHEARSAL_HAND_RAISED_SIGNAL);
       return;
@@ -442,6 +474,7 @@ export function RehearsalRoom({
       screenStream.current = stream;
       stream.getVideoTracks()[0]?.addEventListener("ended", stopSharing);
       setSharing(true);
+      sound("SHARE");
       setLayout("SPOTLIGHT");
     } catch {
       // Cancelled in the browser's picker: nothing to say.
@@ -472,6 +505,9 @@ export function RehearsalRoom({
       ? null
       : { who: lastTurn.from === "THEM" ? name : "You", text: lastTurn.text };
   const thinking = voice.state === "THINKING" || sending;
+  const mood = moodWord(
+    [...rehearsal.turns].reverse().find((turn) => turn.from === "THEM"),
+  );
 
   const personaView = (
     <div
@@ -493,6 +529,8 @@ export function RehearsalRoom({
         {name}
         {thinking ? (
           <span className="text-(--cq-stage-text-muted)"> · thinking</span>
+        ) : mood !== null ? (
+          <span className="text-(--cq-stage-text-muted)"> · {mood}</span>
         ) : null}
       </span>
     </div>
@@ -762,6 +800,26 @@ export function RehearsalRoom({
                 >
                   <LayoutGrid size={16} aria-hidden="true" />
                   {layout === "SPOTLIGHT" ? "Tiled layout" : "Spotlight layout"}
+                </button>
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={soundsOn}
+                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-left hover:bg-(--cq-surface-subtle)"
+                  onClick={() => {
+                    const next = !soundsOn;
+                    sounds.current = next;
+                    setSoundsOn(next);
+                    saveMeetSoundsPreference(next);
+                    setMore(false);
+                  }}
+                >
+                  {soundsOn ? (
+                    <Volume2 size={16} aria-hidden="true" />
+                  ) : (
+                    <VolumeX size={16} aria-hidden="true" />
+                  )}
+                  Meeting sounds {soundsOn ? "on" : "off"}
                 </button>
                 <button
                   type="button"

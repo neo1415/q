@@ -16,7 +16,7 @@ import { ExternalLink } from "@capital-q/ui/icons";
 
 import { EntitlementNotice } from "@/features/billing/entitlement-notice";
 
-import { initialsOf } from "./meet";
+import { initialsOf, stanceWords, TRAIT_SOURCE_WORDS } from "./meet";
 import {
   rehearsalPersonaAction,
   startRehearsalAction,
@@ -187,6 +187,26 @@ export function RehearsalLobby({
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {persona.style}
           </p>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {stanceWords(persona.stance, name)}
+          </p>
+          {persona.traits.length === 0 ? null : (
+            <div className="flex flex-col gap-1">
+              <h2 className="cq-label text-(--cq-text-primary)">
+                What Q knows about how they are
+              </h2>
+              <ul className="cq-body-sm flex flex-col gap-1 text-(--cq-text-secondary)">
+                {persona.traits.map((item, index) => (
+                  <li key={`${item.source}-${String(index)}`}>
+                    {item.trait}{" "}
+                    <span className="text-(--cq-text-tertiary)">
+                      (from {TRAIT_SOURCE_WORDS[item.source]})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p className="cq-caption text-(--cq-text-tertiary)">
             {GROUNDING_WORDS[persona.grounding]}
           </p>

@@ -331,4 +331,147 @@ describe.skipIf(!LIVE || KEY === undefined)("rehearsal (live model)", () => {
     console.log(lines.join("\n"));
     expect(lines.length).toBe(5);
   }, 300_000);
+
+  it("emotional range: Gentle, Tough with provocation, a founder told no", async () => {
+    const gateway = createModelGateway({
+      catalog: createStaticModelCatalog(catalog),
+      registry: createModelProviderRegistry([
+        createOpenAIModelProvider({ apiKey: KEY ?? "" }),
+      ]),
+      usage: createInMemoryModelUsageRepository(),
+    });
+    const scenario = async (
+      label: string,
+      viewer: "FOUNDER" | "INVESTOR",
+      difficulty: "GENTLE" | "REALISTIC" | "TOUGH",
+      script: readonly string[],
+    ) => {
+      const store = memoryStore();
+      const service = createRehearsalService({
+        store,
+        composer: createRehearsalComposer({ gateway }),
+        material: {
+          viewer: () =>
+            Promise.resolve(
+              viewer === "FOUNDER"
+                ? { role: "FOUNDER", organisationName: "Tallyloom" }
+                : {
+                    role: "INVESTOR",
+                    organisationName: "Tidewater Growth Partners",
+                  },
+            ),
+          counterpart: () =>
+            Promise.resolve(
+              viewer === "FOUNDER"
+                ? {
+                    name: "Tidewater Growth Partners",
+                    profile:
+                      "Name: Tidewater Growth Partners\nType: VC\nIn their own words: Series A-B in African B2B software; we back capital-efficient growth with real retention.",
+                    relationshipId: null,
+                  }
+                : {
+                    name: "Tallyloom",
+                    profile:
+                      "Company: Tallyloom\nStage: series_b\nPayroll and PAYE compliance for mid-sized employers in Nigeria and Ghana.",
+                    relationshipId: null,
+                  },
+            ),
+          theirMessages: () => Promise.resolve(""),
+          theirCalls: () => Promise.resolve(""),
+          counterpartMaterial: () =>
+            Promise.resolve({
+              text:
+                viewer === "INVESTOR"
+                  ? "PITCH VIDEO TRANSCRIPT: I'm Babajide, CEO of Tallyloom. 1,250 employers, ARR 6.4 million dollars audited, net revenue retention 118 percent. We are raising 22 million to enter Kenya. This round matters enormously to our team."
+                  : "",
+              sources: [],
+            }),
+          publicWeb: () => Promise.resolve({ text: "", sources: [] }),
+          ownMaterial: () =>
+            Promise.resolve({
+              text: "THEIR COMPANY: Tallyloom. Payroll and PAYE compliance, Nigeria and Ghana. 1,250 employers, ARR $6.4m audited, NRR 118%. Raising $22m Series B.",
+              sources: [],
+            }),
+          relationships: () => Promise.resolve([]),
+          upcomingMeetings: () => Promise.resolve([]),
+        },
+      });
+      const started = await service.start(actor, {
+        kind: viewer === "FOUNDER" ? "INVESTOR_ORGANISATION" : "COMPANY",
+        id: "0d1c0de0-0000-4000-8000-00000000000a",
+        difficulty,
+      });
+      if (started.kind !== "OK") throw new Error(started.kind);
+      const id = started.rehearsal.id;
+      const show = async (said: string | null) => {
+        const row = await store.own(actor, id);
+        const turns = (row?.turns ?? []) as {
+          from: string;
+          text: string;
+          mood?: string;
+          intensity?: string;
+          reaction?: string | null;
+          state?: {
+            patience: number;
+            warmth: number;
+            frustration: number;
+            hurt: number;
+          };
+        }[];
+        const t = turns.at(-1);
+        const st = t?.state;
+        return `${said === null ? "(opening)" : `YOU: ${said.slice(0, 70)}`}\n   -> [${t?.mood ?? ""}/${t?.intensity ?? ""}${t?.reaction ? `/${t.reaction}` : ""}] p${st?.patience ?? "?"} w${st?.warmth ?? "?"} f${st?.frustration ?? "?"} h${st?.hurt ?? "?"} :: ${(t?.text ?? "").slice(0, 150)}`;
+      };
+      const limit = Number(process.env["CQ_SCRIPT_LIMIT"] ?? "99");
+      const out = [`=== ${label}`, await show(null)];
+      for (const text of script.slice(0, limit)) {
+        const r = await service.say(actor, id, { text });
+        out.push(r.kind === "OK" ? await show(text) : `!! ${r.kind}`);
+        if (r.kind === "OK" && r.rehearsal.endedAt !== null) break;
+      }
+      console.log(out.join("\n"));
+    };
+    await scenario(
+      "GENTLE, founder rehearsing with an investor",
+      "FOUNDER",
+      "GENTLE",
+      [
+        "Thanks for having me. Tallyloom runs payroll and PAYE compliance for 1,250 employers in Nigeria and Ghana.",
+        "Our ARR grew from 2.1 to 6.4 million dollars in two years, audited, and net revenue retention is 118 percent.",
+        "Ha, honestly the hardest part was convincing HR managers that spreadsheets are not a personality trait.",
+        "To be fair, our gross margin is only 61 percent today; implementation is still manual and we are fixing that.",
+        "We'd love you to lead. We're raising 22 million.",
+        "Thank you, that means a lot. What would you need from us next?",
+        "Great, we will send the cohort data tomorrow.",
+      ],
+    );
+    await scenario("TOUGH with provocation", "FOUNDER", "TOUGH", [
+      "We're Tallyloom. Payroll. You've seen the deck.",
+      "Retention is great. Trust me.",
+      "I just said it's great. Why do you keep asking?",
+      "Honestly, I don't think you understand the African market at all.",
+      "Look, other funds are falling over themselves for this round. Take it or leave it.",
+      "Fine. Fine. I'm sorry, that was out of line. Our gross retention is 91 percent.",
+      "And net revenue retention is 118 percent, audited.",
+      "We can send the cohort file today.",
+      "So, where does that leave us?",
+    ]);
+    await scenario(
+      "INVESTOR rehearsing; the founder they play hears a hard no",
+      "INVESTOR",
+      "REALISTIC",
+      [
+        "Thanks Babajide. Walk me through why now for Kenya.",
+        "Your retention numbers are genuinely impressive, well done.",
+        "I'll be honest: the Kenya plan worries me, there are no statutory integrations yet.",
+        "We've discussed it as a partnership, and I'm sorry, but we're not going to invest in this round. It's a firm no.",
+        "I know that's hard to hear. Your team has built something real.",
+        "If you get the Kenya integrations live, call me again next year.",
+        "Thank you for your time today.",
+        "Take care.",
+        "Goodbye.",
+      ],
+    );
+    expect(true).toBe(true);
+  }, 900_000);
 });

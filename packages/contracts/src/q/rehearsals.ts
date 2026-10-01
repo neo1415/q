@@ -145,6 +145,8 @@ export const REHEARSAL_MOODS = [
   "MEEK",
   "SARCASTIC",
   "AMUSED",
+  "HAPPY",
+  "DISAPPOINTED",
 ] as const;
 export const REHEARSAL_OUTCOMES = [
   "INDECISIVE",
@@ -168,7 +170,7 @@ export const QRehearsalTurnDtoSchema = z
     sawScreen: z.boolean(),
     /** How loud the played person said it, and any sound before it. */
     intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
-    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH"]).nullable().optional(),
+    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullable().optional(),
   })
   .strict();
 export type QRehearsalTurnDto = z.infer<typeof QRehearsalTurnDtoSchema>;
@@ -184,6 +186,11 @@ export const REHEARSAL_DIMENSION_NAMES = [
   "QUESTION_QUALITY",
   "RAPPORT",
   "NEXT_STEPS",
+  "DILIGENCE",
+  "CONTROL",
+  "FAIRNESS",
+  "DECISION_CLARITY",
+  "PROFESSIONALISM",
 ] as const;
 
 export const QRehearsalReviewDtoSchema = z
@@ -265,6 +272,29 @@ export const QRehearsalPersonaDtoSchema = z
     style: z.string().max(400),
     priorities: z.array(z.string().max(200)).max(6),
     grounding: z.enum(["THIN", "SOME", "RICH"]),
+    /**
+     * Who holds the leverage in this meeting, by code from the roles (a
+     * founder pitching is the weaker party) and how forward Q reads this
+     * person to be. Q's reading, not a fact about them.
+     */
+    stance: z
+      .object({
+        leads: z.enum(["THEM", "YOU"]),
+        forwardness: z.enum(["RESERVED", "TYPICAL", "FORWARD"]),
+        why: z.string().max(300).nullable(),
+      })
+      .strict(),
+    /** Traits the reading rests on, each with where it came from. */
+    traits: z
+      .array(
+        z
+          .object({
+            trait: z.string().max(200),
+            source: z.enum(["PROFILE", "MESSAGES", "CALLS", "PUBLIC", "PITCH"]),
+          })
+          .strict(),
+      )
+      .max(8),
     sources: z.array(QPersonaSourceDtoSchema).max(24),
     refreshedAt: UtcTimestampSchema,
   })

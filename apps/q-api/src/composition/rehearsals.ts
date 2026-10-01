@@ -22,25 +22,36 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
-  CounterpartPersonaResultSchema,
+  CounterpartPersonaStoredSchema,
+  CounterpartPersonaV4LenientSchema,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   InvestorPersonaResultSchema,
-  CounterpartPersonaLenientSchema,
-  normaliseCounterpartPersona,
+  normaliseCounterpartPersonaV4,
   normaliseRehearsalReview,
+  REHEARSAL_DIMENSIONS_FOR,
   RehearsalReviewLenientSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnV3ResultSchema,
+  RehearsalTurnV4ResultSchema,
   renderPrompt,
-  type CounterpartPersonaResult,
+  type CounterpartPersonaStored as CounterpartPersonaResult,
   type CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV3Result as RehearsalTurnResult,
-  type RehearsalTurnV3Variables as RehearsalTurnVariables,
+  type RehearsalTurnV4Result as RehearsalTurnResult,
+  type RehearsalTurnV5Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
+
+import {
+  applyAppraisal,
+  deliveryFor,
+  initialTemperament,
+  registerOf,
+  stanceOf,
+  temperamentNote,
+  type Temperament,
+} from "./rehearsal-temperament.js";
 
 /**
  * Rehearsals (C12 Investor Twin, generalised by REHEARSE, founder direction
@@ -185,6 +196,8 @@ const MOODS = [
   "MEEK",
   "SARCASTIC",
   "AMUSED",
+  "HAPPY",
+  "DISAPPOINTED",
 ] as const;
 type Mood = (typeof MOODS)[number];
 
@@ -196,7 +209,15 @@ const StoredTurnSchema = z.object({
   mood: z.enum(MOODS).nullish(),
   sawScreen: z.boolean().optional(),
   intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
-  reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH"]).nullish(),
+  reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullish(),
+  state: z
+    .object({
+      patience: z.number(),
+      warmth: z.number(),
+      frustration: z.number(),
+      hurt: z.number(),
+    })
+    .optional(),
 });
 
 export type Turn = {
@@ -207,7 +228,9 @@ export type Turn = {
   readonly sawScreen: boolean;
   /** How loud the played person said it, and any sound before it. */
   readonly intensity?: "SOFT" | "NORMAL" | "RAISED" | undefined;
-  readonly reaction?: "LAUGH" | "CHUCKLE" | "SIGH" | null | undefined;
+  readonly reaction?: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null | undefined;
+  /** The played person's temperament after this line (code-tracked). */
+  readonly state?: Temperament | undefined;
 };
 
 export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
@@ -225,13 +248,14 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
       sawScreen: turn.sawScreen === true,
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
+      ...(turn.state === undefined ? {} : { state: turn.state }),
     };
   });
 }
 
 /** The persona a rehearsal row holds: v2, or a C12 (v1) reading. */
 function personaOf(raw: unknown): CounterpartPersonaResult | null {
-  const v2 = CounterpartPersonaResultSchema.safeParse(raw);
+  const v2 = CounterpartPersonaStoredSchema.safeParse(raw);
   if (v2.success) return v2.data;
   const v1 = InvestorPersonaResultSchema.safeParse(raw);
   if (!v1.success) return null;
@@ -267,6 +291,14 @@ export function personaText(persona: CounterpartPersonaResult): string {
     `How they push back: ${list(persona.pushbacks)}`,
     `What wins them over: ${list(persona.howToWin)}`,
     `Dealbreakers: ${list(persona.dealbreakers)}`,
+    ...((persona.knownTraits ?? []).length === 0
+      ? []
+      : [
+          "Known traits:",
+          ...(persona.knownTraits ?? []).map(
+            (t) => `- ${t.trait} (${t.source})`,
+          ),
+        ]),
     `Grounding: ${persona.grounding}`,
   ].join("\n");
 }
@@ -298,6 +330,60 @@ function transcriptOf(
   return text.length <= REHEARSAL_TEXT_MAX
     ? text
     : text.slice(text.length - REHEARSAL_TEXT_MAX);
+}
+
+const wordsOf = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+
+/**
+ * Whether a quoted moment is the person's own words: most of its words
+ * appear, in order, in one of their lines. A structural check on who said
+ * it, never a reading of what it means.
+ */
+export function quotesThem(
+  moment: string,
+  theirLines: readonly string[],
+): boolean {
+  const quoted = wordsOf(moment);
+  if (quoted.length === 0) return false;
+  return theirLines.some((line) => {
+    const words = wordsOf(line);
+    let at = 0;
+    let found = 0;
+    for (const word of quoted) {
+      const next = words.indexOf(word, at);
+      if (next !== -1) {
+        found += 1;
+        at = next + 1;
+      }
+    }
+    return found / quoted.length >= 0.7;
+  });
+}
+
+/**
+ * The review of the person rehearsing and nobody else (founder live
+ * 2026-10-01: an investor's review quoted and graded the founder Q
+ * played). Moments that are not their own words, and dimensions that are
+ * not their role's, are dropped.
+ */
+export function ownReview(
+  review: RehearsalReviewResult,
+  turns: readonly Turn[],
+  role: ViewerRole,
+): RehearsalReviewResult {
+  const theirs = turns.filter((turn) => turn.from === "YOU").map((t) => t.text);
+  const allowed: readonly string[] = REHEARSAL_DIMENSIONS_FOR[role];
+  return {
+    ...review,
+    dimensions: review.dimensions.filter((d) => allowed.includes(d.name)),
+    wentRight: review.wentRight.filter((w) => quotesThem(w.moment, theirs)),
+    wentWrong: review.wentWrong.filter((w) => quotesThem(w.moment, theirs)),
+  };
 }
 
 /** Ratings in words become a score by a fixed rule, never by a model. */
@@ -693,7 +779,7 @@ export type RehearsalService = {
     readonly voice: "FEMALE" | "MALE";
     readonly mood: Mood | null;
     readonly intensity: "SOFT" | "NORMAL" | "RAISED";
-    readonly reaction: "LAUGH" | "CHUCKLE" | "SIGH" | null;
+    readonly reaction: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null;
   } | null>;
 };
 
@@ -879,11 +965,14 @@ const YIELD_LINES = [
 export function yieldTo(previous: readonly Turn[]): {
   readonly result: RehearsalTurnResult;
   readonly sawScreen: boolean;
+  readonly state: Temperament | undefined;
 } {
   const theirs = previous.filter((turn) => turn.from === "THEM");
   const last = theirs.at(-1);
   return {
+    state: last?.state,
     result: {
+      appraisal: "NEUTRAL",
       line: YIELD_LINES[theirs.length % YIELD_LINES.length] ?? "Go ahead.",
       move: "YIELD",
       mood: last?.mood ?? "NEUTRAL",
@@ -985,7 +1074,7 @@ export function createRehearsalService(dependencies: {
     const held =
       existing === null
         ? null
-        : CounterpartPersonaResultSchema.safeParse(existing.profile);
+        : CounterpartPersonaStoredSchema.safeParse(existing.profile);
     const heldProfile = held?.success === true ? held.data : null;
     const webDue =
       existing?.webReadAt == null ||
@@ -1086,7 +1175,7 @@ export function createRehearsalService(dependencies: {
         ? built(existing, heldProfile)
         : "Q_UNAVAILABLE";
     }
-    const parsed = CounterpartPersonaResultSchema.safeParse(saved.profile);
+    const parsed = CounterpartPersonaStoredSchema.safeParse(saved.profile);
     return parsed.success ? built(saved, parsed.data) : "Q_UNAVAILABLE";
   }
 
@@ -1117,6 +1206,7 @@ export function createRehearsalService(dependencies: {
   ): Promise<{
     readonly result: RehearsalTurnResult;
     readonly sawScreen: boolean;
+    readonly state: Temperament;
   } | null> {
     const persona = personaOf(row.persona);
     if (persona === null) return null;
@@ -1132,6 +1222,12 @@ export function createRehearsalService(dependencies: {
     const wrapUp =
       cue === "NONE" &&
       (minutes >= WRAP_UP_MINUTES || turns.length >= WRAP_UP_TURNS);
+    // The temperament so far: carried on their last line, or where the
+    // persona and difficulty start them.
+    const before =
+      [...turns].reverse().find((turn) => turn.from === "THEM")?.state ??
+      initialTemperament(row.difficulty, persona.temperament.baseline);
+    const registerBefore = registerOf(before, row.difficulty);
     const result = await composer.turn(
       actor,
       {
@@ -1146,12 +1242,38 @@ export function createRehearsalService(dependencies: {
         minutesElapsed: Math.max(0, Math.min(minutes, 600)),
         cue: wrapUp ? "WRAP_UP" : cue,
         difficulty: row.difficulty,
+        temperament: temperamentNote(before, registerBefore),
+        stance: stanceOf(
+          counterpartRoleOf(row.counterpartKind),
+          persona.forwardness ?? "TYPICAL",
+          persona.forwardnessWhy ?? null,
+        ).note,
         screenShared: fresh !== null,
       },
       fresh?.image ?? null,
       signal,
     );
-    return result === null ? null : { result, sawScreen: fresh !== null };
+    if (result === null) return null;
+    // Their latest line moves the state by fixed rules; the state decides
+    // the register the voice delivers this line in.
+    const after = applyAppraisal(before, result.appraisal, row.difficulty);
+    const register = registerOf(after, row.difficulty);
+    const delivery = deliveryFor(
+      register,
+      registerBefore,
+      result,
+      result.move === "CLOSE",
+    );
+    return {
+      result: {
+        ...result,
+        mood: delivery.mood as RehearsalTurnResult["mood"],
+        intensity: delivery.intensity,
+        reaction: delivery.reaction,
+      },
+      sawScreen: fresh !== null,
+      state: after,
+    };
   }
 
   const viewerOf = (actor: ActorContext) =>
@@ -1225,6 +1347,19 @@ export function createRehearsalService(dependencies: {
           counterpart: { kind, id, name: built.name },
           ...shownPersona(built.profile),
           grounding: built.profile.grounding,
+          stance: {
+            leads: stanceOf(
+              counterpartRoleOf(kind),
+              built.profile.forwardness ?? "TYPICAL",
+              null,
+            ).leads,
+            forwardness: built.profile.forwardness ?? "TYPICAL",
+            why: built.profile.forwardnessWhy ?? null,
+          },
+          traits: (built.profile.knownTraits ?? []).map((t) => ({
+            trait: t.trait,
+            source: t.source,
+          })),
           sources: publicSources(built.row.sources),
           refreshedAt: built.row.refreshedAt.toISOString(),
         },
@@ -1314,6 +1449,7 @@ export function createRehearsalService(dependencies: {
             sawScreen: false,
             intensity: opening.result.intensity,
             reaction: opening.result.reaction,
+            state: opening.state,
           },
         ],
       });
@@ -1416,6 +1552,7 @@ export function createRehearsalService(dependencies: {
           sawScreen: answered.sawScreen,
           intensity: result.intensity,
           reaction: result.reaction,
+          ...(answered.state === undefined ? {} : { state: answered.state }),
         },
       ];
       const saved = await store.saveTurns(actor, row.id, {
@@ -1468,14 +1605,19 @@ export function createRehearsalService(dependencies: {
         viewerOrganisation: viewer.organisationName.slice(0, 200),
         counterpartName: row.counterpartName,
         persona: personaText(persona).slice(0, 10_000),
-        rehearsal: transcriptOf(turns, row.counterpartName, row.userRole),
+        rehearsal: transcriptOf(
+          turns,
+          `${row.counterpartName} (played by Q)`,
+          row.userRole,
+        ),
         ending: outcome,
       });
       if (review === null) return { kind: "Q_UNAVAILABLE" };
+      const graded = ownReview(review, turns, row.userRole);
       const saved = await store.finish(actor, row.id, {
         outcome,
-        score: scoreOf(review.dimensions),
-        review,
+        score: scoreOf(graded.dimensions),
+        review: graded,
       });
       return okWithHistory(actor, saved ?? (await store.own(actor, row.id)));
     },
@@ -1612,9 +1754,9 @@ export function createRehearsalComposer(dependencies: {
         "STRUCTURED_EXTRACTION",
         PERSONA_BUDGET,
         variables,
-        CounterpartPersonaLenientSchema,
+        CounterpartPersonaV4LenientSchema,
       );
-      return loose === null ? null : normaliseCounterpartPersona(loose);
+      return loose === null ? null : normaliseCounterpartPersonaV4(loose);
     },
     turn: async (actor, variables, image, signal) => {
       const result = await run(
@@ -1623,7 +1765,7 @@ export function createRehearsalComposer(dependencies: {
         "NORMAL_DIALOGUE",
         TURN_BUDGET,
         variables,
-        RehearsalTurnV3ResultSchema,
+        RehearsalTurnV4ResultSchema,
         image,
         signal,
       );

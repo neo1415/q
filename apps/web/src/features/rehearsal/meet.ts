@@ -1,4 +1,5 @@
 import type {
+  QRehearsalPersonaDto,
   QRehearsalReviewDto,
   RehearsalOutcome,
 } from "@capital-q/contracts";
@@ -56,6 +57,11 @@ export const DIMENSION_WORDS: Readonly<
   QUESTION_QUALITY: "Question quality",
   RAPPORT: "Rapport",
   NEXT_STEPS: "Next steps",
+  DILIGENCE: "Diligence",
+  CONTROL: "Control of the meeting",
+  FAIRNESS: "Fairness",
+  DECISION_CLARITY: "Decision clarity",
+  PROFESSIONALISM: "Professionalism",
 };
 
 export const RATING_WORDS = {
@@ -119,3 +125,76 @@ export function shouldNudgeSilence(input: {
     !input.ended
   );
 }
+
+/**
+ * How the played person sounds right now, as a quiet word on their tile
+ * (founder ask 2026-10-01: the tile reflects the mood, subtly). Neutral
+ * says nothing.
+ */
+export const MOOD_WORDS: Readonly<Record<string, string>> = {
+  WARM: "warm",
+  HAPPY: "smiling",
+  ENTHUSIASTIC: "excited",
+  AMUSED: "amused",
+  SKEPTICAL: "sceptical",
+  IMPATIENT: "impatient",
+  ANNOYED: "annoyed",
+  ANGRY: "angry",
+  COLD: "cold",
+  INDIFFERENT: "unmoved",
+  DISAPPOINTED: "disappointed",
+  SAD: "upset",
+  MEEK: "hesitant",
+  AUTHORITATIVE: "firm",
+  SARCASTIC: "sarcastic",
+};
+
+/** The tile's mood word for their latest line, with a raised voice or tears. */
+export function moodWord(
+  turn:
+    | {
+        readonly mood: string | null;
+        readonly intensity?: string | undefined;
+        readonly reaction?: string | null | undefined;
+      }
+    | undefined,
+): string | null {
+  if (turn === undefined || turn.mood === null) return null;
+  if (turn.reaction === "CRY") return "in tears";
+  if (turn.intensity === "RAISED") return "raising their voice";
+  if (turn.reaction === "LAUGH") return "laughing";
+  return MOOD_WORDS[turn.mood] ?? null;
+}
+
+/**
+ * Who leads the meeting and how forward Q reads the person, in words for
+ * the lobby (founder live test 2026-10-01). Q's reading, said as one.
+ */
+export function stanceWords(
+  stance: QRehearsalPersonaDto["stance"],
+  name: string,
+): string {
+  const lead =
+    stance.leads === "THEM"
+      ? `${name} holds the leverage here: you're pitching, so expect them to lead and set the pace.`
+      : `You hold the leverage here: ${name} is pitching to you, so they'll answer first and keep their own questions for later.`;
+  const why =
+    stance.why === null || stance.why === "" ? "" : ` (${stance.why})`;
+  const read =
+    stance.forwardness === "FORWARD"
+      ? ` Q reads them as forward${why}, so they may push back sooner.`
+      : stance.forwardness === "RESERVED"
+        ? ` Q reads them as reserved${why}.`
+        : "";
+  return lead + read;
+}
+
+export const TRAIT_SOURCE_WORDS: Readonly<
+  Record<QRehearsalPersonaDto["traits"][number]["source"], string>
+> = {
+  PROFILE: "their profile",
+  MESSAGES: "their messages",
+  CALLS: "your calls",
+  PUBLIC: "public sources",
+  PITCH: "their pitch",
+};
