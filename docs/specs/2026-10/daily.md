@@ -234,3 +234,23 @@ q-tools tests for the two tools; contracts parse; pgTAP for the migration.
 Live (after the lead deploys): one fictional investor
 (@fictional.capitalq.local), one edition prepared on request, read from
 `q_runtime.daily_editions` and the reader page; ≤1 edition.
+
+## 11. As built (2026-10-01)
+
+- Package `packages/q-daily` (domain, pipeline, services, Postgres stores,
+  gateway writers, Pexels); worker ticker `apps/workers/src/daily`
+  (60 s, `Q_DAILY_DISABLED=1` turns it off, `Q_DAILY_MAX_EDITIONS_PER_DAY`
+  lowers the cap); q-api `apps/q-api/src/http/daily.ts`; web `/daily`,
+  `/daily/[editionId]`, `/api/q-daily/[id]/pdf`, Settings → The Q Daily,
+  account menu and sidebar entry; dev preview `/dev/daily`.
+- Newspaper PDF is `layOutNewspaper` in `packages/deck-render/src/newspaper.ts`
+  over the existing boxes and PDF renderer (DOCS §7 interface), since the
+  DOCS branch is not on the lead head; it only adds a file and an export.
+- Runtime is the worker loop, not LangGraph (AUTO not on the lead head).
+- Cluster issues are keyed per UTC day; editions per local day.
+- "People you know" = CONNECTED relationships only (both sides agreed).
+- The research tool also gains `PAST_WEEK`/`PAST_DAY` freshness.
+- Q's take uses EVIDENCE_SYNTHESIS at CONFIDENTIAL sensitivity; story
+  writing STRUCTURED_EXTRACTION at PUBLIC.
+- No `navigate.DAILY` hand (would need a TURN_READER version, which DOCS
+  also bumps); `get_q_daily` returns the `/daily/<id>` link instead.
