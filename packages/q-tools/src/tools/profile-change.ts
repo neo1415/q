@@ -44,9 +44,15 @@ export const PROPOSE_PROFILE_CHANGE = "profile.change.propose" as const;
 const PROFILE_KINDS = ["PERSON", "COMPANY", "INVESTOR_ORGANISATION"] as const;
 
 /** Every field any profile holds; which ones fit which profile is code's to check. */
+/**
+ * Their time zone, held on the person (live 2026-10-01): a Q-only field
+ * here, since the profile page does not edit it yet.
+ */
+const PERSON_Q_FIELDS = [...PERSON_EDITABLE_FIELDS, "timeZone"] as const;
+
 const ALL_FIELDS = [
   ...new Set<string>([
-    ...PERSON_EDITABLE_FIELDS,
+    ...PERSON_Q_FIELDS,
     ...COMPANY_EDITABLE_FIELDS,
     ...INVESTOR_EDITABLE_FIELDS,
   ]),
@@ -55,7 +61,7 @@ const ALL_FIELDS = [
 export const FIELDS_BY_PROFILE: Readonly<
   Record<(typeof PROFILE_KINDS)[number], readonly string[]>
 > = {
-  PERSON: PERSON_EDITABLE_FIELDS,
+  PERSON: PERSON_Q_FIELDS,
   COMPANY: COMPANY_EDITABLE_FIELDS,
   INVESTOR_ORGANISATION: INVESTOR_EDITABLE_FIELDS,
 };
@@ -150,7 +156,7 @@ export function createProposeProfileChangeTool(
     status: "ACTIVE",
     providerName: "propose_profile_change",
     description:
-      "Prepares a change to the person's own profile for their approval, when they have asked for one: PERSON fields displayName and headline (a one-line description of themselves); COMPANY fields canonicalName, legalName, websiteUrl, foundedDate (YYYY-MM-DD), headquartersCountry (ISO 3166 two-letter code), headquartersCity, currentStageCode (lower_snake_case stage code), shortDescription (one line) and primaryDescription; INVESTOR_ORGANISATION fields displayName, investorType, websiteUrl, hqCountry (two-letter code), publicDescription and deploymentState. It changes nothing by itself: the person is shown exactly what will change and approves or declines it. Result: PREPARED, ONE_PER_TURN, or REFUSED with the reason the value does not fit.",
+      "Prepares a change to the person's own profile for their approval, when they have asked for one: PERSON fields displayName, headline (a one-line description of themselves) and timeZone (IANA, such as Africa/Lagos); COMPANY fields canonicalName, legalName, websiteUrl, foundedDate (YYYY-MM-DD), headquartersCountry (ISO 3166 two-letter code), headquartersCity, currentStageCode (lower_snake_case stage code), shortDescription (one line) and primaryDescription; INVESTOR_ORGANISATION fields displayName, investorType, websiteUrl, hqCountry (two-letter code), publicDescription and deploymentState. It changes nothing by itself: the person is shown exactly what will change and approves or declines it. Result: PREPARED, ONE_PER_TURN, or REFUSED with the reason the value does not fit.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     // Checked where it binds: company.edit / investor.edit by the action

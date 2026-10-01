@@ -45,12 +45,35 @@ export const PersonProfileUpdatePayloadSchema = z
     displayName: PersonDisplayNameSchema.optional(),
     /** `null` returns the headline to not stated. */
     headline: PersonHeadlineSchema.nullable().optional(),
+    /**
+     * Their IANA time zone (live 2026-10-01: "remind me tomorrow at 9" was
+     * set for 09:00 UTC). Only a zone this runtime knows.
+     */
+    timeZone: z
+      .string()
+      .trim()
+      .max(64)
+      .refine(isKnownTimeZone, { message: "not a known time zone" })
+      .optional(),
   })
   .strict()
   .refine(
-    (value) => value.displayName !== undefined || value.headline !== undefined,
+    (value) =>
+      value.displayName !== undefined ||
+      value.headline !== undefined ||
+      value.timeZone !== undefined,
     { message: "expected at least one field to change" },
   );
+
+function isKnownTimeZone(zone: string): boolean {
+  if (!/^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/.test(zone)) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
 export type PersonProfileUpdatePayload = z.infer<
   typeof PersonProfileUpdatePayloadSchema
 >;
@@ -61,6 +84,7 @@ export const PersonProfileUpdateResultSchema = z
     /** v1 results carried only the name; later ones carry the version too. */
     displayName: z.string().nullable(),
     headline: z.string().nullable().optional(),
+    timeZone: z.string().nullable().optional(),
     version: z.number().int().min(1).optional(),
   })
   .strict();
@@ -85,10 +109,19 @@ export function describePersonProfileChanges(
         : `Headline: ${payload.headline}`,
     );
   }
+  if (payload.timeZone !== undefined) {
+    lines.push(`Time zone: ${payload.timeZone}`);
+  }
   const summary =
-    payload.headline === undefined && payload.displayName !== undefined
+    payload.headline === undefined &&
+    payload.timeZone === undefined &&
+    payload.displayName !== undefined
       ? `Change what I call you to ${payload.displayName}.`
-      : `Update your profile. ${lines.join("; ")}`;
+      : payload.headline === undefined &&
+          payload.displayName === undefined &&
+          payload.timeZone !== undefined
+        ? `Save your time zone as ${payload.timeZone}.`
+        : `Update your profile. ${lines.join("; ")}`;
   return { summary: summary.slice(0, 1000), preview: lines.join("\n") };
 }
 
@@ -107,7 +140,7 @@ export function createPersonProfileUpdateAction(
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",
     description:
-      "Changes what Capital Q shows about the approver themselves -- their display name or headline -- exactly as approved.",
+      "Changes what Capital Q shows about the approver themselves -- their display name, headline or time zone -- exactly as approved.",
     payload: PersonProfileUpdatePayloadSchema,
     result: PersonProfileUpdateResultSchema,
     targets: (payload): readonly QSubjectRef[] => [
@@ -164,6 +197,9 @@ export function createPersonProfileUpdateAction(
               ...(action.payload.headline === undefined
                 ? {}
                 : { headline: action.payload.headline }),
+              ...(action.payload.timeZone === undefined
+                ? {}
+                : { timeZone: action.payload.timeZone }),
             },
           });
           return {
@@ -172,6 +208,9 @@ export function createPersonProfileUpdateAction(
               userId: action.payload.userId,
               displayName: updated.displayName,
               headline: updated.headline,
+              ...(action.payload.timeZone === undefined
+                ? {}
+                : { timeZone: updated.timeZone ?? null }),
               version: updated.version,
             },
           };

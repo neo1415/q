@@ -17,6 +17,8 @@ import { createProfileUpdateBoard } from "../src/composition/company-profile-act
 import {
   PERSON_PROFILE_UPDATE,
   createPersonProfileUpdateAction,
+  describePersonProfileChanges,
+  PersonProfileUpdatePayloadSchema,
 } from "../src/composition/person-profile-action.js";
 
 /**
@@ -69,6 +71,9 @@ function fakes() {
         ...(input.changes.headline === undefined
           ? {}
           : { headline: input.changes.headline }),
+        ...(input.changes.timeZone === undefined
+          ? {}
+          : { timeZone: input.changes.timeZone }),
         version: stored.version + 1,
       };
       return Promise.resolve(stored);
@@ -225,6 +230,58 @@ describe("person.profile.update, headline (BIZ-002)", () => {
       result: { headline: "Angel investor", displayName: "Daniel" },
     });
     expect(renamed[0]?.changes).toEqual({ headline: "Angel investor" });
+  });
+});
+
+// Live 2026-10-01: a reminder for 09:00 UTC; Q asks once and offers to
+// save their time zone to their own profile, for their approval.
+describe("their time zone on their profile", () => {
+  it("accepts a known IANA zone only, and says what will be saved", () => {
+    expect(
+      PersonProfileUpdatePayloadSchema.safeParse({
+        userId: USER,
+        timeZone: "Africa/Lagos",
+      }).success,
+    ).toBe(true);
+    for (const bad of ["Lagos time", "Mars/Olympus", "+01:00"]) {
+      expect(
+        PersonProfileUpdatePayloadSchema.safeParse({
+          userId: USER,
+          timeZone: bad,
+        }).success,
+        bad,
+      ).toBe(false);
+    }
+    expect(
+      describePersonProfileChanges({ userId: USER, timeZone: "Africa/Lagos" })
+        .summary,
+    ).toBe("Save your time zone as Africa/Lagos.");
+  });
+
+  it("executes through the same store as the profile page", async () => {
+    const { action, renamed } = fakes();
+    const result = await action.executor.execute(
+      {
+        actionId: "11111111-1111-4111-8111-111111111112",
+        runId: RUN,
+        tenantId: TENANT,
+        organisationId: ORG,
+        actionType: PERSON_PROFILE_UPDATE,
+        actionVersion: 1,
+        idempotencyKey: "k2",
+        payloadHash: "h2",
+        approvalId: "22222222-2222-4222-8222-222222222223",
+        approvedByUserId: USER,
+        payload: { userId: USER, timeZone: "Africa/Lagos" },
+        targets: [{ kind: "USER", userId: USER }],
+      } as never,
+      { approver: PERSON, correlationId: "cor_test", attempt: 1 },
+    );
+    expect(result).toMatchObject({
+      outcome: "EXECUTED",
+      result: { timeZone: "Africa/Lagos" },
+    });
+    expect(renamed[0]?.changes).toEqual({ timeZone: "Africa/Lagos" });
   });
 });
 

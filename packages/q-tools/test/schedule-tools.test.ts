@@ -63,7 +63,11 @@ function ownPlan(actor = actorB): PermittedContextPlan {
 }
 
 function world(
-  options: { calendarZone?: string | null; calendarConnected?: boolean } = {},
+  options: {
+    calendarZone?: string | null;
+    calendarConnected?: boolean;
+    profileZone?: string | null;
+  } = {},
 ) {
   const prepared: { actionType: string; payload: unknown }[] = [];
   const chat: ChatIntelligencePort = {
@@ -122,6 +126,7 @@ function world(
       ),
     brief: () => Promise.resolve(null),
     timeZoneOf: () => Promise.resolve(options.calendarZone ?? null),
+    profileTimeZoneOf: () => Promise.resolve(options.profileZone ?? null),
     canSchedule: () =>
       Promise.resolve(
         options.calendarConnected === false ? "CALENDAR_NOT_CONNECTED" : "OK",
@@ -376,6 +381,88 @@ describe("schedule tools", () => {
             timeZone: "Asia/Singapore",
           },
         },
+      ]);
+    });
+  });
+
+  // Live 2026-10-01: "remind me tomorrow at 9:00" for a founder in Lagos
+  // was set for 09:00 UTC; the browser had reported UTC.
+  describe("the zone a reminder is set in (live 2026-10-01)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    const remind = {
+      callId: "t4",
+      name: "propose_reminder",
+      arguments: { title: "Prep", when: { day: "tomorrow", time: "09:00" } },
+    };
+    const on = (timeZone?: string) => ({
+      ...ownPlan(),
+      screen: {
+        route: "HOME" as const,
+        ...(timeZone === undefined ? {} : { timeZone }),
+      },
+    });
+
+    it("uses the zone saved on their profile before the device's, and the card names it", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-01T18:00:00Z"));
+      const { executor, prepared } = world({ profileZone: "Africa/Lagos" });
+      const outcome = await executor.execute(
+        remind,
+        contextFor(actorB, on("Europe/Paris")),
+      );
+      expect(prepared).toMatchObject([
+        {
+          payload: {
+            remindAt: "2026-10-02T08:00:00.000Z",
+            timeZone: "Africa/Lagos",
+          },
+        },
+      ]);
+      expect(JSON.stringify(outcome.result)).toContain("(Africa/Lagos)");
+    });
+
+    it("does not take a device's bare UTC as where they are: asks once and offers to save it", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-01T18:00:00Z"));
+      for (const zone of ["UTC", "Etc/UTC", "GMT"]) {
+        const { executor, prepared } = world();
+        const outcome = await executor.execute(
+          remind,
+          contextFor(actorB, on(zone)),
+        );
+        expect(prepared, zone).toEqual([]);
+        const said = JSON.stringify(outcome.result);
+        expect(said).toContain("time zone is not known");
+        expect(said).toContain("propose_profile_change");
+        expect(said).toContain("Never assume UTC");
+      }
+    });
+
+    it("still uses a real device zone when nothing is saved", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-01T18:00:00Z"));
+      const { executor, prepared } = world();
+      await executor.execute(remind, contextFor(actorB, on("Africa/Lagos")));
+      expect(prepared).toMatchObject([
+        { payload: { remindAt: "2026-10-02T08:00:00.000Z" } },
+      ]);
+    });
+
+    it("uses UTC when they say UTC themselves", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-01T18:00:00Z"));
+      const { executor, prepared } = world();
+      await executor.execute(
+        {
+          ...remind,
+          arguments: { ...remind.arguments, timeZone: "UTC" },
+        },
+        contextFor(actorB, on("UTC")),
+      );
+      expect(prepared).toMatchObject([
+        { payload: { remindAt: "2026-10-02T09:00:00.000Z", timeZone: "UTC" } },
       ]);
     });
   });

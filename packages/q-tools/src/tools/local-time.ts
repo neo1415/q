@@ -93,6 +93,18 @@ export type LocalWhenResolution =
         | "PAST";
     };
 
+/**
+ * A device that reports UTC is usually not telling where the person is:
+ * privacy-hardened browsers, virtual machines and servers all say UTC
+ * (live 2026-10-01: a founder in Lagos got a reminder at 09:00 UTC because
+ * the browser said UTC). Such a zone is not trusted on the device's word.
+ */
+export function isUncertainDeviceZone(timeZone: string): boolean {
+  return /^(Etc\/)?(UTC|UCT|GMT|Universal|Zulu|Greenwich)(\+0|-0|0)?$/i.test(
+    timeZone,
+  );
+}
+
 export function isKnownTimeZone(timeZone: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone });
@@ -278,7 +290,7 @@ export function unresolvedMessage(
 ): string {
   switch (kind) {
     case "NO_TIME_ZONE":
-      return "Their time zone is not known here. Ask which city or time zone they mean, then pass it as timeZone.";
+      return "Their time zone is not known here. Ask once which city or time zone they are in, then pass it as timeZone; and offer to save it to their profile (propose_profile_change, PERSON timeZone) so you never have to ask again. Never assume UTC.";
     case "NO_DAY":
       return "Say which day: pass day (today, tomorrow or a weekday) or date (YYYY-MM-DD) with the time.";
     case "DAY_CONFLICT":

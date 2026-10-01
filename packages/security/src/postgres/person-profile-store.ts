@@ -31,6 +31,7 @@ const RowSchema = z.object({
   id: UserIdSchema,
   display_name: z.string().nullable(),
   headline: z.string().nullable(),
+  timezone: z.string().nullable().optional(),
   version: z.number().int().min(1),
   updated_at: TimestampSchema,
 });
@@ -41,6 +42,7 @@ function toProfile(row: unknown): PersonProfile {
     userId: parsed.id,
     displayName: parsed.display_name,
     headline: parsed.headline,
+    timeZone: parsed.timezone ?? null,
     version: parsed.version,
     updatedAt: parsed.updated_at,
   };
@@ -53,7 +55,8 @@ export function createPostgresPersonProfileStore(options: {
 
   const read = async (userId: UserId): Promise<PersonProfile | null> => {
     const [row] = await sql`
-      select p.id, p.display_name, p.headline, p.version, p.updated_at
+      select p.id, p.display_name, p.headline, p.timezone, p.version,
+             p.updated_at
         from identity.user_profiles p
        where p.id = ${userId}
          and p.status = 'active'
@@ -80,6 +83,7 @@ export function createPostgresPersonProfileStore(options: {
       }
       const setName = effective.displayName !== undefined;
       const setHeadline = effective.headline !== undefined;
+      const setZone = effective.timeZone !== undefined;
       const [row] = await sql`
         update identity.user_profiles
            set display_name = case when ${setName}::boolean
@@ -88,12 +92,15 @@ export function createPostgresPersonProfileStore(options: {
                headline = case when ${setHeadline}::boolean
                                then ${effective.headline ?? null}::text
                                else headline end,
+               timezone = case when ${setZone}::boolean
+                               then ${effective.timeZone ?? null}::text
+                               else timezone end,
                version = version + 1,
                updated_at = now()
          where id = ${userId}
            and version = ${expectedVersion}
            and status = 'active'
-        returning id, display_name, headline, version, updated_at`;
+        returning id, display_name, headline, timezone, version, updated_at`;
       if (row !== undefined) {
         return toProfile(row);
       }

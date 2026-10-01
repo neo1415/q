@@ -48,6 +48,7 @@ type Prepared = {
 const PERSON_SHAPES: Readonly<Record<string, string>> = {
   displayName: "a name needs to be between 1 and 80 characters",
   headline: "a headline needs to be between 1 and 160 characters",
+  timeZone: "the time zone needs to be one like Africa/Lagos or Europe/London",
 };
 
 const INVESTOR_SHAPES: Readonly<Record<string, string>> = {

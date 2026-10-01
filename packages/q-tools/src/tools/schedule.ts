@@ -38,6 +38,7 @@ import {
   isKnownTimeZone,
   localLabel as zonedLabel,
   LocalWhenSchema,
+  isUncertainDeviceZone,
   resolveLocalWhen,
   unresolvedMessage,
   type LocalWhen,
@@ -137,6 +138,9 @@ export type ScheduleIntelligencePort = {
    * Calendar's own setting, or null. Never UTC by default.
    */
   readonly timeZoneOf?: (actor: ActorContext) => Promise<string | null>;
+  /** The zone saved on their own profile, when they have given one. */
+  readonly profileTimeZoneOf?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
   /** Whether a call could be booked now: party, connection, Calendar. */
   readonly canSchedule?: (
     actor: ActorContext,
@@ -535,14 +539,29 @@ export function createScheduleTools(
     readonly iso: string;
     readonly timeZone: string | undefined;
   }> => {
+    // Precedence: the zone they named, the one saved on their profile,
+    // their device's (unless it only says UTC, which privacy browsers and
+    // VMs report whatever the place), their calendar's. None: Q asks once.
     const named =
       input.timeZone !== undefined && isKnownTimeZone(input.timeZone)
         ? input.timeZone
         : undefined;
+    let zone = named;
+    if (zone === undefined && schedule.profileTimeZoneOf !== undefined) {
+      const saved = await schedule
+        .profileTimeZoneOf(context.actor)
+        .catch(() => null);
+      if (saved !== null && isKnownTimeZone(saved)) zone = saved;
+    }
     const device = context.plan.screen?.timeZone;
-    let zone =
-      named ??
-      (device !== undefined && isKnownTimeZone(device) ? device : undefined);
+    if (
+      zone === undefined &&
+      device !== undefined &&
+      isKnownTimeZone(device) &&
+      !isUncertainDeviceZone(device)
+    ) {
+      zone = device;
+    }
     if (zone === undefined && schedule.timeZoneOf !== undefined) {
       zone =
         (await schedule.timeZoneOf(context.actor).catch(() => null)) ??

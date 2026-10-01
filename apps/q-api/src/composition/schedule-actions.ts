@@ -17,6 +17,7 @@ import type {
   ScheduleService,
 } from "@capital-q/communication";
 import type { Logger } from "@capital-q/observability";
+import type { ActorContext } from "@capital-q/security";
 import {
   defineQAction,
   type AnyQActionDefinition,
@@ -449,8 +450,11 @@ export function createMeetingCancelAction(dependencies: {
 /** What Q's schedule tools read through, as the invoker. */
 export function createScheduleIntelligencePort(
   schedule: ScheduleService,
+  /** The zone saved on the person's own profile (identity.user_profiles). */
+  profileTimeZoneOf?: (actor: ActorContext) => Promise<string | null>,
 ): ScheduleIntelligencePort {
   return {
+    ...(profileTimeZoneOf === undefined ? {} : { profileTimeZoneOf }),
     findSlots: async (actor, input) => {
       const found = await schedule.findSlots({ actor, ...input });
       if (found.outcome === "OK") {

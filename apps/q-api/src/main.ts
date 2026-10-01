@@ -1396,7 +1396,12 @@ const qTools = createQTools({
         null,
     }),
     // BIZ-008: calls and reminders, prepared on the chat board.
-    schedule: createScheduleIntelligencePort(schedule),
+    schedule: createScheduleIntelligencePort(schedule, async (actor) =>
+      actor.actorType === "HUMAN"
+        ? ((await people.read(actor.userId).catch(() => null))?.timeZone ??
+          null)
+        : null,
+    ),
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
     visibility: {

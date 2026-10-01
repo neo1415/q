@@ -16,6 +16,12 @@ export type PersonProfile = {
   readonly userId: UserId;
   readonly displayName: string | null;
   readonly headline: string | null;
+  /**
+   * Their IANA time zone ("Africa/Lagos"), when they have given one: what
+   * "tomorrow at 9" means for them (live 2026-10-01: a reminder at 09:00
+   * UTC for a founder in Lagos). Null: not stated, never guessed.
+   */
+  readonly timeZone?: string | null | undefined;
   readonly version: number;
   readonly updatedAt: string;
 };
@@ -24,6 +30,8 @@ export type PersonProfileChanges = {
   readonly displayName?: string | undefined;
   /** `null` returns the headline to not stated. */
   readonly headline?: string | null | undefined;
+  /** An IANA zone; `null` returns it to not stated. */
+  readonly timeZone?: string | null | undefined;
 };
 
 export type PersonProfileStore = {
@@ -61,10 +69,20 @@ export class PersonProfileVersionConflictError extends Error {
 
 /** Only the requested values that differ from what is stored. */
 export function effectivePersonChanges(
-  current: Pick<PersonProfile, "displayName" | "headline">,
+  current: Pick<PersonProfile, "displayName" | "headline" | "timeZone">,
   changes: PersonProfileChanges,
 ): PersonProfileChanges {
-  const effective: { displayName?: string; headline?: string | null } = {};
+  const effective: {
+    displayName?: string;
+    headline?: string | null;
+    timeZone?: string | null;
+  } = {};
+  if (
+    changes.timeZone !== undefined &&
+    changes.timeZone !== (current.timeZone ?? null)
+  ) {
+    effective.timeZone = changes.timeZone;
+  }
   if (
     changes.displayName !== undefined &&
     changes.displayName !== current.displayName
