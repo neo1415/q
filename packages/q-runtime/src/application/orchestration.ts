@@ -307,6 +307,27 @@ export type QAnswerPort = {
    * best effort: an answer never depends on it having been called.
    */
   readonly warm?: (request: QAnswerRequest) => void;
+  /**
+   * Start reading the person's latest turn as soon as PREFLIGHT has passed
+   * (ADR 0035), beside the Context Firewall. Its input is only their own
+   * message and their own recent turns in this run's conversation; it is
+   * a reading, never an answer, and nothing is said or done from it until
+   * the answer for the same run takes it up. Optional and best effort.
+   */
+  readonly preread?: (input: QPrereadInput) => void;
+  /**
+   * The run was refused (or ended) before its answer: an early reading is
+   * dropped unused.
+   */
+  readonly discard?: (runId: string) => void;
+};
+
+export type QPrereadInput = {
+  readonly runId: QRunId;
+  readonly tenantId: TenantId;
+  readonly actor: ActorContext;
+  readonly correlationId: string;
+  readonly signal?: AbortSignal | undefined;
 };
 
 export function createUnconfiguredQAnswer(): QAnswerPort {

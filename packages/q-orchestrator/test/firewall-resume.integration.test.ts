@@ -168,10 +168,26 @@ function recordingRetrieval(): QRetrievalPort & PlanRecording {
   };
 }
 
-function recordingAnswer(): QAnswerPort & PlanRecording {
+function recordingAnswer(): QAnswerPort &
+  PlanRecording & {
+    readonly prereads: string[];
+    readonly discarded: string[];
+  } {
   const plans: PermittedContextPlan[] = [];
+  const prereads: string[] = [];
+  const discarded: string[] = [];
   return {
     plans,
+    prereads,
+    discarded,
+    // ADR 0035: the early reading starts only after preflight and is
+    // dropped unused when a later stage refuses the run.
+    preread: (input) => {
+      prereads.push(input.runId);
+    },
+    discard: (runId) => {
+      discarded.push(runId);
+    },
     answer: (request) => {
       plans.push(request.plan);
       return Promise.resolve({ kind: "NOT_CONFIGURED" });
@@ -695,6 +711,9 @@ describe("Context Firewall inside the Q orchestrator against local PostgreSQL", 
       expect(final.run.failureCode).toBe("POLICY_DENIED");
       expect(retrieval.plans).toHaveLength(0);
       expect(answer.plans).toHaveLength(0);
+      // Read early after preflight, then dropped unused at the refusal.
+      expect(answer.prereads).toEqual([run.id]);
+      expect(answer.discarded).toEqual([run.id]);
       const stored = await events(run.id);
       expect(stored.map((e) => e.event_type)).toEqual([
         "q.run.started",

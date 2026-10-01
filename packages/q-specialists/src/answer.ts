@@ -44,6 +44,7 @@ import {
   type QAnswerOutcome,
   type QAnswerPort,
   type QAnswerRequest,
+  type QPrereadInput,
   type QCapabilityManifest,
   type QConversationMessage,
   type QResearchDirective,
@@ -104,6 +105,46 @@ import {
  * where explainability belongs and where a person's message does not (§55,
  * §57, §91, §103).
  */
+
+/** The reader's input: the person's own latest words and own recent turns. */
+function turnReaderInput(
+  history: readonly QConversationMessage[],
+  latest: QConversationMessage,
+  actions: readonly { readonly name: string; readonly does: string }[],
+  context: {
+    readonly tenantId: string;
+    readonly userId: string;
+    readonly correlationId: string;
+    readonly signal?: AbortSignal | undefined;
+  },
+) {
+  // Spoken turns carry the recogniser's utterance; typed ones never do.
+  // The reader needs to know which: only speech can be overheard.
+  const spoken = latest.utteranceRef !== undefined;
+  return {
+    utterance: latest.content,
+    actions,
+    recentTurns: history
+      .filter((m) => m.id !== latest.id)
+      .slice(-6)
+      .map((m) => ({
+        role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
+        text: m.content,
+      })),
+    modality: spoken ? ("VOICE" as const) : ("TEXT" as const),
+    attribution: {
+      tenantId: context.tenantId,
+      userId: context.userId,
+      correlationId: context.correlationId,
+    },
+    signal: context.signal,
+  };
+}
+
+const actionsKey = (
+  actions: readonly { readonly name: string; readonly does: string }[],
+): string =>
+  JSON.stringify(actions.map((a) => ({ name: a.name, does: a.does })));
 
 export type SpecialistQAnswerDependencies = {
   readonly specialist: QSpecialist<
@@ -1209,6 +1250,62 @@ export function createSpecialistQAnswer(
     }
   };
 
+  /**
+   * The actions each conversation's reader was last given, so an early
+   * reading (ADR 0035) can be made before this turn's plan exists and
+   * checked against it afterwards. Tool names and what they do: Capital
+   * Q's own vocabulary, not anyone's data.
+   */
+  const lastActions = new Map<string, string>();
+  /** Early readings by run, bounded; dropped on refusal or when unused. */
+  type EarlyReading = {
+    readonly messageId: string;
+    readonly actionsKey: string;
+    readonly reading: Promise<Awaited<ReturnType<QTurnReader["read"]>> | null>;
+  };
+  const prereads = new Map<string, Promise<EarlyReading | null>>();
+  const PREREADS_MAX = 64;
+
+  const preread = (input: QPrereadInput): void => {
+    if (turns === undefined || prereads.has(input.runId)) return;
+    const started = (async (): Promise<EarlyReading | null> => {
+      // The run's own conversation, read as its owner: the same read the
+      // answer makes, under the actor preflight has just checked.
+      const history =
+        await repositories.messages.listRecentForConversationOfRun(
+          sql,
+          input.tenantId,
+          input.runId,
+          64,
+        );
+      const conversationId = history[0]?.conversationId;
+      const latest = [...history].reverse().find((m) => m.role === "USER");
+      if (conversationId === undefined || latest === undefined) return null;
+      const key = lastActions.get(conversationId);
+      // A conversation's first turn has no known actions: read later.
+      if (key === undefined) return null;
+      const actions = JSON.parse(key) as { name: string; does: string }[];
+      const reading = turns
+        .read(
+          turnReaderInput(history, latest, actions, {
+            tenantId: input.tenantId,
+            userId: input.actor.userId,
+            correlationId: input.correlationId,
+            signal: input.signal,
+          }),
+        )
+        .catch(() => null);
+      return { messageId: latest.id, actionsKey: key, reading };
+    })().catch(() => null);
+    // Registered at once, so a refusal that arrives first still drops it.
+    prereads.set(input.runId, started);
+    while (prereads.size > PREREADS_MAX) {
+      const oldest = prereads.keys().next().value;
+      if (oldest === undefined) break;
+      prereads.delete(oldest);
+    }
+  };
+
   const answerTurn = async (
     request: QAnswerRequest,
   ): Promise<QAnswerOutcome> => {
@@ -1320,29 +1417,37 @@ export function createSpecialistQAnswer(
     // The reader needs to know which: only speech can be overheard.
     const spoken = latest.utteranceRef !== undefined;
     const readTurn = () =>
-      turns.read({
-        utterance: latest.content,
-        actions,
-        recentTurns: history
-          .filter((m) => m.id !== latest.id)
-          .slice(-6)
-          .map((m) => ({
-            role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
-            text: m.content,
-          })),
-        modality: spoken ? "VOICE" : "TEXT",
-        attribution: {
+      turns.read(
+        turnReaderInput(history, latest, actions, {
           tenantId: request.tenantId,
           userId: request.actor.userId,
           correlationId: request.correlationId,
-        },
-        signal: request.signal,
-      });
+          signal: request.signal,
+        }),
+      );
+    // Read early, beside the firewall (ADR 0035), with the same words, the
+    // same turns and the same actions as now: taken up only when all three
+    // match; anything else is read again here.
+    const early = prereads.get(request.runId);
+    prereads.delete(request.runId);
+    lastActions.delete(conversationId);
+    lastActions.set(conversationId, actionsKey(actions));
+    if (lastActions.size > MAX_CONVERSATIONS) {
+      const oldest = lastActions.keys().next().value;
+      if (oldest !== undefined) lastActions.delete(oldest);
+    }
+    const ready = early === undefined ? null : await early;
+    const earlyRead =
+      ready !== null &&
+      ready.messageId === latest.id &&
+      ready.actionsKey === actionsKey(actions)
+        ? await ready.reading
+        : null;
     // A reading that failed is tried once more: the gateway has parked the
     // provider that failed, so the second try goes to the fallback model.
     // A request to make something must never be dropped because one model
     // was down (B1, 2026-09-25).
-    let read = await readTurn().catch(() => null);
+    let read = earlyRead ?? (await readTurn().catch(() => null));
     let turnUnread = false;
     if (read === null && request.signal?.aborted !== true) {
       read = await readTurn().catch(() => null);
@@ -1807,6 +1912,11 @@ ${line}`;
   return {
     lastResult: () => last,
     answer: answerTurn,
+    preread,
+    discard: (runId: string) => {
+      prereads.delete(runId);
+      delegate.discard?.(runId);
+    },
     failureNotice: (runId: string) => {
       const notice = notices.get(runId);
       notices.delete(runId);

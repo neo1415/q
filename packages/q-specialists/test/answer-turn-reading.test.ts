@@ -893,3 +893,55 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     expect(delegated()).toBe(1);
   });
 });
+
+describe("the turn read early, beside the firewall (ADR 0035)", () => {
+  const navigate = () =>
+    seam({
+      said: "take me to discover",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "DISCOVER",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+  const early = (run: ReturnType<typeof navigate>, r: QAnswerRequest) =>
+    run.answer.preread?.({
+      runId: r.runId,
+      tenantId: r.tenantId,
+      actor: r.actor,
+      correlationId: r.correlationId,
+    });
+
+  it("is taken up by the answer for the same run: the turn is read once", async () => {
+    const run = navigate();
+    // The first turn of a conversation teaches the reader's actions.
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(1);
+    const next = request();
+    early(run, next);
+    const outcome = await run.answer.answer(next);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(run.reads()).toBe(2);
+    expect(run.stored.at(-1)?.content).toBe("Taking you to Discover.");
+  });
+
+  it("is dropped unused when the run is refused: the answer reads the turn itself", async () => {
+    const run = navigate();
+    await run.answer.answer(request());
+    const next = request();
+    early(run, next);
+    run.answer.discard?.(next.runId);
+    await run.answer.answer(next);
+    // Early reading (unused) plus the answer's own.
+    expect(run.reads()).toBe(3);
+  });
+
+  it("is not made for a conversation's first turn", async () => {
+    const run = navigate();
+    const first = request();
+    early(run, first);
+    await run.answer.answer(first);
+    expect(run.reads()).toBe(1);
+  });
+});
