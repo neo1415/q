@@ -71,6 +71,41 @@ const VOICE_IDS: Readonly<Record<QVoiceChoice, string>> = {
   MALE: "onwK4e9ZLuTAKqWW03F9",
 };
 
+/**
+ * REHEARSE: the voices a person Q plays in a rehearsal speaks with --
+ * ElevenLabs premade voices, none of them Q's own, so the other person
+ * never sounds like Q. One is chosen per counterpart, steadily, from the
+ * voice the person picked in the lobby. Public voice ids, not secrets.
+ */
+export const PERSONA_VOICE_IDS: Readonly<
+  Record<QVoiceChoice, readonly string[]>
+> = {
+  MALE: [
+    "JBFqnCBsd6RMkjVDRZzb", // George
+    "nPczCjzI2devNBz1zQrb", // Brian
+    "CwhRBWXzGAHq8TQ4Fs17", // Roger
+  ],
+  FEMALE: [
+    "XB0fDUnXU5powFXDhCwa", // Charlotte
+    "Xb7hH8MSUJpSbSDYk0k2", // Alice
+    "cgSgspJ2msm6clMCkdW9", // Jessica
+  ],
+};
+
+/** The same counterpart keeps the same voice, rehearsal after rehearsal. */
+export function personaVoiceId(voice: QVoiceChoice, seed: string): string {
+  const ids = PERSONA_VOICE_IDS[voice];
+  let hash = 0;
+  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return ids[hash % ids.length] ?? VOICE_IDS[voice];
+}
+
+const ALL_VOICE_IDS: ReadonlySet<string> = new Set([
+  ...Object.values(VOICE_IDS),
+  ...PERSONA_VOICE_IDS.MALE,
+  ...PERSONA_VOICE_IDS.FEMALE,
+]);
+
 const API_ORIGIN = "https://api.elevenlabs.io";
 
 /**
@@ -164,11 +199,17 @@ function retryable(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
-function streamUrl(voice: QVoiceChoice, outputFormat: string): URL {
-  const url = new URL(
-    `/v1/text-to-speech/${VOICE_IDS[voice]}/stream`,
-    API_ORIGIN,
-  );
+function streamUrl(
+  voice: QVoiceChoice,
+  outputFormat: string,
+  voiceId?: string,
+): URL {
+  // Only a voice this module names: an id is never taken from outside.
+  const id =
+    voiceId !== undefined && ALL_VOICE_IDS.has(voiceId)
+      ? voiceId
+      : VOICE_IDS[voice];
+  const url = new URL(`/v1/text-to-speech/${id}/stream`, API_ORIGIN);
   url.searchParams.set("output_format", outputFormat);
   return url;
 }
@@ -403,6 +444,8 @@ export type ElevenLabsSpeechRelay = {
      * never selects anything the binding did not.
      */
     readonly session?: string | undefined;
+    /** REHEARSE: a persona's own voice (PERSONA_VOICE_IDS), from the binding. */
+    readonly voiceId?: string | undefined;
   }) => Promise<Response>;
 };
 
@@ -436,6 +479,7 @@ type Engine = {
   readonly elevenLabs: boolean;
   readonly request: (input: {
     readonly voice: QVoiceChoice;
+    readonly voiceId?: string | undefined;
     readonly format: string;
     readonly text: string;
     readonly speed: number | undefined;
@@ -455,9 +499,9 @@ export function createElevenLabsSpeechRelay(
     name: model,
     markup: SPEECH_MARKUP[model],
     elevenLabs: true,
-    request: ({ voice, format, text, speed, signal }) =>
+    request: ({ voice, voiceId, format, text, speed, signal }) =>
       doFetch(
-        streamUrl(voice, format),
+        streamUrl(voice, format, voiceId),
         elevenLabsRequest(options.apiKey, model, text, speed, signal),
       ),
   }));
@@ -477,7 +521,7 @@ export function createElevenLabsSpeechRelay(
   let failuresRunning = 0;
 
   return {
-    stream: async ({ voice, text, outputFormat, signal, session }) => {
+    stream: async ({ voice, text, outputFormat, signal, session, voiceId }) => {
       // An allow-list rather than a passthrough: the query string arrives
       // from outside this server, and a vendor URL is not the place to
       // relay a stranger's parameters.
@@ -512,6 +556,7 @@ export function createElevenLabsSpeechRelay(
           (s) =>
             engine.request({
               voice,
+              voiceId,
               format,
               text: speech.text,
               speed: speech.speed,

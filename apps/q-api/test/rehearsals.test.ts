@@ -95,7 +95,11 @@ function memoryStore(): RehearsalStore & {
         scorecard: null,
         meetingId: input.meetingId,
         voice: input.voice,
-        createdAt: new Date("2026-10-01T10:00:00Z"),
+        difficulty: input.difficulty,
+        // Each later rehearsal starts a minute later.
+        createdAt: new Date(
+          Date.parse("2026-10-01T10:00:00Z") + rows.length * 60_000,
+        ),
         endedAt: null,
       };
       rows.push(row);
@@ -148,7 +152,9 @@ function memoryStore(): RehearsalStore & {
     },
     list: (a) =>
       Promise.resolve(
-        rows.filter((r) => (r as { userId?: string }).userId === a.userId),
+        rows
+          .filter((r) => (r as { userId?: string }).userId === a.userId)
+          .reverse(),
       ),
   };
   return { ...store, rows, counts: state };
@@ -157,7 +163,12 @@ function memoryStore(): RehearsalStore & {
 function setup(options: { messages?: () => string } = {}) {
   const seen = {
     personaInputs: [] as string[],
-    turnInputs: [] as { cue: string; screen: boolean; material: string }[],
+    turnInputs: [] as {
+      cue: string;
+      screen: boolean;
+      material: string;
+      difficulty: string;
+    }[],
     webReads: 0,
   };
   const material: RehearsalMaterial = {
@@ -238,6 +249,7 @@ function setup(options: { messages?: () => string } = {}) {
     },
     turn: (_a, variables, image) => {
       seen.turnInputs.push({
+        difficulty: variables.difficulty,
         cue: variables.cue,
         screen: image !== null,
         material: variables.meetingMaterial,
@@ -247,6 +259,8 @@ function setup(options: { messages?: () => string } = {}) {
           line: "Let's pick this up when you have cohorts.",
           move: "CLOSE",
           mood: "NEUTRAL",
+          intensity: "NORMAL",
+          reaction: null,
           conclusion: "ADJOURNED",
         });
       }
@@ -254,7 +268,9 @@ function setup(options: { messages?: () => string } = {}) {
         line:
           variables.cue === "HAND_RAISED" ? "Go ahead." : "What's retention?",
         move: variables.cue === "HAND_RAISED" ? "YIELD" : "QUESTION",
-        mood: "SKEPTICAL",
+        mood: variables.difficulty === "TOUGH" ? "ANGRY" : "SKEPTICAL",
+        intensity: variables.difficulty === "TOUGH" ? "RAISED" : "NORMAL",
+        reaction: variables.cue === "SILENCE" ? "SIGH" : null,
         conclusion: null,
       });
     },
@@ -533,5 +549,80 @@ describe("rehearsal voice line", () => {
       speaker,
     );
     expect(fellBack).toBe(1);
+  });
+});
+
+describe("rehearsal audit (2026-10-01)", () => {
+  it("plays at the chosen difficulty, and the voice gets the line's mood", async () => {
+    const { service, seen } = setup();
+    const started = await service.start(actor(FOUNDER), {
+      kind: "INVESTOR_ORGANISATION",
+      id: INVESTOR,
+      difficulty: "TOUGH",
+    });
+    if (started.kind !== "OK") throw new Error(started.kind);
+    expect(started.rehearsal.difficulty).toBe("TOUGH");
+    expect(seen.turnInputs.every((t) => t.difficulty === "TOUGH")).toBe(true);
+    const said = await service.say(actor(FOUNDER), started.rehearsal.id, {
+      text: "We have no revenue yet.",
+    });
+    const last = said.kind === "OK" ? said.rehearsal.turns.at(-1) : undefined;
+    expect(last?.mood).toBe("ANGRY");
+    expect(last?.intensity).toBe("RAISED");
+  });
+
+  it("reacts to silence once, with no words of theirs recorded", async () => {
+    const { service, seen } = setup();
+    const rehearsal = await startWith(service);
+    const nudged = await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "[silence]",
+    });
+    expect(seen.turnInputs.at(-1)?.cue).toBe("SILENCE");
+    expect(
+      nudged.kind === "OK" &&
+        nudged.rehearsal.turns.filter((t) => t.from === "YOU"),
+    ).toHaveLength(0);
+    expect(
+      nudged.kind === "OK" && nudged.rehearsal.turns.at(-1)?.reaction,
+    ).toBe("SIGH");
+  });
+
+  it("works from a thin record: no deck, no pitch, no public presence", async () => {
+    const { service, seen } = setup({ messages: () => "" });
+    const persona = await service.persona(
+      actor(FOUNDER),
+      "INVESTOR_ORGANISATION",
+      INVESTOR,
+    );
+    expect(persona.kind).toBe("OK");
+    // Absent material is said to be absent, never invented.
+    expect(seen.personaInputs[0]).toContain("(none)");
+  });
+
+  it("counts the talking by code and keeps a very long answer bounded", async () => {
+    const { service } = setup();
+    const rehearsal = await startWith(service);
+    const long = "word ".repeat(1_200).trim();
+    const said = await service.say(actor(FOUNDER), rehearsal.id, {
+      text: long,
+    });
+    if (said.kind !== "OK") throw new Error(said.kind);
+    const yours = said.rehearsal.turns.find((t) => t.from === "YOU");
+    expect(yours?.text.length).toBeLessThanOrEqual(4_000);
+    expect(said.rehearsal.metrics.exchanges).toBe(1);
+    expect(said.rehearsal.metrics.longestAnswerWords).toBeGreaterThan(500);
+    expect(said.rehearsal.metrics.yourShareOfWords).toBeGreaterThan(90);
+  });
+
+  it("shows the previous score with the same person", async () => {
+    const { service, closeNextTurn } = setup();
+    const first = await startWith(service);
+    await service.say(actor(FOUNDER), first.id, { text: "Hello" });
+    await service.finish(actor(FOUNDER), first.id);
+    const second = await startWith(service);
+    closeNextTurn();
+    await service.say(actor(FOUNDER), second.id, { text: "Hi again" });
+    const done = await service.finish(actor(FOUNDER), second.id);
+    expect(done.kind === "OK" && done.rehearsal.previousScore).toBe(65);
   });
 });

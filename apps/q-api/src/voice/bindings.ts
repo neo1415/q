@@ -67,6 +67,11 @@ export type VoiceSessionBinding = {
   /** After this, an unconnected binding is discarded. */
   readonly connectBy: number;
   connectedAt: number | undefined;
+  /**
+   * REHEARSE: the voice the person Q plays speaks with on this line (one
+   * of the relay's own persona voices); absent means Q's voice.
+   */
+  readonly speakerVoiceId?: string | undefined;
   /** Deepgram transport: the bearer its think calls carry. Never logged. */
   readonly thinkToken?: string | undefined;
 };

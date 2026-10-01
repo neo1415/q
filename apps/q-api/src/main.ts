@@ -333,13 +333,17 @@ import {
 import { speechWithFallback } from "./voice/synthesis.js";
 import {
   createElevenLabsSpeechRelay,
+  personaVoiceId,
   createElevenLabsSpeechSynthesis,
 } from "./voice/providers/elevenlabs-speak.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { Q_VOICE_SPEAK_RELAY_PATH } from "./voice/routes.js";
 import { createSpeechPerformanceBoard } from "./voice/speech-performance.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
-import { createRehearsalAwareTurn } from "./voice/rehearsal-turn.js";
+import {
+  createRehearsalAwareTurn,
+  performRehearsalLine,
+} from "./voice/rehearsal-turn.js";
 import {
   createVoiceTurnTimings,
   timedFetch,
@@ -3088,6 +3092,8 @@ const voiceTurn = timedVoiceTurns(
 const rehearsalVoiceTurn = createRehearsalAwareTurn({
   rehearsals,
   fallback: voiceTurn,
+  // The played person's mood becomes the voice's delivery (REHEARSE).
+  performance: speechPerformance,
 });
 logger.info(
   {
@@ -3161,7 +3167,21 @@ const { app, logger: appLogger } = createApp(
             turn: rehearsalVoiceTurn,
             memory: { termsFor: memoryLearner.termsFor },
             openerFacts: createOpenerFacts({ sql: database.sql }),
-            rehearsals: { opening: rehearsals.opening },
+            rehearsals: {
+              opening: rehearsals.opening,
+              // The person Q plays speaks in a voice of their own, never Q's.
+              voiceIdFor: personaVoiceId,
+              performOpening: async (actor, rehearsalId, voiceSessionId) => {
+                const opening = await rehearsals.opening(actor, rehearsalId);
+                if (opening === null) return;
+                performRehearsalLine(speechPerformance, voiceSessionId, {
+                  text: opening.line,
+                  mood: opening.mood,
+                  intensity: opening.intensity,
+                  reaction: opening.reaction,
+                });
+              },
+            },
             // Their own records' names, for the recogniser (founder live
             // 2026-09-27, #6): read by the resolved actor's own
             // organisation and user id only, never from anything said.

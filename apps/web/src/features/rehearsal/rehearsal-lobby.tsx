@@ -7,6 +7,7 @@ import {
   rehearsalSimulationLabel,
   type QRehearsalDto,
   type QRehearsalPersonaDto,
+  type RehearsalDifficulty,
   type RehearsalCounterpartKind,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
@@ -32,6 +33,28 @@ const GROUNDING_WORDS = {
   RICH: "Built from plenty of their own words and record.",
 } as const;
 
+const DIFFICULTIES: readonly {
+  readonly value: RehearsalDifficulty;
+  readonly label: string;
+  readonly hint: string;
+}[] = [
+  {
+    value: "GENTLE",
+    label: "Gentle",
+    hint: "Patient and encouraging, with a hint when you're stuck.",
+  },
+  {
+    value: "REALISTIC",
+    label: "Realistic",
+    hint: "Exactly as Q expects them to be.",
+  },
+  {
+    value: "TOUGH",
+    label: "Tough",
+    hint: "On a bad day: harder questions, more pushback, slower to win over.",
+  },
+];
+
 const SOURCE_KIND_WORDS = {
   PROFILE: "Profile",
   MESSAGES: "Messages",
@@ -56,6 +79,8 @@ export function RehearsalLobby({
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [voice, setVoice] = useState<"FEMALE" | "MALE">("MALE");
+  const [difficulty, setDifficulty] =
+    useState<RehearsalDifficulty>("REALISTIC");
   const [rehearsal, setRehearsal] = useState<QRehearsalDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [joining, startJoining] = useTransition();
@@ -82,6 +107,7 @@ export function RehearsalLobby({
         counterpartId,
         meetingId,
         voice,
+        difficulty,
       });
       if (result.ok) setRehearsal(result.value);
       else setMessage(result.message);
@@ -184,6 +210,38 @@ export function RehearsalLobby({
               </label>
             ))}
           </div>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="cq-label mb-1 text-(--cq-text-primary)">
+            How hard should they be?
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {DIFFICULTIES.map((choice) => (
+              <label
+                key={choice.value}
+                title={choice.hint}
+                className={`cq-body-sm inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--cq-radius-md) border px-3 ${
+                  difficulty === choice.value
+                    ? "border-(--cq-accent) text-(--cq-text-primary)"
+                    : "border-(--cq-border) text-(--cq-text-secondary)"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="rehearsal-difficulty"
+                  value={choice.value}
+                  checked={difficulty === choice.value}
+                  onChange={() => setDifficulty(choice.value)}
+                  className="accent-(--cq-accent)"
+                />
+                {choice.label}
+              </label>
+            ))}
+          </div>
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            {DIFFICULTIES.find((choice) => choice.value === difficulty)?.hint}
+          </p>
         </fieldset>
 
         <div className="flex flex-col gap-2">

@@ -19,6 +19,21 @@ import {
  * wrong with a better answer, tips for this person, and the transcript.
  */
 
+const DIFFICULTY_WORDS = {
+  GENTLE: "Gentle",
+  REALISTIC: "Realistic",
+  TOUGH: "Tough",
+} as const;
+
+/** "Up 8 since last time": both scores are code-computed. */
+export function progressWords(score: number, previous: number): string {
+  const change = score - previous;
+  if (change === 0) return `Same as last time (${String(previous)})`;
+  return change > 0
+    ? `Up ${String(change)} since last time (${String(previous)})`
+    : `Down ${String(-change)} since last time (${String(previous)})`;
+}
+
 export function lobbyHref(rehearsal: Pick<QRehearsalDto, "counterpart">) {
   const id = encodeURIComponent(rehearsal.counterpart.id);
   return rehearsal.counterpart.kind === "COMPANY"
@@ -54,6 +69,7 @@ export function RehearsalReview({
             ? "Still open"
             : OUTCOME_WORDS[rehearsal.outcome]}
           {length === null ? "" : ` · ${length}`}
+          {` · ${DIFFICULTY_WORDS[rehearsal.difficulty]}`}
         </p>
       </header>
 
@@ -78,12 +94,41 @@ export function RehearsalReview({
                 <span className="cq-caption text-(--cq-text-tertiary)">
                   From the ratings below
                 </span>
+                {rehearsal.previousScore === null ? null : (
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    {progressWords(review.score, rehearsal.previousScore)}
+                  </span>
+                )}
               </div>
             )}
             <p className="cq-body-lg text-(--cq-text-primary)">
               {review.overall}
             </p>
           </section>
+
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              [
+                "Your share of the talking",
+                `${String(rehearsal.metrics.yourShareOfWords)}%`,
+              ],
+              [
+                "Longest answer",
+                `${String(rehearsal.metrics.longestAnswerWords)} words`,
+              ],
+              ["Your answers", String(rehearsal.metrics.exchanges)],
+              ["Length", `${String(rehearsal.metrics.minutes)} min`],
+            ].map(([label, value]) => (
+              <div key={label} className="flex flex-col">
+                <dt className="cq-caption text-(--cq-text-tertiary)">
+                  {label}
+                </dt>
+                <dd className="cq-title-sm text-(--cq-text-primary)">
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
 
           <section className="flex flex-col gap-3">
             <h2 className="cq-title-sm text-(--cq-text-primary)">Breakdown</h2>

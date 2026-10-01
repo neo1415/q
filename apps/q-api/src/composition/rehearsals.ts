@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import {
   REHEARSAL_HAND_RAISED_SIGNAL,
+  REHEARSAL_SILENCE_SIGNAL,
+  type RehearsalDifficulty,
   type ModelDataPosture,
   type PersonaSourceKind,
   type QPersonaSourceDto,
@@ -25,14 +27,14 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   InvestorPersonaResultSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnResultSchema,
+  RehearsalTurnV3ResultSchema,
   renderPrompt,
   type CounterpartPersonaResult,
   type CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnResult,
-  type RehearsalTurnVariables,
+  type RehearsalTurnV3Result as RehearsalTurnResult,
+  type RehearsalTurnV3Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
@@ -173,6 +175,12 @@ const MOODS = [
   "ENTHUSIASTIC",
   "COLD",
   "INDIFFERENT",
+  "ANGRY",
+  "SAD",
+  "AUTHORITATIVE",
+  "MEEK",
+  "SARCASTIC",
+  "AMUSED",
 ] as const;
 type Mood = (typeof MOODS)[number];
 
@@ -183,6 +191,8 @@ const StoredTurnSchema = z.object({
   at: z.string(),
   mood: z.enum(MOODS).nullish(),
   sawScreen: z.boolean().optional(),
+  intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
+  reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH"]).nullish(),
 });
 
 export type Turn = {
@@ -191,6 +201,9 @@ export type Turn = {
   readonly at: string;
   readonly mood: Mood | null;
   readonly sawScreen: boolean;
+  /** How loud the played person said it, and any sound before it. */
+  readonly intensity?: "SOFT" | "NORMAL" | "RAISED" | undefined;
+  readonly reaction?: "LAUGH" | "CHUCKLE" | "SIGH" | null | undefined;
 };
 
 export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
@@ -206,6 +219,8 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
       at: turn.at,
       mood: turn.mood ?? null,
       sawScreen: turn.sawScreen === true,
+      ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
+      ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
     };
   });
 }
@@ -322,6 +337,7 @@ export type RehearsalRow = {
   readonly scorecard: unknown;
   readonly meetingId: string | null;
   readonly voice: "FEMALE" | "MALE" | null;
+  readonly difficulty: RehearsalDifficulty;
   readonly createdAt: Date;
   readonly endedAt: Date | null;
 };
@@ -359,6 +375,7 @@ export type RehearsalStore = {
       readonly persona: CounterpartPersonaResult;
       readonly turns: readonly Turn[];
       readonly voice: "FEMALE" | "MALE";
+      readonly difficulty: RehearsalDifficulty;
     },
   ) => Promise<RehearsalRow>;
   /** Only the person's own row, in their own tenant. */
@@ -410,6 +427,7 @@ type RawRehearsalRow = {
   scorecard: unknown;
   meeting_id: string | null;
   voice: "FEMALE" | "MALE" | null;
+  difficulty: RehearsalDifficulty;
   created_at: Date;
   ended_at: Date | null;
 };
@@ -430,6 +448,7 @@ function fromRaw(row: RawRehearsalRow): RehearsalRow {
     scorecard: row.scorecard,
     meetingId: row.meeting_id,
     voice: row.voice,
+    difficulty: row.difficulty,
     createdAt: row.created_at,
     endedAt: row.ended_at,
   };
@@ -502,7 +521,7 @@ export function createPostgresRehearsalStore(
           (id, tenant_id, user_id, organisation_id, investor_organisation_id,
            investor_name, counterpart_kind, counterpart_id, counterpart_name,
            user_role, relationship_id, meeting_id, persona_profile_id, persona,
-           turns, asked, length, voice)
+           turns, asked, length, voice, difficulty)
         values
           (${input.id}, ${actor.tenantId}, ${actor.userId},
            ${actor.organisationId ?? null},
@@ -511,10 +530,10 @@ export function createPostgresRehearsalStore(
            ${input.kind}, ${input.counterpartId}, ${input.name.slice(0, 200)},
            ${input.role}, ${input.relationshipId}, ${input.meetingId},
            ${input.personaProfileId}, ${json(input.persona)},
-           ${json(input.turns)}, 0, 20, ${input.voice})
+           ${json(input.turns)}, 0, 20, ${input.voice}, ${input.difficulty})
         returning id, counterpart_kind, counterpart_id, counterpart_name, user_role,
                persona, turns, asked, status, outcome, score, scorecard,
-               meeting_id, voice, created_at, ended_at`;
+               meeting_id, voice, difficulty, created_at, ended_at`;
       const row = rows[0];
       if (row === undefined) throw new Error("rehearsal not saved");
       return fromRaw(row);
@@ -524,7 +543,7 @@ export function createPostgresRehearsalStore(
       const rows = await sql<RawRehearsalRow[]>`
         select id, counterpart_kind, counterpart_id, counterpart_name, user_role,
                persona, turns, asked, status, outcome, score, scorecard,
-               meeting_id, voice, created_at, ended_at from q_runtime.rehearsals
+               meeting_id, voice, difficulty, created_at, ended_at from q_runtime.rehearsals
          where id = ${rehearsalId} and user_id = ${actor.userId}
            and tenant_id = ${actor.tenantId}
          limit 1`;
@@ -543,7 +562,7 @@ export function createPostgresRehearsalStore(
            and status = 'ACTIVE' and ended_at is null
         returning id, counterpart_kind, counterpart_id, counterpart_name, user_role,
                persona, turns, asked, status, outcome, score, scorecard,
-               meeting_id, voice, created_at, ended_at`;
+               meeting_id, voice, difficulty, created_at, ended_at`;
       const row = rows[0];
       return row === undefined ? null : fromRaw(row);
     },
@@ -559,7 +578,7 @@ export function createPostgresRehearsalStore(
            and tenant_id = ${actor.tenantId} and status = 'ACTIVE'
         returning id, counterpart_kind, counterpart_id, counterpart_name, user_role,
                persona, turns, asked, status, outcome, score, scorecard,
-               meeting_id, voice, created_at, ended_at`;
+               meeting_id, voice, difficulty, created_at, ended_at`;
       const row = rows[0];
       return row === undefined ? null : fromRaw(row);
     },
@@ -569,13 +588,13 @@ export function createPostgresRehearsalStore(
           ? await sql<RawRehearsalRow[]>`
               select id, counterpart_kind, counterpart_id, counterpart_name, user_role,
                persona, turns, asked, status, outcome, score, scorecard,
-               meeting_id, voice, created_at, ended_at from q_runtime.rehearsals
+               meeting_id, voice, difficulty, created_at, ended_at from q_runtime.rehearsals
                where user_id = ${actor.userId} and tenant_id = ${actor.tenantId}
                order by created_at desc limit 50`
           : await sql<RawRehearsalRow[]>`
               select id, counterpart_kind, counterpart_id, counterpart_name, user_role,
                persona, turns, asked, status, outcome, score, scorecard,
-               meeting_id, voice, created_at, ended_at from q_runtime.rehearsals
+               meeting_id, voice, difficulty, created_at, ended_at from q_runtime.rehearsals
                where user_id = ${actor.userId} and tenant_id = ${actor.tenantId}
                  and counterpart_kind = ${filter.kind}
                  and counterpart_id = ${filter.id}
@@ -603,7 +622,7 @@ export type PersonaResult =
   | { readonly kind: "Q_UNAVAILABLE" };
 
 export type RehearsalSay =
-  { readonly text: string } | { readonly cue: "HAND_RAISED" };
+  { readonly text: string } | { readonly cue: "HAND_RAISED" | "SILENCE" };
 
 export type RehearsalService = {
   readonly partners: (actor: ActorContext) => Promise<QRehearsalPartnersDto>;
@@ -623,6 +642,7 @@ export type RehearsalService = {
       readonly id: string;
       readonly meetingId?: string | undefined;
       readonly voice?: "FEMALE" | "MALE" | undefined;
+      readonly difficulty?: RehearsalDifficulty | undefined;
     },
   ) => Promise<RehearsalResult>;
   readonly get: (
@@ -654,7 +674,16 @@ export type RehearsalService = {
   readonly opening: (
     actor: ActorContext,
     rehearsalId: string,
-  ) => Promise<{ readonly line: string; readonly name: string } | null>;
+  ) => Promise<{
+    readonly line: string;
+    readonly name: string;
+    /** Steady per counterpart, to keep their voice the same. */
+    readonly seed: string;
+    readonly voice: "FEMALE" | "MALE";
+    readonly mood: Mood | null;
+    readonly intensity: "SOFT" | "NORMAL" | "RAISED";
+    readonly reaction: "LAUGH" | "CHUCKLE" | "SIGH" | null;
+  } | null>;
 };
 
 function counterpartRoleOf(
@@ -711,9 +740,53 @@ function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
   return { ...parsed.data, score: row.score };
 }
 
-function toDto(row: RehearsalRow): QRehearsalDto | null {
+const wordsIn = (text: string) =>
+  text.split(/\s+/).filter((word) => word.length > 0).length;
+
+/** Counted from the transcript by code, never by a model. */
+export function metricsOf(
+  turns: readonly Turn[],
+  createdAt: Date,
+  endedAt: Date | null,
+  now: Date,
+): QRehearsalDto["metrics"] {
+  let yours = 0;
+  let theirs = 0;
+  let longest = 0;
+  let exchanges = 0;
+  for (const turn of turns) {
+    const words = wordsIn(turn.text);
+    if (turn.from === "YOU") {
+      yours += words;
+      exchanges += 1;
+      longest = Math.max(longest, words);
+    } else {
+      theirs += words;
+    }
+  }
+  const total = yours + theirs;
+  const last = turns.at(-1);
+  const end =
+    endedAt ?? (last === undefined ? now : new Date(Date.parse(last.at)));
+  return {
+    yourShareOfWords: total === 0 ? 0 : Math.round((yours / total) * 100),
+    longestAnswerWords: longest,
+    exchanges,
+    minutes: Math.max(
+      0,
+      Math.round((end.getTime() - createdAt.getTime()) / 60_000),
+    ),
+  };
+}
+
+function toDto(
+  row: RehearsalRow,
+  previousScore: number | null = null,
+  now: Date = new Date(),
+): QRehearsalDto | null {
   const persona = personaOf(row.persona);
   if (persona === null) return null;
+  const turns = normaliseTurns(row.turns, row.userRole);
   return {
     id: row.id,
     counterpart: {
@@ -726,15 +799,23 @@ function toDto(row: RehearsalRow): QRehearsalDto | null {
     outcome: row.outcome,
     meetingId: row.meetingId,
     voice: row.voice ?? "MALE",
+    difficulty: row.difficulty,
+    metrics: metricsOf(turns, row.createdAt, row.endedAt, now),
+    previousScore,
     persona: {
       summary: persona.summary,
       style: persona.style,
       priorities: persona.priorities,
       grounding: persona.grounding,
     },
-    turns: normaliseTurns(row.turns, row.userRole).map((turn) => ({
-      ...turn,
+    turns: turns.map((turn) => ({
+      from: turn.from,
+      text: turn.text,
       at: new Date(turn.at).toISOString(),
+      mood: turn.mood,
+      sawScreen: turn.sawScreen,
+      ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
+      ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
     })),
     review: reviewDto(row),
     createdAt: row.createdAt.toISOString(),
@@ -767,12 +848,33 @@ export function createRehearsalService(dependencies: {
   /** One persona build per viewer and subject at a time. */
   const building = new Map<string, Promise<PersonaRow | null>>();
 
-  function ok(row: RehearsalRow | null): RehearsalResult {
+  function ok(
+    row: RehearsalRow | null,
+    previousScore: number | null = null,
+  ): RehearsalResult {
     if (row === null) return { kind: "NOT_FOUND" };
-    const rehearsal = toDto(row);
+    const rehearsal = toDto(row, previousScore, now());
     return rehearsal === null
       ? { kind: "NOT_FOUND" }
       : { kind: "OK", rehearsal };
+  }
+
+  /** The row, with their previous finished score with the same person. */
+  async function okWithHistory(
+    actor: ActorContext,
+    row: RehearsalRow | null,
+  ): Promise<RehearsalResult> {
+    if (row === null) return { kind: "NOT_FOUND" };
+    const earlier = await store
+      .list(actor, { kind: row.counterpartKind, id: row.counterpartId })
+      .catch(() => []);
+    const previous = earlier.find(
+      (other) =>
+        other.id !== row.id &&
+        other.score !== null &&
+        other.createdAt.getTime() < row.createdAt.getTime(),
+    );
+    return ok(row, previous?.score ?? null);
   }
 
   /**
@@ -971,6 +1073,7 @@ export function createRehearsalService(dependencies: {
         turnsSoFar: Math.min(turns.length, 400),
         minutesElapsed: Math.max(0, Math.min(minutes, 600)),
         cue: wrapUp ? "WRAP_UP" : cue,
+        difficulty: row.difficulty,
         screenShared: fresh !== null,
       },
       fresh?.image ?? null,
@@ -1107,6 +1210,7 @@ export function createRehearsalService(dependencies: {
         scorecard: null,
         meetingId,
         voice,
+        difficulty: input.difficulty ?? "REALISTIC",
         createdAt: now(),
         endedAt: null,
       };
@@ -1130,6 +1234,7 @@ export function createRehearsalService(dependencies: {
         personaProfileId: built.row.id,
         persona: built.profile,
         voice,
+        difficulty: input.difficulty ?? "REALISTIC",
         turns: [
           {
             from: "THEM",
@@ -1137,13 +1242,16 @@ export function createRehearsalService(dependencies: {
             at: now().toISOString(),
             mood: opening.result.mood,
             sawScreen: false,
+            intensity: opening.result.intensity,
+            reaction: opening.result.reaction,
           },
         ],
       });
       return ok(row);
     },
 
-    get: async (actor, rehearsalId) => ok(await store.own(actor, rehearsalId)),
+    get: async (actor, rehearsalId) =>
+      okWithHistory(actor, await store.own(actor, rehearsalId)),
 
     list: async (actor, filter) => {
       const rows = await store.list(actor, filter);
@@ -1175,11 +1283,22 @@ export function createRehearsalService(dependencies: {
       // The browser's raised-hand cue is a fixed token, never their words.
       const words =
         "text" in said
-          ? said.text.split(REHEARSAL_HAND_RAISED_SIGNAL).join(" ").trim()
+          ? said.text
+              .split(REHEARSAL_HAND_RAISED_SIGNAL)
+              .join(" ")
+              .split(REHEARSAL_SILENCE_SIGNAL)
+              .join(" ")
+              .trim()
           : "";
+      // Likewise the silence cue: the browser noticed they said nothing.
+      const silent =
+        ("cue" in said && said.cue === "SILENCE") ||
+        ("text" in said && said.text.includes(REHEARSAL_SILENCE_SIGNAL));
       const handRaised =
-        "cue" in said || said.text.includes(REHEARSAL_HAND_RAISED_SIGNAL);
-      if (words.length === 0 && !handRaised) return ok(row);
+        !silent &&
+        (("cue" in said && said.cue === "HAND_RAISED") ||
+          ("text" in said && said.text.includes(REHEARSAL_HAND_RAISED_SIGNAL)));
+      if (words.length === 0 && !handRaised && !silent) return ok(row);
       const viewer = await viewerOf(actor);
       if (viewer === null) return { kind: "NOT_A_PARTICIPANT" };
       const previous = normaliseTurns(row.turns, row.userRole);
@@ -1200,7 +1319,7 @@ export function createRehearsalService(dependencies: {
         actor,
         row,
         turns,
-        words.length === 0 ? "HAND_RAISED" : "NONE",
+        words.length > 0 ? "NONE" : silent ? "SILENCE" : "HAND_RAISED",
         viewer.organisationName,
         signal,
       );
@@ -1218,6 +1337,8 @@ export function createRehearsalService(dependencies: {
           at: now().toISOString(),
           mood: result.mood,
           sawScreen: answered.sawScreen,
+          intensity: result.intensity,
+          reaction: result.reaction,
         },
       ];
       const saved = await store.saveTurns(actor, row.id, {
@@ -1279,7 +1400,7 @@ export function createRehearsalService(dependencies: {
         score: scoreOf(review.dimensions),
         review,
       });
-      return ok(saved ?? (await store.own(actor, row.id)));
+      return okWithHistory(actor, saved ?? (await store.own(actor, row.id)));
     },
 
     opening: async (actor, rehearsalId) => {
@@ -1292,7 +1413,15 @@ export function createRehearsalService(dependencies: {
         .at(-1);
       return last === undefined
         ? null
-        : { line: last.text, name: row.counterpartName };
+        : {
+            line: last.text,
+            name: row.counterpartName,
+            seed: `${row.counterpartKind}:${row.counterpartId}`,
+            voice: row.voice ?? "MALE",
+            mood: last.mood,
+            intensity: last.intensity ?? "NORMAL",
+            reaction: last.reaction ?? null,
+          };
     },
   };
 }
@@ -1414,7 +1543,7 @@ export function createRehearsalComposer(dependencies: {
         "NORMAL_DIALOGUE",
         TURN_BUDGET,
         variables,
-        RehearsalTurnResultSchema,
+        RehearsalTurnV3ResultSchema,
         image,
         signal,
       ),

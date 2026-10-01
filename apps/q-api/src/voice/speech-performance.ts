@@ -27,6 +27,30 @@ export type SpeechReaction = "LAUGH" | "CHUCKLE" | "SIGH";
 export type SpeechPace = "NORMAL" | "SLOWER" | "FASTER";
 
 /**
+ * REHEARSE: the emotional colour of a line, for a person Q plays in a
+ * rehearsal (an annoyed investor sounds annoyed). Chosen by the turn's
+ * model as a typed field beside the line, never read from the words.
+ */
+export const SPEECH_TONES = [
+  "WARM",
+  "SKEPTICAL",
+  "IMPATIENT",
+  "ANNOYED",
+  "ANGRY",
+  "ENTHUSIASTIC",
+  "COLD",
+  "INDIFFERENT",
+  "SAD",
+  "AUTHORITATIVE",
+  "MEEK",
+  "SARCASTIC",
+  "AMUSED",
+] as const;
+export type SpeechTone = (typeof SPEECH_TONES)[number];
+/** How loud: SOFT is quiet or under the breath, RAISED a raised voice. */
+export type SpeechIntensity = "SOFT" | "NORMAL" | "RAISED";
+
+/**
  * What the model asked for. The same shape as q-core's `SpeechDelivery`,
  * restated here structurally so the speech boundary depends on nothing but
  * its input.
@@ -48,6 +72,9 @@ export type SentencePerformance = {
   readonly pace: SpeechPace;
   /** Phrases that occur verbatim in `sentence`. */
   readonly emphasis: readonly string[];
+  /** REHEARSE: the line's emotional colour, when the speaker is played. */
+  readonly tone?: SpeechTone | null | undefined;
+  readonly intensity?: SpeechIntensity | undefined;
 };
 
 function hasCue(p: SentencePerformance): boolean {
@@ -55,8 +82,35 @@ function hasCue(p: SentencePerformance): boolean {
     p.reaction !== null ||
     p.pauseAfter ||
     p.pace !== "NORMAL" ||
-    p.emphasis.length > 0
+    p.emphasis.length > 0 ||
+    (p.tone ?? null) !== null ||
+    (p.intensity ?? "NORMAL") !== "NORMAL"
   );
+}
+
+/**
+ * REHEARSE: one emotional delivery for every sentence of a line the
+ * played person says, and an optional reaction before the first.
+ */
+export function deliverLine(
+  spoken: readonly string[],
+  delivery: {
+    readonly tone: SpeechTone | null;
+    readonly intensity: SpeechIntensity;
+    readonly reaction: SpeechReaction | null;
+  },
+): readonly SentencePerformance[] {
+  return spoken
+    .map((sentence, index): SentencePerformance => ({
+      sentence,
+      reaction: index === 0 ? delivery.reaction : null,
+      pauseAfter: false,
+      pace: "NORMAL",
+      emphasis: [],
+      tone: delivery.tone,
+      intensity: delivery.intensity,
+    }))
+    .filter(hasCue);
 }
 
 /**

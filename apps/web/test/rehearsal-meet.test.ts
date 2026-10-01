@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { composeBriefing } from "../src/features/home/briefing";
 import { recordPagePath } from "../src/features/q/client-actions";
+import { progressWords } from "../src/features/rehearsal/rehearsal-review";
 import {
   elapsedLabel,
   greySignature,
@@ -82,5 +83,13 @@ describe("Q and rehearsals", () => {
       description: "It's in 2 days. Q plays them so you can practise first.",
       href: "/rehearsals/meeting/77777777-7777-4777-8777-777777777777",
     });
+  });
+});
+
+describe("progress between rehearsals", () => {
+  it("says how the score moved since last time", () => {
+    expect(progressWords(78, 70)).toBe("Up 8 since last time (70)");
+    expect(progressWords(60, 70)).toBe("Down 10 since last time (70)");
+    expect(progressWords(70, 70)).toBe("Same as last time (70)");
   });
 });

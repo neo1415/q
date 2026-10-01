@@ -287,3 +287,61 @@ export const RehearsalReviewResultSchema = z
   })
   .strict();
 export type RehearsalReviewResult = z.infer<typeof RehearsalReviewResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v3 (REHEARSE audit, 2026-10-01): a chosen difficulty, a silence cue, a
+// wider range of moods and a loudness and reaction per line, so the played
+// person can sound angry, kind, flat, authoritative or meek in their voice.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V3_SCHEMA_VERSION = 3;
+
+export const REHEARSAL_LINE_MOODS_V3 = [
+  "WARM",
+  "NEUTRAL",
+  "SKEPTICAL",
+  "IMPATIENT",
+  "ANNOYED",
+  "ANGRY",
+  "ENTHUSIASTIC",
+  "COLD",
+  "INDIFFERENT",
+  "SAD",
+  "AUTHORITATIVE",
+  "MEEK",
+  "SARCASTIC",
+  "AMUSED",
+] as const;
+export const REHEARSAL_DIFFICULTIES = ["GENTLE", "REALISTIC", "TOUGH"] as const;
+export const REHEARSAL_CUES_V3 = [
+  "OPENING",
+  "NONE",
+  "HAND_RAISED",
+  "WRAP_UP",
+  "SILENCE",
+] as const;
+
+export const RehearsalTurnV3VariablesSchema =
+  RehearsalTurnVariablesSchema.extend({
+    cue: z.enum(REHEARSAL_CUES_V3),
+    /** How hard the person rehearsing asked them to be played. Trusted. */
+    difficulty: z.enum(REHEARSAL_DIFFICULTIES),
+  }).strict();
+export type RehearsalTurnV3Variables = z.infer<
+  typeof RehearsalTurnV3VariablesSchema
+>;
+
+export const RehearsalTurnV3ResultSchema = z
+  .object({
+    line: z.string().trim().min(1).max(700),
+    move: z.enum(REHEARSAL_MOVES),
+    /** How this line sounds; it drives the voice's delivery. */
+    mood: z.enum(REHEARSAL_LINE_MOODS_V3),
+    /** SOFT: quiet, under the breath. RAISED: a raised voice. */
+    intensity: z.enum(["SOFT", "NORMAL", "RAISED"]),
+    /** A sound before the line, only when the person would make it. */
+    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH"]).nullable(),
+    conclusion: z.enum(REHEARSAL_CONCLUSIONS).nullable(),
+  })
+  .strict();
+export type RehearsalTurnV3Result = z.infer<typeof RehearsalTurnV3ResultSchema>;

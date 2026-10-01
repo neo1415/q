@@ -70,6 +70,16 @@ export const qRehearsalMeetingPath = (meetingId: string) =>
  * rehearsal turn takes it out before anything reads the transcript.
  */
 export const REHEARSAL_HAND_RAISED_SIGNAL = "[hand-raised]" as const;
+/**
+ * The browser's own cue that the person has said nothing for a while, so
+ * the played person can react to the silence. Never the person's words.
+ */
+export const REHEARSAL_SILENCE_SIGNAL = "[silence]" as const;
+
+/** How hard the person asks to be pushed. */
+export const REHEARSAL_DIFFICULTIES = ["GENTLE", "REALISTIC", "TOUGH"] as const;
+export const RehearsalDifficultySchema = z.enum(REHEARSAL_DIFFICULTIES);
+export type RehearsalDifficulty = z.infer<typeof RehearsalDifficultySchema>;
 
 export const RehearsalCounterpartSchema = z
   .object({
@@ -87,6 +97,7 @@ export const StartRehearsalRequestSchema = z
     meetingId: UuidSchema.optional(),
     /** The voice the other person speaks with. */
     voice: z.enum(["FEMALE", "MALE"]).optional(),
+    difficulty: RehearsalDifficultySchema.optional(),
     /** Kept for C12 callers; the meeting now runs to a natural close. */
     length: z.number().int().min(3).max(20).optional(),
   })
@@ -128,6 +139,12 @@ export const REHEARSAL_MOODS = [
   "ENTHUSIASTIC",
   "COLD",
   "INDIFFERENT",
+  "ANGRY",
+  "SAD",
+  "AUTHORITATIVE",
+  "MEEK",
+  "SARCASTIC",
+  "AMUSED",
 ] as const;
 export const REHEARSAL_OUTCOMES = [
   "INDECISIVE",
@@ -149,6 +166,9 @@ export const QRehearsalTurnDtoSchema = z
     mood: z.enum(REHEARSAL_MOODS).nullable(),
     /** A frame of their shared screen was in view for this line. */
     sawScreen: z.boolean(),
+    /** How loud the played person said it, and any sound before it. */
+    intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
+    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH"]).nullable().optional(),
   })
   .strict();
 export type QRehearsalTurnDto = z.infer<typeof QRehearsalTurnDtoSchema>;
@@ -260,6 +280,21 @@ export const QRehearsalDtoSchema = z
     outcome: RehearsalOutcomeSchema.nullable(),
     meetingId: UuidSchema.nullable(),
     voice: z.enum(["FEMALE", "MALE"]),
+    difficulty: RehearsalDifficultySchema,
+    /**
+     * Counted by code from the transcript: their share of the words, their
+     * longest answer, how many exchanges, how long. Never a model's number.
+     */
+    metrics: z
+      .object({
+        yourShareOfWords: z.number().int().min(0).max(100),
+        longestAnswerWords: z.number().int().min(0),
+        exchanges: z.number().int().min(0),
+        minutes: z.number().int().min(0),
+      })
+      .strict(),
+    /** Their previous finished score with the same person, if any. */
+    previousScore: z.number().int().min(0).max(100).nullable(),
     persona: z
       .object({
         summary: z.string().max(600),

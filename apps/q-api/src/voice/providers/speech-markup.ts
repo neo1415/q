@@ -1,8 +1,10 @@
 import {
   sentenceKey,
   type SentencePerformance,
+  type SpeechIntensity,
   type SpeechPace,
   type SpeechReaction,
+  type SpeechTone,
 } from "../speech-performance.js";
 
 /**
@@ -32,6 +34,8 @@ export type SpeechCapabilities = {
   readonly pause: boolean;
   readonly pace: boolean;
   readonly emphasis: boolean;
+  /** REHEARSE: emotional delivery (audio tags); never approximated. */
+  readonly tone?: boolean | undefined;
 };
 
 export type SpeechMarkup = {
@@ -47,6 +51,10 @@ export type SpeechMarkup = {
   readonly emphasis: (phrase: string) => string;
   /** A speaking-rate multiplier for the vendor, or undefined for as-is. */
   readonly speed: (pace: SpeechPace) => number | undefined;
+  /** REHEARSE: the tag(s) that open a sentence in this tone and loudness. */
+  readonly tone?:
+    | ((tone: SpeechTone | null, intensity: SpeechIntensity) => string)
+    | undefined;
 };
 
 export const ELEVENLABS_SPEECH_MODELS = [
@@ -73,6 +81,33 @@ const V3_TAGS: Readonly<Record<SpeechReaction, string>> = {
   SIGH: "[sighs]",
 };
 
+/**
+ * Eleven v3 audio tags for a rehearsal persona's tone (vendor guide:
+ * elevenlabs.io/docs/best-practices/prompting, "Prompting Eleven v3").
+ * Measured on 2026-10-01 (docs/specs/2026-10/rehearse.md, "Voice
+ * emotion"): each renders as delivery and none is read aloud.
+ */
+export const V3_TONE_TAGS: Readonly<Record<SpeechTone, string>> = {
+  WARM: "[warmly]",
+  SKEPTICAL: "[skeptical]",
+  IMPATIENT: "[impatient]",
+  ANNOYED: "[annoyed]",
+  ANGRY: "[angry]",
+  ENTHUSIASTIC: "[excited]",
+  COLD: "[coldly]",
+  INDIFFERENT: "[flatly]",
+  SAD: "[sad]",
+  AUTHORITATIVE: "[firmly]",
+  MEEK: "[hesitantly]",
+  SARCASTIC: "[sarcastic]",
+  AMUSED: "[amused]",
+};
+const V3_INTENSITY_TAGS: Readonly<Record<SpeechIntensity, string>> = {
+  SOFT: "[quietly]",
+  NORMAL: "",
+  RAISED: "[shouting]",
+};
+
 export const SPEECH_MARKUP: Readonly<
   Record<ElevenLabsSpeechModel, SpeechMarkup>
 > = {
@@ -84,13 +119,23 @@ export const SPEECH_MARKUP: Readonly<
     speed: (pace) => SPEEDS[pace],
   },
   eleven_v3_conversational: {
-    capabilities: { reaction: true, pause: true, pace: false, emphasis: true },
+    capabilities: {
+      reaction: true,
+      pause: true,
+      pace: false,
+      emphasis: true,
+      tone: true,
+    },
     reaction: (reaction) => V3_TAGS[reaction],
     pause: "[short pause]",
     // v3 reads capitals as stress (vendor guidance; the listening check on
     // design/voice-comparison 07-disagreement decides whether it stays).
     emphasis: (phrase) => phrase.toUpperCase(),
     speed: () => undefined,
+    tone: (tone, intensity) =>
+      [tone === null ? "" : V3_TONE_TAGS[tone], V3_INTENSITY_TAGS[intensity]]
+        .filter((tag) => tag.length > 0)
+        .join(" "),
   },
 };
 
@@ -131,7 +176,9 @@ export type RenderedSpeech = {
   readonly text: string;
   readonly speed: number | undefined;
   /** Which cues made it into the audio, for the turn's trace. */
-  readonly rendered: readonly ("reaction" | "pause" | "pace" | "emphasis")[];
+  readonly rendered: readonly (
+    "reaction" | "pause" | "pace" | "emphasis" | "tone"
+  )[];
 };
 
 type Insertion = {
@@ -187,6 +234,16 @@ export function renderSpeech(
     if (can.reaction && p.reaction !== null && isStart) {
       insertions.push({ at: start, text: `${markup.reaction(p.reaction)} ` });
       rendered.add("reaction");
+    }
+    // The tone opens the sentence, ahead of a reaction (inserted later at
+    // the same place, so it lands first).
+    const toneTags =
+      can.tone === true && markup.tone !== undefined && isStart
+        ? markup.tone(p.tone ?? null, p.intensity ?? "NORMAL")
+        : "";
+    if (toneTags.length > 0) {
+      insertions.push({ at: start, text: `${toneTags} ` });
+      rendered.add("tone");
     }
     if (can.pause && p.pauseAfter && isEnd) {
       const stop = /[.!?]/.test(body.charAt(end - 1));
