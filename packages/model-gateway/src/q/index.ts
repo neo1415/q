@@ -1274,8 +1274,321 @@ export function createModelGatewayQAnswer(
     }
   }
 
+  /**
+   * The reads a turn needs before the model is asked anything: the
+   * conversation, the assembled context, the tools offered, memory, and
+   * the person's own facts (mandate, relationship, standing, pitch
+   * moment, setup). Read-only and bound to the run's plan, so it can
+   * start while the turn is still being read (warm) and be taken up by
+   * the answer; null when the run has no conversation to answer.
+   */
+  async function prepareTurn(request: QAnswerRequest) {
+    const plan: PermittedContextPlan = request.plan;
+    /**
+     * Everything recently said in this CONVERSATION, not in this run.
+     *
+     * A voice turn is a run of its own, so run-scoped history gave the
+     * model a single sentence and no past: Q named a company, was asked
+     * "tell me more about it", and answered that no company had been
+     * named. The person is having one conversation; which run a sentence
+     * belonged to is our bookkeeping, not theirs.
+     */
+    const history = await repositories.messages.listRecentForConversationOfRun(
+      sql,
+      request.tenantId,
+      request.runId,
+      64,
+    );
+    const conversationId = history[0]?.conversationId;
+    /**
+     * The most recent document Q put in front of this person, from
+     * their own turns. Used only to tell the model one exists; which
+     * artifact a revision touches is resolved server-side again.
+     */
+    const openDocumentTitle = (() => {
+      for (let index = history.length - 1; index >= 0; index -= 1) {
+        for (const block of history[index]?.blocks ?? []) {
+          if (block.kind === "ARTIFACT_REFERENCE") return block.title;
+        }
+      }
+      return undefined;
+    })();
+    const latest = [...history].reverse().find((m) => m.role === "USER");
+    if (conversationId === undefined || latest === undefined) {
+      return null;
+    }
+    const earlier = history.filter((m) => m.id !== latest.id);
+    const toolContext: QToolExecutionContext = {
+      actor: request.actor,
+      runId: request.runId,
+      correlationId: request.correlationId,
+      capability: request.capability,
+      plan,
+      signal: request.signal,
+      // The person's own words, for the one tool family that sends
+      // anything outside Capital Q: its query is composed from these and
+      // from authorised public identity, never from a model argument.
+      conversation: { latestUserText: latest.content },
+    };
+    // Independent reads, side by side (speed sweep 2026-10-01: they ran
+    // one after another, ~0.3 s of a turn's wait).
+    const [assembled, profile, offeredForRun, memory] = await Promise.all([
+      context.assemble(request),
+      communication.profileFor(request),
+      tools.offer(toolContext),
+      recallMemory(request, conversationId),
+    ]);
+    // The prefetch below reads only tools the run offers; the research
+    // filter decided later never touches them.
+    const prefetchTools = new Set(
+      offeredForRun.map((tool) => tool.definition.name),
+    );
+
+    /**
+     * Their own declared profile, read for them (CQ-QX-007; directive
+     * "Home Q doesn't know the person").
+     *
+     * An investor asking "according to my profile, who am I?" was told
+     * no profile facts existed, and one asking whether a company suits
+     * what they invest in was told their thesis was unknown: the
+     * firewall had admitted their own mandate and nothing read it. When
+     * the plan binds INVESTOR_MANDATE to their own organisation (which
+     * only an owner receives) it is read through the same tool the model
+     * could call, under the same plan, and placed among the AUTHORISED
+     * FACTS the model answers from.
+     */
+    /**
+     * Their own standing -- relationships by state, and an investor's
+     * Saves and Passes -- read on every turn, on every surface, through
+     * the same tool the model could call (founder report 2026-10-01: "am
+     * I interested in this company?" on Discover was answered "I don't
+     * know" a minute after they had saved and passed on it). Started now
+     * so it overlaps the reads below; its own record only, so nothing
+     * here can carry another organisation's data.
+     */
+    const standingRead = prefetchTools.has("list_my_relationships")
+      ? tools.execute(
+          {
+            callId: "q-own-standing",
+            name: "list_my_relationships",
+            arguments: {},
+          },
+          toolContext,
+        )
+      : null;
+    let ownProfile: AuthorisedFact | null = null;
+    let ownProfileCall: QToolCallObservation | null = null;
+    const ownInvestor = ownInvestorOrganisationIn(plan);
+    // The reads below are independent of each other and run side by
+    // side; each fills its own facts (speed sweep 2026-10-01: in turn
+    // they took ~0.6 s before the model was asked anything).
+    const mandateRead = (async (): Promise<void> => {
+      if (ownInvestor !== null && prefetchTools.has("get_investor_mandate")) {
+        const call = {
+          callId: "q-own-mandate",
+          name: "get_investor_mandate",
+          arguments: { investorOrganisationId: ownInvestor },
+        };
+        const outcome = await tools.execute(call, toolContext);
+        ownProfileCall = {
+          toolName: outcome.toolName,
+          providerName: call.name,
+          status: outcome.status,
+          failureCode: outcome.failureCode,
+          latencyMs: outcome.latencyMs,
+        };
+        if (outcome.result.ok) {
+          ownProfile = ownProfileFact(outcome.result.data);
+        }
+      }
+    })();
+    /**
+     * Where their own side stands with the counterparty the question is
+     * about (CQ-Q-030), read through the same tool the model could call,
+     * under the same plan: a company is asked about as an investor, an
+     * investor organisation as a company. A side the person is not on
+     * (a founder asking about a company) is refused by the tool and
+     * simply adds nothing. A relationship itself as the subject is read
+     * by its id, for whichever side the person is on; it comes first,
+     * because it names exactly what the person is asking about.
+     */
+    let relationship: AuthorisedFact | null = null;
+    let relationshipCall: QToolCallObservation | null = null;
+    const asked = askedSubjects(request.subjects, plan);
+    const counterparty =
+      asked.find((subject) => subject.kind === "RELATIONSHIP") ??
+      asked.find(
+        (subject) =>
+          subject.kind === "COMPANY" ||
+          (subject.kind === "INVESTOR_ORGANISATION" &&
+            subject.investorOrganisationId !== ownInvestor),
+      );
+    const relationshipRead = (async (): Promise<void> => {
+      if (counterparty !== undefined && prefetchTools.has("get_relationship")) {
+        const call = {
+          callId: "q-relationship",
+          name: "get_relationship",
+          arguments:
+            counterparty.kind === "RELATIONSHIP"
+              ? { relationshipId: counterparty.relationshipId }
+              : counterparty.kind === "COMPANY"
+                ? { companyId: counterparty.companyId }
+                : counterparty.kind === "INVESTOR_ORGANISATION"
+                  ? {
+                      investorOrganisationId:
+                        counterparty.investorOrganisationId,
+                    }
+                  : {},
+        };
+        const outcome = await tools.execute(call, toolContext);
+        relationshipCall = {
+          toolName: outcome.toolName,
+          providerName: call.name,
+          status: outcome.status,
+          failureCode: outcome.failureCode,
+          latencyMs: outcome.latencyMs,
+        };
+        if (outcome.result.ok) {
+          relationship = relationshipFact(outcome.result.data);
+        }
+      }
+    })();
+    let ownStanding: AuthorisedFact | null = null;
+    let ownStandingCall: QToolCallObservation | null = null;
+    const standingDone = (async (): Promise<void> => {
+      if (standingRead !== null) {
+        const outcome = await standingRead.catch(() => null);
+        if (outcome !== null) {
+          ownStandingCall = {
+            toolName: outcome.toolName,
+            providerName: "list_my_relationships",
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          };
+          if (outcome.result.ok) {
+            const focus =
+              counterparty?.kind === "COMPANY"
+                ? counterparty.companyId
+                : counterparty?.kind === "INVESTOR_ORGANISATION"
+                  ? counterparty.investorOrganisationId
+                  : null;
+            ownStanding = ownStandingFact(outcome.result.data, focus);
+          }
+        }
+      }
+    })();
+    /**
+     * Where the person is in the pitch they are watching, and what is
+     * said there (R18). Only when the plan carries the viewing moment --
+     * the Q API authorised that pitch for this person and the firewall
+     * bound its company -- and read through get_pitch_moment itself, so
+     * the media context applies the playback rule once more. A refusal
+     * adds nothing; no transcript adds a fact that says so.
+     */
+    let pitchMoment: AuthorisedFact | null = null;
+    const pitchRead = (async (): Promise<void> => {
+      if (plan.viewing !== undefined && prefetchTools.has("get_pitch_moment")) {
+        const outcome = await tools.execute(
+          {
+            callId: "q-pitch-moment",
+            name: "get_pitch_moment",
+            arguments: {
+              pitchId: plan.viewing.mediaAssetId,
+              atSeconds: plan.viewing.positionSeconds,
+              windowSeconds: 20,
+            },
+          },
+          toolContext,
+        );
+        if (outcome.result.ok) {
+          pitchMoment = pitchMomentFact(outcome.result.data, null);
+        }
+      }
+    })();
+    /**
+     * Who they are, from their own setup (CQ-QX-007): their name, the
+     * role they gave, and how far along they are. Only when the firewall
+     * granted OWN_ONBOARDING, which it grants to nobody but the person;
+     * a read that fails costs this answer the facts, never the answer.
+     */
+    let onboardingFacts: readonly AuthorisedFact[] = [];
+    const onboardingRead = (async (): Promise<void> => {
+      if (
+        dependencies.ownOnboarding !== undefined &&
+        plan.scopes.some(
+          (scope) =>
+            scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
+        )
+      ) {
+        try {
+          onboardingFacts = ownOnboardingFacts(
+            await dependencies.ownOnboarding.read(request.actor),
+          );
+        } catch (error: unknown) {
+          logger?.warn(
+            { err: error, qRunId: request.runId },
+            "the person's own onboarding was not read for this answer",
+          );
+        }
+      }
+    })();
+    await Promise.all([
+      mandateRead,
+      relationshipRead,
+      standingDone,
+      pitchRead,
+      onboardingRead,
+    ]);
+    return {
+      history,
+      conversationId,
+      openDocumentTitle,
+      latest,
+      earlier,
+      toolContext,
+      assembled,
+      profile,
+      offeredForRun,
+      memory,
+      ownProfile,
+      ownProfileCall,
+      ownInvestor,
+      relationship,
+      relationshipCall,
+      asked,
+      counterparty,
+      ownStanding,
+      ownStandingCall,
+      pitchMoment,
+      onboardingFacts,
+    };
+  }
+  type PreparedTurn = Awaited<ReturnType<typeof prepareTurn>>;
+  /**
+   * Turns being prepared while they are read (speed sweep 2026-10-01: the
+   * turn reader's ~1 s and these reads' ~0.5 s ran one after the other).
+   * Bounded; one the answer never takes is dropped, and its reads only
+   * ever read.
+   */
+  const warming = new Map<string, Promise<PreparedTurn>>();
+  const WARMING_MAX = 64;
+
   return {
     lastObservation: () => last,
+    warm: (request: QAnswerRequest): void => {
+      if (warming.has(request.runId)) return;
+      const started = prepareTurn(request);
+      // Never an unhandled rejection: the answer that takes it re-awaits
+      // the same promise and sees the failure there.
+      started.catch(() => undefined);
+      warming.set(request.runId, started);
+      while (warming.size > WARMING_MAX) {
+        const oldest = warming.keys().next().value;
+        if (oldest === undefined) break;
+        warming.delete(oldest);
+      }
+    },
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
       last = undefined;
       /**
@@ -1301,63 +1614,35 @@ export function createModelGatewayQAnswer(
         sensitivityPolicy.kind === "FROM_PLAN"
           ? plan.maxSensitivity
           : sensitivityPolicy.sensitivity;
-      /**
-       * Everything recently said in this CONVERSATION, not in this run.
-       *
-       * A voice turn is a run of its own, so run-scoped history gave the
-       * model a single sentence and no past: Q named a company, was asked
-       * "tell me more about it", and answered that no company had been
-       * named. The person is having one conversation; which run a sentence
-       * belonged to is our bookkeeping, not theirs.
-       */
-      const history =
-        await repositories.messages.listRecentForConversationOfRun(
-          sql,
-          request.tenantId,
-          request.runId,
-          64,
-        );
-      const conversationId = history[0]?.conversationId;
-      /**
-       * The most recent document Q put in front of this person, from
-       * their own turns. Used only to tell the model one exists; which
-       * artifact a revision touches is resolved server-side again.
-       */
-      const openDocumentTitle = (() => {
-        for (let index = history.length - 1; index >= 0; index -= 1) {
-          for (const block of history[index]?.blocks ?? []) {
-            if (block.kind === "ARTIFACT_REFERENCE") return block.title;
-          }
-        }
-        return undefined;
-      })();
-      const latest = [...history].reverse().find((m) => m.role === "USER");
-      if (conversationId === undefined || latest === undefined) {
+      // Prepared while the turn was being read, when the caller warmed it
+      // (speed sweep 2026-10-01); otherwise now.
+      const warmed = warming.get(request.runId);
+      warming.delete(request.runId);
+      const prepared = await (warmed ?? prepareTurn(request));
+      if (prepared === null) {
         return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
       }
-      const earlier = history.filter((m) => m.id !== latest.id);
-      took("history");
-      const toolContext: QToolExecutionContext = {
-        actor: request.actor,
-        runId: request.runId,
-        correlationId: request.correlationId,
-        capability: request.capability,
-        plan,
-        signal: request.signal,
-        // The person's own words, for the one tool family that sends
-        // anything outside Capital Q: its query is composed from these and
-        // from authorised public identity, never from a model argument.
-        conversation: { latestUserText: latest.content },
-      };
-      // Independent reads, side by side (speed sweep 2026-10-01: they ran
-      // one after another, ~0.3 s of a turn's wait).
-      const [assembled, profile, offeredForRun, memory] = await Promise.all([
-        context.assemble(request),
-        communication.profileFor(request),
-        tools.offer(toolContext),
-        recallMemory(request, conversationId),
-      ]);
-      took("context");
+      const {
+        history,
+        conversationId,
+        openDocumentTitle,
+        latest,
+        earlier,
+        toolContext,
+        assembled,
+        profile,
+        offeredForRun,
+        memory,
+        ownProfile,
+        ownProfileCall,
+        relationship,
+        relationshipCall,
+        ownStanding,
+        ownStandingCall,
+        pitchMoment,
+        onboardingFacts,
+      } = prepared;
+      took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
       /**
        * Whether this turn may reach the public web (CQ-QX-005), decided by
        * the conversation core from its reading of the turn, which has been
@@ -1379,202 +1664,6 @@ export function createModelGatewayQAnswer(
       const offeredByName = new Map(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );
-
-      /**
-       * Their own declared profile, read for them (CQ-QX-007; directive
-       * "Home Q doesn't know the person").
-       *
-       * An investor asking "according to my profile, who am I?" was told
-       * no profile facts existed, and one asking whether a company suits
-       * what they invest in was told their thesis was unknown: the
-       * firewall had admitted their own mandate and nothing read it. When
-       * the plan binds INVESTOR_MANDATE to their own organisation (which
-       * only an owner receives) it is read through the same tool the model
-       * could call, under the same plan, and placed among the AUTHORISED
-       * FACTS the model answers from.
-       */
-      /**
-       * Their own standing -- relationships by state, and an investor's
-       * Saves and Passes -- read on every turn, on every surface, through
-       * the same tool the model could call (founder report 2026-10-01: "am
-       * I interested in this company?" on Discover was answered "I don't
-       * know" a minute after they had saved and passed on it). Started now
-       * so it overlaps the reads below; its own record only, so nothing
-       * here can carry another organisation's data.
-       */
-      const standingRead = offeredByName.has("list_my_relationships")
-        ? tools.execute(
-            {
-              callId: "q-own-standing",
-              name: "list_my_relationships",
-              arguments: {},
-            },
-            toolContext,
-          )
-        : null;
-      let ownProfile: AuthorisedFact | null = null;
-      let ownProfileCall: QToolCallObservation | null = null;
-      const ownInvestor = ownInvestorOrganisationIn(plan);
-      // The reads below are independent of each other and run side by
-      // side; each fills its own facts (speed sweep 2026-10-01: in turn
-      // they took ~0.6 s before the model was asked anything).
-      const mandateRead = (async (): Promise<void> => {
-        if (ownInvestor !== null && offeredByName.has("get_investor_mandate")) {
-          const call = {
-            callId: "q-own-mandate",
-            name: "get_investor_mandate",
-            arguments: { investorOrganisationId: ownInvestor },
-          };
-          const outcome = await tools.execute(call, toolContext);
-          ownProfileCall = {
-            toolName: outcome.toolName,
-            providerName: call.name,
-            status: outcome.status,
-            failureCode: outcome.failureCode,
-            latencyMs: outcome.latencyMs,
-          };
-          if (outcome.result.ok) {
-            ownProfile = ownProfileFact(outcome.result.data);
-          }
-        }
-      })();
-      /**
-       * Where their own side stands with the counterparty the question is
-       * about (CQ-Q-030), read through the same tool the model could call,
-       * under the same plan: a company is asked about as an investor, an
-       * investor organisation as a company. A side the person is not on
-       * (a founder asking about a company) is refused by the tool and
-       * simply adds nothing. A relationship itself as the subject is read
-       * by its id, for whichever side the person is on; it comes first,
-       * because it names exactly what the person is asking about.
-       */
-      let relationship: AuthorisedFact | null = null;
-      let relationshipCall: QToolCallObservation | null = null;
-      const asked = askedSubjects(request.subjects, plan);
-      const counterparty =
-        asked.find((subject) => subject.kind === "RELATIONSHIP") ??
-        asked.find(
-          (subject) =>
-            subject.kind === "COMPANY" ||
-            (subject.kind === "INVESTOR_ORGANISATION" &&
-              subject.investorOrganisationId !== ownInvestor),
-        );
-      const relationshipRead = (async (): Promise<void> => {
-        if (
-          counterparty !== undefined &&
-          offeredByName.has("get_relationship")
-        ) {
-          const call = {
-            callId: "q-relationship",
-            name: "get_relationship",
-            arguments:
-              counterparty.kind === "RELATIONSHIP"
-                ? { relationshipId: counterparty.relationshipId }
-                : counterparty.kind === "COMPANY"
-                  ? { companyId: counterparty.companyId }
-                  : counterparty.kind === "INVESTOR_ORGANISATION"
-                    ? {
-                        investorOrganisationId:
-                          counterparty.investorOrganisationId,
-                      }
-                    : {},
-          };
-          const outcome = await tools.execute(call, toolContext);
-          relationshipCall = {
-            toolName: outcome.toolName,
-            providerName: call.name,
-            status: outcome.status,
-            failureCode: outcome.failureCode,
-            latencyMs: outcome.latencyMs,
-          };
-          if (outcome.result.ok) {
-            relationship = relationshipFact(outcome.result.data);
-          }
-        }
-      })();
-      let ownStanding: AuthorisedFact | null = null;
-      let ownStandingCall: QToolCallObservation | null = null;
-      const standingDone = (async (): Promise<void> => {
-        if (standingRead !== null) {
-          const outcome = await standingRead.catch(() => null);
-          if (outcome !== null) {
-            ownStandingCall = {
-              toolName: outcome.toolName,
-              providerName: "list_my_relationships",
-              status: outcome.status,
-              failureCode: outcome.failureCode,
-              latencyMs: outcome.latencyMs,
-            };
-            if (outcome.result.ok) {
-              const focus =
-                counterparty?.kind === "COMPANY"
-                  ? counterparty.companyId
-                  : counterparty?.kind === "INVESTOR_ORGANISATION"
-                    ? counterparty.investorOrganisationId
-                    : null;
-              ownStanding = ownStandingFact(outcome.result.data, focus);
-            }
-          }
-        }
-      })();
-      /**
-       * Where the person is in the pitch they are watching, and what is
-       * said there (R18). Only when the plan carries the viewing moment --
-       * the Q API authorised that pitch for this person and the firewall
-       * bound its company -- and read through get_pitch_moment itself, so
-       * the media context applies the playback rule once more. A refusal
-       * adds nothing; no transcript adds a fact that says so.
-       */
-      let pitchMoment: AuthorisedFact | null = null;
-      const pitchRead = (async (): Promise<void> => {
-        if (
-          plan.viewing !== undefined &&
-          offeredByName.has("get_pitch_moment")
-        ) {
-          const outcome = await tools.execute(
-            {
-              callId: "q-pitch-moment",
-              name: "get_pitch_moment",
-              arguments: {
-                pitchId: plan.viewing.mediaAssetId,
-                atSeconds: plan.viewing.positionSeconds,
-                windowSeconds: 20,
-              },
-            },
-            toolContext,
-          );
-          if (outcome.result.ok) {
-            pitchMoment = pitchMomentFact(outcome.result.data, null);
-          }
-        }
-      })();
-      /**
-       * Who they are, from their own setup (CQ-QX-007): their name, the
-       * role they gave, and how far along they are. Only when the firewall
-       * granted OWN_ONBOARDING, which it grants to nobody but the person;
-       * a read that fails costs this answer the facts, never the answer.
-       */
-      let onboardingFacts: readonly AuthorisedFact[] = [];
-      const onboardingRead = (async (): Promise<void> => {
-        if (
-          dependencies.ownOnboarding !== undefined &&
-          plan.scopes.some(
-            (scope) =>
-              scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
-          )
-        ) {
-          try {
-            onboardingFacts = ownOnboardingFacts(
-              await dependencies.ownOnboarding.read(request.actor),
-            );
-          } catch (error: unknown) {
-            logger?.warn(
-              { err: error, qRunId: request.runId },
-              "the person's own onboarding was not read for this answer",
-            );
-          }
-        }
-      })();
       /**
        * A setup reminder (founder directive 2026-09-27), only at a natural
        * pause: never while Q is putting a series of questions to them and
@@ -1605,15 +1694,8 @@ export function createModelGatewayQAnswer(
           }
         }
       })();
-      await Promise.all([
-        mandateRead,
-        relationshipRead,
-        standingDone,
-        pitchRead,
-        onboardingRead,
-        nudgeRead,
-      ]);
-      took("prefetch");
+      await nudgeRead;
+      took("nudge");
       const facts: readonly AuthorisedFact[] = [
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),

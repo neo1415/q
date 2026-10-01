@@ -300,6 +300,13 @@ export type QAnswerPort = {
    * Read once; the port forgets it.
    */
   readonly failureNotice?: (runId: string) => string | undefined;
+  /**
+   * Start the turn's read-only preparation (conversation, context, tools,
+   * the person's own facts) while the caller is still reading the turn;
+   * the answer that follows for the same run takes it up. Optional and
+   * best effort: an answer never depends on it having been called.
+   */
+  readonly warm?: (request: QAnswerRequest) => void;
 };
 
 export function createUnconfiguredQAnswer(): QAnswerPort {

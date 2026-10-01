@@ -144,6 +144,7 @@ function build(
   ];
   const executed: QToolProposal[] = [];
   const inFlight = { now: 0, max: 0 };
+  const reads = { history: 0 };
   const tools: QToolPort = {
     offer: () => Promise.resolve([RELATIONSHIP_TOOL, STANDING_TOOL]),
     execute: async (proposal) => {
@@ -184,7 +185,10 @@ function build(
   const repositories = {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
-      listRecentForConversationOfRun: () => Promise.resolve([...messages]),
+      listRecentForConversationOfRun: () => {
+        reads.history += 1;
+        return Promise.resolve([...messages]);
+      },
       insert: (_tx: unknown, input: { content: string }) =>
         Promise.resolve({
           ...messages[0],
@@ -243,7 +247,7 @@ function build(
       maxSensitivity: "PUBLIC",
     } as unknown as PermittedContextPlan,
   } as unknown as QAnswerRequest;
-  return { seam, request, alpha, executed, inFlight };
+  return { seam, request, alpha, executed, inFlight, reads };
 }
 
 const sentTo = (alpha: ReturnType<typeof build>["alpha"]) =>
@@ -287,6 +291,30 @@ describe("the reads before the model run side by side", () => {
     });
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
     expect(inFlight.max).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("a turn warmed while it is read", () => {
+  it("is answered from the reads already started, without reading again", async () => {
+    const { seam, request, executed, reads } = build({
+      status: "SUCCEEDED",
+      data: CONNECTED,
+    });
+    seam.warm?.(request);
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(reads.history).toBe(1);
+    expect(
+      executed.filter((call) => call.name === "list_my_relationships"),
+    ).toHaveLength(1);
+  });
+
+  it("reads for itself when nothing was warmed", async () => {
+    const { seam, request, reads } = build({
+      status: "SUCCEEDED",
+      data: CONNECTED,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(reads.history).toBe(1);
   });
 });
 

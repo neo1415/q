@@ -121,6 +121,7 @@ function seam(options: {
   const stored: QConversationMessage[] = [];
   const events: { type: string; data: unknown }[] = [];
   let delegated = 0;
+  let warmed = 0;
   let investigated = 0;
   const probes: unknown[] = [];
   const answer = createSpecialistQAnswer({
@@ -140,6 +141,9 @@ function seam(options: {
       ? {}
       : { visibility: options.visibility }),
     delegate: {
+      warm: () => {
+        warmed += 1;
+      },
       answer: async (req) => {
         delegated += 1;
         unread.push(req.turnUnread === true);
@@ -198,6 +202,7 @@ function seam(options: {
     stored,
     events,
     delegated: () => delegated,
+    warmed: () => warmed,
     probes,
     investigated: () => investigated,
     unread,
@@ -303,6 +308,8 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     });
     await run.answer.answer(request());
     expect(run.delegated()).toBe(1);
+    // The conversational path's reads started beside the reading.
+    expect(run.warmed()).toBe(1);
   });
 
   it("offers only a screen this run can open; otherwise names the ones it can", () => {

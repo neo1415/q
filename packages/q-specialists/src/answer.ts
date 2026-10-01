@@ -1212,6 +1212,11 @@ export function createSpecialistQAnswer(
   const answerTurn = async (
     request: QAnswerRequest,
   ): Promise<QAnswerOutcome> => {
+    // The conversational path's reads (conversation, context, tools, the
+    // person's own facts) start now, beside the reading below; the answer
+    // takes them up if the turn goes there (speed sweep 2026-10-01: the
+    // reading's ~1 s and those reads' ~0.5-1 s ran one after the other).
+    delegate.warm?.(request);
     const history = await repositories.messages.listRecentForConversationOfRun(
       sql,
       request.tenantId,
