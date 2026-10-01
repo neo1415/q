@@ -20,11 +20,13 @@ import {
   askQAction,
   cancelQRunAction,
   continueQRunAction,
+  pendingQApprovalsAction,
   readQConversationAction,
   rejectQApprovalAction,
   type QStartedRun,
   type QSubjectInput,
 } from "./actions";
+import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
 import { currentScreen, currentViewing } from "./screen";
 import {
@@ -170,6 +172,8 @@ export function useQConversation(
   const [conversationIdState, setConversationIdState] = useState<string | null>(
     options.conversationId ?? null,
   );
+  /** A change still waiting in this conversation whose run is not the open one. */
+  const [carried, setCarried] = useState<CarriedApproval | null>(null);
 
   const conversationId = useRef<string | null>(null);
   /** The conversation id last taken from the caller, so a URL the hook itself wrote is not reopened. */
@@ -547,11 +551,57 @@ export function useQConversation(
     }
   }, []);
 
+  // The change still waiting in this conversation, found again whenever
+  // the thread settles: its card stays until it is decided (QA 2026-10-01).
+  const live = runState.approval !== null;
+  useEffect(() => {
+    if (streaming || live || conversationIdState === null) return;
+    let current = true;
+    const id = conversationIdState;
+    void pendingQApprovalsAction().then((result) => {
+      if (!current || !result.ok) return;
+      setCarried(carriedApproval(id, history, result.value));
+    });
+    return () => {
+      current = false;
+    };
+  }, [streaming, live, conversationIdState, history]);
+
   // A decision on the open run's proposal. The run resumes on the server
   // after a yes and its remaining events are followed again from the
   // cursor, so what the gate did arrives the same way the answer did.
   const decide = useCallback(
     async (decision: "APPROVE" | "REJECT") => {
+      if (runState.approval === null && carried !== null) {
+        // A change from an earlier run of this conversation: decided by
+        // the same engine calls; the thread is read back once it has run.
+        const result =
+          decision === "APPROVE"
+            ? await approveQApprovalAction(carried.approval.approvalId)
+            : await rejectQApprovalAction(carried.approval.approvalId);
+        if (!result.ok) {
+          setNotice(result.message);
+          return;
+        }
+        setCarried(null);
+        const id = conversationId.current;
+        if (id !== null) {
+          for (const wait of [3_000, 10_000]) {
+            setTimeout(() => {
+              void readQConversationAction(id).then((read) => {
+                if (
+                  read.ok &&
+                  conversationId.current === id &&
+                  finished.current
+                ) {
+                  setHistory(read.value.messages);
+                }
+              });
+            }, wait);
+          }
+        }
+        return;
+      }
       const approval = runState.approval;
       const open = openRun.current;
       if (approval === null || open === null) {
@@ -571,7 +621,7 @@ export function useQConversation(
         follow(open);
       }
     },
-    [follow, runState.approval],
+    [follow, runState.approval, carried],
   );
   const approve = useCallback(() => decide("APPROVE"), [decide]);
   const revised = useCallback(() => {
@@ -599,7 +649,20 @@ export function useQConversation(
   }, []);
 
   return {
-    state: { ...runState, messages: [...history, ...runState.messages] },
+    state: {
+      ...runState,
+      messages: [...history, ...runState.messages],
+      ...(runState.approval === null && carried !== null
+        ? {
+            approval: carried.approval,
+            proposals: runState.proposals.some(
+              (proposal) => proposal.proposalId === carried.proposal.proposalId,
+            )
+              ? runState.proposals
+              : [...runState.proposals, carried.proposal],
+          }
+        : {}),
+    },
     pending,
     transport,
     // A run is "working" from the moment it is asked for until its stream

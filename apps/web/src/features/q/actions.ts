@@ -15,6 +15,7 @@ import {
   getQArtifactVersion,
   getQConversation,
   getQRun,
+  listPendingQApprovals,
   listQConversations,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -28,6 +29,7 @@ import {
   type ListQConversationsResponse,
   type QArtifactDetail,
   type QConversationDetail,
+  type QPendingApproval,
   type QRunSummary,
 } from "@capital-q/contracts";
 
@@ -387,6 +389,13 @@ export async function approveQApprovalAction(
     await approveQApproval(session, approvalId.data);
     return null;
   });
+}
+
+/** The approvals still waiting on this person (their own, server-read). */
+export async function pendingQApprovalsAction(): Promise<
+  QActionResult<readonly QPendingApproval[]>
+> {
+  return run(async (session) => (await listPendingQApprovals(session)).items);
 }
 
 export async function rejectQApprovalAction(
