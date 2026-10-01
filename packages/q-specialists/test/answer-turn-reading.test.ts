@@ -82,6 +82,8 @@ function seam(options: {
   readonly offeredTools?: readonly string[];
   /** A spoken turn: stored with the recogniser's utterance. */
   readonly spoken?: boolean;
+  /** The company analysis takes the question (default: it never does). */
+  readonly specialistSupports?: boolean;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -116,12 +118,16 @@ function seam(options: {
   const stored: QConversationMessage[] = [];
   const events: { type: string; data: unknown }[] = [];
   let delegated = 0;
+  let investigated = 0;
   const answer = createSpecialistQAnswer({
     specialist: {
       id: "company-intelligence",
       version: "v1",
-      supports: () => false,
-      investigate: () => Promise.reject(new Error("not used")),
+      supports: () => options.specialistSupports === true,
+      investigate: () => {
+        investigated += 1;
+        return Promise.reject(new Error("not used"));
+      },
     },
     ...(options.visibility === undefined
       ? {}
@@ -182,6 +188,7 @@ function seam(options: {
     stored,
     events,
     delegated: () => delegated,
+    investigated: () => investigated,
     unread,
     capabilities,
     reads: () => reads,
@@ -751,5 +758,43 @@ describe("an action the run offers is never filed as a document (BIZ-004 founder
     });
     await run.answer.answer(request());
     expect(run.heardActions).toEqual([[]]);
+  });
+});
+
+describe("a question about their own record takes the fast path (lead 2026-10-01)", () => {
+  const withCompany = (): QAnswerRequest => ({
+    ...request(),
+    subjects: [{ kind: "COMPANY", companyId: COMPANY }],
+  });
+  const ownRecords: TurnReaderResult = {
+    ...advice,
+    question: {
+      kind: "THEIR_OWN_RECORDS",
+      text: "what do you have on record about my company?",
+      about: [],
+    },
+  };
+
+  it("is answered from the record by the conversational path, not the analysis", async () => {
+    const { answer, delegated, investigated } = seam({
+      said: "What do you have on record about my company?",
+      reading: ownRecords,
+      outcomes: [],
+      specialistSupports: true,
+    });
+    await answer.answer(withCompany());
+    expect(delegated()).toBe(1);
+    expect(investigated()).toBe(0);
+  });
+
+  it("leaves an assessment of their company to the analysis", async () => {
+    const { answer, investigated } = seam({
+      said: "How strong is my company's traction?",
+      reading: advice,
+      outcomes: [],
+      specialistSupports: true,
+    });
+    await answer.answer(withCompany()).catch(() => undefined);
+    expect(investigated()).toBe(1);
   });
 });

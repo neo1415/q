@@ -1399,14 +1399,24 @@ export function createSpecialistQAnswer(
         "q question series",
       );
     }
-    const outcome = await answerOnce({
-      ...request,
-      research,
-      capabilities: manifestOf(capabilities),
-      ...(turnUnread ? { turnUnread: true } : {}),
-      ...(writingDocument ? { writingDocument: true } : {}),
-      ...(series.step === null ? {} : { questionSequence: series.step }),
-    });
+    // A question about what is on their own record ("what do you have on
+    // record about my company", "summarise my raise") is read from the
+    // record by the conversational path, which reads it directly; the
+    // company analysis is for assessment (lead decision 2026-10-01: the
+    // analysis took 12.4 s and 1,100 tokens to restate a profile).
+    const ownRecords =
+      !writingDocument && read?.question?.kind === "THEIR_OWN_RECORDS";
+    const outcome = await answerOnce(
+      {
+        ...request,
+        research,
+        capabilities: manifestOf(capabilities),
+        ...(turnUnread ? { turnUnread: true } : {}),
+        ...(writingDocument ? { writingDocument: true } : {}),
+        ...(series.step === null ? {} : { questionSequence: series.step }),
+      },
+      { ownRecords },
+    );
     if (writingDocument && outcome.kind === "ANSWERED") {
       await fileWrittenAnswer(
         request,
@@ -1439,6 +1449,7 @@ export function createSpecialistQAnswer(
 
   const answerOnce = async (
     request: QAnswerRequest,
+    route: { readonly ownRecords?: boolean } = {},
   ): Promise<QAnswerOutcome> => {
     // The conversation, not the run: a voice turn is its own run, and a
     // specialist that sees one sentence cannot follow what is being
@@ -1467,7 +1478,11 @@ export function createSpecialistQAnswer(
     // the video, which the conversational path reads (get_pitch_moment);
     // the company analysis has no transcript. Decided by the structured
     // context the Q API authorised, never by the question's words.
-    if (request.plan.viewing !== undefined || !specialist.supports(probe)) {
+    if (
+      request.plan.viewing !== undefined ||
+      route.ownRecords === true ||
+      !specialist.supports(probe)
+    ) {
       return delegate.answer(request);
     }
     const company = request.subjects.find(
