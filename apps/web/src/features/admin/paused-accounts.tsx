@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import type { PausedRowDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import { reinstateAction } from "./admin-actions";
+import { ResultLine, useConsoleAction } from "./console-ui";
 
 /**
  * Accounts Q paused (founder direction 2026-09-30), for an operator to
@@ -18,8 +19,7 @@ export function PausedAccounts({
   readonly rows: readonly PausedRowDto[];
 }) {
   const [left, setLeft] = useState(rows);
-  const [message, setMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { perform, pending, result } = useConsoleAction();
   if (left.length === 0) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -49,30 +49,22 @@ export function PausedAccounts({
             <Button
               variant="secondary"
               disabled={pending}
-              onClick={() => {
-                setMessage(null);
-                startTransition(async () => {
-                  const result = await reinstateAction(row.userId);
-                  if (result.ok) {
+              onClick={() =>
+                perform(
+                  () => reinstateAction(row.userId),
+                  () =>
                     setLeft((all) =>
                       all.filter((other) => other.userId !== row.userId),
-                    );
-                  } else {
-                    setMessage(result.message);
-                  }
-                });
-              }}
+                    ),
+                )
+              }
             >
               Reinstate
             </Button>
           </li>
         ))}
       </ul>
-      {message === null ? null : (
-        <p role="alert" className="cq-caption text-(--cq-text-secondary)">
-          {message}
-        </p>
-      )}
+      <ResultLine result={result} />
     </div>
   );
 }

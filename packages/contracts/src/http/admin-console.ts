@@ -67,6 +67,7 @@ const Reason = z.string().trim().min(3).max(500);
 
 export const AdminMeDtoSchema = z
   .object({
+    userId: UuidSchema,
     role: AdminRoleSchema,
     permissions: z.array(z.string().max(64)).max(64),
     permissionsVersion: z.number().int(),

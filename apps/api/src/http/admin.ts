@@ -229,6 +229,7 @@ export function registerAdminRoutes(
     const stepUp = await admin.liveStepUp(userId);
     void reply.header("Cache-Control", "no-store");
     return AdminMeDtoSchema.parse({
+      userId,
       role,
       permissions: permissionsOf(role),
       permissionsVersion: ADMIN_PERMISSIONS_VERSION,

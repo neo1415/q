@@ -325,3 +325,7 @@ export {
   unsubscribePush,
 } from "./work.js";
 // end AUTO block
+
+// ADMIN block
+export * from "./admin-console.js";
+// end ADMIN block
