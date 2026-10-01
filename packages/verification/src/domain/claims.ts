@@ -168,6 +168,6 @@ export function describeStanding(
     case "EXPIRED":
       return "The earlier verification has expired. You can ask Capital Q again.";
     case "REVOKED":
-      return "Capital Q withdrew the earlier verification. You can ask again.";
+      return "Not verified: a Capital Q operator declined this request or withdrew an earlier verification. You can ask again.";
   }
 }

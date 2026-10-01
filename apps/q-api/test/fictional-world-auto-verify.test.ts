@@ -101,6 +101,8 @@ function world(founder: string) {
       ),
     currentRevision: (_sql, claim) => Promise.resolve(highest(claim)),
     insertPending: () => Promise.reject(new Error("not used")),
+    insertOperatorDecision: () =>
+      Promise.reject(new Error("not used by the synthetic decider")),
     insertDecision: (_tx, decision) => {
       next += 1;
       const row: VerificationClaim = {

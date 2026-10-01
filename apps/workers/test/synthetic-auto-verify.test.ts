@@ -116,6 +116,8 @@ function world(
     currentRevision: (_executor, claim) =>
       Promise.resolve(currentRevision(claim)),
     insertPending: () => Promise.reject(new Error("not under test")),
+    insertOperatorDecision: () =>
+      Promise.reject(new Error("not used by the synthetic decider")),
     insertDecision: (_tx, decision) => {
       const now = UtcTimestampSchema.parse(new Date().toISOString());
       const row: VerificationClaim = {

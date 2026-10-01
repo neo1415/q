@@ -1328,6 +1328,9 @@ importers:
         specifier: workspace:*
         version: link:../security
     devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

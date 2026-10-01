@@ -13,11 +13,11 @@
  *
  *   Verification ≠ Evidence ≠ Endorsement ≠ Q inference
  *
- * Two decision methods exist in the vocabulary. Only
- * SYNTHETIC_DEMO_ATTESTATION is implemented, and only where the deployment
- * holds the synthetic-demo allowance and the people involved are
- * synthetic. OPERATOR_DECISION waits for an operator principal
- * (docs/escalations/verify-001/README.md §4).
+ * Two decision methods exist. SYNTHETIC_DEMO_ATTESTATION decides only
+ * where the deployment holds the synthetic-demo allowance and the people
+ * involved are synthetic. OPERATOR_DECISION is a Capital Q operator's
+ * decision from the admin console (ADR 0033); who may make it is decided
+ * by @capital-q/platform-admin before the decider is reached.
  *
  * Server-side only.
  */
@@ -47,6 +47,7 @@ export {
   type SyntheticAutoVerifySweepResult,
 } from "./application/auto-verify-sweep.js";
 export type {
+  NewOperatorDecision,
   NewPendingClaim,
   NewSyntheticDecision,
   PendingSyntheticClaimSource,
@@ -62,6 +63,11 @@ export {
   type RequestCompanyVerificationCommand,
   type RequestCompanyVerificationResult,
 } from "./application/company-verification.js";
+export {
+  createDecideByOperator,
+  type DecideByOperatorCommand,
+  type DecideByOperatorOutcome,
+} from "./application/decide-operator.js";
 export type {
   DecideSyntheticCommand,
   DecideSyntheticOutcome,

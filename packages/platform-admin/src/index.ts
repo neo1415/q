@@ -1,4 +1,41 @@
-import type { DatabaseExecutor } from "@capital-q/database";
+import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+
+import {
+  authorize,
+  freshAuthenticationOf,
+  liveStepUp,
+  recordAdminAction,
+  recordStepUp,
+  roleOf,
+  type AdminGrant,
+} from "./access.js";
+import {
+  accountDetail,
+  isSuspended,
+  organisationDetail,
+  searchAccounts,
+  searchOrganisations,
+  setSuspension,
+  suspendOrganisationMembers,
+} from "./accounts.js";
+import { searchAudit } from "./audit-search.js";
+import {
+  decideBreakGlass,
+  listBreakGlass,
+  readChatUnderBreakGlass,
+  requestBreakGlass,
+} from "./break-glass.js";
+import {
+  createEmailPanel,
+  type EmailSenderConfig,
+  type DnsTxtResolver,
+} from "./email.js";
+import { createFlagReader, listFlags, setFlag } from "./flags.js";
+import { qErrors, qMonitor, qRunTrace } from "./q-monitor.js";
+import { reviewReport, safetyQueue } from "./safety.js";
+import { listTeam, revokeTeamRole, setTeamRole } from "./team.js";
+import { claimTenant, verificationQueue } from "./verification-queue.js";
+import type { AdminPermission } from "./permissions.js";
 
 /**
  * Capital Q's own operations (founder direction 2026-09-29/30).
@@ -10,9 +47,10 @@ import type { DatabaseExecutor } from "@capital-q/database";
  * money Q heard, and money both sides confirmed. Every figure comes from
  * the append-only records the owning contexts keep; nothing here writes.
  *
- * Access is a platform admin only, decided from `identity.platform_admins`
- * on the server; for anyone else every read is null, the same as "no such
- * page".
+ * Access (ADR 0033): every operation takes an `AdminGrant`, which only
+ * `authorize` hands out -- role from `identity.platform_admins`, permission
+ * from the versioned table in ./permissions.ts, step-up from
+ * `platform_ops.step_ups`.
  */
 
 export type AdminOverview = {
@@ -61,22 +99,9 @@ function iso(value: unknown): string {
   return new Date(value as string | Date).toISOString();
 }
 
-export function createPlatformAdmin(options: {
-  readonly sql: DatabaseExecutor;
-}) {
-  const { sql } = options;
-
-  async function isAdmin(userId: string): Promise<boolean> {
-    const rows = await sql<{ one: number }[]>`
-      select 1 as one from identity.platform_admins where user_id = ${userId}`;
-    return rows.length > 0;
-  }
-
+function createLedger(sql: DatabaseExecutor) {
   return {
-    isAdmin,
-
-    overview: async (userId: string): Promise<AdminOverview | null> => {
-      if (!(await isAdmin(userId))) return null;
+    overview: async (_grant: AdminGrant): Promise<AdminOverview> => {
       const [counts] = await sql<
         {
           people: number;
@@ -127,10 +152,9 @@ export function createPlatformAdmin(options: {
     },
 
     attribution: async (
-      userId: string,
+      _grant: AdminGrant,
       limit = 200,
-    ): Promise<readonly AttributionRow[] | null> => {
-      if (!(await isAdmin(userId))) return null;
+    ): Promise<readonly AttributionRow[]> => {
       const rows = await sql<
         {
           relationship_id: string;
@@ -197,8 +221,7 @@ export function createPlatformAdmin(options: {
       }));
     },
 
-    disputes: async (userId: string): Promise<readonly DisputeRow[] | null> => {
-      if (!(await isAdmin(userId))) return null;
+    disputes: async (_grant: AdminGrant): Promise<readonly DisputeRow[]> => {
       const rows = await sql<
         {
           id: string;
@@ -237,8 +260,7 @@ export function createPlatformAdmin(options: {
      * Accounts Q paused (founder direction 2026-09-30), newest first, for
      * an operator to look at and reinstate.
      */
-    paused: async (userId: string): Promise<readonly PausedRow[] | null> => {
-      if (!(await isAdmin(userId))) return null;
+    paused: async (_grant: AdminGrant): Promise<readonly PausedRow[]> => {
       const rows = await sql<
         {
           user_id: string;
@@ -270,21 +292,27 @@ export function createPlatformAdmin(options: {
     /**
      * An operator reinstates a paused account: the pause is lifted, the
      * strikes start again from zero, and who reinstated it is kept.
-     * Null when the caller is not an operator; false when not paused.
+     * False when not paused. Audited.
      */
     reinstate: async (
-      userId: string,
+      grant: AdminGrant,
       pausedUserId: string,
-    ): Promise<boolean | null> => {
-      if (!(await isAdmin(userId))) return null;
+    ): Promise<boolean> => {
       const rows = await sql<{ user_id: string }[]>`
         update q_runtime.person_standing
            set suspended_at = null, suspended_reason = null, strikes = 0,
                rounds = 0, streak = 0, q_started = false,
-               reinstated_at = clock_timestamp(), reinstated_by = ${userId},
+               reinstated_at = clock_timestamp(), reinstated_by = ${grant.userId},
                updated_at = clock_timestamp()
          where user_id = ${pausedUserId} and suspended_at is not null
         returning user_id`;
+      if (rows.length > 0) {
+        await recordAdminAction(sql, grant, {
+          actionType: "account.q_pause.lifted",
+          resourceType: "user_profile",
+          resourceId: pausedUserId,
+        });
+      }
       return rows.length > 0;
     },
   };
@@ -299,6 +327,158 @@ export type PausedRow = {
   readonly reason: string | null;
 };
 
+export function createPlatformAdmin(options: {
+  readonly sql: DatabaseExecutor;
+  readonly transactions: TransactionManager;
+  readonly email?: EmailSenderConfig | undefined;
+  readonly dns?: DnsTxtResolver | undefined;
+}) {
+  const { sql, transactions } = options;
+  const ledger = createLedger(sql);
+  const emailPanel = createEmailPanel({
+    sql,
+    config: options.email ?? { sender: null, provider: "NONE" },
+    resolver: options.dns,
+  });
+  const flags = createFlagReader(sql);
+  return {
+    authorize: (userId: string, permission: AdminPermission) =>
+      authorize(sql, userId, permission),
+    roleOf: (userId: string) => roleOf(sql, userId),
+    liveStepUp: (userId: string) => liveStepUp(sql, userId),
+    recordStepUp: (input: Parameters<typeof recordStepUp>[1]) =>
+      recordStepUp(sql, input),
+    freshAuthenticationOf,
+    isSuspended: (userId: string) => isSuspended(sql, userId),
+    isFlagEnabled: flags.isEnabled,
+    ...ledger,
+    searchAccounts: (grant: AdminGrant, term: string) =>
+      searchAccounts(sql, grant, term),
+    accountDetail: (grant: AdminGrant, userId: string) =>
+      accountDetail(sql, grant, userId),
+    setSuspension: (
+      grant: AdminGrant,
+      input: Parameters<typeof setSuspension>[2],
+    ) => setSuspension(transactions, grant, input),
+    searchOrganisations: (grant: AdminGrant, term: string) =>
+      searchOrganisations(sql, grant, term),
+    organisationDetail: (grant: AdminGrant, organisationId: string) =>
+      organisationDetail(sql, grant, organisationId),
+    suspendOrganisationMembers: (
+      grant: AdminGrant,
+      input: Parameters<typeof suspendOrganisationMembers>[3],
+    ) => suspendOrganisationMembers(sql, transactions, grant, input),
+    verificationQueue: (grant: AdminGrant) => verificationQueue(sql, grant),
+    claimTenant: (claimId: string) => claimTenant(sql, claimId),
+    recordAction: (
+      grant: AdminGrant,
+      action: Parameters<typeof recordAdminAction>[2],
+    ) => recordAdminAction(sql, grant, action),
+    safetyQueue: (grant: AdminGrant, includeReviewed: boolean) =>
+      safetyQueue(sql, grant, { includeReviewed }),
+    reviewReport: (
+      grant: AdminGrant,
+      input: Parameters<typeof reviewReport>[2],
+    ) => reviewReport(transactions, grant, input),
+    listBreakGlass: (grant: AdminGrant) => listBreakGlass(sql, grant),
+    requestBreakGlass: (
+      grant: AdminGrant,
+      input: Parameters<typeof requestBreakGlass>[2],
+    ) => requestBreakGlass(transactions, grant, input),
+    decideBreakGlass: (
+      grant: AdminGrant,
+      input: Parameters<typeof decideBreakGlass>[2],
+    ) => decideBreakGlass(transactions, grant, input),
+    readChatUnderBreakGlass: (grant: AdminGrant, requestId: string) =>
+      readChatUnderBreakGlass(transactions, grant, requestId),
+    qMonitor: (grant: AdminGrant, window: Parameters<typeof qMonitor>[2]) =>
+      qMonitor(sql, grant, window),
+    qErrors: (grant: AdminGrant) => qErrors(sql, grant),
+    qRunTrace: (grant: AdminGrant, runId: string) =>
+      qRunTrace(transactions, grant, runId),
+    searchAudit: (
+      grant: AdminGrant,
+      query: Parameters<typeof searchAudit>[2],
+    ) => searchAudit(sql, grant, query),
+    listFlags: (grant: AdminGrant) => listFlags(sql, grant),
+    setFlag: (grant: AdminGrant, input: Parameters<typeof setFlag>[2]) =>
+      setFlag(transactions, grant, input),
+    emailPanel,
+    listTeam: (grant: AdminGrant) => listTeam(sql, grant),
+    setTeamRole: (
+      grant: AdminGrant,
+      input: Parameters<typeof setTeamRole>[2],
+    ) => setTeamRole(transactions, grant, input),
+    revokeTeamRole: (
+      grant: AdminGrant,
+      input: Parameters<typeof revokeTeamRole>[2],
+    ) => revokeTeamRole(transactions, grant, input),
+  };
+}
+
 export type PlatformAdmin = ReturnType<typeof createPlatformAdmin>;
+
+export * from "./permissions.js";
+export {
+  freshAuthenticationOf,
+  type AdminAccess,
+  type AdminActionRecord,
+  type AdminGrant,
+  type StepUpMethod,
+  type StepUpOutcome,
+} from "./access.js";
+export type {
+  AccountDetail,
+  AccountRow,
+  OrganisationDetail,
+  OrganisationRow,
+  SuspensionOutcome,
+} from "./accounts.js";
+export {
+  decodeAuditCursor,
+  encodeAuditCursor,
+  type AuditQuery,
+  type AuditRow,
+} from "./audit-search.js";
+export type {
+  BreakGlassChat,
+  BreakGlassDecision,
+  BreakGlassRow,
+  BreakGlassTarget,
+} from "./break-glass.js";
+export {
+  checkSenderDomain,
+  recordingEmailSender,
+  senderAddressOf,
+  type DnsCheck,
+  type DnsTxtResolver,
+  type EmailPanel,
+  type EmailSenderConfig,
+} from "./email.js";
+export {
+  createFlagReader,
+  isKillSwitch,
+  KILL_SWITCHES,
+  type FlagRow,
+  type KillSwitch,
+} from "./flags.js";
+export { firewallDecisionRow, recordingFirewall } from "./firewall-recorder.js";
+export {
+  isMonitorWindow,
+  MONITOR_WINDOWS,
+  type MonitorWindow,
+  type QErrorItem,
+  type QMonitor,
+  type QRunTrace,
+} from "./q-monitor.js";
+export {
+  REVIEW_OUTCOMES,
+  type BlockRow,
+  type ReviewOutcome,
+  type ReviewResult,
+  type SafetyReportRow,
+} from "./safety.js";
+export type { TeamChange, TeamMember } from "./team.js";
+export type { VerificationQueueRow } from "./verification-queue.js";
 
 export const PACKAGE_NAME = "@capital-q/platform-admin" as const;

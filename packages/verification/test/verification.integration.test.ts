@@ -35,6 +35,8 @@ import {
   createCompanyVerificationService,
   createPostgresPendingSyntheticClaimSource,
   createSyntheticAutoVerifySweep,
+  createDecideByOperator,
+  createPostgresVerificationClaimRepository,
   createSyntheticVerificationDecider,
   syntheticAutoVerifyAttestation,
   createVerificationClaimsReadinessPort,
@@ -408,6 +410,97 @@ describe("@capital-q/verification against local PostgreSQL", () => {
   });
 
   // R43, temporary until BIZ-006 /ops: the hosted staging workers' sweep.
+  it("lets an operator decide a real person's request by hand, as a HUMAN, exactly once (ADR 0033)", async () => {
+    await withWorld(async (world) => {
+      await request(world, world.realMemberA);
+      const [identity, organisation] = await pendingIds(
+        world.tx,
+        world.tenantA,
+      );
+      if (identity === undefined || organisation === undefined) {
+        throw new Error("expected two pending requests");
+      }
+      const [operator] = await world.tx.sql<{ id: string }[]>`
+        select user_id as id from identity.organisation_memberships
+         where id = ${world.adminB.membershipId}`;
+      const decide = createDecideByOperator({
+        transactions: nestedTransactions(world.tx),
+        repository: createPostgresVerificationClaimRepository(),
+        outbox: createOutboxWriter({ registry }),
+        audit: createPostgresMaterialActionAuditWriter(),
+      });
+      const base = {
+        tenantId: world.tenantA,
+        operatorUserId: operator?.id ?? "",
+        correlationId: CORRELATION(),
+      };
+      expect(
+        await decide({
+          ...base,
+          claimId: identity,
+          status: "VERIFIED",
+          decisionBasis: "Passport checked on a video call",
+          revocationReason: null,
+        }),
+      ).toMatchObject({ kind: "DECIDED", status: "VERIFIED" });
+      expect(
+        await decide({
+          ...base,
+          claimId: organisation,
+          status: "REVOKED",
+          decisionBasis: "Registry shows no such company",
+          revocationReason: "Company not found in the registry",
+        }),
+      ).toMatchObject({ kind: "DECIDED", status: "REVOKED" });
+      // Replay decides nothing.
+      expect(
+        (
+          await decide({
+            ...base,
+            claimId: identity,
+            status: "REVOKED",
+            decisionBasis: "again",
+            revocationReason: "again",
+          })
+        ).kind,
+      ).toBe("NOTHING_TO_DECIDE");
+      const rows = await world.tx.sql<
+        {
+          status: string;
+          method: string;
+          decided_by_actor_type: string;
+          decided_by_user_id: string;
+          revocation_reason: string | null;
+        }[]
+      >`
+        select status, method, decided_by_actor_type, decided_by_user_id, revocation_reason
+          from evidence.verification_claims
+         where tenant_id = ${world.tenantA} and decides_claim_id is not null
+         order by status desc`;
+      expect(rows).toEqual([
+        {
+          status: "VERIFIED",
+          method: "OPERATOR_DECISION",
+          decided_by_actor_type: "HUMAN",
+          decided_by_user_id: operator?.id,
+          revocation_reason: null,
+        },
+        {
+          status: "REVOKED",
+          method: "OPERATOR_DECISION",
+          decided_by_actor_type: "HUMAN",
+          decided_by_user_id: operator?.id,
+          revocation_reason: "Company not found in the registry",
+        },
+      ]);
+      const [audits] = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from audit.material_actions
+         where tenant_id = ${world.tenantA} and action_type = 'verification.claim.decided'
+           and actor_type = 'human'`;
+      expect(audits?.n).toBe(2);
+    });
+  });
+
   describe("SYNTHETIC_AUTO_VERIFY_POLICY sweep", () => {
     const sweepFor = (world: World, environment: string) => {
       const source = createPostgresPendingSyntheticClaimSource(world.tx.sql);

@@ -26,6 +26,19 @@ export type NewSyntheticDecision = {
 };
 
 /**
+ * ADR 0033: a Capital Q operator (platform admin with
+ * `verification.decide` and a live step-up) decides a request by hand.
+ * REVOKED is the "rejected" decision and carries its reason.
+ */
+export type NewOperatorDecision = {
+  readonly decides: VerificationClaim;
+  readonly status: "VERIFIED" | "REVOKED";
+  readonly decisionBasis: string;
+  readonly revocationReason: string | null;
+  readonly operatorUserId: string;
+};
+
+/**
  * `evidence.verification_claims`, append-only. Tenant is always in the
  * predicate; there is no update and no delete here because the table
  * refuses both.
@@ -69,6 +82,10 @@ export type VerificationClaimRepository = {
   readonly insertDecision: (
     tx: TransactionContext,
     decision: NewSyntheticDecision,
+  ) => Promise<VerificationClaim>;
+  readonly insertOperatorDecision: (
+    tx: TransactionContext,
+    decision: NewOperatorDecision,
   ) => Promise<VerificationClaim>;
 };
 
