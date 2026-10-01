@@ -567,6 +567,61 @@ describe("answer seam tool loop", () => {
     },
   );
 
+  it("an answer that asks who 'this person' is, on a company's page, gets one more round naming the screen's company (founder live 2026-10-01)", async () => {
+    const tools = toolPort([GET_COMPANY], (p) =>
+      succeeded(p, { canonicalName: "Kazikit (synthetic)" }),
+    );
+    const company = randomUUID();
+    const { seam, alpha, request, messages } = build({
+      script: [
+        {
+          kind: "TEXT",
+          text: JSON.stringify({
+            ...analystResult("Who should I arrange the meeting with?"),
+            clarifyingQuestions: [
+              { question: "Who should I arrange the meeting with?", why: "" },
+            ],
+          }),
+        },
+        call("c1", { companyId: company }),
+        { kind: "TEXT", text: JSON.stringify(analystResult("Kazikit.")) },
+      ],
+      tools,
+    });
+    await seam.answer({
+      ...request,
+      plan: {
+        ...request.plan,
+        screen: { route: "COMPANY", companyId: company },
+      },
+    });
+    const second = alpha.calls[1]?.request.messages ?? [];
+    expect(second.at(-1)?.content).toContain(`the company ${company}`);
+    expect(tools.executed).toHaveLength(1);
+    expect(messages.at(-1)?.content).toBe("Kazikit.");
+  });
+
+  it("keeps a question back when the screen shows nothing in particular", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, alpha, request } = build({
+      script: [
+        {
+          kind: "TEXT",
+          text: JSON.stringify({
+            ...analystResult("Which company?"),
+            clarifyingQuestions: [{ question: "Which company?", why: "" }],
+          }),
+        },
+      ],
+      tools,
+    });
+    await seam.answer({
+      ...request,
+      plan: { ...request.plan, screen: { route: "HOME" } },
+    });
+    expect(alpha.calls).toHaveLength(1);
+  });
+
   it("does not add a round when the answer talks about nothing it should have done", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     const { seam, alpha, request } = build({

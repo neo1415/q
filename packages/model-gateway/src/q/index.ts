@@ -22,6 +22,7 @@ import {
   type QFailureDiagnosticCode,
   type QOperatingMode,
   type QResponseMessage,
+  type QScreenContext,
   type QSubjectRef,
   type QVisibleStage,
   type TenantModelPolicy,
@@ -389,6 +390,30 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
  * asks the model to act through the tools it holds, or to answer without
  * promising.
  */
+/**
+ * The subject on the person's screen, as a trusted note for a reply that
+ * asked them to identify it; null when the screen shows nothing in
+ * particular.
+ */
+export function screenSubjectNote(
+  screen: QScreenContext | undefined,
+): ModelMessage | null {
+  if (screen === undefined) return null;
+  const shown =
+    screen.companyId !== undefined
+      ? `the company ${screen.companyId} (its person is its founder; read it with get_company or get_relationship)`
+      : screen.investorOrganisationId !== undefined
+        ? `the investor organisation ${screen.investorOrganisationId} (its person is its team; read it with get_relationship)`
+        : screen.documentId !== undefined
+          ? `their document ${screen.documentId}`
+          : null;
+  if (shown === null) return null;
+  return {
+    role: "SYSTEM",
+    content: `Your reply asked them who or what they mean. Their screen shows ${shown}: words that point (this, this one, them, this person, it) mean it. If your question was about who or what, do not ask it: act on that subject now with the tools (prepare the step for their approval when it acts), or say plainly why that step is not possible yet and what is. If your question was about something else (a time, an amount), keep it.`,
+  };
+}
+
 export const SAY_DO_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
@@ -2042,13 +2067,35 @@ export function createModelGatewayQAnswer(
               sayDoRounds === 0 &&
               calls < Q_TOOL_LOOP_MAX_CALLS &&
               request.signal?.aborted !== true;
-            const askToDoIt = (said: string): void => {
+            /**
+             * Asked what the screen already answers. The answer puts a
+             * question back to the person while their screen shows a
+             * company, investor or document (founder live 2026-10-01: on
+             * Kazikit's page "get me a meeting with this person" got "who
+             * should I arrange the meeting with?"). One more round, with
+             * the screen's subject named as the referent; a question about
+             * something else (a time, an amount) is kept. From the
+             * answer's structure and the screen, never the words; once.
+             */
+            const screenNote = screenSubjectNote(plan.screen);
+            const askedWhatScreenShows = (
+              value: CompanyAnalystV14Result,
+            ): boolean =>
+              screenNote !== null &&
+              value.clarifyingQuestions.length > 0 &&
+              sayDoRounds === 0 &&
+              calls < Q_TOOL_LOOP_MAX_CALLS &&
+              request.signal?.aborted !== true;
+            const askToDoIt = (
+              said: string,
+              note: ModelMessage = SAY_DO_NOTE,
+            ): void => {
               sayDoRounds = 1;
               rounds += 1;
               messages = [
                 ...messages,
                 { role: "ASSISTANT", content: said },
-                SAY_DO_NOTE,
+                note,
               ];
             };
             if (result.output.kind === "STRUCTURED") {
@@ -2056,6 +2103,13 @@ export function createModelGatewayQAnswer(
                 saidInsteadOfDone(result.output.value, result.output.dropped)
               ) {
                 askToDoIt(JSON.stringify(result.output.value));
+                continue;
+              }
+              if (
+                screenNote !== null &&
+                askedWhatScreenShows(result.output.value)
+              ) {
+                askToDoIt(JSON.stringify(result.output.value), screenNote);
                 continue;
               }
               // Nothing to look up, and the answer in the task's shape.
@@ -2090,6 +2144,14 @@ export function createModelGatewayQAnswer(
                 saidInsteadOfDone(accepted.value, accepted.dropped)
               ) {
                 askToDoIt(result.output.text);
+                continue;
+              }
+              if (
+                accepted.ok &&
+                screenNote !== null &&
+                askedWhatScreenShows(accepted.value)
+              ) {
+                askToDoIt(result.output.text, screenNote);
                 continue;
               }
               if (accepted.ok) {
