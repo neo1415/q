@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
+
 import {
   createDefaultPromptRegistry,
   TURN_READER_V23,
@@ -26,9 +28,10 @@ describe("TURN_READER v24", () => {
       "Dictating or drafting a message for someone else",
     );
     expect(template).toContain("EARLIER NOT FOR Q: earlierNotForQ is true");
-    // Everything v23 said is still said (the addressed line only grows).
+    // Everything v23 said is still said (the addressed line and the
+    // destinations line only grow).
     for (const line of TURN_READER_V23.template.split("\n")) {
-      if (line.startsWith("ADDRESSED:")) continue;
+      if (line.startsWith("ADDRESSED:") || line.includes("DAILY (")) continue;
       expect(template).toContain(line);
     }
   });
@@ -44,5 +47,19 @@ describe("TURN_READER v24", () => {
     });
     expect(parsed.earlierNotForQ).toBe(false);
     expect(parsed.addressedToQ).toBe(true);
+  });
+
+  it("names every contract destination exactly once, and RESULTS", () => {
+    for (const destination of new Set<string>([
+      ...Q_NAVIGATE_DESTINATIONS,
+      "RESULTS",
+    ])) {
+      expect(
+        TURN_READER_V24.template.split(
+          new RegExp(`(?<![A-Z_])${destination} \\(`),
+        ).length - 1,
+        destination,
+      ).toBe(1);
+    }
   });
 });

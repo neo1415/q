@@ -34,6 +34,22 @@ if (!TURN_READER_V23.template.includes(TURN_READER_V15_ADDRESSED)) {
   );
 }
 
+/**
+ * RESULTS (QA, lead packet "give /results a Q navigation destination"):
+ * named here so one reader version carries both changes. The contract's
+ * destination arrives with QA's branch.
+ */
+const V21_DAILY_DESTINATION =
+  "DAILY (The Q Daily: their own newspaper of news about their sectors, markets, deals and people they know, today's or this week's edition and its archive).";
+export const TURN_READER_V24_DESTINATIONS =
+  "DAILY (The Q Daily: their own newspaper of news about their sectors, markets, deals and people they know, today's or this week's edition and its archive), RESULTS (Results: what their activity on Capital Q produced -- introductions, conversations, meetings and where each stands -- with reports to download).";
+
+if (!TURN_READER_V23.template.includes(V21_DAILY_DESTINATION)) {
+  throw new Error(
+    "TURN_READER v24 extends v21's DAILY destination, which changed",
+  );
+}
+
 export const TURN_READER_V24: PromptDefinition<
   TurnReaderV7Variables,
   TurnReaderV24Result
@@ -42,7 +58,7 @@ export const TURN_READER_V24: PromptDefinition<
   version: 24,
   status: "ACTIVE",
   changeDescription:
-    "Founder live 2026-10-01: addressedToQ also false for dictation meant for someone else and a name said to another person; new earlierNotForQ when the person says what they said before was not for Q. Code keeps such lines out of what Q reads back.",
+    "Founder live 2026-10-01: addressedToQ also false for dictation meant for someone else and a name said to another person; new earlierNotForQ when the person says what they said before was not for Q. Code keeps such lines out of what Q reads back. QA: names the RESULTS destination.",
   effectiveFrom: "2026-10-01",
   output: {
     kind: "STRUCTURED",
@@ -50,8 +66,7 @@ export const TURN_READER_V24: PromptDefinition<
     schemaVersion: TURN_READER_V24_SCHEMA_VERSION,
     schema: TurnReaderV24ResultSchema,
   },
-  template: TURN_READER_V23.template.replace(
-    TURN_READER_V15_ADDRESSED,
-    TURN_READER_V24_ADDRESSED,
-  ),
+  template: TURN_READER_V23.template
+    .replace(TURN_READER_V15_ADDRESSED, TURN_READER_V24_ADDRESSED)
+    .replace(V21_DAILY_DESTINATION, TURN_READER_V24_DESTINATIONS),
 };
