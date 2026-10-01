@@ -867,6 +867,34 @@ function clipText(text: string, max: number): string {
   return `${(word > 0 ? room.slice(0, word) : room).trimEnd()}…`;
 }
 
+/** What the played person says when a hand goes up: short, and no question. */
+const YIELD_LINES = [
+  "Go ahead.",
+  "Sure, go on.",
+  "Okay, go ahead.",
+  "Please, go ahead.",
+] as const;
+
+/** The yield for a raised hand, in the mood they were last in, never louder. */
+export function yieldTo(previous: readonly Turn[]): {
+  readonly result: RehearsalTurnResult;
+  readonly sawScreen: boolean;
+} {
+  const theirs = previous.filter((turn) => turn.from === "THEM");
+  const last = theirs.at(-1);
+  return {
+    result: {
+      line: YIELD_LINES[theirs.length % YIELD_LINES.length] ?? "Go ahead.",
+      move: "YIELD",
+      mood: last?.mood ?? "NEUTRAL",
+      intensity: last?.intensity === "SOFT" ? "SOFT" : "NORMAL",
+      reaction: null,
+      conclusion: null,
+    },
+    sawScreen: false,
+  };
+}
+
 /** A shared frame, held in memory for the next turn only; never persisted. */
 type Frame = { readonly image: RehearsalImage; readonly at: number };
 const FRAME_TTL_MS = 90_000;
@@ -1357,14 +1385,21 @@ export function createRehearsalService(dependencies: {
                 sawScreen: false,
               },
             ];
-      const answered = await reply(
-        actor,
-        row,
-        turns,
-        words.length > 0 ? "NONE" : silent ? "SILENCE" : "HAND_RAISED",
-        viewer.organisationName,
-        signal,
-      );
+      // A raised hand is structural: the played person yields the floor at
+      // once, in a few words, and asks nothing, so the next turn is the
+      // person's. No model decides whether to yield (live 2026-10-01: on
+      // the typed path the counterpart carried on with another question).
+      const yielding = words.length === 0 && !silent;
+      const answered = yielding
+        ? yieldTo(previous)
+        : await reply(
+            actor,
+            row,
+            turns,
+            words.length > 0 ? "NONE" : "SILENCE",
+            viewer.organisationName,
+            signal,
+          );
       // Spoken over: the person carried on, and their grown words come as
       // the next turn. Nothing of this one is kept.
       if (signal?.aborted === true) return ok(row);

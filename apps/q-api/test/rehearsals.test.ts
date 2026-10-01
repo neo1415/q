@@ -408,13 +408,26 @@ describe("rehearsals", () => {
     expect(
       said.kind === "OK" && said.rehearsal.turns.map((t) => t.from),
     ).toEqual(["THEM", "YOU", "THEM"]);
+    const calls = seen.turnInputs.length;
     const hand = await service.say(actor(FOUNDER), rehearsal.id, {
       cue: "HAND_RAISED",
     });
-    expect(seen.turnInputs.at(-1)?.cue).toBe("HAND_RAISED");
-    expect(hand.kind === "OK" && hand.rehearsal.turns.at(-1)?.text).toBe(
-      "Go ahead.",
-    );
+    // A raised hand yields the floor by structure: no model turn, a short
+    // line with no question, and the next line is theirs.
+    expect(seen.turnInputs.length).toBe(calls);
+    const yielded =
+      hand.kind === "OK" ? hand.rehearsal.turns.at(-1) : undefined;
+    expect(yielded?.from).toBe("THEM");
+    expect(yielded?.text).toMatch(/go (ahead|on)\.$/i);
+    expect(yielded?.text).not.toContain("?\u0020");
+    expect(yielded?.mood).toBe("SKEPTICAL");
+    const after = await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Thanks. Our churn is 2% a month.",
+    });
+    expect(
+      after.kind === "OK" && after.rehearsal.turns.slice(-2).map((t) => t.from),
+    ).toEqual(["YOU", "THEM"]);
+    expect(seen.turnInputs.at(-1)?.cue).toBe("NONE");
     // The voice line's token is a cue, never words.
     const spokenHand = await service.say(actor(FOUNDER), rehearsal.id, {
       text: "[hand-raised]",
@@ -422,7 +435,10 @@ describe("rehearsals", () => {
     expect(
       spokenHand.kind === "OK" &&
         spokenHand.rehearsal.turns.filter((t) => t.from === "YOU"),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
+    expect(
+      spokenHand.kind === "OK" && spokenHand.rehearsal.turns.at(-1)?.from,
+    ).toBe("THEM");
     expect(
       (await service.say(actor(OTHER), rehearsal.id, { text: "hi" })).kind,
     ).toBe("NOT_FOUND");
