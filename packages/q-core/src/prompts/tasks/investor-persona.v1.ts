@@ -45,7 +45,7 @@ export const INVESTOR_PERSONA_V1: PromptDefinition<
 > = {
   id: "INVESTOR_PERSONA",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",

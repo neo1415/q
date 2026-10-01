@@ -51,6 +51,9 @@ import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
 import { INVESTOR_PERSONA_V1 } from "./tasks/investor-persona.v1.js";
 import { INVESTOR_TWIN_TURN_V1 } from "./tasks/investor-twin-turn.v1.js";
 import { REHEARSAL_SCORE_V1 } from "./tasks/rehearsal-score.v1.js";
+import { INVESTOR_PERSONA_V2 } from "./tasks/investor-persona.v2.js";
+import { INVESTOR_TWIN_TURN_V2 } from "./tasks/investor-twin-turn.v2.js";
+import { REHEARSAL_SCORE_V2 } from "./tasks/rehearsal-score.v2.js";
 import { FOUNDER_RESEARCH_READER_V1 } from "./tasks/founder-research-reader.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
@@ -287,6 +290,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INVESTOR_PERSONA_V1,
     INVESTOR_TWIN_TURN_V1,
     REHEARSAL_SCORE_V1,
+    INVESTOR_PERSONA_V2,
+    INVESTOR_TWIN_TURN_V2,
+    REHEARSAL_SCORE_V2,
     FOUNDER_RESEARCH_READER_V1,
     GATEQ_INTERVIEWER_V1,
   ];

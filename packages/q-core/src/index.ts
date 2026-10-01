@@ -263,6 +263,33 @@ export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
 export { INVESTOR_PERSONA_V1 } from "./prompts/tasks/investor-persona.v1.js";
 export { INVESTOR_TWIN_TURN_V1 } from "./prompts/tasks/investor-twin-turn.v1.js";
 export { REHEARSAL_SCORE_V1 } from "./prompts/tasks/rehearsal-score.v1.js";
+// REHEARSE block (2026-10-01)
+export { INVESTOR_PERSONA_V2 } from "./prompts/tasks/investor-persona.v2.js";
+export { INVESTOR_TWIN_TURN_V2 } from "./prompts/tasks/investor-twin-turn.v2.js";
+export { REHEARSAL_SCORE_V2 } from "./prompts/tasks/rehearsal-score.v2.js";
+export {
+  REHEARSAL_CONCLUSIONS,
+  REHEARSAL_CUES,
+  REHEARSAL_DIMENSIONS,
+  REHEARSAL_LINE_MOODS,
+  REHEARSAL_MOVES,
+  RehearsalReviewResultSchema,
+  RehearsalReviewVariablesSchema,
+  RehearsalTurnResultSchema,
+  RehearsalTurnVariablesSchema,
+  type RehearsalReviewResult,
+  type RehearsalReviewVariables,
+  type RehearsalTurnResult,
+  type RehearsalTurnVariables,
+} from "./prompts/schemas/rehearsal.js";
+export {
+  CounterpartPersonaResultSchema,
+  CounterpartPersonaVariablesSchema,
+  PERSONA_MOODS,
+  type CounterpartPersonaResult,
+  type CounterpartPersonaVariables,
+} from "./prompts/schemas/investor-persona.js";
+// end REHEARSE block
 export { FOUNDER_RESEARCH_READER_V1 } from "./prompts/tasks/founder-research-reader.v1.js";
 export {
   FOUNDER_RESEARCH_READER_SCHEMA_NAME,

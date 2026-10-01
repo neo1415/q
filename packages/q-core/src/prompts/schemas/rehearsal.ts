@@ -118,3 +118,172 @@ export const RehearsalScoreResultSchema = z
   })
   .strict();
 export type RehearsalScoreResult = z.infer<typeof RehearsalScoreResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v2 (REHEARSE, founder direction 2026-10-01): Q plays either side by voice,
+// with a mood per line, yields to a raised hand, may see a shared screen,
+// and runs to a natural conclusion. The review is role-aware; its score is
+// computed by code from the ratings, never a number the model invents.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_SCHEMA_NAME = "RehearsalTurnResult";
+export const REHEARSAL_TURN_SCHEMA_VERSION = 2;
+
+export const REHEARSAL_MOVES = [
+  "QUESTION",
+  "FOLLOW_UP",
+  "ANSWER",
+  "REMARK",
+  "YIELD",
+  "CLOSE",
+] as const;
+export const REHEARSAL_LINE_MOODS = [
+  "WARM",
+  "NEUTRAL",
+  "SKEPTICAL",
+  "IMPATIENT",
+  "ANNOYED",
+  "ENTHUSIASTIC",
+  "COLD",
+  "INDIFFERENT",
+] as const;
+/** How the meeting ended, in the person Q plays' judgement. */
+export const REHEARSAL_CONCLUSIONS = [
+  "INDECISIVE",
+  "STRONG_LATER",
+  "ADJOURNED",
+  "DEAL_AGREED",
+  "DECLINED",
+] as const;
+/** Code-composed cues for a turn; never the person's words. */
+export const REHEARSAL_CUES = [
+  "OPENING",
+  "NONE",
+  "HAND_RAISED",
+  "WRAP_UP",
+] as const;
+
+export const RehearsalTurnVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    viewerRole: z.enum(["FOUNDER", "INVESTOR"]),
+    /** The rehearsing person's own company or fund. Trusted. */
+    viewerOrganisation: z.string().max(200),
+    /** Who Q plays. UNTRUSTED (their own record). */
+    counterpartName: z.string().max(200),
+    counterpartRole: z.enum(["INVESTOR", "FOUNDER"]),
+    /** The persona, as Q read it. UNTRUSTED. */
+    persona: z.string().max(10_000),
+    /** Material to ask or answer from (pitch transcripts, deck, profile). UNTRUSTED. */
+    meetingMaterial: z.string().max(16_000),
+    /** The meeting so far. UNTRUSTED. */
+    rehearsal: z.string().max(24_000),
+    /** Trusted counts and cues composed by code. */
+    turnsSoFar: z.number().int().min(0).max(400),
+    minutesElapsed: z.number().int().min(0).max(600),
+    cue: z.enum(REHEARSAL_CUES),
+    /** A frame of the viewer's shared screen is attached to this turn. */
+    screenShared: z.boolean(),
+  })
+  .strict();
+export type RehearsalTurnVariables = z.infer<
+  typeof RehearsalTurnVariablesSchema
+>;
+
+export const REHEARSAL_TURN_UNTRUSTED = [
+  "counterpartName",
+  "persona",
+  "meetingMaterial",
+  "rehearsal",
+] as const;
+
+export const RehearsalTurnResultSchema = z
+  .object({
+    /** What they say next, spoken: one to four short sentences. */
+    line: z.string().trim().min(1).max(700),
+    move: z.enum(REHEARSAL_MOVES),
+    mood: z.enum(REHEARSAL_LINE_MOODS),
+    /** Set only with move CLOSE. */
+    conclusion: z.enum(REHEARSAL_CONCLUSIONS).nullable(),
+  })
+  .strict();
+export type RehearsalTurnResult = z.infer<typeof RehearsalTurnResultSchema>;
+
+export const REHEARSAL_REVIEW_SCHEMA_NAME = "RehearsalReviewResult";
+export const REHEARSAL_REVIEW_SCHEMA_VERSION = 2;
+
+export const REHEARSAL_DIMENSIONS = [
+  "CLARITY",
+  "EVIDENCE",
+  "HANDLING_PUSHBACK",
+  "FIT_TO_THIS_PERSON",
+  "THE_ASK",
+  "QUESTION_QUALITY",
+  "RAPPORT",
+  "NEXT_STEPS",
+] as const;
+
+export const RehearsalReviewVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    viewerRole: z.enum(["FOUNDER", "INVESTOR"]),
+    viewerOrganisation: z.string().max(200),
+    counterpartName: z.string().max(200),
+    persona: z.string().max(10_000),
+    rehearsal: z.string().max(24_000),
+    /** How it ended, as recorded: a conclusion, or LEFT_EARLY. Trusted. */
+    ending: z.string().max(40),
+  })
+  .strict();
+export type RehearsalReviewVariables = z.infer<
+  typeof RehearsalReviewVariablesSchema
+>;
+
+export const REHEARSAL_REVIEW_UNTRUSTED = [
+  "counterpartName",
+  "persona",
+  "rehearsal",
+] as const;
+
+export const RehearsalReviewResultSchema = z
+  .object({
+    /** Two or three sentences: how the real meeting would likely go. */
+    overall: z.string().trim().min(1).max(600),
+    dimensions: z
+      .array(
+        z
+          .object({
+            name: z.enum(REHEARSAL_DIMENSIONS),
+            rating: z.enum(REHEARSAL_RATINGS),
+            note: z.string().trim().min(3).max(300),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+    wentRight: z
+      .array(
+        z
+          .object({
+            moment: z.string().trim().min(3).max(300),
+            why: z.string().trim().min(3).max(300),
+          })
+          .strict(),
+      )
+      .max(5),
+    wentWrong: z
+      .array(
+        z
+          .object({
+            moment: z.string().trim().min(3).max(300),
+            why: z.string().trim().min(3).max(300),
+            better: z.string().trim().min(3).max(500),
+          })
+          .strict(),
+      )
+      .max(6),
+    /** Tips for meeting THIS person, from the persona. */
+    tips: z.array(z.string().trim().min(3).max(300)).max(6),
+  })
+  .strict();
+export type RehearsalReviewResult = z.infer<typeof RehearsalReviewResultSchema>;
