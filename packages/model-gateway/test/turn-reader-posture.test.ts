@@ -4,6 +4,7 @@ import { createLogger } from "@capital-q/observability";
 
 import type { ModelGateway } from "../src/index.js";
 import { createQTurnReader } from "../src/q/index.js";
+import { TURN_READER_FAST_FIRST_ATTEMPT_MS } from "../src/q/turn-reader.js";
 
 /**
  * The turn reader declares the deployment's data posture like every other
@@ -19,9 +20,14 @@ const logger = createLogger(
 
 function recording() {
   const requests: Record<string, unknown>[] = [];
+  const options: Record<string, unknown>[] = [];
   const gateway = {
-    execute: (request: Record<string, unknown>) => {
+    execute: (
+      request: Record<string, unknown>,
+      option: Record<string, unknown>,
+    ) => {
       requests.push(request);
+      options.push(option);
       return Promise.resolve({
         output: {
           kind: "STRUCTURED",
@@ -37,7 +43,7 @@ function recording() {
       });
     },
   } as unknown as ModelGateway;
-  return { gateway, requests };
+  return { gateway, requests, options };
 }
 
 const input = {
@@ -68,5 +74,30 @@ describe("the turn reader's data posture", () => {
     const { gateway, requests } = recording();
     await createQTurnReader({ gateway, logger }).read(input);
     expect(requests[0]).not.toHaveProperty("dataPosture");
+  });
+
+  // Speed sweep 2026-10-01: the fast shared model hung to the 6 s deadline
+  // on 8 of 74 reads; it now gets 2.5 s before the fallback reads the turn.
+  it("gives the fast first model 2.5 s under the synthetic posture, and nothing shorter otherwise", async () => {
+    const fast = recording();
+    await createQTurnReader({
+      gateway: fast.gateway,
+      logger,
+      dataPosture: "SYNTHETIC_DEMO",
+    }).read(input);
+    expect(TURN_READER_FAST_FIRST_ATTEMPT_MS).toBe(2_500);
+    expect(fast.options[0]?.firstAttemptTimeoutMs).toBe(2_500);
+    expect(
+      (fast.requests[0]?.budget as { attemptTimeoutMs: number })
+        .attemptTimeoutMs,
+    ).toBe(6_000);
+
+    const real = recording();
+    await createQTurnReader({
+      gateway: real.gateway,
+      logger,
+      dataPosture: "REAL_CUSTOMER",
+    }).read(input);
+    expect(real.options[0]).not.toHaveProperty("firstAttemptTimeoutMs");
   });
 });

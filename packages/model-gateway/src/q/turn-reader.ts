@@ -74,6 +74,17 @@ const TURN_READER_BUDGET = {
   attemptTimeoutMs: 6_000,
 } as const;
 
+/**
+ * How long the first model gets when a synthetic-demo posture routes the
+ * read to the fast shared model first and another waits behind it. Measured
+ * 2026-10-01 (ai_ops.model_usage, 72 h, Gemini flash-lite): 66 reads
+ * answered, p90 1.4 s, p99 3.2 s, only 4 over 2.5 s; 8 hung to the 6 s
+ * deadline, each a 6 s stall before the fallback read the turn. At 2.5 s a
+ * hung read costs 2.5 s and the fallback keeps its full 6 s. Not applied to
+ * other postures, where the first model is the slower one (p50 ~2 s).
+ */
+export const TURN_READER_FAST_FIRST_ATTEMPT_MS = 2_500;
+
 export function createQTurnReader(dependencies: {
   readonly gateway: ModelGateway;
   readonly logger: Logger;
@@ -141,6 +152,9 @@ export function createQTurnReader(dependencies: {
           {
             schema: TurnReaderV15ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
+            ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
+              ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
+              : {}),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
