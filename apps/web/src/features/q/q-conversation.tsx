@@ -548,16 +548,36 @@ export function QConversationPanel({
   // words then go to Q as a question (live 2026-09-30).
   const sendText = client.sendText;
   const lineOpen = voiceActive && client.connected;
+  /**
+   * A typed question over the welcome starts the conversation with the
+   * welcome itself as Q's first line (founder live 2026-10-01: "there are
+   * companies in your feed", then "what are these companies?" was met with
+   * "not sure what companies you mean": the welcome was only ever drawn
+   * here, never part of what Q reads). The same words voice opens with.
+   */
+  const rawAsk = q.ask;
+  const welcomeShown =
+    welcomeLine !== undefined && turns.length === 0 && spoken.length === 0;
+  const qAsk = useCallback(
+    async (text: string) => {
+      const opening = welcomeShown
+        ? await spokenWelcome(welcomeLine, welcomeLead, briefing).catch(
+            () => welcomeLine,
+          )
+        : undefined;
+      await rawAsk(text, opening === undefined ? undefined : { opening });
+    },
+    [rawAsk, welcomeShown, welcomeLine, welcomeLead, briefing],
+  );
   const sayOrAsk = useCallback(
     (text: string) => {
       if (lineOpen) sendText(text);
-      else void q.ask(text);
+      else void qAsk(text);
     },
-    [lineOpen, sendText, q],
+    [lineOpen, sendText, qAsk],
   );
 
   // What the welcome's cards do, in this surface rather than elsewhere.
-  const qAsk = q.ask;
   const tools = useMemo<QSurfaceTools>(
     () => ({
       ask: (prompt) => {
@@ -1074,7 +1094,7 @@ export function QConversationPanel({
                         ? (text: string) => {
                             client.sendText(text);
                           }
-                        : q.ask,
+                        : qAsk,
                     }
                   : {})}
               />

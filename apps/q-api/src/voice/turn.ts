@@ -821,7 +821,9 @@ export function createVoiceTurnHandler(
         ...(thread.screen === undefined ? {} : { screen: thread.screen }),
         ...(thread.viewing === undefined ? {} : { viewing: thread.viewing }),
         ...(thread.conversationId === undefined
-          ? {}
+          ? thread.opening === undefined
+            ? {}
+            : { opening: thread.opening }
           : { conversationId: thread.conversationId }),
       },
       idempotencyKey: randomUUID(),
@@ -832,6 +834,8 @@ export function createVoiceTurnHandler(
     });
     const runId = result.run.id;
     thread.conversationId = result.run.conversationId ?? undefined;
+    // Said once, at the head of the conversation it started.
+    thread.opening = undefined;
     // The screen learns which conversation the spoken turns live in, so
     // "Go to chat" opens exactly this thread and a refresh finds it.
     if (thread.conversationId !== undefined) {

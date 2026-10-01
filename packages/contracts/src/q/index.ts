@@ -102,6 +102,7 @@ export {
   AppendQRunMessageRequestSchema,
   CreateQRunRequestSchema,
   Q_MESSAGE_TEXT_MAX_LENGTH,
+  Q_OPENING_MAX_LENGTH,
   QRequestEnvelopeSchema,
   QUserMessageInputSchema,
   QViewingMomentSchema,

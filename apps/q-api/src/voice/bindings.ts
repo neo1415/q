@@ -48,6 +48,12 @@ export type VoiceThread = {
   readonly organisationHint?: string | undefined;
   /** REHEARSE: every turn on this line goes to this rehearsal. */
   readonly rehearsal?: CreateQVoiceSessionRequest["rehearsal"];
+  /**
+   * What Q said aloud to open the line, until the first question starts a
+   * conversation with it as Q's first line: "what are those?" after a
+   * spoken briefing refers to the briefing (founder live 2026-10-01).
+   */
+  opening?: string | undefined;
 };
 
 export type VoiceSessionBinding = {
