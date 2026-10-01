@@ -11,6 +11,7 @@ import {
   initialsOf,
   OUTCOME_WORDS,
   screenChanged,
+  moodWord,
   shouldNudgeSilence,
 } from "../src/features/rehearsal/meet";
 
@@ -142,5 +143,17 @@ describe("the rehearsal's voice language", () => {
     expect(room).toMatch(
       /rehearsal: \{ rehearsalId: initial\.id \},[\s\S]{0,200}\.\.\.deviceLocale\(\)/,
     );
+  });
+});
+
+describe("the played person's tile", () => {
+  it("names the mood quietly, and says nothing when neutral", () => {
+    expect(moodWord({ mood: "ANGRY", intensity: "RAISED" })).toBe(
+      "raising their voice",
+    );
+    expect(moodWord({ mood: "SAD", reaction: "CRY" })).toBe("in tears");
+    expect(moodWord({ mood: "HAPPY" })).toBe("smiling");
+    expect(moodWord({ mood: "NEUTRAL" })).toBeNull();
+    expect(moodWord(undefined)).toBeNull();
   });
 });

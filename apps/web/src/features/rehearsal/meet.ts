@@ -119,3 +119,43 @@ export function shouldNudgeSilence(input: {
     !input.ended
   );
 }
+
+/**
+ * How the played person sounds right now, as a quiet word on their tile
+ * (founder ask 2026-10-01: the tile reflects the mood, subtly). Neutral
+ * says nothing.
+ */
+export const MOOD_WORDS: Readonly<Record<string, string>> = {
+  WARM: "warm",
+  HAPPY: "smiling",
+  ENTHUSIASTIC: "excited",
+  AMUSED: "amused",
+  SKEPTICAL: "sceptical",
+  IMPATIENT: "impatient",
+  ANNOYED: "annoyed",
+  ANGRY: "angry",
+  COLD: "cold",
+  INDIFFERENT: "unmoved",
+  DISAPPOINTED: "disappointed",
+  SAD: "upset",
+  MEEK: "hesitant",
+  AUTHORITATIVE: "firm",
+  SARCASTIC: "sarcastic",
+};
+
+/** The tile's mood word for their latest line, with a raised voice or tears. */
+export function moodWord(
+  turn:
+    | {
+        readonly mood: string | null;
+        readonly intensity?: string | undefined;
+        readonly reaction?: string | null | undefined;
+      }
+    | undefined,
+): string | null {
+  if (turn === undefined || turn.mood === null) return null;
+  if (turn.reaction === "CRY") return "in tears";
+  if (turn.intensity === "RAISED") return "raising their voice";
+  if (turn.reaction === "LAUGH") return "laughing";
+  return MOOD_WORDS[turn.mood] ?? null;
+}

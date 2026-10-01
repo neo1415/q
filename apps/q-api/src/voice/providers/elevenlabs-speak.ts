@@ -227,6 +227,7 @@ function elevenLabsRequest(
   text: string,
   speed: number | undefined,
   signal: AbortSignal,
+  stability?: number,
 ): RequestInit {
   return {
     method: "POST",
@@ -234,9 +235,15 @@ function elevenLabsRequest(
     body: JSON.stringify({
       text,
       model_id: model,
-      ...(speed === undefined
+      ...(speed === undefined && stability === undefined
         ? {}
-        : { voice_settings: { ...VOICE_DEFAULTS, speed } }),
+        : {
+            voice_settings: {
+              ...VOICE_DEFAULTS,
+              ...(speed === undefined ? {} : { speed }),
+              ...(stability === undefined ? {} : { stability }),
+            },
+          }),
     }),
     signal,
   };
@@ -483,6 +490,7 @@ type Engine = {
     readonly format: string;
     readonly text: string;
     readonly speed: number | undefined;
+    readonly stability?: number | undefined;
     readonly signal: AbortSignal;
   }) => Promise<Response>;
 };
@@ -499,10 +507,17 @@ export function createElevenLabsSpeechRelay(
     name: model,
     markup: SPEECH_MARKUP[model],
     elevenLabs: true,
-    request: ({ voice, voiceId, format, text, speed, signal }) =>
+    request: ({ voice, voiceId, format, text, speed, stability, signal }) =>
       doFetch(
         streamUrl(voice, format, voiceId),
-        elevenLabsRequest(options.apiKey, model, text, speed, signal),
+        elevenLabsRequest(
+          options.apiKey,
+          model,
+          text,
+          speed,
+          signal,
+          stability,
+        ),
       ),
   }));
   const auraStream = options.aura;
@@ -560,6 +575,9 @@ export function createElevenLabsSpeechRelay(
               format,
               text: speech.text,
               speed: speech.speed,
+              ...(speech.stability === undefined
+                ? {}
+                : { stability: speech.stability }),
               signal: s,
             }),
           signal,

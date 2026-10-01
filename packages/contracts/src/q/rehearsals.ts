@@ -145,6 +145,8 @@ export const REHEARSAL_MOODS = [
   "MEEK",
   "SARCASTIC",
   "AMUSED",
+  "HAPPY",
+  "DISAPPOINTED",
 ] as const;
 export const REHEARSAL_OUTCOMES = [
   "INDECISIVE",
@@ -168,7 +170,7 @@ export const QRehearsalTurnDtoSchema = z
     sawScreen: z.boolean(),
     /** How loud the played person said it, and any sound before it. */
     intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
-    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH"]).nullable().optional(),
+    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullable().optional(),
   })
   .strict();
 export type QRehearsalTurnDto = z.infer<typeof QRehearsalTurnDtoSchema>;

@@ -43,6 +43,7 @@ import {
   greySignature,
   initialsOf,
   screenChanged,
+  moodWord,
   shouldNudgeSilence,
 } from "./meet";
 import {
@@ -472,6 +473,9 @@ export function RehearsalRoom({
       ? null
       : { who: lastTurn.from === "THEM" ? name : "You", text: lastTurn.text };
   const thinking = voice.state === "THINKING" || sending;
+  const mood = moodWord(
+    [...rehearsal.turns].reverse().find((turn) => turn.from === "THEM"),
+  );
 
   const personaView = (
     <div
@@ -493,6 +497,8 @@ export function RehearsalRoom({
         {name}
         {thinking ? (
           <span className="text-(--cq-stage-text-muted)"> · thinking</span>
+        ) : mood !== null ? (
+          <span className="text-(--cq-stage-text-muted)"> · {mood}</span>
         ) : null}
       </span>
     </div>

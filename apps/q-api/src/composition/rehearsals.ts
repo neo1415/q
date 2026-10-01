@@ -31,16 +31,25 @@ import {
   normaliseRehearsalReview,
   RehearsalReviewLenientSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnV3ResultSchema,
+  RehearsalTurnV4ResultSchema,
   renderPrompt,
   type CounterpartPersonaResult,
   type CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV3Result as RehearsalTurnResult,
-  type RehearsalTurnV3Variables as RehearsalTurnVariables,
+  type RehearsalTurnV4Result as RehearsalTurnResult,
+  type RehearsalTurnV4Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
+
+import {
+  applyAppraisal,
+  deliveryFor,
+  initialTemperament,
+  registerOf,
+  temperamentNote,
+  type Temperament,
+} from "./rehearsal-temperament.js";
 
 /**
  * Rehearsals (C12 Investor Twin, generalised by REHEARSE, founder direction
@@ -185,6 +194,8 @@ const MOODS = [
   "MEEK",
   "SARCASTIC",
   "AMUSED",
+  "HAPPY",
+  "DISAPPOINTED",
 ] as const;
 type Mood = (typeof MOODS)[number];
 
@@ -196,7 +207,15 @@ const StoredTurnSchema = z.object({
   mood: z.enum(MOODS).nullish(),
   sawScreen: z.boolean().optional(),
   intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
-  reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH"]).nullish(),
+  reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullish(),
+  state: z
+    .object({
+      patience: z.number(),
+      warmth: z.number(),
+      frustration: z.number(),
+      hurt: z.number(),
+    })
+    .optional(),
 });
 
 export type Turn = {
@@ -207,7 +226,9 @@ export type Turn = {
   readonly sawScreen: boolean;
   /** How loud the played person said it, and any sound before it. */
   readonly intensity?: "SOFT" | "NORMAL" | "RAISED" | undefined;
-  readonly reaction?: "LAUGH" | "CHUCKLE" | "SIGH" | null | undefined;
+  readonly reaction?: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null | undefined;
+  /** The played person's temperament after this line (code-tracked). */
+  readonly state?: Temperament | undefined;
 };
 
 export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
@@ -225,6 +246,7 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
       sawScreen: turn.sawScreen === true,
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
+      ...(turn.state === undefined ? {} : { state: turn.state }),
     };
   });
 }
@@ -693,7 +715,7 @@ export type RehearsalService = {
     readonly voice: "FEMALE" | "MALE";
     readonly mood: Mood | null;
     readonly intensity: "SOFT" | "NORMAL" | "RAISED";
-    readonly reaction: "LAUGH" | "CHUCKLE" | "SIGH" | null;
+    readonly reaction: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null;
   } | null>;
 };
 
@@ -879,11 +901,14 @@ const YIELD_LINES = [
 export function yieldTo(previous: readonly Turn[]): {
   readonly result: RehearsalTurnResult;
   readonly sawScreen: boolean;
+  readonly state: Temperament | undefined;
 } {
   const theirs = previous.filter((turn) => turn.from === "THEM");
   const last = theirs.at(-1);
   return {
+    state: last?.state,
     result: {
+      appraisal: "NEUTRAL",
       line: YIELD_LINES[theirs.length % YIELD_LINES.length] ?? "Go ahead.",
       move: "YIELD",
       mood: last?.mood ?? "NEUTRAL",
@@ -1117,6 +1142,7 @@ export function createRehearsalService(dependencies: {
   ): Promise<{
     readonly result: RehearsalTurnResult;
     readonly sawScreen: boolean;
+    readonly state: Temperament;
   } | null> {
     const persona = personaOf(row.persona);
     if (persona === null) return null;
@@ -1132,6 +1158,12 @@ export function createRehearsalService(dependencies: {
     const wrapUp =
       cue === "NONE" &&
       (minutes >= WRAP_UP_MINUTES || turns.length >= WRAP_UP_TURNS);
+    // The temperament so far: carried on their last line, or where the
+    // persona and difficulty start them.
+    const before =
+      [...turns].reverse().find((turn) => turn.from === "THEM")?.state ??
+      initialTemperament(row.difficulty, persona.temperament.baseline);
+    const registerBefore = registerOf(before);
     const result = await composer.turn(
       actor,
       {
@@ -1146,12 +1178,28 @@ export function createRehearsalService(dependencies: {
         minutesElapsed: Math.max(0, Math.min(minutes, 600)),
         cue: wrapUp ? "WRAP_UP" : cue,
         difficulty: row.difficulty,
+        temperament: temperamentNote(before, registerBefore),
         screenShared: fresh !== null,
       },
       fresh?.image ?? null,
       signal,
     );
-    return result === null ? null : { result, sawScreen: fresh !== null };
+    if (result === null) return null;
+    // Their latest line moves the state by fixed rules; the state decides
+    // the register the voice delivers this line in.
+    const after = applyAppraisal(before, result.appraisal, row.difficulty);
+    const register = registerOf(after);
+    const delivery = deliveryFor(register, registerBefore, result);
+    return {
+      result: {
+        ...result,
+        mood: delivery.mood as RehearsalTurnResult["mood"],
+        intensity: delivery.intensity,
+        reaction: delivery.reaction,
+      },
+      sawScreen: fresh !== null,
+      state: after,
+    };
   }
 
   const viewerOf = (actor: ActorContext) =>
@@ -1314,6 +1362,7 @@ export function createRehearsalService(dependencies: {
             sawScreen: false,
             intensity: opening.result.intensity,
             reaction: opening.result.reaction,
+            state: opening.state,
           },
         ],
       });
@@ -1416,6 +1465,7 @@ export function createRehearsalService(dependencies: {
           sawScreen: answered.sawScreen,
           intensity: result.intensity,
           reaction: result.reaction,
+          ...(answered.state === undefined ? {} : { state: answered.state }),
         },
       ];
       const saved = await store.saveTurns(actor, row.id, {
@@ -1623,7 +1673,7 @@ export function createRehearsalComposer(dependencies: {
         "NORMAL_DIALOGUE",
         TURN_BUDGET,
         variables,
-        RehearsalTurnV3ResultSchema,
+        RehearsalTurnV4ResultSchema,
         image,
         signal,
       );

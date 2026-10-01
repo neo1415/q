@@ -23,7 +23,8 @@
  * survives.
  */
 
-export type SpeechReaction = "LAUGH" | "CHUCKLE" | "SIGH";
+/** CRY only from a rehearsal persona's delivery (REHEARSE), never Q. */
+export type SpeechReaction = "LAUGH" | "CHUCKLE" | "SIGH" | "CRY";
 export type SpeechPace = "NORMAL" | "SLOWER" | "FASTER";
 
 /**
@@ -45,6 +46,8 @@ export const SPEECH_TONES = [
   "MEEK",
   "SARCASTIC",
   "AMUSED",
+  "HAPPY",
+  "DISAPPOINTED",
 ] as const;
 export type SpeechTone = (typeof SPEECH_TONES)[number];
 /** How loud: SOFT is quiet or under the breath, RAISED a raised voice. */

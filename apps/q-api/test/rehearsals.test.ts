@@ -260,6 +260,7 @@ function setup(options: { messages?: () => string } = {}) {
         return Promise.resolve({
           line: "Let's pick this up when you have cohorts.",
           move: "CLOSE",
+          appraisal: "NEUTRAL",
           mood: "NEUTRAL",
           intensity: "NORMAL",
           reaction: null,
@@ -270,6 +271,8 @@ function setup(options: { messages?: () => string } = {}) {
         line:
           variables.cue === "HAND_RAISED" ? "Go ahead." : "What's retention?",
         move: variables.cue === "HAND_RAISED" ? "YIELD" : "QUESTION",
+        // On Tough the founder's bad answer reads as rude.
+        appraisal: variables.difficulty === "TOUGH" ? "RUDE" : "NEUTRAL",
         mood: variables.difficulty === "TOUGH" ? "ANGRY" : "SKEPTICAL",
         intensity: variables.difficulty === "TOUGH" ? "RAISED" : "NORMAL",
         reaction: variables.cue === "SILENCE" ? "SIGH" : null,
@@ -587,6 +590,20 @@ describe("rehearsal audit (2026-10-01)", () => {
     const last = said.kind === "OK" ? said.rehearsal.turns.at(-1) : undefined;
     expect(last?.mood).toBe("ANGRY");
     expect(last?.intensity).toBe("RAISED");
+    // Not the model's say-so: the stonewalled state is what raised it.
+    const calm = setup();
+    const gentle = await calm.service.start(actor(FOUNDER), {
+      kind: "INVESTOR_ORGANISATION",
+      id: INVESTOR,
+      difficulty: "GENTLE",
+    });
+    if (gentle.kind !== "OK") throw new Error(gentle.kind);
+    const softer = await calm.service.say(actor(FOUNDER), gentle.rehearsal.id, {
+      text: "We have no revenue yet.",
+    });
+    const line =
+      softer.kind === "OK" ? softer.rehearsal.turns.at(-1) : undefined;
+    expect(line?.intensity).not.toBe("RAISED");
   });
 
   it("reacts to silence once, with no words of theirs recorded", async () => {

@@ -67,6 +67,6 @@ describe("lenient rehearsal readings", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(3);
     expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(3);
-    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(3);
+    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(4);
   });
 });
