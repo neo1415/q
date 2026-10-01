@@ -142,6 +142,36 @@ describe("the agent's speak settings", () => {
     });
   });
 
+  it.each([
+    ["en-GB", "flux-general-en", "en"],
+    [undefined, "flux-general-en", "en"],
+    ["fr-FR", "flux-general-multi", "multi"],
+    ["yo", "flux-general-multi", "multi"],
+  ])(
+    "hears and speaks in the person's language (device %s; founder direction 2026-10-01)",
+    (locale, model, spoken) => {
+      const provider = createDeepgramVoiceProvider({
+        apiKey: "dg-key-never-printed",
+        publicUrl: PUBLIC_URL,
+        thinkPath: "/v1/q/voice/think",
+        speak: {
+          path: "/v1/q/voice/speak",
+          relay: createElevenLabsSpeechRelay({ apiKey: KEY }),
+        },
+      });
+      const settings = provider.settingsFor({
+        voice: "FEMALE",
+        greeting: undefined,
+        thinkToken: "secret-think-token",
+        ...(locale === undefined ? {} : { locale }),
+      });
+      expect(settings.agent).toMatchObject({
+        listen: { provider: { model } },
+        speak: { provider: { language: spoken } },
+      });
+    },
+  );
+
   it("still speaks in Aura-2 on a build with no ElevenLabs key", () => {
     const provider = createDeepgramVoiceProvider({
       apiKey: "dg-key-never-printed",

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
+import { QLocaleSchema } from "./context.js";
 import { QConversationIdSchema } from "./ids.js";
 import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
 import { QSubjectRefsSchema } from "./subject.js";
@@ -208,6 +209,12 @@ export const CreateQVoiceSessionRequestSchema = z
      * is checked by the rehearsal service on every turn.
      */
     rehearsal: z.object({ rehearsalId: UuidSchema }).strict().optional(),
+    /**
+     * The device's language (BCP 47, from the browser), so a person who
+     * speaks another language is heard and answered in it (founder
+     * direction 2026-10-01). A preference, never authority.
+     */
+    locale: QLocaleSchema.optional(),
   })
   .strict();
 

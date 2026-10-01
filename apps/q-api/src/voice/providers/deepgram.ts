@@ -73,6 +73,14 @@ export type DeepgramVoiceProvider = {
      * as "name salvage" until the recogniser was told the word existed.
      */
     readonly terms?: readonly string[] | undefined;
+    /**
+     * The person's device language. English (or none) keeps the English
+     * recogniser, tuned for its end-of-turn behaviour; any other language
+     * hears and speaks multilingually, so Q follows the language the
+     * person actually speaks in (the answer itself already follows their
+     * words).
+     */
+    readonly locale?: string | undefined;
   }) => DeepgramAgentSettings;
 };
 
@@ -108,6 +116,13 @@ export class DeepgramTokenError extends Error {
   }
 }
 
+/** Whether a device language is anything but English. */
+export function speaksBeyondEnglish(locale: string | undefined): boolean {
+  if (locale === undefined) return false;
+  const language = locale.split("-")[0]?.toLowerCase() ?? "";
+  return language.length > 0 && language !== "en";
+}
+
 export function createDeepgramVoiceProvider(
   options: DeepgramVoiceProviderOptions,
 ): DeepgramVoiceProvider {
@@ -129,6 +144,7 @@ export function createDeepgramVoiceProvider(
   const speakFor = (
     voice: QVoiceChoice,
     thinkToken: string,
+    multilingual: boolean,
   ): Record<string, unknown> =>
     speak === undefined
       ? { provider: { type: "deepgram", model: SPEAK_MODELS[voice] } }
@@ -136,7 +152,7 @@ export function createDeepgramVoiceProvider(
           provider: {
             type: "eleven_labs",
             model_id: ELEVENLABS_MODEL_ID,
-            language: "en",
+            language: multilingual ? "multi" : "en",
           },
           endpoint: {
             // No voice in the URL: the relay reads the session's voice
@@ -173,67 +189,70 @@ export function createDeepgramVoiceProvider(
       }
       return body.access_token;
     },
-    settingsFor: ({ voice, greeting, thinkToken, terms }) => ({
-      agent: {
-        language: "en",
-        ...(greeting === undefined ? {} : { greeting }),
-        listen: {
-          provider: {
-            type: "deepgram",
-            version: "v2",
-            model: "flux-general-en",
-            keyterms: [
-              ...new Set([
-                ...(terms ?? [])
-                  .map((term) => term.trim())
-                  .filter((term) => term.length >= 2 && term.length <= 60),
-                ...ASR_KEYWORDS,
-              ]),
-            ].slice(0, 100),
-            // When a person has finished. The threshold is how sure the
-            // turn model must be; the timeout is how long it waits for
-            // that certainty before ending the turn anyway.
-            //
-            // It was 0.8 with the provider's default timeout of five
-            // seconds. A short utterance — "what's up?" — rarely reaches
-            // 0.8 on its own, so the turn ended only when the timeout did,
-            // and five seconds of silence sat in front of every reply
-            // before Q had even begun. The provider's own default is 0.7;
-            // three seconds is the longest a person reads as "listening"
-            // rather than "not working".
-            //
-            // Then 0.7 split people thinking aloud into a turn per pause
-            // (live, 2026-09-25: twelve fragments of one thought). Measured
-            // on the same audio streamed to Flux in real time, 3 runs each
-            // (design/voice-comparison/flux-end-of-turn.md): 0.85 with a
-            // four-second ceiling kept a trailing-off thought whole that
-            // 0.7 and 0.8 split, and split a three-clause sentence in two
-            // rather than three, for about 0.4 s more on a finished
-            // sentence (end of speech to end of turn 0.9 s -> 1.3 s). 0.9
-            // split no less and cost another 0.4 s. What the recogniser
-            // still ends open is held by the turn (turn.ts, unfinished).
-            eot_threshold: 0.85,
-            eot_timeout_ms: 4_000,
+    settingsFor: ({ voice, greeting, thinkToken, terms, locale }) => {
+      const multilingual = speaksBeyondEnglish(locale);
+      return {
+        agent: {
+          ...(multilingual ? {} : { language: "en" }),
+          ...(greeting === undefined ? {} : { greeting }),
+          listen: {
+            provider: {
+              type: "deepgram",
+              version: "v2",
+              model: multilingual ? "flux-general-multi" : "flux-general-en",
+              keyterms: [
+                ...new Set([
+                  ...(terms ?? [])
+                    .map((term) => term.trim())
+                    .filter((term) => term.length >= 2 && term.length <= 60),
+                  ...ASR_KEYWORDS,
+                ]),
+              ].slice(0, 100),
+              // When a person has finished. The threshold is how sure the
+              // turn model must be; the timeout is how long it waits for
+              // that certainty before ending the turn anyway.
+              //
+              // It was 0.8 with the provider's default timeout of five
+              // seconds. A short utterance — "what's up?" — rarely reaches
+              // 0.8 on its own, so the turn ended only when the timeout did,
+              // and five seconds of silence sat in front of every reply
+              // before Q had even begun. The provider's own default is 0.7;
+              // three seconds is the longest a person reads as "listening"
+              // rather than "not working".
+              //
+              // Then 0.7 split people thinking aloud into a turn per pause
+              // (live, 2026-09-25: twelve fragments of one thought). Measured
+              // on the same audio streamed to Flux in real time, 3 runs each
+              // (design/voice-comparison/flux-end-of-turn.md): 0.85 with a
+              // four-second ceiling kept a trailing-off thought whole that
+              // 0.7 and 0.8 split, and split a three-clause sentence in two
+              // rather than three, for about 0.4 s more on a finished
+              // sentence (end of speech to end of turn 0.9 s -> 1.3 s). 0.9
+              // split no less and cost another 0.4 s. What the recogniser
+              // still ends open is held by the turn (turn.ts, unfinished).
+              eot_threshold: 0.85,
+              eot_timeout_ms: 4_000,
+            },
+          },
+          think: {
+            provider: { type: "open_ai", model: "capital-q" },
+            endpoint: {
+              url: thinkUrl,
+              headers: { authorization: `Bearer ${thinkToken}` },
+            },
+            prompt: THINK_PROMPT,
+          },
+          speak: speakFor(voice, thinkToken, multilingual),
+        },
+        audio: {
+          input: { encoding: "linear16", sample_rate: 16_000 },
+          output: {
+            encoding: "linear16",
+            sample_rate: 24_000,
+            container: "none",
           },
         },
-        think: {
-          provider: { type: "open_ai", model: "capital-q" },
-          endpoint: {
-            url: thinkUrl,
-            headers: { authorization: `Bearer ${thinkToken}` },
-          },
-          prompt: THINK_PROMPT,
-        },
-        speak: speakFor(voice, thinkToken),
-      },
-      audio: {
-        input: { encoding: "linear16", sample_rate: 16_000 },
-        output: {
-          encoding: "linear16",
-          sample_rate: 24_000,
-          container: "none",
-        },
-      },
-    }),
+      };
+    },
   };
 }

@@ -122,6 +122,15 @@ export function withGreeting(
   };
 }
 
+/** The browser's language, when it is a well-formed tag. */
+function deviceLocale(): { readonly locale?: string } {
+  if (typeof navigator === "undefined") return {};
+  const tag = navigator.language;
+  return /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(tag) && tag.length <= 35
+    ? { locale: tag }
+    : {};
+}
+
 export function useVoiceInterview(
   events: VoiceSessionEvents = {},
 ): VoiceInterview {
@@ -228,6 +237,8 @@ export function useVoiceInterview(
           : { organisationHint: thread.organisationHint }),
         // R21: the screen the line opens on; moves follow below.
         screen: currentScreen(),
+        // Heard and spoken in the person's own language.
+        ...deviceLocale(),
         voice: chosen,
       });
       if (!started.ok) {

@@ -712,6 +712,7 @@ export function registerQVoiceRoutes(
             voice,
             greeting: firstMessage,
             thinkToken,
+            ...(input.locale === undefined ? {} : { locale: input.locale }),
             // The organisation they typed at sign-up: the one name in this
             // conversation the recogniser could not know.
             terms: [
