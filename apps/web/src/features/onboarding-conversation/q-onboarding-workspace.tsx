@@ -28,6 +28,7 @@ import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { OnboardingTurn } from "../onboarding-kit/controller";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
+import { announceQGestures } from "../q-swarm/q-gestures";
 import {
   onboardingThreadAction,
   onboardingThreadKeepAction,
@@ -795,6 +796,15 @@ export function QOnboardingWorkspace({
       // Q's patience (founder direction 2026-09-30): Q alone turns orange,
       // then red; being sent away, or paused, happens once Q's words have
       // been read.
+      // PRESENCE: the reply's gestures, played as it lands (typed).
+      if (turn.reply !== null && turn.gestures !== undefined) {
+        announceQGestures({
+          answerId: crypto.randomUUID(),
+          gestures: turn.gestures,
+          spoken: false,
+          text: turn.reply,
+        });
+      }
       const conduct = turn.conduct;
       if (conduct !== undefined) {
         if (conduct.mood === "CALM") {

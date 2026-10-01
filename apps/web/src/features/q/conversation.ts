@@ -4,6 +4,7 @@ import {
   type QFindingType,
   type QMessage,
   type QResultBlock,
+  type QSentenceGesture,
 } from "@capital-q/contracts";
 import type { QStreamState } from "@capital-q/api-client";
 
@@ -68,6 +69,8 @@ export type QTurn =
        * into the browser's model of the conversation.
        */
       readonly blocks: readonly QTurnObjectBlock[];
+      /** PRESENCE: what Q's particles form for which sentence (closed set). */
+      readonly gestures?: readonly QSentenceGesture[] | undefined;
     };
 
 /**
@@ -285,6 +288,9 @@ export function turnsFrom(
         findings: findingsOf(message.blocks),
         uncertainties: uncertaintiesOf(message.blocks),
         blocks: objectBlocksOf(message.blocks),
+        ...(message.gestures === undefined
+          ? {}
+          : { gestures: message.gestures }),
       },
     });
   }

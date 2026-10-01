@@ -15,6 +15,7 @@ import {
   startVoiceSessionAction,
 } from "./actions";
 import { currentScreen, currentViewing } from "../q/screen";
+import { announceQGestures } from "../q-swarm/q-gestures";
 import { storeVoicePreference, useVoicePreference } from "./voice-preference";
 import { useVoiceSession } from "./use-voice-session";
 import type {
@@ -195,8 +196,14 @@ export function useVoiceInterview(
   useEffect(() => {
     endedRef.current = ended;
   });
+  /** Q's latest spoken line, to time its gestures by sentence. */
+  const lastQLine = useRef("");
   const client = useVoiceSession({
     ...events,
+    onLine: (line) => {
+      if (line.role === "q") lastQLine.current = line.text;
+      events.onLine?.(line);
+    },
     onEnded: ended,
     onError: (message) => {
       setNotice(message);
@@ -304,6 +311,17 @@ export function useVoiceInterview(
         return;
       }
       if (read.ok) {
+        // PRESENCE: the spoken answer's gestures, played against Q's voice
+        // (announced once per answer, however often the board is read).
+        const presence = read.value.presence;
+        if (presence !== undefined) {
+          announceQGestures({
+            answerId: presence.answerId,
+            gestures: presence.gestures,
+            spoken: true,
+            text: lastQLine.current,
+          });
+        }
         setTurn((current) =>
           current !== null && current.sequence >= read.value.sequence
             ? current

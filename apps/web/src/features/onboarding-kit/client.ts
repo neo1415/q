@@ -1,4 +1,4 @@
-import type { QConduct } from "@capital-q/contracts";
+import type { QConduct, QSentenceGesture } from "@capital-q/contracts";
 /**
  * The frontend-facing port for an onboarding journey, generic over the
  * journey's presentation view and composite responses. Screens and the
@@ -91,6 +91,8 @@ export type OnboardingClient<TView, TResponse> = {
         readonly researching: string | null;
         /** Q's patience after the turn (founder direction 2026-09-30). */
         readonly conduct?: QConduct | undefined;
+        /** PRESENCE: what Q's particles form for which sentence. */
+        readonly gestures?: readonly QSentenceGesture[] | undefined;
       }>)
     | undefined;
   /** Deterministic taxonomy candidates for the user's own text. Never assigned here. */
