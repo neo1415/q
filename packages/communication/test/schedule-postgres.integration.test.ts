@@ -11,6 +11,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import {
   createNetworkMeetingActivityWriter,
+  createCounterpartNotices,
   createPostgresMeetingDirectory,
   createPostgresScheduleStore,
   createScheduleService,
@@ -199,5 +200,70 @@ describe("@capital-q/communication schedule against PostgreSQL", () => {
     expect(first.outcome === "OK" && first.alreadyCreated).toBe(false);
     expect(second.outcome === "OK" && second.alreadyCreated).toBe(true);
     expect(await service.listReminders(founder)).toHaveLength(1);
+  });
+  it("records a time agreed in the chat without Google, and tells the other side (AUTO 2026-10-02)", async () => {
+    const startsAt = new Date(clock.getTime() + 30 * 3_600_000);
+    const key = `errand:${randomUUID()}:agreed`;
+    const agreed = await service.recordAgreed({
+      actor: founder,
+      relationshipId: ids.relationship,
+      purpose: "Agreed call",
+      startsAt,
+      durationMinutes: 30,
+      timeZone: "Africa/Lagos",
+      idempotencyKey: key,
+      correlationId: `cor_${randomUUID()}`,
+    });
+    expect(agreed.outcome).toBe("OK");
+    if (agreed.outcome !== "OK") return;
+    expect(agreed.meeting.meetLink).toBeNull();
+    expect(agreed.invitees.map((person) => person.email)).toHaveLength(1);
+    const again = await service.recordAgreed({
+      actor: founder,
+      relationshipId: ids.relationship,
+      purpose: "Agreed call",
+      startsAt,
+      durationMinutes: 30,
+      timeZone: "Africa/Lagos",
+      idempotencyKey: key,
+      correlationId: `cor_${randomUUID()}`,
+    });
+    expect(again.outcome === "OK" && again.alreadyScheduled).toBe(true);
+    const events = await db.sql<{ event_type: string }[]>`
+      select event_type from network.relationship_events
+       where relationship_id = ${ids.relationship} and event_type = 'meeting_scheduled'`;
+    expect(events.length).toBeGreaterThanOrEqual(1);
+
+    const notices = createCounterpartNotices(db.sql);
+    const told = await notices.notify({
+      relationshipId: ids.relationship,
+      actingSide: "COMPANY",
+      kind: "TIME_PROPOSED",
+      title: "Q, on behalf of Ada, proposed times for a call",
+      body: "1. Mon",
+      target: "CHAT",
+      key: `test:${key}`,
+      priority: "NEEDS_YOU",
+    });
+    expect(told).toBe(1);
+    expect(
+      await notices.notify({
+        relationshipId: ids.relationship,
+        actingSide: "COMPANY",
+        kind: "TIME_PROPOSED",
+        title: "again",
+        body: null,
+        target: "CHAT",
+        key: `test:${key}`,
+        priority: "NEEDS_YOU",
+      }),
+    ).toBe(0);
+    const [row] = await db.sql<{ user_id: string; link_path: string }[]>`
+      select user_id, link_path from communication.notifications
+       where dedupe_key = ${`time_proposed:test:${key}`}`;
+    expect(row?.user_id).toBe(investor.userId);
+    expect(row?.link_path).toBe(
+      `/relationships/company/${ids.company}/messages`,
+    );
   });
 });

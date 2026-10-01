@@ -20,6 +20,14 @@ export type AppEmail = {
    * instead of the branded frame. The plain text is always sent beside it.
    */
   readonly html?: string | undefined;
+  /** Small text files sent with it (a calendar invite, AUTO 2026-10-02). */
+  readonly attachments?:
+    | readonly {
+        readonly filename: string;
+        readonly content: string;
+        readonly contentType: string;
+      }[]
+    | undefined;
 };
 
 export type AppEmailSender = {
@@ -129,6 +137,15 @@ export function createSmtpAppEmailSender(config: {
         subject: message.subject,
         text: message.text,
         html: message.html ?? brandedEmailHtml(message),
+        ...(message.attachments === undefined
+          ? {}
+          : {
+              attachments: message.attachments.map((file) => ({
+                filename: file.filename,
+                content: file.content,
+                contentType: file.contentType,
+              })),
+            }),
       });
     },
   };
@@ -167,6 +184,14 @@ export function createBrevoApiEmailSender(config: {
           subject: message.subject,
           textContent: message.text,
           htmlContent: message.html ?? brandedEmailHtml(message),
+          ...(message.attachments === undefined
+            ? {}
+            : {
+                attachment: message.attachments.map((file) => ({
+                  name: file.filename,
+                  content: Buffer.from(file.content, "utf8").toString("base64"),
+                })),
+              }),
         }),
         signal: AbortSignal.timeout(15_000),
       });

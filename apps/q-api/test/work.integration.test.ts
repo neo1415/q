@@ -157,6 +157,7 @@ describe("Q's delegated work against PostgreSQL", () => {
           why: "Fits the mandate on what was said.",
         }),
       standInReply: () => Promise.resolve(null),
+      slotReader: () => Promise.resolve(null),
     };
     const dependencies = (): WorkRuntimeDependencies => ({
       store,

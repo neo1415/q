@@ -606,7 +606,7 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
     await post(
       state,
       `booked:${key}`,
-      `${state.ref.principalName} would like to talk: ${booked.when}. A calendar invite${booked.meetLink === null ? "" : ` with a Google Meet link (${booked.meetLink})`} is on its way to you. If the time doesn't suit, say so here.`,
+      `${state.ref.principalName} would like to talk: ${booked.when}. A calendar invite${booked.meetLink === null ? " is on its way to you by email; a video link will follow." : ` with a Google Meet link (${booked.meetLink}) is on its way to you.`} If the time doesn't suit, say so here.`,
       "INFO",
     );
     await label(state, "CALL_BOOKED", `Call booked: ${booked.when}.`, {
@@ -624,7 +624,7 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
       title: `Call with ${state.counterpartName} booked: ${booked.when}`,
       body:
         booked.meetLink === null
-          ? "The invite is in your calendar."
+          ? "The invite is in your email. Add a video link: connect Google Calendar in Settings, or paste a link in the chat."
           : `Meet link: ${booked.meetLink}`,
       link: state.chatPath,
       priority: "UPDATE",

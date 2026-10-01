@@ -82,6 +82,13 @@ export type AppEmailPort = {
     readonly to: string;
     readonly subject: string;
     readonly text: string;
+    readonly attachments?:
+      | readonly {
+          readonly filename: string;
+          readonly content: string;
+          readonly contentType: string;
+        }[]
+      | undefined;
   }) => Promise<void>;
 };
 
@@ -189,6 +196,33 @@ export type ScheduleService = {
     ScheduleOutcome<{
       readonly meeting: MeetingView;
       readonly alreadyScheduled: boolean;
+    }>
+  >;
+  /**
+   * AUTO (2026-10-02): a meeting both sides agreed in the chat, recorded
+   * without the organiser's Google calendar -- the same meeting row,
+   * relationship event, reminder and notices as `schedule`, no Meet link
+   * (link to follow). The caller sends the calendar invite (.ics).
+   */
+  readonly recordAgreed: (input: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+    readonly purpose: string;
+    readonly startsAt: Date;
+    readonly durationMinutes: number;
+    readonly timeZone: string;
+    readonly idempotencyKey: string;
+    readonly qActionId?: string | undefined;
+    readonly correlationId: string;
+  }) => Promise<
+    ScheduleOutcome<{
+      readonly meeting: MeetingView;
+      readonly alreadyScheduled: boolean;
+      readonly organiser: { readonly name: string; readonly email: string };
+      readonly invitees: readonly {
+        readonly name: string;
+        readonly email: string;
+      }[];
     }>
   >;
   readonly reschedule: (input: {
@@ -379,6 +413,70 @@ export function createScheduleService(
           ? ("INVESTOR_ORGANISATION" as const)
           : ("COMPANY" as const),
     };
+  }
+
+  /** A meeting is on: its event, its reminder, and everyone told. */
+  async function finalise(
+    record: MeetingRecord,
+    meetLink: string | null,
+    actor: ActorContext,
+    correlationId: string,
+  ): Promise<void> {
+    await transactions.run(async (tx) => {
+      await store.markMeetingScheduled(tx, record.id, meetLink);
+      await activity.record(tx, {
+        relationshipId: record.relationshipId,
+        eventType: "meeting_scheduled",
+        meetingId: record.id,
+        actorUserId: actor.userId,
+        correlationId: correlationId,
+      });
+      await store.upsertMeetingReminder(tx, {
+        meetingId: record.id,
+        tenantId: actor.tenantId,
+        ownerUserId: actor.userId,
+        relationshipId: record.relationshipId,
+        title:
+          `Call in ${String(MEETING_REMINDER_MINUTES)} minutes: ${record.purpose}`.slice(
+            0,
+            200,
+          ),
+        dueAt: new Date(
+          record.startsAt.getTime() - MEETING_REMINDER_MINUTES * 60_000,
+        ),
+      });
+      for (const participant of record.participants) {
+        if (participant.role !== "ATTENDEE") continue;
+        await store.notify(tx, {
+          tenantId: participant.participantTenantId,
+          userId: participant.userId,
+          kind: "MEETING_SCHEDULED",
+          title: `New call: ${record.purpose}`.slice(0, 200),
+          body: null,
+          linkPath: null,
+          reminderId: null,
+          meetingId: record.id,
+          dedupeKey: `meeting-scheduled:${record.id}`,
+        });
+      }
+      // REHEARSE (founder direction 2026-10-01): every Capital Q person
+      // on the call is offered a rehearsal of it with the other side,
+      // played by Q. The link names the meeting; the rehearsal service
+      // resolves it for that person only.
+      for (const participant of record.participants) {
+        await store.notify(tx, {
+          tenantId: participant.participantTenantId,
+          userId: participant.userId,
+          kind: "MEETING_PREP_READY",
+          title: `Rehearse your call: ${record.purpose}`.slice(0, 200),
+          body: "Q can play the other side so you can practise first.",
+          linkPath: `/rehearsals/meeting/${record.id}`,
+          reminderId: null,
+          meetingId: record.id,
+          dedupeKey: `rehearse-suggested:${record.id}`,
+        });
+      }
+    });
   }
 
   async function precheck(
@@ -587,67 +685,93 @@ export function createScheduleService(
         },
         "calendar event created",
       );
-      await transactions.run(async (tx) => {
-        await store.markMeetingScheduled(tx, record.id, meetLink);
-        await activity.record(tx, {
-          relationshipId: record.relationshipId,
-          eventType: "meeting_scheduled",
-          meetingId: record.id,
-          actorUserId: actor.userId,
-          correlationId: input.correlationId,
-        });
-        await store.upsertMeetingReminder(tx, {
-          meetingId: record.id,
-          tenantId: actor.tenantId,
-          ownerUserId: actor.userId,
-          relationshipId: record.relationshipId,
-          title:
-            `Call in ${String(MEETING_REMINDER_MINUTES)} minutes: ${record.purpose}`.slice(
-              0,
-              200,
-            ),
-          dueAt: new Date(
-            record.startsAt.getTime() - MEETING_REMINDER_MINUTES * 60_000,
-          ),
-        });
-        for (const participant of record.participants) {
-          if (participant.role !== "ATTENDEE") continue;
-          await store.notify(tx, {
-            tenantId: participant.participantTenantId,
-            userId: participant.userId,
-            kind: "MEETING_SCHEDULED",
-            title: `New call: ${record.purpose}`.slice(0, 200),
-            body: null,
-            linkPath: null,
-            reminderId: null,
-            meetingId: record.id,
-            dedupeKey: `meeting-scheduled:${record.id}`,
-          });
-        }
-        // REHEARSE (founder direction 2026-10-01): every Capital Q person
-        // on the call is offered a rehearsal of it with the other side,
-        // played by Q. The link names the meeting; the rehearsal service
-        // resolves it for that person only.
-        for (const participant of record.participants) {
-          await store.notify(tx, {
-            tenantId: participant.participantTenantId,
-            userId: participant.userId,
-            kind: "MEETING_PREP_READY",
-            title: `Rehearse your call: ${record.purpose}`.slice(0, 200),
-            body: "Q can play the other side so you can practise first.",
-            linkPath: `/rehearsals/meeting/${record.id}`,
-            reminderId: null,
-            meetingId: record.id,
-            dedupeKey: `rehearse-suggested:${record.id}`,
-          });
-        }
-      });
+      await finalise(record, meetLink, actor, input.correlationId);
       logger?.info({ meetingId: record.id }, "meeting scheduled");
       const fresh = (await store.findMeeting(record.id)) ?? record;
       return {
         outcome: "OK",
         meeting: viewFor(fresh, actor.userId),
         alreadyScheduled: !claim.created,
+      };
+    },
+
+    recordAgreed: async (input) => {
+      const { actor } = input;
+      if (actor.actorType !== "HUMAN") return refusal("NOT_A_PARTY");
+      if (input.startsAt.getTime() < now().getTime()) {
+        return refusal("INVALID_TIME");
+      }
+      const resolved = await counterpartOf(actor, input.relationshipId);
+      if (resolved === null) return refusal("NOT_A_PARTY");
+      if (!resolved.party.connected) return refusal("NOT_CONNECTED");
+      const tenantId = await directory.relationshipTenant(input.relationshipId);
+      if (tenantId === null) return refusal("NOT_A_PARTY");
+      const people = await directory.counterpartPeople({
+        relationshipId: input.relationshipId,
+        counterpart: resolved.counterpart,
+      });
+      const self = await directory.person(actor.userId);
+      if (people.length === 0 || self === null) return refusal("NO_RECIPIENTS");
+      const timeZone = isKnownTimeZone(input.timeZone) ? input.timeZone : "UTC";
+      const meetingId = newId();
+      const claim = await store.claimMeeting({
+        id: meetingId,
+        tenantId,
+        relationshipId: input.relationshipId,
+        organiserUserId: actor.userId,
+        organiserTenantId: actor.tenantId,
+        purpose: input.purpose,
+        startsAt: input.startsAt,
+        endsAt: new Date(
+          input.startsAt.getTime() + input.durationMinutes * 60_000,
+        ),
+        timeZone,
+        // Not a Google event: the id is only the row's own stable handle.
+        googleEventId: googleEventIdFor(meetingId),
+        qActionId: input.qActionId ?? null,
+        idempotencyKey: input.idempotencyKey,
+        participants: [
+          {
+            participantTenantId: actor.tenantId,
+            userId: actor.userId,
+            role: "ORGANISER",
+            displayName: self.name,
+            email: self.email,
+          },
+          ...people
+            .filter((person) => person.userId !== actor.userId)
+            .slice(0, 10)
+            .map((person) => ({
+              participantTenantId: person.tenantId,
+              userId: person.userId,
+              role: "ATTENDEE" as const,
+              displayName: person.name.slice(0, 200),
+              email: person.email.toLowerCase(),
+            })),
+        ],
+      });
+      const record = claim.record;
+      if (record.organiserUserId !== actor.userId) {
+        return refusal("NOT_ORGANISER");
+      }
+      const invitees = record.participants
+        .filter((participant) => participant.role === "ATTENDEE")
+        .map((participant) => ({
+          name: participant.displayName,
+          email: participant.email,
+        }));
+      const organiser = { name: self.name, email: self.email };
+      if (record.status !== "SCHEDULED" && record.status !== "CANCELLED") {
+        await finalise(record, null, actor, input.correlationId);
+        logger?.info({ meetingId: record.id }, "agreed meeting recorded");
+      }
+      const fresh = (await store.findMeeting(record.id)) ?? record;
+      return {
+        outcome: "OK",
+        meeting: viewFor(fresh, actor.userId),
+        alreadyScheduled: !claim.created || record.status === "SCHEDULED",
+        organiser,
+        invitees,
       };
     },
 

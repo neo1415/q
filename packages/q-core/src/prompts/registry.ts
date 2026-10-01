@@ -61,6 +61,7 @@ import {
   WORK_INTERVIEW_TURN_V1,
   WORK_SHORTLIST_V1,
   WORK_STAND_IN_REPLY_V1,
+  WORK_SLOT_READER_V1,
 } from "./tasks/q-work.v1.js";
 import { INVESTOR_PERSONA_V1 } from "./tasks/investor-persona.v1.js";
 import { INVESTOR_TWIN_TURN_V1 } from "./tasks/investor-twin-turn.v1.js";
@@ -339,6 +340,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     WORK_INTERVIEW_TURN_V1,
     WORK_INTERVIEW_REPORT_V1,
     WORK_STAND_IN_REPLY_V1,
+    WORK_SLOT_READER_V1,
     // DAILY block
     DAILY_STORY_WRITER_V1,
     DAILY_Q_TAKE_V1,

@@ -93,6 +93,7 @@ import {
   createWorkWakeListener,
 } from "./composition/waiting.js";
 import {
+  type ErrandNegotiation,
   createErrandReplyComposer,
   createErrandRunner,
   createErrandStartAction,
@@ -138,6 +139,9 @@ import {
 import {
   composeChat,
   composeSchedule,
+  // AUTO block (2026-10-02)
+  createCounterpartNotices,
+  meetingIcs,
   createMeetingAssistantService,
   createNetworkMeetingActivityWriter,
 } from "@capital-q/communication";
@@ -2270,8 +2274,90 @@ setInterval(
 // AUTO block (founder direction 2026-10-01): one gentle reminder to a
 // silent counterpart, shared by errands and delegated work.
 const counterpartNudger = createCounterpartNudger(database.sql);
+// AUTO block (2026-10-02): booking without Google -- Q offers times in the
+// chat, reads the answer by meaning, records the agreed meeting and emails
+// both sides an invite (.ics); and the other side hears what Q did.
+const counterpartNotices = createCounterpartNotices(database.sql);
+const inviteEmailConfig = loadAppEmailConfig(process.env);
+const inviteEmail =
+  inviteEmailConfig.brevoApi !== undefined
+    ? recordingEmailSender(
+        createBrevoApiEmailSender(inviteEmailConfig.brevoApi),
+        {
+          sql: database.sql,
+          source: "q_api.meeting_invite",
+          provider: "BREVO_API",
+        },
+      )
+    : inviteEmailConfig.smtp === undefined
+      ? unavailableAppEmailSender
+      : recordingEmailSender(createSmtpAppEmailSender(inviteEmailConfig.smtp), {
+          sql: database.sql,
+          source: "q_api.meeting_invite",
+          provider: "SMTP",
+        });
+const errandComposers = createWorkComposers({
+  gateway: modelGateway,
+  dataPosture: demoDataPosture,
+  logger,
+});
+const errandNegotiation: ErrandNegotiation = {
+  zoneOf: async (userId) =>
+    (
+      await database.sql<{ timezone: string | null }[]>`
+        select timezone from identity.user_profiles where id = ${userId}`
+    )[0]?.timezone ?? null,
+  readSlots: (input) =>
+    errandComposers.slotReader(input.actor, {
+      principalName: input.principalName,
+      counterpartName: input.counterpartName,
+      offered: input.offered,
+      timeZone: input.timeZone,
+      now: input.now,
+      reply: input.reply,
+    }),
+  recordAgreed: (input) => schedule.recordAgreed(input),
+  sendInvites: async (invite) => {
+    if (!inviteEmail.available) throw new Error("app email is not configured");
+    const ics = meetingIcs({
+      uid: invite.meetingId,
+      sequence: 0,
+      start: invite.start,
+      end: invite.end,
+      summary: invite.purpose,
+      description: `${invite.purpose}\n\nAgreed on Capital Q. A video link will follow.`,
+      location: null,
+      organiser: invite.organiser,
+      attendees: invite.invitees,
+      createdAt: new Date(),
+    });
+    const when = new Intl.DateTimeFormat("en-GB", {
+      dateStyle: "full",
+      timeStyle: "short",
+      timeZone: invite.timeZone,
+    }).format(invite.start);
+    for (const person of [invite.organiser, ...invite.invitees]) {
+      await inviteEmail.send({
+        to: person.email,
+        subject: `Call: ${invite.purpose}`
+          .replace(/[\r\n]+/g, " ")
+          .slice(0, 150),
+        text: `${invite.purpose}\n${when} (${invite.timeZone})\n\nThe calendar invite is attached. A video link will follow.`,
+        attachments: [
+          {
+            filename: "invite.ics",
+            content: ics,
+            contentType: "text/calendar; method=REQUEST",
+          },
+        ],
+      });
+    }
+  },
+};
 const errands = createErrandRunner({
   nudger: counterpartNudger,
+  counterpartNotices,
+  negotiation: errandNegotiation,
   store: createPostgresErrandStore(database.sql),
   resolver: actorContextResolver,
   chat,
@@ -2311,6 +2397,12 @@ const workFeed = createInvestorFeedPort({
 });
 const workRuntime = createWorkRuntime({
   nudger: counterpartNudger,
+  counterpartNotices,
+  noCalendar: {
+    zoneOf: errandNegotiation.zoneOf,
+    recordAgreed: errandNegotiation.recordAgreed,
+    sendInvites: errandNegotiation.sendInvites,
+  },
   // ADMIN block: the operators' kill switch (ADR 0033).
   enabled: () => killSwitches.isEnabled("q.autonomy.delegations"),
   // end ADMIN block
