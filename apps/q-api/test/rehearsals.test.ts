@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { QRehearsalPersonaDtoSchema } from "@capital-q/contracts";
 import type { CounterpartPersonaResult } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
 import {
   createRehearsalService,
   scoreOf,
+  shownPersona,
   type PersonaRow,
   type RehearsalComposer,
   type RehearsalMaterial,
@@ -624,5 +626,32 @@ describe("rehearsal audit (2026-10-01)", () => {
     await service.say(actor(FOUNDER), second.id, { text: "Hi again" });
     const done = await service.finish(actor(FOUNDER), second.id);
     expect(done.kind === "OK" && done.rehearsal.previousScore).toBe(65);
+  });
+});
+
+describe("a persona longer than the screen's contract (live 2026-10-01)", () => {
+  it("is shown within QRehearsalPersonaDto's bounds, cut at a sentence or a word", () => {
+    const shown = shownPersona({
+      summary: `${"A careful seed investor who reads the numbers first. ".repeat(20)}`,
+      style: "Direct and brisk. ".repeat(40),
+      priorities: Array.from(
+        { length: 9 },
+        (_, i) => `Priority ${String(i)} ${"x".repeat(250)}`,
+      ),
+    });
+    const dto = QRehearsalPersonaDtoSchema.safeParse({
+      counterpart: {
+        kind: "COMPANY",
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "Kazikit",
+      },
+      ...shown,
+      grounding: "SOME",
+      sources: [],
+      refreshedAt: new Date().toISOString(),
+    });
+    expect(dto.success).toBe(true);
+    expect(shown.priorities).toHaveLength(6);
+    expect(shown.summary.endsWith(".")).toBe(true);
   });
 });

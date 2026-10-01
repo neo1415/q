@@ -814,9 +814,7 @@ function toDto(
     metrics: metricsOf(turns, row.createdAt, row.endedAt, now),
     previousScore,
     persona: {
-      summary: persona.summary,
-      style: persona.style,
-      priorities: persona.priorities,
+      ...shownPersona(persona),
       grounding: persona.grounding,
     },
     turns: turns.map((turn) => ({
@@ -832,6 +830,41 @@ function toDto(
     createdAt: row.createdAt.toISOString(),
     endedAt: row.endedAt === null ? null : row.endedAt.toISOString(),
   };
+}
+
+/**
+ * A persona as the screen shows it, within the public contract's bounds
+ * (QRehearsalPersonaDto: summary 600, style 400, six priorities of 200).
+ * The stored reading may be longer (live 2026-10-01: once the reader's
+ * bounds were relaxed, a persona with seven priorities made the persona
+ * endpoint answer 500 and the lobby could not start). Cut at a sentence or
+ * a word, never mid-word; the first priorities are the ones that matter.
+ */
+export function shownPersona(profile: {
+  readonly summary: string;
+  readonly style: string;
+  readonly priorities: readonly string[];
+}): { summary: string; style: string; priorities: string[] } {
+  return {
+    summary: clipText(profile.summary, 600),
+    style: clipText(profile.style, 400),
+    priorities: profile.priorities
+      .slice(0, 6)
+      .map((priority) => clipText(priority, 200)),
+  };
+}
+
+function clipText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const room = text.slice(0, max - 1);
+  const sentence = Math.max(
+    room.lastIndexOf(". "),
+    room.lastIndexOf("! "),
+    room.lastIndexOf("? "),
+  );
+  if (sentence >= max / 2) return room.slice(0, sentence + 1);
+  const word = room.lastIndexOf(" ");
+  return `${(word > 0 ? room.slice(0, word) : room).trimEnd()}…`;
 }
 
 /** A shared frame, held in memory for the next turn only; never persisted. */
@@ -1162,9 +1195,7 @@ export function createRehearsalService(dependencies: {
         kind: "OK",
         persona: {
           counterpart: { kind, id, name: built.name },
-          summary: built.profile.summary,
-          style: built.profile.style,
-          priorities: built.profile.priorities,
+          ...shownPersona(built.profile),
           grounding: built.profile.grounding,
           sources: publicSources(built.row.sources),
           refreshedAt: built.row.refreshedAt.toISOString(),
