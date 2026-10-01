@@ -124,6 +124,17 @@ export type ModelGatewayExecuteOptions<T> = {
    * (DROP). For callers whose lists are independent readings.
    */
   readonly invalidListItems?: InvalidListItems | undefined;
+  /**
+   * STRUCTURED output only: top-level fields that are dropped (and so take
+   * their schema default) instead of refusing the object when only they
+   * are wrong. Dropped paths ride on the result.
+   */
+  readonly lenientFields?: readonly string[] | undefined;
+};
+
+type AcceptOptions = {
+  readonly invalidListItems: InvalidListItems | undefined;
+  readonly lenientFields: readonly string[] | undefined;
 };
 
 export type ModelGateway = {
@@ -268,7 +279,7 @@ export function createModelGateway(
     spoke: { spoke: boolean },
     /** This attempt's wall clock: the budget's, or a first model's shorter one. */
     timeoutMs: number,
-    invalidListItems: InvalidListItems | undefined,
+    accept: AcceptOptions,
   ): Promise<AttemptOutcome<T> & { readonly record: ModelAttemptRecord }> {
     const labels = {
       provider: candidate.provider.code,
@@ -381,7 +392,8 @@ export function createModelGateway(
               );
             }
             const accepted = acceptStructuredOutput(result.text, schema, {
-              invalidListItems,
+              invalidListItems: accept.invalidListItems,
+              lenientFields: accept.lenientFields,
             });
             if (accepted.ok && (accepted.dropped?.length ?? 0) > 0) {
               // Paths and codes only, never a value the model wrote.
@@ -437,7 +449,13 @@ export function createModelGateway(
                   result.finish,
                   cost,
                   result.providerReference,
-                  { kind: "STRUCTURED", value: accepted.value },
+                  {
+                    kind: "STRUCTURED",
+                    value: accepted.value,
+                    ...((accepted.dropped?.length ?? 0) > 0
+                      ? { dropped: accepted.dropped }
+                      : {}),
+                  },
                 ),
               };
             }
@@ -604,7 +622,10 @@ export function createModelGateway(
             span,
             options.onTextDelta,
             options.firstAttemptTimeoutMs,
-            options.invalidListItems,
+            {
+              invalidListItems: options.invalidListItems,
+              lenientFields: options.lenientFields,
+            },
           );
         } finally {
           span.end();
@@ -622,7 +643,7 @@ export function createModelGateway(
     },
     onTextDelta: ((text: string) => void) | undefined,
     firstAttemptTimeoutMs: number | undefined,
-    invalidListItems: InvalidListItems | undefined,
+    accept: AcceptOptions,
   ): Promise<ModelGatewayResult<T>> {
     if (callerSignal.aborted) {
       throw new ModelGatewayError("model request cancelled before routing", {
@@ -791,7 +812,7 @@ export function createModelGateway(
           onTextDelta,
           spoke,
           timeoutMs,
-          invalidListItems,
+          accept,
         );
         attempts.push(outcome.record);
         spentUsd +=

@@ -1,3 +1,4 @@
+import { CompanyAnalystV14ResultSchema } from "@capital-q/q-core";
 import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
@@ -144,7 +145,14 @@ function fakeGateway(answer = "Here is what the recorded evidence supports.") {
           fallbackUsed: false,
         },
         completedAt: new Date().toISOString(),
-        output: { kind: "STRUCTURED", value: analystResult(answer) as T },
+        output: {
+          kind: "STRUCTURED",
+          // Through the real schema, as the gateway accepts it (defaults
+          // such as actionTalk and gestures filled in).
+          value: CompanyAnalystV14ResultSchema.parse(
+            analystResult(answer),
+          ) as T,
+        },
       } as unknown as ModelGatewayResult<T>);
     },
   };

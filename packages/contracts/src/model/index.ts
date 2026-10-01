@@ -732,7 +732,12 @@ export type ModelGatewayResultMetadata = z.infer<
 
 export type ModelGatewayOutput<T> =
   | { readonly kind: "TEXT"; readonly text: string }
-  | { readonly kind: "STRUCTURED"; readonly value: T }
+  | {
+      readonly kind: "STRUCTURED";
+      readonly value: T;
+      /** Paths dropped on acceptance (DROP lists, lenient fields); never values. */
+      readonly dropped?: readonly string[] | undefined;
+    }
   | {
       /** The model proposed tool calls, each naming a tool the request offered. */
       readonly kind: "TOOL_CALLS";

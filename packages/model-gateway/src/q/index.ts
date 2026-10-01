@@ -1682,6 +1682,9 @@ export function createModelGatewayQAnswer(
         // a malformed knowledge key must not throw away the profile change
         // beside it (CQ-QX-007 A5).
         invalidListItems: "DROP",
+        // An answer whose only fault is actionTalk's shape is kept (live
+        // 2026-10-01: a string where a list belongs refused the reading).
+        lenientFields: ["actionTalk"],
       };
 
       // The message and its durable completion event commit together
@@ -2005,7 +2008,56 @@ export function createModelGatewayQAnswer(
               throw error;
             }
             took(`round${String(rounds)}`);
+            /**
+             * Said instead of done. The answer talks about doing something
+             * (actionTalk) while tools that could do it are in hand and
+             * nothing was called: one more round, with a trusted note to do
+             * it rather than describe it (founder live 2026-10-01: "what
+             * are these companies, can you list them" was answered "I need
+             * to retrieve your discovery slate first" instead of calling
+             * discovery_slate). Read from the answer's own structure, never
+             * from its words; once. Talk about a change that was in fact
+             * prepared this turn (a PREPARE or SIDE_EFFECT tool succeeded)
+             * is not a gap.
+             */
+            const saidInsteadOfDone = (
+              value: CompanyAnalystV14Result,
+              dropped: readonly string[] | undefined,
+            ): boolean =>
+              (value.actionTalk.length > 0 ||
+                (dropped ?? []).some((path) =>
+                  path.startsWith("actionTalk"),
+                )) &&
+              !toolCalls.some((call) => {
+                const kind = offeredByName.get(
+                  call.providerName,
+                )?.classification;
+                return (
+                  call.status === "SUCCEEDED" &&
+                  kind !== undefined &&
+                  kind !== "READ_ONLY" &&
+                  kind !== "ANALYTICAL"
+                );
+              }) &&
+              sayDoRounds === 0 &&
+              calls < Q_TOOL_LOOP_MAX_CALLS &&
+              request.signal?.aborted !== true;
+            const askToDoIt = (said: string): void => {
+              sayDoRounds = 1;
+              rounds += 1;
+              messages = [
+                ...messages,
+                { role: "ASSISTANT", content: said },
+                SAY_DO_NOTE,
+              ];
+            };
             if (result.output.kind === "STRUCTURED") {
+              if (
+                saidInsteadOfDone(result.output.value, result.output.dropped)
+              ) {
+                askToDoIt(JSON.stringify(result.output.value));
+                continue;
+              }
               // Nothing to look up, and the answer in the task's shape.
               final = result;
               analyst = result.output.value;
@@ -2033,48 +2085,11 @@ export function createModelGatewayQAnswer(
                 CompanyAnalystV14ResultSchema,
                 { invalidListItems: "DROP", lenientFields: ["actionTalk"] },
               );
-              /**
-               * Said instead of done. The answer talks about doing
-               * something (actionTalk) while tools that could do it are in
-               * hand and nothing was called: one more round, with a trusted
-               * note to do it rather than describe it (founder live
-               * 2026-10-01: "what are these companies, can you list them"
-               * was answered "I need to retrieve your discovery slate
-               * first" instead of calling discovery_slate). Read from the
-               * answer's own structure, never from its words; once.
-               */
-              const talkedInsteadOfActing =
-                accepted.ok &&
-                (accepted.value.actionTalk.length > 0 ||
-                  (accepted.dropped ?? []).some((path) =>
-                    path.startsWith("actionTalk"),
-                  ));
-              // Talk about a change that was in fact prepared this turn
-              // (a PREPARE or SIDE_EFFECT tool succeeded) is not a gap.
-              const acted = toolCalls.some(
-                (call) =>
-                  call.status === "SUCCEEDED" &&
-                  offeredByName.get(call.providerName)?.classification !==
-                    undefined &&
-                  offeredByName.get(call.providerName)?.classification !==
-                    "READ_ONLY" &&
-                  offeredByName.get(call.providerName)?.classification !==
-                    "ANALYTICAL",
-              );
               if (
-                talkedInsteadOfActing &&
-                !acted &&
-                sayDoRounds === 0 &&
-                calls < Q_TOOL_LOOP_MAX_CALLS &&
-                request.signal?.aborted !== true
+                accepted.ok &&
+                saidInsteadOfDone(accepted.value, accepted.dropped)
               ) {
-                sayDoRounds = 1;
-                rounds += 1;
-                messages = [
-                  ...messages,
-                  { role: "ASSISTANT", content: result.output.text },
-                  SAY_DO_NOTE,
-                ];
+                askToDoIt(result.output.text);
                 continue;
               }
               if (accepted.ok) {
