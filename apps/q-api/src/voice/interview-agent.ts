@@ -204,6 +204,69 @@ export function refusedStepsOf(
  */
 export const REFUSALS_BEFORE_LETTING_GO = 2;
 
+/** The writes a reply drafted beside its calls may rest on. */
+const DRAFTABLE_WRITES: ReadonlySet<string> = new Set([
+  "record_answers",
+  "recommend",
+  "accept_recommendation",
+  "correct_answer",
+  "set_aside",
+  "confirm_as_stated",
+  "note_preference",
+]);
+
+/** What a landed write reports; anything else was refused or held. */
+const LANDED: ReadonlySet<string> = new Set([
+  "COMMITTED",
+  "WITHDRAWN",
+  "SET_ASIDE",
+  "CONFIRMED_AS_STATED",
+  "RECOMMENDED",
+  "REMEMBERED",
+  "UNCHANGED",
+]);
+
+/**
+ * Every action a write whose every result landed. A read (its answer was
+ * not known when the reply was drafted), a finish, a tool failure or one
+ * refused, held or ambiguous answer makes the draft unusable.
+ */
+export function everyWriteLanded(
+  actions: readonly { tool: string; input: unknown; result: unknown }[],
+): boolean {
+  if (actions.length === 0) return false;
+  return actions.every((action) => {
+    if (!DRAFTABLE_WRITES.has(action.tool)) return false;
+    const result = action.result;
+    if (
+      typeof result !== "object" ||
+      result === null ||
+      !("ok" in result) ||
+      result.ok !== true ||
+      !("data" in result)
+    ) {
+      return false;
+    }
+    const data: unknown = result.data;
+    if (typeof data !== "object" || data === null) return false;
+    const outcomes: unknown[] = [];
+    if ("outcome" in data) outcomes.push(data.outcome);
+    if ("results" in data && Array.isArray(data.results)) {
+      for (const item of data.results as unknown[]) {
+        outcomes.push(
+          typeof item === "object" && item !== null && "outcome" in item
+            ? item.outcome
+            : undefined,
+        );
+      }
+    }
+    return (
+      outcomes.length > 0 &&
+      outcomes.every((o) => typeof o === "string" && LANDED.has(o))
+    );
+  });
+}
+
 /**
  * What Q has done this turn, for the next round's prompt. Oldest actions
  * give way first when it is long: the newest results decide what is left.
@@ -1207,6 +1270,8 @@ export function createInterviewAgent(
     let rounds = 0;
     let calls = 0;
     let timedOut = false;
+    /** Replies used as drafted beside their calls (for the trace). */
+    let drafts = 0;
     try {
       while (
         result === undefined &&
@@ -1258,6 +1323,7 @@ export function createInterviewAgent(
         }
         if (response.output.kind !== "TOOL_CALLS") break;
         const proposals = response.output.calls.slice(0, MAX_CALLS - calls);
+        const before = actions.length;
         for (const call of proposals) {
           calls += 1;
           const outcome = await tools.execute(
@@ -1272,6 +1338,38 @@ export function createInterviewAgent(
         }
         await prefillFromSignup();
         state = await port.state();
+        // The reply written beside the calls, used only when every call
+        // was a write that landed: then it claims nothing the results do
+        // not say, and the round that would rewrite it is saved (HANDOVER
+        // §5.6: 283 of 704 turns spent a second ~2 s round on exactly
+        // this). Anything refused, read or finishing gets the usual round.
+        const drafted = response.output.text.trim();
+        if (
+          // Typed only: a voice round streams its text as it is written,
+          // so a draft there would be spoken before its writes landed.
+          stream === undefined &&
+          input.channel === "text" &&
+          drafted.length > 0 &&
+          everyWriteLanded(actions.slice(before)) &&
+          proposals.length === actions.length - before
+        ) {
+          const settled = reading ?? (await readingDone);
+          const asksMore =
+            settled.pausing ||
+            settled.lookup !== null ||
+            settled.pronounce !== null ||
+            settled.authority.handed.size > 0 ||
+            settled.authority.approved.size > 0 ||
+            settled.authority.finishing;
+          const accepted = asksMore
+            ? null
+            : acceptStructuredOutput(drafted, InterviewAgentV11ResultSchema);
+          if (accepted?.ok === true) {
+            result = accepted.value;
+            drafts += 1;
+            break;
+          }
+        }
       }
       if (result === undefined && remaining() > MIN_REPLY_MS) {
         // The reply, written after every result so far, with no tools left.
@@ -1484,6 +1582,7 @@ export function createInterviewAgent(
       {
         rounds,
         calls,
+        drafted: drafts > 0,
         recorded,
         asking: stillOpen ? askedOpen?.stepKey : null,
         answered: result !== undefined,

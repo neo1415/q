@@ -13,15 +13,16 @@ import {
  * with the onboarding state after every unchanging rule.
  */
 describe("INTERVIEW_AGENT v13", () => {
-  it("has exactly v12's lines", () => {
+  it("has v12's lines and adds only the draft rule", () => {
     const lines = (template: string) =>
-      template
-        .split("\n")
-        .filter((line) => line.length > 0)
-        .sort();
-    expect(lines(INTERVIEW_AGENT_V13.template)).toEqual(
-      lines(INTERVIEW_AGENT_V12.template),
-    );
+      template.split("\n").filter((line) => line.length > 0);
+    const v12 = lines(INTERVIEW_AGENT_V12.template);
+    const v13 = lines(INTERVIEW_AGENT_V13.template);
+    for (const line of v12) expect(v13).toContain(line);
+    const added = v13.filter((line) => !v12.includes(line));
+    expect(added).toHaveLength(1);
+    expect(added[0]).toContain("On channel text");
+    expect(added[0]).toContain("only if every call lands");
   });
 
   it("puts the state after the rules and every other per-turn section, before this turn's actions", () => {
