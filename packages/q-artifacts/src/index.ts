@@ -41,3 +41,24 @@ export {
 } from "./application/service.js";
 
 export { createPostgresArtifactRepository } from "./infrastructure/postgres-artifact-repository.js";
+
+// DOCS block: brand kit.
+export {
+  BrandKitAlreadyAnsweredError,
+  BrandKitAuthorityError,
+  BrandKitNotFoundError,
+  BrandLogoInvalidError,
+  createBrandKitService,
+  readLogo,
+  stateOf as brandKitStateOf,
+  type BrandKitService,
+  type BrandLogoBytes,
+  type EffectiveBrand,
+} from "./application/brand-kit.js";
+export {
+  isBrandish,
+  pairingForFamilies,
+  readWebsiteBrand,
+  siteOf,
+  type WebsiteBrandReading,
+} from "./domain/website-brand.js";
