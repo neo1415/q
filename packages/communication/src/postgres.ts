@@ -176,7 +176,7 @@ export function createPostgresChatStore(options: {
                 ${input.attachment?.mimeType ?? null}, ${input.attachment?.sizeBytes ?? null},
                 ${input.voiceDurationMs}, ${input.revisesMessageId}, ${input.qActionId},
                 ${input.qDelegationId ?? null},
-                ${input.qEnvelope === undefined || input.qEnvelope === null ? null : JSON.stringify(input.qEnvelope)}::jsonb,
+                ${input.qEnvelope === undefined || input.qEnvelope === null ? null : tx.sql.json(JSON.parse(JSON.stringify(input.qEnvelope)) as Parameters<typeof tx.sql.json>[0])},
                 ${input.idempotencyKey})
         returning id`;
       const id = inserted[0]?.id;

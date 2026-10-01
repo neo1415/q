@@ -236,6 +236,34 @@ describe("@capital-q/communication against PostgreSQL", () => {
     ).rejects.toMatchObject({ code: "55000" });
   });
 
+  it("marks Q's messages under a delegation, many per delegation, with the Q-to-Q envelope (ADR 0029)", async () => {
+    const delegation = randomUUID();
+    for (const key of ["it-q-0001", "it-q-0002"]) {
+      await service.send({
+        actor: founder,
+        relationshipId: ids.relationship,
+        request: { kind: "TEXT", body: `From Q ${key}` },
+        idempotencyKey: key,
+        qDelegationId: delegation,
+        qEnvelope: { protocol: "cq.q2q/1", side: "COMPANY", intent: "ANSWER" },
+      });
+    }
+    const read = await service.readForQ({
+      actor: investor,
+      relationshipId: ids.relationship,
+    });
+    const fromQ = read.messages.filter((message) => message.viaQ);
+    expect(fromQ.map((message) => message.text)).toEqual([
+      "From Q it-q-0001",
+      "From Q it-q-0002",
+    ]);
+    expect(fromQ[0]?.envelope).toEqual({
+      protocol: "cq.q2q/1",
+      side: "COMPANY",
+      intent: "ANSWER",
+    });
+  });
+
   it("pins the shared version and opens it for the other side", async () => {
     const sent = await service.send({
       actor: founder,

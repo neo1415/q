@@ -71,7 +71,9 @@ export type WorkRuntimeDependencies = {
   readonly composers: WorkComposers;
   readonly chat: {
     readonly readForQ: ChatService["readForQ"];
-    readonly send: ChatService["send"];
+    readonly send: (
+      input: Parameters<ChatService["send"]>[0],
+    ) => Promise<unknown>;
   };
   readonly schedule: Pick<ScheduleService, "findSlots" | "schedule">;
   readonly interests: Pick<InterestService, "expressInterest">;

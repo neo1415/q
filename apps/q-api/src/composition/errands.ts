@@ -244,7 +244,7 @@ export function createErrandStartAction(dependencies: {
                     ${approver.organisationId ?? null}, ${action.actionId},
                     ${companyId}, ${relationshipId},
                     ${action.payload.counterpartName},
-                    ${JSON.stringify(action.payload)}::jsonb,
+                    ${sql.json(JSON.parse(JSON.stringify(action.payload)) as Parameters<typeof sql.json>[0])},
                     ${action.payload.expressInterest ? "Interest expressed; waiting for them to accept." : "Started."},
                     ${new Date(Date.now() + ERRAND_TTL_MS)})
             on conflict (q_action_id) do update set updated_at = q_runtime.errands.updated_at

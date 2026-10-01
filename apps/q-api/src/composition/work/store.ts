@@ -68,6 +68,16 @@ export const TERMINAL_STAGES: readonly LaneStage[] = [
 
 type Owner = { readonly tenantId: string; readonly userId: string };
 
+/**
+ * A plain JSON value for a jsonb parameter. Sent through the driver's own
+ * json serialiser: a pre-stringified value cast to jsonb is stored as a
+ * JSON *string*, which the object checks reject.
+ */
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+function asJson(value: unknown): Json {
+  return JSON.parse(JSON.stringify(value)) as Json;
+}
+
 const LANE_COLUMNS = (sql: DatabaseExecutor) => sql`
   id, delegation_id, company_id, investor_organisation_id, relationship_id,
   counterpart_name, stage, match_reasons, learned, interview, needs, report,
@@ -110,7 +120,7 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
            summary, thread_id, expires_at)
         values (${id}, ${input.owner.tenantId}, ${input.owner.userId},
                 ${input.owner.organisationId}, ${input.kind}, ${input.qActionId},
-                ${JSON.stringify(input.grant)}::jsonb, ${input.summary.slice(0, 300)},
+                ${sql.json(asJson(input.grant))}, ${input.summary.slice(0, 300)},
                 ${`work:${id}`}, ${input.expiresAt})
         on conflict (q_action_id) do update set updated_at = q_runtime.delegations.updated_at
         returning id`;
@@ -165,7 +175,6 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
         readonly reasons: ShortlistPick["reasons"];
       },
     ): Promise<string> => {
-      const reasons = JSON.stringify(lane.reasons.slice(0, 5));
       const rows =
         lane.companyId !== null
           ? await sql<{ id: string }[]>`
@@ -174,7 +183,7 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
                  counterpart_name, stage, match_reasons)
               values (${ref.delegationId}, ${ref.tenantId}, ${ref.userId}, ${lane.companyId},
                       ${lane.relationshipId}, ${lane.counterpartName.slice(0, 200)},
-                      ${lane.stage}, ${reasons}::jsonb)
+                      ${lane.stage}, ${sql.json(asJson(lane.reasons.slice(0, 5)))})
               on conflict (delegation_id, company_id) where company_id is not null
                 do update set updated_at = q_runtime.delegation_lanes.updated_at
               returning id`
@@ -184,7 +193,7 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
                  relationship_id, counterpart_name, stage, match_reasons)
               values (${ref.delegationId}, ${ref.tenantId}, ${ref.userId},
                       ${lane.investorOrganisationId ?? null}, ${lane.relationshipId},
-                      ${lane.counterpartName.slice(0, 200)}, ${lane.stage}, ${reasons}::jsonb)
+                      ${lane.counterpartName.slice(0, 200)}, ${lane.stage}, ${sql.json(asJson(lane.reasons.slice(0, 5)))})
               on conflict (delegation_id, relationship_id) where relationship_id is not null
                 do update set updated_at = q_runtime.delegation_lanes.updated_at
               returning id`;
@@ -199,10 +208,10 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
            set stage = coalesce(${patch.stage ?? null}, stage),
                relationship_id = coalesce(${patch.relationshipId ?? null}, relationship_id),
                last_step = coalesce(${patch.lastStep?.slice(0, 300) ?? null}, last_step),
-               learned = coalesce(${patch.learned === undefined ? null : JSON.stringify(patch.learned)}::jsonb, learned),
-               interview = coalesce(${patch.interview === undefined ? null : JSON.stringify(patch.interview)}::jsonb, interview),
+               learned = coalesce(${patch.learned === undefined ? null : sql.json(asJson(patch.learned))}, learned),
+               interview = coalesce(${patch.interview === undefined ? null : sql.json(asJson(patch.interview))}, interview),
                needs = case when ${patch.needs === undefined} then needs
-                            else ${patch.needs === undefined || patch.needs === null ? null : JSON.stringify(patch.needs)}::jsonb end,
+                            else ${patch.needs === undefined || patch.needs === null ? null : sql.json(asJson(patch.needs))} end,
                meeting_id = coalesce(${patch.meetingId ?? null}, meeting_id),
                replies_sent = coalesce(${patch.repliesSent ?? null}, replies_sent),
                updated_at = clock_timestamp()
@@ -219,7 +228,7 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
     saveReport: async (laneId: string, report: unknown): Promise<void> => {
       await sql`
         update q_runtime.delegation_lanes
-           set report = ${JSON.stringify(report)}::jsonb, report_at = clock_timestamp(),
+           set report = ${sql.json(asJson(report))}, report_at = clock_timestamp(),
                updated_at = clock_timestamp()
          where id = ${laneId}`;
     },
@@ -343,10 +352,10 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
       const own = await ownDelegation(owner, delegationId);
       if (own === null || own.kind !== "INVESTOR_OUTREACH") return "NOT_FOUND";
       if (own.status !== "ACTIVE") return "NOT_ACTIVE";
-      const answerJson = JSON.stringify({ ...answer, id: randomUUID() });
+      const answerJson = sql.json(asJson({ ...answer, id: randomUUID() }));
       const rows = await sql<{ id: string }[]>`
         update q_runtime.delegation_lanes
-           set needs = coalesce(needs, '{}'::jsonb) || jsonb_build_object('answer', ${answerJson}::jsonb),
+           set needs = coalesce(needs, '{}'::jsonb) || jsonb_build_object('answer', ${answerJson}),
                observed_fingerprint = null, updated_at = clock_timestamp()
          where id = ${laneId} and delegation_id = ${delegationId}
            and stage not in ('DECLINED', 'DONE', 'STOPPED', 'FAILED')
