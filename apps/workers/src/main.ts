@@ -184,6 +184,7 @@ import {
   DOCUMENTS_QUEUE,
 } from "./queue/pgmq.js";
 import { createQueueRunner } from "./queue/runner.js";
+import { recordingEmailSender } from "@capital-q/platform-admin";
 
 const SERVICE_NAME = "workers";
 
@@ -857,12 +858,21 @@ const schedule = composeSchedule({
   interests: { relationshipById: () => Promise.resolve(null) },
   calendars: (userId) => gmailIntegrations.calendarOf(userId),
   // HTTPS first: the deployment's network blocks outbound SMTP.
+  // ADMIN block: each send's outcome feeds the console's Email panel.
   email:
     appEmail.brevoApi !== undefined
-      ? createBrevoApiEmailSender(appEmail.brevoApi)
+      ? recordingEmailSender(createBrevoApiEmailSender(appEmail.brevoApi), {
+          sql: database.sql,
+          source: "workers.reminders",
+          provider: "BREVO_API",
+        })
       : appEmail.smtp === undefined
         ? unavailableAppEmailSender
-        : createSmtpAppEmailSender(appEmail.smtp),
+        : recordingEmailSender(createSmtpAppEmailSender(appEmail.smtp), {
+            sql: database.sql,
+            source: "workers.reminders",
+            provider: "SMTP",
+          }),
   logger,
 });
 

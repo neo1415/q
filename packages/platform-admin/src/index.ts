@@ -427,6 +427,7 @@ export {
   type StepUpMethod,
   type StepUpOutcome,
 } from "./access.js";
+export { isSuspended } from "./accounts.js";
 export type {
   AccountDetail,
   AccountRow,

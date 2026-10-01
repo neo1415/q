@@ -385,6 +385,15 @@ import {
   createReminderCreateAction,
   createScheduleIntelligencePort,
 } from "./composition/schedule-actions.js";
+// ADMIN block
+import {
+  createFlagReader,
+  isSuspended as isAccountSuspended,
+  recordingEmailSender,
+  recordingFirewall,
+} from "@capital-q/platform-admin";
+import { withSuspension } from "./composition/suspension.js";
+// end ADMIN block
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -507,16 +516,26 @@ const subjects = createQSubjectResolverRegistry([
 // platform can access and what Q may reason over for this actor,
 // organisation, purpose and subject set. It runs inside the orchestrator
 // before any retrieval, and again ahead of retrieval on every resume.
-const firewall = createContextFirewall({
-  authorization,
-  disclosure,
-  resolvers: disclosureResolvers,
-  relationshipParties,
-  documents,
-  capital,
-  clock: systemDisclosureClock,
-  logger,
-});
+// ADMIN block (ADR 0033): every decision is also logged, codes only, for
+// the operations console's per-run trace. Recording never alters it.
+const firewall = recordingFirewall(
+  createContextFirewall({
+    authorization,
+    disclosure,
+    resolvers: disclosureResolvers,
+    relationshipParties,
+    documents,
+    capital,
+    clock: systemDisclosureClock,
+    logger,
+  }),
+  {
+    sql: database.sql,
+    onRecordError: (error) =>
+      logger.warn({ err: error }, "firewall decision not recorded"),
+  },
+);
+// end ADMIN block
 
 const repositories = createPostgresQRuntimeRepositories();
 const ownInvestorOrganisations = createPostgresInvestorOrganisationRepository();
@@ -1471,9 +1490,13 @@ const errandRelationships = createRelationshipIntelligencePort({
   board: relationshipBoard,
   ownCompany: runtimeDependencies.ownCompany,
 });
-const actorContextResolver = createPostgresActorContextResolver({
-  sql: database.sql,
-});
+// ADMIN block: a suspended account resolves to no actor (ADR 0033).
+const actorContextResolver = withSuspension(
+  createPostgresActorContextResolver({ sql: database.sql }),
+  (userId) => isAccountSuspended(database.sql, userId),
+);
+const killSwitches = createFlagReader(database.sql);
+// end ADMIN block
 const qActionRegistry = createQActionRegistry([
   createCompanyProfileUpdateAction({
     profiles: companies,
@@ -2028,9 +2051,13 @@ const errands = createErrandRunner({
   logger,
 });
 setInterval(() => {
-  errands.tick().catch((error: unknown) => {
-    logger.warn({ err: error }, "errand run failed");
-  });
+  // ADMIN block: the operators' kill switch stops every errand step.
+  killSwitches
+    .isEnabled("q.autonomy.errands")
+    .then((enabled) => (enabled ? errands.tick() : undefined))
+    .catch((error: unknown) => {
+      logger.warn({ err: error }, "errand run failed");
+    });
 }, 60 * 1000).unref();
 
 // AUTO block (ADR 0030): Q's delegated work on LangGraph, checkpointed in
@@ -2741,10 +2768,24 @@ logger.info(
 const operatorEmailConfig = loadAppEmailConfig(process.env);
 const operatorEmail =
   operatorEmailConfig.brevoApi !== undefined
-    ? createBrevoApiEmailSender(operatorEmailConfig.brevoApi)
+    ? recordingEmailSender(
+        createBrevoApiEmailSender(operatorEmailConfig.brevoApi),
+        {
+          sql: database.sql,
+          source: "q_api.operator_notice",
+          provider: "BREVO_API",
+        },
+      )
     : operatorEmailConfig.smtp === undefined
       ? unavailableAppEmailSender
-      : createSmtpAppEmailSender(operatorEmailConfig.smtp);
+      : recordingEmailSender(
+          createSmtpAppEmailSender(operatorEmailConfig.smtp),
+          {
+            sql: database.sql,
+            source: "q_api.operator_notice",
+            provider: "SMTP",
+          },
+        );
 const reportPausedAccount = async (
   actor: ActorContext,
   strikes: number,

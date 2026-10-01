@@ -213,6 +213,9 @@ importers:
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../../packages/permissions
+      '@capital-q/platform-admin':
+        specifier: workspace:*
+        version: link:../../packages/platform-admin
       '@capital-q/public-identity':
         specifier: workspace:*
         version: link:../../packages/public-identity
@@ -443,6 +446,9 @@ importers:
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../../packages/permissions
+      '@capital-q/platform-admin':
+        specifier: workspace:*
+        version: link:../../packages/platform-admin
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../../packages/q-core
