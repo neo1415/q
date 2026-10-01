@@ -532,7 +532,10 @@ describe("answer seam tool loop", () => {
   it.each([
     ["a list", ["I need to retrieve your companies first."]],
     // The shape a model actually wrote live: one string, not a list.
-    ["a string, in the wrong shape", "I need to retrieve your companies first."],
+    [
+      "a string, in the wrong shape",
+      "I need to retrieve your companies first.",
+    ],
   ])(
     "an answer that describes doing something instead of calling the tool gets one more round (actionTalk as %s; founder live 2026-10-01)",
     async (_label, actionTalk) => {
@@ -559,9 +562,7 @@ describe("answer seam tool loop", () => {
       expect(tools.executed).toHaveLength(1);
       const second = alpha.calls[1]?.request;
       expect(second?.tools.map((t) => t.name)).toEqual(["get_company"]);
-      expect(second?.messages.at(-1)?.content).toContain(
-        "instead of doing it",
-      );
+      expect(second?.messages.at(-1)?.content).toContain("instead of doing it");
       expect(messages.at(-1)?.content).toBe("Northwind.");
     },
   );

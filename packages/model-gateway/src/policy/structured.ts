@@ -149,7 +149,11 @@ export function acceptStructuredOutput<T>(
   }
   let parsed = schema.safeParse(decoded);
   if (parsed.success && lenientDropped.length > 0) {
-    return { ok: true, value: parsed.data, dropped: lenientDropped.slice(0, 8) };
+    return {
+      ok: true,
+      value: parsed.data,
+      dropped: lenientDropped.slice(0, 8),
+    };
   }
   if (parsed.success) {
     return { ok: true, value: parsed.data };
