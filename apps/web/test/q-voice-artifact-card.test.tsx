@@ -27,6 +27,8 @@ vi.mock("../src/features/q/actions", () => ({
   readQConversationAction: (id: string) => readQConversationAction(id),
   // Nothing waits for a decision in these conversations.
   pendingQApprovalsAction: () => Promise.resolve({ ok: true, value: [] }),
+  listQConversationsAction: () =>
+    Promise.resolve({ ok: true, value: { items: [] } }),
   askQAction: vi.fn(),
   continueQRunAction: vi.fn(),
   cancelQRunAction: vi.fn(),

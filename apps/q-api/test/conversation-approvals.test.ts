@@ -11,6 +11,7 @@ import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
   createConversationApprovalPort,
+  createRecentPendingElsewhere,
   plainProposalStatus,
   type ConversationApprovalDependencies,
 } from "../src/composition/conversation-approvals.js";
@@ -147,6 +148,7 @@ function harness(rows: Row[]) {
           }
           return Promise.resolve({ decided } as never);
         },
+        listPendingApprovals: () => Promise.resolve([]),
       },
       orchestrator: {
         start: () => Promise.reject(new Error("unused")),
@@ -288,5 +290,98 @@ describe("declining by conversation (R33)", () => {
     const { port, declines } = harness([row]);
     await expect(port.decline?.(at(OWNER), row.proposalId)).rejects.toThrow();
     expect(declines).toEqual([]);
+  });
+});
+
+describe("changes waiting in their other conversations (live 2026-10-01)", () => {
+  const NOW = Date.parse("2026-10-01T16:00:00.000Z");
+  const row = (
+    approvalId: string,
+    conversationId: string | null,
+    minutesAgo: number,
+  ) => ({
+    approvalId,
+    runId: RUN_EARLIER,
+    conversationId,
+    summary: "Q looks after Nixo for you",
+    requestedAt: new Date(NOW - minutesAgo * 60_000).toISOString(),
+    expiresAt: new Date(NOW + 60 * 60_000).toISOString(),
+  });
+  const elsewhere = (rows: Row[], pending: ReturnType<typeof row>[]) =>
+    createRecentPendingElsewhere({
+      now: () => NOW,
+      runtime: {
+        getRun: (query) =>
+          Promise.resolve({
+            run: { conversationId: CONVERSATION, id: query.runId },
+          } as never),
+        getConversation: () => Promise.reject(new Error("unused")),
+      },
+      late: () => ({
+        actions: {
+          findApprovalForAction: () => Promise.reject(new Error("unused")),
+          approve: () => Promise.reject(new Error("unused")),
+          reject: () => Promise.reject(new Error("unused")),
+          listPendingApprovals: (query) =>
+            Promise.resolve(
+              query.actor.userId === OWNER.userId ? (pending as never) : [],
+            ),
+          getApproval: (query) => {
+            const found = rows.find(
+              (candidate) => candidate.approvalId === query.approvalId,
+            );
+            if (found === undefined || found.owner !== query.actor.userId) {
+              return Promise.reject(new QApprovalNotPermittedError());
+            }
+            return Promise.resolve(viewOf(found));
+          },
+        },
+        orchestrator: undefined,
+      }),
+    });
+  const context = (who: ActorContext) => ({
+    actor: who,
+    runId: RUN_NOW,
+    correlationId: CORRELATION,
+    tenantId: TENANT,
+    userId: who.userId,
+  });
+  const errand = (approvalId: string, proposalId: string): Row => ({
+    proposalId,
+    approvalId,
+    owner: OWNER.userId,
+    summary: "Q looks after Nixo for you",
+    approval: "PENDING",
+    action: "AWAITING_APPROVAL",
+    canDecide: true,
+  });
+
+  it("lists a change asked for recently in another conversation, read back as them", async () => {
+    const approvalId = randomUUID();
+    const proposalId = randomUUID();
+    const read = elsewhere(
+      [errand(approvalId, proposalId)],
+      [row(approvalId, randomUUID(), 5)],
+    );
+    expect(await read(context(OWNER))).toEqual([
+      {
+        proposalId,
+        summary: "Q looks after Nixo for you",
+        status: "PENDING",
+      },
+    ]);
+  });
+
+  it("leaves out this conversation's own, older ones, and anyone else's", async () => {
+    const mine = randomUUID();
+    const old = randomUUID();
+    const rows = [errand(mine, randomUUID()), errand(old, randomUUID())];
+    const read = elsewhere(rows, [
+      row(mine, CONVERSATION, 5),
+      row(old, randomUUID(), 45),
+    ]);
+    expect(await read(context(OWNER))).toEqual([]);
+    const all = elsewhere(rows, [row(mine, randomUUID(), 5)]);
+    expect(await all(context(STRANGER))).toEqual([]);
   });
 });

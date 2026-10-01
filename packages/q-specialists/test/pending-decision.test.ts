@@ -201,3 +201,100 @@ describe("a typed decision on a waiting change", () => {
     );
   });
 });
+
+describe("a yes in a new conversation to a change asked for elsewhere (live 2026-10-01)", () => {
+  const ERRAND: Proposal = {
+    proposalId: "b23ff5cc",
+    summary: "Q looks after Nixo for you",
+    status: "PENDING",
+  };
+  const withElsewhere = (
+    elsewhere: readonly Proposal[],
+    reading: Awaited<ReturnType<PendingDecisionPort["read"]>>,
+    here: readonly Proposal[] = [],
+  ) => {
+    const made = port({ proposals: here, reading });
+    const asked: string[] = [];
+    const value: PendingDecisionPort = {
+      ...made.value,
+      read: (input) => {
+        asked.push(input.question);
+        return made.value.read(input);
+      },
+      recentElsewhere: () => Promise.resolve(elsewhere),
+    };
+    return { value, calls: made.calls, asked };
+  };
+
+  it("approves the one recent change from another conversation, the status line naming it", async () => {
+    const { value, calls, asked } = withElsewhere([ERRAND], {
+      decision: "YES",
+      remainder: null,
+    });
+    const outcome = await decidePending(value, turn("yes, go ahead"));
+    expect(asked).toEqual([
+      "Q looks after Nixo for you. Shall I go ahead with exactly this, unchanged?",
+    ]);
+    expect(calls.approve).toEqual(["b23ff5cc"]);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: "Done: Q looks after Nixo for you.",
+    });
+  });
+
+  it("asks which, by name, when several recent changes wait elsewhere; approves nothing", async () => {
+    const { value, calls } = withElsewhere(
+      [ERRAND, { ...REMINDER, proposalId: "p2" }],
+      { decision: "YES", remainder: null },
+    );
+    const outcome = await decidePending(value, turn("yes, go ahead"));
+    expect(calls.approve).toEqual([]);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: '2 changes are waiting for your approval: "Q looks after Nixo for you" and "Reminder: Send Savanna the updated deck". Which one do you mean?',
+    });
+  });
+
+  it("a change waiting in this conversation is the one meant; elsewhere is not read", async () => {
+    let elsewhereRead = 0;
+    const made = port({
+      proposals: [REMINDER],
+      reading: { decision: "YES", remainder: null },
+    });
+    const value: PendingDecisionPort = {
+      ...made.value,
+      recentElsewhere: () => {
+        elsewhereRead += 1;
+        return Promise.resolve([ERRAND]);
+      },
+    };
+    await decidePending(value, turn("yes"));
+    expect(elsewhereRead).toBe(0);
+    expect(made.calls.approve).toEqual(["p1"]);
+  });
+
+  it("nothing waiting anywhere, or a turn that is not a decision: answered as any other", async () => {
+    const none = withElsewhere([], { decision: "YES", remainder: null });
+    expect(await decidePending(none.value, turn("yes"))).toEqual({
+      kind: "NONE",
+    });
+    expect(none.calls.read).toBe(0);
+    const unrelated = withElsewhere([ERRAND], {
+      decision: "UNRELATED",
+      remainder: null,
+    });
+    expect(
+      await decidePending(unrelated.value, turn("what's Nixo's runway?")),
+    ).toEqual({ kind: "NONE" });
+    expect(unrelated.calls.approve).toEqual([]);
+  });
+
+  it("a decided change elsewhere is not offered again", async () => {
+    const { value, calls } = withElsewhere([{ ...ERRAND, status: "SAVED" }], {
+      decision: "YES",
+      remainder: null,
+    });
+    expect(await decidePending(value, turn("yes"))).toEqual({ kind: "NONE" });
+    expect(calls.approve).toEqual([]);
+  });
+});

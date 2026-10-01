@@ -25,6 +25,11 @@ import type { ActorContext } from "@capital-q/security";
  * - Read NO: declined through the engine; anything more they said is
  *   answered after. A YES with more: approved, and the rest answered.
  * - Several pending and a decision read: Q asks which, by name.
+ * - Nothing pending in this conversation, but changes asked for recently
+ *   in another one (live 2026-10-01: after a reload the dock opened a new
+ *   conversation, and "yes, go ahead" met "I need the specific action"
+ *   while an errand waited): exactly one is decided as above, its status
+ *   line naming it; several are asked about by name.
  * - Read as something else, or not read at all: answered as any other.
  */
 
@@ -77,6 +82,17 @@ export type PendingDecisionPort = {
     context: PendingDecisionContext,
     proposalId: string,
   ) => Promise<{ readonly status: PendingDecisionStatus }>;
+  /**
+   * Changes still waiting for this person's approval that were asked for
+   * recently in their other conversations. Absent: only this one counts.
+   */
+  readonly recentElsewhere?: (context: PendingDecisionContext) => Promise<
+    readonly {
+      readonly proposalId: string;
+      readonly summary: string;
+      readonly status: PendingDecisionStatus;
+    }[]
+  >;
 };
 
 export type PendingDecisionOutcome =
@@ -145,7 +161,11 @@ export async function decidePending(
   },
 ): Promise<PendingDecisionOutcome> {
   const all = await port.proposals(input.context);
-  const pending = all.filter((proposal) => proposal.status === "PENDING");
+  let pending = all.filter((proposal) => proposal.status === "PENDING");
+  if (pending.length === 0 && port.recentElsewhere !== undefined) {
+    const elsewhere = await port.recentElsewhere(input.context).catch(() => []);
+    pending = elsewhere.filter((proposal) => proposal.status === "PENDING");
+  }
   if (pending.length === 0) return { kind: "NONE" };
   const only = pending.length === 1 ? pending[0] : undefined;
   const question =

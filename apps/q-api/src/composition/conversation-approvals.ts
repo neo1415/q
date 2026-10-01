@@ -75,7 +75,11 @@ export type ConversationApprovalDependencies = {
   readonly late: () => {
     readonly actions: Pick<
       QActionService,
-      "findApprovalForAction" | "getApproval" | "approve" | "reject"
+      | "findApprovalForAction"
+      | "getApproval"
+      | "approve"
+      | "reject"
+      | "listPendingApprovals"
     >;
     readonly orchestrator: QOrchestrator | undefined;
     /**
@@ -305,6 +309,58 @@ export function createConversationApprovalPort(
   return { inConversation, approve, decline, inboxItem };
 }
 
+/** How recently a change in another conversation was asked for to count. */
+export const RECENT_ELSEWHERE_MS = 30 * 60_000;
+
+/**
+ * Changes still waiting for this person's approval, asked for in the last
+ * half hour in a conversation other than this run's (live 2026-10-01). The
+ * person's own pending list, each read back as them through getApproval.
+ */
+export function createRecentPendingElsewhere(
+  dependencies: Pick<ConversationApprovalDependencies, "runtime" | "late"> & {
+    readonly withinMs?: number | undefined;
+    readonly now?: (() => number) | undefined;
+  },
+): (
+  context: PendingProposalContext,
+) => Promise<readonly ConversationProposal[]> {
+  const { runtime, late } = dependencies;
+  const withinMs = dependencies.withinMs ?? RECENT_ELSEWHERE_MS;
+  const now = dependencies.now ?? Date.now;
+  return async (context) => {
+    const { actor } = context;
+    const correlationId = CorrelationIdSchema.parse(context.correlationId);
+    const { run } = await runtime.getRun({
+      actor,
+      runId: QRunIdSchema.parse(context.runId),
+      correlationId,
+    });
+    const { actions } = late();
+    const rows = await actions.listPendingApprovals({ actor });
+    const found: ConversationProposal[] = [];
+    for (const row of rows) {
+      if (
+        row.conversationId !== null &&
+        row.conversationId === run.conversationId
+      ) {
+        continue;
+      }
+      if (now() - Date.parse(row.requestedAt) > withinMs) continue;
+      const view = await actions
+        .getApproval({ actor, approvalId: row.approvalId, correlationId })
+        .catch(() => null);
+      if (view === null) continue;
+      found.push({
+        proposalId: view.action.actionId,
+        summary: view.action.summary,
+        status: plainProposalStatus(view),
+      });
+    }
+    return found;
+  };
+}
+
 /**
  * The typed-turn decision port (founder fixture #1): the conversation's
  * proposals and their engine status, the person's words read by
@@ -313,9 +369,16 @@ export function createConversationApprovalPort(
 export function createPendingDecisionPort(dependencies: {
   readonly proposals: PendingProposalPort;
   readonly decisions: DecisionReader;
+  /** Changes waiting in their other conversations, asked for recently. */
+  readonly recentElsewhere?:
+    | ((
+        context: PendingProposalContext,
+      ) => Promise<readonly ConversationProposal[]>)
+    | undefined;
 }): PendingDecisionPort {
-  const { proposals, decisions } = dependencies;
+  const { proposals, decisions, recentElsewhere } = dependencies;
   return {
+    ...(recentElsewhere === undefined ? {} : { recentElsewhere }),
     proposals: (context) => proposals.inConversation(context),
     read: (input) =>
       decisions.read({

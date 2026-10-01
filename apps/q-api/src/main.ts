@@ -385,6 +385,7 @@ import { assertComposedActionTypes } from "./composition/q-action-types.js";
 import {
   createConversationApprovalPort,
   createPendingDecisionPort,
+  createRecentPendingElsewhere,
   plainProposalStatus,
 } from "./composition/conversation-approvals.js";
 import { createApprovedContinuation } from "./composition/approved-continuation.js";
@@ -1985,6 +1986,12 @@ const qIntelligence = composeQIntelligence({
   // through the Approval Engine (founder fixture #1).
   pendingDecisions: createPendingDecisionPort({
     proposals: conversationApprovals,
+    // "Yes, go ahead" in a new conversation: the one change asked for
+    // recently elsewhere (live 2026-10-01).
+    recentElsewhere: createRecentPendingElsewhere({
+      runtime: qRuntime,
+      late: () => ({ actions: qActions, orchestrator, continueApproved }),
+    }),
     decisions: createDecisionReader({
       gateway: modelGateway,
       logger,

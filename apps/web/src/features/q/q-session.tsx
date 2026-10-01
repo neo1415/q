@@ -26,11 +26,13 @@ import {
   readActiveConversation,
   rememberActiveConversation,
 } from "./active-conversation";
+import { listQConversationsAction, pendingQApprovalsAction } from "./actions";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
 import { performClientAction, registerClientRouter } from "./client-actions";
 import { followOfTurns } from "./follow-navigation";
 import { useQSubject, type QSubject } from "./q-subject";
+import { resumableConversation } from "./resume-conversation";
 import { setOpenDocument } from "./screen";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation, type QConversation } from "./use-q-conversation";
@@ -160,6 +162,33 @@ export function QSessionProvider({
   const [conversationId, setConversationId] = useState<string | null>(
     initialConversation,
   );
+  // A fresh load that names no conversation, away from the Q page: the
+  // dock resumes the recent one, above all one with a change waiting for
+  // their approval, so its card is there and "yes, go ahead" finds it
+  // (live 2026-10-01). Read once; a conversation already named wins.
+  const loadedNamed = useRef(conversationId !== null);
+  const resumeSubject = useRef(subject);
+  useEffect(() => {
+    if (!connected || loadedNamed.current) return;
+    if (window.location.pathname === Q_PAGE) return;
+    let current = true;
+    void Promise.all([
+      pendingQApprovalsAction(),
+      listQConversationsAction(),
+    ]).then(([pending, conversations]) => {
+      if (!current) return;
+      const found = resumableConversation({
+        now: Date.now(),
+        subject: resumeSubject.current,
+        pending: pending.ok ? pending.value : [],
+        conversations: conversations.ok ? conversations.value.items : [],
+      });
+      if (found !== null) setConversationId((now) => now ?? found);
+    });
+    return () => {
+      current = false;
+    };
+  }, [connected]);
   const onConversation = useCallback((named: string) => {
     setConversationId(named);
     writeToQPageUrl(named);
