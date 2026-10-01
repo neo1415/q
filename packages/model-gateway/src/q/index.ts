@@ -390,6 +390,15 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
  * asks the model to act through the tools it holds, or to answer without
  * promising.
  */
+/**
+ * Fields of the analyst's reading that are auxiliary to the answer: one in
+ * the wrong shape is left out (or null) instead of refusing the answer.
+ */
+export const ANALYST_LENIENT_FIELDS: readonly string[] = [
+  "actionTalk",
+  "recommendation",
+];
+
 export const SAY_DO_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
@@ -1707,9 +1716,12 @@ export function createModelGatewayQAnswer(
         // a malformed knowledge key must not throw away the profile change
         // beside it (CQ-QX-007 A5).
         invalidListItems: "DROP",
-        // An answer whose only fault is actionTalk's shape is kept (live
-        // 2026-10-01: a string where a list belongs refused the reading).
-        lenientFields: ["actionTalk"],
+        // An answer whose only fault is an auxiliary field's shape is kept
+        // (live 2026-10-01: actionTalk as a string, and a malformed
+        // recommendation, each refused the whole reading; with a tool's
+        // proposal already prepared, the person was told Q's reasoning
+        // service was unreachable).
+        lenientFields: ANALYST_LENIENT_FIELDS,
       };
 
       // The message and its durable completion event commit together
@@ -2137,7 +2149,10 @@ export function createModelGatewayQAnswer(
               const accepted = acceptStructuredOutput(
                 result.output.text,
                 CompanyAnalystV14ResultSchema,
-                { invalidListItems: "DROP", lenientFields: ["actionTalk"] },
+                {
+                  invalidListItems: "DROP",
+                  lenientFields: ANALYST_LENIENT_FIELDS,
+                },
               );
               if (
                 accepted.ok &&

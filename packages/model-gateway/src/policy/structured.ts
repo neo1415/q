@@ -144,6 +144,23 @@ export function acceptStructuredOutput<T>(
           lenientDropped.push(describe(issue));
         }
       }
+      // A required-but-nullable field left out stands as null, its
+      // "nothing to say" value (live 2026-10-01: a malformed
+      // `recommendation` refused whole answers).
+      const second = schema.safeParse(record);
+      if (!second.success) {
+        for (const issue of second.error.issues) {
+          const field = issue.path[0];
+          if (
+            issue.path.length === 1 &&
+            typeof field === "string" &&
+            lenient.includes(field) &&
+            !(field in record)
+          ) {
+            record[field] = null;
+          }
+        }
+      }
       decoded = record;
     }
   }
