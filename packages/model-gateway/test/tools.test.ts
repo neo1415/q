@@ -204,6 +204,52 @@ describe("Gemini projection", () => {
     expect(toolsForGemini([])).toEqual([]);
   });
 
+  // Live 2026-10-01: the seam's "do it, don't say it" round appends the
+  // model's reply and a trusted SYSTEM note. Lifted into the instruction,
+  // the note left the contents ending on the model's turn; flash-lite
+  // answered 400 and flash hung to its 45 s deadline.
+  it("says a later system note where it was added, so the contents end on a user turn", () => {
+    const { systemInstruction, contents } = toContents([
+      { role: "SYSTEM", content: "charter" },
+      { role: "USER", content: "task" },
+      { role: "SYSTEM", content: "capabilities" },
+      { role: "ASSISTANT", content: '{"answer":"I will look it up."}' },
+      { role: "SYSTEM", content: "Do it, don't say it." },
+    ]);
+    expect(systemInstruction).toBe("charter");
+    expect(contents.map((c) => c.role)).toEqual(["user", "model", "user"]);
+    expect(contents[0]?.parts).toEqual([
+      { text: "task" },
+      { text: "[Capital Q note] capabilities" },
+    ]);
+    expect(contents.at(-1)?.parts).toEqual([
+      { text: "[Capital Q note] Do it, don't say it." },
+    ]);
+  });
+
+  it("never mixes a note into a turn of function responses", () => {
+    const { contents } = toContents([
+      { role: "SYSTEM", content: "charter" },
+      { role: "USER", content: "task" },
+      {
+        role: "ASSISTANT",
+        content: "",
+        toolCalls: [{ callId: "abc", name: "get_company", arguments: {} }],
+      },
+      { role: "TOOL", callId: "abc", name: "get_company", content: "{}" },
+      { role: "SYSTEM", content: "sources changed" },
+    ]);
+    expect(contents.map((c) => c.role)).toEqual([
+      "user",
+      "model",
+      "user",
+      "user",
+    ]);
+    expect(contents.at(-1)?.parts).toEqual([
+      { text: "[Capital Q note] sources changed" },
+    ]);
+  });
+
   it("maps tool turns to function calls and merged function responses, echoing only real ids", () => {
     const { systemInstruction, contents } = toContents([
       { role: "SYSTEM", content: "sys" },

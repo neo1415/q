@@ -135,15 +135,33 @@ export function toContents(messages: readonly ModelMessage[]): {
   readonly systemInstruction: string | undefined;
   readonly contents: Content[];
 } {
-  const system = messages
-    .filter((m) => m.role === "SYSTEM")
-    .map((m) => m.content)
-    .join("\n\n");
+  // Only the leading system messages are the system instruction. A
+  // trusted note added later in the turn (the seam's "do it, don't say
+  // it" round, a source change, an own-mandate note) is said where it
+  // was added. Live 2026-10-01: lifted into the instruction, it left
+  // the contents ending on the model's own reply; flash-lite refused
+  // that with 400 and flash hung to the 45 s deadline.
+  const leading = messages.findIndex((m) => m.role !== "SYSTEM");
+  const head = leading === -1 ? messages : messages.slice(0, leading);
+  const system = head.map((m) => m.content).join("\n\n");
   const contents: Content[] = [];
-  for (const message of messages) {
+  for (const [index, message] of messages.entries()) {
     switch (message.role) {
-      case "SYSTEM":
+      case "SYSTEM": {
+        if (leading === -1 || index < leading) break;
+        const note: Part = { text: `[Capital Q note] ${message.content}` };
+        const last = contents.at(-1);
+        if (
+          last !== undefined &&
+          last.role === "user" &&
+          last.parts?.every((p) => p.functionResponse === undefined) === true
+        ) {
+          last.parts.push(note);
+        } else {
+          contents.push({ role: "user", parts: [note] });
+        }
         break;
+      }
       case "USER":
         contents.push({
           role: "user",
