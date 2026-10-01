@@ -89,7 +89,12 @@
     "turn-reader/v7": "35c13812e361ec18765a34dcdb4a3aabd1138bab96d2175667e8959bed7e4fc5",
     "turn-reader/v8": "80daa7662a5c5391f162ba8577e4f717ae22b11b4a724b803a12f29a0b8183c8",
     "turn-reader/v9": "f11ef638ab86a97bcc86119dd659e1b092b5f131462d0bb49f2213c84c8e2b1e",
-    "welcome-conductor/v1": "1bee2c687f0b73949090001e0ae6064eaf95344ff4addea78ab9d611eb712810"
+    "welcome-conductor/v1": "1bee2c687f0b73949090001e0ae6064eaf95344ff4addea78ab9d611eb712810",
+    "work-converse/v1": "7af8d5a1ce811886549c76921373bc91266669913f973bce9758a1f615c31bf1",
+    "work-interview-report/v1": "0995fed71a320a5e1087696a881870e1ae2acb4d6b452e7d1055eadc17f7600d",
+    "work-interview-turn/v1": "7366247a58e5db9f03d2d5c0e68c8b3e538fdfcc894ea19a9c0bc9337ab8d60b",
+    "work-shortlist/v1": "901f1389ffedbd8c702574097b87e51f926cc594305d8d43c8b3b4c65c2d10e3",
+    "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0"
   },
   "generatedBy": "CQ-Q-006"
 }

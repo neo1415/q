@@ -690,3 +690,29 @@ export {
   type SpeechPace,
   type SpeechReaction,
 } from "./speech/delivery.js";
+// AUTO block: Q's delegated work prompts (ADR 0029).
+export {
+  WORK_CONVERSE_V1,
+  WORK_INTERVIEW_REPORT_V1,
+  WORK_INTERVIEW_TURN_V1,
+  WORK_SHORTLIST_V1,
+  WORK_STAND_IN_REPLY_V1,
+} from "./prompts/tasks/q-work.v1.js";
+export {
+  WorkConverseResultSchema,
+  WorkInterviewReportResultSchema,
+  WorkInterviewTurnResultSchema,
+  WorkShortlistResultSchema,
+  WorkStandInReplyResultSchema,
+  type WorkConverseResult,
+  type WorkConverseVariables,
+  type WorkInterviewReportResult,
+  type WorkInterviewReportVariables,
+  type WorkInterviewTurnResult,
+  type WorkInterviewTurnVariables,
+  type WorkShortlistResult,
+  type WorkShortlistVariables,
+  type WorkStandInReplyResult,
+  type WorkStandInReplyVariables,
+} from "./prompts/schemas/q-work.js";
+// end AUTO block

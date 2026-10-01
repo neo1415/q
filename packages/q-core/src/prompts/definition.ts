@@ -59,6 +59,12 @@ export const PROMPT_IDS = [
   "REHEARSAL_SCORE",
   /** Founder direction 2026-09-30: a company's own pages, read during setup. */
   "FOUNDER_RESEARCH_READER",
+  // AUTO block (ADR 0029): Q's delegated work.
+  "WORK_SHORTLIST",
+  "WORK_CONVERSE",
+  "WORK_INTERVIEW_TURN",
+  "WORK_INTERVIEW_REPORT",
+  "WORK_STAND_IN_REPLY",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -87,6 +93,12 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INVESTOR_TWIN_TURN: "investor-twin-turn",
   REHEARSAL_SCORE: "rehearsal-score",
   FOUNDER_RESEARCH_READER: "founder-research-reader",
+  // AUTO block (ADR 0029)
+  WORK_SHORTLIST: "work-shortlist",
+  WORK_CONVERSE: "work-converse",
+  WORK_INTERVIEW_TURN: "work-interview-turn",
+  WORK_INTERVIEW_REPORT: "work-interview-report",
+  WORK_STAND_IN_REPLY: "work-stand-in-reply",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

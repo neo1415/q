@@ -49,6 +49,14 @@ import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
 import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
 import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
+// AUTO block (ADR 0029)
+import {
+  WORK_CONVERSE_V1,
+  WORK_INTERVIEW_REPORT_V1,
+  WORK_INTERVIEW_TURN_V1,
+  WORK_SHORTLIST_V1,
+  WORK_STAND_IN_REPLY_V1,
+} from "./tasks/q-work.v1.js";
 import { INVESTOR_PERSONA_V1 } from "./tasks/investor-persona.v1.js";
 import { INVESTOR_TWIN_TURN_V1 } from "./tasks/investor-twin-turn.v1.js";
 import { REHEARSAL_SCORE_V1 } from "./tasks/rehearsal-score.v1.js";
@@ -299,6 +307,12 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     REHEARSAL_SCORE_V2,
     FOUNDER_RESEARCH_READER_V1,
     GATEQ_INTERVIEWER_V1,
+    // AUTO block (ADR 0029)
+    WORK_SHORTLIST_V1,
+    WORK_CONVERSE_V1,
+    WORK_INTERVIEW_TURN_V1,
+    WORK_INTERVIEW_REPORT_V1,
+    WORK_STAND_IN_REPLY_V1,
   ];
 
 /** The production registry: the source-controlled definitions above. */

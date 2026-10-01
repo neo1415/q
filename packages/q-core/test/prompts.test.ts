@@ -122,6 +122,12 @@ describe("registry", () => {
         "REHEARSAL_SCORE",
         // Founder direction 2026-09-30: founder research during setup.
         "FOUNDER_RESEARCH_READER",
+        // AUTO (ADR 0029): Q's delegated work.
+        "WORK_SHORTLIST",
+        "WORK_CONVERSE",
+        "WORK_INTERVIEW_TURN",
+        "WORK_INTERVIEW_REPORT",
+        "WORK_STAND_IN_REPLY",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
