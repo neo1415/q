@@ -212,7 +212,10 @@ Q tools (registry group RECORDS, INSTANT, OWN_Q_CONVERSATION):
   "what does my deal flow look like": the same read model, compact.
 - `get_my_results_report` (`results.own.report`) — "download my pipeline
   report": returns the PDF/CSV links for the asked range; Q offers them.
-- Navigation destination `RESULTS`.
+- Navigation: a `Results` item in the sidebar and account menu; Q's tools
+  return `/results` and the report links. A `RESULTS` voice/turn-reader
+  destination needs a new TURN_READER version and is left to the lead
+  (shared prompt; see §11).
 
 ## 6. Data model (migration 20261115000000_platform_ops_admin.sql)
 
@@ -241,7 +244,8 @@ All under `/v1/admin` (404 for non-admins; 404 for missing permission;
 `STEP_UP_REQUIRED` 403 for sensitive writes without step-up): `me` (role +
 permissions), `step-up`, `accounts?q`, `accounts/:id`, `accounts/:id/suspension`
 (POST), `organisations?q`, `organisations/:id`, `verification/claims`,
-`verification/claims/:id/decision` (POST, Idempotency-Key), `safety/reports`,
+`verification/claims/:id/decision` (POST; replay-safe by state: a decided
+request is no longer current, so a repeat decides nothing), `safety/reports`,
 `safety/reports/:id/review` (POST), `break-glass` (GET/POST),
 `break-glass/:id/decision` (POST), `break-glass/:id/messages`,
 `q/monitor?window`, `q/errors`, `q/runs/:id`, `audit?…`, `flags`,
@@ -289,3 +293,26 @@ New problem codes: `STEP_UP_REQUIRED` (403), `ACCOUNT_SUSPENDED` (403).
 - DAILY: before generating or emailing, `isFlagEnabled("q.daily")`.
 - Email senders composed in q-api/workers are wrapped with
   `recordingEmailSender` so deliveries appear in the Email panel.
+
+## 11. As built (2026-10-01)
+
+- Migration `20261115000000_platform_ops_admin.sql`; pgTAP
+  `supabase/tests/database/rls/600_platform_ops_admin.test.sql` (24).
+- `@capital-q/platform-admin`: permissions v1, access/step-up, accounts,
+  verification queue, safety, break-glass, Q monitor, audit search, kill
+  switches (+ reader), email panel and delivery log, team, firewall
+  recorder. `@capital-q/verification`: `createDecideByOperator`.
+- api: `/v1/admin/*` (31 routes, each with RBAC negatives in
+  `apps/api/test/admin.test.ts`), `ACCOUNT_SUSPENDED` at actor resolution
+  and identity lookup; `/v1/results`, `/v1/results/report`.
+- q-api: firewall decisions recorded; suspended accounts resolve to no
+  actor; errands gated by `q.autonomy.errands`; operator notice emails
+  logged; Q tools `get_my_results`, `get_my_results_report`.
+- workers: reminder emails logged.
+- web: `/admin` console sections, step-up dialog, `/results` page and
+  downloads; `Results` nav item.
+- Not done here (lead): wire `q.autonomy.delegations` (AUTO) and `q.daily`
+  (DAILY) to `createFlagReader`; a `RESULTS` turn-reader destination;
+  copy `SMTP_SENDER`/`BREVO_API_KEY` presence to the api service so the
+  Email panel shows the real sender; step-up needs a password sign-in
+  (magic-link-only admins cannot step up yet).
