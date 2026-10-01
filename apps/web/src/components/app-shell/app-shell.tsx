@@ -88,7 +88,7 @@ export function AppShell({
           <main id="main" className="cq-shell-main">
             {children}
           </main>
-          <MobileNavigation />
+          <MobileNavigation scope={context.scope} />
         </div>
       </div>
       {/* DOCS: the one owner of document-ready cards, on every page. */}

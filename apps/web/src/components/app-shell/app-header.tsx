@@ -5,12 +5,12 @@ import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { ThemeMenu } from "@/features/appearance/theme-menu";
 import { NotificationCenter } from "@/features/work/notification-center";
 
-import { AccountMenu } from "./account-menu";
 import type { ShellContext } from "./app-shell";
 
 /**
  * Compact mobile top bar: wordmark, the current context (the scope, never
- * inside the input), the theme as one icon and the account menu. Q is the floating dock on a phone
+ * inside the input), notices and the theme as one icon. Every other
+ * section, Profile and Settings included, is under the More tab. Q is the floating dock on a phone
  * (ADR 0017 F1), not a header button. Hidden on desktop.
  */
 export function AppHeader({ context }: { readonly context: ShellContext }) {
@@ -31,10 +31,6 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
           />
           <NotificationCenter />
           <ThemeMenu align="end" />
-          <AccountMenu
-            founder={context.scope === "founder_private"}
-            investor={context.scope === "investor_private"}
-          />
         </div>
       </div>
     </header>

@@ -26,7 +26,8 @@ test.describe("mobile application shell", () => {
 
     const nav = page.getByRole("navigation", { name: "Primary" });
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link")).toHaveCount(5);
+    await expect(nav.getByRole("link")).toHaveCount(4);
+    await expect(nav.getByRole("button", { name: "More" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Q" })).toHaveAttribute(
       "aria-current",
       "page",
@@ -68,17 +69,14 @@ test.describe("mobile application shell", () => {
     );
 
     // Every tab is a comfortable touch target.
-    for (const name of [
-      "Q",
-      "Discover",
-      "Capital",
-      "Relationships",
-      "Profile",
-    ]) {
+    for (const name of ["Q", "Discover", "Capital", "Relationships"]) {
       const box = await nav.getByRole("link", { name }).boundingBox();
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
     }
+    const more = await nav.getByRole("button", { name: "More" }).boundingBox();
+    expect(more?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(more?.width ?? 0).toBeGreaterThanOrEqual(44);
 
     await expectNoHorizontalOverflow(page);
   });
@@ -107,7 +105,11 @@ test.describe("mobile application shell", () => {
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
-    await nav.getByRole("link", { name: "Profile" }).tap();
+    await nav.getByRole("button", { name: "More" }).tap();
+    await page
+      .getByRole("navigation", { name: "More sections" })
+      .getByRole("link", { name: "Profile" })
+      .tap();
     await expect(page).toHaveURL(/\/profile$/);
     await expect(
       page.getByRole("heading", { name: "Profile", level: 1 }),
