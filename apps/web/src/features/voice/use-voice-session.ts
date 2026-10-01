@@ -59,7 +59,9 @@ export function useVoiceSession(
   );
 
   const live = useRef({ connected: false, muted: false });
-  live.current = { connected: client.connected, muted: client.muted };
+  useEffect(() => {
+    live.current = { connected: client.connected, muted: client.muted };
+  }, [client.connected, client.muted]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
