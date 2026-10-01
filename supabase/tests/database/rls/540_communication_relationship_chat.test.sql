@@ -89,7 +89,11 @@ select throws_ok(
   '55000', null, 'even the server role cannot delete a message');
 
 -- Privileged server role -----------------------------------------------------------
-select is((select count(*)::int from communication.messages), 4, 'the server role reads every message');
+-- Over this file's two fixture threads, across both tenants: the
+-- shared local database may hold other suites' rows.
+select is((select count(*)::int from communication.messages
+            where conversation_id in ('00000000-0000-4000-8000-000000008f01',
+                                      '00000000-0000-4000-8000-000000008f02')), 4, 'the server role reads every message');
 
 -- Positive: A (company side) reads its own thread ------------------------------------
 select pg_temp.act_as_user_a();
