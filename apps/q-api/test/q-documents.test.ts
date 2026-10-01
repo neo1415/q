@@ -27,6 +27,7 @@ import {
 import { createApp, type QApiSecurityDependencies } from "../src/app.js";
 import { suggestBrandFromWebsite } from "../src/composition/brand-from-website.js";
 import { createDocumentStudioPort } from "../src/composition/documents.js";
+import { createVettedHttp } from "../src/composition/vetted-http.js";
 
 /**
  * DOCS: the brand kit routes, filing one answer as a PDF, and a deck's
@@ -328,30 +329,53 @@ describe("reading a brand from the company's own website", () => {
   const page = `<html><head><meta name="theme-color" content="#0b6e4f">
     <link rel="apple-touch-icon" href="/touch.png"></head><body></body></html>`;
 
-  const fetchFrom =
-    (routes: Record<string, Response | (() => Response)>) =>
-    (input: string | URL | Request): Promise<Response> => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
-      const found = routes[url];
-      if (found === undefined)
-        return Promise.resolve(new Response("", { status: 404 }));
-      return Promise.resolve(typeof found === "function" ? found() : found);
-    };
+  /** The vetted client over a fake public DNS and a fake transport. */
+  const httpFrom = (
+    routes: Record<
+      string,
+      {
+        status?: number;
+        location?: string;
+        type: string;
+        body: Uint8Array | string;
+      }
+    >,
+  ) =>
+    createVettedHttp({
+      resolve: () => Promise.resolve([{ address: "93.184.216.34", family: 4 }]),
+      transport: (input) => {
+        const found = routes[input.url.href];
+        return Promise.resolve(
+          found === undefined
+            ? {
+                status: 404,
+                location: null,
+                contentType: "",
+                body: new Uint8Array(),
+              }
+            : {
+                status: found.status ?? 200,
+                location: found.location ?? null,
+                contentType: found.type,
+                body:
+                  typeof found.body === "string"
+                    ? new TextEncoder().encode(found.body)
+                    : found.body,
+              },
+        );
+      },
+    });
 
   it("suggests the declared colour and the logo; Q's pairing by sector", async () => {
     const suggestion = await suggestBrandFromWebsite({
       websiteUrl: "northstar.example.com",
       sectorCodes: ["logistics"],
-      fetchImpl: fetchFrom({
-        "https://northstar.example.com/": () =>
-          new Response(page, { headers: { "content-type": "text/html" } }),
-        "https://northstar.example.com/touch.png": () =>
-          new Response(PNG, { headers: { "content-type": "image/png" } }),
+      http: httpFrom({
+        "https://northstar.example.com/": { type: "text/html", body: page },
+        "https://northstar.example.com/touch.png": {
+          type: "image/png",
+          body: new Uint8Array(PNG),
+        },
       }),
     });
     expect(suggestion?.palette.primary).toBe("#0b6e4f");
@@ -364,21 +388,23 @@ describe("reading a brand from the company's own website", () => {
     const offSite = await suggestBrandFromWebsite({
       websiteUrl: "https://northstar.example.com",
       sectorCodes: [],
-      fetchImpl: fetchFrom({
-        "https://northstar.example.com/": () =>
-          new Response("", {
-            status: 302,
-            headers: { location: "http://169.254.169.254/latest/meta-data" },
-          }),
+      http: httpFrom({
+        "https://northstar.example.com/": {
+          status: 302,
+          location: "http://169.254.169.254/latest/meta-data",
+          type: "",
+          body: "",
+        },
       }),
     });
     expect(offSite).toBeNull();
     const local = await suggestBrandFromWebsite({
       websiteUrl: "http://127.0.0.1:54321",
       sectorCodes: [],
-      fetchImpl: () => {
-        throw new Error("must not be called");
-      },
+      http: createVettedHttp({
+        resolve: () => Promise.reject(new Error("must not be called")),
+        transport: () => Promise.reject(new Error("must not be called")),
+      }),
     });
     expect(local).toBeNull();
   });

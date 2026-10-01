@@ -42,13 +42,19 @@ cover:
   (`deck-render/src/design.ts`): still one of the three named directions,
   plus one of four OFL type pairings. No model chooses colours or fonts.
 - **The website read.** The Q API may fetch the company's own recorded
-  website (never a URL from a request or a model): public-host check
-  (`judgePublicUrl`), at most two same-site redirects, 6 s, 1 MB of HTML,
-  two same-site stylesheets of 256 KB, a PNG/JPEG logo of 512 KB. Only
-  colours, font family names and the logo bytes are kept; nothing from the
-  page reaches a model. DNS-rebinding to a private address is not checked
-  at connect time (the hosted egress has no private network of ours to
-  reach); a resolver-pinned fetch is the follow-up if that changes.
+  website (never a URL from a request or a model) through one vetted client
+  (`apps/q-api/src/composition/vetted-http.ts`): the URL passes
+  `judgePublicUrl`; the name is resolved by the client itself and refused
+  when ANY resolved address is loopback, private, link-local/metadata,
+  CGNAT, reserved, multicast, or an IPv6 form that reaches IPv4
+  (IPv4-mapped, IPv4-compatible, NAT64, 6to4, Teredo) or is unique/link
+  local; the socket is pinned to the vetted address through the request's
+  own `lookup` (no second resolution, so no rebinding window) while the
+  name stays the Host header and TLS SNI; redirects (at most two, same
+  site) are each vetted from scratch; 6 s per hop, 1 MB of HTML, two
+  same-site stylesheets of 256 KB, a PNG/JPEG logo of 512 KB. Only colours,
+  font family names and the logo bytes are kept; nothing from the page
+  reaches a model.
 - **Words pass.** DOCUMENT_POLISH v1 rewords a newly composed deck's slides
   (conclusion titles from the slide's own words, plain language, the
   common AI tells named as style rules). Code keeps any line whose rewrite

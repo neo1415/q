@@ -13,6 +13,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import type { QDocumentRoutesDependencies } from "../http/q-documents.js";
 import { suggestBrandFromWebsite } from "./brand-from-website.js";
+import type { VettedHttp } from "./vetted-http.js";
 
 /**
  * The document studio's server side (DOCS): the brand kit service and what
@@ -75,7 +76,7 @@ export function createDocumentsModule(dependencies: {
     actor: ActorContext,
     runId: string,
   ) => Promise<readonly QMessage[]>;
-  readonly fetchImpl?: typeof fetch | undefined;
+  readonly http?: VettedHttp | undefined;
 }): DocumentsModule {
   const brandKit = createBrandKitService({
     sql: dependencies.sql,
@@ -92,7 +93,7 @@ export function createDocumentsModule(dependencies: {
       const suggestion = await suggestBrandFromWebsite({
         websiteUrl: company.websiteUrl,
         sectorCodes: company.sectorCodes,
-        fetchImpl: dependencies.fetchImpl,
+        http: dependencies.http,
       });
       return suggestion === null
         ? { status: "UNREADABLE" }
