@@ -229,9 +229,9 @@ describe("Q sees you on camera: when a look is sent (founder ask 2026-10-01)", (
     expect(shouldLook(base)).toBe(true);
   });
 
-  it("at most every 8 s on turns, and once per 30 s between them", () => {
-    expect(shouldLook({ ...base, lastLookMs: base.nowMs - 5_000 })).toBe(false);
-    expect(shouldLook({ ...base, lastLookMs: base.nowMs - 9_000 })).toBe(true);
+  it("fresh with every turn (deduped over 2 s), and once per 30 s between them", () => {
+    expect(shouldLook({ ...base, lastLookMs: base.nowMs - 1_000 })).toBe(false);
+    expect(shouldLook({ ...base, lastLookMs: base.nowMs - 3_000 })).toBe(true);
     expect(
       shouldLook({ ...base, reason: "IDLE", lastLookMs: base.nowMs - 20_000 }),
     ).toBe(false);

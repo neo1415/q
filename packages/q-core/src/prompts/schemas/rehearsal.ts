@@ -567,3 +567,19 @@ export const RehearsalTurnV5ResultSchema = RehearsalTurnV4ResultSchema.extend({
   presence: PresenceReadingSchema.nullable(),
 }).strict();
 export type RehearsalTurnV5Result = z.infer<typeof RehearsalTurnV5ResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v7 (REHEARSE, 2026-10-01): when the person asks whether Q can see them, or
+// points to something in view ("can you see this?", "look at my
+// whiteboard"), the turn says so by meaning (askedToSee); code then answers
+// from a camera frame from just now, or, without consent, the played
+// person says plainly they cannot see them.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V6_SCHEMA_VERSION = 6;
+
+export const RehearsalTurnV6ResultSchema = RehearsalTurnV5ResultSchema.extend({
+  /** Their latest line asks you to look at them or at something in view. */
+  askedToSee: z.boolean(),
+}).strict();
+export type RehearsalTurnV6Result = z.infer<typeof RehearsalTurnV6ResultSchema>;

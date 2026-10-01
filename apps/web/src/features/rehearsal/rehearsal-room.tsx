@@ -212,7 +212,7 @@ export function RehearsalRoom({
   /**
    * A small look at them, when they consented and their camera is on: a
    * 512px JPEG sent for the next turn only and never stored. On their turns
-   * (at most every 8 s) and, between turns, once per 30 s.
+   * (fresh with each one, so "can you see this?" has a frame from just now) and, between turns, once per 30 s.
    */
   const look = useCallback(
     async (reason: "TURN" | "IDLE") => {

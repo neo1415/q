@@ -32,13 +32,13 @@ import {
   REHEARSAL_DIMENSIONS_FOR,
   RehearsalReviewLenientSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnV5ResultSchema,
+  RehearsalTurnV6ResultSchema,
   renderPrompt,
   type CounterpartPersonaStored as CounterpartPersonaResult,
   type CounterpartPersonaV5Variables as CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV5Result as RehearsalTurnResult,
+  type RehearsalTurnV6Result as RehearsalTurnResult,
   type RehearsalTurnV6Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -1023,6 +1023,7 @@ export function yieldTo(previous: readonly Turn[]): {
       reaction: null,
       conclusion: null,
       presence: null,
+      askedToSee: false,
     },
     sawScreen: false,
   };
@@ -1037,6 +1038,12 @@ type Frame = { readonly image: RehearsalImage; readonly at: number };
 export const FRAME_TTL_MS = 90_000;
 /** A camera frame is a look at them now: stale after half a minute. */
 export const CAMERA_FRAME_TTL_MS = 30_000;
+/**
+ * An ordinary turn looks at them at most this often; a turn that asks Q to
+ * look ("can you see this?") always gets a look, from a frame this fresh.
+ */
+export const CAMERA_LOOK_GAP_MS = 8_000;
+export const CAMERA_FRESH_MS = 3_500;
 const frameKey = (rehearsalId: string, kind: "SCREEN" | "CAMERA") =>
   `${rehearsalId}:${kind}`;
 const NO_MATERIAL: Sourced = { text: "", sources: [] };
@@ -1066,12 +1073,18 @@ export function createRehearsalService(dependencies: {
     frames.delete(key);
     const ttl = kind === "CAMERA" ? CAMERA_FRAME_TTL_MS : FRAME_TTL_MS;
     return frame !== undefined && now().getTime() - frame.at <= ttl
-      ? frame.image
+      ? frame
       : null;
   };
+  /** Rehearsals whose person currently lets Q see them (frames arriving). */
+  const consenting = new Set<string>();
+  /** When an ordinary turn last looked at them, per rehearsal. */
+  const lastLook = new Map<string, number>();
   const dropFrames = (rehearsalId: string) => {
     frames.delete(frameKey(rehearsalId, "SCREEN"));
     frames.delete(frameKey(rehearsalId, "CAMERA"));
+    consenting.delete(rehearsalId);
+    lastLook.delete(rehearsalId);
   };
   /** One persona build per viewer and subject at a time. */
   const building = new Map<string, Promise<PersonaRow | null>>();
@@ -1285,8 +1298,19 @@ export function createRehearsalService(dependencies: {
   } | null> {
     const persona = personaOf(row.persona);
     if (persona === null) return null;
-    const screenFrame = takeFrame(row.id, "SCREEN");
-    const cameraFrame = takeFrame(row.id, "CAMERA");
+    const screenFrame = takeFrame(row.id, "SCREEN")?.image ?? null;
+    const held = takeFrame(row.id, "CAMERA");
+    const consent = consenting.has(row.id);
+    const at = now().getTime();
+    // An ordinary turn looks at most every few seconds (cost); the frame
+    // not used is set aside for a turn that asks Q to look.
+    const looked = lastLook.get(row.id);
+    const cameraFrame =
+      held !== null &&
+      (looked === undefined || at - looked >= CAMERA_LOOK_GAP_MS)
+        ? held.image
+        : null;
+    if (cameraFrame !== null) lastLook.set(row.id, at);
     const themTurns = turns.filter((turn) => turn.from === "THEM").length;
     const seen = presence.get(row.id);
     const look = presenceNote(
@@ -1294,6 +1318,7 @@ export function createRehearsalService(dependencies: {
       cameraFrame !== null,
       row.difficulty,
       themTurns,
+      consent,
     );
     const minutes = Math.floor(
       (now().getTime() - row.createdAt.getTime()) / 60_000,
@@ -1307,39 +1332,68 @@ export function createRehearsalService(dependencies: {
       [...turns].reverse().find((turn) => turn.from === "THEM")?.state ??
       initialTemperament(row.difficulty, persona.temperament.baseline);
     const registerBefore = registerOf(before, row.difficulty);
-    const result = await composer.turn(
+    const variables = {
+      viewerRole: row.userRole,
+      viewerOrganisation: viewerOrganisation.slice(0, 200),
+      counterpartName: row.counterpartName,
+      counterpartRole: counterpartRoleOf(row.counterpartKind),
+      persona: personaText(persona).slice(0, 10_000),
+      meetingMaterial: (await meetingMaterial(actor, row)).slice(0, 16_000),
+      rehearsal: transcriptOf(turns, row.counterpartName, row.userRole),
+      turnsSoFar: Math.min(turns.length, 400),
+      minutesElapsed: Math.max(0, Math.min(minutes, 600)),
+      cue: wrapUp ? "WRAP_UP" : cue,
+      difficulty: row.difficulty,
+      temperament: temperamentNote(before, registerBefore),
+      stance: stanceOf(
+        counterpartRoleOf(row.counterpartKind),
+        persona.forwardness ?? "TYPICAL",
+        persona.forwardnessWhy ?? null,
+      ).note,
+      screenShared: screenFrame !== null,
+      cameraOn: cameraFrame !== null,
+      presence: look.note,
+    };
+    const first = await composer.turn(
       actor,
-      {
-        viewerRole: row.userRole,
-        viewerOrganisation: viewerOrganisation.slice(0, 200),
-        counterpartName: row.counterpartName,
-        counterpartRole: counterpartRoleOf(row.counterpartKind),
-        persona: personaText(persona).slice(0, 10_000),
-        meetingMaterial: (await meetingMaterial(actor, row)).slice(0, 16_000),
-        rehearsal: transcriptOf(turns, row.counterpartName, row.userRole),
-        turnsSoFar: Math.min(turns.length, 400),
-        minutesElapsed: Math.max(0, Math.min(minutes, 600)),
-        cue: wrapUp ? "WRAP_UP" : cue,
-        difficulty: row.difficulty,
-        temperament: temperamentNote(before, registerBefore),
-        stance: stanceOf(
-          counterpartRoleOf(row.counterpartKind),
-          persona.forwardness ?? "TYPICAL",
-          persona.forwardnessWhy ?? null,
-        ).note,
-        screenShared: screenFrame !== null,
-        cameraOn: cameraFrame !== null,
-        presence: look.note,
-      },
+      variables,
       { screen: screenFrame, camera: cameraFrame },
       signal,
     );
-    if (result === null) return null;
-    if (cameraFrame !== null || look.offer !== null) {
+    if (first === null) return null;
+    // "Can you see this?" (2026-10-01): read by meaning on the turn. With
+    // consent, the answer comes from a frame from just now; one taken a
+    // while ago is not good enough. Without consent the first line already
+    // said plainly that Q can't see them.
+    const fresh =
+      held !== null && at - held.at <= CAMERA_FRESH_MS ? held.image : null;
+    const lookAgain =
+      first.askedToSee &&
+      consent &&
+      !(cameraFrame !== null && fresh !== null) &&
+      signal?.aborted !== true;
+    const result = lookAgain
+      ? ((await composer.turn(
+          actor,
+          {
+            ...variables,
+            cameraOn: fresh !== null,
+            presence:
+              fresh !== null
+                ? "They asked you to look: this frame is from just now. Answer about what it shows -- the object, the whiteboard, their setup -- in character, briefly; if it is unclear, say you can't make it out and ask them to hold it closer. Only behaviour, setup and objects; never appearance or identity."
+                : "They asked you to look, but you have no clear look at them right now. Say you can't quite make it out and ask them to hold it up again. Never pretend to see it.",
+          },
+          { screen: screenFrame, camera: fresh },
+          signal,
+        )) ?? first)
+      : first;
+    if (lookAgain && fresh !== null) lastLook.set(row.id, at);
+    const sawYou = cameraFrame !== null || (lookAgain && fresh !== null);
+    if (sawYou || look.offer !== null) {
       const state = seen ?? newPresenceState();
       recordPresence(
         state,
-        cameraFrame === null ? null : result.presence,
+        sawYou ? result.presence : null,
         look.offer,
         themTurns,
       );
@@ -1675,6 +1729,11 @@ export function createRehearsalService(dependencies: {
       // The latest only: a new frame replaces the one held; none forgets it.
       if (image === null) frames.delete(frameKey(row.id, kind));
       else frames.set(frameKey(row.id, kind), { image, at: current });
+      // A camera frame is their consent in force; none withdraws it.
+      if (kind === "CAMERA") {
+        if (image === null) consenting.delete(row.id);
+        else consenting.add(row.id);
+      }
       return "OK";
     },
 
@@ -1912,7 +1971,7 @@ export function createRehearsalComposer(dependencies: {
         "NORMAL_DIALOGUE",
         TURN_BUDGET,
         variables,
-        RehearsalTurnV5ResultSchema,
+        RehearsalTurnV6ResultSchema,
         views,
         signal,
       );

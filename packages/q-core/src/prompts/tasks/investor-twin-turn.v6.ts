@@ -29,7 +29,7 @@ export const INVESTOR_TWIN_TURN_V6: PromptDefinition<
 > = {
   ...INVESTOR_TWIN_TURN_V5,
   version: 6,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder ask 2026-10-01: with consent, a camera frame rides with the turn; a presence reading (gaze, distraction, framing, lighting, background, company, confidence) and one code-chosen remark per issue; guardrails against appearance, identity and emotion from a face.",
   effectiveFrom: "2026-10-01",

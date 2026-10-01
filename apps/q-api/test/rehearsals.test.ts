@@ -181,6 +181,8 @@ function setup(options: { messages?: () => string } = {}) {
   const clock = { at: new Date("2026-10-01T10:05:00Z").getTime() };
   const looks = {
     next: null as PresenceReading | null,
+    /** The person's line asks Q to look, read by meaning. */
+    asked: (_text: string) => false,
   };
   const seen = {
     personaInputs: [] as string[],
@@ -306,6 +308,7 @@ function setup(options: { messages?: () => string } = {}) {
           reaction: null,
           conclusion: "ADJOURNED",
           presence: views.camera === null ? null : looks.next,
+          askedToSee: false,
         });
       }
       return Promise.resolve({
@@ -319,6 +322,7 @@ function setup(options: { messages?: () => string } = {}) {
         reaction: variables.cue === "SILENCE" ? "SIGH" : null,
         conclusion: null,
         presence: views.camera === null ? null : looks.next,
+        askedToSee: looks.asked(variables.rehearsal),
       });
     },
     review: (_a, variables) => {
@@ -1025,7 +1029,7 @@ describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
   });
 
   it("never persists a frame: nothing of it reaches the stored rehearsal", async () => {
-    const { service, store, looks, closeNextTurn } = setup();
+    const { service, store, looks, closeNextTurn, clock } = setup();
     const rehearsal = await startWith(service);
     looks.next = reading({ gaze: "READING_OFF_SCREEN" });
     const secret = "SECRETFRAMEBYTES0123456789";
@@ -1037,6 +1041,7 @@ describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
         "CAMERA",
       );
       await service.say(actor(FOUNDER), rehearsal.id, { text });
+      clock.at += 10_000;
     }
     closeNextTurn();
     await service.say(actor(FOUNDER), rehearsal.id, { text: "Three." });
@@ -1051,7 +1056,7 @@ describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
   });
 
   it("offers each issue once, never two turns running, and only what difficulty allows", async () => {
-    const { service, seen, looks } = setup();
+    const { service, seen, looks, clock } = setup();
     const rehearsal = await startWith(service);
     looks.next = reading({ gaze: "READING_OFF_SCREEN", lighting: "POOR" });
     const notes: string[] = [];
@@ -1061,6 +1066,7 @@ describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
         text: `Line ${String(i)}.`,
       });
       notes.push(seen.turnInputs.at(-1)?.presenceNote ?? "");
+      clock.at += 10_000;
     }
     const offers = notes.map((note) =>
       note.includes("you may mention it once")
@@ -1129,5 +1135,63 @@ describe("presence guardrails", () => {
     const state = newPresenceState();
     recordPresence(state, unclear, null, 1);
     expect(presenceNote(state, true, "TOUGH", 2).offer).toBeNull();
+  });
+});
+
+describe('"can you see this?" (2026-10-01)', () => {
+  const FRAME = { mediaType: "image/jpeg" as const, dataBase64: "AAAA" };
+  const asks = (transcript: string) =>
+    /whiteboard\.?\s*$/i.test(transcript.trim().split("\n").at(-1) ?? "");
+
+  it("with consent, an ask is answered from a frame from just now", async () => {
+    const { service, seen, looks, clock } = setup();
+    looks.asked = asks;
+    const rehearsal = await startWith(service);
+    await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Our numbers." });
+    // Two seconds later: inside the ordinary look gap, so an ordinary turn
+    // would get no image; the ask gets the fresh frame it came with.
+    clock.at += 2_000;
+    await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+    const calls = seen.turnInputs.length;
+    await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Look at my whiteboard.",
+    });
+    const passes = seen.turnInputs.slice(calls);
+    expect(passes.map((p) => p.camera)).toEqual([false, true]);
+    expect(passes.at(-1)?.presenceNote).toContain(
+      "this frame is from just now",
+    );
+  });
+
+  it('without consent, the ask gets the honest "can\'t see you", in one pass', async () => {
+    const { service, seen, looks } = setup();
+    looks.asked = asks;
+    const rehearsal = await startWith(service);
+    const calls = seen.turnInputs.length;
+    await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Look at my whiteboard.",
+    });
+    const passes = seen.turnInputs.slice(calls);
+    expect(passes).toHaveLength(1);
+    expect(passes[0]?.camera).toBe(false);
+    expect(passes[0]?.presenceNote).toContain("say plainly you can't see them");
+    expect(passes[0]?.presenceNote).toContain('"Let Q see you"');
+  });
+
+  it("an ordinary turn takes no fresh look inside the gap, and no second pass", async () => {
+    const { service, seen, clock } = setup();
+    const rehearsal = await startWith(service);
+    await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "One." });
+    clock.at += 2_000;
+    await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+    const calls = seen.turnInputs.length;
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Two." });
+    const passes = seen.turnInputs.slice(calls);
+    expect(passes).toHaveLength(1);
+    expect(passes[0]?.camera).toBe(false);
+    // With consent in force, it is not told it cannot see them.
+    expect(passes[0]?.presenceNote).toContain("No look at them this turn");
   });
 });

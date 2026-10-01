@@ -90,10 +90,18 @@ export function presenceNote(
   cameraOn: boolean,
   difficulty: "GENTLE" | "REALISTIC" | "TOUGH",
   themTurns: number,
+  consent = cameraOn,
 ): { readonly note: string; readonly offer: PresenceIssue | null } {
+  if (!cameraOn && !consent) {
+    // Never pretend (2026-10-01): asked to look, they hear plainly why not.
+    return {
+      note: 'You cannot see them: their camera is not shared with you. Say nothing about how they look or their setup. If they ask you to look at them or at something, say plainly you can\'t see them and that they can switch on "Let Q see you" at the bottom of the call.',
+      offer: null,
+    };
+  }
   if (!cameraOn) {
     return {
-      note: "You cannot see them. Say nothing about how they look or their setup.",
+      note: "No look at them this turn. Say nothing about how they look or their setup.",
       offer: null,
     };
   }

@@ -74,7 +74,7 @@ describe("lenient rehearsal readings", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(5);
     expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(4);
-    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(6);
+    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(7);
   });
 
   it("tells the played person who holds the leverage, and reads how forward they are", () => {
@@ -217,7 +217,9 @@ describe("camera guardrails in the turn prompt (founder ask 2026-10-01)", () => 
   it("comments only on meeting behaviour and setup, never on the person", () => {
     expect(turn).toContain("{{presence}}");
     expect(turn).toContain("cameraOn {{cameraOn}}");
-    expect(turn).toContain("Only meeting behaviour and setup, ever");
+    expect(turn).toContain(
+      "Only meeting behaviour, setup and the objects they show you, ever",
+    );
     for (const never of [
       "appearance",
       "face",
@@ -237,7 +239,7 @@ describe("camera guardrails in the turn prompt (founder ask 2026-10-01)", () => 
     expect(turn).toContain('at most say "looks like you have company"');
     expect(turn).toContain("unknown stays unknown");
     expect(turn).toContain(
-      "Never mention a thing the line above does not name",
+      "Never remark on their presence beyond what that line names, except to answer when they ask you to look",
     );
   });
 
@@ -254,5 +256,25 @@ describe("camera guardrails in the turn prompt (founder ask 2026-10-01)", () => 
         mood: "nervous",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('"can you see this?" (2026-10-01)', () => {
+  const turn =
+    createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
+      .template;
+
+  it("reads the ask by meaning, answers from the frame, and never pretends", () => {
+    expect(turn).toContain(
+      "askedToSee: true when their latest line asks whether you can see them",
+    );
+    expect(turn).toContain("by meaning, in any wording or language");
+    expect(turn).toContain("I can't make it out, can you hold it closer?");
+    expect(turn).toContain("say plainly you can't see them");
+    expect(turn).toContain('"Let Q see you"');
+    expect(turn).toContain("Never pretend");
+    // Objects join behaviour and setup; appearance and identity stay out.
+    expect(turn).toContain("the objects they show you");
+    expect(turn).toContain("no guessing who anyone is");
   });
 });

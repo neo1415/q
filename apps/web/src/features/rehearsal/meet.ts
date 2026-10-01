@@ -203,8 +203,13 @@ export const TRAIT_SOURCE_WORDS: Readonly<
 export const SEE_YOU_CONSENT =
   "Let Q see you on camera (frames are analysed for this rehearsal only and never stored)";
 
-/** A look at them at most this often, and on their turns. */
-export const LOOK_MIN_GAP_MS = 8_000;
+/**
+ * A fresh frame goes up with every turn they take (a few seconds apart at
+ * most, so a voice turn's partials send one), so a turn that asks Q to look
+ * ("can you see this?") has a frame from just now. Uploading costs nothing;
+ * the server decides when a frame is worth a look (every 8 s, or on an ask).
+ */
+export const LOOK_MIN_GAP_MS = 2_000;
 /** Between turns, one idle look at most this often. */
 export const LOOK_IDLE_MS = 30_000;
 export const LOOK_WIDTH = 512;
