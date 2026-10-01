@@ -15,6 +15,7 @@ import {
   Q_VOICE_TURN_PATH,
   QVoiceScreenUpdateSchema,
   QVoiceTurnStateSchema,
+  type QVoiceChoice,
 } from "@capital-q/contracts";
 import { fetchMe } from "@capital-q/api-client";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
@@ -109,7 +110,24 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
         readonly opening: (
           actor: ActorContext,
           rehearsalId: string,
-        ) => Promise<{ readonly line: string; readonly name: string } | null>;
+        ) => Promise<{
+          readonly line: string;
+          readonly name: string;
+          /** Steady per counterpart: picks the persona's own voice. */
+          readonly seed: string;
+        } | null>;
+        /** The persona's voice id for the speak relay, if it has one. */
+        readonly voiceIdFor?:
+          | ((voice: QVoiceChoice, seed: string) => string | undefined)
+          | undefined;
+        /** How the opening line sounds (its mood), on this voice session. */
+        readonly performOpening?:
+          | ((
+              actor: ActorContext,
+              rehearsalId: string,
+              voiceSessionId: string,
+            ) => Promise<void>)
+          | undefined;
       }
     | undefined;
   /**
@@ -428,6 +446,9 @@ export function registerQVoiceRoutes(
           // Keys this sentence's delivery cues and timing (CQ-VOICE-010);
           // from the binding, like the voice, never from the request.
           session: binding.voiceSessionId,
+          ...(binding.speakerVoiceId === undefined
+            ? {}
+            : { voiceId: binding.speakerVoiceId }),
         });
       } catch (error: unknown) {
         if (gone.signal.aborted) {
@@ -540,6 +561,7 @@ export function registerQVoiceRoutes(
       let knownName: string | null = null;
       // REHEARSE: a rehearsal line opens with the other person's own line.
       let rehearsalName: string | null = null;
+      let rehearsalSeed: string | null = null;
       if (input.rehearsal !== undefined) {
         const opening =
           dependencies.rehearsals === undefined
@@ -556,6 +578,7 @@ export function registerQVoiceRoutes(
           });
         }
         rehearsalName = opening.name;
+        rehearsalSeed = opening.seed;
         if (!resume) firstMessage = opening.line;
       }
       if (
@@ -693,6 +716,15 @@ export function registerQVoiceRoutes(
       }
       const issuedAt = now();
       const voiceSessionId = randomUUID();
+      const speakerVoiceId =
+        rehearsalSeed === null
+          ? undefined
+          : dependencies.rehearsals?.voiceIdFor?.(voice, rehearsalSeed);
+      if (input.rehearsal !== undefined && !resume) {
+        await dependencies.rehearsals
+          ?.performOpening?.(actor, input.rehearsal.rehearsalId, voiceSessionId)
+          .catch(() => undefined);
+      }
       let credentials: {
         readonly token: string;
         readonly providerConversationId: string;
@@ -758,6 +790,7 @@ export function registerQVoiceRoutes(
         ...(credentials.thinkToken === undefined
           ? {}
           : { thinkToken: credentials.thinkToken }),
+        ...(speakerVoiceId === undefined ? {} : { speakerVoiceId }),
       });
       if (!accepted) {
         throw new VoiceSessionLimitError();

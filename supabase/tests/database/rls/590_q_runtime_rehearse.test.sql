@@ -12,7 +12,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(17);
+select plan(18);
 
 -- Positive (server) -----------------------------------------------------------------
 select lives_ok(
@@ -74,6 +74,13 @@ select throws_ok(
      values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'), 'COMPANY',
              '00000000-0000-4000-8000-0000000059f2', 'C', '{}', 'MAYBE') $$,
   '23514', null, 'outcomes are a closed set');
+
+select throws_ok(
+  $$ insert into q_runtime.rehearsals
+       (tenant_id, user_id, counterpart_kind, counterpart_id, counterpart_name, persona, difficulty)
+     values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'), 'COMPANY',
+             '00000000-0000-4000-8000-0000000059f2', 'C', '{}', 'BRUTAL') $$,
+  '23514', null, 'difficulty is a closed set (20261111010000)');
 
 -- Exposure: q_runtime is not a browser schema at all ------------------------------
 select pg_temp.act_as_user_a();

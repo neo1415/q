@@ -123,6 +123,7 @@ describe("rehearsal store (Postgres)", () => {
           personaProfileId: saved.id,
           persona: PERSONA,
           voice: "FEMALE",
+          difficulty: "TOUGH",
           turns: [
             {
               from: "THEM",
@@ -134,6 +135,7 @@ describe("rehearsal store (Postgres)", () => {
           ],
         });
         expect(await store.own(other, id)).toBeNull();
+        expect((await store.own(me, id))?.difficulty).toBe("TOUGH");
         const closed = await store.saveTurns(me, id, {
           turns: [],
           asked: 1,

@@ -13,6 +13,7 @@ import {
 } from "@capital-q/api-client";
 import {
   RehearsalCounterpartKindSchema,
+  RehearsalDifficultySchema,
   REHEARSAL_SCREEN_MAX_CHARS,
   type QRehearsalDto,
   type QRehearsalPersonaDto,
@@ -74,11 +75,13 @@ export async function startRehearsalAction(input: {
   readonly counterpartId: unknown;
   readonly meetingId?: unknown;
   readonly voice?: unknown;
+  readonly difficulty?: unknown;
 }): Promise<RehearsalResult> {
   const kind = RehearsalCounterpartKindSchema.safeParse(input.kind);
   const id = Id.safeParse(input.counterpartId);
   const meeting = Id.optional().safeParse(input.meetingId ?? undefined);
   const voice = z.enum(["FEMALE", "MALE"]).safeParse(input.voice);
+  const difficulty = RehearsalDifficultySchema.safeParse(input.difficulty);
   if (!kind.success || !id.success || !meeting.success) {
     return { ok: false, message: "Not found." };
   }
@@ -87,6 +90,7 @@ export async function startRehearsalAction(input: {
       counterpart: { kind: kind.data, id: id.data },
       ...(meeting.data === undefined ? {} : { meetingId: meeting.data }),
       ...(voice.success ? { voice: voice.data } : {}),
+      ...(difficulty.success ? { difficulty: difficulty.data } : {}),
     }),
   );
 }

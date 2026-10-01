@@ -223,3 +223,49 @@ public and shared information."
 - Live (after deploy, fictional accounts): founder rehearses with a
   connected investor by voice to a CLOSE; investor rehearses with a company;
   booking a call creates the suggestion; screen share question.
+
+## 11. Audit (2026-10-01): competitors, gaps, voice emotion
+
+### Capabilities of kuuza.ai and peers vs ours
+
+Sources: [kuuza.ai](https://kuuza.ai), [kuuza.ai/features](https://kuuza.ai/features),
+[Exec: Hyperbound vs SecondNature](https://www.exec.com/learn/hyperbound-vs-secondnature),
+[Exec: Hyperbound vs Yoodli](https://www.exec.com/learn/hyperbound-vs-yoodli),
+[ElevenLabs: Eleven v3 audio tags](https://elevenlabs.io/blog/v3-audiotags),
+[ElevenLabs: prompting v3](https://elevenlabs.io/docs/best-practices/prompting).
+
+| Capability (theirs)                                      | Ours                                                                                                                                                                   |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Personas from polite to frustrated, emotional intonation | Persona per real counterpart; 14 moods per line, performed by the voice (v3 tags), loudness and laugh/chuckle/sigh                                                     |
+| Difficulty levels (Medium / Hard / Expert)               | Gentle / Realistic / Tough, chosen in the lobby                                                                                                                        |
+| Interruptions                                            | Full duplex: the person can interrupt (think aborted); the persona interrupts a ramble on Tough                                                                        |
+| Custom scenarios from scripts, FAQs, profiles            | Built automatically from the real counterpart's profile, messages, calls, pitch, deck, public web                                                                      |
+| Voices and accents                                       | Six ElevenLabs voices for personas, never Q's; steady per counterpart. Accented (e.g. West African) voices: not in the premade set -- follow-up with voice-library ids |
+| Instant debrief: strengths, weaknesses, improvements     | Review: outcome, score (code-computed), 5 rated dimensions, what went right / wrong with a better answer, tips for this person                                         |
+| Speech metrics (pace, structure, talk time)              | Code-counted: your share of the words, longest answer, answers, minutes. Pace and filler words: not measured                                                           |
+| Progress tracking, leaderboards                          | History with scores; "up N since last time" per person. Team leaderboards: not applicable                                                                              |
+| Video, voice and text                                    | Meet-style room with your camera (local), voice, typed fallback; screen share read by a vision model                                                                   |
+| Background noise, bad signal simulation                  | Not built (not asked for)                                                                                                                                              |
+| CRM/LMS integrations                                     | Not applicable                                                                                                                                                         |
+| Many languages                                           | Typed rehearsals follow the language rule; the voice recogniser is English-only (flux-general-en), so spoken non-English is not heard well                             |
+
+### Voice emotion, measured live (10 calls, eleven_v3_conversational, pcm 16 kHz)
+
+Same sentence, transcribed back with Deepgram nova-3: no tag was read aloud
+in any case. RMS loudness / length: baseline 4397 / 2.16 s; [angry] 4046 /
+2.32 s; [angry] [shouting] 4337 / 2.64 s; [quietly] 3105 / 2.24 s; [sad]
+2391 / 2.16 s vs [excited] 4528 / 2.32 s on the same voice; [sarcastic]
+2.80 s; [flatly] 3304; [firmly] 3046; [hesitantly] [sighs] 1998 / 2.96 s.
+All six persona voice ids answered 200; time to the whole clip 0.8-1.0 s.
+Turbo (the fallback) and Aura read tags aloud, so a tone is dropped there.
+
+### Edge cases handled
+
+No deck / no pitch / thin profile / no public presence: material says
+"(none)" and grounding is THIN; nothing is invented. Network drop: the
+room switches to typing and offers "Reconnect voice" (resumes without a
+second greeting). Microphone denied: typing, with the reason. Silence:
+after 25 s with nobody speaking, one in-character nudge (a cue, never
+words). Very long answer: kept to 4,000 characters; counted in metrics.
+Language switch: the persona answers in it only if they plausibly would.
+A repeated or empty utterance never makes the persona repeat its line.

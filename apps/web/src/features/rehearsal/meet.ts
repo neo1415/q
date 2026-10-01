@@ -93,3 +93,29 @@ export function greySignature(rgba: Uint8ClampedArray): Uint8Array {
   }
   return out;
 }
+
+/** After this long with nobody speaking, the played person reacts once. */
+export const SILENCE_MS = 25_000;
+
+/**
+ * Whether to tell the played person the line has gone quiet: only while
+ * the line is listening (not while they speak or think), only once per
+ * silence, never with the microphone off (the person chose quiet) and
+ * never after the meeting ended.
+ */
+export function shouldNudgeSilence(input: {
+  readonly state: string;
+  readonly lastActivityMs: number;
+  readonly nowMs: number;
+  readonly alreadyNudged: boolean;
+  readonly micOn: boolean;
+  readonly ended: boolean;
+}): boolean {
+  return (
+    input.state === "LISTENING" &&
+    input.nowMs - input.lastActivityMs > SILENCE_MS &&
+    !input.alreadyNudged &&
+    input.micOn &&
+    !input.ended
+  );
+}

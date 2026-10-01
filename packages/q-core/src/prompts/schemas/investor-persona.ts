@@ -43,11 +43,11 @@ export const INVESTOR_PERSONA_UNTRUSTED = [
 export const InvestorPersonaResultSchema = z
   .object({
     /** Two or three sentences: who they are in a meeting. */
-    summary: z.string().trim().min(1).max(1200),
+    summary: z.string().trim().min(1).max(600),
     /** How they speak: tone, pace, how hard they push. */
-    style: z.string().trim().min(1).max(1200),
+    style: z.string().trim().min(1).max(300),
     /** What they care about most, most important first. */
-    priorities: z.array(z.string().trim().min(3).max(400)).max(12),
+    priorities: z.array(z.string().trim().min(3).max(200)).max(6),
     /** Questions they are likely to ask this founder, hardest first. */
     likelyQuestions: z
       .array(
@@ -61,9 +61,9 @@ export const InvestorPersonaResultSchema = z
       .min(3)
       .max(12),
     /** How they push back when an answer is weak. */
-    pushbacks: z.array(z.string().trim().min(3).max(400)).max(12),
+    pushbacks: z.array(z.string().trim().min(3).max(200)).max(6),
     /** What would win them over, from their own words where possible. */
-    howToWin: z.array(z.string().trim().min(3).max(400)).max(12),
+    howToWin: z.array(z.string().trim().min(3).max(200)).max(6),
     /** How much of this rests on their own words: THIN, SOME or RICH. */
     grounding: z.enum(["THIN", "SOME", "RICH"]),
   })
@@ -129,42 +129,119 @@ export const COUNTERPART_PERSONA_UNTRUSTED = [
   "previousProfile",
 ] as const;
 
-// Generous bounds (live 2026-10-01: a persona one item over a tight cap was
-// thrown away whole, so the rehearsal could not start). Consumers keep the
-// first few of each list they need.
 const Line = (max: number) => z.string().trim().min(3).max(max);
 
 export const CounterpartPersonaResultSchema = z
   .object({
     /** Two or three sentences: who they are in a meeting. */
-    summary: z.string().trim().min(1).max(1200),
+    summary: z.string().trim().min(1).max(600),
     /** How they speak: tone, pace, verbal habits, how hard they push. */
-    style: z.string().trim().min(1).max(1200),
+    style: z.string().trim().min(1).max(400),
     /** Their baseline mood, and what warms or cools them. */
     temperament: z
       .object({
         baseline: z.enum(PERSONA_MOODS),
-        warmsTo: z.array(Line(400)).max(12),
-        coolsOn: z.array(Line(400)).max(12),
+        warmsTo: z.array(Line(200)).max(5),
+        coolsOn: z.array(Line(200)).max(5),
       })
       .strict(),
-    priorities: z.array(Line(400)).max(12),
+    priorities: z.array(Line(200)).max(6),
     /** What they will ask, hardest first. */
     likelyQuestions: z
       .array(z.object({ question: Line(300), why: Line(200) }).strict())
-      .min(3)
-      .max(16),
+      .min(1)
+      .max(12),
     /** For a founder Q plays: how they answer the hard questions. */
     likelyAnswers: z
       .array(z.object({ topic: Line(120), answer: Line(400) }).strict())
       .max(10),
-    pushbacks: z.array(Line(400)).max(12),
-    howToWin: z.array(Line(400)).max(12),
+    pushbacks: z.array(Line(200)).max(6),
+    howToWin: z.array(Line(200)).max(6),
     /** What would end it for them. */
-    dealbreakers: z.array(Line(400)).max(12),
+    dealbreakers: z.array(Line(200)).max(5),
     grounding: z.enum(["THIN", "SOME", "RICH"]),
   })
   .strict();
 export type CounterpartPersonaResult = z.infer<
   typeof CounterpartPersonaResultSchema
 >;
+
+// ---------------------------------------------------------------------------
+// v3 (REHEARSE audit, live 2026-10-01): the v2 reading was refused whole
+// when the model wrote a seventh priority or a long style line
+// ("priorities:too_big", "style:too_big" on every live attempt). The model
+// now answers a lenient shape and code trims it to the stored bounds, so
+// one long list never costs the whole persona (handover lesson: lenient
+// per field).
+// ---------------------------------------------------------------------------
+
+export const COUNTERPART_PERSONA_V3_SCHEMA_VERSION = 3;
+
+const Loose = (max: number) => z.string().trim().min(1).max(max);
+
+export const CounterpartPersonaLenientSchema = z
+  .object({
+    summary: Loose(2_000),
+    style: Loose(1_200),
+    temperament: z
+      .object({
+        baseline: z.enum(PERSONA_MOODS),
+        warmsTo: z.array(Loose(600)).max(20),
+        coolsOn: z.array(Loose(600)).max(20),
+      })
+      .strict(),
+    priorities: z.array(Loose(600)).max(20),
+    likelyQuestions: z
+      .array(z.object({ question: Loose(800), why: Loose(600) }).strict())
+      .min(1)
+      .max(30),
+    likelyAnswers: z
+      .array(z.object({ topic: Loose(400), answer: Loose(1_200) }).strict())
+      .max(30),
+    pushbacks: z.array(Loose(600)).max(20),
+    howToWin: z.array(Loose(600)).max(20),
+    dealbreakers: z.array(Loose(600)).max(20),
+    grounding: z.enum(["THIN", "SOME", "RICH"]),
+  })
+  .strict();
+export type CounterpartPersonaLenient = z.infer<
+  typeof CounterpartPersonaLenientSchema
+>;
+
+/** Cut to a bound at a word, so a trimmed line still reads. */
+function cut(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = text.slice(0, max - 1);
+  const space = head.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? head.slice(0, space) : head).trimEnd()}…`;
+}
+const cutAll = (items: readonly string[], count: number, max: number) =>
+  items.slice(0, count).map((item) => cut(item, max));
+
+/** The lenient reading, trimmed to the stored (v2) shape. */
+export function normaliseCounterpartPersona(
+  loose: CounterpartPersonaLenient,
+): CounterpartPersonaResult {
+  return {
+    summary: cut(loose.summary, 600),
+    style: cut(loose.style, 300),
+    temperament: {
+      baseline: loose.temperament.baseline,
+      warmsTo: cutAll(loose.temperament.warmsTo, 5, 200),
+      coolsOn: cutAll(loose.temperament.coolsOn, 5, 200),
+    },
+    priorities: cutAll(loose.priorities, 6, 200),
+    likelyQuestions: loose.likelyQuestions.slice(0, 12).map((q) => ({
+      question: cut(q.question, 300),
+      why: cut(q.why, 200),
+    })),
+    likelyAnswers: loose.likelyAnswers.slice(0, 10).map((a) => ({
+      topic: cut(a.topic, 120),
+      answer: cut(a.answer, 400),
+    })),
+    pushbacks: cutAll(loose.pushbacks, 6, 200),
+    howToWin: cutAll(loose.howToWin, 6, 200),
+    dealbreakers: cutAll(loose.dealbreakers, 5, 200),
+    grounding: loose.grounding,
+  };
+}

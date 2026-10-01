@@ -163,6 +163,7 @@ export function registerRehearsalRoutes(
           id: counterpart.id,
           meetingId: body.data.meetingId,
           voice: body.data.voice,
+          difficulty: body.data.difficulty,
         }),
       );
     },

@@ -11,6 +11,7 @@ import {
 
 import {
   REHEARSAL_HAND_RAISED_SIGNAL,
+  REHEARSAL_SILENCE_SIGNAL,
   rehearsalSimulationLabel,
   type QRehearsalDto,
 } from "@capital-q/contracts";
@@ -41,6 +42,7 @@ import {
   greySignature,
   initialsOf,
   screenChanged,
+  shouldNudgeSilence,
 } from "./meet";
 import {
   raiseHandAction,
@@ -151,10 +153,13 @@ export function RehearsalRoom({
   const lastSignature = useRef<Uint8Array | null>(null);
   const refreshTimer = useRef<number | null>(null);
   const left = useRef(false);
+  // Set when the line opens and on every line heard; 0 until then.
+  const lastActivity = useRef(0);
 
   const name = rehearsal.counterpart.name;
   const label = rehearsalSimulationLabel(name);
   const startedAt = Date.parse(initial.createdAt);
+  const ended = rehearsal.endedAt !== null || rehearsal.status === "FINISHED";
 
   const refresh = useCallback(() => {
     if (refreshTimer.current !== null) {
@@ -170,14 +175,22 @@ export function RehearsalRoom({
 
   const voice = useVoiceSession({
     onLine: (line: VoiceTranscriptLine) => {
-      if (line.role === "user") setHand(false);
+      lastActivity.current = Date.now();
+      if (line.role === "user") {
+        setHand(false);
+        nudged.current = false;
+      }
       if (line.role === "q" && !line.partial) refresh();
     },
     onError: (message) => setNotice(message),
     onEnded: (reason) => {
       if (!left.current && reason !== "ended") {
+        // A dropped line: keep going by typing, or reconnect the voice.
         setVoiceLive("TYPED");
         setPanel(true);
+        setNotice(
+          "The voice line dropped. Reconnect, or keep going by typing.",
+        );
       }
     },
   });
@@ -193,14 +206,14 @@ export function RehearsalRoom({
   }, [initial.id, router, voice]);
 
   // Open the voice line once: the other person speaks first.
-  const opened = useRef(false);
-  useEffect(() => {
-    if (opened.current) return;
-    opened.current = true;
-    void (async () => {
+  // Open the voice line; on a reconnect, resume without a new greeting.
+  const connect = useCallback(
+    async (resume: boolean) => {
+      setVoiceLive("CONNECTING");
       const started = await startVoiceSessionAction({
         rehearsal: { rehearsalId: initial.id },
         voice: initial.voice,
+        ...(resume ? { resume: true } : {}),
       });
       if (!started.ok) {
         setNotice(`${started.message} You can answer by typing.`);
@@ -213,14 +226,49 @@ export function RehearsalRoom({
           credential: started.value,
           firstMessage: started.value.firstMessage,
         });
+        lastActivity.current = Date.now();
         setVoiceLive("LIVE");
       } catch {
-        setNotice("Voice didn't start. You can answer by typing.");
+        // A denied microphone lands here: the room still works by typing.
+        setNotice(
+          "Voice didn't start (is the microphone allowed?). You can answer by typing.",
+        );
         setVoiceLive("TYPED");
         setPanel(true);
       }
-    })();
-  }, [initial.id, initial.voice, voice]);
+    },
+    [initial.id, initial.voice, voice],
+  );
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    void connect(false);
+  }, [connect]);
+
+  // Silence: when nobody has spoken for a while, the played person reacts
+  // once (asks if they are there, rephrases) -- a cue, never their words.
+  const nudged = useRef(false);
+  useEffect(() => {
+    if (voiceLive !== "LIVE") return;
+    const id = window.setInterval(() => {
+      if (
+        shouldNudgeSilence({
+          state: voice.state,
+          lastActivityMs: lastActivity.current,
+          nowMs: Date.now(),
+          alreadyNudged: nudged.current,
+          micOn,
+          ended,
+        })
+      ) {
+        nudged.current = true;
+        lastActivity.current = Date.now();
+        voice.sendText(REHEARSAL_SILENCE_SIGNAL);
+      }
+    }, 3_000);
+    return () => window.clearInterval(id);
+  }, [voiceLive, voice, micOn, ended]);
 
   // The clock and the timer.
   useEffect(() => {
@@ -247,7 +295,6 @@ export function RehearsalRoom({
   }, [voice, micOn]);
 
   // The other person closed the meeting: let them finish, then leave.
-  const ended = rehearsal.endedAt !== null || rehearsal.status === "FINISHED";
   useEffect(() => {
     if (!ended || voice.state === "Q_SPEAKING") return;
     const id = window.setTimeout(() => void leave(), CLOSE_PAUSE_MS);
@@ -608,6 +655,18 @@ export function RehearsalRoom({
           className="cq-body-sm mx-auto mb-2 flex max-w-xl items-center gap-2 rounded-(--cq-radius-md) bg-(--cq-stage-surface-strong) px-3 py-2"
         >
           <span>{notice}</span>
+          {voiceLive === "TYPED" && !ended ? (
+            <button
+              type="button"
+              onClick={() => {
+                setNotice(null);
+                void connect(true);
+              }}
+              className="cq-label min-h-11 rounded-(--cq-radius-md) bg-(--cq-stage-accent) px-3 text-(--cq-stage-canvas)"
+            >
+              Reconnect voice
+            </button>
+          ) : null}
           <button
             type="button"
             aria-label="Dismiss"

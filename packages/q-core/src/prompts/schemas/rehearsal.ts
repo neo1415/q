@@ -287,3 +287,139 @@ export const RehearsalReviewResultSchema = z
   })
   .strict();
 export type RehearsalReviewResult = z.infer<typeof RehearsalReviewResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v3 (REHEARSE audit, 2026-10-01): a chosen difficulty, a silence cue, a
+// wider range of moods and a loudness and reaction per line, so the played
+// person can sound angry, kind, flat, authoritative or meek in their voice.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V3_SCHEMA_VERSION = 3;
+
+export const REHEARSAL_LINE_MOODS_V3 = [
+  "WARM",
+  "NEUTRAL",
+  "SKEPTICAL",
+  "IMPATIENT",
+  "ANNOYED",
+  "ANGRY",
+  "ENTHUSIASTIC",
+  "COLD",
+  "INDIFFERENT",
+  "SAD",
+  "AUTHORITATIVE",
+  "MEEK",
+  "SARCASTIC",
+  "AMUSED",
+] as const;
+export const REHEARSAL_DIFFICULTIES = ["GENTLE", "REALISTIC", "TOUGH"] as const;
+export const REHEARSAL_CUES_V3 = [
+  "OPENING",
+  "NONE",
+  "HAND_RAISED",
+  "WRAP_UP",
+  "SILENCE",
+] as const;
+
+export const RehearsalTurnV3VariablesSchema =
+  RehearsalTurnVariablesSchema.extend({
+    cue: z.enum(REHEARSAL_CUES_V3),
+    /** How hard the person rehearsing asked them to be played. Trusted. */
+    difficulty: z.enum(REHEARSAL_DIFFICULTIES),
+  }).strict();
+export type RehearsalTurnV3Variables = z.infer<
+  typeof RehearsalTurnV3VariablesSchema
+>;
+
+export const RehearsalTurnV3ResultSchema = z
+  .object({
+    /** Lenient; the service keeps at most 700 characters of it. */
+    line: z.string().trim().min(1).max(2_000),
+    move: z.enum(REHEARSAL_MOVES),
+    /** How this line sounds; it drives the voice's delivery. */
+    mood: z.enum(REHEARSAL_LINE_MOODS_V3),
+    /** SOFT: quiet, under the breath. RAISED: a raised voice. */
+    intensity: z.enum(["SOFT", "NORMAL", "RAISED"]),
+    /** A sound before the line, only when the person would make it. */
+    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH"]).nullable(),
+    conclusion: z.enum(REHEARSAL_CONCLUSIONS).nullable(),
+  })
+  .strict();
+export type RehearsalTurnV3Result = z.infer<typeof RehearsalTurnV3ResultSchema>;
+
+// v3 review (REHEARSE audit): lenient like the persona, trimmed by code.
+export const REHEARSAL_REVIEW_V3_SCHEMA_VERSION = 3;
+const LooseText = (max: number) => z.string().trim().min(1).max(max);
+export const RehearsalReviewLenientSchema = z
+  .object({
+    overall: LooseText(2_000),
+    dimensions: z
+      .array(
+        z
+          .object({
+            name: z.enum(REHEARSAL_DIMENSIONS),
+            rating: z.enum(REHEARSAL_RATINGS),
+            note: LooseText(1_000),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(10),
+    wentRight: z
+      .array(
+        z.object({ moment: LooseText(1_000), why: LooseText(1_000) }).strict(),
+      )
+      .max(15),
+    wentWrong: z
+      .array(
+        z
+          .object({
+            moment: LooseText(1_000),
+            why: LooseText(1_000),
+            better: LooseText(1_500),
+          })
+          .strict(),
+      )
+      .max(15),
+    tips: z.array(LooseText(1_000)).max(15),
+  })
+  .strict();
+export type RehearsalReviewLenient = z.infer<
+  typeof RehearsalReviewLenientSchema
+>;
+
+function cutText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = text.slice(0, max - 1);
+  const space = head.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? head.slice(0, space) : head).trimEnd()}…`;
+}
+
+/** The lenient review trimmed to the stored (v2) shape; one rating per dimension. */
+export function normaliseRehearsalReview(
+  loose: RehearsalReviewLenient,
+): RehearsalReviewResult {
+  const seen = new Set<string>();
+  const dimensions = loose.dimensions
+    .filter((d) => (seen.has(d.name) ? false : (seen.add(d.name), true)))
+    .slice(0, 5)
+    .map((d) => ({
+      name: d.name,
+      rating: d.rating,
+      note: cutText(d.note, 300),
+    }));
+  return {
+    overall: cutText(loose.overall, 600),
+    dimensions,
+    wentRight: loose.wentRight.slice(0, 5).map((w) => ({
+      moment: cutText(w.moment, 300),
+      why: cutText(w.why, 300),
+    })),
+    wentWrong: loose.wentWrong.slice(0, 6).map((w) => ({
+      moment: cutText(w.moment, 300),
+      why: cutText(w.why, 300),
+      better: cutText(w.better, 500),
+    })),
+    tips: loose.tips.slice(0, 6).map((tip) => cutText(tip, 300)),
+  };
+}
