@@ -83,6 +83,7 @@ import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
 import { ownStandingFact } from "./own-standing.js";
 import { onScreenCompanyFact } from "./company-fact.js";
+import { onScreenDailyFact } from "./daily-fact.js";
 import { companiesNamedIn, knownCompaniesOf } from "./named-companies.js";
 import {
   ownOnboardingFacts,
@@ -1513,6 +1514,34 @@ export function createModelGatewayQAnswer(
         }),
       );
     })();
+    /**
+     * The Q Daily on their screen, read for them (founder live
+     * 2026-10-01: "summarize everything here" on the Daily never read the
+     * edition). Their own edition, through the tool the model would use.
+     */
+    let onScreenDaily: AuthorisedFact | null = null;
+    let onScreenDailyCall: QToolCallObservation | null = null;
+    const dailyRead = (async (): Promise<void> => {
+      if (plan.screen?.route !== "DAILY" || !prefetchTools.has("get_q_daily")) {
+        return;
+      }
+      const call = {
+        callId: "q-on-screen-daily",
+        name: "get_q_daily",
+        arguments: {},
+      };
+      const outcome = await tools.execute(call, toolContext);
+      onScreenDailyCall = {
+        toolName: outcome.toolName,
+        providerName: call.name,
+        status: outcome.status,
+        failureCode: outcome.failureCode,
+        latencyMs: outcome.latencyMs,
+      };
+      if (outcome.result.ok) {
+        onScreenDaily = onScreenDailyFact(outcome.result.data);
+      }
+    })();
     const relationshipRead = (async (): Promise<void> => {
       if (counterparty !== undefined && prefetchTools.has("get_relationship")) {
         const call = {
@@ -1631,6 +1660,7 @@ export function createModelGatewayQAnswer(
       onboardingRead,
       companyRead,
       namedRead,
+      dailyRead,
     ]);
     return {
       history,
@@ -1652,6 +1682,8 @@ export function createModelGatewayQAnswer(
       onScreenCompanyCall,
       namedCompanies,
       namedCompanyCalls,
+      onScreenDaily,
+      onScreenDailyCall,
       asked,
       counterparty,
       ownStanding,
@@ -1737,6 +1769,8 @@ export function createModelGatewayQAnswer(
         onScreenCompanyCall,
         namedCompanies,
         namedCompanyCalls,
+        onScreenDaily,
+        onScreenDailyCall,
         ownStanding,
         ownStandingCall,
         pitchMoment,
@@ -1801,6 +1835,7 @@ export function createModelGatewayQAnswer(
         ...(ownProfile === null ? [] : [ownProfile]),
         ...(onScreenCompany === null ? [] : [onScreenCompany]),
         ...namedCompanies,
+        ...(onScreenDaily === null ? [] : [onScreenDaily]),
         ...(relationship === null ? [] : [relationship]),
         ...(ownStanding === null ? [] : [ownStanding]),
         ...(pitchMoment === null ? [] : [pitchMoment]),
@@ -2261,6 +2296,9 @@ export function createModelGatewayQAnswer(
         toolCalls.push(onScreenCompanyCall);
       }
       toolCalls.push(...namedCompanyCalls);
+      if (onScreenDailyCall !== null) {
+        toolCalls.push(onScreenDailyCall);
+      }
       if (ownStandingCall !== null) {
         toolCalls.push(ownStandingCall);
       }

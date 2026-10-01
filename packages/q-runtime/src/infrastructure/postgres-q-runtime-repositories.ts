@@ -564,7 +564,6 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
            where m.tenant_id = ${input.tenantId}
              and m.conversation_id = ${input.conversationId}
              and m.id = any(${input.messageIds}::uuid[])
-             and m.role = 'USER'
           on conflict (message_id, mark) do nothing`;
       },
       listForRun: async (executor, tenantId, runId, limit) => {

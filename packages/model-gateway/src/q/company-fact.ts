@@ -57,13 +57,12 @@ export function onScreenCompanyFact(
   const own = read.relationToYou === "OWN";
   return {
     scope: "COMPANY_PROFILE",
-    statement:
-      `${own ? "Their own company" : label}: ${name}${
-        parts.length === 0 ? "" : ` -- ${parts.join("; ")}`
-      }.${description === null ? "" : ` As the company describes itself: ${description}`}`.slice(
-        0,
-        2_000,
-      ),
+    statement: `${own ? "Their own company" : label}: ${name}${
+      parts.length === 0 ? "" : ` -- ${parts.join("; ")}`
+    }.${description === null ? "" : ` As the company describes itself: ${description}`}`.slice(
+      0,
+      2_000,
+    ),
     truthClass: "USER_CLAIM",
     evidenceStatus: "SELF_REPORTED",
     source: "Capital Q canonical company profile",

@@ -86,6 +86,34 @@ const ON_SCREEN = {
   truthClass: "USER_CLAIM",
 };
 
+const DAILY_TOOL: QOfferedTool = {
+  ...RELATIONSHIP_TOOL,
+  toolName: "q_daily.get",
+  definition: {
+    name: "get_q_daily",
+    description: "Their latest edition of The Q Daily.",
+    inputJsonSchema: { type: "object", properties: {} },
+  },
+};
+const DAILY = {
+  status: "READY",
+  editionDate: "2026-10-01",
+  number: 12,
+  href: "/daily",
+  headlines: [
+    {
+      section: "Deals",
+      headline: "Nigerian start-ups raised $364.1m",
+      publisher: "TechCabal",
+    },
+  ],
+  qTake: "Funding is tightening around accountability.",
+  frequency: "DAILY",
+  email: false,
+  sections: [],
+  nextDueAt: null,
+};
+
 const OTHER = randomUUID();
 const STANDING = {
   yourSide: "INVESTOR",
@@ -173,7 +201,12 @@ function build(
   const reads = { history: 0 };
   const tools: QToolPort = {
     offer: () =>
-      Promise.resolve([RELATIONSHIP_TOOL, STANDING_TOOL, COMPANY_TOOL]),
+      Promise.resolve([
+        RELATIONSHIP_TOOL,
+        STANDING_TOOL,
+        COMPANY_TOOL,
+        DAILY_TOOL,
+      ]),
     execute: async (proposal) => {
       inFlight.now += 1;
       inFlight.max = Math.max(inFlight.max, inFlight.now);
@@ -204,7 +237,9 @@ function build(
                     ? STANDING
                     : proposal.name === "get_company"
                       ? ON_SCREEN
-                      : read.data,
+                      : proposal.name === "get_q_daily"
+                        ? DAILY
+                        : read.data,
               },
         latencyMs: 2,
       } as QToolCallOutcome;
@@ -436,5 +471,26 @@ describe("Q calls them by their profile name (founder live 2026-10-01)", () => {
     expect(sent.indexOf("WHO IS ASKING: Zino.")).toBeLessThan(
       sent.indexOf("The name is Neo"),
     );
+  });
+});
+
+describe("The Q Daily on their screen is read before the model (founder live 2026-10-01)", () => {
+  it("states today's edition among the facts when they ask from /daily, and not elsewhere", async () => {
+    const daily = build({ status: "SUCCEEDED", data: CONNECTED });
+    const onDaily = {
+      ...daily.request,
+      plan: { ...daily.request.plan, screen: { route: "DAILY" } },
+    } as typeof daily.request;
+    expect((await daily.seam.answer(onDaily)).kind).toBe("ANSWERED");
+    const facts = sentTo(daily.alpha);
+    expect(facts).toContain("The Q Daily on their screen");
+    expect(facts).toContain(
+      "[Deals] Nigerian start-ups raised $364.1m (reported by TechCabal)",
+    );
+    expect(facts).toContain("Q's take (Q's own inference, not reported fact)");
+
+    const home = build({ status: "SUCCEEDED", data: CONNECTED });
+    await home.seam.answer(home.request);
+    expect(home.executed.map((call) => call.name)).not.toContain("get_q_daily");
   });
 });
