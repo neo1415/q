@@ -1,0 +1,48 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  createDefaultPromptRegistry,
+  TURN_READER_V23,
+  TURN_READER_V24,
+  TurnReaderV24ResultSchema,
+} from "../src/index.js";
+
+/**
+ * TURN_READER v24 (founder live 2026-10-01): speech never meant for Q --
+ * a dictation to someone else, a name said to another person -- and the
+ * person saying "wasn't talking to you" about what came before.
+ */
+describe("TURN_READER v24", () => {
+  it("is the active reader and v23 is deprecated", () => {
+    expect(
+      createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
+    ).toBe(24);
+    expect(TURN_READER_V23.status).toBe("DEPRECATED");
+  });
+
+  it("adds dictation and earlierNotForQ to the addressed line, and loses nothing of v23", () => {
+    const template = TURN_READER_V24.template;
+    expect(template).toContain(
+      "Dictating or drafting a message for someone else",
+    );
+    expect(template).toContain("EARLIER NOT FOR Q: earlierNotForQ is true");
+    // Everything v23 said is still said (the addressed line only grows).
+    for (const line of TURN_READER_V23.template.split("\n")) {
+      if (line.startsWith("ADDRESSED:")) continue;
+      expect(template).toContain(line);
+    }
+  });
+
+  it("reads earlierNotForQ as false when a model leaves it out", () => {
+    const parsed = TurnReaderV24ResultSchema.parse({
+      kind: "SMALL_TALK",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+    });
+    expect(parsed.earlierNotForQ).toBe(false);
+    expect(parsed.addressedToQ).toBe(true);
+  });
+});

@@ -305,6 +305,9 @@ export function createMemoryLearner(
             actor.tenantId,
             conversation.id,
             TRANSCRIPT_TURNS,
+            // Marked lines (speech for someone else, lines the person hid)
+            // are never learned from (20261110030000).
+            { readBack: true },
           );
         // Only turns the summary does not already cover, plus the run's
         // own; the summary carries the rest.

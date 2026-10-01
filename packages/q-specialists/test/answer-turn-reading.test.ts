@@ -86,6 +86,11 @@ function seam(options: {
   readonly spoken?: boolean;
   /** The company analysis takes the question (default: it never does). */
   readonly specialistSupports?: boolean;
+  /** Earlier lines of the conversation, oldest first. */
+  readonly earlier?: readonly {
+    readonly role: "USER" | "Q";
+    readonly content: string;
+  }[];
   /** A typed decision on a waiting change (founder fixture #1). */
   readonly pendingDecisions?: PendingDecisionPort;
   /** A hand-over prepared by code (TURN_READER v22). */
@@ -103,6 +108,17 @@ function seam(options: {
     ...(options.spoken === true ? { utteranceRef: "utt-1" } : {}),
   };
   const directives: (QResearchDirective | undefined)[] = [];
+  const marked: string[] = [];
+  const earlier: QConversationMessage[] = (options.earlier ?? []).map(
+    (line, index) =>
+      ({
+        ...message,
+        id: randomUUID(),
+        role: line.role,
+        content: line.content,
+        createdAt: new Date(Date.now() - (10 - index) * 1000).toISOString(),
+      }) as QConversationMessage,
+  );
   const unread: boolean[] = [];
   const capabilities: unknown[] = [];
   let reads = 0;
@@ -166,7 +182,12 @@ function seam(options: {
     },
     repositories: {
       messages: {
-        listRecentForConversationOfRun: () => Promise.resolve([message]),
+        listRecentForConversationOfRun: () =>
+          Promise.resolve([...earlier, message]),
+        mark: (_tx: unknown, input: { messageIds: readonly string[] }) => {
+          marked.push(...input.messageIds);
+          return Promise.resolve();
+        },
         insert: (_tx: unknown, input: Omit<QConversationMessage, "id">) => {
           const row = {
             ...input,
@@ -207,6 +228,9 @@ function seam(options: {
     events,
     delegated: () => delegated,
     warmed: () => warmed,
+    marked,
+    message,
+    earlierLines: earlier,
     probes,
     investigated: () => investigated,
     unread,
@@ -1080,5 +1104,74 @@ describe("a hand-over is prepared by code for the subject on screen (TURN_READER
     expect(prepared).toEqual([
       { kind: "RELATIONSHIP", relationshipId: "r-kazikit" },
     ]);
+  });
+});
+
+describe("speech that was not for Q is kept out of what Q reads back (founder live 2026-10-01)", () => {
+  const reading = (extra: Partial<TurnReaderResult>): TurnReaderResult =>
+    ({
+      kind: "SMALL_TALK",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      ...extra,
+    });
+
+  it("marks a spoken line meant for someone else, and says nothing", async () => {
+    const run = seam({
+      said: "Neo, n e u. N e u.",
+      spoken: true,
+      reading: reading({ addressedToQ: false }),
+      outcomes: [],
+    });
+    const outcome = await run.answer.answer(request());
+    expect(outcome).toMatchObject({ kind: "ANSWERED", messageId: null });
+    expect(run.marked).toEqual([run.message.id]);
+    expect(run.delegated()).toBe(0);
+  });
+
+  it("on 'wasn't talking to you', marks their lines since Q last spoke, not Q's and not this one", async () => {
+    const run = seam({
+      said: "Q, I wasn't really talking to you. Take me to Discover.",
+      spoken: true,
+      earlier: [
+        { role: "Q", content: "Hey, Zino." },
+        { role: "USER", content: "Have you tested eleven labs?" },
+        { role: "USER", content: "And the whole Google Meet stuff." },
+      ],
+      reading: {
+        ...toolReading({
+          kind: "NAVIGATE",
+          destination: "DISCOVER",
+          visibility: null,
+        }),
+        earlierNotForQ: true,
+      } as TurnReaderResult,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    const [, dictation1, dictation2] = run.earlierLines;
+    expect(new Set(run.marked)).toEqual(
+      new Set([dictation1?.id, dictation2?.id]),
+    );
+    expect(run.marked).not.toContain(run.message.id);
+    // The request itself is still acted on.
+    expect(run.stored.at(-1)?.content).toBe("Taking you to Discover.");
+  });
+
+  it("marks nothing on an ordinary turn", async () => {
+    const run = seam({
+      said: "take me to discover",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "DISCOVER",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.marked).toEqual([]);
   });
 });

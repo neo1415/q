@@ -447,6 +447,96 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
     });
   });
 
+  // Founder live 2026-10-01: a name said to someone else and a dictation
+  // were stored as the person's turns and read back as context. A mark
+  // keeps a line out of what Q reads back, append-only; history keeps it.
+  it("keeps a marked line out of what Q reads back, and never rewrites history", async () => {
+    await withWorld(async ({ tx, service, adminA, tenantA }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "Hey Q." } }),
+        idempotencyKey: "mark-0001",
+        correlationId: CORRELATION(),
+      });
+      const overheard = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "Neo, n e u. N e u." },
+        }),
+        idempotencyKey: "mark-0002",
+        correlationId: CORRELATION(),
+      });
+      const latest = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "What do you call me?" },
+        }),
+        idempotencyKey: "mark-0003",
+        correlationId: CORRELATION(),
+      });
+      const overheardId = overheard.message.id;
+      const nested = nestedTransactions(tx);
+      await nested.run(
+        (inner) =>
+          repositories.messages.mark?.(inner, {
+            tenantId: tenantA,
+            conversationId: first.conversation.id,
+            messageIds: [overheardId],
+            mark: "NOT_ADDRESSED_TO_Q",
+            markedBy: "Q_READING",
+            runId: latest.run.id,
+          }) ?? Promise.resolve(),
+      );
+      const readBack =
+        await repositories.messages.listRecentForConversationOfRun(
+          tx.sql,
+          tenantA,
+          latest.run.id,
+          64,
+        );
+      expect(readBack.map((m) => m.content)).toEqual([
+        "Hey Q.",
+        "What do you call me?",
+      ]);
+      const learned = await repositories.messages.listRecentForConversation(
+        tx.sql,
+        tenantA,
+        first.conversation.id,
+        64,
+        { readBack: true },
+      );
+      expect(learned.map((m) => m.id)).not.toContain(overheardId);
+      // The person's own history still shows what was said.
+      const history = await repositories.messages.listRecentForConversation(
+        tx.sql,
+        tenantA,
+        first.conversation.id,
+        64,
+      );
+      expect(history.map((m) => m.id)).toContain(overheardId);
+      // Marking twice is a no-op; a mark is never rewritten.
+      await nested.run(
+        (inner) =>
+          repositories.messages.mark?.(inner, {
+            tenantId: tenantA,
+            conversationId: first.conversation.id,
+            messageIds: [overheardId],
+            mark: "NOT_ADDRESSED_TO_Q",
+            markedBy: "Q_READING",
+          }) ?? Promise.resolve(),
+      );
+      await expect(
+        nested.run(
+          (inner) =>
+            inner.sql`update q_runtime.conversation_message_marks set mark = 'HIDDEN_BY_PERSON' where message_id = ${overheardId}`,
+        ),
+      ).rejects.toThrow(/append-only/);
+    });
+  });
+
   it("lists and reopens the owner's conversations, newest activity first, and hides them from everyone else (ADR 0012)", async () => {
     await withWorld(
       async ({ tx, service, adminA, memberA, adminB, companyA }) => {

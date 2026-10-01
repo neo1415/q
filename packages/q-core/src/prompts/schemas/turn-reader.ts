@@ -469,3 +469,19 @@ export const TurnReaderV22ResultSchema = TurnReaderV15ResultSchema.extend({
   handOver: TurnHandOverSchema.nullable().default(null),
 }).strict();
 export type TurnReaderV22Result = z.infer<typeof TurnReaderV22ResultSchema>;
+
+/**
+ * v24 (founder live 2026-10-01): an open microphone heard a name said to
+ * someone else ("Neo, n e u") and a long dictation to the founder's
+ * developer, both stored as their turns; Q then called them "Neo" and
+ * summarised the dictation. addressedToQ now covers dictation meant for
+ * someone else, and earlierNotForQ says when the person tells Q that what
+ * they said before was not for it ("wasn't talking to you"). Code keeps
+ * those lines out of what Q reads back; nothing is deleted.
+ */
+export const TURN_READER_V24_SCHEMA_VERSION = 24;
+
+export const TurnReaderV24ResultSchema = TurnReaderV22ResultSchema.extend({
+  earlierNotForQ: z.boolean().default(false),
+}).strict();
+export type TurnReaderV24Result = z.infer<typeof TurnReaderV24ResultSchema>;

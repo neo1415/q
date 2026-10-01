@@ -1313,6 +1313,37 @@ export function createSpecialistQAnswer(
     }
   };
 
+  /** Lines of theirs that were not for Q, marked append-only (20261110030000). */
+  const markNotForQ = async (
+    request: QAnswerRequest,
+    conversationId: string,
+    messageIds: readonly string[],
+  ): Promise<void> => {
+    const mark = repositories.messages.mark;
+    if (mark === undefined || messageIds.length === 0) return;
+    try {
+      await transactions.run((tx) =>
+        mark(tx, {
+          tenantId: request.tenantId,
+          conversationId,
+          messageIds,
+          mark: "NOT_ADDRESSED_TO_Q",
+          markedBy: "Q_READING",
+          runId: request.runId,
+        }),
+      );
+      logger?.info(
+        { qRunId: request.runId, marked: messageIds.length },
+        "lines not meant for Q kept out of what Q reads back",
+      );
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "lines not meant for Q were not marked",
+      );
+    }
+  };
+
   const answerTurn = async (
     request: QAnswerRequest,
   ): Promise<QAnswerOutcome> => {
@@ -1491,7 +1522,25 @@ export function createSpecialistQAnswer(
     // the room) are not a turn to Q: nothing is answered, nothing is
     // recorded as theirs, and Q keeps listening (founder live 2026-09-29:
     // answering the room made Q "talk to itself").
+    // The person said what came before was not for Q ("wasn't talking to
+    // you"): those lines -- theirs, since Q last spoke -- are kept out of
+    // what Q reads back from now on, context, readings and memory alike
+    // (founder live 2026-10-01). Nothing is deleted.
+    if (read !== null && read.earlierNotForQ === true) {
+      const before: string[] = [];
+      for (let index = history.length - 1; index >= 0; index -= 1) {
+        const message = history[index];
+        if (message === undefined || message.id === latest.id) continue;
+        if (message.role !== "USER") break;
+        before.push(message.id);
+        if (before.length >= 30) break;
+      }
+      await markNotForQ(request, conversationId, before);
+    }
     if (spoken && read !== null && read.addressedToQ === false) {
+      // Not theirs to Q: kept out of what Q reads back, so a name said to
+      // someone else or a dictation never becomes context or memory.
+      await markNotForQ(request, conversationId, [latest.id]);
       logger?.info({ qRunId: request.runId }, "q turn not addressed to Q");
       return {
         kind: "ANSWERED",
