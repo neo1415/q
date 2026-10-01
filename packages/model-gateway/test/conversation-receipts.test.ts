@@ -5,6 +5,9 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import {
   capabilityNote,
+  DAILY_HERE_LINE,
+  HERE_LINE,
+  screenLines,
   collectReceipts,
   PLAIN_KNOWING_LINE,
   POINTING_LINE,
@@ -291,5 +294,19 @@ describe("a change's status is its real one, said plainly (live 2026-09-27 #1, #
     expect(note).not.toContain("ready for approval");
     expect(note).toContain("never call the same change both");
     expect(note).toContain("internal terms");
+  });
+});
+
+describe("here is the screen (founder live 2026-10-01)", () => {
+  it("on The Q Daily, 'everything here' is today's edition, read with its tool", () => {
+    const lines = screenLines({ route: "DAILY" });
+    expect(lines[0]).toContain("on The Q Daily (today's edition)");
+    expect(lines).toContain(HERE_LINE);
+    expect(lines).toContain(DAILY_HERE_LINE);
+    expect(DAILY_HERE_LINE).toContain("get_q_daily");
+  });
+
+  it("says nothing about here on a screen without a name", () => {
+    expect(screenLines({ route: "OTHER" })).not.toContain(HERE_LINE);
   });
 });

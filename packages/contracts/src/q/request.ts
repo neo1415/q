@@ -65,6 +65,9 @@ export const Q_SCREEN_ROUTES = [
   "RELATIONSHIP_INVESTOR",
   "VERIFICATION",
   "ONBOARDING",
+  // The Q Daily (founder live 2026-10-01): "summarize everything here" on
+  // the Daily was answered from older conversation text.
+  "DAILY",
   "OTHER",
 ] as const;
 export const QScreenRouteSchema = z.enum(Q_SCREEN_ROUTES);

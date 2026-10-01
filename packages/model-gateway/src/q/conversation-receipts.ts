@@ -175,6 +175,7 @@ const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
   RELATIONSHIP_INVESTOR: "their relationship with an investor",
   VERIFICATION: "verification",
   ONBOARDING: "their setup",
+  DAILY: "The Q Daily (today's edition)",
   OTHER: null,
 };
 
@@ -191,6 +192,16 @@ const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
  */
 export const POINTING_LINE =
   "When they point instead of naming (this, this one, them, here, this person, this company, it), they mean what their screen shows: a company's person is its founder, an investor organisation's person is its team. Never ask which one they mean when the screen answers it. When they hand it over without saying what to do (handle this, take care of it), take the next step its state calls for (read the relationship when there is one) and prepare it for their approval; ask only when two different next steps are equally likely, naming both.";
+
+/**
+ * "Here" is the screen (founder live 2026-10-01: "summarize everything
+ * here" on The Q Daily was answered from an older dictation in the
+ * conversation). Guidance about reference, never a word list.
+ */
+export const HERE_LINE =
+  '"Here", "this page", "everything here" and "what I\'m looking at" mean what this screen shows now, never earlier conversation text.';
+export const DAILY_HERE_LINE =
+  'On The Q Daily, "this", "here" and "everything here" mean today\'s edition on their screen: read it with get_q_daily and answer from it.';
 
 /**
  * The notes' own vocabulary is not the person's. Live, in one week about
@@ -222,6 +233,8 @@ export function screenLines(
       name === null ? "a Capital Q screen without a name here" : `on ${name}`
     }${shown.length === 0 ? "" : `, showing ${shown.join(" and ")}`}. You know what screen they are on: when they ask where they are or what they are looking at, say it plainly (for example "You're on your profile."); never say you cannot see their screen.`,
     ...(shown.length === 0 ? [] : [POINTING_LINE]),
+    ...(name === null ? [] : [HERE_LINE]),
+    ...(screen.route === "DAILY" ? [DAILY_HERE_LINE] : []),
     ...localTimeLines(screen.timeZone, now),
   ];
 }
