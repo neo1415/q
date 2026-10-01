@@ -118,3 +118,24 @@ describe("founder extraction data posture", () => {
     expect(gateway.sent[0]?.dataPosture).toBe("REAL_CUSTOMER");
   });
 });
+
+describe("founder extraction leniency (live 2026-10-01)", () => {
+  it("asks the gateway to drop a list element that fails, never to refuse the reading", async () => {
+    const options: unknown[] = [];
+    const gateway = {
+      execute: (_request: unknown, given: unknown) => {
+        options.push(given);
+        return Promise.reject(
+          Object.assign(new Error("no provider in this test"), {
+            failureClass: "PROVIDER_OUTAGE",
+          }),
+        );
+      },
+    };
+    await createFounderExtraction({
+      gateway: gateway as never,
+      budget: {},
+    }).extract(requestFor() as never);
+    expect(options[0]).toMatchObject({ invalidListItems: "DROP" });
+  });
+});

@@ -100,6 +100,8 @@ export type FounderExtractionGateway = {
     options: {
       readonly schema: unknown;
       readonly signal?: AbortSignal | undefined;
+      /** The gateway's own option: a list element that fails is dropped. */
+      readonly invalidListItems?: "REFUSE" | "DROP" | undefined;
     },
   ) => Promise<{
     readonly providerCode: string;
@@ -264,6 +266,12 @@ export function createFounderExtraction(
           },
           {
             schema: FounderExtractionV2ResultSchema,
+            // One bad list element (live 2026-10-01: a taxonomy label over
+            // 80 characters) refused the whole reading twice on luna, ~8.5 s
+            // and two paid calls, before the fallback model answered. An
+            // element that fails its schema is dropped, never kept: nothing
+            // invalid is read, and the rest of the reading survives.
+            invalidListItems: "DROP",
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           },
         );
