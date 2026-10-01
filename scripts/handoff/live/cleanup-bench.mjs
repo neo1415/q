@@ -143,9 +143,14 @@ for (const row of tables) {
     parts.push(`tenant_id in (${list(ownTenants)})`);
   for (const col of row.person_cols ?? [])
     parts.push(`${col}::text in (${list(personIds)})`);
-  for (const ref of profileRefs.filter((r) => r.child === row.t)) {
-    for (const col of ref.cols)
-      parts.push(`${col}::text in (${list(profileIds)})`);
+  // Platform records a person only authored (a flag they updated) are not
+  // theirs to take with them: those references are checked below instead.
+  // Their own platform rows (decisions about them, by tenant or user) go.
+  if (!row.t.startsWith("platform")) {
+    for (const ref of profileRefs.filter((r) => r.child === row.t)) {
+      for (const col of ref.cols)
+        parts.push(`${col}::text in (${list(profileIds)})`);
+    }
   }
   if (parts.length > 0)
     predicateOf.set(row.t, [...new Set(parts)].join(" or "));
@@ -194,14 +199,20 @@ for (const [table, predicate] of predicateOf) {
   if (n > 0) counts.set(table, n);
 }
 
-// Platform-wide records (feature flags, admin settings) are never a bench
-// account's to take with it, even when one authored a row: refuse instead.
-const platformRows = [...counts.keys()].filter((t) => t.startsWith("platform"));
-if (platformRows.length > 0) {
+// Platform-wide records (feature flags, admin settings) a bench account
+// authored are never taken with it: they stop the run instead.
+const authored = [];
+for (const ref of profileRefs.filter((r) => r.child.startsWith("platform"))) {
+  for (const col of ref.cols) {
+    const [{ n }] = await sql(
+      `select count(*)::int as n from ${ref.child} where ${col}::text in (${list(profileIds)})`,
+    );
+    if (n > 0) authored.push(`${ref.child}.${col} (${n})`);
+  }
+}
+if (authored.length > 0) {
   console.log(
-    `refused: platform records reference these accounts: ${platformRows
-      .map((t) => `${t} (${counts.get(t)})`)
-      .join(", ")}`,
+    `refused: platform records were authored by these accounts: ${authored.join(", ")}`,
   );
   process.exit(1);
 }
