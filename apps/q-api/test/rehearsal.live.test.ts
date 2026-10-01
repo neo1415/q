@@ -422,8 +422,9 @@ describe.skipIf(!LIVE || KEY === undefined)("rehearsal (live model)", () => {
         const st = t?.state;
         return `${said === null ? "(opening)" : `YOU: ${said.slice(0, 70)}`}\n   -> [${t?.mood ?? ""}/${t?.intensity ?? ""}${t?.reaction ? `/${t.reaction}` : ""}] p${st?.patience ?? "?"} w${st?.warmth ?? "?"} f${st?.frustration ?? "?"} h${st?.hurt ?? "?"} :: ${(t?.text ?? "").slice(0, 150)}`;
       };
+      const limit = Number(process.env["CQ_SCRIPT_LIMIT"] ?? "99");
       const out = [`=== ${label}`, await show(null)];
-      for (const text of script) {
+      for (const text of script.slice(0, limit)) {
         const r = await service.say(actor, id, { text });
         out.push(r.kind === "OK" ? await show(text) : `!! ${r.kind}`);
         if (r.kind === "OK" && r.rehearsal.endedAt !== null) break;
