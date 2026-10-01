@@ -237,13 +237,31 @@ export function buildQGraph(
   // conversation, and was stamped with a version this build understands.
   const preflight = async (
     state: QGraphState,
+    config: RunnableConfig,
   ): Promise<Partial<QGraphState>> => {
     const run = await boundary(state);
     if (run.conversationId === null) {
       throw new Error("q run has no conversation");
     }
     assertResumableOrchestrationVersion(run.orchestrationVersion);
-    await advance(state, "CONTEXT_RESOLUTION");
+    // CONTEXT_RESOLUTION and POLICY_CHECK in one transaction, each status
+    // still taken in order (speed sweep 2026-10-01).
+    honour(
+      await runtime.advanceThrough(ref(state), [
+        "CONTEXT_RESOLUTION",
+        "POLICY_CHECK",
+      ]),
+    );
+    // Preflight has passed: the person's own latest turn may be read now,
+    // beside the firewall (ADR 0035). Own words and own turns only; the
+    // reading is dropped unused if any later stage refuses the run.
+    answer.preread?.({
+      runId: state.runId,
+      tenantId: state.tenantId,
+      actor: actorFor(state),
+      correlationId: state.correlationId,
+      signal: config.signal,
+    });
     return { preflight: "PASSED" };
   };
 
@@ -254,11 +272,13 @@ export function buildQGraph(
   const contextFirewall = async (
     state: QGraphState,
   ): Promise<Partial<QGraphState>> => {
+    // POLICY_CHECK was taken with CONTEXT_RESOLUTION; this still stops a
+    // run cancelled or ended since.
     await boundary(state);
-    await advance(state, "POLICY_CHECK");
     const decision = await plan(state);
     if (decision.outcome === "DENIED") {
       livePlans.delete(state.runId);
+      answer.discard?.(state.runId);
       return { context: "DENIED", contextPlan: null };
     }
     livePlans.set(state.runId, decision.plan);
@@ -285,7 +305,8 @@ export function buildQGraph(
   const retrieve = async (
     state: QGraphState,
   ): Promise<Partial<QGraphState>> => {
-    await boundary(state);
+    // The move itself refuses a cancelled or ended run (honour), so no
+    // separate read of the run first.
     await advance(state, "RETRIEVAL");
     const held = livePlans.get(state.runId);
     const reusable =
@@ -298,6 +319,7 @@ export function buildQGraph(
       : await plan(state);
     if (decision.outcome === "DENIED") {
       livePlans.delete(state.runId);
+      answer.discard?.(state.runId);
       return { context: "DENIED", contextPlan: null, retrieval: null };
     }
     if (
@@ -332,12 +354,12 @@ export function buildQGraph(
     state: QGraphState,
     config: RunnableConfig,
   ): Promise<Partial<QGraphState>> => {
-    await boundary(state);
     await advance(state, "SYNTHESIS", "PREPARING_ANALYSIS");
     let current = livePlans.get(state.runId);
     if (current === undefined) {
       const decision = await plan(state);
       if (decision.outcome === "DENIED") {
+        answer.discard?.(state.runId);
         return { context: "DENIED", contextPlan: null, answer: null };
       }
       current = decision.plan;

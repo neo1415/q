@@ -144,6 +144,7 @@ export {
   type ContextFirewallRequest,
   type QAnswerOutcome,
   type QAnswerPort,
+  type QPrereadInput,
   type QAnswerRequest,
   type QCapabilityManifest,
   type QResearchDirective,
