@@ -272,10 +272,15 @@ export { INVESTOR_PERSONA_V2 } from "./prompts/tasks/investor-persona.v2.js";
 export { INVESTOR_TWIN_TURN_V2 } from "./prompts/tasks/investor-twin-turn.v2.js";
 export { REHEARSAL_SCORE_V2 } from "./prompts/tasks/rehearsal-score.v2.js";
 export { INVESTOR_TWIN_TURN_V3 } from "./prompts/tasks/investor-twin-turn.v3.js";
+export { INVESTOR_PERSONA_V3 } from "./prompts/tasks/investor-persona.v3.js";
+export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
 export {
   REHEARSAL_CONCLUSIONS,
   REHEARSAL_CUES,
   REHEARSAL_CUES_V3,
+  RehearsalReviewLenientSchema,
+  normaliseRehearsalReview,
+  type RehearsalReviewLenient,
   REHEARSAL_DIFFICULTIES,
   REHEARSAL_LINE_MOODS_V3,
   RehearsalTurnV3ResultSchema,
@@ -295,8 +300,11 @@ export {
   type RehearsalTurnVariables,
 } from "./prompts/schemas/rehearsal.js";
 export {
+  CounterpartPersonaLenientSchema,
   CounterpartPersonaResultSchema,
   CounterpartPersonaVariablesSchema,
+  normaliseCounterpartPersona,
+  type CounterpartPersonaLenient,
   PERSONA_MOODS,
   type CounterpartPersonaResult,
   type CounterpartPersonaVariables,

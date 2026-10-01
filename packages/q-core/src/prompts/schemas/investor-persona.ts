@@ -149,7 +149,7 @@ export const CounterpartPersonaResultSchema = z
     /** What they will ask, hardest first. */
     likelyQuestions: z
       .array(z.object({ question: Line(300), why: Line(200) }).strict())
-      .min(3)
+      .min(1)
       .max(12),
     /** For a founder Q plays: how they answer the hard questions. */
     likelyAnswers: z
@@ -165,3 +165,83 @@ export const CounterpartPersonaResultSchema = z
 export type CounterpartPersonaResult = z.infer<
   typeof CounterpartPersonaResultSchema
 >;
+
+// ---------------------------------------------------------------------------
+// v3 (REHEARSE audit, live 2026-10-01): the v2 reading was refused whole
+// when the model wrote a seventh priority or a long style line
+// ("priorities:too_big", "style:too_big" on every live attempt). The model
+// now answers a lenient shape and code trims it to the stored bounds, so
+// one long list never costs the whole persona (handover lesson: lenient
+// per field).
+// ---------------------------------------------------------------------------
+
+export const COUNTERPART_PERSONA_V3_SCHEMA_VERSION = 3;
+
+const Loose = (max: number) => z.string().trim().min(1).max(max);
+
+export const CounterpartPersonaLenientSchema = z
+  .object({
+    summary: Loose(2_000),
+    style: Loose(1_200),
+    temperament: z
+      .object({
+        baseline: z.enum(PERSONA_MOODS),
+        warmsTo: z.array(Loose(600)).max(20),
+        coolsOn: z.array(Loose(600)).max(20),
+      })
+      .strict(),
+    priorities: z.array(Loose(600)).max(20),
+    likelyQuestions: z
+      .array(z.object({ question: Loose(800), why: Loose(600) }).strict())
+      .min(1)
+      .max(30),
+    likelyAnswers: z
+      .array(z.object({ topic: Loose(400), answer: Loose(1_200) }).strict())
+      .max(30),
+    pushbacks: z.array(Loose(600)).max(20),
+    howToWin: z.array(Loose(600)).max(20),
+    dealbreakers: z.array(Loose(600)).max(20),
+    grounding: z.enum(["THIN", "SOME", "RICH"]),
+  })
+  .strict();
+export type CounterpartPersonaLenient = z.infer<
+  typeof CounterpartPersonaLenientSchema
+>;
+
+/** Cut to a bound at a word, so a trimmed line still reads. */
+function cut(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = text.slice(0, max - 1);
+  const space = head.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? head.slice(0, space) : head).trimEnd()}…`;
+}
+const cutAll = (items: readonly string[], count: number, max: number) =>
+  items.slice(0, count).map((item) => cut(item, max));
+
+/** The lenient reading, trimmed to the stored (v2) shape. */
+export function normaliseCounterpartPersona(
+  loose: CounterpartPersonaLenient,
+): CounterpartPersonaResult {
+  return {
+    summary: cut(loose.summary, 600),
+    style: cut(loose.style, 300),
+    temperament: {
+      baseline: loose.temperament.baseline,
+      warmsTo: cutAll(loose.temperament.warmsTo, 5, 200),
+      coolsOn: cutAll(loose.temperament.coolsOn, 5, 200),
+    },
+    priorities: cutAll(loose.priorities, 6, 200),
+    likelyQuestions: loose.likelyQuestions.slice(0, 12).map((q) => ({
+      question: cut(q.question, 300),
+      why: cut(q.why, 200),
+    })),
+    likelyAnswers: loose.likelyAnswers.slice(0, 10).map((a) => ({
+      topic: cut(a.topic, 120),
+      answer: cut(a.answer, 400),
+    })),
+    pushbacks: cutAll(loose.pushbacks, 6, 200),
+    howToWin: cutAll(loose.howToWin, 6, 200),
+    dealbreakers: cutAll(loose.dealbreakers, 5, 200),
+    grounding: loose.grounding,
+  };
+}

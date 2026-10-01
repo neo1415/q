@@ -43,7 +43,7 @@ export const REHEARSAL_SCORE_V2: PromptDefinition<
 > = {
   id: "REHEARSAL_SCORE",
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",

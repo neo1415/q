@@ -26,6 +26,10 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   InvestorPersonaResultSchema,
+  CounterpartPersonaLenientSchema,
+  normaliseCounterpartPersona,
+  normaliseRehearsalReview,
+  RehearsalReviewLenientSchema,
   RehearsalReviewResultSchema,
   RehearsalTurnV3ResultSchema,
   renderPrompt,
@@ -1527,17 +1531,20 @@ export function createRehearsalComposer(dependencies: {
   }
 
   return {
-    persona: (actor, variables) =>
-      run(
+    // Lenient shapes from the model, trimmed here to what is stored.
+    persona: async (actor, variables) => {
+      const loose = await run(
         actor,
         "INVESTOR_PERSONA",
         "STRUCTURED_EXTRACTION",
         PERSONA_BUDGET,
         variables,
-        CounterpartPersonaResultSchema,
-      ),
-    turn: (actor, variables, image, signal) =>
-      run(
+        CounterpartPersonaLenientSchema,
+      );
+      return loose === null ? null : normaliseCounterpartPersona(loose);
+    },
+    turn: async (actor, variables, image, signal) => {
+      const result = await run(
         actor,
         "INVESTOR_TWIN_TURN",
         "NORMAL_DIALOGUE",
@@ -1546,15 +1553,21 @@ export function createRehearsalComposer(dependencies: {
         RehearsalTurnV3ResultSchema,
         image,
         signal,
-      ),
-    review: (actor, variables) =>
-      run(
+      );
+      return result === null
+        ? null
+        : { ...result, line: result.line.slice(0, 700) };
+    },
+    review: async (actor, variables) => {
+      const loose = await run(
         actor,
         "REHEARSAL_SCORE",
         "STRUCTURED_EXTRACTION",
         REVIEW_BUDGET,
         variables,
-        RehearsalReviewResultSchema,
-      ),
+        RehearsalReviewLenientSchema,
+      );
+      return loose === null ? null : normaliseRehearsalReview(loose);
+    },
   };
 }
