@@ -3,6 +3,7 @@ import { createAppendQRunMessage } from "./append-message.js";
 import { createCancelQRun } from "./cancel-run.js";
 import {
   createArchiveQConversation,
+  createHideQConversationMessage,
   createGetQConversation,
   createListQConversations,
 } from "./conversations.js";
@@ -28,6 +29,10 @@ export type QRuntimeService = {
   readonly listConversations: ReturnType<typeof createListQConversations>;
   readonly getConversation: ReturnType<typeof createGetQConversation>;
   readonly archiveConversation: ReturnType<typeof createArchiveQConversation>;
+  /** The owner keeps one of their lines out of what Q reads back. */
+  readonly hideConversationMessage: ReturnType<
+    typeof createHideQConversationMessage
+  >;
 };
 
 export type QRuntimeServiceOptions = Omit<
@@ -52,5 +57,6 @@ export function createQRuntimeService(
     listConversations: createListQConversations(dependencies),
     getConversation: createGetQConversation(dependencies),
     archiveConversation: createArchiveQConversation(dependencies),
+    hideConversationMessage: createHideQConversationMessage(dependencies),
   };
 }

@@ -54,6 +54,7 @@ import { announceQSaid } from "@/features/q-swarm/q-said";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { plainFromMarkdown, QMarkdown } from "./markdown";
+import { HideFromQ } from "./hide-from-q";
 import { QAnswer } from "./q-answer";
 import { QBoard } from "./q-board";
 import { QHistorySheet } from "./q-history-sheet";
@@ -843,6 +844,10 @@ export function QConversationPanel({
                             <span className="sr-only">You: </span>
                             {line.text}
                           </p>
+                          <HideFromQ
+                            conversationId={q.conversationId}
+                            messageId={line.id}
+                          />
                         </li>
                       ) : (
                         <li

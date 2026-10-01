@@ -511,6 +511,71 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
     });
   });
 
+  it("lets the owner hide one of their lines from Q, and nobody else", async () => {
+    await withWorld(async ({ tx, service, adminA, memberA, tenantA }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "Hey Q." } }),
+        idempotencyKey: "hide-0001",
+        correlationId: CORRELATION(),
+      });
+      const dictation = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "Have you tested eleven labs?" },
+        }),
+        idempotencyKey: "hide-0002",
+        correlationId: CORRELATION(),
+      });
+      const other = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "A different conversation." } }),
+        idempotencyKey: "hide-0003",
+        correlationId: CORRELATION(),
+      });
+      // Someone else in the tenant: not found, nothing marked.
+      await expect(
+        service.hideConversationMessage({
+          actor: memberA.actor,
+          conversationId: first.conversation.id,
+          messageId: dictation.message.id,
+        }),
+      ).rejects.toThrow(QConversationNotFoundError);
+      // A message of another conversation: not found.
+      await expect(
+        service.hideConversationMessage({
+          actor: adminA.actor,
+          conversationId: first.conversation.id,
+          messageId: other.message.id,
+        }),
+      ).rejects.toThrow(QConversationNotFoundError);
+      // The owner, twice: idempotent.
+      for (let i = 0; i < 2; i += 1) {
+        await service.hideConversationMessage({
+          actor: adminA.actor,
+          conversationId: first.conversation.id,
+          messageId: dictation.message.id,
+        });
+      }
+      const marks = await tx.sql<{ mark: string; marked_by: string }[]>`
+        select mark, marked_by from q_runtime.conversation_message_marks
+         where message_id = ${dictation.message.id}`;
+      expect(marks).toEqual([
+        { mark: "HIDDEN_BY_PERSON", marked_by: "PERSON" },
+      ]);
+      const readBack =
+        await repositories.messages.listRecentForConversationOfRun(
+          tx.sql,
+          tenantA,
+          first.run.id,
+          64,
+        );
+      expect(readBack.map((m) => m.content)).toEqual(["Hey Q."]);
+    });
+  });
+
   // Founder live 2026-10-01: a name said to someone else and a dictation
   // were stored as the person's turns and read back as context. A mark
   // keeps a line out of what Q reads back, append-only; history keeps it.

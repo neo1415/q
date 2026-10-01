@@ -6,9 +6,11 @@ import {
   ListQConversationsResponseSchema,
   parseContract,
   Q_CONVERSATION_ARCHIVE_SUFFIX,
+  Q_CONVERSATION_MESSAGE_HIDE_SUFFIX,
   Q_CONVERSATIONS_PATH,
   QConversationDetailSchema,
   QConversationIdSchema,
+  QMessageIdSchema,
   type CorrelationId,
   type QConversationId,
 } from "@capital-q/contracts";
@@ -29,13 +31,17 @@ import {
  * the runtime answers "not found" for anything that is not theirs. The
  * list is cursor-paged by last activity; the detail carries the recent
  * turns and the latest run's handle so a client can pick up a run still
- * in flight. Archiving is the one change, and it is idempotent.
+ * in flight. Archiving a conversation and hiding one of their lines from
+ * Q are the changes, and both are idempotent.
  */
 
 export type QConversationRoutesDependencies = ActorContextDependencies & {
   readonly qRuntime: Pick<
     QRuntimeService,
-    "listConversations" | "getConversation" | "archiveConversation"
+    | "listConversations"
+    | "getConversation"
+    | "archiveConversation"
+    | "hideConversationMessage"
   >;
   /** As on the run routes: a person with no organisation yet still has conversations. */
   readonly identity?: ApplicationIdentityLookup | undefined;
@@ -113,6 +119,28 @@ export function registerQConversationRoutes(
       await service.archiveConversation({
         actor: getActorContext(request),
         conversationId: conversationIdParam(request),
+        correlationId: correlation(),
+      });
+      return reply.code(204).header("Cache-Control", "no-store").send();
+    },
+  );
+
+  // The owner keeps one of their lines out of what Q reads back, without
+  // deleting it (founder live 2026-10-01). Same ownership rule as archive.
+  app.post(
+    `${conversationPath}/messages/:messageId${Q_CONVERSATION_MESSAGE_HIDE_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const params = request.params as Record<string, unknown>;
+      const messageId = parseContract(
+        QMessageIdSchema,
+        params["messageId"],
+        "The message identifier is not valid.",
+      );
+      await service.hideConversationMessage({
+        actor: getActorContext(request),
+        conversationId: conversationIdParam(request),
+        messageId,
         correlationId: correlation(),
       });
       return reply.code(204).header("Cache-Control", "no-store").send();
