@@ -340,7 +340,7 @@ describe("what an earlier utterance stated stays theirs (live 2026-09-30)", () =
               ],
             },
           }),
-      },
+      } as unknown as ModelGateway,
     };
     await createInterviewAgent({
       gateway,

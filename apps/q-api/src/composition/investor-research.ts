@@ -85,7 +85,7 @@ export function createInvestorResearchReader(dependencies: {
   readonly gateway: ModelGateway;
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
-}): InvestorResearchDependencies["reader"] {
+}): NonNullable<InvestorResearchDependencies["reader"]> {
   const registry = createDefaultPromptRegistry();
   const { gateway, logger } = dependencies;
   return async (request) => {
