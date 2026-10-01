@@ -34,6 +34,8 @@ export const PROTECTED_PATH_PREFIXES = [
   "/settings",
   // AUTO (ADR 0030): Q's work.
   "/work",
+  // DAILY: The Q Daily reader.
+  "/daily",
   "/gateway",
   "/rehearsals",
   "/results",

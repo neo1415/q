@@ -29,6 +29,8 @@ export const config = {
     "/settings/:path*",
     // AUTO (ADR 0030): Q's work.
     "/work/:path*",
+    // DAILY: The Q Daily reader.
+    "/daily/:path*",
     "/gateway/:path*",
     "/rehearsals/:path*",
     "/results/:path*",
