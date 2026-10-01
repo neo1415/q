@@ -47,7 +47,10 @@ function firewall(): ContextFirewallPort {
 }
 
 /** A model that replies, asking the step it names; records what it saw. */
-function replying(asking: string | null = "I2.stages") {
+function replying(
+  asking: string | null = "I2.stages",
+  extra: Record<string, unknown> = {},
+) {
   const seen: string[] = [];
   const gateway = {
     execute: (request: {
@@ -57,7 +60,7 @@ function replying(asking: string | null = "I2.stages") {
       return Promise.resolve({
         output: {
           kind: "TEXT",
-          text: JSON.stringify({ reply: "Sure.", asking }),
+          text: JSON.stringify({ reply: "Sure.", asking, ...extra }),
         },
       });
     },
@@ -244,5 +247,29 @@ describe("a corrected pronunciation, from their own words", () => {
         JSON.stringify(pronounce),
       ).toBe(expected !== null);
     }
+  });
+});
+
+describe("PRESENCE: the reply's gestures", () => {
+  it("carries the model's closed-set gestures with the reply, and drops anything else", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: SO_FAR,
+    });
+    const { gateway } = replying("I2.stages", {
+      gestures: [
+        { sentence: 0, gesture: "NOD" },
+        { sentence: 0, gesture: "CLAP" },
+        { sentence: 1, gesture: "SPARKLES" },
+      ],
+    });
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({})),
+    }).turn({ ...turn(world, "Mostly seed."), actor });
+    expect(outcome.gestures).toEqual([{ sentence: 0, gesture: "NOD" }]);
   });
 });

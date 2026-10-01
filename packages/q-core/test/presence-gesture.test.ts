@@ -72,3 +72,21 @@ describe("PRESENCE gestures beside a reply", () => {
     expect(parsed.gestures).toEqual([]);
   });
 });
+
+describe("INTERVIEW_AGENT v16 (PRESENCE)", () => {
+  it("is v15's text with gestures in its output schema, lenient on the way in", async () => {
+    const {
+      INTERVIEW_AGENT_V15,
+      INTERVIEW_AGENT_V16,
+      InterviewAgentV16ResultSchema,
+    } = await import("../src/index.js");
+    expect(INTERVIEW_AGENT_V16.status).toBe("ACTIVE");
+    expect(INTERVIEW_AGENT_V16.template).toBe(INTERVIEW_AGENT_V15.template);
+    const parsed = InterviewAgentV16ResultSchema.parse({
+      reply: "What do you charge?",
+      gestures: [{ sentence: 0, gesture: "NOT_A_GESTURE" }],
+    });
+    // The reply survives; the unknown gesture is dropped by code.
+    expect(gesturesForReply(parsed.reply, parsed.gestures)).toEqual([]);
+  });
+});

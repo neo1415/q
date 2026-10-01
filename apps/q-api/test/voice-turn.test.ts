@@ -1146,6 +1146,47 @@ describe("a spoken question for Q", () => {
     ).toBeUndefined();
   });
 
+  it("PRESENCE: puts the answer's gestures on the board for the screen, keyed by the answer", async () => {
+    const runtime = fakeRuntime();
+    const board = createVoiceTurnBoard();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.message.completed", {
+          message: {
+            messageId: "f0000000-0000-4000-8000-000000000041",
+            role: "Q",
+            text: "Revenue doubled last year. Impressive work.",
+            gestures: [
+              { sentence: 0, gesture: "CHART_UP" },
+              { sentence: 1, gesture: "CLAP" },
+            ],
+          },
+        }),
+        event("q.run.completed", { status: "COMPLETED" }),
+      ]),
+      logger,
+      board,
+    });
+    await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: undefined,
+      }),
+      [{ role: "user", content: "how did we do last year" }],
+      new AbortController().signal,
+      fakeSpeaker(),
+    );
+    expect(board.read("vs-1").presence).toEqual({
+      answerId: "f0000000-0000-4000-8000-000000000041",
+      gestures: [
+        { sentence: 0, gesture: "CHART_UP" },
+        { sentence: 1, gesture: "CLAP" },
+      ],
+    });
+  });
+
   it("speaks a run's public failure and nothing internal", async () => {
     const runtime = fakeRuntime();
     const handle = createVoiceTurnHandler({

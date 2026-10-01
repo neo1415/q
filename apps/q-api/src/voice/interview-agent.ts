@@ -31,9 +31,10 @@ import {
   isExhausted,
   reduceConversation,
   type ConversationState,
-  InterviewAgentV11ResultSchema,
+  InterviewAgentV16ResultSchema,
+  gesturesForReply,
   renderPrompt,
-  type InterviewAgentV11Result,
+  type InterviewAgentV16Result,
   type InterviewAgentVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -1203,7 +1204,7 @@ export function createInterviewAgent(
       input.onSentence === undefined
         ? undefined
         : createReplySentenceStream(input.onSentence);
-    let result: InterviewAgentV11Result | undefined;
+    let result: InterviewAgentV16Result | undefined;
     let rounds = 0;
     let calls = 0;
     let timedOut = false;
@@ -1252,7 +1253,7 @@ export function createInterviewAgent(
           }
           const accepted = acceptStructuredOutput(
             written,
-            InterviewAgentV11ResultSchema,
+            InterviewAgentV16ResultSchema,
           );
           if (accepted.ok) result = accepted.value;
           break;
@@ -1277,21 +1278,21 @@ export function createInterviewAgent(
       if (result === undefined && remaining() > MIN_REPLY_MS) {
         // The reply, written after every result so far, with no tools left.
         const rendered = render();
-        const response = await gateway.execute<InterviewAgentV11Result>(
+        const response = await gateway.execute<InterviewAgentV16Result>(
           {
             ...base,
             messages: [...rendered.messages],
             output: rendered.output,
           },
           {
-            schema: InterviewAgentV11ResultSchema,
+            schema: InterviewAgentV16ResultSchema,
             firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
             signal,
           },
         );
         if (response.output.kind === "STRUCTURED") {
           result = (
-            response.output as { readonly value: InterviewAgentV11Result }
+            response.output as { readonly value: InterviewAgentV16Result }
           ).value;
         }
       }
@@ -1509,9 +1510,14 @@ export function createInterviewAgent(
       research?.markSaid(input.onboardingSessionId, unsaidShown);
     }
 
+    // PRESENCE: what Q's particles form for which sentence, as the model
+    // asked, kept to the closed set and to this reply (spec §5).
+    const gestures =
+      result === undefined ? [] : gesturesForReply(reply, result.gestures);
     return {
       reply,
       intent: opening ? "OPENING" : "ANSWER",
+      ...(gestures.length === 0 ? {} : { gestures }),
       asking:
         stillOpen && askedOpen !== null && askedStep !== undefined
           ? {

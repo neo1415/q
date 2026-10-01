@@ -178,6 +178,9 @@ export function registerQInterviewRoute(
           held: [...(outcome.pending?.held ?? [])],
         },
         ...(outcome.conduct === undefined ? {} : { conduct: outcome.conduct }),
+        ...(outcome.gestures === undefined || outcome.gestures.length === 0
+          ? {}
+          : { gestures: [...outcome.gestures] }),
       });
     },
   );

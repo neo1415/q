@@ -116,6 +116,7 @@ export { INTERVIEW_AGENT_V12 } from "./prompts/tasks/interview-agent.v12.js";
 export { INTERVIEW_AGENT_V13 } from "./prompts/tasks/interview-agent.v13.js";
 export { INTERVIEW_AGENT_V14 } from "./prompts/tasks/interview-agent.v14.js";
 export { INTERVIEW_AGENT_V15 } from "./prompts/tasks/interview-agent.v15.js";
+export { INTERVIEW_AGENT_V16 } from "./prompts/tasks/interview-agent.v16.js";
 export { DELEGATION_READER_V1 } from "./prompts/tasks/delegation-reader.v1.js";
 export { DELEGATION_READER_V2 } from "./prompts/tasks/delegation-reader.v2.js";
 export { DELEGATION_READER_V3 } from "./prompts/tasks/delegation-reader.v3.js";
@@ -147,10 +148,12 @@ export {
   InterviewAgentV7VariablesSchema,
   InterviewAgentV9VariablesSchema,
   InterviewAgentV11ResultSchema,
+  InterviewAgentV16ResultSchema,
   InterviewAgentV11VariablesSchema,
   InterviewAgentVariablesSchema,
   type InterviewAgentResult,
   type InterviewAgentV11Result,
+  type InterviewAgentV16Result,
   type InterviewAgentV11Variables,
   type InterviewAgentV3Variables,
   type InterviewAgentV5Variables,
