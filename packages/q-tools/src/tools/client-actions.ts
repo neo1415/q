@@ -394,6 +394,26 @@ const NAME_MATCH_LEAD = 0.1;
  * their own relationships are searched, so a name can never open, or
  * reveal, a record they are not a party to.
  */
+/**
+ * How well a spoken name matches a record's name, allowing the short form
+ * people say: "Tidewater" for "Tidewater Growth Partners (fictional)"
+ * (REHEARSE audit, live 2026-10-01: Q could not open the rehearsal for it).
+ * The spoken name is compared with the record's whole name and with the
+ * record's leading words of the same count, a little discounted, so a
+ * full match still wins over a short one.
+ */
+export function spokenNameScore(spoken: string, recordName: string): number {
+  const whole = nameSimilarity(spoken, recordName);
+  const words = recordName
+    .replace(/\([^)]*\)/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+  const count = spoken.split(/\s+/).filter((word) => word.length > 0).length;
+  if (count === 0 || count >= words.length) return whole;
+  const leading = nameSimilarity(spoken, words.slice(0, count).join(" "));
+  return Math.max(whole, leading * 0.9);
+}
+
 export function matchCounterpart(
   name: string,
   candidates: readonly { readonly id: string; readonly name: string }[],
@@ -401,7 +421,7 @@ export function matchCounterpart(
   const scored = candidates
     .map((candidate) => ({
       id: candidate.id,
-      score: nameSimilarity(name, candidate.name),
+      score: spokenNameScore(name, candidate.name),
     }))
     .sort((left, right) => right.score - left.score);
   const best = scored[0];

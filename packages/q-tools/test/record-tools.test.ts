@@ -345,6 +345,28 @@ describe("opening a chat by a spoken name (founder report 2026-09-30)", () => {
     expect(outcome.status).not.toBe("SUCCEEDED");
   });
 
+  it("a rehearsal opens by the short name people say (REHEARSE audit)", async () => {
+    // Live 2026-10-01: "rehearse my meeting with Tidewater" did not find
+    // "Tidewater Growth Partners (fictional)".
+    expect(
+      matchCounterpart("Tidewater", [
+        { id: FUND, name: "Tidewater Growth Partners (fictional)" },
+        { id: KOLA, name: "Zino Aviation" },
+      ]),
+    ).toBe(FUND);
+    const outcome = await executor.execute(
+      call("open_page", { page: "INVESTOR_REHEARSAL", name: "Agro" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "INVESTOR_REHEARSAL",
+      id: FUND,
+    });
+  });
+
   it("two names too close to tell apart are ambiguous", () => {
     expect(
       matchCounterpart("agro", [
