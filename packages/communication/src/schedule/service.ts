@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { TransactionManager } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
+import { reminderEmail } from "../email-templates.js";
 import type { ChatPartyResolver } from "../service.js";
 import { composePrepBrief, PREP_BRIEF_COMPOSER_VERSION } from "./brief.js";
 import { isKnownTimeZone, proposeSlots, type Interval } from "./slots.js";
@@ -115,6 +116,8 @@ export type ScheduleServiceDependencies = {
   readonly calendars: CalendarDirectory;
   readonly activity: MeetingActivityWriter;
   readonly email: AppEmailPort;
+  /** DOCS: the web origin, for links in emails; null leaves them out. */
+  readonly appOrigin?: string | null | undefined;
   readonly logger?:
     | {
         readonly info: (
@@ -1048,17 +1051,16 @@ export function createScheduleService(
         const owner = await directory.person(reminder.ownerUserId);
         if (owner === null) continue;
         try {
+          const message = reminderEmail({
+            title: reminder.title,
+            note: reminder.note,
+            origin: dependencies.appOrigin ?? null,
+          });
           await dependencies.email.send({
             to: owner.email,
-            subject: `Reminder: ${reminder.title}`.replace(/[\r\n]+/g, " "),
-            text: [
-              reminder.title,
-              reminder.note ?? "",
-              "",
-              "Open Capital Q to act on it.",
-            ]
-              .filter((line, index) => index !== 1 || line.length > 0)
-              .join("\n"),
+            subject: message.subject,
+            text: message.text,
+            html: message.html,
           });
           await store.markReminderEmailed(reminder.id, current);
           emailed += 1;

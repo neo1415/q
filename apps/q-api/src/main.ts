@@ -61,6 +61,7 @@ import {
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
+import { accountPausedEmail, callInviteEmail } from "./composition/emails.js";
 import {
   createDocumentImages,
   createSupabaseDocumentImageStore,
@@ -2414,12 +2415,17 @@ const errandNegotiation: ErrandNegotiation = {
       timeZone: invite.timeZone,
     }).format(invite.start);
     for (const person of [invite.organiser, ...invite.invitees]) {
+      const message = callInviteEmail({
+        purpose: invite.purpose,
+        when,
+        timeZone: invite.timeZone,
+        origin: googleWorkspace.webOrigin ?? null,
+      });
       await inviteEmail.send({
         to: person.email,
-        subject: `Call: ${invite.purpose}`
-          .replace(/[\r\n]+/g, " ")
-          .slice(0, 150),
-        text: `${invite.purpose}\n${when} (${invite.timeZone})\n\nThe calendar invite is attached. A video link will follow.`,
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
         attachments: [
           {
             filename: "invite.ics",
@@ -3257,11 +3263,17 @@ const reportPausedAccount = async (
          '/admin', ${`paused:${actor.userId}`})
       on conflict do nothing`;
     if (operator.email !== null && operatorEmail.available) {
+      const message = accountPausedEmail({
+        name,
+        strikes,
+        origin: googleWorkspace.webOrigin ?? null,
+      });
       await operatorEmail
         .send({
           to: operator.email,
-          subject: `Capital Q: Q paused ${name}'s account`,
-          text: `Q paused ${name}'s account after ${strikes} warnings about steering onboarding to small talk.\n\nReview it and reinstate it from the admin console: /admin\n\n-- Capital Q`,
+          subject: message.subject,
+          text: message.text,
+          html: message.html,
         })
         .catch((error: unknown) => {
           logger.warn({ err: error }, "operator email about a pause not sent");

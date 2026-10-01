@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import type { DatabaseExecutor } from "@capital-q/database";
 
+import { renderEmail } from "@capital-q/email";
+
 import { meetingIcs } from "./ics.js";
 import type { AppEmailPort } from "./service.js";
 
@@ -47,14 +49,6 @@ function zoneOr(zone: string | null, fallback: string): string {
   } catch {
     return fallback;
   }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 export function meetingVersion(meeting: {
@@ -120,37 +114,67 @@ export function meetingEmail(input: {
     `${input.updated ? "Updated: " : ""}${input.purpose} - ${when}`
       .replace(/[\r\n]+/g, " ")
       .slice(0, 150);
-  const text = [
-    `${lead}: ${input.purpose}`,
-    `${when} (${String(minutes)} minutes)`,
-    "",
-    input.meetLink === null
-      ? "Video link: to follow. Capital Q will email it as soon as it is ready."
-      : `Join with Google Meet: ${input.meetLink}`,
-    "",
-    "The calendar invite is attached: open it to add the call to your calendar.",
-    ...(prepare === null
-      ? []
-      : ["", `Prepare with Q (the prep brief and a rehearsal): ${prepare}`]),
-  ].join("\n");
-  const button = (href: string, label: string) =>
-    `<p style="margin:16px 0"><a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#1f3a5f;color:#ffffff;text-decoration:none;font-weight:600">${escapeHtml(label)}</a></p>`;
-  const html = [
-    '<!doctype html><html><body style="margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#14171f">',
-    '<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px">',
-    '<p style="margin:0 0 4px;font-size:13px;color:#5b6271">Capital Q</p>',
-    `<h1 style="margin:0 0 8px;font-size:20px">${escapeHtml(lead)}: ${escapeHtml(input.purpose)}</h1>`,
-    `<p style="margin:0 0 4px;font-size:16px">${escapeHtml(when)}</p>`,
-    `<p style="margin:0;font-size:14px;color:#5b6271">${String(minutes)} minutes</p>`,
-    input.meetLink === null
-      ? '<p style="margin:16px 0">Video link: to follow. Capital Q will email it as soon as it is ready.</p>'
-      : `${button(input.meetLink, "Join with Google Meet")}<p style="margin:0;font-size:13px;color:#5b6271">Or open: <a href="${escapeHtml(input.meetLink)}">${escapeHtml(input.meetLink)}</a></p>`,
-    '<p style="margin:16px 0 0;font-size:14px">Add to calendar: open the attached invite (invite.ics).</p>',
-    prepare === null
-      ? ""
-      : `<p style="margin:12px 0 0;font-size:14px"><a href="${escapeHtml(prepare)}">Prepare with Q</a>: the prep brief and a rehearsal of this call.</p>`,
-    "</div></body></html>",
-  ].join("");
+  // DOCS: the shared Capital Q layout (packages/email). The Meet button,
+  // the Meet URL written out, and the attached invite.ics stay.
+  const rendered = renderEmail({
+    subject,
+    preheader: `${when} · ${String(minutes)} minutes${input.meetLink === null ? " · video link to follow" : " · Google Meet"}`,
+    heading: `${lead}: ${input.purpose}`,
+    blocks: [
+      {
+        kind: "facts",
+        rows: [
+          { label: "When", value: when },
+          { label: "Length", value: `${String(minutes)} minutes` },
+          {
+            label: "Where",
+            value:
+              input.meetLink === null ? "Video link to follow" : "Google Meet",
+          },
+        ],
+      },
+      ...(input.meetLink === null
+        ? [
+            {
+              kind: "paragraph",
+              text: "Video link: to follow. Capital Q will email it as soon as it is ready.",
+            } as const,
+          ]
+        : [
+            {
+              kind: "button",
+              label: "Join with Google Meet",
+              href: input.meetLink,
+            } as const,
+            {
+              kind: "link",
+              label: "Or open:",
+              href: input.meetLink,
+              showUrl: true,
+            } as const,
+          ]),
+      {
+        kind: "note",
+        text: "The calendar invite is attached (invite.ics): open it to add the call to your calendar.",
+      },
+      ...(prepare === null
+        ? []
+        : [
+            { kind: "divider" } as const,
+            {
+              kind: "link",
+              label:
+                "Prepare with Q: the prep brief and a rehearsal of this call",
+              href: prepare,
+            } as const,
+          ]),
+    ],
+    reason:
+      "You're receiving this because this call was arranged on Capital Q.",
+    origin: input.appOrigin,
+  });
+  const text = rendered.text;
+  const html = rendered.html;
   const ics = meetingIcs({
     uid: input.meetingId,
     sequence: input.sequence,

@@ -879,6 +879,8 @@ if (appEmail.brevoApi !== undefined) {
 const schedule = composeSchedule({
   sql: database.sql,
   transactions: database.transactions,
+  // DOCS: links in reminder emails go to the web app.
+  appOrigin: googleWorkspace.webOrigin ?? null,
   // The worker acts for nobody: it only delivers and briefs from rows a
   // person's authorised request created. No party check can pass here.
   interests: { relationshipById: () => Promise.resolve(null) },

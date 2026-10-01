@@ -183,6 +183,9 @@ importers:
       '@capital-q/discovery':
         specifier: workspace:*
         version: link:../../packages/discovery
+      '@capital-q/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
@@ -613,6 +616,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/email':
+        specifier: workspace:*
+        version: link:../email
       '@capital-q/network':
         specifier: workspace:*
         version: link:../network
@@ -782,6 +788,15 @@ importers:
       '@capital-q/organisations':
         specifier: workspace:*
         version: link:../organisations
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/email:
+    devDependencies:
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
@@ -988,6 +1003,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/email':
+        specifier: workspace:*
+        version: link:../email
       '@capital-q/network':
         specifier: workspace:*
         version: link:../network
@@ -1535,6 +1553,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/email':
+        specifier: workspace:*
+        version: link:../email
       '@capital-q/model-gateway':
         specifier: workspace:*
         version: link:../model-gateway

@@ -378,11 +378,15 @@ describe("reminders and briefs", () => {
       delivered: 0,
       emailed: 0,
     });
+    // DOCS: on the shared Capital Q layout, with its plain-text twin.
     expect(w.email.sent).toEqual([
       {
         to: "ada@co.example.invalid",
         subject: "Reminder: Follow up with Ben",
-        text: "Follow up with Ben\n\nOpen Capital Q to act on it.",
+        text: expect.stringContaining(
+          "Follow up with Ben\n\nOpen Capital Q to act on it.",
+        ) as unknown,
+        html: expect.stringContaining(">Follow up with Ben</h1>") as unknown,
       },
     ]);
     const notices = await w.service.listNotifications(FOUNDER);

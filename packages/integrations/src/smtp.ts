@@ -1,3 +1,4 @@
+import { renderPlainTextEmail } from "@capital-q/email";
 import { createTransport } from "nodemailer";
 
 /**
@@ -46,52 +47,23 @@ const LINE_BREAK = /[\r\n]/;
 /** Who Capital Q's own emails come from, by name, when none is configured. */
 export const APP_EMAIL_SENDER_NAME = "Capital Q";
 
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-/** A line's web addresses as links; everything else is escaped text. */
-function linked(line: string): string {
-  return line
-    .split(/(https:\/\/[^\s<>"]+)/g)
-    .map((part, index) =>
-      index % 2 === 1
-        ? `<a href="${escapeHtml(part)}" style="color:#1f5eff;text-decoration:underline">${escapeHtml(part)}</a>`
-        : escapeHtml(part),
-    )
-    .join("");
-}
-
 /**
- * Capital Q's branded email (founder direction 2026-09-30): the same
- * words as the plain text, in Capital Q's frame. Inline styles, no
- * remote images or tracking, so nothing in it looks like bulk mail; the
- * plain text is always sent beside it.
+ * The HTML for a message that brought only text (DOCS email packet): the
+ * shared Capital Q layout (packages/email), its paragraphs and https URLs
+ * as links. Every Capital Q template brings its own HTML from the same
+ * layout; this is the fallback so nothing leaves unbranded.
  */
 export function brandedEmailHtml(message: {
   readonly subject: string;
   readonly text: string;
 }): string {
-  const paragraphs = message.text
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter((block) => block.length > 0 && block !== "-- Capital Q")
-    .map(
-      (block) =>
-        `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1b1f24">${block
-          .split("\n")
-          .map(linked)
-          .join("<br>")}</p>`,
-    )
-    .join("");
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(message.subject)}</title></head><body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 12px"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e3e6ea"><tr><td style="padding:24px 28px 8px"><span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:#0b0d10;color:#ffffff;font-weight:700;font-size:15px;line-height:28px;text-align:center">Q</span><span style="font-size:16px;font-weight:600;color:#0b0d10;vertical-align:middle;padding-left:8px">Capital Q</span></td></tr><tr><td style="padding:16px 28px 8px">${paragraphs}</td></tr><tr><td style="padding:8px 28px 24px;border-top:1px solid #eef0f3;font-size:12px;line-height:1.5;color:#6b7280">Capital Q &middot; investment intelligence for founders and investors.<br>You're receiving this because of your Capital Q account.</td></tr></table></td></tr></table></body></html>`;
+  return renderPlainTextEmail({
+    subject: message.subject,
+    text: message.text,
+    origin: null,
+  }).html;
 }
 
-/** The configured sender, named Capital Q when it carries no name. */
 function namedSender(sender: string): {
   readonly email: string;
   readonly name: string;
