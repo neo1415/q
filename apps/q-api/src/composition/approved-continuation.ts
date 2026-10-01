@@ -44,8 +44,20 @@ export function createApprovedContinuation(dependencies: {
     const orchestrator = dependencies.orchestrator();
     if (orchestrator !== undefined) {
       try {
-        await orchestrator.resume({ actor, runId, correlationId });
-        return;
+        const handle = await orchestrator.resume({
+          actor,
+          runId,
+          correlationId,
+        });
+        if (handle.status !== "FAILED") return;
+        // The resume ran and failed (live 2026-10-01, 6b04d028: the run
+        // ended INTERNAL_ERROR and the approved action stayed APPROVED).
+        // The approval stands, so the action goes through the gate on its
+        // own; the gate's claim makes a second execution impossible.
+        logger?.warn(
+          { qRunId: runId, actionId, correlationId },
+          "approved action's run failed on resume; executing through the gate",
+        );
       } catch (error: unknown) {
         if (
           !(error instanceof QRunNotResumableError) &&

@@ -182,6 +182,11 @@ export function createConversationApprovalPort(
       throw new Error("the proposal is not readable as this person");
     }
     const { actions, orchestrator, continueApproved } = late();
+    // Whether the continuation finished within the wait: "applying" is
+    // said only while it may still be running (live 2026-10-01: Q said
+    // "It's being applied now" about an action whose continuation had
+    // already failed, and it stayed APPROVED).
+    let continued: "WAITING" | "DONE" | "FAILED" = "WAITING";
     try {
       const result = await actions.approve({
         actor,
@@ -213,12 +218,16 @@ export function createConversationApprovalPort(
         // The same continuation the card's Approve starts. It runs on its
         // own; this answer waits a bounded time to report what happened.
         const resumed = continuation()
-          .then(() => true)
+          .then(() => {
+            continued = "DONE";
+            return true;
+          })
           .catch((error: unknown) => {
             logger?.error(
               { err: error, qRunId: result.action.runId, correlationId },
               "q run did not resume after an approval by conversation",
             );
+            continued = "FAILED";
             return true;
           });
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -245,9 +254,17 @@ export function createConversationApprovalPort(
       // as it now stands, below.
     }
     const after = await viewOf(actor, proposalId, context.correlationId);
-    return {
-      status: after === null ? "NOT_SAVED" : plainProposalStatus(after),
-    };
+    if (after === null) return { status: "NOT_SAVED" };
+    const status = plainProposalStatus(after);
+    // Approved and nothing left running it: not "being applied".
+    if (
+      status === "SAVING" &&
+      continued !== "WAITING" &&
+      after.action.actionStatus === "APPROVED"
+    ) {
+      return { status: "NOT_SAVED" };
+    }
+    return { status };
   };
 
   /**

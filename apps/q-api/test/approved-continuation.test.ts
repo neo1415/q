@@ -70,6 +70,23 @@ describe("createApprovedContinuation", () => {
     expect(executed).toEqual([]);
   });
 
+  it("executes through the gate when the resume itself fails the run (live 2026-10-01, 6b04d028)", async () => {
+    const { continueApproved, executed, resumed } = world(
+      () => Promise.resolve({ status: "FAILED" }) as Promise<never>,
+    );
+    await continueApproved(input);
+    expect(resumed).toEqual([input.runId]);
+    expect(executed).toEqual([input.actionId]);
+  });
+
+  it("does not execute again when the resumed run completed", async () => {
+    const { continueApproved, executed } = world(
+      () => Promise.resolve({ status: "COMPLETED" }) as Promise<never>,
+    );
+    await continueApproved(input);
+    expect(executed).toEqual([]);
+  });
+
   it.each([
     ["not resumable", () => new QRunNotResumableError("COMPLETED")],
     ["already terminal", () => new QRunAlreadyTerminalError("FAILED")],

@@ -1,3 +1,4 @@
+import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import { Command, isInterrupted } from "@langchain/langgraph";
 
 import { type QRunHandle } from "@capital-q/contracts";
@@ -107,6 +108,23 @@ function requireSameOrganisationContext(
   if (run.actorOrganisationId !== (actor.organisationId ?? null)) {
     throw new QRunNotFoundError();
   }
+}
+
+/**
+ * Runs a graph invocation outside any LangGraph invocation already in
+ * progress (live 2026-10-01, action 6b04d028). A typed "yes, go ahead" is
+ * itself a Q run: its answer approves the waiting change and resumes that
+ * change's run from inside its own graph's node. LangGraph carries the
+ * running invocation's config in async-local storage, and a nested invoke
+ * inherits it, so the resumed run read the yes-run's task context instead
+ * of its own checkpoint: an empty state, a ZodError, the run FAILED and the
+ * approved action never executed. Each run is its own thread, always.
+ */
+function detached<T>(invoke: () => Promise<T>): Promise<T> {
+  return AsyncLocalStorageProviderSingleton.getInstance().run(
+    undefined,
+    invoke,
+  );
 }
 
 export function createLangGraphQOrchestrator(
@@ -371,7 +389,7 @@ export function createLangGraphQOrchestrator(
       };
       return execute(
         ref,
-        () => graph.invoke(initial, config(ref, input.signal)),
+        () => detached(() => graph.invoke(initial, config(ref, input.signal))),
         "start",
       );
     },
@@ -420,18 +438,20 @@ export function createLangGraphQOrchestrator(
       return execute(
         ref,
         () =>
-          graph.invoke(
-            // The actor's organisation context is taken from THIS authorised
-            // request, never from the checkpoint: whatever the engine
-            // remembers, the firewall re-plans on behalf of who is here now.
-            new Command({
-              resume: { kind: "Q_ORCHESTRATION_RESUME" },
-              update: {
-                actorOrganisationId: input.actor.organisationId ?? null,
-                actorMembershipId: input.actor.membershipId ?? null,
-              },
-            }),
-            config(ref, input.signal),
+          detached(() =>
+            graph.invoke(
+              // The actor's organisation context is taken from THIS authorised
+              // request, never from the checkpoint: whatever the engine
+              // remembers, the firewall re-plans on behalf of who is here now.
+              new Command({
+                resume: { kind: "Q_ORCHESTRATION_RESUME" },
+                update: {
+                  actorOrganisationId: input.actor.organisationId ?? null,
+                  actorMembershipId: input.actor.membershipId ?? null,
+                },
+              }),
+              config(ref, input.signal),
+            ),
           ),
         "resume",
       );

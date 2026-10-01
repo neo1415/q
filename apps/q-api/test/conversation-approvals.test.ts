@@ -73,7 +73,13 @@ function viewOf(row: Row): QApprovalView {
   });
 }
 
-function harness(rows: Row[]) {
+function harness(
+  rows: Row[],
+  options: {
+    readonly continueApproved?: () => Promise<void>;
+    readonly applyWithinMs?: number;
+  } = {},
+) {
   const approvals: string[] = [];
   const declines: string[] = [];
   const resumed: string[] = [];
@@ -164,8 +170,19 @@ function harness(rows: Row[]) {
       },
     }),
   };
+  const late = dependencies.late;
+  const continueApproved = options.continueApproved;
   return {
-    port: createConversationApprovalPort(dependencies),
+    port: createConversationApprovalPort({
+      ...dependencies,
+      ...(options.applyWithinMs === undefined
+        ? {}
+        : { applyWithinMs: options.applyWithinMs }),
+      late:
+        continueApproved === undefined
+          ? late
+          : () => ({ ...late(), continueApproved }),
+    }),
     approvals,
     declines,
     resumed,
@@ -248,6 +265,30 @@ describe("createConversationApprovalPort", () => {
     });
     expect(approvals).toEqual([row.proposalId]);
     expect(resumed).toEqual([RUN_EARLIER]);
+  });
+
+  it("never says 'being applied' when the continuation ended and the action still waits (live 2026-10-01, 6b04d028)", async () => {
+    for (const ending of [
+      () => Promise.resolve(),
+      () => Promise.reject(new Error("resume failed")),
+    ]) {
+      const row = pending();
+      const { port } = harness([row], { continueApproved: ending });
+      expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+        status: "NOT_SAVED",
+      });
+    }
+  });
+
+  it("says it is being applied only while the continuation may still be running", async () => {
+    const row = pending();
+    const { port } = harness([row], {
+      continueApproved: () => new Promise<void>(() => undefined),
+      applyWithinMs: 20,
+    });
+    expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+      status: "SAVING",
+    });
   });
 
   it("reports CHANGED and approves nothing when the payload no longer matches", async () => {
