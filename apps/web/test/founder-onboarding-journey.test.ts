@@ -423,7 +423,8 @@ describe("founder journey over the runtime contract", () => {
         const view = await port.current();
         return view === null
           ? null
-          : { ...view, session: { ...view.session, definitionVersion: 3 } };
+          : // 3 is presentable since founder v3 (a superset of v2).
+            { ...view, session: { ...view.session, definitionVersion: 99 } };
       },
     };
     await expect(
