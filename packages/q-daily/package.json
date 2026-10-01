@@ -1,0 +1,37 @@
+{
+  "name": "@capital-q/q-daily",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Q Daily: a personal newspaper of the public news that concerns one founder or investor, gathered on a schedule within hard budgets, every claim cited, Q's take labelled as inference, laid out for email, the reader and a PDF. Owns its preferences, its shared public gatherings and each person's editions; reads a person's own records only to choose topics.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/model-gateway": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-research": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

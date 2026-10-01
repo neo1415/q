@@ -59,6 +59,8 @@ const FORBIDDEN_IMPORTS = [
   "@capital-q/founder-onboarding",
   "@capital-q/investor-onboarding",
   "@capital-q/q-presence",
+  // DAILY: what a person reads in The Q Daily never feeds ranking.
+  "@capital-q/q-daily",
 ];
 
 /**

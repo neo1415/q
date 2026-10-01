@@ -1496,6 +1496,37 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/q-daily:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/model-gateway':
+        specifier: workspace:*
+        version: link:../model-gateway
+      '@capital-q/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@capital-q/q-core':
+        specifier: workspace:*
+        version: link:../q-core
+      '@capital-q/q-research':
+        specifier: workspace:*
+        version: link:../q-research
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   packages/q-embeddings:
     dependencies:
       '@capital-q/config':
