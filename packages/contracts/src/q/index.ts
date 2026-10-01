@@ -254,6 +254,22 @@ export {
   type QUserMessage,
 } from "./message.js";
 
+// PRESENCE block
+export {
+  Q_GESTURE_MAX_SENTENCE_INDEX,
+  Q_GESTURES_MAX,
+  Q_PRESENCE_GESTURES,
+  QPresenceGestureSchema,
+  QSentenceGestureSchema,
+  QSentenceGesturesSchema,
+  QVoicePresenceSchema,
+  type QPresenceGesture,
+  type QSentenceGesture,
+  type QSentenceGestures,
+  type QVoicePresence,
+} from "./presence.js";
+// end PRESENCE block
+
 export {
   Q_CONFIDENCE_LABELS,
   Q_CONFIDENCE_LEVELS,
