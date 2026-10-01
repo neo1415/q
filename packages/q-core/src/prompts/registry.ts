@@ -22,6 +22,7 @@ import { COMPANY_ANALYST_V10 } from "./tasks/company-analyst.v10.js";
 import { COMPANY_ANALYST_V11 } from "./tasks/company-analyst.v11.js";
 import { COMPANY_ANALYST_V12 } from "./tasks/company-analyst.v12.js";
 import { COMPANY_ANALYST_V13 } from "./tasks/company-analyst.v13.js";
+import { COMPANY_ANALYST_V14 } from "./tasks/company-analyst.v14.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -101,6 +102,7 @@ import { INTERVIEW_AGENT_V12 } from "./tasks/interview-agent.v12.js";
 import { INTERVIEW_AGENT_V13 } from "./tasks/interview-agent.v13.js";
 import { INTERVIEW_AGENT_V14 } from "./tasks/interview-agent.v14.js";
 import { INTERVIEW_AGENT_V15 } from "./tasks/interview-agent.v15.js";
+import { INTERVIEW_AGENT_V16 } from "./tasks/interview-agent.v16.js";
 import { INVESTOR_RESEARCH_READER_V1 } from "./tasks/investor-research-reader.v1.js";
 import { DELEGATION_READER_V1 } from "./tasks/delegation-reader.v1.js";
 import { DELEGATION_READER_V2 } from "./tasks/delegation-reader.v2.js";
@@ -259,6 +261,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INTERVIEW_AGENT_V13,
     INTERVIEW_AGENT_V14,
     INTERVIEW_AGENT_V15,
+    INTERVIEW_AGENT_V16,
     DELEGATION_READER_V1,
     DELEGATION_READER_V2,
     DELEGATION_READER_V3,
@@ -282,6 +285,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V11,
     COMPANY_ANALYST_V12,
     COMPANY_ANALYST_V13,
+    COMPANY_ANALYST_V14,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,

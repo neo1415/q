@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ModelSentenceGesturesSchema } from "../../speech/gesture.js";
 import { TaskFrameSchema } from "./common.js";
 
 /**
@@ -171,4 +172,18 @@ export const InterviewAgentV11ResultSchema = InterviewAgentResultSchema.extend({
 }).strict();
 export type InterviewAgentV11Result = z.infer<
   typeof InterviewAgentV11ResultSchema
+>;
+
+/**
+ * v16 result (PRESENCE, founder direction 2026-10-01): v11's, plus what
+ * Q's particles form for which sentence of the reply. Plain strings on the
+ * way in (this call drops nothing, so an odd gesture must not refuse the
+ * reply); code keeps only the contract's closed set (`gesturesForReply`).
+ */
+export const InterviewAgentV16ResultSchema =
+  InterviewAgentV11ResultSchema.extend({
+    gestures: ModelSentenceGesturesSchema,
+  }).strict();
+export type InterviewAgentV16Result = z.infer<
+  typeof InterviewAgentV16ResultSchema
 >;

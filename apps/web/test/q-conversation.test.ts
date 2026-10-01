@@ -301,3 +301,28 @@ describe("C5R1-W03 · a conversation outlives its runs", () => {
     );
   });
 });
+
+describe("PRESENCE: an answer's gestures reach the turn", () => {
+  it("carries the closed-set gestures from the completion event, and none when absent", () => {
+    const state = apply([
+      durable("q.message.completed", {
+        message: {
+          messageId: "msg_q_gestures",
+          runId: RUN,
+          role: "Q",
+          text: "Revenue doubled. Well done.",
+          gestures: [
+            { sentence: 0, gesture: "CHART_UP" },
+            { sentence: 1, gesture: "CLAP" },
+          ],
+          createdAt: "2026-09-12T09:00:01.000Z",
+        },
+      }),
+    ]);
+    const turn = turnsFrom(state, []).find((item) => item.kind === "Q");
+    expect(turn?.kind === "Q" ? turn.gestures : null).toEqual([
+      { sentence: 0, gesture: "CHART_UP" },
+      { sentence: 1, gesture: "CLAP" },
+    ]);
+  });
+});

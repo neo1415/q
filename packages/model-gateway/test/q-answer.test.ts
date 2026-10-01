@@ -177,7 +177,7 @@ function build(options: {
     sleep: () => Promise.resolve(),
     logger,
   });
-  const { repositories, messages } = fakeRepositories(
+  const { repositories, messages, events } = fakeRepositories(
     options.userMessage ?? "What's our current raise target?",
   );
   const seam = createModelGatewayQAnswer({
@@ -213,7 +213,16 @@ function build(options: {
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: planWith(maxSensitivity),
   });
-  return { seam, alpha, beta, messages, logLines, usage, answerRequest };
+  return {
+    seam,
+    alpha,
+    beta,
+    messages,
+    events,
+    logLines,
+    usage,
+    answerRequest,
+  };
 }
 
 const withFacts: QAuthorisedContextPort = {
@@ -238,7 +247,7 @@ describe("Q answer seam over the Prompt Registry", () => {
       return;
     }
     expect(outcome.promptBundleVersion).toBe(
-      "q-system.v1_company-analyst.v13_comm.v1",
+      "q-system.v1_company-analyst.v14_comm.v1",
     );
     expect(outcome.modelPolicyVersion).toBe("normal_dialogue.v1");
     expect(messages.at(-1)?.role).toBe("Q");
@@ -262,6 +271,28 @@ describe("Q answer seam over the Prompt Registry", () => {
     expect(sent?.messages[1]?.content).toContain("Northwind Sensor Systems");
     expect(sent?.output.kind).toBe("STRUCTURED");
     expect(seam.lastObservation()?.promptCharacters).toBeGreaterThan(5_000);
+  });
+
+  it("PRESENCE: carries the model's gestures, clamped to the reply, on the completion event only", async () => {
+    const { seam, events, answerRequest } = build({
+      context: withFacts,
+      providerOutput: {
+        ...analystResult(),
+        gestures: [
+          { sentence: 7, gesture: "MONEY" },
+          { sentence: 0, gesture: "CLAP" },
+        ],
+      },
+    });
+    const outcome = await seam.answer(answerRequest());
+    expect(outcome.kind).toBe("ANSWERED");
+    const completed = events.find(
+      (event) => event.eventType === "q.message.completed",
+    );
+    const message = (completed?.payload as { message?: { gestures?: unknown } })
+      .message;
+    // One sentence in the reply: both land on it, and the first wins.
+    expect(message?.gestures).toEqual([{ sentence: 0, gesture: "MONEY" }]);
   });
 
   it("declares the plan's sensitivity by default, so a confidential plan finds no public-only provider", async () => {

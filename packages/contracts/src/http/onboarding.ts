@@ -4,6 +4,7 @@ import { DecimalStringSchema } from "../common/decimal.js";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { QConductSchema } from "../q/conduct.js";
+import { QSentenceGesturesSchema } from "../q/presence.js";
 
 /**
  * `/v1/onboarding` -- the generic onboarding runtime (CQ-ONB-001).
@@ -884,6 +885,8 @@ export const SayOnboardingResponseSchema = z
     pending: OnboardingTurnPendingSchema,
     /** Q's patience after this turn (founder direction 2026-09-30). */
     conduct: QConductSchema.optional(),
+    /** PRESENCE: what Q's particles form for which sentence of the reply. */
+    gestures: QSentenceGesturesSchema.optional(),
   })
   .strict();
 export type SayOnboardingResponse = z.infer<typeof SayOnboardingResponseSchema>;

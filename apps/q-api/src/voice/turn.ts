@@ -945,6 +945,18 @@ export function createVoiceTurnHandler(
             // The screen follows Q's answer: a navigation or a client
             // action it carries, after Q has said so (useFollowTurn).
             const follow = followOfAnswer(event.data.message.blocks);
+            // PRESENCE: the answer's gestures go to the screen, which plays
+            // them against Q's voice (spec §5). Presentation only.
+            const gestures = event.data.message.gestures ?? [];
+            if (gestures.length > 0) {
+              dependencies.board?.record(binding.voiceSessionId, {
+                ...dependencies.board.read(binding.voiceSessionId),
+                presence: {
+                  answerId: event.data.message.messageId,
+                  gestures,
+                },
+              });
+            }
             if (follow.navigate !== null || follow.clientAction !== null) {
               dependencies.board?.record(binding.voiceSessionId, {
                 ...dependencies.board.read(binding.voiceSessionId),
@@ -1277,6 +1289,16 @@ export function createVoiceTurnHandler(
         navigate: outcome.navigate,
         handoff: outcome.handoff,
         degraded: outcome.degraded,
+        // PRESENCE: this reply's gestures, keyed by a fresh id so the
+        // screen plays them once (spec §5).
+        ...(outcome.gestures === undefined || outcome.gestures.length === 0
+          ? {}
+          : {
+              presence: {
+                answerId: randomUUID(),
+                gestures: [...outcome.gestures],
+              },
+            }),
       });
       if (
         outcome.pronounce !== null &&

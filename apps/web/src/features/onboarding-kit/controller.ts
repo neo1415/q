@@ -1,6 +1,6 @@
 "use client";
 
-import type { QConduct } from "@capital-q/contracts";
+import type { QConduct, QSentenceGesture } from "@capital-q/contracts";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -53,6 +53,8 @@ export type OnboardingTurn = {
   readonly researching: string | null;
   /** Q's patience after the turn (founder direction 2026-09-30). */
   readonly conduct?: QConduct | undefined;
+  /** PRESENCE: what Q's particles form for which sentence. */
+  readonly gestures?: readonly QSentenceGesture[] | undefined;
 };
 
 export type OnboardingState<TView> = {
@@ -388,6 +390,7 @@ export function useOnboardingJourney<
             navigate: outcome.navigate,
             researching: outcome.researching,
             conduct: outcome.conduct,
+            gestures: outcome.gestures,
           };
         } catch {
           return null;
@@ -403,6 +406,7 @@ export function useOnboardingJourney<
           navigate: outcome.navigate,
           researching: outcome.researching,
           conduct: outcome.conduct,
+          gestures: outcome.gestures,
         };
         return outcome.view;
       }, true);

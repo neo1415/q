@@ -6,6 +6,7 @@ import {
   OnboardingTurnPendingSchema,
 } from "../http/onboarding.js";
 import { QConductSchema } from "./conduct.js";
+import { QSentenceGesturesSchema } from "./presence.js";
 
 /**
  * One turn of the Q interview, over HTTP (QX-004 core gate: one Q).
@@ -118,6 +119,8 @@ export const QInterviewTurnResponseSchema = z
      * paused (SUSPEND); the mood colours Q. Absent from older servers.
      */
     conduct: QConductSchema.optional(),
+    /** PRESENCE: what Q's particles form for which sentence of the reply. */
+    gestures: QSentenceGesturesSchema.optional(),
   })
   .strict();
 export type QInterviewTurnResponse = z.infer<

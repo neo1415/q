@@ -40,8 +40,9 @@ import {
   publicSourceBlockFields,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV12Result,
-  CompanyAnalystV12ResultSchema,
+  type CompanyAnalystV14Result,
+  CompanyAnalystV14ResultSchema,
+  gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
   ProfileUpdateSchema,
@@ -155,7 +156,7 @@ export {
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV12Result → Q message + bundle version on the run
+ *   CompanyAnalystV14Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -986,7 +987,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV12Result;
+  readonly result: CompanyAnalystV14Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -1673,9 +1674,9 @@ export function createModelGatewayQAnswer(
         }
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV12Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV14Result> = {
         signal: request.signal,
-        schema: CompanyAnalystV12ResultSchema,
+        schema: CompanyAnalystV14ResultSchema,
         onTextDelta,
         // The analyst's lists are independent readings: one statement with
         // a malformed knowledge key must not throw away the profile change
@@ -1745,6 +1746,11 @@ export function createModelGatewayQAnswer(
          * object would eventually land.
          */
         given?: QResponseMessage["blocks"],
+        /**
+         * PRESENCE: what Q's particles form for which sentence, clamped to
+         * the reply. On the live completion event only; never stored.
+         */
+        gestures?: QResponseMessage["gestures"],
       ) => {
         // Every public page read for this answer travels with it as a
         // structured source (R23, R38): the prose stays answer-first and
@@ -1781,6 +1787,9 @@ export function createModelGatewayQAnswer(
                 message: {
                   ...(toQMessage(stored) as QResponseMessage),
                   ...(blocks === undefined ? {} : { blocks }),
+                  ...(gestures === undefined || gestures.length === 0
+                    ? {}
+                    : { gestures: [...gestures] }),
                 },
               },
             },
@@ -1929,12 +1938,12 @@ export function createModelGatewayQAnswer(
       }
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV12Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV14Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV12Result | undefined;
+        let analyst: CompanyAnalystV14Result | undefined;
 
         if (offered.length > 0) {
           took("prepare");
@@ -1955,10 +1964,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV12Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV14Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV12Result>(
+              result = await gateway.execute<CompanyAnalystV14Result>(
                 {
                   ...base,
                   messages,
@@ -2013,7 +2022,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystV12ResultSchema,
+                CompanyAnalystV14ResultSchema,
                 { invalidListItems: "DROP", lenientFields: ["actionTalk"] },
               );
               /**
@@ -2242,7 +2251,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV12Result>(
+          final = await gateway.execute<CompanyAnalystV14Result>(
             { ...base, messages, output: rendered.output },
             options,
           );
@@ -2494,6 +2503,7 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
                   title: revisedArtifact.title,
                 },
               ],
+          gesturesForReply(reply, analyst.gestures),
         );
         last = {
           result: analyst,

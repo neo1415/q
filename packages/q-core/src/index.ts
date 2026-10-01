@@ -116,6 +116,7 @@ export { INTERVIEW_AGENT_V12 } from "./prompts/tasks/interview-agent.v12.js";
 export { INTERVIEW_AGENT_V13 } from "./prompts/tasks/interview-agent.v13.js";
 export { INTERVIEW_AGENT_V14 } from "./prompts/tasks/interview-agent.v14.js";
 export { INTERVIEW_AGENT_V15 } from "./prompts/tasks/interview-agent.v15.js";
+export { INTERVIEW_AGENT_V16 } from "./prompts/tasks/interview-agent.v16.js";
 export { DELEGATION_READER_V1 } from "./prompts/tasks/delegation-reader.v1.js";
 export { DELEGATION_READER_V2 } from "./prompts/tasks/delegation-reader.v2.js";
 export { DELEGATION_READER_V3 } from "./prompts/tasks/delegation-reader.v3.js";
@@ -147,10 +148,12 @@ export {
   InterviewAgentV7VariablesSchema,
   InterviewAgentV9VariablesSchema,
   InterviewAgentV11ResultSchema,
+  InterviewAgentV16ResultSchema,
   InterviewAgentV11VariablesSchema,
   InterviewAgentVariablesSchema,
   type InterviewAgentResult,
   type InterviewAgentV11Result,
+  type InterviewAgentV16Result,
   type InterviewAgentV11Variables,
   type InterviewAgentV3Variables,
   type InterviewAgentV5Variables,
@@ -447,6 +450,7 @@ export {
   COMPANY_ANALYST_V13,
   COMPANY_ANALYST_V13_FORMAT_SECTION,
 } from "./prompts/tasks/company-analyst.v13.js";
+export { COMPANY_ANALYST_V14 } from "./prompts/tasks/company-analyst.v14.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export { ARTIFACT_REVISION_V2 } from "./prompts/tasks/artifact-revision.v2.js";
 export { ARTIFACT_REVISION_V3 } from "./prompts/tasks/artifact-revision.v3.js";
@@ -512,8 +516,11 @@ export {
   CompanyAnalystV6ResultSchema,
   CompanyAnalystV8ResultSchema,
   CompanyAnalystV12ResultSchema,
+  CompanyAnalystV14ResultSchema,
+  COMPANY_ANALYST_V14_SCHEMA_VERSION,
   ModelComparisonCardsSchema,
   type CompanyAnalystV12Result,
+  type CompanyAnalystV14Result,
   type ModelComparisonCards,
   CompanyAnalystV5VariablesSchema,
   type ArtifactRequest,
@@ -768,3 +775,13 @@ export {
   type DailyStoryWriterVariables,
 } from "./prompts/schemas/daily.js";
 // end DAILY block
+// PRESENCE block
+export {
+  gesturesForReply,
+  ModelSentenceGesturesEnumSchema,
+  ModelSentenceGesturesSchema,
+  PRESENCE_GESTURES_GUIDANCE,
+  sentenceCount,
+  type ModelSentenceGestures,
+} from "./speech/gesture.js";
+// end PRESENCE block

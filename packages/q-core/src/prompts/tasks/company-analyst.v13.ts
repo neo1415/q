@@ -71,7 +71,8 @@ export const COMPANY_ANALYST_V13: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V12,
   version: 13,
-  status: "ACTIVE",
+  // Deprecated by v14 (PRESENCE gestures, 2026-10-01).
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-09-29: userStatements defined (stated facts only, never requests or unclear words); Q knows it makes and revises decks and documents and a revision carries the whole specific change; misheard names resolve to the name on record; answer format restated compactly.",
   effectiveFrom: "2026-09-29",

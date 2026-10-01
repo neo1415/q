@@ -72,12 +72,12 @@ describe("INTERVIEW_AGENT v14", () => {
 });
 
 describe("INTERVIEW_AGENT v15", () => {
-  it("is active, has no draft rule, and keeps the cache-ordered layout", async () => {
+  it("is succeeded only by v16 (same text), has no draft rule, and keeps the cache-ordered layout", async () => {
     const { INTERVIEW_AGENT_V15 } = await import("../src/index.js");
     expect(
       createDefaultPromptRegistry().getActive("INTERVIEW_AGENT").definition
         .version,
-    ).toBe(15);
+    ).toBe(16);
     expect(INTERVIEW_AGENT_V15.template).not.toContain("write_reply");
     expect(INTERVIEW_AGENT_V15.template).not.toContain("On channel text");
     const lines = (t: string) =>

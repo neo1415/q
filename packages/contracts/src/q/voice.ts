@@ -4,6 +4,7 @@ import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { QLocaleSchema } from "./context.js";
 import { QConversationIdSchema } from "./ids.js";
+import { QVoicePresenceSchema } from "./presence.js";
 import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
 import { QSubjectRefsSchema } from "./subject.js";
 import { QClientActionIntentSchema } from "./ui-intent.js";
@@ -347,6 +348,8 @@ export const QVoiceTurnStateSchema = z
      * exists, so the screen can show and reopen it (ADR 0012).
      */
     conversationId: QConversationIdSchema.optional(),
+    /** PRESENCE: the latest spoken answer's gestures, played once per answer. */
+    presence: QVoicePresenceSchema.optional(),
   })
   .strict();
 export type QVoiceTurnState = z.infer<typeof QVoiceTurnStateSchema>;

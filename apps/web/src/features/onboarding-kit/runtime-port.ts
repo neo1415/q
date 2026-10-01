@@ -517,6 +517,7 @@ export function createRuntimeClient<
                 navigate: outcome.navigate,
                 researching: outcome.researching,
                 conduct: outcome.conduct,
+                gestures: outcome.gestures,
               };
             }),
         }),

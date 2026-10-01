@@ -49,6 +49,7 @@ import {
   workingLabel,
   type QTurn,
 } from "./conversation";
+import { announceQGestures } from "@/features/q-swarm/q-gestures";
 import { announceQSaid } from "@/features/q-swarm/q-said";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
@@ -409,6 +410,12 @@ export function QConversationPanel({
     // Voice announces its own lines as they are spoken.
     if (voice.active) return;
     announceQSaid(plainFromMarkdown(latest.text).slice(0, 400));
+    // PRESENCE: the answer's own gestures, one after another as it lands.
+    announceQGestures({
+      answerId: latest.id,
+      gestures: latest.gestures ?? [],
+      spoken: false,
+    });
     // Said as words: the answer's Markdown is structure on screen, never
     // asterisks and pipes read aloud.
     void say(

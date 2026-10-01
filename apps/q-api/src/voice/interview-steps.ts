@@ -2,6 +2,7 @@ import { type ApiSession } from "@capital-q/api-client";
 import {
   type OnboardingResponseValue,
   type OnboardingSessionView,
+  type QSentenceGestures,
 } from "@capital-q/contracts";
 import {
   FOUNDER_DEFINITION_CURRENT,
@@ -216,6 +217,8 @@ export type InterviewTurnOutcome = {
    * Absent on every path where the model did not write the reply.
    */
   readonly delivery?: SpeechDelivery | null | undefined;
+  /** PRESENCE: what Q's particles form for which sentence of the reply. */
+  readonly gestures?: QSentenceGestures | undefined;
 };
 
 export type OnboardingRefusal = {

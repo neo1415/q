@@ -27,7 +27,8 @@ export const INTERVIEW_AGENT_V15: PromptDefinition<
 > = {
   ...INTERVIEW_AGENT_V14,
   version: 15,
-  status: "ACTIVE",
+  // Deprecated by v16 (PRESENCE gestures, 2026-10-01).
+  status: "DEPRECATED",
   changeDescription:
     "Lead decision 2026-10-01: the drafted-reply rule is removed (0 of 19 live turns used it); v13's cache-ordered layout stays.",
   effectiveFrom: "2026-10-01",
