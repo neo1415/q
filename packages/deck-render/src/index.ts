@@ -33,7 +33,7 @@ export {
   type DeckIssue,
 } from "./inspect.js";
 
-export { deckToSvg, slideToSvg } from "./svg.js";
+export { deckToSvg, slideImageBoxes, slideToSvg } from "./svg.js";
 export { deckToPptx } from "./pptx.js";
 export { deckToPdf } from "./pdf.js";
 

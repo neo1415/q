@@ -61,11 +61,43 @@ cover:
   states a figure the grounding does not carry, and the audit pass records
   every figure on a slide that the record does not hold.
 
+## Addendum (2026-10-01): generated images
+
+Founder-approved. Generated illustrations are a Model Gateway task class,
+IMAGE_GENERATION (`packages/model-gateway/src/images`), with OpenAI
+(`gpt-image-1`, medium quality) and Gemini (`gemini-2.5-flash-image`)
+adapters behind the same adapter pattern as text, a fake for tests, and
+every attempt recorded in `ai_ops.model_usage` with an estimated cost.
+
+- **Off unless enabled** (`CQ_DOCUMENT_IMAGES=enabled`) and only with the
+  server's storage key (`SUPABASE_SECRET_KEY` on q-api). Budgets counted
+  from the provenance table before every call: per document (one Q run,
+  default 2), per organisation per UTC day (default 6), across Capital Q
+  per UTC day (default 40). A spent budget is "no picture", never a failed
+  document.
+- **Prompts are built by code** from the deck's own words only: the slide
+  title, the cover's one-line description and the brand accent. No
+  figures, no names, never the team slide. The gateway appends standing
+  exclusions the caller cannot drop: no text, no logos or brand marks of
+  any company, no real or identifiable people or likeness of a real
+  person.
+- **Used where a picture is wanted and the stock library had none**
+  (after Pexels in the pipeline, at most two per deck), or when the person
+  asks (`illustrate_my_document`, a new version).
+- **Provenance**: `artifacts.document_images` (append-only, server-only;
+  provenance always AI_GENERATED, provider, model, the exact prompt, cost);
+  the deck names the image as `cq-image:<id>` with provenance AI_GENERATED
+  and the credit "AI-generated image · Capital Q", shown on the picture in
+  the viewer.
+- **Delivery**: bytes in the private `cq-document-images` bucket. The
+  viewer draws pictures over the slide from a 10-minute signed storage URL
+  (browser to storage directly, never through Next.js); PDF and PPTX
+  exports read the bytes server-side as the actor. A signed URL or bytes
+  are only ever produced for the image's own organisation.
+
 ## Consequences
 
 Decks look like the company's own, after one confirmation, and look
 sector-appropriate before it. Every rendered figure stays traceable, and the
 audit is stored on each version so Q can be proactive about gaps without
-filling them. Generated illustrations (image models) are not part of this
-decision: they need a Model Gateway image task class, storage and signed
-delivery, and are a later packet.
+filling them. Generated illustrations are covered by the addendum above.

@@ -705,6 +705,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Redraws one of their documents in their confirmed brand as a new version; the earlier version is kept.",
     { acts: true },
   ),
+  tool(
+    "illustrate_my_document",
+    "DOCUMENT",
+    "Adds AI-generated illustrations (labelled as such; never people, logos or text) to one of their decks as a new version, within a daily allowance; the earlier version is kept.",
+    { acts: true },
+  ),
   // --- end DOCS block -------------------------------------------------------
   // --- R34 relationship chat (CHAT worker block; keep together) ---------
   tool(

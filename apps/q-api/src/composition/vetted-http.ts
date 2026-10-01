@@ -83,7 +83,7 @@ export const systemResolver: Resolver = (hostname) =>
         return;
       }
       resolve(
-        (addresses).map((entry) => ({
+        addresses.map((entry) => ({
           address: entry.address,
           family: entry.family === 6 ? 6 : 4,
         })),

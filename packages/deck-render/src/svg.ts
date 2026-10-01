@@ -120,3 +120,42 @@ export function slideToSvg(slide: LaidOutSlide, deck: LaidOutDeck): string {
 export function deckToSvg(deck: LaidOutDeck): readonly string[] {
   return deck.slides.map((slide) => slideToSvg(slide, deck));
 }
+
+/**
+ * DOCS: every picture on a laid-out deck, in slide units, for a viewer to
+ * draw over the slide. A slide shown as an SVG image cannot load pictures
+ * of its own, so the viewer places them itself: a stock photo straight
+ * from the library's CDN, a generated image by a short-lived signed URL
+ * straight from storage.
+ */
+export function slideImageBoxes(deck: LaidOutDeck): readonly {
+  readonly slide: number;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly url: string;
+  readonly alt: string;
+  readonly credit: string;
+  readonly fit: "cover" | "contain";
+}[] {
+  return deck.slides.flatMap((slide) =>
+    slide.boxes.flatMap((box) =>
+      box.kind === "IMAGE" && !box.url.startsWith("data:")
+        ? [
+            {
+              slide: slide.index,
+              x: box.x,
+              y: box.y,
+              width: box.width,
+              height: box.height,
+              url: box.url,
+              alt: box.alt,
+              credit: box.credit,
+              fit: box.fit ?? "cover",
+            },
+          ]
+        : [],
+    ),
+  );
+}

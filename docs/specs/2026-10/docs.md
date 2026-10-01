@@ -328,6 +328,13 @@ next poll. Same document announced twice → one toast per (id, version).
   drawn as bars.
 - The PDF embeds Noto Sans whatever the pairing (full Unicode); PPTX and the
   viewer name the pairing's faces.
-- Generated illustrations are not built (no image route in the Model
-  Gateway; storage, signed delivery and founder credits). Pexels photos are.
+- Generated illustrations: built after founder approval (ADR 0031
+  addendum): IMAGE_GENERATION through the gateway (OpenAI, Gemini, fake),
+  budgets, private bucket with signed delivery, provenance table
+  (migration 20261113010000), pipeline step after Pexels, and the
+  `illustrate_my_document` tool. Off until `CQ_DOCUMENT_IMAGES=enabled`
+  and `SUPABASE_SECRET_KEY` are set on q-api.
+- Website reads go through a vetted client (own DNS resolution, every
+  address public incl. IPv6 forms, socket pinned to the vetted address,
+  each redirect re-vetted).
 - ADR 0031 records the brand-kit, design-choice and website-read decisions.

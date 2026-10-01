@@ -195,3 +195,11 @@ export {
   type DocumentStudioInput,
   type StudioBrand,
 } from "./company/document-studio.js";
+
+// DOCS block: generated illustrations.
+export {
+  illustrateWithGenerated,
+  illustrationPrompt,
+  ILLUSTRATIONS_PER_DECK,
+  type IllustrationPort,
+} from "./company/deck-illustrations.js";

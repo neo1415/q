@@ -193,14 +193,32 @@ export const Q_DECK_SLIDES_MAX = 24;
  * one known place and nowhere a model named. Credit travels with it.
  */
 export const Q_SLIDE_IMAGE_HOST = "images.pexels.com" as const;
+
+/**
+ * DOCS: an AI-generated image Capital Q made for this organisation's
+ * document, named by its provenance row (artifacts.document_images), never
+ * by a storage URL: the bytes are in a private bucket and are delivered by
+ * a short-lived signed URL or read server-side for a file.
+ */
+export const Q_GENERATED_IMAGE_SCHEME = "cq-image:" as const;
+const GENERATED_IMAGE =
+  /^cq-image:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The provenance row id of a generated image's URL, or null. */
+export function generatedImageId(url: string): string | null {
+  return GENERATED_IMAGE.test(url)
+    ? url.slice(Q_GENERATED_IMAGE_SCHEME.length)
+    : null;
+}
+
 export const QSlideImageSchema = z
   .object({
     url: z
       .string()
-      .url()
       .max(600)
       .refine(
         (value) => {
+          if (generatedImageId(value) !== null) return true;
           try {
             const url = new URL(value);
             return url.protocol === "https:" && url.host === Q_SLIDE_IMAGE_HOST;
@@ -208,12 +226,24 @@ export const QSlideImageSchema = z
             return false;
           }
         },
-        { message: "expected a stock photo URL" },
+        { message: "expected a stock photo URL or a generated image" },
       ),
     alt: z.string().trim().min(1).max(200),
     credit: z.string().trim().min(1).max(120),
+    /**
+     * DOCS: where the picture came from. Absent is a stock photograph
+     * (the only kind before generated images); AI_GENERATED is always
+     * said in the credit as well, so a reader of the file sees it.
+     */
+    provenance: z.enum(["STOCK", "AI_GENERATED"]).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (image) =>
+      (generatedImageId(image.url) !== null) ===
+      (image.provenance === "AI_GENERATED"),
+    { message: "a generated image says so, and only a generated image does" },
+  );
 export type QSlideImage = z.infer<typeof QSlideImageSchema>;
 
 /** One slide. Its grounding lives in the matching section; this is its shape. */

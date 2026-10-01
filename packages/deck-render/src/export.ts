@@ -4,7 +4,7 @@ import type {
 } from "@capital-q/contracts";
 
 import { documentFromArtifact, documentToPdf } from "./document.js";
-import { fetchSlideImages } from "./images.js";
+import { fetchSlideImages, type GeneratedImageReader } from "./images.js";
 import { layOutDeck } from "./layout.js";
 import { deckToPdf } from "./pdf.js";
 import { deckToPptx } from "./pptx.js";
@@ -51,13 +51,15 @@ export async function renderArtifactFile(input: {
   readonly format: QArtifactExportFormat;
   readonly brand?: BrandInput | undefined;
   readonly company?: string | undefined;
+  /** DOCS: reads a generated image's bytes for this actor. */
+  readonly readGenerated?: GeneratedImageReader | undefined;
 }): Promise<ArtifactFile | null> {
   const { version, format } = input;
   const meta = { title: version.title, company: input.company };
   const deck = version.content.deck;
   if (deck !== undefined) {
     const laid = layOutDeck(deck, input.brand);
-    const images = await fetchSlideImages(laid);
+    const images = await fetchSlideImages(laid, fetch, input.readGenerated);
     const bytes =
       format === "pptx"
         ? await deckToPptx(laid, meta, images)

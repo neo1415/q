@@ -28,6 +28,18 @@
     "./providers/openai": {
       "types": "./dist/providers/openai.d.ts",
       "default": "./dist/providers/openai.js"
+    },
+    "./images": {
+      "types": "./dist/images/index.d.ts",
+      "default": "./dist/images/index.js"
+    },
+    "./images/openai": {
+      "types": "./dist/images/openai.d.ts",
+      "default": "./dist/images/openai.js"
+    },
+    "./images/google": {
+      "types": "./dist/images/google.d.ts",
+      "default": "./dist/images/google.js"
     }
   },
   "main": "./dist/index.js",

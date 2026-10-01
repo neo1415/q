@@ -485,6 +485,7 @@ export {
   AUDIT_MY_DOCUMENT,
   createDocumentStudioTools,
   GET_BRAND_KIT,
+  ILLUSTRATE_MY_DOCUMENT,
   SUGGEST_BRAND_KIT,
   type DocumentStudioPort,
 } from "./tools/documents.js";

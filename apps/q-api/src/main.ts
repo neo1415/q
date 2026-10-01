@@ -62,6 +62,16 @@ import {
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
 import {
+  createDocumentImages,
+  createSupabaseDocumentImageStore,
+} from "./composition/document-images.js";
+import {
+  createImageGateway,
+  type ImageProvider,
+} from "@capital-q/model-gateway/images";
+import { createGoogleImageProvider } from "@capital-q/model-gateway/images/google";
+import { createOpenAIImageProvider } from "@capital-q/model-gateway/images/openai";
+import {
   createDocumentStudioPort,
   createDocumentsModule,
   ownCompanyOf,
@@ -1356,6 +1366,7 @@ const qTools = createQTools({
       audit: (actor, artifactId) =>
         documentStudioPort().audit(actor, artifactId),
       applyBrand: (input) => documentStudioPort().applyBrand(input),
+      illustrate: (input) => documentStudioPort().illustrate(input),
     },
     // R33: Save / Unsave / Pass, recorded by the interaction service the
     // Discover buttons call, with the feed's own eligibility re-run.
@@ -1753,6 +1764,40 @@ const memoryLearner = createMemoryLearner({
   people: { displayNameFor },
   logger,
 });
+// DOCS block: generated images for documents (ADR 0031 addendum). Off
+// unless CQ_DOCUMENT_IMAGES=enabled: every picture spends the founder's
+// provider credit, so budgets cap it per document, per organisation per
+// day and across Capital Q per day. The image bucket is private and needs
+// the server's storage key; without it no picture is made.
+const imageProviders: ImageProvider[] = [];
+if (providerSecrets.openai !== undefined) {
+  imageProviders.push(
+    createOpenAIImageProvider({ apiKey: providerSecrets.openai.reveal() }),
+  );
+}
+if (providerSecrets.google !== undefined) {
+  imageProviders.push(
+    createGoogleImageProvider({ apiKey: providerSecrets.google.reveal() }),
+  );
+}
+const documentImages = createDocumentImages({
+  sql: database.sql,
+  gateway: createImageGateway({
+    enabled: config.documentImages.enabled,
+    providers: imageProviders,
+    usage: createPostgresModelUsageRepository({ sql: database.sql }),
+  }),
+  store:
+    config.secrets.supabaseSecretKey === undefined ||
+    config.supabaseAuth === undefined
+      ? undefined
+      : createSupabaseDocumentImageStore({
+          supabaseUrl: config.supabaseAuth.url,
+          secretKey: config.secrets.supabaseSecretKey,
+        }),
+  budgets: config.documentImages,
+  logger,
+});
 // DOCS block: the document studio (brand kit, answer exports).
 // The Q tools port is built lazily: the tools are composed before the
 // artifact service exists further down.
@@ -1767,6 +1812,7 @@ const documentStudioPort = (): DocumentStudioPort => {
 const documentStudio = createDocumentsModule({
   sql: database.sql,
   transactions: database.transactions,
+  images: documentImages,
   runMessages: async (actor, runId) =>
     (
       await qRuntime.getRun({
@@ -1804,6 +1850,12 @@ const qArtifacts = createQArtifacts({
           };
     },
     ownCompanyOf: (actor) => ownCompanyOf(database.sql, actor),
+    illustrationsFor: (request) =>
+      documentImages.illustrationsFor({
+        actor: request.actor,
+        runId: request.runId,
+        correlationId: request.correlationId,
+      }),
   },
 });
 // Q's standing with each person (founder direction 2026-09-30): their chosen

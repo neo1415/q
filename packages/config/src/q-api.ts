@@ -32,6 +32,7 @@ import {
 } from "./speech-providers.js";
 import {
   supabaseAuthEnvShape,
+  supabaseSecretKeySchema,
   toSupabaseAuthConfig,
   type SupabaseAuthConfig,
 } from "./supabase-auth.js";
@@ -79,6 +80,24 @@ const qApiEnvSchema = z.object({
   // the registry offers the authenticated person. Off unless a deployment
   // says otherwise; nothing about Q's own behaviour depends on it.
   Q_MCP_SERVER: z.enum(["enabled", "disabled"]).optional(),
+  // DOCS block: generated images for documents. Off unless a deployment
+  // turns them on (they spend provider credit); the secret key is the
+  // storage authority for the private image bucket, server-only.
+  SUPABASE_SECRET_KEY: supabaseSecretKeySchema.optional(),
+  CQ_DOCUMENT_IMAGES: z.enum(["enabled", "disabled"]).optional(),
+  CQ_DOCUMENT_IMAGES_PER_DOCUMENT: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(6)
+    .optional(),
+  CQ_DOCUMENT_IMAGES_PER_DAY: z.coerce.number().int().min(0).max(50).optional(),
+  CQ_DOCUMENT_IMAGES_PLATFORM_PER_DAY: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(500)
+    .optional(),
 });
 
 /**
@@ -88,6 +107,8 @@ const qApiEnvSchema = z.object({
  * configuration surface.
  */
 export type QApiSecrets = {
+  /** DOCS: storage authority for the private document-image bucket. */
+  readonly supabaseSecretKey: string | undefined;
   /** Server-only. Never serialised, logged, or handed to a client or a prompt. */
   readonly modelProviders: ModelProviderSecrets;
   /** Server-only. Read once by the research adapter at composition. */
@@ -115,6 +136,17 @@ export type QApiVoiceConfig = {
 
 export type QApiPublicConfig = Readonly<Record<string, never>>;
 
+/** DOCS: generated images for documents, and their budgets. */
+export type QApiDocumentImagesConfig = {
+  readonly enabled: boolean;
+  /** Per composed or illustrated document (one Q run). */
+  readonly perDocument: number;
+  /** Per organisation per UTC day. */
+  readonly perOrganisationPerDay: number;
+  /** Across Capital Q per UTC day: the founder's credit ceiling. */
+  readonly platformPerDay: number;
+};
+
 export type QApiConnectorsConfig = {
   /** Whether the MCP server façade is mounted. */
   readonly mcpServer: boolean;
@@ -129,6 +161,7 @@ export type QApiConfig = {
   readonly public: QApiPublicConfig;
   readonly voice: QApiVoiceConfig;
   readonly connectors: QApiConnectorsConfig;
+  readonly documentImages: QApiDocumentImagesConfig;
   readonly secrets: QApiSecrets;
 };
 
@@ -163,7 +196,14 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
       publicUrl: parsed.Q_API_PUBLIC_URL?.replace(/\/$/, ""),
     },
     connectors: { mcpServer: parsed.Q_MCP_SERVER === "enabled" },
+    documentImages: {
+      enabled: parsed.CQ_DOCUMENT_IMAGES === "enabled",
+      perDocument: parsed.CQ_DOCUMENT_IMAGES_PER_DOCUMENT ?? 2,
+      perOrganisationPerDay: parsed.CQ_DOCUMENT_IMAGES_PER_DAY ?? 6,
+      platformPerDay: parsed.CQ_DOCUMENT_IMAGES_PLATFORM_PER_DAY ?? 40,
+    },
     secrets: {
+      supabaseSecretKey: parsed.SUPABASE_SECRET_KEY,
       modelProviders: toModelProviderSecrets(parsed),
       researchProviders: toResearchProviderSecrets(parsed),
       speechProviders: toSpeechProviderSecrets(parsed),

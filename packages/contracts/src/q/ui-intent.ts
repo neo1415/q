@@ -399,6 +399,7 @@ export const Q_INSTANT_ACTION_TOOLS = [
   // private document; the earlier one is kept.
   "suggest_brand_kit",
   "apply_my_brand",
+  "illustrate_my_document",
 ] as const;
 
 /**

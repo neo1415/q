@@ -36,6 +36,7 @@ export const GET_BRAND_KIT = "documents.brand.get" as const;
 export const SUGGEST_BRAND_KIT = "documents.brand.suggest" as const;
 export const AUDIT_MY_DOCUMENT = "documents.own.audit" as const;
 export const APPLY_MY_BRAND = "documents.own.brand" as const;
+export const ILLUSTRATE_MY_DOCUMENT = "documents.own.illustrate" as const;
 
 export type DocumentStudioPort = {
   readonly brandState: (actor: ActorContext) => Promise<QBrandKitState>;
@@ -72,6 +73,27 @@ export type DocumentStudioPort = {
         readonly currentVersion: number;
       }
     | { readonly status: "NOT_FOUND" | "NO_BRAND" | "NOT_REVISABLE" | "FAILED" }
+  >;
+  /** Generated pictures on a deck's slides, as a new version. */
+  readonly illustrate: (input: {
+    readonly actor: ActorContext;
+    readonly plan: PermittedContextPlan;
+    readonly runId: string;
+    readonly artifactId: string;
+    readonly slides: readonly number[] | undefined;
+  }) => Promise<
+    | {
+        readonly status: "APPLIED";
+        readonly artifactId: string;
+        readonly type: string;
+        readonly artifactStatus: string;
+        readonly title: string;
+        readonly currentVersion: number;
+      }
+    | {
+        readonly status:
+          "NOT_FOUND" | "NOT_A_DECK" | "IMAGES_OFF" | "NO_PICTURE" | "FAILED";
+      }
   >;
 };
 
@@ -306,6 +328,84 @@ function createApplyMyBrandTool(port: DocumentStudioPort): AnyQToolDefinition {
   });
 }
 
+// --- illustrate_my_document -------------------------------------------------
+
+export const IllustrateMyDocumentInputSchema = z
+  .object({
+    artifactId: QArtifactIdSchema.describe(
+      "The deck to illustrate: its id from this conversation's card or list_my_documents.",
+    ),
+    slides: z
+      .array(z.number().int().min(1).max(24))
+      .min(1)
+      .max(2)
+      .optional()
+      .describe(
+        "Which slides (1-based) they asked for pictures on; omit to let Capital Q pick the cover and a slide without a photo.",
+      ),
+  })
+  .strict();
+export const IllustrateMyDocumentOutputSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("DOCUMENT_UPDATED"),
+      document: BrandedDocumentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.enum([
+        "NOT_FOUND",
+        "NOT_A_DECK",
+        "IMAGES_OFF",
+        "NO_PICTURE",
+        "FAILED",
+      ]),
+    })
+    .strict(),
+]);
+
+function createIllustrateMyDocumentTool(
+  port: DocumentStudioPort,
+): AnyQToolDefinition {
+  return defineQTool<
+    z.infer<typeof IllustrateMyDocumentInputSchema>,
+    z.infer<typeof IllustrateMyDocumentOutputSchema>,
+    null
+  >({
+    ...OWN,
+    id: ILLUSTRATE_MY_DOCUMENT,
+    providerName: "illustrate_my_document",
+    description:
+      "Adds AI-generated illustrations to one of their decks (at most two pictures, labelled AI-generated; never people, logos or text) as a new version; the earlier version is kept. Call it when they ask for pictures, images or illustrations in a deck. IMAGES_OFF: image generation is not available here. NO_PICTURE: today's picture allowance is used up or the picture could not be made; say so plainly. NOT_A_DECK: it is a document without slides.",
+    classification: "SIDE_EFFECT",
+    riskClass: "LOW_RISK_INTERNAL",
+    input: IllustrateMyDocumentInputSchema,
+    output: IllustrateMyDocumentOutputSchema,
+    authorize: authorizeOwn,
+    execute: async (input, context) => {
+      const outcome = await port.illustrate({
+        actor: context.actor,
+        plan: context.plan,
+        runId: context.runId,
+        artifactId: input.artifactId,
+        slides: input.slides,
+      });
+      if (outcome.status !== "APPLIED") return { status: outcome.status };
+      const document = BrandedDocumentSchema.safeParse({
+        artifactId: outcome.artifactId,
+        type: outcome.type,
+        status: outcome.artifactStatus,
+        title: outcome.title.slice(0, 160),
+        currentVersion: outcome.currentVersion,
+      });
+      return document.success
+        ? { status: "DOCUMENT_UPDATED", document: document.data }
+        : { status: "FAILED" };
+    },
+  });
+}
+
 export function createDocumentStudioTools(ports: {
   readonly documentStudio?: DocumentStudioPort | undefined;
 }): readonly AnyQToolDefinition[] {
@@ -316,5 +416,6 @@ export function createDocumentStudioTools(ports: {
     createSuggestBrandKitTool(port),
     createAuditMyDocumentTool(port),
     createApplyMyBrandTool(port),
+    createIllustrateMyDocumentTool(port),
   ];
 }

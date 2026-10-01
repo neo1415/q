@@ -4,6 +4,7 @@ import {
   ListQArtifactsQuerySchema,
   ListQArtifactsResponseSchema,
   parseContract,
+  generatedImageId,
   Q_ARTIFACT_EXPORT_SUFFIX,
   Q_ARTIFACT_VERSIONS_SUFFIX,
   Q_ARTIFACTS_PATH,
@@ -18,6 +19,7 @@ import {
 import {
   deckToSvg,
   layOutDeck,
+  slideImageBoxes,
   renderArtifactFile,
   type ArtifactFile,
   type BrandInput,
@@ -72,6 +74,22 @@ export type QArtifactRoutesDependencies = ActorContextDependencies & {
    */
   readonly brandLogo?:
     | ((actor: ActorContext, version: number) => Promise<BrandLogo | null>)
+    | undefined;
+  /**
+   * DOCS: generated images, read as the actor (their own organisation's
+   * only): bytes for a file, a short-lived signed URL for the viewer.
+   */
+  readonly generatedImages?:
+    | {
+        readonly bytesFor: (
+          actor: ActorContext,
+          imageId: string,
+        ) => Promise<Uint8Array | null>;
+        readonly signedUrlFor: (
+          actor: ActorContext,
+          imageId: string,
+        ) => Promise<string | null>;
+      }
     | undefined;
   /** As on the run routes: a person with no organisation yet still has a session. */
   readonly identity?: ApplicationIdentityLookup | undefined;
@@ -309,16 +327,30 @@ export function registerQArtifactRoutes(
       if (deck === undefined) {
         return reply.code(409).send(noSlides());
       }
+      const laid = layOutDeck(deck, await brandFor(request, found.version));
+      // DOCS: pictures the viewer draws over each slide: a stock photo
+      // from its CDN, a generated one by a signed URL straight from
+      // storage (an SVG shown as an image loads nothing of its own).
+      const generated = dependencies.generatedImages;
+      const images = (
+        await Promise.all(
+          slideImageBoxes(laid).map(async (box) => {
+            const imageId = generatedImageId(box.url);
+            if (imageId === null) return box;
+            const signed =
+              generated === undefined
+                ? null
+                : await generated
+                    .signedUrlFor(getActorContext(request), imageId)
+                    .catch(() => null);
+            return signed === null ? null : { ...box, url: signed };
+          }),
+        )
+      ).filter((box) => box !== null);
       return reply
         .code(200)
         .header("cache-control", "no-store")
-        .send({
-          slides: [
-            ...deckToSvg(
-              layOutDeck(deck, await brandFor(request, found.version)),
-            ),
-          ],
-        });
+        .send({ slides: [...deckToSvg(laid)], images });
     },
   );
 
@@ -350,6 +382,15 @@ export function registerQArtifactRoutes(
           version: found.version,
           format,
           brand: await brandFor(request, found.version),
+          ...(dependencies.generatedImages === undefined
+            ? {}
+            : {
+                readGenerated: (imageId: string) =>
+                  dependencies.generatedImages?.bytesFor(
+                    getActorContext(request),
+                    imageId,
+                  ) ?? Promise.resolve(null),
+              }),
         });
       } catch (error) {
         // The stored version is intact and nothing was written: a renderer

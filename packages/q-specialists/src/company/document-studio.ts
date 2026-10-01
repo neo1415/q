@@ -30,12 +30,17 @@ import {
 } from "@capital-q/q-core";
 
 import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
+import {
+  illustrateWithGenerated,
+  type IllustrationPort,
+} from "./deck-illustrations.js";
 
 /**
  * The document studio (DOCS spec §5): the specialist steps a composed deck
  * passes through before it is filed.
  *
- *   compose → design → brand → imagery → charts → words → audit
+ *   compose → design → brand → imagery (stock, then generated) → charts
+ *   → words → audit
  *
  * Every step takes content and returns content. A step that cannot run,
  * or fails, returns what it was given: a deck is never lost to a step.
@@ -465,6 +470,8 @@ export type DocumentStudioInput = {
   readonly directionChosen: boolean;
   readonly brand: StudioBrand | null;
   readonly photos?: StockPhotoPort | undefined;
+  /** Generated pictures where the stock library had none. */
+  readonly illustrations?: IllustrationPort | undefined;
   readonly polisher?: DeckPolisher | undefined;
   readonly sensitivity: ModelSensitivity;
   readonly attribution: Parameters<DeckPolisher["polish"]>[0]["attribution"];
@@ -487,6 +494,11 @@ export async function runDocumentStudio(
     } catch {
       // A deck without photos is a deck.
     }
+  }
+  if (input.illustrations !== undefined && next.deck !== undefined) {
+    next = await illustrateWithGenerated(next, input.illustrations, {
+      signal: input.signal,
+    });
   }
   next = refineCharts(next);
   if (input.polisher !== undefined && next.deck !== undefined) {

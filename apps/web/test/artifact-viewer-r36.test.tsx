@@ -280,3 +280,54 @@ describe("R36 · pulling the phone sheet down", () => {
     expect(shouldSwipeDismiss(-200, 100)).toBe(false);
   });
 });
+
+describe("DOCS · pictures on a slide", () => {
+  it("draws a generated picture over its slide from its signed URL, labelled", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              slides: [SVG(1), SVG(2), SVG(3)],
+              images: [
+                {
+                  slide: 0,
+                  x: 576,
+                  y: 0,
+                  width: 384,
+                  height: 540,
+                  url: "https://project.supabase.co/storage/v1/object/sign/cq-document-images/o/i.png?token=t",
+                  alt: "Cover illustration (AI-generated)",
+                  credit: "AI-generated image · Capital Q",
+                  fit: "cover",
+                },
+                {
+                  slide: 1,
+                  x: 0,
+                  y: 0,
+                  width: 10,
+                  height: 10,
+                  url: "javascript:alert(1)",
+                  alt: "bad",
+                  credit: "",
+                  fit: "cover",
+                },
+              ],
+            }),
+        } as Response),
+      ),
+    );
+    render(<ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} />);
+    const picture = await screen.findByAltText(
+      "Cover illustration (AI-generated)",
+    );
+    expect(picture.getAttribute("src")).toContain("/object/sign/");
+    expect(screen.getByText("AI-generated image · Capital Q")).toBeTruthy();
+    const figure = picture.closest("figure");
+    expect(figure?.style.left).toBe("60%");
+    // A picture that is not https is dropped; the rest are drawn.
+    expect(screen.queryByAltText("bad")).toBeNull();
+  });
+});

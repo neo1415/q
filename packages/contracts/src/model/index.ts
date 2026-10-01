@@ -44,6 +44,8 @@ export const MODEL_TASK_CLASSES = [
   "REALTIME_VOICE",
   "GUARDRAIL",
   "EMBEDDING",
+  // DOCS: illustrations for documents, through the image adapters only.
+  "IMAGE_GENERATION",
 ] as const;
 export const ModelTaskClassSchema = z.enum(MODEL_TASK_CLASSES);
 export type ModelTaskClass = z.infer<typeof ModelTaskClassSchema>;

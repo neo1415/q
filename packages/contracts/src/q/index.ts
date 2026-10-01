@@ -588,6 +588,9 @@ export {
   QDeckColourSchema,
   QSlideImageSchema,
   Q_SLIDE_IMAGE_HOST,
+  // DOCS block: generated images.
+  Q_GENERATED_IMAGE_SCHEME,
+  generatedImageId,
   type QSlideImage,
   QSlideLayoutSchema,
   QSlideSchema,

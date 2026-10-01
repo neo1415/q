@@ -19,6 +19,7 @@ import {
   type DeckPolisher,
   type StudioBrand,
 } from "./document-studio.js";
+import type { IllustrationPort } from "./deck-illustrations.js";
 import { composePitchDeck } from "./pitch-deck.js";
 
 /**
@@ -65,6 +66,10 @@ export type ArtifactPreparation = {
           readonly sectorCodes: readonly string[];
         } | null>;
         readonly polisher?: DeckPolisher | undefined;
+        /** Generated pictures, for this run (budgets are the port's). */
+        readonly illustrationsFor?:
+          | ((request: QAnswerRequest) => IllustrationPort | undefined)
+          | undefined;
       }
     | undefined;
 };
@@ -320,6 +325,7 @@ export async function prepareOrReviseArtifact(input: {
             directionChosen: ask.visualDirection !== null,
             brand,
             photos: artifacts.photos,
+            illustrations: studio?.illustrationsFor?.(request),
             polisher: studio?.polisher,
             sensitivity: request.plan.maxSensitivity,
             attribution: {

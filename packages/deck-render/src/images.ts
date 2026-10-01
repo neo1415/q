@@ -1,4 +1,4 @@
-import { Q_SLIDE_IMAGE_HOST } from "@capital-q/contracts";
+import { generatedImageId, Q_SLIDE_IMAGE_HOST } from "@capital-q/contracts";
 
 import type { LaidOutDeck } from "./layout.js";
 
@@ -13,14 +13,30 @@ export type SlideImages = ReadonlyMap<string, Uint8Array>;
 
 const MAX_BYTES = 4 * 1024 * 1024;
 
+/**
+ * DOCS: the bytes of a generated image, read server-side from the private
+ * bucket by its provenance id, already authorised for the actor. Null:
+ * drawn without it.
+ */
+export type GeneratedImageReader = (
+  imageId: string,
+) => Promise<Uint8Array | null>;
+
 export async function fetchSlideImages(
   deck: LaidOutDeck,
   doFetch: typeof fetch = fetch,
+  readGenerated?: GeneratedImageReader,
 ): Promise<SlideImages> {
   const urls = new Set<string>();
+  const generated = new Map<string, string>();
   for (const slide of deck.slides) {
     for (const box of slide.boxes) {
       if (box.kind !== "IMAGE") continue;
+      const imageId = generatedImageId(box.url);
+      if (imageId !== null) {
+        generated.set(box.url, imageId);
+        continue;
+      }
       try {
         const url = new URL(box.url);
         if (url.protocol === "https:" && url.host === Q_SLIDE_IMAGE_HOST) {
@@ -32,6 +48,24 @@ export async function fetchSlideImages(
     }
   }
   const found = new Map<string, Uint8Array>();
+  await Promise.all(
+    [...generated].map(async ([url, imageId]) => {
+      if (readGenerated === undefined) return;
+      try {
+        const bytes = await readGenerated(imageId);
+        if (
+          bytes !== null &&
+          bytes.byteLength > 0 &&
+          bytes.byteLength <= MAX_BYTES &&
+          imageKind(bytes) !== null
+        ) {
+          found.set(url, bytes);
+        }
+      } catch {
+        // Unreadable: the slide keeps its words.
+      }
+    }),
+  );
   await Promise.all(
     [...urls].map(async (url) => {
       try {

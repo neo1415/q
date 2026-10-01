@@ -28,6 +28,7 @@ import { createApp, type QApiSecurityDependencies } from "../src/app.js";
 import { suggestBrandFromWebsite } from "../src/composition/brand-from-website.js";
 import { createDocumentStudioPort } from "../src/composition/documents.js";
 import { createVettedHttp } from "../src/composition/vetted-http.js";
+import type { DocumentImages } from "../src/composition/document-images.js";
 
 /**
  * DOCS: the brand kit routes, filing one answer as a PDF, and a deck's
@@ -53,6 +54,7 @@ const ARTIFACT = QArtifactIdSchema.parse(
   "11111111-0000-4000-8000-000000000001",
 );
 const RUN = QRunIdSchema.parse("22222222-0000-4000-8000-000000000001");
+const IMAGE = "44444444-0000-4000-8000-000000000001";
 const NOW = "2026-10-01T10:00:00.000Z";
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
@@ -100,6 +102,19 @@ function deckDetail(): QArtifactDetail {
               bullets: [],
               bulletsRight: [],
               section: 0,
+            },
+            {
+              layout: "BULLETS",
+              title: "Product",
+              bullets: ["A booking app for spare truck space."],
+              bulletsRight: [],
+              section: 0,
+              image: {
+                url: `cq-image:${IMAGE}`,
+                alt: "Illustration for Product (AI-generated)",
+                credit: "AI-generated image · Capital Q",
+                provenance: "AI_GENERATED",
+              },
             },
           ],
         },
@@ -166,6 +181,16 @@ function build(options: { readonly messages?: readonly QMessage[] } = {}) {
     artifacts,
     documentStudio: {
       brandKit,
+      images: {
+        bytesFor: (actor, imageId) => {
+          calls.push({ name: "imageBytes", input: { actor, imageId } });
+          return Promise.resolve(new Uint8Array(PNG));
+        },
+        signedUrlFor: (_actor, imageId) =>
+          Promise.resolve(
+            `https://project.supabase.co/storage/v1/object/sign/cq-document-images/o/${imageId}.png?token=t`,
+          ),
+      },
       suggestFromWebsite: () => Promise.resolve({ status: "NO_WEBSITE" }),
       runMessages: (actor, runId) => {
         calls.push({ name: "runMessages", input: { actor, runId } });
@@ -260,6 +285,45 @@ describe("brand kit routes", () => {
       actor: CONTEXT,
       version: 3,
     });
+    await app.close();
+  });
+});
+
+describe("generated images in a deck", () => {
+  it("the viewer gets a signed storage URL to draw over the slide, never bytes through the app", async () => {
+    const { app } = build();
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/q/artifacts/${ARTIFACT}/slides`,
+    });
+    const body: {
+      images: { slide: number; url: string; credit: string }[];
+    } = response.json();
+    expect(body.images).toEqual([
+      expect.objectContaining({
+        slide: 1,
+        url: expect.stringContaining(
+          "/storage/v1/object/sign/cq-document-images/",
+        ) as unknown,
+        credit: "AI-generated image · Capital Q",
+      }),
+    ]);
+    expect(JSON.stringify(body)).not.toContain(`cq-image:${IMAGE}"`);
+    await app.close();
+  });
+
+  it("a PDF or PowerPoint embeds the generated image, read as the actor", async () => {
+    const { app, calls } = build();
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/q/artifacts/${ARTIFACT}/export/pptx`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(calls.find((call) => call.name === "imageBytes")?.input).toEqual({
+      actor: CONTEXT,
+      imageId: IMAGE,
+    });
+    expect(response.rawPayload.toString("latin1")).toContain("ppt/media/");
     await app.close();
   });
 });
@@ -412,7 +476,7 @@ describe("reading a brand from the company's own website", () => {
 
 describe("the document studio's Q tools port", () => {
   const plan = {} as never;
-  const studioWith = (effective: boolean) => {
+  const studioWith = (effective: boolean, images?: DocumentImages) => {
     const revised: unknown[] = [];
     const artifacts = {
       read: () => Promise.resolve(deckDetail()),
@@ -442,10 +506,68 @@ describe("the document studio's Q tools port", () => {
         } as unknown as BrandKitService,
         suggestFromWebsite: () => Promise.resolve({ status: "NO_WEBSITE" }),
         runMessages: () => Promise.resolve([]),
+        images,
       },
     });
     return { port, revised };
   };
+
+  it("illustrates a deck as a new version, cover only when asked for it", async () => {
+    const asked: string[] = [];
+    const images: DocumentImages = {
+      enabled: true,
+      illustrationsFor: () => ({
+        illustrate: (input) => {
+          asked.push(input.purpose);
+          return Promise.resolve({
+            url: "cq-image:55555555-0000-4000-8000-000000000001",
+            alt: input.alt,
+            credit: "AI-generated image · Capital Q",
+            provenance: "AI_GENERATED" as const,
+          });
+        },
+      }),
+      bytesFor: () => Promise.resolve(null),
+      signedUrlFor: () => Promise.resolve(null),
+    };
+    const { port, revised } = studioWith(false, images);
+    const outcome = await port.illustrate({
+      actor: CONTEXT,
+      plan,
+      runId: RUN,
+      artifactId: ARTIFACT,
+      slides: [1],
+    });
+    expect(outcome).toMatchObject({ status: "APPLIED", currentVersion: 2 });
+    expect(asked).toEqual(["COVER"]);
+    expect(revised[0]).toMatchObject({
+      instruction: "Add illustrations",
+      content: {
+        content: {
+          deck: {
+            slides: [
+              { image: { provenance: "AI_GENERATED" } },
+              expect.anything() as unknown,
+            ],
+          },
+        },
+      },
+    });
+  });
+
+  it("says images are off, and writes nothing", async () => {
+    const { port, revised } = studioWith(false);
+    expect(
+      await port.illustrate({
+        actor: CONTEXT,
+        plan,
+        runId: RUN,
+        artifactId: ARTIFACT,
+        slides: undefined,
+      }),
+    ).toEqual({ status: "IMAGES_OFF" });
+    expect(revised).toEqual([]);
+  });
 
   it("applies the confirmed brand as a new version, re-audited", async () => {
     const { port, revised } = studioWith(true);

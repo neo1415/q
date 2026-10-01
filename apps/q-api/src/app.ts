@@ -19,7 +19,10 @@ import {
 
 import { registerProblemHandling } from "./http/problem-handler.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
-import { registerQArtifactRoutes } from "./http/q-artifacts.js";
+import {
+  registerQArtifactRoutes,
+  type QArtifactRoutesDependencies,
+} from "./http/q-artifacts.js";
 import {
   registerQDocumentRoutes,
   type QDocumentRoutesDependencies,
@@ -135,10 +138,12 @@ export type QApiModules = {
   readonly artifacts?: ArtifactService | undefined;
   // DOCS block: brand kit and answer exports (the document studio).
   readonly documentStudio?:
-    | Omit<
+    | (Omit<
         QDocumentRoutesDependencies,
         "authenticator" | "resolver" | "identity" | "artifacts"
-      >
+      > & {
+        readonly images?: QArtifactRoutesDependencies["generatedImages"];
+      })
     | undefined;
   /** The orchestration boundary; absent means runs are only persisted. */
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
@@ -319,6 +324,9 @@ export function createApp(
               if (studio === undefined) return null;
               return studio.brandKit.logo(actor, version);
             },
+            ...(modules.documentStudio.images === undefined
+              ? {}
+              : { generatedImages: modules.documentStudio.images }),
           }),
     });
     // DOCS block: the brand kit and filing one answer as a PDF.
