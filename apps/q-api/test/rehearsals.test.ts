@@ -10,6 +10,8 @@ import type { ActorContext } from "@capital-q/security";
 import {
   CAMERA_FRAME_TTL_MS,
   createRehearsalService,
+  HOLDING_LINES,
+  minimalPersona,
   ownReview,
   scoreOf,
   shownPersona,
@@ -179,6 +181,9 @@ function memoryStore(): RehearsalStore & {
 
 function setup(options: { messages?: () => string } = {}) {
   const clock = { at: new Date("2026-10-01T10:05:00Z").getTime() };
+  /** Model outages: persona readings and turns that come back empty. */
+  const outage = { persona: false, turns: 0 };
+  const warnings: { fields: Record<string, unknown>; message: string }[] = [];
   const looks = {
     next: null as PresenceReading | null,
     /** The person's line asks Q to look, read by meaning. */
@@ -286,9 +291,22 @@ function setup(options: { messages?: () => string } = {}) {
           variables.previousProfile,
         ].join("|"),
       );
-      return Promise.resolve(PERSONA);
+      return Promise.resolve(outage.persona ? null : PERSONA);
     },
     turn: (_a, variables, views) => {
+      if (outage.turns > 0) {
+        outage.turns -= 1;
+        seen.turnInputs.push({
+          camera: false,
+          presenceNote: "",
+          difficulty: variables.difficulty,
+          cue: variables.cue,
+          screen: false,
+          material: variables.meetingMaterial,
+          stance: variables.stance,
+        });
+        return Promise.resolve(null);
+      }
       seen.turnInputs.push({
         camera: views.camera !== null && variables.cameraOn,
         presenceNote: variables.presence,
@@ -351,8 +369,15 @@ function setup(options: { messages?: () => string } = {}) {
     material,
     composer,
     now: () => new Date(clock.at),
+    logger: {
+      warn: (fields: Record<string, unknown>, message: string) => {
+        warnings.push({ fields, message });
+      },
+    } as never,
   });
   return {
+    outage,
+    warnings,
     clock,
     looks,
     service,
@@ -1193,5 +1218,79 @@ describe('"can you see this?" (2026-10-01)', () => {
     expect(passes[0]?.camera).toBe(false);
     // With consent in force, it is not told it cannot see them.
     expect(passes[0]?.presenceNote).toContain("No look at them this turn");
+  });
+});
+
+describe("a rehearsal can always start (REHEARSE P0, 2026-10-01)", () => {
+  it("a persona reading that fails becomes a minimal THIN persona, logged as degraded, rebuilt later", async () => {
+    const { service, outage, warnings, store } = setup();
+    outage.persona = true;
+    const result = await service.persona(
+      actor(FOUNDER),
+      "INVESTOR_ORGANISATION",
+      INVESTOR,
+    );
+    expect(result.kind).toBe("OK");
+    if (result.kind !== "OK") return;
+    expect(result.persona.grounding).toBe("THIN");
+    expect(result.persona.summary).toContain("little is known");
+    expect(result.persona.stance.leads).toBe("THEM");
+    expect(warnings.map((w) => w.message)).toContain("rehearsal degraded");
+    // Read by no prompt: the next open builds the real reading.
+    const row = await store.findPersona(
+      actor(FOUNDER),
+      "INVESTOR_ORGANISATION",
+      INVESTOR,
+    );
+    expect((row?.profile as { readBy?: number }).readBy).toBe(0);
+    outage.persona = false;
+    const again = await service.persona(
+      actor(FOUNDER),
+      "INVESTOR_ORGANISATION",
+      INVESTOR,
+    );
+    expect(again.kind === "OK" && again.persona.grounding).toBe("SOME");
+  });
+
+  it("it starts even when the persona and the opening both fail", async () => {
+    const { service, outage } = setup();
+    outage.persona = true;
+    outage.turns = 2;
+    const rehearsal = await startWith(service);
+    expect(rehearsal.turns[0]?.text).toBe(HOLDING_LINES.OPENING);
+  });
+
+  it("a turn that fails is retried once, then a holding line in character, never an error", async () => {
+    const { service, outage, warnings } = setup();
+    const rehearsal = await startWith(service);
+    outage.turns = 1;
+    const retried = await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Hello.",
+    });
+    expect(retried.kind === "OK" && retried.rehearsal.turns.at(-1)?.text).toBe(
+      "What's retention?",
+    );
+    outage.turns = 2;
+    const held = await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Again.",
+    });
+    expect(held.kind).toBe("OK");
+    expect(held.kind === "OK" && held.rehearsal.turns.at(-1)?.text).toBe(
+      HOLDING_LINES.TURN,
+    );
+    expect(
+      warnings.filter((w) => w.message === "rehearsal degraded"),
+    ).toHaveLength(1);
+  });
+
+  it("the minimal persona keeps what their profile says, and nothing invented", () => {
+    const minimal = minimalPersona(
+      "Ventures Fund",
+      "INVESTOR",
+      "Name: Ventures Fund\nType: VC\nIn their own words: seed fintech in West Africa",
+    );
+    expect(minimal.priorities).toEqual(["seed fintech in West Africa"]);
+    expect(minimal.grounding).toBe("THIN");
+    expect(minimal.knownTraits).toEqual([]);
   });
 });

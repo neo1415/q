@@ -287,7 +287,7 @@ export const CounterpartPersonaStoredSchema =
      * A reading by an older prompt is rebuilt from scratch (live
      * 2026-10-01: a v3 reading of a founder described the investor).
      */
-    readBy: z.number().int().min(1).optional(),
+    readBy: z.number().int().min(0).optional(),
   }).strict();
 export type CounterpartPersonaStored = z.infer<
   typeof CounterpartPersonaStoredSchema

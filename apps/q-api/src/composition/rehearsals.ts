@@ -23,16 +23,11 @@ import type { ModelGateway } from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
   CounterpartPersonaStoredSchema,
-  CounterpartPersonaV4LenientSchema,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   InvestorPersonaResultSchema,
-  normaliseCounterpartPersonaV4,
-  normaliseRehearsalReview,
   REHEARSAL_DIMENSIONS_FOR,
-  RehearsalReviewLenientSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnV6ResultSchema,
   renderPrompt,
   type CounterpartPersonaStored as CounterpartPersonaResult,
   type CounterpartPersonaV5Variables as CounterpartPersonaVariables,
@@ -52,6 +47,7 @@ import {
   temperamentNote,
   type Temperament,
 } from "./rehearsal-temperament.js";
+import { readPersona, readReview, readTurn } from "./rehearsal-readings.js";
 import {
   newPresenceState,
   presenceNote,
@@ -1029,6 +1025,106 @@ export function yieldTo(previous: readonly Turn[]): {
   };
 }
 
+/** Said in character when a turn could not be composed; never an error. */
+/** After a degraded persona, Q tries the real reading again this soon. */
+const PERSONA_REBUILD_AFTER_MS = 2 * 60_000;
+
+/**
+ * The persona when no reading could be made: from the material alone --
+ * their name, their side of the table, what their profile says they care
+ * about -- and plainly marked as little known. Code, never a model.
+ */
+export function minimalPersona(
+  name: string,
+  role: "INVESTOR" | "FOUNDER",
+  profile: string,
+): CounterpartPersonaResult {
+  const stated = profile
+    .split("\n")
+    .map((line) => line.replace(/^[A-Za-z ]{2,30}:\s*/, "").trim())
+    .filter((line, index) => index > 0 && line.length >= 3)
+    .slice(0, 4)
+    .map((line) => clipText(line, 200));
+  return {
+    summary: clipText(
+      `${name}: little is known yet about how they run a meeting, so Q plays them as a typical ${role === "INVESTOR" ? "investor" : "founder"} from their profile.`,
+      600,
+    ),
+    style: "Not known yet: courteous and to the point.",
+    temperament: { baseline: "NEUTRAL", warmsTo: [], coolsOn: [] },
+    priorities: stated,
+    likelyQuestions:
+      role === "INVESTOR"
+        ? [
+            {
+              question: "What traction do you have so far?",
+              why: "Any investor starts there.",
+            },
+            {
+              question: "Why is this team the one to build it?",
+              why: "Team is the early bet.",
+            },
+            {
+              question:
+                "How big can this get, and what will you do with the money?",
+              why: "Market and use of funds.",
+            },
+          ]
+        : [
+            {
+              question:
+                "How do you usually work with founders after investing?",
+              why: "What a founder asks a fund.",
+            },
+            {
+              question: "What does your process look like from here?",
+              why: "Timing matters to them.",
+            },
+          ],
+    likelyAnswers: [],
+    pushbacks: [],
+    howToWin: [],
+    dealbreakers: [],
+    grounding: "THIN",
+    forwardness: "TYPICAL",
+    forwardnessWhy: "No sign either way.",
+    knownTraits: [],
+    readBy: 0,
+  };
+}
+
+export const HOLDING_LINES = {
+  OPENING:
+    "Hi, thanks for making the time. Shall we get started? Tell me where you are.",
+  TURN: "Sorry, give me a second, I lost my train of thought. Could you say that again?",
+} as const;
+
+function holdingTurn(
+  turns: readonly Turn[],
+  cue: string,
+): {
+  readonly result: RehearsalTurnResult;
+  readonly sawScreen: boolean;
+  readonly state: Temperament | undefined;
+} {
+  const last = [...turns].reverse().find((turn) => turn.from === "THEM");
+  return {
+    state: last?.state,
+    result: {
+      appraisal: "NEUTRAL",
+      line: cue === "OPENING" ? HOLDING_LINES.OPENING : HOLDING_LINES.TURN,
+      move: "REMARK",
+      mood: "NEUTRAL",
+      intensity: "NORMAL",
+      reaction: null,
+      conclusion: null,
+      presence: null,
+      askedToSee: false,
+    },
+    sawScreen: false,
+  };
+}
+
 /**
  * A shared frame, held in memory for the next turn only; never persisted,
  * logged or sent anywhere but the turn's model call. Screen frames and
@@ -1259,12 +1355,63 @@ export function createRehearsalService(dependencies: {
     if (saved === null) {
       // A refresh that failed keeps the reading already held, even one by
       // an older prompt: a dated reading beats no rehearsal.
-      return existing !== null && held?.success === true
-        ? built(existing, held.data)
-        : "Q_UNAVAILABLE";
+      if (existing !== null && held?.success === true) {
+        return built(existing, held.data);
+      }
+      // No reading at all (a model outage): never "couldn't get into
+      // character". A minimal persona from the material, marked THIN and
+      // read by no prompt (readBy 0), so it is rebuilt soon.
+      logger?.warn(
+        { stage: "persona", kind, subjectId: id, userId: actor.userId },
+        "rehearsal degraded",
+      );
+      const minimal = minimalPersona(
+        counterpart.name,
+        counterpartRoleOf(kind),
+        counterpart.profile,
+      );
+      const stored = await store
+        .savePersona(actor, {
+          kind,
+          id,
+          name: counterpart.name,
+          relationshipId,
+          profile: minimal,
+          sources: [
+            {
+              kind: "PROFILE",
+              label: `${counterpart.name}'s profile`,
+              url: null,
+            },
+          ],
+          signalDigest: digest,
+          webReadAt: existing?.webReadAt ?? null,
+        })
+        .catch(() => null);
+      if (stored === null) return "Q_UNAVAILABLE";
+      rebuildLater(actor, viewer, kind, id);
+      return built(stored, minimal);
     }
     const parsed = CounterpartPersonaStoredSchema.safeParse(saved.profile);
     return parsed.success ? built(saved, parsed.data) : "Q_UNAVAILABLE";
+  }
+
+  /** One background rebuild after a degraded persona, per subject. */
+  const rebuilding = new Set<string>();
+  function rebuildLater(
+    actor: ActorContext,
+    viewer: Parameters<typeof ensurePersona>[1],
+    kind: RehearsalCounterpartKind,
+    id: string,
+  ): void {
+    const key = `${actor.userId}:${kind}:${id}`;
+    if (rebuilding.has(key)) return;
+    rebuilding.add(key);
+    setTimeout(() => {
+      void ensurePersona(actor, viewer, kind, id)
+        .catch(() => undefined)
+        .finally(() => rebuilding.delete(key));
+    }, PERSONA_REBUILD_AFTER_MS).unref();
   }
 
   /** What the person Q plays asks about, or answers from. */
@@ -1426,6 +1573,34 @@ export function createRehearsalService(dependencies: {
     };
   }
 
+  /**
+   * A turn never fails in the room (REHEARSE P0, 2026-10-01): one retry,
+   * then a short in-character holding line that asks them to go on or say
+   * it again -- their next words are the retry. Logged as degraded.
+   */
+  async function replyOrHold(...args: Parameters<typeof reply>): Promise<{
+    readonly result: RehearsalTurnResult;
+    readonly sawScreen: boolean;
+    readonly state: Temperament | undefined;
+  }> {
+    const [actor, row, turns, cue, , signal] = args;
+    const first = await reply(...args);
+    if (first !== null || signal?.aborted === true) {
+      return first ?? holdingTurn(turns, cue);
+    }
+    const second = await reply(...args);
+    if (second !== null) return second;
+    logger?.warn(
+      {
+        rehearsalId: row.id,
+        stage: cue === "OPENING" ? "opening" : "turn",
+        userId: actor.userId,
+      },
+      "rehearsal degraded",
+    );
+    return holdingTurn(turns, cue);
+  }
+
   const viewerOf = (actor: ActorContext) =>
     material.viewer(actor).catch(() => null);
 
@@ -1569,7 +1744,7 @@ export function createRehearsalService(dependencies: {
         createdAt: now(),
         endedAt: null,
       };
-      const opening = await reply(
+      const opening = await replyOrHold(
         actor,
         draft,
         [],
@@ -1577,7 +1752,6 @@ export function createRehearsalService(dependencies: {
         viewer.organisationName,
         undefined,
       );
-      if (opening === null) return { kind: "Q_UNAVAILABLE" };
       const row = await store.insert(actor, {
         id,
         kind: input.kind,
@@ -1678,7 +1852,7 @@ export function createRehearsalService(dependencies: {
       const yielding = words.length === 0 && !silent;
       const answered = yielding
         ? yieldTo(previous)
-        : await reply(
+        : await replyOrHold(
             actor,
             row,
             turns,
@@ -1689,7 +1863,6 @@ export function createRehearsalService(dependencies: {
       // Spoken over: the person carried on, and their grown words come as
       // the next turn. Nothing of this one is kept.
       if (signal?.aborted === true) return ok(row);
-      if (answered === null) return { kind: "Q_UNAVAILABLE" };
       const { result } = answered;
       const closing = result.move === "CLOSE";
       const next: Turn[] = [
@@ -1860,6 +2033,9 @@ const REHEARSAL_LABEL_FALLBACKS: Readonly<Record<string, string>> = {
   "dimensions.rating": "SOLID",
 };
 
+/** What the gateway accepts from a rehearsal call: any JSON object. */
+const ANY_OBJECT = z.record(z.string(), z.unknown());
+
 export function createRehearsalComposer(dependencies: {
   readonly gateway: ModelGateway;
   readonly dataPosture?: ModelDataPosture | undefined;
@@ -1952,43 +2128,42 @@ export function createRehearsalComposer(dependencies: {
 
   return {
     personaVersion,
-    // Lenient shapes from the model, trimmed here to what is stored.
-    persona: async (actor, variables) => {
-      const loose = await run(
-        actor,
-        "INVESTOR_PERSONA",
-        "STRUCTURED_EXTRACTION",
-        PERSONA_BUDGET,
-        variables,
-        CounterpartPersonaV4LenientSchema,
-      );
-      return loose === null ? null : normaliseCounterpartPersonaV4(loose);
-    },
-    turn: async (actor, variables, views, signal) => {
-      const result = await run(
-        actor,
-        "INVESTOR_TWIN_TURN",
-        "NORMAL_DIALOGUE",
-        TURN_BUDGET,
-        variables,
-        RehearsalTurnV6ResultSchema,
-        views,
-        signal,
-      );
-      return result === null
-        ? null
-        : { ...result, line: result.line.slice(0, 700) };
-    },
-    review: async (actor, variables) => {
-      const loose = await run(
-        actor,
-        "REHEARSAL_SCORE",
-        "STRUCTURED_EXTRACTION",
-        REVIEW_BUDGET,
-        variables,
-        RehearsalReviewLenientSchema,
-      );
-      return loose === null ? null : normaliseRehearsalReview(loose);
-    },
+    // Any JSON object is accepted from the model and read field by field
+    // in code (rehearsal-readings): one bad field never costs a reading.
+    persona: async (actor, variables) =>
+      readPersona(
+        await run(
+          actor,
+          "INVESTOR_PERSONA",
+          "STRUCTURED_EXTRACTION",
+          PERSONA_BUDGET,
+          variables,
+          ANY_OBJECT,
+        ),
+      ),
+    turn: async (actor, variables, views, signal) =>
+      readTurn(
+        await run(
+          actor,
+          "INVESTOR_TWIN_TURN",
+          "NORMAL_DIALOGUE",
+          TURN_BUDGET,
+          variables,
+          ANY_OBJECT,
+          views,
+          signal,
+        ),
+      ),
+    review: async (actor, variables) =>
+      readReview(
+        await run(
+          actor,
+          "REHEARSAL_SCORE",
+          "STRUCTURED_EXTRACTION",
+          REVIEW_BUDGET,
+          variables,
+          ANY_OBJECT,
+        ),
+      ),
   };
 }
