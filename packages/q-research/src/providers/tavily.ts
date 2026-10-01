@@ -111,6 +111,10 @@ function timeRangeFor(
       return { timeRange: "month" };
     case "PAST_YEAR":
       return { timeRange: "year" };
+    case "PAST_WEEK":
+      return { timeRange: "week" };
+    case "PAST_DAY":
+      return { timeRange: "day" };
     case "ANY":
       return {};
   }
@@ -162,7 +166,7 @@ export function createTavilyResearchProvider(
         response = await raceSignal(
           client.search(request.query, {
             searchDepth: "basic",
-            topic: "general",
+            topic: request.topic === "NEWS" ? "news" : "general",
             maxResults: Math.min(
               request.maxResults,
               RESEARCH_BOUNDS.maxSearchResults,

@@ -51,6 +51,10 @@ function tbsFor(freshness: PublicWebSearchRequest["freshness"]): string | null {
       return "qdr:m";
     case "PAST_YEAR":
       return "qdr:y";
+    case "PAST_WEEK":
+      return "qdr:w";
+    case "PAST_DAY":
+      return "qdr:d";
     case "ANY":
       return null;
   }

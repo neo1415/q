@@ -69,6 +69,7 @@ export function createCachedResearchProvider(input: {
         request.freshness,
         [...request.includeDomains].sort(),
         request.maxResults,
+        request.topic ?? "GENERAL",
       ]);
       const hit = read(searches, key, context);
       if (hit !== null) return { ...hit, latencyMs: 0 };

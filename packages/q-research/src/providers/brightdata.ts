@@ -165,6 +165,8 @@ function googleUrl(request: PublicWebSearchRequest): string {
   });
   if (request.freshness === "PAST_MONTH") params.set("tbs", "qdr:m");
   if (request.freshness === "PAST_YEAR") params.set("tbs", "qdr:y");
+  if (request.freshness === "PAST_WEEK") params.set("tbs", "qdr:w");
+  if (request.freshness === "PAST_DAY") params.set("tbs", "qdr:d");
   return `https://www.google.com/search?${params.toString()}`;
 }
 

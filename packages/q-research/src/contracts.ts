@@ -33,7 +33,14 @@ export const RESEARCH_BOUNDS = {
   maxIncludeDomains: 3,
 } as const;
 
-export const PUBLIC_WEB_FRESHNESS = ["ANY", "PAST_YEAR", "PAST_MONTH"] as const;
+export const PUBLIC_WEB_FRESHNESS = [
+  "ANY",
+  "PAST_YEAR",
+  "PAST_MONTH",
+  // The Q Daily (DAILY): news of the week and of the day.
+  "PAST_WEEK",
+  "PAST_DAY",
+] as const;
 export const PublicWebFreshnessSchema = z.enum(PUBLIC_WEB_FRESHNESS);
 export type PublicWebFreshness = z.infer<typeof PublicWebFreshnessSchema>;
 
@@ -55,6 +62,11 @@ export const PublicWebSearchRequestSchema = z
       .array(z.string().trim().min(1).max(253))
       .max(RESEARCH_BOUNDS.maxIncludeDomains)
       .default([]),
+    /**
+     * A hint that news is wanted (The Q Daily). An index with a news
+     * vertical uses it; the others search as usual. Absent: GENERAL.
+     */
+    topic: z.enum(["GENERAL", "NEWS"]).optional(),
   })
   .strict();
 export type PublicWebSearchRequest = z.infer<

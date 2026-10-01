@@ -785,3 +785,7 @@ export {
   type QWorkStepDto,
 } from "./work.js";
 // end AUTO block
+
+// DAILY block (The Q Daily, docs/specs/2026-10/daily.md)
+export * from "./daily.js";
+// end DAILY block
