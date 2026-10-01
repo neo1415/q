@@ -67,6 +67,14 @@ export type WebPushConfig = {
         readonly subject: string;
       }
     | undefined;
+  /**
+   * The public key alone: what the API hands a browser to subscribe with.
+   * The API never holds the private key (only the sender does), so it must
+   * not wait for all three (live 2026-10-01: the API had the public key
+   * and subject but, rightly, no private key, so pushes were never
+   * offered to anybody).
+   */
+  readonly publicKey: string | undefined;
   readonly missing: readonly string[];
 };
 
@@ -88,6 +96,7 @@ export function loadWebPushConfig(env: EnvironmentInput): WebPushConfig {
             subject: parsed.WEB_PUSH_SUBJECT,
           }
         : undefined,
+    publicKey: parsed.WEB_PUSH_VAPID_PUBLIC_KEY,
     missing,
   };
 }

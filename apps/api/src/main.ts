@@ -1220,7 +1220,7 @@ const { app, logger } = createApp(config, security, {
   // stays with the workers that send.
   push: {
     subscriptions: createPushSubscriptionStore(database.sql),
-    publicKey: loadWebPushConfig(process.env).vapid?.publicKey ?? null,
+    publicKey: loadWebPushConfig(process.env).publicKey ?? null,
   },
   gateq,
   gateqApply,
