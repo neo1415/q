@@ -221,6 +221,7 @@ describe("Settings → The Q Daily", () => {
     ).toBe("true");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Daily" }));
+      await Promise.resolve();
     });
     expect(setPreferences).toHaveBeenCalledWith({ frequency: "DAILY" });
     expect(
@@ -241,6 +242,7 @@ describe("Settings → The Q Daily", () => {
     render(<DailySetting initial={PREFERENCES} />);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Q's take" }));
+      await Promise.resolve();
     });
     expect(setPreferences).toHaveBeenCalledWith({
       sections: ["YOUR_SECTOR", "YOUR_MARKET", "DEALS", "PEOPLE"],
@@ -277,6 +279,7 @@ describe("Prepare my edition", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Prepare my edition" }),
       );
+      await Promise.resolve();
     });
     expect(refresh).toHaveBeenCalled();
   });
@@ -291,6 +294,7 @@ describe("Prepare my edition", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Prepare my edition" }),
       );
+      await Promise.resolve();
     });
     expect(screen.getByRole("alert").textContent).toMatch(
       /You have a recent edition/,
