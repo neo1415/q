@@ -381,8 +381,9 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(final.run.status).toBe("COMPLETED");
       expect(final.run.orchestrationVersion).toBe(Q_ORCHESTRATION_VERSION);
       expect(final.run.modelPolicyVersion).toBe("normal_dialogue.v1");
+      // The active analyst (v15: proposalStatus beside v14's gestures).
       expect(final.run.promptBundleVersion).toBe(
-        "q-system.v1_company-analyst.v4_comm.v1",
+        "q-system.v1_company-analyst.v15_comm.v1",
       );
       expect(google.calls[0]?.request.messages[0]?.content).toContain(
         "You are Q",
@@ -400,10 +401,16 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(google.calls).toHaveLength(1);
       expect(groq.calls).toHaveLength(0);
       expect(google.calls[0]?.request.modelCode).toBe("gemini-3.5-flash-lite");
+      // Charter, task, then what the run can do and has produced (the
+      // capability note, a trusted SYSTEM message since CQ-QX-008).
       expect(google.calls[0]?.request.messages.map((m) => m.role)).toEqual([
         "SYSTEM",
         "USER",
+        "SYSTEM",
       ]);
+      expect(google.calls[0]?.request.messages[2]?.content).toContain(
+        "You cannot end, clear or start a conversation",
+      );
 
       const ledger = await db.sql<
         { task_class: string; success: boolean; q_run_id: string }[]
@@ -472,16 +479,28 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(google.calls[0]?.request.tools.map((t) => t.name)).toEqual([
         "get_company",
       ]);
-      expect(google.calls[0]?.request.output.kind).toBe("TEXT");
+      // The tool round asks for the answer's own shape beside the tools
+      // (schema-enforced first round, 2026-10-01); a provider that cannot
+      // take both drops the schema in its adapter, never here.
+      expect(google.calls[0]?.request.output.kind).toBe("STRUCTURED");
       // The tools-first note (a SYSTEM message) travels with every tool
       // round since 1e1c4e1, on every provider.
+      // Charter, task, the capability note (CQ-QX-008), the tools-first
+      // note, then the tool round and its result.
       expect(google.calls[1]?.request.messages.map((m) => m.role)).toEqual([
         "SYSTEM",
         "USER",
         "SYSTEM",
+        "SYSTEM",
         "ASSISTANT",
         "TOOL",
       ]);
+      expect(google.calls[1]?.request.messages[2]?.content).toContain(
+        "You cannot end, clear or start a conversation",
+      );
+      expect(google.calls[1]?.request.messages[3]?.content).toContain(
+        "LOOK IT UP FIRST.",
+      );
 
       const final = await world.service.getRun({
         actor: world.actor,
