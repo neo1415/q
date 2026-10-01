@@ -32,6 +32,7 @@ import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
 import { useFollowNewest } from "./follow-newest";
 import { QAnswer } from "./q-answer";
+import { QNow } from "./q-now";
 import { QBoard } from "./q-board";
 import { viewingOf, type QMoment } from "./q-moment";
 import { useQSession } from "./q-session";
@@ -204,6 +205,14 @@ export function QSheetConversation({
             />
           </div>
         ) : null}
+        {/* What waits on the person, decided here (QA 2026-10-01: in the
+            dock a prepared change showed "Approval needed" with no card,
+            so it could be approved only on the Q page or by typing). */}
+        <QNow
+          session={session}
+          onAct={(text) => void q.ask(text)}
+          quietWhenIdle
+        />
         <div ref={endRef} />
         <QBoard
           conversationId={q.conversationId}
