@@ -6,6 +6,7 @@ import {
   QConfidenceLevelSchema,
 } from "@capital-q/contracts";
 
+import { ModelSentenceGesturesEnumSchema } from "../../speech/gesture.js";
 import {
   AuthorisedFactsSchema,
   ClarifyingQuestionSchema,
@@ -400,6 +401,20 @@ export type CompanyAnalystV12Result = z.infer<
   typeof CompanyAnalystV12ResultSchema
 >;
 export const COMPANY_ANALYST_V12_SCHEMA_VERSION = 12;
+
+/**
+ * v14 (PRESENCE, founder direction 2026-10-01): what Q's particles form
+ * while a sentence is said, chosen by the model from a closed set beside
+ * the answer and clamped by code (`gesturesForReply`). Empty by default.
+ */
+export const CompanyAnalystV14ResultSchema =
+  CompanyAnalystV12ResultSchema.extend({
+    gestures: ModelSentenceGesturesEnumSchema,
+  }).strict();
+export type CompanyAnalystV14Result = z.infer<
+  typeof CompanyAnalystV14ResultSchema
+>;
+export const COMPANY_ANALYST_V14_SCHEMA_VERSION = 14;
 
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";

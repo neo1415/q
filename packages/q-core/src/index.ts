@@ -430,6 +430,7 @@ export {
   COMPANY_ANALYST_V13,
   COMPANY_ANALYST_V13_FORMAT_SECTION,
 } from "./prompts/tasks/company-analyst.v13.js";
+export { COMPANY_ANALYST_V14 } from "./prompts/tasks/company-analyst.v14.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export { ARTIFACT_REVISION_V2 } from "./prompts/tasks/artifact-revision.v2.js";
 export { ARTIFACT_REVISION_V3 } from "./prompts/tasks/artifact-revision.v3.js";
@@ -495,8 +496,11 @@ export {
   CompanyAnalystV6ResultSchema,
   CompanyAnalystV8ResultSchema,
   CompanyAnalystV12ResultSchema,
+  CompanyAnalystV14ResultSchema,
+  COMPANY_ANALYST_V14_SCHEMA_VERSION,
   ModelComparisonCardsSchema,
   type CompanyAnalystV12Result,
+  type CompanyAnalystV14Result,
   type ModelComparisonCards,
   CompanyAnalystV5VariablesSchema,
   type ArtifactRequest,
@@ -730,3 +734,14 @@ export {
   type DocumentPolishResult,
   type DocumentPolishVariables,
 } from "./prompts/schemas/document-polish.js";
+
+// PRESENCE block
+export {
+  gesturesForReply,
+  ModelSentenceGesturesEnumSchema,
+  ModelSentenceGesturesSchema,
+  PRESENCE_GESTURES_GUIDANCE,
+  sentenceCount,
+  type ModelSentenceGestures,
+} from "./speech/gesture.js";
+// end PRESENCE block

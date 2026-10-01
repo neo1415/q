@@ -63,7 +63,7 @@ describe("COMPANY_ANALYST v10", () => {
 describe("COMPANY_ANALYST v11", () => {
   it("was the active analyst version until v12 took over", () => {
     const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(13);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(14);
     expect(COMPANY_ANALYST_V11.status).toBe("DEPRECATED");
   });
 
@@ -124,7 +124,8 @@ describe("COMPANY_ANALYST v13 (founder live 2026-09-29)", () => {
   it("defines stated facts, knows it makes and revises documents, and resolves misheard names", async () => {
     const { COMPANY_ANALYST_V12, COMPANY_ANALYST_V13 } =
       await import("../src/index.js");
-    expect(COMPANY_ANALYST_V13.status).toBe("ACTIVE");
+    // Superseded by v14 (PRESENCE gestures), which keeps all of this.
+    expect(COMPANY_ANALYST_V13.status).toBe("DEPRECATED");
     const template = COMPANY_ANALYST_V13.template;
     expect(template).toContain(
       "userStatements: only a fact they state in THIS message",
