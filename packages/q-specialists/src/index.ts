@@ -172,3 +172,10 @@ export {
   type StockPhoto,
   type StockPhotoPort,
 } from "./company/deck-photos.js";
+
+// DOCS block: one answer as a document, for the per-answer PDF control.
+export {
+  ANSWER_DOCUMENT_ARTIFACT_TYPE,
+  composeAnswerDocument,
+  type AnswerDocument,
+} from "./answer-document.js";

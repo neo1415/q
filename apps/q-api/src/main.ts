@@ -61,6 +61,7 @@ import {
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
+import { createDocumentsModule } from "./composition/documents.js";
 import { createRecallBots } from "./composition/recall-bots.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
 import { createScout } from "./composition/scout.js";
@@ -98,6 +99,7 @@ import {
 } from "./composition/profile-answer-action.js";
 import {
   CorrelationIdSchema,
+  QRunIdSchema,
   createEventRegistry,
   type ModelDataPosture,
   type QViewingMoment,
@@ -1754,6 +1756,18 @@ const qArtifacts = createQArtifacts({
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),
 });
+// DOCS block: the document studio (brand kit, answer exports).
+const documentStudio = createDocumentsModule({
+  sql: database.sql,
+  transactions: database.transactions,
+  runMessages: async (actor, runId) =>
+    (
+      await qRuntime.getRun({
+        actor,
+        runId: QRunIdSchema.parse(runId),
+      })
+    ).summary.messages ?? [],
+});
 // Q's standing with each person (founder direction 2026-09-30): their chosen
 // personality, which every Q surface speaks with, and Q's patience.
 const standingStore = createPostgresStandingStore(database.sql);
@@ -3010,6 +3024,7 @@ const { app, logger: appLogger } = createApp(
   {
     qRuntime,
     artifacts: qArtifacts.service,
+    documentStudio,
     recommendationExplanations,
     // The profile page's "Q found" column (BIZ-002): firewall first, then
     // the own-public-presence envelope, then the cited pages.

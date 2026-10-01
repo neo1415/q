@@ -128,6 +128,18 @@ export type ArtifactService = {
   readonly prepareArtifact: (
     input: PrepareArtifactInput,
   ) => Promise<QArtifactDetail>;
+  /**
+   * DOCS: file one of Q's answers the actor already received, exactly as
+   * written, as their organisation's private document. No subject and no
+   * plan: nothing is composed and nothing is read beyond the answer, whose
+   * ownership the caller established by reading it as this actor.
+   */
+  readonly fileOwnAnswer: (input: {
+    readonly actorContext: ActorContext;
+    readonly qRunId: string;
+    readonly artifactType: string;
+    readonly content: ComposedArtifact;
+  }) => Promise<QArtifactDetail>;
   /** Append a version. The previous one is untouched. */
   readonly reviseArtifact: (
     input: ReviseArtifactInput,
@@ -321,6 +333,45 @@ export function createArtifactService(dependencies: {
         throw error;
       }
 
+      const settled = await repository.findById(
+        input.actorContext,
+        artifact.id,
+      );
+      if (settled === null) {
+        throw new ArtifactNotFoundError();
+      }
+      return detailOf(input.actorContext, settled);
+    },
+
+    fileOwnAnswer: async (input) => {
+      const organisationId = input.actorContext.organisationId;
+      if (organisationId === undefined) {
+        throw new ArtifactAuthorityError();
+      }
+      const artifact = await transactions.run((tx) =>
+        repository.create(tx, {
+          tenantId: input.actorContext.tenantId,
+          organisationId,
+          type: input.artifactType,
+          companyId: null,
+          investorOrganisationId: null,
+          createdByUserId: input.actorContext.userId,
+        }),
+      );
+      try {
+        await append({
+          actor: input.actorContext,
+          artifact,
+          composed: input.content,
+          instruction: null,
+          runId: input.qRunId,
+        });
+      } catch (error) {
+        await transactions.run((tx) =>
+          repository.setStatus(tx, artifact.id, "FAILED"),
+        );
+        throw error;
+      }
       const settled = await repository.findById(
         input.actorContext,
         artifact.id,

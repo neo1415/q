@@ -20,7 +20,10 @@ import {
   layOutDeck,
   renderArtifactFile,
   type ArtifactFile,
+  type BrandInput,
+  type BrandLogo,
 } from "@capital-q/deck-render";
+import type { ActorContext } from "@capital-q/security";
 import {
   ArtifactNotFoundError,
   type ArtifactService,
@@ -63,6 +66,13 @@ import {
 
 export type QArtifactRoutesDependencies = ActorContextDependencies & {
   readonly artifacts: ArtifactService;
+  /**
+   * DOCS: the logo of the brand kit version a deck was drawn with, read
+   * as the actor (their own organisation's kit only). Absent: no logos.
+   */
+  readonly brandLogo?:
+    | ((actor: ActorContext, version: number) => Promise<BrandLogo | null>)
+    | undefined;
   /** As on the run routes: a person with no organisation yet still has a session. */
   readonly identity?: ApplicationIdentityLookup | undefined;
 };
@@ -185,6 +195,27 @@ export function registerQArtifactRoutes(
   const artifacts = dependencies.artifacts;
   const artifactPath = `${Q_ARTIFACTS_PATH}/:artifactId`;
 
+  /** The brand a stored deck names, with its logo, for drawing it. */
+  const brandFor = async (
+    request: FastifyRequest,
+    version: QArtifactVersion,
+  ): Promise<BrandInput | undefined> => {
+    const kitVersion = version.content.deck?.brand?.kitVersion;
+    if (kitVersion === undefined || dependencies.brandLogo === undefined) {
+      return undefined;
+    }
+    try {
+      const logo = await dependencies.brandLogo(
+        getActorContext(request),
+        kitVersion,
+      );
+      return logo === null ? undefined : { logo };
+    } catch {
+      // A logo that cannot be read leaves the cover without it.
+      return undefined;
+    }
+  };
+
   app.get(
     Q_ARTIFACTS_PATH,
     { onRequest: withContext },
@@ -281,7 +312,13 @@ export function registerQArtifactRoutes(
       return reply
         .code(200)
         .header("cache-control", "no-store")
-        .send({ slides: [...deckToSvg(layOutDeck(deck))] });
+        .send({
+          slides: [
+            ...deckToSvg(
+              layOutDeck(deck, await brandFor(request, found.version)),
+            ),
+          ],
+        });
     },
   );
 
@@ -312,6 +349,7 @@ export function registerQArtifactRoutes(
           type: found.type,
           version: found.version,
           format,
+          brand: await brandFor(request, found.version),
         });
       } catch (error) {
         // The stored version is intact and nothing was written: a renderer

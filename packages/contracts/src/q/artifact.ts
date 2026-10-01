@@ -3,7 +3,7 @@ import { z } from "zod";
 import { DecimalStringSchema } from "../common/decimal.js";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
-import { QArtifactIdSchema, QRunIdSchema } from "./ids.js";
+import { QArtifactIdSchema, QMessageIdSchema, QRunIdSchema } from "./ids.js";
 import { QPublicFindingSchema } from "./finding.js";
 import { QSubjectRefSchema } from "./subject.js";
 
@@ -571,7 +571,11 @@ export type ConfirmQBrandKitRequest = z.infer<
 /** PUBLIC. File one of Q's answers in this person's conversation as a PDF. */
 export const Q_ANSWER_EXPORTS_PATH = "/v1/q/answer-exports" as const;
 export const CreateQAnswerExportRequestSchema = z
-  .object({ runId: QRunIdSchema })
+  .object({
+    runId: QRunIdSchema,
+    /** The answer to file; absent is the run's latest answer. */
+    messageId: QMessageIdSchema.optional(),
+  })
   .strict();
 export type CreateQAnswerExportRequest = z.infer<
   typeof CreateQAnswerExportRequestSchema

@@ -20,6 +20,10 @@ import {
 import { registerProblemHandling } from "./http/problem-handler.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
 import { registerQArtifactRoutes } from "./http/q-artifacts.js";
+import {
+  registerQDocumentRoutes,
+  type QDocumentRoutesDependencies,
+} from "./http/q-documents.js";
 import type { ArtifactService } from "@capital-q/q-artifacts";
 import {
   registerRecommendationExplanationRoutes,
@@ -129,6 +133,13 @@ export type QApiModules = {
   readonly qRuntime?: QRunRoutesDependencies["qRuntime"] | undefined;
   /** Reading what Q composed, when the artifact context is composed (ADR 0013). */
   readonly artifacts?: ArtifactService | undefined;
+  // DOCS block: brand kit and answer exports (the document studio).
+  readonly documentStudio?:
+    | Omit<
+        QDocumentRoutesDependencies,
+        "authenticator" | "resolver" | "identity" | "artifacts"
+      >
+    | undefined;
   /** The orchestration boundary; absent means runs are only persisted. */
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
@@ -300,7 +311,26 @@ export function createApp(
       resolver: security.resolver,
       identity: security.identity,
       artifacts: modules.artifacts,
+      ...(modules.documentStudio === undefined
+        ? {}
+        : {
+            brandLogo: async (actor, version) => {
+              const studio = modules.documentStudio;
+              if (studio === undefined) return null;
+              return studio.brandKit.logo(actor, version);
+            },
+          }),
     });
+    // DOCS block: the brand kit and filing one answer as a PDF.
+    if (modules.documentStudio !== undefined) {
+      registerQDocumentRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        artifacts: modules.artifacts,
+        ...modules.documentStudio,
+      });
+    }
   }
 
   if (modules.recommendationExplanations !== undefined) {
