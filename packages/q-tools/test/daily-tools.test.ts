@@ -91,8 +91,8 @@ function harness(edition: QDailyEdition | null, preferences = PREFERENCES) {
     setPreferences: (actor, patch) => {
       set.push({ userId: actor.userId, patch });
       return Promise.resolve({
-        ...preferences,
-        ...patch,
+        frequency: patch.frequency ?? preferences.frequency,
+        email: patch.email ?? preferences.email,
         sections: patch.sections ?? preferences.sections,
         nextDueAt: patch.frequency === "OFF" ? null : preferences.nextDueAt,
       });
