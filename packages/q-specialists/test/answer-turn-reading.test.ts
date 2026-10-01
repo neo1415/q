@@ -6,6 +6,7 @@ import {
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
+import type { PendingDecisionPort } from "../src/pending-decision.js";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
 import type { TurnReaderV8Result as TurnReaderResult } from "@capital-q/q-core";
@@ -84,6 +85,8 @@ function seam(options: {
   readonly spoken?: boolean;
   /** The company analysis takes the question (default: it never does). */
   readonly specialistSupports?: boolean;
+  /** A typed decision on a waiting change (founder fixture #1). */
+  readonly pendingDecisions?: PendingDecisionPort;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -182,6 +185,9 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.pendingDecisions === undefined
+      ? {}
+      : { pendingDecisions: options.pendingDecisions }),
     ...(options.offeredTools === undefined
       ? {}
       : { offeredTools: () => Promise.resolve(options.offeredTools ?? []) }),
@@ -817,5 +823,62 @@ describe("a question about their own record takes the fast path (lead 2026-10-01
         aboutNamedOther: advice.aboutNamedOther,
       },
     });
+  });
+});
+
+describe("a typed yes to a waiting change (founder fixture #1)", () => {
+  const waiting = (approved: string[]): PendingDecisionPort => ({
+    proposals: () =>
+      Promise.resolve([
+        {
+          proposalId: "p1",
+          summary: "Reminder: Send Savanna the updated deck",
+          status: "PENDING",
+        },
+      ]),
+    read: () => Promise.resolve({ decision: "YES", remainder: null }),
+    approve: (_context, proposalId) => {
+      approved.push(proposalId);
+      return Promise.resolve({ status: "SAVED" });
+    },
+    decline: () => Promise.resolve({ status: "DECLINED" }),
+  });
+
+  it("is approved by code and answered with the engine's status; the model is not asked", async () => {
+    const approved: string[] = [];
+    const { answer, stored, delegated, reads } = seam({
+      said: "yes, go ahead",
+      reading: null,
+      outcomes: [],
+      pendingDecisions: waiting(approved),
+    });
+    await answer.answer(request());
+    expect(approved).toEqual(["p1"]);
+    expect(stored.map((m) => m.content)).toEqual([
+      "Done: Reminder: Send Savanna the updated deck.",
+    ]);
+    expect(delegated()).toBe(0);
+    expect(reads()).toBe(0);
+  });
+
+  it("a yes that asks for something else is answered, then told the waiting change's real status", async () => {
+    const approved: string[] = [];
+    const { answer, stored, delegated } = seam({
+      said: "yes but change the time to 3pm",
+      reading: null,
+      outcomes: [],
+      pendingDecisions: {
+        ...waiting(approved),
+        read: () =>
+          Promise.resolve({
+            decision: "YES",
+            remainder: "but change the time to 3pm",
+          }),
+      },
+    });
+    await answer.answer(request());
+    expect(approved).toEqual([]);
+    expect(delegated()).toBe(1);
+    expect(stored.at(-1)?.content).toMatch(/^Not saved yet: Reminder/);
   });
 });

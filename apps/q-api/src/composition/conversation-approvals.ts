@@ -21,6 +21,9 @@ import type {
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
+import type { PendingDecisionPort } from "@capital-q/q-specialists";
+
+import type { DecisionReader } from "../voice/decision.js";
 import type { ApprovedContinuation } from "./approved-continuation.js";
 
 /**
@@ -300,4 +303,38 @@ export function createConversationApprovalPort(
   };
 
   return { inConversation, approve, decline, inboxItem };
+}
+
+/**
+ * The typed-turn decision port (founder fixture #1): the conversation's
+ * proposals and their engine status, the person's words read by
+ * DECISION_READER, and the engine's own approve and reject.
+ */
+export function createPendingDecisionPort(dependencies: {
+  readonly proposals: PendingProposalPort;
+  readonly decisions: DecisionReader;
+}): PendingDecisionPort {
+  const { proposals, decisions } = dependencies;
+  return {
+    proposals: (context) => proposals.inConversation(context),
+    read: (input) =>
+      decisions.read({
+        question: input.question,
+        utterance: input.utterance,
+        recentTurns: input.recentTurns,
+        attribution: {
+          tenantId: input.context.tenantId,
+          userId: input.context.userId,
+          correlationId: input.context.correlationId,
+        },
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      }),
+    approve: (context, proposalId) => proposals.approve(context, proposalId),
+    decline: async (context, proposalId) => {
+      if (proposals.decline === undefined) {
+        return { status: "PENDING" as const };
+      }
+      return proposals.decline(context, proposalId);
+    },
+  };
 }

@@ -203,3 +203,11 @@ export {
   ILLUSTRATIONS_PER_DECK,
   type IllustrationPort,
 } from "./company/deck-illustrations.js";
+export {
+  decidePending,
+  statusLine,
+  type PendingDecisionContext,
+  type PendingDecisionOutcome,
+  type PendingDecisionPort,
+  type PendingDecisionStatus,
+} from "./pending-decision.js";

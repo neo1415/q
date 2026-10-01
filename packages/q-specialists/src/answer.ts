@@ -56,6 +56,7 @@ import type {
   QSpecialistTurnReading,
 } from "./contracts.js";
 import type { QOwnRecordsPort } from "./own-records-port.js";
+import { decidePending, type PendingDecisionPort } from "./pending-decision.js";
 import {
   NO_OWN_RECORDS,
   resolveOwnRecord,
@@ -128,6 +129,12 @@ export type SpecialistQAnswerDependencies = {
    * and failures carry no notice — the behaviour before the core.
    */
   readonly turns?: QTurnReader | undefined;
+  /**
+   * A typed yes or no to a change waiting in this conversation, read and
+   * acted on by code through the Approval Engine (pending-decision.ts).
+   * Absent: approval by conversation is left to the answer's tools.
+   */
+  readonly pendingDecisions?: PendingDecisionPort | undefined;
   /** Whether public research exists in this composition at all. */
   readonly researchAvailable?: boolean | undefined;
   /**
@@ -1220,6 +1227,65 @@ export function createSpecialistQAnswer(
     ) {
       return answerOnce(request);
     }
+    // A change waiting for their decision is decided first, by code, from
+    // the reading of their words; never left to the answer's own tools.
+    let afterAnswer: string | null = null;
+    if (dependencies.pendingDecisions !== undefined) {
+      const decided = await decidePending(dependencies.pendingDecisions, {
+        context: {
+          actor: request.actor,
+          runId: request.runId,
+          correlationId: request.correlationId,
+          tenantId: request.tenantId,
+          userId: request.actor.userId,
+        },
+        utterance: latest.content,
+        recentTurns: history
+          .filter((m) => m.id !== latest.id)
+          .slice(-6)
+          .map((m) => ({
+            role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
+            text: m.content,
+          })),
+        signal: request.signal,
+      }).catch((error: unknown) => {
+        logger?.warn(
+          { err: error, qRunId: request.runId },
+          "a decision on a waiting change was not read; answering normally",
+        );
+        return { kind: "NONE" } as const;
+      });
+      if (decided.kind === "REPLY") {
+        return recordAnswer(request, conversationId, decided.line);
+      }
+      if (decided.kind === "ANSWER_THEN") {
+        if (decided.before !== null) {
+          await recordAnswer(request, conversationId, decided.before);
+        }
+        afterAnswer = decided.after;
+      }
+    }
+    const outcome = await answerTurnRead(
+      request,
+      history,
+      conversationId,
+      latest,
+    );
+    if (afterAnswer !== null && outcome.kind === "ANSWERED") {
+      // What the change's real status is, after whatever the answer said
+      // about it: from the engine, never from the model's words.
+      await recordAnswer(request, conversationId, afterAnswer);
+    }
+    return outcome;
+  };
+
+  const answerTurnRead = async (
+    request: QAnswerRequest,
+    history: readonly QConversationMessage[],
+    conversationId: QConversationMessage["conversationId"],
+    latest: QConversationMessage,
+  ): Promise<QAnswerOutcome> => {
+    if (turns === undefined) return answerOnce(request);
     const state =
       conversations.get(conversationId) ?? INITIAL_CONVERSATION_STATE;
     /*

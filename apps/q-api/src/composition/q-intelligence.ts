@@ -46,6 +46,7 @@ import {
   createToolOwnMandatePort,
   createToolOwnRecordsPort,
   type ArtifactPreparation,
+  type PendingDecisionPort,
   type QVisibilityNotebook,
 } from "@capital-q/q-specialists";
 
@@ -110,6 +111,12 @@ export type QIntelligenceDependencies = {
   readonly statements?: QUserStatementRecorder | undefined;
   /** Where a requested profile change is noted for the action proposer (ADR 0011). */
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
+  /**
+   * A typed yes or no to a change waiting in the conversation, read by
+   * DECISION_READER and acted on through the Approval Engine (founder
+   * fixture #1; pending-decision.ts).
+   */
+  readonly pendingDecisions?: PendingDecisionPort | undefined;
   /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
@@ -321,6 +328,9 @@ export function composeQIntelligence(
   const answer = createSpecialistQAnswer({
     specialist,
     delegate: conversational,
+    ...(dependencies.pendingDecisions === undefined
+      ? {}
+      : { pendingDecisions: dependencies.pendingDecisions }),
     repositories,
     sql,
     transactions,

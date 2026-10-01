@@ -373,6 +373,7 @@ import { createHandleClaimAction } from "./composition/handle-claim-action.js";
 import { assertComposedActionTypes } from "./composition/q-action-types.js";
 import {
   createConversationApprovalPort,
+  createPendingDecisionPort,
   plainProposalStatus,
 } from "./composition/conversation-approvals.js";
 import { createApprovedContinuation } from "./composition/approved-continuation.js";
@@ -1241,6 +1242,14 @@ const ownDaily = (actor: {
 const entitlements = createEntitlementService({ sql: database.sql });
 // end BILLING block
 
+// Approval by conversation: the one change waiting for this person in
+// this conversation, approved as the card approves it (live test
+// 2026-09-27 #1). The engine and orchestrator are composed below.
+const conversationApprovals = createConversationApprovalPort({
+  runtime: qRuntime,
+  late: () => ({ actions: qActions, orchestrator, continueApproved }),
+  logger,
+});
 const qTools = createQTools({
   ports: {
     // BILLING block
@@ -1347,11 +1356,7 @@ const qTools = createQTools({
     // Approval by conversation: the one change waiting for this person in
     // this conversation, approved as the card approves it (live test
     // 2026-09-27 #1). The engine and orchestrator are composed below.
-    pendingProposals: createConversationApprovalPort({
-      runtime: qRuntime,
-      late: () => ({ actions: qActions, orchestrator, continueApproved }),
-      logger,
-    }),
+    pendingProposals: conversationApprovals,
     // Live test 2026-09-27 #4: "is my card saved?" -- the Q Card screen's
     // own read, authorised again by the service (card.view).
     qCards: {
@@ -1921,6 +1926,16 @@ const qArtifacts = createQArtifacts({
 // personality, which every Q surface speaks with, and Q's patience.
 const standingStore = createPostgresStandingStore(database.sql);
 const qIntelligence = composeQIntelligence({
+  // A typed yes or no to a waiting change, read and acted on by code
+  // through the Approval Engine (founder fixture #1).
+  pendingDecisions: createPendingDecisionPort({
+    proposals: conversationApprovals,
+    decisions: createDecisionReader({
+      gateway: modelGateway,
+      logger,
+      dataPosture: demoDataPosture,
+    }),
+  }),
   personalityOf: ({ tenantId, userId }) =>
     standingStore
       .read(userId, tenantId, new Date())
