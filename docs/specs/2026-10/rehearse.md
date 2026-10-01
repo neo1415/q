@@ -172,7 +172,8 @@ meetingId?, voice?}` → `QRehearsalDto`.
   a relationship with). "Rehearse my meeting with X" by text or voice from
   any Q resolves X by name over their own relationships.
 - `navigate` destination `REHEARSALS` (the list).
-- `list_my_rehearsals` (read): their past rehearsals with outcome and score.
+- History and scores: Q opens Rehearsals (`navigate REHEARSALS`); a read
+  tool for rehearsal history is a follow-up, not built in this packet.
 - Authority: all INSTANT (own practice, own screens). Nothing in a
   rehearsal writes a claim, memory, relationship event or message; nothing
   reaches the other person.
