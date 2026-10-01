@@ -501,3 +501,17 @@ export {
   SetQDailyPreferencesInputSchema,
   type QDailyToolPort,
 } from "./tools/daily.js";
+// BILLING block (ADR 0034)
+export {
+  createGetMyPlanTool,
+  GET_MY_PLAN,
+  gateQTool,
+  MyPlanOutputSchema,
+  type MyPlanOutput,
+  type QEntitlementPort,
+  type QEntitlementVerdict,
+  type QPlanFeature,
+  type QToolGate,
+} from "./tools/plan.js";
+export { Q_TOOL_GATES } from "./default-tools.js";
+// end BILLING block

@@ -121,6 +121,14 @@ export const PROBLEM_DEFINITIONS: Readonly<
     403,
   ),
   // end ADMIN block
+  // BILLING block (ADR 0034): the account's plan does not include this, or
+  // its limit is used. 402 so clients can tell it from a permission refusal.
+  ENTITLEMENT_REQUIRED: define(
+    "entitlement-required",
+    "Your plan does not include this right now.",
+    402,
+  ),
+  // end BILLING block
 };
 
 export type CreateProblemInput = {

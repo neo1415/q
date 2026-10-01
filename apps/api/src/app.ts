@@ -105,6 +105,16 @@ import {
   type OrganisationRoutesDependencies,
 } from "./http/organisations.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
+// BILLING block (ADR 0034)
+import {
+  registerAdminBillingRoutes,
+  type AdminBillingRoutesDependencies,
+} from "./http/admin-billing.js";
+import {
+  registerBillingRoutes,
+  type BillingRoutesDependencies,
+} from "./http/billing.js";
+// end BILLING block
 import {
   registerTaxonomyRoutes,
   type TaxonomyRoutesDependencies,
@@ -185,6 +195,18 @@ export type ApiModules = {
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
     CommitmentRoutesDependencies["commitments"] | undefined;
+  // BILLING block (ADR 0034): plans, usage, checkout, the Stripe webhook,
+  // and the console's billing controls. Absent: none of it registers and
+  // nothing is gated.
+  readonly billing?:
+    Omit<BillingRoutesDependencies, "authenticator" | "resolver"> | undefined;
+  readonly adminBilling?:
+    | Omit<
+        AdminBillingRoutesDependencies,
+        "authenticator" | "resolver" | "admin"
+      >
+    | undefined;
+  // end BILLING block
   /** ADR 0023: founders' Connection Requests. Absent: those routes do not register. */
   readonly connections?:
     NetworkInterestRoutesDependencies["connections"] | undefined;
@@ -352,7 +374,27 @@ export function createApp(
       freshTokens: modules.adminFreshTokens,
       decideVerification: modules.adminVerificationDecider,
     });
+    // BILLING block
+    if (modules.adminBilling !== undefined) {
+      registerAdminBillingRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        admin: modules.admin,
+        ...modules.adminBilling,
+      });
+    }
+    // end BILLING block
   }
+
+  // BILLING block
+  if (modules.billing !== undefined) {
+    registerBillingRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      ...modules.billing,
+    });
+  }
+  // end BILLING block
 
   // ADMIN block
   if (modules.results !== undefined) {
@@ -421,6 +463,7 @@ export function createApp(
       resolver: security.resolver,
       gateq: modules.gateq,
       inbox: modules.gateqInbox,
+      entitlements: modules.billing?.entitlements,
     });
   }
 

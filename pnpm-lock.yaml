@@ -53,6 +53,9 @@ importers:
       '@capital-q/audit':
         specifier: workspace:*
         version: link:../../packages/audit
+      '@capital-q/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../../packages/capital
@@ -153,6 +156,9 @@ importers:
       '@capital-q/audit':
         specifier: workspace:*
         version: link:../../packages/audit
+      '@capital-q/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../../packages/capital
@@ -536,6 +542,25 @@ importers:
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../eventing
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/billing:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

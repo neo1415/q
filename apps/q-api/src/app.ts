@@ -129,6 +129,10 @@ export type QApiModules = {
   /** AUTO: Q's delegated work, the person's own, read, answered, stopped. */
   readonly work?: WorkRoutesDependencies["work"] | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
+  // BILLING block (ADR 0034): the plan's rehearsal allowance.
+  readonly rehearsalEntitlements?:
+    RehearsalRoutesDependencies["entitlements"] | undefined;
+  // end BILLING block
   /** Q's standing with each person: personality and patience. */
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
   // DAILY block: The Q Daily, the person's own editions and preferences.
@@ -413,6 +417,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       rehearsals: modules.rehearsals,
+      entitlements: modules.rehearsalEntitlements,
     });
   }
 

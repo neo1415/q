@@ -65,6 +65,8 @@ const EVERY_PORT: QToolPorts = {
   work: STUB,
   // DAILY block
   daily: STUB,
+  // BILLING (ADR 0034)
+  entitlements: STUB,
 };
 
 const EVERY_TOOL = [

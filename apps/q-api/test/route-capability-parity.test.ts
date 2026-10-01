@@ -243,6 +243,30 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
 
   // ADMIN block (ADR 0033): the operations console. Operators only;
   // Q holds no console authority.
+  // BILLING block (ADR 0034)
+  "api/http/billing.ts GET BILLING_PLAN_PATH": cap("tool.get_my_plan"),
+  "api/http/billing.ts GET BILLING_PLANS_PATH": cap("tool.get_my_plan"),
+  "api/http/billing.ts POST BILLING_CHECKOUT_PATH": exempt(
+    "buying a plan happens on the payment provider's own hosted page, by a person; Q never pays (it reads the plan with get_my_plan)",
+  ),
+  "api/http/billing.ts POST BILLING_PORTAL_PATH": exempt(
+    "the payment provider's hosted billing portal, opened by a person; Q never manages payment",
+  ),
+  "api/http/billing.ts POST BILLING_STRIPE_WEBHOOK_PATH": WEBHOOK,
+  "api/http/admin-billing.ts GET ADMIN_BILLING_ACCOUNT_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/admin-billing.ts POST ADMIN_BILLING_ASSIGN_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/admin-billing.ts POST ADMIN_BILLING_OVERRIDE_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_EXPORT_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/admin-billing.ts POST ADMIN_BILLING_FEES_ACCRUE_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/admin-billing.ts POST ADMIN_BILLING_FEE_RATE_PATH":
+    OPERATIONS_CONSOLE,
+  // end BILLING block
   "api/http/admin.ts GET ADMIN_ME_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts POST ADMIN_STEP_UP_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts GET ADMIN_ACCOUNTS_PATH": OPERATIONS_CONSOLE,
@@ -701,6 +725,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/admin/q/runs/[runId]": OPERATIONS_CONSOLE,
   "/admin/audit": OPERATIONS_CONSOLE,
   "/admin/flags": OPERATIONS_CONSOLE,
+  "/admin/billing": OPERATIONS_CONSOLE,
   "/admin/email": OPERATIONS_CONSOLE,
   "/admin/team": OPERATIONS_CONSOLE,
   "/results": cap("tool.get_my_results"),
@@ -730,6 +755,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
   "/relationships": cap("navigate.RELATIONSHIPS"),
   "/settings": cap("navigate.SETTINGS"),
+  "/settings/plan": cap("tool.get_my_plan"),
   // AUTO (ADR 0030): Q's work; Q reads the same with list_q_work.
   "/work": cap("tool.list_q_work"),
   "/work/[delegationId]": cap("tool.list_q_work"),

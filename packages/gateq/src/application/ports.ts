@@ -36,6 +36,14 @@ export type GatewayRepository = {
     readonly investorOrganisationId: string;
     readonly limit: number;
   }) => Promise<readonly Gateway[]>;
+  /**
+   * BILLING (ADR 0034): how many ACTIVE gateways an organisation has, for
+   * its plan's gateway count. Optional so domain-only fakes need not
+   * implement it.
+   */
+  readonly countActiveForOrganisation?: (
+    organisationId: string,
+  ) => Promise<number>;
   readonly setStatus: (
     tx: TransactionContext,
     id: GatewayId,

@@ -24,6 +24,12 @@ import {
   StartRehearsalRequestSchema,
 } from "@capital-q/contracts";
 
+import {
+  billingAccountOf,
+  FEATURE_REHEARSALS,
+  type EntitlementService,
+} from "@capital-q/billing";
+
 import type {
   RehearsalImage,
   RehearsalResult,
@@ -34,6 +40,7 @@ import {
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import { sendEntitlementRequired } from "./entitlement-problem.js";
 
 /**
  * Rehearsals (C12, generalised by REHEARSE 2026-10-01). A person starts,
@@ -45,6 +52,12 @@ import {
 
 export type RehearsalRoutesDependencies = ActorContextDependencies & {
   readonly rehearsals: RehearsalService;
+  // BILLING block (ADR 0034): each rehearsal started draws one unit from
+  // the plan, taken before any model work and given back if it does not
+  // start. Absent: rehearsals are not plan-controlled (tests).
+  readonly entitlements?:
+    Pick<EntitlementService, "consume" | "release"> | undefined;
+  // end BILLING block
 };
 
 const RehearsalParamsSchema = z
@@ -155,17 +168,52 @@ export function registerRehearsalRoutes(
       if (counterpart === null) {
         return problem(request, reply, "INVALID_REQUEST", "Invalid request.");
       }
-      return answer(
-        request,
-        reply,
-        await rehearsals.start(getActorContext(request), {
+      const actor = getActorContext(request);
+      // BILLING block: one unit per start request (a retried request with
+      // the same Idempotency-Key is the same unit).
+      const { entitlements } = dependencies;
+      const header = request.headers["idempotency-key"];
+      const meter = {
+        account: billingAccountOf(actor),
+        feature: FEATURE_REHEARSALS,
+        idempotencyKey: `rehearsal-start:${
+          typeof header === "string" && /^[\x21-\x7e]{8,128}$/.test(header)
+            ? header
+            : request.id
+        }`,
+      };
+      if (entitlements !== undefined) {
+        const decision = await entitlements.consume({
+          ...meter,
+          actorUserId: actor.userId,
+          surface: "Q_API",
+        });
+        if (!decision.allowed) {
+          return sendEntitlementRequired(request, reply, decision.refusal);
+        }
+      }
+      // end BILLING block
+      let started: RehearsalResult;
+      try {
+        started = await rehearsals.start(actor, {
           kind: counterpart.kind,
           id: counterpart.id,
           meetingId: body.data.meetingId,
           voice: body.data.voice,
           difficulty: body.data.difficulty,
-        }),
-      );
+        });
+      } catch (error: unknown) {
+        await entitlements
+          ?.release({ ...meter, reason: "The rehearsal did not start." })
+          .catch(() => false);
+        throw error;
+      }
+      if (started.kind !== "OK") {
+        await entitlements
+          ?.release({ ...meter, reason: "The rehearsal did not start." })
+          .catch(() => false);
+      }
+      return answer(request, reply, started);
     },
   );
 

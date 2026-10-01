@@ -42,9 +42,20 @@ const SOME_ID = "f0000000-0000-4000-8000-000000000001";
 
 type Person = { readonly role: AdminRole | null; readonly stepUp: boolean };
 
+/** BILLING: every console audit row the fake database was asked to write. */
+const AUDITED: { readonly actionType: string; readonly resourceId: string }[] =
+  [];
+
 function fakeSql(people: ReadonlyMap<string, Person>) {
   const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.join("?");
+    if (text.includes("insert into platform_ops.admin_actions")) {
+      AUDITED.push({
+        actionType: String(values[2]),
+        resourceId: String(values[4]),
+      });
+      return Promise.resolve([]);
+    }
     if (text.includes("from identity.platform_admins where user_id")) {
       const person = people.get(String(values[0]));
       return Promise.resolve(
@@ -105,9 +116,67 @@ function appFor(
       }),
       adminVerificationDecider: () =>
         Promise.resolve({ kind: "NOTHING_TO_DECIDE" }),
+      // BILLING block (ADR 0034): fakes behind the console's billing routes.
+      adminBilling: {
+        accounts: fakeBillingAccounts(),
+        fees: fakeFeeLedger(),
+      },
+      // end BILLING block
     },
   ).app;
 }
+
+// BILLING block (ADR 0034)
+const BILLING_ACCOUNT = {
+  organisationId: SOME_ID,
+  organisationName: "Fixture Co",
+  current: {
+    account: "ORGANISATION" as const,
+    plan: {
+      key: "launch",
+      version: 1,
+      name: "Launch",
+      description: "Launch plan.",
+      audience: "ANY" as const,
+    },
+    source: "LAUNCH_DEFAULT" as const,
+    endsAt: null,
+    features: [],
+    hasBillingCustomer: false,
+  },
+  history: [],
+  plans: [{ key: "launch", name: "Launch" }],
+};
+
+function fakeBillingAccounts() {
+  return {
+    catalogue: () => Promise.resolve({ plans: [] }),
+    accountDetail: () => Promise.resolve(BILLING_ACCOUNT),
+    assignPlan: () => Promise.resolve({ previousPlanKey: null }),
+    setOverride: () => Promise.resolve({ previousLimit: null, had: false }),
+    customerOf: () => Promise.resolve(null),
+    lookupKeyOf: () => Promise.resolve(null),
+  };
+}
+
+function fakeFeeLedger() {
+  const ledger = {
+    schedule: {
+      version: 1,
+      rateBps: null,
+      accrueLevels: ["INVESTED" as const],
+      payerSide: "COMPANY" as const,
+      effectiveFrom: "2026-10-01T00:00:00.000Z",
+    },
+    entries: [],
+  };
+  return {
+    accrue: () => Promise.resolve({ added: 0, priced: 0, voided: 0 }),
+    list: () => Promise.resolve(ledger),
+    setRate: () => Promise.resolve({ version: 2, previousRateBps: null }),
+  };
+}
+// end BILLING block
 
 type Route = {
   readonly method: "GET" | "POST" | "DELETE";
@@ -293,6 +362,53 @@ const ROUTES: readonly Route[] = [
     permission: "roles.manage",
     body: REASON,
   },
+  // BILLING block (ADR 0034)
+  {
+    method: "GET",
+    url: `/v1/admin/billing/accounts/${SOME_ID}`,
+    permission: "billing.read",
+    listOk: true,
+  },
+  {
+    method: "POST",
+    url: `/v1/admin/billing/accounts/${SOME_ID}/plan`,
+    permission: "billing.write",
+    body: { planKey: "fund", endsAt: null, ...REASON },
+    listOk: true,
+  },
+  {
+    method: "POST",
+    url: `/v1/admin/billing/accounts/${SOME_ID}/overrides`,
+    permission: "billing.write",
+    body: { featureKey: "q.rehearsals", limit: 5, ...REASON },
+    listOk: true,
+  },
+  {
+    method: "GET",
+    url: "/v1/admin/billing/fees",
+    permission: "billing.fees.read",
+    listOk: true,
+  },
+  {
+    method: "GET",
+    url: "/v1/admin/billing/fees/export",
+    permission: "billing.fees.read",
+    listOk: true,
+  },
+  {
+    method: "POST",
+    url: "/v1/admin/billing/fees/accrue",
+    permission: "billing.fees.accrue",
+    listOk: true,
+  },
+  {
+    method: "POST",
+    url: "/v1/admin/billing/fee-rate",
+    permission: "billing.fees.rate",
+    body: { rateBps: 150, ...REASON },
+    listOk: true,
+  },
+  // end BILLING block
 ];
 
 const USERS = {
@@ -489,3 +605,66 @@ describe("account suspension", () => {
     ).rejects.toBeInstanceOf(AccountSuspendedError);
   });
 });
+
+// BILLING block (ADR 0034)
+describe("console billing changes are audited with their reason", () => {
+  it("records a plan assignment, a trial, a limit override and a fee rate", async () => {
+    AUDITED.length = 0;
+    const owner = idFor("platform_owner", true);
+    const trialEnds = new Date(Date.now() + 14 * 86_400_000).toISOString();
+    for (const route of [
+      {
+        method: "POST" as const,
+        url: `/v1/admin/billing/accounts/${SOME_ID}/plan`,
+        permission: "billing.write" as const,
+        body: { planKey: "fund", endsAt: null, ...REASON },
+      },
+      {
+        method: "POST" as const,
+        url: `/v1/admin/billing/accounts/${SOME_ID}/plan`,
+        permission: "billing.write" as const,
+        body: { planKey: "fund", endsAt: trialEnds, ...REASON },
+      },
+      {
+        method: "POST" as const,
+        url: `/v1/admin/billing/accounts/${SOME_ID}/overrides`,
+        permission: "billing.write" as const,
+        body: { featureKey: "q.rehearsals", limit: 5, ...REASON },
+      },
+      {
+        method: "POST" as const,
+        url: "/v1/admin/billing/fee-rate",
+        permission: "billing.fees.rate" as const,
+        body: { rateBps: 150, ...REASON },
+      },
+    ]) {
+      expect((await call(owner, route)).statusCode).toBe(200);
+    }
+    expect(AUDITED.map((row) => row.actionType)).toEqual([
+      "billing.plan.assign",
+      "billing.plan.trial",
+      "billing.limit.override",
+      "billing.fees.rate",
+    ]);
+    expect(AUDITED[0]?.resourceId).toBe(SOME_ID);
+  });
+
+  it("refuses a change without a reason, and a trial that has already ended", async () => {
+    const owner = idFor("platform_owner", true);
+    const noReason = await call(owner, {
+      method: "POST",
+      url: `/v1/admin/billing/accounts/${SOME_ID}/plan`,
+      permission: "billing.write",
+      body: { planKey: "fund", endsAt: null },
+    });
+    expect(noReason.statusCode).toBe(422);
+    const past = await call(owner, {
+      method: "POST",
+      url: `/v1/admin/billing/accounts/${SOME_ID}/plan`,
+      permission: "billing.write",
+      body: { planKey: "fund", endsAt: "2020-01-01T00:00:00.000Z", ...REASON },
+    });
+    expect(past.statusCode).toBe(422);
+  });
+});
+// end BILLING block

@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -141,6 +141,19 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'daily_cluster_issues',     'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'commitments',                'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'platform_admins',           'INTERNAL_SERVER_ONLY', '{}'),
+  -- BILLING block (ADR 0034): server-only; people read their plan through the API.
+  ('billing', 'features',                   'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'plans',                      'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'plan_features',              'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'plan_assignments',           'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'limit_overrides',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'usage_events',               'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'customers',                  'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'subscriptions',              'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'provider_events',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'fee_schedules',              'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'fee_entries',                'INTERNAL_SERVER_ONLY', '{}'),
+  -- end BILLING block
   ('q_runtime', 'checkpoints',               'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'checkpoint_blobs',          'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'checkpoint_writes',         'INTERNAL_SERVER_ONLY', '{}'),

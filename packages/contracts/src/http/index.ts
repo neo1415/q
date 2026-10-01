@@ -1161,3 +1161,7 @@ export {
 export * from "./admin-console.js";
 export * from "./results.js";
 // end ADMIN block
+
+// BILLING block (ADR 0034)
+export * from "./billing.js";
+// end BILLING block

@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { getRehearsalPartners, listRehearsals } from "@capital-q/api-client";
+import {
+  getMyPlan,
+  getRehearsalPartners,
+  listRehearsals,
+} from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { CalendarDays, ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
-import { qApiSession } from "@/features/q/context";
+import { remainingOf, unitsOf } from "@/features/billing/plan-words";
+import { apiSession, qApiSession } from "@/features/q/context";
 import { OUTCOME_WORDS, initialsOf } from "@/features/rehearsal/meet";
 
 export const metadata: Metadata = { title: "Rehearsals" };
@@ -16,7 +21,8 @@ export const dynamic = "force-dynamic";
 /**
  * Rehearsals (REHEARSE, founder direction 2026-10-01): upcoming calls to
  * rehearse first, the people you're connected to, and every past
- * rehearsal with its review. Unlimited; Q plays the other person.
+ * rehearsal with its review. Q plays the other person. How many a month
+ * is the account's plan (BILLING, ADR 0034); the page says what is left.
  */
 
 function lobbyHref(
@@ -43,14 +49,25 @@ const when = (iso: string) =>
   });
 
 export default async function RehearsalsPage() {
-  const session = await qApiSession();
-  const [partners, history] =
+  const [session, billingSession] = await Promise.all([
+    qApiSession(),
+    apiSession(),
+  ]);
+  const [partners, history, plan] =
     session === null
-      ? [null, null]
+      ? [null, null, null]
       : await Promise.all([
           getRehearsalPartners(session).catch(() => null),
           listRehearsals(session).catch(() => null),
+          billingSession === null
+            ? null
+            : getMyPlan(billingSession).catch(() => null),
         ]);
+  // BILLING block: what the plan leaves this month, said in words.
+  const allowance =
+    plan?.features.find((feature) => feature.key === "q.rehearsals") ?? null;
+  const left = allowance === null ? null : remainingOf(allowance);
+  // end BILLING block
 
   if (partners === null) {
     return (
@@ -93,6 +110,19 @@ export default async function RehearsalsPage() {
             Pick someone you’re meeting and rehearse the call. Q plays them by
             voice, from what you can see of them, then reviews how it went.
           </p>
+          {allowance === null || left === null ? null : (
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {left === 0
+                ? `You've used this month's ${allowance.unitPlural} on your ${plan?.plan.name ?? ""} plan. `
+                : `${String(left)} ${unitsOf(allowance, left)} left this month on your ${plan?.plan.name ?? ""} plan. `}
+              <Link
+                href="/settings/plan"
+                className="underline underline-offset-2 text-(--cq-text-primary)"
+              >
+                See your plan
+              </Link>
+            </p>
+          )}
         </header>
 
         {partners.upcoming.length === 0 ? null : (

@@ -1,0 +1,33 @@
+{
+  "name": "@capital-q/billing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Plans, entitlements and the usage meter; the payment-provider adapter (Stripe, off until configured); the facilitation-fee ledger. Owns the billing schema. Never decides what Q may know or how anything ranks.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

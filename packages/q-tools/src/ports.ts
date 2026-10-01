@@ -28,6 +28,7 @@ import type { OnboardingRemindersPort } from "./tools/onboarding-reminders.js";
 // AUTO block (ADR 0030)
 import type { QWorkIntelligencePort } from "./tools/q-work.js";
 import type { ResultsToolPort } from "./tools/results.js";
+import type { QEntitlementPort } from "./tools/plan.js";
 // DOCS block.
 import type { DocumentStudioPort } from "./tools/documents.js";
 import type { QDailyToolPort } from "./tools/daily.js";
@@ -260,6 +261,10 @@ export type PitchMomentPort = {
  * optional; without a configured provider the research tools do not exist.
  */
 export type QToolPorts = {
+  // BILLING block (ADR 0034): the plan gate and "what does my plan include".
+  // Absent: nothing is gated and there is no plan tool.
+  readonly entitlements?: QEntitlementPort | undefined;
+  // end BILLING block
   // ADMIN block: the person's own results (spec admin.md §5).
   readonly results?: ResultsToolPort | undefined;
   // end ADMIN block

@@ -14,7 +14,8 @@ export const ADMIN_ROLES = [
 ] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
-export const ADMIN_PERMISSIONS_VERSION = 1 as const;
+// 2: BILLING permissions added (ADR 0034).
+export const ADMIN_PERMISSIONS_VERSION = 2 as const;
 
 const ALL: readonly AdminRole[] = ADMIN_ROLES;
 const OWNER_OPERATOR_TS: readonly AdminRole[] = [
@@ -73,6 +74,24 @@ export const ADMIN_PERMISSIONS = {
   "flags.write": { roles: ["platform_owner", "operator"], stepUp: true },
   "email.read": { roles: ["platform_owner", "operator"], stepUp: false },
   "roles.manage": { roles: ["platform_owner"], stepUp: true },
+  // BILLING block (ADR 0034): plans and limits per account, and the fee
+  // ledger. Changing a plan or a limit is a write (step-up, audited); the
+  // fee rate is the founder's alone.
+  "billing.read": {
+    roles: ["platform_owner", "operator", "support", "analyst"],
+    stepUp: false,
+  },
+  "billing.write": { roles: ["platform_owner", "operator"], stepUp: true },
+  "billing.fees.read": {
+    roles: ["platform_owner", "operator", "analyst"],
+    stepUp: false,
+  },
+  "billing.fees.accrue": {
+    roles: ["platform_owner", "operator"],
+    stepUp: true,
+  },
+  "billing.fees.rate": { roles: ["platform_owner"], stepUp: true },
+  // end BILLING block
 } as const satisfies Record<
   string,
   { readonly roles: readonly AdminRole[]; readonly stepUp: boolean }

@@ -41,14 +41,17 @@ describe("error code registry", () => {
     }
   });
 
-  it("adds only the two transport-level codes and ADR 0033's two operator codes", () => {
+  it("adds only the two transport-level codes, ADR 0033's two operator codes and ADR 0034's plan code", () => {
     expect(CAPITAL_Q_ERROR_CODES).toContain("INVALID_REQUEST");
     expect(CAPITAL_Q_ERROR_CODES).toContain("INTERNAL_SERVER_ERROR");
     expect(CAPITAL_Q_ERROR_CODES).toContain("STEP_UP_REQUIRED");
     expect(CAPITAL_Q_ERROR_CODES).toContain("ACCOUNT_SUSPENDED");
     expect(PROBLEM_DEFINITIONS.STEP_UP_REQUIRED.status).toBe(403);
     expect(PROBLEM_DEFINITIONS.ACCOUNT_SUSPENDED.status).toBe(403);
-    expect(CAPITAL_Q_ERROR_CODES).toHaveLength(16);
+    // BILLING (ADR 0034): a plan refusal is distinguishable from a permission one.
+    expect(CAPITAL_Q_ERROR_CODES).toContain("ENTITLEMENT_REQUIRED");
+    expect(PROBLEM_DEFINITIONS.ENTITLEMENT_REQUIRED.status).toBe(402);
+    expect(CAPITAL_Q_ERROR_CODES).toHaveLength(17);
   });
 
   it("defines every code in the problem registry", () => {

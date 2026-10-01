@@ -111,6 +111,8 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     work: port(),
     // DAILY block
     daily: port(),
+    // BILLING (ADR 0034): the plan gate.
+    entitlements: port(),
   };
   return {
     ports,

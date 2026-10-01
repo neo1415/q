@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   ApiProblemError,
+  entitlementOf,
   finishRehearsal,
   getRehearsal,
   getRehearsalPersona,
@@ -15,6 +16,7 @@ import {
   RehearsalCounterpartKindSchema,
   RehearsalDifficultySchema,
   REHEARSAL_SCREEN_MAX_CHARS,
+  type EntitlementProblemExtension,
   type QRehearsalDto,
   type QRehearsalPersonaDto,
 } from "@capital-q/contracts";
@@ -28,7 +30,12 @@ import { qApiSession } from "@/features/q/context";
  */
 export type RehearsalResult<T = QRehearsalDto> =
   | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly message: string };
+  | {
+      readonly ok: false;
+      readonly message: string;
+      // BILLING (ADR 0034): the plan's own words when it does not cover this.
+      readonly entitlement?: EntitlementProblemExtension | undefined;
+    };
 
 const Id = z.string().uuid();
 
@@ -45,6 +52,10 @@ async function run<T>(
   try {
     return { ok: true, value: await work(session) };
   } catch (error: unknown) {
+    const entitlement = entitlementOf(error);
+    if (entitlement !== null) {
+      return { ok: false, message: entitlement.message, entitlement };
+    }
     return {
       ok: false,
       message:

@@ -137,10 +137,22 @@ import {
   createIntakeTaxonomyPort,
 } from "./gateq/intake-ports.js";
 import {
+  CapabilitySchema,
   createAuthorizationService,
   OrganisationIdSchema,
   TenantIdSchema,
 } from "@capital-q/security";
+// BILLING block (ADR 0034)
+import {
+  createBillingAccounts,
+  createEntitlementService,
+  createFeeLedger,
+  createStripeBillingProvider,
+  createWebhookApplier,
+  FEATURE_GATEWAYS,
+  stripeConfigFromEnv,
+} from "@capital-q/billing";
+// end BILLING block
 import {
   createPostgresProfileImageRepository,
   createPostgresPublicIdentityRepository,
@@ -1150,6 +1162,27 @@ const schedule = composeSchedule({
   email: unavailableAppEmailSender,
 });
 
+// BILLING block (ADR 0034): plans and usage, the fee ledger, and Stripe
+// when (and only when) the founder has configured both secrets.
+const entitlements = createEntitlementService({ sql: database.sql });
+const billingAccounts = createBillingAccounts({
+  sql: database.sql,
+  transactions: database.transactions,
+  entitlements,
+});
+const stripeConfig = stripeConfigFromEnv(process.env);
+const billingProvider =
+  stripeConfig === null ? undefined : createStripeBillingProvider(stripeConfig);
+const gatewayCounts = async (organisationId: string | undefined) => ({
+  [FEATURE_GATEWAYS]:
+    organisationId === undefined
+      ? 0
+      : ((await gateqGateways.countActiveForOrganisation?.(organisationId)) ??
+        0),
+});
+const ORGANISATION_ADMIN = CapabilitySchema.parse("organisation.admin");
+// end BILLING block
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -1202,6 +1235,42 @@ const { app, logger } = createApp(config, security, {
   interests,
   connections,
   commitments,
+  // BILLING block (ADR 0034)
+  billing: {
+    entitlements,
+    accounts: billingAccounts,
+    provider: billingProvider,
+    applyWebhook:
+      billingProvider === undefined
+        ? undefined
+        : createWebhookApplier({ transactions: database.transactions }),
+    canManage: async (actor) => {
+      if (actor.organisationId === undefined) return false;
+      const decision = await authorization.authorize({
+        actor,
+        capability: ORGANISATION_ADMIN,
+        resource: {
+          kind: "ORGANISATION",
+          tenantId: actor.tenantId,
+          organisationId: actor.organisationId,
+        },
+      });
+      return decision.outcome === "ALLOW";
+    },
+    counts: (actor) => gatewayCounts(actor.organisationId),
+    webOrigin:
+      process.env["CQ_WEB_ORIGIN"] ??
+      "https://capital-qweb-production.up.railway.app",
+  },
+  adminBilling: {
+    accounts: billingAccounts,
+    fees: createFeeLedger({
+      sql: database.sql,
+      transactions: database.transactions,
+    }),
+    countsFor: (organisationId) => gatewayCounts(organisationId),
+  },
+  // end BILLING block
   // ADMIN block (ADR 0033)
   admin: platformAdmin,
   results,

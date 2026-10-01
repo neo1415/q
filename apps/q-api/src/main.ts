@@ -215,6 +215,16 @@ import {
 import { Q_ACTION_EVENTS } from "@capital-q/q-actions/events";
 import { createContextFirewall } from "@capital-q/q-firewall";
 import { createQTools, type DocumentStudioPort } from "@capital-q/q-tools";
+// BILLING block (ADR 0034)
+import {
+  createEntitlementService,
+  FEATURE_DELEGATIONS,
+} from "@capital-q/billing";
+import {
+  createQEntitlementPort,
+  meteredQAction,
+} from "./composition/entitlements.js";
+// end BILLING block
 import {
   createLangGraphQOrchestrator,
   createPostgresQCheckpointStore,
@@ -1226,8 +1236,16 @@ const ownDaily = (actor: {
 });
 // end DAILY block
 
+// BILLING block (ADR 0034): plans and the meter, the same service the
+// API reads; Q's tools see it through the plan gate.
+const entitlements = createEntitlementService({ sql: database.sql });
+// end BILLING block
+
 const qTools = createQTools({
   ports: {
+    // BILLING block
+    entitlements: createQEntitlementPort(entitlements),
+    // end BILLING block
     // AUTO block (ADR 0030)
     work: workPort,
     // ADMIN block
@@ -1663,20 +1681,29 @@ const qActionRegistry = createQActionRegistry([
   createMeetingScheduleAction({ schedule, logger }),
   createMeetingRescheduleAction({ schedule }),
   createMeetingCancelAction({ schedule }),
-  createErrandStartAction({
-    sql: database.sql,
-    interests: interestService,
-    relationships: errandRelationships,
-    chat,
-    logger,
-  }),
+  // BILLING block (ADR 0034): an errand, outreach or a stand-in each draw
+  // one "Q handles it" unit from the plan when they run.
+  meteredQAction(
+    createErrandStartAction({
+      sql: database.sql,
+      interests: interestService,
+      relationships: errandRelationships,
+      chat,
+      logger,
+    }),
+    FEATURE_DELEGATIONS,
+    entitlements,
+  ),
   // AUTO block (ADR 0030): outreach and stand-in, one approval each.
   ...createWorkStartActions({
     store: workStore,
     isInvestor: workIsInvestor,
     ownCompany: workOwnCompany,
     logger,
-  }),
+  }).map((definition) =>
+    meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
+  ),
+  // end BILLING block
 ]);
 // Every composed action has a capability entry (R20): the list the
 // completeness test reads is the list composed here.
@@ -1812,6 +1839,8 @@ if (providerSecrets.google !== undefined) {
 }
 const documentImages = createDocumentImages({
   sql: database.sql,
+  // BILLING block (ADR 0034): each picture is one unit of the plan's AI images.
+  meter: createQEntitlementPort(entitlements, "Q_API"),
   gateway: createImageGateway({
     enabled: config.documentImages.enabled,
     providers: imageProviders,
@@ -3157,6 +3186,9 @@ const { app, logger: appLogger } = createApp(
     // AUTO block (ADR 0030)
     work: workPort,
     rehearsals,
+    // BILLING block (ADR 0034)
+    rehearsalEntitlements: entitlements,
+    // end BILLING block
     standing: standingStore,
     // DAILY block
     daily: dailyReader,
