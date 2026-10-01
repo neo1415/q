@@ -62,6 +62,7 @@ create policy meeting_roster_entries_select_participant
   );
 
 -- Read only from the browser; the server alone appends.
+revoke all on function private.communication_meeting_roster_append_only() from public, anon, authenticated;
 revoke all on communication.meeting_roster_entries from anon, authenticated;
 grant select on communication.meeting_roster_entries to authenticated;
 
@@ -121,5 +122,6 @@ create policy meeting_host_notes_select_participant
     )
   );
 
+revoke all on function private.communication_meeting_host_notes_append_only() from public, anon, authenticated;
 revoke all on communication.meeting_host_notes from anon, authenticated;
 grant select on communication.meeting_host_notes to authenticated;
