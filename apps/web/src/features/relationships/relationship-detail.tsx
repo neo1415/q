@@ -334,7 +334,7 @@ function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
           className="cq-caption inline-flex min-h-8 items-center gap-1 text-(--cq-text-secondary) underline-offset-4 hover:underline"
         >
           <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-          {profile.websiteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+          {profile.websiteUrl.replace(/^https?:\/\//i, "").replace(/\/$/, "")}
         </a>
       )}
       {profile.chips.map((chip) => (

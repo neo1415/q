@@ -248,11 +248,16 @@ describe("Founder canonical mappings", () => {
 
   it("normalises a bare domain into an https URL and keeps explicit schemes", () => {
     expect(normaliseWebsite("example.com")).toBe("https://example.com");
+    expect(normaliseWebsite("Https://zinoaviation.com")).toBe(
+      "https://zinoaviation.com",
+    );
     expect(normaliseWebsite("http://example.com/x")).toBe(
       "http://example.com/x",
     );
+    // The scheme is kept (http stays http) but stored lower-case, which
+    // RFC 3986 makes the canonical form; the rest is kept as typed.
     expect(normaliseWebsite("  HTTPS://Example.com ")).toBe(
-      "HTTPS://Example.com",
+      "https://Example.com",
     );
   });
 

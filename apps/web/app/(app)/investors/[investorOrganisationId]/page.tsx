@@ -115,7 +115,7 @@ export default async function InvestorPage({
                   className="inline-flex items-center gap-1 underline underline-offset-4"
                 >
                   <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-                  {investor.websiteUrl.replace(/^https?:\/\//, "")}
+                  {investor.websiteUrl.replace(/^https?:\/\//i, "")}
                 </a>,
               ]),
         ]}

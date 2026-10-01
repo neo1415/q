@@ -153,7 +153,11 @@ function invalid(path: string, code: string, message: string): never {
  */
 export function normaliseWebsite(raw: string): string {
   const trimmed = raw.trim();
-  const url = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  // The scheme is stored lower-case: a typed or spoken "Https://" showed
+  // as "Https://site.com" wherever the scheme is trimmed for display.
+  const url = /^https?:\/\//i.test(trimmed)
+    ? trimmed.replace(/^https?:\/\//i, (scheme) => scheme.toLowerCase())
+    : `https://${trimmed}`;
   let host: string;
   try {
     host = new URL(url).hostname;

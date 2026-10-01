@@ -154,8 +154,8 @@ export function cardDescriptor(
 /** "https://www.kivu.africa/" -> "kivu.africa", for a link's visible text. */
 export function websiteLabel(url: string): string {
   return url
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
     .replace(/\/$/, "");
 }
 
