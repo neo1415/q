@@ -517,3 +517,53 @@ export const RehearsalTurnV5VariablesSchema =
 export type RehearsalTurnV5Variables = z.infer<
   typeof RehearsalTurnV5VariablesSchema
 >;
+
+// ---------------------------------------------------------------------------
+// v6 (REHEARSE, founder ask 2026-10-01: Q sees you on camera): with the
+// person's explicit consent, a downscaled camera frame rides with their
+// turn. The model returns a short presence reading of meeting behaviour and
+// setup only (never appearance, identity or a face's emotions); code keeps
+// it as text for the review and decides which issue, if any, the played
+// person may remark on, once.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V5_SCHEMA_VERSION = 5;
+
+export const PresenceReadingSchema = z
+  .object({
+    /** Where they look, as a meeting partner would notice it. */
+    gaze: z.enum([
+      "AT_CAMERA",
+      "READING_OFF_SCREEN",
+      "LOOKING_AWAY",
+      "UNCLEAR",
+    ]),
+    /** Busy with something else (phone, typing elsewhere). */
+    distracted: z.boolean(),
+    framing: z.enum(["GOOD", "POOR", "UNCLEAR"]),
+    lighting: z.enum(["GOOD", "POOR", "UNCLEAR"]),
+    background: z.enum(["CALM", "BUSY", "UNCLEAR"]),
+    /** Someone else is in view; never who. */
+    company: z.boolean(),
+    /** Composed, engaged, steady on camera. */
+    confident: z.boolean(),
+  })
+  .strict();
+export type PresenceReading = z.infer<typeof PresenceReadingSchema>;
+
+export const RehearsalTurnV6VariablesSchema =
+  RehearsalTurnV5VariablesSchema.extend({
+    /** A consented camera frame is attached. Trusted. */
+    cameraOn: z.boolean(),
+    /** Code-composed: what the played person may remark on. Trusted. */
+    presence: z.string().max(1_200),
+  }).strict();
+export type RehearsalTurnV6Variables = z.infer<
+  typeof RehearsalTurnV6VariablesSchema
+>;
+
+export const RehearsalTurnV5ResultSchema = RehearsalTurnV4ResultSchema.extend({
+  /** Null unless a camera frame was attached and is clear enough to read. */
+  presence: PresenceReadingSchema.nullable(),
+}).strict();
+export type RehearsalTurnV5Result = z.infer<typeof RehearsalTurnV5ResultSchema>;

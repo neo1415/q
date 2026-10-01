@@ -215,6 +215,28 @@ export function RehearsalReview({
               </ul>
             </section>
           )}
+
+          {(review.presence ?? []).length === 0 ? null : (
+            <section className="flex flex-col gap-3">
+              <h2 className="cq-title-sm text-(--cq-text-primary)">Presence</h2>
+              <p className="cq-caption text-(--cq-text-tertiary)">
+                From what Q saw on your camera, with your permission. No images
+                were kept.
+              </p>
+              <ul className="flex flex-col gap-3">
+                {(review.presence ?? []).map((item) => (
+                  <li key={item.observation} className="flex flex-col gap-1">
+                    <p className="cq-body-sm text-(--cq-text-primary)">
+                      {item.observation}
+                    </p>
+                    <p className="cq-body-sm text-(--cq-text-secondary)">
+                      {item.tip}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
 

@@ -347,14 +347,19 @@ export function registerRehearsalRoutes(
       const params = RehearsalParamsSchema.safeParse(request.params);
       if (!params.success) return reply.callNotFound();
       const body = RehearsalScreenRequestSchema.safeParse(request.body);
-      const image = body.success ? imageOf(body.data.image) : null;
-      if (image === null) {
+      if (!body.success) {
+        return problem(request, reply, "INVALID_REQUEST", "Invalid frame.");
+      }
+      const raw = body.data.image;
+      const image = raw === undefined ? null : imageOf(raw);
+      if (raw !== undefined && image === null) {
         return problem(request, reply, "INVALID_REQUEST", "Invalid frame.");
       }
       const result = await rehearsals.screen(
         getActorContext(request),
         params.data.rehearsalId,
         image,
+        body.data.kind,
       );
       if (result === "NOT_FOUND") {
         return problem(request, reply, "RESOURCE_NOT_FOUND", "Not found.");

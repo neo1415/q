@@ -136,22 +136,28 @@ export async function raiseHandAction(
   );
 }
 
-/** One frame of the shared screen (a downscaled JPEG data URL). */
+/**
+ * One frame of the shared screen, or of the camera when they let Q see
+ * them (a downscaled JPEG data URL); null forgets the held frame at once.
+ */
 export async function shareScreenFrameAction(
   rehearsalId: unknown,
   image: unknown,
+  kind: unknown = "SCREEN",
 ): Promise<RehearsalResult<true>> {
   const id = Id.safeParse(rehearsalId);
   const frame = z
     .string()
     .max(REHEARSAL_SCREEN_MAX_CHARS)
     .startsWith("data:image/jpeg;base64,")
+    .nullable()
     .safeParse(image);
-  if (!id.success || !frame.success) {
+  const which = z.enum(["SCREEN", "CAMERA"]).safeParse(kind);
+  if (!id.success || !frame.success || !which.success) {
     return { ok: false, message: "That frame was too large to share." };
   }
   return run(async (session) => {
-    await sendRehearsalScreen(session, id.data, frame.data);
+    await sendRehearsalScreen(session, id.data, frame.data, which.data);
     return true as const;
   });
 }

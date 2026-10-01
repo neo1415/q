@@ -302,6 +302,7 @@ export { INVESTOR_PERSONA_V3 } from "./prompts/tasks/investor-persona.v3.js";
 export { INVESTOR_PERSONA_V4 } from "./prompts/tasks/investor-persona.v4.js";
 export { INVESTOR_PERSONA_V5 } from "./prompts/tasks/investor-persona.v5.js";
 export { INVESTOR_TWIN_TURN_V5 } from "./prompts/tasks/investor-twin-turn.v5.js";
+export { INVESTOR_TWIN_TURN_V6 } from "./prompts/tasks/investor-twin-turn.v6.js";
 export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
 export { REHEARSAL_SCORE_V4 } from "./prompts/tasks/rehearsal-score.v4.js";
 export {
@@ -314,6 +315,12 @@ export {
   RehearsalTurnV4ResultSchema,
   RehearsalTurnV4VariablesSchema,
   RehearsalTurnV5VariablesSchema,
+  RehearsalTurnV6VariablesSchema,
+  RehearsalTurnV5ResultSchema,
+  PresenceReadingSchema,
+  type PresenceReading,
+  type RehearsalTurnV6Variables,
+  type RehearsalTurnV5Result,
   type RehearsalTurnV5Variables,
   type RehearsalTurnV4Result,
   type RehearsalTurnV4Variables,

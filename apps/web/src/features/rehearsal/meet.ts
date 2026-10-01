@@ -198,3 +198,32 @@ export const TRAIT_SOURCE_WORDS: Readonly<
   PUBLIC: "public sources",
   PITCH: "their pitch",
 };
+
+/** The consent, word for word, in the lobby and the room. */
+export const SEE_YOU_CONSENT =
+  "Let Q see you on camera (frames are analysed for this rehearsal only and never stored)";
+
+/** A look at them at most this often, and on their turns. */
+export const LOOK_MIN_GAP_MS = 8_000;
+/** Between turns, one idle look at most this often. */
+export const LOOK_IDLE_MS = 30_000;
+export const LOOK_WIDTH = 512;
+export const LOOK_QUALITY = 0.6;
+
+/**
+ * Whether to send a camera frame now: only with consent and the camera on,
+ * never more often than the gap, and between turns only once per idle
+ * period.
+ */
+export function shouldLook(input: {
+  readonly consent: boolean;
+  readonly cameraOn: boolean;
+  readonly ended: boolean;
+  readonly lastLookMs: number;
+  readonly nowMs: number;
+  readonly reason: "TURN" | "IDLE";
+}): boolean {
+  if (!input.consent || !input.cameraOn || input.ended) return false;
+  const gap = input.nowMs - input.lastLookMs;
+  return input.reason === "TURN" ? gap >= LOOK_MIN_GAP_MS : gap >= LOOK_IDLE_MS;
+}

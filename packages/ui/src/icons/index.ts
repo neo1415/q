@@ -32,6 +32,7 @@ export {
   Download,
   ExternalLink,
   Eye,
+  EyeOff,
   FileText,
   Globe,
   Hand,

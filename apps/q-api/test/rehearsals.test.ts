@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { QRehearsalPersonaDtoSchema } from "@capital-q/contracts";
-import type { CounterpartPersonaStored as CounterpartPersonaResult } from "@capital-q/q-core";
+import type {
+  CounterpartPersonaStored as CounterpartPersonaResult,
+  PresenceReading,
+} from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
 import {
+  CAMERA_FRAME_TTL_MS,
   createRehearsalService,
   ownReview,
   scoreOf,
@@ -18,6 +22,12 @@ import {
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
 import { createRehearsalAwareTurn } from "../src/voice/rehearsal-turn.js";
+import {
+  newPresenceState,
+  presenceNote,
+  presenceReview,
+  recordPresence,
+} from "../src/composition/rehearsal-presence.js";
 
 /**
  * REHEARSE (founder direction 2026-10-01): a person rehearses a meeting
@@ -168,6 +178,10 @@ function memoryStore(): RehearsalStore & {
 }
 
 function setup(options: { messages?: () => string } = {}) {
+  const clock = { at: new Date("2026-10-01T10:05:00Z").getTime() };
+  const looks = {
+    next: null as PresenceReading | null,
+  };
   const seen = {
     personaInputs: [] as string[],
     personaVariables: [] as Record<string, unknown>[],
@@ -177,6 +191,8 @@ function setup(options: { messages?: () => string } = {}) {
       material: string;
       difficulty: string;
       stance: string;
+      camera: boolean;
+      presenceNote: string;
     }[],
     webReads: 0,
     reviewTranscripts: [] as string[],
@@ -270,11 +286,13 @@ function setup(options: { messages?: () => string } = {}) {
       );
       return Promise.resolve(PERSONA);
     },
-    turn: (_a, variables, image) => {
+    turn: (_a, variables, views) => {
       seen.turnInputs.push({
+        camera: views.camera !== null && variables.cameraOn,
+        presenceNote: variables.presence,
         difficulty: variables.difficulty,
         cue: variables.cue,
-        screen: image !== null,
+        screen: views.screen !== null,
         material: variables.meetingMaterial,
         stance: variables.stance,
       });
@@ -287,6 +305,7 @@ function setup(options: { messages?: () => string } = {}) {
           intensity: "NORMAL",
           reaction: null,
           conclusion: "ADJOURNED",
+          presence: views.camera === null ? null : looks.next,
         });
       }
       return Promise.resolve({
@@ -299,6 +318,7 @@ function setup(options: { messages?: () => string } = {}) {
         intensity: variables.difficulty === "TOUGH" ? "RAISED" : "NORMAL",
         reaction: variables.cue === "SILENCE" ? "SIGH" : null,
         conclusion: null,
+        presence: views.camera === null ? null : looks.next,
       });
     },
     review: (_a, variables) => {
@@ -326,9 +346,11 @@ function setup(options: { messages?: () => string } = {}) {
     store,
     material,
     composer,
-    now: () => new Date("2026-10-01T10:05:00Z"),
+    now: () => new Date(clock.at),
   });
   return {
+    clock,
+    looks,
     service,
     store,
     seen,
@@ -946,5 +968,166 @@ describe("the persona reads the person Q plays, never the person rehearsing (liv
       viewerRole: "FOUNDER",
       viewerOrganisation: "Nixo",
     });
+  });
+});
+
+describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
+  const FRAME = { mediaType: "image/jpeg" as const, dataBase64: "AAAA" };
+  const reading = (over: Partial<PresenceReading> = {}): PresenceReading => ({
+    gaze: "AT_CAMERA",
+    distracted: false,
+    framing: "GOOD",
+    lighting: "GOOD",
+    background: "CALM",
+    company: false,
+    confident: true,
+    ...over,
+  });
+
+  it("consent off: no camera frame is sent, and the played person is told it cannot see them", async () => {
+    const { service, seen } = setup();
+    const rehearsal = await startWith(service);
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Hello." });
+    expect(seen.turnInputs.at(-1)?.camera).toBe(false);
+    expect(seen.turnInputs.at(-1)?.presenceNote).toContain(
+      "You cannot see them",
+    );
+  });
+
+  it("a camera frame rides with the next turn only, apart from the screen", async () => {
+    const { service, seen } = setup();
+    const rehearsal = await startWith(service);
+    await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Hello." });
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Next." });
+    expect(seen.turnInputs.slice(-2).map((t) => [t.camera, t.screen])).toEqual([
+      [true, false],
+      [false, false],
+    ]);
+  });
+
+  it("turning it off mid-call forgets the held frame at once", async () => {
+    const { service, seen } = setup();
+    const rehearsal = await startWith(service);
+    await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+    await service.screen(actor(FOUNDER), rehearsal.id, null, "CAMERA");
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Hello." });
+    expect(seen.turnInputs.at(-1)?.camera).toBe(false);
+  });
+
+  it("a camera frame older than its TTL is dropped, never shown", async () => {
+    const { service, seen, clock } = setup();
+    const rehearsal = await startWith(service);
+    await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+    clock.at += CAMERA_FRAME_TTL_MS + 1_000;
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Hello." });
+    expect(seen.turnInputs.at(-1)?.camera).toBe(false);
+  });
+
+  it("never persists a frame: nothing of it reaches the stored rehearsal", async () => {
+    const { service, store, looks, closeNextTurn } = setup();
+    const rehearsal = await startWith(service);
+    looks.next = reading({ gaze: "READING_OFF_SCREEN" });
+    const secret = "SECRETFRAMEBYTES0123456789";
+    for (const text of ["One.", "Two."]) {
+      await service.screen(
+        actor(FOUNDER),
+        rehearsal.id,
+        { mediaType: "image/jpeg", dataBase64: secret },
+        "CAMERA",
+      );
+      await service.say(actor(FOUNDER), rehearsal.id, { text });
+    }
+    closeNextTurn();
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Three." });
+    const finished = await service.finish(actor(FOUNDER), rehearsal.id);
+    expect(JSON.stringify(store.rows)).not.toContain(secret);
+    // The review gets a Presence section, written from text readings.
+    if (finished.kind !== "OK") throw new Error(finished.kind);
+    const section = finished.rehearsal.review?.presence ?? [];
+    expect(section.length).toBeGreaterThanOrEqual(2);
+    expect(section.length).toBeLessThanOrEqual(4);
+    expect(section.map((p) => p.observation).join(" ")).toContain("notes");
+  });
+
+  it("offers each issue once, never two turns running, and only what difficulty allows", async () => {
+    const { service, seen, looks } = setup();
+    const rehearsal = await startWith(service);
+    looks.next = reading({ gaze: "READING_OFF_SCREEN", lighting: "POOR" });
+    const notes: string[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+      await service.say(actor(FOUNDER), rehearsal.id, {
+        text: `Line ${String(i)}.`,
+      });
+      notes.push(seen.turnInputs.at(-1)?.presenceNote ?? "");
+    }
+    const offers = notes.map((note) =>
+      note.includes("you may mention it once")
+        ? (note.split("If it still shows")[0] ?? "").includes("notes")
+          ? "NOTES"
+          : (note.split("If it still shows")[0] ?? "").includes("lighting")
+            ? "LIGHT"
+            : "OTHER"
+        : null,
+    );
+    // Turn 1 has no reading yet; notes offered once, a rest, lighting once.
+    expect(offers).toEqual([null, "NOTES", null, "LIGHT", null, null]);
+    expect(notes.at(-1)).toContain("Already raised, never again");
+  });
+});
+
+describe("presence guardrails", () => {
+  it("Gentle lets distraction and a busy room pass; Tough calls notes out", () => {
+    const state = newPresenceState();
+    recordPresence(
+      state,
+      {
+        gaze: "LOOKING_AWAY",
+        distracted: true,
+        framing: "GOOD",
+        lighting: "GOOD",
+        background: "BUSY",
+        company: false,
+        confident: false,
+      },
+      null,
+      1,
+    );
+    expect(presenceNote(state, true, "GENTLE", 2).offer).toBeNull();
+    expect(presenceNote(state, true, "TOUGH", 2).offer).toBe("DISTRACTED");
+    const notes = newPresenceState();
+    recordPresence(
+      notes,
+      {
+        gaze: "READING_OFF_SCREEN",
+        distracted: false,
+        framing: "GOOD",
+        lighting: "GOOD",
+        background: "CALM",
+        company: false,
+        confident: true,
+      },
+      null,
+      1,
+    );
+    expect(presenceNote(notes, true, "TOUGH", 2).note).toContain("bluntly");
+    expect(presenceNote(notes, true, "GENTLE", 2).note).toContain("kindly");
+  });
+
+  it("an unclear frame gives no review and no remark", () => {
+    const unclear = {
+      gaze: "UNCLEAR",
+      distracted: false,
+      framing: "UNCLEAR",
+      lighting: "UNCLEAR",
+      background: "UNCLEAR",
+      company: false,
+      confident: false,
+    } as const;
+    expect(presenceReview([unclear, unclear, unclear])).toEqual([]);
+    const state = newPresenceState();
+    recordPresence(state, unclear, null, 1);
+    expect(presenceNote(state, true, "TOUGH", 2).offer).toBeNull();
   });
 });

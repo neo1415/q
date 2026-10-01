@@ -109,14 +109,15 @@ export function sayInRehearsal(
 export function sendRehearsalScreen(
   session: ApiSession,
   rehearsalId: string,
-  image: string,
+  image: string | null,
+  kind: "SCREEN" | "CAMERA" = "SCREEN",
 ) {
   return call(
     session,
     "POST",
     qRehearsalScreenPath(rehearsalId),
     z.object({ accepted: z.literal(true) }).strict(),
-    { body: { image } },
+    { body: image === null ? { kind } : { kind, image } },
   );
 }
 

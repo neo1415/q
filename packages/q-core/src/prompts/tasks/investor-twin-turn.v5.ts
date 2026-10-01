@@ -32,7 +32,7 @@ export const INVESTOR_TWIN_TURN_V5: PromptDefinition<
 > = {
   ...INVESTOR_TWIN_TURN_V4,
   version: 5,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live test 2026-10-01: a code-composed stance says who holds the leverage (a founder pitching is the weaker party unless known to be forward); an angry or cold close is a goodbye in that emotion.",
   effectiveFrom: "2026-10-01",

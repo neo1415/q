@@ -32,14 +32,14 @@ import {
   REHEARSAL_DIMENSIONS_FOR,
   RehearsalReviewLenientSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnV4ResultSchema,
+  RehearsalTurnV5ResultSchema,
   renderPrompt,
   type CounterpartPersonaStored as CounterpartPersonaResult,
   type CounterpartPersonaV5Variables as CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV4Result as RehearsalTurnResult,
-  type RehearsalTurnV5Variables as RehearsalTurnVariables,
+  type RehearsalTurnV5Result as RehearsalTurnResult,
+  type RehearsalTurnV6Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
@@ -52,6 +52,14 @@ import {
   temperamentNote,
   type Temperament,
 } from "./rehearsal-temperament.js";
+import {
+  newPresenceState,
+  presenceNote,
+  presenceReview,
+  recordPresence,
+  type PresenceObservation,
+  type PresenceState,
+} from "./rehearsal-presence.js";
 
 /**
  * Rehearsals (C12 Investor Twin, generalised by REHEARSE, founder direction
@@ -160,6 +168,12 @@ export type RehearsalImage = {
   readonly dataBase64: string;
 };
 
+/** What the played person can see this turn: frames, never kept. */
+export type RehearsalViews = {
+  readonly screen: RehearsalImage | null;
+  readonly camera: RehearsalImage | null;
+};
+
 export type RehearsalComposer = {
   /** The active INVESTOR_PERSONA version: older stored readings are rebuilt. */
   readonly personaVersion: number;
@@ -170,7 +184,7 @@ export type RehearsalComposer = {
   readonly turn: (
     actor: ActorContext,
     variables: Omit<RehearsalTurnVariables, FrameKeys>,
-    image: RehearsalImage | null,
+    views: RehearsalViews,
     signal?: AbortSignal,
   ) => Promise<RehearsalTurnResult | null>;
   readonly review: (
@@ -499,7 +513,12 @@ export type RehearsalStore = {
     input: {
       readonly outcome: RehearsalConclusion;
       readonly score: number | null;
-      readonly review: RehearsalReviewResult | null;
+      /** The review, with the Presence section beside it when there is one. */
+      readonly review:
+        | (RehearsalReviewResult & {
+            readonly presence?: readonly PresenceObservation[];
+          })
+        | null;
     },
   ) => Promise<RehearsalRow | null>;
   readonly list: (
@@ -759,11 +778,16 @@ export type RehearsalService = {
     said: RehearsalSay,
     signal?: AbortSignal,
   ) => Promise<RehearsalResult>;
-  /** A frame of the person's shared screen, for the next turn only. */
+  /**
+   * A frame of the person's shared screen, or (with their consent) their
+   * camera, for the next turn only; the latest of each kind, in memory.
+   */
   readonly screen: (
     actor: ActorContext,
     rehearsalId: string,
-    image: RehearsalImage,
+    /** Null forgets the frame held of this kind at once. */
+    image: RehearsalImage | null,
+    kind?: "SCREEN" | "CAMERA",
   ) => Promise<"OK" | "NOT_FOUND" | "FINISHED">;
   readonly finish: (
     actor: ActorContext,
@@ -832,11 +856,28 @@ function publicSources(raw: unknown): QPersonaSourceDto[] {
     }));
 }
 
+const PresenceSectionSchema = z
+  .array(
+    z
+      .object({
+        observation: z.string().max(300),
+        tip: z.string().max(300),
+      })
+      .strict(),
+  )
+  .max(4);
+
 function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
-  if (row.scorecard === null || row.scorecard === undefined) return null;
-  const parsed = RehearsalReviewResultSchema.safeParse(row.scorecard);
+  if (row.scorecard === null || typeof row.scorecard !== "object") return null;
+  const { presence, ...review } = row.scorecard as Record<string, unknown>;
+  const parsed = RehearsalReviewResultSchema.safeParse(review);
   if (!parsed.success) return null;
-  return { ...parsed.data, score: row.score };
+  const looks = PresenceSectionSchema.safeParse(presence ?? []);
+  return {
+    ...parsed.data,
+    score: row.score,
+    ...(looks.success && looks.data.length > 0 ? { presence: looks.data } : {}),
+  };
 }
 
 const wordsIn = (text: string) =>
@@ -981,14 +1022,23 @@ export function yieldTo(previous: readonly Turn[]): {
       intensity: last?.intensity === "SOFT" ? "SOFT" : "NORMAL",
       reaction: null,
       conclusion: null,
+      presence: null,
     },
     sawScreen: false,
   };
 }
 
-/** A shared frame, held in memory for the next turn only; never persisted. */
+/**
+ * A shared frame, held in memory for the next turn only; never persisted,
+ * logged or sent anywhere but the turn's model call. Screen frames and
+ * consented camera frames are kept apart, the latest of each.
+ */
 type Frame = { readonly image: RehearsalImage; readonly at: number };
-const FRAME_TTL_MS = 90_000;
+export const FRAME_TTL_MS = 90_000;
+/** A camera frame is a look at them now: stale after half a minute. */
+export const CAMERA_FRAME_TTL_MS = 30_000;
+const frameKey = (rehearsalId: string, kind: "SCREEN" | "CAMERA") =>
+  `${rehearsalId}:${kind}`;
 const NO_MATERIAL: Sourced = { text: "", sources: [] };
 
 type BuiltPersona = {
@@ -1008,6 +1058,21 @@ export function createRehearsalService(dependencies: {
   const { store, material, composer, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
   const frames = new Map<string, Frame>();
+  /** Presence readings as text, per rehearsal; dropped when it finishes. */
+  const presence = new Map<string, PresenceState>();
+  const takeFrame = (rehearsalId: string, kind: "SCREEN" | "CAMERA") => {
+    const key = frameKey(rehearsalId, kind);
+    const frame = frames.get(key);
+    frames.delete(key);
+    const ttl = kind === "CAMERA" ? CAMERA_FRAME_TTL_MS : FRAME_TTL_MS;
+    return frame !== undefined && now().getTime() - frame.at <= ttl
+      ? frame.image
+      : null;
+  };
+  const dropFrames = (rehearsalId: string) => {
+    frames.delete(frameKey(rehearsalId, "SCREEN"));
+    frames.delete(frameKey(rehearsalId, "CAMERA"));
+  };
   /** One persona build per viewer and subject at a time. */
   const building = new Map<string, Promise<PersonaRow | null>>();
 
@@ -1220,12 +1285,16 @@ export function createRehearsalService(dependencies: {
   } | null> {
     const persona = personaOf(row.persona);
     if (persona === null) return null;
-    const frame = frames.get(row.id);
-    const fresh =
-      frame !== undefined && now().getTime() - frame.at <= FRAME_TTL_MS
-        ? frame
-        : null;
-    if (fresh !== null) frames.delete(row.id);
+    const screenFrame = takeFrame(row.id, "SCREEN");
+    const cameraFrame = takeFrame(row.id, "CAMERA");
+    const themTurns = turns.filter((turn) => turn.from === "THEM").length;
+    const seen = presence.get(row.id);
+    const look = presenceNote(
+      seen,
+      cameraFrame !== null,
+      row.difficulty,
+      themTurns,
+    );
     const minutes = Math.floor(
       (now().getTime() - row.createdAt.getTime()) / 60_000,
     );
@@ -1258,12 +1327,29 @@ export function createRehearsalService(dependencies: {
           persona.forwardness ?? "TYPICAL",
           persona.forwardnessWhy ?? null,
         ).note,
-        screenShared: fresh !== null,
+        screenShared: screenFrame !== null,
+        cameraOn: cameraFrame !== null,
+        presence: look.note,
       },
-      fresh?.image ?? null,
+      { screen: screenFrame, camera: cameraFrame },
       signal,
     );
     if (result === null) return null;
+    if (cameraFrame !== null || look.offer !== null) {
+      const state = seen ?? newPresenceState();
+      recordPresence(
+        state,
+        cameraFrame === null ? null : result.presence,
+        look.offer,
+        themTurns,
+      );
+      presence.set(row.id, state);
+      // Bounded: rehearsals nobody finished never pile up.
+      if (presence.size > 500) {
+        const oldest = presence.keys().next().value;
+        if (oldest !== undefined) presence.delete(oldest);
+      }
+    }
     // Their latest line moves the state by fixed rules; the state decides
     // the register the voice delivers this line in.
     const after = applyAppraisal(before, result.appraisal, row.difficulty);
@@ -1281,7 +1367,7 @@ export function createRehearsalService(dependencies: {
         intensity: delivery.intensity,
         reaction: delivery.reaction,
       },
-      sawScreen: fresh !== null,
+      sawScreen: screenFrame !== null,
       state: after,
     };
   }
@@ -1578,7 +1664,7 @@ export function createRehearsalService(dependencies: {
       return saved === null ? { kind: "FINISHED" } : ok(saved);
     },
 
-    screen: async (actor, rehearsalId, image) => {
+    screen: async (actor, rehearsalId, image, kind = "SCREEN") => {
       const row = await store.own(actor, rehearsalId);
       if (row === null) return "NOT_FOUND";
       if (row.status !== "ACTIVE" || row.endedAt !== null) return "FINISHED";
@@ -1586,7 +1672,9 @@ export function createRehearsalService(dependencies: {
       for (const [key, frame] of frames) {
         if (current - frame.at > FRAME_TTL_MS) frames.delete(key);
       }
-      frames.set(row.id, { image, at: current });
+      // The latest only: a new frame replaces the one held; none forgets it.
+      if (image === null) frames.delete(frameKey(row.id, kind));
+      else frames.set(frameKey(row.id, kind), { image, at: current });
       return "OK";
     },
 
@@ -1594,7 +1682,9 @@ export function createRehearsalService(dependencies: {
       const row = await store.own(actor, rehearsalId);
       if (row === null) return { kind: "NOT_FOUND" };
       if (row.status === "FINISHED") return ok(row);
-      frames.delete(row.id);
+      dropFrames(row.id);
+      const looks = presenceReview(presence.get(row.id)?.readings ?? []);
+      presence.delete(row.id);
       const turns = normaliseTurns(row.turns, row.userRole);
       if (!turns.some((turn) => turn.from === "YOU")) {
         // Nothing to review: they left before saying anything.
@@ -1627,7 +1717,8 @@ export function createRehearsalService(dependencies: {
       const saved = await store.finish(actor, row.id, {
         outcome,
         score: scoreOf(graded.dimensions),
-        review: graded,
+        // Text only, written by code from the readings; never an image.
+        review: looks.length === 0 ? graded : { ...graded, presence: looks },
       });
       return okWithHistory(actor, saved ?? (await store.own(actor, row.id)));
     },
@@ -1701,7 +1792,7 @@ export function createRehearsalComposer(dependencies: {
     budget: Budget,
     variables: V,
     schema: z.ZodType<R>,
-    image: RehearsalImage | null = null,
+    views: RehearsalViews = { screen: null, camera: null },
     signal?: AbortSignal,
   ): Promise<R | null> {
     const rendered = renderPrompt<V>(registry, {
@@ -1713,14 +1804,24 @@ export function createRehearsalComposer(dependencies: {
       variables,
     });
     const messages = [...rendered.messages];
-    if (image !== null) {
-      // The shared frame rides with the turn, as a USER image.
+    // Frames ride with the turn as USER images, to the same vision-capable
+    // route the gateway picks for a shared screen; they are never logged.
+    if (views.screen !== null) {
       messages.push({
         role: "USER",
         content: "Their shared screen, as it is now.",
-        images: [image],
+        images: [views.screen],
       });
     }
+    if (views.camera !== null) {
+      messages.push({
+        role: "USER",
+        content:
+          "Their camera, as it is now (shared with their consent, for this turn only).",
+        images: [views.camera],
+      });
+    }
+    const seeing = views.screen !== null || views.camera !== null;
     try {
       const response = await dependencies.gateway.execute<R>(
         {
@@ -1732,7 +1833,7 @@ export function createRehearsalComposer(dependencies: {
           budget,
           messages,
           output: rendered.output,
-          ...(image === null ? {} : { requiredCapabilities: ["VISION"] }),
+          ...(seeing ? { requiredCapabilities: ["VISION"] } : {}),
           attribution: {
             tenantId: actor.tenantId,
             userId: actor.userId,
@@ -1771,15 +1872,15 @@ export function createRehearsalComposer(dependencies: {
       );
       return loose === null ? null : normaliseCounterpartPersonaV4(loose);
     },
-    turn: async (actor, variables, image, signal) => {
+    turn: async (actor, variables, views, signal) => {
       const result = await run(
         actor,
         "INVESTOR_TWIN_TURN",
         "NORMAL_DIALOGUE",
         TURN_BUDGET,
         variables,
-        RehearsalTurnV4ResultSchema,
-        image,
+        RehearsalTurnV5ResultSchema,
+        views,
         signal,
       );
       return result === null
