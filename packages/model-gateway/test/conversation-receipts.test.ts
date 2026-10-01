@@ -6,6 +6,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import {
   capabilityNote,
   collectReceipts,
+  PLAIN_KNOWING_LINE,
   POINTING_LINE,
   type QCapabilityManifest,
   type QReceiptPort,
@@ -157,6 +158,10 @@ describe("the capability note says what the run can do, and nothing else", () =>
   it("says nothing about pointing when the screen shows nothing in particular", () => {
     const note = capabilityNote(FULL, [], [], { route: "HOME" }).content;
     expect(note).not.toContain(POINTING_LINE);
+  });
+
+  it('keeps the notes\' own words out of what Q says (live: "the authorised context does not include")', () => {
+    expect(capabilityNote(FULL, [], []).content).toContain(PLAIN_KNOWING_LINE);
   });
 
   it("a tool that prepares a change is named as one, never as a read (R20)", () => {

@@ -112,6 +112,7 @@ export {
   approvalStatusLine,
   capabilityNote,
   collectReceipts,
+  PLAIN_KNOWING_LINE,
   POINTING_LINE,
   type QCapabilityManifest,
   type QReceipt,
