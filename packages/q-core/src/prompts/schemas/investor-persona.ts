@@ -319,3 +319,26 @@ export function normaliseCounterpartPersonaV4(
       .map((t) => ({ trait: cut(t.trait, 200), source: t.source })),
   };
 }
+
+// ---------------------------------------------------------------------------
+// v5 (REHEARSE, live re-run 2026-10-01): when an investor rehearsed, the
+// reading of the founder Q plays described the investor ("very little
+// direct evidence about <the investor> as an investor"). The person read is
+// now named, and every block of material is labelled by whose it is.
+// ---------------------------------------------------------------------------
+
+export const COUNTERPART_PERSONA_V5_SCHEMA_VERSION = 5;
+
+export const CounterpartPersonaV5VariablesSchema =
+  CounterpartPersonaVariablesSchema.extend({
+    /** The person or organisation Q will play. UNTRUSTED (a stored name). */
+    counterpartName: z.string().max(200),
+  }).strict();
+export type CounterpartPersonaV5Variables = z.infer<
+  typeof CounterpartPersonaV5VariablesSchema
+>;
+
+export const COUNTERPART_PERSONA_V5_UNTRUSTED = [
+  ...COUNTERPART_PERSONA_UNTRUSTED,
+  "counterpartName",
+] as const;

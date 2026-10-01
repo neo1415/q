@@ -7,6 +7,9 @@ import {
   CounterpartPersonaV4LenientSchema,
   normaliseCounterpartPersonaV4,
   createDefaultPromptRegistry,
+  renderPrompt,
+  DEFAULT_COMMUNICATION_PROFILE,
+  type CounterpartPersonaV5Variables,
   normaliseCounterpartPersona,
   normaliseRehearsalReview,
   RehearsalReviewLenientSchema,
@@ -68,7 +71,7 @@ describe("lenient rehearsal readings", () => {
 
   it("is what the active persona and review prompts ask for", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(4);
+    expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(5);
     expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(4);
     expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(5);
   });
@@ -121,5 +124,86 @@ describe("lenient rehearsal readings", () => {
       ...v2
     } = stored;
     expect(CounterpartPersonaStoredSchema.safeParse(v2).success).toBe(true);
+  });
+});
+
+describe("the persona reading names the person Q plays (live re-run 2026-10-01)", () => {
+  const registry = createDefaultPromptRegistry();
+  const render = (
+    variables: Omit<
+      CounterpartPersonaV5Variables,
+      | "operatingMode"
+      | "communicationProfile"
+      | "communicationGuidance"
+      | "environmentNotes"
+    >,
+  ) =>
+    renderPrompt<CounterpartPersonaV5Variables>(registry, {
+      task: "INVESTOR_PERSONA",
+      operatingMode: "ASSESSMENT",
+      communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
+      environmentNotes: "test",
+      variables,
+    })
+      .messages.map((m) => m.content)
+      .join("\n");
+  const base = {
+    theirMessages: "(none)",
+    theirWordsInCalls: "(none)",
+    publicPresence: "(none)",
+    pitchMaterial: "Cold rooms in Benue.",
+    previousProfile: "(none)",
+  };
+
+  it("an investor rehearsing: the reading is of the founder, labelled as theirs", () => {
+    const text = render({
+      ...base,
+      viewerRole: "INVESTOR",
+      viewerOrganisation: "Chidi Angels",
+      counterpartRole: "FOUNDER",
+      counterpartName: "Yamfield Agro",
+      counterpartProfile: "Name: Yamfield Agro",
+    });
+    expect(text).toContain("WHO YOU ARE READING: the FOUNDER named below.");
+    expect(text.indexOf("Yamfield Agro")).toBeGreaterThan(
+      text.indexOf("Their name:"),
+    );
+    expect(text).toContain(
+      "WHO IS REHEARSING: the INVESTOR, from Chidi Angels.",
+    );
+    expect(text).toContain(
+      "Never describe the INVESTOR, their fund or their company",
+    );
+    expect(text).toContain("THE FOUNDER'S PROFILE (the FOUNDER Q plays)");
+    expect(text).toContain(
+      "Every field below is about the FOUNDER, never the INVESTOR.",
+    );
+    expect(text).toContain(
+      "never a reason to write about the INVESTOR instead",
+    );
+  });
+
+  it("a founder rehearsing: the reading is of the investor, labelled as theirs", () => {
+    const text = render({
+      ...base,
+      viewerRole: "FOUNDER",
+      viewerOrganisation: "Nixo",
+      counterpartRole: "INVESTOR",
+      counterpartName: "Ventures Fund",
+      counterpartProfile: "Name: Ventures Fund",
+    });
+    expect(text).toContain("WHO YOU ARE READING: the INVESTOR named below.");
+    expect(text.indexOf("Ventures Fund")).toBeGreaterThan(
+      text.indexOf("Their name:"),
+    );
+    expect(text).toContain("WHO IS REHEARSING: the FOUNDER, from Nixo.");
+    expect(text).toContain(
+      "Never describe the FOUNDER, their fund or their company",
+    );
+    expect(text).toContain("THE INVESTOR'S PROFILE (the INVESTOR Q plays)");
+    expect(text).toContain(
+      "Every field below is about the INVESTOR, never the FOUNDER.",
+    );
+    expect(text).toContain("never a reason to write about the FOUNDER instead");
   });
 });

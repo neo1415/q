@@ -300,6 +300,7 @@ export { INVESTOR_TWIN_TURN_V3 } from "./prompts/tasks/investor-twin-turn.v3.js"
 export { INVESTOR_TWIN_TURN_V4 } from "./prompts/tasks/investor-twin-turn.v4.js";
 export { INVESTOR_PERSONA_V3 } from "./prompts/tasks/investor-persona.v3.js";
 export { INVESTOR_PERSONA_V4 } from "./prompts/tasks/investor-persona.v4.js";
+export { INVESTOR_PERSONA_V5 } from "./prompts/tasks/investor-persona.v5.js";
 export { INVESTOR_TWIN_TURN_V5 } from "./prompts/tasks/investor-twin-turn.v5.js";
 export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
 export { REHEARSAL_SCORE_V4 } from "./prompts/tasks/rehearsal-score.v4.js";
@@ -345,6 +346,8 @@ export {
   normaliseCounterpartPersonaV4,
   CounterpartPersonaStoredSchema,
   CounterpartPersonaV4LenientSchema,
+  CounterpartPersonaV5VariablesSchema,
+  type CounterpartPersonaV5Variables,
   PERSONA_FORWARDNESS,
   PERSONA_TRAIT_SOURCES,
   type CounterpartPersonaStored,

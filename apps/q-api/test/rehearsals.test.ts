@@ -34,6 +34,7 @@ const HIDDEN = "55555555-5555-4555-8555-555555555555";
 const RELATIONSHIP = "66666666-6666-4666-8666-666666666666";
 const MEETING = "77777777-7777-4777-8777-777777777777";
 const COMPANY = "88888888-8888-4888-8888-888888888888";
+const ANGEL = "99999999-9999-4999-8999-999999999999";
 
 const actor = (userId: string) =>
   ({ tenantId: TENANT, userId, actorType: "HUMAN" }) as unknown as ActorContext;
@@ -169,6 +170,7 @@ function memoryStore(): RehearsalStore & {
 function setup(options: { messages?: () => string } = {}) {
   const seen = {
     personaInputs: [] as string[],
+    personaVariables: [] as Record<string, unknown>[],
     turnInputs: [] as {
       cue: string;
       screen: boolean;
@@ -184,7 +186,9 @@ function setup(options: { messages?: () => string } = {}) {
       Promise.resolve(
         a.userId === FOUNDER || a.userId === OTHER
           ? { role: "FOUNDER", organisationName: "Nixo" }
-          : null,
+          : a.userId === ANGEL
+            ? { role: "INVESTOR", organisationName: "Chidi Angels" }
+            : null,
       ),
     counterpart: (_a, kind, id) =>
       Promise.resolve(
@@ -194,7 +198,13 @@ function setup(options: { messages?: () => string } = {}) {
               profile: "Name: Ventures Fund\nType: VC",
               relationshipId: RELATIONSHIP,
             }
-          : null,
+          : kind === "COMPANY" && id === COMPANY
+            ? {
+                name: "Yamfield Agro",
+                profile: "Name: Yamfield Agro\nSector: agriculture",
+                relationshipId: RELATIONSHIP,
+              }
+            : null,
       ),
     theirMessages: () => Promise.resolve(options.messages?.() ?? "Kola: hi"),
     theirCalls: () => Promise.resolve(""),
@@ -245,6 +255,7 @@ function setup(options: { messages?: () => string } = {}) {
   let closeNext = false;
   const composer: RehearsalComposer = {
     persona: (_a, variables) => {
+      seen.personaVariables.push({ ...variables });
       seen.personaInputs.push(
         [
           variables.counterpartProfile,
@@ -852,5 +863,35 @@ describe("the review grades the person rehearsing, in their role (live 2026-10-0
     expect(seen.reviewTranscripts.at(-1)).toContain(
       "The founder (rehearsing): Our churn is 2%.",
     );
+  });
+});
+
+describe("the persona reads the person Q plays, never the person rehearsing (live 2026-10-01)", () => {
+  it("an investor rehearsing: the founder's company is read, named, as the FOUNDER", async () => {
+    const { service, seen } = setup();
+    const result = await service.persona(actor(ANGEL), "COMPANY", COMPANY);
+    expect(result.kind).toBe("OK");
+    expect(seen.personaVariables.at(-1)).toMatchObject({
+      counterpartName: "Yamfield Agro",
+      counterpartRole: "FOUNDER",
+      viewerRole: "INVESTOR",
+      viewerOrganisation: "Chidi Angels",
+    });
+  });
+
+  it("a founder rehearsing: the investor is read, named, as the INVESTOR", async () => {
+    const { service, seen } = setup();
+    const result = await service.persona(
+      actor(FOUNDER),
+      "INVESTOR_ORGANISATION",
+      INVESTOR,
+    );
+    expect(result.kind).toBe("OK");
+    expect(seen.personaVariables.at(-1)).toMatchObject({
+      counterpartName: "Ventures Fund",
+      counterpartRole: "INVESTOR",
+      viewerRole: "FOUNDER",
+      viewerOrganisation: "Nixo",
+    });
   });
 });

@@ -26,7 +26,7 @@ export const INVESTOR_PERSONA_V4: PromptDefinition<
 > = {
   ...INVESTOR_PERSONA_V3,
   version: 4,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live test 2026-10-01: forwardness (with why) and known traits with sources, so the played person knows who holds the leverage and the lobby shows what the reading rests on.",
   effectiveFrom: "2026-10-01",
