@@ -649,6 +649,10 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
   "/relationships": cap("navigate.RELATIONSHIPS"),
   "/settings": cap("navigate.SETTINGS"),
+  // AUTO (ADR 0029): Q's work; Q reads the same with list_q_work.
+  "/work": cap("tool.list_q_work"),
+  "/work/[delegationId]": cap("tool.list_q_work"),
+  "/work/[delegationId]/report/[laneId]": DOWNLOAD,
   "/settings/memory": exempt(
     "the person reading and correcting what Q remembers; not a place Q sends anyone",
   ),

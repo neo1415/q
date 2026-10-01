@@ -340,3 +340,34 @@ words never colour alone, no badges spam: one quiet stage label per row.
 - Live (after deploy, fictional accounts): investor.onboard1 with 2 seed
   founders: approve outreach (N=2, interview on), accept as founders,
   answer interview, check report PDF, tap a time, check Meet link + push.
+
+## 12. As built (2026-10-01) — differences from the plan above
+
+- **Decks.** Investors cannot open a company's deck on Capital Q before they
+  are connected, so sourcing reads only what the investor may see: the feed
+  card (stage, country, the company's own description, feed reasons) and
+  up to two ready pitch transcripts under the pitch's own playback rule.
+  Shortlist reasons must quote that material; code drops any that do not.
+- **The report** is kept on its lane (`delegation_lanes.report`, migration
+  `20261112010000`) rather than as a Q document: a Q document is prepared
+  inside a Q run under that run's Context Firewall plan, and delegated work
+  runs outside any conversation. It is read at
+  `/work/<delegation>/report/<lane>` and downloaded as PDF through
+  `/api/q-work-report/<delegation>/<lane>` (rendered by the same document
+  renderer as Q documents).
+- **Chat marker.** `communication.messages.q_delegation_id` marks every Q
+  message under a delegation or errand; the chat shows "Sent by Q for
+  <name>". ADR 0028 errands now use it too: the unique `q_action_id` index
+  allowed an errand only one message.
+- **jsonb.** Errand plans and chat envelopes were written as
+  `JSON.stringify(x)::jsonb`, which this driver stores as a JSON _string_
+  (the object checks reject it, so errands could never be filed). Both now
+  use the driver's own `sql.json`.
+- **Stand-in and interviews.** When the founder's stand-in is on, an
+  investor Q's interview questions (intent ASK) are answered by the
+  founder's Q from the approved brief; the transcript marks those lines
+  `[Q]` and the report prompt reads them as such.
+- **Push** is VAPID on `node:crypto` (RFC 8291 test vector passes), no
+  provider and no new dependency. Configure `WEB_PUSH_VAPID_PUBLIC_KEY`,
+  `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_SUBJECT` on api (public key) and
+  workers (sender); without them in-app and email delivery continue.

@@ -89,7 +89,9 @@ select lives_ok(
   'a Q_WORK notice that needs the person is accepted');
 
 -- Server role ------------------------------------------------------------------
-select is((select count(*)::int from q_runtime.delegations), 3, 'the server role reads every delegation');
+select is((select count(*)::int from q_runtime.delegations
+            where user_id in (pg_temp.rls_id('user_a'), pg_temp.rls_id('user_b'), pg_temp.rls_id('user_r'))),
+          3, 'the server role reads every delegation');
 
 -- Clients: q_runtime is a server-only schema (no usage grant); the owner
 -- policies above are a second layer should that ever change. -----------------

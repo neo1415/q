@@ -165,7 +165,8 @@ self.addEventListener("fetch", (event) => {
 
 /** A same-origin app path, or the home page. */
 function safePath(path) {
-  return typeof path === "string" && /^\/(?!\/)[A-Za-z0-9/_-]{0,200}$/.test(path)
+  return typeof path === "string" &&
+    /^\/(?!\/)[A-Za-z0-9/_-]{0,200}$/.test(path)
     ? path
     : "/home";
 }

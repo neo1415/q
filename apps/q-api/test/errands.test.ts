@@ -159,7 +159,13 @@ function world(options: {
           side: "INVESTOR" as const,
           connected: options.connected ?? true,
           blocked: options.blocked ?? false,
-          messages: [...(options.messages ?? [])],
+          // The chat's read also names each message and whether Q sent it.
+          messages: (options.messages ?? []).map((message, index) => ({
+            ...message,
+            id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+            viaQ: false,
+            envelope: null,
+          })),
         }),
       send: (input) => {
         if (input.request.kind === "TEXT") {
