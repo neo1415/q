@@ -390,6 +390,12 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
  * asks the model to act through the tools it holds, or to answer without
  * promising.
  */
+export const SAY_DO_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "Your reply described doing something (looking something up, fetching a list, preparing or changing something) instead of doing it. If a tool offered here does it, call that tool now through the function-calling interface and write nothing else; then answer from what it returns. If no tool does it, write the answer from what you have, without saying you will do it.",
+};
+
 /**
  * The subject on the person's screen, as a trusted note for a reply that
  * asked them to identify it; null when the screen shows nothing in
@@ -413,12 +419,6 @@ export function screenSubjectNote(
     content: `Your reply asked them who or what they mean. Their screen shows ${shown}: words that point (this, this one, them, this person, it) mean it. If your question was about who or what, do not ask it: act on that subject now with the tools (prepare the step for their approval when it acts), or say plainly why that step is not possible yet and what is. If your question was about something else (a time, an amount), keep it.`,
   };
 }
-
-export const SAY_DO_NOTE: ModelMessage = {
-  role: "SYSTEM",
-  content:
-    "Your reply described doing something (looking something up, fetching a list, preparing or changing something) instead of doing it. If a tool offered here does it, call that tool now through the function-calling interface and write nothing else; then answer from what it returns. If no tool does it, write the answer from what you have, without saying you will do it.",
-};
 
 /** Said when an answer about their own records had to use the public web. */
 /**
