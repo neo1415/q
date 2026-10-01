@@ -55,6 +55,15 @@ export type Register = (typeof REGISTERS)[number];
 
 type Delta = Partial<Record<keyof Temperament, number>>;
 
+/** Readings that give the played person new cause for frustration. */
+const PROVOKING: ReadonlySet<RehearsalAppraisal> = new Set([
+  "EVASIVE",
+  "REPEATED_DODGE",
+  "RUDE",
+  "OVERCLAIM",
+  "CLEAR_BUT_THIN",
+]);
+
 /** What each reading of their latest line does to the played person. */
 const EFFECTS: Readonly<Record<RehearsalAppraisal, Delta>> = {
   STRONG_ANSWER: { warmth: 12, frustration: -12, patience: 6 },
@@ -132,22 +141,43 @@ export function applyAppraisal(
   };
   const next = { ...state };
   for (const key of Object.keys(delta) as (keyof Temperament)[]) {
-    next[key] = clamp(state[key] + scale(key, delta[key] ?? 0));
+    // Emotion builds: one line moves frustration and patience at most a
+    // step (live 2026-10-01: one curt opener on Tough went straight to
+    // shouting). A flat, final no may land all at once.
+    const step = scale(key, delta[key] ?? 0);
+    const bound = key === "hurt" ? 80 : 25;
+    next[key] = clamp(state[key] + Math.max(-bound, Math.min(bound, step)));
+  }
+  // Tempers cool when a line gives no new cause (live: on Gentle, polite
+  // lines kept the investor climbing to anger).
+  if (!PROVOKING.has(appraisal)) {
+    next.frustration = clamp(next.frustration - 6);
   }
   // Patience wears down with frustration, and comes back slowly.
   next.patience = clamp(Math.min(next.patience, 100 - next.frustration / 2));
   return next;
 }
 
-/** The register the state puts them in. Anger first, then grief, then warmth. */
-export function registerOf(state: Temperament): Register {
-  if (
-    state.frustration >= 85 ||
-    (state.frustration >= 70 && state.patience <= 15)
-  ) {
-    return "FURIOUS";
+/**
+ * The register the state puts them in: anger first, then grief, then
+ * warmth. Difficulty sets the thresholds: on Gentle they never go past
+ * exasperation, on Realistic fury needs more, on Tough it comes soonest.
+ */
+export function registerOf(
+  state: Temperament,
+  difficulty: Difficulty = "REALISTIC",
+): Register {
+  const furyAt = difficulty === "TOUGH" ? 85 : 92;
+  const angerAt = difficulty === "TOUGH" ? 62 : 70;
+  if (difficulty !== "GENTLE") {
+    if (
+      state.frustration >= furyAt ||
+      (state.frustration >= angerAt + 8 && state.patience <= 10)
+    ) {
+      return "FURIOUS";
+    }
+    if (state.frustration >= angerAt) return "ANGRY";
   }
-  if (state.frustration >= 65) return "ANGRY";
   if (state.hurt >= 70) return "CRYING";
   if (state.frustration >= 45) return "EXASPERATED";
   if (state.hurt >= 45) return "SAD";

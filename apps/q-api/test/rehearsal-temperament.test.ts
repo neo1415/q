@@ -19,17 +19,22 @@ const run = (
   appraisals: readonly RehearsalAppraisal[],
 ) => {
   let state = initialTemperament(difficulty, "NEUTRAL");
-  const registers = [registerOf(state)];
+  const registers = [registerOf(state, difficulty)];
   for (const appraisal of appraisals) {
     state = applyAppraisal(state, appraisal, difficulty);
-    registers.push(registerOf(state));
+    registers.push(registerOf(state, difficulty));
   }
   return { state, registers };
 };
 
 describe("temperament", () => {
   it("stonewalling on Tough ends in fury; the same on Gentle does not", () => {
-    const dodges: RehearsalAppraisal[] = ["EVASIVE", "REPEATED_DODGE", "RUDE"];
+    const dodges: RehearsalAppraisal[] = [
+      "EVASIVE",
+      "REPEATED_DODGE",
+      "RUDE",
+      "REPEATED_DODGE",
+    ];
     expect(run("TOUGH", dodges).registers.at(-1)).toBe("FURIOUS");
     expect(run("GENTLE", dodges).registers.at(-1)).not.toBe("FURIOUS");
     // It builds: exasperation comes before anger.
@@ -56,6 +61,17 @@ describe("temperament", () => {
     const angry = run("TOUGH", ["RUDE", "REPEATED_DODGE"]).state;
     const calmer = applyAppraisal(angry, "APOLOGY", "TOUGH");
     expect(calmer.frustration).toBeLessThan(angry.frustration);
+  });
+
+  it("builds a step at a time: one curt line never goes straight to shouting", () => {
+    const { registers } = run("TOUGH", ["RUDE"]);
+    expect(registers.at(-1)).not.toBe("FURIOUS");
+  });
+
+  it("polite lines cool a temper rather than feed it", () => {
+    const hot = run("REALISTIC", ["EVASIVE", "REPEATED_DODGE"]).state;
+    const after = applyAppraisal(hot, "NEUTRAL", "REALISTIC");
+    expect(after.frustration).toBeLessThan(hot.frustration);
   });
 
   it("nothing said moves almost nothing", () => {

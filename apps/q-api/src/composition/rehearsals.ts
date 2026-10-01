@@ -1163,7 +1163,7 @@ export function createRehearsalService(dependencies: {
     const before =
       [...turns].reverse().find((turn) => turn.from === "THEM")?.state ??
       initialTemperament(row.difficulty, persona.temperament.baseline);
-    const registerBefore = registerOf(before);
+    const registerBefore = registerOf(before, row.difficulty);
     const result = await composer.turn(
       actor,
       {
@@ -1188,7 +1188,7 @@ export function createRehearsalService(dependencies: {
     // Their latest line moves the state by fixed rules; the state decides
     // the register the voice delivers this line in.
     const after = applyAppraisal(before, result.appraisal, row.difficulty);
-    const register = registerOf(after);
+    const register = registerOf(after, row.difficulty);
     const delivery = deliveryFor(register, registerBefore, result);
     return {
       result: {
