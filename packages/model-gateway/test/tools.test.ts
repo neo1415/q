@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import type { ModelMessage, ModelToolDefinition } from "@capital-q/contracts";
 
@@ -141,16 +142,31 @@ describe("gateway with tools", () => {
     expect(result.providerCode).toBe("beta");
   });
 
-  it("rejects tools with STRUCTURED output as an invalid request", async () => {
-    const { gateway } = build([{ kind: "TEXT", text: "x" }]);
-    await expect(
-      gateway.execute(
-        request({
-          tools: [TOOL],
-          output: { kind: "STRUCTURED", schemaName: "X", jsonSchema: {} },
-        }),
-      ),
-    ).rejects.toBeInstanceOf(ModelGatewayError);
+  it("with STRUCTURED output, returns tool calls when proposed and the validated answer when not", async () => {
+    const schema = z.object({ answer: z.string() }).strict();
+    const structured = {
+      tools: [TOOL],
+      output: { kind: "STRUCTURED" as const, schemaName: "X", jsonSchema: {} },
+    };
+    const calling = build([
+      {
+        kind: "TOOL_CALLS",
+        calls: [{ callId: "c1", name: TOOL.name, arguments: {} }],
+      },
+    ]);
+    const proposed = await calling.gateway.execute(request(structured), {
+      schema,
+    });
+    expect(proposed.output.kind).toBe("TOOL_CALLS");
+
+    const answering = build([{ kind: "JSON", value: { answer: "done" } }]);
+    const answered = await answering.gateway.execute(request(structured), {
+      schema,
+    });
+    expect(answered.output).toEqual({
+      kind: "STRUCTURED",
+      value: { answer: "done" },
+    });
   });
 
   it("accepts assistant tool-call turns and tool-result turns in the conversation", async () => {

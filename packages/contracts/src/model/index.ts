@@ -552,13 +552,12 @@ export const ModelGatewayRequestSchema = z
     tenantPolicy: TenantModelPolicySchema.optional(),
   })
   .strict()
-  .refine(
-    (request) => request.tools.length === 0 || request.output.kind === "TEXT",
-    {
-      message: "tools are offered with TEXT output only",
-      path: ["tools"],
-    },
-  )
+  // Tools may come with TEXT or STRUCTURED output (harden 2026-10-01): a
+  // round that may call a tool or answer carries the answer's schema, so the
+  // answer arrives in shape instead of paying a second call. The gateway
+  // returns tool calls when the model proposes them and validates the
+  // structured answer when it does not; an adapter whose provider refuses
+  // the pairing sends the tools alone and the schema still decides.
   .refine(
     (request) =>
       new Set(request.tools.map((tool) => tool.name)).size ===

@@ -525,7 +525,10 @@ export function createGoogleModelProvider(
           ? {}
           : { temperature: request.temperature }),
         ...(systemInstruction === undefined ? {} : { systemInstruction }),
-        ...(request.output.kind === "STRUCTURED"
+        // A response schema beside function declarations is refused by
+        // Gemini, so with tools the shape is the prompt's and Capital Q's
+        // own Zod acceptance decides, as for any text answer.
+        ...(request.output.kind === "STRUCTURED" && request.tools.length === 0
           ? {
               responseMimeType: "application/json",
               responseJsonSchema: schemaForGemini(request.output.jsonSchema),
