@@ -15,17 +15,10 @@ import { useHomeHref } from "@/features/q/active-conversation";
 
 import type { ShellContext } from "./app-shell";
 import {
-  DOCUMENTS_NAVIGATION,
-  FOUNDER_MEDIA_NAVIGATION,
-  DAILY_NAVIGATION,
-  FIND_NAVIGATION,
-  REHEARSALS_NAVIGATION,
-  RESULTS_NAVIGATION,
-  FOUNDER_REQUESTS_NAVIGATION,
-  INVESTORS_NAVIGATION,
   isActiveRoute,
   PRIMARY_NAVIGATION,
   PROFILE_NAVIGATION,
+  sectionsFor,
   SETTINGS_NAVIGATION,
 } from "./navigation";
 import { sidebarCollapsed, type SidebarOverride } from "./sidebar-state";
@@ -56,22 +49,7 @@ export function DesktopSidebar({
     setOverride({ onQ, collapsed: next });
   };
 
-  const items = [
-    ...PRIMARY_NAVIGATION,
-    ...(context.scope === "founder_private"
-      ? [INVESTORS_NAVIGATION, FOUNDER_MEDIA_NAVIGATION]
-      : context.scope === "investor_private"
-        ? [FOUNDER_REQUESTS_NAVIGATION]
-        : []),
-    ...(context.scope === "founder_private" ||
-    context.scope === "investor_private"
-      ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION]
-      : []),
-    DOCUMENTS_NAVIGATION,
-    // DAILY block
-    DAILY_NAVIGATION,
-    FIND_NAVIGATION,
-  ];
+  const items = sectionsFor(context.scope);
 
   return (
     <aside

@@ -15,6 +15,8 @@ import {
   Users,
 } from "@capital-q/ui/icons";
 
+import type { ContextScope } from "@capital-q/ui/tokens";
+
 import { QNavIcon } from "./q-nav-icon";
 
 /**
@@ -154,17 +156,56 @@ export const FIND_NAVIGATION: NavigationItem = {
 
 /**
  * The phone's tab bar (founder directive, 2026-09-27): Discover first, Q in
- * the centre, Profile last. There is no separate Chats area -- a person's
- * conversations with Q live on the Q page and their relationship threads
- * under Relationships -- so the fourth slot is Capital.
+ * the centre. There is no separate Chats area -- a person's conversations
+ * with Q live on the Q page and their relationship threads under
+ * Relationships. The fifth slot is More (founder report, 2026-10-01: the
+ * phone could not reach Rehearsals, Results, Documents and the rest), which
+ * opens every other section, Profile first.
  */
 export const MOBILE_NAVIGATION: readonly NavigationItem[] = [
   byHref("/discover"),
   byHref("/relationships"),
   byHref("/home"),
   byHref("/capital"),
-  PROFILE_NAVIGATION,
 ];
+
+/** Profile and Settings: the person's own pages, on every side. */
+export const ACCOUNT_NAVIGATION: readonly NavigationItem[] = [
+  PROFILE_NAVIGATION,
+  SETTINGS_NAVIGATION,
+];
+
+/**
+ * Every section a person in this context can reach, in the sidebar's
+ * order. The one source both the desktop sidebar and the phone's More
+ * sheet read, so the two never drift. Showing a link is not access: each
+ * route's server decides what this person may see.
+ */
+export function sectionsFor(scope: ContextScope): readonly NavigationItem[] {
+  const founder = scope === "founder_private";
+  const investor = scope === "investor_private";
+  return [
+    ...PRIMARY_NAVIGATION,
+    ...(founder ? [INVESTORS_NAVIGATION, FOUNDER_MEDIA_NAVIGATION] : []),
+    ...(investor ? [FOUNDER_REQUESTS_NAVIGATION] : []),
+    ...(founder || investor ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION] : []),
+    DOCUMENTS_NAVIGATION,
+    DAILY_NAVIGATION,
+    FIND_NAVIGATION,
+  ];
+}
+
+/** What the More sheet lists: Profile first, then everything not on a tab. */
+export function moreSectionsFor(
+  scope: ContextScope,
+): readonly NavigationItem[] {
+  const onTabs = new Set(MOBILE_NAVIGATION.map((item) => item.href));
+  return [
+    PROFILE_NAVIGATION,
+    ...sectionsFor(scope).filter((item) => !onTabs.has(item.href)),
+    SETTINGS_NAVIGATION,
+  ];
+}
 
 /** The centre tab, drawn as Q's own mark rather than a plain icon. */
 export const MOBILE_CENTRE_HREF = "/home" satisfies NavigationItem["href"];
