@@ -60,17 +60,35 @@ describe("DELEGATION_READER v5", () => {
 });
 
 describe("INTERVIEW_AGENT v14", () => {
-  it("is active and only swaps the draft rule for write_reply", async () => {
+  it("only swaps the draft rule for write_reply", async () => {
     const { INTERVIEW_AGENT_V14 } = await import("../src/index.js");
-    expect(
-      createDefaultPromptRegistry().getActive("INTERVIEW_AGENT").definition
-        .version,
-    ).toBe(14);
     const v13 = INTERVIEW_AGENT_V13.template.split("\n");
     const v14 = INTERVIEW_AGENT_V14.template.split("\n");
     expect(v14).toHaveLength(v13.length);
     const changed = v14.filter((line) => !v13.includes(line));
     expect(changed).toHaveLength(1);
     expect(changed[0]).toContain("call write_reply");
+  });
+});
+
+describe("INTERVIEW_AGENT v15", () => {
+  it("is active, has no draft rule, and keeps the cache-ordered layout", async () => {
+    const { INTERVIEW_AGENT_V15 } = await import("../src/index.js");
+    expect(
+      createDefaultPromptRegistry().getActive("INTERVIEW_AGENT").definition
+        .version,
+    ).toBe(15);
+    expect(INTERVIEW_AGENT_V15.template).not.toContain("write_reply");
+    expect(INTERVIEW_AGENT_V15.template).not.toContain("On channel text");
+    const lines = (t: string) =>
+      t
+        .split("\n")
+        .filter((l) => l.length > 0)
+        .sort();
+    expect(lines(INTERVIEW_AGENT_V15.template)).toEqual(
+      lines(INTERVIEW_AGENT_V12.template),
+    );
+    const at = (text: string) => INTERVIEW_AGENT_V15.template.indexOf(text);
+    expect(at("{{utterance}}")).toBeLessThan(at("{{state}}"));
   });
 });

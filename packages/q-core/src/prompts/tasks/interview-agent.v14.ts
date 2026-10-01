@@ -33,7 +33,7 @@ export const INTERVIEW_AGENT_V14: PromptDefinition<
 > = {
   ...INTERVIEW_AGENT_V13,
   version: 14,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Latency, live 2026-10-01: the reply beside write-only calls is a write_reply call, which the model makes in parallel; text beside calls never came.",
   effectiveFrom: "2026-10-01",
