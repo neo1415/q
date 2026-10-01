@@ -116,7 +116,15 @@ export function toInput(messages: readonly ModelMessage[]): {
     if (message.role === "USER") {
       input.push({
         role: "user",
-        content: [{ type: "input_text", text: message.content }],
+        content: [
+          { type: "input_text", text: message.content },
+          // A shared screen in a rehearsal (REHEARSE): inline, low detail.
+          ...(message.images ?? []).map((image) => ({
+            type: "input_image" as const,
+            image_url: `data:${image.mediaType};base64,${image.dataBase64}`,
+            detail: "low" as const,
+          })),
+        ],
       });
       continue;
     }

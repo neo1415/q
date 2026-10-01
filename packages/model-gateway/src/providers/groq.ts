@@ -252,7 +252,20 @@ export function toMessages(
       case "SYSTEM":
         return { role: "system", content: m.content };
       case "USER":
-        return { role: "user", content: m.content };
+        return m.images === undefined
+          ? { role: "user", content: m.content }
+          : {
+              role: "user",
+              content: [
+                { type: "text", text: m.content },
+                ...m.images.map((image) => ({
+                  type: "image_url" as const,
+                  image_url: {
+                    url: `data:${image.mediaType};base64,${image.dataBase64}`,
+                  },
+                })),
+              ],
+            };
       case "ASSISTANT":
         return {
           role: "assistant",

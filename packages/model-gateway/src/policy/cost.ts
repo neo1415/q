@@ -27,6 +27,10 @@ export function estimateInputTokens(
   let chars = 0;
   for (const message of messages) {
     chars += message.content.length + 8;
+    // A low-detail image is about a thousand tokens on every provider.
+    if (message.role === "USER" && message.images !== undefined) {
+      chars += message.images.length * 4_000;
+    }
     if (message.role === "ASSISTANT" && message.toolCalls !== undefined) {
       chars += JSON.stringify(message.toolCalls).length;
     }

@@ -3,6 +3,7 @@ import type { z } from "zod";
 import {
   allowsModelFallback,
   isRetryableModelFailure,
+  messagesCarryImages,
   ModelGatewayRequestSchema,
   ModelGatewayResultMetadataSchema,
   type ModelAttemptRecord,
@@ -658,7 +659,9 @@ export function createModelGateway(
         request,
         requiredCapabilities: requiredCapabilitiesFor(
           request.output,
-          request.requiredCapabilities,
+          messagesCarryImages(request.messages)
+            ? [...request.requiredCapabilities, "VISION"]
+            : request.requiredCapabilities,
           request.tools,
         ),
         estimatedInputTokens: estimateInputTokens(

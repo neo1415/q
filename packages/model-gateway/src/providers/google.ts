@@ -145,7 +145,19 @@ export function toContents(messages: readonly ModelMessage[]): {
       case "SYSTEM":
         break;
       case "USER":
-        contents.push({ role: "user", parts: [{ text: message.content }] });
+        contents.push({
+          role: "user",
+          parts: [
+            { text: message.content },
+            // A shared screen in a rehearsal (REHEARSE): inline only.
+            ...(message.images ?? []).map((image) => ({
+              inlineData: {
+                mimeType: image.mediaType,
+                data: image.dataBase64,
+              },
+            })),
+          ],
+        });
         break;
       case "ASSISTANT":
         contents.push({ role: "model", parts: assistantParts(message) });

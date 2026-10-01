@@ -378,12 +378,50 @@ export type ModelToolCall = z.infer<typeof ModelToolCallSchema>;
  * are data the model reads, never instructions it must follow: the
  * caller fences and labels them accordingly.
  */
+/**
+ * An image a USER message carries for a vision-capable model (REHEARSE:
+ * the screen a person chose to share in a rehearsal). Inline base64 only,
+ * never a URL a provider would fetch; bounded so one frame can never
+ * become an unbounded upload. A request carrying one requires VISION.
+ */
+export const MODEL_IMAGE_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+export const MODEL_IMAGE_MAX_BASE64_CHARS = 700_000;
+export const ModelImageSchema = z
+  .object({
+    mediaType: z.enum(MODEL_IMAGE_MEDIA_TYPES),
+    dataBase64: z
+      .string()
+      .min(16)
+      .max(MODEL_IMAGE_MAX_BASE64_CHARS)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  })
+  .strict();
+export type ModelImage = z.infer<typeof ModelImageSchema>;
+
 export const ModelTextMessageSchema = z
   .object({
     role: z.enum(["SYSTEM", "USER"]),
     content: z.string().min(1).max(MODEL_MESSAGE_MAX_CHARS),
+    /** Images for a VISION model; read on USER messages only. */
+    images: z.array(ModelImageSchema).min(1).max(2).optional(),
   })
   .strict();
+
+/** True when a USER message carries an image: the request then needs VISION. */
+export function messagesCarryImages(
+  messages: readonly { readonly role: string; readonly images?: unknown }[],
+): boolean {
+  return messages.some(
+    (message) =>
+      message.role === "USER" &&
+      Array.isArray(message.images) &&
+      message.images.length > 0,
+  );
+}
 
 export const ModelAssistantMessageSchema = z
   .object({
