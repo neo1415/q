@@ -24,13 +24,13 @@ select is(
 -- already running it keep their own journey (CQ-Q-021 §82).
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
-  2, 'founder definition points new sessions at version 2');
+  3, 'founder definition points new sessions at version 3 (2026-10-01: Paying customers)');
 select is(
   (select count(*)::int
      from onboarding.definition_versions v
      join onboarding.definitions d on d.id = v.definition_id
     where d.journey_type = 'founder' and v.published_at is not null),
-  2, 'both founder definition versions are published');
+  3, 'all three founder definition versions are published (older sessions keep theirs)');
 select is(
   (select count(*)::int
      from onboarding.definition_versions v
