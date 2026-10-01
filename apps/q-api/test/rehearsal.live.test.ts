@@ -172,6 +172,17 @@ function memoryStore(): RehearsalStore {
       rows[at(id)] = next;
       return Promise.resolve(next);
     },
+    completeReview: (_a, id, input) => {
+      const row = rows[at(id)];
+      if (row === undefined) return Promise.resolve(null);
+      const next: RehearsalRow = {
+        ...row,
+        score: input.score,
+        scorecard: input.review,
+      };
+      rows[at(id)] = next;
+      return Promise.resolve(next);
+    },
     list: () => Promise.resolve([...rows].reverse()),
   };
 }

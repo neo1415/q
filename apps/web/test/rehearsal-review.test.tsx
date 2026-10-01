@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => undefined }),
+}));
 
 import type { QRehearsalDto } from "@capital-q/contracts";
 
@@ -67,5 +71,32 @@ describe("the review's transcript", () => {
       "Hello, thanks for making the time.",
     );
     expect(items[1]?.textContent).toContain("Hello. Um, how are you?");
+  });
+});
+
+describe("a provisional review (REHEARSE P0, 2026-10-01)", () => {
+  it("says Q is still writing it, shows what code counted, and no score", () => {
+    render(
+      <RehearsalReview
+        rehearsal={{
+          ...fixture,
+          review: {
+            overall:
+              "Q will finish your review shortly. So far: you spoke 40% of the words.",
+            score: null,
+            dimensions: [],
+            wentRight: [],
+            wentWrong: [],
+            tips: [],
+            provisional: true,
+          },
+        }}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "Q is still writing the full review",
+    );
+    expect(screen.getByText(/Q will finish your review shortly/)).toBeTruthy();
+    expect(screen.queryByText("/ 100")).toBeNull();
   });
 });

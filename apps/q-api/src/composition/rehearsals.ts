@@ -509,12 +509,27 @@ export type RehearsalStore = {
     input: {
       readonly outcome: RehearsalConclusion;
       readonly score: number | null;
-      /** The review, with the Presence section beside it when there is one. */
+      /**
+       * The review, with the Presence section beside it when there is one;
+       * or a provisional one written by code while Q could not write it.
+       */
       readonly review:
         | (RehearsalReviewResult & {
             readonly presence?: readonly PresenceObservation[];
           })
+        | ReturnType<typeof provisionalReview>
         | null;
+    },
+  ) => Promise<RehearsalRow | null>;
+  /** Fills in the real review over a provisional one; nothing else. */
+  readonly completeReview: (
+    actor: ActorContext,
+    rehearsalId: string,
+    input: {
+      readonly score: number | null;
+      readonly review: RehearsalReviewResult & {
+        readonly presence?: readonly PresenceObservation[];
+      };
     },
   ) => Promise<RehearsalRow | null>;
   readonly list: (
@@ -696,6 +711,20 @@ export function createPostgresRehearsalStore(
       const row = rows[0];
       return row === undefined ? null : fromRaw(row);
     },
+    completeReview: async (actor, rehearsalId, input) => {
+      const rows = await sql<RawRehearsalRow[]>`
+        update q_runtime.rehearsals
+           set score = ${input.score}, scorecard = ${json(input.review)},
+               updated_at = clock_timestamp()
+         where id = ${rehearsalId} and user_id = ${actor.userId}
+           and tenant_id = ${actor.tenantId} and status = 'FINISHED'
+           and scorecard ->> 'provisional' = 'true'
+        returning id, counterpart_kind, counterpart_id, counterpart_name, user_role,
+               persona, turns, asked, status, outcome, score, scorecard,
+               meeting_id, voice, difficulty, created_at, ended_at`;
+      const row = rows[0];
+      return row === undefined ? null : fromRaw(row);
+    },
     list: async (actor, filter) => {
       const rows =
         filter === undefined
@@ -863,9 +892,56 @@ const PresenceSectionSchema = z
   )
   .max(4);
 
+const ProvisionalReviewSchema = z
+  .object({
+    overall: z.string().max(600),
+    tips: z.array(z.string().max(300)).max(6),
+  })
+  .passthrough();
+
+/**
+ * The review while Q could not write it (REHEARSE P0, 2026-10-01): what
+ * code can say from the transcript -- the talking counted, nothing rated,
+ * no score -- and that Q will finish it shortly.
+ */
+export function provisionalReview(metrics: QRehearsalDto["metrics"]): {
+  readonly provisional: true;
+  readonly overall: string;
+  readonly tips: string[];
+} {
+  const tips: string[] = [];
+  if (metrics.yourShareOfWords > 65) {
+    tips.push("You did most of the talking: leave room for their questions.");
+  }
+  if (metrics.longestAnswerWords > 120) {
+    tips.push("Your longest answer ran long: lead with the point, then stop.");
+  }
+  return {
+    provisional: true,
+    overall: `Q will finish your review shortly. So far: you spoke ${String(metrics.yourShareOfWords)}% of the words over ${String(metrics.exchanges)} exchanges in ${String(metrics.minutes)} minutes; your longest answer was ${String(metrics.longestAnswerWords)} words.`,
+    tips,
+  };
+}
+
 function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
   if (row.scorecard === null || typeof row.scorecard !== "object") return null;
-  const { presence, ...review } = row.scorecard as Record<string, unknown>;
+  const { presence, provisional, ...review } = row.scorecard as Record<
+    string,
+    unknown
+  >;
+  if (provisional === true) {
+    const held = ProvisionalReviewSchema.safeParse(review);
+    if (!held.success) return null;
+    return {
+      overall: held.data.overall,
+      tips: held.data.tips,
+      score: null,
+      dimensions: [],
+      wentRight: [],
+      wentWrong: [],
+      provisional: true,
+    };
+  }
   const parsed = RehearsalReviewResultSchema.safeParse(review);
   if (!parsed.success) return null;
   const looks = PresenceSectionSchema.safeParse(presence ?? []);
@@ -1026,6 +1102,9 @@ export function yieldTo(previous: readonly Turn[]): {
 }
 
 /** Said in character when a turn could not be composed; never an error. */
+/** After a provisional review, Q tries the real one again at these delays. */
+export const REVIEW_RETRY_MS = [30_000, 2 * 60_000, 10 * 60_000] as const;
+
 /** After a degraded persona, Q tries the real reading again this soon. */
 const PERSONA_REBUILD_AFTER_MS = 2 * 60_000;
 
@@ -1394,6 +1473,51 @@ export function createRehearsalService(dependencies: {
     }
     const parsed = CounterpartPersonaStoredSchema.safeParse(saved.profile);
     return parsed.success ? built(saved, parsed.data) : "Q_UNAVAILABLE";
+  }
+
+  /**
+   * The real review, written in the background after a provisional one:
+   * a few tries, further apart, then left provisional (still readable).
+   */
+  function reviewLater(
+    actor: ActorContext,
+    rehearsalId: string,
+    looks: readonly PresenceObservation[],
+    attempt: number,
+  ): void {
+    const delay = REVIEW_RETRY_MS[attempt];
+    if (delay === undefined) return;
+    setTimeout(() => {
+      void (async () => {
+        const row = await store.own(actor, rehearsalId);
+        if (row === null) return;
+        const persona = personaOf(row.persona);
+        const viewer = await viewerOf(actor);
+        if (persona === null || viewer === null) return;
+        const turns = normaliseTurns(row.turns, row.userRole);
+        const review = await composer.review(actor, {
+          viewerRole: row.userRole,
+          viewerOrganisation: viewer.organisationName.slice(0, 200),
+          counterpartName: row.counterpartName,
+          persona: personaText(persona).slice(0, 10_000),
+          rehearsal: transcriptOf(
+            turns,
+            `${row.counterpartName} (played by Q)`,
+            row.userRole,
+          ),
+          ending: row.outcome ?? "LEFT_EARLY",
+        });
+        if (review === null) {
+          reviewLater(actor, rehearsalId, looks, attempt + 1);
+          return;
+        }
+        const graded = ownReview(review, turns, row.userRole);
+        await store.completeReview(actor, rehearsalId, {
+          score: scoreOf(graded.dimensions),
+          review: looks.length === 0 ? graded : { ...graded, presence: looks },
+        });
+      })().catch(() => undefined);
+    }, delay).unref();
   }
 
   /** One background rebuild after a degraded persona, per subject. */
@@ -1944,7 +2068,24 @@ export function createRehearsalService(dependencies: {
         ),
         ending: outcome,
       });
-      if (review === null) return { kind: "Q_UNAVAILABLE" };
+      if (review === null) {
+        // Never an empty page: a provisional review by code now, the real
+        // one filled in by a retry in the background.
+        logger?.warn(
+          { rehearsalId: row.id, stage: "review", userId: actor.userId },
+          "rehearsal degraded",
+        );
+        const held = provisionalReview(
+          metricsOf(turns, row.createdAt, row.endedAt ?? now(), now()),
+        );
+        const saved = await store.finish(actor, row.id, {
+          outcome,
+          score: null,
+          review: held,
+        });
+        reviewLater(actor, row.id, looks, 0);
+        return okWithHistory(actor, saved ?? (await store.own(actor, row.id)));
+      }
       const graded = ownReview(review, turns, row.userRole);
       const saved = await store.finish(actor, row.id, {
         outcome,

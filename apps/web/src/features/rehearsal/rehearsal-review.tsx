@@ -13,6 +13,7 @@ import {
   RATING_WORDS,
   elapsedLabel,
 } from "./meet";
+import { ReviewRefresh } from "./review-refresh";
 
 /**
  * The review after a rehearsal (REHEARSE): how it ended, a score computed
@@ -82,6 +83,13 @@ export function RehearsalReview({
         </p>
       ) : (
         <>
+          {review.provisional === true ? (
+            <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
+              Q is still writing the full review; this page updates when it&rsquo;s
+              ready.
+              <ReviewRefresh />
+            </p>
+          ) : null}
           <section className="flex flex-col gap-3 md:flex-row md:items-start md:gap-8">
             {review.score === null ? null : (
               <div className="flex shrink-0 flex-col">

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { QRehearsalPersonaDtoSchema } from "@capital-q/contracts";
 import type {
@@ -12,6 +12,7 @@ import {
   createRehearsalService,
   HOLDING_LINES,
   minimalPersona,
+  REVIEW_RETRY_MS,
   ownReview,
   scoreOf,
   shownPersona,
@@ -169,6 +170,25 @@ function memoryStore(): RehearsalStore & {
       rows[index] = next;
       return Promise.resolve(next);
     },
+    completeReview: (a, id, input) => {
+      const index = rows.findIndex(
+        (r) =>
+          r.id === id &&
+          (r as { userId?: string }).userId === a.userId &&
+          r.status === "FINISHED" &&
+          (r.scorecard as { provisional?: boolean } | null)?.provisional ===
+            true,
+      );
+      const row = rows[index];
+      if (row === undefined) return Promise.resolve(null);
+      const next: RehearsalRow = {
+        ...row,
+        score: input.score,
+        scorecard: input.review,
+      };
+      rows[index] = next;
+      return Promise.resolve(next);
+    },
     list: (a) =>
       Promise.resolve(
         rows
@@ -182,7 +202,7 @@ function memoryStore(): RehearsalStore & {
 function setup(options: { messages?: () => string } = {}) {
   const clock = { at: new Date("2026-10-01T10:05:00Z").getTime() };
   /** Model outages: persona readings and turns that come back empty. */
-  const outage = { persona: false, turns: 0 };
+  const outage = { persona: false, turns: 0, reviews: 0 };
   const warnings: { fields: Record<string, unknown>; message: string }[] = [];
   const looks = {
     next: null as PresenceReading | null,
@@ -344,6 +364,10 @@ function setup(options: { messages?: () => string } = {}) {
       });
     },
     review: (_a, variables) => {
+      if (outage.reviews > 0) {
+        outage.reviews -= 1;
+        return Promise.resolve(null);
+      }
       seen.reviewTranscripts.push(variables.rehearsal);
       return Promise.resolve({
         overall: "Solid, but bring cohorts.",
@@ -1292,5 +1316,42 @@ describe("a rehearsal can always start (REHEARSE P0, 2026-10-01)", () => {
     expect(minimal.priorities).toEqual(["seed fintech in West Africa"]);
     expect(minimal.grounding).toBe("THIN");
     expect(minimal.knownTraits).toEqual([]);
+  });
+});
+
+describe("a review is never an empty page (REHEARSE P0, 2026-10-01)", () => {
+  it("a failed review is provisional, by code from the turns, then filled in by a retry", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { service, outage, warnings, closeNextTurn } = setup();
+      const rehearsal = await startWith(service);
+      await service.say(actor(FOUNDER), rehearsal.id, {
+        text: "We have 300 farmers storing produce.",
+      });
+      closeNextTurn();
+      await service.say(actor(FOUNDER), rehearsal.id, { text: "Thank you." });
+      outage.reviews = 2;
+      const finished = await service.finish(actor(FOUNDER), rehearsal.id);
+      if (finished.kind !== "OK") throw new Error(finished.kind);
+      const held = finished.rehearsal.review;
+      expect(held?.provisional).toBe(true);
+      expect(held?.score).toBeNull();
+      expect(held?.dimensions).toEqual([]);
+      expect(held?.overall).toContain("Q will finish your review shortly");
+      expect(warnings.map((w) => w.message)).toContain("rehearsal degraded");
+      // First retry still fails; the second fills in the real review.
+      await vi.advanceTimersByTimeAsync(REVIEW_RETRY_MS[0]);
+      expect(await service.get(actor(FOUNDER), rehearsal.id)).toMatchObject({
+        kind: "OK",
+        rehearsal: { review: { provisional: true } },
+      });
+      await vi.advanceTimersByTimeAsync(REVIEW_RETRY_MS[1]);
+      const done = await service.get(actor(FOUNDER), rehearsal.id);
+      if (done.kind !== "OK") throw new Error(done.kind);
+      expect(done.rehearsal.review?.provisional).toBeUndefined();
+      expect(done.rehearsal.review?.score).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

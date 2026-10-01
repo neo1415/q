@@ -250,6 +250,11 @@ export const QRehearsalReviewDtoSchema = z
       )
       .max(4)
       .optional(),
+    /**
+     * Written by code from the transcript while Q could not write the
+     * review; Q fills in the real one shortly. No ratings, no score.
+     */
+    provisional: z.boolean().optional(),
   })
   .strict();
 export type QRehearsalReviewDto = z.infer<typeof QRehearsalReviewDtoSchema>;
