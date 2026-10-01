@@ -126,6 +126,10 @@ function gaussian(random: () => number): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * random());
 }
 
+/** A clamped normal sample, for soft scatter. */
+const gaussianSoft = (random: () => number): number =>
+  Math.max(-2.5, Math.min(2.5, gaussian(random)));
+
 const smooth = (edge0: number, edge1: number, x: number): number => {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
@@ -445,8 +449,10 @@ function facePoints(
     if (p !== undefined) {
       out.push({
         ...p,
-        x: (p.x + (random() - 0.5) * 0.008) * scale,
-        y: (p.y + (random() - 0.5) * 0.008) * scale + cy,
+        // A soft scatter, so repeated samples read as shading rather
+        // than as clumps (founder: "not hyper-defined").
+        x: (p.x + gaussianSoft(random) * 0.014) * scale,
+        y: (p.y + gaussianSoft(random) * 0.014) * scale + cy,
         z: p.z,
         b: PART_LIGHT[p.part] ?? 0.6,
       });
@@ -480,7 +486,8 @@ function handPoints(
     let u = 0;
     if (pick < 4) {
       const a = random() * TAU;
-      const r = 0.55 + Math.sqrt(random()) * 0.45;
+      // A filled palm, a little denser at its edge.
+      const r = Math.sqrt(random()) ** 0.7;
       x = Math.cos(a) * r * 0.1;
       y = Math.sin(a) * r * 0.095;
     } else if (pick < 10) {
@@ -764,7 +771,8 @@ function cloudFigure(count: number): Figure {
         const radius = Math.hypot(bx, by);
         const angle =
           Math.atan2(by, bx) + t * 0.16 + radius * Math.sin(t * 0.21) * 1.3;
-        const stretch = 1 + 0.32 * Math.sin(t * 0.29 + angle * 2);
+        // One slow lobe that wanders round: smoke, not a star.
+        const stretch = 1 + 0.24 * Math.sin(t * 0.29 + angle + radius * 3.1);
         const swell = 1 + output * 0.25 + input * 0.15;
         out.x[i] = Math.cos(angle) * radius * stretch * swell;
         out.y[i] = Math.sin(angle) * radius * (2 - stretch) * swell;

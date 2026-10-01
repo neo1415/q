@@ -171,7 +171,7 @@ export function layoutPoints(
     points[i * 4] = half + (sim.x[i] ?? 0) * unit;
     points[i * 4 + 1] = half + (sim.y[i] ?? 0) * unit;
     // Nearer is larger; brighter is a little larger (a glow).
-    points[i * 4 + 2] = base * (2.6 + depth * 0.9 + light * 1.4);
+    points[i * 4 + 2] = base * (2.1 + depth * 0.6 + light * 0.6);
     points[i * 4 + 3] = Math.min(1, (0.25 + light * 0.75) * fade);
   }
   return points;

@@ -53,15 +53,15 @@ seeing."
 Signals (all real, none inferred from words): the surface's `QApertureState`
 (voice state / run state), mic level, speaker level, and the gesture queue.
 
-| Presence   | When                                                    | Figure                                                                                         |
-| ---------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| FLOW       | IDLE, COMPLETE, ERROR (dim)                             | Flow field cloud, no face.                                                                     |
-| ATTENTIVE  | LISTENING (incl. user speaking)                         | Cloud leans toward the person (down/forward), swells with mic level. No face.                  |
-| WAKE       | entering LISTENING from IDLE ("Hey Q", session opens)   | EXCLAIM `!` for ~1.6 s, then ATTENTIVE.                                                        |
-| ASKING     | NEEDS_INPUT, NEEDS_APPROVAL                             | QUESTION `?` (held, breathing).                                                                |
-| THINKING   | THINKING, WORKING                                       | Head (soft, partial face) with slow sideways tilt and glance; WORKING keeps a slow orbit flow. |
-| SPEAKING   | SPEAKING                                                | Face: mouth from speaker level, blinks, subtle head motion; larger (0.62 of frame vs 0.52).    |
-| GESTURE(g) | a gesture is due (voice: at its sentence; text: queued) | Its figure for ~2.2 s (LAUGH 2.8 s), then back to the state's figure.                          |
+| Presence   | When                                                    | Figure                                                                                      |
+| ---------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| FLOW       | IDLE, ERROR (dim)                                       | Flow field cloud, no face.                                                                  |
+| ATTENTIVE  | LISTENING (incl. user speaking)                         | Cloud leans toward the person (down/forward), swells with mic level. No face.               |
+| WAKE       | entering LISTENING from IDLE ("Hey Q", session opens)   | EXCLAIM `!` for ~1.6 s, then ATTENTIVE.                                                     |
+| ASKING     | NEEDS_INPUT, NEEDS_APPROVAL                             | QUESTION `?` (held, breathing).                                                             |
+| THINKING   | THINKING (WORKING: ORBIT, a slow busy orbit, no face)   | Head (soft, partial face) with slow sideways tilt and glance.                               |
+| SPEAKING   | SPEAKING, COMPLETE (a typed answer landing)             | Face: mouth from speaker level, blinks, subtle head motion; larger (≈0.84 of frame height). |
+| GESTURE(g) | a gesture is due (voice: at its sentence; text: queued) | Its figure for ~2.2 s (LAUGH 2.8 s), then back to the state's figure.                       |
 
 Gestures (closed set, contract `QPresenceGesture`): QUESTION `?`, EXCLAIM
 `!`, MONEY `$`, BUILDINGS skyline, CHART_UP rising line + arrow, CLAP two
