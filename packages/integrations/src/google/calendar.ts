@@ -68,6 +68,24 @@ export type CalendarProvider = {
     },
   ) => Promise<void>;
   readonly cancel: (access: MailboxAccess, eventId: string) => Promise<void>;
+  /**
+   * AUTO (2026-10-02): the event's Meet link, read again; with `ask`, a new
+   * conference request first. MISSING: no such event (not a Google one).
+   */
+  readonly conference: (
+    access: MailboxAccess,
+    eventId: string,
+    options: { readonly ask: boolean },
+  ) => Promise<
+    | { readonly status: "READY"; readonly meetLink: string }
+    | { readonly status: "PENDING" | "MISSING" }
+  >;
+  /** Send everyone the updated invite, now carrying the Meet link. */
+  readonly announceLink: (
+    access: MailboxAccess,
+    eventId: string,
+    meetLink: string,
+  ) => Promise<void>;
 };
 
 const EventListSchema = z.object({
@@ -275,6 +293,68 @@ export function createGoogleCalendarProvider(
               timeZone: times.timeZone,
             },
           }),
+        },
+        EventSchema,
+      );
+    },
+
+    conference: async (access, eventId, options) => {
+      if (options.ask) {
+        // A fresh request id: Google creates a conference once per id.
+        const asked = await send(
+          http,
+          `${eventUrl(eventId)}?conferenceDataVersion=1&sendUpdates=none`,
+          {
+            method: "PATCH",
+            headers: headers(access, true),
+            body: JSON.stringify({
+              conferenceData: {
+                createRequest: {
+                  requestId: `${eventId}-retry`,
+                  conferenceSolutionKey: { type: "hangoutsMeet" },
+                },
+              },
+            }),
+          },
+        );
+        if (asked.status === 404 || asked.status === 410) {
+          return { status: "MISSING" };
+        }
+        if (asked.status < 200 || asked.status > 299) {
+          throw errorForStatus(asked.status);
+        }
+      }
+      const response = await send(
+        http,
+        `${eventUrl(eventId)}?conferenceDataVersion=1`,
+        { method: "GET", headers: headers(access) },
+      );
+      if (response.status === 404 || response.status === 410) {
+        return { status: "MISSING" };
+      }
+      if (response.status < 200 || response.status > 299) {
+        throw errorForStatus(response.status);
+      }
+      const parsed = EventSchema.safeParse(await readJson(response));
+      if (!parsed.success) {
+        throw new GoogleProviderError("MALFORMED_RESPONSE", response.status);
+      }
+      const link = meetLinkOf(parsed.data);
+      return link === null
+        ? { status: "PENDING" }
+        : { status: "READY", meetLink: link };
+    },
+
+    announceLink: async (access, eventId, meetLink) => {
+      // Touching the event with sendUpdates=all is what makes Google send
+      // every guest the updated invite, now with the link in it.
+      await call(
+        http,
+        `${eventUrl(eventId)}?conferenceDataVersion=1&sendUpdates=all`,
+        {
+          method: "PATCH",
+          headers: headers(access, true),
+          body: JSON.stringify({ location: meetLink }),
         },
         EventSchema,
       );

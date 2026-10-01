@@ -16,7 +16,10 @@ import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
 export const SCHEDULE_TICK_INTERVAL_MS = 30 * 1000;
 
 export async function runScheduleTicker(options: {
-  readonly schedule: Pick<ScheduleService, "deliverDue" | "prepareBriefs">;
+  readonly schedule: Pick<
+    ScheduleService,
+    "deliverDue" | "prepareBriefs" | "refreshMeetLinks"
+  >;
   readonly signal: AbortSignal;
   readonly logger: RunnerLogger;
   readonly intervalMs?: number | undefined;
@@ -30,6 +33,11 @@ export async function runScheduleTicker(options: {
     try {
       const reminders = await options.schedule.deliverDue(correlationId);
       const briefs = await options.schedule.prepareBriefs(correlationId);
+      // AUTO (2026-10-02): a Meet link Google attached after the booking.
+      const links = await options.schedule.refreshMeetLinks(correlationId);
+      if (links.found > 0) {
+        options.logger.info({ ...links }, "meet links attached");
+      }
       if (reminders.delivered + reminders.emailed + briefs > 0) {
         options.logger.info({ ...reminders, briefs }, "schedule tick");
       }

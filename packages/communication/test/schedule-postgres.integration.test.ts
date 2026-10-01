@@ -234,6 +234,31 @@ describe("@capital-q/communication schedule against PostgreSQL", () => {
        where relationship_id = ${ids.relationship} and event_type = 'meeting_scheduled'`;
     expect(events.length).toBeGreaterThanOrEqual(1);
 
+    // AUTO (2026-10-02): it waits for a link, which is set once.
+    const store = createPostgresScheduleStore({
+      sql: db.sql,
+      transactions: db.transactions,
+    });
+    const awaiting = await store.meetingsAwaitingLink(new Date(), 500);
+    expect(
+      awaiting.some((entry) => entry.meeting.id === agreed.meeting.id),
+    ).toBe(true);
+    expect(
+      await store.setMeetLink(
+        agreed.meeting.id,
+        "https://meet.google.com/abc-defg-hij",
+      ),
+    ).toBe(true);
+    expect(
+      await store.setMeetLink(
+        agreed.meeting.id,
+        "https://meet.google.com/zzz-zzzz-zzz",
+      ),
+    ).toBe(false);
+    expect((await store.findMeeting(agreed.meeting.id))?.meetLink).toBe(
+      "https://meet.google.com/abc-defg-hij",
+    );
+
     const notices = createCounterpartNotices(db.sql);
     const told = await notices.notify({
       relationshipId: ids.relationship,

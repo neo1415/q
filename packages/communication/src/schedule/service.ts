@@ -69,6 +69,19 @@ export type OrganiserCalendar = {
     },
   ) => Promise<void>;
   readonly cancel: (eventId: string) => Promise<void>;
+  /** AUTO (2026-10-02): read the Meet link again; `ask` requests one first. */
+  readonly conference?:
+    | ((
+        eventId: string,
+        options: { readonly ask: boolean },
+      ) => Promise<
+        | { readonly status: "READY"; readonly meetLink: string }
+        | { readonly status: "PENDING" | "MISSING" }
+      >)
+    | undefined;
+  /** Send every guest the updated invite, with the link. */
+  readonly announceLink?:
+    ((eventId: string, meetLink: string) => Promise<void>) | undefined;
 };
 
 /** A person's own connected calendar, or null. */
@@ -295,6 +308,18 @@ export type ScheduleService = {
     correlationId: string,
     limit?: number,
   ) => Promise<{ readonly delivered: number; readonly emailed: number }>;
+  /**
+   * Worker tick (AUTO, 2026-10-02): a booked call whose Meet link Google
+   * had not attached yet. Re-read on every tick for the first half hour
+   * (asking Google again from 10 minutes), then every 10 minutes until the
+   * call; when it appears, the meeting gets it, everyone gets the updated
+   * invite and a notice. After half an hour without one, the organiser is
+   * told plainly, once, that Q keeps trying.
+   */
+  readonly refreshMeetLinks: (
+    correlationId: string,
+    limit?: number,
+  ) => Promise<{ readonly found: number; readonly waiting: number }>;
   /** Worker tick: prep briefs for meetings starting within 24 hours. */
   readonly prepareBriefs: (
     correlationId: string,
@@ -306,6 +331,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_WINDOW_DAYS = 7;
 const MEETING_REMINDER_MINUTES = 15;
 const BRIEF_LEAD_MS = 24 * 3_600_000;
+/** Re-read a missing Meet link on every tick this long after booking. */
+const MEET_LINK_EAGER_MS = 30 * 60_000;
+/** From then on, ask Google for a conference again (idempotent per id). */
+const MEET_LINK_ASK_AFTER_MS = 10 * 60_000;
 /** How long after due an email reminder is still worth retrying. */
 const EMAIL_RETRY_WINDOW_MS = 60 * 60_000;
 
@@ -1046,6 +1075,86 @@ export function createScheduleService(
         }
       }
       return { delivered, emailed };
+    },
+
+    refreshMeetLinks: async (_correlationId, limit = 20) => {
+      const current = now();
+      const waiting = await store.meetingsAwaitingLink(current, limit);
+      let found = 0;
+      for (const { meeting, createdAt } of waiting) {
+        const age = current.getTime() - createdAt.getTime();
+        // The first half hour on every tick, then about every 10 minutes.
+        if (age > MEET_LINK_EAGER_MS && Math.floor(age / 60_000) % 10 !== 0) {
+          continue;
+        }
+        const calendar = await calendars(meeting.organiserUserId).catch(
+          () => null,
+        );
+        // No calendar (a time agreed in the chat) has its own "link to
+        // follow"; a calendar without the capability can't be asked.
+        if (calendar?.conference === undefined) continue;
+        const read = await calendar
+          .conference(meeting.googleEventId, {
+            ask: age >= MEET_LINK_ASK_AFTER_MS,
+          })
+          .catch((error: unknown) => {
+            logger?.warn(
+              { meetingId: meeting.id, err: error },
+              "meet link re-read failed",
+            );
+            return null;
+          });
+        if (read === null || read.status === "MISSING") continue;
+        if (read.status === "READY") {
+          if (!(await store.setMeetLink(meeting.id, read.meetLink))) continue;
+          found += 1;
+          await calendar
+            .announceLink?.(meeting.googleEventId, read.meetLink)
+            .catch((error: unknown) => {
+              logger?.warn(
+                { meetingId: meeting.id, err: error },
+                "updated invite not sent",
+              );
+            });
+          await transactions.run(async (tx) => {
+            for (const participant of meeting.participants) {
+              await store.notify(tx, {
+                tenantId: participant.participantTenantId,
+                userId: participant.userId,
+                kind: "MEETING_SCHEDULED",
+                title: `Meet link ready: ${meeting.purpose}`.slice(0, 200),
+                body: read.meetLink,
+                linkPath: null,
+                reminderId: null,
+                meetingId: meeting.id,
+                dedupeKey: `meet-link:${meeting.id}`,
+              });
+            }
+          });
+          logger?.info({ meetingId: meeting.id }, "meet link attached late");
+          continue;
+        }
+        if (age >= MEET_LINK_EAGER_MS) {
+          await transactions.run(async (tx) => {
+            await store.notify(tx, {
+              tenantId: meeting.organiserTenantId,
+              userId: meeting.organiserUserId,
+              kind: "MEETING_SCHEDULED",
+              title:
+                `Google hasn't added a Meet link to "${meeting.purpose}" yet`.slice(
+                  0,
+                  200,
+                ),
+              body: "Q asked Google again and keeps checking until the call. If you'd rather not wait, add a video link to the calendar event and Q will use it.",
+              linkPath: null,
+              reminderId: null,
+              meetingId: meeting.id,
+              dedupeKey: `meet-link-missing:${meeting.id}`,
+            });
+          });
+        }
+      }
+      return { found, waiting: waiting.length - found };
     },
 
     prepareBriefs: async (_correlationId, limit = 50) => {

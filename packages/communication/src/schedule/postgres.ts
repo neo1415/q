@@ -249,6 +249,32 @@ export function createPostgresScheduleStore(options: {
       return rows.length === 1;
     },
 
+    meetingsAwaitingLink: async (now, limit) => {
+      const rows = await sql<{ id: string; created_at: Date }[]>`
+        select id, created_at from communication.meetings
+         where status = 'SCHEDULED' and meet_link is null
+           and starts_at > ${now} and created_at > ${new Date(now.getTime() - 24 * 3_600_000)}
+         order by created_at asc
+         limit ${limit}`;
+      const found: { meeting: MeetingRecord; createdAt: Date }[] = [];
+      for (const row of rows) {
+        const meeting = await findMeeting(row.id);
+        if (meeting !== null) {
+          found.push({ meeting, createdAt: new Date(row.created_at) });
+        }
+      }
+      return found;
+    },
+
+    setMeetLink: async (meetingId, meetLink) => {
+      const rows = await sql<{ id: string }[]>`
+        update communication.meetings
+           set meet_link = ${meetLink}, updated_at = clock_timestamp()
+         where id = ${meetingId} and status = 'SCHEDULED' and meet_link is null
+        returning id`;
+      return rows.length > 0;
+    },
+
     meetingsNeedingBrief: async (now, until, limit) =>
       (
         await selectMeetings(

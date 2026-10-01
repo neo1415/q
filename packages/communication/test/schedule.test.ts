@@ -47,7 +47,7 @@ const NOW = new Date("2026-10-05T07:00:00Z");
 
 function world(options: { connected?: boolean; now?: Date } = {}) {
   let clock = options.now ?? NOW;
-  const store = createInMemoryScheduleStore();
+  const store = createInMemoryScheduleStore({ now: () => clock });
   const activity = createRecordingMeetingActivity();
   const email = createFakeAppEmail();
   const investorCalendar = createFakeCalendar("ben@vc.example.invalid");
@@ -524,5 +524,93 @@ describe("recordAgreed", () => {
       timeZone: "Nowhere/Else",
     });
     expect(odd.outcome === "OK" && odd.meeting.timeZone).toBe("UTC");
+  });
+});
+
+// AUTO (2026-10-02): a Meet link Google attaches after the booking.
+describe("refreshMeetLinks", () => {
+  const MIN = 60_000;
+
+  it("re-reads, asks Google again after 10 minutes, then attaches the link, re-invites and tells both sides once", async () => {
+    const w = world();
+    w.investorCalendar.insertLink = null;
+    const booked = await w.service.schedule(SCHEDULE);
+    expect(booked.outcome === "OK" && booked.meeting.meetLink).toBeNull();
+    if (booked.outcome !== "OK") return;
+    w.advance(new Date(NOW.getTime() + 1 * MIN));
+    expect(await w.service.refreshMeetLinks("cor_x")).toEqual({
+      found: 0,
+      waiting: 1,
+    });
+    expect(w.investorCalendar.conferenceReads.at(-1)?.ask).toBe(false);
+    w.advance(new Date(NOW.getTime() + 11 * MIN));
+    await w.service.refreshMeetLinks("cor_x");
+    expect(w.investorCalendar.conferenceReads.at(-1)?.ask).toBe(true);
+    w.investorCalendar.laterLink = "https://meet.google.com/xyz-later-abc";
+    w.advance(new Date(NOW.getTime() + 12 * MIN));
+    expect((await w.service.refreshMeetLinks("cor_x")).found).toBe(1);
+    expect((await w.store.findMeeting(booked.meeting.id))?.meetLink).toBe(
+      "https://meet.google.com/xyz-later-abc",
+    );
+    expect(w.investorCalendar.announced).toEqual([
+      {
+        eventId: googleEventIdFor(booked.meeting.id),
+        meetLink: "https://meet.google.com/xyz-later-abc",
+      },
+    ]);
+    const told = w.store.notifications.filter(
+      (n) => n.dedupeKey === `meet-link:${booked.meeting.id}`,
+    );
+    expect(told.map((n) => n.userId).sort()).toEqual(
+      [FOUNDER.userId, INVESTOR.userId].sort(),
+    );
+    // Nothing more to do: never twice.
+    w.advance(new Date(NOW.getTime() + 13 * MIN));
+    expect(await w.service.refreshMeetLinks("cor_x")).toEqual({
+      found: 0,
+      waiting: 0,
+    });
+    expect(w.investorCalendar.announced).toHaveLength(1);
+  });
+
+  it("tells the organiser plainly, once, when it still has none after half an hour, and keeps checking every 10 minutes", async () => {
+    const w = world();
+    w.investorCalendar.insertLink = null;
+    const booked = await w.service.schedule(SCHEDULE);
+    if (booked.outcome !== "OK") return;
+    w.advance(new Date(NOW.getTime() + 30 * MIN));
+    await w.service.refreshMeetLinks("cor_x");
+    const reads = w.investorCalendar.conferenceReads.length;
+    w.advance(new Date(NOW.getTime() + 34 * MIN));
+    await w.service.refreshMeetLinks("cor_x");
+    expect(w.investorCalendar.conferenceReads).toHaveLength(reads);
+    w.advance(new Date(NOW.getTime() + 40 * MIN));
+    await w.service.refreshMeetLinks("cor_x");
+    expect(w.investorCalendar.conferenceReads).toHaveLength(reads + 1);
+    const missing = w.store.notifications.filter(
+      (n) => n.dedupeKey === `meet-link-missing:${booked.meeting.id}`,
+    );
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.userId).toBe(INVESTOR.userId);
+  });
+
+  it("leaves a time agreed without Google alone (no such Google event)", async () => {
+    const w = world();
+    const agreed = await w.service.recordAgreed({
+      actor: INVESTOR,
+      relationshipId: REL,
+      purpose: "Agreed call",
+      startsAt: new Date("2026-10-06T09:00:00Z"),
+      durationMinutes: 30,
+      timeZone: "Africa/Lagos",
+      idempotencyKey: "errand:0002:agreed",
+      correlationId: "cor_00000000-0000-4000-8000-000000000003",
+    });
+    expect(agreed.outcome).toBe("OK");
+    w.advance(new Date(NOW.getTime() + 31 * MIN));
+    await w.service.refreshMeetLinks("cor_x");
+    expect(
+      w.store.notifications.some((n) => n.dedupeKey.startsWith("meet-link")),
+    ).toBe(false);
   });
 });

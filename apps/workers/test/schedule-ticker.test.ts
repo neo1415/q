@@ -30,6 +30,7 @@ describe("schedule ticker", () => {
             : Promise.resolve({ delivered: 1, emailed: 1 });
         },
         prepareBriefs: () => Promise.resolve(0),
+        refreshMeetLinks: () => Promise.resolve({ found: 0, waiting: 0 }),
       },
       signal: controller.signal,
       logger,

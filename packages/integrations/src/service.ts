@@ -176,6 +176,14 @@ export type ConnectedCalendar = {
     },
   ) => Promise<void>;
   readonly cancel: (eventId: string) => Promise<void>;
+  readonly conference: (
+    eventId: string,
+    options: { readonly ask: boolean },
+  ) => Promise<
+    | { readonly status: "READY"; readonly meetLink: string }
+    | { readonly status: "PENDING" | "MISSING" }
+  >;
+  readonly announceLink: (eventId: string, meetLink: string) => Promise<void>;
 };
 
 export const CALENDAR_EVENTS_SCOPE =
@@ -537,6 +545,10 @@ export function createIntegrationsService(
           calendar.move(await accessFor(account), eventId, times),
         cancel: async (eventId) =>
           calendar.cancel(await accessFor(account), eventId),
+        conference: async (eventId, options) =>
+          calendar.conference(await accessFor(account), eventId, options),
+        announceLink: async (eventId, meetLink) =>
+          calendar.announceLink(await accessFor(account), eventId, meetLink),
       };
     },
 
