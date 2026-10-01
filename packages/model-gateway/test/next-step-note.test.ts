@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import type { QOfferedTool } from "@capital-q/q-runtime";
+
 import {
   CAPABILITIES_NOTE,
   ENVIRONMENT_NOTES_MAX_CHARS,
   NEXT_STEP_NOTE,
   environmentNotesFor,
-  type QOfferedTool,
 } from "../src/q/index.js";
 
 /**
