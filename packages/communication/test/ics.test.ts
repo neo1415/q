@@ -63,3 +63,41 @@ describe("meetingIcs (RFC 5545)", () => {
     expect(long).toContain("\r\n ");
   });
 });
+
+describe("meetingIcs with a Meet link", () => {
+  it("writes the link as LOCATION and URL", () => {
+    const ics = meetingIcs({
+      uid: "00000000-0000-4000-8000-0000000000e2",
+      sequence: 1,
+      start: new Date("2026-10-05T09:00:00Z"),
+      end: new Date("2026-10-05T09:30:00Z"),
+      summary: "Intro call",
+      description: "Join",
+      location: "https://meet.google.com/abc-defg-hij",
+      url: "https://meet.google.com/abc-defg-hij",
+      organiser: { name: "Ada", email: "ada@fund.example" },
+      attendees: [],
+      createdAt: new Date("2026-10-02T08:00:00Z"),
+    });
+    expect(ics).toContain("LOCATION:https://meet.google.com/abc-defg-hij");
+    expect(ics).toContain("URL:https://meet.google.com/abc-defg-hij");
+    expect(ics).toContain("SEQUENCE:1");
+  });
+
+  it("drops a URL that is not https", () => {
+    const ics = meetingIcs({
+      uid: "00000000-0000-4000-8000-0000000000e3",
+      sequence: 0,
+      start: new Date("2026-10-05T09:00:00Z"),
+      end: new Date("2026-10-05T09:30:00Z"),
+      summary: "Intro call",
+      description: "Join",
+      location: null,
+      url: "javascript:alert(1)",
+      organiser: { name: "Ada", email: "ada@fund.example" },
+      attendees: [],
+      createdAt: new Date("2026-10-02T08:00:00Z"),
+    });
+    expect(ics).not.toContain("URL:");
+  });
+});

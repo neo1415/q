@@ -20,6 +20,7 @@ describe("schedule ticker", () => {
   it("delivers and briefs every 30 seconds, surviving a failure", async () => {
     const controller = new AbortController();
     let ticks = 0;
+    let mails = 0;
     const waits: number[] = [];
     await runScheduleTicker({
       schedule: {
@@ -32,6 +33,12 @@ describe("schedule ticker", () => {
         prepareBriefs: () => Promise.resolve(0),
         refreshMeetLinks: () => Promise.resolve({ found: 0, waiting: 0 }),
       },
+      meetingMail: {
+        tick: () => {
+          mails += 1;
+          return Promise.resolve({ sent: 0 });
+        },
+      },
       signal: controller.signal,
       logger,
       sleep: (ms) => {
@@ -41,6 +48,8 @@ describe("schedule ticker", () => {
       },
     });
     expect(ticks).toBe(3);
+    // The meeting email runs on every tick that got past the first step.
+    expect(mails).toBe(2);
     expect(waits).toEqual([
       SCHEDULE_TICK_INTERVAL_MS,
       SCHEDULE_TICK_INTERVAL_MS,

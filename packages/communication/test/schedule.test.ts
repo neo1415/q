@@ -237,6 +237,10 @@ describe("schedule, reschedule, cancel", () => {
         .filter((n) => n.kind === "MEETING_SCHEDULED")
         .map((n) => [n.userId, n.kind]),
     ).toEqual([[FOUNDER.userId, "MEETING_SCHEDULED"]]);
+    // The "New call" notice carries the Meet link itself.
+    expect(
+      w.store.notifications.find((n) => n.kind === "MEETING_SCHEDULED")?.body,
+    ).toBe("Meet link: https://meet.google.com/abc-defg-hij");
     // REHEARSE: everyone on the call is offered a rehearsal of it.
     const rehearse = w.store.notifications.filter(
       (n) => n.kind === "MEETING_PREP_READY",

@@ -1,4 +1,4 @@
-import type { ScheduleService } from "@capital-q/communication";
+import type { MeetingMailer, ScheduleService } from "@capital-q/communication";
 import { createCorrelationId } from "@capital-q/observability";
 
 import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
@@ -20,6 +20,8 @@ export async function runScheduleTicker(options: {
     ScheduleService,
     "deliverDue" | "prepareBriefs" | "refreshMeetLinks"
   >;
+  /** The booked-call email to every participant (founder report 2026-10-02). */
+  readonly meetingMail?: Pick<MeetingMailer, "tick"> | undefined;
   readonly signal: AbortSignal;
   readonly logger: RunnerLogger;
   readonly intervalMs?: number | undefined;
@@ -37,6 +39,11 @@ export async function runScheduleTicker(options: {
       const links = await options.schedule.refreshMeetLinks(correlationId);
       if (links.found > 0) {
         options.logger.info({ ...links }, "meet links attached");
+      }
+      // After the link refresh, so a late link is in the same pass's email.
+      const mail = (await options.meetingMail?.tick()) ?? { sent: 0 };
+      if (mail.sent > 0) {
+        options.logger.info({ ...mail }, "meeting emails sent");
       }
       if (reminders.delivered + reminders.emailed + briefs > 0) {
         options.logger.info({ ...reminders, briefs }, "schedule tick");

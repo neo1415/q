@@ -95,6 +95,8 @@ export type AppEmailPort = {
     readonly to: string;
     readonly subject: string;
     readonly text: string;
+    /** Its own HTML; absent, the sender frames the text. */
+    readonly html?: string | undefined;
     readonly attachments?:
       | readonly {
           readonly filename: string;
@@ -481,7 +483,8 @@ export function createScheduleService(
           userId: participant.userId,
           kind: "MEETING_SCHEDULED",
           title: `New call: ${record.purpose}`.slice(0, 200),
-          body: null,
+          // The link in the notice itself (founder report 2026-10-02).
+          body: meetLink === null ? null : `Meet link: ${meetLink}`,
           linkPath: null,
           reminderId: null,
           meetingId: record.id,

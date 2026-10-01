@@ -15,6 +15,8 @@ export type IcsInvite = {
   readonly summary: string;
   readonly description: string;
   readonly location: string | null;
+  /** The meeting's own link (a Meet link), as the event's URL. */
+  readonly url?: string | null | undefined;
   readonly organiser: { readonly name: string; readonly email: string };
   readonly attendees: readonly {
     readonly name: string;
@@ -78,6 +80,11 @@ export function meetingIcs(invite: IcsInvite): string {
     `SUMMARY:${text(invite.summary)}`,
     `DESCRIPTION:${text(invite.description)}`,
     ...(invite.location === null ? [] : [`LOCATION:${text(invite.location)}`]),
+    ...(invite.url === undefined ||
+    invite.url === null ||
+    !/^https:\/\/\S+$/.test(invite.url)
+      ? []
+      : [`URL:${invite.url}`]),
     ...(EMAIL.test(invite.organiser.email)
       ? [
           `ORGANIZER;CN=${param(invite.organiser.name)}:mailto:${invite.organiser.email}`,

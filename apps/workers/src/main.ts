@@ -165,6 +165,7 @@ import {
   composeSchedule,
   // AUTO block (ADR 0030)
   createCounterpartNotices,
+  createMeetingMailer,
   createNotificationDelivery,
   createPostgresMeetingDirectory,
   createWebPushSender,
@@ -901,6 +902,29 @@ const schedule = composeSchedule({
   logger,
 });
 
+// AUTO block (founder report 2026-10-02): every participant of a booked
+// call gets one Capital Q email with the time in their zone, the Meet link
+// and an invite file; once per meeting, person and version.
+const meetingMail = createMeetingMailer({
+  sql: database.sql,
+  email:
+    appEmail.brevoApi !== undefined
+      ? recordingEmailSender(createBrevoApiEmailSender(appEmail.brevoApi), {
+          sql: database.sql,
+          source: "workers.meetings",
+          provider: "BREVO_API",
+        })
+      : appEmail.smtp === undefined
+        ? unavailableAppEmailSender
+        : recordingEmailSender(createSmtpAppEmailSender(appEmail.smtp), {
+            sql: database.sql,
+            source: "workers.meetings",
+            provider: "SMTP",
+          }),
+  appOrigin: googleWorkspace.webOrigin ?? null,
+  logger,
+});
+
 // AUTO block (ADR 0030): notices beyond the app -- Web Push to the
 // person's devices (VAPID, free) and email for "Needs you" left unread.
 const webPush = loadWebPushConfig(process.env);
@@ -1012,6 +1036,7 @@ await Promise.all([
     : []),
   runScheduleTicker({
     schedule,
+    meetingMail,
     signal: shutdownController.signal,
     logger,
   }),

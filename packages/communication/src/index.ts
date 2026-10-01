@@ -127,6 +127,12 @@ export {
 // end AUTO block
 // AUTO block: calendar invites without Google (2026-10-02).
 export { meetingIcs, type IcsInvite } from "./schedule/ics.js";
+export {
+  createMeetingMailer,
+  meetingEmail,
+  meetingVersion,
+  type MeetingMailer,
+} from "./schedule/meeting-mail.js";
 // end AUTO block
 export {
   createCounterpartNotices,
