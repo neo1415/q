@@ -61,6 +61,11 @@ export function createDailyEditionService(deps: {
   /** The web app's origin for links in the email; null leaves them out. */
   readonly webOrigin: string | null;
   readonly maxEditionsPerDay?: number | undefined;
+  /**
+   * The platform kill switch (ADR 0033, flag `q.daily`): asked before an
+   * edition is generated and again before it is emailed. Absent: on.
+   */
+  readonly enabled?: (() => Promise<boolean>) | undefined;
   readonly logger?: Logger | undefined;
 }): {
   readonly tick: (now: Date, correlationId: string) => Promise<DailyTickResult>;
@@ -71,6 +76,8 @@ export function createDailyEditionService(deps: {
   ) => Promise<"PREPARED" | "EMAILED" | "SKIPPED">;
 } {
   const { store } = deps;
+  const isOn = async (): Promise<boolean> =>
+    deps.enabled === undefined ? true : deps.enabled().catch(() => false);
   const dailyCap = Math.max(
     0,
     Math.min(
@@ -85,6 +92,11 @@ export function createDailyEditionService(deps: {
     correlationId: string,
   ): Promise<"PREPARED" | "EMAILED" | "SKIPPED"> {
     const next = nextDueAt(reader.frequency, reader.timeZone, now);
+    if (!(await isOn())) {
+      // Switched off by Capital Q: nothing generated; due again next time.
+      await store.reschedule(reader.userId, next);
+      return "SKIPPED";
+    }
     const profile = await store.profileOf(reader.userId, reader.tenantId);
     if (profile === null) {
       await store.reschedule(reader.userId, next);
@@ -189,6 +201,7 @@ export function createDailyEditionService(deps: {
       return "PREPARED";
     }
     if (profile.email === null) return "PREPARED";
+    if (!(await isOn())) return "PREPARED";
     const links =
       deps.webOrigin === null
         ? null
@@ -214,6 +227,9 @@ export function createDailyEditionService(deps: {
     prepare,
     tick: async (now, correlationId) => {
       const defaults = await store.ensureDefaults(now, 200);
+      if (!(await isOn())) {
+        return { defaults, prepared: 0, emailed: 0, skipped: 0 };
+      }
       const today = await store.editionsToday(now);
       const room = Math.max(
         0,

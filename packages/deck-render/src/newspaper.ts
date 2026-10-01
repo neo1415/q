@@ -4,6 +4,7 @@ import {
   type QDailyStory,
 } from "@capital-q/contracts";
 
+import { DOCUMENT_PAGE } from "./document.js";
 import { fetchSlideImages, type SlideImages } from "./images.js";
 import {
   measure,
@@ -33,7 +34,8 @@ import { themeFor, type DeckTheme } from "./theme.js";
  * edition, which was checked against its sources before it was stored.
  */
 
-export const NEWSPAPER_PAGE = { width: 595, height: 842 } as const;
+/** The same A4 page every other document is drawn on (DOCS). */
+export const NEWSPAPER_PAGE = DOCUMENT_PAGE;
 const MARGIN = 40;
 const GUTTER = 18;
 const COLUMNS = 2;
@@ -278,6 +280,7 @@ function photo(
       url: image.url,
       alt: image.alt,
       credit: image.credit,
+      fit: "cover",
     },
     text(
       "LABEL",
@@ -527,6 +530,7 @@ export function layOutNewspaper(
         url: image.url,
         alt: image.alt,
         credit: image.credit,
+        fit: "cover",
       });
       y += height + 3;
       placed.push(

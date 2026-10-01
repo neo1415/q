@@ -353,6 +353,41 @@ describe("an edition, end to end with fakes", () => {
     expect(second?.qTake).toBeNull();
   });
 
+  it("does nothing while Capital Q's kill switch is off, and never emails after it goes off", async () => {
+    const index = fakeIndex();
+    const store = memoryStore([reader(USER)]);
+    const off = createDailyEditionService({
+      store,
+      index,
+      webOrigin: null,
+      enabled: () => Promise.resolve(false),
+    });
+    expect(await off.tick(NOW, "corr-off")).toMatchObject({ prepared: 0 });
+    expect(index.searches).toEqual([]);
+    expect(store.editions).toHaveLength(0);
+
+    const sent: DailyEmail[] = [];
+    let calls = 0;
+    const later = memoryStore([reader(USER)]);
+    const service = createDailyEditionService({
+      store: later,
+      index: fakeIndex(),
+      webOrigin: null,
+      email: {
+        available: true,
+        send: (email) => {
+          sent.push(email);
+          return Promise.resolve();
+        },
+      },
+      // On for the tick and the generation, off by the time it would email.
+      enabled: () => Promise.resolve((calls += 1) <= 2),
+    });
+    await service.tick(NOW, "corr-off-2");
+    expect(later.editions).toHaveLength(1);
+    expect(sent).toEqual([]);
+  });
+
   it("respects the daily cap", async () => {
     const store = memoryStore([reader(USER)]);
     const service = createDailyEditionService({

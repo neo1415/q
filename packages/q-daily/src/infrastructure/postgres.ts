@@ -8,7 +8,7 @@ import {
   type QDailyOptionalSection,
   type QDailyStory,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor } from "@capital-q/database";
+import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 
 import type { InterestProfile } from "../profile.js";
 import { nextDueAt } from "../schedule.js";
@@ -29,17 +29,6 @@ import type {
  */
 
 const LEASE_MS = 30 * 60 * 1000;
-
-/**
- * A plain JSON value for a jsonb parameter, through the driver's own json
- * serialiser: a pre-stringified value cast to jsonb is stored as a JSON
- * string, not an array or object.
- */
-function asJson(value: unknown): Parameters<DatabaseExecutor["json"]>[0] {
-  return JSON.parse(JSON.stringify(value)) as Parameters<
-    DatabaseExecutor["json"]
-  >[0];
-}
 
 function json(value: unknown): unknown {
   return typeof value === "string" ? JSON.parse(value) : value;
@@ -432,7 +421,7 @@ export function createPostgresDailyWorkerStore(
         insert into q_runtime.daily_cluster_issues
           (cluster_key, issue_date, topics, stories, searches_used, model_calls_used)
         values (${issue.clusterKey}, ${issue.issueDate},
-                ${sql.json(asJson(issue.topics))}, ${sql.json(asJson(issue.stories))},
+                ${jsonbParam(sql, issue.topics)}, ${jsonbParam(sql, issue.stories)},
                 ${Math.min(issue.searchesUsed, 50)}, ${Math.min(issue.modelCallsUsed, 50)})
         on conflict (cluster_key, issue_date) do nothing
         returning id`;
@@ -480,7 +469,7 @@ export function createPostgresDailyWorkerStore(
         values (${edition.id}, ${edition.userId}, ${edition.tenantId},
                 ${edition.content.editionDate}, ${edition.content.number},
                 ${edition.content.frequency}, ${edition.clusterIssueId},
-                ${sql.json(asJson(edition.content))},
+                ${jsonbParam(sql, edition.content)},
                 ${edition.searchesUsed}, ${edition.modelCallsUsed})
         on conflict do nothing
         returning id`;

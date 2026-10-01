@@ -13,6 +13,7 @@ import {
   type DailyTickResult,
 } from "@capital-q/q-daily";
 import { createCorrelationId } from "@capital-q/observability";
+import { createFlagReader } from "@capital-q/platform-admin";
 
 import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
 import { composeWorkerResearchProvider } from "../presence/composition.js";
@@ -52,7 +53,8 @@ export function composeWorkerDaily(dependencies: {
       })
     : undefined;
   const photos = createPexelsDailyPhotos(
-    dependencies.env["PEXELS_API_KEY"] ?? dependencies.env["PEXELS_API"],
+    // The deployment's variable is PEXELS_API (as on q-api).
+    dependencies.env["PEXELS_API"] ?? dependencies.env["PEXELS_API_KEY"],
   );
   const cap = Number.parseInt(
     dependencies.env["Q_DAILY_MAX_EDITIONS_PER_DAY"] ?? "",
@@ -69,6 +71,11 @@ export function composeWorkerDaily(dependencies: {
     ...(photos === undefined ? {} : { photos }),
     email: dependencies.email,
     webOrigin: webOriginOf(dependencies.env["CQ_WEB_ORIGIN"]),
+    // ADMIN kill switch (ADR 0033): before generating and before emailing.
+    enabled: (() => {
+      const flags = createFlagReader(dependencies.sql);
+      return () => flags.isEnabled("q.daily");
+    })(),
     ...(Number.isFinite(cap) && cap >= 0 ? { maxEditionsPerDay: cap } : {}),
     ...(dependencies.logger === undefined
       ? {}
