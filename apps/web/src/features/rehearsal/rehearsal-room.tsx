@@ -42,6 +42,7 @@ import {
   greySignature,
   initialsOf,
   screenChanged,
+  shouldNudgeSilence,
 } from "./meet";
 import {
   raiseHandAction,
@@ -69,8 +70,6 @@ const FRAME_MAX_WIDTH = 1280;
 const SIGNATURE_SIZE = { width: 32, height: 18 } as const;
 /** After the other person closes the meeting, a breath before leaving. */
 const CLOSE_PAUSE_MS = 2_500;
-/** After this long with nobody speaking, the played person reacts once. */
-const SILENCE_MS = 25_000;
 
 type Layout = "SPOTLIGHT" | "TILED";
 
@@ -253,10 +252,16 @@ export function RehearsalRoom({
   useEffect(() => {
     if (voiceLive !== "LIVE") return;
     const id = window.setInterval(() => {
-      const quiet =
-        voice.state === "LISTENING" &&
-        Date.now() - lastActivity.current > SILENCE_MS;
-      if (quiet && !nudged.current && micOn && !ended) {
+      if (
+        shouldNudgeSilence({
+          state: voice.state,
+          lastActivityMs: lastActivity.current,
+          nowMs: Date.now(),
+          alreadyNudged: nudged.current,
+          micOn,
+          ended,
+        })
+      ) {
         nudged.current = true;
         lastActivity.current = Date.now();
         voice.sendText(REHEARSAL_SILENCE_SIGNAL);

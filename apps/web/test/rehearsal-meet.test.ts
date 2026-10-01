@@ -9,6 +9,7 @@ import {
   initialsOf,
   OUTCOME_WORDS,
   screenChanged,
+  shouldNudgeSilence,
 } from "../src/features/rehearsal/meet";
 
 /**
@@ -91,5 +92,26 @@ describe("progress between rehearsals", () => {
     expect(progressWords(78, 70)).toBe("Up 8 since last time (70)");
     expect(progressWords(60, 70)).toBe("Down 10 since last time (70)");
     expect(progressWords(70, 70)).toBe("Same as last time (70)");
+  });
+});
+
+describe("silence on the line", () => {
+  const base = {
+    state: "LISTENING",
+    lastActivityMs: 0,
+    nowMs: 30_000,
+    alreadyNudged: false,
+    micOn: true,
+    ended: false,
+  };
+  it("nudges once after 25 seconds of nobody speaking", () => {
+    expect(shouldNudgeSilence(base)).toBe(true);
+    expect(shouldNudgeSilence({ ...base, alreadyNudged: true })).toBe(false);
+    expect(shouldNudgeSilence({ ...base, nowMs: 20_000 })).toBe(false);
+  });
+  it("never while they speak, with the mic off, or after the meeting ended", () => {
+    expect(shouldNudgeSilence({ ...base, state: "Q_SPEAKING" })).toBe(false);
+    expect(shouldNudgeSilence({ ...base, micOn: false })).toBe(false);
+    expect(shouldNudgeSilence({ ...base, ended: true })).toBe(false);
   });
 });

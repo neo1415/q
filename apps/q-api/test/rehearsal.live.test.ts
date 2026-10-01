@@ -276,4 +276,59 @@ describe.skipIf(!LIVE || KEY === undefined)("rehearsal (live model)", () => {
     );
     expect(done.kind).toBe("OK");
   }, 300_000);
+
+  it("plays a founder for an investor, from their pitch", async () => {
+    const gateway = createModelGateway({
+      catalog: createStaticModelCatalog(catalog),
+      registry: createModelProviderRegistry([
+        createOpenAIModelProvider({ apiKey: KEY ?? "" }),
+      ]),
+      usage: createInMemoryModelUsageRepository(),
+    });
+    const service = createRehearsalService({
+      store: memoryStore(),
+      composer: createRehearsalComposer({ gateway }),
+      material: {
+        viewer: () =>
+          Promise.resolve({
+            role: "INVESTOR",
+            organisationName: "Tidewater Growth Partners",
+          }),
+        counterpart: () =>
+          Promise.resolve({
+            name: "Tallyloom",
+            profile: "Company: Tallyloom\nStage: pre_seed\nBased in: Lagos NG",
+            relationshipId: null,
+          }),
+        theirMessages: () => Promise.resolve(""),
+        theirCalls: () => Promise.resolve(""),
+        counterpartMaterial: () =>
+          Promise.resolve({
+            text: "PITCH VIDEO TRANSCRIPT: Hi, I'm Ada, founder of Tallyloom. Market traders lose track of their money. Tallyloom lets them keep books by voice in Pidgin and Yoruba. We have 12,000 traders and we're raising half a million dollars.",
+            sources: [],
+          }),
+        publicWeb: () => Promise.resolve({ text: "", sources: [] }),
+        ownMaterial: () => Promise.resolve({ text: "", sources: [] }),
+        relationships: () => Promise.resolve([]),
+        upcomingMeetings: () => Promise.resolve([]),
+      },
+    });
+    const started = await service.start(actor, {
+      kind: "COMPANY",
+      id: "0d1c0de0-0000-4000-8000-000000000001",
+    });
+    if (started.kind !== "OK") throw new Error(started.kind);
+    const lines = [`THEM: ${started.rehearsal.turns[0]?.text ?? ""}`];
+    for (const text of [
+      "What is your monthly retention?",
+      "Why would traders pay for this?",
+    ]) {
+      lines.push(`YOU: ${text}`);
+      const r = await service.say(actor, started.rehearsal.id, { text });
+      const t = r.kind === "OK" ? r.rehearsal.turns.at(-1) : undefined;
+      lines.push(`THEM [${t?.mood ?? r.kind}]: ${t?.text ?? ""}`);
+    }
+    console.log(lines.join("\n"));
+    expect(lines.length).toBe(5);
+  }, 300_000);
 });
