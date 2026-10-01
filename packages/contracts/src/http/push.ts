@@ -39,6 +39,13 @@ export const PushSubscriptionRequestSchema = z
         auth: Base64Url.min(16).max(64),
       })
       .strict(),
+    /**
+     * Every browser's PushSubscription.toJSON() carries this (null when the
+     * subscription does not expire). Refusing it as an unknown key refused
+     * every real subscription (live 2026-10-01: "This browser's push
+     * subscription isn't usable"). Accepted and not stored.
+     */
+    expirationTime: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type PushSubscriptionRequest = z.infer<
