@@ -251,6 +251,30 @@ function selectMessage(executor: DatabaseExecutor) {
       from q_runtime.conversation_messages m`;
 }
 
+/**
+ * A run whose spoken words a later message of the same utterance extended
+ * (founder fixture failure #9; domain/utterances.ts). Applied in SQL, before
+ * the limit, so fourteen growing fragments of one dictation are one turn
+ * and do not crowd the rest of the conversation out of the window (live
+ * 2026-10-01). Nothing is deleted.
+ */
+function notSupersededRun(executor: DatabaseExecutor) {
+  return executor`
+    not exists (
+      select 1
+        from q_runtime.conversation_messages u1
+        join q_runtime.conversation_messages u2
+          on u2.tenant_id = u1.tenant_id
+         and u2.conversation_id = u1.conversation_id
+         and u2.provider_message_ref = u1.provider_message_ref
+         and u2.role = 'USER'
+         and (u2.created_at, u2.id) > (u1.created_at, u1.id)
+       where u1.run_id = m.run_id
+         and u1.tenant_id = m.tenant_id
+         and u1.role = 'USER'
+         and u1.provider_message_ref is not null)`;
+}
+
 function selectEvent(executor: DatabaseExecutor) {
   return executor`
     select e.id, e.tenant_id, e.run_id, e.sequence, e.event_type,
@@ -589,6 +613,7 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
              and (${!readBack} or not exists (
                select 1 from q_runtime.conversation_message_marks k
                 where k.message_id = m.id and k.tenant_id = m.tenant_id))
+             and ${notSupersededRun(executor)}
            order by m.created_at desc, m.id desc
            limit ${limit}`;
         return withoutSupersededUtterances(rows.map(toMessage).reverse());
@@ -616,6 +641,7 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
              and not exists (
                select 1 from q_runtime.conversation_message_marks k
                 where k.message_id = m.id and k.tenant_id = m.tenant_id)
+             and ${notSupersededRun(executor)}
            order by m.created_at desc, m.id desc
            limit ${limit}`;
         return withoutSupersededUtterances(rows.map(toMessage).reverse());

@@ -451,6 +451,66 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
     });
   });
 
+  // Founder fixture failure #9, live again 2026-10-01: one dictation was
+  // stored as fourteen growing fragments, each its own run. Read back, an
+  // utterance is one turn, its latest form, and the fragments do not take
+  // the conversation's window.
+  it("reads one utterance as one turn, before the window is applied", async () => {
+    await withWorld(async ({ tx, service, adminA, tenantA }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "Hey Q." } }),
+        idempotencyKey: "utt-0000",
+        correlationId: CORRELATION(),
+      });
+      const words = [
+        "All those kinds",
+        "of things",
+        "and eleven labs",
+        "have you tested that",
+      ];
+      let said = "";
+      let last = first;
+      for (const [index, word] of words.entries()) {
+        said = `${said} ${word}`.trim();
+        last = await service.createRun({
+          actor: adminA.actor,
+          input: request({
+            conversationId: first.conversation.id,
+            message: { text: said },
+          }),
+          utteranceRef: "voice:session:0.abc",
+          idempotencyKey: `utt-000${String(index + 1)}`,
+          correlationId: CORRELATION(),
+        });
+      }
+      const read = await repositories.messages.listRecentForConversationOfRun(
+        tx.sql,
+        tenantA,
+        last.run.id,
+        2,
+      );
+      // The window of two holds the opening and the whole utterance once.
+      expect(read.map((m) => m.content)).toEqual([
+        "Hey Q.",
+        "All those kinds of things and eleven labs have you tested that",
+      ]);
+      const history = await repositories.messages.listRecentForConversation(
+        tx.sql,
+        tenantA,
+        first.conversation.id,
+        64,
+      );
+      expect(history.filter((m) => m.role === "USER")).toHaveLength(2);
+      // Every fragment is still stored: history is never rewritten.
+      const stored = await tx.sql<{ n: number }[]>`
+        select count(*)::int as n from q_runtime.conversation_messages
+         where conversation_id = ${first.conversation.id} and role = 'USER'`;
+      expect(stored[0]?.n).toBe(5);
+    });
+  });
+
   // Founder live 2026-10-01: a name said to someone else and a dictation
   // were stored as the person's turns and read back as context. A mark
   // keeps a line out of what Q reads back, append-only; history keeps it.
