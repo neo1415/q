@@ -6,6 +6,7 @@ import type { QErrandDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { useQSessionOptional } from "@/features/q/q-session";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { readErrandsAction, stopErrandAction } from "./errand-actions";
@@ -24,7 +25,8 @@ export function RelationshipErrands({
   readonly counterpart: string;
   readonly connected: boolean;
 }) {
-  const { askAbout } = useGlobalQ();
+  const { askAbout, setOpen } = useGlobalQ();
+  const session = useQSessionOptional();
   const [errands, setErrands] = useState<readonly QErrandDto[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -46,13 +48,22 @@ export function RelationshipErrands({
     return (
       <Button
         variant="quiet"
-        onClick={() =>
-          askAbout(
-            connected
-              ? `Look after ${counterpart} for me: answer their questions, book a call and tell me with the link.`
-              : `Look after ${counterpart} for me: express interest, and when they accept, say hello, answer their questions, book a call and tell me with the link.`,
-          )
-        }
+        onClick={() => {
+          const ask = connected
+            ? `Look after ${counterpart} for me: answer their questions, book a call and tell me with the link.`
+            : `Look after ${counterpart} for me: express interest, and when they accept, say hello, answer their questions, book a call and tell me with the link.`;
+          // One tap hands it over (QA 2026-10-01: the button only filled
+          // the composer, so nothing happened until the person pressed
+          // send). Q opens beside the page, already working on it, and the
+          // plan comes back as a card to approve. Without a live session
+          // the words are left in the composer, as before.
+          if (session === null) {
+            askAbout(ask);
+            return;
+          }
+          setOpen(true);
+          void session.q.ask(ask);
+        }}
       >
         Let Q handle this
       </Button>
