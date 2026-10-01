@@ -296,6 +296,19 @@ const researchCall: FakeBehaviour = {
   ],
 };
 
+/**
+ * The calls the model made. The company on the person's screen is read
+ * for them before the model is asked (callId q-on-screen-company, speed
+ * sweep 2026-10-01); that read is not a round the model chose.
+ */
+function modelCalls<
+  T extends { readonly proposal: { readonly callId: string } },
+>(executed: readonly T[]): T[] {
+  return executed.filter(
+    (entry) => entry.proposal.callId !== "q-on-screen-company",
+  );
+}
+
 describe("environment notes with research offered", () => {
   it("always fit the charter bound, however many subjects and tools a run has", () => {
     const tools = [GET_COMPANY, RESEARCH];
@@ -369,11 +382,11 @@ describe("answer seam: Q decides to research", () => {
       }),
     });
     expect(outcome.kind).toBe("ANSWERED");
-    expect(tools.executed.map((e) => e.proposal.name)).toEqual([
+    expect(modelCalls(tools.executed).map((e) => e.proposal.name)).toEqual([
       "get_company",
       "research_public_web",
     ]);
-    expect(tools.executed[1]?.proposal.arguments).toEqual({
+    expect(modelCalls(tools.executed)[1]?.proposal.arguments).toEqual({
       query: question,
       maxSources: 2,
     });
@@ -394,7 +407,12 @@ describe("answer seam: Q decides to research", () => {
     expect(finalCall?.messages.at(-1)?.content).toContain("news.example.com");
     expect(
       seam.lastObservation()?.toolCalls.map((c) => c.providerName),
-    ).toEqual(["get_company", "research_public_web"]);
+    ).toEqual([
+      // The company on their screen, read for them before the model.
+      "get_company",
+      "get_company",
+      "research_public_web",
+    ]);
   });
 
   it("takes research out of the model's hands on a turn the core read as not asking for it, whatever its words (CQ-QX-005)", async () => {
@@ -549,7 +567,7 @@ describe("answer seam: public-web research", () => {
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
     expect(tools.executed).toHaveLength(1);
-    expect(tools.executed[0]?.context.conversation).toEqual({
+    expect(modelCalls(tools.executed)[0]?.context.conversation).toEqual({
       latestUserText: "Which markets does the public web say we operate in?",
     });
     expect(stages).toEqual(["SEARCHING_PUBLIC_SOURCES"]);
@@ -582,7 +600,7 @@ describe("answer seam: public-web research", () => {
     expect(outcome.kind).toBe("ANSWERED");
     // Exactly one tool executed: the research. The "obedient" proposal had no
     // tools to bind to, because the round budget closes after one round.
-    expect(tools.executed.map((e) => e.proposal.name)).toEqual([
+    expect(modelCalls(tools.executed).map((e) => e.proposal.name)).toEqual([
       "research_public_web",
     ]);
     const afterResearch = alpha.calls[1]?.request;
@@ -836,7 +854,7 @@ describe("answer seam: a round whose every call was refused gets one more", () =
     });
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
-    expect(tools.executed.map((e) => e.proposal.name)).toEqual([
+    expect(modelCalls(tools.executed).map((e) => e.proposal.name)).toEqual([
       "get_company",
       "research_public_web",
     ]);
@@ -854,6 +872,6 @@ describe("answer seam: a round whose every call was refused gets one more", () =
       userText: "Where does Northstar operate?",
     });
     await seam.answer(request);
-    expect(tools.executed).toHaveLength(2);
+    expect(modelCalls(tools.executed)).toHaveLength(2);
   });
 });
