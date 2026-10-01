@@ -19,6 +19,11 @@
     -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   --cq-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /*
+   * The Q Daily's newspaper voice (DAILY): a system serif for the masthead
+   * and headlines only. No download; body text stays in the UI face.
+   */
+  --cq-font-editorial: Georgia, "Times New Roman", Times, serif;
 
   /* Surfaces: canvas → section → surface → raised overlay. */
   --cq-canvas: oklch(0.985 0.004 92);

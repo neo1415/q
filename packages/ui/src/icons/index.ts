@@ -52,6 +52,7 @@ export {
   MonitorUp,
   Moon,
   MoreHorizontal,
+  Newspaper,
   Move,
   PanelLeft,
   PanelRight,

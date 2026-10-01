@@ -336,3 +336,12 @@ export {
 export * from "./admin-console.js";
 export * from "./results.js";
 // end ADMIN block
+
+// DAILY block
+export {
+  getQDaily,
+  getQDailyEdition,
+  getQDailyPreferences,
+  requestQDailyEdition,
+  setQDailyPreferences,
+} from "./daily.js";

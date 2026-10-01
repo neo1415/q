@@ -8,6 +8,7 @@ import {
   Handshake,
   Search,
   Landmark,
+  Newspaper,
   Play,
   Presentation,
   Settings,
@@ -37,6 +38,7 @@ export type NavigationItem = {
     | "/search"
     | "/rehearsals"
     | "/results"
+    | "/daily"
     | "/settings"
     | "/documents";
   readonly label: string;
@@ -132,6 +134,16 @@ export const RESULTS_NAVIGATION: NavigationItem = {
   icon: ChartColumn,
 };
 // end ADMIN block
+
+/**
+ * The Q Daily (DAILY): the person's own newspaper of news about their
+ * sectors, markets, deals and the people they know, with its archive.
+ */
+export const DAILY_NAVIGATION: NavigationItem = {
+  href: "/daily",
+  label: "The Q Daily",
+  icon: Newspaper,
+};
 
 /** Search people by @handle and founders' videos (founder design 2026-09-29). */
 export const FIND_NAVIGATION: NavigationItem = {

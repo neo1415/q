@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { getQDailyPreferences } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import {
@@ -12,7 +13,8 @@ import {
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { GmailConnection } from "@/features/integrations/gmail-connection";
 import { QMotionToggle } from "@/features/q-aperture";
-import { resolveQStanding } from "@/features/q/context";
+import { DailySetting } from "@/features/daily/daily-setting";
+import { qApiSession, resolveQStanding } from "@/features/q/context";
 import { PersonalitySetting } from "@/features/settings/personality-setting";
 import { VoiceSetting } from "@/features/settings/voice-setting";
 import { PushSetting } from "@/features/work/push-setting";
@@ -23,9 +25,9 @@ export const metadata: Metadata = { title: "Settings" };
  * Settings (R28): how Capital Q looks and how Q behaves on this device.
  *
  * Every choice here is a per-device preference the browser keeps (theme,
- * Q motion, Q's voice); nothing is fetched to render the page, so it opens
- * at once. Connected accounts (BIZ-007: Gmail) read their own status after
- * the page opens. Notifications (AUTO): a push on this device and email
+ * Q motion, Q's voice). Connected accounts (BIZ-007: Gmail) read their own status after
+ * the page opens; Q's personality and The Q Daily are kept by Capital Q
+ * and read in parallel as the page renders. Notifications (AUTO): a push on this device and email
  * for what needs them; in-app notices always show. The page offers no
  * switch that does nothing.
  */
@@ -37,7 +39,14 @@ export default async function SettingsPage({
   const google = (await searchParams)["google"];
   // Who Q is with them is kept by Capital Q, so it follows them to every
   // device (founder direction 2026-09-30).
-  const standing = await resolveQStanding();
+  const session = await qApiSession();
+  const [standing, daily] = await Promise.all([
+    resolveQStanding(),
+    // DAILY: how The Q Daily comes; null when the Q API could not be asked.
+    session === null
+      ? Promise.resolve(null)
+      : getQDailyPreferences(session).catch(() => null),
+  ]);
   return (
     <PageContainer width="reading">
       <PageHeader title="Settings" />
@@ -77,6 +86,20 @@ export default async function SettingsPage({
               >
                 Open
               </Link>
+            </SettingRow>
+          </dl>
+        </PageSection>
+
+        <PageSection id="q-daily" title="The Q Daily">
+          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+            <SettingRow term="Your newspaper">
+              {daily === null ? (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  These choices couldn&apos;t load. Reload in a moment.
+                </p>
+              ) : (
+                <DailySetting initial={daily} />
+              )}
             </SettingRow>
           </dl>
         </PageSection>

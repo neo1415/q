@@ -17,6 +17,7 @@ import type { ShellContext } from "./app-shell";
 import {
   DOCUMENTS_NAVIGATION,
   FOUNDER_MEDIA_NAVIGATION,
+  DAILY_NAVIGATION,
   FIND_NAVIGATION,
   REHEARSALS_NAVIGATION,
   RESULTS_NAVIGATION,
@@ -67,6 +68,8 @@ export function DesktopSidebar({
       ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION]
       : []),
     DOCUMENTS_NAVIGATION,
+    // DAILY block
+    DAILY_NAVIGATION,
     FIND_NAVIGATION,
   ];
 
