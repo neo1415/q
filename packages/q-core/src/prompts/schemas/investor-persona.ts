@@ -43,11 +43,11 @@ export const INVESTOR_PERSONA_UNTRUSTED = [
 export const InvestorPersonaResultSchema = z
   .object({
     /** Two or three sentences: who they are in a meeting. */
-    summary: z.string().trim().min(1).max(600),
+    summary: z.string().trim().min(1).max(1200),
     /** How they speak: tone, pace, how hard they push. */
-    style: z.string().trim().min(1).max(300),
+    style: z.string().trim().min(1).max(1200),
     /** What they care about most, most important first. */
-    priorities: z.array(z.string().trim().min(3).max(200)).max(6),
+    priorities: z.array(z.string().trim().min(3).max(400)).max(12),
     /** Questions they are likely to ask this founder, hardest first. */
     likelyQuestions: z
       .array(
@@ -61,9 +61,9 @@ export const InvestorPersonaResultSchema = z
       .min(3)
       .max(12),
     /** How they push back when an answer is weak. */
-    pushbacks: z.array(z.string().trim().min(3).max(200)).max(6),
+    pushbacks: z.array(z.string().trim().min(3).max(400)).max(12),
     /** What would win them over, from their own words where possible. */
-    howToWin: z.array(z.string().trim().min(3).max(200)).max(6),
+    howToWin: z.array(z.string().trim().min(3).max(400)).max(12),
     /** How much of this rests on their own words: THIN, SOME or RICH. */
     grounding: z.enum(["THIN", "SOME", "RICH"]),
   })
@@ -129,36 +129,39 @@ export const COUNTERPART_PERSONA_UNTRUSTED = [
   "previousProfile",
 ] as const;
 
+// Generous bounds (live 2026-10-01: a persona one item over a tight cap was
+// thrown away whole, so the rehearsal could not start). Consumers keep the
+// first few of each list they need.
 const Line = (max: number) => z.string().trim().min(3).max(max);
 
 export const CounterpartPersonaResultSchema = z
   .object({
     /** Two or three sentences: who they are in a meeting. */
-    summary: z.string().trim().min(1).max(600),
+    summary: z.string().trim().min(1).max(1200),
     /** How they speak: tone, pace, verbal habits, how hard they push. */
-    style: z.string().trim().min(1).max(400),
+    style: z.string().trim().min(1).max(1200),
     /** Their baseline mood, and what warms or cools them. */
     temperament: z
       .object({
         baseline: z.enum(PERSONA_MOODS),
-        warmsTo: z.array(Line(200)).max(5),
-        coolsOn: z.array(Line(200)).max(5),
+        warmsTo: z.array(Line(400)).max(12),
+        coolsOn: z.array(Line(400)).max(12),
       })
       .strict(),
-    priorities: z.array(Line(200)).max(6),
+    priorities: z.array(Line(400)).max(12),
     /** What they will ask, hardest first. */
     likelyQuestions: z
       .array(z.object({ question: Line(300), why: Line(200) }).strict())
       .min(3)
-      .max(12),
+      .max(16),
     /** For a founder Q plays: how they answer the hard questions. */
     likelyAnswers: z
       .array(z.object({ topic: Line(120), answer: Line(400) }).strict())
       .max(10),
-    pushbacks: z.array(Line(200)).max(6),
-    howToWin: z.array(Line(200)).max(6),
+    pushbacks: z.array(Line(400)).max(12),
+    howToWin: z.array(Line(400)).max(12),
     /** What would end it for them. */
-    dealbreakers: z.array(Line(200)).max(5),
+    dealbreakers: z.array(Line(400)).max(12),
     grounding: z.enum(["THIN", "SOME", "RICH"]),
   })
   .strict();
