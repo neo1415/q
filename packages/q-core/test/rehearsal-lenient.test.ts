@@ -7,6 +7,7 @@ import {
   CounterpartPersonaV4LenientSchema,
   normaliseCounterpartPersonaV4,
   createDefaultPromptRegistry,
+  PresenceReadingSchema,
   renderPrompt,
   DEFAULT_COMMUNICATION_PROFILE,
   type CounterpartPersonaV5Variables,
@@ -73,7 +74,7 @@ describe("lenient rehearsal readings", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(5);
     expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(4);
-    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(5);
+    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(6);
   });
 
   it("tells the played person who holds the leverage, and reads how forward they are", () => {
@@ -205,5 +206,53 @@ describe("the persona reading names the person Q plays (live re-run 2026-10-01)"
       "Every field below is about the INVESTOR, never the FOUNDER.",
     );
     expect(text).toContain("never a reason to write about the FOUNDER instead");
+  });
+});
+
+describe("camera guardrails in the turn prompt (founder ask 2026-10-01)", () => {
+  const turn =
+    createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
+      .template;
+
+  it("comments only on meeting behaviour and setup, never on the person", () => {
+    expect(turn).toContain("{{presence}}");
+    expect(turn).toContain("cameraOn {{cameraOn}}");
+    expect(turn).toContain("Only meeting behaviour and setup, ever");
+    for (const never of [
+      "appearance",
+      "face",
+      "body",
+      "clothing",
+      "age",
+      "race",
+      "gender",
+      "disability",
+      "health",
+      "religion",
+    ]) {
+      expect(turn).toContain(never);
+    }
+    expect(turn).toContain("no guessing who anyone is");
+    expect(turn).toContain("no reading emotions from a face");
+    expect(turn).toContain('at most say "looks like you have company"');
+    expect(turn).toContain("unknown stays unknown");
+    expect(turn).toContain(
+      "Never mention a thing the line above does not name",
+    );
+  });
+
+  it("reads presence only as typed, bounded values", () => {
+    expect(
+      PresenceReadingSchema.safeParse({
+        gaze: "AT_CAMERA",
+        distracted: false,
+        framing: "GOOD",
+        lighting: "GOOD",
+        background: "CALM",
+        company: false,
+        confident: true,
+        mood: "nervous",
+      }).success,
+    ).toBe(false);
   });
 });

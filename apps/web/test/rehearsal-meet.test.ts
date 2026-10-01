@@ -14,6 +14,8 @@ import {
   moodWord,
   shouldNudgeSilence,
   stanceWords,
+  shouldLook,
+  SEE_YOU_CONSENT,
 } from "../src/features/rehearsal/meet";
 import {
   MEET_SOUND_GAIN,
@@ -206,6 +208,41 @@ describe("who holds the leverage, in the lobby (founder live test 2026-10-01)", 
     expect(forward).toContain("Zino Aviation holds the leverage here");
     expect(forward).toContain(
       "Q reads them as forward (Interrupts with numbers)",
+    );
+  });
+});
+
+describe("Q sees you on camera: when a look is sent (founder ask 2026-10-01)", () => {
+  const base = {
+    consent: true,
+    cameraOn: true,
+    ended: false,
+    lastLookMs: 0,
+    nowMs: 100_000,
+    reason: "TURN" as const,
+  };
+
+  it("never without consent, a camera, or after the call", () => {
+    expect(shouldLook({ ...base, consent: false })).toBe(false);
+    expect(shouldLook({ ...base, cameraOn: false })).toBe(false);
+    expect(shouldLook({ ...base, ended: true })).toBe(false);
+    expect(shouldLook(base)).toBe(true);
+  });
+
+  it("at most every 8 s on turns, and once per 30 s between them", () => {
+    expect(shouldLook({ ...base, lastLookMs: base.nowMs - 5_000 })).toBe(false);
+    expect(shouldLook({ ...base, lastLookMs: base.nowMs - 9_000 })).toBe(true);
+    expect(
+      shouldLook({ ...base, reason: "IDLE", lastLookMs: base.nowMs - 20_000 }),
+    ).toBe(false);
+    expect(
+      shouldLook({ ...base, reason: "IDLE", lastLookMs: base.nowMs - 31_000 }),
+    ).toBe(true);
+  });
+
+  it("asks in plain words, saying frames are never stored", () => {
+    expect(SEE_YOU_CONSENT).toBe(
+      "Let Q see you on camera (frames are analysed for this rehearsal only and never stored)",
     );
   });
 });

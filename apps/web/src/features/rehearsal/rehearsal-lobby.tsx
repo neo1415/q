@@ -16,7 +16,12 @@ import { ExternalLink } from "@capital-q/ui/icons";
 
 import { EntitlementNotice } from "@/features/billing/entitlement-notice";
 
-import { initialsOf, stanceWords, TRAIT_SOURCE_WORDS } from "./meet";
+import {
+  initialsOf,
+  SEE_YOU_CONSENT,
+  stanceWords,
+  TRAIT_SOURCE_WORDS,
+} from "./meet";
 import {
   rehearsalPersonaAction,
   startRehearsalAction,
@@ -82,6 +87,8 @@ export function RehearsalLobby({
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [voice, setVoice] = useState<"FEMALE" | "MALE">("MALE");
+  // Off by default: Q sees them only when they say so (founder ask 2026-10-01).
+  const [seeYou, setSeeYou] = useState(false);
   const [difficulty, setDifficulty] =
     useState<RehearsalDifficulty>("REALISTIC");
   const [rehearsal, setRehearsal] = useState<QRehearsalDto | null>(null);
@@ -102,7 +109,9 @@ export function RehearsalLobby({
     };
   }, [kind, counterpartId, attempt]);
 
-  if (rehearsal !== null) return <RehearsalRoom initial={rehearsal} />;
+  if (rehearsal !== null) {
+    return <RehearsalRoom initial={rehearsal} seeYou={seeYou} />;
+  }
 
   function join() {
     setMessage(null);
@@ -271,6 +280,20 @@ export function RehearsalLobby({
             {DIFFICULTIES.find((choice) => choice.value === difficulty)?.hint}
           </p>
         </fieldset>
+
+        <label className="cq-body-sm flex min-h-11 cursor-pointer items-start gap-3 text-(--cq-text-secondary)">
+          <input
+            type="checkbox"
+            checked={seeYou}
+            onChange={(event) => setSeeYou(event.target.checked)}
+            className="mt-1 size-4 accent-(--cq-accent)"
+          />
+          <span>
+            <span className="text-(--cq-text-primary)">{SEE_YOU_CONSENT}</span>{" "}
+            {name} can then react to how you come across, as on a real call. You
+            can turn it off at any time.
+          </span>
+        </label>
 
         <div className="flex flex-col gap-2">
           <Button size="large" onClick={join} disabled={joining}>

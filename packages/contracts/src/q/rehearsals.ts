@@ -116,14 +116,21 @@ export const RehearsalTurnRequestSchema = z.union([
 ]);
 export type RehearsalTurnRequest = z.infer<typeof RehearsalTurnRequestSchema>;
 
-/** One frame of the screen the person chose to share; never stored. */
+/**
+ * One frame of the screen the person chose to share, or of their camera
+ * when they opted in to Q seeing them; never stored.
+ */
 export const REHEARSAL_SCREEN_MAX_CHARS = 480_000;
+export const REHEARSAL_FRAME_KINDS = ["SCREEN", "CAMERA"] as const;
 export const RehearsalScreenRequestSchema = z
   .object({
+    kind: z.enum(REHEARSAL_FRAME_KINDS).default("SCREEN"),
+    /** Absent: forget the frame held of this kind (they stopped sharing). */
     image: z
       .string()
       .max(REHEARSAL_SCREEN_MAX_CHARS)
-      .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/),
+      .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/)
+      .optional(),
   })
   .strict();
 export type RehearsalScreenRequest = z.infer<
@@ -228,6 +235,21 @@ export const QRehearsalReviewDtoSchema = z
       )
       .max(6),
     tips: z.array(z.string().max(300)).max(6),
+    /**
+     * How they came across on camera, when they let Q see them: written by
+     * code from presence readings kept as text during the rehearsal.
+     */
+    presence: z
+      .array(
+        z
+          .object({
+            observation: z.string().max(300),
+            tip: z.string().max(300),
+          })
+          .strict(),
+      )
+      .max(4)
+      .optional(),
   })
   .strict();
 export type QRehearsalReviewDto = z.infer<typeof QRehearsalReviewDtoSchema>;

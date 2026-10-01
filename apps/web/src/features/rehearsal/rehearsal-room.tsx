@@ -18,6 +18,8 @@ import {
 import {
   Captions,
   CaptionsOff,
+  Eye,
+  EyeOff,
   Hand,
   ICON_STROKE,
   LayoutGrid,
@@ -47,6 +49,10 @@ import {
   screenChanged,
   moodWord,
   shouldNudgeSilence,
+  LOOK_QUALITY,
+  LOOK_WIDTH,
+  SEE_YOU_CONSENT,
+  shouldLook,
 } from "./meet";
 import {
   raiseHandAction,
@@ -132,13 +138,21 @@ function RoundButton({
 
 export function RehearsalRoom({
   initial,
+  seeYou = false,
 }: {
   readonly initial: QRehearsalDto;
+  /** They opted in, in the lobby, to Q seeing them on camera. */
+  readonly seeYou?: boolean;
 }) {
   const router = useRouter();
   const [rehearsal, setRehearsal] = useState(initial);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(false);
+  // Consent to Q seeing them: separate from the self-view, off unless they
+  // opted in, and off again the instant they say so.
+  const [qSees, setQSees] = useState(seeYou);
+  const consent = useRef(seeYou);
+  const lastLook = useRef(0);
   const [captionsOn, setCaptionsOn] = useState(true);
   const [hand, setHand] = useState(false);
   const [layout, setLayout] = useState<Layout>("SPOTLIGHT");
@@ -195,12 +209,58 @@ export function RehearsalRoom({
     }, 600);
   }, [initial.id]);
 
+  /**
+   * A small look at them, when they consented and their camera is on: a
+   * 512px JPEG sent for the next turn only and never stored. On their turns
+   * (at most every 8 s) and, between turns, once per 30 s.
+   */
+  const look = useCallback(
+    async (reason: "TURN" | "IDLE") => {
+      const video = selfVideo.current;
+      if (
+        video === null ||
+        video.videoWidth === 0 ||
+        !shouldLook({
+          consent: consent.current,
+          cameraOn: camStream.current !== null,
+          ended: left.current,
+          lastLookMs: lastLook.current,
+          nowMs: Date.now(),
+          reason,
+        })
+      ) {
+        return;
+      }
+      lastLook.current = Date.now();
+      const scale = Math.min(1, LOOK_WIDTH / video.videoWidth);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      canvas
+        .getContext("2d")
+        ?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const image = canvas.toDataURL("image/jpeg", LOOK_QUALITY);
+      // Consent can be withdrawn while the frame was being drawn.
+      if (!consent.current) return;
+      await shareScreenFrameAction(initial.id, image, "CAMERA").catch(
+        () => undefined,
+      );
+    },
+    [initial.id],
+  );
+  const lookRef = useRef(look);
+  useEffect(() => {
+    lookRef.current = look;
+  }, [look]);
+
   const voice = useVoiceSession({
     onLine: (line: VoiceTranscriptLine) => {
       lastActivity.current = Date.now();
       if (line.role === "user") {
         setHand(false);
         nudged.current = false;
+        // They are speaking: a look rides with this turn.
+        void lookRef.current("TURN");
       }
       if (line.role === "q" && !line.partial) refresh();
     },
@@ -387,6 +447,29 @@ export function RehearsalRoom({
     }
   }, [camOn, layout, sharing]);
 
+  /** Q stops seeing them at once: no more frames, and the held one is forgotten. */
+  function toggleSeeing() {
+    const next = !qSees;
+    consent.current = next;
+    setQSees(next);
+    if (!next) {
+      void shareScreenFrameAction(initial.id, null, "CAMERA").catch(
+        () => undefined,
+      );
+    } else {
+      lastLook.current = 0;
+      if (!camOn) setNotice(`Turn on your camera so ${name} can see you.`);
+      void look("IDLE");
+    }
+  }
+
+  // Between turns, one look per idle period, only while they consent.
+  useEffect(() => {
+    if (!qSees || !camOn || ended) return;
+    const id = window.setInterval(() => void look("IDLE"), 5_000);
+    return () => window.clearInterval(id);
+  }, [qSees, camOn, ended, look]);
+
   async function raiseHand() {
     if (hand) {
       setHand(false);
@@ -408,6 +491,7 @@ export function RehearsalRoom({
     if (text.length === 0 || sending) return;
     setDraft("");
     setHand(false);
+    await look("TURN");
     if (lineLive) {
       // Typed while the line is open: the same turn, answered aloud.
       voice.sendText(text);
@@ -569,6 +653,15 @@ export function RehearsalRoom({
           <MicOff size={14} aria-label="Your microphone is off" />
         </span>
       )}
+      {qSees && camOn ? (
+        <span
+          role="status"
+          className="cq-caption absolute top-2 left-2 inline-flex items-center gap-1 rounded-(--cq-radius-sm) bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)"
+        >
+          <Eye size={12} aria-hidden="true" />
+          {name} can see you
+        </span>
+      ) : null}
       <span className="cq-caption absolute bottom-2 left-2 rounded-(--cq-radius-sm) bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)">
         You
         {hand ? " · hand raised" : ""}
@@ -750,6 +843,13 @@ export function RehearsalRoom({
             icon={camOn ? Video : VideoOff}
             off={!camOn}
             onClick={() => void toggleCamera()}
+          />
+          <RoundButton
+            label={qSees ? `Stop letting ${name} see you` : SEE_YOU_CONSENT}
+            icon={qSees ? Eye : EyeOff}
+            pressed={qSees}
+            onClick={toggleSeeing}
+            disabled={ended}
           />
           <RoundButton
             label={captionsOn ? "Turn off captions" : "Turn on captions"}
