@@ -59,6 +59,9 @@ const CORE = [
   "list_my_relationships",
   // Founder directive 2026-09-28: "change my deck" can come mid-anything.
   "revise_my_document",
+  // AUTO (ADR 0029): "what are you working on" and "stop" from any turn.
+  "list_q_work",
+  "stop_q_work",
 ];
 
 const registry = createQToolRegistry(createDefaultQTools(EVERY_PORT));

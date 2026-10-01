@@ -26,6 +26,8 @@ import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createProposeEmailTool } from "./tools/email.js";
 import { createChatTools } from "./tools/chat.js";
 import { createErrandTools } from "./tools/errands.js";
+// AUTO block (ADR 0029)
+import { createQWorkTools } from "./tools/q-work.js";
 import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
@@ -85,6 +87,9 @@ export function createDefaultQTools(
     ...(ports.chat === undefined || ports.relationships === undefined
       ? []
       : createErrandTools(ports, ports.chat, ports.relationships)),
+    // AUTO block (ADR 0029): "Q, handle it" -- outreach, stand-in, and
+    // following, answering and stopping them, from any Q surface.
+    ...(ports.work === undefined ? [] : createQWorkTools(ports.work)),
     // BIZ-008: calls and reminders, prepared on the same board.
     ...(ports.schedule === undefined ||
     ports.chat === undefined ||

@@ -451,3 +451,18 @@ export {
   type QCapabilityRunFacts,
   type QCapabilitySurface,
 } from "./capabilities.js";
+// AUTO block: Q's delegated work tools (ADR 0029).
+export {
+  ANSWER_Q_WORK,
+  createQWorkTools,
+  LIST_Q_WORK,
+  PROPOSE_Q_OUTREACH,
+  PROPOSE_STAND_IN,
+  ProposeQOutreachInputSchema,
+  ProposeStandInInputSchema,
+  SET_AWAY,
+  STOP_Q_WORK,
+  type QWorkIntelligencePort,
+  type QWorkProposal,
+} from "./tools/q-work.js";
+// end AUTO block

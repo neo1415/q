@@ -25,6 +25,8 @@ import type { ActorContext, AuthorizationService } from "@capital-q/security";
 import type { ChatIntelligencePort } from "./tools/chat.js";
 import type { ScheduleIntelligencePort } from "./tools/schedule.js";
 import type { OnboardingRemindersPort } from "./tools/onboarding-reminders.js";
+// AUTO block (ADR 0029)
+import type { QWorkIntelligencePort } from "./tools/q-work.js";
 
 /** One company as the investor's feed shows it. */
 export type InvestorFeedCompany = {
@@ -331,6 +333,8 @@ export type QToolPorts = {
    * "stop reminding me", "let's finish my setup". Absent: neither tool exists.
    */
   readonly onboardingReminders?: OnboardingRemindersPort | undefined;
+  // AUTO block (ADR 0029): Q's delegated work; absent means no work tool.
+  readonly work?: QWorkIntelligencePort | undefined;
 };
 
 /**

@@ -668,6 +668,43 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Takes on a multi-step job about one relationship for one approval: express interest, message them once connected, answer from an approved brief, book a call, and report back. Stoppable any time.",
     { approval: "PREPARE_APPROVE", executes: ["q.errand.start"] },
   ),
+  // --- AUTO block (ADR 0029): Q's delegated work; keep together ---------
+  tool(
+    "propose_q_outreach",
+    "RELATIONSHIP",
+    "An investor's outreach for one approval: picks the closest fits from their feed, expresses interest, chats with founders who accept, can interview and report, books calls with a Meet link. Stoppable.",
+    { approval: "PREPARE_APPROVE", executes: ["q.work.outreach.start"] },
+  ),
+  tool(
+    "propose_stand_in",
+    "RELATIONSHIP",
+    "A founder's stand-in for one approval: while they are away Q answers investors only from a brief they approved, labelled as Q, and hands the chats back on return.",
+    { approval: "PREPARE_APPROVE", executes: ["q.work.standin.start"] },
+  ),
+  tool(
+    "list_q_work",
+    "RELATIONSHIP",
+    "Reads what Q is working on for them: each outreach or stand-in, every founder's stage, times waiting for their choice, reports.",
+  ),
+  tool(
+    "stop_q_work",
+    "RELATIONSHIP",
+    "Stops Q's work at once, all of it or one founder; no approval needed.",
+    { acts: true },
+  ),
+  tool(
+    "answer_q_work",
+    "RELATIONSHIP",
+    "Gives Q their decision on a founder in their outreach: book the call (or another one) at the time they chose, or pass.",
+    { acts: true },
+  ),
+  tool(
+    "set_away",
+    "RELATIONSHIP",
+    "Tells Q the founder is away now (the stand-in answers at once) or back (Q hands the chats back).",
+    { acts: true },
+  ),
+  // --- end AUTO block ---------------------------------------------------------
   // --- BIZ-008 meetings + reminders (B8 worker block; keep together) -----
   tool(
     "find_meeting_times",

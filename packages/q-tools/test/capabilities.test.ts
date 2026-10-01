@@ -58,6 +58,8 @@ const EVERY_PORT: QToolPorts = {
   evidenceDocuments: STUB,
   relationshipMail: STUB,
   onboardingReminders: STUB,
+  // AUTO (ADR 0029)
+  work: STUB,
 };
 
 const EVERY_TOOL = [
