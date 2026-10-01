@@ -21,6 +21,13 @@ import { QSubjectRefsSchema } from "./subject.js";
 
 export const Q_CONVERSATIONS_PATH = "/v1/q/conversations" as const;
 export const Q_CONVERSATION_ARCHIVE_SUFFIX = "/archive" as const;
+/**
+ * POST {conversation}/messages/:messageId/hide -- the owner keeps one of
+ * their lines out of what Q reads back (context, memory), without deleting
+ * it: history still shows it (founder live 2026-10-01: an open microphone
+ * stored speech meant for someone else). Idempotent; no body.
+ */
+export const Q_CONVERSATION_MESSAGE_HIDE_SUFFIX = "/hide" as const;
 
 /** How many turns reopening a conversation brings back. Older ones exist; the prompt sees a summary of them. */
 export const Q_CONVERSATION_MESSAGES_MAX = 120;

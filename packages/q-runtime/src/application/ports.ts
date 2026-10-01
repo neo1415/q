@@ -227,9 +227,9 @@ export type QConversationMessageRepository = {
     options?: { readonly readBack?: boolean | undefined },
   ) => Promise<readonly QConversationMessage[]>;
   /**
-   * Keep the person's own lines out of what Q reads back, append-only
-   * (20261110030000). Only USER lines of this conversation are marked;
-   * marking twice is a no-op.
+   * Keep lines out of what Q reads back, append-only (20261110030000):
+   * the person's lines not meant for Q, and Q's replies to them. Only
+   * lines of this conversation are marked; marking twice is a no-op.
    */
   readonly mark?: (
     tx: TransactionContext,

@@ -1514,6 +1514,8 @@ export function createSpecialistQAnswer(
           transcript: read.transcript,
           question: read.question?.kind ?? null,
           aboutNamedOther: read.aboutNamedOther,
+          addressedToQ: read.addressedToQ ?? true,
+          earlierNotForQ: read.earlierNotForQ ?? false,
           research: (await research).mode,
           tool: read.tool?.kind ?? null,
         },
@@ -1529,15 +1531,20 @@ export function createSpecialistQAnswer(
     // what Q reads back from now on, context, readings and memory alike
     // (founder live 2026-10-01). Nothing is deleted.
     if (read !== null && read.earlierNotForQ === true) {
+      // What they said just before: their latest run of lines, and Q's
+      // reply to them if Q answered (live check 2026-10-01: Q's reply to
+      // a line not meant for it kept the line alive in context).
       const before: string[] = [];
+      let seenTheirs = false;
       for (let index = history.length - 1; index >= 0; index -= 1) {
         const message = history[index];
         if (message === undefined || message.id === latest.id) continue;
-        if (message.role !== "USER") break;
+        if (message.role === "USER") seenTheirs = true;
+        else if (seenTheirs) break;
         before.push(message.id);
         if (before.length >= 30) break;
       }
-      await markNotForQ(request, conversationId, before);
+      await markNotForQ(request, conversationId, seenTheirs ? before : []);
     }
     if (spoken && read !== null && read.addressedToQ === false) {
       // Not theirs to Q: kept out of what Q reads back, so a name said to

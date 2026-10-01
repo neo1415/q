@@ -16,6 +16,7 @@ import {
   Q_APPROVAL_REJECT_SUFFIX,
   Q_APPROVALS_PATH,
   Q_CONVERSATION_ARCHIVE_SUFFIX,
+  Q_CONVERSATION_MESSAGE_HIDE_SUFFIX,
   Q_CONVERSATIONS_PATH,
   Q_RUN_CANCEL_SUFFIX,
   Q_RUN_MESSAGES_SUFFIX,
@@ -253,6 +254,29 @@ export function getQConversation(session: ApiSession, conversationId: string) {
 }
 
 /** `POST /v1/q/conversations/:conversationId/archive` — idempotent; 204. */
+/** Keep one of the owner's lines out of what Q reads back; never deleted. */
+export async function hideQConversationMessage(
+  session: ApiSession,
+  conversationId: string,
+  messageId: string,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${conversationPath(conversationId)}/messages/${encodeURIComponent(messageId)}${Q_CONVERSATION_MESSAGE_HIDE_SUFFIX}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
+}
+
 export async function archiveQConversation(
   session: ApiSession,
   conversationId: string,

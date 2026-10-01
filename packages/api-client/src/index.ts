@@ -141,6 +141,7 @@ export {
   appendQRunMessage,
   approveQApproval,
   archiveQConversation,
+  hideQConversationMessage,
   cancelQRun,
   createQRun,
   getQConversation,

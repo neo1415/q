@@ -7,6 +7,7 @@ import {
   appendQRunMessage,
   approveQApproval,
   archiveQConversation,
+  hideQConversationMessage,
   cancelQRun,
   rejectQApproval,
   createQRun,
@@ -24,6 +25,7 @@ import {
   Q_MESSAGE_TEXT_MAX_LENGTH,
   Q_OPENING_MAX_LENGTH,
   QConversationIdSchema,
+  QMessageIdSchema,
   QScreenContextSchema,
   QViewingMomentSchema,
   type ListQConversationsResponse,
@@ -463,6 +465,30 @@ export async function archiveQConversationAction(
   }
   return run(async (session) => {
     await archiveQConversation(session, conversationId.data);
+    return null;
+  });
+}
+
+/**
+ * "Hide from Q" on one of their own lines (founder live 2026-10-01): the
+ * line stays in their history and is kept out of what Q reads back. The
+ * Q API checks it is theirs; ids here are only validated.
+ */
+export async function hideQMessageAction(
+  rawConversationId: string,
+  rawMessageId: string,
+): Promise<QActionResult<null>> {
+  const conversationId = QConversationIdSchema.safeParse(rawConversationId);
+  const messageId = QMessageIdSchema.safeParse(rawMessageId);
+  if (!conversationId.success || !messageId.success) {
+    return failure("I couldn't find that message.");
+  }
+  return run(async (session) => {
+    await hideQConversationMessage(
+      session,
+      conversationId.data,
+      messageId.data,
+    );
     return null;
   });
 }

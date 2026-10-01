@@ -55,6 +55,7 @@ function fakeService() {
     list: [] as unknown[],
     get: [] as unknown[],
     archive: [] as unknown[],
+    hide: [] as unknown[],
   };
   const service = {
     listConversations: (query: unknown) => {
@@ -93,6 +94,12 @@ function fakeService() {
     archiveConversation: (command: unknown) => {
       calls.archive.push(command);
       return Promise.resolve();
+    },
+    hideConversationMessage: (command: { conversationId: string }) => {
+      calls.hide.push(command);
+      return command.conversationId === CONVERSATION
+        ? Promise.resolve()
+        : Promise.reject(new QConversationNotFoundError());
     },
   } as unknown as QRuntimeService;
   return { service, calls };
@@ -171,6 +178,36 @@ describe("/v1/q/conversations", () => {
       actor: CONTEXT,
       conversationId: CONVERSATION,
     });
+    await app.close();
+  });
+
+  // Founder live 2026-10-01: the owner keeps a line out of what Q reads
+  // back, without deleting it.
+  it("hides one of the owner's lines from Q, idempotently, with no body", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp(service);
+    const message = "f0000000-0000-4000-8000-000000000003";
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/q/conversations/${CONVERSATION}/messages/${message}/hide`,
+    });
+    expect(response.statusCode).toBe(204);
+    expect(calls.hide[0]).toMatchObject({
+      actor: CONTEXT,
+      conversationId: CONVERSATION,
+      messageId: message,
+    });
+    const elsewhere = await app.inject({
+      method: "POST",
+      url: `/v1/q/conversations/f0000000-0000-4000-8000-0000000000ff/messages/${message}/hide`,
+    });
+    expect(elsewhere.statusCode).toBe(404);
+    const bad = await app.inject({
+      method: "POST",
+      url: `/v1/q/conversations/${CONVERSATION}/messages/not-an-id/hide`,
+    });
+    expect(bad.statusCode).toBe(422);
+    expect(calls.hide).toHaveLength(2);
     await app.close();
   });
 

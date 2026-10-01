@@ -1307,6 +1307,30 @@ describe("speech that was not for Q is kept out of what Q reads back (founder li
     expect(run.stored.at(-1)?.content).toBe("Taking you to Discover.");
   });
 
+  it("marks Q's reply to the line too, when Q had answered it", async () => {
+    const run = seam({
+      said: "Sorry, wasn't talking to you. What do you call me?",
+      earlier: [
+        { role: "Q", content: "Good morning." },
+        { role: "USER", content: "Send the board pack to Ade by Friday." },
+        { role: "Q", content: "I can't send the board pack from here." },
+      ],
+      reading: {
+        ...toolReading({
+          kind: "NAVIGATE",
+          destination: "DISCOVER",
+          visibility: null,
+        }),
+        earlierNotForQ: true,
+      } as TurnReaderResult,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    const [greeting, boardPack, reply] = run.earlierLines;
+    expect(new Set(run.marked)).toEqual(new Set([boardPack?.id, reply?.id]));
+    expect(run.marked).not.toContain(greeting?.id);
+  });
+
   it("marks nothing on an ordinary turn", async () => {
     const run = seam({
       said: "take me to discover",

@@ -3,6 +3,7 @@ import {
   Q_CONVERSATIONS_PAGE_MAX,
   QConversationDetailSchema,
   QConversationSummarySchema,
+  QMessageIdSchema,
   type CorrelationId,
   type QConversationDetail,
   type QConversationId,
@@ -18,6 +19,7 @@ import {
   type QConversationMessage,
   type QRunRecord,
 } from "../contracts/index.js";
+import { QConversationNotFoundError } from "../domain/errors.js";
 import { ownedConversation } from "./access.js";
 import type { QRuntimeDependencies } from "./dependencies.js";
 
@@ -186,5 +188,55 @@ export function createArchiveQConversation(dependencies: QRuntimeDependencies) {
         command.conversationId,
       );
     });
+  };
+}
+
+export type HideQConversationMessageCommand = {
+  readonly actor: ActorContext;
+  readonly conversationId: QConversationId;
+  readonly messageId: string;
+  readonly correlationId?: CorrelationId | undefined;
+};
+
+/**
+ * The owner keeps one line of their conversation out of what Q reads back
+ * (20261110030000, HIDDEN_BY_PERSON). Ownership first, refusal recorded
+ * like any other read; a message that is not in this conversation is
+ * "not found", like everything that is not theirs. Idempotent. Nothing is
+ * deleted: the line stays in their history.
+ */
+export function createHideQConversationMessage(
+  dependencies: QRuntimeDependencies,
+) {
+  const { sql, transactions, repositories } = dependencies;
+  return async (command: HideQConversationMessageCommand): Promise<void> => {
+    await ownedConversation(
+      dependencies,
+      sql,
+      command.actor,
+      command.conversationId,
+      command.correlationId,
+    );
+    const message = await repositories.messages
+      .findById(
+        sql,
+        command.actor.tenantId,
+        QMessageIdSchema.parse(command.messageId),
+      )
+      .catch(() => null);
+    if (message === null || message.conversationId !== command.conversationId) {
+      throw new QConversationNotFoundError();
+    }
+    const mark = repositories.messages.mark;
+    if (mark === undefined) return;
+    await transactions.run((tx) =>
+      mark(tx, {
+        tenantId: command.actor.tenantId,
+        conversationId: command.conversationId,
+        messageIds: [message.id],
+        mark: "HIDDEN_BY_PERSON",
+        markedBy: "PERSON",
+      }),
+    );
   };
 }

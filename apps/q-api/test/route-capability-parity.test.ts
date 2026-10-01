@@ -675,6 +675,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     exempt(
       "a conversation is ended from the chats list; Q never ends or clears its own conversation (conversation receipts rule)",
     ),
+  "q-api/http/q-conversations.ts POST `${conversationPath}/messages/:messageId${Q_CONVERSATION_MESSAGE_HIDE_SUFFIX}`":
+    exempt(
+      "the person hides one of their own lines from Q in the conversation view; Q does not decide what it may read back (founder live 2026-10-01)",
+    ),
   "q-api/http/q-events.ts GET eventsPath": Q_TRANSPORT,
   "q-api/http/q-mcp.ts POST Q_MCP_PATH": exempt(
     "the MCP connector surface: an external client calling Q's tools, not a person's action",
