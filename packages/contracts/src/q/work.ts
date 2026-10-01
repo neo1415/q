@@ -195,5 +195,87 @@ export const qWorkLaneReportPath = (delegationId: string, laneId: string) =>
     encodeURIComponent(delegationId),
   ).replace(":laneId", encodeURIComponent(laneId));
 
+// ---------------------------------------------------------------------------
+// The grants (the approved payloads): what Q may do, exactly
+// ---------------------------------------------------------------------------
+
+export const Q_WORK_OUTREACH_START = "q.work.outreach.start" as const;
+export const Q_WORK_STANDIN_START = "q.work.standin.start" as const;
+
+/** When the person takes calls, in their own calendar zone. */
+export const QWorkCallWindowSchema = z
+  .object({
+    /** ISO weekdays, 1 = Monday … 7 = Sunday. */
+    days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
+    startHour: z.number().int().min(0).max(23),
+    endHour: z.number().int().min(1).max(24),
+  })
+  .strict()
+  .refine((window) => window.endHour > window.startHour, {
+    message: "a window ends after it starts",
+  });
+export type QWorkCallWindow = z.infer<typeof QWorkCallWindowSchema>;
+
+/** The investor's approved outreach plan, exactly as approved. */
+export const QWorkOutreachGrantSchema = z
+  .object({
+    maxCompanies: z.number().int().min(1).max(10),
+    /** Posted, marked as from Q, once a founder accepts. */
+    openingMessage: z.string().trim().min(10).max(1_200),
+    /** Everything Q may tell founders. Null: Q answers nothing itself. */
+    brief: z.string().trim().min(20).max(2_000).nullable(),
+    /** What Q should learn from each founder for the investor. */
+    topics: z.array(z.string().trim().min(3).max(200)).max(6),
+    /** A first-stage interview in the chat, question by question. */
+    interview: z
+      .object({
+        questions: z.array(z.string().trim().min(5).max(400)).min(1).max(8),
+      })
+      .strict()
+      .nullable(),
+    call: z
+      .object({
+        purpose: z.string().trim().min(3).max(200),
+        durationMinutes: z.number().int().min(15).max(120),
+        windows: z.array(QWorkCallWindowSchema).min(1).max(7),
+        /** Q may book the first free time inside a window without asking. */
+        mayBookInWindows: z.boolean(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+export type QWorkOutreachGrant = z.infer<typeof QWorkOutreachGrantSchema>;
+
+/** The founder's approved stand-in: the brief is the Context Firewall. */
+export const QWorkStandInGrantSchema = z
+  .object({
+    brief: z.string().trim().min(20).max(3_000),
+    /** Q steps in after this long without the founder on Capital Q. */
+    awayAfterMinutes: z.number().int().min(10).max(1_440),
+  })
+  .strict();
+export type QWorkStandInGrant = z.infer<typeof QWorkStandInGrantSchema>;
+
+export const QWorkOutreachStartPayloadSchema = z
+  .object({
+    grant: QWorkOutreachGrantSchema,
+    expiresInDays: z.number().int().min(1).max(30),
+  })
+  .strict();
+export type QWorkOutreachStartPayload = z.infer<
+  typeof QWorkOutreachStartPayloadSchema
+>;
+
+export const QWorkStandInStartPayloadSchema = z
+  .object({
+    grant: QWorkStandInGrantSchema,
+    expiresInDays: z.number().int().min(1).max(90),
+  })
+  .strict();
+export type QWorkStandInStartPayload = z.infer<
+  typeof QWorkStandInStartPayloadSchema
+>;
+
 export const QPresenceRequestSchema = z.object({ away: z.boolean() }).strict();
 export type QPresenceRequest = z.infer<typeof QPresenceRequestSchema>;
