@@ -156,8 +156,9 @@ reason: NOT_IN_PLAN|LIMIT_REACHED, planKey, planName, limit, used, resetsAt, upg
   - `POST /v1/admin/billing/fees/accrue`
   - `POST /v1/admin/billing/fee-rate {rateBps, reason}` (platform_owner only)
   - `GET /v1/admin/billing/fees.csv`
-- Q tool `plan.get_mine` (SAFE_READ, core). Capability registry entry "Your plan and usage"
-  (SETTINGS, INSTANT). Navigate destination `PLAN`.
+- Q tool `plan.get_mine` (`get_my_plan`, SAFE_READ). Capability registry entry (SETTINGS,
+  INSTANT). No new navigate destination: Settings is already one, and the plan page is linked from it
+  (a new destination would need TURN_READER prompt changes).
 
 ## 7. Authority and approval
 
@@ -215,7 +216,8 @@ denial text names the person's own plan and counts only.
 ## 11. Edge cases
 
 - Plan downgrade mid-month: used counts stay. The new limit applies at the next consume.
-- Trial expiry: `ends_at` passes and the account falls back to the previous assignment or launch.
+- Trial expiry: `ends_at` passes and the account falls back to the launch default (or Free once
+  launch ends).
   Nothing runs at expiry; resolution is time-based.
 - Stripe `past_due`: the plan is kept (Stripe retries). `canceled` or `unpaid` ends the assignment.
   Events out of order: the subscription row keeps the latest `event.created`.

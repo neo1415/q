@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { createProblemDetails } from "./problem-factory.js";
 
 /**
  * Plans, entitlements and usage (BILLING, docs/specs/2026-10/billing.md,
@@ -286,3 +287,21 @@ export const FeeAccrualDtoSchema = z
     voided: z.number().int(),
   })
   .strict();
+
+/**
+ * The one ENTITLEMENT_REQUIRED body every gated entry point answers with:
+ * the standard problem plus the caller's own plan and counts.
+ */
+export function createEntitlementProblem(input: {
+  readonly requestId: string;
+  readonly entitlement: EntitlementProblemExtension;
+}) {
+  return {
+    ...createProblemDetails({
+      code: "ENTITLEMENT_REQUIRED",
+      requestId: input.requestId,
+      detail: input.entitlement.message,
+    }),
+    entitlement: input.entitlement,
+  };
+}

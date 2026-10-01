@@ -81,6 +81,21 @@ export default async function SettingsPage({
           </dl>
         </PageSection>
 
+        {/* BILLING block (ADR 0034) */}
+        <PageSection id="plan" title="Plan">
+          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+            <SettingRow term="Your plan and usage">
+              <Link
+                href="/settings/plan"
+                className={buttonClassName("secondary", "compact")}
+              >
+                Open
+              </Link>
+            </SettingRow>
+          </dl>
+        </PageSection>
+        {/* end BILLING block */}
+
         <PageSection id="memory" title="Q's memory">
           <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             <SettingRow term="What Q remembers">

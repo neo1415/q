@@ -52,6 +52,10 @@ export const Q_TOOL_FAILURE_CODES = [
   "INVALID_TOOL_OUTPUT",
   /** The bounded result limit was exceeded. */
   "RESULT_TOO_LARGE",
+  // BILLING block (ADR 0034): the account's plan does not cover this now;
+  // the safe message names their own plan, counts and the plan page.
+  "ENTITLEMENT_REQUIRED",
+  // end BILLING block
 ] as const;
 export type QToolFailureCode = (typeof Q_TOOL_FAILURE_CODES)[number];
 

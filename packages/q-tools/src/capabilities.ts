@@ -535,6 +535,13 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Gives download links for their own results report for a period: a branded PDF and a CSV for their business.",
   ),
   // end ADMIN block
+  // BILLING block (ADR 0034)
+  tool(
+    "get_my_plan",
+    "SETTINGS",
+    "Reads what their own plan includes: rehearsals, Q handling things, AI images in documents, web research, the Q Daily and GateQ gateways, with this month's use and when it resets. Their plan page is /settings/plan.",
+  ),
+  // end BILLING block
   tool(
     "list_my_documents",
     "DOCUMENT",

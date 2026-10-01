@@ -50,13 +50,14 @@ describe("the sentence Q and the page show", () => {
       kind: "MONTHLY",
       featureName: "Rehearsals",
       planName: "Free",
+      unitSingular: "rehearsal",
       unitPlural: "rehearsals",
       limit: 1,
       used: 1,
       resetsAt: "2026-11-01T00:00:00.000Z",
     });
     expect(text).toBe(
-      "Your Free plan includes 1 rehearsals a month and you've used 1. It resets on 1 November. You can see what each plan includes in Settings → Plan.",
+      "Your Free plan includes 1 rehearsal a month and you've used 1. It resets on 1 November. You can see what each plan includes in Settings → Plan.",
     );
     expect(
       EntitlementProblemExtensionSchema.safeParse({
@@ -81,6 +82,7 @@ describe("the sentence Q and the page show", () => {
         kind: "MONTHLY",
         featureName: "Rehearsals",
         planName: "Free",
+        unitSingular: "rehearsal",
         unitPlural: "rehearsals",
         limit: 0,
         used: 0,

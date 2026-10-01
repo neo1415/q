@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { FEATURE_AI_IMAGES } from "@capital-q/billing";
+
 import {
   Q_GENERATED_IMAGE_SCHEME,
   QSlideImageSchema,
@@ -147,6 +149,24 @@ export function createDocumentImages(dependencies: {
   readonly budgets: DocumentImageBudgets;
   readonly logger?: Logger | undefined;
   readonly newId?: (() => string) | undefined;
+  // BILLING block (ADR 0034): each picture draws one unit of the plan's
+  // AI images. A refusal makes no picture (the document is still built,
+  // with stock or none); a picture that is not made gives the unit back.
+  readonly meter?:
+    | {
+        readonly consume: (
+          actor: ActorContext,
+          feature: string,
+          idempotencyKey: string,
+        ) => Promise<{ readonly allowed: boolean }>;
+        readonly release: (
+          actor: ActorContext,
+          feature: string,
+          idempotencyKey: string,
+        ) => Promise<void>;
+      }
+    | undefined;
+  // end BILLING block
 }): DocumentImages {
   const { sql, gateway, store, budgets } = dependencies;
   const newId = dependencies.newId ?? randomUUID;
@@ -207,6 +227,21 @@ export function createDocumentImages(dependencies: {
       return {
         illustrate: async (input): Promise<QSlideImage | null> => {
           if (!(await withinBudget(owner, runId))) return null;
+          const imageId = newId();
+          // BILLING block
+          const meter = dependencies.meter;
+          const meterKey = `document-image:${imageId}`;
+          if (
+            meter !== undefined &&
+            !(await meter.consume(actor, FEATURE_AI_IMAGES, meterKey)).allowed
+          ) {
+            return null;
+          }
+          const giveBack = () =>
+            meter
+              ?.release(actor, FEATURE_AI_IMAGES, meterKey)
+              .catch(() => undefined);
+          // end BILLING block
           const generated = await gateway.generate({
             prompt: input.prompt,
             // Slides are 16:9; a landscape picture fills its side best.
@@ -219,8 +254,10 @@ export function createDocumentImages(dependencies: {
             },
             signal: input.signal,
           });
-          if (generated.status !== "GENERATED") return null;
-          const imageId = newId();
+          if (generated.status !== "GENERATED") {
+            await giveBack();
+            return null;
+          }
           const extension =
             generated.image.contentType === "image/png" ? "png" : "jpg";
           const key = `${organisationId}/${imageId}.${extension}`;
@@ -235,6 +272,7 @@ export function createDocumentImages(dependencies: {
               { qRunId: runId },
               "generated document image could not be stored",
             );
+            await giveBack();
             return null;
           }
           await sql`

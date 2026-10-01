@@ -156,6 +156,9 @@ importers:
       '@capital-q/audit':
         specifier: workspace:*
         version: link:../../packages/audit
+      '@capital-q/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../../packages/capital

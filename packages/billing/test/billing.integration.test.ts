@@ -207,7 +207,7 @@ describe("@capital-q/billing against local Postgres", () => {
           used: 1,
         });
         expect(second.refusal.message).toContain(
-          "Your Free plan includes 1 rehearsals a month",
+          "Your Free plan includes 1 rehearsal a month",
         );
       }
       expect(
@@ -304,7 +304,7 @@ describe("@capital-q/billing against local Postgres", () => {
       expect(refused.allowed).toBe(false);
       if (!refused.allowed)
         expect(refused.refusal.message).toContain(
-          "includes 1 gateways and you have 1",
+          "includes 1 gateway and you have 1",
         );
       const detail = await accounts.accountDetail(w.orgA, {
         [FEATURE_GATEWAYS]: 1,

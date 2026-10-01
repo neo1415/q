@@ -9,6 +9,7 @@ import {
   BillingCatalogueDtoSchema,
   BillingCheckoutRequestSchema,
   BillingRedirectDtoSchema,
+  createEntitlementProblem,
   createProblemDetails,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
@@ -94,14 +95,10 @@ export function sendEntitlementRequired(
   reply: FastifyReply,
   refusal: EntitlementRefusal,
 ) {
-  return send(reply, {
-    ...createProblemDetails({
-      code: "ENTITLEMENT_REQUIRED",
-      requestId: request.id,
-      detail: refusal.message,
-    }),
-    entitlement: refusal,
-  });
+  return send(
+    reply,
+    createEntitlementProblem({ requestId: request.id, entitlement: refusal }),
+  );
 }
 
 export function registerBillingRoutes(

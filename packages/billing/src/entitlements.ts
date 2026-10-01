@@ -88,6 +88,7 @@ export function entitlementSentence(input: {
   readonly kind: "ACCESS" | "MONTHLY" | "COUNT";
   readonly featureName: string;
   readonly planName: string;
+  readonly unitSingular: string;
   readonly unitPlural: string;
   readonly limit: number | null;
   readonly used: number | null;
@@ -99,14 +100,15 @@ export function entitlementSentence(input: {
   }
   const limit = String(input.limit ?? 0);
   const used = String(input.used ?? 0);
+  const units = input.limit === 1 ? input.unitSingular : input.unitPlural;
   if (input.kind === "COUNT") {
-    return `Your ${input.planName} plan includes ${limit} ${input.unitPlural} and you have ${used}. ${see}`;
+    return `Your ${input.planName} plan includes ${limit} ${units} and you have ${used}. ${see}`;
   }
   const resets =
     input.resetsAt === null
       ? ""
       : ` It resets on ${DAY_MONTH.format(new Date(input.resetsAt))}.`;
-  return `Your ${input.planName} plan includes ${limit} ${input.unitPlural} a month and you've used ${used}.${resets} ${see}`;
+  return `Your ${input.planName} plan includes ${limit} ${units} a month and you've used ${used}.${resets} ${see}`;
 }
 
 type FeatureRow = {
@@ -238,6 +240,7 @@ export function createEntitlementService(options: EntitlementServiceOptions) {
         kind: standing.kind,
         featureName: standing.name,
         planName: plan.name,
+        unitSingular: standing.unitSingular,
         unitPlural: standing.unitPlural,
         limit: standing.limit,
         used: standing.used,

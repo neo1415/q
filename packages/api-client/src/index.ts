@@ -336,3 +336,20 @@ export {
 export * from "./admin-console.js";
 export * from "./results.js";
 // end ADMIN block
+
+// BILLING block (ADR 0034)
+export {
+  accrueAdminFees,
+  assignAdminBillingPlan,
+  entitlementOf,
+  exportAdminFeeLedger,
+  getAdminBillingAccount,
+  getAdminFeeLedger,
+  getMyPlan,
+  getPlanCatalogue,
+  openBillingPortal,
+  setAdminBillingOverride,
+  setAdminFeeRate,
+  startPlanCheckout,
+} from "./billing.js";
+// end BILLING block

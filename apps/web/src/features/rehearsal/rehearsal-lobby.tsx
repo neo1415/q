@@ -5,12 +5,15 @@ import { useEffect, useState, useTransition } from "react";
 
 import {
   rehearsalSimulationLabel,
+  type EntitlementProblemExtension,
   type QRehearsalDto,
   type QRehearsalPersonaDto,
   type RehearsalCounterpartKind,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { ExternalLink } from "@capital-q/ui/icons";
+
+import { EntitlementNotice } from "@/features/billing/entitlement-notice";
 
 import { initialsOf } from "./meet";
 import {
@@ -58,6 +61,8 @@ export function RehearsalLobby({
   const [voice, setVoice] = useState<"FEMALE" | "MALE">("MALE");
   const [rehearsal, setRehearsal] = useState<QRehearsalDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [entitlement, setEntitlement] =
+    useState<EntitlementProblemExtension | null>(null);
   const [joining, startJoining] = useTransition();
 
   useEffect(() => {
@@ -76,6 +81,7 @@ export function RehearsalLobby({
 
   function join() {
     setMessage(null);
+    setEntitlement(null);
     startJoining(async () => {
       const result = await startRehearsalAction({
         kind,
@@ -84,6 +90,8 @@ export function RehearsalLobby({
         voice,
       });
       if (result.ok) setRehearsal(result.value);
+      else if (result.entitlement !== undefined)
+        setEntitlement(result.entitlement);
       else setMessage(result.message);
     });
   }
@@ -198,6 +206,9 @@ export function RehearsalLobby({
             <p role="alert" className="cq-body-sm text-(--cq-text-secondary)">
               {message}
             </p>
+          )}
+          {entitlement === null ? null : (
+            <EntitlementNotice entitlement={entitlement} />
           )}
         </div>
 

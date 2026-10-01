@@ -62,7 +62,7 @@ const REFUSAL: EntitlementRefusal = {
   resetsAt: null,
   upgradePath: "/settings/plan",
   message:
-    "Your Free plan includes 1 gateways and you have 1. You can see what each plan includes in Settings → Plan.",
+    "Your Free plan includes 1 gateway and you have 1. You can see what each plan includes in Settings → Plan.",
 };
 
 function fakeEntitlements(allowed: boolean): EntitlementService & {

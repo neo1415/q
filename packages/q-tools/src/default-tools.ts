@@ -10,7 +10,15 @@ import { createGetCompanyTool } from "./tools/get-company.js";
 import { createExtractPublicWebTool } from "./tools/extract-public-web.js";
 import { createGetInvestorMandateTool } from "./tools/get-investor-mandate.js";
 import { createLookupPublicProfileTool } from "./tools/lookup-public-profile.js";
-import { createResearchPublicWebTool } from "./tools/research-public-web.js";
+import {
+  createResearchPublicWebTool,
+  RESEARCH_PUBLIC_WEB,
+} from "./tools/research-public-web.js";
+import {
+  createGetMyPlanTool,
+  gateQTool,
+  type QToolGate,
+} from "./tools/plan.js";
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
@@ -28,9 +36,13 @@ import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createProposeEmailTool } from "./tools/email.js";
 import { createChatTools } from "./tools/chat.js";
-import { createErrandTools } from "./tools/errands.js";
+import { createErrandTools, PROPOSE_ERRAND } from "./tools/errands.js";
 // AUTO block (ADR 0030)
-import { createQWorkTools } from "./tools/q-work.js";
+import {
+  createQWorkTools,
+  PROPOSE_Q_OUTREACH,
+  PROPOSE_STAND_IN,
+} from "./tools/q-work.js";
 import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
@@ -51,6 +63,34 @@ import { createGetQCardTool } from "./tools/q-card.js";
 export function createDefaultQTools(
   ports: QToolPorts,
 ): readonly AnyQToolDefinition[] {
+  // BILLING block (ADR 0034): the plan-controlled tools pass through the
+  // plan gate, and the person can ask what their plan includes.
+  const entitlements = ports.entitlements;
+  const tools = createUngatedQTools(ports);
+  if (entitlements === undefined) return tools;
+  return [
+    ...tools.map((tool) => {
+      const gate = Q_TOOL_GATES[tool.id];
+      return gate === undefined ? tool : gateQTool(tool, gate, entitlements);
+    }),
+    createGetMyPlanTool(entitlements),
+  ];
+  // end BILLING block
+}
+
+/**
+ * BILLING block (ADR 0034): which Q tools draw on which plan feature.
+ * Proposals only CHECK (the unit is taken when the approved action runs);
+ * a web research request is itself the metered work.
+ */
+export const Q_TOOL_GATES: Readonly<Record<string, QToolGate>> = {
+  [PROPOSE_ERRAND]: { feature: "q.delegations", mode: "CHECK" },
+  [PROPOSE_Q_OUTREACH]: { feature: "q.delegations", mode: "CHECK" },
+  [PROPOSE_STAND_IN]: { feature: "q.delegations", mode: "CHECK" },
+  [RESEARCH_PUBLIC_WEB]: { feature: "q.research", mode: "CONSUME" },
+};
+
+function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
   const research = ports.research;
   const profiles = ports.profiles;
   return [
