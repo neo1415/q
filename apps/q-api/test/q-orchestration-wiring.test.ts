@@ -69,6 +69,7 @@ function runtime(created: boolean): QRuntimeService {
     listConversations: notUnderTest,
     getConversation: notUnderTest,
     archiveConversation: notUnderTest,
+    hideConversationMessage: notUnderTest,
   };
 }
 

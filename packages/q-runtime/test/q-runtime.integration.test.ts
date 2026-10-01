@@ -487,7 +487,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       }
       const read = await repositories.messages.listRecentForConversationOfRun(
         tx.sql,
-        tenantA,
+        TenantIdSchema.parse(tenantA),
         last.run.id,
         2,
       );
@@ -498,7 +498,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       ]);
       const history = await repositories.messages.listRecentForConversation(
         tx.sql,
-        tenantA,
+        TenantIdSchema.parse(tenantA),
         first.conversation.id,
         64,
       );
@@ -568,7 +568,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       const readBack =
         await repositories.messages.listRecentForConversationOfRun(
           tx.sql,
-          tenantA,
+          TenantIdSchema.parse(tenantA),
           first.run.id,
           64,
         );
