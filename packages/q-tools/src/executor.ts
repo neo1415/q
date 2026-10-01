@@ -204,10 +204,33 @@ export function createQToolExecutor(
               ),
             );
           }
-          const authorization = await definition.authorize(
-            parsed.data,
-            context,
-          );
+          // An authorize step that throws (its port down, a timeout) is
+          // closed, as a typed failure for this one call: it used to
+          // escape the executor and end the whole turn (harden harness,
+          // 2026-10-01: get_company, get_capital_objective,
+          // propose_handle_claim). Nothing is granted on a failure.
+          let authorization: Awaited<ReturnType<typeof definition.authorize>>;
+          try {
+            authorization = await definition.authorize(parsed.data, context);
+          } catch (error: unknown) {
+            logger?.error(
+              { err: error, qRunId: context.runId, tool: definition.id },
+              "q tool authorization threw",
+            );
+            return finish(
+              context,
+              failed(
+                proposal,
+                record,
+                "FAILED",
+                isAborted(context.signal) ? "CANCELLED" : "TOOL_INTERNAL_ERROR",
+                isAborted(context.signal)
+                  ? "The request was cancelled."
+                  : "The tool could not complete.",
+                elapsed(),
+              ),
+            );
+          }
           if (authorization.outcome === "DENY") {
             return finish(
               context,
