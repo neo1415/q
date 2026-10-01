@@ -134,6 +134,8 @@ describe("registry", () => {
         // DAILY: The Q Daily's story writer and Q's take column.
         "DAILY_STORY_WRITER",
         "DAILY_Q_TAKE",
+        // MEET-HOST (ADR 0037): Q in a live call.
+        "MEETING_HOST_TURN",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

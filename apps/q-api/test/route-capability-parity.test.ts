@@ -602,6 +602,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "the Readiness Blueprint's plan-gated stub (501 until built); its Q tool comes with the feature",
   ),
   // end BILLING-2 block
+  // MEET-HOST (ADR 0037): Recall's live events, signed per meeting.
+  "q-api/http/meeting-host.ts POST MEETING_HOST_WEBHOOK_PATH": WEBHOOK,
   "q-api/http/rehearsals.ts POST Q_REHEARSALS_PATH": exempt(
     "the rehearsal screen's own start; Q takes them there with open_page INVESTOR_REHEARSAL, and the rehearsal itself is Q playing the investor",
   ),

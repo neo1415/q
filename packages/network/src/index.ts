@@ -241,6 +241,8 @@ export {
   CommitmentDetectedRelationshipEvent,
   CommitmentDisputedRelationshipEvent,
   MeetingRecordingDeclinedRelationshipEvent,
+  MeetingNoShowRelationshipEvent,
+  RELATIONSHIP_EVENT_MEETING_NO_SHOW,
   RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
   RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
   RELATIONSHIP_EVENT_MEETING_RECORDING_DECLINED,

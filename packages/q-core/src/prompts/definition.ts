@@ -71,6 +71,8 @@ export const PROMPT_IDS = [
   // DAILY block: The Q Daily's story writer and Q's take column.
   "DAILY_STORY_WRITER",
   "DAILY_Q_TAKE",
+  // MEET-HOST block (ADR 0037): Q as a live participant in a booked call.
+  "MEETING_HOST_TURN",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -88,6 +90,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   DECISION_READER: "decision-reader",
   MEMORY_EXTRACTOR: "memory-extractor",
   MEETING_NOTES: "meeting-notes",
+  MEETING_HOST_TURN: "meeting-host-turn",
   GATEQ_INTERVIEWER: "gateq-interviewer",
   ARTIFACT_REVISION: "artifact-revision",
   TURN_READER: "turn-reader",

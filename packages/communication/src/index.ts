@@ -100,6 +100,11 @@ export {
   type MeetingAssistantOutcome,
   type MeetingAssistantService,
   type MeetingBotProvider,
+  type MeetingBotHosting,
+  hostedJoin,
+  HOST_JOIN_EARLY_MS,
+  HOST_WAIT_AFTER_START_MS,
+  HOST_MAX_CALL_MS,
   type MeetingBotState,
   type MeetingNotes,
   type MeetingNotesComposer,
@@ -142,3 +147,35 @@ export {
 
 // DOCS block: emails on the shared Capital Q layout.
 export { noticeEmail, reminderEmail } from "./email-templates.js";
+// MEET-HOST block (ADR 0037): Q as a live participant in a booked call.
+export {
+  addressedToQ,
+  asksQToAct,
+  asksQToBreakRules,
+  asksQToLeave,
+  boundedPolicy,
+  createMeetingHost,
+  DEFAULT_HOST_POLICY,
+  HOST_AT_TIME,
+  HOST_POLICY_BOUNDS,
+  hostProposed,
+  saysNeverMind,
+  type HostOutcome,
+  type HostPolicy,
+  DEFAULT_HOST_LIMITS,
+  HOST_LEAVING,
+  HOST_REFUSAL,
+  HOST_UNAVAILABLE,
+  matchParty,
+  type CallParticipant,
+  type HostAction,
+  type HostContext,
+  type HostEvent,
+  type HostLimits,
+  type HostParty,
+  type HostPhase,
+  type HostSide,
+  type MeetingHost,
+  type RosterEntry,
+} from "./meeting-host/host.js";
+// end MEET-HOST block

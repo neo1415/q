@@ -78,6 +78,12 @@ import {
   ownCompanyOf,
 } from "./composition/documents.js";
 import { createRecallBots } from "./composition/recall-bots.js";
+import {
+  createMeetingHostComposer,
+  createMeetingHostRuntime,
+  createPostgresMeetingHostStore,
+} from "./composition/meeting-host-runtime.js";
+import { createMeetingHostFollowThrough } from "./composition/meeting-host-follow-through.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
 import { createScout } from "./composition/scout.js";
 // AUTO block (ADR 0030): Q's delegated work.
@@ -2268,12 +2274,86 @@ const meetingCommitments = createCommitmentService({
   }),
   newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
 });
+// MEET-HOST block (founder direction 2026-10-01; ADR 0037): Q as a live
+// participant in calls booked on Capital Q. Recall brings the call's events
+// to a signed per-meeting endpoint; Q greets, introduces, answers when
+// addressed, and leaves by its own bounded policy or when asked. Off with
+// CQ_MEETING_HOST=off, or when Recall, ElevenLabs or the public URL is
+// missing: then the bot is ADR 0027's silent note-taker.
+const recallKey = process.env.RECALL_API_KEY ?? process.env.RECALL_API;
+const recallBots = createRecallBots({
+  apiKey: recallKey,
+  region: process.env.RECALL_REGION ?? "eu-central-1",
+});
+const meetingHost = createMeetingHostRuntime({
+  enabled:
+    process.env.CQ_MEETING_HOST !== "off" &&
+    recallBots?.say !== undefined &&
+    config.secrets.speechProviders.elevenLabs !== undefined,
+  publicBase: process.env.Q_API_PUBLIC_URL,
+  secret: recallKey,
+  store: createPostgresMeetingHostStore(database.sql),
+  voice: {
+    speak: async (text) => {
+      if (elevenLabsSpeech === undefined) throw new Error("no speech");
+      const spoken = await elevenLabsSpeech.oneWay.synthesise({
+        text,
+        voice: "FEMALE",
+      });
+      return spoken.audio;
+    },
+    play: async (botId, mp3) => {
+      await recallBots?.say?.(botId, mp3);
+    },
+    leave: async (botId) => {
+      await recallBots?.leave?.(botId);
+    },
+  },
+  composer: createMeetingHostComposer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  followThrough: createMeetingHostFollowThrough({
+    sql: database.sql,
+    resolver: actorContextResolver,
+    cancel: async (actor, meetingId) => {
+      const cancelled = await schedule.cancel({
+        actor,
+        meetingId,
+        correlationId: `cor_${randomUUID()}`,
+      });
+      return cancelled.outcome === "OK";
+    },
+    markNoShow: async (input) => {
+      const writer = createNetworkMeetingActivityWriter();
+      await database.transactions.run((tx) =>
+        writer.record(tx, {
+          relationshipId: input.relationshipId,
+          eventType: "meeting_no_show",
+          meetingId: input.meetingId,
+          actorUserId: input.actorUserId,
+          correlationId: `cor_${randomUUID()}`,
+        }),
+      );
+    },
+    email: async (message) => {
+      if (!inviteEmail.available) return;
+      await inviteEmail.send(message);
+    },
+    publicWebUrl: process.env.RAILWAY_SERVICE__CAPITAL_Q_WEB_URL
+      ? `https://${process.env.RAILWAY_SERVICE__CAPITAL_Q_WEB_URL}`
+      : undefined,
+    logger,
+  }),
+  logger,
+});
+// end MEET-HOST block
 const meetingAssistant = createMeetingAssistantService({
   sql: database.sql,
-  bots: createRecallBots({
-    apiKey: process.env.RECALL_API_KEY ?? process.env.RECALL_API,
-    region: process.env.RECALL_REGION ?? "eu-central-1",
-  }),
+  bots: recallBots,
+  // MEET-HOST: the bot joins early, live, with a signed events endpoint.
+  hosting: (meetingId) => meetingHost.urlFor(meetingId),
   composer: createMeetingNotesComposer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -3423,6 +3503,8 @@ const { app, logger: appLogger } = createApp(
     profileFindings: profileFindingsReader,
     memory: memoryService,
     meetingAssistant,
+    // MEET-HOST block (ADR 0037)
+    meetingHost,
     errands,
     // AUTO block (ADR 0030)
     work: workPort,

@@ -41,12 +41,31 @@ export type MeetingTranscriptLine = {
   readonly text: string;
 };
 
+/**
+ * How Q takes part when it hosts the call (MEET-HOST, ADR 0037): where the
+ * call's live events go, and the hard limits on how long the bot stays.
+ */
+export type MeetingBotHosting = {
+  /** Our verified endpoint for the call's live events. */
+  readonly realtimeUrl: string;
+  /** Alone in the call (or held in the waiting room) this long: leave. */
+  readonly aloneLeaveMs: number;
+  /** The hard cap on minutes in the call, whatever happens. */
+  readonly maxCallMs: number;
+  readonly metadata: Readonly<Record<string, string>>;
+};
+
 export type MeetingBotProvider = {
   readonly create: (input: {
     readonly meetingUrl: string;
     readonly joinAt: Date | null;
     readonly botName: string;
+    readonly hosting?: MeetingBotHosting;
   }) => Promise<{ readonly botId: string }>;
+  /** Plays a short spoken line (mp3) into the call. */
+  readonly say?: (botId: string, mp3Base64: string) => Promise<void>;
+  /** Leaves the call now (a participant asked Q to go). */
+  readonly leave?: (botId: string) => Promise<void>;
   readonly read: (botId: string) => Promise<{
     readonly state: MeetingBotState;
     /** Present once the call has ended and its captions are ready. */
@@ -230,6 +249,41 @@ export function transcriptText(
     : text;
 }
 
+/** MEET-HOST: Q is in the room a few minutes before the start. */
+export const HOST_JOIN_EARLY_MS = 3 * 60_000;
+/** ...and waits this long after the start if nobody comes. */
+export const HOST_WAIT_AFTER_START_MS = 10 * 60_000;
+/** Never longer in one call than this, whatever happens (cost cap). */
+export const HOST_MAX_CALL_MS = 150 * 60_000;
+
+/**
+ * When the bot joins, and the limits it carries: early when there is
+ * notice to schedule it, now when there is not; alone too long, or past
+ * the call's length plus a margin, it leaves.
+ */
+export function hostedJoin(
+  meeting: { readonly starts_at: Date; readonly ends_at: Date },
+  current: Date,
+): {
+  readonly joinAt: Date | null;
+  readonly aloneLeaveMs: number;
+  readonly maxCallMs: number;
+} {
+  const target = meeting.starts_at.getTime() - HOST_JOIN_EARLY_MS;
+  const joinAt =
+    target - current.getTime() > SCHEDULE_NOTICE_MS ? new Date(target) : null;
+  const joinsAt = joinAt?.getTime() ?? current.getTime();
+  const aloneLeaveMs =
+    Math.max(0, meeting.starts_at.getTime() - joinsAt) +
+    HOST_WAIT_AFTER_START_MS;
+  const length = meeting.ends_at.getTime() - meeting.starts_at.getTime();
+  const maxCallMs = Math.min(
+    HOST_MAX_CALL_MS,
+    Math.max(0, meeting.starts_at.getTime() - joinsAt) + length + 20 * 60_000,
+  );
+  return { joinAt, aloneLeaveMs, maxCallMs };
+}
+
 export function createMeetingAssistantService(dependencies: {
   /** Privileged server connection; every call is authorised here first. */
   readonly sql: DatabaseExecutor;
@@ -258,11 +312,46 @@ export function createMeetingAssistantService(dependencies: {
     | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * MEET-HOST (ADR 0037): where a hosted bot sends the call's live events,
+   * per meeting. Absent: the bot stays the passive note-taker of ADR 0027.
+   */
+  readonly hosting?: ((meetingId: string) => string | undefined) | undefined;
 }): MeetingAssistantService {
   const { sql, bots, composer, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
 
   /** The meeting, when this person is a participant (either side). */
+  /** The bot to book: a hosted one when hosting is set up, else ADR 0027's. */
+  function botFor(
+    meetingId: string,
+    meetingUrl: string,
+    meeting: { readonly starts_at: Date; readonly ends_at: Date },
+    current: Date,
+    startsIn: number,
+  ) {
+    const realtimeUrl = dependencies.hosting?.(meetingId);
+    if (realtimeUrl === undefined) {
+      return {
+        meetingUrl,
+        joinAt: startsIn > SCHEDULE_NOTICE_MS ? meeting.starts_at : null,
+        botName: Q_MEETING_BOT_NAME,
+      };
+    }
+    const plan = hostedJoin(meeting, current);
+    return {
+      meetingUrl,
+      joinAt: plan.joinAt,
+      botName: Q_MEETING_BOT_NAME,
+      hosting: {
+        realtimeUrl,
+        aloneLeaveMs: plan.aloneLeaveMs,
+        maxCallMs: plan.maxCallMs,
+        metadata: { meeting_id: meetingId },
+      },
+    };
+  }
+
   async function attended(
     actor: ActorContext,
     meetingId: string,
@@ -457,11 +546,9 @@ export function createMeetingAssistantService(dependencies: {
       if (id === undefined) return { outcome: "REFUSED", code: "UNAVAILABLE" };
       const startsIn = meeting.starts_at.getTime() - current.getTime();
       try {
-        const created = await bots.create({
-          meetingUrl: meeting.meet_link,
-          joinAt: startsIn > SCHEDULE_NOTICE_MS ? meeting.starts_at : null,
-          botName: Q_MEETING_BOT_NAME,
-        });
+        const created = await bots.create(
+          botFor(meeting.id, meeting.meet_link, meeting, current, startsIn),
+        );
         await update(id, { status: "SCHEDULED", botId: created.botId });
       } catch (error: unknown) {
         logger?.warn({ err: error, meetingId }, "meeting bot not created");
@@ -620,11 +707,9 @@ export function createMeetingAssistantService(dependencies: {
         if (id === undefined || call.meet_link === null) continue;
         const startsIn = call.starts_at.getTime() - current.getTime();
         try {
-          const created = await bots.create({
-            meetingUrl: call.meet_link,
-            joinAt: startsIn > SCHEDULE_NOTICE_MS ? call.starts_at : null,
-            botName: Q_MEETING_BOT_NAME,
-          });
+          const created = await bots.create(
+            botFor(call.id, call.meet_link, call, current, startsIn),
+          );
           await update(id, { status: "SCHEDULED", botId: created.botId });
           enlisted += 1;
         } catch (error: unknown) {

@@ -1,3 +1,5 @@
+import type { MeetingHostRuntime } from "./composition/meeting-host-runtime.js";
+import { registerMeetingHostRoutes } from "./http/meeting-host.js";
 import { randomUUID } from "node:crypto";
 
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
@@ -148,6 +150,8 @@ export type QApiModules = {
   /** Q in a meeting: bring it to a call, read its notes. */
   readonly meetingAssistant?:
     MeetingAssistantRoutesDependencies["assistant"] | undefined;
+  // MEET-HOST block (ADR 0037): Recall's live events for calls Q hosts.
+  readonly meetingHost?: MeetingHostRuntime | undefined;
   /** What Q found about the actor's own profile subject (BIZ-002). */
   readonly profileFindings?:
     ProfileFindingsRoutesDependencies["findings"] | undefined;
@@ -455,6 +459,11 @@ export function createApp(
       resolver: security.resolver,
       assistant: modules.meetingAssistant,
     });
+  }
+
+  // MEET-HOST block: signed per meeting, no session.
+  if (modules.meetingHost !== undefined) {
+    registerMeetingHostRoutes(app, { host: modules.meetingHost });
   }
 
   // What Q found about the actor's own profile subject (BIZ-002).

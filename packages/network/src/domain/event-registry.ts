@@ -308,6 +308,20 @@ export const MeetingRecordingDeclinedRelationshipEvent =
       "A participant declined Q's recording of a call booked on Capital Q; the call still counts as held through Capital Q.",
   });
 
+/**
+ * A call booked on Capital Q where an expected side never came (MEET-HOST,
+ * founder direction 2026-10-01): Q waited out its grace period and left.
+ * Activity only: a missed call is not a relationship state or an outcome.
+ */
+export const RELATIONSHIP_EVENT_MEETING_NO_SHOW = "meeting_no_show" as const;
+export const MeetingNoShowRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_MEETING_NO_SHOW,
+  payloadSchema: MeetingActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "A call booked on Capital Q did not take place because nobody, or only one side, came.",
+});
+
 /** Q heard money in a call and filed it for both sides to adopt or dispute. */
 export const RELATIONSHIP_EVENT_COMMITMENT_DETECTED =
   "commitment_detected" as const;
@@ -414,4 +428,5 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     MeetingRecordingDeclinedRelationshipEvent,
     CommitmentDetectedRelationshipEvent,
     CommitmentDisputedRelationshipEvent,
+    MeetingNoShowRelationshipEvent,
   ];

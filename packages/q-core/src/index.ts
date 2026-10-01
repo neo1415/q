@@ -304,6 +304,18 @@ export { INVESTOR_PERSONA_V5 } from "./prompts/tasks/investor-persona.v5.js";
 export { INVESTOR_TWIN_TURN_V5 } from "./prompts/tasks/investor-twin-turn.v5.js";
 export { INVESTOR_TWIN_TURN_V6 } from "./prompts/tasks/investor-twin-turn.v6.js";
 export { INVESTOR_TWIN_TURN_V7 } from "./prompts/tasks/investor-twin-turn.v7.js";
+// MEET-HOST block (ADR 0037)
+export { MEETING_HOST_TURN_V1 } from "./prompts/tasks/meeting-host-turn.v1.js";
+export {
+  MEETING_HOST_SCHEMA_NAME,
+  MEETING_HOST_SCHEMA_VERSION,
+  MEETING_HOST_UNTRUSTED,
+  MeetingHostResultSchema,
+  MeetingHostVariablesSchema,
+  type MeetingHostResult,
+  type MeetingHostVariables,
+} from "./prompts/schemas/meeting-host.js";
+// end MEET-HOST block
 export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
 export { REHEARSAL_SCORE_V4 } from "./prompts/tasks/rehearsal-score.v4.js";
 export {
