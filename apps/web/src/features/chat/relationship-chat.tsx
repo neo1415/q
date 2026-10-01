@@ -42,6 +42,8 @@ import {
   ChatSafetyMenu,
   type ChatSafetyDialog,
 } from "./chat-safety";
+import { useFollowNewest } from "@/features/q/follow-newest";
+
 import { VoiceRecorder } from "./voice-recorder";
 
 /**
@@ -73,9 +75,11 @@ function merge(
 ): ChatMessageDto[] {
   const byId = new Map(current.map((message) => [message.messageId, message]));
   for (const change of changes) byId.set(change.messageId, change);
+  // By time, not by the timestamp's text: "…:05.5Z" and "…:05.123Z" (or
+  // an offset form) sort wrongly as strings.
   return [...byId.values()].sort(
     (a, b) =>
-      a.sentAt.localeCompare(b.sentAt) ||
+      Date.parse(a.sentAt) - Date.parse(b.sentAt) ||
       a.messageId.localeCompare(b.messageId),
   );
 }
@@ -192,9 +196,10 @@ export function RelationshipChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poll]);
 
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
-  }, [messages.length]);
+  // The newest message is followed while the reader is at the bottom;
+  // reading earlier messages is not interrupted, and their own new
+  // message always brings them down (founder report 2026-10-01).
+  useFollowNewest(end, String(messages.length), messages.at(-1)?.mine === true);
 
   const deliver = async (
     message:

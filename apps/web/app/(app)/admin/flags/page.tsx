@@ -6,7 +6,8 @@ import { ErrorState } from "@capital-q/ui/states";
 
 import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
-import { FlagToggle, flagName } from "@/features/admin/flag-controls";
+import { FlagToggle } from "@/features/admin/flag-controls";
+import { flagName } from "@/features/admin/flag-names";
 import { when } from "@/features/admin/words";
 
 export const metadata: Metadata = { title: "Kill switches · Admin" };

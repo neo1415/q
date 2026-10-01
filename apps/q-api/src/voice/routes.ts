@@ -744,6 +744,7 @@ export function registerQVoiceRoutes(
             voice,
             greeting: firstMessage,
             thinkToken,
+            ...(input.locale === undefined ? {} : { locale: input.locale }),
             // The organisation they typed at sign-up: the one name in this
             // conversation the recogniser could not know.
             terms: [
@@ -783,6 +784,13 @@ export function registerQVoiceRoutes(
           ...(input.rehearsal === undefined
             ? {}
             : { rehearsal: input.rehearsal }),
+          ...(firstMessage === undefined ||
+          input.conversationId !== undefined ||
+          input.onboarding !== undefined ||
+          input.welcome === true ||
+          input.rehearsal !== undefined
+            ? {}
+            : { opening: firstMessage }),
         },
         issuedAt,
         connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,

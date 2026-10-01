@@ -31,6 +31,15 @@ describe("loadWebPushConfig", () => {
     ]);
   });
 
+  it("gives the public key on its own, for the API that never holds the private one", () => {
+    const config = loadWebPushConfig({
+      WEB_PUSH_VAPID_PUBLIC_KEY: PUBLIC,
+      WEB_PUSH_SUBJECT: "mailto:q@example.invalid",
+    });
+    expect(config.vapid).toBeUndefined();
+    expect(config.publicKey).toBe(PUBLIC);
+  });
+
   it("rejects a malformed key", () => {
     expect(() =>
       loadWebPushConfig({ WEB_PUSH_VAPID_PUBLIC_KEY: "not a key" }),

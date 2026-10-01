@@ -182,6 +182,24 @@ const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
  * Where the person is as they ask (R21), from the screen the run carries
  * through the Context Firewall: the route, and only entities it bound.
  */
+/**
+ * Words that point instead of naming (founder report 2026-10-01: on a
+ * company's page "get me a meeting with this person" was met with "which
+ * person?", and "handle this for me" with a menu of everything). What is
+ * on their screen is known; a person points at what is in front of them.
+ * Trusted guidance about reference, never a list the code matches.
+ */
+export const POINTING_LINE =
+  "When they point instead of naming (this, this one, them, here, this person, this company, it), they mean what their screen shows: a company's person is its founder, an investor organisation's person is its team. Never ask which one they mean when the screen answers it. When they hand it over without saying what to do (handle this, take care of it), take the next step its state calls for (read the relationship when there is one) and prepare it for their approval; ask only when two different next steps are equally likely, naming both.";
+
+/**
+ * The notes' own vocabulary is not the person's. Live, in one week about
+ * 2% of Q's answers (10 of 554) told the person what "the authorised
+ * context" or "authorised facts" did or did not include.
+ */
+export const PLAIN_KNOWING_LINE =
+  "HOW YOU SAY WHAT YOU KNOW: the words in these notes (authorised context, facts supplied, scope, tools, firewall) are Capital Q's, never the person's; never say them. Say plainly what you know, what you don't (\"I don't have that on record\") and what you will do about it.";
+
 export function screenLines(
   screen: QScreenContext | undefined,
   now: Date = new Date(),
@@ -203,6 +221,7 @@ export function screenLines(
     `WHERE THEY ARE NOW (Capital Q, from their screen as they asked): ${
       name === null ? "a Capital Q screen without a name here" : `on ${name}`
     }${shown.length === 0 ? "" : `, showing ${shown.join(" and ")}`}. You know what screen they are on: when they ask where they are or what they are looking at, say it plainly (for example "You're on your profile."); never say you cannot see their screen.`,
+    ...(shown.length === 0 ? [] : [POINTING_LINE]),
     ...localTimeLines(screen.timeZone, now),
   ];
 }
@@ -260,6 +279,7 @@ export function capabilityNote(
 ): ModelMessage {
   const lines: string[] = [
     ...screenLines(screen),
+    PLAIN_KNOWING_LINE,
     "WHAT YOU CAN DO IN THIS CONVERSATION (Capital Q, authoritative; you can do nothing else):",
   ];
   const named = (tools: typeof offeredTools): string =>

@@ -16,7 +16,46 @@ export type SpokenLine = {
   readonly id: string;
   readonly role: "user" | "q";
   readonly text: string;
+  /**
+   * The stored turn that was the thread's last when this line was first
+   * heard: null before any, undefined when not known. Where the line sits
+   * in the thread until it is stored itself.
+   */
+  readonly after?: string | null | undefined;
 };
+
+/**
+ * One thread, in the order things were said (founder report 2026-10-01:
+ * the voice page's chat was "not arranged properly -- top to bottom,
+ * bottom to top"). A spoken line not yet stored used to be put after
+ * every stored turn, so a greeting or a spoken-only line ("Alright,
+ * leaving it as it is.") moved to the bottom as the conversation grew.
+ * Each spoken line now sits after the stored turn that was last when it
+ * was heard; one heard before any sits first; one whose turn is not in
+ * view is at the end, where it was heard most recently.
+ */
+export function threadInOrder<
+  S extends { readonly id: string },
+  L extends { readonly after?: string | null | undefined },
+>(stored: readonly S[], spokenOnly: readonly L[]): readonly (S | L)[] {
+  const ids = new Set(stored.map((line) => line.id));
+  const first = spokenOnly.filter((line) => line.after === null);
+  const at = new Map<string, L[]>();
+  const end: L[] = [];
+  for (const line of spokenOnly) {
+    if (line.after === null) continue;
+    if (line.after !== undefined && ids.has(line.after)) {
+      const list = at.get(line.after) ?? [];
+      list.push(line);
+      at.set(line.after, list);
+    } else end.push(line);
+  }
+  const out: (S | L)[] = [...first];
+  for (const line of stored) {
+    out.push(line, ...(at.get(line.id) ?? []));
+  }
+  return [...out, ...end];
+}
 
 function asWords(text: string): string {
   return text

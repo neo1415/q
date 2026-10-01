@@ -1222,6 +1222,33 @@ describe("a spoken question for Q", () => {
     expect(said).not.toMatch(/snag|ask (?:me|it) again|try it another way/i);
   });
 
+  it("starts the conversation with what Q said aloud first, once (founder live 2026-10-01)", async () => {
+    const runtime = fakeRuntime();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.message.delta", { messageId: "m1", text: "Here they are. " }),
+      ]),
+      logger,
+    });
+    const bound = binding({
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+      opening: "Welcome back. There are companies in your feed.",
+    });
+    await handle(
+      bound,
+      [{ role: "user", content: "What are those companies?" }],
+      new AbortController().signal,
+      fakeSpeaker(),
+    );
+    expect(runtime.calls.createRun[0]).toMatchObject({
+      input: { opening: "Welcome back. There are companies in your feed." },
+    });
+    expect(bound.thread.opening).toBeUndefined();
+  });
+
   it.each([
     "Change my website to thevaultlyne.com",
     "Please make my company visible to investors",

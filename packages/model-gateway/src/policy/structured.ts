@@ -101,7 +101,18 @@ const describe = (issue: Issue): string =>
 export function acceptStructuredOutput<T>(
   text: string,
   schema: z.ZodType<T>,
-  options: { readonly invalidListItems?: InvalidListItems | undefined } = {},
+  options: {
+    readonly invalidListItems?: InvalidListItems | undefined;
+    /**
+     * Top-level fields that are auxiliary to the reading: when the model
+     * wrote one in the wrong shape, that field alone is left out (its
+     * schema default applies) instead of refusing the whole object, and it
+     * is reported in `dropped`. Live 2026-10-01: an answer that wrote
+     * `actionTalk` as a string lost the whole round, and the person got a
+     * tool-less fallback that said what Q "needed to retrieve".
+     */
+    readonly lenientFields?: readonly string[] | undefined;
+  } = {},
 ): StructuredOutcome<T> {
   const fenced = FENCE.exec(text);
   const body = (fenced?.[1] ?? text).trim();
@@ -111,7 +122,39 @@ export function acceptStructuredOutput<T>(
   } catch {
     return { ok: false, stage: "JSON" };
   }
+  const lenientDropped: string[] = [];
+  const lenient = options.lenientFields ?? [];
+  if (
+    lenient.length > 0 &&
+    decoded !== null &&
+    typeof decoded === "object" &&
+    !Array.isArray(decoded)
+  ) {
+    const first = schema.safeParse(decoded);
+    if (!first.success) {
+      const record = { ...(decoded as Record<string, unknown>) };
+      for (const issue of first.error.issues) {
+        const field = issue.path[0];
+        if (
+          typeof field === "string" &&
+          lenient.includes(field) &&
+          field in record
+        ) {
+          delete record[field];
+          lenientDropped.push(describe(issue));
+        }
+      }
+      decoded = record;
+    }
+  }
   let parsed = schema.safeParse(decoded);
+  if (parsed.success && lenientDropped.length > 0) {
+    return {
+      ok: true,
+      value: parsed.data,
+      dropped: lenientDropped.slice(0, 8),
+    };
+  }
   if (parsed.success) {
     return { ok: true, value: parsed.data };
   }
@@ -150,5 +193,9 @@ export function acceptStructuredOutput<T>(
   if (!parsed.success) {
     return { ok: false, stage: "SCHEMA", refusals: refused };
   }
-  return { ok: true, value: parsed.data, dropped: dropped.slice(0, 8) };
+  return {
+    ok: true,
+    value: parsed.data,
+    dropped: [...lenientDropped, ...dropped].slice(0, 8),
+  };
 }

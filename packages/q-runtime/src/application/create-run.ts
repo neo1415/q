@@ -316,6 +316,18 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         correlationId: command.correlationId,
       });
 
+      // What the surface said before this first question, as Q's opening
+      // line, so the conversation holds what a follow-up refers to.
+      if (existing === null && input.opening !== undefined) {
+        await repositories.messages.insert(tx, {
+          tenantId: actor.tenantId,
+          conversationId: conversation.id,
+          runId: run.id,
+          role: "Q",
+          content: input.opening,
+        });
+      }
+
       const message = await repositories.messages.insert(tx, {
         tenantId: actor.tenantId,
         conversationId: conversation.id,
@@ -379,12 +391,16 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
           actor.userId,
           run.conversationId,
         );
-        const [message] = await repositories.messages.listForRun(
-          tx.sql,
-          actor.tenantId,
-          run.id,
-          1,
-        );
+        // The person's question; a surface's opening line, when the run
+        // was given one, is recorded before it.
+        const message = (
+          await repositories.messages.listForRun(
+            tx.sql,
+            actor.tenantId,
+            run.id,
+            2,
+          )
+        ).find((recorded) => recorded.role === "USER");
         if (conversation === null || message === undefined) {
           throw new QRunCreationConflictError();
         }

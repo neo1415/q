@@ -95,7 +95,11 @@ export type QConversation = {
   /** `viewing`: where in a pitch the person was; sent only when a run starts. */
   readonly ask: (
     question: string,
-    extras?: { readonly viewing?: QViewingMoment | undefined },
+    extras?: {
+      readonly viewing?: QViewingMoment | undefined;
+      /** What the surface said first; sent only when a conversation starts. */
+      readonly opening?: string | undefined;
+    },
   ) => Promise<void>;
   readonly stop: () => Promise<void>;
   /**
@@ -368,7 +372,14 @@ export function useQConversation(
   const ask = useCallback(
     async (
       question: string,
-      extras?: { readonly viewing?: QViewingMoment | undefined },
+      extras?: {
+        readonly viewing?: QViewingMoment | undefined;
+        /**
+         * What the surface said before this question (Home's welcome), so
+         * a new conversation starts with it; ignored when one is open.
+         */
+        readonly opening?: string | undefined;
+      },
     ) => {
       const text = question.trim();
       // A run paused on an approval is waiting for the person, not busy:
@@ -445,6 +456,7 @@ export function useQConversation(
           currentViewing() ?? extras?.viewing,
           // R21: the screen they asked from, resolved or dropped server-side.
           currentScreen(),
+          startsConversation ? extras?.opening : undefined,
         );
         if (!started.ok) {
           forgetPendingAsk(idempotencyKey);

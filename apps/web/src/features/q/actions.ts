@@ -21,6 +21,7 @@ import {
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   Q_MESSAGE_TEXT_MAX_LENGTH,
+  Q_OPENING_MAX_LENGTH,
   QConversationIdSchema,
   QScreenContextSchema,
   QViewingMomentSchema,
@@ -59,6 +60,7 @@ const failure = (message: string): QActionResult<never> => ({
 
 const QuestionSchema = z.string().trim().min(1).max(Q_MESSAGE_TEXT_MAX_LENGTH);
 const RunIdSchema = z.string().uuid();
+const OpeningSchema = z.string().trim().min(1).max(Q_OPENING_MAX_LENGTH);
 
 async function qSession(): Promise<ApiSession | QActionResult<never>> {
   const { qApiBaseUrl } = loadWebServerConfig();
@@ -216,6 +218,12 @@ export async function askQAction(
    * or drops it. Anything malformed is dropped here.
    */
   rawScreen?: unknown,
+  /**
+   * What the surface said before this first question (Home's welcome and
+   * briefing), so the conversation holds what a follow-up refers to.
+   * Used only when this starts a conversation; dropped if malformed.
+   */
+  rawOpening?: string,
 ): Promise<QActionResult<QStartedRun>> {
   const parsed = QuestionSchema.safeParse(rawQuestion);
   if (!parsed.success) {
@@ -263,6 +271,11 @@ export async function askQAction(
       ? undefined
       : QScreenContextSchema.safeParse(rawScreen).data;
 
+  const opening =
+    rawOpening === undefined || conversationId !== undefined
+      ? undefined
+      : OpeningSchema.safeParse(rawOpening).data;
+
   const idempotencyKey =
     rawIdempotencyKey === undefined
       ? undefined
@@ -283,7 +296,9 @@ export async function askQAction(
           ...(viewing === undefined ? {} : { viewing }),
           ...(screen === undefined ? {} : { screen }),
           ...(inConversation === undefined
-            ? {}
+            ? opening === undefined
+              ? {}
+              : { opening }
             : { conversationId: inConversation }),
         },
         key,

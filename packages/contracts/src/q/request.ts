@@ -19,6 +19,9 @@ import { QContractVersionSchema } from "./version.js";
  */
 export const Q_MESSAGE_TEXT_MAX_LENGTH = 8000;
 
+/** A surface's opening words: a greeting and a short briefing, never a page. */
+export const Q_OPENING_MAX_LENGTH = 1200;
+
 export const QUserMessageInputSchema = z
   .object({
     text: z.string().trim().min(1).max(Q_MESSAGE_TEXT_MAX_LENGTH),
@@ -126,6 +129,16 @@ export const CreateQRunRequestSchema = z
     viewing: QViewingMomentSchema.optional(),
     /** R21: what is on screen; each entity resolved for the asker or dropped. */
     screen: QScreenContextSchema.optional(),
+    /**
+     * What Q's surface said to the person before this first question (the
+     * welcome or briefing on Home: "There are companies in your feed…").
+     * Kept as Q's opening line of a NEW conversation, so a follow-up such
+     * as "what are these companies?" has what it refers to. Ignored when
+     * the run continues a conversation. It is what this person's own
+     * screen showed them, read as conversation (data, never instruction),
+     * and it grants nothing.
+     */
+    opening: z.string().trim().min(1).max(Q_OPENING_MAX_LENGTH).optional(),
   })
   .strict();
 

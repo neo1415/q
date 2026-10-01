@@ -529,6 +529,54 @@ describe("answer seam tool loop", () => {
     ]);
   });
 
+  it.each([
+    ["a list", ["I need to retrieve your companies first."]],
+    // The shape a model actually wrote live: one string, not a list.
+    [
+      "a string, in the wrong shape",
+      "I need to retrieve your companies first.",
+    ],
+  ])(
+    "an answer that describes doing something instead of calling the tool gets one more round (actionTalk as %s; founder live 2026-10-01)",
+    async (_label, actionTalk) => {
+      const tools = toolPort([GET_COMPANY], (p) =>
+        succeeded(p, { canonicalName: "Northwind (synthetic)" }),
+      );
+      const { seam, alpha, request, messages } = build({
+        script: [
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult("I can list them once I retrieve them."),
+              actionTalk,
+            }),
+          },
+          call("c1"),
+          { kind: "TEXT", text: JSON.stringify(analystResult("Northwind.")) },
+        ],
+        tools,
+      });
+      const outcome = await seam.answer(request);
+      expect(outcome.kind).toBe("ANSWERED");
+      // The tool was called on the extra round, and the answer is from it.
+      expect(tools.executed).toHaveLength(1);
+      const second = alpha.calls[1]?.request;
+      expect(second?.tools.map((t) => t.name)).toEqual(["get_company"]);
+      expect(second?.messages.at(-1)?.content).toContain("instead of doing it");
+      expect(messages.at(-1)?.content).toBe("Northwind.");
+    },
+  );
+
+  it("does not add a round when the answer talks about nothing it should have done", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, alpha, request } = build({
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("direct")) }],
+      tools,
+    });
+    await seam.answer(request);
+    expect(alpha.calls).toHaveLength(1);
+  });
+
   it("hands a denial back to the model as data and never the private material", async () => {
     const tools = toolPort([GET_COMPANY], denied);
     const { seam, alpha, request, logLines } = build({
