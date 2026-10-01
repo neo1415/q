@@ -2118,6 +2118,9 @@ const workFeed = createInvestorFeedPort({
   logger,
 });
 const workRuntime = createWorkRuntime({
+  // ADMIN block: the operators' kill switch (ADR 0033).
+  enabled: () => killSwitches.isEnabled("q.autonomy.delegations"),
+  // end ADMIN block
   store: workStore,
   checkpoints,
   resolver: actorContextResolver,

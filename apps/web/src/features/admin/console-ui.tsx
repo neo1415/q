@@ -17,7 +17,11 @@ import { Button, type ButtonVariant } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
 import { Input, Textarea } from "@capital-q/ui/input";
 
-import { stepUpAction, type ConsoleResult } from "./console-actions";
+import {
+  sendStepUpCodeAction,
+  stepUpAction,
+  type ConsoleResult,
+} from "./console-actions";
 
 /**
  * The console's client pieces: the step-up dialog every sensitive action
@@ -32,6 +36,8 @@ const StepUpContext = createContext<Guard | null>(null);
 export function StepUpProvider({ children }: { readonly children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"PASSWORD" | "CODE">("PASSWORD");
+  const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
   const [pending, startTransition] = useTransition();
   const settle = useRef<((confirmed: boolean) => void) | null>(null);
@@ -42,6 +48,8 @@ export function StepUpProvider({ children }: { readonly children: ReactNode }) {
       new Promise<boolean>((resolve) => {
         settle.current = resolve;
         setPassword("");
+        setSent(null);
+        setMode("PASSWORD");
         setError(undefined);
         setOpen(true);
       }),
@@ -75,7 +83,7 @@ export function StepUpProvider({ children }: { readonly children: ReactNode }) {
       >
         <DialogContent
           title="Confirm it's you"
-          description="Sensitive console actions need your password again. It lasts 15 minutes."
+          description="Sensitive console actions need you to sign in again: your password, or a code sent to your email. It lasts 15 minutes."
           actions={
             <>
               <Button variant="quiet" onClick={() => close(false)}>
@@ -86,7 +94,9 @@ export function StepUpProvider({ children }: { readonly children: ReactNode }) {
                 disabled={pending || password.length === 0}
                 onClick={() =>
                   startTransition(async () => {
-                    const result = await stepUpAction(password);
+                    const result = await stepUpAction(
+                      mode === "PASSWORD" ? { password } : { code: password },
+                    );
                     if (result.ok) close(true);
                     else setError(result.message);
                   })
@@ -97,15 +107,47 @@ export function StepUpProvider({ children }: { readonly children: ReactNode }) {
             </>
           }
         >
-          <Input
-            id={fieldId}
-            label="Password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            error={error}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <div className="flex flex-col gap-3">
+            <Input
+              id={fieldId}
+              label={mode === "PASSWORD" ? "Password" : "Code from your email"}
+              type={mode === "PASSWORD" ? "password" : "text"}
+              inputMode={mode === "PASSWORD" ? undefined : "numeric"}
+              autoComplete={
+                mode === "PASSWORD" ? "current-password" : "one-time-code"
+              }
+              value={password}
+              error={error}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            {mode === "PASSWORD" ? (
+              <Button
+                variant="quiet"
+                size="compact"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    setError(undefined);
+                    const result = await sendStepUpCodeAction();
+                    if (result.ok) {
+                      setMode("CODE");
+                      setPassword("");
+                      setSent(result.message ?? null);
+                    } else setError(result.message);
+                  })
+                }
+              >
+                Email me a code instead
+              </Button>
+            ) : (
+              <p
+                role="status"
+                className="cq-caption text-(--cq-text-secondary)"
+              >
+                {sent}
+              </p>
+            )}
+          </div>
         </DialogContent>
       </DialogRoot>
     </StepUpContext.Provider>

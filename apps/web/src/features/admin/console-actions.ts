@@ -84,42 +84,84 @@ async function run(
 }
 
 /**
- * Step-up: the admin's password, checked by signing in again on a
- * throwaway client that keeps no session; the fresh token goes to the API,
- * which verifies it with the Auth server and records a 15-minute step-up.
- * The throwaway session is then signed out (this session only).
+ * Step-up: the admin proves it's them again, on a throwaway client that
+ * keeps no session -- with their password, or (for an admin who signs in by
+ * email link) with a one-time code sent to their own email. The fresh token
+ * goes to the API, which verifies it with the Auth server and records a
+ * 15-minute step-up. The throwaway session is then signed out (it alone).
  */
-export async function stepUpAction(password: string): Promise<ConsoleResult> {
-  const parsed = z.string().min(1).max(200).safeParse(password);
-  if (!parsed.success) return { ok: false, message: "Enter your password." };
-  const session = await apiSession();
-  if (session === null)
-    return { ok: false, message: "Sign in again to continue." };
+async function ownEmail(): Promise<string | null> {
   const current = await createServerSupabaseClient();
   const { data } = await current.auth.getUser();
-  const email = data.user?.email;
-  if (email === undefined) {
-    return {
-      ok: false,
-      message:
-        "This account has no password sign-in. Sign in with a password to use the console.",
-    };
-  }
+  return data.user?.email ?? null;
+}
+
+function throwawayClient() {
   const { auth } = loadWebServerConfig();
-  const fresh = createClient(auth.supabase.url, auth.supabase.publishableKey, {
+  return createClient(auth.supabase.url, auth.supabase.publishableKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
     },
   });
-  const signedIn = await fresh.auth.signInWithPassword({
+}
+
+/** Sends a one-time sign-in code to the admin's own email (never an address from the form). */
+export async function sendStepUpCodeAction(): Promise<ConsoleResult> {
+  const email = await ownEmail();
+  if (email === null)
+    return { ok: false, message: "Sign in again to continue." };
+  const { error } = await throwawayClient().auth.signInWithOtp({
     email,
-    password: parsed.data,
+    options: { shouldCreateUser: false },
   });
+  return error === null
+    ? { ok: true, message: `Code sent to ${email}.` }
+    : {
+        ok: false,
+        message: "The code couldn't be sent. Try again in a minute.",
+      };
+}
+
+export async function stepUpAction(input: {
+  readonly password?: string | undefined;
+  readonly code?: string | undefined;
+}): Promise<ConsoleResult> {
+  const password = z.string().min(1).max(200).safeParse(input.password);
+  const code = z
+    .string()
+    .trim()
+    .regex(/^\d{6,10}$/)
+    .safeParse(input.code);
+  if (!password.success && !code.success) {
+    return {
+      ok: false,
+      message: "Enter your password or the code we emailed you.",
+    };
+  }
+  const session = await apiSession();
+  if (session === null)
+    return { ok: false, message: "Sign in again to continue." };
+  const email = await ownEmail();
+  if (email === null)
+    return { ok: false, message: "Sign in again to continue." };
+  const fresh = throwawayClient();
+  const signedIn = password.success
+    ? await fresh.auth.signInWithPassword({ email, password: password.data })
+    : await fresh.auth.verifyOtp({
+        email,
+        token: code.success ? code.data : "",
+        type: "email",
+      });
   const token = signedIn.data.session?.access_token;
   if (signedIn.error !== null || token === undefined) {
-    return { ok: false, message: "That password didn't match. Try again." };
+    return {
+      ok: false,
+      message: password.success
+        ? "That password didn't match. Try again."
+        : "That code didn't match or has expired. Send a new one.",
+    };
   }
   try {
     await postAdminStepUp(session, token);

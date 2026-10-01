@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@capital-q/database";
+import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 
 /**
  * Records every Context Firewall decision -- codes only -- so the admin
@@ -99,7 +99,7 @@ export function recordingFirewall<
            reason, allowed_labels, denied)
         values (${row.tenantId}, ${row.userId}, ${row.runId}, ${row.correlationId},
                 ${row.capability}, ${row.outcome}, ${row.reason},
-                ${row.allowed}::text[], ${JSON.stringify(row.denied)}::text::jsonb)`.then(
+                ${row.allowed}::text[], ${jsonbParam(options.sql, row.denied)})`.then(
         () => undefined,
         (error: unknown) => options.onRecordError?.(error),
       );

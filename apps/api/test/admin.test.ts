@@ -63,7 +63,7 @@ function fakeSql(people: ReadonlyMap<string, Person>) {
     }
     return Promise.resolve([]);
   };
-  return sql as never;
+  return Object.assign(sql, { json: (value: unknown) => value }) as never;
 }
 
 function appFor(

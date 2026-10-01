@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@capital-q/database";
+import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 
 import {
   isAdminRole,
@@ -102,7 +102,7 @@ export async function recordAdminAction(
             ${action.resourceType}, ${action.resourceId}, ${action.reason ?? null},
             ${grant.stepUpId}, ${action.breakGlassId ?? null},
             ${action.outcome ?? "SUCCEEDED"},
-            ${JSON.stringify(action.metadata ?? {})}::text::jsonb)`;
+            ${jsonbParam(sql, action.metadata ?? {})})`;
 }
 
 // --- step-up ---------------------------------------------------------------
@@ -199,7 +199,7 @@ export async function recordStepUp(
        step_up_id, outcome, metadata)
     values (${input.userId}, ${role}, 'admin.step_up.recorded', 'step_up',
             ${row.id}, ${row.id}, 'SUCCEEDED',
-            ${JSON.stringify({ method: auth.method })}::text::jsonb)`;
+            ${jsonbParam(sql, { method: auth.method })})`;
   return {
     kind: "RECORDED",
     stepUpId: row.id,

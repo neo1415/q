@@ -64,6 +64,11 @@ const WAKE_BUCKET_MS = 3 * 3_600_000;
 const MATERIAL_MAX = 3_800;
 
 export type WorkRuntimeDependencies = {
+  // ADMIN block (ADR 0033): Capital Q's kill switch for standing
+  // delegations ("q.autonomy.delegations"). Off: no step runs; every
+  // delegation stays ACTIVE (paused, not failed) and its person is told.
+  readonly enabled?: (() => Promise<boolean>) | undefined;
+  // end ADMIN block
   readonly store: WorkStore;
   readonly checkpoints: QCheckpointStore;
   readonly resolver: ActorContextResolver;
@@ -793,6 +798,28 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
     /** One pass over active work, bounded; each delegation in turn. */
     tick: async (limit = 20): Promise<number> => {
       const rows = await store.active(limit);
+      // ADMIN block: paused platform-wide by an operator. Nothing advances;
+      // each person hears once a day that their work is on hold.
+      if (
+        dependencies.enabled !== undefined &&
+        !(await dependencies.enabled())
+      ) {
+        const day = now().toISOString().slice(0, 10);
+        for (const row of rows) {
+          const ref = await refOf(row);
+          await store
+            .notify(ref, row.kind, {
+              key: `paused-${day}`,
+              title: "Q paused your delegated work",
+              body: "Capital Q has paused work Q does on its own for a while. Nothing was lost; Q picks up where it left off when it resumes.",
+              link: null,
+              priority: "UPDATE",
+            })
+            .catch(() => undefined);
+        }
+        return 0;
+      }
+      // end ADMIN block
       for (const row of rows) {
         try {
           await advance(row);

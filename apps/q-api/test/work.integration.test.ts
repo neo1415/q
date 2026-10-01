@@ -230,6 +230,24 @@ describe("Q's delegated work against PostgreSQL", () => {
       nameOf: () => Promise.resolve("Ada Investor"),
     });
 
+    // ADMIN (ADR 0033): with the operators' kill switch off nothing runs;
+    // the delegation stays ACTIVE and the person is told it is paused.
+    const paused = dependencies();
+    expect(
+      await createWorkRuntime({
+        ...paused,
+        enabled: () => Promise.resolve(false),
+      }).tick(50),
+    ).toBe(0);
+    expect(await store.lanes(delegationId)).toEqual([]);
+    expect((await store.delegation(delegationId))?.status).toBe("ACTIVE");
+    const held = await db.sql<{ title: string }[]>`
+      select title from communication.notifications where user_id = ${userId}`;
+    expect(held.map((row) => row.title)).toEqual([
+      "Q paused your delegated work",
+    ]);
+    await paused.checkpoints.close();
+
     // First process: sources and expresses interest in the grounded pick only.
     const first = dependencies();
     await createWorkRuntime(first).tick(50);
@@ -240,7 +258,7 @@ describe("Q's delegated work against PostgreSQL", () => {
     const notices = await db.sql<{ title: string; priority: string }[]>`
       select title, priority from communication.notifications
        where user_id = ${userId} order by created_at`;
-    expect(notices[0]?.title).toBe("Q expressed interest in Pay Co");
+    expect(notices[1]?.title).toBe("Q expressed interest in Pay Co");
     await first.checkpoints.close();
 
     // A deploy later: a fresh runtime and saver; the founder has accepted.
