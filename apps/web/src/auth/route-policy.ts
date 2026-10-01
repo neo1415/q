@@ -33,6 +33,7 @@ export const PROTECTED_PATH_PREFIXES = [
   "/relationships",
   "/settings",
   "/gateway",
+  "/rehearsals",
   "/admin",
   "/paused",
   // Setting a new password needs the recovery session the callback created.
