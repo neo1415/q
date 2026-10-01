@@ -74,6 +74,15 @@ import {
   UuidSchema,
   type CorrelationId,
   type KnownErrorCode,
+  // ADMIN-3 block
+  ADMIN_KYB_DOCUMENT_PATH,
+  ADMIN_REVIEW_DECISION_PATH,
+  ADMIN_REVIEWS_PATH,
+  AdminKybDocumentDtoSchema,
+  AdminReviewDecisionDtoSchema,
+  AdminReviewDecisionRequestSchema,
+  AdminReviewListDtoSchema,
+  // end ADMIN-3 block
 } from "@capital-q/contracts";
 import {
   ADMIN_PERMISSIONS_VERSION,
@@ -125,6 +134,24 @@ export type AdminRoutesDependencies = ActorContextDependencies & {
     | undefined;
   readonly decideVerification?: OperatorVerificationDecider | undefined;
   readonly newCorrelationId?: (() => CorrelationId) | undefined;
+  // ADMIN-3 block: closing the KYB submission behind a decided claim, and a
+  // one-minute signed read of its document for the deciding operator.
+  readonly closeKyb?:
+    | ((input: {
+        readonly claimId: string;
+        readonly approved: boolean;
+        readonly reason: string;
+        readonly decidedByUserId: string;
+      }) => Promise<boolean>)
+    | undefined;
+  readonly kybDownload?:
+    | ((document: {
+        readonly tenantId: string;
+        readonly documentId: string;
+        readonly versionId: string;
+      }) => Promise<{ readonly url: string; readonly expiresAt: string }>)
+    | undefined;
+  // end ADMIN-3 block
 };
 
 function send(
@@ -478,6 +505,15 @@ export function registerAdminRoutes(
         revocationReason: input.revocationReason ?? null,
         correlationId: correlation(),
       });
+      // ADMIN-3: the KYB submission that asked for this claim closes with it.
+      if (outcome.kind === "DECIDED" && dependencies.closeKyb !== undefined) {
+        await dependencies.closeKyb({
+          claimId,
+          approved: outcome.status === "VERIFIED",
+          reason: input.revocationReason ?? input.decisionBasis,
+          decidedByUserId: grant.userId,
+        });
+      }
       await admin.recordAction(grant, {
         actionType: "verification.claim.decided",
         resourceType: "verification_claim",
@@ -490,6 +526,73 @@ export function registerAdminRoutes(
         decided: outcome.kind === "DECIDED",
         status: outcome.kind === "DECIDED" ? outcome.status : null,
       });
+    },
+  );
+
+  // --- ADMIN-3: human reviews and KYB documents -------------------------------
+
+  app.get(
+    ADMIN_REVIEWS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "reviews.read");
+      if (grant === null) return reply;
+      const all = (request.query as { all?: unknown }).all === "1";
+      return AdminReviewListDtoSchema.parse({
+        rows: await admin.reviewQueue(grant, all),
+      });
+    },
+  );
+
+  app.post(
+    ADMIN_REVIEW_DECISION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "reviews.decide");
+      if (grant === null) return reply;
+      const reviewId = param(request, "reviewId");
+      if (reviewId === null) return notFound(request, reply);
+      const input = await body(
+        request,
+        reply,
+        AdminReviewDecisionRequestSchema,
+      );
+      if (input === null) return reply;
+      const outcome = await admin.decideReview(grant, { reviewId, ...input });
+      if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
+      if (outcome.kind === "SELF") {
+        return send(
+          request,
+          reply,
+          "PERMISSION_DENIED",
+          "Another admin must decide a review you asked for.",
+        );
+      }
+      return AdminReviewDecisionDtoSchema.parse({ decided: true });
+    },
+  );
+
+  app.get(
+    ADMIN_KYB_DOCUMENT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "verification.read");
+      if (grant === null) return reply;
+      const submissionId = param(request, "submissionId");
+      const document =
+        submissionId === null
+          ? null
+          : await admin.kybDocument(grant, submissionId);
+      if (document === null || dependencies.kybDownload === undefined) {
+        return notFound(request, reply);
+      }
+      const link = await dependencies.kybDownload(document);
+      await admin.recordAction(grant, {
+        actionType: "verification.kyb.document_opened",
+        resourceType: "kyb_submission",
+        resourceId: submissionId ?? document.documentId,
+      });
+      return AdminKybDocumentDtoSchema.parse(link);
     },
   );
 

@@ -409,6 +409,25 @@ const ROUTES: readonly Route[] = [
     listOk: true,
   },
   // end BILLING block
+  // ADMIN-3 block
+  {
+    method: "GET",
+    url: "/v1/admin/reviews",
+    permission: "reviews.read",
+    listOk: true,
+  },
+  {
+    method: "POST",
+    url: `/v1/admin/reviews/${SOME_ID}/decision`,
+    permission: "reviews.decide",
+    body: { outcome: "UPHELD", reason: "The reading stands on the evidence" },
+  },
+  {
+    method: "GET",
+    url: `/v1/admin/kyb/${SOME_ID}/document`,
+    permission: "verification.read",
+  },
+  // end ADMIN-3 block
 ];
 
 const USERS = {

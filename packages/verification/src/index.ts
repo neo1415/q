@@ -64,6 +64,15 @@ export {
   type RequestCompanyVerificationResult,
 } from "./application/company-verification.js";
 export {
+  closeKybForClaim,
+  createKybService,
+  type KybInput,
+  type KybProvider,
+  type KybService,
+  type KybView,
+  type SubmitKybOutcome,
+} from "./application/kyb.js";
+export {
   createDecideByOperator,
   type DecideByOperatorCommand,
   type DecideByOperatorOutcome,

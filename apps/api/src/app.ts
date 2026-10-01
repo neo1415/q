@@ -15,6 +15,10 @@ import {
   type AdminRoutesDependencies,
 } from "./http/admin.js";
 import {
+  registerReviewsKybRoutes,
+  type ReviewsKybRoutesDependencies,
+} from "./http/reviews-kyb.js";
+import {
   registerResultsRoutes,
   type ResultsRoutesDependencies,
 } from "./http/results.js";
@@ -190,6 +194,11 @@ export type ApiModules = {
   // ADMIN block (ADR 0033)
   readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
   readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
+  // ADMIN-3 block
+  readonly adminCloseKyb?: AdminRoutesDependencies["closeKyb"];
+  readonly adminKybDownload?: AdminRoutesDependencies["kybDownload"];
+  readonly kyb?: ReviewsKybRoutesDependencies["kyb"] | undefined;
+  // end ADMIN-3 block
   readonly results?: ResultsRoutesDependencies["results"] | undefined;
   // end ADMIN block
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
@@ -373,7 +382,19 @@ export function createApp(
       admin: modules.admin,
       freshTokens: modules.adminFreshTokens,
       decideVerification: modules.adminVerificationDecider,
+      closeKyb: modules.adminCloseKyb,
+      kybDownload: modules.adminKybDownload,
     });
+    // ADMIN-3 block: the person's side of reviews and KYB.
+    if (modules.kyb !== undefined) {
+      registerReviewsKybRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        reviews: modules.admin,
+        kyb: modules.kyb,
+      });
+    }
+    // end ADMIN-3 block
     // BILLING block
     if (modules.adminBilling !== undefined) {
       registerAdminBillingRoutes(app, {

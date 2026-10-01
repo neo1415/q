@@ -34,7 +34,17 @@ import { createFlagReader, listFlags, setFlag } from "./flags.js";
 import { qErrors, qMonitor, qRunTrace } from "./q-monitor.js";
 import { reviewReport, safetyQueue } from "./safety.js";
 import { listTeam, revokeTeamRole, setTeamRole } from "./team.js";
-import { claimTenant, verificationQueue } from "./verification-queue.js";
+import {
+  claimTenant,
+  kybDocument,
+  verificationQueue,
+} from "./verification-queue.js";
+import {
+  decideReview,
+  ownReviews,
+  requestReview,
+  reviewQueue,
+} from "./reviews.js";
 import type { AdminPermission } from "./permissions.js";
 
 /**
@@ -370,6 +380,21 @@ export function createPlatformAdmin(options: {
     ) => suspendOrganisationMembers(sql, transactions, grant, input),
     verificationQueue: (grant: AdminGrant) => verificationQueue(sql, grant),
     claimTenant: (claimId: string) => claimTenant(sql, claimId),
+    // ADMIN-3 block
+    kybDocument: (grant: AdminGrant, submissionId: string) =>
+      kybDocument(sql, grant, submissionId),
+    requestReview: (
+      requester: Parameters<typeof requestReview>[1],
+      input: Parameters<typeof requestReview>[2],
+    ) => requestReview(transactions, requester, input),
+    ownReviews: (userId: string) => ownReviews(sql, userId),
+    reviewQueue: (grant: AdminGrant, includeDecided: boolean) =>
+      reviewQueue(sql, grant, { includeDecided }),
+    decideReview: (
+      grant: AdminGrant,
+      input: Parameters<typeof decideReview>[2],
+    ) => decideReview(transactions, grant, input),
+    // end ADMIN-3 block
     recordAction: (
       grant: AdminGrant,
       action: Parameters<typeof recordAdminAction>[2],
@@ -481,5 +506,20 @@ export {
 } from "./safety.js";
 export type { TeamChange, TeamMember } from "./team.js";
 export type { VerificationQueueRow } from "./verification-queue.js";
+// ADMIN-3 block
+export {
+  MAX_OPEN_REVIEWS,
+  REVIEW_DECISIONS,
+  REVIEW_SLA_HOURS,
+  REVIEW_SUBJECTS,
+  type DecideReviewOutcome,
+  type OwnReview,
+  type RequestReviewOutcome,
+  type ReviewDecision,
+  type ReviewQueueRow,
+  type ReviewRequester,
+  type ReviewSubject,
+} from "./reviews.js";
+// end ADMIN-3 block
 
 export const PACKAGE_NAME = "@capital-q/platform-admin" as const;
