@@ -260,3 +260,10 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - 13:25 UTC: OpenAI credit_balance_exhausted. Live testing paused; Q runs on Gemini fallback (2/2 live turns pass). OpenAI over the last 24 h: ~2,270 calls, ~$2.77 logged. The founder must top up.
 - Waiting on credit: QA live re-checks (hand-over card, decline case, choice question), AUTO slot negotiation on lagoon's errands, HARDEN 30-turn sweep, rehearsal voice turns, speed measurement.
 - Needs the founder's real browser and mic: laugh audio, barge-in, "Zino Aviation" STT, FR/Yoruba voice.
+
+## 2026-10-01 evening — lead
+- Merged and deployed 6d9a7500: REHEARSE (persona v5, rebuild of stale readings, emotion state with v3 delivery, angry goodbye plus Meet sounds, review grades only the user's role, leverage), HARDEN (open-mic pause, addressedness marks with migration 20261110030000, profile name only, named-company prefetch, Daily screen, partials collapse, Hide from Q), QA (ALREADY_ACTIVE, v23/v24 hand-over, mobile More sheet, Results destination, named-relationship plan), AUTO (Meet-link re-read, outreach picks founders itself), ADMIN (human reviews + manual KYB, migration 20261115010000), BILLING (Readiness Blueprint groundwork, ADR 0036 draft, recommendation volume; migration 20261116020000). Hosted 110/110; test:db 1627/1627.
+- pgTAP 140/260/540 now count their own fixtures (no more failures from shared rows).
+- Removed bench.nixo, nixo2 and nixo3 (fictional duplicates). There are 10 more fictional "Zino Aviation" investor orgs (qx004-*, rw-*@example.com) to clear later.
+- REAL-ACCOUNT RUN (founder-approved): made Nixo network_visible via its visibility page. Zino asked Q on Nixo's page "get me a meeting with this person" → card → Approve → interest 18:07:26 → Nixo accepted 18:08:17 → booked 18:08:39 with Meet https://meet.google.com/xke-cckh-szx, Fri 2 Oct 12:30 UTC. Notices sent to both sides, rehearsal suggested, prep brief ready.
+- Defect found: after a reload the dock starts a new conversation, so a typed "yes" misses the pending card. Sent to QA.
