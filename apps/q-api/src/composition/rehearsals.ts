@@ -280,12 +280,19 @@ const WRAP_UP_TURNS = 70;
 /** The public web is read about a counterpart at most this often. */
 const WEB_READ_EVERY_MS = 7 * 24 * 3_600_000;
 
-function transcriptOf(turns: readonly Turn[], name: string): string {
+function transcriptOf(
+  turns: readonly Turn[],
+  name: string,
+  viewerRole: ViewerRole = "FOUNDER",
+): string {
+  // The rehearsing side by role, so the played person never mistakes
+  // whose lines are whose.
+  const them = `${viewerRole === "FOUNDER" ? "The founder" : "The investor"} (rehearsing)`;
   if (turns.length === 0) return "(nothing said yet)";
   const text = turns
     .map(
       (turn) =>
-        `${turn.from === "THEM" ? name : "The person rehearsing"}${turn.sawScreen ? " [their screen in view]" : ""}: ${turn.text}`,
+        `${turn.from === "THEM" ? name : them}${turn.sawScreen ? " [their screen in view]" : ""}: ${turn.text}`,
     )
     .join("\n");
   return text.length <= REHEARSAL_TEXT_MAX
@@ -1073,7 +1080,7 @@ export function createRehearsalService(dependencies: {
         counterpartRole: counterpartRoleOf(row.counterpartKind),
         persona: personaText(persona).slice(0, 10_000),
         meetingMaterial: (await meetingMaterial(actor, row)).slice(0, 16_000),
-        rehearsal: transcriptOf(turns, row.counterpartName),
+        rehearsal: transcriptOf(turns, row.counterpartName, row.userRole),
         turnsSoFar: Math.min(turns.length, 400),
         minutesElapsed: Math.max(0, Math.min(minutes, 600)),
         cue: wrapUp ? "WRAP_UP" : cue,
@@ -1395,7 +1402,7 @@ export function createRehearsalService(dependencies: {
         viewerOrganisation: viewer.organisationName.slice(0, 200),
         counterpartName: row.counterpartName,
         persona: personaText(persona).slice(0, 10_000),
-        rehearsal: transcriptOf(turns, row.counterpartName),
+        rehearsal: transcriptOf(turns, row.counterpartName, row.userRole),
         ending: outcome,
       });
       if (review === null) return { kind: "Q_UNAVAILABLE" };

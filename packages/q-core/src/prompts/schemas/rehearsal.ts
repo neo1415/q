@@ -411,12 +411,10 @@ export function normaliseRehearsalReview(
   return {
     overall: cutText(loose.overall, 600),
     dimensions,
-    wentRight: loose.wentRight
-      .slice(0, 5)
-      .map((w) => ({
-        moment: cutText(w.moment, 300),
-        why: cutText(w.why, 300),
-      })),
+    wentRight: loose.wentRight.slice(0, 5).map((w) => ({
+      moment: cutText(w.moment, 300),
+      why: cutText(w.why, 300),
+    })),
     wentWrong: loose.wentWrong.slice(0, 6).map((w) => ({
       moment: cutText(w.moment, 300),
       why: cutText(w.why, 300),
