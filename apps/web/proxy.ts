@@ -31,6 +31,7 @@ export const config = {
     "/work/:path*",
     "/gateway/:path*",
     "/rehearsals/:path*",
+    "/results/:path*",
     "/admin/:path*",
     "/paused/:path*",
     "/auth/:path*",

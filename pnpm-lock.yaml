@@ -261,6 +261,9 @@ importers:
       '@capital-q/q-tools':
         specifier: workspace:*
         version: link:../../packages/q-tools
+      '@capital-q/results':
+        specifier: workspace:*
+        version: link:../../packages/results
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security

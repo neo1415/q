@@ -18,6 +18,7 @@ import {
   FOUNDER_MEDIA_NAVIGATION,
   FIND_NAVIGATION,
   REHEARSALS_NAVIGATION,
+  RESULTS_NAVIGATION,
   FOUNDER_REQUESTS_NAVIGATION,
   INVESTORS_NAVIGATION,
   isActiveRoute,
@@ -62,7 +63,7 @@ export function DesktopSidebar({
         : []),
     ...(context.scope === "founder_private" ||
     context.scope === "investor_private"
-      ? [REHEARSALS_NAVIGATION]
+      ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION]
       : []),
     FIND_NAVIGATION,
   ];

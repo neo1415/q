@@ -502,6 +502,18 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RECORDS",
     "Lists every change waiting for their approval, across their conversations.",
   ),
+  // ADMIN block
+  tool(
+    "get_my_results",
+    "RECORDS",
+    "Reads their own results on Capital Q for a period: a founder's raise progress, investor engagement and pipeline; an investor's deal flow funnel, meetings, Q's work and mandate fit. Their Results page is /results.",
+  ),
+  tool(
+    "get_my_results_report",
+    "RECORDS",
+    "Gives download links for their own results report for a period: a branded PDF and a CSV for their business.",
+  ),
+  // end ADMIN block
   tool(
     "list_my_documents",
     "DOCUMENT",

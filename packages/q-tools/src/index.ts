@@ -466,3 +466,16 @@ export {
   type QWorkProposal,
 } from "./tools/q-work.js";
 // end AUTO block
+
+// ADMIN block
+export {
+  createGetMyResultsReportTool,
+  createGetMyResultsTool,
+  createResultsTools,
+  GET_MY_RESULTS,
+  GET_MY_RESULTS_REPORT,
+  resultsReportLinks,
+  summariseResults,
+  type ResultsToolPort,
+} from "./tools/results.js";
+// end ADMIN block

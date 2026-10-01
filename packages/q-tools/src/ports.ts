@@ -27,6 +27,7 @@ import type { ScheduleIntelligencePort } from "./tools/schedule.js";
 import type { OnboardingRemindersPort } from "./tools/onboarding-reminders.js";
 // AUTO block (ADR 0030)
 import type { QWorkIntelligencePort } from "./tools/q-work.js";
+import type { ResultsToolPort } from "./tools/results.js";
 
 /** One company as the investor's feed shows it. */
 export type InvestorFeedCompany = {
@@ -256,6 +257,9 @@ export type PitchMomentPort = {
  * optional; without a configured provider the research tools do not exist.
  */
 export type QToolPorts = {
+  // ADMIN block: the person's own results (spec admin.md §5).
+  readonly results?: ResultsToolPort | undefined;
+  // end ADMIN block
   readonly companies: CompanyQueryPort;
   readonly capital: CapitalObjectiveQueryPort;
   readonly mandates: InvestorMandateQueryPort;

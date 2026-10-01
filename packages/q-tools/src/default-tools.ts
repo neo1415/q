@@ -20,6 +20,7 @@ import {
   createDeclinePendingProposalTool,
 } from "./tools/pending-proposal.js";
 import { createOwnWorkTools } from "./tools/own-work.js";
+import { createResultsTools } from "./tools/results.js";
 import { createOwnRecordTools } from "./tools/own-records.js";
 import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
@@ -147,6 +148,9 @@ export function createDefaultQTools(
       ? []
       : createRecordChangeTools(ports, ports.recordChanges)),
     ...createOwnRecordTools(ports),
+    // ADMIN block: "how is my raise going", "download my pipeline report".
+    ...createResultsTools(ports),
+    // end ADMIN block
   ];
 }
 

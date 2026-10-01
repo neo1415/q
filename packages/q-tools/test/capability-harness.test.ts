@@ -96,6 +96,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     qCards: port(),
     clientActions: true,
     approvalInbox: port(),
+    results: port(),
     discoveryDecisions: port(),
     documents: port(),
     documentRevision: port(),

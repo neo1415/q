@@ -29,6 +29,7 @@ import {
 } from "@capital-q/audit";
 import { CAPITAL_EVENTS } from "@capital-q/capital/events";
 import {
+  CapitalObjectiveNotFoundError,
   createCapitalService,
   createPostgresCapitalObjectiveQueryPort,
 } from "@capital-q/capital";
@@ -386,6 +387,7 @@ import {
   createScheduleIntelligencePort,
 } from "./composition/schedule-actions.js";
 // ADMIN block
+import { createResultsReader, resultsWindow } from "@capital-q/results";
 import {
   createFlagReader,
   isSuspended as isAccountSuspended,
@@ -1151,6 +1153,53 @@ const qTools = createQTools({
   ports: {
     // AUTO block (ADR 0030)
     work: workPort,
+// ADMIN block (spec admin.md §5): the person's own results for Q's
+// get_my_results / get_my_results_report tools. Same read model and raise
+// view as the Results page and Capital.
+const ownResults = createResultsReader({
+  sql: database.sql,
+  raise: async (actor, companyId) => {
+    let target: { amount: string; currencyCode: string } | null = null;
+    try {
+      const objective = await capitalService.getCurrentCapitalObjective({
+        actor,
+        companyId: CompanyIdSchema.parse(companyId),
+      });
+      target = {
+        amount: objective.target.amount,
+        currencyCode: objective.target.currency,
+      };
+    } catch (error: unknown) {
+      if (!(error instanceof CapitalObjectiveNotFoundError)) throw error;
+    }
+    const view = await meetingCommitments.fundraising({
+      actor,
+      companyId,
+      target,
+    });
+    return {
+      target: view.target,
+      totals: view.totals,
+      remaining: view.remaining,
+      pipeline: view.pipeline,
+      investors: view.investors.map((investor) => ({
+        investorName: investor.investorName,
+        amount: investor.amount,
+        currencyCode: investor.currencyCode,
+        bucket: investor.bucket,
+      })),
+    };
+  },
+});
+// end ADMIN block
+
+const qTools = createQTools({
+  ports: {
+    // ADMIN block
+    results: {
+      read: (actor, query) => ownResults.read(actor, resultsWindow(query)),
+    },
+    // end ADMIN block
     onboardingReminders: {
       choose: (actor, choice) => onboardingNudges.choose(actor.userId, choice),
       unfinished: (actor) => onboardingNudges.continueTarget(actor.userId),

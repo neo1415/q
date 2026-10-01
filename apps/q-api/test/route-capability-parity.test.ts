@@ -51,6 +51,12 @@ const DOWNLOAD = exempt(
   "a document's render or file download (PDF/PPTX, slides, a version), linked from its card; Q lists documents (list_my_documents) and the card carries the downloads",
 );
 
+// ADMIN block
+const OPERATIONS_CONSOLE = exempt(
+  "Capital Q's operations console (ADR 0033): platform operators only, step-up for writes; never Q's to act on, never a tenant's",
+);
+// end ADMIN block
+
 const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ---- apps/api ---------------------------------------------------------
   'api/app.ts GET "/health/live"': HEALTH,
@@ -234,6 +240,41 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/admin.ts POST ADMIN_REINSTATE_PATH": exempt(
     "an operator lifting a pause Q put on an account: a person's decision, never Q's",
   ),
+
+  // ADMIN block (ADR 0033): the operations console. Operators only;
+  // Q holds no console authority.
+  "api/http/admin.ts GET ADMIN_ME_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_STEP_UP_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_ACCOUNTS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_ACCOUNT_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_ACCOUNT_SUSPENSION_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_ORGANISATIONS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_ORGANISATION_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_ORGANISATION_SUSPENSION_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_VERIFICATION_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_VERIFICATION_DECISION_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_SAFETY_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_SAFETY_REVIEW_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_BREAK_GLASS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_BREAK_GLASS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_BREAK_GLASS_DECISION_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_BREAK_GLASS_CHAT_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_Q_MONITOR_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_Q_ERRORS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_Q_RUN_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_AUDIT_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_FLAGS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_FLAG_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_EMAIL_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts GET ADMIN_TEAM_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_TEAM_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts DELETE ADMIN_TEAM_MEMBER_PATH": OPERATIONS_CONSOLE,
+  "api/http/results.ts GET RESULTS_PATH": cap("tool.get_my_results"),
+  "api/http/results.ts GET RESULTS_REPORT_PATH": cap(
+    "tool.get_my_results_report",
+  ),
+  // end ADMIN block
 
   // Spec 6.6.14: money is stated and confirmed by a person on each side;
   // Q never states, confirms or withdraws a commitment on anyone's behalf.
@@ -624,6 +665,22 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // GateQ: a gateway's public page and the embed another site frames.
   "/g/[publicId]": PUBLIC,
   "/g/[publicId]/embed": PUBLIC,
+  // ADMIN block
+  "/admin/accounts": OPERATIONS_CONSOLE,
+  "/admin/accounts/[userId]": OPERATIONS_CONSOLE,
+  "/admin/organisations": OPERATIONS_CONSOLE,
+  "/admin/organisations/[organisationId]": OPERATIONS_CONSOLE,
+  "/admin/verification": OPERATIONS_CONSOLE,
+  "/admin/safety": OPERATIONS_CONSOLE,
+  "/admin/safety/break-glass/[requestId]": OPERATIONS_CONSOLE,
+  "/admin/q": OPERATIONS_CONSOLE,
+  "/admin/q/runs/[runId]": OPERATIONS_CONSOLE,
+  "/admin/audit": OPERATIONS_CONSOLE,
+  "/admin/flags": OPERATIONS_CONSOLE,
+  "/admin/email": OPERATIONS_CONSOLE,
+  "/admin/team": OPERATIONS_CONSOLE,
+  "/results": cap("tool.get_my_results"),
+  // end ADMIN block
   "/admin": exempt(
     "Capital Q's admin console: platform operators only, never a place Q sends anyone",
   ),

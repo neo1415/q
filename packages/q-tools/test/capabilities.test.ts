@@ -50,6 +50,7 @@ const EVERY_PORT: QToolPorts = {
   qCards: STUB,
   clientActions: true,
   approvalInbox: STUB,
+  results: STUB,
   discoveryDecisions: STUB,
   documents: STUB,
   documentRevision: STUB,

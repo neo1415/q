@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 
 import {
+  ChartColumn,
   CircleUser,
   Compass,
   Handshake,
@@ -34,6 +35,7 @@ export type NavigationItem = {
     | "/investors"
     | "/search"
     | "/rehearsals"
+    | "/results"
     | "/settings";
   readonly label: string;
   readonly icon: ComponentType<{
@@ -109,6 +111,18 @@ export const REHEARSALS_NAVIGATION: NavigationItem = {
   label: "Rehearsals",
   icon: Presentation,
 };
+
+// ADMIN block
+/**
+ * Results (spec docs/specs/2026-10/admin.md §5): what a person's activity
+ * on Capital Q produced, with reports to download. Founders and investors.
+ */
+export const RESULTS_NAVIGATION: NavigationItem = {
+  href: "/results",
+  label: "Results",
+  icon: ChartColumn,
+};
+// end ADMIN block
 
 /** Search people by @handle and founders' videos (founder design 2026-09-29). */
 export const FIND_NAVIGATION: NavigationItem = {

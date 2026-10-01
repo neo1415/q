@@ -19,6 +19,7 @@ import {
   FOUNDER_MEDIA_NAVIGATION,
   FIND_NAVIGATION,
   REHEARSALS_NAVIGATION,
+  RESULTS_NAVIGATION,
   FOUNDER_REQUESTS_NAVIGATION,
   INVESTORS_NAVIGATION,
   PROFILE_NAVIGATION,
@@ -42,7 +43,9 @@ export function AccountMenu({
   const sideLinks = [
     ...(founder ? [INVESTORS_NAVIGATION, FOUNDER_MEDIA_NAVIGATION] : []),
     ...(investor ? [FOUNDER_REQUESTS_NAVIGATION] : []),
-    ...(founder === true || investor === true ? [REHEARSALS_NAVIGATION] : []),
+    ...(founder === true || investor === true
+      ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION]
+      : []),
     FIND_NAVIGATION,
   ];
   return (

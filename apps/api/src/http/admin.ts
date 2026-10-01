@@ -211,18 +211,9 @@ export function registerAdminRoutes(
     return null;
   }
 
-  const get = (
-    path: string,
-    handler: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>,
-  ) => app.get(path, { onRequest: withContext }, handler);
-  const post = (
-    path: string,
-    handler: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>,
-  ) => app.post(path, { onRequest: withContext }, handler);
-
   // --- who am I --------------------------------------------------------------
 
-  get(ADMIN_ME_PATH, async (request, reply) => {
+  app.get(ADMIN_ME_PATH, { onRequest: withContext }, async (request, reply) => {
     const userId = getActorContext(request).userId;
     const role = await admin.roleOf(userId);
     if (role === null) return notFound(request, reply);
@@ -237,381 +228,499 @@ export function registerAdminRoutes(
     });
   });
 
-  post(ADMIN_STEP_UP_PATH, async (request, reply) => {
-    const userId = getActorContext(request).userId;
-    if ((await admin.roleOf(userId)) === null) return notFound(request, reply);
-    const input = await body(request, reply, AdminStepUpRequestSchema);
-    if (input === null) return reply;
-    const fresh =
-      dependencies.freshTokens === undefined
-        ? null
-        : await dependencies.freshTokens.authenticate(input.accessToken);
-    const outcome =
-      fresh === null
-        ? { kind: "STALE" as const }
-        : await admin.recordStepUp({
-            userId,
-            freshAuthUserId: fresh.authUserId,
-            authentication: admin.freshAuthenticationOf(input.accessToken),
-          });
-    if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
-    if (outcome.kind !== "RECORDED") {
-      return send(
-        request,
-        reply,
-        "AUTHENTICATION_REQUIRED",
-        "That password did not confirm it's you. Try again.",
-      );
-    }
-    void reply.header("Cache-Control", "no-store");
-    return AdminStepUpDtoSchema.parse({ expiresAt: outcome.expiresAt });
-  });
+  app.post(
+    ADMIN_STEP_UP_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const userId = getActorContext(request).userId;
+      if ((await admin.roleOf(userId)) === null)
+        return notFound(request, reply);
+      const input = await body(request, reply, AdminStepUpRequestSchema);
+      if (input === null) return reply;
+      const fresh =
+        dependencies.freshTokens === undefined
+          ? null
+          : await dependencies.freshTokens.authenticate(input.accessToken);
+      const outcome =
+        fresh === null
+          ? { kind: "STALE" as const }
+          : await admin.recordStepUp({
+              userId,
+              freshAuthUserId: fresh.authUserId,
+              authentication: admin.freshAuthenticationOf(input.accessToken),
+            });
+      if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
+      if (outcome.kind !== "RECORDED") {
+        return send(
+          request,
+          reply,
+          "AUTHENTICATION_REQUIRED",
+          "That password did not confirm it's you. Try again.",
+        );
+      }
+      void reply.header("Cache-Control", "no-store");
+      return AdminStepUpDtoSchema.parse({ expiresAt: outcome.expiresAt });
+    },
+  );
 
   // --- ledger (existing console) --------------------------------------------
 
-  get(ADMIN_OVERVIEW_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "overview.read");
-    if (grant === null) return reply;
-    return AdminOverviewDtoSchema.parse(await admin.overview(grant));
-  });
+  app.get(
+    ADMIN_OVERVIEW_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "overview.read");
+      if (grant === null) return reply;
+      return AdminOverviewDtoSchema.parse(await admin.overview(grant));
+    },
+  );
 
-  get(ADMIN_ATTRIBUTION_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "ledger.read");
-    if (grant === null) return reply;
-    return AttributionListDtoSchema.parse({
-      rows: await admin.attribution(grant),
-    });
-  });
+  app.get(
+    ADMIN_ATTRIBUTION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "ledger.read");
+      if (grant === null) return reply;
+      return AttributionListDtoSchema.parse({
+        rows: await admin.attribution(grant),
+      });
+    },
+  );
 
-  get(ADMIN_DISPUTES_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "ledger.read");
-    if (grant === null) return reply;
-    return DisputeListDtoSchema.parse({ rows: await admin.disputes(grant) });
-  });
+  app.get(
+    ADMIN_DISPUTES_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "ledger.read");
+      if (grant === null) return reply;
+      return DisputeListDtoSchema.parse({ rows: await admin.disputes(grant) });
+    },
+  );
 
-  get(ADMIN_PAUSED_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "accounts.read");
-    if (grant === null) return reply;
-    return PausedListDtoSchema.parse({ rows: await admin.paused(grant) });
-  });
+  app.get(
+    ADMIN_PAUSED_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "accounts.read");
+      if (grant === null) return reply;
+      return PausedListDtoSchema.parse({ rows: await admin.paused(grant) });
+    },
+  );
 
   // An operator lifts a pause Q put on an account (founder 2026-09-30).
-  post(ADMIN_REINSTATE_PATH, async (request, reply) => {
-    const userId = param(request, "userId");
-    const grant = await guard(request, reply, "accounts.reinstate_q");
-    if (grant === null) return reply;
-    if (userId === null || !(await admin.reinstate(grant, userId))) {
-      return notFound(request, reply);
-    }
-    return ReinstatedDtoSchema.parse({ reinstated: true });
-  });
+  app.post(
+    ADMIN_REINSTATE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const userId = param(request, "userId");
+      const grant = await guard(request, reply, "accounts.reinstate_q");
+      if (grant === null) return reply;
+      if (userId === null || !(await admin.reinstate(grant, userId))) {
+        return notFound(request, reply);
+      }
+      return ReinstatedDtoSchema.parse({ reinstated: true });
+    },
+  );
 
   // --- accounts and organisations -------------------------------------------
 
-  get(ADMIN_ACCOUNTS_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "accounts.read");
-    if (grant === null) return reply;
-    const q = (request.query as { q?: unknown }).q;
-    const term = typeof q === "string" ? q.trim() : "";
-    return AdminAccountListDtoSchema.parse({
-      rows: term.length < 2 ? [] : await admin.searchAccounts(grant, term),
-    });
-  });
+  app.get(
+    ADMIN_ACCOUNTS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "accounts.read");
+      if (grant === null) return reply;
+      const q = (request.query as { q?: unknown }).q;
+      const term = typeof q === "string" ? q.trim() : "";
+      return AdminAccountListDtoSchema.parse({
+        rows: term.length < 2 ? [] : await admin.searchAccounts(grant, term),
+      });
+    },
+  );
 
-  get(ADMIN_ACCOUNT_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "accounts.read");
-    if (grant === null) return reply;
-    const userId = param(request, "userId");
-    const detail =
-      userId === null ? null : await admin.accountDetail(grant, userId);
-    if (detail === null) return notFound(request, reply);
-    return AdminAccountDetailDtoSchema.parse(detail);
-  });
+  app.get(
+    ADMIN_ACCOUNT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "accounts.read");
+      if (grant === null) return reply;
+      const userId = param(request, "userId");
+      const detail =
+        userId === null ? null : await admin.accountDetail(grant, userId);
+      if (detail === null) return notFound(request, reply);
+      return AdminAccountDetailDtoSchema.parse(detail);
+    },
+  );
 
-  post(ADMIN_ACCOUNT_SUSPENSION_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "accounts.suspend");
-    if (grant === null) return reply;
-    const userId = param(request, "userId");
-    if (userId === null) return notFound(request, reply);
-    const input = await body(request, reply, AdminSuspensionRequestSchema);
-    if (input === null) return reply;
-    const outcome = await admin.setSuspension(grant, {
-      userId,
-      suspend: input.suspend,
-      reason: input.reason,
-    });
-    if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
-    if (outcome.kind === "SELF") {
-      return send(
-        request,
-        reply,
-        "PERMISSION_DENIED",
-        "You can't suspend your own account.",
-      );
-    }
-    return AdminSuspensionDtoSchema.parse({
-      suspended: input.suspend,
-      changed: outcome.kind === "DONE" ? 1 : 0,
-    });
-  });
+  app.post(
+    ADMIN_ACCOUNT_SUSPENSION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "accounts.suspend");
+      if (grant === null) return reply;
+      const userId = param(request, "userId");
+      if (userId === null) return notFound(request, reply);
+      const input = await body(request, reply, AdminSuspensionRequestSchema);
+      if (input === null) return reply;
+      const outcome = await admin.setSuspension(grant, {
+        userId,
+        suspend: input.suspend,
+        reason: input.reason,
+      });
+      if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
+      if (outcome.kind === "SELF") {
+        return send(
+          request,
+          reply,
+          "PERMISSION_DENIED",
+          "You can't suspend your own account.",
+        );
+      }
+      return AdminSuspensionDtoSchema.parse({
+        suspended: input.suspend,
+        changed: outcome.kind === "DONE" ? 1 : 0,
+      });
+    },
+  );
 
-  get(ADMIN_ORGANISATIONS_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "accounts.read");
-    if (grant === null) return reply;
-    const q = (request.query as { q?: unknown }).q;
-    const term = typeof q === "string" ? q.trim() : "";
-    return AdminOrganisationListDtoSchema.parse({
-      rows: term.length < 2 ? [] : await admin.searchOrganisations(grant, term),
-    });
-  });
+  app.get(
+    ADMIN_ORGANISATIONS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "accounts.read");
+      if (grant === null) return reply;
+      const q = (request.query as { q?: unknown }).q;
+      const term = typeof q === "string" ? q.trim() : "";
+      return AdminOrganisationListDtoSchema.parse({
+        rows:
+          term.length < 2 ? [] : await admin.searchOrganisations(grant, term),
+      });
+    },
+  );
 
-  get(ADMIN_ORGANISATION_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "accounts.read");
-    if (grant === null) return reply;
-    const organisationId = param(request, "organisationId");
-    const detail =
-      organisationId === null
-        ? null
-        : await admin.organisationDetail(grant, organisationId);
-    if (detail === null) return notFound(request, reply);
-    return AdminOrganisationDetailDtoSchema.parse(detail);
-  });
+  app.get(
+    ADMIN_ORGANISATION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "accounts.read");
+      if (grant === null) return reply;
+      const organisationId = param(request, "organisationId");
+      const detail =
+        organisationId === null
+          ? null
+          : await admin.organisationDetail(grant, organisationId);
+      if (detail === null) return notFound(request, reply);
+      return AdminOrganisationDetailDtoSchema.parse(detail);
+    },
+  );
 
-  post(ADMIN_ORGANISATION_SUSPENSION_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "accounts.suspend");
-    if (grant === null) return reply;
-    const organisationId = param(request, "organisationId");
-    if (organisationId === null) return notFound(request, reply);
-    const input = await body(request, reply, AdminSuspensionRequestSchema);
-    if (input === null) return reply;
-    const outcome = await admin.suspendOrganisationMembers(grant, {
-      organisationId,
-      suspend: input.suspend,
-      reason: input.reason,
-    });
-    if (outcome === null) return notFound(request, reply);
-    return AdminSuspensionDtoSchema.parse({
-      suspended: input.suspend,
-      changed: outcome.changed,
-    });
-  });
+  app.post(
+    ADMIN_ORGANISATION_SUSPENSION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "accounts.suspend");
+      if (grant === null) return reply;
+      const organisationId = param(request, "organisationId");
+      if (organisationId === null) return notFound(request, reply);
+      const input = await body(request, reply, AdminSuspensionRequestSchema);
+      if (input === null) return reply;
+      const outcome = await admin.suspendOrganisationMembers(grant, {
+        organisationId,
+        suspend: input.suspend,
+        reason: input.reason,
+      });
+      if (outcome === null) return notFound(request, reply);
+      return AdminSuspensionDtoSchema.parse({
+        suspended: input.suspend,
+        changed: outcome.changed,
+      });
+    },
+  );
 
   // --- verification ----------------------------------------------------------
 
-  get(ADMIN_VERIFICATION_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "verification.read");
-    if (grant === null) return reply;
-    return AdminVerificationListDtoSchema.parse({
-      rows: await admin.verificationQueue(grant),
-    });
-  });
+  app.get(
+    ADMIN_VERIFICATION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "verification.read");
+      if (grant === null) return reply;
+      return AdminVerificationListDtoSchema.parse({
+        rows: await admin.verificationQueue(grant),
+      });
+    },
+  );
 
-  post(ADMIN_VERIFICATION_DECISION_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "verification.decide");
-    if (grant === null) return reply;
-    const claimId = param(request, "claimId");
-    const decide = dependencies.decideVerification;
-    if (claimId === null || decide === undefined)
-      return notFound(request, reply);
-    const input = await body(
-      request,
-      reply,
-      AdminVerificationDecisionRequestSchema,
-    );
-    if (input === null) return reply;
-    const tenantId = await admin.claimTenant(claimId);
-    if (tenantId === null) return notFound(request, reply);
-    const outcome = await decide({
-      tenantId,
-      claimId,
-      operatorUserId: grant.userId,
-      status: input.status,
-      decisionBasis: input.decisionBasis,
-      revocationReason: input.revocationReason ?? null,
-      correlationId: correlation(),
-    });
-    await admin.recordAction(grant, {
-      actionType: "verification.claim.decided",
-      resourceType: "verification_claim",
-      resourceId: claimId,
-      reason: input.decisionBasis,
-      outcome: outcome.kind === "DECIDED" ? "SUCCEEDED" : "FAILED",
-      metadata: { status: input.status },
-    });
-    return AdminVerificationDecisionDtoSchema.parse({
-      decided: outcome.kind === "DECIDED",
-      status: outcome.kind === "DECIDED" ? outcome.status : null,
-    });
-  });
+  app.post(
+    ADMIN_VERIFICATION_DECISION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "verification.decide");
+      if (grant === null) return reply;
+      const claimId = param(request, "claimId");
+      const decide = dependencies.decideVerification;
+      if (claimId === null || decide === undefined)
+        return notFound(request, reply);
+      const input = await body(
+        request,
+        reply,
+        AdminVerificationDecisionRequestSchema,
+      );
+      if (input === null) return reply;
+      const tenantId = await admin.claimTenant(claimId);
+      if (tenantId === null) return notFound(request, reply);
+      const outcome = await decide({
+        tenantId,
+        claimId,
+        operatorUserId: grant.userId,
+        status: input.status,
+        decisionBasis: input.decisionBasis,
+        revocationReason: input.revocationReason ?? null,
+        correlationId: correlation(),
+      });
+      await admin.recordAction(grant, {
+        actionType: "verification.claim.decided",
+        resourceType: "verification_claim",
+        resourceId: claimId,
+        reason: input.decisionBasis,
+        outcome: outcome.kind === "DECIDED" ? "SUCCEEDED" : "FAILED",
+        metadata: { status: input.status },
+      });
+      return AdminVerificationDecisionDtoSchema.parse({
+        decided: outcome.kind === "DECIDED",
+        status: outcome.kind === "DECIDED" ? outcome.status : null,
+      });
+    },
+  );
 
   // --- trust & safety --------------------------------------------------------
 
-  get(ADMIN_SAFETY_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "safety.read");
-    if (grant === null) return reply;
-    const all = (request.query as { all?: unknown }).all === "1";
-    return AdminSafetyDtoSchema.parse(await admin.safetyQueue(grant, all));
-  });
+  app.get(
+    ADMIN_SAFETY_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "safety.read");
+      if (grant === null) return reply;
+      const all = (request.query as { all?: unknown }).all === "1";
+      return AdminSafetyDtoSchema.parse(await admin.safetyQueue(grant, all));
+    },
+  );
 
-  post(ADMIN_SAFETY_REVIEW_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "safety.decide");
-    if (grant === null) return reply;
-    const reportId = param(request, "reportId");
-    if (reportId === null) return notFound(request, reply);
-    const input = await body(request, reply, AdminReviewRequestSchema);
-    if (input === null) return reply;
-    const outcome = await admin.reviewReport(grant, {
-      reportId,
-      outcome: input.outcome,
-      note: input.note,
-      suspendUserId: input.suspendUserId ?? null,
-    });
-    if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
-    if (outcome.kind === "INVALID_SUBJECT") {
-      return send(
+  app.post(
+    ADMIN_SAFETY_REVIEW_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "safety.decide");
+      if (grant === null) return reply;
+      const reportId = param(request, "reportId");
+      if (reportId === null) return notFound(request, reply);
+      const input = await body(request, reply, AdminReviewRequestSchema);
+      if (input === null) return reply;
+      const outcome = await admin.reviewReport(grant, {
+        reportId,
+        outcome: input.outcome,
+        note: input.note,
+        suspendUserId: input.suspendUserId ?? null,
+      });
+      if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
+      if (outcome.kind === "INVALID_SUBJECT") {
+        return send(
+          request,
+          reply,
+          "VALIDATION_FAILED",
+          "Choose a member of the reported side to suspend.",
+        );
+      }
+      return { reviewed: true };
+    },
+  );
+
+  app.get(
+    ADMIN_BREAK_GLASS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "safety.read");
+      if (grant === null) return reply;
+      return AdminBreakGlassListDtoSchema.parse({
+        rows: await admin.listBreakGlass(grant),
+      });
+    },
+  );
+
+  app.post(
+    ADMIN_BREAK_GLASS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "breakglass.request");
+      if (grant === null) return reply;
+      const input = await body(request, reply, AdminBreakGlassRequestSchema);
+      if (input === null) return reply;
+      const created = await admin.requestBreakGlass(grant, input);
+      if (created === null) return notFound(request, reply);
+      return AdminBreakGlassCreatedDtoSchema.parse(created);
+    },
+  );
+
+  app.post(
+    ADMIN_BREAK_GLASS_DECISION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "breakglass.approve");
+      if (grant === null) return reply;
+      const requestId = param(request, "requestId");
+      if (requestId === null) return notFound(request, reply);
+      const input = await body(
         request,
         reply,
-        "VALIDATION_FAILED",
-        "Choose a member of the reported side to suspend.",
+        AdminBreakGlassDecisionRequestSchema,
       );
-    }
-    return { reviewed: true };
-  });
+      if (input === null) return reply;
+      const outcome = await admin.decideBreakGlass(grant, {
+        requestId,
+        ...input,
+      });
+      if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
+      if (outcome.kind === "SECOND_PERSON_REQUIRED") {
+        return send(
+          request,
+          reply,
+          "PERMISSION_DENIED",
+          "Another admin must decide this request.",
+        );
+      }
+      return AdminBreakGlassDecisionDtoSchema.parse({ status: outcome.status });
+    },
+  );
 
-  get(ADMIN_BREAK_GLASS_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "safety.read");
-    if (grant === null) return reply;
-    return AdminBreakGlassListDtoSchema.parse({
-      rows: await admin.listBreakGlass(grant),
-    });
-  });
-
-  post(ADMIN_BREAK_GLASS_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "breakglass.request");
-    if (grant === null) return reply;
-    const input = await body(request, reply, AdminBreakGlassRequestSchema);
-    if (input === null) return reply;
-    const created = await admin.requestBreakGlass(grant, input);
-    if (created === null) return notFound(request, reply);
-    return AdminBreakGlassCreatedDtoSchema.parse(created);
-  });
-
-  post(ADMIN_BREAK_GLASS_DECISION_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "breakglass.approve");
-    if (grant === null) return reply;
-    const requestId = param(request, "requestId");
-    if (requestId === null) return notFound(request, reply);
-    const input = await body(
-      request,
-      reply,
-      AdminBreakGlassDecisionRequestSchema,
-    );
-    if (input === null) return reply;
-    const outcome = await admin.decideBreakGlass(grant, {
-      requestId,
-      ...input,
-    });
-    if (outcome.kind === "NOT_FOUND") return notFound(request, reply);
-    if (outcome.kind === "SECOND_PERSON_REQUIRED") {
-      return send(
-        request,
-        reply,
-        "PERMISSION_DENIED",
-        "Another admin must decide this request.",
-      );
-    }
-    return AdminBreakGlassDecisionDtoSchema.parse({ status: outcome.status });
-  });
-
-  get(ADMIN_BREAK_GLASS_CHAT_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "breakglass.request");
-    if (grant === null) return reply;
-    const requestId = param(request, "requestId");
-    const chat =
-      requestId === null
-        ? null
-        : await admin.readChatUnderBreakGlass(grant, requestId);
-    if (chat === null) return notFound(request, reply);
-    return AdminBreakGlassChatDtoSchema.parse(chat);
-  });
+  app.get(
+    ADMIN_BREAK_GLASS_CHAT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "breakglass.request");
+      if (grant === null) return reply;
+      const requestId = param(request, "requestId");
+      const chat =
+        requestId === null
+          ? null
+          : await admin.readChatUnderBreakGlass(grant, requestId);
+      if (chat === null) return notFound(request, reply);
+      return AdminBreakGlassChatDtoSchema.parse(chat);
+    },
+  );
 
   // --- Q monitor -------------------------------------------------------------
 
-  get(ADMIN_Q_MONITOR_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "q.monitor.read");
-    if (grant === null) return reply;
-    const window = (request.query as { window?: unknown }).window;
-    return AdminQMonitorDtoSchema.parse(
-      await admin.qMonitor(grant, isMonitorWindow(window) ? window : "24h"),
-    );
-  });
+  app.get(
+    ADMIN_Q_MONITOR_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "q.monitor.read");
+      if (grant === null) return reply;
+      const window = (request.query as { window?: unknown }).window;
+      return AdminQMonitorDtoSchema.parse(
+        await admin.qMonitor(grant, isMonitorWindow(window) ? window : "24h"),
+      );
+    },
+  );
 
-  get(ADMIN_Q_ERRORS_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "q.monitor.read");
-    if (grant === null) return reply;
-    return AdminQErrorsDtoSchema.parse({ rows: await admin.qErrors(grant) });
-  });
+  app.get(
+    ADMIN_Q_ERRORS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "q.monitor.read");
+      if (grant === null) return reply;
+      return AdminQErrorsDtoSchema.parse({ rows: await admin.qErrors(grant) });
+    },
+  );
 
-  get(ADMIN_Q_RUN_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "q.trace.read");
-    if (grant === null) return reply;
-    const runId = param(request, "runId");
-    const trace = runId === null ? null : await admin.qRunTrace(grant, runId);
-    if (trace === null) return notFound(request, reply);
-    return AdminQRunTraceDtoSchema.parse(trace);
-  });
+  app.get(
+    ADMIN_Q_RUN_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "q.trace.read");
+      if (grant === null) return reply;
+      const runId = param(request, "runId");
+      const trace = runId === null ? null : await admin.qRunTrace(grant, runId);
+      if (trace === null) return notFound(request, reply);
+      return AdminQRunTraceDtoSchema.parse(trace);
+    },
+  );
 
   // --- audit -----------------------------------------------------------------
 
-  get(ADMIN_AUDIT_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "audit.read");
-    if (grant === null) return reply;
-    const parsed = AdminAuditQuerySchema.safeParse(request.query ?? {});
-    if (!parsed.success) {
-      return send(request, reply, "VALIDATION_FAILED", "Check the filters.");
-    }
-    const { action, ...query } = parsed.data;
-    return AdminAuditPageDtoSchema.parse(
-      await admin.searchAudit(grant, { ...query, actionPrefix: action }),
-    );
-  });
+  app.get(
+    ADMIN_AUDIT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "audit.read");
+      if (grant === null) return reply;
+      const parsed = AdminAuditQuerySchema.safeParse(request.query ?? {});
+      if (!parsed.success) {
+        return send(request, reply, "VALIDATION_FAILED", "Check the filters.");
+      }
+      const { action, ...query } = parsed.data;
+      return AdminAuditPageDtoSchema.parse(
+        await admin.searchAudit(grant, { ...query, actionPrefix: action }),
+      );
+    },
+  );
 
   // --- kill switches ---------------------------------------------------------
 
-  get(ADMIN_FLAGS_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "flags.read");
-    if (grant === null) return reply;
-    return AdminFlagListDtoSchema.parse({ rows: await admin.listFlags(grant) });
-  });
+  app.get(
+    ADMIN_FLAGS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "flags.read");
+      if (grant === null) return reply;
+      return AdminFlagListDtoSchema.parse({
+        rows: await admin.listFlags(grant),
+      });
+    },
+  );
 
-  post(ADMIN_FLAG_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "flags.write");
-    if (grant === null) return reply;
-    const key = (request.params as { key?: unknown }).key;
-    if (!isKillSwitch(key)) return notFound(request, reply);
-    const input = await body(request, reply, AdminFlagRequestSchema);
-    if (input === null) return reply;
-    const outcome = await admin.setFlag(grant, { key, ...input });
-    if (outcome === "NOT_FOUND") return notFound(request, reply);
-    return AdminFlagChangedDtoSchema.parse({ changed: outcome === "CHANGED" });
-  });
+  app.post(
+    ADMIN_FLAG_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "flags.write");
+      if (grant === null) return reply;
+      const key = (request.params as { key?: unknown }).key;
+      if (!isKillSwitch(key)) return notFound(request, reply);
+      const input = await body(request, reply, AdminFlagRequestSchema);
+      if (input === null) return reply;
+      const outcome = await admin.setFlag(grant, { key, ...input });
+      if (outcome === "NOT_FOUND") return notFound(request, reply);
+      return AdminFlagChangedDtoSchema.parse({
+        changed: outcome === "CHANGED",
+      });
+    },
+  );
 
   // --- email -----------------------------------------------------------------
 
-  get(ADMIN_EMAIL_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "email.read");
-    if (grant === null) return reply;
-    const refresh = (request.query as { refresh?: unknown }).refresh === "1";
-    return AdminEmailDtoSchema.parse(await admin.emailPanel(grant, refresh));
-  });
+  app.get(
+    ADMIN_EMAIL_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "email.read");
+      if (grant === null) return reply;
+      const refresh = (request.query as { refresh?: unknown }).refresh === "1";
+      return AdminEmailDtoSchema.parse(await admin.emailPanel(grant, refresh));
+    },
+  );
 
   // --- team ------------------------------------------------------------------
 
-  get(ADMIN_TEAM_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "overview.read");
-    if (grant === null) return reply;
-    return AdminTeamDtoSchema.parse({ rows: await admin.listTeam(grant) });
-  });
+  app.get(
+    ADMIN_TEAM_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "overview.read");
+      if (grant === null) return reply;
+      return AdminTeamDtoSchema.parse({ rows: await admin.listTeam(grant) });
+    },
+  );
 
   const teamOutcome = (
     request: FastifyRequest,
@@ -652,13 +761,17 @@ export function registerAdminRoutes(
     }
   };
 
-  post(ADMIN_TEAM_PATH, async (request, reply) => {
-    const grant = await guard(request, reply, "roles.manage");
-    if (grant === null) return reply;
-    const input = await body(request, reply, AdminTeamGrantRequestSchema);
-    if (input === null) return reply;
-    return teamOutcome(request, reply, await admin.setTeamRole(grant, input));
-  });
+  app.post(
+    ADMIN_TEAM_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "roles.manage");
+      if (grant === null) return reply;
+      const input = await body(request, reply, AdminTeamGrantRequestSchema);
+      if (input === null) return reply;
+      return teamOutcome(request, reply, await admin.setTeamRole(grant, input));
+    },
+  );
 
   app.delete(
     ADMIN_TEAM_MEMBER_PATH,
