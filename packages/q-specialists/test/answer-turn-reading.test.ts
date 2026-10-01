@@ -868,24 +868,28 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     expect(reads()).toBe(0);
   });
 
-  it("a yes that asks for something else is answered, then told the waiting change's real status", async () => {
-    const approved: string[] = [];
+  it("a no with more said is declined first, then the rest is answered", async () => {
+    const declined: string[] = [];
     const { answer, stored, delegated } = seam({
       said: "yes but change the time to 3pm",
       reading: null,
       outcomes: [],
       pendingDecisions: {
-        ...waiting(approved),
+        ...waiting([]),
         read: () =>
           Promise.resolve({
-            decision: "YES",
-            remainder: "but change the time to 3pm",
+            decision: "NO",
+            remainder: "change the time to 3pm",
           }),
+        decline: (_context, proposalId) => {
+          declined.push(proposalId);
+          return Promise.resolve({ status: "DECLINED" });
+        },
       },
     });
     await answer.answer(request());
-    expect(approved).toEqual([]);
+    expect(declined).toEqual(["p1"]);
+    expect(stored[0]?.content).toMatch(/^Declined: Reminder/);
     expect(delegated()).toBe(1);
-    expect(stored.at(-1)?.content).toMatch(/^Not saved yet: Reminder/);
   });
 });
