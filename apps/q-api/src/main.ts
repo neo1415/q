@@ -1149,10 +1149,6 @@ const workPort = createWorkPort({
 });
 // end AUTO block
 
-const qTools = createQTools({
-  ports: {
-    // AUTO block (ADR 0030)
-    work: workPort,
 // ADMIN block (spec admin.md §5): the person's own results for Q's
 // get_my_results / get_my_results_report tools. Same read model and raise
 // view as the Results page and Capital.
@@ -1195,6 +1191,8 @@ const ownResults = createResultsReader({
 
 const qTools = createQTools({
   ports: {
+    // AUTO block (ADR 0030)
+    work: workPort,
     // ADMIN block
     results: {
       read: (actor, query) => ownResults.read(actor, resultsWindow(query)),
