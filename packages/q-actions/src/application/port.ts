@@ -86,7 +86,10 @@ export function createQActionPort(options: {
         });
         // Only now, with the proposal and its approval request committed,
         // may Q say it has prepared anything.
-        await narrator.proposed(run, action);
+        await narrator.proposed(run, action, {
+          id: approval.id,
+          expiresAt: approval.expiresAt,
+        });
         return {
           kind: "AWAITING_APPROVAL",
           actionId: action.id,

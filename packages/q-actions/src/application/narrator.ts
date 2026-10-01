@@ -1,4 +1,10 @@
-import type { QResponseMessage, QRunId } from "@capital-q/contracts";
+import {
+  QActionProposalSchema,
+  Q_CONTRACT_VERSION,
+  type QResponseMessage,
+  type QResultBlock,
+  type QRunId,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import {
@@ -34,7 +40,20 @@ export type QActionNarrator = {
   /** A proposal and its approval request now exist. */
   readonly proposed: (
     run: QRunRef,
-    action: Pick<QActionRecord, "summary">,
+    action: Pick<QActionRecord, "summary"> &
+      Partial<
+        Pick<
+          QActionRecord,
+          | "id"
+          | "runId"
+          | "actionType"
+          | "riskClass"
+          | "targets"
+          | "preview"
+          | "createdAt"
+        >
+      >,
+    approval?: { readonly id: string; readonly expiresAt: string },
   ) => Promise<void>;
   /** The person asked for something that could not be prepared; `reason` is theirs to read. */
   readonly refused: (run: QRunRef, reason: string) => Promise<void>;
@@ -61,6 +80,53 @@ export const noQActionNarrator: QActionNarrator = {
 function sentence(text: string): string {
   const trimmed = text.trim().replace(/[.\s]+$/u, "");
   return trimmed.length === 0 ? "" : `${trimmed}.`;
+}
+
+/**
+ * The proposal itself, on the line that says it is waiting (QA 2026-10-01).
+ * The conversation is where a waiting change is found again -- by the
+ * typed "go ahead" (pending-decision), approve_pending_proposal and the
+ * card after a reload -- and it used to be there only when the answer's
+ * own structure carried it: an answer whose structure was refused left a
+ * pending change no turn could find, and its card vanished.
+ */
+export function proposalBlocks(
+  action: Parameters<QActionNarrator["proposed"]>[1],
+  approval: Parameters<QActionNarrator["proposed"]>[2],
+): readonly QResultBlock[] | undefined {
+  if (
+    approval === undefined ||
+    action.id === undefined ||
+    action.runId === undefined ||
+    action.actionType === undefined ||
+    action.riskClass === undefined ||
+    action.targets === undefined ||
+    action.createdAt === undefined
+  ) {
+    return undefined;
+  }
+  const proposal = QActionProposalSchema.safeParse({
+    contractVersion: Q_CONTRACT_VERSION,
+    proposalId: action.id,
+    runId: action.runId,
+    actionType: action.actionType,
+    actionClass: action.riskClass,
+    targets: [...action.targets],
+    summary: action.summary,
+    ...(action.preview === undefined || action.preview === null
+      ? {}
+      : { preview: action.preview }),
+    approval: {
+      required: true,
+      approval: { approvalId: approval.id, status: "PENDING" },
+    },
+    status: "PROPOSED",
+    createdAt: action.createdAt,
+    expiresAt: approval.expiresAt,
+  });
+  return proposal.success
+    ? [{ kind: "ACTION_PROPOSAL", proposal: proposal.data }]
+    : undefined;
 }
 
 export function proposedLine(summary: string): string {
@@ -97,7 +163,11 @@ export function createQActionNarrator(dependencies: {
    * written is a log line: the record it describes already stands, and
    * the approval control is drawn from that record, not from this text.
    */
-  const say = async (run: QRunRef, content: string): Promise<void> => {
+  const say = async (
+    run: QRunRef,
+    content: string,
+    blocks?: readonly QResultBlock[],
+  ): Promise<void> => {
     try {
       const found = await runtime.runs.findForActor(
         sql,
@@ -114,6 +184,7 @@ export function createQActionNarrator(dependencies: {
           runId: run.runId,
           role: "Q",
           content,
+          ...(blocks === undefined ? {} : { blocks }),
         });
         await appendRunEvent(
           runtime,
@@ -155,7 +226,8 @@ export function createQActionNarrator(dependencies: {
   };
 
   return {
-    proposed: (run, action) => say(run, proposedLine(action.summary)),
+    proposed: (run, action, approval) =>
+      say(run, proposedLine(action.summary), proposalBlocks(action, approval)),
     refused: (run, reason) => say(run, refusedLine(reason)),
     settled: async (context, outcome) => {
       const run: QRunRef = {
