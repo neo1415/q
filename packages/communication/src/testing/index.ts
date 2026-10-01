@@ -115,6 +115,8 @@ export function createInMemoryChatStore(
         voiceDurationMs: input.voiceDurationMs,
         revisesMessageId: input.revisesMessageId,
         qActionId: input.qActionId,
+        qDelegationId: input.qDelegationId ?? null,
+        qEnvelope: input.qEnvelope ?? null,
         createdAt: now(),
       };
       rows.push(row);

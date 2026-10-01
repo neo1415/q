@@ -98,8 +98,11 @@ function world(options: {
 }) {
   const patches: ErrandPatch[] = [];
   const notices: { step: string; title: string; body: string | null }[] = [];
-  const sent: { body: string; key: string; qActionId: string | undefined }[] =
-    [];
+  const sent: {
+    body: string;
+    key: string;
+    qDelegationId: string | undefined;
+  }[] = [];
   const booked: { key: string; startsAt: Date }[] = [];
   const composed: { brief: string; thread: string }[] = [];
   let meeting: string | null = options.errand.meeting_id;
@@ -163,7 +166,7 @@ function world(options: {
           sent.push({
             body: input.request.body,
             key: input.idempotencyKey,
-            qActionId: input.qActionId,
+            qDelegationId: input.qDelegationId,
           });
         }
         return Promise.resolve(null);
@@ -223,7 +226,8 @@ describe("errands", () => {
     expect(w.sent[0]).toEqual({
       body: "Hello from our fund, glad to be connected.",
       key: "errand:00000000-0000-4000-8000-0000000000f1:open",
-      qActionId: ACTION,
+      // Marked as Q's by the errand itself, so every message can be.
+      qDelegationId: "00000000-0000-4000-8000-0000000000f1",
     });
     expect(w.booked).toEqual([
       {
@@ -271,7 +275,7 @@ describe("errands", () => {
       {
         body: "We write $250k-$1m cheques at pre-seed.",
         key: "errand:00000000-0000-4000-8000-0000000000f1:reply:2026-09-30T08:30:00.000Z",
-        qActionId: ACTION,
+        qDelegationId: "00000000-0000-4000-8000-0000000000f1",
       },
     ]);
     expect(w.notices[0]?.body).toBe("Who else is in the portfolio?");

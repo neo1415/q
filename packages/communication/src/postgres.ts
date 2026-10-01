@@ -46,6 +46,8 @@ type MessageRow = {
   voice_duration_ms: number | null;
   revises_message_id: string | null;
   q_action_id: string | null;
+  q_delegation_id: string | null;
+  q_envelope: unknown;
   created_at: Date;
 };
 
@@ -79,6 +81,8 @@ function toRow(row: MessageRow): ChatMessageRow {
     voiceDurationMs: row.voice_duration_ms,
     revisesMessageId: row.revises_message_id,
     qActionId: row.q_action_id,
+    qDelegationId: row.q_delegation_id,
+    qEnvelope: row.q_envelope,
     createdAt: row.created_at,
   };
 }
@@ -91,7 +95,8 @@ const SELECT_MESSAGE = (sql: DatabaseExecutor) => sql`
          m.sender_side, m.kind, m.body, m.document_id, m.document_version_id,
          m.document_tenant_id, m.attachment_title,
          m.attachment_mime_type, m.attachment_size_bytes, m.voice_duration_ms,
-         m.revises_message_id, m.q_action_id, m.created_at
+         m.revises_message_id, m.q_action_id, m.q_delegation_id, m.q_envelope,
+         m.created_at
     from communication.messages m
     join identity.user_profiles p on p.id = m.sender_user_id`;
 
@@ -160,7 +165,8 @@ export function createPostgresChatStore(options: {
           (tenant_id, conversation_id, sender_user_id, sender_side, kind, body,
            document_id, document_version_id, document_tenant_id,
            attachment_title, attachment_mime_type, attachment_size_bytes,
-           voice_duration_ms, revises_message_id, q_action_id, idempotency_key)
+           voice_duration_ms, revises_message_id, q_action_id, q_delegation_id,
+           q_envelope, idempotency_key)
         values (${conversation.tenantId}, ${conversation.id}, ${input.senderUserId},
                 ${input.senderSide}, ${input.kind}, ${input.body},
                 ${input.attachment?.documentId ?? null},
@@ -169,6 +175,8 @@ export function createPostgresChatStore(options: {
                 ${input.attachment?.title ?? null},
                 ${input.attachment?.mimeType ?? null}, ${input.attachment?.sizeBytes ?? null},
                 ${input.voiceDurationMs}, ${input.revisesMessageId}, ${input.qActionId},
+                ${input.qDelegationId ?? null},
+                ${input.qEnvelope === undefined || input.qEnvelope === null ? null : JSON.stringify(input.qEnvelope)}::jsonb,
                 ${input.idempotencyKey})
         returning id`;
       const id = inserted[0]?.id;

@@ -163,7 +163,8 @@ function toDto(folded: Folded, viewerUserId: string): ChatMessageDto {
     voiceDurationMs: folded.unsent ? null : original.voiceDurationMs,
     edited: folded.edited,
     unsent: folded.unsent,
-    viaQ: original.qActionId !== null,
+    viaQ:
+      original.qActionId !== null || (original.qDelegationId ?? null) !== null,
     sentAt: UtcTimestampSchema.parse(original.createdAt.toISOString()),
   };
 }
@@ -211,6 +212,13 @@ export function createChatService(dependencies: ChatServiceDependencies) {
     readonly idempotencyKey: string;
     /** Set only by the approved `chat.message.send` executor. */
     readonly qActionId?: string | undefined;
+    /**
+     * AUTO (ADR 0029): set only by Q's delegated work and errands, under
+     * the person's approved delegation; the message shows as sent by Q.
+     */
+    readonly qDelegationId?: string | undefined;
+    /** AUTO: the Q-to-Q envelope (cq.q2q/1); only with qDelegationId. */
+    readonly qEnvelope?: Readonly<Record<string, unknown>> | undefined;
   }): Promise<{
     readonly message: ChatMessageDto;
     readonly deduplicated: boolean;
@@ -254,6 +262,9 @@ export function createChatService(dependencies: ChatServiceDependencies) {
         request.kind === "VOICE_NOTE" ? request.durationMs : null,
       revisesMessageId: null,
       qActionId: input.qActionId ?? null,
+      qDelegationId: input.qDelegationId ?? null,
+      qEnvelope:
+        input.qDelegationId === undefined ? null : (input.qEnvelope ?? null),
       idempotencyKey: input.idempotencyKey,
       correlationId: dependencies.newCorrelationId(),
     });
@@ -460,6 +471,10 @@ export function createChatService(dependencies: ChatServiceDependencies) {
       /** Messaging is blocked (by either side); nothing can be sent. */
       readonly blocked: boolean;
       readonly messages: readonly {
+        /** AUTO: stable id, the time it was sent, and whether Q sent it. */
+        readonly id: string;
+        readonly viaQ: boolean;
+        readonly envelope: unknown;
         readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
         readonly senderName: string;
         readonly kind: ChatMessageDto["kind"];
@@ -490,6 +505,11 @@ export function createChatService(dependencies: ChatServiceDependencies) {
         connected: party.connected,
         blocked,
         messages: folded.map((message) => ({
+          id: message.original.id,
+          viaQ:
+            message.original.qActionId !== null ||
+            (message.original.qDelegationId ?? null) !== null,
+          envelope: message.original.qEnvelope ?? null,
           from:
             message.original.senderUserId === actor.userId
               ? "YOU"
