@@ -164,6 +164,11 @@ export const adminBillingOverridePath = (organisationId: string) =>
 export const ADMIN_BILLING_FEES_PATH = "/v1/admin/billing/fees" as const;
 export const ADMIN_BILLING_FEES_ACCRUE_PATH =
   "/v1/admin/billing/fees/accrue" as const;
+export const ADMIN_BILLING_FEES_EXPORT_PATH =
+  "/v1/admin/billing/fees/export" as const;
+export const FeeLedgerExportDtoSchema = z
+  .object({ filename: z.string().min(1).max(100), csv: z.string() })
+  .strict();
 export const ADMIN_BILLING_FEE_RATE_PATH =
   "/v1/admin/billing/fee-rate" as const;
 

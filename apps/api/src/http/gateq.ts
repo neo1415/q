@@ -33,12 +33,18 @@ import {
   type QualificationResult,
 } from "@capital-q/gateq";
 import type { SubmissionInbox } from "@capital-q/gateq-intake";
+import {
+  billingAccountOf,
+  FEATURE_GATEWAYS,
+  type EntitlementService,
+} from "@capital-q/billing";
 
 import {
   getActorContext,
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import { sendEntitlementRequired } from "./billing.js";
 
 /**
  * `/v1/gateq` — configuring an organisation's front door, and the one
@@ -66,6 +72,10 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly gateq: GateQService;
   /** Submitted applications, read after GateQ authorises the gateway. */
   readonly inbox?: SubmissionInbox | undefined;
+  // BILLING block (ADR 0034): how many gateways the account's plan allows.
+  // Absent: no plan control (tests of the GateQ domain alone).
+  readonly entitlements?: Pick<EntitlementService, "check"> | undefined;
+  // end BILLING block
 };
 
 const gatewayIdOf = (request: FastifyRequest): GatewayId =>
@@ -159,6 +169,26 @@ export function registerGateQRoutes(
         request.body,
         "The gateway is not valid.",
       );
+      // BILLING block: a new gateway counts against the plan's gateways.
+      if (dependencies.entitlements !== undefined) {
+        const existing = await gateq.listGateways({
+          actor,
+          investorOrganisationId: input.investorOrganisationId,
+          organisationId: actor.organisationId ?? "",
+        });
+        const decision = await dependencies.entitlements.check(
+          billingAccountOf(actor),
+          FEATURE_GATEWAYS,
+          {
+            count: existing.filter((gateway) => gateway.status === "ACTIVE")
+              .length,
+          },
+        );
+        if (!decision.allowed) {
+          return sendEntitlementRequired(request, reply, decision.refusal);
+        }
+      }
+      // end BILLING block
       const gateway = await gateq.createGateway({
         actor,
         investorOrganisationId: input.investorOrganisationId,

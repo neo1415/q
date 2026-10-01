@@ -186,6 +186,13 @@ export function createPostgresGatewayRepository(options: {
       return rows.map(toGateway);
     },
 
+    countActiveForOrganisation: async (organisationId) => {
+      const rows = await sql<{ n: number }[]>`
+        select count(*)::int as n from gateq.gateways
+         where organisation_id = ${organisationId} and status = 'ACTIVE'`;
+      return rows[0]?.n ?? 0;
+    },
+
     setStatus: async (tx, id, status) => {
       const rows = await tx.sql`
         update gateq.gateways

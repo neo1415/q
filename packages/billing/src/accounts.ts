@@ -235,7 +235,22 @@ export function createBillingAccounts(options: {
     });
   }
 
-  return { catalogue, accountDetail, assignPlan, setOverride, customerOf };
+  /** The provider price lookup key of an ACTIVE self-serve plan. */
+  async function lookupKeyOf(planKey: string): Promise<string | null> {
+    const rows = await sql<{ stripe_lookup_key: string | null }[]>`
+      select stripe_lookup_key from billing.plans
+       where key = ${planKey} and status = 'ACTIVE' and self_serve`;
+    return rows[0]?.stripe_lookup_key ?? null;
+  }
+
+  return {
+    catalogue,
+    accountDetail,
+    assignPlan,
+    setOverride,
+    customerOf,
+    lookupKeyOf,
+  };
 }
 
 export type BillingAccounts = ReturnType<typeof createBillingAccounts>;

@@ -296,3 +296,19 @@ export function createFakeBillingProvider(options: {
     verifyWebhook: verifyWith(options.webhookSecret),
   };
 }
+
+/**
+ * Stripe is on only when both secrets are present and real: a key set to
+ * the disabled-locally placeholder (CLAUDE.md: tests make no live provider
+ * calls) or left empty keeps the provider off, never half on.
+ */
+export function stripeConfigFromEnv(
+  env: Readonly<Record<string, string | undefined>>,
+): StripeConfig | null {
+  const secretKey = env["STRIPE_SECRET_KEY"]?.trim() ?? "";
+  const webhookSecret = env["STRIPE_WEBHOOK_SECRET"]?.trim() ?? "";
+  const real = (value: string) =>
+    value.length >= 16 && !value.includes("disabled-locally");
+  if (!real(secretKey) || !real(webhookSecret)) return null;
+  return { secretKey, webhookSecret };
+}
