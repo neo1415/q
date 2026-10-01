@@ -241,6 +241,12 @@ export function createPresenceTrigger(
 
   return {
     afterInterviewTurn: (actor, view, onFound, hints) => {
+      // Evidence is recorded for a subject the actor's active organisation
+      // owns, so an actor with none yet (the first turns of a setup, before
+      // the organisation exists) can only fail every page (live 2026-10-01:
+      // EvidenceSubjectNotFoundError on all 13 pages, and the build was
+      // marked started, so it never ran again). Wait for a turn that has one.
+      if (actor.organisationId === undefined) return;
       const subject = view.session.subject;
       const steps = subject === null ? null : subjectNameStepFor(subject.type);
       const interviewName =

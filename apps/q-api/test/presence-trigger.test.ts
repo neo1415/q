@@ -15,9 +15,17 @@ import { createPresenceTrigger } from "../src/voice/presence-trigger.js";
  * somebody from the moment they arrive was never gathered at all.
  */
 
+// Evidence belongs to the actor's active organisation, so the actor a
+// build runs as has one.
 const ACTOR = {
   userId: "22222222-2222-4222-8222-222222222222",
   tenantId: "11111111-1111-4111-8111-111111111111",
+  organisationId: "33333333-3333-4333-8333-333333333333",
+  actorType: "HUMAN",
+} as unknown as ActorContext;
+const WITHOUT_ORGANISATION = {
+  userId: ACTOR.userId,
+  tenantId: ACTOR.tenantId,
   actorType: "HUMAN",
 } as unknown as ActorContext;
 
@@ -126,6 +134,17 @@ describe("what Capital Q looks up when somebody arrives", () => {
       await settle();
       expect(builds.map((b) => b.subjectType)).toEqual(["COMPANY"]);
     }
+  });
+
+  it("waits for a turn whose actor has an organisation, then looks up (live 2026-10-01)", async () => {
+    const { builds, trigger } = build({ personName: "Ada Okafor" });
+    const named = view({ "F1.company_name": "The Vaultlyne" });
+    trigger.afterInterviewTurn(WITHOUT_ORGANISATION, named);
+    await settle();
+    expect(builds).toHaveLength(0);
+    trigger.afterInterviewTurn(ACTOR, named);
+    await settle();
+    expect(builds.map((b) => b.subjectType)).toEqual(["COMPANY", "PERSON"]);
   });
 
   it("looks up nothing at all before a company is named", async () => {
