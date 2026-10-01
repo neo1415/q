@@ -33,6 +33,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { startVoiceSessionAction } from "@/features/voice/actions";
+import { deviceLocale } from "@/features/voice/device-locale";
 import { useVoiceSession } from "@/features/voice/use-voice-session";
 import { isLineLive, type VoiceTranscriptLine } from "@/features/voice/session";
 
@@ -220,6 +221,8 @@ export function RehearsalRoom({
       const started = await startVoiceSessionAction({
         rehearsal: { rehearsalId: initial.id },
         voice: initial.voice,
+        // Heard and spoken in the person's own language, as on Home.
+        ...deviceLocale(),
         ...(resume ? { resume: true } : {}),
       });
       if (!started.ok) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { composeBriefing } from "../src/features/home/briefing";
 import { recordPagePath } from "../src/features/q/client-actions";
+import { deviceLocale } from "../src/features/voice/device-locale";
 import { isLineLive } from "../src/features/voice/session";
 import { progressWords } from "../src/features/rehearsal/rehearsal-review";
 import {
@@ -122,5 +123,24 @@ describe("a dropped voice line", () => {
     expect(isLineLive({ connected: true, state: "LISTENING" })).toBe(true);
     expect(isLineLive({ connected: true, state: "ERROR" })).toBe(false);
     expect(isLineLive({ connected: false, state: "LISTENING" })).toBe(false);
+  });
+});
+
+describe("the rehearsal's voice language", () => {
+  it("sends the device locale, so a non-English one is heard and spoken", () => {
+    expect(deviceLocale("fr-FR")).toEqual({ locale: "fr-FR" });
+    expect(deviceLocale("yo")).toEqual({ locale: "yo" });
+    expect(deviceLocale("not a tag")).toEqual({});
+    expect(deviceLocale("")).toEqual({});
+  });
+  it("is passed by the rehearsal room when it opens the line", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const room = await readFile(
+      new URL("../src/features/rehearsal/rehearsal-room.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(room).toMatch(
+      /rehearsal: \{ rehearsalId: initial\.id \},[\s\S]{0,200}\.\.\.deviceLocale\(\)/,
+    );
   });
 });

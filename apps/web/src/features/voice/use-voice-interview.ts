@@ -17,6 +17,7 @@ import {
 import { currentScreen, currentViewing } from "../q/screen";
 import { announceQGestures } from "../q-swarm/q-gestures";
 import { storeVoicePreference, useVoicePreference } from "./voice-preference";
+import { deviceLocale } from "./device-locale";
 import { useVoiceSession } from "./use-voice-session";
 import type {
   VoiceSessionClient,
@@ -121,15 +122,6 @@ export function withGreeting(
       agent: said.length === 0 ? agent : { ...agent, greeting: said },
     },
   };
-}
-
-/** The browser's language, when it is a well-formed tag. */
-function deviceLocale(): { readonly locale?: string } {
-  if (typeof navigator === "undefined") return {};
-  const tag = navigator.language;
-  return /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(tag) && tag.length <= 35
-    ? { locale: tag }
-    : {};
 }
 
 export function useVoiceInterview(
