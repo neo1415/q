@@ -8,6 +8,7 @@ import {
   CURRENCY_OPTIONS,
   FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V2_VERSION,
+  FOUNDER_DEFINITION_V3_VERSION,
   FOUNDER_STEPS,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
@@ -331,11 +332,19 @@ export function runtimeState(view: OnboardingSessionView): RuntimeState {
   };
 }
 
+/** The versions this screen renders: v2, and v3 (v2 plus two options). */
+const SUPPORTED_VERSIONS: ReadonlySet<number> = new Set([
+  FOUNDER_DEFINITION_V2_VERSION,
+  FOUNDER_DEFINITION_V3_VERSION,
+]);
+
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
-  // v2 only. A session pinned to v1 still runs v1's journey on the server;
-  // this screen would render its F2 as an upload it never collected, so it
-  // says plainly that it cannot render rather than misrepresenting it (§82).
-  return view.session.definitionVersion === FOUNDER_DEFINITION_V2_VERSION;
+  // v2 and its strict superset v3. A session pinned to v1 still runs v1's
+  // journey on the server; this screen would render its F2 as an upload
+  // it never collected, so it says plainly that it cannot render rather
+  // than misrepresenting it (§82). Live 2026-10-01: v3 was published and
+  // this check refused every new founder until it named v3 too.
+  return SUPPORTED_VERSIONS.has(view.session.definitionVersion);
 }
 
 function single(state: RuntimeState, key: string): string | undefined {
