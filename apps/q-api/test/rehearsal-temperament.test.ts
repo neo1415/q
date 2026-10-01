@@ -5,6 +5,7 @@ import {
   deliveryFor,
   initialTemperament,
   registerOf,
+  stanceOf,
   temperamentNote,
   type RehearsalAppraisal,
 } from "../src/composition/rehearsal-temperament.js";
@@ -128,5 +129,54 @@ describe("delivery from the register", () => {
         reaction: "CHUCKLE",
       }),
     ).toEqual({ mood: "HAPPY", intensity: "NORMAL", reaction: "CHUCKLE" });
+  });
+});
+
+describe("who holds the leverage (founder live test 2026-10-01)", () => {
+  it("a founder pitching is the weaker party: answers first, asks fair questions later", () => {
+    const stance = stanceOf("FOUNDER", "TYPICAL", null);
+    expect(stance.leads).toBe("YOU");
+    expect(stance.note).toContain("they hold the leverage");
+    expect(stance.note).toContain("come later, once you have answered theirs");
+    expect(stance.note).not.toContain("forward");
+  });
+
+  it("only a founder known to be forward pushes back sooner, and still needs the money", () => {
+    const stance = stanceOf(
+      "FOUNDER",
+      "FORWARD",
+      "Challenged two funds on terms in public",
+    );
+    expect(stance.leads).toBe("YOU");
+    expect(stance.note).toContain("known to be forward (Challenged two funds");
+    expect(stance.note).toContain("you still need their money");
+  });
+
+  it("an investor hearing a pitch leads", () => {
+    const stance = stanceOf("INVESTOR", "TYPICAL", null);
+    expect(stance.leads).toBe("THEM");
+    expect(stance.note).toContain("you hold the leverage");
+  });
+});
+
+describe("leaving in anger (founder live test 2026-10-01)", () => {
+  const model = {
+    mood: "NEUTRAL",
+    intensity: "NORMAL",
+    reaction: null,
+  } as const;
+
+  it("an angry goodbye is raised, a cold one stays cold, a calm close is untouched", () => {
+    expect(deliveryFor("ANGRY", "ANGRY", model, true)).toEqual({
+      mood: "ANGRY",
+      intensity: "RAISED",
+      reaction: null,
+    });
+    expect(
+      deliveryFor("FURIOUS", "ANGRY", { ...model, mood: "COLD" }, true),
+    ).toEqual({ mood: "COLD", intensity: "NORMAL", reaction: null });
+    expect(deliveryFor("EVEN", "EVEN", model, true).intensity).toBe("NORMAL");
+    // Mid-meeting anger without fury stays at a normal volume.
+    expect(deliveryFor("ANGRY", "ANGRY", model).intensity).toBe("NORMAL");
   });
 });

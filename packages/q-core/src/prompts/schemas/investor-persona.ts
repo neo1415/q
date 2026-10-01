@@ -245,3 +245,77 @@ export function normaliseCounterpartPersona(
     grounding: loose.grounding,
   };
 }
+
+// ---------------------------------------------------------------------------
+// v4 (REHEARSE, founder live test 2026-10-01): played as a founder, the
+// persona asked the investor "why are you interested?" as if it held the
+// leverage. The reading now says how forward this person is, with why, and
+// lists the traits it rests on with where each came from, so code can tell
+// the played person who holds the leverage and the lobby can show it.
+// ---------------------------------------------------------------------------
+
+export const COUNTERPART_PERSONA_V4_SCHEMA_VERSION = 4;
+
+/** How hard this person pushes beyond what their side of the table usually does. */
+export const PERSONA_FORWARDNESS = ["RESERVED", "TYPICAL", "FORWARD"] as const;
+export type PersonaForwardness = (typeof PERSONA_FORWARDNESS)[number];
+
+/** Where a known trait came from. */
+export const PERSONA_TRAIT_SOURCES = [
+  "PROFILE",
+  "MESSAGES",
+  "CALLS",
+  "PUBLIC",
+  "PITCH",
+] as const;
+
+const KnownTrait = z
+  .object({
+    trait: z.string().trim().min(3).max(200),
+    source: z.enum(PERSONA_TRAIT_SOURCES),
+  })
+  .strict();
+
+/** The stored reading: v2's shape, plus v4's stance and traits when read by v4. */
+export const CounterpartPersonaStoredSchema =
+  CounterpartPersonaResultSchema.extend({
+    forwardness: z.enum(PERSONA_FORWARDNESS).optional(),
+    forwardnessWhy: z.string().trim().max(300).optional(),
+    knownTraits: z.array(KnownTrait).max(8).optional(),
+  }).strict();
+export type CounterpartPersonaStored = z.infer<
+  typeof CounterpartPersonaStoredSchema
+>;
+
+export const CounterpartPersonaV4LenientSchema =
+  CounterpartPersonaLenientSchema.extend({
+    forwardness: z.enum(PERSONA_FORWARDNESS),
+    forwardnessWhy: z.string().trim().max(1_200),
+    knownTraits: z
+      .array(
+        z
+          .object({
+            trait: Loose(600),
+            source: z.enum(PERSONA_TRAIT_SOURCES),
+          })
+          .strict(),
+      )
+      .max(20),
+  }).strict();
+export type CounterpartPersonaV4Lenient = z.infer<
+  typeof CounterpartPersonaV4LenientSchema
+>;
+
+export function normaliseCounterpartPersonaV4(
+  loose: CounterpartPersonaV4Lenient,
+): CounterpartPersonaStored {
+  return {
+    ...normaliseCounterpartPersona(loose),
+    forwardness: loose.forwardness,
+    forwardnessWhy: cut(loose.forwardnessWhy, 300),
+    knownTraits: loose.knownTraits
+      .filter((t) => t.trait.length >= 3)
+      .slice(0, 8)
+      .map((t) => ({ trait: cut(t.trait, 200), source: t.source })),
+  };
+}

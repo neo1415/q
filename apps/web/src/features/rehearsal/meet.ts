@@ -1,4 +1,5 @@
 import type {
+  QRehearsalPersonaDto,
   QRehearsalReviewDto,
   RehearsalOutcome,
 } from "@capital-q/contracts";
@@ -164,3 +165,36 @@ export function moodWord(
   if (turn.reaction === "LAUGH") return "laughing";
   return MOOD_WORDS[turn.mood] ?? null;
 }
+
+/**
+ * Who leads the meeting and how forward Q reads the person, in words for
+ * the lobby (founder live test 2026-10-01). Q's reading, said as one.
+ */
+export function stanceWords(
+  stance: QRehearsalPersonaDto["stance"],
+  name: string,
+): string {
+  const lead =
+    stance.leads === "THEM"
+      ? `${name} holds the leverage here: you're pitching, so expect them to lead and set the pace.`
+      : `You hold the leverage here: ${name} is pitching to you, so they'll answer first and keep their own questions for later.`;
+  const why =
+    stance.why === null || stance.why === "" ? "" : ` (${stance.why})`;
+  const read =
+    stance.forwardness === "FORWARD"
+      ? ` Q reads them as forward${why}, so they may push back sooner.`
+      : stance.forwardness === "RESERVED"
+        ? ` Q reads them as reserved${why}.`
+        : "";
+  return lead + read;
+}
+
+export const TRAIT_SOURCE_WORDS: Readonly<
+  Record<QRehearsalPersonaDto["traits"][number]["source"], string>
+> = {
+  PROFILE: "their profile",
+  MESSAGES: "their messages",
+  CALLS: "your calls",
+  PUBLIC: "public sources",
+  PITCH: "their pitch",
+};

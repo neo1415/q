@@ -215,8 +215,8 @@ export type Delivery = {
 
 const IN_REGISTER: Readonly<Record<Register, readonly string[]>> = {
   FURIOUS: ["ANGRY"],
-  ANGRY: ["ANGRY", "ANNOYED"],
-  EXASPERATED: ["IMPATIENT", "ANNOYED", "SARCASTIC"],
+  ANGRY: ["ANGRY", "ANNOYED", "COLD"],
+  EXASPERATED: ["IMPATIENT", "ANNOYED", "SARCASTIC", "COLD"],
   CRYING: ["SAD"],
   SAD: ["SAD", "DISAPPOINTED", "MEEK"],
   DELIGHTED: ["ENTHUSIASTIC", "HAPPY", "AMUSED"],
@@ -241,12 +241,24 @@ const HEATED = new Set(["ANGRY", "ANNOYED"]);
  * the register's own mood otherwise. A raised voice only when furious, a
  * sob only on entering grief, a laugh only when warm, a sigh on entering
  * exasperation. No outburst without a cause in the state.
+ *
+ * Leaving in anger is said in anger (founder live test 2026-10-01: the
+ * angry ending was a flat stop): an angry or furious goodbye is raised,
+ * a cold one stays cold.
  */
 export function deliveryFor(
   register: Register,
   previous: Register | null,
   model: Delivery,
+  closing = false,
 ): Delivery {
+  if (closing && (register === "ANGRY" || register === "FURIOUS")) {
+    return {
+      mood: model.mood === "COLD" ? "COLD" : "ANGRY",
+      intensity: model.mood === "COLD" ? "NORMAL" : "RAISED",
+      reaction: null,
+    };
+  }
   const entering = previous !== register;
   if (register === "EVEN") {
     const calm = HEATED.has(model.mood) ? "SKEPTICAL" : model.mood;
@@ -302,4 +314,47 @@ export function deliveryFor(
             : null,
       };
   }
+}
+
+export type Forwardness = "RESERVED" | "TYPICAL" | "FORWARD";
+
+/**
+ * Who holds the leverage in this meeting (founder live test 2026-10-01:
+ * played as a founder, the persona asked the investor "why are you
+ * interested?" as if it held it). By the roles: an investor hearing a
+ * pitch leads; a founder pitching is the weaker party -- answers,
+ * persuades, asks fair questions later. Only how forward this person is
+ * known to be (the persona's reading, from their own words or record)
+ * shifts that, never the model's mood in the moment.
+ */
+export function stanceOf(
+  played: "INVESTOR" | "FOUNDER",
+  forwardness: Forwardness,
+  why: string | null,
+): {
+  /** Who leads, seen from the person rehearsing. */
+  readonly leads: "THEM" | "YOU";
+  readonly note: string;
+} {
+  const because = why === null || why === "" ? "" : ` (${why})`;
+  if (played === "FOUNDER") {
+    const base =
+      "You are the founder pitching to this investor: they hold the leverage. Answer their questions, persuade, stay courteous under pressure. Your own questions about the fund, process and terms are fair and come later, once you have answered theirs.";
+    const shift =
+      forwardness === "FORWARD"
+        ? ` This founder is known to be forward${because}: you may push back sooner and ask pointed questions earlier, but you still need their money.`
+        : forwardness === "RESERVED"
+          ? ` This founder is known to be reserved${because}: answer more than you ask.`
+          : "";
+    return { leads: "YOU", note: base + shift };
+  }
+  const base =
+    "You are the investor hearing this founder's pitch: you hold the leverage. You lead with questions and set the pace; you are fair, never contemptuous.";
+  const shift =
+    forwardness === "FORWARD"
+      ? ` This investor is known to be forward${because}: interrupt, challenge numbers directly.`
+      : forwardness === "RESERVED"
+        ? ` This investor is known to be reserved${because}: fewer words, let silences sit.`
+        : "";
+  return { leads: "THEM", note: base + shift };
 }

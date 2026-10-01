@@ -22,24 +22,24 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
-  CounterpartPersonaResultSchema,
+  CounterpartPersonaStoredSchema,
+  CounterpartPersonaV4LenientSchema,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   InvestorPersonaResultSchema,
-  CounterpartPersonaLenientSchema,
-  normaliseCounterpartPersona,
+  normaliseCounterpartPersonaV4,
   normaliseRehearsalReview,
   REHEARSAL_DIMENSIONS_FOR,
   RehearsalReviewLenientSchema,
   RehearsalReviewResultSchema,
   RehearsalTurnV4ResultSchema,
   renderPrompt,
-  type CounterpartPersonaResult,
+  type CounterpartPersonaStored as CounterpartPersonaResult,
   type CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
   type RehearsalTurnV4Result as RehearsalTurnResult,
-  type RehearsalTurnV4Variables as RehearsalTurnVariables,
+  type RehearsalTurnV5Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
@@ -48,6 +48,7 @@ import {
   deliveryFor,
   initialTemperament,
   registerOf,
+  stanceOf,
   temperamentNote,
   type Temperament,
 } from "./rehearsal-temperament.js";
@@ -254,7 +255,7 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
 
 /** The persona a rehearsal row holds: v2, or a C12 (v1) reading. */
 function personaOf(raw: unknown): CounterpartPersonaResult | null {
-  const v2 = CounterpartPersonaResultSchema.safeParse(raw);
+  const v2 = CounterpartPersonaStoredSchema.safeParse(raw);
   if (v2.success) return v2.data;
   const v1 = InvestorPersonaResultSchema.safeParse(raw);
   if (!v1.success) return null;
@@ -290,6 +291,14 @@ export function personaText(persona: CounterpartPersonaResult): string {
     `How they push back: ${list(persona.pushbacks)}`,
     `What wins them over: ${list(persona.howToWin)}`,
     `Dealbreakers: ${list(persona.dealbreakers)}`,
+    ...((persona.knownTraits ?? []).length === 0
+      ? []
+      : [
+          "Known traits:",
+          ...(persona.knownTraits ?? []).map(
+            (t) => `- ${t.trait} (${t.source})`,
+          ),
+        ]),
     `Grounding: ${persona.grounding}`,
   ].join("\n");
 }
@@ -1065,7 +1074,7 @@ export function createRehearsalService(dependencies: {
     const held =
       existing === null
         ? null
-        : CounterpartPersonaResultSchema.safeParse(existing.profile);
+        : CounterpartPersonaStoredSchema.safeParse(existing.profile);
     const heldProfile = held?.success === true ? held.data : null;
     const webDue =
       existing?.webReadAt == null ||
@@ -1166,7 +1175,7 @@ export function createRehearsalService(dependencies: {
         ? built(existing, heldProfile)
         : "Q_UNAVAILABLE";
     }
-    const parsed = CounterpartPersonaResultSchema.safeParse(saved.profile);
+    const parsed = CounterpartPersonaStoredSchema.safeParse(saved.profile);
     return parsed.success ? built(saved, parsed.data) : "Q_UNAVAILABLE";
   }
 
@@ -1234,6 +1243,11 @@ export function createRehearsalService(dependencies: {
         cue: wrapUp ? "WRAP_UP" : cue,
         difficulty: row.difficulty,
         temperament: temperamentNote(before, registerBefore),
+        stance: stanceOf(
+          counterpartRoleOf(row.counterpartKind),
+          persona.forwardness ?? "TYPICAL",
+          persona.forwardnessWhy ?? null,
+        ).note,
         screenShared: fresh !== null,
       },
       fresh?.image ?? null,
@@ -1244,7 +1258,12 @@ export function createRehearsalService(dependencies: {
     // the register the voice delivers this line in.
     const after = applyAppraisal(before, result.appraisal, row.difficulty);
     const register = registerOf(after, row.difficulty);
-    const delivery = deliveryFor(register, registerBefore, result);
+    const delivery = deliveryFor(
+      register,
+      registerBefore,
+      result,
+      result.move === "CLOSE",
+    );
     return {
       result: {
         ...result,
@@ -1328,6 +1347,19 @@ export function createRehearsalService(dependencies: {
           counterpart: { kind, id, name: built.name },
           ...shownPersona(built.profile),
           grounding: built.profile.grounding,
+          stance: {
+            leads: stanceOf(
+              counterpartRoleOf(kind),
+              built.profile.forwardness ?? "TYPICAL",
+              null,
+            ).leads,
+            forwardness: built.profile.forwardness ?? "TYPICAL",
+            why: built.profile.forwardnessWhy ?? null,
+          },
+          traits: (built.profile.knownTraits ?? []).map((t) => ({
+            trait: t.trait,
+            source: t.source,
+          })),
           sources: publicSources(built.row.sources),
           refreshedAt: built.row.refreshedAt.toISOString(),
         },
@@ -1722,9 +1754,9 @@ export function createRehearsalComposer(dependencies: {
         "STRUCTURED_EXTRACTION",
         PERSONA_BUDGET,
         variables,
-        CounterpartPersonaLenientSchema,
+        CounterpartPersonaV4LenientSchema,
       );
-      return loose === null ? null : normaliseCounterpartPersona(loose);
+      return loose === null ? null : normaliseCounterpartPersonaV4(loose);
     },
     turn: async (actor, variables, image, signal) => {
       const result = await run(

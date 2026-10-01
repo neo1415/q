@@ -63,7 +63,7 @@ export const INVESTOR_TWIN_TURN_V4: PromptDefinition<
 > = {
   id: "INVESTOR_TWIN_TURN",
   version: 4,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "NORMAL_DIALOGUE",
   owner: "q-core",

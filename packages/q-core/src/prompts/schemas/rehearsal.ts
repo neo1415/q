@@ -500,3 +500,20 @@ export const RehearsalTurnV4ResultSchema = z
   })
   .strict();
 export type RehearsalTurnV4Result = z.infer<typeof RehearsalTurnV4ResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v5 (REHEARSE, founder live test 2026-10-01): played as a founder, the
+// persona questioned the investor as if it held the leverage, and an angry
+// ending was a flat stop. Code now hands in who holds the leverage in this
+// meeting (from the roles and the persona's forwardness) as a trusted
+// stance note; the result shape is v4's.
+// ---------------------------------------------------------------------------
+
+export const RehearsalTurnV5VariablesSchema =
+  RehearsalTurnV4VariablesSchema.extend({
+    /** Code-composed: who holds the leverage and how forward they are. Trusted. */
+    stance: z.string().max(800),
+  }).strict();
+export type RehearsalTurnV5Variables = z.infer<
+  typeof RehearsalTurnV5VariablesSchema
+>;

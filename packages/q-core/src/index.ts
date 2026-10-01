@@ -292,6 +292,8 @@ export { REHEARSAL_SCORE_V2 } from "./prompts/tasks/rehearsal-score.v2.js";
 export { INVESTOR_TWIN_TURN_V3 } from "./prompts/tasks/investor-twin-turn.v3.js";
 export { INVESTOR_TWIN_TURN_V4 } from "./prompts/tasks/investor-twin-turn.v4.js";
 export { INVESTOR_PERSONA_V3 } from "./prompts/tasks/investor-persona.v3.js";
+export { INVESTOR_PERSONA_V4 } from "./prompts/tasks/investor-persona.v4.js";
+export { INVESTOR_TWIN_TURN_V5 } from "./prompts/tasks/investor-twin-turn.v5.js";
 export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
 export { REHEARSAL_SCORE_V4 } from "./prompts/tasks/rehearsal-score.v4.js";
 export {
@@ -303,6 +305,8 @@ export {
   REHEARSAL_LINE_MOODS_V4,
   RehearsalTurnV4ResultSchema,
   RehearsalTurnV4VariablesSchema,
+  RehearsalTurnV5VariablesSchema,
+  type RehearsalTurnV5Variables,
   type RehearsalTurnV4Result,
   type RehearsalTurnV4Variables,
   RehearsalReviewLenientSchema,
@@ -331,6 +335,14 @@ export {
   CounterpartPersonaResultSchema,
   CounterpartPersonaVariablesSchema,
   normaliseCounterpartPersona,
+  normaliseCounterpartPersonaV4,
+  CounterpartPersonaStoredSchema,
+  CounterpartPersonaV4LenientSchema,
+  PERSONA_FORWARDNESS,
+  PERSONA_TRAIT_SOURCES,
+  type CounterpartPersonaStored,
+  type CounterpartPersonaV4Lenient,
+  type PersonaForwardness,
   type CounterpartPersonaLenient,
   PERSONA_MOODS,
   type CounterpartPersonaResult,

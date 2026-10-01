@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { QRehearsalPersonaDtoSchema } from "@capital-q/contracts";
-import type { CounterpartPersonaResult } from "@capital-q/q-core";
+import type { CounterpartPersonaStored as CounterpartPersonaResult } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -53,6 +53,9 @@ const PERSONA: CounterpartPersonaResult = {
   howToWin: ["Bring cohorts"],
   dealbreakers: [],
   grounding: "SOME",
+  forwardness: "FORWARD",
+  forwardnessWhy: "Interrupts with numbers in every call",
+  knownTraits: [{ trait: "Asks for cohort data first", source: "CALLS" }],
 };
 
 function memoryStore(): RehearsalStore & {
@@ -171,6 +174,7 @@ function setup(options: { messages?: () => string } = {}) {
       screen: boolean;
       material: string;
       difficulty: string;
+      stance: string;
     }[],
     webReads: 0,
     reviewTranscripts: [] as string[],
@@ -257,6 +261,7 @@ function setup(options: { messages?: () => string } = {}) {
         cue: variables.cue,
         screen: image !== null,
         material: variables.meetingMaterial,
+        stance: variables.stance,
       });
       if (closeNext) {
         return Promise.resolve({
@@ -342,6 +347,30 @@ describe("rehearsals", () => {
     expect(seen.turnInputs[0]?.cue).toBe("OPENING");
     // Played investor asks from the founder's own deck.
     expect(seen.turnInputs[0]?.material).toContain("40% month-on-month");
+    // The investor hearing a pitch holds the leverage; known forwardness shifts how.
+    expect(seen.turnInputs[0]?.stance).toContain("you hold the leverage");
+    expect(seen.turnInputs[0]?.stance).toContain("known to be forward");
+  });
+
+  it("shows who leads and the traits the reading rests on in the lobby (live 2026-10-01)", async () => {
+    const { service } = setup();
+    const result = await service.persona(
+      actor(FOUNDER),
+      "INVESTOR_ORGANISATION",
+      INVESTOR,
+    );
+    if (result.kind !== "OK") throw new Error(result.kind);
+    expect(QRehearsalPersonaDtoSchema.safeParse(result.persona).success).toBe(
+      true,
+    );
+    expect(result.persona.stance).toEqual({
+      leads: "THEM",
+      forwardness: "FORWARD",
+      why: "Interrupts with numbers in every call",
+    });
+    expect(result.persona.traits).toEqual([
+      { trait: "Asks for cohort data first", source: "CALLS" },
+    ]);
   });
 
   it("keeps a meeting id only when the meeting is the person's own", async () => {
@@ -684,6 +713,8 @@ describe("a persona longer than the screen's contract (live 2026-10-01)", () => 
       },
       ...shown,
       grounding: "SOME",
+      stance: { leads: "YOU", forwardness: "TYPICAL", why: null },
+      traits: [],
       sources: [],
       refreshedAt: new Date().toISOString(),
     });

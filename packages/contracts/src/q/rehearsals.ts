@@ -272,6 +272,29 @@ export const QRehearsalPersonaDtoSchema = z
     style: z.string().max(400),
     priorities: z.array(z.string().max(200)).max(6),
     grounding: z.enum(["THIN", "SOME", "RICH"]),
+    /**
+     * Who holds the leverage in this meeting, by code from the roles (a
+     * founder pitching is the weaker party) and how forward Q reads this
+     * person to be. Q's reading, not a fact about them.
+     */
+    stance: z
+      .object({
+        leads: z.enum(["THEM", "YOU"]),
+        forwardness: z.enum(["RESERVED", "TYPICAL", "FORWARD"]),
+        why: z.string().max(300).nullable(),
+      })
+      .strict(),
+    /** Traits the reading rests on, each with where it came from. */
+    traits: z
+      .array(
+        z
+          .object({
+            trait: z.string().max(200),
+            source: z.enum(["PROFILE", "MESSAGES", "CALLS", "PUBLIC", "PITCH"]),
+          })
+          .strict(),
+      )
+      .max(8),
     sources: z.array(QPersonaSourceDtoSchema).max(24),
     refreshedAt: UtcTimestampSchema,
   })

@@ -269,3 +269,11 @@ after 25 s with nobody speaking, one in-character nudge (a cue, never
 words). Very long answer: kept to 4,000 characters; counted in metrics.
 Language switch: the persona answers in it only if they plausibly would.
 A repeated or empty utterance never makes the persona repeat its line.
+
+## 12. Founder live test (2026-10-01, rehearsal bc85199e, investor rehearsing, Tough)
+
+- **Review grades the person rehearsing** (REHEARSAL_SCORE v4): role dimensions (investor: diligence, control, fairness, decision clarity, professionalism; founder: clarity, evidence, pushback, fit, ask); code drops any moment that does not quote a YOU line, and any dimension not of their role.
+- **Transcript on the review** is an always-visible list (was a closed `<details>`).
+- **Leverage**: INVESTOR_PERSONA v4 reads `forwardness` (RESERVED/TYPICAL/FORWARD, with why) and up to eight `knownTraits` with sources (profile, messages, calls, public, pitch). Code (`stanceOf`) composes who holds the leverage from the roles -- a founder pitching is the weaker party: answers, persuades, asks fair questions later -- and only known forwardness shifts it. INVESTOR_TWIN_TURN v5 carries it as a trusted `stance` note. The lobby shows who leads, Q's reading of forwardness and the traits with their sources.
+- **Ending in anger**: v5 asks for a goodbye in the emotion; code delivers an angry or furious close raised (a cold one stays cold). The room waits for the goodbye to finish, a 1.4 s beat, then the other side's leave sound and the review.
+- **Meeting sounds**: join, leave, they-left, hand, share -- synthesised WebAudio sine notes (no audio assets), peak gain 0.06, under 0.5 s. A "Meeting sounds" toggle in More options, kept in this browser; off by default under reduced motion.
