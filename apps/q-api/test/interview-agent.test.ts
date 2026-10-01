@@ -80,7 +80,11 @@ function model(script: readonly Scripted[]) {
       readonly tools?: readonly { readonly name: string }[];
     }) => {
       seen.push({
-        tools: (request.tools ?? []).map((t) => t.name),
+        // The registry's tools; write_reply is the turn's own output
+        // channel (INTERVIEW_AGENT v14), asserted in interview-agent-draft.
+        tools: (request.tools ?? [])
+          .map((t) => t.name)
+          .filter((name) => name !== "write_reply"),
         text: request.messages.map((m) => m.content).join("\n"),
       });
       const step = script[Math.min(index, script.length - 1)];

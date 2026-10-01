@@ -15,7 +15,7 @@ import {
 describe("INTERVIEW_AGENT v11", () => {
   it("is the active interviewer", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("INTERVIEW_AGENT").definition.version).toBe(13);
+    expect(registry.getActive("INTERVIEW_AGENT").definition.version).toBe(14);
   });
 
   it("keeps every v10 rule and adds who Q is, conduct and openings", () => {

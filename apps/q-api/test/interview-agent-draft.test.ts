@@ -155,6 +155,133 @@ describe("a reply drafted beside its writes", () => {
   });
 });
 
+/** The draft as a write_reply call beside the write (INTERVIEW_AGENT v14). */
+function replyingByCall(args: unknown, replyOnly = false) {
+  let rounds = 0;
+  const reply = {
+    callId: "r",
+    name: "write_reply",
+    arguments: {
+      reply: "Harrow Road Capital, noted. How do you invest?",
+      asking: "I0.investor_type",
+    },
+  };
+  const gateway = {
+    execute: (request: { tools?: readonly { name: string }[] }) => {
+      rounds += 1;
+      offeredReply.push(
+        (request.tools ?? []).some((tool) => tool.name === "write_reply"),
+      );
+      return Promise.resolve(
+        rounds === 1
+          ? {
+              output: {
+                kind: "TOOL_CALLS",
+                text: "",
+                calls: replyOnly
+                  ? [reply]
+                  : [
+                      { callId: "c1", name: "record_answers", arguments: args },
+                      reply,
+                    ],
+              },
+            }
+          : {
+              output: {
+                kind: "TEXT",
+                text: JSON.stringify({ reply: "Rewritten.", asking: null }),
+              },
+            },
+      );
+    },
+  } as unknown as ModelGateway;
+  const offeredReply: boolean[] = [];
+  return { gateway, rounds: () => rounds, offeredReply };
+}
+
+describe("a reply drafted as a write_reply call (v14)", () => {
+  const landing = {
+    answers: [
+      {
+        stepKey: "I0.organisation_name",
+        value: "Harrow Road Capital",
+        quote: SAID,
+      },
+    ],
+  };
+
+  it("is used beside a write that landed, in one round, and is offered on the typed channel", async () => {
+    const world = investorSession({ currentStepKey: "I0.organisation_name" });
+    const { gateway, rounds, offeredReply } = replyingByCall(landing);
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({ stated: ["I0.organisation_name"] })),
+    }).turn({ ...turn(world, SAID), actor });
+    expect(rounds()).toBe(1);
+    expect(offeredReply[0]).toBe(true);
+    expect(outcome.reply).toBe(
+      "Harrow Road Capital, noted. How do you invest?",
+    );
+    expect(world.recordedValue("I0.organisation_name")).toBeDefined();
+  });
+
+  it("is thrown away beside a refused write", async () => {
+    const world = investorSession({ currentStepKey: "I0.investor_type" });
+    const { gateway, rounds } = replyingByCall({
+      answers: [
+        {
+          stepKey: "I0.investor_type",
+          value: "zzz not an option",
+          quote: SAID,
+        },
+      ],
+    });
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({ stated: ["I0.investor_type"] })),
+    }).turn({ ...turn(world, SAID), actor });
+    expect(rounds()).toBe(2);
+    expect(outcome.reply).toBe("Rewritten.");
+  });
+
+  it("alone is the reply", async () => {
+    const world = investorSession({ currentStepKey: "I0.organisation_name" });
+    const { gateway, rounds } = replyingByCall(landing, true);
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading()),
+    }).turn({ ...turn(world, "Hello there."), actor });
+    expect(rounds()).toBe(1);
+    expect(outcome.reply).toBe(
+      "Harrow Road Capital, noted. How do you invest?",
+    );
+  });
+
+  it("is not offered on the voice channel", async () => {
+    const world = investorSession({ currentStepKey: "I0.organisation_name" });
+    const { gateway, offeredReply } = replyingByCall(landing);
+    await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({ stated: ["I0.organisation_name"] })),
+    })
+      .turn({ ...turn(world, SAID), channel: "voice", actor })
+      .catch(() => undefined);
+    expect(offeredReply[0]).toBe(false);
+  });
+});
+
 describe("everyWriteLanded", () => {
   const write = (tool: string, data: unknown, ok = true) => ({
     tool,

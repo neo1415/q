@@ -51,6 +51,7 @@ import {
   createQToolExecutor,
   createQToolRegistry,
   HOME_Q_CAPABILITY_GROUPS,
+  inputJsonSchemaOf,
   type QCapabilityGroup,
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -203,6 +204,21 @@ export function refusedStepsOf(
  * was retried on eight turns, a model round each).
  */
 export const REFUSALS_BEFORE_LETTING_GO = 2;
+
+/**
+ * The reply as a call (INTERVIEW_AGENT v14): models make parallel calls
+ * readily and text beside calls almost never (bench 2026-10-01: 0 drafts
+ * in 9 turns). Not a tool of the registry -- it reaches nothing and
+ * changes nothing; it is the turn's own output, carried where the model
+ * will put it, and read with the same schema as the JSON reply.
+ */
+export const WRITE_REPLY = "write_reply";
+const WRITE_REPLY_DEFINITION = {
+  name: WRITE_REPLY,
+  description:
+    "Your reply to the person, as the reply JSON. Beside write-only calls it is worded for the case where every call lands, and is shown only if they all do.",
+  inputJsonSchema: inputJsonSchemaOf(InterviewAgentV11ResultSchema),
+};
 
 /** The writes a reply drafted beside its calls may rest on. */
 const DRAFTABLE_WRITES: ReadonlySet<string> = new Set([
@@ -1272,6 +1288,7 @@ export function createInterviewAgent(
     let timedOut = false;
     /** Replies used as drafted beside their calls (for the trace). */
     let drafts = 0;
+    const draftable = stream === undefined && input.channel === "text";
     try {
       while (
         result === undefined &&
@@ -1286,7 +1303,14 @@ export function createInterviewAgent(
             ...base,
             messages: [...render().messages],
             output: { kind: "TEXT" },
-            tools: offered.map((tool) => tool.definition),
+            tools: [
+              ...offered.map((tool) => tool.definition),
+              // Typed only: a voice round streams as it is written.
+              // Only beside tools: with none the reply is the text.
+              ...(draftable && offered.length > 0
+                ? [WRITE_REPLY_DEFINITION]
+                : []),
+            ],
           },
           {
             firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
@@ -1297,7 +1321,19 @@ export function createInterviewAgent(
               : { onTextDelta: stream.push }),
           },
         );
-        if (response.output.kind === "TEXT") {
+        const replyCall =
+          response.output.kind === "TOOL_CALLS"
+            ? response.output.calls.find((call) => call.name === WRITE_REPLY)
+            : undefined;
+        const replyOnly =
+          response.output.kind === "TOOL_CALLS" &&
+          replyCall !== undefined &&
+          response.output.calls.every((call) => call.name === WRITE_REPLY);
+        if (response.output.kind === "TEXT" || replyOnly) {
+          const written =
+            response.output.kind === "TEXT"
+              ? response.output.text
+              : JSON.stringify(replyCall?.arguments ?? null);
           if (unread) {
             const settled = await readingDone;
             // The reading asks something of this turn the reply could not
@@ -1312,17 +1348,19 @@ export function createInterviewAgent(
             ) {
               continue;
             }
-            stream?.push(response.output.text);
+            stream?.push(written);
           }
           const accepted = acceptStructuredOutput(
-            response.output.text,
+            written,
             InterviewAgentV11ResultSchema,
           );
           if (accepted.ok) result = accepted.value;
           break;
         }
         if (response.output.kind !== "TOOL_CALLS") break;
-        const proposals = response.output.calls.slice(0, MAX_CALLS - calls);
+        const proposals = response.output.calls
+          .filter((call) => call.name !== WRITE_REPLY)
+          .slice(0, MAX_CALLS - calls);
         const before = actions.length;
         for (const call of proposals) {
           calls += 1;
@@ -1343,12 +1381,14 @@ export function createInterviewAgent(
         // not say, and the round that would rewrite it is saved (HANDOVER
         // §5.6: 283 of 704 turns spent a second ~2 s round on exactly
         // this). Anything refused, read or finishing gets the usual round.
-        const drafted = response.output.text.trim();
+        const drafted =
+          replyCall === undefined
+            ? response.output.text.trim()
+            : JSON.stringify(replyCall.arguments);
         if (
           // Typed only: a voice round streams its text as it is written,
           // so a draft there would be spoken before its writes landed.
-          stream === undefined &&
-          input.channel === "text" &&
+          draftable &&
           drafted.length > 0 &&
           everyWriteLanded(actions.slice(before)) &&
           proposals.length === actions.length - before

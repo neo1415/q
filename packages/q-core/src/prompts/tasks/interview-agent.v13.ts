@@ -45,7 +45,7 @@ export const INTERVIEW_AGENT_V13: PromptDefinition<
 > = {
   ...INTERVIEW_AGENT_V12,
   version: 13,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Latency: the onboarding state moves after the unchanging rules, next to this turn's actions, so the provider's prompt cache covers the rules on every round; on the typed channel a write-only response drafts its reply beside the calls.",
   effectiveFrom: "2026-10-01",
