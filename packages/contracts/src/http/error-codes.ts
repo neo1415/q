@@ -38,6 +38,10 @@ export const CAPITAL_Q_ERROR_CODES = [
   // BILLING block (ADR 0034)
   "ENTITLEMENT_REQUIRED",
   // end BILLING block
+  // BILLING-2 block (ADR 0036): a planned capability whose route exists
+  // and is not built yet.
+  "NOT_IMPLEMENTED",
+  // end BILLING-2 block
 ] as const;
 
 export type KnownErrorCode = (typeof CAPITAL_Q_ERROR_CODES)[number];

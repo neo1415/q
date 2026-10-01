@@ -180,6 +180,14 @@ export type SlateReadServiceDependencies = {
   /** When present, a missing or expired slate asks for a rebuild. */
   readonly requester?: RefreshRequester | undefined;
   readonly policy?: SlatePolicy | undefined;
+  /**
+   * BILLING-2 (ADR 0036): how far down the ranked slate this reader may
+   * page -- a plan VALUE. Volume only: ranks above it are served in the
+   * same order on every plan; nothing is reordered, boosted or hidden
+   * above the cut. Absent, or null for a reader: the whole slate.
+   */
+  readonly volume?:
+    ((actor: ActorContext) => Promise<number | null>) | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -211,6 +219,17 @@ export function createSlateReadService(
   const policy = dependencies.policy ?? SLATE_POLICY_V1;
   const clock = dependencies.clock ?? (() => new Date());
   const meter = getMeter("@capital-q/discovery");
+  // BILLING-2: the plan's volume cuts the slate at a rank; it never
+  // changes an order.
+  const pageWithin = async (
+    args: Parameters<SlateRepository["pageItems"]>[0],
+    volume: number | null,
+  ): Promise<readonly RecommendationItem[]> => {
+    if (volume === null) return slates.pageItems(args);
+    if (args.afterRank >= volume) return [];
+    const rows = await slates.pageItems(args);
+    return rows.filter((item) => item.rank <= volume);
+  };
   const metrics = {
     pages: meter.createCounter("discovery.slates.pages"),
     served: meter.createHistogram("discovery.slates.page_items"),
@@ -428,6 +447,7 @@ export function createSlateReadService(
     readonly unverifiable: readonly string[];
     readonly outdatedPolicy: boolean;
     readonly investorOrganisationId: string;
+    readonly volume: number | null;
   }): Promise<SlatePage> => {
     const { slate, limit } = input;
     const batchSize = Math.min(
@@ -442,11 +462,14 @@ export function createSlateReadService(
     let exhausted = false;
     let more = false;
     while (items.length < limit && scanned < policy.candidatePoolMax) {
-      const batch = await slates.pageItems({
-        slateId: slate.id,
-        afterRank: after,
-        limit: Math.min(batchSize, policy.candidatePoolMax - scanned),
-      });
+      const batch = await pageWithin(
+        {
+          slateId: slate.id,
+          afterRank: after,
+          limit: Math.min(batchSize, policy.candidatePoolMax - scanned),
+        },
+        input.volume,
+      );
       if (batch.length === 0) {
         exhausted = true;
         break;
@@ -563,6 +586,7 @@ export function createSlateReadService(
         metrics.pages.add(1, { outcome: "NOT_AN_INVESTOR" });
         return empty(["NO_ACTIVE_MANDATE"]);
       }
+      const volume = (await dependencies.volume?.(query.actor)) ?? null;
       const lookup = await ports.mandates.activeMandate({
         tenantId: query.actor.tenantId,
         investorOrganisationId: subject.investorOrganisationId,
@@ -661,15 +685,15 @@ export function createSlateReadService(
           unverifiable,
           outdatedPolicy,
           investorOrganisationId: subject.investorOrganisationId,
+          volume,
         });
       }
 
       // One more than the page so the continuation is known without a count.
-      const fetched = await slates.pageItems({
-        slateId: slate.id,
-        afterRank,
-        limit: limit + 1,
-      });
+      const fetched = await pageWithin(
+        { slateId: slate.id, afterRank, limit: limit + 1 },
+        volume,
+      );
       const pageItems: readonly RecommendationItem[] = fetched.slice(0, limit);
       const last = pageItems[pageItems.length - 1];
       const nextCursor =

@@ -67,6 +67,22 @@ describe("plan words", () => {
     ).toBe("1 of 3 gateways");
   });
 
+  it("says a plan value as a number, never a meter (BILLING-2)", () => {
+    const volume: BillingFeatureStandingDto = {
+      ...REHEARSALS,
+      key: "discover.recommendation_volume",
+      name: "Recommendations per feed",
+      kind: "VALUE",
+      unitSingular: "recommendation",
+      unitPlural: "recommendations",
+      limit: 200,
+      used: null,
+      resetsAt: null,
+    };
+    expect(allowanceLine(volume)).toBe("Up to 200 recommendations");
+    expect(usedPercent(volume)).toBeNull();
+  });
+
   it("names where the plan came from", () => {
     expect(
       sourceLine({

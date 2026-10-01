@@ -149,8 +149,10 @@ import {
   createFeeLedger,
   createStripeBillingProvider,
   createWebhookApplier,
+  billingAccountOf,
   FEATURE_GATEWAYS,
   stripeConfigFromEnv,
+  VALUE_RECOMMENDATION_VOLUME,
 } from "@capital-q/billing";
 // end BILLING block
 import {
@@ -704,9 +706,20 @@ const disclosure = createDisclosureAccessService({
   relationshipParties: createRelationshipPartyResolver(disclosurePorts),
   clock: systemDisclosureClock,
 });
+// BILLING-2 block (ADR 0036): how far down the ranked slate the reader's
+// plan lets the feed page. Today every plan carries the slate policy's
+// own number, so nothing changes; ranking never reads a plan.
+const recommendationVolume = createEntitlementService({ sql: database.sql });
+// end BILLING-2 block
 const slates = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
+  // A plan value is configuration, not a gate: if it cannot be read the
+  // feed serves the whole slate rather than failing.
+  volume: (actor) =>
+    recommendationVolume
+      .valueOf(billingAccountOf(actor), VALUE_RECOMMENDATION_VOLUME)
+      .catch(() => null),
   queue: createPostgresRefreshQueue({ sql: database.sql }),
   // Discover filters (ux/discover-filters). The verification reader and
   // the pitch port are composed further down; they are read per request.

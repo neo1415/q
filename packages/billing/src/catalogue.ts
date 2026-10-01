@@ -22,6 +22,22 @@ export const GATED_FEATURE_KEYS = [
 export type GatedFeatureKey = (typeof GATED_FEATURE_KEYS)[number];
 
 /**
+ * BILLING-2 (ADR 0036): the Capital Readiness Blueprint, PADL #85 Layer 2
+ * "Pro" -- an ACCESS feature; the route is a 501 stub until it is built.
+ */
+export const FEATURE_READINESS_BLUEPRINT = "q.readiness_blueprint" as const;
+
+/**
+ * BILLING-2 (ADR 0036): plan VALUES -- numbers a plan sets, read by the
+ * owning context as configuration, never a refusal. Recommendation volume
+ * changes how far down the ranked slate a feed may page; it never changes
+ * a position (no pay-to-rank).
+ */
+export const VALUE_RECOMMENDATION_VOLUME =
+  "discover.recommendation_volume" as const;
+export const PLAN_VALUE_KEYS = [VALUE_RECOMMENDATION_VOLUME] as const;
+
+/**
  * What no plan may ever gate (PADL #85 Layer 1 "Diagnosis (Core Platform)",
  * Decision #106 "Full InvestIQ diagnosis without paid advisory", and the
  * neutrality decisions: "Commercial payment cannot secretly manipulate Q's

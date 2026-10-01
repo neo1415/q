@@ -41,7 +41,7 @@ describe("error code registry", () => {
     }
   });
 
-  it("adds only the two transport-level codes, ADR 0033's two operator codes and ADR 0034's plan code", () => {
+  it("adds only the two transport-level codes, ADR 0033's two operator codes, ADR 0034's plan code and ADR 0036's not-yet code", () => {
     expect(CAPITAL_Q_ERROR_CODES).toContain("INVALID_REQUEST");
     expect(CAPITAL_Q_ERROR_CODES).toContain("INTERNAL_SERVER_ERROR");
     expect(CAPITAL_Q_ERROR_CODES).toContain("STEP_UP_REQUIRED");
@@ -51,7 +51,9 @@ describe("error code registry", () => {
     // BILLING (ADR 0034): a plan refusal is distinguishable from a permission one.
     expect(CAPITAL_Q_ERROR_CODES).toContain("ENTITLEMENT_REQUIRED");
     expect(PROBLEM_DEFINITIONS.ENTITLEMENT_REQUIRED.status).toBe(402);
-    expect(CAPITAL_Q_ERROR_CODES).toHaveLength(17);
+    // BILLING-2 (ADR 0036): a planned route that is not built yet says so.
+    expect(PROBLEM_DEFINITIONS.NOT_IMPLEMENTED.status).toBe(501);
+    expect(CAPITAL_Q_ERROR_CODES).toHaveLength(18);
   });
 
   it("defines every code in the problem registry", () => {

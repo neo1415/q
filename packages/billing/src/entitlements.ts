@@ -85,7 +85,7 @@ const DAY_MONTH = new Intl.DateTimeFormat("en-GB", {
  */
 export function entitlementSentence(input: {
   readonly reason: "NOT_IN_PLAN" | "LIMIT_REACHED";
-  readonly kind: "ACCESS" | "MONTHLY" | "COUNT";
+  readonly kind: "ACCESS" | "MONTHLY" | "COUNT" | "VALUE";
   readonly featureName: string;
   readonly planName: string;
   readonly unitSingular: string;
@@ -115,7 +115,7 @@ type FeatureRow = {
   key: string;
   name: string;
   description: string;
-  kind: "ACCESS" | "MONTHLY" | "COUNT";
+  kind: "ACCESS" | "MONTHLY" | "COUNT" | "VALUE";
   unit_singular: string;
   unit_plural: string;
   included: boolean | null;
@@ -307,7 +307,12 @@ export function createEntitlementService(options: EntitlementServiceOptions) {
       if (!standing.included) {
         return { allowed: false, refusal: refusalOf(plan, standing) };
       }
-      if (standing.kind === "ACCESS" || standing.limit === null) {
+      // A VALUE is configuration a plan sets, never a refusal.
+      if (
+        standing.kind === "ACCESS" ||
+        standing.kind === "VALUE" ||
+        standing.limit === null
+      ) {
         return { allowed: true, remaining: null, replayed: false };
       }
       const used = standing.used ?? 0;
@@ -365,6 +370,22 @@ export function createEntitlementService(options: EntitlementServiceOptions) {
             : Math.max(0, standing.limit - result.used),
         replayed: result.outcome === "REPLAYED",
       };
+    },
+
+    /**
+     * The number a plan sets for a VALUE feature (e.g. how many ranked
+     * recommendations a feed may show); null = no plan value, so the
+     * owning context keeps its own default. Never a refusal.
+     */
+    async valueOf(
+      account: BillingAccount,
+      feature: string,
+    ): Promise<number | null> {
+      const { row } = await one(account, feature, now());
+      if (row.kind !== "VALUE") {
+        throw new Error(`billing: ${feature} is not a plan value`);
+      }
+      return row.has_override ? row.override_limit : row.plan_limit;
     },
 
     /** Give a unit back when the metered work failed after it was taken. */

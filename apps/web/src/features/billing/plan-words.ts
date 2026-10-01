@@ -23,6 +23,12 @@ export function unitsOf(
 export function allowanceLine(feature: BillingFeatureStandingDto): string {
   if (!feature.included) return "Not included in your plan";
   if (feature.kind === "ACCESS") return "Included";
+  // BILLING-2: a number the plan sets (never a meter).
+  if (feature.kind === "VALUE") {
+    return feature.limit === null
+      ? "No limit"
+      : `Up to ${String(feature.limit)} ${unitsOf(feature, feature.limit)}`;
+  }
   if (feature.limit === null) {
     return feature.used === null
       ? "Unlimited"
@@ -51,7 +57,12 @@ export function resetLine(feature: BillingFeatureStandingDto): string | null {
 
 /** Percentage used for the meter, or null when there is no limit. */
 export function usedPercent(feature: BillingFeatureStandingDto): number | null {
-  if (!feature.included || feature.limit === null || feature.limit === 0) {
+  if (
+    !feature.included ||
+    feature.kind === "VALUE" ||
+    feature.limit === null ||
+    feature.limit === 0
+  ) {
     return null;
   }
   return Math.round(((feature.used ?? 0) / feature.limit) * 100);

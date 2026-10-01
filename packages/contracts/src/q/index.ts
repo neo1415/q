@@ -807,3 +807,7 @@ export {
 // DAILY block (The Q Daily, docs/specs/2026-10/daily.md)
 export * from "./daily.js";
 // end DAILY block
+
+// BILLING-2 block (ADR 0036): the Capital Readiness Blueprint's contracts.
+export * from "./readiness-blueprint.js";
+// end BILLING-2 block

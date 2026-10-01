@@ -60,6 +60,7 @@ import type { SlatePolicy } from "../slates/contracts.js";
 import type { RefreshRequestStore, SlateRepository } from "../slates/ports.js";
 import {
   createSlateReadService,
+  type SlateReadServiceDependencies,
   type SlateReadService,
 } from "../slates/reader.js";
 import {
@@ -189,6 +190,8 @@ export type SlateReadPipelineDependencies = {
    */
   readonly filterFacts?: Omit<DiscoverFilterFactsPort, "sectors"> | undefined;
   readonly policy?: SlatePolicy | undefined;
+  /** BILLING-2 (ADR 0036): the reader's plan volume; see the slate reader. */
+  readonly volume?: SlateReadServiceDependencies["volume"];
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -251,6 +254,7 @@ export function createSlateReadPipeline(
     },
     requester,
     policy,
+    volume: dependencies.volume,
     clock,
     logger,
   });

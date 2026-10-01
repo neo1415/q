@@ -226,8 +226,10 @@ import { createContextFirewall } from "@capital-q/q-firewall";
 import { createQTools, type DocumentStudioPort } from "@capital-q/q-tools";
 // BILLING block (ADR 0034)
 import {
+  billingAccountOf,
   createEntitlementService,
   FEATURE_DELEGATIONS,
+  VALUE_RECOMMENDATION_VOLUME,
 } from "@capital-q/billing";
 import {
   createQEntitlementPort,
@@ -839,9 +841,20 @@ logger.info(
  * It is composed here, in the Q service, because a person asking "why" is
  * asking Q — and because this is where the Model Gateway already lives.
  */
+// BILLING-2 block (ADR 0036): how far down the ranked slate the reader's
+// plan lets the feed page. Today every plan carries the slate policy's
+// own number, so nothing changes; ranking never reads a plan.
+const recommendationVolume = createEntitlementService({ sql: database.sql });
+// end BILLING-2 block
 const slateRead = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
+  // A plan value is configuration, not a gate: if it cannot be read the
+  // feed serves the whole slate rather than failing.
+  volume: (actor) =>
+    recommendationVolume
+      .valueOf(billingAccountOf(actor), VALUE_RECOMMENDATION_VOLUME)
+      .catch(() => null),
   logger,
 });
 
@@ -3348,6 +3361,9 @@ const { app, logger: appLogger } = createApp(
     // BILLING block (ADR 0034)
     rehearsalEntitlements: entitlements,
     // end BILLING block
+    // BILLING-2 block (ADR 0036)
+    readinessBlueprint: entitlements,
+    // end BILLING-2 block
     standing: standingStore,
     // DAILY block
     daily: dailyReader,
