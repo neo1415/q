@@ -55,10 +55,19 @@ const AVAILABILITY_FAILURES: ReadonlySet<ModelFailureClass> = new Set([
  */
 const TIMEOUT_MEANS_UNHEALTHY_AFTER_MS = 20_000;
 
+/**
+ * A provider whose ACCOUNT cannot serve (credit or quota exhausted) is
+ * skipped, every model on it, for this long after one such answer; then
+ * one attempt probes it again. Live 2026-10-01: OpenAI credit ran out and
+ * every turn first spent two retries on it before falling back.
+ */
+const ACCOUNT_EXHAUSTED_OPEN_MS = 10 * 60_000;
+
 export type ProviderHealthOptions = {
   readonly failureThreshold?: number | undefined;
   readonly windowMs?: number | undefined;
   readonly openForMs?: number | undefined;
+  readonly accountExhaustedOpenForMs?: number | undefined;
 };
 
 export function createProcessLocalProviderHealth(
@@ -69,6 +78,10 @@ export function createProcessLocalProviderHealth(
   const openForMs = options.openForMs ?? 30_000;
   const failures = new Map<string, number[]>();
   const openUntil = new Map<string, number>();
+  const accountOpenForMs =
+    options.accountExhaustedOpenForMs ?? ACCOUNT_EXHAUSTED_OPEN_MS;
+  /** Provider-wide: every model on an exhausted account. */
+  const accountOpenUntil = new Map<ModelProviderCode, number>();
   const keyOf = (code: ModelProviderCode, model: ModelCode): string =>
     `${code}\u0000${model}`;
 
@@ -81,12 +94,20 @@ export function createProcessLocalProviderHealth(
     if (until !== undefined && until > at.getTime()) {
       return "TEMPORARILY_FAILING";
     }
+    const accountUntil = accountOpenUntil.get(code);
+    if (accountUntil !== undefined && accountUntil > at.getTime()) {
+      return "TEMPORARILY_FAILING";
+    }
     return "HEALTHY";
   };
 
   return {
     state,
-    recordFailure: (code, model, failureClass, at, elapsedMs) => {
+    recordFailure: (code, model, failureClass, at, elapsedMs, exhausted) => {
+      if (exhausted === true) {
+        accountOpenUntil.set(code, at.getTime() + accountOpenForMs);
+        return;
+      }
       if (!AVAILABILITY_FAILURES.has(failureClass)) {
         return;
       }
@@ -111,6 +132,7 @@ export function createProcessLocalProviderHealth(
       }
     },
     recordSuccess: (code, model) => {
+      accountOpenUntil.delete(code);
       const key = keyOf(code, model);
       failures.delete(key);
       openUntil.delete(key);

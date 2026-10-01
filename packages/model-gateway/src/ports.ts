@@ -198,6 +198,8 @@ export type ProviderHealthPort = {
      * `createProcessLocalProviderHealth`.
      */
     elapsedMs?: number,
+    /** The provider account cannot serve until a person acts (credit, quota). */
+    accountExhausted?: boolean,
   ) => void;
   readonly recordSuccess: (
     code: ModelProviderCode,

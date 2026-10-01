@@ -90,6 +90,47 @@ function isApiError(error: unknown): error is APIError {
   return error instanceof APIError;
 }
 
+/**
+ * The account, not the request: nothing will be served until someone tops
+ * up or raises a limit. Live 2026-10-01: "credit_balance_exhausted" came
+ * back classed TRANSIENT, so every turn retried a model that could not
+ * answer before falling back, and runs failed after 50 to 95 seconds.
+ */
+const ACCOUNT_EXHAUSTED_CODES: ReadonlySet<string> = new Set([
+  "credit_balance_exhausted",
+  "insufficient_quota",
+  "billing_hard_limit_reached",
+  "billing_not_active",
+]);
+
+export function accountExhausted(
+  status: number | undefined,
+  vendorErrorCode: string | undefined,
+): boolean {
+  return (
+    status === 402 ||
+    (vendorErrorCode !== undefined &&
+      ACCOUNT_EXHAUSTED_CODES.has(vendorErrorCode))
+  );
+}
+
+/**
+ * How a refusal is classed. An exhausted account is PERMANENT for the
+ * attempt -- no retry on this model; another candidate may answer -- and
+ * flagged, so the provider is skipped rather than retried every turn.
+ */
+export function refusalClass(
+  status: number | undefined,
+  vendorErrorCode: string | undefined,
+): {
+  readonly failureClass: ModelFailureClass;
+  readonly accountExhausted: boolean;
+} {
+  return accountExhausted(status, vendorErrorCode)
+    ? { failureClass: "PERMANENT", accountExhausted: true }
+    : { failureClass: classify(status), accountExhausted: false };
+}
+
 function classify(status: number | undefined): ModelFailureClass {
   if (status === 401 || status === 403) return "AUTHENTICATION";
   if (status === 429) return "RATE_LIMIT";
@@ -274,10 +315,13 @@ function normalizeError(error: unknown): ModelProviderFailure {
   }
   if (isApiError(error)) {
     const status = error.status;
+    const code = typeof error.code === "string" ? error.code : undefined;
+    const refused = refusalClass(status, code);
     return new ModelProviderFailure(
       `openai request refused (${status ?? "no status"})`,
       {
-        failureClass: classify(status),
+        failureClass: refused.failureClass,
+        ...(refused.accountExhausted ? { accountExhausted: true } : {}),
         providerCode: OPENAI_PROVIDER_CODE,
         ...(status === undefined ? {} : { providerStatus: status }),
         ...(typeof error.code === "string"

@@ -535,6 +535,9 @@ export function createModelGateway(
             failureClass,
             clock.now(),
             latencyMs,
+            outcome.kind === "FAILURE" &&
+              outcome.cause instanceof ModelProviderFailure &&
+              outcome.cause.accountExhausted,
           );
         }
         span.setAttribute("q.model.result", result);
