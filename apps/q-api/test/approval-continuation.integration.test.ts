@@ -57,6 +57,7 @@ import {
   createPostgresPersonProfileStore,
 } from "@capital-q/security/postgres";
 
+import { createApprovedActionSweep } from "../src/composition/approved-action-sweep.js";
 import { createApprovedContinuation } from "../src/composition/approved-continuation.js";
 import { createChatMessageSendAction } from "../src/composition/chat-actions.js";
 import { plainProposalStatus } from "../src/composition/conversation-approvals.js";
@@ -95,6 +96,7 @@ type World = {
   readonly orchestration: ReturnType<typeof createQOrchestrationRuntime>;
   readonly runtime: ReturnType<typeof createQRuntimeService>;
   readonly sent: string[];
+  readonly port: ReturnType<typeof createQActionPort>;
 };
 
 describe("approve → continue → execute, per action type (local PostgreSQL)", () => {
@@ -283,6 +285,7 @@ describe("approve → continue → execute, per action type (local PostgreSQL)",
       runtime,
       orchestration,
       sent,
+      port,
       continueApproved: createApprovedContinuation({
         orchestrator: () => orchestrator,
         actions: port,
@@ -293,6 +296,7 @@ describe("approve → continue → execute, per action type (local PostgreSQL)",
   afterAll(async () => {
     const tenants = [world.tenantId];
     await db.transactions.run(async (tx) => {
+      await tx.sql`delete from communication.notifications where tenant_id = any(${tenants}::uuid[])`;
       await tx.sql`delete from q_runtime.approvals where tenant_id = any(${tenants}::uuid[])`;
       await tx.sql`delete from q_runtime.actions where tenant_id = any(${tenants}::uuid[])`;
       await tx.sql`alter table q_runtime.run_events disable trigger run_events_append_only`;
@@ -480,5 +484,104 @@ describe("approve → continue → execute, per action type (local PostgreSQL)",
     expect(new Set(emails).size).toBe(emails.length);
     expect(chats).toHaveLength(2);
     expect(emails).toHaveLength(2);
+  });
+
+  describe("the sweep of approved actions nobody carried out (live 2026-10-01, 6b04d028)", () => {
+    const reminder = () => ({
+      ownerUserId: world.actor.userId,
+      title: `Prepare questions ${randomUUID().slice(0, 6)}`,
+      remindAt: "2030-10-09T08:00:00.000Z",
+      timeZone: "Europe/London",
+      channel: "EMAIL",
+    });
+    /** Approved, then its run failed on resume: APPROVED with nothing left to run it. */
+    async function stuck() {
+      const ref = await pausedRun();
+      const { action, approval } = await world.service.propose({
+        actor: world.actor,
+        runId: ref.runId,
+        correlationId: CORRELATION(),
+        actionType: "reminder.create",
+        payload: reminder(),
+      });
+      await world.service.approve({
+        actor: world.actor,
+        approvalId: QApprovalIdSchema.parse(approval.id),
+        correlationId: CORRELATION(),
+      });
+      await world.orchestration.resumeFromApproval(ref);
+      await world.orchestration.fail(ref, "INTERNAL_ERROR");
+      return { actionId: action.id, approvalId: approval.id };
+    }
+    const statusOf = async (actionId: string) => {
+      const [row] = await db.sql<
+        { status: string; execution_attempts: number }[]
+      >`select status, execution_attempts from q_runtime.actions where id = ${actionId}`;
+      return row;
+    };
+    const sweep = () =>
+      createApprovedActionSweep({ sql: db.sql, actions: world.port });
+
+    it("executes a stuck approved action once, as the approver, even when two sweeps run at once", async () => {
+      const { actionId } = await stuck();
+      const [first, second] = await Promise.all([
+        sweep().sweep({ olderThanMs: 0 }),
+        sweep().sweep({ olderThanMs: 0 }),
+      ]);
+      expect(first.executed + second.executed).toBe(1);
+      expect(await statusOf(actionId)).toEqual({
+        status: "EXECUTED",
+        execution_attempts: 1,
+      });
+      // And a later pass finds nothing left to do.
+      const again = await sweep().sweep({ olderThanMs: 0 });
+      expect(again.executed).toBe(0);
+      expect(await statusOf(actionId)).toMatchObject({ status: "EXECUTED" });
+    });
+
+    it("leaves a just-approved action to its own continuation", async () => {
+      const { actionId } = await stuck();
+      await sweep().sweep();
+      expect(await statusOf(actionId)).toMatchObject({ status: "APPROVED" });
+      await sweep().sweep({ olderThanMs: 0 });
+    });
+
+    it("honours expiry: a lapsed approval runs nothing, and the approver is told once", async () => {
+      const { actionId, approvalId } = await stuck();
+      await db.sql`update q_runtime.approvals
+        set requested_at = now() - interval '3 hours',
+            approved_at = now() - interval '2 hours',
+            expires_at = now() - interval '1 hour'
+        where id = ${approvalId}`;
+      const result = await sweep().sweep({ olderThanMs: 0 });
+      expect(result.notExecuted).toBeGreaterThanOrEqual(1);
+      expect(await statusOf(actionId)).toMatchObject({ status: "EXPIRED" });
+      const notices = await db.sql<{ title: string }[]>`
+        select title from communication.notifications
+         where user_id = ${world.actor.userId}
+           and dedupe_key = ${`approved-action:${actionId}:NOT_APPROVED`}`;
+      expect(notices).toEqual([{ title: "A change you approved has lapsed" }]);
+    });
+
+    it("never acts beyond the approver: without their membership the gate refuses and nothing runs", async () => {
+      const { actionId } = await stuck();
+      await db.sql`update identity.organisation_memberships
+        set membership_status = 'left', left_at = now()
+        where id = ${world.actor.membershipId ?? null}`;
+      try {
+        const result = await sweep().sweep({ olderThanMs: 0 });
+        expect(result.executed).toBe(0);
+        expect(await statusOf(actionId)).toMatchObject({
+          status: "APPROVED",
+          execution_attempts: 0,
+        });
+      } finally {
+        await db.sql`update identity.organisation_memberships
+          set membership_status = 'active', left_at = null
+          where id = ${world.actor.membershipId ?? null}`;
+      }
+      await sweep().sweep({ olderThanMs: 0 });
+      expect(await statusOf(actionId)).toMatchObject({ status: "EXECUTED" });
+    });
   });
 });

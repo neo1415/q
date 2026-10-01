@@ -388,6 +388,10 @@ import {
   createRecentPendingElsewhere,
   plainProposalStatus,
 } from "./composition/conversation-approvals.js";
+import {
+  APPROVED_ACTION_SWEEP_INTERVAL_MS,
+  createApprovedActionSweep,
+} from "./composition/approved-action-sweep.js";
 import { createApprovedContinuation } from "./composition/approved-continuation.js";
 import { createHandleClaimBoard } from "./composition/handle-claim-board.js";
 import {
@@ -2188,6 +2192,26 @@ const continueApproved = createApprovedContinuation({
   actions: qActionPort,
   logger,
 });
+
+// Approved actions nobody carried out (live 2026-10-01, 6b04d028): through
+// the same execution gate, as the approver, every two minutes.
+const approvedActionSweep = createApprovedActionSweep({
+  sql: database.sql,
+  actions: qActionPort,
+  logger,
+});
+setInterval(() => {
+  approvedActionSweep
+    .sweep()
+    .then((result) => {
+      if (result.examined > 0) {
+        logger.info({ ...result }, "approved action sweep");
+      }
+    })
+    .catch((error: unknown) => {
+      logger.warn({ err: error }, "approved action sweep failed");
+    });
+}, APPROVED_ACTION_SWEEP_INTERVAL_MS).unref();
 
 /**
  * The orchestration boundary. On: an accepted run is orchestrated at once
