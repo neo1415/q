@@ -1337,10 +1337,6 @@ export function createModelGatewayQAnswer(
       }
       const earlier = history.filter((m) => m.id !== latest.id);
       took("history");
-      const assembled = await context.assemble(request);
-      took("assemble");
-      const profile = await communication.profileFor(request);
-      took("profile");
       const toolContext: QToolExecutionContext = {
         actor: request.actor,
         runId: request.runId,
@@ -1353,10 +1349,15 @@ export function createModelGatewayQAnswer(
         // from authorised public identity, never from a model argument.
         conversation: { latestUserText: latest.content },
       };
-      const offeredForRun = await tools.offer(toolContext);
-      took("tools");
-      const memory = await recallMemory(request, conversationId);
-      took("memory");
+      // Independent reads, side by side (speed sweep 2026-10-01: they ran
+      // one after another, ~0.3 s of a turn's wait).
+      const [assembled, profile, offeredForRun, memory] = await Promise.all([
+        context.assemble(request),
+        communication.profileFor(request),
+        tools.offer(toolContext),
+        recallMemory(request, conversationId),
+      ]);
+      took("context");
       /**
        * Whether this turn may reach the public web (CQ-QX-005), decided by
        * the conversation core from its reading of the turn, which has been
@@ -1414,25 +1415,29 @@ export function createModelGatewayQAnswer(
       let ownProfile: AuthorisedFact | null = null;
       let ownProfileCall: QToolCallObservation | null = null;
       const ownInvestor = ownInvestorOrganisationIn(plan);
-      if (ownInvestor !== null && offeredByName.has("get_investor_mandate")) {
-        const call = {
-          callId: "q-own-mandate",
-          name: "get_investor_mandate",
-          arguments: { investorOrganisationId: ownInvestor },
-        };
-        const outcome = await tools.execute(call, toolContext);
-        ownProfileCall = {
-          toolName: outcome.toolName,
-          providerName: call.name,
-          status: outcome.status,
-          failureCode: outcome.failureCode,
-          latencyMs: outcome.latencyMs,
-        };
-        if (outcome.result.ok) {
-          ownProfile = ownProfileFact(outcome.result.data);
+      // The reads below are independent of each other and run side by
+      // side; each fills its own facts (speed sweep 2026-10-01: in turn
+      // they took ~0.6 s before the model was asked anything).
+      const mandateRead = (async (): Promise<void> => {
+        if (ownInvestor !== null && offeredByName.has("get_investor_mandate")) {
+          const call = {
+            callId: "q-own-mandate",
+            name: "get_investor_mandate",
+            arguments: { investorOrganisationId: ownInvestor },
+          };
+          const outcome = await tools.execute(call, toolContext);
+          ownProfileCall = {
+            toolName: outcome.toolName,
+            providerName: call.name,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          };
+          if (outcome.result.ok) {
+            ownProfile = ownProfileFact(outcome.result.data);
+          }
         }
-        took("mandate");
-      }
+      })();
       /**
        * Where their own side stands with the counterparty the question is
        * about (CQ-Q-030), read through the same tool the model could call,
@@ -1454,59 +1459,64 @@ export function createModelGatewayQAnswer(
             (subject.kind === "INVESTOR_ORGANISATION" &&
               subject.investorOrganisationId !== ownInvestor),
         );
-      if (counterparty !== undefined && offeredByName.has("get_relationship")) {
-        const call = {
-          callId: "q-relationship",
-          name: "get_relationship",
-          arguments:
-            counterparty.kind === "RELATIONSHIP"
-              ? { relationshipId: counterparty.relationshipId }
-              : counterparty.kind === "COMPANY"
-                ? { companyId: counterparty.companyId }
-                : counterparty.kind === "INVESTOR_ORGANISATION"
-                  ? {
-                      investorOrganisationId:
-                        counterparty.investorOrganisationId,
-                    }
-                  : {},
-        };
-        const outcome = await tools.execute(call, toolContext);
-        relationshipCall = {
-          toolName: outcome.toolName,
-          providerName: call.name,
-          status: outcome.status,
-          failureCode: outcome.failureCode,
-          latencyMs: outcome.latencyMs,
-        };
-        if (outcome.result.ok) {
-          relationship = relationshipFact(outcome.result.data);
-        }
-        took("relationship");
-      }
-      let ownStanding: AuthorisedFact | null = null;
-      let ownStandingCall: QToolCallObservation | null = null;
-      if (standingRead !== null) {
-        const outcome = await standingRead.catch(() => null);
-        if (outcome !== null) {
-          ownStandingCall = {
+      const relationshipRead = (async (): Promise<void> => {
+        if (
+          counterparty !== undefined &&
+          offeredByName.has("get_relationship")
+        ) {
+          const call = {
+            callId: "q-relationship",
+            name: "get_relationship",
+            arguments:
+              counterparty.kind === "RELATIONSHIP"
+                ? { relationshipId: counterparty.relationshipId }
+                : counterparty.kind === "COMPANY"
+                  ? { companyId: counterparty.companyId }
+                  : counterparty.kind === "INVESTOR_ORGANISATION"
+                    ? {
+                        investorOrganisationId:
+                          counterparty.investorOrganisationId,
+                      }
+                    : {},
+          };
+          const outcome = await tools.execute(call, toolContext);
+          relationshipCall = {
             toolName: outcome.toolName,
-            providerName: "list_my_relationships",
+            providerName: call.name,
             status: outcome.status,
             failureCode: outcome.failureCode,
             latencyMs: outcome.latencyMs,
           };
           if (outcome.result.ok) {
-            const focus =
-              counterparty?.kind === "COMPANY"
-                ? counterparty.companyId
-                : counterparty?.kind === "INVESTOR_ORGANISATION"
-                  ? counterparty.investorOrganisationId
-                  : null;
-            ownStanding = ownStandingFact(outcome.result.data, focus);
+            relationship = relationshipFact(outcome.result.data);
           }
         }
-        took("standing");
-      }
+      })();
+      let ownStanding: AuthorisedFact | null = null;
+      let ownStandingCall: QToolCallObservation | null = null;
+      const standingDone = (async (): Promise<void> => {
+        if (standingRead !== null) {
+          const outcome = await standingRead.catch(() => null);
+          if (outcome !== null) {
+            ownStandingCall = {
+              toolName: outcome.toolName,
+              providerName: "list_my_relationships",
+              status: outcome.status,
+              failureCode: outcome.failureCode,
+              latencyMs: outcome.latencyMs,
+            };
+            if (outcome.result.ok) {
+              const focus =
+                counterparty?.kind === "COMPANY"
+                  ? counterparty.companyId
+                  : counterparty?.kind === "INVESTOR_ORGANISATION"
+                    ? counterparty.investorOrganisationId
+                    : null;
+              ownStanding = ownStandingFact(outcome.result.data, focus);
+            }
+          }
+        }
+      })();
       /**
        * Where the person is in the pitch they are watching, and what is
        * said there (R18). Only when the plan carries the viewing moment --
@@ -1516,24 +1526,28 @@ export function createModelGatewayQAnswer(
        * adds nothing; no transcript adds a fact that says so.
        */
       let pitchMoment: AuthorisedFact | null = null;
-      if (plan.viewing !== undefined && offeredByName.has("get_pitch_moment")) {
-        const outcome = await tools.execute(
-          {
-            callId: "q-pitch-moment",
-            name: "get_pitch_moment",
-            arguments: {
-              pitchId: plan.viewing.mediaAssetId,
-              atSeconds: plan.viewing.positionSeconds,
-              windowSeconds: 20,
+      const pitchRead = (async (): Promise<void> => {
+        if (
+          plan.viewing !== undefined &&
+          offeredByName.has("get_pitch_moment")
+        ) {
+          const outcome = await tools.execute(
+            {
+              callId: "q-pitch-moment",
+              name: "get_pitch_moment",
+              arguments: {
+                pitchId: plan.viewing.mediaAssetId,
+                atSeconds: plan.viewing.positionSeconds,
+                windowSeconds: 20,
+              },
             },
-          },
-          toolContext,
-        );
-        if (outcome.result.ok) {
-          pitchMoment = pitchMomentFact(outcome.result.data, null);
+            toolContext,
+          );
+          if (outcome.result.ok) {
+            pitchMoment = pitchMomentFact(outcome.result.data, null);
+          }
         }
-        took("pitch-moment");
-      }
+      })();
       /**
        * Who they are, from their own setup (CQ-QX-007): their name, the
        * role they gave, and how far along they are. Only when the firewall
@@ -1541,25 +1555,26 @@ export function createModelGatewayQAnswer(
        * a read that fails costs this answer the facts, never the answer.
        */
       let onboardingFacts: readonly AuthorisedFact[] = [];
-      if (
-        dependencies.ownOnboarding !== undefined &&
-        plan.scopes.some(
-          (scope) =>
-            scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
-        )
-      ) {
-        try {
-          onboardingFacts = ownOnboardingFacts(
-            await dependencies.ownOnboarding.read(request.actor),
-          );
-        } catch (error: unknown) {
-          logger?.warn(
-            { err: error, qRunId: request.runId },
-            "the person's own onboarding was not read for this answer",
-          );
+      const onboardingRead = (async (): Promise<void> => {
+        if (
+          dependencies.ownOnboarding !== undefined &&
+          plan.scopes.some(
+            (scope) =>
+              scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
+          )
+        ) {
+          try {
+            onboardingFacts = ownOnboardingFacts(
+              await dependencies.ownOnboarding.read(request.actor),
+            );
+          } catch (error: unknown) {
+            logger?.warn(
+              { err: error, qRunId: request.runId },
+              "the person's own onboarding was not read for this answer",
+            );
+          }
         }
-        took("onboarding");
-      }
+      })();
       /**
        * A setup reminder (founder directive 2026-09-27), only at a natural
        * pause: never while Q is putting a series of questions to them and
@@ -1567,28 +1582,38 @@ export function createModelGatewayQAnswer(
        * under the same own-only scope; a failed read is simply no reminder.
        */
       let onboardingNudge: QOnboardingNudge | null = null;
-      if (
-        dependencies.onboardingNudge !== undefined &&
-        request.questionSequence === undefined &&
-        request.turnUnread !== true &&
-        plan.scopes.some(
-          (scope) =>
-            scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
-        )
-      ) {
-        try {
-          onboardingNudge = await dependencies.onboardingNudge.peek(
-            request.actor,
-            conversationId,
-          );
-        } catch (error: unknown) {
-          logger?.warn(
-            { err: error, qRunId: request.runId },
-            "the setup reminder was not read for this answer",
-          );
+      const nudgeRead = (async (): Promise<void> => {
+        if (
+          dependencies.onboardingNudge !== undefined &&
+          request.questionSequence === undefined &&
+          request.turnUnread !== true &&
+          plan.scopes.some(
+            (scope) =>
+              scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
+          )
+        ) {
+          try {
+            onboardingNudge = await dependencies.onboardingNudge.peek(
+              request.actor,
+              conversationId,
+            );
+          } catch (error: unknown) {
+            logger?.warn(
+              { err: error, qRunId: request.runId },
+              "the setup reminder was not read for this answer",
+            );
+          }
         }
-        took("onboarding-nudge");
-      }
+      })();
+      await Promise.all([
+        mandateRead,
+        relationshipRead,
+        standingDone,
+        pitchRead,
+        onboardingRead,
+        nudgeRead,
+      ]);
+      took("prefetch");
       const facts: readonly AuthorisedFact[] = [
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
@@ -1737,7 +1762,10 @@ export function createModelGatewayQAnswer(
        * it is released the moment the answer goes on.
        */
       let heldPromise: string | null = null;
+      /** When the person got the first sentence, from the seam's start. */
+      let firstPublishedMs: number | null = null;
       const publish = (text: string): void => {
+        firstPublishedMs ??= Date.now() - startedAt;
         streamedText += `${text} `;
         deltas?.publish({
           runId: request.runId,
@@ -2752,6 +2780,7 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             // turn finished. Zero means nobody was listening, or the
             // model wrote its object in an order this cannot read.
             streamedCharacters: streamedText.length,
+            firstPublishedMs,
           },
           "q answer produced",
         );

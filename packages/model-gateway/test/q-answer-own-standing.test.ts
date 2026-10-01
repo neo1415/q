@@ -143,9 +143,14 @@ function build(
     } as unknown as QConversationMessage,
   ];
   const executed: QToolProposal[] = [];
+  const inFlight = { now: 0, max: 0 };
   const tools: QToolPort = {
     offer: () => Promise.resolve([RELATIONSHIP_TOOL, STANDING_TOOL]),
-    execute: (proposal) => {
+    execute: async (proposal) => {
+      inFlight.now += 1;
+      inFlight.max = Math.max(inFlight.max, inFlight.now);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight.now -= 1;
       executed.push(proposal);
       const outcome: QToolCallOutcome = {
         callId: proposal.callId,
@@ -173,7 +178,7 @@ function build(
               },
         latencyMs: 2,
       } as QToolCallOutcome;
-      return Promise.resolve(outcome);
+      return outcome;
     },
   };
   const repositories = {
@@ -238,7 +243,7 @@ function build(
       maxSensitivity: "PUBLIC",
     } as unknown as PermittedContextPlan,
   } as unknown as QAnswerRequest;
-  return { seam, request, alpha, executed };
+  return { seam, request, alpha, executed, inFlight };
 }
 
 const sentTo = (alpha: ReturnType<typeof build>["alpha"]) =>
@@ -269,6 +274,19 @@ describe("Q knows who it is talking to", () => {
     // expressive thing asked for rather than an emoji.
     expect(sent).toContain("ANSWER WHAT THEY MEAN");
     expect(sent).toContain("never a bare emoji");
+  });
+});
+
+describe("the reads before the model run side by side", () => {
+  // Speed sweep 2026-10-01: one after another they took ~0.6 s of the
+  // wait before the model was asked anything.
+  it("reads the relationship and their own standing at the same time", async () => {
+    const { seam, request, inFlight } = build({
+      status: "SUCCEEDED",
+      data: CONNECTED,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(inFlight.max).toBeGreaterThanOrEqual(2);
   });
 });
 
