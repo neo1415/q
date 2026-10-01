@@ -131,7 +131,11 @@ function Lead({ story }: { readonly story: QDailyStory }) {
   return (
     <article
       aria-labelledby={`story-${story.id}`}
-      className="grid gap-5 border-b border-(--cq-border) pb-8 md:grid-cols-[3fr_2fr]"
+      className={
+        story.image === null
+          ? "grid max-w-4xl gap-5 border-b border-(--cq-border) pb-8"
+          : "grid gap-5 border-b border-(--cq-border) pb-8 md:grid-cols-[3fr_2fr]"
+      }
       data-daily-lead
     >
       <div className="flex flex-col gap-3">
