@@ -272,6 +272,15 @@ const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
 const LAUGHING_FACE = /[\u{1F600}-\u{1F606}\u{1F602}\u{1F923}\u{1F60A}]/u;
 /** What a laugh is voiced as; the reaction tag renders the laugh itself. */
 const LAUGH_LINE = "Ha!";
+/**
+ * A laugh Q wrote out at the start of its own sentence ("Ha!", "Haha.",
+ * "Jajaja!"), as it is told to when asked to laugh (EXPRESSIVE_NOTE,
+ * founder report 2026-10-01). On Q's output only, like the face above: a
+ * voice that can laugh then laughs there instead of reading "Ha" out.
+ * A single "hi"/"he" is a greeting or a pronoun, so those need repeating.
+ */
+const WRITTEN_LAUGH =
+  /^(?:hah?|(?:ha|he|hi|ja)(?:[\s-]?(?:ha|he|hi|ja))+)\s*[!.,\u2026]/iu;
 
 const THINKING_HM_AFTER_MS = 2_600;
 const THINKING_HUM_AFTER_MS = 6_500;
@@ -922,6 +931,20 @@ export function createVoiceTurnHandler(
             }
             streamedDeltas = true;
             spokenCharacters += spoken.length + 1;
+            // Cue before the sentence is handed over, so the relay finds
+            // it when the provider asks to hear this sentence.
+            if (!laughed && WRITTEN_LAUGH.test(spoken)) {
+              laughed = true;
+              dependencies.performance?.perform(binding.voiceSessionId, [
+                {
+                  sentence: spoken,
+                  reaction: "LAUGH",
+                  pauseAfter: false,
+                  pace: "NORMAL",
+                  emphasis: [],
+                },
+              ]);
+            }
             yield `${spoken} `;
             // Q's own sentence ended on a laugh (founder live 2026-09-29:
             // "it didn't really laugh"): the emoji is silent in speech, so

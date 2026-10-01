@@ -14,7 +14,7 @@ import { z } from "zod";
  * bundles have a size budget, and the schema already names the gestures.
  */
 export const PRESENCE_GESTURES_GUIDANCE =
-  "Usually []. Up to 4 {sentence: 0-based index of a sentence in your reply, gesture} that your particles form while that sentence is said, only when the sentence is plainly about it: QUESTION you ask them something; EXCLAIM surprise or emphasis; MONEY money, revenue, a raise, valuation; BUILDINGS companies, offices, property; CHART_UP growth, traction; CLAP impressed, congratulating; LAUGH you find it funny; THINK_TILT weighing something up; NOD agreeing; HANDS_EXPLAIN explaining steps or how something works.";
+  "Usually []. Up to 4 {sentence: 0-based index of a sentence in your reply, gesture} that your particles form while that sentence is said, only when the sentence is plainly about it: QUESTION you ask them something; EXCLAIM surprise or emphasis; MONEY money, revenue, a raise, valuation; BUILDINGS companies, offices, property; CHART_UP growth, traction; CLAP impressed, congratulating, or they ask you to clap or cheer; LAUGH you find it funny or they ask you to laugh; THINK_TILT weighing something up; NOD agreeing; HANDS_EXPLAIN explaining steps or how something works.";
 
 /**
  * PRESENCE (spec §5): the gestures a model may ask for beside its reply,

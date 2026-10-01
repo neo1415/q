@@ -81,6 +81,7 @@ import { withoutActionTalk } from "./action-talk.js";
 import { ownProfileFact } from "./own-profile.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
+import { ownStandingFact } from "./own-standing.js";
 import {
   ownOnboardingFacts,
   type QOwnOnboardingPort,
@@ -550,7 +551,10 @@ const RESEARCH_NOTE_BRIEF =
 // 7,000 since 2026-10-01 (harden spec §4): measured, a Home Q run with
 // research offered rendered ~2,800 characters before what Q can do
 // (~2,000), so at 4,000 CAPABILITIES_NOTE was dropped on nearly every run.
-export const ENVIRONMENT_NOTES_MAX_CHARS = 7_000;
+// 8,000 since 2026-10-01 (founder reports: self-knowledge, expressive
+// requests): LIKELY_INTENT_NOTE and EXPRESSIVE_NOTE add ~720 characters and
+// a production-sized run would otherwise lose what Q can do again.
+export const ENVIRONMENT_NOTES_MAX_CHARS = 8_000;
 
 /**
  * What Q can do, so it says so rather than claiming it cannot (founder
@@ -650,6 +654,26 @@ export function clearsOnPurpose(update: {
  */
 export const NEXT_STEP_NOTE =
   'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn) and then the single most useful next step for them, offered as something you will do ("Want me to draft the intro to Ada?"). Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
+
+/**
+ * Answer what they mean, not only what they literally asked (founder
+ * report 2026-10-01: "am I interested in this company?" got "there is no
+ * recorded interest" and nothing else). The literal record is stated
+ * first and never overstated; then what it implies for them, from their
+ * own standing and mandate, and the one action that would move it.
+ * Trusted product guidance, not a phrase list.
+ */
+export const LIKELY_INTENT_NOTE =
+  "ANSWER WHAT THEY MEAN: you know who you are talking to -- their own standing is among the facts, and list_my_relationships or get_investor_mandate tell more; never say you do not know about their own activity. When the literal answer is no or nothing recorded, say so in a clause, then answer the question behind it: what their record does show (a save or pass is not interest), how a company in view fits their mandate and why, and offer the one action that moves it (express interest, save it).";
+
+/**
+ * Expressive requests (founder report 2026-10-01: "laugh" was answered
+ * with a bare emoji). Q does the thing as a person would -- in words, and
+ * in its presence gestures, which the screen animates and the voice turns
+ * into delivery -- in any language.
+ */
+export const EXPRESSIVE_NOTE =
+  'ASKED TO LAUGH, CLAP, WHISPER OR SOUND EXCITED: do it as a person would, in words (a laugh written as "Ha!", then a short line), with the matching gesture (LAUGH, CLAP, EXCLAIM); never a bare emoji, never describe it instead.';
 
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
@@ -780,6 +804,8 @@ export function environmentNotesFor(
       options.questionSequence?.kind === "REASK"
         ? []
         : [NEXT_STEP_NOTE]),
+      LIKELY_INTENT_NOTE,
+      EXPRESSIVE_NOTE,
       ...(options.openDocumentTitle === undefined
         ? []
         : [
@@ -1355,6 +1381,25 @@ export function createModelGatewayQAnswer(
        * could call, under the same plan, and placed among the AUTHORISED
        * FACTS the model answers from.
        */
+      /**
+       * Their own standing -- relationships by state, and an investor's
+       * Saves and Passes -- read on every turn, on every surface, through
+       * the same tool the model could call (founder report 2026-10-01: "am
+       * I interested in this company?" on Discover was answered "I don't
+       * know" a minute after they had saved and passed on it). Started now
+       * so it overlaps the reads below; its own record only, so nothing
+       * here can carry another organisation's data.
+       */
+      const standingRead = offeredByName.has("list_my_relationships")
+        ? tools.execute(
+            {
+              callId: "q-own-standing",
+              name: "list_my_relationships",
+              arguments: {},
+            },
+            toolContext,
+          )
+        : null;
       let ownProfile: AuthorisedFact | null = null;
       let ownProfileCall: QToolCallObservation | null = null;
       const ownInvestor = ownInvestorOrganisationIn(plan);
@@ -1426,6 +1471,30 @@ export function createModelGatewayQAnswer(
           relationship = relationshipFact(outcome.result.data);
         }
         took("relationship");
+      }
+      let ownStanding: AuthorisedFact | null = null;
+      let ownStandingCall: QToolCallObservation | null = null;
+      if (standingRead !== null) {
+        const outcome = await standingRead.catch(() => null);
+        if (outcome !== null) {
+          ownStandingCall = {
+            toolName: outcome.toolName,
+            providerName: "list_my_relationships",
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          };
+          if (outcome.result.ok) {
+            const focus =
+              counterparty?.kind === "COMPANY"
+                ? counterparty.companyId
+                : counterparty?.kind === "INVESTOR_ORGANISATION"
+                  ? counterparty.investorOrganisationId
+                  : null;
+            ownStanding = ownStandingFact(outcome.result.data, focus);
+          }
+        }
+        took("standing");
       }
       /**
        * Where the person is in the pitch they are watching, and what is
@@ -1513,6 +1582,7 @@ export function createModelGatewayQAnswer(
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
         ...(relationship === null ? [] : [relationship]),
+        ...(ownStanding === null ? [] : [ownStanding]),
         ...(pitchMoment === null ? [] : [pitchMoment]),
         ...assembled.facts,
       ];
@@ -1960,6 +2030,9 @@ export function createModelGatewayQAnswer(
       }
       if (relationshipCall !== null) {
         toolCalls.push(relationshipCall);
+      }
+      if (ownStandingCall !== null) {
+        toolCalls.push(ownStandingCall);
       }
       if (ownProfile !== null || onboardingFacts.length > 0) {
         messages = [...messages, OWN_MANDATE_NOTE];
