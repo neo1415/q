@@ -100,6 +100,8 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     discoveryDecisions: port(),
     documents: port(),
     documentRevision: port(),
+    // DOCS block.
+    documentStudio: port(),
     recordChanges: port(),
     ownRecords: port(),
     evidenceDocuments: port(),

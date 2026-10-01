@@ -8,7 +8,11 @@ import {
   type QBrandKitStatus,
   type QBrandPalette,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+import {
+  jsonbParam,
+  type DatabaseExecutor,
+  type TransactionManager,
+} from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
@@ -242,7 +246,7 @@ export function createBrandKitService(dependencies: {
                   logo_content_type, based_on_version, created_by_user_id)
                 select ${tenantId}, ${organisationId}, ${values.companyId},
                        ${version}, ${values.status}, ${values.source},
-                       ${values.sourceUrl}, ${tx.sql.json(palette)}::jsonb,
+                       ${values.sourceUrl}, ${jsonbParam(tx.sql, palette)},
                        ${values.pairing}, logo, logo_content_type,
                        ${values.basedOnVersion}, ${actor.userId}
                   from artifacts.brand_kit_versions
@@ -261,7 +265,7 @@ export function createBrandKitService(dependencies: {
                   logo_content_type, based_on_version, created_by_user_id)
                 values (${tenantId}, ${organisationId}, ${values.companyId},
                         ${version}, ${values.status}, ${values.source},
-                        ${values.sourceUrl}, ${tx.sql.json(palette)}::jsonb,
+                        ${values.sourceUrl}, ${jsonbParam(tx.sql, palette)},
                         ${values.pairing},
                         ${logo === null ? null : Buffer.from(logo.bytes)},
                         ${logo === null ? null : logo.contentType},

@@ -118,6 +118,16 @@ const OWN = {
   visibleStage: null,
 } as const;
 
+/**
+ * Reads of their brand and of a document's checks are offered where a
+ * document of their own is in question; on a general question the bound
+ * on offered tools is kept for the tools that act (suggest, apply,
+ * illustrate), which the person asks for by name.
+ */
+const DOCUMENT_READ_PURPOSES = Q_TASK_CLASSES.filter(
+  (purpose) => purpose !== "GENERAL_QUESTION",
+);
+
 const authorizeOwn = (
   _input: unknown,
   { actor, plan }: { actor: ActorContext; plan: PermittedContextPlan },
@@ -145,6 +155,7 @@ function createGetBrandKitTool(port: DocumentStudioPort): AnyQToolDefinition {
     null
   >({
     ...OWN,
+    supportedPurposes: DOCUMENT_READ_PURPOSES,
     id: GET_BRAND_KIT,
     providerName: "get_brand_kit",
     description:
@@ -235,6 +246,7 @@ function createAuditMyDocumentTool(
     null
   >({
     ...OWN,
+    supportedPurposes: DOCUMENT_READ_PURPOSES,
     id: AUDIT_MY_DOCUMENT,
     providerName: "audit_my_document",
     description:
