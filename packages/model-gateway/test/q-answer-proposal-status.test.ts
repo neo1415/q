@@ -391,3 +391,29 @@ describe("a change prepared this turn is not told 'nothing is waiting' (live 202
     expect(reply).toContain("Here is a short description");
   });
 });
+
+describe("saving is not verifying (live 2026-10-02, Nixo)", () => {
+  it("tells Q, on the founder's exact words, to prepare the save and not argue about verification", async () => {
+    const said =
+      "Regardless of whether it is verified or not, I'm giving you the permission to do so.";
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      {},
+      [],
+      { said },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const sent = alpha.calls
+      .flatMap((call) => call.request.messages.map((m) => m.content))
+      .join("\n");
+    expect(sent).toContain(said);
+    expect(sent).toContain("SAVING IS NOT VERIFYING");
+    expect(sent).toContain(
+      "I'll save these as your stated company details (not independently verified).",
+    );
+    expect(sent).toContain(
+      "Never argue about verification once they have said to save.",
+    );
+  });
+});
