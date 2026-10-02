@@ -61,7 +61,7 @@ import {
   RECOMMENDATION_REFRESH_QUEUE,
   refreshDirectiveFor,
   RefreshRecommendationSlateJob,
-  createReapproachEvidence,
+  createMaterialChanges,
 } from "@capital-q/discovery";
 import { createOutboxWriter, DOMAIN_EVENTS_QUEUE } from "@capital-q/eventing";
 import {
@@ -571,7 +571,7 @@ const recommendations = createRecommendationPipeline({
   disclosure,
   // After a post-meeting pass, the company comes back only on a material
   // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
-  reapproachEvidence: createReapproachEvidence({
+  materialChanges: createMaterialChanges({
     pitchReadyAt: (companyIds) =>
       createPostgresDiscoverablePitchQueryPort({
         sql: database.sql,

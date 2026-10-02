@@ -55,7 +55,7 @@ import {
   createInteractionSignalService,
   createPostgresInteractionRepository,
   createPostgresCompanySectorsPort,
-  createReapproachEvidence,
+  createMaterialChanges,
   createSlateReadPipeline,
 } from "@capital-q/discovery";
 import {
@@ -745,7 +745,7 @@ const slates = createSlateReadPipeline({
   },
   // After a post-meeting pass, the company comes back only on a material
   // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
-  reapproachEvidence: createReapproachEvidence({
+  materialChanges: createMaterialChanges({
     pitchReadyAt: (companyIds) =>
       discoverablePitches.latestReadyAt?.(companyIds) ??
       Promise.resolve(new Map()),

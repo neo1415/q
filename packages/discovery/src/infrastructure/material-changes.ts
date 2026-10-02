@@ -1,4 +1,4 @@
-import type { ReapproachEvidencePort } from "../eligibility/ports.js";
+import type { MaterialChangePort } from "../eligibility/ports.js";
 
 type TimesByCompany = (
   companyIds: readonly string[],
@@ -10,10 +10,10 @@ type TimesByCompany = (
  * newest capital objective time, per company. Either read failing leaves
  * that evidence unknown, and unknown never reopens a pass.
  */
-export function createReapproachEvidence(sources: {
+export function createMaterialChanges(sources: {
   readonly pitchReadyAt?: TimesByCompany | undefined;
   readonly capitalObjectiveAt?: TimesByCompany | undefined;
-}): ReapproachEvidencePort {
+}): MaterialChangePort {
   const none: TimesByCompany = () => Promise.resolve(new Map());
   return {
     latest: async (companyIds) => {

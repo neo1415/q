@@ -195,7 +195,7 @@ export type RelationshipStanding =
  * §67): a pitch that became playable, a capital objective set. Owned by
  * the media and capital contexts; composed by the app.
  */
-export type ReapproachEvidencePort = {
+export type MaterialChangePort = {
   readonly latest: (companyIds: readonly string[]) => Promise<
     ReadonlyMap<
       string,

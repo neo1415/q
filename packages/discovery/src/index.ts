@@ -145,7 +145,7 @@ export type {
   MandateHardConstraint,
   MandateSnapshotForEligibility,
   MandateTaxonomyRule,
-  ReapproachEvidencePort,
+  MaterialChangePort,
   RelationshipStanding,
   RelationshipStandingPort,
   TaxonomyVersionPort,
@@ -720,5 +720,5 @@ export {
   type PublishablePitchTimesPort,
 } from "./rerank/pitch-reintroductions.js";
 export type { PassReintroduction } from "./rerank/ports.js";
-export { createReapproachEvidence } from "./infrastructure/reapproach-evidence.js";
+export { createMaterialChanges } from "./infrastructure/material-changes.js";
 export { createPostgresCompanySectorsPort } from "./infrastructure/postgres-filter-facts.js";

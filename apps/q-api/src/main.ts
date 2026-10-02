@@ -345,7 +345,7 @@ import {
   createPostgresDiscoveryRepository,
   createPostgresInvestorDecisionReader,
   createRecommendationExplanationService,
-  createReapproachEvidence,
+  createMaterialChanges,
   createSlateReadPipeline,
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
@@ -893,7 +893,7 @@ const slateRead = createSlateReadPipeline({
   disclosure,
   // After a post-meeting pass, the company comes back only on a material
   // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
-  reapproachEvidence: createReapproachEvidence({
+  materialChanges: createMaterialChanges({
     pitchReadyAt: (companyIds) =>
       createPostgresDiscoverablePitchQueryPort({
         sql: database.sql,

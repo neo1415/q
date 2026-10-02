@@ -26,7 +26,7 @@ import {
 } from "../candidates/service.js";
 import type {
   EligibilityPorts,
-  ReapproachEvidencePort,
+  MaterialChangePort,
 } from "../eligibility/ports.js";
 import {
   createEligibilityService,
@@ -115,7 +115,7 @@ export type RecommendationPipelineDependencies = {
   readonly embedder: SemanticEmbedder;
   readonly policy?: SlatePolicy | undefined;
   /** Re-approach after a post-meeting pass (doc 19 §67). Absent: it stays closed. */
-  readonly reapproachEvidence?: ReapproachEvidencePort | undefined;
+  readonly materialChanges?: MaterialChangePort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -140,7 +140,7 @@ export type RecommendationPipeline = {
 function composeEligibility(input: {
   readonly sql: DatabaseExecutor;
   readonly disclosure: DisclosureAccessService;
-  readonly reapproachEvidence?: ReapproachEvidencePort | undefined;
+  readonly materialChanges?: MaterialChangePort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 }) {
@@ -181,7 +181,7 @@ function composeEligibility(input: {
     relationships,
     disclosure,
     taxonomy,
-    reapproachEvidence: input.reapproachEvidence,
+    materialChanges: input.materialChanges,
   });
   const eligibility = createEligibilityService({
     ports: eligibilityPorts,
@@ -212,7 +212,7 @@ export type SlateReadPipelineDependencies = {
    */
   readonly pitchTimes?: PublishablePitchTimesPort | undefined;
   /** Re-approach after a post-meeting pass (doc 19 §67). Absent: it stays closed. */
-  readonly reapproachEvidence?: ReapproachEvidencePort | undefined;
+  readonly materialChanges?: MaterialChangePort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -239,7 +239,7 @@ export function createSlateReadPipeline(
   const { eligibilityPorts, eligibility } = composeEligibility({
     sql,
     disclosure,
-    reapproachEvidence: dependencies.reapproachEvidence,
+    materialChanges: dependencies.materialChanges,
     clock,
     logger,
   });
@@ -308,7 +308,7 @@ export function createRecommendationPipeline(
     composeEligibility({
       sql,
       disclosure,
-      reapproachEvidence: dependencies.reapproachEvidence,
+      materialChanges: dependencies.materialChanges,
       clock,
       logger,
     });

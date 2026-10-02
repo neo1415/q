@@ -31,7 +31,7 @@ import type {
   CompanyClassification,
   EligibilityPorts,
   MandateSnapshotForEligibility,
-  ReapproachEvidencePort,
+  MaterialChangePort,
   RelationshipStanding,
 } from "../eligibility/ports.js";
 
@@ -57,7 +57,7 @@ export type DomainEligibilityPortDependencies = {
    * The company's newest evidence of a material change, for re-approach
    * after a pass (doc 19 §67). Absent: a passed relationship stays closed.
    */
-  readonly reapproachEvidence?: ReapproachEvidencePort | undefined;
+  readonly materialChanges?: MaterialChangePort | undefined;
   readonly disclosure: DisclosureAccessService;
   readonly taxonomy?: TaxonomyQueryPort | undefined;
 };
@@ -74,7 +74,7 @@ export function createDomainEligibilityPorts(
     relationships,
     disclosure,
     taxonomy,
-    reapproachEvidence,
+    materialChanges,
   } = dependencies;
 
   const toSnapshot = (
@@ -271,9 +271,9 @@ export function createDomainEligibilityPorts(
         if (
           passed.length > 0 &&
           passStanding !== undefined &&
-          reapproachEvidence !== undefined
+          materialChanges !== undefined
         ) {
-          const evidence = await reapproachEvidence.latest(
+          const changes = await materialChanges.latest(
             passed.map((p) => p.companyId),
           );
           await Promise.all(
@@ -282,7 +282,7 @@ export function createDomainEligibilityPorts(
                 RelationshipIdSchema.parse(relationshipId),
               );
               if (standing === null) return;
-              const latest = evidence.get(companyId);
+              const latest = changes.get(companyId);
               out.set(companyId, {
                 kind: "STATE",
                 currentState: "PASSED",
