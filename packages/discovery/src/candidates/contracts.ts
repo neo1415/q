@@ -76,6 +76,9 @@ export const STRUCTURED_GENERATOR_VERSIONS = [
   "structured-mandate.v1",
   "structured-mandate.v2",
   "structured-mandate.v3",
+  // v4 must stay readable: slates built before v5 still name it (live
+  // 2026-10-02, every Discover load failed until it was listed again).
+  "structured-mandate.v4",
   STRUCTURED_GENERATOR_VERSION,
 ] as const;
 
