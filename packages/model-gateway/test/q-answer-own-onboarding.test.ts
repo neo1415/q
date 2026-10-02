@@ -216,7 +216,12 @@ describe("a turn Capital Q could not read (B1)", () => {
     const { environmentNotesFor, TURN_UNREAD_NOTE } =
       await import("../src/q/index.js");
     const unread = environmentNotesFor([], [], [], { turnUnread: true });
-    expect(unread.startsWith(TURN_UNREAD_NOTE)).toBe(true);
+    // Prompt-cache order (2026-10-02): first of this turn's notes, after
+    // the steady guidance every turn shares.
+    expect(unread).toContain(TURN_UNREAD_NOTE);
+    expect(unread.indexOf(TURN_UNREAD_NOTE)).toBeLessThan(
+      unread.indexOf("No authorised company"),
+    );
     expect(environmentNotesFor([], [], [])).not.toContain(TURN_UNREAD_NOTE);
   });
 });

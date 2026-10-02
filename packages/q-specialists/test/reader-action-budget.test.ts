@@ -111,3 +111,57 @@ describe("the reader's action list budget", () => {
     expect(full?.total ?? 0).toBeGreaterThan(empty?.total ?? 0);
   });
 });
+
+/**
+ * Prompt-cache order (lead 2026-10-02, TURN_READER v33): the reader's
+ * static instructions form one prefix every turn shares, whatever the
+ * actions, the modality or the words; OpenAI reuses an identical prefix
+ * of 1024 tokens or more.
+ */
+describe("the reader prompt's cacheable prefix", () => {
+  it("two different turns (other actions, voice, other words) share the whole static part", async () => {
+    const seen: string[] = [];
+    const reader = createQTurnReader({
+      gateway: {
+        execute: (request: {
+          readonly messages: readonly {
+            readonly role: string;
+            readonly content: string;
+          }[];
+        }) => {
+          seen.push(
+            request.messages.map((m) => `[${m.role}]\n${m.content}`).join("\n"),
+          );
+          return Promise.resolve({ output: { kind: "TEXT", text: "" } });
+        },
+      } as never,
+      logger: createLogger(
+        { serviceName: "test", environment: "test" },
+        { level: "silent" },
+      ),
+    });
+    await reader.read({
+      utterance: "Pass on Ajopot.",
+      recentTurns: [{ role: "Q", text: "Hi." }],
+      modality: "TEXT",
+      attribution: { tenantId: "t", userId: "u", correlationId: "c" },
+      actions: acting,
+    });
+    await reader.read({
+      utterance: "What's my raise?",
+      recentTurns: [],
+      modality: "VOICE",
+      attribution: { tenantId: "t", userId: "u", correlationId: "c" },
+      actions: acting.slice(0, 20),
+    });
+    const [a = "", b = ""] = seen;
+    let shared = 0;
+    while (shared < a.length && a[shared] === b[shared]) shared += 1;
+    console.info(
+      `reader prompt: ${String(a.length)} chars; shared prefix ${String(shared)} chars (~${String(Math.round(shared / 4))} tokens); per-turn tail ${String(a.length - shared)} chars`,
+    );
+    // Everything up to the per-turn tail (ACTIONS) is shared.
+    expect(shared).toBeGreaterThanOrEqual(a.indexOf("\nACTIONS\n"));
+    expect(shared).toBeGreaterThanOrEqual(20_000);
+  });
+});

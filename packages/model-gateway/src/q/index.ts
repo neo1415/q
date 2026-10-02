@@ -833,64 +833,77 @@ export function environmentNotesFor(
   // deterministically when it does anyway.
   const statementsNote = `A userStatements knowledgeKey must start with one of: ${recordableNamespacesSentence()}.`;
   const aboutACompany = subjects.some((subject) => subject.kind === "COMPANY");
-  const compose = (researchNote: string | null, capabilities = false): string =>
+  /**
+   * The notes in prompt-cache order (lead 2026-10-02: the provider reuses
+   * an identical prefix): first what is the same on every turn, then what
+   * is the same for this person, then this turn's own -- the turn's most
+   * critical notes first among those. When the bound is reached, the
+   * steady guidance yields before any of this turn's notes do.
+   */
+  const steady = [
+    LIKELY_INTENT_NOTE,
+    SAVE_NOT_VERIFY_NOTE,
+    OWN_DAY_NOTE,
+    EXPRESSIVE_NOTE,
+    statementsNote,
+    DISPLAY_NAME_NOTE,
+    "No scoring or ranking service is available; do not produce scores.",
+  ];
+  const personal = [
+    ...(options.asker === undefined
+      ? []
+      : [
+          `WHO IS ASKING: ${options.asker} "My company", "us" and its name mean this company: never ask whether it is the one they mean, and never ask them for anything given here. ${NAME_NOTE}`,
+        ]),
+    ...(options.personality === undefined
+      ? []
+      : [
+          `WHO YOU ARE WITH THIS PERSON: ${options.personality} Speak as that, as a person would: vary how you begin, laugh when something is funny, take a joke, and never begin two replies the same way.`,
+        ]),
+  ];
+  const turnNotes = (researchNote: string | null, capabilities: boolean) => [
+    // This turn's critical notes lead its part: a request for a document
+    // read as chat, or a series cut short, are the bugs these prevent
+    // (QX-003F, B1, R35).
+    ...(options.turnUnread === true ? [TURN_UNREAD_NOTE] : []),
+    ...(options.writingDocument === true && options.turnUnread !== true
+      ? [WRITING_DOCUMENT_NOTE]
+      : []),
+    ...(options.questionSequence === undefined
+      ? []
+      : [questionSequenceNote(options.questionSequence)]),
+    ...(options.openDocumentTitle === undefined
+      ? []
+      : [
+          `THIS PERSON ALREADY HAS A DOCUMENT: "${options.openDocumentTitle}". Any request in THIS message to change it — shorter, longer, less promotional, reworded, a section dropped or expanded — MUST set artifactRequest with kind REVISE, their exact words as quote, and what they want changed in instruction. Setting the field is how Capital Q changes it, colours and slides included: never say it cannot be edited, and never say it is changed before Capital Q says so.`,
+        ]),
+    // Not while a requested series of questions is still being asked:
+    // that reply ends with the next question (R35).
+    ...(options.turnUnread === true ||
+    options.questionSequence?.kind === "ASK" ||
+    options.questionSequence?.kind === "REASK"
+      ? []
+      : [NEXT_STEP_NOTE]),
+    factsNote,
+    ...(tools.length === 0 ? [] : [subjectIdentifierNotes(subjects)]),
+    toolsNote,
+    ...(options.generalKnowledge === true ? [GENERAL_KNOWLEDGE_NOTE] : []),
+    ...(researchNote === null ? [] : [researchNote]),
+    ...(aboutACompany ? [PROFILE_UPDATE_NOTE] : []),
+    ...(capabilities ? [CAPABILITIES_NOTE] : []),
+    ...(options.onboardingNudge === undefined
+      ? []
+      : [onboardingNudgeNote(options.onboardingNudge)]),
+  ];
+  const compose = (
+    researchNote: string | null,
+    capabilities = false,
+    steadyKept: number = steady.length,
+  ): string =>
     [
-      // First, because this list is hard-truncated at
-      // ENVIRONMENT_NOTES_MAX_CHARS and anything near the end is simply
-      // cut. A model that does not know a document exists reads "make the
-      // summary shorter" as being about its own answer, says it has done
-      // it, and nothing is written (QX-003F).
-      // First of all, for the same reason: a request for a document read
-      // as ordinary chat was answered with the document's content in the
-      // chat, or nothing, and no file (B1).
-      ...(options.turnUnread === true ? [TURN_UNREAD_NOTE] : []),
-      ...(options.writingDocument === true && options.turnUnread !== true
-        ? [WRITING_DOCUMENT_NOTE]
-        : []),
-      // Near the top for the same reason: a series cut off by truncation
-      // is the one-question-and-stop bug again (R35).
-      ...(options.questionSequence === undefined
-        ? []
-        : [questionSequenceNote(options.questionSequence)]),
-      ...(options.asker === undefined
-        ? []
-        : [
-            `WHO IS ASKING: ${options.asker} "My company", "us" and its name mean this company: never ask whether it is the one they mean, and never ask them for anything given here. ${NAME_NOTE}`,
-          ]),
-      ...(options.personality === undefined
-        ? []
-        : [
-            `WHO YOU ARE WITH THIS PERSON: ${options.personality} Speak as that, as a person would: vary how you begin, laugh when something is funny, take a joke, and never begin two replies the same way.`,
-          ]),
-      // Not while a requested series of questions is still being asked:
-      // that reply ends with the next question (R35).
-      ...(options.turnUnread === true ||
-      options.questionSequence?.kind === "ASK" ||
-      options.questionSequence?.kind === "REASK"
-        ? []
-        : [NEXT_STEP_NOTE]),
-      LIKELY_INTENT_NOTE,
-      SAVE_NOT_VERIFY_NOTE,
-      OWN_DAY_NOTE,
-      EXPRESSIVE_NOTE,
-      ...(options.openDocumentTitle === undefined
-        ? []
-        : [
-            `THIS PERSON ALREADY HAS A DOCUMENT: "${options.openDocumentTitle}". Any request in THIS message to change it — shorter, longer, less promotional, reworded, a section dropped or expanded — MUST set artifactRequest with kind REVISE, their exact words as quote, and what they want changed in instruction. Setting the field is how Capital Q changes it, colours and slides included: never say it cannot be edited, and never say it is changed before Capital Q says so.`,
-          ]),
-      factsNote,
-      ...(tools.length === 0 ? [] : [subjectIdentifierNotes(subjects)]),
-      toolsNote,
-      ...(options.generalKnowledge === true ? [GENERAL_KNOWLEDGE_NOTE] : []),
-      ...(researchNote === null ? [] : [researchNote]),
-      statementsNote,
-      ...(aboutACompany ? [PROFILE_UPDATE_NOTE] : []),
-      DISPLAY_NAME_NOTE,
-      ...(capabilities ? [CAPABILITIES_NOTE] : []),
-      "No scoring or ranking service is available; do not produce scores.",
-      ...(options.onboardingNudge === undefined
-        ? []
-        : [onboardingNudgeNote(options.onboardingNudge)]),
+      ...steady.slice(0, steadyKept),
+      ...personal,
+      ...turnNotes(researchNote, capabilities),
     ].join(" ");
   // The charter variable is bounded; the research guidance is the part that
   // yields first, in two steps, so a run with many subjects still renders.
@@ -906,10 +919,14 @@ export function environmentNotesFor(
   if (full.length <= ENVIRONMENT_NOTES_MAX_CHARS) {
     return full;
   }
-  const brief = compose(researchOffered ? RESEARCH_NOTE_BRIEF : null);
-  return brief.length <= ENVIRONMENT_NOTES_MAX_CHARS
-    ? brief
-    : brief.slice(0, ENVIRONMENT_NOTES_MAX_CHARS);
+  const briefNote = researchOffered ? RESEARCH_NOTE_BRIEF : null;
+  // Then the steady guidance yields, from its end, before anything of this
+  // turn's is cut.
+  for (let kept = steady.length; kept >= 0; kept -= 1) {
+    const brief = compose(briefNote, false, kept);
+    if (brief.length <= ENVIRONMENT_NOTES_MAX_CHARS) return brief;
+  }
+  return compose(briefNote, false, 0).slice(0, ENVIRONMENT_NOTES_MAX_CHARS);
 }
 
 /**

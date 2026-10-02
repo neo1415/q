@@ -722,3 +722,45 @@ describe("ownIndexFact", () => {
     );
   });
 });
+
+/**
+ * Prompt-cache order (lead 2026-10-02): the provider reuses an identical
+ * prefix. Two different turns share the charter and the steady guidance;
+ * this turn's notes come after them.
+ */
+describe("the answer prompt's cacheable prefix", () => {
+  it("two different turns share at least the charter and the steady notes", async () => {
+    const one = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {},
+      {
+        said: "Where are we with Kora?",
+      },
+    );
+    await one.seam.answer(one.request);
+    const two = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {},
+      {
+        said: "What's my raise status?",
+      },
+    );
+    await two.seam.answer(two.request);
+    const flat = (alpha: typeof one.alpha) =>
+      (alpha.calls[0]?.request.messages ?? [])
+        .map((m) => `[${m.role}]\n${m.content}`)
+        .join("\n");
+    const a = flat(one.alpha);
+    const b = flat(two.alpha);
+    let shared = 0;
+    while (shared < a.length && a[shared] === b[shared]) shared += 1;
+    console.info(
+      `answer prompt: ${String(a.length)} chars; shared prefix ${String(shared)} chars (~${String(Math.round(shared / 4))} tokens)`,
+    );
+    expect(shared).toBeGreaterThanOrEqual(9_000);
+    // Where it ends: this turn's own notes, after the steady ones.
+    expect(a.slice(0, shared)).toContain("SAVING IS NOT VERIFYING");
+  });
+});

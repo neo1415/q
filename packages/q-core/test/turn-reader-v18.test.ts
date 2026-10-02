@@ -14,7 +14,7 @@ describe("TURN_READER v18", () => {
   it("is superseded by v19 and v20, which only add screens", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(32);
+    ).toBe(33);
   });
 
   it("keeps every v17 line and adds only the acceptance rule", () => {

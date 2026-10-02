@@ -50,7 +50,11 @@ describe("questionSequenceNote", () => {
     const withSeries = environmentNotesFor([], [], [], {
       questionSequence: step,
     });
-    expect(withSeries.startsWith(questionSequenceNote(step))).toBe(true);
+    // Prompt-cache order (2026-10-02): first of this turn's notes.
+    expect(withSeries).toContain(questionSequenceNote(step));
+    expect(withSeries.indexOf(questionSequenceNote(step))).toBeLessThan(
+      withSeries.indexOf("No authorised company"),
+    );
     expect(environmentNotesFor([], [], [], {})).not.toContain(
       "QUESTIONS TO THEM",
     );

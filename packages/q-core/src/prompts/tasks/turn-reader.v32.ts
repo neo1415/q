@@ -25,7 +25,7 @@ export const TURN_READER_V32: PromptDefinition<
 > = {
   ...TURN_READER_V31,
   version: 32,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Lead 2026-10-02 (speed): the action list grouped by area -- offered actions as name and a few words, the rest as names only per area. Same schema as v31.",
   effectiveFrom: "2026-10-02",

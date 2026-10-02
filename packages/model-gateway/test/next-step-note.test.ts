@@ -50,7 +50,11 @@ describe("how a reply ends", () => {
       },
     );
     expect(notes).toContain(NEXT_STEP_NOTE);
-    expect(notes.indexOf(NEXT_STEP_NOTE)).toBeLessThan(1_200);
+    // Prompt-cache order (2026-10-02): steady guidance, then this person,
+    // then this turn -- where it leads, before the facts and tools notes.
+    expect(notes.indexOf(NEXT_STEP_NOTE)).toBeLessThan(
+      notes.indexOf("No facts were supplied"),
+    );
     expect(notes.length).toBeLessThanOrEqual(ENVIRONMENT_NOTES_MAX_CHARS);
   });
 
