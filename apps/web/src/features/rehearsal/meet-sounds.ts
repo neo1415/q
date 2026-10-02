@@ -65,15 +65,17 @@ const PREFERENCE_KEY = "cq.rehearsal.sounds";
 
 /**
  * Whether meeting sounds play: the person's own choice when they made one,
- * otherwise on -- unless they ask the system for reduced motion.
+ * otherwise on. Reduced motion is about motion, not sound (founder live
+ * 2026-10-02: no sounds were heard -- Windows "animation effects off" sets
+ * reduced motion, and that had turned them off); the sounds stay quiet.
  */
 export function meetSoundsOn(
   stored: string | null,
   reducedMotion: boolean,
 ): boolean {
-  if (stored === "on") return true;
+  void reducedMotion;
   if (stored === "off") return false;
-  return !reducedMotion;
+  return true;
 }
 
 function storedPreference(): string | null {
@@ -102,6 +104,23 @@ export function saveMeetSoundsPreference(on: boolean): void {
 }
 
 let context: AudioContext | null = null;
+
+/**
+ * Creates or resumes the audio context inside a click, so the browser lets
+ * later sounds play (an AudioContext made outside a gesture can stay
+ * suspended). Call it from "Join now" and on the first tap in the room.
+ */
+export function primeMeetSounds(): void {
+  if (typeof window === "undefined") return;
+  const Context = window.AudioContext as typeof AudioContext | undefined;
+  if (Context === undefined) return;
+  try {
+    context ??= new Context();
+    if (context.state === "suspended") void context.resume();
+  } catch {
+    // No audio here: the meeting carries on in silence.
+  }
+}
 
 /** Plays a sound when sounds are on; silent when the browser has no audio. */
 export function playMeetSound(sound: MeetSound, on: boolean): void {
