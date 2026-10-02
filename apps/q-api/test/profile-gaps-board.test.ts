@@ -86,8 +86,11 @@ describe("the profile gaps board", () => {
       runId: RUN,
       actor: ACTOR,
     } as never);
-    expect(proposal?.actionType).toBe(PROFILE_GAPS_FILL);
-    const payload = ProfileGapsPayloadSchema.parse(proposal?.payload);
+    if (proposal === null || proposal === undefined || "refused" in proposal) {
+      throw new Error("expected a proposal");
+    }
+    expect(proposal.actionType).toBe(PROFILE_GAPS_FILL);
+    const payload = ProfileGapsPayloadSchema.parse(proposal.payload);
     expect(payload.changes).toEqual({
       foundedDate: "2025-01-01",
       headquartersCity: "San Francisco",

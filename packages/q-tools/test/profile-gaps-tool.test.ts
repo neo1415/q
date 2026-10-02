@@ -110,6 +110,7 @@ const data = (outcome: { result: { ok: boolean; data?: unknown } }) =>
     openFields: string[];
     filledFields: string[];
     sources: unknown[];
+    forms?: Record<string, string>;
     line: string;
   };
 
@@ -268,9 +269,10 @@ describe("fill_profile_gaps with the setup answers (live 2026-10-02 on 25942649)
     expect(data(first).openFields).toEqual(
       expect.arrayContaining(["categories", "team_size", "foundedDate"]),
     );
-    expect(
-      (first.result.data as { forms: Record<string, string> }).forms,
-    ).toEqual({ categories: "category names", team_size: "digits" });
+    expect(data(first).forms).toEqual({
+      categories: "category names",
+      team_size: "digits",
+    });
     const second = await call("g2", {
       values: [
         { field: "foundedDate", value: "2025-01-01", sources: [1] },
