@@ -1776,6 +1776,7 @@ export function createRehearsalService(dependencies: {
       registerBefore,
       shaped,
       shaped.move === "CLOSE",
+      PROVOKED.has(result.appraisal),
     );
     return {
       result: {
