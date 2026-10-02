@@ -84,7 +84,7 @@ export function registerAppActionRoutes(
           return undefined;
         }
         void reply.header("Cache-Control", "no-store");
-        return http.respond(out, input);
+        return await http.respond(out, input, dependencies.ports);
       },
     });
   }

@@ -23,8 +23,6 @@ import {
   InvestorRepresentativeDtoSchema,
   parseContract,
   SetInvestorVisibilityRequestSchema,
-  UpdateInvestorOrganisationRequestSchema,
-  UpsertMyInvestorRepresentativeRequestSchema,
   type CorrelationId,
 } from "@capital-q/contracts";
 import { createCorrelationId } from "@capital-q/observability";
@@ -131,23 +129,8 @@ export function registerInvestorRoutes(
     );
   });
 
-  app.patch(byId, { onRequest: withContext }, async (request, reply) => {
-    const input = parseContract(
-      UpdateInvestorOrganisationRequestSchema,
-      request.body,
-      "The investor organisation update is not valid.",
-    );
-    const investor = await service.updateInvestorOrganisation({
-      actor: getActorContext(request),
-      investorOrganisationId: investorIdParam(request),
-      input,
-      correlationId: correlation(),
-    });
-    void reply.header("Cache-Control", "no-store");
-    return InvestorOrganisationDtoSchema.parse(
-      toInvestorOrganisationDto(investor),
-    );
-  });
+  // Declared in the app's action registry (ADR 0040); the route is
+  // generated (http/app-actions.ts), as Q's path is.
 
   // Who may see the declared investor profile. An intentional act by an
   // editor, never a side effect of a mandate being activated.
@@ -206,25 +189,6 @@ export function registerInvestorRoutes(
     },
   );
 
-  app.put(
-    `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        UpsertMyInvestorRepresentativeRequestSchema,
-        request.body,
-        "The representation request is not valid.",
-      );
-      const representative = await service.upsertMyInvestorRepresentative({
-        actor: getActorContext(request),
-        investorOrganisationId: investorIdParam(request),
-        input,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return InvestorRepresentativeDtoSchema.parse(
-        toInvestorRepresentativeDto(representative),
-      );
-    },
-  );
+  // Declared in the app's action registry (ADR 0040); the route is
+  // generated (http/app-actions.ts), as Q's path is.
 }

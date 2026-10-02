@@ -1,6 +1,7 @@
 import type { AnyAppAction } from "./define.js";
 import { DISCOVERY_DECISIONS } from "./actions/discovery.js";
 import { SET_PITCH_SHARING } from "./actions/pitch.js";
+import { PROFILE_AND_RECORDS } from "./actions/records.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -10,4 +11,5 @@ import { SET_PITCH_SHARING } from "./actions/pitch.js";
 export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   SET_PITCH_SHARING,
   ...DISCOVERY_DECISIONS,
+  ...PROFILE_AND_RECORDS,
 ]);

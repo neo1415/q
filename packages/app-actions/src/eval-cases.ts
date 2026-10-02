@@ -54,7 +54,11 @@ export function parityCases(
 ): readonly ParityCase[] {
   const cases: ParityCase[] = [];
   for (const action of actions) {
-    const kind = action.tool.eval.names;
+    const tool = action.tool;
+    // An action Q still does through its hand-written tool is not yet the
+    // registry's to evaluate (its eval comes with the tool's migration).
+    if (tool === undefined) continue;
+    const kind = tool.eval.names;
     const name = kind === undefined ? undefined : names[kind];
     if (kind !== undefined && name === undefined) continue;
     const fill = (template: string, value: string | undefined) =>
@@ -62,9 +66,9 @@ export function parityCases(
     const expect: ParityExpectation = {
       kind: "ACTION",
       action: action.name,
-      tool: action.tool.name,
+      tool: tool.name,
     };
-    const [first, second] = action.tool.eval.say;
+    const [first, second] = tool.eval.say;
     cases.push(
       {
         id: `${action.name}#1`,

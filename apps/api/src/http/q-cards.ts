@@ -1,22 +1,16 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
-  ClaimHandleRequestSchema,
-  CorrelationIdSchema,
   PUBLIC_CARD_CODES_PATH,
   PUBLIC_HANDLES_PATH,
   PublicCardCodeDtoSchema,
   PublicHandleResponseSchema,
-  Q_CARD_HANDLE_SEGMENT,
   Q_CARDS_PATH,
   QCardDtoSchema,
   QCardSubjectTypeSchema,
-  UpdateQCardRequestSchema,
   UuidSchema,
   parseContract,
-  type CorrelationId,
 } from "@capital-q/contracts";
-import { createCorrelationId } from "@capital-q/observability";
 import {
   QCardNotFoundError,
   type PublicIdentityService,
@@ -57,10 +51,6 @@ type SubjectParams = {
   readonly subjectType?: string | undefined;
   readonly subjectId?: string | undefined;
 };
-
-function correlation(): CorrelationId {
-  return CorrelationIdSchema.parse(createCorrelationId());
-}
 
 function subjectOf(request: FastifyRequest): QCardSubject {
   const params = request.params as SubjectParams;
@@ -106,43 +96,11 @@ export function registerQCardRoutes(
     return QCardDtoSchema.parse(card);
   });
 
-  // PUT: the desired handle. Claiming the one already held changes nothing,
-  // so a retried request is safe by construction.
-  app.put(
-    `${cardPath}${Q_CARD_HANDLE_SEGMENT}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        ClaimHandleRequestSchema,
-        request.body,
-        "The handle request is not valid.",
-      );
-      const card = await service.claimHandle({
-        actor: getActorContext(request),
-        subject: subjectOf(request),
-        handle: input.handle,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return QCardDtoSchema.parse(card);
-    },
-  );
+  // Declared in the app's action registry (ADR 0040); the route is
+  // generated (http/app-actions.ts), as Q's path is.
 
-  app.patch(cardPath, { onRequest: withContext }, async (request, reply) => {
-    const input = parseContract(
-      UpdateQCardRequestSchema,
-      request.body,
-      "The card update is not valid.",
-    );
-    const card = await service.updateCard({
-      actor: getActorContext(request),
-      subject: subjectOf(request),
-      input,
-      correlationId: correlation(),
-    });
-    void reply.header("Cache-Control", "no-store");
-    return QCardDtoSchema.parse(card);
-  });
+  // Declared in the app's action registry (ADR 0040); the route is
+  // generated (http/app-actions.ts), as Q's path is.
 
   /**
    * The anonymous read behind `/@handle`. No `onRequest` hook, deliberately:

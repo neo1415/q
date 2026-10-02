@@ -13,15 +13,9 @@ import {
   COMPANY_TEAM_ME_SUFFIX,
   CompanyMemberDtoSchema,
   CompanyTeamFactsDtoSchema,
-  CorrelationIdSchema,
   FounderProfileDtoSchema,
   parseContract,
-  UpdateCompanyTeamFactsRequestSchema,
-  UpdateMyFounderProfileRequestSchema,
-  UpsertMyCompanyMembershipRequestSchema,
-  type CorrelationId,
 } from "@capital-q/contracts";
-import { createCorrelationId } from "@capital-q/observability";
 
 import {
   getActorContext,
@@ -37,10 +31,6 @@ import type { CompanyRoutesDependencies } from "./companies.js";
  * person, so a client cannot read or write anyone else's relationship or
  * profile. Handlers parse, call the service and map the DTO.
  */
-
-function correlation(): CorrelationId {
-  return CorrelationIdSchema.parse(createCorrelationId());
-}
 
 function companyIdParam(request: FastifyRequest): CompanyId {
   const params = request.params as Record<string, unknown>;
@@ -72,25 +62,8 @@ export function registerCompanyTeamRoutes(
     },
   );
 
-  app.put(
-    `${base}${COMPANY_TEAM_ME_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        UpsertMyCompanyMembershipRequestSchema,
-        request.body,
-        "The company relationship is not valid.",
-      );
-      const member = await service.upsertMyCompanyMembership({
-        actor: getActorContext(request),
-        companyId: companyIdParam(request),
-        input,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return CompanyMemberDtoSchema.parse(toCompanyMemberDto(member));
-    },
-  );
+  // Declared in the app's action registry (ADR 0040); the route is
+  // generated (http/app-actions.ts), as Q's path is.
 
   app.get(
     `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`,
@@ -105,25 +78,8 @@ export function registerCompanyTeamRoutes(
     },
   );
 
-  app.patch(
-    `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        UpdateMyFounderProfileRequestSchema,
-        request.body,
-        "The founder profile update is not valid.",
-      );
-      const profile = await service.updateMyFounderProfile({
-        actor: getActorContext(request),
-        companyId: companyIdParam(request),
-        input,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return FounderProfileDtoSchema.parse(toFounderProfileDto(profile));
-    },
-  );
+  // Declared in the app's action registry (ADR 0040); the route is
+  // generated (http/app-actions.ts), as Q's path is.
 
   app.get(
     `${base}${COMPANY_TEAM_FACTS_SUFFIX}`,
@@ -138,23 +94,6 @@ export function registerCompanyTeamRoutes(
     },
   );
 
-  app.patch(
-    `${base}${COMPANY_TEAM_FACTS_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        UpdateCompanyTeamFactsRequestSchema,
-        request.body,
-        "The team facts update is not valid.",
-      );
-      const facts = await service.updateCompanyTeamFacts({
-        actor: getActorContext(request),
-        companyId: companyIdParam(request),
-        input,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return CompanyTeamFactsDtoSchema.parse(toCompanyTeamFactsDto(facts));
-    },
-  );
+  // Declared in the app's action registry (ADR 0040); the route is
+  // generated (http/app-actions.ts), as Q's path is.
 }

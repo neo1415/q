@@ -366,7 +366,9 @@ export function composeQIntelligence(
     // ADR 0040: a declared app action the reading names, run by code.
     appActions: createToolAppActionPort({
       tools,
-      names: APP_ACTIONS.map((action) => action.tool.name),
+      names: APP_ACTIONS.flatMap((action) =>
+        action.tool === undefined ? [] : [action.tool.name],
+      ),
       ...(logger === undefined ? {} : { logger }),
     }),
     handOver: createToolHandOverPort({

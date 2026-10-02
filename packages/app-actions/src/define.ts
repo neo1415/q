@@ -50,7 +50,7 @@ export type AppActionHttp<In, Out> = {
     body: unknown,
   ) => unknown;
   /** The wire answer, in the route's existing response contract. */
-  readonly respond: (out: Out, input: In) => unknown;
+  readonly respond: (out: Out, input: In, ports: AppActionPorts) => unknown;
   /** The idempotency key the screen sent, from the parsed input. */
   readonly idempotencyKeyOf?: ((input: In) => string) | undefined;
   /** An outcome the route answers as a 404 (a refusal that must not leak). */
@@ -130,7 +130,14 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
   /** Whether it did what was asked (a refusal can be an outcome). Default: yes. */
   readonly succeeded?: ((out: Out) => boolean) | undefined;
   readonly http?: AppActionHttp<In, Out> | undefined;
-  readonly tool: AppActionTool<In, ToolIn>;
+  /**
+   * The Q tool generated from this declaration. Absent while the area's
+   * hand-written tool still serves Q (`legacyTool` names it); migrating the
+   * tool is the second step for that area.
+   */
+  readonly tool?: AppActionTool<In, ToolIn> | undefined;
+  /** The hand-written Q tool that still does this for Q, until migrated. */
+  readonly legacyTool?: string | undefined;
 };
 
 /** Erased for the registry; per-action types stay with the action (as q-tools does). */

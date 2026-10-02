@@ -969,15 +969,22 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RECORDS",
     "Reads their own pitch videos, documents or rehearsals exactly as their pages show them.",
   ),
-  ...APP_ACTIONS.map((action) =>
-    tool(
-      action.tool.name,
-      APP_ACTION_GROUPS[action.area] ?? "RECORDS",
-      action.does,
-      action.classification === "CONSEQUENTIAL"
-        ? { approval: "PREPARE_APPROVE", executes: [`app.${action.name}`] }
-        : { acts: action.classification === "INSTANT" },
-    ),
+  ...APP_ACTIONS.flatMap((action) =>
+    action.tool === undefined
+      ? []
+      : [
+          tool(
+            action.tool.name,
+            APP_ACTION_GROUPS[action.area] ?? "RECORDS",
+            action.does,
+            action.classification === "CONSEQUENTIAL"
+              ? {
+                  approval: "PREPARE_APPROVE",
+                  executes: [`app.${action.name}`],
+                }
+              : { acts: action.classification === "INSTANT" },
+          ),
+        ],
   ),
 ]);
 

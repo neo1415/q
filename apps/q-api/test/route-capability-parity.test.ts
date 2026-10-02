@@ -140,9 +140,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/companies.ts POST COMPANIES_PATH": ONBOARDING_SETUP,
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId`":
     cap("tool.get_company"),
-  "api/http/companies.ts PATCH `${COMPANIES_PATH}/:companyId`": cap(
-    "tool.propose_profile_change",
-  ),
   "api/http/companies.ts POST `${COMPANIES_PATH}/:companyId${COMPANY_VISIBILITY_SEGMENT}`":
     cap("hand.set_visibility"),
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_SEGMENT}`":
@@ -155,18 +152,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/company-team.ts GET `${base}${COMPANY_TEAM_ME_SUFFIX}`": cap(
     "tool.read_my_record",
   ),
-  "api/http/company-team.ts PUT `${base}${COMPANY_TEAM_ME_SUFFIX}`": cap(
-    "tool.propose_team_change",
-  ),
   "api/http/company-team.ts GET `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`":
     cap("tool.read_my_record"),
-  "api/http/company-team.ts PATCH `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`":
-    cap("tool.propose_team_change"),
   "api/http/company-team.ts GET `${base}${COMPANY_TEAM_FACTS_SUFFIX}`": cap(
     "tool.read_my_record",
-  ),
-  "api/http/company-team.ts PATCH `${base}${COMPANY_TEAM_FACTS_SUFFIX}`": cap(
-    "tool.propose_team_change",
   ),
 
   "api/http/discovery.ts GET DISCOVERY_COMPANIES_PATH": cap(
@@ -374,7 +363,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "tool.read_my_record",
   ),
   "api/http/investors.ts GET byId": cap("tool.read_my_record"),
-  "api/http/investors.ts PATCH byId": cap("tool.propose_profile_change"),
   "api/http/investors.ts POST `${byId}${INVESTOR_VISIBILITY_SEGMENT}`": cap(
     "tool.propose_investor_visibility",
   ),
@@ -383,8 +371,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/investors.ts GET `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`":
     cap("tool.read_my_record"),
-  "api/http/investors.ts PUT `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`":
-    cap("tool.propose_team_change"),
 
   "api/http/me.ts PATCH ME_PATH": cap("tool.propose_profile_change"),
   "api/http/me.ts GET ME_PROFILE_PATH": exempt(
@@ -520,10 +506,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     ONBOARDING_SETUP,
 
   "api/http/q-cards.ts GET cardPath": cap("tool.get_q_card"),
-  "api/http/q-cards.ts PUT `${cardPath}${Q_CARD_HANDLE_SEGMENT}`": cap(
-    "tool.propose_handle_claim",
-  ),
-  "api/http/q-cards.ts PATCH cardPath": cap("tool.propose_q_card_change"),
   "api/http/q-cards.ts GET `${PUBLIC_HANDLES_PATH}/:handle`": PUBLIC,
   "api/http/q-cards.ts GET `${PUBLIC_CARD_CODES_PATH}/:code`": PUBLIC,
 
@@ -897,7 +879,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 151;
+const LEGACY_MUTATION_ROUTES_MAX = 143;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
@@ -953,7 +935,9 @@ describe("every route and page is something Q can do, or exempt with a reason (R
   it("every declared action is a route and a Q tool, from one declaration (ADR 0040)", () => {
     for (const action of APP_ACTIONS) {
       expect(
-        CAPABILITY_IDS.has(`tool.${action.tool.name}`),
+        CAPABILITY_IDS.has(
+          `tool.${action.tool?.name ?? action.legacyTool ?? ""}`,
+        ),
         `${action.name}: no capability for its generated tool`,
       ).toBe(true);
     }

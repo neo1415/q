@@ -27,7 +27,9 @@ const actor = ActorContextSchema.parse({
 describe("the action registry", () => {
   it("names each action once, each tool once, each route once", () => {
     const names = APP_ACTIONS.map((action) => action.name);
-    const tools = APP_ACTIONS.map((action) => action.tool.name);
+    const tools = APP_ACTIONS.flatMap((action) =>
+      action.tool === undefined ? [] : [action.tool.name],
+    );
     const routes = APP_ACTIONS.flatMap((action) =>
       action.http === undefined
         ? []
@@ -38,19 +40,57 @@ describe("the action registry", () => {
     expect(new Set(routes).size).toBe(routes.length);
     for (const action of APP_ACTIONS) {
       expect(action.name).toMatch(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/);
-      expect(action.tool.eval.say).toHaveLength(2);
+      // An action is served to Q by a generated tool or, until its area's
+      // second step, by the hand tool it names; never by neither.
+      if (action.tool === undefined) {
+        expect(action.legacyTool).toMatch(/^[a-z][a-z_]*$/);
+      } else {
+        expect(action.tool.eval.say).toHaveLength(2);
+      }
     }
   });
 
-  it("the slice: a pitch's audience (approval) and the feed's four decisions (instant)", () => {
+  it("the slice, then profile and records: each action's Q tool and classification", () => {
     expect(
-      APP_ACTIONS.map((action) => [action.tool.name, action.classification]),
+      APP_ACTIONS.map((action) => [
+        action.name,
+        action.tool?.name ?? `legacy:${action.legacyTool ?? ""}`,
+        action.classification,
+      ]),
     ).toEqual([
-      ["set_pitch_sharing", "CONSEQUENTIAL"],
-      ["save_company", "INSTANT"],
-      ["unsave_company", "INSTANT"],
-      ["pass_company", "INSTANT"],
-      ["unpass_company", "INSTANT"],
+      ["pitch.details.set", "set_pitch_sharing", "CONSEQUENTIAL"],
+      ["discovery.company.save", "save_company", "INSTANT"],
+      ["discovery.company.unsave", "unsave_company", "INSTANT"],
+      ["discovery.company.pass", "pass_company", "INSTANT"],
+      ["discovery.company.unpass", "unpass_company", "INSTANT"],
+      [
+        "company.profile.update",
+        "legacy:propose_profile_change",
+        "CONSEQUENTIAL",
+      ],
+      ["company.team.me.upsert", "legacy:propose_team_change", "CONSEQUENTIAL"],
+      [
+        "company.founder_profile.me.update",
+        "legacy:propose_team_change",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "company.team_facts.update",
+        "legacy:propose_team_change",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "investor.profile.update",
+        "legacy:propose_profile_change",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "investor.representative.me.upsert",
+        "legacy:propose_team_change",
+        "CONSEQUENTIAL",
+      ],
+      ["q_card.handle.claim", "legacy:propose_handle_claim", "CONSEQUENTIAL"],
+      ["q_card.update", "legacy:propose_q_card_change", "CONSEQUENTIAL"],
     ]);
   });
 });
@@ -100,7 +140,10 @@ describe("the parity eval's cases come from the registry", () => {
       { COMPANY: "Kazikit", MEDIA: "Nixo pitch" },
       { media: "Nixo pitch" },
     );
-    expect(cases).toHaveLength(APP_ACTIONS.length * 3 + 2);
+    // Actions still served by a hand tool have no generated eval case yet.
+    expect(cases).toHaveLength(
+      APP_ACTIONS.filter((action) => action.tool !== undefined).length * 3 + 2,
+    );
     expect(
       cases.find((c) => c.id === "discovery.company.pass#misheard")?.say,
     ).toBe(`Pass on ${misheard("Kazikit")}.`);
