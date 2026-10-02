@@ -122,8 +122,7 @@ export function createOpenerFacts(dependencies: {
       notesReady:
         notices.find((row) => row.kind === "MEETING_NOTES_READY")?.n ?? 0,
       notesQuestion:
-        notices.find((row) => row.kind === "MEETING_NOTES_READY")?.body ??
-        null,
+        notices.find((row) => row.kind === "MEETING_NOTES_READY")?.body ?? null,
       unreadNotices: notices.reduce((sum, row) => sum + row.n, 0),
       scoutFinding: notices.find((row) => row.kind === "Q_SCOUT")?.body ?? null,
     };

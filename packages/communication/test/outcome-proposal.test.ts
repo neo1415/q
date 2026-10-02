@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { howDidItGo, proposeMeetingOutcome } from "../src/index.js";
+import {
+  howDidItGo,
+  notesQuestions,
+  proposeMeetingOutcome,
+} from "../src/index.js";
 
 /** "How did it go?" (2026-10-02): proposed from the notes, never recorded. */
 describe("the proposed meeting outcome", () => {
@@ -49,5 +53,31 @@ describe("the proposed meeting outcome", () => {
     expect(
       howDidItGo({ proposal: null, followUps: 0, inCallProposals: 0 }),
     ).toBe("How did it go? Tell me what was agreed and I'll record it.");
+  });
+});
+
+describe("the other side's debrief question (Context Firewall)", () => {
+  it("is built only from what both sides read, never from the organiser's Q notes", () => {
+    const questions = notesQuestions({
+      agreements: ["Thanks all, good first conversation"],
+      followUps: [{ text: "Start due diligence on Kora", owner: null }],
+      inCallProposals: 2,
+    });
+    expect(questions.organiser).toContain("next steps are diligence");
+    expect(questions.organiser).toContain("I noted 3 things to follow up");
+    expect(questions.others).toBe(
+      "How did it go? Tell me what was agreed and I'll record it.",
+    );
+    expect(questions.others).not.toMatch(/diligence|follow up/i);
+  });
+
+  it("proposes for the other side when the agreements themselves say so", () => {
+    expect(
+      notesQuestions({
+        agreements: ["Apex will begin diligence"],
+        followUps: [],
+        inCallProposals: 0,
+      }).others,
+    ).toContain("next steps are diligence");
   });
 });

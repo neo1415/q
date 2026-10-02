@@ -12,7 +12,7 @@ import {
 } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
-import { howDidItGo, proposeMeetingOutcome } from "./outcome-proposal.js";
+import { notesQuestions } from "./outcome-proposal.js";
 
 /**
  * Q in a meeting (founder direction 2026-09-29).
@@ -520,11 +520,12 @@ export function createMeetingAssistantService(dependencies: {
        where meeting_id = ${row.meeting_id} and kind = 'PROPOSAL'`
       .then((rows) => rows[0]?.n ?? 0)
       .catch(() => 0);
-    const ask = howDidItGo({
-      proposal: proposeMeetingOutcome(notes),
-      followUps: notes.followUps.length,
+    const questions = notesQuestions({
+      agreements: notes.agreements,
+      followUps: notes.followUps,
       inCallProposals,
     });
+    const ask = questions.organiser;
     await sql`
       insert into communication.notifications
         (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
@@ -544,6 +545,38 @@ export function createMeetingAssistantService(dependencies: {
         join core.companies c on c.id = r.company_id
        where r.id = ${row.relationship_id}
       on conflict (user_id, dedupe_key) do nothing`;
+    // The other side's debrief (2026-10-02; was organiser-only, ADR 0027):
+    // each other participant hears the record is ready, on their own side's
+    // page. Context Firewall: their question is built only from what both
+    // sides read (the agreements), never from the organiser's private Q
+    // analysis (summary, flags, follow-ups) or the proposals made to Q.
+    const theirs = questions.others;
+    await sql`
+      insert into communication.notifications
+        (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
+      select p.participant_tenant_id, p.user_id, 'MEETING_NOTES_READY',
+             ${`The call's record is ready: ${row.purpose}`.slice(0, 200)}, ${theirs.slice(0, 1000)},
+             case when exists (
+                    select 1 from identity.organisation_memberships m
+                     where m.user_id = p.user_id
+                       and m.organisation_id = c.organisation_id
+                       and m.membership_status = 'active')
+                  then '/relationships/investor/' || r.investor_organisation_id::text || '#outcome'
+                  else '/relationships/company/' || r.company_id::text || '#outcome'
+             end,
+             null, ${row.meeting_id}, ${`meeting-notes:${row.meeting_id}`}
+        from communication.meeting_participants p
+        join network.relationships r on r.id = ${row.relationship_id}
+        join core.companies c on c.id = r.company_id
+       where p.meeting_id = ${row.meeting_id}
+         and p.user_id <> ${row.user_id}
+       limit 20
+      on conflict (user_id, dedupe_key) do nothing`.catch((error: unknown) => {
+      logger?.warn(
+        { err: error, meetingId: row.meeting_id },
+        "the other side's notes notice was not written",
+      );
+    });
   }
 
   return {

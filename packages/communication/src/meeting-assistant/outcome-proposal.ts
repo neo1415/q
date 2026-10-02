@@ -83,3 +83,31 @@ export function howDidItGo(input: {
       : ` I noted ${String(open)} thing${open === 1 ? "" : "s"} to follow up; I can set reminders or draft the messages for you to approve.`;
   return `${ask}${offer}`;
 }
+
+/**
+ * Both questions from one record: the organiser's (from their own Q notes,
+ * with what Q noted and was asked in the call) and the other side's, built
+ * only from what both sides read -- the agreements. Context Firewall: the
+ * organiser's private Q analysis never shapes the other side's question.
+ */
+export function notesQuestions(input: {
+  readonly agreements: readonly string[];
+  readonly followUps: readonly QMeetingFollowUp[];
+  readonly inCallProposals: number;
+}): { readonly organiser: string; readonly others: string } {
+  return {
+    organiser: howDidItGo({
+      proposal: proposeMeetingOutcome(input),
+      followUps: input.followUps.length,
+      inCallProposals: input.inCallProposals,
+    }),
+    others: howDidItGo({
+      proposal: proposeMeetingOutcome({
+        agreements: input.agreements,
+        followUps: [],
+      }),
+      followUps: 0,
+      inCallProposals: 0,
+    }),
+  };
+}
