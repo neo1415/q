@@ -11,7 +11,7 @@ import {
   type CounterpartPersonaStored,
   type PresenceReading,
   type RehearsalReviewResult,
-  type RehearsalTurnV6Result,
+  type RehearsalTurnV7Result,
 } from "@capital-q/q-core";
 
 /**
@@ -194,10 +194,12 @@ export function readPresence(raw: unknown): PresenceReading | null {
 }
 
 /** A played line: null only when there are no words to say. */
-export function readTurn(raw: unknown): RehearsalTurnV6Result | null {
+export function readTurn(raw: unknown): RehearsalTurnV7Result | null {
   if (!isRecord(raw)) return null;
+  const onlyNoise = flag(raw["onlyNoise"], false);
   const line = text(raw["line"], 700, "");
-  if (line.length === 0) return null;
+  // Noise needs no words; anything else with none is no turn at all.
+  if (line.length === 0 && !onlyNoise) return null;
   const move = label(raw["move"], REHEARSAL_MOVES, "REMARK");
   const conclusion = labelOrNull(raw["conclusion"], REHEARSAL_CONCLUSIONS);
   return {
@@ -220,6 +222,8 @@ export function readTurn(raw: unknown): RehearsalTurnV6Result | null {
     conclusion: move === "CLOSE" ? (conclusion ?? "INDECISIVE") : null,
     presence: readPresence(raw["presence"]),
     askedToSee: flag(raw["askedToSee"], false),
+    wantsToEnd: flag(raw["wantsToEnd"], false),
+    onlyNoise,
   };
 }
 

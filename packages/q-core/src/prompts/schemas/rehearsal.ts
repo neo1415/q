@@ -583,3 +583,20 @@ export const RehearsalTurnV6ResultSchema = RehearsalTurnV5ResultSchema.extend({
   askedToSee: z.boolean(),
 }).strict();
 export type RehearsalTurnV6Result = z.infer<typeof RehearsalTurnV6ResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v8 (REHEARSE, founder live 2026-10-02: "no fixed phrases, let Q judge by
+// meaning"): whether the person wants to end the meeting, and whether their
+// latest line was only noise, are read by meaning on the turn itself, in
+// any language -- never by matching their words against a list.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V7_SCHEMA_VERSION = 7;
+
+export const RehearsalTurnV7ResultSchema = RehearsalTurnV6ResultSchema.extend({
+  /** Their latest line asks to end, leave or stop the meeting. */
+  wantsToEnd: z.boolean(),
+  /** Their latest line carries nothing: background noise, a stray sound. */
+  onlyNoise: z.boolean(),
+}).strict();
+export type RehearsalTurnV7Result = z.infer<typeof RehearsalTurnV7ResultSchema>;
