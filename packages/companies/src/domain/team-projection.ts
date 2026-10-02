@@ -40,13 +40,18 @@ function bioOf(summary: string | null): string | null {
   return `${text.slice(0, COMPANY_TEAM_BIO_MAX - 1).trimEnd()}…`;
 }
 
+function titleOf(title: string | null): string | null {
+  const text = title?.trim() ?? "";
+  return text === "" ? null : text.slice(0, 120);
+}
+
 export function projectTeamForNetwork(
   sources: readonly TeamProjectionSource[],
 ): CompanyProfileTeamMember[] {
   return sources.slice(0, 50).map((source) => ({
     name: nameOf(source),
     relationshipType: source.relationshipType,
-    businessTitle: source.businessTitle?.trim() || null,
+    businessTitle: titleOf(source.businessTitle),
     isFounder: source.isFounder,
     shortBio: bioOf(source.professionalSummary),
   }));

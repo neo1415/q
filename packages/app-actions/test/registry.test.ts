@@ -150,6 +150,7 @@ describe("the action registry", () => {
       ["pitch.upload.start", "offer.pitch_video_upload", "CONSEQUENTIAL"],
       ["pitch.upload.cancel", "offer.pitch_video_upload", "CONSEQUENTIAL"],
       ["pitch.playback_policy.set", "via:set_pitch_sharing", "CONSEQUENTIAL"],
+      ["document.deck_audience.set", "set_deck_audience", "CONSEQUENTIAL"],
     ]);
   });
 });
