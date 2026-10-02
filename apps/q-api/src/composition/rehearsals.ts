@@ -1248,11 +1248,7 @@ type Frame = { readonly image: RehearsalImage; readonly at: number };
 export const FRAME_TTL_MS = 90_000;
 /** A camera frame is a look at them now: stale after half a minute. */
 export const CAMERA_FRAME_TTL_MS = 30_000;
-/**
- * An ordinary turn looks at them at most this often; a turn that asks Q to
- * look ("can you see this?") always gets a look, from a frame this fresh.
- */
-export const CAMERA_LOOK_GAP_MS = 8_000;
+/** A turn that asks Q to look ("can you see this?") wants a frame this fresh. */
 export const CAMERA_FRESH_MS = 3_500;
 const frameKey = (rehearsalId: string, kind: "SCREEN" | "CAMERA") =>
   `${rehearsalId}:${kind}`;
@@ -1288,13 +1284,18 @@ export function createRehearsalService(dependencies: {
   };
   /** Rehearsals whose person currently lets Q see them (frames arriving). */
   const consenting = new Set<string>();
-  /** When an ordinary turn last looked at them, per rehearsal. */
-  const lastLook = new Map<string, number>();
+  /** The latest frame of a kind, left held for later turns. */
+  const peekFrame = (rehearsalId: string, kind: "SCREEN" | "CAMERA") => {
+    const frame = frames.get(frameKey(rehearsalId, kind));
+    const ttl = kind === "CAMERA" ? CAMERA_FRAME_TTL_MS : FRAME_TTL_MS;
+    return frame !== undefined && now().getTime() - frame.at <= ttl
+      ? frame
+      : null;
+  };
   const dropFrames = (rehearsalId: string) => {
     frames.delete(frameKey(rehearsalId, "SCREEN"));
     frames.delete(frameKey(rehearsalId, "CAMERA"));
     consenting.delete(rehearsalId);
-    lastLook.delete(rehearsalId);
   };
   /** One persona build per viewer and subject at a time. */
   const building = new Map<string, Promise<PersonaRow | null>>();
@@ -1606,18 +1607,16 @@ export function createRehearsalService(dependencies: {
     const persona = personaOf(row.persona);
     if (persona === null) return null;
     const screenFrame = takeFrame(row.id, "SCREEN")?.image ?? null;
-    const held = takeFrame(row.id, "CAMERA");
+    // The latest camera frame stays held (never consumed by a turn): a
+    // reply the person spoke over must not cost the next turn its look
+    // (founder live 2026-10-02: the camera was on and the played person
+    // said it could not see them -- an interrupted reply had taken the
+    // frame and the next one was inside the look gap). Every turn with a
+    // frame held sees it.
+    const held = peekFrame(row.id, "CAMERA");
     const consent = consenting.has(row.id);
     const at = now().getTime();
-    // An ordinary turn looks at most every few seconds (cost); the frame
-    // not used is set aside for a turn that asks Q to look.
-    const looked = lastLook.get(row.id);
-    const cameraFrame =
-      held !== null &&
-      (looked === undefined || at - looked >= CAMERA_LOOK_GAP_MS)
-        ? held.image
-        : null;
-    if (cameraFrame !== null) lastLook.set(row.id, at);
+    const cameraFrame = held?.image ?? null;
     const themTurns = turns.filter((turn) => turn.from === "THEM").length;
     const seen = presence.get(row.id);
     const look = presenceNote(
@@ -1699,7 +1698,7 @@ export function createRehearsalService(dependencies: {
           signal,
         )) ?? first)
       : first;
-    if (lookAgain && fresh !== null) lastLook.set(row.id, at);
+
     const sawYou = cameraFrame !== null || (lookAgain && fresh !== null);
     if (sawYou || look.offer !== null) {
       const state = seen ?? newPresenceState();

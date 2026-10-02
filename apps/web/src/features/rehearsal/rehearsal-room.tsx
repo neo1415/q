@@ -685,6 +685,18 @@ export function RehearsalRoom({
           <Eye size={12} aria-hidden="true" />
           {name} can see you
         </span>
+      ) : camOn ? (
+        // Founder live 2026-10-02: the camera was on and the played person
+        // said it couldn't see them -- the self-view is not consent. The
+        // switch is right on the tile, not only in the control bar.
+        <button
+          type="button"
+          onClick={toggleSeeing}
+          className="cq-caption absolute top-2 left-2 inline-flex min-h-11 items-center gap-1 rounded-(--cq-radius-md) bg-(--cq-surface-raised) px-2 text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+        >
+          <EyeOff size={14} aria-hidden="true" />
+          {name} can&rsquo;t see you &middot; Let Q see you
+        </button>
       ) : null}
       <span className="cq-caption absolute bottom-2 left-2 rounded-(--cq-radius-sm) bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)">
         You
