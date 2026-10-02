@@ -118,6 +118,11 @@ function seam(options: {
   readonly profileGaps?: QProfileGapsPort;
   /** ADR 0040: a declared app action the reading names. */
   readonly appActions?: QAppActionPort;
+  /** The arguments read for a named app action (parity eval 2026-10-02). */
+  readonly appActionArguments?: (
+    request: QAnswerRequest,
+    input: { readonly tool: string; readonly utterance: string },
+  ) => Promise<Record<string, unknown> | null>;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -252,6 +257,9 @@ function seam(options: {
       ? {}
       : { pendingDecisions: options.pendingDecisions }),
     ...(options.handOver === undefined ? {} : { handOver: options.handOver }),
+    ...(options.appActionArguments === undefined
+      ? {}
+      : { appActionArguments: options.appActionArguments }),
     ...(options.appActions === undefined
       ? {}
       : { appActions: options.appActions }),
@@ -2271,5 +2279,100 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
       await port.run(request(), { tool: "sign_out", arguments: {} }),
     ).toBeNull();
     expect(calls.map((call) => call.name)).toEqual(["save_company"]);
+  });
+});
+
+/**
+ * Parity eval 2026-10-02 (live ff7d5a36, runs 20f2f3b8, 9c90c7f7,
+ * 7b452d68): the reader named the action (askedAction) but left appAction
+ * empty, nothing was done and the answer refused. Code now reads the
+ * arguments against the tool's own schema and runs it the same way; the
+ * declared app actions also lead the reader's list.
+ */
+describe("a named app action with no arguments is still done (parity eval 2026-10-02)", () => {
+  const named = (askedAction: string) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+      appAction: null,
+      askedAction,
+    }) as TurnReaderResult;
+  const port = (ran: unknown[]): QAppActionPort => ({
+    tools: new Set(["pass_company", "save_company"]),
+    run: (_request, action) => {
+      ran.push(action);
+      return Promise.resolve(`Done: ${action.tool}.`);
+    },
+  });
+
+  for (const [said, tool] of [
+    ["Pass on Ajopot.", "pass_company"],
+    ["Put Ajopot in my saved list.", "save_company"],
+    ["I'm not interested in Ajopot, skip it.", "pass_company"],
+  ] as const) {
+    it(`'${said}' runs ${tool} with the arguments read for it; the model is not asked`, async () => {
+      const ran: unknown[] = [];
+      const asked: unknown[] = [];
+      const { answer, stored, delegated } = seam({
+        said,
+        reading: named(tool),
+        outcomes: [],
+        offeredTools: ["pass_company", "save_company", "get_company"],
+        appActions: port(ran),
+        appActionArguments: (_request, input) => {
+          asked.push(input);
+          return Promise.resolve({ company: "Ajopot" });
+        },
+      });
+      await answer.answer(request());
+      expect(asked).toEqual([{ tool, utterance: said }]);
+      expect(ran).toEqual([{ tool, arguments: { company: "Ajopot" } }]);
+      expect(stored.at(-1)?.content).toBe(`Done: ${tool}.`);
+      expect(delegated()).toBe(0);
+    });
+  }
+
+  it("not offered in this run, or no arguments in their words: the answer runs as before", async () => {
+    const ran: unknown[] = [];
+    const notOffered = seam({
+      said: "Pass on Ajopot.",
+      reading: named("pass_company"),
+      outcomes: [],
+      offeredTools: ["get_company"],
+      appActions: port(ran),
+      appActionArguments: () => Promise.resolve({ company: "Ajopot" }),
+    });
+    await notOffered.answer.answer(request());
+    expect(notOffered.delegated()).toBe(1);
+    const noArgs = seam({
+      said: "Pass.",
+      reading: named("pass_company"),
+      outcomes: [],
+      offeredTools: ["pass_company"],
+      appActions: port(ran),
+      appActionArguments: () => Promise.resolve(null),
+    });
+    await noArgs.answer.answer(request());
+    expect(noArgs.delegated()).toBe(1);
+    expect(ran).toEqual([]);
+  });
+
+  it("the declared app actions lead the reader's list", async () => {
+    const run = seam({
+      said: "Pass on Ajopot.",
+      reading: named("pass_company"),
+      outcomes: [],
+      offeredTools: ["propose_profile_change", "pass_company"],
+      appActions: port([]),
+      appActionArguments: () => Promise.resolve(null),
+    });
+    await run.answer.answer(request());
+    const heard = run.heardActions[0] as { name: string }[];
+    expect(heard[0]?.name).toBe("pass_company");
   });
 });

@@ -245,7 +245,7 @@ export const TurnReaderV7VariablesSchema = TurnReaderVariablesSchema.extend({
         does: z.string().max(240),
       }),
     )
-    .max(100)
+    .max(200)
     .default([]),
 }).strict();
 export type TurnReaderV7Variables = z.infer<typeof TurnReaderV7VariablesSchema>;

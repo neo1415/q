@@ -155,14 +155,14 @@ export function createQTurnReader(dependencies: {
         actions: [
           ...(input.actions ?? [])
             .filter((action) => action.available !== false)
-            .slice(0, 40)
+            .slice(0, 100)
             .map((action) => ({
               name: action.name.slice(0, 80),
               does: action.does.slice(0, 240),
             })),
           ...(input.actions ?? [])
             .filter((action) => action.available === false)
-            .slice(0, 60)
+            .slice(0, 100)
             .map((action) => ({
               name: action.name.slice(0, 80),
               does: `(not available in this conversation) ${action.does.slice(0, 80)}`,

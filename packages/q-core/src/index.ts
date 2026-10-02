@@ -925,3 +925,12 @@ export {
   type ProfileGapReaderResult,
   type ProfileGapReaderVariables,
 } from "./prompts/schemas/profile-gap-reader.js";
+export { APP_ACTION_ARGUMENTS_V1 } from "./prompts/tasks/app-action-arguments.v1.js";
+export {
+  APP_ACTION_ARGUMENTS_SCHEMA_NAME,
+  APP_ACTION_ARGUMENTS_SCHEMA_VERSION,
+  AppActionArgumentsResultSchema,
+  AppActionArgumentsVariablesSchema,
+  type AppActionArgumentsResult,
+  type AppActionArgumentsVariables,
+} from "./prompts/schemas/app-action-arguments.js";

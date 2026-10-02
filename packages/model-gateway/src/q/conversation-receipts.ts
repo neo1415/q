@@ -229,7 +229,7 @@ export const PLAIN_KNOWING_LINE =
  * exist that did). Code logs every "can't" it can see as q.parity_gap.
  */
 export const CHECK_BEFORE_CANT_LINE =
-  "CHECK BEFORE NO OR CAN'T: before saying something of theirs does not exist, look at WHAT EXISTS in the facts and read it with read_my or a list or read tool you hold; before saying you can't do something, look for the tool that does it in the list below. Say you can't only when no tool here does it, plainly in one sentence, and never claim a record is missing that WHAT EXISTS counts.";
+  "CHECK BEFORE NO OR CAN'T: before saying something of theirs does not exist, look at WHAT EXISTS in the facts and read it with read_my or a list or read tool you hold; before saying you can't do something, look for the tool that does it in the list below. Say you can't only when no tool here does it, plainly in one sentence, and never claim a record is missing that WHAT EXISTS counts. A company, person or record that is not in these facts is unknown here, never \"not there\": call the tool with the name as they said it and let the tool resolve it.";
 
 export function screenLines(
   screen: QScreenContext | undefined,
