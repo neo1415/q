@@ -6,6 +6,7 @@ import { DISCOVERY_DECISIONS } from "./actions/discovery.js";
 import { DOCUMENT_ACTIONS } from "./actions/documents.js";
 import { INTEREST_ACTIONS } from "./actions/interest.js";
 import { MANDATE_ACTIONS } from "./actions/mandate.js";
+import { ME_ACTIONS } from "./actions/me.js";
 import { MEDIA_ACTIONS } from "./actions/media.js";
 import { ONBOARDING_ACTIONS } from "./actions/onboarding.js";
 import { OUTCOME_ACTIONS } from "./actions/outcomes.js";
@@ -46,4 +47,5 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
  */
 export const PERSON_ACTIONS: readonly AnyPersonAction[] = Object.freeze([
   ...ONBOARDING_ACTIONS,
+  ...ME_ACTIONS,
 ]);

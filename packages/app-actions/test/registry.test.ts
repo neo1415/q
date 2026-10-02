@@ -222,6 +222,8 @@ describe("person-scoped actions (onboarding)", () => {
       "onboarding.question.answer",
       "onboarding.question.dismiss",
       "onboarding.reminders.choose",
+      "person.name.set",
+      "person.profile.edit",
     ]);
     for (const action of PERSON_ACTIONS) {
       expect(qCapabilityId(action), action.name).toMatch(/^tool\.[a-z_]+$/);

@@ -326,11 +326,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/investors.ts GET `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`":
     cap("tool.read_my_record"),
 
-  "api/http/me.ts PATCH ME_PATH": cap("tool.update_my_profile"),
   "api/http/me.ts GET ME_PROFILE_PATH": exempt(
     "the person's own profile is in every Q run's context already (CQ-QX-007)",
   ),
-  "api/http/me.ts PATCH ME_PROFILE_PATH": cap("tool.update_my_profile"),
   "api/http/me.ts GET ME_PATH": exempt(
     "the app shell's session read; Q already acts as the signed-in person",
   ),
@@ -784,7 +782,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 94;
+const LEGACY_MUTATION_ROUTES_MAX = 92;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
