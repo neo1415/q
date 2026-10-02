@@ -8,6 +8,9 @@ vi.mock("../src/features/discover/company-pitch", () => ({
   CompanyPitch: ({ company }: { company: { companyId: string } }) => (
     <div data-testid={`pitch-${company.companyId}`} />
   ),
+  DeferredCompanyPitch: ({ company }: { company: { companyId: string } }) => (
+    <button data-testid={`deferred-${company.companyId}`} />
+  ),
 }));
 
 import {
@@ -79,7 +82,10 @@ describe("Your companies", () => {
         ]}
       />,
     );
+    // Only the first is signed on load; the rest wait for Play.
     expect(screen.getByTestId(`pitch-${NIXO}`)).toBeTruthy();
+    expect(screen.queryByTestId(`pitch-${SAVED}`)).toBeNull();
+    expect(screen.getByTestId(`deferred-${SAVED}`)).toBeTruthy();
     const labels = [
       ...document.querySelectorAll("[data-your-company-label]"),
     ].map((node) => node.textContent);

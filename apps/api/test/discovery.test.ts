@@ -71,7 +71,7 @@ function buildApp(options: {
   readonly network?:
     | Pick<
         NonNullable<NonNullable<Parameters<typeof createApp>[2]>["discovery"]>,
-        "networkPitches" | "networkCompany" | "yourCompanies"
+        "networkPitches" | "networkCompany" | "yourCompanies" | "mayPlay"
       >
     | undefined;
 }): { readonly app: FastifyInstance; readonly queries: PageCompaniesQuery[] } {
@@ -662,6 +662,7 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
   const SAVED = "c2000000-0000-4000-8000-000000000002";
   const HIDDEN = "c2000000-0000-4000-8000-000000000003";
   const NO_PITCH = "c2000000-0000-4000-8000-000000000004";
+  const REFUSED = "c2000000-0000-4000-8000-000000000005";
   const set = (n: number, companyId: string): DiscoverablePitchSet => ({
     mediaAssetId:
       `f0000000-0000-4000-8000-00000000020${String(n)}` as DiscoverablePitchSet["mediaAssetId"],
@@ -680,6 +681,7 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
           [NIXO, set(1, NIXO)],
           [SAVED, set(2, SAVED)],
           [HIDDEN, set(3, HIDDEN)],
+          [REFUSED, set(5, REFUSED)],
         ]),
       ),
     latestReadyAt: () =>
@@ -688,11 +690,13 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
           [NIXO, "2026-10-02T08:04:06.000Z"],
           [SAVED, "2026-09-20T10:00:00.000Z"],
           [HIDDEN, "2026-10-01T10:00:00.000Z"],
+          // Newest of all, yet never listed: the player would refuse it.
+          [REFUSED, "2026-10-02T09:00:00.000Z"],
         ]),
       ),
   };
 
-  it("their connected, interested and saved companies' pitches, newest first, labelled, disclosure re-checked, cursor-paged", async () => {
+  it("their connected, interested and saved companies' pitches, newest first, labelled, disclosure re-checked, only what will play, cursor-paged", async () => {
     const { app } = buildApp({
       principal: PRINCIPAL,
       page: new Error("not used"),
@@ -704,7 +708,10 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
             { companyId: NIXO, label: "CONNECTED" as const },
             { companyId: HIDDEN, label: "INTERESTED" as const },
             { companyId: NO_PITCH, label: "CONNECTED" as const },
+            { companyId: REFUSED, label: "INTERESTED" as const },
           ]),
+        // The player's own rule: REFUSED's pitch would not be signed.
+        mayPlay: (_actor, companyId) => Promise.resolve(companyId !== REFUSED),
         networkCompany: (_actor, companyId) =>
           Promise.resolve(
             companyId === HIDDEN
@@ -756,6 +763,7 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
       network: {
         yourCompanies: () => Promise.resolve([]),
         networkCompany: () => Promise.resolve(null),
+        mayPlay: () => Promise.resolve(true),
       },
     });
     const response = await app.inject({

@@ -112,7 +112,21 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
         }[]
       >)
     | undefined;
+  /** The playback rule; absent, the row is empty rather than unplayable. */
+  readonly mayPlay?: YourCompaniesMayPlay | undefined;
 };
+
+/**
+ * Whether this viewer may play this pitch: the media service's own
+ * playback rule (the one that signs a play), as a yes or no. The row lists
+ * only what will play (live 2026-10-02: four INVESTORS pitches of
+ * companies outside the investor's mandate were listed and refused).
+ */
+export type YourCompaniesMayPlay = (
+  actor: ActorContext,
+  companyId: string,
+  mediaAssetId: string,
+) => Promise<boolean>;
 
 /** How many of their own companies the row considers at most. */
 const YOUR_COMPANIES_MAX = 200;
@@ -392,10 +406,12 @@ export function registerDiscoveryRoutes(
       });
       const pitches = dependencies.pitches;
       const networkCompany = dependencies.networkCompany;
+      const mayPlay = dependencies.mayPlay;
       if (
         dependencies.yourCompanies === undefined ||
         pitches === undefined ||
-        networkCompany === undefined
+        networkCompany === undefined ||
+        mayPlay === undefined
       ) {
         return empty;
       }
@@ -440,6 +456,15 @@ export function registerDiscoveryRoutes(
           () => null,
         );
         if (company === null || company.companyStatus !== "active") continue;
+        // One predicate with the player: only what the playback rule will
+        // sign for this viewer is listed.
+        if (
+          !(await mayPlay(actor, entry.companyId, entry.set.mediaAssetId).catch(
+            () => false,
+          ))
+        ) {
+          continue;
+        }
         items.push({
           companyId: entry.companyId,
           canonicalName: company.canonicalName,

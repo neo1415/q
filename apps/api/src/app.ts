@@ -188,6 +188,8 @@ export type ApiModules = {
         /** "Your companies" row (2026-10-02). Absent: the row is empty. */
         readonly yourCompanies?:
           DiscoveryRoutesDependencies["yourCompanies"] | undefined;
+        /** The playback rule the row lists by. Absent: the row is empty. */
+        readonly mayPlay?: DiscoveryRoutesDependencies["mayPlay"] | undefined;
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
@@ -372,6 +374,7 @@ export function createApp(
       networkCompany: modules.discovery.networkCompany,
       investorImages: modules.discovery.investorImages,
       yourCompanies: modules.discovery.yourCompanies,
+      mayPlay: modules.discovery.mayPlay,
     });
     if (modules.discovery.interactions !== undefined) {
       registerRecommendationInteractionRoutes(app, {

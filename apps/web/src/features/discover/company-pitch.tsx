@@ -1,11 +1,13 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import type {
   DiscoveredCompanyDto,
   PitchSummaryDto,
 } from "@capital-q/contracts";
+import { Button } from "@capital-q/ui/button";
+import { ICON_SIZE, Play } from "@capital-q/ui/icons";
 
 import { actionPlaybackSource } from "./feed/action-feed-transport";
 import { attachHlsOrNativeSource } from "./player/hls-source";
@@ -55,8 +57,11 @@ export function asPlayable(company: {
 
 export function CompanyPitch({
   company,
+  startOnRequest = true,
 }: {
   readonly company: Parameters<typeof asPlayable>[0];
+  /** False once the person already asked to play it (a deferred pitch). */
+  readonly startOnRequest?: boolean | undefined;
 }) {
   const reducedMotion = useSyncExternalStore(
     subscribeReducedMotion,
@@ -71,8 +76,32 @@ export function CompanyPitch({
         authorize={actionPlaybackSource(company.companyId)}
         reducedMotion={reducedMotion}
         attachSource={attachHlsOrNativeSource}
-        startOnRequest
+        startOnRequest={startOnRequest}
       />
     </div>
+  );
+}
+
+/**
+ * A pitch in a list beyond the first (preload policy, doc 20): nothing is
+ * signed or fetched until the person presses Play; only then is the
+ * player mounted, and it starts as soon as its source is ready.
+ */
+export function DeferredCompanyPitch({
+  company,
+}: {
+  readonly company: Parameters<typeof asPlayable>[0];
+}) {
+  const [asked, setAsked] = useState(false);
+  if (asked) return <CompanyPitch company={company} startOnRequest={false} />;
+  return (
+    <Button
+      variant="secondary"
+      onClick={() => setAsked(true)}
+      data-deferred-pitch={company.companyId}
+    >
+      <Play size={ICON_SIZE.compact} aria-hidden="true" />
+      Play {company.canonicalName}&apos;s pitch
+    </Button>
   );
 }

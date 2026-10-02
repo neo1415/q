@@ -6,7 +6,7 @@ import type {
 } from "@capital-q/contracts";
 import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 
-import { CompanyPitch } from "./company-pitch";
+import { CompanyPitch, DeferredCompanyPitch } from "./company-pitch";
 
 /**
  * "Your companies" (founder decision 2026-10-02): pitches from companies
@@ -68,8 +68,8 @@ export function YourCompaniesRow({
 
 /**
  * The full list, newest pitch first. Each pitch plays through the same
- * signed playback as everywhere else (poster first, nothing fetched until
- * Play).
+ * signed playback as everywhere else: the first is signed on load (its
+ * poster), every other one only when the person presses its Play.
  */
 export function YourCompaniesList({
   items,
@@ -78,7 +78,7 @@ export function YourCompaniesList({
 }) {
   return (
     <ul className="flex flex-col gap-8" data-your-companies-list>
-      {items.map((item) => (
+      {items.map((item, index) => (
         <li
           key={item.companyId}
           id={`company-${item.companyId}`}
@@ -98,7 +98,12 @@ export function YourCompaniesList({
               {YOUR_COMPANY_LABEL_WORDS[item.label]}
             </span>
           </div>
-          <CompanyPitch company={item} />
+          {/* Only the first is signed on load; the rest on Play. */}
+          {index === 0 ? (
+            <CompanyPitch company={item} />
+          ) : (
+            <DeferredCompanyPitch company={item} />
+          )}
         </li>
       ))}
     </ul>

@@ -207,6 +207,7 @@ import {
   createPostgresDiscoverablePitchQueryPort,
   createPostgresNetworkPitchQueryPort,
   createUnconfiguredVideoProvider,
+  MediaAssetIdSchema,
 } from "@capital-q/media";
 import {
   createPostgresTaxonomyAssignmentRepository,
@@ -1255,6 +1256,14 @@ const { app, logger } = createApp(config, security, {
         if (!labelled.has(companyId)) labelled.set(companyId, "SAVED");
       }
       return [...labelled].map(([companyId, label]) => ({ companyId, label }));
+    },
+    // The row lists only what the player will sign: the media service's
+    // own playback rule, as a yes or no (live 2026-10-02).
+    mayPlay: async (actor, companyId, mediaAssetId) => {
+      const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+      return parsed.success
+        ? media.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
+        : false;
     },
     networkCompany: async (actor, companyId) => {
       const parsed = CompanyIdSchema.safeParse(companyId);
