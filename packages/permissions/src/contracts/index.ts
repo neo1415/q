@@ -127,6 +127,9 @@ export const DISCLOSURE_RESOURCE_TYPES = [
   "capital_objective",
   "relationship",
   "relationship_event",
+  // Diligence (2026-10-02): one of a company's own documents, shared with
+  // one relationship by its owner (relationship_shared only).
+  "document",
 ] as const;
 export const DisclosureResourceTypeSchema = z.enum(DISCLOSURE_RESOURCE_TYPES);
 export type DisclosureResourceType = z.infer<

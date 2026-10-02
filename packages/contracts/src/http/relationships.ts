@@ -659,3 +659,89 @@ export const networkRelationshipOutcomePath = (
   relationshipId: string,
   verb: "pass" | "pause" | "resume" | "meeting-outcome",
 ) => `/v1/network/relationships/${encodeURIComponent(relationshipId)}/${verb}`;
+
+/**
+ * Diligence (2026-10-02): a minimal gated document area on a relationship
+ * once diligence has started. A share is a disclosure policy on one of the
+ * company's own documents for THIS relationship; requests are the
+ * investor's. Each verb is its own path.
+ */
+export const NETWORK_RELATIONSHIP_DILIGENCE_PATH =
+  "/v1/network/relationships/:relationshipId/diligence" as const;
+export const NETWORK_DILIGENCE_SHARES_PATH =
+  "/v1/network/relationships/:relationshipId/diligence/shares" as const;
+export const NETWORK_DILIGENCE_SHARE_REVOKE_PATH =
+  "/v1/network/relationships/:relationshipId/diligence/shares/:policyId/revoke" as const;
+export const NETWORK_DILIGENCE_REQUESTS_PATH =
+  "/v1/network/relationships/:relationshipId/diligence/requests" as const;
+export const NETWORK_DILIGENCE_REQUEST_FULFIL_PATH =
+  "/v1/network/relationships/:relationshipId/diligence/requests/:requestId/fulfil" as const;
+export const NETWORK_DILIGENCE_DOWNLOAD_PATH =
+  "/v1/network/relationships/:relationshipId/diligence/documents/:documentId/download" as const;
+
+export const diligencePath = (relationshipId: string, rest = "") =>
+  `/v1/network/relationships/${encodeURIComponent(relationshipId)}/diligence${rest}`;
+
+export const DiligenceDtoSchema = z
+  .object({
+    relationshipId: UuidSchema,
+    side: z.enum(["INVESTOR", "COMPANY"]),
+    open: z.boolean(),
+    shares: z
+      .array(
+        z
+          .object({
+            policyId: UuidSchema,
+            documentId: UuidSchema,
+            title: z.string().max(300),
+            documentType: z.string().max(64),
+            sharedAt: UtcTimestampSchema,
+          })
+          .strict(),
+      )
+      .max(200),
+    requests: z
+      .array(
+        z
+          .object({
+            requestId: UuidSchema,
+            title: z.string().max(200),
+            note: z.string().max(1000).nullable(),
+            requestedAt: UtcTimestampSchema,
+            status: z.enum(["OPEN", "FULFILLED"]),
+            fulfilledBy: z
+              .object({
+                documentId: UuidSchema,
+                title: z.string().max(300).nullable(),
+              })
+              .strict()
+              .nullable(),
+          })
+          .strict(),
+      )
+      .max(200),
+  })
+  .strict();
+export type DiligenceDto = z.infer<typeof DiligenceDtoSchema>;
+
+export const ShareDiligenceDocumentRequestSchema = z
+  .object({ documentId: UuidSchema })
+  .strict();
+export const RequestDiligenceDocumentRequestSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    note: z.string().trim().min(1).max(1000).nullable().optional(),
+  })
+  .strict();
+export type RequestDiligenceDocumentRequest = z.infer<
+  typeof RequestDiligenceDocumentRequestSchema
+>;
+export const DiligenceShareResultDtoSchema = z
+  .object({ policyId: UuidSchema })
+  .strict();
+export const DiligenceRequestResultDtoSchema = z
+  .object({ requestId: UuidSchema })
+  .strict();
+export const DiligenceDownloadDtoSchema = z
+  .object({ url: z.string().url(), expiresAt: UtcTimestampSchema })
+  .strict();

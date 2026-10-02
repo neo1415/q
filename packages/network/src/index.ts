@@ -73,6 +73,10 @@ export {
   DiscoveredRelationshipEvent,
   EmailActivityPayloadSchema,
   ChatActivityPayloadSchema,
+  DocumentRequestedRelationshipEvent,
+  DocumentSharedRelationshipEvent,
+  RELATIONSHIP_EVENT_DOCUMENT_REQUESTED,
+  RELATIONSHIP_EVENT_DOCUMENT_SHARED,
   MessageSentRelationshipEvent,
   RELATIONSHIP_EVENT_MESSAGE_SENT,
   MeetingActivityPayloadSchema,
@@ -218,6 +222,11 @@ export {
   type NetworkServiceOptions,
 } from "./application/service.js";
 
+export {
+  createPostgresDiligenceRequests,
+  type DiligenceRequestRecord,
+  type DiligenceRequestRepository,
+} from "./infrastructure/postgres-diligence.js";
 export {
   createPostgresPassStandingReader,
   createPostgresRelationshipEventRepository,

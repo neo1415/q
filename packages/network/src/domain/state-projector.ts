@@ -28,6 +28,8 @@ import {
   RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED,
   RELATIONSHIP_EVENT_RELATIONSHIP_PROGRESSED,
   RELATIONSHIP_EVENT_RELATIONSHIP_RESUMED,
+  RELATIONSHIP_EVENT_DOCUMENT_REQUESTED,
+  RELATIONSHIP_EVENT_DOCUMENT_SHARED,
 } from "./event-registry.js";
 
 /**
@@ -314,6 +316,13 @@ const RESTATEMENTS_V2: Readonly<
   ],
 };
 
+/** v2's activity: v1's, plus diligence documents (never a move). */
+const ACTIVITY_TYPES_V2: ReadonlySet<string> = new Set([
+  ...ACTIVITY_TYPES,
+  RELATIONSHIP_EVENT_DOCUMENT_REQUESTED,
+  RELATIONSHIP_EVENT_DOCUMENT_SHARED,
+]);
+
 const KNOWN_TYPES_V2: ReadonlySet<string> = new Set([
   ...KNOWN_TYPES,
   RELATIONSHIP_EVENT_DILIGENCE_STARTED,
@@ -411,7 +420,7 @@ export function projectRelationshipStateV2(
       }
       continue;
     }
-    if (ACTIVITY_TYPES.has(event.eventType)) continue;
+    if (ACTIVITY_TYPES_V2.has(event.eventType)) continue;
     if (!KNOWN_TYPES_V2.has(event.eventType)) {
       unrecognised += 1;
       continue;

@@ -150,6 +150,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- side only when shared (suite 640).
   ('network', 'relationship_pass_reasons',  'PUBLIC_REFERENCE',     '{SELECT}'),
   ('network', 'relationship_passes',        'RLS_REQUIRED',         '{SELECT}'),
+  -- Diligence (2026-10-02): server-only; both sides read through the API.
+  ('network', 'diligence_requests',         'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'diligence_fulfilments',      'INTERNAL_SERVER_ONLY', '{}'),
   ('identity', 'platform_admins',           'INTERNAL_SERVER_ONLY', '{}'),
   -- BILLING block (ADR 0034): server-only; people read their plan through the API.
   ('billing', 'features',                   'INTERNAL_SERVER_ONLY', '{}'),

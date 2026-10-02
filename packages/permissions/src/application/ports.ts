@@ -115,6 +115,20 @@ export type DisclosurePolicyRepository = {
     executor: DatabaseExecutor,
     resources: readonly DisclosureResourceRef[],
   ) => Promise<readonly DisclosurePolicy[]>;
+  /**
+   * Unrevoked policies of one resource type granted to one recipient (a
+   * relationship's diligence shares). Optional: adapters without it list
+   * nothing.
+   */
+  readonly findUnrevokedForRecipient?:
+    | ((
+        executor: DatabaseExecutor,
+        query: {
+          readonly resourceType: DisclosureResourceRef["type"];
+          readonly recipient: DisclosureRecipient;
+        },
+      ) => Promise<readonly DisclosurePolicy[]>)
+    | undefined;
   /** Every policy of one resource, including revoked history, for inspection. */
   readonly findAllForResource: (
     executor: DatabaseExecutor,

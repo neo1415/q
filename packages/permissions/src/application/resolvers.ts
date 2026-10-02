@@ -19,7 +19,7 @@ import {
   type RelationshipEvent,
   type RelationshipQueryPort,
 } from "@capital-q/network";
-import { UserIdSchema } from "@capital-q/security";
+import { TenantIdSchema, UserIdSchema } from "@capital-q/security";
 
 import type {
   DisclosureResourceDescriptor,
@@ -325,12 +325,52 @@ export function createRelationshipEventDisclosureResolver(ports: {
   };
 }
 
+/**
+ * A company's own document, for disclosure (diligence, 2026-10-02): its
+ * tenant and company, nothing of its content. Owned by Evidence.
+ */
+export type DocumentDisclosurePort = {
+  readonly findCanonicalDocument: (documentId: string) => Promise<{
+    readonly id: string;
+    readonly tenantId: string;
+    readonly companyId: string | null;
+  } | null>;
+};
+
+export function createDocumentDisclosureResolver(ports: {
+  readonly documents: DocumentDisclosurePort;
+  readonly companies: CompanyQueryPort;
+}): DisclosureResourceResolver {
+  return {
+    resourceType: "document",
+    resolve: async (resourceId) => {
+      const document = await ports.documents
+        .findCanonicalDocument(resourceId)
+        .catch(() => null);
+      if (document === null || document.companyId === null) return null;
+      const company = await ports.companies.findCanonicalCompany(
+        CompanyIdSchema.parse(document.companyId),
+      );
+      if (company === null) return null;
+      return {
+        resource: ref("document", document.id),
+        tenantId: TenantIdSchema.parse(document.tenantId),
+        ownerOrganisationId: company.organisationId,
+        // A company's documents are its own until it shares one.
+        intrinsicScope: "founder_private",
+      };
+    },
+  };
+}
+
 export type DisclosureDomainPorts = {
   readonly companies: CompanyQueryPort;
   readonly investors: InvestorOrganisationQueryPort;
   readonly mandates: InvestorMandateQueryPort;
   readonly capital: CapitalObjectiveQueryPort;
   readonly relationships: RelationshipQueryPort;
+  /** Diligence documents. Absent: a document is never a disclosure resource. */
+  readonly documents?: DocumentDisclosurePort | undefined;
 };
 
 /** The full V1 resolver set, in one place, for the composition root. */
@@ -355,5 +395,13 @@ export function createDefaultDisclosureResolvers(
       companies: ports.companies,
       investors: ports.investors,
     }),
+    ...(ports.documents === undefined
+      ? []
+      : [
+          createDocumentDisclosureResolver({
+            documents: ports.documents,
+            companies: ports.companies,
+          }),
+        ]),
   ];
 }
