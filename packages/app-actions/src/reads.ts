@@ -22,6 +22,9 @@ export const OWN_READ_KINDS = [
   // 2026-10-02: their recent calls with Q's notes, so "how did it go?",
   // the follow-ups and what was proposed to Q in the call can be acted on.
   "calls",
+  // 2026-10-02: the files they uploaded (deck, financials, …), as their
+  // documents page lists them; "documents" is Q's own drafts for them.
+  "uploads",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -63,6 +66,14 @@ export type OwnReadPorts = AppActionPorts & {
    * and, for the organiser, what was proposed to Q in the call.
    */
   readonly calls?:
+    ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
+  /**
+   * The files their organisation uploaded (pitch deck, financials, …), as
+   * the documents page lists them, read through the evidence service with
+   * its own authorization. Parity eval 2026-10-02: "Make our deck …" was
+   * matched against Q's drafts, never the uploaded deck.
+   */
+  readonly uploads?:
     ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
   /** Their own company's name, to name an untitled pitch video by. */
   readonly ownCompanyName?:
@@ -161,6 +172,8 @@ export async function readOwn(
       return ports.feed === undefined ? null : ports.feed(actor);
     case "calls":
       return ports.calls === undefined ? null : ports.calls(actor);
+    case "uploads":
+      return ports.uploads === undefined ? null : ports.uploads(actor);
   }
 }
 
@@ -170,6 +183,7 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   rehearsals: "Rehearsals",
   feed: "Companies in their Discover feed now",
   calls: "Recent calls with Q's notes",
+  uploads: "Files they uploaded",
 };
 
 /** One kind in the "what exists" index: a count and a few titles with state. */

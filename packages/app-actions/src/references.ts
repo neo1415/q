@@ -13,6 +13,8 @@ export const REFERENCE_KINDS = [
   "COMPANY",
   "RELATIONSHIP",
   "DOCUMENT",
+  // A file they uploaded (deck, financials): DOCUMENT is Q's own drafts.
+  "UPLOAD",
   "MEDIA",
   "REHEARSAL",
 ] as const;

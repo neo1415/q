@@ -59,6 +59,7 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
       "What did we agree on my last call?",
       "What follow-ups came out of my call?",
     ],
+    uploads: ["Which files have I uploaded?", "Have I uploaded my deck?"],
   };
 
 export function parityCases(

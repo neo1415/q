@@ -4,9 +4,6 @@ import {
   ME_PROFILE_PATH,
   MeResponseSchema,
   PersonProfileDtoSchema,
-  UpdateMeRequestSchema,
-  UpdatePersonProfileRequestSchema,
-  parseContract,
   type MeResponse,
   type PersonProfileDto,
 } from "@capital-q/contracts";
@@ -100,28 +97,8 @@ export function registerMeRoute(
     return { store: people, profile };
   };
 
-  // `PATCH /v1/me` — what to call the person, as it always was: no
-  // version, the latest request wins. Kept for the callers that predate
-  // the profile route; it writes through the same store.
-  app.patch(ME_PATH, { onRequest: authenticated }, async (request, reply) => {
-    const parsed = UpdateMeRequestSchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
-      return reply.code(400).send({
-        type: "about:blank",
-        title: "Bad Request",
-        status: 400,
-        detail: "A display name between 1 and 80 characters is required.",
-      });
-    }
-    const { store, profile } = await ownProfile(getPrincipal(request));
-    await store.update({
-      userId: profile.userId,
-      expectedVersion: profile.version,
-      changes: { displayName: parsed.data.displayName },
-    });
-    return reply.code(204).send();
-  });
-
+  // PATCH /v1/me and /v1/me/profile are generated from the action registry,
+  // person-scoped (ADR 0040, http/app-actions.ts), through the same store.
   if (people !== undefined) {
     app.get(
       ME_PROFILE_PATH,
@@ -130,36 +107,6 @@ export function registerMeRoute(
         const { profile } = await ownProfile(getPrincipal(request));
         void reply.header("Cache-Control", "no-store");
         return toPersonProfileDto(profile);
-      },
-    );
-
-    // Optimistic and idempotent: a stale version is VERSION_CONFLICT, and
-    // a replay of a change that already landed answers with the profile as
-    // it stands (the store's rule, shared with Q's approved action).
-    app.patch(
-      ME_PROFILE_PATH,
-      { onRequest: authenticated },
-      async (request, reply) => {
-        const input = parseContract(
-          UpdatePersonProfileRequestSchema,
-          request.body,
-          "The profile update is not valid.",
-        );
-        const { store, profile } = await ownProfile(getPrincipal(request));
-        const updated = await store.update({
-          userId: profile.userId,
-          expectedVersion: input.expectedVersion,
-          changes: {
-            ...(input.displayName === undefined
-              ? {}
-              : { displayName: input.displayName }),
-            ...(input.headline === undefined
-              ? {}
-              : { headline: input.headline }),
-          },
-        });
-        void reply.header("Cache-Control", "no-store");
-        return toPersonProfileDto(updated);
       },
     );
   }

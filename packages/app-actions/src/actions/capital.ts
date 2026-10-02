@@ -27,6 +27,7 @@ import {
   defineAppAction,
   portMissing,
   defineAppActionFamily,
+  refusal,
   type AnyAppAction,
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
@@ -393,7 +394,9 @@ export const CAPITAL_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
       const current = await ports.capital
         .getCurrentCapitalObjective({ actor: context.actor, companyId })
         .catch(() => null);
-      if (current === null) return null;
+      if (current === null) {
+        return refusal("Your company has no raise yet: set one up first.");
+      }
       const objective = {
         companyId,
         capitalObjectiveId: current.id,

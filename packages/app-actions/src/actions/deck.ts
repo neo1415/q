@@ -157,7 +157,7 @@ export const SET_DECK_AUDIENCE = defineAppAction<
     description:
       "Sets who can download the person's own pitch deck -- only their organisation, or investors who can find their company (the same investors who can watch its pitch) -- exactly as the documents page's choice does. Prepared for their approval: nothing changes until they approve exactly it.",
     input: ToolInputSchema,
-    references: { deck: "DOCUMENT" },
+    references: { deck: "UPLOAD" },
     // Offered when the person asks for a change (and on a general turn);
     // an own-company question's tools are already at MODEL_TOOLS_MAX.
     scopes: ["COMPANY_PROFILE"],
@@ -167,7 +167,7 @@ export const SET_DECK_AUDIENCE = defineAppAction<
         "Let investors download my deck {name}.",
         "Make {name} private to my organisation again.",
       ],
-      names: "DOCUMENT",
+      names: "UPLOAD",
     },
     toCanonical: (input) =>
       Promise.resolve({ documentId: input.deck, audience: input.audience }),

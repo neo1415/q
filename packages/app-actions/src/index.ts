@@ -1,6 +1,9 @@
 export {
   defineAppAction,
   defineAppActionFamily,
+  isRefusal,
+  refusal,
+  type AppActionRefusal,
   definePersonAction,
   type AnyPersonAction,
   type PersonActionContext,

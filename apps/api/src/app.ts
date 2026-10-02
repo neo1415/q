@@ -510,6 +510,7 @@ export function createApp(
       ...(modules.onboardingNudges === undefined
         ? {}
         : { onboardingNudges: modules.onboardingNudges }),
+      ...(security.people === undefined ? {} : { people: security.people }),
     },
   });
 

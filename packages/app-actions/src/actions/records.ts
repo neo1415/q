@@ -52,6 +52,7 @@ import { UserIdSchema, type PersonProfile } from "@capital-q/security";
 
 import {
   defineAppAction,
+  refusal,
   portMissing,
   type AnyAppAction,
   type AppActionContext,
@@ -1057,7 +1058,13 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
           actor: context.actor,
           subject,
         });
-        if (current === null) return null;
+        // No card yet: say so, and what makes one (parity eval 2026-10-02:
+        // a bare refusal read as "not available in this context").
+        if (current === null) {
+          return refusal(
+            "You don't have a Q Card yet: claiming a handle makes one (claim_q_card_handle).",
+          );
+        }
         return {
           subject,
           input: {

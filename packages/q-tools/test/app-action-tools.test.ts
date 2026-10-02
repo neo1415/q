@@ -603,6 +603,8 @@ describe("the raise form, one generated tool for its four declarations", () => {
       contextFor(actorA, founderPlan()),
     );
     expect(update.result).toMatchObject({ ok: false });
+    // The refusal says why in words, rather than a bare NOT_AVAILABLE.
+    expect(JSON.stringify(update.result)).toContain("no raise yet");
     expect(none.prepared).toEqual([]);
   });
 
@@ -859,5 +861,120 @@ describe("sharing their raise, by the investor's name (visibility and shares)", 
         },
       },
     ]);
+  });
+});
+
+describe("their uploaded deck, by its name (parity eval 2026-10-02)", () => {
+  const DECK = "6a0c1f5e-0000-4000-8000-0000000000d1";
+  const FINANCIALS = "6a0c1f5e-0000-4000-8000-0000000000d2";
+  const upload = (id: string, title: string, type: string) => ({
+    id,
+    title,
+    status: "ready",
+    at: null,
+    facts: { type, reading: "COMPLETED" },
+  });
+
+  function deckWorld() {
+    const prepared: { actionType: string; payload: unknown }[] = [];
+    const ports = fakePorts({
+      appActions: {
+        ownCompanyId: (actor) =>
+          Promise.resolve(actor.userId === actorA.userId ? COMPANY_A : null),
+        // Q's own drafts: never what a deck name is matched among.
+        documents: () =>
+          Promise.resolve([
+            upload(
+              "6a0c1f5e-0000-4000-8000-0000000000d3",
+              "Ajopot deck notes",
+              "MEMO",
+            ),
+          ]),
+        uploads: () =>
+          Promise.resolve([
+            upload(DECK, "Ajopot seed deck", "PITCH_DECK"),
+            upload(FINANCIALS, "Ajopot financials 2026", "FINANCIALS"),
+          ]),
+        deckAudience: {
+          getDocument: ({ documentId }) =>
+            documentId === DECK
+              ? Promise.resolve({
+                  id: DECK,
+                  title: "Ajopot seed deck",
+                  documentType: "PITCH_DECK",
+                  downloadAudience: "ORGANISATION" as const,
+                  version: 3,
+                })
+              : Promise.reject(new Error("not found")),
+          setDocumentDownloadAudience: () =>
+            Promise.reject(new Error("not on Q's path")),
+        },
+      },
+      appApprovals: {
+        prepareForApproval: (entry) => {
+          prepared.push({
+            actionType: entry.actionType,
+            payload: entry.payload,
+          });
+          return "PREPARED";
+        },
+      },
+    });
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(createDefaultQTools(ports)),
+    });
+    return { executor, prepared };
+  }
+
+  const plan = (): PermittedContextPlan => {
+    const base = planFor(actorA, "ACTION_PREPARATION", [
+      { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        sensitivity: "CONFIDENTIAL",
+        companyId: COMPANY_A,
+      },
+    ]);
+    return {
+      ...base,
+      scopes: base.scopes.map((scope) =>
+        scope.kind === "OWN_Q_CONVERSATION"
+          ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+          : scope,
+      ),
+    };
+  };
+
+  it.each(["Ajopot seed deck", "my deck"])(
+    "'%s' finds the uploaded deck, never Q's drafts",
+    async (said) => {
+      const { executor, prepared } = deckWorld();
+      const outcome = await executor.execute(
+        call("set_deck_audience", { deck: said, audience: "INVESTORS" }),
+        contextFor(actorA, plan()),
+      );
+      expect(outcome.result).toMatchObject({ ok: true });
+      expect(prepared).toHaveLength(1);
+      expect(prepared[0]).toMatchObject({
+        actionType: "app.document.deck_audience.set",
+        payload: { documentId: DECK },
+      });
+    },
+  );
+
+  it("read_my uploads lists the files they uploaded", async () => {
+    const { executor } = deckWorld();
+    const outcome = await executor.execute(
+      call("read_my", { kind: "uploads" }),
+      contextFor(actorA, plan()),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        kind: "uploads",
+        available: true,
+        items: [{ id: DECK }, { id: FINANCIALS }],
+      },
+    });
   });
 });
