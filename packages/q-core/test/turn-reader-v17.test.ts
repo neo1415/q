@@ -8,6 +8,11 @@ import {
   TURN_READER_V17,
 } from "../src/index.js";
 
+// PASSED arrives with v29.
+const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
+  (name) => name !== "PASSED",
+);
+
 /**
  * TURN_READER v17 (founder direction 2026-09-30: "Q can take me
  * anywhere"): every screen of the app is a destination. Nothing of v16 is
@@ -16,12 +21,12 @@ import {
 describe("TURN_READER v17", () => {
   it("is superseded by v18, which only adds a screen", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(28);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(29);
   });
 
   it("names every contract destination exactly once", () => {
     // REHEARSALS is named from v19 on.
-    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+    for (const destination of DESTINATIONS_BEFORE_V29.filter(
       (entry) =>
         entry !== "REHEARSALS" &&
         entry !== "DOCUMENTS" &&

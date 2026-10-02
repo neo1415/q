@@ -8,6 +8,11 @@ import {
   TURN_READER_V20,
 } from "../src/index.js";
 
+// PASSED arrives with v29.
+const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
+  (name) => name !== "PASSED",
+);
+
 /** TURN_READER v20 (DOCS, on REHEARSE's v19): Documents is a destination. */
 describe("TURN_READER v20", () => {
   it("stays resolvable by its exact version once v21 replaces it", () => {
@@ -19,7 +24,7 @@ describe("TURN_READER v20", () => {
 
   it("names every contract destination of its time exactly once", () => {
     // DAILY arrived with v21.
-    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+    for (const destination of DESTINATIONS_BEFORE_V29.filter(
       // RESULTS arrives with v24.
       (name) => name !== "DAILY" && name !== "RESULTS",
     )) {

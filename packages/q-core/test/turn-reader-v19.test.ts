@@ -8,6 +8,11 @@ import {
   TURN_READER_V19,
 } from "../src/index.js";
 
+// PASSED arrives with v29.
+const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
+  (name) => name !== "PASSED",
+);
+
 /** TURN_READER v19 (REHEARSE, on HARDEN's v18): the Rehearsals screen is a destination. */
 describe("TURN_READER v19", () => {
   it("stays resolvable by its exact version once v20 replaces it", () => {
@@ -19,7 +24,7 @@ describe("TURN_READER v19", () => {
 
   it("names every contract destination of its time exactly once", () => {
     // DOCUMENTS arrived with v20, DAILY with v21.
-    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+    for (const destination of DESTINATIONS_BEFORE_V29.filter(
       (name) => name !== "DOCUMENTS" && name !== "DAILY" && name !== "RESULTS",
     )) {
       expect(

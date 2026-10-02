@@ -8,6 +8,11 @@ import {
   TurnReaderV11ResultSchema,
 } from "../src/index.js";
 
+// PASSED arrives with v29.
+const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
+  (name) => name !== "PASSED",
+);
+
 /**
  * TURN_READER v13 (R33): every destination the contracts name is one the
  * reader can choose, so "open my settings" navigates instead of falling to
@@ -40,7 +45,7 @@ describe("TURN_READER v13", () => {
       // RESULTS arrives with v24.
       "RESULTS",
     ];
-    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+    for (const destination of DESTINATIONS_BEFORE_V29.filter(
       (entry) => !V17_SCREENS.includes(entry),
     )) {
       expect(

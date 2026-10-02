@@ -38,7 +38,7 @@ export const TURN_READER_V28: PromptDefinition<
 > = {
   ...TURN_READER_V27,
   version: 28,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "HARDEN P0 2026-10-02 (Zino): one direct request (a message, a meeting at a time, a pass) is a TOOL_REQUEST, never a hand-over; timeWindow carries a requested time relative to now.",
   effectiveFrom: "2026-10-02",

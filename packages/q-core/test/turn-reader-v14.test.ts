@@ -10,6 +10,11 @@ import {
   TurnReaderV14ResultSchema,
 } from "../src/index.js";
 
+// PASSED arrives with v29.
+const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
+  (name) => name !== "PASSED",
+);
+
 /**
  * TURN_READER v14 (founder live 2026-09-28 #1): any answer can be a
  * document. v13's rules and destinations stay.
@@ -17,7 +22,7 @@ import {
 describe("TURN_READER v14", () => {
   it("is the active reader and v13 is deprecated", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(28);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(29);
     expect(TURN_READER_V13.status).toBe("DEPRECATED");
     expect(TURN_READER_V14.template).toContain("SEQUENCE (null unless");
     expect(TURN_READER_V14.template).toContain("unknownScreen is set");
@@ -51,7 +56,7 @@ describe("TURN_READER v14", () => {
       // RESULTS arrives with v24.
       "RESULTS",
     ];
-    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+    for (const destination of DESTINATIONS_BEFORE_V29.filter(
       (entry) => !V17_SCREENS.includes(entry),
     )) {
       expect(

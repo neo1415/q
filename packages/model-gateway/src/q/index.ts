@@ -83,7 +83,13 @@ import { withoutActionTalk } from "./action-talk.js";
 import { ownProfileFact } from "./own-profile.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
-import { ownStandingFact } from "./own-standing.js";
+import {
+  ownIndexFact,
+  ownStandingFact,
+  type QOwnIndex,
+} from "./own-standing.js";
+
+export type { QOwnIndex } from "./own-standing.js";
 import { onScreenCompanyFact } from "./company-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
@@ -1099,6 +1105,18 @@ export type ModelGatewayQAnswerDependencies = {
         readonly firstAnswer?: boolean | undefined;
       }) => Promise<string | null>)
     | undefined;
+  /**
+   * What exists on the person's own account, by kind (HARDEN, ADR 0040 with
+   * QA's read registry): counts and a few titles, read for them each turn.
+   * Absent: no index (Q still reads with its tools).
+   */
+  readonly ownIndex?:
+    | ((request: {
+        readonly actor: QAnswerRequest["actor"];
+        readonly runId: string;
+        readonly plan: QAnswerRequest["plan"];
+      }) => Promise<QOwnIndex | null>)
+    | undefined;
   /** Narrows provider eligibility for this composition; never widens it. */
   readonly tenantPolicy?: TenantModelPolicy | undefined;
   readonly logger?: Logger | undefined;
@@ -1688,6 +1706,14 @@ export function createModelGatewayQAnswer(
     })();
     let ownStanding: AuthorisedFact | null = null;
     let ownStandingCall: QToolCallObservation | null = null;
+    let ownIndex: AuthorisedFact | null = null;
+    const indexDone = (async (): Promise<void> => {
+      if (dependencies.ownIndex === undefined) return;
+      const index = await dependencies
+        .ownIndex({ actor: request.actor, runId: request.runId, plan })
+        .catch(() => null);
+      ownIndex = ownIndexFact(index);
+    })();
     const standingDone = (async (): Promise<void> => {
       if (standingRead !== null) {
         const outcome = await standingRead.catch(() => null);
@@ -1780,6 +1806,7 @@ export function createModelGatewayQAnswer(
       mandateRead,
       relationshipRead,
       standingDone,
+      indexDone,
       pitchRead,
       onboardingRead,
       companyRead,
@@ -1815,6 +1842,7 @@ export function createModelGatewayQAnswer(
       counterparty,
       ownStanding,
       ownStandingCall,
+      ownIndex,
       pitchMoment,
       onboardingFacts,
     };
@@ -1902,6 +1930,7 @@ export function createModelGatewayQAnswer(
         ownDayCalls,
         ownStanding,
         ownStandingCall,
+        ownIndex,
         pitchMoment,
         onboardingFacts,
       } = prepared;
@@ -1968,6 +1997,7 @@ export function createModelGatewayQAnswer(
         ...(ownDay === null ? [] : [ownDay]),
         ...(relationship === null ? [] : [relationship]),
         ...(ownStanding === null ? [] : [ownStanding]),
+        ...(ownIndex === null ? [] : [ownIndex]),
         ...(pitchMoment === null ? [] : [pitchMoment]),
         ...assembled.facts,
       ];
@@ -3033,6 +3063,37 @@ export function createModelGatewayQAnswer(
               kind !== "ANALYTICAL"
             );
           });
+        /**
+         * A parity gap (HARDEN, ADR 0040 with QA, 2026-10-02): they asked Q
+         * to do something and this answer did nothing -- no change
+         * prepared, no screen action, no document, no approval. Every such
+         * turn is logged under one key, with what was offered and what was
+         * tried, so each miss is seen rather than found live.
+         */
+        if (
+          request.turnKind === "TOOL_REQUEST" &&
+          !preparedThisTurn &&
+          clientActionBlocks.length === 0 &&
+          approvalLine === null &&
+          gaps === null &&
+          request.writingDocument !== true
+        ) {
+          logger?.warn(
+            {
+              key: "q.parity_gap",
+              qRunId: request.runId,
+              offered: offered.length,
+              called: toolCalls.map(
+                (call) => `${call.providerName}:${call.status}`,
+              ),
+              refusedOrFailed: toolCalls
+                .filter((call) => call.status !== "SUCCEEDED")
+                .map((call) => call.failureCode ?? call.status),
+              actionTalk: analyst.actionTalk.length,
+            },
+            "q.parity_gap",
+          );
+        }
         const statusLine =
           analyst.proposalStatus &&
           approvalLine === null &&

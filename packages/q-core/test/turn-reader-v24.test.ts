@@ -9,6 +9,11 @@ import {
   TurnReaderV24ResultSchema,
 } from "../src/index.js";
 
+// PASSED arrives with v29.
+const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
+  (name) => name !== "PASSED",
+);
+
 /**
  * TURN_READER v24 (founder live 2026-10-01): speech never meant for Q --
  * a dictation to someone else, a name said to another person -- and the
@@ -18,7 +23,7 @@ describe("TURN_READER v24", () => {
   it("is the active reader and v23 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(28);
+    ).toBe(29);
     expect(TURN_READER_V23.status).toBe("DEPRECATED");
     expect(TURN_READER_V24.status).toBe("DEPRECATED");
   });
@@ -52,7 +57,7 @@ describe("TURN_READER v24", () => {
 
   it("names every contract destination exactly once, and RESULTS", () => {
     for (const destination of new Set<string>([
-      ...Q_NAVIGATE_DESTINATIONS,
+      ...DESTINATIONS_BEFORE_V29,
       "RESULTS",
     ])) {
       expect(

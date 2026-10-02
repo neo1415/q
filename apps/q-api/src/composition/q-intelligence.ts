@@ -142,6 +142,11 @@ export type QIntelligenceDependencies = {
   readonly ownDay?: ModelGatewayQAnswerDependencies["ownDay"];
   readonly askerOf?: ModelGatewayQAnswerDependencies["askerOf"];
   /**
+   * What exists on the person's own account, by kind (ADR 0040: QA's read
+   * registry composes it). Absent: no index.
+   */
+  readonly ownIndex?: ModelGatewayQAnswerDependencies["ownIndex"];
+  /**
    * Where an answer goes as it is written. Absent means it goes out only
    * when it is finished; the stored message and its completion event are
    * the same either way.
@@ -285,6 +290,9 @@ export function composeQIntelligence(
     ...(dependencies.askerOf === undefined
       ? {}
       : { askerOf: dependencies.askerOf }),
+    ...(dependencies.ownIndex === undefined
+      ? {}
+      : { ownIndex: dependencies.ownIndex }),
     ...(dependencies.ownDay === undefined
       ? {}
       : { ownDay: dependencies.ownDay }),

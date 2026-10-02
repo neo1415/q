@@ -185,6 +185,7 @@ const DESTINATION_LABELS: Readonly<
   PITCH: "Open Pitch & media",
   COMPANY_INTEREST: "Open investor interest",
   SAVED: "Open Saved",
+  PASSED: "Open Passed",
   INVESTORS: "Open Investors",
   SEARCH: "Open Search",
   GATEWAY: "Open your gateway",

@@ -14,11 +14,12 @@ import {
  * as a window from now.
  */
 describe("TURN_READER v28", () => {
-  it("is the active reader and v27 is deprecated", () => {
+  it("v27 is deprecated (v29 is active)", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(28);
+    ).toBe(29);
     expect(TURN_READER_V27.status).toBe("DEPRECATED");
+    expect(TURN_READER_V28.status).toBe("DEPRECATED");
   });
 
   it("keeps a message or a meeting at a time out of the hand-over, and loses nothing of v27", () => {

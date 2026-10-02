@@ -597,3 +597,96 @@ describe("TALUM is Tallyloom, and his own interest is not a request to accept (l
     expect(sent).toContain("the other side hasn't answered yet");
   });
 });
+
+/**
+ * HARDEN with QA's ADR 0040 (2026-10-02): Q never says "no record" of
+ * something the person has -- WHAT EXISTS rides on every turn -- and never
+ * says "can't" without looking; a turn that asked Q to act and did nothing
+ * is logged as q.parity_gap.
+ */
+describe("what exists, and the parity gap", () => {
+  const capture = () => {
+    const warned: { data: unknown; message: string }[] = [];
+    const logger = {
+      info: () => undefined,
+      debug: () => undefined,
+      error: () => undefined,
+      warn: (data: unknown, message: string) => warned.push({ data, message }),
+      child: () => logger,
+    };
+    return { warned, logger: logger as never };
+  };
+
+  it("puts WHAT EXISTS in the facts and the check-before-can't line in the note", async () => {
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {
+        ownIndex: () =>
+          Promise.resolve({
+            kinds: [
+              {
+                kind: "DOCUMENTS",
+                label: "Documents",
+                total: 3,
+                titles: ["Nixo deck v2", "Investor brief", "Q report"],
+              },
+              { kind: "MEETINGS", label: "Meetings", total: 0, titles: [] },
+            ],
+          }),
+      },
+    );
+    await seam.answer(request);
+    const sent = sentTo(alpha);
+    expect(sent).toContain(
+      "WHAT EXISTS on the person's own account (counts, read for them this turn; read any of it with read_my): Documents: 3 (Nixo deck v2; Investor brief; Q report). Meetings: 0.",
+    );
+    expect(sent).toContain("CHECK BEFORE NO OR CAN'T");
+  });
+
+  it("logs q.parity_gap when they asked Q to act and the answer did nothing", async () => {
+    const { warned, logger } = capture();
+    const { seam, request } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      { logger },
+    );
+    await seam.answer({ ...request, turnKind: "TOOL_REQUEST" });
+    const gap = warned.find((entry) => entry.message === "q.parity_gap");
+    expect(gap?.data).toMatchObject({ key: "q.parity_gap" });
+  });
+
+  it("does not log a gap for a question", async () => {
+    const { warned, logger } = capture();
+    const { seam, request } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      { logger },
+    );
+    await seam.answer({ ...request, turnKind: "QUESTION_TO_Q" });
+    expect(warned.some((entry) => entry.message === "q.parity_gap")).toBe(
+      false,
+    );
+  });
+});
+
+describe("ownIndexFact", () => {
+  it("is compact: three titles at most, long ones cut, nothing for an empty index", async () => {
+    const { ownIndexFact } = await import("../src/q/own-standing.js");
+    expect(ownIndexFact(null)).toBe(null);
+    expect(ownIndexFact({ kinds: [] })).toBe(null);
+    const fact = ownIndexFact({
+      kinds: [
+        {
+          kind: "RELATIONSHIPS",
+          label: "Relationships",
+          total: 5,
+          titles: ["Nixo", "Tallyloom", "Kazikit", "Yamfield"],
+        },
+      ],
+    });
+    expect(fact?.statement).toContain(
+      "Relationships: 5 (Nixo; Tallyloom; Kazikit; …)",
+    );
+  });
+});

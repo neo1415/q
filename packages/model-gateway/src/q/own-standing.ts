@@ -190,3 +190,41 @@ export function ownStandingFact(
     source: "Capital Q relationship history",
   };
 }
+
+/**
+ * What exists on the person's own account, by kind (HARDEN with QA's ADR
+ * 0040 read registry, 2026-10-02): counts and a few titles, so Q never
+ * says "no record" of something they have. Compact on purpose: it rides
+ * on every turn.
+ */
+export type QOwnIndex = {
+  readonly kinds: readonly {
+    readonly kind: string;
+    readonly label: string;
+    readonly total: number;
+    readonly titles: readonly string[];
+  }[];
+};
+
+export function ownIndexFact(index: QOwnIndex | null): AuthorisedFact | null {
+  if (index === null || index.kinds.length === 0) return null;
+  const parts = index.kinds.slice(0, 16).map((entry) => {
+    const titles = entry.titles
+      .map((title) => title.trim())
+      .filter((title) => title.length > 0)
+      .slice(0, 3)
+      .map((title) => (title.length > 60 ? `${title.slice(0, 57)}…` : title));
+    return `${entry.label}: ${String(entry.total)}${titles.length === 0 ? "" : ` (${titles.join("; ")}${entry.total > titles.length ? "; …" : ""})`}`;
+  });
+  return {
+    scope: "RELATIONSHIP_CONTEXT",
+    statement:
+      `WHAT EXISTS on the person's own account (counts, read for them this turn; read any of it with read_my): ${parts.join(". ")}. A kind not listed may still exist: read before saying it doesn't.`.slice(
+        0,
+        1_500,
+      ),
+    truthClass: "VERIFIED",
+    evidenceStatus: "PLATFORM_VERIFIED",
+    source: "Capital Q records",
+  };
+}
