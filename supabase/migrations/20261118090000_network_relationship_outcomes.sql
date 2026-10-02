@@ -119,6 +119,8 @@ begin
 end
 $$;
 
+revoke all on function private.network_relationship_passes_party_guard() from public, anon, authenticated;
+
 create trigger relationship_passes_party_guard
   before insert on network.relationship_passes
   for each row execute function private.network_relationship_passes_party_guard();
@@ -133,6 +135,8 @@ begin
     using errcode = '55000';
 end
 $$;
+
+revoke all on function private.network_relationship_passes_append_only() from public, anon, authenticated;
 
 create trigger relationship_passes_append_only
   before update or delete on network.relationship_passes
@@ -165,7 +169,7 @@ as $$
   )
 $$;
 
-revoke all on function private.is_relationship_side_member(uuid, text) from public;
+revoke all on function private.is_relationship_side_member(uuid, text) from public, anon;
 grant execute on function private.is_relationship_side_member(uuid, text) to authenticated;
 
 -- The investor side reads its own passes, reason and note included.

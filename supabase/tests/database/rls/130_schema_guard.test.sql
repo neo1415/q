@@ -145,6 +145,11 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'daily_cluster_issues',     'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'conversation_message_marks', 'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'commitments',                'RLS_REQUIRED',         '{SELECT}'),
+  -- Post-meeting outcomes (2026-10-02): pass reasons are reference rows
+  -- (spec 6.6.10); a pass is read by the investor side, and by the company
+  -- side only when shared (suite 640).
+  ('network', 'relationship_pass_reasons',  'PUBLIC_REFERENCE',     '{SELECT}'),
+  ('network', 'relationship_passes',        'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'platform_admins',           'INTERNAL_SERVER_ONLY', '{}'),
   -- BILLING block (ADR 0034): server-only; people read their plan through the API.
   ('billing', 'features',                   'INTERNAL_SERVER_ONLY', '{}'),
@@ -300,7 +305,10 @@ select is(
     where n.nspname = 'private' and p.prosecdef
       and p.proname not in ('handle_new_auth_user', 'current_app_user_id', 'is_tenant_member', 'is_organisation_member',
                             -- R34: party check for chat RLS, reviewed 2026-09-27 (search_path '', boolean only, membership-based).
-                            'is_conversation_party')),
+                            'is_conversation_party',
+                            -- 2026-10-02: which side of a relationship the caller is an active member of, for
+                            -- network.relationship_passes RLS (search_path '', boolean only, membership-based).
+                            'is_relationship_side_member')),
   '',
   'the set of SECURITY DEFINER helpers is exactly the reviewed set (new ones are listed on failure)');
 
