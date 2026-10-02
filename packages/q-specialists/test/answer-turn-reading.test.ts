@@ -2458,3 +2458,104 @@ describe("a reader's arguments the tool refuses are read again (parity eval 2026
     expect(delegated()).toBe(1);
   });
 });
+
+/**
+ * QA parity run 1ec08a4b (2026-10-02): "Make our fund visible to founders on
+ * Capital Q" was read as SET_VISIBILITY, the company's hand, and the investor
+ * was told Q changes who sees a company. SET_VISIBILITY stays a company's;
+ * with no company in the run and the fund's own action offered, that action
+ * is done with the arguments read from their words.
+ */
+describe("a fund's visibility is its own action, never the company's hand (QA 1ec08a4b)", () => {
+  const fundPort = (ran: unknown[]): QAppActionPort => ({
+    tools: new Set(["set_investor_visibility", "pass_company"]),
+    run: (_request, action) => {
+      ran.push(action);
+      return Promise.resolve(`Done: ${action.tool}.`);
+    },
+  });
+  const said = "Make our fund visible to founders on Capital Q.";
+
+  it("read as SET_VISIBILITY with no company: set_investor_visibility runs; the company hand does not", async () => {
+    const ran: unknown[] = [];
+    const noted: unknown[] = [];
+    const asked: unknown[] = [];
+    const run = seam({
+      said,
+      reading: toolReading({
+        kind: "SET_VISIBILITY",
+        destination: null,
+        visibility: "network_visible",
+      }),
+      outcomes: [],
+      visibility: { noteVisibility: (entry) => noted.push(entry) },
+      offeredTools: ["set_investor_visibility", "get_company"],
+      appActions: fundPort(ran),
+      appActionArguments: (_request, input) => {
+        asked.push(input);
+        return Promise.resolve({ visibility: "network_visible" });
+      },
+    });
+    await run.answer.answer(request());
+    expect(noted).toEqual([]);
+    expect(asked).toEqual([
+      { tool: "set_investor_visibility", utterance: said },
+    ]);
+    expect(ran).toEqual([
+      {
+        tool: "set_investor_visibility",
+        arguments: { visibility: "network_visible" },
+      },
+    ]);
+    expect(run.stored.at(-1)?.content).toBe("Done: set_investor_visibility.");
+    expect(run.stored.at(-1)?.content).not.toMatch(/who sees a company/);
+  });
+
+  it("'make my company visible to investors' with a company in the run is still the company's hand", async () => {
+    const ran: unknown[] = [];
+    const noted: Record<string, unknown>[] = [];
+    const run = seam({
+      said: "please make my company visible to investors",
+      reading: toolReading({
+        kind: "SET_VISIBILITY",
+        destination: null,
+        visibility: "network_visible",
+      }),
+      outcomes: [],
+      visibility: { noteVisibility: (entry) => noted.push(entry) },
+      offeredTools: ["set_investor_visibility"],
+      appActions: fundPort(ran),
+      appActionArguments: () =>
+        Promise.resolve({ visibility: "network_visible" }),
+    });
+    const turn = {
+      ...request(),
+      subjects: [{ kind: "COMPANY" as const, companyId: COMPANY }],
+    } as QAnswerRequest;
+    await run.answer.answer(turn);
+    expect(ran).toEqual([]);
+    expect(noted).toHaveLength(1);
+    expect(noted[0]?.["companyId"]).toBe(COMPANY);
+  });
+
+  it("without the fund's action offered, the company hand says what it can do, as before", async () => {
+    const ran: unknown[] = [];
+    const run = seam({
+      said,
+      reading: toolReading({
+        kind: "SET_VISIBILITY",
+        destination: null,
+        visibility: "network_visible",
+      }),
+      outcomes: [],
+      visibility: { noteVisibility: () => undefined },
+      offeredTools: ["get_company"],
+      appActions: fundPort(ran),
+      appActionArguments: () =>
+        Promise.resolve({ visibility: "network_visible" }),
+    });
+    await run.answer.answer(request());
+    expect(ran).toEqual([]);
+    expect(run.stored.at(-1)?.content).toMatch(/who sees a company/);
+  });
+});

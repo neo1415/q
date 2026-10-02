@@ -34,7 +34,7 @@ export const TURN_READER_V33: PromptDefinition<
 > = {
   ...TURN_READER_V32,
   version: 33,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Lead 2026-10-02 (speed): every per-turn value last (action groups, modality, recent turns, the words), so the static instructions form one cacheable prefix. Same words and schema as v32.",
   effectiveFrom: "2026-10-02",

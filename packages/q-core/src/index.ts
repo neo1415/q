@@ -235,6 +235,7 @@ export {
   TURN_READER_V33,
   TURN_READER_V33_TAIL,
 } from "./prompts/tasks/turn-reader.v33.js";
+export { TURN_READER_V34 } from "./prompts/tasks/turn-reader.v34.js";
 export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
