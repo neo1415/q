@@ -4,12 +4,12 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV30ResultSchema,
+  TurnReaderV31ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
-  type TurnReaderV30Result,
+  type TurnReaderV31Result,
   type TurnReaderV7Variables,
 } from "@capital-q/q-core";
 
@@ -74,6 +74,14 @@ export type QTurnReading = Omit<
   readonly endVoice?: boolean | undefined;
   /** v27: they authorise saving research or findings into their own profile. */
   readonly saveToOwnProfile?: boolean | undefined;
+  /** v31: the one declared app action a direct request asks for, as said. */
+  readonly appAction?:
+    | {
+        readonly tool: string;
+        readonly arguments: Readonly<Record<string, unknown>>;
+      }
+    | null
+    | undefined;
   /** v30: the listed action's name that does what they asked, or null. */
   readonly askedAction?: string | null | undefined;
   /** v28: a time they asked for, in minutes from now. */
@@ -171,7 +179,7 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderV30Result>(
+        const response = await gateway.execute<TurnReaderV31Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             // A closed classification needs little thought; left unset, a
@@ -187,7 +195,7 @@ export function createQTurnReader(dependencies: {
             attribution: input.attribution,
           },
           {
-            schema: TurnReaderV30ResultSchema,
+            schema: TurnReaderV31ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
             ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
               ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
@@ -195,7 +203,7 @@ export function createQTurnReader(dependencies: {
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV30ResultSchema.safeParse(
+        const parsed = TurnReaderV31ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

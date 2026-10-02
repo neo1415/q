@@ -10,10 +10,10 @@ import {
 
 /** TURN_READER v30 (ADR 0040 parity): askedAction, a listed action's name. */
 describe("TURN_READER v30", () => {
-  it("is the active reader and v29 is deprecated", () => {
+  it("v29 is deprecated (v31 is active)", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(30);
+    ).toBe(31);
     expect(TURN_READER_V29.status).toBe("DEPRECATED");
   });
 

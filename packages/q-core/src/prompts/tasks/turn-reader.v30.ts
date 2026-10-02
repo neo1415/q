@@ -28,7 +28,7 @@ export const TURN_READER_V30: PromptDefinition<
 > = {
   ...TURN_READER_V29,
   version: 30,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "HARDEN 2026-10-02 (ADR 0040 parity): askedAction, the listed action's name that does what they asked, or null; actions not available in this run are listed and marked.",
   effectiveFrom: "2026-10-02",
