@@ -311,7 +311,7 @@ describe("a reply about a change's status says the engine's status", () => {
     expect(reply).not.toContain(CLAIM);
     expect(reply).toContain("Anything else for today?");
     expect(reply).toContain(
-      "Reminder: call Ada at 3pm is waiting for your approval, not saved yet.",
+      '"Reminder: call Ada at 3pm" is waiting for your approval, not saved yet.',
     );
   });
 
@@ -337,7 +337,7 @@ describe("a reply about a change's status says the engine's status", () => {
       [{ id: PROPOSAL, status: "SAVED" }],
     );
     await seam.answer(request);
-    expect(stored.at(-1)).toContain("Reminder: call Ada at 3pm is saved.");
+    expect(stored.at(-1)).toContain('"Reminder: call Ada at 3pm" is saved.');
   });
 
   it("adds nothing when the reply is not about a change's status", async () => {

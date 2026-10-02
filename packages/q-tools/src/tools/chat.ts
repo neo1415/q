@@ -64,6 +64,13 @@ export type ErrandPlan = {
   readonly bookCall: {
     readonly purpose: string;
     readonly durationMinutes: number;
+    /**
+     * The window they asked for (live 2026-10-02: "in the next five
+     * minutes"): no earlier than notBefore, no later than notAfter, as
+     * ISO instants. Absent: the first free time.
+     */
+    readonly notBefore?: string | undefined;
+    readonly notAfter?: string | undefined;
   } | null;
 };
 

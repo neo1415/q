@@ -212,6 +212,10 @@ export {
   TURN_READER_V27_SAVE_TO_PROFILE,
 } from "./prompts/tasks/turn-reader.v27.js";
 export {
+  TURN_READER_V28,
+  TURN_READER_V28_DIRECT,
+} from "./prompts/tasks/turn-reader.v28.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -256,6 +260,11 @@ export {
   TURN_READER_V27_SCHEMA_VERSION,
   TurnReaderV27ResultSchema,
   type TurnReaderV27Result,
+  TURN_READER_V28_SCHEMA_VERSION,
+  TurnReaderV28ResultSchema,
+  TurnTimeWindowSchema,
+  type TurnReaderV28Result,
+  type TurnTimeWindow,
   type TurnReaderV24Result,
   type TurnHandOver,
   type TurnReaderV22Result,

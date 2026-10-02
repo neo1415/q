@@ -17,7 +17,7 @@ import {
 describe("TURN_READER v14", () => {
   it("is the active reader and v13 is deprecated", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(27);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(28);
     expect(TURN_READER_V13.status).toBe("DEPRECATED");
     expect(TURN_READER_V14.template).toContain("SEQUENCE (null unless");
     expect(TURN_READER_V14.template).toContain("unknownScreen is set");

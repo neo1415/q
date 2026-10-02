@@ -16,10 +16,10 @@ import {
  * is saveToOwnProfile, read by meaning; code then fills the open fields.
  */
 describe("TURN_READER v27", () => {
-  it("is the active reader and v26 is deprecated", () => {
+  it("v26 is deprecated (v28 is active)", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(27);
+    ).toBe(28);
     expect(TURN_READER_V26.status).toBe("DEPRECATED");
   });
 

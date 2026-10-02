@@ -1819,3 +1819,49 @@ describe("live 2026-10-02 (Nixo): permission to fill the profile from what is on
     expect(calls.length).toBe(2);
   });
 });
+
+/**
+ * HARDEN P0 (live 2026-10-02, Zino 12:32-12:43): "send a message to nixo
+ * telling them I am looking forward to the next meeting" got "Q looks
+ * after Nixo for you is saved." and no message card. With TURN_READER v28
+ * a direct request is a TOOL_REQUEST with no hand-over: it goes to the
+ * answer, which prepares the message card; the hand-over never runs.
+ */
+describe("live 2026-10-02 (Zino): a direct request is not handed over", () => {
+  it("the exact message line goes to the answer, not to an errand", async () => {
+    const prepared: unknown[] = [];
+    const handOver: QHandOverPort = {
+      answerConnectionRequest: () =>
+        Promise.resolve({
+          status: "NO_PENDING_REQUESTS",
+          awaitingApprovalOf: "nothing",
+        }),
+      prepare: (_request, subject) => {
+        prepared.push(subject);
+        return Promise.resolve({
+          status: "PREPARED",
+          awaitingApprovalOf: "Q looks after Nixo for you",
+        });
+      },
+      candidates: () => Promise.resolve([]),
+    };
+    const { answer, delegated } = seam({
+      said: "send a message to nixo telling them I am looking forward to the next meeting",
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: null,
+        timeWindow: null,
+      } as TurnReaderResult,
+      outcomes: [],
+      handOver,
+    });
+    await answer.answer(request());
+    expect(prepared).toEqual([]);
+    expect(delegated()).toBe(1);
+  });
+});
