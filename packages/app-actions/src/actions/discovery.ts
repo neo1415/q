@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   InteractionRecordedDtoSchema,
   PassCompanyRequestSchema,
+  Q_TASK_CLASSES,
   SaveCompanyRequestSchema,
   UuidSchema,
 } from "@capital-q/contracts";
@@ -167,6 +168,12 @@ export const DISCOVERY_DECISIONS: readonly AnyAppAction[] = DECISIONS.map(
         description: `${decision.verb} one company in the person's Discover, exactly as the button does, from any page: name it as they said it. Their own word, done at once; it never changes their mandate and the company is not told.`,
         input: ToolInputSchema,
         references: { company: "COMPANY" },
+        // An investor's own Discover: never on a founder's turn about their
+        // own company (the purpose is only ever theirs), which keeps that
+        // turn's tools within MODEL_TOOLS_MAX.
+        purposes: Q_TASK_CLASSES.filter(
+          (purpose) => purpose !== "OWN_COMPANY_QUESTION",
+        ),
         eval: { say: decision.say, names: "COMPANY" },
         toCanonical: (input, context) =>
           Promise.resolve({

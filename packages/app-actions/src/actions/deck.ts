@@ -158,10 +158,15 @@ export const SET_DECK_AUDIENCE = defineAppAction<
       "Sets who can download the person's own pitch deck -- only their organisation, or investors who can find their company (the same investors who can watch its pitch) -- exactly as the documents page's choice does. Prepared for their approval: nothing changes until they approve exactly it.",
     input: ToolInputSchema,
     references: { deck: "UPLOAD" },
-    // Offered when the person asks for a change (and on a general turn);
-    // an own-company question's tools are already at MODEL_TOOLS_MAX.
+    // Parity eval 2026-10-02: "Let investors download my deck" reads as
+    // an own-company turn; without it there the reader reached for
+    // set_pitch_sharing. Tool focus now bounds each turn's offer.
     scopes: ["COMPANY_PROFILE"],
-    purposes: ["ACTION_PREPARATION", "GENERAL_QUESTION"],
+    purposes: [
+      "OWN_COMPANY_QUESTION",
+      "ACTION_PREPARATION",
+      "GENERAL_QUESTION",
+    ],
     eval: {
       say: [
         "Let investors download my deck {name}.",

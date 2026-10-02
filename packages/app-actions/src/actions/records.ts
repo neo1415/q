@@ -298,13 +298,20 @@ async function ownSubject(
   context: AppActionContext,
   subject: "COMPANY" | "INVESTOR_ORGANISATION",
 ) {
-  const subjectId = await own(
-    subject === "COMPANY"
-      ? ports.ownCompanyId
-      : ports.ownInvestorOrganisationId,
-    context,
-  );
-  return subjectId === null ? null : { subjectType: subject, subjectId };
+  const of = (kind: "COMPANY" | "INVESTOR_ORGANISATION") =>
+    own(
+      kind === "COMPANY" ? ports.ownCompanyId : ports.ownInvestorOrganisationId,
+      context,
+    );
+  const subjectId = await of(subject);
+  if (subjectId !== null) return { subjectType: subject, subjectId };
+  // "Our Q Card" from someone with only the other kind of organisation is
+  // that one (parity eval 2026-10-02: a founder's turn filled
+  // INVESTOR_ORGANISATION and got a bare refusal). Still only their own.
+  const other: "COMPANY" | "INVESTOR_ORGANISATION" =
+    subject === "COMPANY" ? "INVESTOR_ORGANISATION" : "COMPANY";
+  const otherId = await of(other);
+  return otherId === null ? null : { subjectType: other, subjectId: otherId };
 }
 
 const subjectTargets = (subject: {
