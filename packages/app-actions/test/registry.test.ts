@@ -104,6 +104,16 @@ describe("the action registry", () => {
   });
 });
 
+describe("the reader's compact list", () => {
+  it("every declaration has a short label of 2 to 5 words", () => {
+    for (const action of APP_ACTIONS) {
+      const words = (action.short ?? "").trim().split(/\s+/).filter(Boolean);
+      expect(words.length, action.name).toBeGreaterThanOrEqual(2);
+      expect(words.length, action.name).toBeLessThanOrEqual(5);
+    }
+  });
+});
+
 describe("one coercion for every name", () => {
   const candidates: ReferenceCandidates = (kind) =>
     Promise.resolve(

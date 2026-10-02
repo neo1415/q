@@ -21,6 +21,7 @@ const DECISIONS = [
   {
     type: "SAVE",
     name: "discovery.company.save",
+    short: "save a company",
     tool: "save_company",
     path: "/v1/discovery/companies/:companyId/save",
     verb: "Saves",
@@ -31,6 +32,7 @@ const DECISIONS = [
   {
     type: "UNSAVE",
     name: "discovery.company.unsave",
+    short: "remove from Saved",
     tool: "unsave_company",
     path: "/v1/discovery/companies/:companyId/unsave",
     verb: "Removes from Saved",
@@ -40,6 +42,7 @@ const DECISIONS = [
   {
     type: "PASS",
     name: "discovery.company.pass",
+    short: "pass on a company",
     tool: "pass_company",
     path: "/v1/discovery/companies/:companyId/pass",
     verb: "Passes on",
@@ -50,6 +53,7 @@ const DECISIONS = [
   {
     type: "UNPASS",
     name: "discovery.company.unpass",
+    short: "undo a pass",
     tool: "unpass_company",
     path: "/v1/discovery/companies/:companyId/unpass",
     verb: "Undoes a pass on",
@@ -95,6 +99,7 @@ export const DISCOVERY_DECISIONS: readonly AnyAppAction[] = DECISIONS.map(
       z.infer<typeof ToolInputSchema>
     >({
       name: decision.name,
+      short: decision.short,
       area: "discovery",
       classification: "INSTANT",
       does: `${decision.verb} a company in Discover, as the feed's own button does.`,

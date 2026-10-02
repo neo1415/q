@@ -449,6 +449,7 @@ const PERSON_PROFILE = defineAppAction<
   z.infer<typeof PersonTool>
 >({
   name: "person.profile.update",
+  short: "change their name or headline",
   area: "records",
   classification: "CONSEQUENTIAL",
   does: "Changes what Capital Q calls them, their headline or their time zone, as their profile page does.",
@@ -509,6 +510,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof CompanyTool>
   >({
     name: "company.profile.update",
+    short: "edit the company profile",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Changes their company profile's declared fields, as the profile page's Save does.",
@@ -590,6 +592,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof CompanyRoleTool>
   >({
     name: "company.team.me.upsert",
+    short: "set their company title",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Records their own place on their company's team, as the team page does.",
@@ -660,6 +663,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof FounderProfileTool>
   >({
     name: "company.founder_profile.me.update",
+    short: "edit their founder profile",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Changes their own founder profile, as the team page does.",
@@ -713,6 +717,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof TeamFactsTool>
   >({
     name: "company.team_facts.update",
+    short: "change team size facts",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Changes their company's team facts (size, roles), as the team page does.",
@@ -764,6 +769,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof InvestorTool>
   >({
     name: "investor.profile.update",
+    short: "edit the investor profile",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Changes their investor organisation's declared profile, as its page does.",
@@ -854,6 +860,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof InvestorRoleTool>
   >({
     name: "investor.representative.me.upsert",
+    short: "set their fund title",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Records how they represent their investor organisation, as its page does.",
@@ -918,6 +925,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof HandleClaimTool>
   >({
     name: "q_card.handle.claim",
+    short: "claim a Q Card handle",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Claims the @handle of their Q Card, as the card page does.",
@@ -990,6 +998,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof QCardTool>
   >({
     name: "q_card.update",
+    short: "change Q Card settings",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Changes their Q Card, as the card page does.",

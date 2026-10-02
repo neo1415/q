@@ -233,6 +233,8 @@ export type AppActionFamilyInput = {
  */
 export function defineAppActionFamily<ToolIn>(definition: {
   readonly name: string;
+  /** 3-5 words for the reader's compact list. */
+  readonly short?: string | undefined;
   readonly area: string;
   readonly does: string;
   readonly members: Readonly<Record<string, AnyAppAction>>;
@@ -273,6 +275,7 @@ export function defineAppActionFamily<ToolIn>(definition: {
     });
   const family = defineAppAction<AppActionFamilyInput, unknown, ToolIn>({
     name: definition.name,
+    ...(definition.short === undefined ? {} : { short: definition.short }),
     area: definition.area,
     classification: "CONSEQUENTIAL",
     does: definition.does,

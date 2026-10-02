@@ -115,6 +115,7 @@ export const SET_PITCH_SHARING = defineAppAction<
   z.infer<typeof ToolInputSchema>
 >({
   name: "pitch.details.set",
+  short: "set who sees a pitch",
   area: "pitch",
   classification: "CONSEQUENTIAL",
   does: "Sets a pitch video's title and who can watch it (only their organisation, investors, or everyone on Capital Q), audience and playback together.",

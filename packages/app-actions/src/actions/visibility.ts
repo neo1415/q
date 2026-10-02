@@ -83,6 +83,7 @@ const COMPANY_VISIBILITY = defineAppAction<
   Company
 >({
   name: "company.visibility.set",
+  short: "set company visibility",
   area: "visibility",
   classification: "CONSEQUENTIAL",
   does: "Sets who can see their company on Capital Q, as the visibility page does.",
@@ -144,6 +145,7 @@ const INVESTOR_VISIBILITY = defineAppAction<
   z.infer<typeof InvestorVisibilityTool>
 >({
   name: "investor.visibility.set",
+  short: "set fund visibility",
   area: "visibility",
   classification: "CONSEQUENTIAL",
   does: "Sets who can see their investor organisation on Capital Q, as its page does.",
@@ -272,6 +274,7 @@ const SHARE_RAISE = defineAppAction<
   z.infer<typeof ShareTool>
 >({
   name: "disclosure.raise.share",
+  short: "share the raise",
   area: "visibility",
   classification: "CONSEQUENTIAL",
   does: "Shares their company's raise (target, instrument, stage and close date; never the use of funds) with one investor they have a relationship with, as the visibility page does.",
@@ -395,6 +398,7 @@ const REVOKE_SHARE = defineAppAction<
   z.infer<typeof RevokeTool>
 >({
   name: "disclosure.share.revoke",
+  short: "stop sharing the raise",
   area: "visibility",
   classification: "CONSEQUENTIAL",
   does: "Stops sharing their raise with one investor, as the visibility page does; what they already saw cannot be recalled.",

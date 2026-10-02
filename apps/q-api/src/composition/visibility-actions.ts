@@ -7,12 +7,7 @@ import {
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import type { VisibilityCentre } from "@capital-q/permissions";
-import {
-  defineQAction,
-  type AnyQActionDefinition,
-  type QActionProposer,
-} from "@capital-q/q-actions";
-import type { VisibilityIntelligencePort } from "@capital-q/q-tools";
+import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
 import {
   capability,
   type ActorContext,
@@ -237,88 +232,4 @@ export function createRevokeShareAction(
       },
     },
   });
-}
-
-// ---------------------------------------------------------------------------
-// The board the proposal tools write to
-// ---------------------------------------------------------------------------
-
-const READING_TTL_MS = 10 * 60 * 1000;
-
-type Prepared = {
-  readonly tenantId: string;
-  readonly actorUserId: string;
-  readonly actionType: "disclosure.raise.share" | "disclosure.share.revoke";
-  readonly payload: Readonly<Record<string, string>>;
-  readonly at: number;
-};
-
-export type VisibilityActionBoard = {
-  readonly prepareForApproval: VisibilityIntelligencePort["prepareForApproval"];
-  readonly proposer: QActionProposer;
-};
-
-/**
- * One prepared share or revoke per run, for the run's own person and
- * tenant, until the run's prepare step asks; then validated against the
- * action's own payload schema. Nothing on the board can execute.
- */
-export function createVisibilityActionBoard(
-  options: {
-    readonly logger?: Logger | undefined;
-    readonly now?: (() => number) | undefined;
-  } = {},
-): VisibilityActionBoard {
-  const now = options.now ?? (() => Date.now());
-  const prepared = new Map<string, Prepared>();
-  const sweep = () => {
-    const cutoff = now() - READING_TTL_MS;
-    for (const [runId, entry] of prepared) {
-      if (entry.at < cutoff) prepared.delete(runId);
-    }
-  };
-  return {
-    prepareForApproval: (entry) => {
-      sweep();
-      const existing = prepared.get(entry.runId);
-      if (existing !== undefined) {
-        return existing.actionType === entry.actionType &&
-          JSON.stringify(existing.payload) === JSON.stringify(entry.payload)
-          ? "PREPARED"
-          : "ONE_PER_TURN";
-      }
-      prepared.set(entry.runId, { ...entry, at: now() });
-      return "PREPARED";
-    },
-    proposer: {
-      propose: (context) => {
-        const entry = prepared.get(context.runId);
-        if (entry === undefined) return Promise.resolve(null);
-        prepared.delete(context.runId);
-        if (
-          entry.tenantId !== context.actor.tenantId ||
-          entry.actorUserId !== context.actor.userId
-        ) {
-          return Promise.resolve(null);
-        }
-        const share = entry.actionType === "disclosure.raise.share";
-        const parsed = (
-          share ? ShareRaisePayloadSchema : RevokeSharePayloadSchema
-        ).safeParse(entry.payload);
-        if (!parsed.success) {
-          options.logger?.warn(
-            { qRunId: context.runId, actionType: entry.actionType },
-            "a prepared visibility action did not fit its payload",
-          );
-          return Promise.resolve({
-            refused: "that isn't something I can prepare from here",
-          });
-        }
-        return Promise.resolve({
-          actionType: share ? DISCLOSURE_RAISE_SHARE : DISCLOSURE_SHARE_REVOKE,
-          payload: parsed.data,
-        });
-      },
-    },
-  };
 }

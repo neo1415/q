@@ -13,8 +13,6 @@ import {
 import {
   createRevokeShareAction,
   createShareRaiseAction,
-  createVisibilityActionBoard,
-  DISCLOSURE_RAISE_SHARE,
   shareRaisePreview,
 } from "../src/composition/visibility-actions.js";
 
@@ -37,7 +35,6 @@ const ORG = "d0000000-0000-4000-8000-000000000001";
 const COMPANY = "a0000000-0000-4000-8000-000000000001";
 const APEX = "88888888-0000-4000-8000-000000000001";
 const POLICY = "99999999-0000-4000-8000-000000000001";
-const RUN = "f0000000-0000-4000-8000-000000000003";
 
 const FOUNDER: ActorContext = {
   userId: UserIdSchema.parse(USER),
@@ -198,72 +195,5 @@ describe("disclosure.share.revoke", () => {
     expect(harness().revoke.describe(revoke, []).preview).toContain(
       "can't be recalled",
     );
-  });
-});
-
-describe("the visibility action board", () => {
-  const context = (actor: ActorContext = FOUNDER) =>
-    ({ actor, runId: RUN }) as never;
-
-  it("turns one prepared share into a proposal for its own person, and nothing else", async () => {
-    const board = createVisibilityActionBoard();
-    expect(
-      board.prepareForApproval({
-        runId: RUN,
-        tenantId: TENANT,
-        actorUserId: USER,
-        actionType: "disclosure.raise.share",
-        payload: SHARE,
-      }),
-    ).toBe("PREPARED");
-    expect(
-      board.prepareForApproval({
-        runId: RUN,
-        tenantId: TENANT,
-        actorUserId: USER,
-        actionType: "disclosure.share.revoke",
-        payload: { companyId: COMPANY, policyId: POLICY, recipientName: "x" },
-      }),
-    ).toBe("ONE_PER_TURN");
-    expect(await board.proposer.propose(context())).toEqual({
-      actionType: DISCLOSURE_RAISE_SHARE,
-      payload: SHARE,
-    });
-    // Taken once.
-    expect(await board.proposer.propose(context())).toBeNull();
-  });
-
-  it("never hands one person's preparation to another", async () => {
-    const board = createVisibilityActionBoard();
-    board.prepareForApproval({
-      runId: RUN,
-      tenantId: TENANT,
-      actorUserId: USER,
-      actionType: "disclosure.raise.share",
-      payload: SHARE,
-    });
-    const other: ActorContext = {
-      ...FOUNDER,
-      userId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000009"),
-    };
-    expect(await board.proposer.propose(context(other))).toBeNull();
-  });
-
-  it("refuses a preparation that does not fit the action's payload", async () => {
-    const board = createVisibilityActionBoard();
-    board.prepareForApproval({
-      runId: RUN,
-      tenantId: TENANT,
-      actorUserId: USER,
-      actionType: "disclosure.raise.share",
-      payload: {
-        companyId: COMPANY,
-        relationshipId: "not-an-id",
-        recipientName: "x",
-      },
-    });
-    expect(await board.proposer.propose(context())).toMatchObject({
-      refused: expect.any(String) as unknown,
-    });
   });
 });
