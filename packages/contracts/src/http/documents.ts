@@ -48,6 +48,46 @@ export const DOCUMENT_TYPES = [
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPES);
 export type DocumentType = z.infer<typeof DocumentTypeSchema>;
 
+/**
+ * Who may download a document's file (ADR 0041; founder decision
+ * 2026-10-02), as one choice: ORGANISATION ("Only my organisation", the
+ * default) or INVESTORS ("Investors who can find us": every investor the
+ * company's pitch is viewable to). Only a PITCH_DECK may be INVESTORS.
+ */
+export const DOCUMENT_DOWNLOAD_AUDIENCES = [
+  "ORGANISATION",
+  "INVESTORS",
+] as const;
+export const DocumentDownloadAudienceSchema = z.enum(
+  DOCUMENT_DOWNLOAD_AUDIENCES,
+);
+export type DocumentDownloadAudience = z.infer<
+  typeof DocumentDownloadAudienceSchema
+>;
+
+/** `POST /v1/documents/:documentId/download-audience` — one choice, versioned. */
+export const DOCUMENT_DOWNLOAD_AUDIENCE_SEGMENT = "/download-audience" as const;
+export const SetDocumentDownloadAudienceRequestSchema = z
+  .object({
+    audience: DocumentDownloadAudienceSchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetDocumentDownloadAudienceRequest = z.infer<
+  typeof SetDocumentDownloadAudienceRequestSchema
+>;
+/** The choice as it now stands: never a file, a title or a URL. */
+export const DocumentDownloadAudienceDtoSchema = z
+  .object({
+    documentId: UuidSchema,
+    downloadAudience: DocumentDownloadAudienceSchema,
+    version: ResourceVersionSchema,
+  })
+  .strict();
+export type DocumentDownloadAudienceDto = z.infer<
+  typeof DocumentDownloadAudienceDtoSchema
+>;
+
 export const DOCUMENT_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export const DocumentStatusSchema = z.enum(DOCUMENT_STATUSES);
 export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
@@ -238,6 +278,8 @@ export const DocumentDtoSchema = z
     status: DocumentStatusSchema,
     visibilityScope: z.string(),
     sensitivityClass: z.string(),
+    /** ADR 0041: who may download the file; absent from older APIs. */
+    downloadAudience: DocumentDownloadAudienceSchema.default("ORGANISATION"),
     currentVersion: DocumentVersionDtoSchema.nullable(),
     createdAt: UtcTimestampSchema,
     updatedAt: UtcTimestampSchema,

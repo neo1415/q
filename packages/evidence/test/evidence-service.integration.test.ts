@@ -37,7 +37,9 @@ import {
   createEvidenceSubjectResolverRegistry,
   createPostgresClaimQueryPort,
   createPostgresDocumentQueryPort,
+  createSharedDocumentDownloads,
   DocumentNotFoundError,
+  DocumentVersionConflictError,
   DocumentVersionNotFoundError,
   EvidenceItemNotFoundError,
   EvidenceRuleError,
@@ -1173,6 +1175,153 @@ describe("@capital-q/evidence against local PostgreSQL", () => {
             s`update evidence.claims set truth_class = 'document_supported' where id = ${claimB.id}`,
         ),
       ).rejects.toMatchObject({ code: "23514" });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // ADR 0041: who may download a pitch deck
+  // -------------------------------------------------------------------------
+
+  it("a pitch deck is private by default; its owner opens it to investors and closes it again, audited, with an event, and nobody else can", async () => {
+    await withWorld(async (world) => {
+      const { tx, service } = world;
+      const deck = await service.createDocument({
+        actor: world.adminA,
+        input: {
+          title: "Seed deck",
+          documentType: "PITCH_DECK",
+          companyId: world.companyA,
+        },
+        correlationId: CORRELATION(),
+      });
+      const registered = await service.registerDocumentVersion({
+        actor: world.adminA,
+        input: {
+          documentId: deck.id,
+          expectedDocumentVersion: deck.version,
+          storageBucket: "company-private",
+          storageKey: `documents/${deck.id}/${randomUUID()}`,
+          originalFilename: "deck.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 2048,
+          sha256: SHA,
+        },
+        correlationId: CORRELATION(),
+      });
+      await tx.sql`update evidence.document_versions set malware_scan_status = 'CLEAN'
+                    where id = ${registered.version.id}`;
+      const reads = createSharedDocumentDownloads({
+        sql: tx.sql,
+        storage: {
+          createDownloadAuthorization: () =>
+            Promise.resolve({
+              url: "https://storage.example.invalid/signed",
+              providerExpiresAt: "2026-10-02T10:01:00.000Z",
+            }),
+        },
+      });
+      const opened = () =>
+        reads.investorAudienceDeck({
+          companyTenantId: world.tenantA,
+          companyId: world.companyA,
+        });
+
+      // Private by default: nothing is offered to investors.
+      const current = await service.getDocument({
+        actor: world.adminA,
+        documentId: deck.id,
+      });
+      expect(current.downloadAudience).toBe("ORGANISATION");
+      await expect(opened()).resolves.toBeNull();
+
+      // A member without document.manage, and another tenant's admin by a
+      // guessed id, change nothing.
+      await expect(
+        service.setDocumentDownloadAudience({
+          actor: world.memberA,
+          documentId: deck.id,
+          audience: "INVESTORS",
+          expectedVersion: current.version,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toMatchObject({ name: "AuthorizationDeniedError" });
+      await expect(
+        service.setDocumentDownloadAudience({
+          actor: world.adminB,
+          documentId: deck.id,
+          audience: "INVESTORS",
+          expectedVersion: current.version,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(DocumentNotFoundError);
+      await expect(opened()).resolves.toBeNull();
+
+      // The owner opens it: one audit entry, one event, ids only.
+      const shared = await service.setDocumentDownloadAudience({
+        actor: world.adminA,
+        documentId: deck.id,
+        audience: "INVESTORS",
+        expectedVersion: current.version,
+        correlationId: CORRELATION(),
+      });
+      expect(shared.downloadAudience).toBe("INVESTORS");
+      expect(shared.version).toBe(current.version + 1);
+      await expect(opened()).resolves.toMatchObject({
+        documentId: deck.id,
+        documentVersionId: registered.version.id,
+        title: "Seed deck",
+      });
+      // Another tenant's company id never finds it.
+      await expect(
+        reads.investorAudienceDeck({
+          companyTenantId: world.tenantB,
+          companyId: world.companyA,
+        }),
+      ).resolves.toBeNull();
+      const audits = await tx.sql`
+        select metadata from audit.material_actions
+         where tenant_id = ${world.tenantA}
+           and action_type = 'document.download_audience_changed'`;
+      expect(audits).toHaveLength(1);
+      const events = await tx.sql`
+        select * from events.outbox
+         where tenant_id = ${world.tenantA}
+           and event_type = 'evidence.document.download_audience_changed'`;
+      expect(events).toHaveLength(1);
+      expect(JSON.stringify(events)).not.toContain("Seed deck");
+
+      // A stale screen cannot overwrite a newer choice.
+      await expect(
+        service.setDocumentDownloadAudience({
+          actor: world.adminA,
+          documentId: deck.id,
+          audience: "ORGANISATION",
+          expectedVersion: current.version,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(DocumentVersionConflictError);
+
+      // Turning it off revokes it at once.
+      await service.setDocumentDownloadAudience({
+        actor: world.adminA,
+        documentId: deck.id,
+        audience: "ORGANISATION",
+        expectedVersion: shared.version,
+        correlationId: CORRELATION(),
+      });
+      await expect(opened()).resolves.toBeNull();
+
+      // Only a pitch deck can be opened to investors.
+      const model = await seedDocument(world, world.adminA);
+      await expect(
+        service.setDocumentDownloadAudience({
+          actor: world.adminA,
+          documentId: model.document.id,
+          audience: "INVESTORS",
+          expectedVersion: model.document.version,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(EvidenceRuleError);
     });
   });
 });

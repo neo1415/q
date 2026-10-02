@@ -10,6 +10,7 @@ import { DocumentNotFoundError } from "../domain/errors.js";
 import {
   createPostgresDocumentRepository,
   createPostgresDocumentVersionRepository,
+  findInvestorAudienceDeck,
 } from "../infrastructure/postgres-repositories.js";
 import type { PrivateDocumentDownloadAuthorizer } from "./storage-port.js";
 
@@ -50,6 +51,21 @@ export type SharedDocumentDownloads = {
     readonly documentTenantId: string;
     readonly documentId: string;
   }) => Promise<DocumentType | null>;
+  /**
+   * The deck a company opened to investors (ADR 0041), or null. The caller
+   * has ALREADY decided the reader is an investor the company is viewable
+   * to (the pitch rule); this answers only which deck, and the download is
+   * `authorizeSharedVersion` on exactly that version.
+   */
+  readonly investorAudienceDeck: (company: {
+    readonly companyTenantId: string;
+    readonly companyId: string;
+  }) => Promise<{
+    readonly documentId: string;
+    readonly documentVersionId: string;
+    readonly title: string;
+    readonly updatedAt: string;
+  } | null>;
 };
 
 export function createSharedDocumentDownloads(options: {
@@ -108,6 +124,15 @@ export function createSharedDocumentDownloads(options: {
       return document === null || document.status !== "ACTIVE"
         ? null
         : document.documentType;
+    },
+    investorAudienceDeck: async (company) => {
+      const tenantId = TenantIdSchema.safeParse(company.companyTenantId);
+      if (!tenantId.success) return null;
+      return findInvestorAudienceDeck(
+        options.sql,
+        tenantId.data,
+        company.companyId,
+      );
     },
   };
 }

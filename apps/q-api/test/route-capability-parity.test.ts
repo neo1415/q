@@ -120,6 +120,17 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId${COMPANY_NETWORK_PREVIEW_SEGMENT}`":
     cap("tool.read_my_record"),
 
+  // A company's profile from Discover (2026-10-02; ADR 0041): Q reads a
+  // company with get_company; the photo and the deck are file reads.
+  "api/http/company-profile.ts GET `${base}${COMPANY_PROFILE_SEGMENT}`":
+    cap("tool.get_company"),
+  "api/http/company-profile.ts GET `${base}${COMPANY_PROFILE_PHOTO_SEGMENT}`":
+    exempt(
+      "the avatar's image: a redirect to a short-lived signed photo URL, bytes browser <-> storage; Q names the company instead",
+    ),
+  "api/http/company-profile.ts GET `${base}${COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT}`":
+    DOWNLOAD,
+
   "api/http/company-team.ts GET `${base}${COMPANY_TEAM_ME_SUFFIX}`": cap(
     "tool.read_my_record",
   ),

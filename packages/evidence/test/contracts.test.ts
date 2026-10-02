@@ -230,7 +230,7 @@ describe("subject resolver registry", () => {
 });
 
 describe("events", () => {
-  it("declares six confidential, replay-safe events whose payloads carry no content", () => {
+  it("declares seven confidential, replay-safe events whose payloads carry no content", () => {
     expect(EVIDENCE_EVENTS.map((e) => e.name)).toEqual([
       "evidence.source.registered",
       "evidence.document.created",
@@ -238,6 +238,7 @@ describe("events", () => {
       "evidence.document.ready",
       "evidence.claim.changed",
       "evidence.evidence_item.created",
+      "evidence.document.download_audience_changed",
     ]);
     for (const event of EVIDENCE_EVENTS) {
       expect(event.sensitivity).toBe("CONFIDENTIAL");

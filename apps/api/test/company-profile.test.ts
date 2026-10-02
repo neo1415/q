@@ -28,6 +28,7 @@ import { createApp, type ApiSecurityDependencies } from "../src/app.js";
 import type { CompanyNetworkViewPort } from "../src/http/companies.js";
 import type {
   CompanyProfilePorts,
+  AudienceCompanyDeck,
   SharedCompanyDeck,
 } from "../src/http/company-profile.js";
 
@@ -161,15 +162,44 @@ type Calls = {
   raise: number;
   deck: number;
   download: number;
+  audienceDownload: number;
+  team: number;
   played: string[];
 };
+
+const AUDIENCE_DECK: AudienceCompanyDeck = {
+  documentId: "72000000-0000-4000-8000-000000000001",
+  documentVersionId: "73000000-0000-4000-8000-000000000001",
+  title: "Kivu Grid deck (for investors)",
+  sharedAt: "2026-10-01T09:00:00.000Z",
+};
+
+const TEAM = [
+  {
+    name: "Ada Obi",
+    relationshipType: "team_member" as const,
+    businessTitle: "CEO",
+    isFounder: true,
+    shortBio: "Built grid storage at two utilities.",
+  },
+];
 
 function ports(options: {
   readonly investor: boolean;
   readonly deck?: SharedCompanyDeck | null;
   readonly playable?: readonly string[];
+  /** The pitch rule admits this investor (resolveViewableCompany). */
+  readonly findable?: boolean;
+  readonly audience?: AudienceCompanyDeck | null;
 }): { readonly profile: CompanyProfilePorts; readonly calls: Calls } {
-  const calls: Calls = { raise: 0, deck: 0, download: 0, played: [] };
+  const calls: Calls = {
+    raise: 0,
+    deck: 0,
+    download: 0,
+    audienceDownload: 0,
+    team: 0,
+    played: [],
+  };
   const playable = options.playable ?? [INVESTORS_VIDEO, NETWORK_VIDEO];
   return {
     calls,
@@ -199,6 +229,19 @@ function ports(options: {
           url: "https://storage.example/deck.pdf?sig=2",
           expiresAt: "2026-10-02T10:01:00.000Z",
         });
+      },
+      investorMayFind: () => Promise.resolve(options.findable === true),
+      audienceDeck: () => Promise.resolve(options.audience ?? null),
+      downloadAudienceDeck: () => {
+        calls.audienceDownload += 1;
+        return Promise.resolve({
+          url: "https://storage.example/audience-deck.pdf?sig=3",
+          expiresAt: "2026-10-02T10:01:00.000Z",
+        });
+      },
+      team: () => {
+        calls.team += 1;
+        return Promise.resolve(TEAM);
       },
     },
   };
@@ -349,7 +392,7 @@ describe("POST /v1/companies/:id/profile/deck/download", () => {
   it("an investor with a shared deck receives a short-lived signed URL", async () => {
     const { profile, calls } = ports({ investor: true });
     const app = buildApp({ profile });
-    const response = await app.inject({ method: "POST", url: DECK_URL });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.json<{ url: string; expiresAt: string }>()).toEqual({
@@ -363,7 +406,7 @@ describe("POST /v1/companies/:id/profile/deck/download", () => {
   it("a founder is refused with not-found, and nothing is looked up or signed", async () => {
     const { profile, calls } = ports({ investor: false });
     const app = buildApp({ profile });
-    const response = await app.inject({ method: "POST", url: DECK_URL });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
     expect(response.statusCode).toBe(404);
     expect(calls.deck).toBe(0);
     expect(calls.download).toBe(0);
@@ -378,7 +421,7 @@ describe("POST /v1/companies/:id/profile/deck/download", () => {
       organisationId: COMPANY_ORG,
     };
     const app = buildApp({ profile, owned: true, context: owner });
-    const response = await app.inject({ method: "POST", url: DECK_URL });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
     expect(response.statusCode).toBe(404);
     expect(calls.download).toBe(0);
     await app.close();
@@ -387,7 +430,7 @@ describe("POST /v1/companies/:id/profile/deck/download", () => {
   it("an investor the company shared no deck with gets the same not-found", async () => {
     const { profile, calls } = ports({ investor: true, deck: null });
     const app = buildApp({ profile });
-    const response = await app.inject({ method: "POST", url: DECK_URL });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
     expect(response.statusCode).toBe(404);
     expect(calls.download).toBe(0);
     await app.close();
@@ -396,7 +439,7 @@ describe("POST /v1/companies/:id/profile/deck/download", () => {
   it("is not-found across tenants for a company that is not visible", async () => {
     const { profile, calls } = ports({ investor: true });
     const app = buildApp({ profile, visible: false });
-    const response = await app.inject({ method: "POST", url: DECK_URL });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
     expect(response.statusCode).toBe(404);
     expect(calls.deck).toBe(0);
     expect(calls.download).toBe(0);
@@ -431,5 +474,128 @@ describe("GET /v1/companies/:id/profile/photo", () => {
     expect(response.statusCode).toBe(404);
     expect(response.body).not.toContain("photo.webp");
     await app.close();
+  });
+});
+
+describe("ADR 0041: a deck opened to investors who can find the company", () => {
+  it("an investor the pitch rule admits downloads it through the deck's own audience", async () => {
+    const { profile, calls } = ports({
+      investor: true,
+      findable: true,
+      audience: AUDIENCE_DECK,
+      deck: null,
+    });
+    const app = buildApp({ profile });
+    const read = (
+      await app.inject({ method: "GET", url: PROFILE_URL })
+    ).json<ProfileBody>();
+    expect(read.overview?.deck?.title).toBe(AUDIENCE_DECK.title);
+    expect(JSON.stringify(read)).not.toContain(AUDIENCE_DECK.documentId);
+    const response = await app.inject({ method: "GET", url: DECK_URL });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ url: string }>().url).toContain("audience-deck");
+    expect(calls.audienceDownload).toBe(1);
+    expect(calls.download).toBe(0);
+    await app.close();
+  });
+
+  it("an investor the pitch rule does not admit gets no audience deck (only a chat share, if any)", async () => {
+    const { profile, calls } = ports({
+      investor: true,
+      findable: false,
+      audience: AUDIENCE_DECK,
+      deck: null,
+    });
+    const app = buildApp({ profile });
+    const read = (
+      await app.inject({ method: "GET", url: PROFILE_URL })
+    ).json<ProfileBody>();
+    expect(read.overview?.deck).toBeNull();
+    const response = await app.inject({ method: "GET", url: DECK_URL });
+    expect(response.statusCode).toBe(404);
+    expect(calls.audienceDownload).toBe(0);
+    await app.close();
+  });
+
+  it("a founder is refused the audience deck too, and no audience is even asked", async () => {
+    const { profile, calls } = ports({
+      investor: false,
+      findable: true,
+      audience: AUDIENCE_DECK,
+    });
+    const app = buildApp({ profile });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
+    expect(response.statusCode).toBe(404);
+    expect(calls.audienceDownload).toBe(0);
+    expect(calls.download).toBe(0);
+    await app.close();
+  });
+
+  it("private by default and after it is turned off: no audience deck is the same not-found", async () => {
+    const { profile, calls } = ports({
+      investor: true,
+      findable: true,
+      audience: null,
+      deck: null,
+    });
+    const app = buildApp({ profile });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
+    expect(response.statusCode).toBe(404);
+    expect(calls.audienceDownload).toBe(0);
+    await app.close();
+  });
+
+  it("is not-found across tenants for a company that is not visible", async () => {
+    const { profile, calls } = ports({
+      investor: true,
+      findable: true,
+      audience: AUDIENCE_DECK,
+    });
+    const app = buildApp({ profile, visible: false });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
+    expect(response.statusCode).toBe(404);
+    expect(calls.audienceDownload).toBe(0);
+    await app.close();
+  });
+});
+
+describe("ADR 0041: the team on the profile", () => {
+  type TeamBody = {
+    overview: { team: Record<string, unknown>[] } | null;
+  };
+
+  it("an investor who can find the company sees the allow-listed team", async () => {
+    const { profile } = ports({ investor: true, findable: true });
+    const app = buildApp({ profile });
+    const body = (
+      await app.inject({ method: "GET", url: PROFILE_URL })
+    ).json<TeamBody>();
+    expect(body.overview?.team).toEqual(TEAM);
+    for (const member of body.overview?.team ?? []) {
+      expect(Object.keys(member).sort()).toEqual([
+        "businessTitle",
+        "isFounder",
+        "name",
+        "relationshipType",
+        "shortBio",
+      ]);
+    }
+    await app.close();
+  });
+
+  it("an investor the pitch rule does not admit, and a founder, get no team", async () => {
+    for (const options of [
+      { investor: true, findable: false },
+      { investor: false, findable: true },
+    ]) {
+      const { profile, calls } = ports(options);
+      const app = buildApp({ profile });
+      const body = (
+        await app.inject({ method: "GET", url: PROFILE_URL })
+      ).json<TeamBody>();
+      expect(body.overview?.team ?? []).toEqual([]);
+      expect(calls.team).toBe(0);
+      await app.close();
+    }
   });
 });

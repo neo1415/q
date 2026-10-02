@@ -18,6 +18,7 @@ import {
   CompanyProfileDeckDownloadDtoSchema,
   CompanyProfileDtoSchema,
   parseContract,
+  type CompanyProfileTeamMember,
   type CompanyProfileViewer,
   type Money,
   type PitchSummaryDto,
@@ -41,7 +42,7 @@ import type { CompanyNetworkViewPort } from "./companies.js";
  *
  *   GET  /v1/companies/:companyId/profile                  the profile, for this reader
  *   GET  /v1/companies/:companyId/profile/photo            the photo alone (Discover's avatar)
- *   POST /v1/companies/:companyId/profile/deck/download    a signed read of the shared deck
+ *   GET  /v1/companies/:companyId/profile/deck/download    a signed read of the deck
  *
  * Nothing here is a new disclosure rule. Each part is read through the
  * rule that already governs it, and the route only composes them:
@@ -55,9 +56,13 @@ import type { CompanyNetworkViewPort } from "./companies.js";
  *   the photo          the company's Q Card `photo` scope, for signed-in
  *                      participants;
  *   the videos         the media service's own playback rule, per video;
- *   the deck           a pitch deck the company shared with the reader in
- *                      their relationship chat (R34), opened through the
- *                      chat's own attachment read.
+ *   the deck           a pitch deck the company opened to investors who
+ *                      can find it (ADR 0041: the deck's own audience, for
+ *                      an investor the pitch rule admits), else one it
+ *                      shared with the reader in their relationship chat
+ *                      (R34), opened through the chat's own attachment read;
+ *   the team           ADR 0041's allow-listed projection, for an investor
+ *                      the pitch rule admits (and the owner).
  *
  * The role decides the shape, server-side. A founder viewing another
  * company receives identity and network videos only; the overview, the
@@ -72,6 +77,18 @@ export type SharedCompanyDeck = {
   readonly title: string;
   readonly sharedAt: string;
 };
+
+/** A deck the company opened to investors who can find it (ADR 0041). */
+export type AudienceCompanyDeck = {
+  readonly documentId: string;
+  readonly documentVersionId: string;
+  readonly title: string;
+  readonly sharedAt: string;
+};
+
+type ResolvedDeck =
+  | ({ readonly kind: "AUDIENCE" } & AudienceCompanyDeck)
+  | ({ readonly kind: "CHAT" } & SharedCompanyDeck);
 
 export type CompanyProfilePorts = {
   /** The actor holds an investor organisation (watches as an investor). */
@@ -101,6 +118,29 @@ export type CompanyProfilePorts = {
     actor: ActorContext,
     deck: SharedCompanyDeck,
   ) => Promise<{ readonly url: string; readonly expiresAt: string }>;
+  /**
+   * ADR 0041: the company is viewable to this investor under the pitch
+   * rule (media's resolveViewableCompany: their own investor organisation,
+   * its ACTIVE mandate, the company eligible now). Gates the audience
+   * deck and the team.
+   */
+  readonly investorMayFind: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<boolean>;
+  /** The deck the company opened to investors, or null (Evidence). */
+  readonly audienceDeck: (
+    company: CompanyProfileFacts,
+  ) => Promise<AudienceCompanyDeck | null>;
+  /** A short-lived signed read of exactly that version. */
+  readonly downloadAudienceDeck: (
+    company: CompanyProfileFacts,
+    deck: AudienceCompanyDeck,
+  ) => Promise<{ readonly url: string; readonly expiresAt: string }>;
+  /** The allow-listed team projection (companies context). */
+  readonly team: (
+    company: CompanyProfileFacts,
+  ) => Promise<readonly CompanyProfileTeamMember[]>;
 };
 
 export type CompanyProfileRoutesDependencies = ActorContextDependencies & {
@@ -193,6 +233,25 @@ export function registerCompanyProfileRoutes(
       .map(pitchSummary);
   };
 
+  /**
+   * The deck an investor may download, re-resolved from the server's own
+   * records on every call (the client never names a document, relationship
+   * or message): the audience deck where the pitch rule admits them, else
+   * one the company sent them in chat. Never for anyone but an investor.
+   */
+  const deckFor = async (
+    actor: ActorContext,
+    company: CompanyProfileFacts,
+    findable: boolean,
+  ): Promise<ResolvedDeck | null> => {
+    if (findable) {
+      const audience = await quietly(profile.audienceDeck(company), null);
+      if (audience !== null) return { kind: "AUDIENCE", ...audience };
+    }
+    const shared = await quietly(profile.sharedDeck(actor, company), null);
+    return shared === null ? null : { kind: "CHAT", ...shared };
+  };
+
   app.get(
     `${base}${COMPANY_PROFILE_SEGMENT}`,
     { onRequest: withContext },
@@ -202,8 +261,11 @@ export function registerCompanyProfileRoutes(
       const viewer = await viewerOf(actor, company);
       const projection = projectCompanyForNetwork(company);
       const full = viewer !== "FOUNDER";
+      const findable =
+        viewer === "INVESTOR" &&
+        (await quietly(profile.investorMayFind(actor, company.id), false));
 
-      const [photoUrl, videos, raise, verified, sectors, deck] =
+      const [photoUrl, videos, raise, verified, sectors, deck, team] =
         await Promise.all([
           quietly(profile.photo(company), null),
           videosFor(actor, company.id, viewer),
@@ -217,9 +279,12 @@ export function registerCompanyProfileRoutes(
           full
             ? quietly(profile.sectorNodeIds(company.id), [] as const)
             : ([] as const),
-          viewer === "INVESTOR"
-            ? quietly(profile.sharedDeck(actor, company), null)
-            : null,
+          viewer === "INVESTOR" ? deckFor(actor, company, findable) : null,
+          // ADR 0041: the team for an investor the pitch rule admits, and
+          // the owner previewing; never computed for anyone else.
+          viewer === "OWNER" || findable
+            ? quietly(profile.team(company), [] as const)
+            : ([] as const),
         ]);
 
       void reply.header("Cache-Control", "no-store");
@@ -246,6 +311,7 @@ export function registerCompanyProfileRoutes(
                 deck === null
                   ? null
                   : { title: deck.title, sharedAt: deck.sharedAt },
+              team: [...team],
             }
           : null,
         videos,
@@ -267,8 +333,8 @@ export function registerCompanyProfileRoutes(
     },
   );
 
-  // A POST because each call mints a fresh signed URL; nothing is cached.
-  app.post(
+  // A read: each call mints a fresh short-lived signed URL, never cached.
+  app.get(
     `${base}${COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT}`,
     { onRequest: withContext },
     async (request, reply) => {
@@ -280,11 +346,16 @@ export function registerCompanyProfileRoutes(
       if ((await viewerOf(actor, company)) !== "INVESTOR") {
         throw new DocumentNotFoundError();
       }
-      // Re-resolved from the server's own records on every call: the
-      // client never names a relationship, message or document.
-      const deck = await profile.sharedDeck(actor, company);
+      const findable = await quietly(
+        profile.investorMayFind(actor, company.id),
+        false,
+      );
+      const deck = await deckFor(actor, company, findable);
       if (deck === null) throw new DocumentNotFoundError();
-      const link = await profile.downloadDeck(actor, deck);
+      const link =
+        deck.kind === "AUDIENCE"
+          ? await profile.downloadAudienceDeck(company, deck)
+          : await profile.downloadDeck(actor, deck);
       void reply.header("Cache-Control", "no-store");
       return CompanyProfileDeckDownloadDtoSchema.parse(link);
     },

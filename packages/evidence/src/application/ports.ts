@@ -13,6 +13,7 @@ import type {
   DocumentId,
   DocumentProcessingRun,
   DocumentStatus,
+  DocumentDownloadAudience,
   DocumentType,
   DocumentVersion,
   DocumentVersionId,
@@ -150,6 +151,16 @@ export type DocumentRepository = {
       readonly documentId: DocumentId;
       readonly expectedVersion: number;
       readonly changes: DocumentDetailChanges;
+    },
+  ) => Promise<boolean>;
+  /** ADR 0041. False when `expectedVersion` no longer matches. */
+  readonly setDownloadAudience: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly documentId: DocumentId;
+      readonly expectedVersion: number;
+      readonly audience: DocumentDownloadAudience;
     },
   ) => Promise<boolean>;
 };

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 
-import { getQBrandKit, listQArtifacts } from "@capital-q/api-client";
+import {
+  getQBrandKit,
+  listDocuments,
+  listQArtifacts,
+} from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import {
@@ -8,6 +12,7 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { getSessionAccessToken } from "@/auth/session";
+import { DeckSharing, type DeckRow } from "@/features/documents/deck-sharing";
 import { DocumentsScreen } from "@/features/documents/documents-screen";
 
 export const metadata: Metadata = { title: "Documents" };
@@ -20,7 +25,7 @@ export const dynamic = "force-dynamic";
  * organisation's documents and brand.
  */
 export default async function DocumentsPage() {
-  const { qApiBaseUrl } = loadWebServerConfig();
+  const { qApiBaseUrl, apiBaseUrl } = loadWebServerConfig();
   const accessToken = await getSessionAccessToken();
   const session =
     qApiBaseUrl === undefined || accessToken === null
@@ -33,12 +38,36 @@ export default async function DocumentsPage() {
           listQArtifacts(session, { limit: 50 }).catch(() => null),
           getQBrandKit(session).catch(() => null),
         ]);
+  // The organisation's uploaded pitch decks and who may download each
+  // (ADR 0041), from the application API under the same session. Failing
+  // leaves the section out, nothing more.
+  const decks: DeckRow[] =
+    apiBaseUrl === undefined || accessToken === null
+      ? []
+      : await listDocuments({ baseUrl: apiBaseUrl, accessToken })
+          .then((list) =>
+            list.documents
+              .filter(
+                (document) =>
+                  document.documentType === "PITCH_DECK" &&
+                  document.status === "ACTIVE" &&
+                  document.companyId !== null,
+              )
+              .map((document) => ({
+                documentId: document.id,
+                title: document.title,
+                downloadAudience: document.downloadAudience,
+                version: document.version,
+              })),
+          )
+          .catch(() => []);
   return (
     <PageContainer width="reading" className="flex flex-col gap-8">
       <PageHeader
         title="Documents"
         description="Decks, briefs and reports Q made for you, and the brand they're drawn in."
       />
+      <DeckSharing decks={decks} />
       <DocumentsScreen documents={documents?.items ?? null} brand={brand} />
     </PageContainer>
   );

@@ -172,6 +172,7 @@ describe("the action registry", () => {
         "via:relationship_outcome",
         "CONSEQUENTIAL",
       ],
+      ["document.deck_audience.set", "set_deck_audience", "CONSEQUENTIAL"],
     ]);
   });
 });

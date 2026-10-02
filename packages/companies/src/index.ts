@@ -189,3 +189,9 @@ export {
   CompanyVisibilityChangedEvent,
   companyVisibilityChangedEvent,
 } from "./events/index.js";
+
+export {
+  projectTeamForNetwork,
+  type TeamProjectionSource,
+} from "./domain/team-projection.js";
+export { createPostgresCompanyTeamProjection } from "./infrastructure/postgres-team-projection.js";

@@ -17,6 +17,7 @@ import type { ActorContext } from "@capital-q/security";
 import {
   ClaimChangeKindSchema,
   ClaimEvidenceRelationshipSchema,
+  DocumentDownloadAudienceSchema,
   DocumentTypeSchema,
   EvidenceSourceTypeSchema,
   EvidenceSubjectTypeSchema,
@@ -105,6 +106,27 @@ export const DocumentVersionCreatedEvent = defineEvent({
     "An immutable file version was registered and became the document's current version. Carries no storage identity.",
 });
 
+export const DocumentDownloadAudienceChangedEvent = defineEvent({
+  name: "evidence.document.download_audience_changed",
+  version: 1,
+  owner: EVIDENCE_EVENT_OWNER,
+  producer: EVIDENCE_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "CONFIDENTIAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      documentId: UuidSchema,
+      ownerOrganisationId: UuidSchema,
+      companyId: UuidSchema.nullable(),
+      downloadAudience: DocumentDownloadAudienceSchema,
+      documentVersion: z.number().int().min(1),
+    })
+    .strict(),
+  description:
+    "Who may download a pitch deck changed (ADR 0041): its organisation only, or also investors the company is viewable to. Never the file, its title or its storage.",
+});
+
 export const ClaimChangedEvent = defineEvent({
   name: "evidence.claim.changed",
   version: 1,
@@ -182,6 +204,7 @@ export const EVIDENCE_EVENTS: readonly EventDefinition[] = [
   DocumentReadyEvent,
   ClaimChangedEvent,
   EvidenceItemCreatedEvent,
+  DocumentDownloadAudienceChangedEvent,
 ];
 
 type Context = {
@@ -251,6 +274,18 @@ export function documentVersionCreatedEvent(
     DocumentVersionCreatedEvent,
     context,
     { type: "document", id: data.documentId, version: documentVersion },
+    data,
+  );
+}
+
+export function documentDownloadAudienceChangedEvent(
+  context: Context,
+  data: z.infer<typeof DocumentDownloadAudienceChangedEvent.dataSchema>,
+) {
+  return envelope(
+    DocumentDownloadAudienceChangedEvent,
+    context,
+    { type: "document", id: data.documentId, version: data.documentVersion },
     data,
   );
 }

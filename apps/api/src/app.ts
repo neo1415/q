@@ -44,6 +44,7 @@ import {
   registerDocumentRoutes,
   type DocumentRoutesDependencies,
 } from "./http/documents.js";
+import { deckAudiencePort } from "./deck-audience-port.js";
 import { registerAppActionRoutes } from "./http/app-actions.js";
 import { registerInvestorMandateRoutes } from "./http/investor-mandates.js";
 import {
@@ -456,6 +457,9 @@ export function createApp(
       ...(modules.chatSafety === undefined
         ? {}
         : { chatSafety: modules.chatSafety }),
+      ...(modules.evidence === undefined
+        ? {}
+        : { deckAudience: deckAudiencePort(modules.evidence) }),
     },
   });
 

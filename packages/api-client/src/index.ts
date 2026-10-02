@@ -125,6 +125,7 @@ export {
   getDocument,
   getDocumentUploadSession,
   listDocuments,
+  setDocumentDownloadAudience,
 } from "./documents.js";
 
 export {

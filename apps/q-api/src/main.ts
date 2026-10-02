@@ -1411,6 +1411,20 @@ const appActionPorts: OwnReadPorts = {
   media: pitchMedia,
   outcomes: outcomeService,
   calls: createOwnCalls({ sql: database.sql }),
+  // ADR 0041: who may download a pitch deck, through Evidence (which
+  // authorises, audits and emits); ids were validated by the action.
+  deckAudience: {
+    getDocument: ({ actor, documentId }) =>
+      researchComposition.evidence.getDocument({
+        actor,
+        documentId: DocumentIdSchema.parse(documentId),
+      }),
+    setDocumentDownloadAudience: (command) =>
+      researchComposition.evidence.setDocumentDownloadAudience({
+        ...command,
+        documentId: DocumentIdSchema.parse(command.documentId),
+      }),
+  },
   interactions: createInteractionSignalService({
     ports: slateRead.eligibilityPorts,
     eligibility: slateRead.eligibility,
