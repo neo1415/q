@@ -1474,19 +1474,29 @@ export function createModelGatewayQAnswer(
       // anything outside Capital Q: its query is composed from these and
       // from authorised public identity, never from a model argument.
       conversation: { latestUserText: latest.content },
+      // What the turn is about, read by code (lead 2026-10-02): the offer
+      // narrows to it; absent, the purpose's list as before.
+      ...(request.toolFocus === undefined ? {} : { focus: request.toolFocus }),
     };
     // Independent reads, side by side (speed sweep 2026-10-01: they ran
     // one after another, ~0.3 s of a turn's wait).
-    const [assembled, profile, offeredForRun, memory] = await Promise.all([
-      context.assemble(request),
-      communication.profileFor(request),
-      tools.offer(toolContext),
-      recallMemory(request, conversationId),
-    ]);
-    // The prefetch below reads only tools the run offers; the research
+    const [assembled, profile, offeredForRun, availableForRun, memory] =
+      await Promise.all([
+        context.assemble(request),
+        communication.profileFor(request),
+        tools.offer(toolContext),
+        // The facts read for every turn are read by code, so a turn's
+        // focus (which narrows only what the model is offered) never
+        // removes them.
+        tools.available === undefined
+          ? Promise.resolve(null)
+          : tools.available(toolContext),
+        recallMemory(request, conversationId),
+      ]);
+    // The prefetch below reads only tools the run may use; the research
     // filter decided later never touches them.
     const prefetchTools = new Set(
-      offeredForRun.map((tool) => tool.definition.name),
+      (availableForRun ?? offeredForRun).map((tool) => tool.definition.name),
     );
 
     /**

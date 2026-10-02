@@ -9,8 +9,36 @@ import {
 } from "@capital-q/contracts";
 import type { QOfferedTool, QToolExecutionContext } from "@capital-q/q-runtime";
 
+import { capabilityArea, Q_CAPABILITIES } from "./capabilities.js";
 import type { AnyQToolDefinition } from "./definition.js";
 import { planScopeKinds } from "./plan.js";
+
+/**
+ * The most tools one turn is offered (lead 2026-10-02). Every turn pays for
+ * every offered tool's schema, so the offer follows what the turn is about
+ * (its focus) rather than a static list per purpose; the provider's own
+ * bound (MODEL_TOOLS_MAX) stays the hard ceiling above this.
+ */
+export const Q_TURN_TOOLS_MAX = 40;
+
+/** Each tool's capability area, by provider name (the reader's areas). */
+const TOOL_AREAS: ReadonlyMap<string, string> = new Map(
+  Q_CAPABILITIES.flatMap((capability) =>
+    capability.performedBy.kind === "TOOL"
+      ? [
+          [
+            capability.performedBy.providerName,
+            capability.area ?? capabilityArea(capability.group),
+          ] as const,
+        ]
+      : [],
+  ),
+);
+
+/** The area a tool is listed under, or null when no capability names it. */
+export function toolAreaOf(providerName: string): string | null {
+  return TOOL_AREAS.get(providerName) ?? null;
+}
 
 /**
  * The Capital Q-owned Tool Registry (doc 12 §33; packet §8-§12).
@@ -184,11 +212,26 @@ export function createQToolRegistry(
     const kinds = planScopeKinds(context.plan);
     const purpose = context.plan.purpose.taskClass;
     const core = (record: QToolRecord) => record.definition.core === true;
+    const focus = context.focus;
+    const focused =
+      focus !== undefined && (focus.areas.length > 0 || focus.tools.length > 0);
+    const areas = new Set(focus?.areas ?? []);
+    const named = new Set(focus?.tools ?? []);
+    // Focused: the core, the tools the turn named (whatever their
+    // purposes), and this purpose's tools in the turn's areas. A tool no
+    // capability lists has no area to judge it by, so it is kept.
+    const relevant = (record: QToolRecord): boolean => {
+      if (core(record)) return true;
+      const name = record.definition.providerName;
+      if (!focused)
+        return record.definition.supportedPurposes.includes(purpose);
+      if (named.has(name)) return true;
+      if (!record.definition.supportedPurposes.includes(purpose)) return false;
+      const area = TOOL_AREAS.get(name);
+      return area === undefined || areas.has(area);
+    };
     return [...activeById.values()]
-      .filter(
-        (record) =>
-          core(record) || record.definition.supportedPurposes.includes(purpose),
-      )
+      .filter(relevant)
       .filter(
         ({ definition }) =>
           definition.requiredScopeKinds.length === 0 ||
@@ -197,6 +240,9 @@ export function createQToolRegistry(
       .sort(
         (a, b) =>
           Number(core(b)) - Number(core(a)) ||
+          // What the turn named leads, so no bound can cut it.
+          Number(named.has(b.definition.providerName)) -
+            Number(named.has(a.definition.providerName)) ||
           a.definition.supportedPurposes.length -
             b.definition.supportedPurposes.length ||
           a.definition.id.localeCompare(b.definition.id),
@@ -204,7 +250,7 @@ export function createQToolRegistry(
   };
 
   const eligible = (context: QToolExecutionContext): readonly QToolRecord[] =>
-    ranked(context).slice(0, MODEL_TOOLS_MAX);
+    ranked(context).slice(0, Math.min(Q_TURN_TOOLS_MAX, MODEL_TOOLS_MAX));
 
   return {
     get: (id, version) => byVersion.get(versionIdOf(id, version)),
@@ -212,9 +258,13 @@ export function createQToolRegistry(
     list: () => records,
     eligible,
     ranked,
+    // What may execute is what the run's purpose and plan allow, exactly as
+    // before a turn's focus existed: the focus narrows what the model is
+    // shown (cost), never what the run is authorised to use. A code read
+    // of a fact the model was not shown this turn still runs.
     offeredByProviderName: (context, providerName) =>
-      eligible(context).find(
-        (record) => record.definition.providerName === providerName,
-      ),
+      ranked({ ...context, focus: undefined })
+        .slice(0, MODEL_TOOLS_MAX)
+        .find((record) => record.definition.providerName === providerName),
   };
 }

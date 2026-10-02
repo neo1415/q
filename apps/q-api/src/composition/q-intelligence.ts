@@ -419,7 +419,7 @@ export function composeQIntelligence(
     // (R20), which the turn reader and the answer's note are given.
     offeredTools: async (request) =>
       (
-        await tools.offer({
+        await (tools.available ?? tools.offer)({
           actor: request.actor,
           runId: request.runId,
           correlationId: request.correlationId,

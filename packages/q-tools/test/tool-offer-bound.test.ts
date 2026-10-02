@@ -10,6 +10,7 @@ import {
 import {
   createDefaultQTools,
   createQToolRegistry,
+  Q_TURN_TOOLS_MAX,
   type QToolPorts,
 } from "../src/index.js";
 import { COMPANY_A, actorA, contextFor, planFor } from "./support.js";
@@ -95,6 +96,9 @@ describe("the tools a run is offered are bounded by relevance, not by the alphab
         .eligible(context)
         .map((r) => r.definition.providerName);
       expect(ranked.length).toBeLessThanOrEqual(MODEL_TOOLS_MAX);
+      // Lead 2026-10-02: no turn is offered more than Q_TURN_TOOLS_MAX,
+      // the unfocused fallback included.
+      expect(offered.length).toBeLessThanOrEqual(Q_TURN_TOOLS_MAX);
       expect(offered).toEqual(expect.arrayContaining(CORE));
       // The core leads, so no bound can ever cut it.
       expect(offered.slice(0, CORE.length).sort()).toEqual([...CORE].sort());

@@ -248,6 +248,8 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * (TURN_READER v30, ADR 0040), offered here or not. Absent: none named.
    */
   readonly askedAction?: string | undefined;
+  /** What the turn is about, for the tool offer (QToolFocus). */
+  readonly toolFocus?: QToolFocus | undefined;
 };
 
 export type QCapabilityManifest = {
@@ -372,6 +374,22 @@ export type QToolExecutionContext = {
    * model's argument as given. Absent when a caller has no conversation.
    */
   readonly conversation?: { readonly latestUserText: string } | undefined;
+  /**
+   * What this turn is about, from its reading (lead 2026-10-02): the tool
+   * offer narrows to the core, these capability areas and these tools.
+   * Absent or empty: the purpose's list, ranked and bounded as before.
+   */
+  readonly focus?: QToolFocus | undefined;
+};
+
+/**
+ * The parts of the app a turn is about (capability areas, e.g.
+ * "Relationships") and the tools it named (provider names). Decided by
+ * code from the turn's reading, never by the answer's model.
+ */
+export type QToolFocus = {
+  readonly areas: readonly string[];
+  readonly tools: readonly string[];
 };
 
 /**
@@ -433,6 +451,15 @@ export type QToolPort = {
   readonly offer: (
     context: QToolExecutionContext,
   ) => Promise<readonly QOfferedTool[]>;
+  /**
+   * Everything relevant to this purpose, actor and plan, before a turn's
+   * focus narrows it (lead 2026-10-02): what the turn reader is told Capital
+   * Q can do, so an action not offered to the answer is still named and
+   * reached. Absent: the offer is the list.
+   */
+  readonly available?:
+    | ((context: QToolExecutionContext) => Promise<readonly QOfferedTool[]>)
+    | undefined;
   /** Validate → authorise → execute → validate output. Never throws for a bad proposal. */
   readonly execute: (
     proposal: QToolProposal,

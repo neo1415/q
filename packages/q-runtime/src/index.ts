@@ -173,6 +173,7 @@ export {
   type QToolCallOutcome,
   type QToolCallStatusOutcome,
   type QToolExecutionContext,
+  type QToolFocus,
   type QToolPort,
   type QToolProposal,
   type QToolResult,

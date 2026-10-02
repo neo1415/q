@@ -20,6 +20,7 @@ import {
   toOfferedTool,
   type QToolRecord,
   type QToolRegistry,
+  Q_TURN_TOOLS_MAX,
 } from "./registry.js";
 
 /**
@@ -372,14 +373,14 @@ export function createQToolExecutor(
       const ranked = registry.ranked(context);
       // The bound is applied by the registry (core first, then priority);
       // what it cut is logged so a crowded purpose is seen, not silent.
-      if (ranked.length > MODEL_TOOLS_MAX) {
+      if (ranked.length > Q_TURN_TOOLS_MAX) {
         logger?.warn(
           {
             qRunId: context.runId,
             purpose: context.plan.purpose.taskClass,
             eligible: ranked.length,
             dropped: ranked
-              .slice(MODEL_TOOLS_MAX)
+              .slice(Q_TURN_TOOLS_MAX)
               .map((record) => record.definition.providerName),
           },
           "more tools relevant than one model request carries",
@@ -387,6 +388,15 @@ export function createQToolExecutor(
       }
       return Promise.resolve(registry.eligible(context).map(toOfferedTool));
     },
+    // The reader's list: every tool this purpose and plan allow, unfocused,
+    // up to what one request can carry, exactly as the offer was before.
+    available: (context) =>
+      Promise.resolve(
+        registry
+          .ranked({ ...context, focus: undefined })
+          .slice(0, MODEL_TOOLS_MAX)
+          .map(toOfferedTool),
+      ),
     execute,
   };
 }

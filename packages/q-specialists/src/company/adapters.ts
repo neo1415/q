@@ -55,7 +55,8 @@ export function createToolCanonicalPort(
 ): CompanyCanonicalPort {
   return {
     read: async (context: QToolExecutionContext, companyId: string) => {
-      const offered = await tools.offer(context);
+      // What the run may use, unnarrowed by a turn's focus: code calls these.
+      const offered = await (tools.available ?? tools.offer)(context);
       const names = new Set(offered.map((tool) => tool.definition.name));
       const facts: AuthorisedFact[] = [];
       let toolCalls = 0;
@@ -353,7 +354,8 @@ export function createToolResearchPort(
 ): CompanyResearchPort {
   return {
     research: async (context: QToolExecutionContext, input) => {
-      const offered = await tools.offer(context);
+      // What the run may use, unnarrowed by a turn's focus: code calls these.
+      const offered = await (tools.available ?? tools.offer)(context);
       if (
         !offered.some((tool) => tool.definition.name === "research_public_web")
       ) {

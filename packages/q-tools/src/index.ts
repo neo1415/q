@@ -262,6 +262,8 @@ export {
 export {
   createQToolRegistry,
   inputJsonSchemaOf,
+  Q_TURN_TOOLS_MAX,
+  toolAreaOf,
   toOfferedTool,
   type QToolRecord,
   type QToolRegistry,

@@ -1,4 +1,5 @@
 import { appActionOf, type QAppActionPort } from "./app-action-turn.js";
+import { toolFocusOf } from "./tool-focus.js";
 
 /**
  * The investor organisation's own visibility action (app action
@@ -33,6 +34,7 @@ import {
   Q_CAPABILITIES,
   type GetInvestorMandateOutput,
   type QCapability,
+  toolAreaOf,
 } from "@capital-q/q-tools";
 import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 
@@ -58,6 +60,7 @@ import {
   type QConversationMessage,
   type QResearchDirective,
   type QRuntimeRepositories,
+  type QToolFocus,
 } from "@capital-q/q-runtime";
 
 import type {
@@ -1301,6 +1304,8 @@ export function createSpecialistQAnswer(
    * state: a restart forgets where a series was, never a fact.
    */
   const sequences = new Map<string, QuestionSequence>();
+  /** The last turn's tool focus per conversation, bounded like the rest. */
+  const focuses = new Map<string, QToolFocus>();
   const keepSequence = (
     conversationId: string,
     next: QuestionSequence | null,
@@ -1902,6 +1907,39 @@ export function createSpecialistQAnswer(
     // analysis took 12.4 s and 1,100 tokens to restate a profile).
     const ownRecords =
       !writingDocument && read?.question?.kind === "THEIR_OWN_RECORDS";
+    // What the turn is about narrows the tool offer (lead 2026-10-02);
+    // "yes" to Q's own offer keeps the previous turn's focus.
+    const named = [
+      ...(read?.askedAction !== undefined &&
+      read.askedAction !== null &&
+      actions.some((action) => action.name === read.askedAction)
+        ? [read.askedAction]
+        : []),
+      ...(appActionOf(read) === null ? [] : [appActionOf(read)?.tool ?? ""]),
+    ].filter((name) => name.length > 0);
+    const toolFocus = toolFocusOf({
+      reading:
+        read === null
+          ? null
+          : {
+              kind: read.kind,
+              questionKind: read.question?.kind ?? null,
+              namedTools: named,
+              hand: read.tool?.kind ?? null,
+              handOver: (read.handOver ?? null) !== null,
+            },
+      subjectKinds: request.subjects.map((subject) => subject.kind),
+      areaOf: toolAreaOf,
+      previous: focuses.get(conversationId) ?? null,
+    });
+    focuses.delete(conversationId);
+    if (toolFocus !== null) {
+      focuses.set(conversationId, toolFocus);
+      if (focuses.size > MAX_CONVERSATIONS) {
+        const oldest = focuses.keys().next().value;
+        if (oldest !== undefined) focuses.delete(oldest);
+      }
+    }
     const outcome = await answerOnce(
       {
         ...request,
@@ -1917,6 +1955,7 @@ export function createSpecialistQAnswer(
           : { askedAction: read.askedAction }),
         ...(writingDocument ? { writingDocument: true } : {}),
         ...(series.step === null ? {} : { questionSequence: series.step }),
+        ...(toolFocus === null ? {} : { toolFocus }),
       },
       {
         ownRecords,
