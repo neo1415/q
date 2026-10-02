@@ -37,7 +37,15 @@ export type QReceiptPort = {
   readonly action: (
     actor: ActorContext,
     proposalId: string,
-  ) => Promise<{ readonly status: string } | null>;
+  ) => Promise<{
+    readonly status: string;
+    /**
+     * Where work the approval started stands now, in plain words, from its
+     * own records (an errand: "Q is looking after Nixo: waiting for them
+     * to accept"). Absent for a change that is simply saved.
+     */
+    readonly progress?: string | undefined;
+  } | null>;
 };
 
 export type QReceipt =
@@ -54,6 +62,7 @@ export type QReceipt =
       readonly actionType: string;
       readonly summary: string;
       readonly status: string;
+      readonly progress?: string | undefined;
     };
 
 const RECEIPTS_MAX = 12;
@@ -132,6 +141,7 @@ export async function collectReceipts(
         actionType: block.proposal.actionType,
         summary: block.proposal.summary,
         status: record.status,
+        ...(record.progress === undefined ? {} : { progress: record.progress }),
       });
     }
   }
@@ -464,8 +474,13 @@ const PROPOSAL_STATUS_WORDS: Readonly<Record<string, string>> = {
   EXPIRED: "lapsed before a decision, so nothing changed",
 };
 
+/**
+ * A card's title as the subject of a sentence: quoted, because a title is
+ * often a sentence itself (live 2026-10-02: "Q looks after Nixo for you is
+ * saved").
+ */
 function named(summary: string): string {
-  return summary.trim().replace(/[.\s]+$/u, "");
+  return `"${summary.trim().replace(/[.\s]+$/u, "")}"`;
 }
 
 /**
@@ -485,17 +500,26 @@ export function proposalStatusLine(receipts: readonly QReceipt[]): string {
   );
   const pending = actions.filter((action) => action.status === "PENDING");
   const only = pending.length === 1 ? pending[0] : undefined;
+  // Work an approval started, where it stands now (an errand), first.
+  const running = actions.filter(
+    (action) => action.status !== "PENDING" && action.progress !== undefined,
+  );
+  const progress = running.map((action) => action.progress ?? "");
   if (only !== undefined) {
+    if (progress.length > 0) {
+      return `${progress.join(" ")} ${named(only.summary)} is waiting for your approval, not saved yet.`;
+    }
     return `${named(only.summary)} is waiting for your approval, not saved yet. Tap Approve on its card, or tell me to go ahead.`;
   }
   if (pending.length > 1) {
     const names = pending
       .slice(0, 4)
-      .map((action) => `"${named(action.summary)}"`)
+      .map((action) => named(action.summary))
       .join(", ");
     return `${String(pending.length)} changes are waiting for your approval, none saved yet: ${names}.`;
   }
   const latest = actions.at(-1);
+  if (latest?.progress !== undefined) return latest.progress;
   if (latest === undefined) {
     return "Nothing is waiting for your approval in this conversation, and nothing has been saved here.";
   }

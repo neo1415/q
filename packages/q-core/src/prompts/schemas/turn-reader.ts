@@ -515,3 +515,28 @@ export const TurnReaderV27ResultSchema = TurnReaderV25ResultSchema.extend({
   saveToOwnProfile: z.boolean().default(false),
 }).strict();
 export type TurnReaderV27Result = z.infer<typeof TurnReaderV27ResultSchema>;
+
+/**
+ * v28 (HARDEN P0, live 2026-10-02, Zino): "send a message to nixo telling
+ * them I am looking forward to the next meeting" was read as a hand-over,
+ * and an errand card came instead of the message; "book a meeting with
+ * Nixo in the next five minutes" lost its time. A single direct request is
+ * not a hand-over, and timeWindow carries a time they asked for, relative
+ * to now, so code can honour it or say why not.
+ */
+export const TURN_READER_V28_SCHEMA_VERSION = 28;
+
+export const TurnTimeWindowSchema = z
+  .object({
+    /** Minutes from now the thing may start at the earliest; null: now. */
+    fromMinutes: z.number().int().min(0).max(525_600).nullable().default(null),
+    /** Minutes from now it must happen by; null: no limit given. */
+    toMinutes: z.number().int().min(0).max(525_600).nullable().default(null),
+  })
+  .strict();
+export type TurnTimeWindow = z.infer<typeof TurnTimeWindowSchema>;
+
+export const TurnReaderV28ResultSchema = TurnReaderV27ResultSchema.extend({
+  timeWindow: TurnTimeWindowSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV28Result = z.infer<typeof TurnReaderV28ResultSchema>;

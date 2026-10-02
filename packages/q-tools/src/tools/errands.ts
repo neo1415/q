@@ -88,6 +88,17 @@ export const ProposeErrandInputSchema = z
         "When they asked Q to book a call: its purpose, as the invite title. Null: no call.",
       ),
     callMinutes: z.number().int().min(15).max(120).default(30),
+    callWindow: z
+      .object({
+        fromMinutes: z.number().int().min(0).max(525_600).nullable(),
+        toMinutes: z.number().int().min(0).max(525_600).nullable(),
+      })
+      .strict()
+      .nullable()
+      .default(null)
+      .describe(
+        'When they said when the call should happen, in minutes from now ("in the next five minutes" is {fromMinutes: 0, toMinutes: 5}). Null: the first free time.',
+      ),
   })
   .strict()
   .refine(exactlyOne, ONE_REF);
@@ -102,11 +113,54 @@ type ErrandGrant = {
   readonly blocked: boolean;
 };
 
+/**
+ * Q books a call no sooner than this after the errand starts, so nobody is
+ * surprised by an invite (q-api's errand runner holds the same rule).
+ */
+export const ERRAND_CALL_LEAD_MINUTES = 18 * 60;
+
+/** The requested window, as instants; nothing when none was asked. */
+function callWindowOf(
+  window: ParsedInput["callWindow"],
+  at: Date,
+): { notBefore?: string; notAfter?: string } {
+  if (window === null) return {};
+  const minutes = (n: number) => new Date(at.getTime() + n * 60_000);
+  return {
+    ...(window.fromMinutes === null
+      ? {}
+      : { notBefore: minutes(window.fromMinutes).toISOString() }),
+    ...(window.toMinutes === null
+      ? {}
+      : { notAfter: minutes(window.toMinutes).toISOString() }),
+  };
+}
+
+/**
+ * Said with the card when the window can't be kept (live 2026-10-02:
+ * "book a meeting with Nixo in the next five minutes" was silently booked
+ * for whenever): why, and what Q will do instead.
+ */
+function windowNote(window: ParsedInput["callWindow"]): string {
+  if (window?.toMinutes === null || window === null) return "";
+  if (window.toMinutes >= ERRAND_CALL_LEAD_MINUTES) return "";
+  return `; I can't book the call within ${spanWords(window.toMinutes)}: Q books a call at least 18 hours ahead, after they accept, so nobody is surprised, and it will take the first free time after that`;
+}
+
+function spanWords(minutes: number): string {
+  if (minutes < 60)
+    return `${String(minutes)} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.round(minutes / 60);
+  return `${String(hours)} hour${hours === 1 ? "" : "s"}`;
+}
+
 export function createErrandTools(
   ports: QToolPorts,
   chat: ChatIntelligencePort,
   relationships: RelationshipIntelligencePort,
+  options: { readonly now?: () => Date } = {},
 ): readonly AnyQToolDefinition[] {
+  const now = options.now ?? (() => new Date());
   return [
     defineQTool<ParsedInput, ChatProposalOutput, ErrandGrant>({
       id: PROPOSE_ERRAND,
@@ -211,6 +265,7 @@ export function createErrandTools(
               : {
                   purpose: input.callPurpose,
                   durationMinutes: input.callMinutes,
+                  ...callWindowOf(input.callWindow, now()),
                 },
         };
         const status = chat.prepareForApproval({
@@ -221,7 +276,7 @@ export function createErrandTools(
         });
         return {
           status,
-          awaitingApprovalOf: `Q looks after ${grant.counterpartName} for you`,
+          awaitingApprovalOf: `Q looks after ${grant.counterpartName} for you${windowNote(input.callPurpose === null ? null : input.callWindow)}`,
         };
       },
     }),

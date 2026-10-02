@@ -101,6 +101,8 @@ import {
 } from "./composition/waiting.js";
 import {
   type ErrandNegotiation,
+  ERRAND_START,
+  errandProgress,
   createErrandReplyComposer,
   createErrandRunner,
   createErrandStartAction,
@@ -2258,7 +2260,31 @@ const qIntelligence = composeQIntelligence({
       const view = await qActions
         .getApproval({ actor, approvalId: approval.id })
         .catch(() => null);
-      return view === null ? null : { status: plainProposalStatus(view) };
+      if (view === null) return null;
+      const status = plainProposalStatus(view);
+      // An errand the approval started (live 2026-10-02, Zino: "have you
+      // booked?" was answered "Q looks after Nixo for you is saved"):
+      // where it stands now, from the errand's own record.
+      if (status !== "SAVED" || view.action.actionType !== ERRAND_START) {
+        return { status };
+      }
+      const rows = await database.sql<
+        {
+          counterpart_name: string;
+          status: string;
+          stage: string;
+          last_step: string | null;
+        }[]
+      >`
+        select counterpart_name, status, stage, last_step
+          from q_runtime.errands
+         where q_action_id = ${view.action.actionId}
+           and user_id = ${actor.userId} and tenant_id = ${actor.tenantId}
+         limit 1`.catch(() => []);
+      const errand = rows[0];
+      return errand === undefined
+        ? { status }
+        : { status, progress: errandProgress(errand) };
     },
   },
   visibility: profileBoard,

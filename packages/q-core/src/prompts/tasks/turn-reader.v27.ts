@@ -31,7 +31,7 @@ export const TURN_READER_V27: PromptDefinition<
 > = {
   ...TURN_READER_V26,
   version: 27,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "HARDEN P0 2026-10-02: saveToOwnProfile, true when the person authorises saving research or findings into their own profile; code fills the open fields itself.",
   effectiveFrom: "2026-10-02",

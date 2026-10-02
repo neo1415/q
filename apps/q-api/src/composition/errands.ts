@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   ChatMessageBodySchema,
   QActionTypeSchema,
+  UtcTimestampSchema,
   UuidSchema,
   type ModelDataPosture,
   type QSubjectRef,
@@ -92,6 +93,9 @@ export const ErrandStartPayloadSchema = z
       .object({
         purpose: z.string().trim().min(3).max(200),
         durationMinutes: z.number().int().min(15).max(120),
+        /** The window they asked for, as instants (live 2026-10-02). */
+        notBefore: UtcTimestampSchema.optional(),
+        notAfter: UtcTimestampSchema.optional(),
       })
       .strict()
       .nullable(),
@@ -289,6 +293,60 @@ export function createErrandStartAction(dependencies: {
       },
     },
   });
+}
+
+/**
+ * The first moment a call may be booked: never sooner than the lead time,
+ * and never before the start of the window they asked for.
+ */
+export function earliestCall(
+  current: Date,
+  call: { readonly notBefore?: string | undefined },
+): Date {
+  const lead = current.getTime() + CALL_LEAD_MS;
+  const asked =
+    call.notBefore === undefined ? lead : new Date(call.notBefore).getTime();
+  return new Date(Math.max(lead, asked));
+}
+
+/**
+ * Where an errand stands, in one plain sentence from its own record (live
+ * 2026-10-02, Zino: "have you booked?" got "Q looks after Nixo for you is
+ * saved"). Never the card's title as a status.
+ */
+export function errandProgress(errand: {
+  readonly counterpart_name: string;
+  readonly status: string;
+  readonly stage: string;
+  readonly last_step: string | null;
+}): string {
+  const name = errand.counterpart_name;
+  const last =
+    errand.last_step === null || errand.last_step.trim().length === 0
+      ? ""
+      : ` Latest: ${errand.last_step.trim().replace(/[.\s]+$/u, "")}.`;
+  if (errand.status !== "ACTIVE") {
+    switch (errand.status) {
+      case "DONE":
+        return `Q has finished looking after ${name}.${last}`;
+      case "STOPPED":
+        return `Q stopped looking after ${name}.${last}`;
+      case "EXPIRED":
+        return `Q's errand with ${name} lapsed before they answered.${last}`;
+      default:
+        return `Q's errand with ${name} didn't go through.${last}`;
+    }
+  }
+  switch (errand.stage) {
+    case "WAITING_CONNECTION":
+      return `Q is looking after ${name} for you: waiting for them to accept, so nothing is booked yet.${last}`;
+    case "CONVERSING":
+      return `Q is looking after ${name} for you: messaging them to agree a time; nothing is booked yet.${last}`;
+    case "CALL_BOOKED":
+      return `Q is looking after ${name} for you: the call is booked.${last}`;
+    default:
+      return `Q is looking after ${name} for you.${last}`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -749,7 +807,7 @@ export function createErrandRunner(dependencies: {
     const zone = (await negotiation.zoneOf(row.user_id)) ?? "UTC";
     const current = now();
     const slots = workingHourSlots({
-      from: new Date(current.getTime() + CALL_LEAD_MS),
+      from: earliestCall(current, call),
       until: new Date(current.getTime() + 14 * 24 * 3_600_000),
       timeZone: zone,
       durationMinutes: call.durationMinutes,
@@ -946,7 +1004,7 @@ export function createErrandRunner(dependencies: {
     const found = await schedule.findSlots({
       actor,
       relationshipId: row.relationship_id,
-      from: new Date(current.getTime() + CALL_LEAD_MS),
+      from: earliestCall(current, call),
       durationMinutes: call.durationMinutes,
     });
     if (

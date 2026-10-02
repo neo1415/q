@@ -323,3 +323,61 @@ describe("propose_errand, one errand per subject (QA 2026-10-01)", () => {
     expect(prepared).toEqual([]);
   });
 });
+
+describe("propose_errand honours the time they asked for, or says why not (live 2026-10-02, Zino)", () => {
+  // "book a meeting with Nixon the next five minutes"
+  it("'in the next five minutes': the window rides on the plan, and the card says why it can't be kept", async () => {
+    const { executor, prepared } = world();
+    const before = Date.now();
+    const outcome = await executor.execute(
+      {
+        callId: "e2",
+        name: "propose_errand",
+        arguments: {
+          relationshipId: RELATIONSHIP,
+          callPurpose: "Meeting",
+          callWindow: { fromMinutes: 0, toMinutes: 5 },
+        },
+      },
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    const data = (outcome.result as { data: { awaitingApprovalOf: string } })
+      .data;
+    expect(data.awaitingApprovalOf).toBe(
+      "Q looks after Apex for you; I can't book the call within 5 minutes: Q books a call at least 18 hours ahead, after they accept, so nobody is surprised, and it will take the first free time after that",
+    );
+    const plan = (
+      prepared[0] as {
+        payload: { bookCall: { notBefore: string; notAfter: string } };
+      }
+    ).payload.bookCall;
+    expect(Date.parse(plan.notBefore)).toBeGreaterThanOrEqual(before - 1000);
+    expect(Date.parse(plan.notAfter) - Date.parse(plan.notBefore)).toBe(
+      5 * 60_000,
+    );
+  });
+
+  it("a window it can keep is carried with no note", async () => {
+    const { executor, prepared } = world();
+    const outcome = await executor.execute(
+      {
+        callId: "e3",
+        name: "propose_errand",
+        arguments: {
+          relationshipId: RELATIONSHIP,
+          callPurpose: "Meeting",
+          callWindow: { fromMinutes: 2 * 24 * 60, toMinutes: 3 * 24 * 60 },
+        },
+      },
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    expect(
+      (outcome.result as { data: { awaitingApprovalOf: string } }).data
+        .awaitingApprovalOf,
+    ).toBe("Q looks after Apex for you");
+    expect(
+      (prepared[0] as { payload: { bookCall: { notBefore?: string } } }).payload
+        .bookCall.notBefore,
+    ).toBeDefined();
+  });
+});
