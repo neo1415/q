@@ -465,7 +465,10 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "fill_profile_gaps",
     "PROFILE",
     "Searches public sources and fills only the open fields of their own company profile, as one change shown to them and saved, as their stated details, only when they approve.",
-    { approval: "PREPARE_APPROVE", executes: ["company.profile.update"] },
+    {
+      approval: "PREPARE_APPROVE",
+      executes: ["profile.gaps.fill", "company.profile.update"],
+    },
   ),
   tool(
     "propose_handle_claim",

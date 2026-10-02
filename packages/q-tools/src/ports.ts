@@ -327,6 +327,12 @@ export type QToolPorts = {
   readonly schedule?: ScheduleIntelligencePort | undefined;
   /** Profile changes for approval (BIZ-002); absent means the tool does not exist. */
   readonly profileChanges?: ProfileChangePort | undefined;
+  /**
+   * Filling their own profile's gaps as ONE change (HARDEN P0): which
+   * onboarding answers are open, and one combined card for company fields
+   * and answers. Absent: fill_profile_gaps fills company fields only.
+   */
+  readonly profileGaps?: ProfileGapsPort | undefined;
   /** A pitch's transcript around a moment (R18); absent means no pitch tool. */
   readonly pitchMoments?: PitchMomentPort | undefined;
   /** Who can see what (CQ-BIZ-003); absent means no visibility tool exists. */
@@ -508,6 +514,62 @@ export type RecordChange =
       readonly field: ProfileAnswerField;
       readonly value: string | readonly string[];
     };
+
+/**
+ * The founder answers public research can fill (HARDEN P0, 2026-10-02):
+ * the company's categories and team facts. Their own role, full-time
+ * status and traction are theirs to say; materials are documents.
+ */
+export const RESEARCHABLE_FOUNDER_ANSWERS = [
+  "categories",
+  "founder_count",
+  "team_size",
+  "functions",
+] as const;
+export type ResearchableFounderAnswer =
+  (typeof RESEARCHABLE_FOUNDER_ANSWERS)[number];
+
+export type ProfileGapsPort = {
+  /**
+   * Which researchable answers of their own COMPLETED founder setup are
+   * open (never given, or skipped). Null: no completed setup, so answers
+   * are not in play.
+   */
+  readonly openAnswers: (
+    actor: ActorContext,
+  ) => Promise<readonly ResearchableFounderAnswer[] | null>;
+  /** The form each answer takes, for a reader of sources (its options, its names). */
+  readonly answerForms: () => Readonly<
+    Record<ResearchableFounderAnswer, string>
+  >;
+  /**
+   * ONE combined change for approval: company fields and answers, with the
+   * sources named on the card. Answers that do not resolve are left out
+   * and named in `dropped`.
+   */
+  readonly prepare: (entry: {
+    readonly runId: string;
+    readonly actor: ActorContext;
+    readonly companyId: string;
+    readonly companyChanges: readonly {
+      readonly field: string;
+      readonly value: string;
+    }[];
+    readonly answers: readonly {
+      readonly field: ResearchableFounderAnswer;
+      readonly value: string;
+    }[];
+    readonly sources: readonly string[];
+  }) => Promise<{
+    readonly status: "PREPARED" | "ONE_PER_TURN" | "REFUSED";
+    readonly reason: string | null;
+    /** Fields left out because their value did not fit, with why. */
+    readonly dropped: readonly {
+      readonly field: string;
+      readonly reason: string;
+    }[];
+  }>;
+};
 
 /** The profile facts Q may change through a revised onboarding answer (ADR 0024). */
 export const PROFILE_ANSWER_FIELDS = {

@@ -393,6 +393,10 @@ import { createDecisionReader } from "./voice/decision.js";
 import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
 import { createInvestorProfileUpdateAction } from "./composition/investor-profile-action.js";
 import { createProfileChangeBoard } from "./composition/profile-change-board.js";
+import {
+  createProfileGapsBoard,
+  createProfileGapsFillAction,
+} from "./composition/profile-gaps-action.js";
 import { createProfileFindingsReader } from "./composition/profile-findings.js";
 import { createHandleClaimAction } from "./composition/handle-claim-action.js";
 import { assertComposedActionTypes } from "./composition/q-action-types.js";
@@ -1028,6 +1032,24 @@ const connectionService = createConnectionService({
 const relationshipBoard = createRelationshipActionBoard({ logger });
 // A profile change the person asked Q for waits here for approval (BIZ-002).
 const profileChangeBoard = createProfileChangeBoard({ logger });
+// Filling the profile's gaps as one card (HARDEN P0, 2026-10-02). The
+// onboarding runtime is composed further down; read only when a tool asks.
+const profileGapsBoard = createProfileGapsBoard({
+  answers: () => profileAnswers,
+  responses: async (actor) => {
+    const view = await onboardingRevisions.runtime.getCurrentSession({
+      actor: { userId: actor.userId, context: actor },
+      journeyType: "founder",
+    });
+    return view === null || view.session.status !== "COMPLETED"
+      ? null
+      : view.responses.map((response) => ({
+          stepKey: response.stepKey,
+          value: response.value,
+        }));
+  },
+  logger,
+});
 // Email on a relationship (BIZ-007): the person's own connected Gmail,
 // through the integrations context. The approved `email.send` executes
 // here, so q-api carries the same Google variables as api and workers.
@@ -1432,6 +1454,7 @@ const qTools = createQTools({
     ),
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
+    profileGaps: profileGapsBoard,
     visibility: {
       state: (actor, companyId) => visibilityCentre.state({ actor, companyId }),
       prepareForApproval: visibilityBoard.prepareForApproval,
@@ -1768,6 +1791,14 @@ const qActionRegistry = createQActionRegistry([
   ...createRecordChangeActions(recordChangeDependencies),
   // ADR 0024: a profile fact from onboarding, revised on approval.
   createProfileAnswerAction({ answers: profileAnswers, logger }),
+  // HARDEN P0: the profile's gaps from public sources, one approval.
+  createProfileGapsFillAction({
+    profiles: companies,
+    service: companyService,
+    authorization,
+    answers: profileAnswers,
+    logger,
+  }),
   // An email on a relationship, from the approver's own Gmail (BIZ-007).
   createEmailSendAction({
     integrations,
@@ -1833,6 +1864,7 @@ const qActionPort = createQActionPort({
     // AUTO block (ADR 0030)
     workBoard.proposer,
     profileChangeBoard.proposer,
+    profileGapsBoard.proposer,
     visibilityBoard.proposer,
     handleClaimBoard.proposer,
     humanReviewBoard.proposer,

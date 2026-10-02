@@ -49,7 +49,7 @@ export function createProfileGapReader(dependencies: {
 }): ProfileGapReader {
   const registry = createDefaultPromptRegistry();
   const { gateway, logger } = dependencies;
-  return async ({ request, companyName, openFields, sources }) => {
+  return async ({ request, companyName, openFields, forms, sources }) => {
     if (openFields.length === 0 || sources.length === 0) return null;
     const rendered = renderPrompt<ProfileGapReaderVariables>(registry, {
       task: "PROFILE_GAP_READER",
@@ -61,7 +61,7 @@ export function createProfileGapReader(dependencies: {
         companyName: companyName.slice(0, 160),
         openFields: openFields.map((field) => ({
           field,
-          form: FORMS[field] ?? "as the source states it",
+          form: forms[field] ?? FORMS[field] ?? "as the source states it",
         })),
         sources: sources.slice(0, 8).map((source) => ({
           index: source.index,

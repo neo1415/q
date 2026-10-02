@@ -30,7 +30,9 @@ export const ProfileGapReaderVariablesSchema = z
     companyName: z.string().max(160),
     /** The open fields, each with the form its value takes. */
     openFields: z
-      .array(z.object({ field: z.string().max(64), form: z.string().max(300) }))
+      .array(
+        z.object({ field: z.string().max(64), form: z.string().max(2_000) }),
+      )
       .max(12),
     /** The sources, numbered. Untrusted content throughout. */
     sources: z

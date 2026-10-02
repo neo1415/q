@@ -1,6 +1,7 @@
 import { COMPANY_EDITABLE_FIELDS } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
+import { RESEARCHABLE_FOUNDER_ANSWERS } from "@capital-q/q-tools";
 
 /**
  * Filling the open fields of their own profile, run by code (HARDEN P0,
@@ -49,6 +50,8 @@ export type ProfileGapReader = (input: {
   readonly request: QAnswerRequest;
   readonly companyName: string;
   readonly openFields: readonly string[];
+  /** The form a field's value takes, where the tool says (setup answers). */
+  readonly forms: Readonly<Record<string, string>>;
   readonly sources: readonly ProfileGapSource[];
 }) => Promise<ProfileGapReading | null>;
 
@@ -64,12 +67,16 @@ export type QProfileGapsPort = {
 };
 
 const FILL = "fill_profile_gaps";
-const FIELDS: ReadonlySet<string> = new Set(COMPANY_EDITABLE_FIELDS);
+const FIELDS: ReadonlySet<string> = new Set<string>([
+  ...COMPANY_EDITABLE_FIELDS,
+  ...RESEARCHABLE_FOUNDER_ANSWERS,
+]);
 
 type GapsData = {
   readonly status: string;
   readonly companyName: string | null;
   readonly openFields: readonly string[];
+  readonly forms: Readonly<Record<string, string>>;
   readonly sources: readonly ProfileGapSource[];
   readonly line: string;
 };
@@ -101,8 +108,15 @@ function gapsData(data: unknown): GapsData | null {
           : [];
       })
     : [];
+  const forms: Record<string, string> = {};
+  if (value.forms !== null && typeof value.forms === "object") {
+    for (const [field, form] of Object.entries(value.forms)) {
+      if (typeof form === "string") forms[field] = form;
+    }
+  }
   return {
     status: value.status,
+    forms,
     companyName:
       typeof value.companyName === "string" ? value.companyName : null,
     openFields,
@@ -111,7 +125,34 @@ function gapsData(data: unknown): GapsData | null {
   };
 }
 
-const normal = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
+/**
+ * Text as compared for a quote: case, accents, quotes, dashes, punctuation
+ * and runs of whitespace do not matter (live 2026-10-02: a directory page's
+ * "Team Size: 4" against a quote of "team size 4").
+ */
+const normal = (text: string) =>
+  text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * Whether a quote stands on a source: its words appear there in order
+ * after normalising; or, for a quote a model trimmed or stitched, at least
+ * four fifths of its (three or more) words appear in the source.
+ */
+function quoted(source: string, quote: string): boolean {
+  const q = normal(quote);
+  if (q.length === 0) return false;
+  if (source.includes(q)) return true;
+  const words = q.split(" ").filter((word) => word.length > 0);
+  if (words.length < 3) return false;
+  const have = new Set(source.split(" "));
+  const hits = words.filter((word) => have.has(word)).length;
+  return hits / words.length >= 0.8;
+}
 
 export function createToolProfileGapsPort(dependencies: {
   readonly tools: QToolPort;
@@ -161,6 +202,7 @@ export function createToolProfileGapsPort(dependencies: {
         request,
         companyName: found.companyName ?? "",
         openFields: open,
+        forms: found.forms,
         sources: found.sources,
       }).catch((error: unknown) => {
         logger?.warn(
@@ -173,17 +215,25 @@ export function createToolProfileGapsPort(dependencies: {
         found.sources.map((source) => [source.index, normal(source.excerpt)]),
       );
       // A value stands only on a source's own words: the quote must be in
-      // one of the sources it cites.
+      // one of the sources it cites. Each candidate is logged with what
+      // became of it, so a turn that found nothing says why.
+      const verdicts: { field: string; kept: boolean; why: string }[] = [];
       const values =
         reading === null || reading.wrongSubject
           ? []
-          : reading.values.filter(
-              (entry) =>
-                open.includes(entry.field) &&
-                entry.sources.some((index) =>
-                  (byIndex.get(index) ?? "").includes(normal(entry.quote)),
-                ),
-            );
+          : reading.values.filter((entry) => {
+              const why = !open.includes(entry.field)
+                ? "not an open field"
+                : !entry.sources.some((index) => byIndex.has(index))
+                  ? "cites no source of this search"
+                  : !entry.sources.some((index) =>
+                        quoted(byIndex.get(index) ?? "", entry.quote),
+                      )
+                    ? "quote not in its source"
+                    : "kept";
+              verdicts.push({ field: entry.field, kept: why === "kept", why });
+              return why === "kept";
+            });
       const conflicting =
         reading === null
           ? []
@@ -191,10 +241,22 @@ export function createToolProfileGapsPort(dependencies: {
       logger?.info(
         {
           qRunId: request.runId,
-          open: open.length,
-          read: reading?.values.length ?? 0,
-          kept: values.length,
-          conflicting: conflicting.length,
+          open,
+          sources: found.sources.map((source) => ({
+            index: source.index,
+            chars: source.excerpt.length,
+          })),
+          reader:
+            reading === null
+              ? "nothing"
+              : reading.wrongSubject
+                ? "wrong subject"
+                : "read",
+          candidates: verdicts,
+          conflicting,
+          unread: open.filter(
+            (field) => !verdicts.some((verdict) => verdict.field === field),
+          ),
         },
         "profile gaps mapped from public sources",
       );

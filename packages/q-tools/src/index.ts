@@ -58,6 +58,8 @@ export type {
   PendingProposalPort,
   QCardReadPort,
   ProfileChangePort,
+  ProfileGapsPort,
+  ResearchableFounderAnswer,
   ProposalPlainStatus,
   ApprovalInboxPort,
   DiscoveryDecisionPort,
@@ -135,6 +137,7 @@ export {
 export {
   OWN_RECORD_KINDS,
   PROFILE_ANSWER_FIELDS,
+  RESEARCHABLE_FOUNDER_ANSWERS,
   PROPOSAL_PLAIN_STATUSES,
   type ProfileAnswerField,
 } from "./ports.js";

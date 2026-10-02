@@ -7,6 +7,7 @@ import {
   createQToolExecutor,
   createQToolRegistry,
   type ProfileChangePort,
+  type ProfileGapsPort,
 } from "../src/index.js";
 import {
   COMPANY_A,
@@ -34,7 +35,10 @@ const founderPlan = planFor(actorA, "GENERAL_QUESTION", [
   PUBLIC,
 ]);
 
-function harness(sources: readonly { index: number; domain: string }[]) {
+function harness(
+  sources: readonly { index: number; domain: string }[],
+  profileGaps?: ProfileGapsPort,
+) {
   const prepared: Prepared[] = [];
   const searched: string[] = [];
   const research = {
@@ -88,6 +92,7 @@ function harness(sources: readonly { index: number; domain: string }[]) {
         ...fakePorts(),
         research,
         profileChanges,
+        ...(profileGaps === undefined ? {} : { profileGaps }),
       }),
     ]),
   });
@@ -232,5 +237,62 @@ describe("fill_profile_gaps", () => {
       ),
     );
     expect(noPublic.status).not.toBe("SUCCEEDED");
+  });
+});
+
+describe("fill_profile_gaps with the setup answers (live 2026-10-02 on 25942649)", () => {
+  it("puts open setup answers in play beside company fields, and prepares them on ONE combined card", async () => {
+    const combined: Parameters<ProfileGapsPort["prepare"]>[0][] = [];
+    const gaps: ProfileGapsPort = {
+      openAnswers: () => Promise.resolve(["categories", "team_size"]),
+      answerForms: () => ({
+        categories: "category names",
+        founder_count: "digits",
+        team_size: "digits",
+        functions: "functions",
+      }),
+      prepare: (entry) => {
+        combined.push(entry);
+        return Promise.resolve({
+          status: "PREPARED",
+          reason: null,
+          dropped: [],
+        });
+      },
+    };
+    const { call, prepared } = harness(
+      [{ index: 1, domain: "ycombinator.com" }],
+      gaps,
+    );
+    const first = await call("g1", {});
+    expect(data(first).openFields).toEqual(
+      expect.arrayContaining(["categories", "team_size", "foundedDate"]),
+    );
+    expect(
+      (first.result.data as { forms: Record<string, string> }).forms,
+    ).toEqual({ categories: "category names", team_size: "digits" });
+    const second = await call("g2", {
+      values: [
+        { field: "foundedDate", value: "2025-01-01", sources: [1] },
+        { field: "team_size", value: "4", sources: [1] },
+        { field: "categories", value: "B2B, Fintech", sources: [1] },
+      ],
+    });
+    expect(data(second).status).toBe("PREPARED");
+    // One card, not the single-profile board.
+    expect(prepared).toHaveLength(0);
+    expect(combined).toHaveLength(1);
+    expect(combined[0]).toMatchObject({
+      companyId: COMPANY_A,
+      companyChanges: [{ field: "foundedDate", value: "2025-01-01" }],
+      answers: [
+        { field: "team_size", value: "4" },
+        { field: "categories", value: "B2B, Fintech" },
+      ],
+      sources: ["ycombinator.com"],
+    });
+    expect(data(second).line).toContain(
+      "I filled founding date, team size and sector and categories from public sources (ycombinator.com)",
+    );
   });
 });

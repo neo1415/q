@@ -11,7 +11,12 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
-import type { ProfileChangePort, QToolPorts } from "../ports.js";
+import {
+  RESEARCHABLE_FOUNDER_ANSWERS,
+  type ProfileChangePort,
+  type QToolPorts,
+  type ResearchableFounderAnswer,
+} from "../ports.js";
 import { boundIds } from "./profile-change.js";
 
 /**
@@ -42,7 +47,23 @@ const RESEARCHABLE: readonly string[] = COMPANY_EDITABLE_FIELDS.filter(
   (field) => field !== "canonicalName",
 );
 
+const ANSWER_FIELDS: ReadonlySet<string> = new Set(
+  RESEARCHABLE_FOUNDER_ANSWERS,
+);
+const isAnswer = (field: string): field is ResearchableFounderAnswer =>
+  ANSWER_FIELDS.has(field);
+
+/** Every field this tool may fill: company fields, then setup answers. */
+const ALL_FIELDS = [
+  ...COMPANY_EDITABLE_FIELDS,
+  ...RESEARCHABLE_FOUNDER_ANSWERS,
+] as const;
+
 const LABELS: Readonly<Record<string, string>> = {
+  categories: "sector and categories",
+  founder_count: "number of founders",
+  team_size: "team size",
+  functions: "team functions",
   legalName: "legal name",
   websiteUrl: "website",
   foundedDate: "founding date",
@@ -55,6 +76,18 @@ const LABELS: Readonly<Record<string, string>> = {
 
 const label = (field: string): string => LABELS[field] ?? field;
 
+/** The bare host of their own site, for the query: never a path. */
+function siteOf(url: string | null): string {
+  if (url === null) return "";
+  try {
+    return new URL(
+      url.includes("://") ? url : `https://${url}`,
+    ).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 function list(items: readonly string[]): string {
   if (items.length <= 1) return items.join("");
   return `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
@@ -66,7 +99,7 @@ export const FillProfileGapsInputSchema = z
       .array(
         z
           .object({
-            field: z.enum(COMPANY_EDITABLE_FIELDS),
+            field: z.enum(ALL_FIELDS),
             value: z
               .string()
               .trim()
@@ -87,7 +120,7 @@ export const FillProfileGapsInputSchema = z
         "Leave out on the first call: it reads the open fields and searches. On the second call, one value per open field the sources support, each with its source indexes.",
       ),
     conflicting: z
-      .array(z.enum(COMPANY_EDITABLE_FIELDS))
+      .array(z.enum(ALL_FIELDS))
       .max(9)
       .optional()
       .describe(
@@ -118,6 +151,8 @@ export const FillProfileGapsOutputSchema = z
     /** Their company's name on Capital Q, for a reader of the sources. */
     companyName: z.string().max(200).nullable(),
     openFields: z.array(z.string()).max(12),
+    /** The form each open field's value takes, for a reader of the sources. */
+    forms: z.record(z.string(), z.string().max(2000)),
     /** Fields already filled: never changed by this tool. */
     filledFields: z.array(z.string()).max(12),
     sources: z
@@ -231,6 +266,7 @@ export function createFillProfileGapsTool(
       const empty = {
         companyName: profile?.canonicalName.slice(0, 200) ?? null,
         openFields: [],
+        forms: {},
         filledFields: [],
         sources: [],
         guidance: "",
@@ -258,8 +294,22 @@ export function createFillProfileGapsTool(
         const value = record[field];
         return value === null || value === undefined || value.trim() === "";
       };
-      const open = RESEARCHABLE.filter(isOpen);
+      // Setup answers are in play only where a combined card exists and
+      // their setup is complete (ADR 0024 revises a completed session).
+      const openAnswers =
+        ports.profileGaps === undefined
+          ? []
+          : ((await ports.profileGaps
+              .openAnswers(context.actor)
+              .catch(() => null)) ?? []);
+      const open = [...RESEARCHABLE.filter(isOpen), ...openAnswers];
       const filled = RESEARCHABLE.filter((field) => !isOpen(field));
+      const answerForms = ports.profileGaps?.answerForms();
+      const forms: Record<string, string> = {};
+      for (const field of openAnswers) {
+        const form = answerForms?.[field];
+        if (form !== undefined) forms[field] = form.slice(0, 2000);
+      }
       if (open.length === 0) {
         return {
           ...empty,
@@ -332,15 +382,44 @@ export function createFillProfileGapsTool(
             line: `I searched public sources and found nothing I could use for your open fields (${list(open.map(label))}); they stay open.${disagreed.length === 0 ? "" : ` Sources disagree on ${list(disagreed.map(label))}.`}`,
           };
         }
-        const prepared = await ports.profileChanges.prepareForApproval({
-          runId: context.runId,
-          tenantId: context.actor.tenantId,
-          actorUserId: context.actor.userId,
-          profile: "COMPANY",
-          subjectId: grant.companyId,
-          changes,
-        });
-        if (prepared.status !== "PREPARED") {
+        const companyChanges = changes.filter(
+          (change) => !isAnswer(change.field),
+        );
+        const answers = changes.flatMap((change) =>
+          isAnswer(change.field)
+            ? [{ field: change.field, value: change.value }]
+            : [],
+        );
+        let unfit: readonly { field: string; reason: string }[] = [];
+        let prepared: {
+          readonly status: "PREPARED" | "ONE_PER_TURN" | "REFUSED";
+          readonly reason: string | null;
+        };
+        if (ports.profileGaps !== undefined) {
+          const combined = await ports.profileGaps.prepare({
+            runId: context.runId,
+            actor: context.actor,
+            companyId: grant.companyId,
+            companyChanges,
+            answers,
+            sources: domains,
+          });
+          unfit = combined.dropped;
+          prepared = combined;
+        } else {
+          prepared = await ports.profileChanges.prepareForApproval({
+            runId: context.runId,
+            tenantId: context.actor.tenantId,
+            actorUserId: context.actor.userId,
+            profile: "COMPANY",
+            subjectId: grant.companyId,
+            changes: companyChanges,
+          });
+        }
+        const saved = changes.filter(
+          (change) => !unfit.some((entry) => entry.field === change.field),
+        );
+        if (prepared.status !== "PREPARED" || saved.length === 0) {
           return {
             ...empty,
             status: "REFUSED",
@@ -357,7 +436,11 @@ export function createFillProfileGapsTool(
           status: "PREPARED",
           openFields: open.map(label),
           filledFields: filled.map(label),
-          line: `I filled ${list(changes.map((change) => label(change.field)))} from public sources${domains.length === 0 ? "" : ` (${domains.join(", ")})`}; approve the card to save ${changes.length === 1 ? "it" : "them"} as your stated details.${tail}`,
+          line: `I filled ${list(saved.map((change) => label(change.field)))} from public sources${domains.length === 0 ? "" : ` (${domains.join(", ")})`}; approve the card to save ${saved.length === 1 ? "it" : "them"} as your stated details.${tail}${
+            unfit.length === 0
+              ? ""
+              : ` ${list(unfit.map((entry) => label(entry.field)))} didn't fit the profile, so I left ${unfit.length === 1 ? "it" : "them"} open.`
+          }`,
         };
       }
 
@@ -369,9 +452,17 @@ export function createFillProfileGapsTool(
         actor: context.actor,
         runId: context.runId,
         correlationId: context.correlationId,
-        requestedQuery: `${profile.canonicalName} company ${open
-          .map(label)
-          .join(" ")}`.slice(0, 200),
+        // The name and its own site, plus what is open: one search that
+        // finds directory pages (an accelerator's, a registry's) as well.
+        requestedQuery: [
+          profile.canonicalName,
+          siteOf(profile.websiteUrl),
+          "startup founded team",
+          ...open.slice(0, 4).map(label),
+        ]
+          .filter((part) => part.length > 0)
+          .join(" ")
+          .slice(0, 200),
         userText: context.conversation?.latestUserText ?? "",
         subject: {
           kind: "COMPANY",
@@ -382,7 +473,7 @@ export function createFillProfileGapsTool(
           identityAuthorised,
           persistAsEvidence: true,
         },
-        extractCount: 4,
+        extractCount: 5,
         signal: context.signal,
       });
       if (outcome.status !== "OK" || outcome.sources.length === 0) {
@@ -411,6 +502,7 @@ export function createFillProfileGapsTool(
         ...empty,
         status: "RESEARCHED",
         openFields: open,
+        forms,
         filledFields: filled,
         sources: outcome.sources.slice(0, 5).map((source) => ({
           index: source.index,
