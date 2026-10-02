@@ -162,7 +162,11 @@ export function createPostgresRelationshipRepository(): RelationshipRepository {
       const rows = await executor`
         select r.id from network.relationships r
          where (${page.after}::uuid is null or r.id > ${page.after}::uuid)
-           and (not ${page.onlyBehind} or r.projected_sequence < r.last_event_sequence)
+           and (not ${page.onlyBehind}
+                or r.projected_sequence < r.last_event_sequence
+                or (${page.version ?? null}::text is not null
+                    and r.projected_sequence > 0
+                    and r.projector_version <> ${page.version ?? null}::text))
          order by r.id
          limit ${page.limit}`;
       return rows.map((row) => RelationshipIdSchema.parse(row["id"]));

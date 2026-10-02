@@ -33,6 +33,68 @@ export const RELATIONSHIP_CURRENT_STATES = [
 ] as const;
 export const RelationshipStateV1Schema = z.enum(RELATIONSHIP_CURRENT_STATES);
 export type RelationshipStateV1 = z.infer<typeof RelationshipStateV1Schema>;
+
+/**
+ * relationship-state.v2 (founder request 2026-10-02: the journey no longer
+ * stops at "meeting held"). Append-only: every v1 state keeps its meaning
+ * and v1 projections stay readable; v2 adds what happens after a meeting.
+ *
+ *   CONNECTED --meeting_held--> MEETING_HELD
+ *   CONNECTED | MEETING_HELD --diligence_started--> IN_DILIGENCE
+ *   any match state --relationship_paused--> PAUSED --relationship_resumed--> back
+ *   any match state --relationship_passed--> PASSED --relationship_resumed--> back
+ *   any match state --commitment_confirmed (INVESTED)--> INVESTED
+ */
+export const RELATIONSHIP_STATES_V2 = [
+  ...RELATIONSHIP_CURRENT_STATES,
+  "MEETING_HELD",
+  "IN_DILIGENCE",
+  "PAUSED",
+  "PASSED",
+  "INVESTED",
+] as const;
+export const RelationshipStateV2Schema = z.enum(RELATIONSHIP_STATES_V2);
+export type RelationshipStateV2 = z.infer<typeof RelationshipStateV2Schema>;
+
+/**
+ * The states in which the match (CONNECTED, doc 17 §85) is open: both sides
+ * agreed to connect, so the thread, meetings and commitments belong to it.
+ * A pass or a pause does not unmake the match; it changes what is next.
+ */
+export const RELATIONSHIP_MATCHED_STATES: readonly RelationshipStateV2[] = [
+  "CONNECTED",
+  "MEETING_HELD",
+  "IN_DILIGENCE",
+  "PAUSED",
+  "PASSED",
+  "INVESTED",
+];
+export function isMatchedRelationshipState(state: string): boolean {
+  return (RELATIONSHIP_MATCHED_STATES as readonly string[]).includes(state);
+}
+
+/**
+ * The match is open AND moving: the active pipeline (6.6.15) and the states
+ * in which a meeting, diligence or a commitment can still be taken forward.
+ * Not PAUSED, PASSED or INVESTED.
+ */
+export const RELATIONSHIP_ACTIVE_MATCH_STATES: readonly RelationshipStateV2[] =
+  ["CONNECTED", "MEETING_HELD", "IN_DILIGENCE"];
+export function isActiveMatchState(state: string): boolean {
+  return (RELATIONSHIP_ACTIVE_MATCH_STATES as readonly string[]).includes(
+    state,
+  );
+}
+
+/**
+ * Why an investor passed after engagement (Product Specification 6.6.10).
+ * The codes are reference data (network.relationship_pass_reasons); this is
+ * only the shape a code must have. The database decides which exist.
+ */
+export const RelationshipPassReasonCodeSchema = z
+  .string()
+  .regex(/^[A-Z][A-Z_]{1,31}$/);
+
 export const RelationshipCurrentStateSchema = z
   .string()
   .regex(/^[A-Z][A-Z_]{0,31}$/);
@@ -230,7 +292,7 @@ export const NETWORK_INVESTOR_RELATIONSHIP_PATH =
 /** What happened, in order: one entry per state the relationship reached. */
 export const RelationshipMilestoneDtoSchema = z
   .object({
-    state: RelationshipStateV1Schema,
+    state: RelationshipStateV2Schema,
     at: UtcTimestampSchema,
   })
   .strict();
@@ -246,6 +308,11 @@ export const RELATIONSHIP_NEXT_STEPS = [
   "ANSWER_INTEREST",
   "SCHEDULE_MEETING",
   "NONE",
+  // relationship-state.v2: after a meeting the investor decides (diligence,
+  // pass, pause) and the founder follows up; a pause is resumed.
+  "DECIDE_NEXT_STEP",
+  "FOLLOW_UP",
+  "RESUME",
 ] as const;
 
 export const RelationshipStatusDtoSchema = z
@@ -254,7 +321,7 @@ export const RelationshipStatusDtoSchema = z
     companyId: UuidSchema,
     investorOrganisationId: UuidSchema,
     /** Where are we. */
-    state: RelationshipStateV1Schema,
+    state: RelationshipStateV2Schema,
     stateSince: UtcTimestampSchema,
     /** What happened. */
     milestones: z.array(RelationshipMilestoneDtoSchema).max(64),
@@ -290,7 +357,7 @@ export const RelationshipSummaryDtoSchema = z
         name: z.string().min(1).max(200),
       })
       .strict(),
-    state: RelationshipStateV1Schema,
+    state: RelationshipStateV2Schema,
     stateSince: UtcTimestampSchema,
     nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),
   })

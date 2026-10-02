@@ -25,6 +25,7 @@ import {
 import { createRequestDatabaseClient } from "@capital-q/database";
 import {
   CorrelationIdSchema,
+  isMatchedRelationshipState,
   type YourCompanyLabel,
 } from "@capital-q/contracts";
 import { createPlatformAdmin } from "@capital-q/platform-admin";
@@ -1247,7 +1248,9 @@ const { app, logger } = createApp(config, security, {
       for (const listing of relationships) {
         const state = listing.projection.state;
         const companyId = listing.relationship.companyId;
-        if (state === "CONNECTED") labelled.set(companyId, "CONNECTED");
+        if (isMatchedRelationshipState(state)) {
+          labelled.set(companyId, "CONNECTED");
+        }
         else if (state === "INTEREST_EXPRESSED" && !labelled.has(companyId)) {
           labelled.set(companyId, "INTERESTED");
         }

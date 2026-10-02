@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import {
   Q_TASK_CLASSES,
-  RelationshipStateV1Schema,
+  RelationshipStateV2Schema,
   RELATIONSHIP_NEXT_STEPS,
   UtcTimestampSchema,
   UuidSchema,
@@ -182,7 +182,7 @@ export const GetRelationshipInputSchema = z
 export type GetRelationshipInput = z.infer<typeof GetRelationshipInputSchema>;
 
 const MilestoneSchema = z
-  .object({ state: RelationshipStateV1Schema, at: UtcTimestampSchema })
+  .object({ state: RelationshipStateV2Schema, at: UtcTimestampSchema })
   .strict();
 
 export const GetRelationshipOutputSchema = z
@@ -199,7 +199,7 @@ export const GetRelationshipOutputSchema = z
     /** Null: nothing on record that this side can see. Never "no relationship exists". */
     relationship: z
       .object({
-        state: RelationshipStateV1Schema,
+        state: RelationshipStateV2Schema,
         stateSince: UtcTimestampSchema,
         milestones: z.array(MilestoneSchema).max(64),
         nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),
@@ -724,7 +724,7 @@ export const ListMyRelationshipsOutputSchema = z
                 name: z.string().max(200),
               })
               .strict(),
-            state: RelationshipStateV1Schema,
+            state: RelationshipStateV2Schema,
             stateSince: UtcTimestampSchema,
             milestones: z.array(MilestoneSchema).max(64),
             nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),

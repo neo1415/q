@@ -262,7 +262,12 @@ export const MeetingHeldRelationshipEvent = defineRelationshipEvent({
  * in the event.
  */
 export const CommitmentActivityPayloadSchema = z
-  .object({ commitmentId: UuidSchema })
+  .object({
+    commitmentId: UuidSchema,
+    // The level confirmed (relationship-state.v2 reads INVESTED from it).
+    // Absent on every event written before 2026-10-02.
+    level: z.enum(["SOFT", "FIRM", "INVESTED"]).optional(),
+  })
   .strict();
 export type CommitmentActivityPayload = z.infer<
   typeof CommitmentActivityPayloadSchema
@@ -406,6 +411,90 @@ export function createRelationshipEventRegistry(
 }
 
 /**
+ * Post-meeting outcomes (founder request 2026-10-02; Product Specification
+ * 6.6.10-6.6.14; doc 13 §28). Each is shared, because both sides are its
+ * subject and the founder is owed an honest answer; none carries a reason
+ * or a note. A pass's reason lives in network.relationship_passes, private
+ * to the investor unless they chose to share it (founder decision (a)).
+ */
+const OutcomeSideSchema = z.enum(["INVESTOR", "COMPANY"]);
+
+export const RelationshipPassedPayloadSchema = z
+  .object({
+    passId: UuidSchema,
+    side: OutcomeSideSchema,
+    /** Whether the reason was shared with the founder; never the reason. */
+    reasonShared: z.boolean(),
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_RELATIONSHIP_PASSED =
+  "relationship_passed" as const;
+export const RelationshipPassedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_RELATIONSHIP_PASSED,
+  payloadSchema: RelationshipPassedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The investor organisation decided not to proceed for now. Carries no reason: a shared reason is read from the pass record.",
+});
+
+export const OutcomeActivityPayloadSchema = z
+  .object({
+    side: OutcomeSideSchema,
+    meetingId: UuidSchema.optional(),
+  })
+  .strict();
+
+export const RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED =
+  "relationship_paused" as const;
+export const RelationshipPausedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED,
+  payloadSchema: OutcomeActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "One side paused the relationship for now. Not a pass, not a decline.",
+});
+
+export const RELATIONSHIP_EVENT_RELATIONSHIP_RESUMED =
+  "relationship_resumed" as const;
+export const RelationshipResumedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_RELATIONSHIP_RESUMED,
+  payloadSchema: OutcomeActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "A pause was lifted, or the investor reset their pass: the relationship is back where it was.",
+});
+
+export const RELATIONSHIP_EVENT_DILIGENCE_STARTED =
+  "diligence_started" as const;
+export const DiligenceStartedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_DILIGENCE_STARTED,
+  payloadSchema: OutcomeActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "Both sides are in diligence. Not a commitment and not an investment.",
+});
+
+export const RelationshipProgressedPayloadSchema = z
+  .object({
+    side: OutcomeSideSchema,
+    /** What was agreed next, as a bounded code (e.g. FOLLOW_UP_MEETING). */
+    step: z.string().regex(/^[A-Z][A-Z_]{1,31}$/),
+    meetingId: UuidSchema.optional(),
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_RELATIONSHIP_PROGRESSED =
+  "relationship_progressed" as const;
+export const RelationshipProgressedRelationshipEvent = defineRelationshipEvent(
+  {
+    type: RELATIONSHIP_EVENT_RELATIONSHIP_PROGRESSED,
+    payloadSchema: RelationshipProgressedPayloadSchema,
+    allowedVisibilityScopes: ["relationship_shared"],
+    description:
+      "A meeting's outcome was confirmed as moving forward (another meeting, materials). Recorded, not a state of its own.",
+  },
+);
+
+/**
  * Production registry: `discovered` (CQ-NET-001), `interest_expressed`
  * (CQ-NET-010), `connection_accepted` and `interest_declined` (CQ-NET-011).
  */
@@ -429,4 +518,9 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     CommitmentDetectedRelationshipEvent,
     CommitmentDisputedRelationshipEvent,
     MeetingNoShowRelationshipEvent,
+    RelationshipPassedRelationshipEvent,
+    RelationshipPausedRelationshipEvent,
+    RelationshipResumedRelationshipEvent,
+    DiligenceStartedRelationshipEvent,
+    RelationshipProgressedRelationshipEvent,
   ];

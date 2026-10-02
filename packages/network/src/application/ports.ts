@@ -98,6 +98,11 @@ export type RelationshipRepository = {
       readonly after: RelationshipId | null;
       readonly limit: number;
       readonly onlyBehind: boolean;
+      /**
+       * The current projector version: a cache folded by another version
+       * is behind too, so a rebuild rolls a new version out from history.
+       */
+      readonly version?: string | undefined;
     },
   ) => Promise<readonly RelationshipId[]>;
 };

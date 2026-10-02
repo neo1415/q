@@ -190,11 +190,17 @@ export {
 } from "./application/relationship-status.js";
 export {
   nextStepFor,
+  projectorFor,
   projectRelationshipState,
+  projectRelationshipStateV1,
+  projectRelationshipStateV2,
   RELATIONSHIP_PROJECTOR_VERSION,
+  RELATIONSHIP_PROJECTOR_VERSIONS,
   RELATIONSHIP_STATE_TRANSITIONS,
+  RELATIONSHIP_STATE_TRANSITIONS_V2,
   visibleToParty,
   type ProjectableEvent,
+  type RelationshipProjectorVersion,
   type RelationshipNextStep,
   type RelationshipParty,
   type RelationshipProjection,

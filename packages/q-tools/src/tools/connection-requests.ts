@@ -311,7 +311,13 @@ export function createProposeConnectionRequestAnswerTool(
 export function relationshipTruth(name: string, state: string): string {
   switch (state) {
     case "CONNECTED":
+    case "MEETING_HELD":
+    case "IN_DILIGENCE":
+    case "PAUSED":
+    case "INVESTED":
       return `You're already connected with ${name}, so there's nothing to accept. I can send them a message or book a call with them.`;
+    case "PASSED":
+      return `${name} has decided not to proceed for now, so there's nothing to accept.`;
     case "INTEREST_EXPRESSED":
       return `${name} hasn't accepted your interest yet, so there's no request of theirs to accept. I can look after it for you: wait for them to accept, then message them and book an introductory call.`;
     case "DECLINED":
