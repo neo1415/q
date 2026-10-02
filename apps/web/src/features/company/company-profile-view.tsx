@@ -85,7 +85,10 @@ function TeamList({
       </h2>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
         {team.map((member, index) => (
-          <li key={`${member.name}-${String(index)}`} className="flex flex-col gap-1 py-3">
+          <li
+            key={`${member.name}-${String(index)}`}
+            className="flex flex-col gap-1 py-3"
+          >
             <p className="cq-body font-medium text-(--cq-text-primary)">
               {member.name}
             </p>

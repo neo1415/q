@@ -54,7 +54,10 @@ export type DocumentType = z.infer<typeof DocumentTypeSchema>;
  * default) or INVESTORS ("Investors who can find us": every investor the
  * company's pitch is viewable to). Only a PITCH_DECK may be INVESTORS.
  */
-export const DOCUMENT_DOWNLOAD_AUDIENCES = ["ORGANISATION", "INVESTORS"] as const;
+export const DOCUMENT_DOWNLOAD_AUDIENCES = [
+  "ORGANISATION",
+  "INVESTORS",
+] as const;
 export const DocumentDownloadAudienceSchema = z.enum(
   DOCUMENT_DOWNLOAD_AUDIENCES,
 );

@@ -107,11 +107,12 @@ export const SET_DECK_AUDIENCE = defineAppAction<
   input: DeckAudienceInputSchema,
   output: z.custom<DeckRecord>(),
   authorize: async (ports, context, input) =>
-    (await ownDeck(ports.documents, context.actor, input.documentId)) === null
+    (await ownDeck(ports.deckAudience, context.actor, input.documentId)) ===
+    null
       ? { ok: false, reason: "That isn't one of your company's pitch decks." }
       : { ok: true },
   run: async (ports, context, input) => {
-    const port = ports.documents;
+    const port = ports.deckAudience;
     const deck = await ownDeck(port, context.actor, input.documentId);
     if (port === undefined || deck === null) {
       throw new Error("DECK_NOT_AVAILABLE");

@@ -656,7 +656,9 @@ export function createSetDocumentDownloadAudience(
   dependencies: EvidenceServiceDependencies,
 ) {
   const { transactions, repositories, audit, outbox } = dependencies;
-  return async (command: SetDocumentDownloadAudienceCommand): Promise<Document> => {
+  return async (
+    command: SetDocumentDownloadAudienceCommand,
+  ): Promise<Document> => {
     const { actor } = command;
     const organisationId = activeOrganisation(actor);
     const documentId = DocumentIdSchema.parse(command.documentId);
@@ -678,7 +680,9 @@ export function createSetDocumentDownloadAudience(
       command.audience === "INVESTORS" &&
       visible.documentType !== "PITCH_DECK"
     ) {
-      throw new EvidenceRuleError("only a pitch deck can be shared with investors");
+      throw new EvidenceRuleError(
+        "only a pitch deck can be shared with investors",
+      );
     }
     return transactions.run(async (tx) => {
       const document = await repositories.documents.lockById(

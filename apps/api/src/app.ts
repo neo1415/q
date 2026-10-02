@@ -456,7 +456,7 @@ export function createApp(
         : { chatSafety: modules.chatSafety }),
       ...(modules.evidence === undefined
         ? {}
-        : { documents: deckAudiencePort(modules.evidence) }),
+        : { deckAudience: deckAudiencePort(modules.evidence) }),
     },
   });
 

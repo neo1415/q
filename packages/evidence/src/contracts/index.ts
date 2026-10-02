@@ -134,7 +134,10 @@ export const DocumentStatusSchema = z.enum(DOCUMENT_STATUSES);
  * whom the company is viewable (the pitch rule). Only a PITCH_DECK may be
  * INVESTORS. Never widens `visibilityScope` or anything derived from it.
  */
-export const DOCUMENT_DOWNLOAD_AUDIENCES = ["ORGANISATION", "INVESTORS"] as const;
+export const DOCUMENT_DOWNLOAD_AUDIENCES = [
+  "ORGANISATION",
+  "INVESTORS",
+] as const;
 export const DocumentDownloadAudienceSchema = z.enum(
   DOCUMENT_DOWNLOAD_AUDIENCES,
 );

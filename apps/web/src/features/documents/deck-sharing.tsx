@@ -73,7 +73,10 @@ function DeckChoice({ deck }: { readonly deck: DeckRow }) {
   };
 
   return (
-    <li className="flex flex-col gap-3 py-4" data-deck-sharing={deck.documentId}>
+    <li
+      className="flex flex-col gap-3 py-4"
+      data-deck-sharing={deck.documentId}
+    >
       <p className="cq-body font-medium text-(--cq-text-primary)">
         {deck.title}
       </p>

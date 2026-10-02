@@ -24,7 +24,7 @@ import type { DeckAudiencePort } from "./actions/deck.js";
  */
 export type AppActionPorts = {
   /** ADR 0041: who may download a pitch deck (the Evidence service). */
-  readonly documents?: DeckAudiencePort | undefined;
+  readonly deckAudience?: DeckAudiencePort | undefined;
   readonly media?:
     Pick<MediaService, "listCompanyMedia" | "setPitchDetails"> | undefined;
   readonly interactions?: Pick<InteractionSignalService, "decide"> | undefined;

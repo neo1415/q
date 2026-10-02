@@ -1366,7 +1366,7 @@ const appActionPorts: OwnReadPorts = {
   media: pitchMedia,
   // ADR 0041: who may download a pitch deck, through Evidence (which
   // authorises, audits and emits); ids were validated by the action.
-  documents: {
+  deckAudience: {
     getDocument: ({ actor, documentId }) =>
       researchComposition.evidence.getDocument({
         actor,

@@ -12,10 +12,7 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { getSessionAccessToken } from "@/auth/session";
-import {
-  DeckSharing,
-  type DeckRow,
-} from "@/features/documents/deck-sharing";
+import { DeckSharing, type DeckRow } from "@/features/documents/deck-sharing";
 import { DocumentsScreen } from "@/features/documents/documents-screen";
 
 export const metadata: Metadata = { title: "Documents" };

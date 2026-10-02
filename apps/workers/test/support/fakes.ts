@@ -93,6 +93,7 @@ export function makeDocument(
     title: "Deck",
     visibilityScope: "founder_private",
     sensitivityClass: "CONFIDENTIAL",
+    downloadAudience: "ORGANISATION",
     currentVersionId: version.id,
     status: "ACTIVE",
     createdByUserId: UserIdSchema.parse(randomUUID()),

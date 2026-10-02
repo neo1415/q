@@ -7,7 +7,10 @@ import { DocumentIdSchema, type EvidenceService } from "@capital-q/evidence";
  * emits. The action passes an id it already validated as a UUID.
  */
 export function deckAudiencePort(
-  evidence: Pick<EvidenceService, "getDocument" | "setDocumentDownloadAudience">,
+  evidence: Pick<
+    EvidenceService,
+    "getDocument" | "setDocumentDownloadAudience"
+  >,
 ): DeckAudiencePort {
   return {
     getDocument: ({ actor, documentId }) =>
