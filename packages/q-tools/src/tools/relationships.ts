@@ -21,6 +21,7 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope, boundScopeFor } from "../plan.js";
+import { createProposeConnectionRequestAnswerTool } from "./connection-requests.js";
 import type {
   InvestorFeedPort,
   OwnRelationships,
@@ -582,7 +583,7 @@ function createProposeInterestAnswerTool(
     status: "ACTIVE",
     providerName: "propose_interest_answer",
     description:
-      "Prepares the person's company's answer to an investor organisation's interest -- accept (both sides agree to connect) or decline (not taken forward, no reason shared) -- for their own approval, when they have said which. It answers nothing by itself: the person approves or declines what is shown. Only an interest still awaiting an answer can be answered.",
+      "Prepares the person's company's answer to an investor organisation's interest -- accept (both sides agree to connect) or decline (not taken forward, no reason shared) -- for their own approval, when they have said which. It answers nothing by itself: the person approves or declines what is shown. Only an interest still awaiting an answer can be answered. For an investor answering a founder's Connection Request, use propose_connection_request_answer instead.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [capability("company.interest.respond")],
@@ -804,11 +805,14 @@ export function createRelationshipTools(
   ports: QToolPorts,
   relationships: RelationshipIntelligencePort,
 ): readonly AnyQToolDefinition[] {
+  const connectionAnswer =
+    createProposeConnectionRequestAnswerTool(relationships);
   return [
     createGetRelationshipTool(ports, relationships),
     createListIncomingInterestTool(relationships),
     createProposeExpressInterestTool(ports, relationships),
     createProposeInterestAnswerTool(relationships),
+    ...(connectionAnswer === null ? [] : [connectionAnswer]),
     ...(relationships.ownRelationships === undefined
       ? []
       : [

@@ -53,6 +53,20 @@ export type QHandOverPort = {
     readonly awaitingApprovalOf: string;
   } | null>;
   /** Their own relationships, most recent first: who they might mean. */
+  /**
+   * An investor's pending founders' Connection Requests (live 2026-10-02:
+   * "accept their connection and send them a message"): answer one with
+   * Q's opening message, as ONE approval. `company` is who they named or
+   * the company on screen, or null. Null result: not an investor, or not
+   * composed. Absent: never tried.
+   */
+  readonly answerConnectionRequest?: (
+    request: QAnswerRequest,
+    company: string | null,
+  ) => Promise<{
+    readonly status: string;
+    readonly awaitingApprovalOf: string;
+  } | null>;
   readonly candidates: (request: QAnswerRequest) => Promise<
     readonly {
       readonly name: string;
@@ -108,6 +122,35 @@ export async function actOnHandOver(
 ): Promise<HandOverOutcome> {
   let subject: HandOverSubject | null = null;
   const onScreen = handOverSubjectOf(request);
+  // A founder's request waiting on this investor comes first: handing it
+  // over means accepting it and opening the conversation. Who it is: the
+  // name they gave, else the company on screen, else (one waiting) that
+  // one, else they are asked once, by name. A name or company that is not
+  // a waiting request falls through to the errand below.
+  if (port.answerConnectionRequest !== undefined) {
+    const named =
+      handOver.counterpartName ??
+      (onScreen?.kind === "COMPANY" ? onScreen.companyId : null);
+    const answered = await port.answerConnectionRequest(request, named);
+    if (answered !== null) {
+      switch (answered.status) {
+        case "PREPARED":
+          return {
+            kind: "PREPARED",
+            line: `${answered.awaitingApprovalOf}: once you approve, I accept it and send the message shown on the card, word for word.`,
+          };
+        case "ONE_PER_TURN":
+          return {
+            kind: "PREPARED",
+            line: "Another change is already waiting for your approval in this answer; approve or decline it first, then I'll prepare this.",
+          };
+        case "WHICH_ONE":
+          return { kind: "ASK", line: answered.awaitingApprovalOf };
+        default:
+          break;
+      }
+    }
+  }
   // Their own relationships are read only when a name needs resolving or
   // there is nothing on screen to act on.
   const candidates =
@@ -249,6 +292,23 @@ export function createToolHandOverPort(dependencies: {
         },
         plan,
       );
+      if (data === null || typeof data !== "object") return null;
+      const record = data as Record<string, unknown>;
+      return typeof record["status"] === "string" &&
+        typeof record["awaitingApprovalOf"] === "string"
+        ? {
+            status: record["status"],
+            awaitingApprovalOf: record["awaitingApprovalOf"],
+          }
+        : null;
+    },
+    answerConnectionRequest: async (request, company) => {
+      const data = await call(request, "propose_connection_request_answer", {
+        company,
+        decision: "ACCEPTED",
+        openingMessage: null,
+        withMessage: true,
+      });
       if (data === null || typeof data !== "object") return null;
       const record = data as Record<string, unknown>;
       return typeof record["status"] === "string" &&

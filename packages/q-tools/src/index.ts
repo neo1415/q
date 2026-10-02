@@ -524,3 +524,16 @@ export {
   type HumanReviewPort,
 } from "./tools/human-review.js";
 // end ADMIN-3 block
+
+export {
+  ConnectionRequestAnswerOutputSchema,
+  connectionAnswerSummary,
+  listedNames,
+  matchPendingRequest,
+  prepareConnectionAnswer,
+  standardOpeningMessage,
+  PROPOSE_CONNECTION_REQUEST_ANSWER,
+  ProposeConnectionRequestAnswerInputSchema,
+  type ConnectionRequestAnswerOutput,
+  type PendingConnectionRequest,
+} from "./tools/connection-requests.js";

@@ -151,13 +151,31 @@ export type RelationshipIntelligencePort = {
     actor: ActorContext,
     interestId: string,
   ) => Promise<boolean>;
+  /**
+   * Founders' Connection Requests to the actor's own investor organisation
+   * still awaiting its answer (ADR 0023): its own inbox, so always theirs
+   * to know. Rejects for anyone who is not an investor organisation's
+   * member with the right to see them. Absent: not composed.
+   */
+  readonly pendingConnectionRequests?:
+    | ((actor: ActorContext) => Promise<
+        readonly {
+          readonly interestId: string;
+          readonly companyId: string;
+          readonly companyName: string;
+          readonly relationshipId: string;
+        }[]
+      >)
+    | undefined;
   readonly prepareForApproval: (entry: {
     readonly runId: string;
     readonly tenantId: string;
     readonly actorUserId: string;
     readonly actionType:
-      "relationship.interest.express" | "relationship.interest.respond";
-    readonly payload: Readonly<Record<string, string>>;
+      | "relationship.interest.express"
+      | "relationship.interest.respond"
+      | "relationship.connection_request.respond";
+    readonly payload: Readonly<Record<string, string | null>>;
   }) => "PREPARED" | "ONE_PER_TURN";
 };
 

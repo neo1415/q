@@ -3,6 +3,7 @@ import {
   toIncomingInterestDto,
   toRelationshipStatusDto,
   toRelationshipSummaryDto,
+  type ConnectionService,
   type InterestService,
   type RelationshipListing,
 } from "@capital-q/network";
@@ -18,6 +19,10 @@ import type {
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
+import {
+  ConnectionRequestAnswerPayloadSchema,
+  RELATIONSHIP_CONNECTION_REQUEST_RESPOND,
+} from "./connection-request-answer-action.js";
 import {
   ExpressInterestPayloadSchema,
   RELATIONSHIP_INTEREST_EXPRESS,
@@ -47,8 +52,10 @@ type Prepared = {
   readonly tenantId: string;
   readonly actorUserId: string;
   readonly actionType:
-    "relationship.interest.express" | "relationship.interest.respond";
-  readonly payload: Readonly<Record<string, string>>;
+    | "relationship.interest.express"
+    | "relationship.interest.respond"
+    | "relationship.connection_request.respond";
+  readonly payload: Readonly<Record<string, string | null>>;
   readonly at: number;
 };
 
@@ -102,7 +109,9 @@ export function createRelationshipActionBoard(
         const schema =
           entry.actionType === "relationship.interest.express"
             ? ExpressInterestPayloadSchema
-            : RespondToInterestPayloadSchema;
+            : entry.actionType === "relationship.connection_request.respond"
+              ? ConnectionRequestAnswerPayloadSchema
+              : RespondToInterestPayloadSchema;
         const parsed = schema.safeParse(entry.payload);
         if (!parsed.success) {
           options.logger?.warn(
@@ -117,7 +126,9 @@ export function createRelationshipActionBoard(
           actionType:
             entry.actionType === "relationship.interest.express"
               ? RELATIONSHIP_INTEREST_EXPRESS
-              : RELATIONSHIP_INTEREST_RESPOND,
+              : entry.actionType === "relationship.connection_request.respond"
+                ? RELATIONSHIP_CONNECTION_REQUEST_RESPOND
+                : RELATIONSHIP_INTEREST_RESPOND,
           payload: parsed.data,
         });
       },
@@ -161,9 +172,28 @@ export function createRelationshipIntelligencePort(dependencies: {
    */
   readonly ownCompany?:
     ((actor: ActorContext) => Promise<string | null>) | undefined;
+  /** An investor's own inbox of founders' Connection Requests (ADR 0023). */
+  readonly connections?:
+    Pick<ConnectionService, "listConnectionRequests"> | undefined;
 }): RelationshipIntelligencePort {
-  const { interests, board, ownCompany } = dependencies;
+  const { interests, board, ownCompany, connections } = dependencies;
   return {
+    ...(connections === undefined
+      ? {}
+      : {
+          pendingConnectionRequests: async (actor: ActorContext) =>
+            (await connections.listConnectionRequests({ actor }))
+              .filter(
+                ({ interest }) =>
+                  interest.status === "EXPRESSED" && interest.response === null,
+              )
+              .map(({ interest, company }) => ({
+                interestId: interest.id,
+                companyId: interest.companyId,
+                companyName: company.canonicalName,
+                relationshipId: interest.relationshipId,
+              })),
+        }),
     /**
      * R35: the same lists the relationships screen reads. An investor's
      * member first (the Network context resolves the organisation from the

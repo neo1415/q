@@ -20,6 +20,7 @@ import { PERSON_PROFILE_UPDATE } from "./person-profile-action.js";
 import { ONBOARDING_ANSWER_REVISE } from "./profile-answer-action.js";
 import { RECORD_CHANGE_ACTION_TYPES } from "./record-change-actions.js";
 import { RELATIONSHIP_INTEREST_RESPOND } from "./respond-to-interest-action.js";
+import { RELATIONSHIP_CONNECTION_REQUEST_RESPOND } from "./connection-request-answer-action.js";
 import {
   DISCLOSURE_RAISE_SHARE,
   DISCLOSURE_SHARE_REVOKE,
@@ -37,6 +38,8 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   COMPANY_VISIBILITY_SET,
   RELATIONSHIP_INTEREST_EXPRESS,
   RELATIONSHIP_INTEREST_RESPOND,
+  // Live 2026-10-02: an investor's answer to a founder's request, with a message.
+  RELATIONSHIP_CONNECTION_REQUEST_RESPOND,
   DISCLOSURE_RAISE_SHARE,
   DISCLOSURE_SHARE_REVOKE,
   PERSON_PROFILE_UPDATE,

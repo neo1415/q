@@ -338,7 +338,7 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIP",
     "Accept or decline founders' Connection Requests to their investor organisation (Founder requests, linked from Relationships)",
     "RELATIONSHIPS",
-    "Accepting or declining is the investor's own decision about a founder; Q never answers a request for them.",
+    "Accepting or declining is the investor's own decision about a founder; Q prepares it for their approval and never answers a request without it.",
     false,
   ),
   offer(
@@ -689,6 +689,15 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     {
       approval: "PREPARE_APPROVE",
       executes: ["relationship.interest.respond"],
+    },
+  ),
+  tool(
+    "propose_connection_request_answer",
+    "RELATIONSHIP",
+    "For an investor: accepts or declines a founder's Connection Request and, on acceptance, sends the opening message Q drafted -- one approval for both.",
+    {
+      approval: "PREPARE_APPROVE",
+      executes: ["relationship.connection_request.respond"],
     },
   ),
   tool(

@@ -167,7 +167,9 @@ import {
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
   createCommitmentService,
+  createConnectionService,
   createInterestService,
+  type InterestServiceOptions,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
   createRelationshipEventAppender,
@@ -298,6 +300,7 @@ import {
 import { createCompanyVisibilitySetAction } from "./composition/company-visibility-action.js";
 import { createExpressInterestAction } from "./composition/express-interest-action.js";
 import { createRespondToInterestAction } from "./composition/respond-to-interest-action.js";
+import { createConnectionRequestAnswerAction } from "./composition/connection-request-answer-action.js";
 import {
   chainProposers,
   createRelationshipActionBoard,
@@ -975,7 +978,7 @@ const currentSlateExplanations = createCurrentSlateExplanationService({
 // as the application API composes it — the feed's investor subject, the
 // network-preview disclosure rule, the same capability, idempotency and
 // outbox — so Q's approved action and the feed button are one command.
-const interestService = createInterestService({
+const interestServiceOptions: InterestServiceOptions = {
   sql: database.sql,
   transactions: database.transactions,
   companies,
@@ -999,6 +1002,19 @@ const interestService = createInterestService({
           decision.reasonCode === "PUBLIC_EXTERNAL")
       );
     },
+  },
+};
+const interestService = createInterestService(interestServiceOptions);
+// An investor's own inbox of founders' Connection Requests (live
+// 2026-10-02): listed and answered through the Network context's own
+// commands. Q never requests a connection, so the founder-side ports
+// refuse: only the investor's list and answer are reachable from here.
+const connectionService = createConnectionService({
+  ...interestServiceOptions,
+  founderSubject: { companyFor: () => Promise.resolve(null) },
+  investorReach: {
+    visibleInvestor: () => Promise.resolve(null),
+    companyQualifies: () => Promise.resolve(false),
   },
 });
 // Relationship intelligence (CQ-Q-030): Q reads where the person's own
@@ -1366,6 +1382,7 @@ const qTools = createQTools({
       interests: interestService,
       board: relationshipBoard,
       ownCompany: runtimeDependencies.ownCompany,
+      connections: connectionService,
     }),
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {
@@ -1708,6 +1725,11 @@ const qActionRegistry = createQActionRegistry([
   createExpressInterestAction({ interests: interestService, logger }),
   // The company's answer: the inbox's own command, approved (CQ-NET-011).
   createRespondToInterestAction({ interests: interestService, logger }),
+  createConnectionRequestAnswerAction({
+    connections: connectionService,
+    chat,
+    logger,
+  }),
   // Sharing the raise with an investor, and revoking it (CQ-BIZ-003).
   createShareRaiseAction({
     visibility: visibilityCentre,

@@ -1143,6 +1143,128 @@ describe("a hand-over is prepared by code for the subject on screen (TURN_READER
   });
 });
 
+describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)", () => {
+  const COMPANY = "94ec9c88-d157-49d1-9bf4-fc01d1e7b8d3";
+  const reading = (counterpartName: string | null) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: { kind: "HAND_OVER", counterpartName },
+    }) as TurnReaderResult;
+  const port = (
+    answer: (company: string | null) => {
+      status: string;
+      awaitingApprovalOf: string;
+    } | null,
+  ) => {
+    const asked: (string | null)[] = [];
+    const errands: unknown[] = [];
+    const value: QHandOverPort = {
+      answerConnectionRequest: (_request, company) => {
+        asked.push(company);
+        return Promise.resolve(answer(company));
+      },
+      prepare: (_request, subject) => {
+        errands.push(subject);
+        return Promise.resolve({
+          status: "PREPARED",
+          awaitingApprovalOf: "Q looks after them for you",
+        });
+      },
+      candidates: () => Promise.resolve([]),
+    };
+    return { value, asked, errands };
+  };
+  const run = async (
+    handOver: QHandOverPort,
+    counterpartName: string | null,
+    onCompany = false,
+  ) => {
+    const { answer, stored, delegated } = seam({
+      said: "handle it",
+      reading: reading(counterpartName),
+      outcomes: [],
+      handOver,
+    });
+    const base = request();
+    await answer.answer(
+      onCompany
+        ? {
+            ...base,
+            plan: {
+              ...base.plan,
+              screen: { route: "COMPANY", companyId: COMPANY },
+            },
+          }
+        : base,
+    );
+    return { line: stored.at(-1)?.content, delegated: delegated() };
+  };
+
+  it("one request waiting: prepared as one approval with the message, and the model is not asked", async () => {
+    const { value, asked, errands } = port(() => ({
+      status: "PREPARED",
+      awaitingApprovalOf:
+        "Accept Kazikit's connection request and send them your message",
+    }));
+    const { line, delegated } = await run(value, null);
+    expect(asked).toEqual([null]);
+    expect(errands).toEqual([]);
+    expect(line).toBe(
+      "Accept Kazikit's connection request and send them your message: once you approve, I accept it and send the message shown on the card, word for word.",
+    );
+    expect(delegated).toBe(0);
+  });
+
+  it("several waiting: asks once, naming them; prepares nothing", async () => {
+    const { value, errands } = port(() => ({
+      status: "WHICH_ONE",
+      awaitingApprovalOf:
+        "2 connection requests are waiting: Kazikit or Tallyloom. Which one should I accept?",
+    }));
+    const { line } = await run(value, null);
+    expect(line).toBe(
+      "2 connection requests are waiting: Kazikit or Tallyloom. Which one should I accept?",
+    );
+    expect(errands).toEqual([]);
+  });
+
+  it("the name they gave, else the company on screen, is the one asked for", async () => {
+    const named = port(() => ({
+      status: "PREPARED",
+      awaitingApprovalOf: "Accept Kazikit's connection request",
+    }));
+    await run(named.value, "Kazikit", true);
+    expect(named.asked).toEqual(["Kazikit"]);
+    const screen = port(() => ({
+      status: "PREPARED",
+      awaitingApprovalOf: "Accept Kazikit's connection request",
+    }));
+    await run(screen.value, null, true);
+    expect(screen.asked).toEqual([COMPANY]);
+  });
+
+  it("not a waiting request, or not an investor: the errand as before", async () => {
+    for (const answer of [
+      () => ({
+        status: "NOT_FOUND",
+        awaitingApprovalOf:
+          '"Nixo" isn\'t one of the connection requests waiting for you',
+      }),
+      () => ({ status: "NO_PENDING_REQUESTS", awaitingApprovalOf: "none" }),
+      () => null,
+    ]) {
+      const { value, errands } = port(answer);
+      await run(value, null, true);
+      expect(errands).toEqual([{ kind: "COMPANY", companyId: COMPANY }]);
+    }
+  });
+});
+
 describe("the hand-over port plans a named relationship before acting (QA 2026-10-01)", () => {
   const RELATIONSHIP = "11111111-2222-4333-8444-555555555555";
   const outcome = (data: unknown): QToolCallOutcome => ({
