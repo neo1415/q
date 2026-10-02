@@ -322,8 +322,9 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         version: 1,
       });
 
-      // Nothing beyond the company: no members, no capital objective, no
-      // evidence tables exist to be written.
+      // The exact core schema the migrations create (identity, handles and
+      // review tables included): an unexpected table fails this, as does a
+      // missing one. The company write above touches only `companies`.
       const tables = await sql<{ table_name: string }[]>`
         select table_name from information_schema.tables where table_schema = 'core' order by 1`;
       expect(tables.map((t) => t.table_name)).toEqual([
@@ -335,6 +336,9 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         "company_members",
         "company_team_facts",
         "founder_profiles",
+        "handles",
+        "human_reviews",
+        "identity_submissions",
         "investor_creation_requests",
         "investor_mandate_constraints",
         "investor_mandate_creation_requests",
@@ -342,6 +346,11 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         "investor_organisations",
         "investor_portfolio_references",
         "investor_representatives",
+        "kyb_submissions",
+        "profile_images",
+        "reserved_handles",
+        "shareable_identities",
+        "shareable_identity_scans",
       ]);
       const [related] = await sql<
         { members: number; profiles: number; facts: number }[]
