@@ -98,6 +98,13 @@ export type QCapability = {
   readonly surfaces: readonly QCapabilitySurface[];
   /** What it does, in a person's terms. Trusted text: it reaches prompts. */
   readonly does: string;
+  /**
+   * 3-5 words for the turn reader's grouped action list (speed: the list
+   * rides on every turn). Absent: derived from `does` (shortOf).
+   */
+  readonly short?: string | undefined;
+  /** The area it is listed under for the reader; absent: from `group`. */
+  readonly area?: string | undefined;
   readonly performedBy:
     | { readonly kind: "TOOL"; readonly providerName: string }
     | { readonly kind: "HAND"; readonly hand: QCapabilityHand }
@@ -116,6 +123,78 @@ export type QCapability = {
   readonly eligible: (facts: QCapabilityRunFacts) => boolean;
 };
 
+/** The reader's area for a group: a person's word for that part of the app. */
+const AREAS: Readonly<Record<QCapabilityGroup, string>> = {
+  NAVIGATION: "Screens",
+  PROFILE: "Profile",
+  VISIBILITY: "Visibility",
+  HANDLE: "Q Card",
+  DOCUMENT: "Documents",
+  MEDIA: "Pitch",
+  RESEARCH: "Research",
+  RELATIONSHIP: "Relationships",
+  RECORDS: "Records",
+  ONBOARDING: "Setup",
+  SETTINGS: "Settings",
+};
+
+export function capabilityArea(group: QCapabilityGroup): string {
+  return AREAS[group];
+}
+
+/**
+ * A short label from a capability's `does`: its first clause, at most six
+ * words, lower-cased, without a dangling joining word at the end ("Passes
+ * on a company in their Discover feed." -> "passes on a company").
+ */
+export function shortOf(does: string): string {
+  const clause = does.split(/[:;(.,]| -- | — /u)[0] ?? does;
+  const words = clause.trim().toLowerCase().split(/\s+/u).slice(0, 6);
+  // A label that ends on a joining word reads cut off ("switches the
+  // app's appearance to"): the joining words at its end go.
+  while (words.length > 2 && TRAILING.has(words.at(-1) ?? "")) words.pop();
+  return words.join(" ");
+}
+
+/**
+ * Labels where the first clause of `does` says too little ("creates", "for
+ * a founder"): the reader's grouped list needs the job in a few words.
+ */
+const SHORTS: Readonly<Record<string, string>> = {
+  approve_pending_proposal: "approves the waiting change",
+  decline_pending_proposal: "declines the waiting change",
+  propose_raise_change: "changes their raise",
+  propose_mandate_change: "changes their mandate",
+  propose_connection_request: "asks an investor to connect",
+  propose_connection_request_answer: "answers a connection request",
+  propose_q_outreach: "Q reaches out for them",
+  propose_stand_in: "Q stands in for them",
+  set_onboarding_reminders: "sets setup reminders",
+  set_pitch_sharing: "who may play their pitch",
+  reload_page: "reloads the page",
+  control_screen: "scrolls or moves the screen",
+};
+
+const TRAILING: ReadonlySet<string> = new Set([
+  "a",
+  "an",
+  "the",
+  "to",
+  "of",
+  "in",
+  "on",
+  "for",
+  "with",
+  "their",
+  "its",
+  "as",
+  "and",
+  "or",
+  "from",
+  "by",
+  "at",
+]);
+
 const OFFERED =
   "offered by the Tool Registry for this run (its purpose, the plan's scope kinds, a composed port); the tool authorises again on every call";
 
@@ -128,6 +207,8 @@ function tool(
     readonly executes?: readonly string[];
     readonly surfaces?: readonly QCapabilitySurface[];
     readonly acts?: boolean;
+    readonly short?: string | undefined;
+    readonly area?: string | undefined;
   } = {},
 ): QCapability {
   const approval = options.approval ?? "INSTANT";
@@ -136,6 +217,8 @@ function tool(
     group,
     surfaces: options.surfaces ?? ["HOME_Q"],
     does,
+    short: options.short ?? SHORTS[providerName] ?? shortOf(does),
+    area: options.area ?? capabilityArea(group),
     performedBy: { kind: "TOOL", providerName },
     approval,
     acts: approval === "PREPARE_APPROVE" || options.acts === true,
@@ -944,12 +1027,16 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
             action.tool.name,
             APP_ACTION_GROUPS[action.area] ?? "RECORDS",
             action.does,
-            action.classification === "CONSEQUENTIAL"
-              ? {
-                  approval: "PREPARE_APPROVE",
-                  executes: [`app.${action.name}`],
-                }
-              : { acts: action.classification === "INSTANT" },
+            {
+              ...(action.classification === "CONSEQUENTIAL"
+                ? {
+                    approval: "PREPARE_APPROVE" as const,
+                    executes: [`app.${action.name}`],
+                  }
+                : { acts: action.classification === "INSTANT" }),
+              // The declaration's own label when it has one.
+              ...(action.short === undefined ? {} : { short: action.short }),
+            },
           ),
         ],
   ),

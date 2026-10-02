@@ -43,6 +43,9 @@ export type QTurnReader = {
           readonly does: string;
           /** Declared in the registry, but not offered in this run (ADR 0040). */
           readonly available?: boolean | undefined;
+          /** v32: a few words, and the area it is grouped under. */
+          readonly short?: string | undefined;
+          readonly area?: string | undefined;
         }[]
       | undefined;
     readonly attribution: {
@@ -125,15 +128,73 @@ export const TURN_READER_FAST_FIRST_ATTEMPT_MS = 2_500;
  */
 export const TURN_READER_ACTIONS_MAX = 160;
 
+/**
+ * The grouped form (v32): areas in the order their first offered action
+ * appears (the app actions lead), each "Area: name (short); name (short)";
+ * then one "Not available here" line per area with names only.
+ */
+function groupedActions(
+  offered: readonly {
+    readonly name: string;
+    readonly does: string;
+    readonly short?: string | undefined;
+    readonly area?: string | undefined;
+  }[],
+  declared: readonly {
+    readonly name: string;
+    readonly area?: string | undefined;
+  }[],
+): string {
+  const label = (action: {
+    readonly does: string;
+    readonly short?: string | undefined;
+  }) =>
+    (action.short ?? action.does.split(/[.;:]/u)[0] ?? action.does)
+      .trim()
+      .slice(0, 60);
+  const byArea = <T extends { readonly area?: string | undefined }>(
+    list: readonly T[],
+  ): Map<string, T[]> => {
+    const areas = new Map<string, T[]>();
+    for (const action of list) {
+      const area = action.area ?? "Other";
+      areas.set(area, [...(areas.get(area) ?? []), action]);
+    }
+    return areas;
+  };
+  const lines: string[] = [];
+  for (const [area, list] of byArea(offered)) {
+    lines.push(
+      `${area}: ${list
+        .map((action) => `${action.name.slice(0, 80)} (${label(action)})`)
+        .join("; ")}`,
+    );
+  }
+  for (const [area, list] of byArea(declared)) {
+    lines.push(
+      `Not available here, ${area}: ${list
+        .map((action) => action.name.slice(0, 80))
+        .join(", ")}`,
+    );
+  }
+  return lines.length === 0 ? "(none)" : lines.join("\n");
+}
+
 /** The actions as the reader is told of them, within the budget. */
 export function readerActions(
   actions: readonly {
     readonly name: string;
     readonly does: string;
     readonly available?: boolean | undefined;
+    /** A few words for the grouped list (v32); absent: does, cut. */
+    readonly short?: string | undefined;
+    /** The area it is grouped under (v32); absent: "Other". */
+    readonly area?: string | undefined;
   }[],
 ): {
   readonly listed: readonly { readonly name: string; readonly does: string }[];
+  /** v32: one line per area -- offered "name (short)", then names only. */
+  readonly groups: string;
   readonly droppedOffered: readonly string[];
   readonly droppedDeclared: number;
 } {
@@ -153,6 +214,7 @@ export function readerActions(
         does: `(not available in this conversation) ${action.does.slice(0, 80)}`,
       })),
     ],
+    groups: groupedActions(keptOffered, keptDeclared),
     droppedOffered: offered
       .slice(TURN_READER_ACTIONS_MAX)
       .map((action) => action.name),
@@ -209,6 +271,7 @@ export function createQTurnReader(dependencies: {
         // registry declares that this run does not offer (v30 askedAction),
         // within TURN_READER_ACTIONS_MAX.
         actions: [...listed.listed],
+        actionGroups: listed.groups,
       };
       try {
         const rendered = renderPrompt<TurnReaderV7Variables>(registry, {

@@ -32,7 +32,7 @@ export const TURN_READER_V31: PromptDefinition<
 > = {
   ...TURN_READER_V30,
   version: 31,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA 2026-10-02 (ADR 0040 parity eval): appAction, the one declared app action a direct request asks for with its arguments as said; a pitch or video's sharing is set_pitch_sharing, never SET_VISIBILITY.",
   effectiveFrom: "2026-10-02",

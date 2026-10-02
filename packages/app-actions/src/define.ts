@@ -124,6 +124,11 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
   readonly classification: AppActionClass;
   /** One line for the capability registry and the parity doc. */
   readonly does: string;
+  /**
+   * 3-5 words for the turn reader's grouped action list ("save a
+   * company"). Optional: absent, it is derived from `does`.
+   */
+  readonly short?: string | undefined;
   readonly input: z.ZodType<In>;
   readonly output: z.ZodType<Out>;
   /** The route's own authorize step: the same check, whoever calls. */

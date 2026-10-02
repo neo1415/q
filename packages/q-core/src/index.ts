@@ -228,6 +228,10 @@ export {
   TURN_READER_V31_APP_ACTION,
 } from "./prompts/tasks/turn-reader.v31.js";
 export {
+  TURN_READER_V32,
+  TURN_READER_V32_ACTIONS,
+} from "./prompts/tasks/turn-reader.v32.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,

@@ -116,6 +116,9 @@ type ReaderAction = {
   readonly name: string;
   readonly does: string;
   readonly available?: boolean | undefined;
+  /** v32: a few words, and the area it is grouped under. */
+  readonly short?: string | undefined;
+  readonly area?: string | undefined;
 };
 
 /** The reader's input: the person's own latest words and own recent turns. */
@@ -153,12 +156,20 @@ function turnReaderInput(
   };
 }
 
+/** The capability's reader label and area (v32), when it has them. */
+const labelOf = (capability: QCapability) => ({
+  ...(capability.short === undefined ? {} : { short: capability.short }),
+  ...(capability.area === undefined ? {} : { area: capability.area }),
+});
+
 const actionsKey = (actions: readonly ReaderAction[]): string =>
   JSON.stringify(
     actions.map((a) => ({
       name: a.name,
       does: a.does,
       ...(a.available === false ? { available: false } : {}),
+      ...(a.short === undefined ? {} : { short: a.short }),
+      ...(a.area === undefined ? {} : { area: a.area }),
     })),
   );
 
@@ -1497,6 +1508,7 @@ export function createSpecialistQAnswer(
               {
                 name: capability.performedBy.providerName,
                 does: capability.does,
+                ...labelOf(capability),
               },
             ]
           : [],
@@ -1520,6 +1532,7 @@ export function createSpecialistQAnswer(
                 name: capability.performedBy.providerName,
                 does: capability.does,
                 available: false,
+                ...labelOf(capability),
               },
             ]
           : [],

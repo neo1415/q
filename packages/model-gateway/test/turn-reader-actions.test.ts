@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createLogger } from "@capital-q/observability";
 
 import type { ModelGateway } from "../src/index.js";
-import { createQTurnReader } from "../src/q/index.js";
+import { createQTurnReader, readerActions } from "../src/q/index.js";
 
 /**
  * The turn reader is told the run's own actions (founder live 2026-09-26:
@@ -114,5 +114,67 @@ describe("a long offer reaches the reader whole", () => {
       ],
     });
     expect(prompts[0]).toContain("pass_company");
+  });
+});
+
+/** v32 (speed): the grouped form the reader is shown. */
+describe("the grouped action list (v32)", () => {
+  it("offered actions as name (a few words) by area, in offer order; the rest names only", () => {
+    const { groups } = readerActions([
+      {
+        name: "pass_company",
+        does: "Passes on a company in their Discover feed.",
+        short: "passes on a company",
+        area: "Relationships",
+      },
+      {
+        name: "update_my_profile",
+        does: "Changes what Capital Q calls them.",
+        short: "changes what Q calls them",
+        area: "Profile",
+      },
+      {
+        name: "save_company",
+        does: "Saves a company.",
+        short: "saves a company",
+        area: "Relationships",
+      },
+      {
+        name: "propose_raise_change",
+        does: "Creates, changes or closes their raise.",
+        area: "Records",
+        available: false,
+      },
+    ]);
+    expect(groups).toBe(
+      [
+        "Relationships: pass_company (passes on a company); save_company (saves a company)",
+        "Profile: update_my_profile (changes what Q calls them)",
+        "Not available here, Records: propose_raise_change",
+      ].join("\n"),
+    );
+  });
+
+  it("the reader prompt carries the grouped list, not the JSON one", async () => {
+    const { gateway, prompts } = recording();
+    const reader = createQTurnReader({ gateway, logger });
+    await reader.read({
+      utterance: "Pass on Ajopot.",
+      recentTurns: [],
+      modality: "TEXT",
+      attribution: ATTRIBUTION,
+      actions: [
+        {
+          name: "pass_company",
+          does: "Passes on a company in their Discover feed.",
+          short: "passes on a company",
+          area: "Relationships",
+        },
+      ],
+    });
+    expect(prompts[0]).toContain(
+      "Relationships: pass_company (passes on a company)",
+    );
+    expect(prompts[0]).not.toContain('"does":');
   });
 });

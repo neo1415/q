@@ -816,7 +816,13 @@ describe("an action the run offers is never filed as a document (BIZ-004 founder
         capability.performedBy.kind === "TOOL" &&
         capability.performedBy.providerName === providerName,
     );
-    return { name: providerName, does: entry?.does };
+    // v32: with its few words and area, for the grouped list.
+    return {
+      name: providerName,
+      does: entry?.does,
+      short: entry?.short,
+      area: entry?.area,
+    };
   };
   const ACTION_READING = {
     kind: "TOOL_REQUEST",

@@ -17,7 +17,14 @@ import { Q_CAPABILITIES } from "@capital-q/q-tools";
  */
 const acting = Q_CAPABILITIES.flatMap((capability) =>
   capability.performedBy.kind === "TOOL" && capability.acts
-    ? [{ name: capability.performedBy.providerName, does: capability.does }]
+    ? [
+        {
+          name: capability.performedBy.providerName,
+          does: capability.does,
+          short: capability.short,
+          area: capability.area,
+        },
+      ]
     : [],
 );
 
@@ -78,11 +85,29 @@ describe("the reader's action list budget", () => {
       });
     await read([]);
     await read(acting);
-    const [empty, full] = sizes;
-    const listChars = (full?.total ?? 0) - (empty?.total ?? 0);
-    console.info(
-      `reader prompt: ${String(acting.length)} acting tools; without actions ${String(empty?.total)} chars; with all offered ${String(full?.total)} chars (~${String(Math.round((full?.total ?? 0) / 4))} tokens); the list alone ${String(listChars)} chars (~${String(Math.round(listChars / 4))} tokens)`,
+    // Half offered, half declared elsewhere: a typical turn.
+    await read(
+      acting.map((action, index) =>
+        index % 2 === 0 ? action : { ...action, available: false },
+      ),
     );
+    const [empty, full, half] = sizes;
+    const listed = readerActions(acting);
+    // Before (v31): the list as JSON, every action with its full "does".
+    const before = JSON.stringify(listed.listed).length;
+    const after = listed.groups.length;
+    const tokens = (chars: number) => Math.round(chars / 4);
+    console.info(
+      [
+        `reader action list, ${String(acting.length)} acting tools, all offered:`,
+        `before (v31 JSON) ${String(before)} chars (~${String(tokens(before))} tokens)`,
+        `after (v32 grouped) ${String(after)} chars (~${String(tokens(after))} tokens)`,
+        `whole reader call ${String(full?.total)} chars (~${String(tokens(full?.total ?? 0))} tokens);`,
+        `half offered ${String(half?.total)} chars; no actions ${String(empty?.total)} chars`,
+      ].join(" "),
+    );
+    // The grouped list is at most half the JSON one.
+    expect(after * 2).toBeLessThanOrEqual(before);
     expect(full?.total ?? 0).toBeGreaterThan(empty?.total ?? 0);
   });
 });

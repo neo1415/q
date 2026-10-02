@@ -247,6 +247,12 @@ export const TurnReaderV7VariablesSchema = TurnReaderVariablesSchema.extend({
     )
     .max(200)
     .default([]),
+  /**
+   * v32 (speed, 2026-10-02): the same actions, grouped by area -- offered
+   * ones as name and a few words, the rest as names only, one line per
+   * area. Built by code; trusted. Older versions do not read it.
+   */
+  actionGroups: z.string().max(16_000).default(""),
 }).strict();
 export type TurnReaderV7Variables = z.infer<typeof TurnReaderV7VariablesSchema>;
 
