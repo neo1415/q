@@ -125,7 +125,7 @@ Relationships:
 Media and documents:
 
 - [x] Pitch (done 2026-10-02: five declarations with generated routes; the file steps map to the pitch screen's offer, the playback policy to set_pitch_sharing; provider failures map as before): create, upload session, cancel and delete. These need the person's file, so they are declared as READ plus an offer. The playback-policy route folds into `pitch.details.set`. **M**
-- [ ] Documents: upload sessions ×3 (file: offer) and the brand kit ×4 (`q-documents`). **M**
+- [ ] Documents: upload sessions ×3 (file: offer) and the brand kit ×4 (`q-documents`). **M** The brand kit is exempt (lead decision 2026-10-02): its routes are Q's own document surface in q-api, as errands are.
 - [ ] Profile images ×3 (file: offer). **M**
 
 Settings and the rest:
