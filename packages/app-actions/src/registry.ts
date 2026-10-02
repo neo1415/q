@@ -10,6 +10,7 @@ import { ME_ACTIONS } from "./actions/me.js";
 import { MEDIA_ACTIONS } from "./actions/media.js";
 import { ONBOARDING_ACTIONS } from "./actions/onboarding.js";
 import { OUTCOME_ACTIONS } from "./actions/outcomes.js";
+import { DILIGENCE_ACTIONS } from "./actions/diligence.js";
 import { SET_PITCH_SHARING } from "./actions/pitch.js";
 import { PROFILE_IMAGE_ACTIONS } from "./actions/profile-images.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
@@ -34,6 +35,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...SCHEDULE_ACTIONS,
   ...MEDIA_ACTIONS,
   ...OUTCOME_ACTIONS,
+  ...DILIGENCE_ACTIONS,
   SET_DECK_AUDIENCE,
   ...DOCUMENT_ACTIONS,
   ...PROFILE_IMAGE_ACTIONS,

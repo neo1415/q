@@ -173,6 +173,16 @@ describe("the action registry", () => {
         "via:relationship_outcome",
         "CONSEQUENTIAL",
       ],
+      // Diligence (2026-10-02): one family tool, all approved.
+      ["diligence.change", "diligence_documents", "CONSEQUENTIAL"],
+      ["diligence.document.share", "via:diligence_documents", "CONSEQUENTIAL"],
+      ["diligence.document.revoke", "via:diligence_documents", "CONSEQUENTIAL"],
+      [
+        "diligence.document.request",
+        "via:diligence_documents",
+        "CONSEQUENTIAL",
+      ],
+      ["diligence.request.fulfil", "via:diligence_documents", "CONSEQUENTIAL"],
       ["document.deck_audience.set", "set_deck_audience", "CONSEQUENTIAL"],
       ["document.upload.start", "offer.document_upload", "CONSEQUENTIAL"],
       ["document.upload.complete", "offer.document_upload", "CONSEQUENTIAL"],

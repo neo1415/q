@@ -85,6 +85,7 @@ import {
   createConnectionService,
   createInterestService,
   createRelationshipEventAppender,
+  createPostgresDiligenceRequests,
   createRelationshipEventRegistry,
   RELATIONSHIP_EVENT_DEFINITIONS,
   createPostgresRelationshipEventRepository,
@@ -99,6 +100,7 @@ import {
   createPermissionsService,
   createPostgresDisclosurePolicyRepository,
   createRelationshipPartyResolver,
+  createDiligenceService,
   createVisibilityCentre,
   systemDisclosureClock,
 } from "@capital-q/permissions";
@@ -196,6 +198,7 @@ import {
   DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
   DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
   createSharedDocumentDownloads,
+  findActiveDocumentById,
   DocumentNotFoundError,
   DocumentIdSchema,
 } from "@capital-q/evidence";
@@ -203,6 +206,7 @@ import {
   composeChat,
   composeChatSafety,
   composeSchedule,
+  createCounterpartNotices,
   createPushSubscriptionStore,
 } from "@capital-q/communication";
 import {
@@ -703,12 +707,21 @@ const relationships: RelationshipQueryPort = {
   getEventById: (relationshipEventId) =>
     relationshipEventRepository.findById(database.sql, relationshipEventId),
 };
+// A company's own document, for the disclosure layer (diligence): tenant,
+// company, title; read permission-neutrally from Evidence's own table.
+const diligenceDocumentLookup = (documentId: string) =>
+  findActiveDocumentById(database.sql, documentId);
 const disclosurePorts = {
   companies: createPostgresCompanyQueryPort({ sql: database.sql }),
   investors: createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),
   mandates: createPostgresInvestorMandateQueryPort({ sql: database.sql }),
   capital: createPostgresCapitalObjectiveQueryPort({ sql: database.sql }),
   relationships,
+  // Diligence: a company's own document as a disclosure resource.
+  documents: {
+    findCanonicalDocument: async (documentId: string) =>
+      (await diligenceDocumentLookup(documentId)) ?? null,
+  },
 };
 const disclosure = createDisclosureAccessService({
   sql: database.sql,
@@ -1106,6 +1119,78 @@ const permissions = createPermissionsService({
   ),
   relationshipParties: createRelationshipPartyResolver(disclosurePorts),
 });
+/**
+ * Diligence (2026-10-02): a relationship's minimal gated document area. A
+ * share is the disclosure policy above (relationship_shared), revocable; a
+ * download is decided by the access service, then signed straight from
+ * storage; requests and their answers are Network's, append-only.
+ */
+const diligenceDocuments =
+  storage === undefined
+    ? undefined
+    : createSharedDocumentDownloads({ sql: database.sql, storage });
+const diligence = createDiligenceService({
+  sql: database.sql,
+  transactions: database.transactions,
+  relationships: interests,
+  policies: permissions.policies,
+  policyRepository: createPostgresDisclosurePolicyRepository(),
+  access: disclosure,
+  documents: {
+    ownDocument: async (actor, documentId) => {
+      const document = await evidence
+        .getDocument({ actor, documentId: DocumentIdSchema.parse(documentId) })
+        .catch(() => null);
+      return document === null
+        ? null
+        : {
+            id: document.id,
+            tenantId: document.tenantId,
+            companyId: document.companyId,
+            title: document.title,
+            documentType: document.documentType,
+            currentVersionId: document.currentVersionId,
+          };
+    },
+    canonical: (documentId) => diligenceDocumentLookup(documentId),
+    signedDownload: async (document) => {
+      if (
+        diligenceDocuments === undefined ||
+        document.currentVersionId === null
+      ) {
+        throw new DocumentNotFoundError();
+      }
+      const link = await diligenceDocuments.authorizeSharedVersion({
+        documentTenantId: document.tenantId,
+        documentId: document.id,
+        documentVersionId: document.currentVersionId,
+        disposition: "ATTACHMENT",
+      });
+      return { url: link.url, expiresAt: link.expiresAt };
+    },
+  },
+  requests: createPostgresDiligenceRequests(),
+  appender: createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  }),
+  audit,
+  notify: (input) =>
+    createCounterpartNotices(database.sql).notify({
+      relationshipId: input.relationshipId,
+      actingSide: input.actingSide,
+      kind: "DILIGENCE",
+      title: input.title,
+      body: null,
+      target: "RELATIONSHIP",
+      key: input.key,
+      priority: "UPDATE",
+    }),
+  newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
+});
 const visibility = createVisibilityCentre({
   access: permissions.access,
   inspect: permissions.inspectResourceDisclosure,
@@ -1492,6 +1577,7 @@ const { app, logger } = createApp(config, security, {
   connections,
   commitments,
   outcomes,
+  diligence,
   // BILLING block (ADR 0034)
   billing: {
     entitlements,

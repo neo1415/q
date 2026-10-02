@@ -493,6 +493,40 @@ export const RelationshipProgressedRelationshipEvent = defineRelationshipEvent({
 });
 
 /**
+ * Diligence (2026-10-02): the investor asked for a document, or the founder
+ * shared one with this relationship. Activity only, shared by both sides;
+ * the request's words live on its row and the share is a disclosure policy.
+ */
+export const DocumentRequestedPayloadSchema = z
+  .object({ requestId: UuidSchema })
+  .strict();
+export const RELATIONSHIP_EVENT_DOCUMENT_REQUESTED =
+  "document_requested" as const;
+export const DocumentRequestedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_DOCUMENT_REQUESTED,
+  payloadSchema: DocumentRequestedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description: "The investor asked for a document in diligence.",
+});
+
+export const DocumentSharedPayloadSchema = z
+  .object({
+    documentId: UuidSchema,
+    disclosurePolicyId: UuidSchema,
+    /** The request it answered, when it answered one. */
+    requestId: UuidSchema.optional(),
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_DOCUMENT_SHARED = "document_shared" as const;
+export const DocumentSharedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_DOCUMENT_SHARED,
+  payloadSchema: DocumentSharedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The company shared one of its documents with this relationship. Revocable; revoking is the disclosure policy's own history.",
+});
+
+/**
  * Production registry: `discovered` (CQ-NET-001), `interest_expressed`
  * (CQ-NET-010), `connection_accepted` and `interest_declined` (CQ-NET-011).
  */
@@ -521,4 +555,6 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     RelationshipResumedRelationshipEvent,
     DiligenceStartedRelationshipEvent,
     RelationshipProgressedRelationshipEvent,
+    DocumentRequestedRelationshipEvent,
+    DocumentSharedRelationshipEvent,
   ];

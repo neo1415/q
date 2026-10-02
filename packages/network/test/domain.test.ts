@@ -145,6 +145,8 @@ describe("relationship event registry", () => {
       "relationship_resumed",
       "diligence_started",
       "relationship_progressed",
+      "document_requested",
+      "document_shared",
     ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",

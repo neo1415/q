@@ -252,6 +252,7 @@ export { createPostgresDocumentExtractionRepository } from "./infrastructure/pos
 export const PACKAGE_NAME = "@capital-q/evidence" as const;
 export {
   createSharedDocumentDownloads,
+  findActiveDocumentById,
   SHARED_DOWNLOAD_TTL_SECONDS,
   type SharedDocumentDownloads,
 } from "./application/shared-download.js";

@@ -105,6 +105,8 @@ export type {
 export { createDisclosureResourceResolverRegistry } from "./application/resolver-registry.js";
 export {
   createCapitalObjectiveDisclosureResolver,
+  createDocumentDisclosureResolver,
+  type DocumentDisclosurePort,
   createCompanyDisclosureResolver,
   createDefaultDisclosureResolvers,
   createFounderProfileDisclosureResolver,
@@ -164,3 +166,12 @@ export {
   type VisibilityCentre,
   type VisibilityCentrePorts,
 } from "./application/visibility-centre.js";
+export {
+  createDiligenceService,
+  type DiligenceDocument,
+  type DiligenceDocumentPort,
+  type DiligenceOutcome,
+  type DiligenceRefusal,
+  type DiligenceService,
+  type DiligenceView,
+} from "./application/diligence.js";

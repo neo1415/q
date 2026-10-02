@@ -157,6 +157,17 @@ export function createPostgresDisclosurePolicyRepository(): DisclosurePolicyRepo
          order by p.created_at, p.id`;
       return rows.map(toPolicy);
     },
+    findUnrevokedForRecipient: async (executor, query) => {
+      const rows = await executor`
+        ${policySelect(executor)}
+         where p.resource_type = ${query.resourceType}
+           and p.recipient_type = ${query.recipient.type}
+           and p.recipient_id = ${query.recipient.id}
+           and p.revoked_at is null
+         order by p.created_at, p.id
+         limit 200`;
+      return rows.map(toPolicy);
+    },
     findAllForResource: async (executor, resource) => {
       const rows = await executor`
         ${policySelect(executor)}
