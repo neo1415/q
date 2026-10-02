@@ -22,6 +22,7 @@ import { PROFILE_GAPS_FILL } from "./profile-gaps-action.js";
 import { RECORD_CHANGE_ACTION_TYPES } from "./record-change-actions.js";
 import { RELATIONSHIP_INTEREST_RESPOND } from "./respond-to-interest-action.js";
 import { RELATIONSHIP_CONNECTION_REQUEST_RESPOND } from "./connection-request-answer-action.js";
+import { RELATIONSHIP_CONNECTION_REQUEST_SEND } from "./connection-request-send-action.js";
 import {
   DISCLOSURE_RAISE_SHARE,
   DISCLOSURE_SHARE_REVOKE,
@@ -41,6 +42,8 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   RELATIONSHIP_INTEREST_RESPOND,
   // Live 2026-10-02: an investor's answer to a founder's request, with a message.
   RELATIONSHIP_CONNECTION_REQUEST_RESPOND,
+  // Action parity 2026-10-02: a founder's Connection Request, by Q.
+  RELATIONSHIP_CONNECTION_REQUEST_SEND,
   DISCLOSURE_RAISE_SHARE,
   DISCLOSURE_SHARE_REVOKE,
   PERSON_PROFILE_UPDATE,

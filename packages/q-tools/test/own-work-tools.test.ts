@@ -189,6 +189,77 @@ describe("Save, Unsave and Pass from a conversation", () => {
   });
 });
 
+describe("Save, Pass and Undo pass by name, from any page (action parity 2026-10-02)", () => {
+  const TALUM = "55555555-0000-4000-8000-0000000000a1";
+  function world() {
+    const seen: Parameters<DiscoveryDecisionPort["decide"]>[1][] = [];
+    const port: DiscoveryDecisionPort = {
+      decide: (_actor, decision) => {
+        seen.push(decision);
+        return Promise.resolve({
+          status: "RECORDED",
+          deduplicated: false,
+          saved: decision.type === "SAVE",
+          passed: decision.type === "PASS",
+        });
+      },
+    };
+    const names = {
+      investorFeed: {
+        page: () => Promise.resolve(null),
+        decisions: () =>
+          Promise.resolve([
+            {
+              companyId: TALUM,
+              name: "Talum",
+              stageCode: "SEED",
+              headquartersCountry: "GB",
+              decision: "PASSED" as const,
+            },
+          ]),
+      },
+    };
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createOwnWorkTools({ discoveryDecisions: port }, names),
+      ),
+    });
+    return { executor, seen };
+  }
+
+  it("undoes a pass on a company named as they said it, on a general (Home) turn", async () => {
+    const { executor, seen } = world();
+    const outcome = await executor.execute(
+      call("unpass_company", { company: "talum" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(seen).toEqual([
+      expect.objectContaining({ type: "UNPASS", companyId: TALUM }),
+    ]);
+  });
+
+  it("refuses a name it cannot find, and an input naming both or neither", async () => {
+    const { executor, seen } = world();
+    const unknown = await executor.execute(
+      call("pass_company", { company: "Nowhere Ltd" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(unknown.status).not.toBe("SUCCEEDED");
+    const both = await executor.execute(
+      call("save_company", { company: "Talum", companyId: TALUM }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(both.status).not.toBe("SUCCEEDED");
+    const neither = await executor.execute(
+      call("save_company", {}),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(neither.status).not.toBe("SUCCEEDED");
+    expect(seen).toEqual([]);
+  });
+});
+
 describe("the approvals inbox and their documents", () => {
   const executor = createQToolExecutor({
     registry: createQToolRegistry(

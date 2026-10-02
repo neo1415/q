@@ -112,6 +112,9 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     work: port(),
     // DAILY block
     daily: port(),
+    // Action parity (2026-10-02): Settings switches.
+    notificationSettings: port(),
+    personality: port(),
     // BILLING (ADR 0034): the plan gate.
     entitlements: port(),
   };
@@ -235,6 +238,14 @@ const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
     when: { day: "tomorrow", time: "14:00" },
   },
   propose_meeting_change: { meetingId: UUID, change: "CANCEL" },
+  set_notification_settings: { email: false },
+  propose_express_interest: { companyId: UUID },
+  propose_connection_request: { investor: "Kazikit Capital" },
+  // "Name exactly one of companyId or company".
+  save_company: { companyId: UUID },
+  unsave_company: { companyId: UUID },
+  pass_company: { companyId: UUID },
+  unpass_company: { companyId: UUID },
 };
 
 /** What a field the schema walk could not satisfy is tried as, in order. */

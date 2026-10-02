@@ -66,6 +66,7 @@ import {
 export const FIND_MEETING_TIMES = "relationship.meeting.find_times" as const;
 export const PROPOSE_MEETING_CHANGE = "relationship.meeting.change" as const;
 export const LIST_SCHEDULE = "schedule.list" as const;
+export const DISMISS_REMINDER = "schedule.reminder.dismiss" as const;
 
 type Refusal =
   | "NOT_A_PARTY"
@@ -117,6 +118,15 @@ export type ScheduleIntelligencePort = {
       readonly relationshipId: string | null;
     }[];
   }>;
+  /**
+   * Dismiss one of their own reminders, exactly as the reminder's Dismiss
+   * does (the same service, as the person). False: not theirs, or not open.
+   * Absent: no dismiss_reminder tool.
+   */
+  readonly dismissReminder?: (
+    actor: ActorContext,
+    reminderId: string,
+  ) => Promise<boolean>;
   /** A call they organised, or null. */
   readonly organisedMeeting: (
     actor: ActorContext,
@@ -458,6 +468,7 @@ export const ProposeReminderInputSchema = z
         input.relationshipId,
         input.companyId,
         input.investorOrganisationId,
+        input.counterpartName,
       ].filter((id) => id !== undefined).length <= 1,
     {
       message:
@@ -759,7 +770,8 @@ export function createScheduleTools(
         const named =
           input.relationshipId !== undefined ||
           input.companyId !== undefined ||
-          input.investorOrganisationId !== undefined;
+          input.investorOrganisationId !== undefined ||
+          input.counterpartName !== undefined;
         if (!named) {
           return ownConversation(actor, plan)
             ? allow("INTERNAL", { relationship: null })
@@ -870,5 +882,79 @@ export function createScheduleTools(
         };
       },
     }),
+    ...(schedule.dismissReminder === undefined
+      ? []
+      : [createDismissReminderTool(schedule, schedule.dismissReminder)]),
   ];
+}
+
+// --- dismiss_reminder --------------------------------------------------------
+
+export const DismissReminderInputSchema = z
+  .object({
+    reminderId: UuidSchema.describe(
+      "One of their open reminders, by id from list_schedule.",
+    ),
+  })
+  .strict();
+
+export const DismissReminderOutputSchema = z
+  .object({ done: z.boolean(), note: z.string().max(200) })
+  .strict();
+
+/**
+ * Action parity (2026-10-02): "dismiss that reminder" does what the
+ * reminder's own Dismiss does, at once: the person's word is the decision
+ * (Q never decides on its own that something was dealt with). Only an open
+ * reminder of theirs, as list_schedule reads it.
+ */
+function createDismissReminderTool(
+  schedule: ScheduleIntelligencePort,
+  dismiss: NonNullable<ScheduleIntelligencePort["dismissReminder"]>,
+): AnyQToolDefinition {
+  return defineQTool<
+    z.infer<typeof DismissReminderInputSchema>,
+    z.infer<typeof DismissReminderOutputSchema>,
+    { readonly reminderId: string; readonly title: string }
+  >({
+    id: DISMISS_REMINDER,
+    version: 1,
+    status: "ACTIVE",
+    providerName: "dismiss_reminder",
+    description:
+      "Dismisses one of the person's own open reminders when they say they have dealt with it or no longer want it, exactly as Dismiss on the reminder does. Use the id from list_schedule; never dismiss one they did not ask about.",
+    classification: "SIDE_EFFECT",
+    riskClass: "LOW_RISK_INTERNAL",
+    requiredCapabilities: [],
+    supportedPurposes: [...Q_TASK_CLASSES],
+    requiredScopeKinds: ["OWN_Q_CONVERSATION"],
+    approval: "NONE",
+    idempotency: "SAFE_TO_REPEAT",
+    owner: "q-tools",
+    visibleStage: null,
+    input: DismissReminderInputSchema,
+    output: DismissReminderOutputSchema,
+    authorize: async (input, { actor, plan }) => {
+      if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
+      const own = await schedule.upcoming(actor).catch(() => null);
+      const reminder = own?.reminders.find(
+        (entry) => entry.id === input.reminderId,
+      );
+      return reminder === undefined
+        ? deny("NOT_AVAILABLE")
+        : allow("CONFIDENTIAL", {
+            reminderId: reminder.id,
+            title: reminder.title,
+          });
+    },
+    execute: async (_input, context, grant) => {
+      const dismissed = await dismiss(context.actor, grant.reminderId);
+      return {
+        done: dismissed,
+        note: dismissed
+          ? `Dismissed: ${grant.title}.`
+          : "That reminder was already dismissed.",
+      };
+    },
+  });
 }

@@ -21,6 +21,8 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope, boundScopeFor } from "../plan.js";
+import { findRecordByName } from "./client-actions.js";
+import { createProposeConnectionRequestTool } from "./connection-request-send.js";
 import { createProposeConnectionRequestAnswerTool } from "./connection-requests.js";
 import type {
   InvestorFeedPort,
@@ -487,11 +489,25 @@ export type ProposalOutput = z.infer<typeof ProposalOutputSchema>;
 
 export const ProposeExpressInterestInputSchema = z
   .object({
-    companyId: UuidSchema.describe(
+    companyId: UuidSchema.optional().describe(
       "The company the person wants to express interest in, as given in the conversation context.",
     ),
+    company: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe(
+        "Or the company's name as the person said it, from any page; Capital Q finds it among companies they can see.",
+      ),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      (input.companyId === undefined) !== (input.company === undefined),
+    { message: "name exactly one of companyId or company" },
+  );
 export type ProposeExpressInterestInput = z.infer<
   typeof ProposeExpressInterestInputSchema
 >;
@@ -503,7 +519,7 @@ function createProposeExpressInterestTool(
   return defineQTool<
     ProposeExpressInterestInput,
     ProposalOutput,
-    { readonly companyName: string }
+    { readonly companyId: string; readonly companyName: string }
   >({
     id: PROPOSE_EXPRESS_INTEREST,
     version: 1,
@@ -523,25 +539,40 @@ function createProposeExpressInterestTool(
     input: ProposeExpressInterestInputSchema,
     output: ProposalOutputSchema,
     authorize: async (input, { actor, plan }) => {
-      if (!actionTarget(plan, input.companyId)) {
-        return deny("NOT_AVAILABLE");
-      }
-      if (!(await relationships.mayExpressInterest(actor, input.companyId))) {
+      // By id: a company this run's plan targets. By name (action parity
+      // 2026-10-02, from any page): one company they can already see, by
+      // the same matcher open_page uses; never a guess among several.
+      const companyId =
+        input.companyId !== undefined
+          ? actionTarget(plan, input.companyId)
+            ? input.companyId
+            : null
+          : await findRecordByName(
+              ports,
+              actor,
+              "COMPANY",
+              input.company ?? "",
+            );
+      if (companyId === null) return deny("NOT_AVAILABLE");
+      if (!(await relationships.mayExpressInterest(actor, companyId))) {
         return deny("NOT_AVAILABLE");
       }
       const profile = await ports.companies.findCanonicalCompanyProfile(
-        CompanyIdSchema.parse(input.companyId),
+        CompanyIdSchema.parse(companyId),
       );
       if (profile === null) return deny("NOT_AVAILABLE");
-      return allow("NETWORK_VISIBLE", { companyName: profile.canonicalName });
+      return allow("NETWORK_VISIBLE", {
+        companyId,
+        companyName: profile.canonicalName,
+      });
     },
-    execute: (input, context, grant) => {
+    execute: (_input, context, grant) => {
       const status = relationships.prepareForApproval({
         runId: context.runId,
         tenantId: context.actor.tenantId,
         actorUserId: context.actor.userId,
         actionType: "relationship.interest.express",
-        payload: { companyId: input.companyId, companyName: grant.companyName },
+        payload: { companyId: grant.companyId, companyName: grant.companyName },
       });
       return Promise.resolve({
         status,
@@ -813,6 +844,16 @@ export function createRelationshipTools(
     createProposeExpressInterestTool(ports, relationships),
     createProposeInterestAnswerTool(relationships),
     ...(connectionAnswer === null ? [] : [connectionAnswer]),
+    // Action parity (2026-10-02): a founder's Connection Request by name.
+    ...(relationships.mayRequestConnection === undefined
+      ? []
+      : [
+          createProposeConnectionRequestTool(
+            ports,
+            relationships,
+            relationships.mayRequestConnection,
+          ),
+        ]),
     ...(relationships.ownRelationships === undefined
       ? []
       : [

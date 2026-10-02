@@ -89,7 +89,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/schedule.ts GET REMINDERS_PATH": cap("tool.list_schedule"),
   "api/http/schedule.ts POST REMINDERS_PATH": cap("tool.propose_reminder"),
   "api/http/schedule.ts POST REMINDER_DISMISS_PATH": cap(
-    "offer.reminder_dismiss",
+    "tool.dismiss_reminder",
   ),
   "api/http/schedule.ts GET NOTIFICATIONS_PATH": exempt(
     "the notices panel's own feed of what already happened (a reminder due, an invite, a brief ready); Q reads the calls and reminders behind them with list_schedule",
@@ -110,8 +110,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/push.ts GET NOTIFICATION_SETTINGS_PATH": exempt(
     "the notification settings switches, shown in Settings and the notices panel",
   ),
-  "api/http/push.ts PUT NOTIFICATION_SETTINGS_PATH": exempt(
-    "the notification settings switches the person flips themselves in Settings",
+  "api/http/push.ts PUT NOTIFICATION_SETTINGS_PATH": cap(
+    "tool.set_notification_settings",
   ),
 
   // R34 relationship chat.
@@ -449,7 +449,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ADR 0023: founders' Connection Requests and the investor's inbox. The
   // accept/decline loop is the "POST path" entry below.
   "api/http/network-interests.ts POST NETWORK_INVESTOR_CONNECTION_REQUEST_PATH":
-    cap("offer.connection_request"),
+    cap("tool.propose_connection_request"),
   "api/http/network-interests.ts GET NETWORK_INVESTOR_CONNECTION_PATH": cap(
     "offer.connection_request",
   ),
@@ -583,9 +583,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/work.ts POST Q_WORK_LANE_ANSWER_PATH": cap("tool.answer_q_work"),
   "q-api/http/work.ts GET Q_WORK_LANE_REPORT_PATH": DOWNLOAD,
   "q-api/http/work.ts PUT Q_PRESENCE_PATH": cap("tool.set_away"),
-  "q-api/http/errands.ts DELETE Q_ERRAND_PATH": exempt(
-    "the person's own click stopping an errand they approved; stopping never needs Q",
-  ),
+  "q-api/http/errands.ts DELETE Q_ERRAND_PATH": cap("tool.stop_q_work"),
   // DAILY block: The Q Daily.
   "q-api/http/daily.ts GET Q_DAILY_PATH": cap("tool.get_q_daily"),
   "q-api/http/daily.ts GET Q_DAILY_EDITION_PATH": cap("tool.get_q_daily"),
@@ -594,14 +592,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/daily.ts PUT Q_DAILY_PREFERENCES_PATH": cap(
     "tool.set_q_daily_preferences",
   ),
-  "q-api/http/daily.ts POST Q_DAILY_REQUESTS_PATH": exempt(
-    "the reader's own Prepare my edition button, rate-limited to one per 20 hours; Q tells them when the next one comes (get_q_daily)",
-  ),
+  "q-api/http/daily.ts POST Q_DAILY_REQUESTS_PATH": cap("tool.request_q_daily"),
   "q-api/http/standing.ts GET Q_STANDING_PATH": exempt(
     "the person reading their own Q personality and whether their account is paused; shown in Settings and on arrival",
   ),
-  "q-api/http/standing.ts PUT Q_STANDING_PERSONALITY_PATH": exempt(
-    "the Settings choice of who Q is; a stated preference about how Q talks is already kept by Q itself",
+  "q-api/http/standing.ts PUT Q_STANDING_PERSONALITY_PATH": cap(
+    "tool.set_q_personality",
   ),
   // BILLING-2 block (ADR 0036)
   "q-api/http/readiness-blueprint.ts POST Q_READINESS_BLUEPRINTS_PATH": exempt(
@@ -771,9 +767,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/admin": exempt(
     "Capital Q's admin console: platform operators only, never a place Q sends anyone",
   ),
-  "/gateway": exempt(
-    "the investor's gateway (link, QR, snippet, inbox), opened from Capital; a navigate capability comes with the Q gateway tool",
-  ),
+  "/gateway": cap("navigate.GATEWAY"),
   "/onboarding/founder": exempt(
     "the founder interview: Q's own onboarding loop (voice INTERVIEW_FOUNDER)",
   ),
@@ -790,7 +784,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/discover": cap("navigate.DISCOVER"),
   "/discover/saved": cap("navigate.SAVED"),
   "/discover/passed": exempt(
-    "the Passed list with Undo pass (doc 19 §68); a Q destination waits for a turn-reader version",
+    "the Passed list (doc 19 §68): its one action, Undo pass, is unpass_company by name from any page; opening the list itself needs a navigate destination in the turn reader, whose versions HARDEN owns",
   ),
   "/company/visibility": cap("navigate.COMPANY_VISIBILITY"),
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
@@ -806,9 +800,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // DAILY block: The Q Daily (navigate.DAILY; an edition via get_q_daily).
   "/daily": cap("navigate.DAILY"),
   "/daily/[editionId]": cap("tool.get_q_daily"),
-  "/settings/memory": exempt(
-    "the person reading and correcting what Q remembers; not a place Q sends anyone",
-  ),
+  "/settings/memory": cap("navigate.MEMORY"),
   "/verification": cap("navigate.VERIFICATION"),
   "/pitch": cap("navigate.PITCH"),
   // One video's page and a new video's, both opened from Pitch & media (ADR 0022).
@@ -899,6 +891,11 @@ function pageRoutes(): string[] {
 
 const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
 
+/** POST routes that only read (a search with a body), mapped to a read tool. */
+const READS_BY_POST: ReadonlySet<string> = new Set([
+  "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH",
+]);
+
 describe("every route and page is something Q can do, or exempt with a reason (R20/R33)", () => {
   it("every API route call site is classified", () => {
     const keys = routeKeys();
@@ -933,6 +930,28 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         "exempt" in coverage && /backlog/i.test(coverage.exempt),
     );
     expect(backlog.map(([key]) => key)).toEqual([]);
+  });
+
+  it("a route that changes something maps to something Q does, never only a read (action parity 2026-10-02)", () => {
+    const byId = new Map(Q_CAPABILITIES.map((c) => [c.id, c]));
+    const readOnly = Object.entries(ROUTE_COVERAGE).filter(
+      ([key, coverage]) => {
+        if (!/ (POST|PUT|PATCH|DELETE) /.test(key)) return false;
+        if (!("capability" in coverage)) return false;
+        if (READS_BY_POST.has(key)) return false;
+        const capability = byId.get(coverage.capability);
+        // An offer takes them to the control with its reason; a document
+        // hand makes the thing. A tool must act (Prepare -> Approve, or the
+        // person's own instant action), except the onboarding loop's own.
+        return (
+          capability !== undefined &&
+          capability.performedBy.kind === "TOOL" &&
+          !capability.acts &&
+          !capability.surfaces.includes("ONBOARDING")
+        );
+      },
+    );
+    expect(readOnly.map(([key]) => key)).toEqual([]);
   });
 
   it("every capability named is in the registry, and every exemption says why", () => {

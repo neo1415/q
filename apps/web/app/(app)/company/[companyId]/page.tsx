@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   getCompanyNetworkPreview,
   getOwnInterest,
+  getRelationshipWithCompany,
 } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ArrowLeft, ChevronRight, Globe, ICON_SIZE } from "@capital-q/ui/icons";
@@ -66,10 +67,18 @@ export default async function CompanyPage({
   // Only an investor organisation's member gets an answer here; anyone
   // else (a founder, a person with no organisation) is refused by the API
   // and simply sees no Express Interest control.
-  const interest =
+  const [interest, standing] =
     session === null
-      ? null
-      : await getOwnInterest(session, company.companyId).catch(() => null);
+      ? [null, null]
+      : await Promise.all([
+          getOwnInterest(session, company.companyId).catch(() => null),
+          // Where their organisation stands with the company; refused for
+          // anyone who is not an investor's member, which reads as none.
+          getRelationshipWithCompany(session, company.companyId).catch(
+            () => null,
+          ),
+        ]);
+  const connected = standing?.relationship?.state === "CONNECTED";
 
   const place = [
     company.headquartersCity,
@@ -181,6 +190,7 @@ export default async function CompanyPage({
         companyId={company.companyId}
         companyName={company.canonicalName}
         facts={company.facts}
+        connected={connected}
       />
     </PageContainer>
   );

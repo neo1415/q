@@ -57,6 +57,7 @@ export function RelationshipDetail({
   profile,
   thread = null,
   basePath,
+  media = null,
 }: {
   readonly side: RelationshipSide;
   readonly counterpart: string;
@@ -72,6 +73,8 @@ export function RelationshipDetail({
   readonly thread?: ChatThreadDto | null | undefined;
   /** This relationship's own page, e.g. /relationships/company/{id}. */
   readonly basePath: string;
+  /** The counterpart's pitch, when this side may play it. */
+  readonly media?: ReactNode;
 }) {
   const connected = relationship?.state === "CONNECTED";
   const messageCount = thread?.messages.length ?? 0;
@@ -93,6 +96,12 @@ export function RelationshipDetail({
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-8">
+          {media === null || media === undefined ? null : (
+            <Card title="Pitch" id="pitch">
+              {media}
+            </Card>
+          )}
+
           {relationship === null || !connected ? null : (
             <Card title="Commitment" id="commitment">
               <RelationshipCommitment

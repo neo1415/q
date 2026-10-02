@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { CompanyPitch } from "@/features/discover/company-pitch";
 import { QPageSubject } from "@/features/q/q-subject";
 import { InvestorRelationshipActions } from "@/features/relationships/relationship-actions";
 import {
@@ -65,6 +66,9 @@ export default async function InvestorRelationshipPage({
         thread={loaded.thread}
         basePath={`/relationships/company/${loaded.companyId}`}
         absentSentence={loaded.absentSentence}
+        media={
+          loaded.pitch === null ? null : <CompanyPitch company={loaded.pitch} />
+        }
         actions={
           own === null || !mayExpress ? null : (
             <InvestorRelationshipActions

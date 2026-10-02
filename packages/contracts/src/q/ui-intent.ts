@@ -388,6 +388,8 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "save_company",
   "unsave_company",
   "pass_company",
+  // Undo pass (doc 19 §68), as the Passed list's button.
+  "unpass_company",
   "decline_pending_proposal",
   "reassess_marketplace_readiness",
   "set_onboarding_reminders",
@@ -406,6 +408,11 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "illustrate_my_document",
   // DAILY: how they receive The Q Daily, reversible in Settings.
   "set_q_daily_preferences",
+  // Action parity (2026-10-02): the person's own word, as the control does.
+  "request_q_daily",
+  "dismiss_reminder",
+  "set_notification_settings",
+  "set_q_personality",
 ] as const;
 
 /**

@@ -38,10 +38,13 @@ const EVERY_PORT: QToolPorts = {
   recommendationExplanations: STUB,
   research: STUB,
   profiles: STUB,
-  relationships: { pendingConnectionRequests: STUB } as never,
+  relationships: {
+    pendingConnectionRequests: STUB,
+    mayRequestConnection: STUB,
+  } as never,
   email: STUB,
   chat: STUB,
-  schedule: STUB,
+  schedule: { dismissReminder: STUB } as never,
   profileChanges: STUB,
   pitchMoments: STUB,
   visibility: STUB,
@@ -65,7 +68,10 @@ const EVERY_PORT: QToolPorts = {
   // AUTO (ADR 0030)
   work: STUB,
   // DAILY block
-  daily: STUB,
+  daily: { request: STUB } as never,
+  // Action parity (2026-10-02): Settings switches.
+  notificationSettings: STUB,
+  personality: STUB,
   // BILLING (ADR 0034)
   entitlements: STUB,
 };

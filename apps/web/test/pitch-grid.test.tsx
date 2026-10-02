@@ -107,6 +107,28 @@ describe("PitchGrid", () => {
     ).toBe("/pitch/new");
   });
 
+  it("a private video chosen for everyone says it is private, never 'Everyone' (live 2026-10-02, Nixo)", async () => {
+    vi.mocked(actions.listPitchMediaAction).mockResolvedValue({
+      ok: true,
+      value: [
+        video({
+          mediaAssetId: id(1),
+          title: "Nixo pitch",
+          audience: "NETWORK",
+          playbackPolicy: "PRIVATE",
+        }),
+      ],
+    });
+    render(<PitchGrid companyId={COMPANY} />);
+    await waitFor(() =>
+      expect(document.querySelectorAll("[data-pitch-tile]")).toHaveLength(1),
+    );
+    const tile = document.querySelector("[data-pitch-tile]");
+    expect(tile?.textContent).toContain("Private");
+    expect(tile?.textContent).toContain("Only your organisation");
+    expect(tile?.textContent).not.toContain("Everyone");
+  });
+
   it("offers the first video when there is none, and says why the list could not load", async () => {
     vi.mocked(actions.listPitchMediaAction).mockResolvedValueOnce({
       ok: true,

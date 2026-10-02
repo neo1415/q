@@ -14,6 +14,7 @@ import type {
   ChatThreadDto,
   CompanyInterestStatusDto,
   IncomingInterestDto,
+  PitchSummaryDto,
   RelationshipStatusDto,
 } from "@capital-q/contracts";
 
@@ -76,6 +77,15 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
   Loaded<{
     readonly companyId: string;
     readonly own: CompanyInterestStatusDto | null;
+    /** The company's pitch, when the server lets this reader play it. */
+    readonly pitch: {
+      readonly companyId: string;
+      readonly canonicalName: string;
+      readonly shortDescription: string | null;
+      readonly currentStageCode: string | null;
+      readonly headquartersCountry: string | null;
+      readonly pitch: PitchSummaryDto;
+    } | null;
   }>
 > {
   const [context, session] = await Promise.all([
@@ -116,6 +126,19 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
     counterpart: company.canonicalName,
     relationship,
     own,
+    // The same publishable pitch the company page plays (live
+    // 2026-10-02: a connected investor saw none here).
+    pitch:
+      company.pitch === null
+        ? null
+        : {
+            companyId: company.companyId,
+            canonicalName: company.canonicalName,
+            shortDescription: company.shortDescription,
+            currentStageCode: company.currentStageCode,
+            headquartersCountry: company.headquartersCountry,
+            pitch: company.pitch,
+          },
     thread: await threadFor(session, relationship),
     profile: {
       ...NO_PROFILE,

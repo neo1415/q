@@ -33,6 +33,10 @@ import type { QEntitlementPort } from "./tools/plan.js";
 // DOCS block.
 import type { DocumentStudioPort } from "./tools/documents.js";
 import type { QDailyToolPort } from "./tools/daily.js";
+import type {
+  NotificationSettingsPort,
+  QPersonalityPort,
+} from "./tools/own-settings.js";
 
 /** One company as the investor's feed shows it. */
 export type InvestorFeedCompany = {
@@ -167,6 +171,18 @@ export type RelationshipIntelligencePort = {
         }[]
       >)
     | undefined;
+  /**
+   * Whether the actor's company may send this investor organisation a
+   * Connection Request now: the command's own check (ADR 0023: a founder,
+   * an investor that takes requests, none already open). Writes nothing.
+   * Absent: not composed, and Q cannot send one.
+   */
+  readonly mayRequestConnection?:
+    | ((
+        actor: ActorContext,
+        investorOrganisationId: string,
+      ) => Promise<boolean>)
+    | undefined;
   readonly prepareForApproval: (entry: {
     readonly runId: string;
     readonly tenantId: string;
@@ -174,7 +190,8 @@ export type RelationshipIntelligencePort = {
     readonly actionType:
       | "relationship.interest.express"
       | "relationship.interest.respond"
-      | "relationship.connection_request.respond";
+      | "relationship.connection_request.respond"
+      | "relationship.connection_request.send";
     readonly payload: Readonly<Record<string, string | null>>;
   }) => "PREPARED" | "ONE_PER_TURN";
 };
@@ -356,6 +373,10 @@ export type QToolPorts = {
   readonly approvalInbox?: ApprovalInboxPort | undefined;
   /** R33: Save, Unsave and Pass from a conversation. */
   readonly discoveryDecisions?: DiscoveryDecisionPort | undefined;
+  /** Action parity 2026-10-02: Settings' notification switches. */
+  readonly notificationSettings?: NotificationSettingsPort | undefined;
+  /** Action parity 2026-10-02: Settings' choice of Q's personality. */
+  readonly personality?: QPersonalityPort | undefined;
   /** R33: their own documents. */
   readonly documents?: OwnDocumentsPort | undefined;
   /** Revising one of their own documents into a new version. */
@@ -742,7 +763,7 @@ export type DiscoveryDecisionPort = {
   readonly decide: (
     actor: ActorContext,
     decision: {
-      readonly type: "SAVE" | "UNSAVE" | "PASS";
+      readonly type: "SAVE" | "UNSAVE" | "PASS" | "UNPASS";
       readonly companyId: string;
       /** Idempotency identity, derived by the tool from the run. */
       readonly clientEventId: string;
