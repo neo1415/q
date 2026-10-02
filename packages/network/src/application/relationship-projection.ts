@@ -29,6 +29,8 @@ export type RelationshipStateProjector = {
     /** Re-fold every relationship, not only those whose cache is behind. */
     readonly all?: boolean | undefined;
     readonly batchSize?: number | undefined;
+    /** At most this many relationships in one run; the next run continues. */
+    readonly max?: number | undefined;
   }) => Promise<{
     readonly scanned: number;
     readonly changed: number;
@@ -81,6 +83,7 @@ export function createRelationshipStateProjector(
     project,
     rebuild: async (options = {}) => {
       const limit = Math.min(Math.max(options.batchSize ?? 200, 1), 1000);
+      const max = options.max ?? Number.POSITIVE_INFINITY;
       let after: RelationshipId | null = null;
       let scanned = 0;
       let changed = 0;
@@ -93,13 +96,14 @@ export function createRelationshipStateProjector(
           version: RELATIONSHIP_PROJECTOR_VERSION,
         });
         for (const id of ids) {
+          if (scanned >= max) break;
           const result = await project(id);
           scanned += 1;
           if (result.changed) changed += 1;
           anomalies += result.projection?.anomalies.length ?? 0;
         }
         const last = ids.at(-1);
-        if (ids.length < limit || last === undefined) break;
+        if (ids.length < limit || last === undefined || scanned >= max) break;
         after = last;
       }
       return { scanned, changed, anomalies };
