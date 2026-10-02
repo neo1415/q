@@ -118,7 +118,7 @@ function world(
               ]
             : [],
       } as never),
-  } as RelationshipIntelligencePort;
+  } as never as RelationshipIntelligencePort;
   const schedule: ScheduleIntelligencePort = {
     findSlots: () => Promise.resolve({ status: "UNAVAILABLE" }),
     upcoming: () => Promise.resolve({ meetings: [], reminders: [] }),

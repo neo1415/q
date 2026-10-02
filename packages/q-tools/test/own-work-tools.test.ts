@@ -221,7 +221,7 @@ describe("Save, Pass and Undo pass by name, from any page (action parity 2026-10
     };
     const executor = createQToolExecutor({
       registry: createQToolRegistry(
-        createOwnWorkTools({ discoveryDecisions: port }, names),
+        createOwnWorkTools({ discoveryDecisions: port }, names as never),
       ),
     });
     return { executor, seen };
