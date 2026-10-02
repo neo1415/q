@@ -11,7 +11,12 @@ import type { ReferenceKind } from "./references.js";
  */
 
 export type ParityExpectation =
-  | { readonly kind: "ACTION"; readonly action: string; readonly tool: string }
+  | {
+      readonly kind: "ACTION";
+      readonly action: string;
+      readonly tool: string;
+      readonly orSays?: string | undefined;
+    }
   | {
       readonly kind: "READ";
       readonly read: OwnReadKind;
@@ -73,6 +78,7 @@ export function parityCases(
       kind: "ACTION",
       action: action.name,
       tool: tool.name,
+      ...(tool.eval.orSays === undefined ? {} : { orSays: tool.eval.orSays }),
     };
     const [first, second] = tool.eval.say;
     cases.push(

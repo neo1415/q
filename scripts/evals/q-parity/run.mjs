@@ -199,7 +199,20 @@ async function check(testCase, runId, userId, company) {
     const proposed = await sql(
       `select payload::text as p from q_runtime.run_events where run_id = ${quote(runId)} and event_type = 'q.action.proposed'`,
     );
-    return proposed.some((row) => row.p.includes(`app.${expect.action}`));
+    if (proposed.some((row) => row.p.includes(`app.${expect.action}`))) {
+      return true;
+    }
+    // A refusal that is right for this eval account's state (e.g. no Q
+    // Card yet), declared with the action's own eval phrasings.
+    if (expect.orSays === undefined) return false;
+    const said = (
+      await sql(
+        `select payload::text as p from q_runtime.run_events where run_id = ${quote(runId)} and event_type = 'q.message.completed'`,
+      )
+    )
+      .map((row) => row.p)
+      .join(" ");
+    return new RegExp(expect.orSays, "i").test(said);
   }
   // The state the person asked for, by the end of the run. "Already
   // saved" is the right answer to "save it" when it was: what matters is

@@ -132,6 +132,13 @@ export type AppActionTool<In, ToolIn> = {
     readonly say: readonly [string, string];
     /** The kind of record `{name}` is filled from on the eval account. */
     readonly names?: ReferenceKind | undefined;
+    /**
+     * A refusal that is the right answer on an eval account whose state
+     * does not allow the action (a case-insensitive pattern Q's answer
+     * matches): it passes instead of a prepared card. Never a product
+     * rule; the eval only.
+     */
+    readonly orSays?: string | undefined;
   };
 };
 

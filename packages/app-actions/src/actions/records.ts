@@ -1046,6 +1046,10 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
           "Let search engines find our Q Card.",
           "Hide our Q Card from search engines.",
         ],
+        // The founder eval account has no Q Card yet: "make one first" is
+        // the right answer there (lead 2026-10-02: expect it, seed none).
+        orSays:
+          "(no|hasn.t|has not been|isn.t)[^.]*q card|q card[^.]*(not|hasn.t)[^.]*(made|created|yet)|create[^.]*q card",
       },
       toCanonical: async (fields, context, ports) => {
         const subject = await ownSubject(ports, context, fields.subject);
