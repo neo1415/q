@@ -18,6 +18,11 @@ export type OpenerFacts = {
   readonly remindersDue: number;
   readonly firstReminder: string | null;
   readonly notesReady: number;
+  /**
+   * Q's "How did it go?" from the notes notice (2026-10-02): the outcome Q
+   * proposes from its notes, to be confirmed, and the follow-ups it offers.
+   */
+  readonly notesQuestion?: string | null | undefined;
   readonly unreadNotices: number;
   /** What the scout found about their company that they have not seen. */
   readonly scoutFinding?: string | null | undefined;
@@ -55,7 +60,9 @@ export function composeReturningOpener(
     return `${hello} ${call}${also} Want me to prep you for it?`;
   }
   if (facts.notesReady > 0) {
-    return `${hello} My notes from your last call are ready. Want the short version?`;
+    return facts.notesQuestion === undefined || facts.notesQuestion === null
+      ? `${hello} My notes from your last call are ready. Want the short version?`
+      : `${hello} My notes from your last call are ready. ${facts.notesQuestion}`;
   }
   if (facts.scoutFinding !== undefined && facts.scoutFinding !== null) {
     return `${hello} I spotted something new about your company: "${clip(facts.scoutFinding)}". Want the gist?`;
@@ -114,6 +121,8 @@ export function createOpenerFacts(dependencies: {
       firstReminder: reminders[0]?.title ?? null,
       notesReady:
         notices.find((row) => row.kind === "MEETING_NOTES_READY")?.n ?? 0,
+      notesQuestion:
+        notices.find((row) => row.kind === "MEETING_NOTES_READY")?.body ?? null,
       unreadNotices: notices.reduce((sum, row) => sum + row.n, 0),
       scoutFinding: notices.find((row) => row.kind === "Q_SCOUT")?.body ?? null,
     };

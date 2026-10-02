@@ -110,6 +110,12 @@ export {
   type MeetingNotesComposer,
   type MeetingTranscriptLine,
 } from "./meeting-assistant/service.js";
+export {
+  howDidItGo,
+  notesQuestions,
+  proposeMeetingOutcome,
+  type ProposedMeetingOutcome,
+} from "./meeting-assistant/outcome-proposal.js";
 
 // AUTO block: Web Push (VAPID) and notice delivery (ADR 0030).
 export {
