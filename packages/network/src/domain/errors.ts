@@ -76,6 +76,18 @@ export class InterestNotFoundError extends Error {
 }
 
 /** The interest was already answered the other way; an answer is never overwritten. */
+/**
+ * The pair is already connected (live 2026-10-02: two founders' Connection
+ * Requests were recorded on relationships already connected, and the
+ * projector rightly kept them as anomalies). Asking again is refused.
+ */
+export class RelationshipAlreadyConnectedError extends Error {
+  constructor() {
+    super("You're already connected.");
+    this.name = "RelationshipAlreadyConnectedError";
+  }
+}
+
 export class InterestAlreadyAnsweredError extends Error {
   constructor() {
     super("This interest has already been answered.");

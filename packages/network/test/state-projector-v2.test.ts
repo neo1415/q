@@ -365,3 +365,27 @@ describe("nextStepFor, per relationship-state.v2 state", () => {
     }
   });
 });
+
+/**
+ * Live 2026-10-02 (worker rebuild: anomalies=2): a founder's Connection
+ * Request recorded after the pair was already connected. Not a legal
+ * real-world move -- they were already connected -- so the projector keeps
+ * it as an anomaly and changes nothing; the request path now refuses it.
+ */
+describe("a second interest on a match (live anomalies)", () => {
+  it("is kept as an anomaly from the match state, never applied", () => {
+    const projection = projectRelationshipStateV2([
+      ...connected(),
+      event(4, "message_sent"),
+      event(5, "meeting_scheduled"),
+      event(6, "interest_expressed", {
+        interestId: "00000000-0000-4000-8000-0000000000e1",
+        expressedByParty: "COMPANY",
+      }),
+    ]);
+    expect(projection?.state).toBe("CONNECTED");
+    expect(projection?.anomalies).toEqual([
+      { sequence: 6, eventType: "interest_expressed", from: "CONNECTED" },
+    ]);
+  });
+});

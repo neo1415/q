@@ -30,11 +30,15 @@ import {
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
   InterestNotFoundError,
+  RelationshipAlreadyConnectedError,
   RelationshipPartyNotFoundError,
 } from "../domain/errors.js";
 import { RELATIONSHIP_EVENT_INTEREST_EXPRESSED } from "../domain/event-registry.js";
 import { relationshipInterestExpressedEvent } from "../events/index.js";
-import { createRelationshipEventAppender } from "./append-event.js";
+import {
+  createRelationshipEventAppender,
+  isAlreadyMatched,
+} from "./append-event.js";
 import {
   createEnsureRelationshipInTransaction,
   resolveRelationshipParties,
@@ -290,6 +294,13 @@ export function createRequestConnection(
         },
         parties,
       );
+      // Already connected: a request would be a second interest on a
+      // match (live 2026-10-02 anomalies). Refused, never recorded.
+      if (
+        await isAlreadyMatched(tx, dependencies.repositories, relationship.id)
+      ) {
+        throw new RelationshipAlreadyConnectedError();
+      }
       const open = await interests.findOpenByRelationship(
         tx.sql,
         relationship.id,

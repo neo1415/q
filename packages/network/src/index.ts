@@ -54,6 +54,7 @@ export {
   ConnectionNotAcceptedError,
   ConnectionNotPermittedError,
   InterestAlreadyAnsweredError,
+  RelationshipAlreadyConnectedError,
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
   InterestNotFoundError,

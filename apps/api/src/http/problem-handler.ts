@@ -45,6 +45,7 @@ import {
   ConnectionNotAcceptedError,
   ConnectionNotPermittedError,
   InterestAlreadyAnsweredError,
+  RelationshipAlreadyConnectedError,
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
   InterestNotFoundError,
@@ -456,6 +457,14 @@ function toProblem(
   }
   if (error instanceof ProfileImageStorageUnavailableError) {
     return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
+  }
+
+  if (error instanceof RelationshipAlreadyConnectedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
   }
 
   if (error instanceof InterestAlreadyAnsweredError) {

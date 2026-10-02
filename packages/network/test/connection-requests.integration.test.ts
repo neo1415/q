@@ -41,6 +41,7 @@ import {
   createConnectionService,
   createInterestService,
   InterestAlreadyAnsweredError,
+  RelationshipAlreadyConnectedError,
   InterestNotFoundError,
   type ConnectionService,
   type InboundPreference,
@@ -521,6 +522,50 @@ describe("Founder Connection Requests against local PostgreSQL", () => {
           investorOrganisationId: investorA,
         });
         expect(forCompany?.projection.state).toBe("CONNECTED");
+      },
+    );
+  });
+
+  it("once connected, another request is refused and nothing is recorded (live anomalies 2026-10-02)", async () => {
+    await withWorld(
+      async ({
+        tx,
+        connections,
+        interests,
+        founder,
+        investorRep,
+        investorA,
+      }) => {
+        const sent = await request(connections, founder, investorA);
+        await connections.respondToConnectionRequest({
+          actor: investorRep,
+          interestId: sent.interest.id,
+          decision: "ACCEPTED",
+          surface: "INBOX",
+          idempotencyKey: `answer:${randomUUID()}`,
+          correlationId: CORRELATION(),
+        });
+        const count = async () =>
+          (
+            await tx.sql<{ n: number }[]>`
+              select count(*)::int as n from network.relationship_events
+               where relationship_id = ${sent.interest.relationshipId}`
+          )[0]?.n ?? 0;
+        const before = await count();
+        await expect(
+          connections.requestConnection({
+            actor: founder,
+            investorOrganisationId: investorA,
+            idempotencyKey: `again:${randomUUID()}`,
+            correlationId: CORRELATION(),
+          }),
+        ).rejects.toBeInstanceOf(RelationshipAlreadyConnectedError);
+        expect(await count()).toBe(before);
+        const status = await interests.relationshipForCompany({
+          actor: founder,
+          investorOrganisationId: investorA,
+        });
+        expect(status?.projection.anomalies).toEqual([]);
       },
     );
   });

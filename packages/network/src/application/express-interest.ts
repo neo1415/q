@@ -25,11 +25,15 @@ import {
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
   InterestNotPermittedError,
+  RelationshipAlreadyConnectedError,
   RelationshipPartyNotFoundError,
 } from "../domain/errors.js";
 import { RELATIONSHIP_EVENT_INTEREST_EXPRESSED } from "../domain/event-registry.js";
 import { relationshipInterestExpressedEvent } from "../events/index.js";
-import { createRelationshipEventAppender } from "./append-event.js";
+import {
+  createRelationshipEventAppender,
+  isAlreadyMatched,
+} from "./append-event.js";
 import type { NetworkServiceDependencies } from "./dependencies.js";
 import {
   createEnsureRelationshipInTransaction,
@@ -297,6 +301,14 @@ export function createExpressInterest(
         tx.sql,
         relationship.id,
       );
+      // The open interest answers a retry, as before; with none open, a
+      // pair already connected is never given a second interest.
+      if (
+        open === null &&
+        (await isAlreadyMatched(tx, dependencies.repositories, relationship.id))
+      ) {
+        throw new RelationshipAlreadyConnectedError();
+      }
       if (open !== null) {
         await remember(open.id);
         return { interest: open, deduplicated: true };
