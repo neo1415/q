@@ -11,6 +11,7 @@ import {
   listReminders,
 } from "@capital-q/api-client";
 import {
+  isMatchedRelationshipState,
   CHAT_PAGE_MAX,
   type ChatMessageDto,
   type RelationshipSummaryDto,
@@ -108,7 +109,7 @@ export async function relationshipDigests(
 
   const entries = await Promise.all(
     items.slice(0, DIGEST_LIMIT).map(async (item) => {
-      const connected = item.state === "CONNECTED";
+      const connected = isMatchedRelationshipState(item.state);
       const [profile, thread, meetings] = await Promise.all([
         counterpartProfile(session, context, item).catch(() => null),
         connected

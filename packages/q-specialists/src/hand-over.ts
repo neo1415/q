@@ -1,3 +1,4 @@
+import { isActiveMatchState } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import type {
   ContextFirewallPort,
@@ -275,7 +276,7 @@ export async function actOnHandOver(
   return {
     kind: "PREPARED",
     line:
-      chosen?.state === "CONNECTED"
+      chosen?.state !== undefined && isActiveMatchState(chosen.state)
         ? `${prepared.awaitingApprovalOf}: once you approve, I send them the message on the card, book an introductory call and send you the link.`
         : chosen?.state === "INTEREST_EXPRESSED"
           ? `${truth}${prepared.awaitingApprovalOf}: once you approve, I wait for them to accept, then send them the message on the card, book an introductory call and send you the link.`

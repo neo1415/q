@@ -1,5 +1,5 @@
 import type {
-  RelationshipStateV1,
+  RelationshipStateV2,
   RelationshipSummaryDto,
 } from "@capital-q/contracts";
 import { formatDay } from "@/components/date-format";
@@ -14,16 +14,23 @@ import { formatDay } from "@/components/date-format";
 
 export type RelationshipSide = "INVESTOR" | "COMPANY";
 
-export const STATE_WORDS: Readonly<Record<RelationshipStateV1, string>> = {
+export const STATE_WORDS: Readonly<Record<RelationshipStateV2, string>> = {
   DISCOVERED: "Discovered",
   INTEREST_EXPRESSED: "Interest expressed",
   CONNECTED: "Connected",
   DECLINED: "Not taken forward",
+  // relationship-state.v2 (2026-10-02): after the first meeting. A pass is
+  // "not proceeding for now", never a rejection; Pass is neutral.
+  MEETING_HELD: "Met",
+  IN_DILIGENCE: "In diligence",
+  PAUSED: "Paused",
+  PASSED: "Not proceeding for now",
+  INVESTED: "Invested",
 };
 
 /** What each milestone meant, told from the side reading it. */
 export function milestoneSentence(
-  state: RelationshipStateV1,
+  state: RelationshipStateV2,
   side: RelationshipSide,
   counterpart: string,
 ): string {
@@ -42,6 +49,18 @@ export function milestoneSentence(
       return side === "INVESTOR"
         ? `${counterpart} has not taken this forward.`
         : `Your company did not take this forward.`;
+    case "MEETING_HELD":
+      return "The first call took place.";
+    case "IN_DILIGENCE":
+      return "Diligence started.";
+    case "PAUSED":
+      return "Paused for now.";
+    case "PASSED":
+      return side === "INVESTOR"
+        ? "Your organisation decided not to proceed for now."
+        : `${counterpart} decided not to proceed for now.`;
+    case "INVESTED":
+      return "The investment was confirmed by both sides.";
   }
 }
 
@@ -51,7 +70,7 @@ export function milestoneSentence(
  * both parties. Said in words beside each entry (doc 17 §84).
  */
 export function visibilityWords(
-  state: RelationshipStateV1,
+  state: RelationshipStateV2,
   counterpart: string,
 ): string {
   return state === "DISCOVERED"
@@ -72,6 +91,12 @@ export function nextStepSentence(
       return `${counterpart} is waiting for your answer: accept to connect, or decline.`;
     case "SCHEDULE_MEETING":
       return `A first call is the natural next step. Book one with ${counterpart} here, or send them a message.`;
+    case "DECIDE_NEXT_STEP":
+      return `After the call: start diligence, pause, or decide not to proceed for now. Q can record what was agreed.`;
+    case "FOLLOW_UP":
+      return `Follow up on what was agreed with ${counterpart}: the materials, questions and next call.`;
+    case "RESUME":
+      return `You paused this. Resume when you're ready.`;
     case "NONE":
       return "Nothing is pending.";
   }
@@ -85,6 +110,9 @@ export const NEXT_STEP_WORDS: Readonly<
   AWAIT_ANSWER: "Wait for their answer",
   ANSWER_INTEREST: "Answer their interest",
   SCHEDULE_MEETING: "Book a first call",
+  DECIDE_NEXT_STEP: "Decide the next step",
+  FOLLOW_UP: "Follow up",
+  RESUME: "Resume when ready",
   NONE: "Nothing pending",
 };
 
@@ -112,6 +140,8 @@ export function relationshipsNeedingYou(
   return items.filter(
     (item) =>
       item.nextStep === "ANSWER_INTEREST" ||
-      item.nextStep === "SCHEDULE_MEETING",
+      item.nextStep === "SCHEDULE_MEETING" ||
+      item.nextStep === "DECIDE_NEXT_STEP" ||
+      item.nextStep === "FOLLOW_UP",
   );
 }

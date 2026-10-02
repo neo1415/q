@@ -150,6 +150,28 @@ describe("the action registry", () => {
       ["pitch.upload.start", "offer.pitch_video_upload", "CONSEQUENTIAL"],
       ["pitch.upload.cancel", "offer.pitch_video_upload", "CONSEQUENTIAL"],
       ["pitch.playback_policy.set", "via:set_pitch_sharing", "CONSEQUENTIAL"],
+      // Post-meeting outcomes (2026-10-02): one family tool, all approved.
+      ["relationship.outcome.change", "relationship_outcome", "CONSEQUENTIAL"],
+      [
+        "relationship.outcome.pass",
+        "via:relationship_outcome",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.outcome.pause",
+        "via:relationship_outcome",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.outcome.resume",
+        "via:relationship_outcome",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.outcome.meeting",
+        "via:relationship_outcome",
+        "CONSEQUENTIAL",
+      ],
     ]);
   });
 });

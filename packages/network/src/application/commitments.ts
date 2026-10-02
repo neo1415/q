@@ -1,8 +1,10 @@
-import type {
-  CommitmentDto,
-  CorrelationId,
-  FundraisingDto,
-  StateCommitmentRequest,
+import {
+  isActiveMatchState,
+  isMatchedRelationshipState,
+  type CommitmentDto,
+  type CorrelationId,
+  type FundraisingDto,
+  type StateCommitmentRequest,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
@@ -120,7 +122,11 @@ export function createCommitmentService(dependencies: {
     if (view === null || view.status === null) return null;
     return {
       side: view.side,
-      connected: view.status.projection.state === "CONNECTED",
+      // A commitment is stated in a live or paused match (relationship-
+      // state.v2); an investment already made stays readable.
+      connected:
+        isMatchedRelationshipState(view.status.projection.state) &&
+        view.status.projection.state !== "PASSED",
       tenantId: view.status.relationship.tenantId,
     };
   }
@@ -152,6 +158,8 @@ export function createCommitmentService(dependencies: {
     relationshipId: string,
     eventType: string,
     commitmentId: string,
+    /** relationship-state.v2 reads a confirmed INVESTED commitment. */
+    level?: "SOFT" | "FIRM" | "INVESTED",
   ): Promise<void> {
     await appender.append(tx, {
       relationshipId: RelationshipIdSchema.parse(relationshipId),
@@ -160,7 +168,7 @@ export function createCommitmentService(dependencies: {
       source: { type: "MANUAL", id: commitmentId },
       // Both sides are parties to a commitment between them.
       visibilityScope: "relationship_shared",
-      payload: { commitmentId },
+      payload: level === undefined ? { commitmentId } : { commitmentId, level },
       correlationId: dependencies.newCorrelationId(),
     });
   }
@@ -411,6 +419,7 @@ export function createCommitmentService(dependencies: {
             row.relationship_id,
             RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED,
             commitmentId,
+            row.level,
           );
         }
       });
@@ -447,6 +456,7 @@ export function createCommitmentService(dependencies: {
             row.relationship_id,
             RELATIONSHIP_EVENT_COMMITMENT_WITHDRAWN,
             commitmentId,
+            row.level,
           );
         }
       });
@@ -505,7 +515,7 @@ export function createCommitmentService(dependencies: {
       const committed = new Set(rows.map((row) => row.relationship_id));
       const pipeline = listing.filter(
         (item) =>
-          item.projection.state === "CONNECTED" &&
+          isActiveMatchState(item.projection.state) &&
           !committed.has(item.relationship.id),
       ).length;
 

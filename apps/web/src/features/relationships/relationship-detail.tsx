@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type {
-  ChatThreadDto,
-  RelationshipStatusDto,
+import {
+  isActiveMatchState,
+  isMatchedRelationshipState,
+  type ChatThreadDto,
+  type RelationshipStatusDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
@@ -27,6 +29,7 @@ import type { CounterpartProfile } from "./relationship-page-data";
 import { StatusPill } from "./status-pill";
 import { RelationshipCommitment } from "./relationship-commitment";
 import { RelationshipErrands } from "./relationship-errands";
+import { RelationshipOutcome } from "./relationship-outcome";
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
   NEXT_STEP_WORDS,
@@ -76,7 +79,9 @@ export function RelationshipDetail({
   /** The counterpart's pitch, when this side may play it. */
   readonly media?: ReactNode;
 }) {
-  const connected = relationship?.state === "CONNECTED";
+  // The match outlives CONNECTED (relationship-state.v2).
+  const connected =
+    relationship !== null && isMatchedRelationshipState(relationship.state);
   const messageCount = thread?.messages.length ?? 0;
   return (
     <PageContainer className="flex flex-col gap-6">
@@ -173,6 +178,12 @@ export function RelationshipDetail({
                       focus="reminder"
                     />
                   </ScheduleDialog>
+                  <RelationshipOutcome
+                    relationshipId={relationship.relationshipId}
+                    state={relationship.state}
+                    side={side}
+                    counterpart={counterpart}
+                  />
                 </>
               )}
             </div>
@@ -254,7 +265,8 @@ export function RelationshipHero({
         <div className="flex flex-col items-start gap-1 sm:items-end">
           <StatusPill
             tone={
-              relationship.state === "CONNECTED"
+              isActiveMatchState(relationship.state) ||
+              relationship.state === "INVESTED"
                 ? "positive"
                 : relationship.state === "INTEREST_EXPRESSED"
                   ? "waiting"

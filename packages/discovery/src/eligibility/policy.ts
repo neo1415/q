@@ -1,3 +1,5 @@
+import { reapproachAfterPass } from "@capital-q/network";
+
 import {
   ELIGIBILITY_CRITERIA,
   ELIGIBILITY_POLICY_VERSION,
@@ -69,12 +71,19 @@ const GEOGRAPHY_DIMENSION = "geography.country";
 
 /**
  * Relationship states the Network context defines as removing the pair
- * from standard discovery. Empty so far: the projector (CQ-NET-012) has
- * defined only DISCOVERED so far, and nothing is inferred from Pass,
- * silence or disinterest. When Network defines an intentionally closed or
- * blocked state, it is added here and the policy version is bumped.
+ * from standard discovery. Nothing is inferred from Discover's Pass,
+ * silence or disinterest.
+ *
+ * PASSED (relationship-state.v2, 2026-10-02): the investor decided after
+ * engaging not to proceed. It is closed until a material change reopens
+ * it (founder decision (b), doc 19 §67; reapproachAfterPass). No policy
+ * version bump: no relationship could be PASSED before v2, so no earlier
+ * evaluation reads differently; before it, every state past DISCOVERED was
+ * already UNKNOWN and so never rankable.
  */
-export const RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY: readonly string[] = [];
+export const RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY: readonly string[] = [
+  "PASSED",
+];
 
 /** Relationship states this policy understands as open. */
 const RELATIONSHIP_STATES_OPEN: readonly string[] = ["DISCOVERED"];
@@ -241,8 +250,23 @@ function otherHardCriterion(
 
 function relationshipCriterion(
   standing: RelationshipStanding,
+  mandate: ActiveMandateLookup,
 ): CriterionResult {
   if (standing.kind === "NONE") return result("RELATIONSHIP_STANDING", "PASS");
+  if (standing.currentState === "PASSED" && standing.pass !== undefined) {
+    const reopened = reapproachAfterPass(standing.pass.standing, {
+      mandate:
+        mandate.kind === "FOUND" && mandate.mandate.status === "ACTIVE"
+          ? {
+              mandateId: mandate.mandate.mandateId,
+              version: mandate.mandate.version,
+            }
+          : null,
+      latestPitchReadyAt: standing.pass.latestPitchReadyAt,
+      latestCapitalObjectiveAt: standing.pass.latestCapitalObjectiveAt,
+    });
+    if (reopened !== null) return result("RELATIONSHIP_STANDING", "PASS");
+  }
   if (RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY.includes(standing.currentState)) {
     return result("RELATIONSHIP_STANDING", "FAIL", "RELATIONSHIP_CLOSED");
   }
@@ -459,7 +483,7 @@ export function evaluateHardEligibility(
   // of it. No canonical field says what ticket a company seeks, so no rule
   // is invented.
   put(result("CHEQUE_COMPATIBILITY", "NOT_APPLICABLE"));
-  put(relationshipCriterion(input.relationship));
+  put(relationshipCriterion(input.relationship, mandate));
 
   const criteria = ELIGIBILITY_CRITERIA.map((criterion) => {
     const found = byCriterion.get(criterion);

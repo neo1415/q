@@ -290,6 +290,14 @@ export {
   withdrawCommitment,
 } from "./commitments.js";
 export {
+  getRelationshipPass,
+  listPassReasons,
+  passRelationship,
+  pauseRelationship,
+  recordMeetingOutcome,
+  resumeRelationship,
+} from "./outcomes.js";
+export {
   applicationTurn,
   createGateway,
   draftGatewayVersion,

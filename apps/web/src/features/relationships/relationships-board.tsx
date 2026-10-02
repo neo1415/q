@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import type { RelationshipSummaryDto } from "@capital-q/contracts";
+import {
+  isActiveMatchState,
+  isMatchedRelationshipState,
+  type RelationshipSummaryDto,
+} from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import {
   ArrowUpRight,
@@ -39,7 +43,18 @@ import {
  */
 
 type Filter =
-  "ALL" | "AWAITING" | "CONNECTED" | "FOLLOW_UP" | "DISCOVERED" | "DECLINED";
+  | "ALL"
+  | "AWAITING"
+  | "CONNECTED"
+  | "FOLLOW_UP"
+  | "DISCOVERED"
+  | "DECLINED"
+  // relationship-state.v2 (2026-10-02): where a match went after a call.
+  | "MEETING_HELD"
+  | "IN_DILIGENCE"
+  | "PAUSED"
+  | "PASSED"
+  | "INVESTED";
 type Sort = "RECENT" | "NAME";
 
 const FILTER_WORDS: Readonly<Record<Filter, string>> = {
@@ -49,6 +64,11 @@ const FILTER_WORDS: Readonly<Record<Filter, string>> = {
   FOLLOW_UP: "Follow-up due",
   DISCOVERED: "Discovered",
   DECLINED: "Not taken forward",
+  MEETING_HELD: STATE_WORDS.MEETING_HELD,
+  IN_DILIGENCE: STATE_WORDS.IN_DILIGENCE,
+  PAUSED: STATE_WORDS.PAUSED,
+  PASSED: STATE_WORDS.PASSED,
+  INVESTED: STATE_WORDS.INVESTED,
 };
 
 function matches(
@@ -68,7 +88,12 @@ function matches(
     case "DISCOVERED":
       return item.state === "DISCOVERED";
     case "DECLINED":
-      return item.state === "DECLINED";
+    case "MEETING_HELD":
+    case "IN_DILIGENCE":
+    case "PAUSED":
+    case "PASSED":
+    case "INVESTED":
+      return item.state === filter;
   }
 }
 
@@ -88,7 +113,11 @@ function statusTone(
   digest: RelationshipDigest | undefined,
 ): StatusTone {
   if (digest?.followUpDue === true) return "attention";
-  if (item.state === "CONNECTED") return "positive";
+  // A live or completed match reads positive; a pause or a pass is
+  // neutral, never an alarm (Pass is neutral, not red).
+  if (isActiveMatchState(item.state) || item.state === "INVESTED") {
+    return "positive";
+  }
   if (item.state === "INTEREST_EXPRESSED") return "waiting";
   return "neutral";
 }
@@ -259,7 +288,8 @@ function RelationshipCard({
   const { askAbout } = useGlobalQ();
   const href = relationshipHref(item);
   const name = item.counterpart.name;
-  const connected = item.state === "CONNECTED";
+  // The match outlives CONNECTED: the thread and calls stay open after it.
+  const connected = isMatchedRelationshipState(item.state);
   const messages = digest?.messages ?? null;
   const last = messages?.last ?? null;
   const ask = () =>

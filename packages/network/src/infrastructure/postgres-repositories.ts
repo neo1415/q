@@ -23,6 +23,7 @@ import type {
   RelationshipEventRepository,
   RelationshipRepository,
 } from "../application/ports.js";
+import type { PassStanding } from "../domain/reapproach.js";
 
 /**
  * PostgreSQL adapters for the Network ports. Parameterised SQL only; the
@@ -162,7 +163,11 @@ export function createPostgresRelationshipRepository(): RelationshipRepository {
       const rows = await executor`
         select r.id from network.relationships r
          where (${page.after}::uuid is null or r.id > ${page.after}::uuid)
-           and (not ${page.onlyBehind} or r.projected_sequence < r.last_event_sequence)
+           and (not ${page.onlyBehind}
+                or r.projected_sequence < r.last_event_sequence
+                or (${page.version ?? null}::text is not null
+                    and r.projected_sequence > 0
+                    and r.projector_version <> ${page.version ?? null}::text))
          order by r.id
          limit ${page.limit}`;
       return rows.map((row) => RelationshipIdSchema.parse(row["id"]));
@@ -248,5 +253,34 @@ export function createPostgresRelationshipEventRepository(): RelationshipEventRe
          limit ${page.limit}`;
       return rows.map(toEvent);
     },
+  };
+}
+
+/**
+ * The latest pass on a relationship, for the re-approach rule (doc 19 §67):
+ * when, and under which mandate. Never the reason or the note.
+ */
+export function createPostgresPassStandingReader(sql: DatabaseExecutor) {
+  return async (relationshipId: string): Promise<PassStanding | null> => {
+    const rows = await sql<
+      {
+        created_at: Date;
+        mandate_id: string | null;
+        mandate_version: number | null;
+      }[]
+    >`
+      select created_at, mandate_id, mandate_version
+        from network.relationship_passes
+       where relationship_id = ${relationshipId}
+       order by created_at desc
+       limit 1`;
+    const row = rows[0];
+    return row === undefined
+      ? null
+      : {
+          passedAt: row.created_at.toISOString(),
+          mandateId: row.mandate_id,
+          mandateVersion: row.mandate_version,
+        };
   };
 }

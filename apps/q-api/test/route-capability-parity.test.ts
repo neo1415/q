@@ -380,6 +380,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/network-interests.ts GET NETWORK_COMPANY_RELATIONSHIPS_PATH": cap(
     "navigate.RELATIONSHIPS",
   ),
+  // Post-meeting outcomes (2026-10-02): the Pass dialog's reason list is
+  // reference data; the current pass is read on the relationship page.
+  "api/http/network-interests.ts GET NETWORK_PASS_REASONS_PATH": REFERENCE,
+  "api/http/network-interests.ts GET NETWORK_RELATIONSHIP_PASS_PATH": cap(
+    "navigate.RELATIONSHIPS",
+  ),
   "api/http/network-interests.ts GET NETWORK_COMPANY_INCOMING_INTEREST_PATH":
     cap("tool.list_incoming_interest"),
   // ADR 0023: founders' Connection Requests and the investor's inbox. The

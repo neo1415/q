@@ -182,6 +182,8 @@ export const NotificationKindSchema = z.enum([
   "CONNECTION_REQUESTED",
   "Q_MESSAGE",
   "TIME_PROPOSED",
+  // 2026-10-02: a pass, pause or resume, told to the other side.
+  "RELATIONSHIP_OUTCOME",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

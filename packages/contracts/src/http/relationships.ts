@@ -33,6 +33,68 @@ export const RELATIONSHIP_CURRENT_STATES = [
 ] as const;
 export const RelationshipStateV1Schema = z.enum(RELATIONSHIP_CURRENT_STATES);
 export type RelationshipStateV1 = z.infer<typeof RelationshipStateV1Schema>;
+
+/**
+ * relationship-state.v2 (founder request 2026-10-02: the journey no longer
+ * stops at "meeting held"). Append-only: every v1 state keeps its meaning
+ * and v1 projections stay readable; v2 adds what happens after a meeting.
+ *
+ *   CONNECTED --meeting_held--> MEETING_HELD
+ *   CONNECTED | MEETING_HELD --diligence_started--> IN_DILIGENCE
+ *   any match state --relationship_paused--> PAUSED --relationship_resumed--> back
+ *   any match state --relationship_passed--> PASSED --relationship_resumed--> back
+ *   any match state --commitment_confirmed (INVESTED)--> INVESTED
+ */
+export const RELATIONSHIP_STATES_V2 = [
+  ...RELATIONSHIP_CURRENT_STATES,
+  "MEETING_HELD",
+  "IN_DILIGENCE",
+  "PAUSED",
+  "PASSED",
+  "INVESTED",
+] as const;
+export const RelationshipStateV2Schema = z.enum(RELATIONSHIP_STATES_V2);
+export type RelationshipStateV2 = z.infer<typeof RelationshipStateV2Schema>;
+
+/**
+ * The states in which the match (CONNECTED, doc 17 §85) is open: both sides
+ * agreed to connect, so the thread, meetings and commitments belong to it.
+ * A pass or a pause does not unmake the match; it changes what is next.
+ */
+export const RELATIONSHIP_MATCHED_STATES: readonly RelationshipStateV2[] = [
+  "CONNECTED",
+  "MEETING_HELD",
+  "IN_DILIGENCE",
+  "PAUSED",
+  "PASSED",
+  "INVESTED",
+];
+export function isMatchedRelationshipState(state: string): boolean {
+  return (RELATIONSHIP_MATCHED_STATES as readonly string[]).includes(state);
+}
+
+/**
+ * The match is open AND moving: the active pipeline (6.6.15) and the states
+ * in which a meeting, diligence or a commitment can still be taken forward.
+ * Not PAUSED, PASSED or INVESTED.
+ */
+export const RELATIONSHIP_ACTIVE_MATCH_STATES: readonly RelationshipStateV2[] =
+  ["CONNECTED", "MEETING_HELD", "IN_DILIGENCE"];
+export function isActiveMatchState(state: string): boolean {
+  return (RELATIONSHIP_ACTIVE_MATCH_STATES as readonly string[]).includes(
+    state,
+  );
+}
+
+/**
+ * Why an investor passed after engagement (Product Specification 6.6.10).
+ * The codes are reference data (network.relationship_pass_reasons); this is
+ * only the shape a code must have. The database decides which exist.
+ */
+export const RelationshipPassReasonCodeSchema = z
+  .string()
+  .regex(/^[A-Z][A-Z_]{1,31}$/);
+
 export const RelationshipCurrentStateSchema = z
   .string()
   .regex(/^[A-Z][A-Z_]{0,31}$/);
@@ -230,7 +292,7 @@ export const NETWORK_INVESTOR_RELATIONSHIP_PATH =
 /** What happened, in order: one entry per state the relationship reached. */
 export const RelationshipMilestoneDtoSchema = z
   .object({
-    state: RelationshipStateV1Schema,
+    state: RelationshipStateV2Schema,
     at: UtcTimestampSchema,
   })
   .strict();
@@ -246,6 +308,11 @@ export const RELATIONSHIP_NEXT_STEPS = [
   "ANSWER_INTEREST",
   "SCHEDULE_MEETING",
   "NONE",
+  // relationship-state.v2: after a meeting the investor decides (diligence,
+  // pass, pause) and the founder follows up; a pause is resumed.
+  "DECIDE_NEXT_STEP",
+  "FOLLOW_UP",
+  "RESUME",
 ] as const;
 
 export const RelationshipStatusDtoSchema = z
@@ -254,7 +321,7 @@ export const RelationshipStatusDtoSchema = z
     companyId: UuidSchema,
     investorOrganisationId: UuidSchema,
     /** Where are we. */
-    state: RelationshipStateV1Schema,
+    state: RelationshipStateV2Schema,
     stateSince: UtcTimestampSchema,
     /** What happened. */
     milestones: z.array(RelationshipMilestoneDtoSchema).max(64),
@@ -290,7 +357,7 @@ export const RelationshipSummaryDtoSchema = z
         name: z.string().min(1).max(200),
       })
       .strict(),
-    state: RelationshipStateV1Schema,
+    state: RelationshipStateV2Schema,
     stateSince: UtcTimestampSchema,
     nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),
   })
@@ -487,3 +554,108 @@ export const ConnectionRequestAnswerDtoSchema = z
 export type ConnectionRequestAnswerDto = z.infer<
   typeof ConnectionRequestAnswerDtoSchema
 >;
+
+/**
+ * Post-meeting outcomes (founder request 2026-10-02; Product Specification
+ * 6.6.10-6.6.14). The investor's Pass, Pause and Resume on a matched
+ * relationship, and either side's confirmed meeting outcome, each a verb in
+ * its own path (no generic action route). Server-confirmed and idempotent.
+ */
+export const NETWORK_RELATIONSHIP_PASS_PATH =
+  "/v1/network/relationships/:relationshipId/pass" as const;
+export const NETWORK_RELATIONSHIP_PAUSE_PATH =
+  "/v1/network/relationships/:relationshipId/pause" as const;
+export const NETWORK_RELATIONSHIP_RESUME_PATH =
+  "/v1/network/relationships/:relationshipId/resume" as const;
+export const NETWORK_RELATIONSHIP_MEETING_OUTCOME_PATH =
+  "/v1/network/relationships/:relationshipId/meeting-outcome" as const;
+/** The reason categories an investor may give (reference data, 6.6.10). */
+export const NETWORK_PASS_REASONS_PATH = "/v1/network/pass-reasons" as const;
+
+/**
+ * Founder decision (a): the reason is the investor's private note and a
+ * learning signal; it reaches the founder only when shareWithFounder.
+ */
+export const PassRelationshipRequestSchema = z
+  .object({
+    reasonCode: RelationshipPassReasonCodeSchema.nullable().optional(),
+    note: z.string().trim().min(1).max(1000).nullable().optional(),
+    shareWithFounder: z.boolean().default(false),
+  })
+  .strict();
+export type PassRelationshipRequest = z.infer<
+  typeof PassRelationshipRequestSchema
+>;
+
+/** What a meeting led to, as the person confirmed it (PADL #130). */
+export const MEETING_OUTCOMES = [
+  "DILIGENCE",
+  "FOLLOW_UP_MEETING",
+  "MATERIALS_REQUESTED",
+  "INTRODUCTIONS",
+  "OTHER",
+] as const;
+export const RecordMeetingOutcomeRequestSchema = z
+  .object({
+    outcome: z.enum(MEETING_OUTCOMES),
+    meetingId: UuidSchema.optional(),
+  })
+  .strict();
+export type RecordMeetingOutcomeRequest = z.infer<
+  typeof RecordMeetingOutcomeRequestSchema
+>;
+
+export const RelationshipOutcomeResultDtoSchema = z
+  .object({
+    relationshipId: UuidSchema,
+    /** True when it was already the case: nothing new was recorded. */
+    deduplicated: z.boolean(),
+  })
+  .strict();
+export type RelationshipOutcomeResultDto = z.infer<
+  typeof RelationshipOutcomeResultDtoSchema
+>;
+
+export const PassReasonListDtoSchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            code: RelationshipPassReasonCodeSchema,
+            label: z.string().min(1).max(60),
+          })
+          .strict(),
+      )
+      .max(64),
+  })
+  .strict();
+export type PassReasonListDto = z.infer<typeof PassReasonListDtoSchema>;
+
+/**
+ * `GET /v1/network/relationships/:relationshipId/pass`: the current pass as
+ * the asking side may see it. The investor side sees its own reason and
+ * note; the company side sees one only when it was shared, and `null`
+ * otherwise -- it learns that the investor passed from the state alone.
+ */
+export const RelationshipPassDtoSchema = z
+  .object({
+    passedAt: UtcTimestampSchema,
+    reasonCode: RelationshipPassReasonCodeSchema.nullable(),
+    reasonLabel: z.string().max(60).nullable(),
+    note: z.string().max(1000).nullable(),
+    sharedWithFounder: z.boolean(),
+  })
+  .strict();
+export const RelationshipPassResponseDtoSchema = z
+  .object({ pass: RelationshipPassDtoSchema.nullable() })
+  .strict();
+export type RelationshipPassResponseDto = z.infer<
+  typeof RelationshipPassResponseDtoSchema
+>;
+
+/** One relationship's outcome path, filled. The verb names the action. */
+export const networkRelationshipOutcomePath = (
+  relationshipId: string,
+  verb: "pass" | "pause" | "resume" | "meeting-outcome",
+) => `/v1/network/relationships/${encodeURIComponent(relationshipId)}/${verb}`;

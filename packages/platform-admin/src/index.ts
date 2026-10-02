@@ -130,8 +130,10 @@ function createLedger(sql: DatabaseExecutor) {
           (select count(*)::int from core.companies) as companies,
           (select count(*)::int from core.investor_organisations) as investors,
           (select count(*)::int from network.relationships) as relationships,
+          -- Every match, wherever it went after connecting (relationship-state.v2).
           (select count(*)::int from network.relationships
-            where current_state = 'CONNECTED') as connected,
+            where current_state in ('CONNECTED', 'MEETING_HELD', 'IN_DILIGENCE',
+                                    'PAUSED', 'PASSED', 'INVESTED')) as connected,
           (select count(*)::int from network.relationship_events
             where event_type = 'meeting_held') as held,
           (select count(*)::int from network.relationship_events

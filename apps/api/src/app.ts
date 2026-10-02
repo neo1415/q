@@ -217,6 +217,8 @@ export type ApiModules = {
   // end ADMIN-3 block
   readonly results?: ResultsRoutesDependencies["results"] | undefined;
   // end ADMIN block
+  /** Post-meeting outcomes (2026-10-02). Absent: those routes do not register. */
+  readonly outcomes?: NetworkInterestRoutesDependencies["outcomes"] | undefined;
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
     CommitmentRoutesDependencies["commitments"] | undefined;
@@ -447,6 +449,7 @@ export function createApp(
       ...(modules.connections === undefined
         ? {}
         : { connections: modules.connections }),
+      ...(modules.outcomes === undefined ? {} : { outcomes: modules.outcomes }),
       ...(modules.chat === undefined ? {} : { chat: modules.chat }),
       ...(modules.schedule === undefined ? {} : { schedule: modules.schedule }),
       ...(modules.media === undefined ? {} : { pitchUploads: modules.media }),
@@ -525,6 +528,7 @@ export function createApp(
       resolver: security.resolver,
       interests: modules.interests,
       connections: modules.connections,
+      outcomes: modules.outcomes,
     });
   }
 

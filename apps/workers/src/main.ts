@@ -20,7 +20,10 @@ import { randomUUID } from "node:crypto";
 
 import { z } from "zod";
 
-import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
+import {
+  createPostgresCapitalObjectiveQueryPort,
+  createPostgresCapitalObjectiveTimes,
+} from "@capital-q/capital";
 import {
   createCompanyService,
   createPostgresCompanyQueryPort,
@@ -58,6 +61,7 @@ import {
   RECOMMENDATION_REFRESH_QUEUE,
   refreshDirectiveFor,
   RefreshRecommendationSlateJob,
+  createReapproachEvidence,
 } from "@capital-q/discovery";
 import { createOutboxWriter, DOMAIN_EVENTS_QUEUE } from "@capital-q/eventing";
 import {
@@ -133,6 +137,7 @@ import {
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
 import {
   createPostgresAutomatedModeration,
+  createPostgresDiscoverablePitchQueryPort,
   MediaAssetIdSchema,
 } from "@capital-q/media";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
@@ -155,6 +160,7 @@ import { withReadinessAfterVerification } from "./verification/readiness-handler
 import { withRelationshipProjection } from "./network/relationship-projection-handler.js";
 import { withQWorkWake } from "./network/q-work-wake-handler.js";
 import { withInterestNotices } from "./network/interest-notice-handler.js";
+import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
@@ -563,6 +569,17 @@ const recommendations = createRecommendationPipeline({
   sql: database.sql,
   transactions: database.transactions,
   disclosure,
+  // After a post-meeting pass, the company comes back only on a material
+  // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
+  reapproachEvidence: createReapproachEvidence({
+    pitchReadyAt: (companyIds) =>
+      createPostgresDiscoverablePitchQueryPort({
+        sql: database.sql,
+      }).latestReadyAt?.(companyIds) ?? Promise.resolve(new Map()),
+    capitalObjectiveAt: createPostgresCapitalObjectiveTimes({
+      sql: database.sql,
+    }).latestCreatedAt,
+  }),
   embedder: createEmbeddingService({
     provider: createLocalTeiEmbeddingProvider({
       baseUrl: embeddingConfig.baseUrl,
@@ -727,50 +744,59 @@ const documentEvents = createQueueRunner({
     // AUTO block (founder direction 2026-10-01): acceptance wakes Q's
     // waiting work at once, after the state above is projected.
     withQWorkWake(
-      withInterestNotices(
-        withReadinessAfterVerification(
-          withVerificationDecisions(
-            createDomainEventHandler({
-              registry,
-              queues,
-              pipelineVersion: config.documents.pipelineVersion,
-              mediaModeration: {
-                onReady: (event) => {
-                  // The message names the asset; the decision re-reads it. An id that
-                  // is not one is archived by the handler's own outcome, not thrown.
-                  const mediaAssetId = MediaAssetIdSchema.safeParse(
-                    event.mediaAssetId,
-                  );
-                  if (!mediaAssetId.success) {
-                    return Promise.resolve({ kind: "SKIPPED" });
-                  }
-                  return mediaModeration({
-                    tenantId: event.tenantId,
-                    mediaAssetId: mediaAssetId.data,
-                    correlationId: CorrelationIdSchema.parse(
-                      event.correlationId ?? `cor_${randomUUID()}`,
-                    ),
-                  });
+      withOutcomeNotices(
+        withInterestNotices(
+          withReadinessAfterVerification(
+            withVerificationDecisions(
+              createDomainEventHandler({
+                registry,
+                queues,
+                pipelineVersion: config.documents.pipelineVersion,
+                mediaModeration: {
+                  onReady: (event) => {
+                    // The message names the asset; the decision re-reads it. An id that
+                    // is not one is archived by the handler's own outcome, not thrown.
+                    const mediaAssetId = MediaAssetIdSchema.safeParse(
+                      event.mediaAssetId,
+                    );
+                    if (!mediaAssetId.success) {
+                      return Promise.resolve({ kind: "SKIPPED" });
+                    }
+                    return mediaModeration({
+                      tenantId: event.tenantId,
+                      mediaAssetId: mediaAssetId.data,
+                      correlationId: CorrelationIdSchema.parse(
+                        event.correlationId ?? `cor_${randomUUID()}`,
+                      ),
+                    });
+                  },
                 },
-              },
-              ...(founderReview === undefined ? {} : { founderReview }),
-              ...(mandateReview === undefined ? {} : { mandateReview }),
-              ...(presenceResearch === undefined ? {} : { presenceResearch }),
-              recommendations: {
-                onEvent: (event) =>
-                  slateInvalidation.apply(refreshDirectiveFor(event), {
-                    correlationId: event.correlationId,
-                    causationId: `cau_${event.id}`,
-                  }),
-              },
+                ...(founderReview === undefined ? {} : { founderReview }),
+                ...(mandateReview === undefined ? {} : { mandateReview }),
+                ...(presenceResearch === undefined ? {} : { presenceResearch }),
+                recommendations: {
+                  onEvent: (event) =>
+                    slateInvalidation.apply(refreshDirectiveFor(event), {
+                      correlationId: event.correlationId,
+                      causationId: `cau_${event.id}`,
+                    }),
+                },
+                logger,
+              }),
+              { registry, decide: verificationDecider, logger },
+            ),
+            {
+              registry,
+              ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
+              reconcile:
+                readinessCompanies.reconcileMarketplaceReadinessAsSystem,
               logger,
-            }),
-            { registry, decide: verificationDecider, logger },
+            },
           ),
           {
             registry,
-            ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
-            reconcile: readinessCompanies.reconcileMarketplaceReadinessAsSystem,
+            sql: database.sql,
+            notices: createCounterpartNotices(database.sql),
             logger,
           },
         ),

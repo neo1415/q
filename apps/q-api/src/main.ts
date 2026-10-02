@@ -32,6 +32,7 @@ import {
   CapitalObjectiveNotFoundError,
   createCapitalService,
   createPostgresCapitalObjectiveQueryPort,
+  createPostgresCapitalObjectiveTimes,
 } from "@capital-q/capital";
 import {
   CompanyIdSchema,
@@ -43,6 +44,7 @@ import {
   createCompanyMediaOwnerResolver,
   createMediaOwnerResolverRegistry,
   createMediaService,
+  createPostgresDiscoverablePitchQueryPort,
   cuesAround,
   MediaAssetIdSchema,
 } from "@capital-q/media";
@@ -170,6 +172,7 @@ import {
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
   createCommitmentService,
+  createRelationshipOutcomeService,
   createConnectionService,
   createInterestService,
   type InterestServiceOptions,
@@ -342,6 +345,7 @@ import {
   createPostgresDiscoveryRepository,
   createPostgresInvestorDecisionReader,
   createRecommendationExplanationService,
+  createReapproachEvidence,
   createSlateReadPipeline,
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
@@ -886,6 +890,17 @@ const recommendationVolume = createEntitlementService({ sql: database.sql });
 const slateRead = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
+  // After a post-meeting pass, the company comes back only on a material
+  // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
+  reapproachEvidence: createReapproachEvidence({
+    pitchReadyAt: (companyIds) =>
+      createPostgresDiscoverablePitchQueryPort({
+        sql: database.sql,
+      }).latestReadyAt?.(companyIds) ?? Promise.resolve(new Map()),
+    capitalObjectiveAt: createPostgresCapitalObjectiveTimes({
+      sql: database.sql,
+    }).latestCreatedAt,
+  }),
   // A plan value is configuration, not a gate: if it cannot be read the
   // feed serves the whole slate rather than failing.
   volume: (actor) =>
@@ -1020,6 +1035,35 @@ const interestServiceOptions: InterestServiceOptions = {
   },
 };
 const interestService = createInterestService(interestServiceOptions);
+/**
+ * Post-meeting outcomes (2026-10-02): Q's generated pass, pause, resume
+ * and meeting-outcome tools run through the same Network service as the
+ * relationship page's buttons, after the person's approval.
+ */
+const outcomeService = createRelationshipOutcomeService({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests: interestService,
+  appender: createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  }),
+  outbox: interestServiceOptions.outbox,
+  activeMandate: async (actor, investorOrganisationId) => {
+    const found = await slateRead.eligibilityPorts.mandates.activeMandate({
+      tenantId: actor.tenantId,
+      investorOrganisationId,
+      mandateId: null,
+    });
+    return found.kind === "FOUND"
+      ? { mandateId: found.mandate.mandateId, version: found.mandate.version }
+      : null;
+  },
+  newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+});
 // An investor's own inbox of founders' Connection Requests (live
 // 2026-10-02): listed and answered through the Network context's own
 // commands. Q never requests a connection, so the founder-side ports
@@ -1364,6 +1408,7 @@ const investorFeed = createInvestorFeedPort({
 });
 const appActionPorts: OwnReadPorts = {
   media: pitchMedia,
+  outcomes: outcomeService,
   interactions: createInteractionSignalService({
     ports: slateRead.eligibilityPorts,
     eligibility: slateRead.eligibility,

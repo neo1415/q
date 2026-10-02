@@ -1,3 +1,4 @@
+import { isMatchedRelationshipState } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { InterestService } from "@capital-q/network";
 import type { ActorContext } from "@capital-q/security";
@@ -42,7 +43,9 @@ export function createNetworkChatParties(
     if (view === null || view.status === null) return null;
     return {
       side: view.side,
-      connected: view.status.projection.state === "CONNECTED",
+      // The match outlives CONNECTED (relationship-state.v2): a thread
+      // stays open after a meeting, a pause or a pass.
+      connected: isMatchedRelationshipState(view.status.projection.state),
     };
   };
 }

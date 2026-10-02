@@ -97,6 +97,7 @@ export {
   createPostgresCapitalObjectiveCreationRequestStore,
   createPostgresCapitalObjectiveHistoryWriter,
   createPostgresCapitalObjectiveQueryPort,
+  createPostgresCapitalObjectiveTimes,
   createPostgresCapitalObjectiveRepository,
 } from "./infrastructure/postgres-repositories.js";
 

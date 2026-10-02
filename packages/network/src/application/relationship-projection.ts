@@ -1,6 +1,7 @@
 import type { RelationshipEvent, RelationshipId } from "../contracts/index.js";
 import {
   projectRelationshipState,
+  RELATIONSHIP_PROJECTOR_VERSION,
   type RelationshipProjection,
 } from "../domain/state-projector.js";
 import type { NetworkServiceDependencies } from "./dependencies.js";
@@ -89,6 +90,7 @@ export function createRelationshipStateProjector(
           after,
           limit,
           onlyBehind: options.all !== true,
+          version: RELATIONSHIP_PROJECTOR_VERSION,
         });
         for (const id of ids) {
           const result = await project(id);

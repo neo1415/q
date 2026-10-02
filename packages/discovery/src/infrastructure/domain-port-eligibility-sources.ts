@@ -10,7 +10,10 @@ import {
   type InvestorMandateQueryPort,
   type InvestorOrganisationRepository,
 } from "@capital-q/investors";
-import type { RelationshipQueryPort } from "@capital-q/network";
+import {
+  RelationshipIdSchema,
+  type RelationshipQueryPort,
+} from "@capital-q/network";
 import {
   actorPrincipal,
   DISCLOSURE_BATCH_MAX,
@@ -28,6 +31,7 @@ import type {
   CompanyClassification,
   EligibilityPorts,
   MandateSnapshotForEligibility,
+  ReapproachEvidencePort,
   RelationshipStanding,
 } from "../eligibility/ports.js";
 
@@ -49,6 +53,11 @@ export type DomainEligibilityPortDependencies = {
   readonly mandates: InvestorMandateQueryPort;
   readonly investorOrganisations: InvestorOrganisationRepository;
   readonly relationships: RelationshipQueryPort;
+  /**
+   * The company's newest evidence of a material change, for re-approach
+   * after a pass (doc 19 §67). Absent: a passed relationship stays closed.
+   */
+  readonly reapproachEvidence?: ReapproachEvidencePort | undefined;
   readonly disclosure: DisclosureAccessService;
   readonly taxonomy?: TaxonomyQueryPort | undefined;
 };
@@ -65,6 +74,7 @@ export function createDomainEligibilityPorts(
     relationships,
     disclosure,
     taxonomy,
+    reapproachEvidence,
   } = dependencies;
 
   const toSnapshot = (
@@ -237,6 +247,7 @@ export function createDomainEligibilityPorts(
           investorOrganisationId,
         );
         const out = new Map<string, RelationshipStanding>();
+        const passed: { companyId: string; relationshipId: string }[] = [];
         await Promise.all(
           companyIds.map(async (companyId) => {
             const relationship = await relationships.findByParties(
@@ -249,8 +260,42 @@ export function createDomainEligibilityPorts(
                 ? { kind: "NONE" }
                 : { kind: "STATE", currentState: relationship.currentState },
             );
+            if (relationship?.currentState === "PASSED") {
+              passed.push({ companyId, relationshipId: relationship.id });
+            }
           }),
         );
+        // Re-approach after a pass (doc 19 §67): only for the few passed
+        // pairs, and only when both reads are composed.
+        const passStanding = relationships.passStanding;
+        if (
+          passed.length > 0 &&
+          passStanding !== undefined &&
+          reapproachEvidence !== undefined
+        ) {
+          const evidence = await reapproachEvidence.latest(
+            passed.map((p) => p.companyId),
+          );
+          await Promise.all(
+            passed.map(async ({ companyId, relationshipId }) => {
+              const standing = await passStanding(
+                RelationshipIdSchema.parse(relationshipId),
+              );
+              if (standing === null) return;
+              const latest = evidence.get(companyId);
+              out.set(companyId, {
+                kind: "STATE",
+                currentState: "PASSED",
+                pass: {
+                  standing,
+                  latestPitchReadyAt: latest?.latestPitchReadyAt ?? null,
+                  latestCapitalObjectiveAt:
+                    latest?.latestCapitalObjectiveAt ?? null,
+                },
+              });
+            }),
+          );
+        }
         return out;
       },
     },

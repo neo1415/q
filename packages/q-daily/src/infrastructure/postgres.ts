@@ -1,4 +1,5 @@
 import {
+  RELATIONSHIP_ACTIVE_MATCH_STATES,
   Q_DAILY_OPTIONAL_SECTIONS,
   QDailyEditionSchema,
   QDailyFrequencySchema,
@@ -186,7 +187,8 @@ export async function readInterestProfile(
         select io.display_name as name
           from network.relationships r
           join core.investor_organisations io on io.id = r.investor_organisation_id
-         where r.company_id = ${company.id} and r.current_state = 'CONNECTED'
+         where r.company_id = ${company.id}
+           and r.current_state = any(${[...RELATIONSHIP_ACTIVE_MATCH_STATES]}::text[])
          order by r.state_updated_at desc
          limit 5`
     ).map((row) => row.name);
@@ -295,7 +297,7 @@ export async function readInterestProfile(
         from network.relationships r
         join core.companies c on c.id = r.company_id
        where r.investor_organisation_id = ${investor.id}
-         and r.current_state = 'CONNECTED'
+         and r.current_state = any(${[...RELATIONSHIP_ACTIVE_MATCH_STATES]}::text[])
        order by r.state_updated_at desc
        limit 5`
   ).map((row) => row.name);

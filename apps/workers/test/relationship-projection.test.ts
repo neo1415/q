@@ -163,7 +163,7 @@ describe("relationship state projection consumer", () => {
     expect(h.cache).toEqual({
       state: "CONNECTED",
       sequence: 3,
-      version: "relationship-state.v1",
+      version: "relationship-state.v2",
     });
     // The first projection saw the whole history; later ones changed nothing.
     expect(h.writes).toEqual([3]);

@@ -27,6 +27,8 @@ import {
 import {
   InterestExpressedPayloadSchema,
   RELATIONSHIP_EVENT_INTEREST_EXPRESSED,
+  OutcomeActivityPayloadSchema,
+  RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED,
 } from "../domain/event-registry.js";
 import type { ExpressInterestDependencies } from "./express-interest.js";
 import { readHistory } from "./relationship-projection.js";
@@ -82,7 +84,12 @@ function viewOf(
     : {
         relationship,
         projection,
-        nextStep: nextStepFor(projection.state, party, lastExpresser(visible)),
+        nextStep: nextStepFor(
+          projection.state,
+          party,
+          lastExpresser(visible),
+          lastPauser(visible),
+        ),
       };
 }
 
@@ -100,6 +107,22 @@ function lastExpresser(
     return parsed.success && parsed.data.expressedByParty === "COMPANY"
       ? "COMPANY"
       : "INVESTOR";
+  }
+  return "INVESTOR";
+}
+
+/** Who paused most recently: only they are offered Resume. */
+function lastPauser(
+  history: readonly {
+    readonly eventType: string;
+    readonly payload?: unknown;
+  }[],
+): RelationshipParty {
+  for (let at = history.length - 1; at >= 0; at -= 1) {
+    const event = history[at];
+    if (event?.eventType !== RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED) continue;
+    const parsed = OutcomeActivityPayloadSchema.safeParse(event.payload);
+    return parsed.success ? parsed.data.side : "INVESTOR";
   }
   return "INVESTOR";
 }

@@ -114,12 +114,91 @@ export const RelationshipInterestDeclinedEvent = defineEvent({
     "The company has not taken an investor organisation's interest forward.",
 });
 
+/**
+ * A post-meeting outcome was recorded on a relationship (2026-10-02): a
+ * pass, a pause, a resume, diligence or progress. Identifiers and the
+ * outcome only -- never a pass's reason, which stays in the pass record
+ * for whoever may read it. Consumers re-project the state and tell the
+ * other side.
+ */
+export const RELATIONSHIP_OUTCOMES = [
+  "PASSED",
+  "PAUSED",
+  "RESUMED",
+  "DILIGENCE_STARTED",
+  "PROGRESSED",
+] as const;
+export type RelationshipOutcome = (typeof RELATIONSHIP_OUTCOMES)[number];
+
+export const RelationshipOutcomeRecordedEvent = defineEvent({
+  name: "network.relationship.outcome_recorded",
+  version: 1,
+  owner: NETWORK_EVENT_OWNER,
+  producer: NETWORK_EVENT_PRODUCER,
+  consumers: ["@capital-q/q", "@capital-q/recommendations"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      relationshipId: UuidSchema,
+      companyId: UuidSchema,
+      investorOrganisationId: UuidSchema,
+      outcome: z.enum(RELATIONSHIP_OUTCOMES),
+      side: z.enum(["INVESTOR", "COMPANY"]),
+      /** The pass record, for a consumer allowed to read it; never its reason. */
+      passId: UuidSchema.optional(),
+    })
+    .strict(),
+  description:
+    "A post-meeting outcome was recorded on a canonical relationship. Carries no reason and no note.",
+});
+
 export const NETWORK_EVENTS: readonly EventDefinition[] = [
   RelationshipCreatedEvent,
   RelationshipInterestExpressedEvent,
   RelationshipMatchedEvent,
   RelationshipInterestDeclinedEvent,
+  RelationshipOutcomeRecordedEvent,
 ];
+
+export function relationshipOutcomeRecordedEvent(input: {
+  readonly tenantId: string;
+  readonly organisationId: string | undefined;
+  readonly actorUserId: string;
+  readonly correlationId: CorrelationId;
+  readonly relationshipId: string;
+  readonly companyId: string;
+  readonly investorOrganisationId: string;
+  readonly outcome: RelationshipOutcome;
+  readonly side: "INVESTOR" | "COMPANY";
+  readonly passId?: string | undefined;
+}): CapitalQEvent<z.infer<typeof RelationshipOutcomeRecordedEvent.dataSchema>> {
+  return {
+    specVersion: "1.0",
+    id: EventIdSchema.parse(randomUUID()),
+    type: RelationshipOutcomeRecordedEvent.name,
+    source: RelationshipOutcomeRecordedEvent.producer,
+    time: UtcTimestampSchema.parse(new Date().toISOString()),
+    subject: `relationship/${input.relationshipId}`,
+    dataContentType: "application/json",
+    eventVersion: RelationshipOutcomeRecordedEvent.version,
+    tenantId: input.tenantId,
+    ...(input.organisationId === undefined
+      ? {}
+      : { organisationId: input.organisationId }),
+    actor: { type: "HUMAN", id: input.actorUserId },
+    correlationId: input.correlationId,
+    aggregate: { type: "relationship", id: input.relationshipId, version: 1 },
+    data: {
+      relationshipId: input.relationshipId,
+      companyId: input.companyId,
+      investorOrganisationId: input.investorOrganisationId,
+      outcome: input.outcome,
+      side: input.side,
+      ...(input.passId === undefined ? {} : { passId: input.passId }),
+    },
+  };
+}
 
 /** One of the company's answers, as its outbox announcement. */
 export function interestAnsweredEvent(input: {

@@ -13,7 +13,11 @@ import {
   NETWORK_INVESTOR_RELATIONSHIP_PATH,
   NETWORK_INVESTOR_RELATIONSHIPS_PATH,
   NETWORK_COMPANY_RELATIONSHIPS_PATH,
+  NETWORK_PASS_REASONS_PATH,
+  NETWORK_RELATIONSHIP_PASS_PATH,
+  PassReasonListDtoSchema,
   RelationshipListDtoSchema,
+  RelationshipPassResponseDtoSchema,
   RelationshipStatusResponseDtoSchema,
 } from "@capital-q/contracts";
 import {
@@ -25,6 +29,7 @@ import {
   toRelationshipSummaryDto,
   type ConnectionService,
   type InterestService,
+  type RelationshipOutcomeService,
 } from "@capital-q/network";
 
 import {
@@ -57,6 +62,11 @@ export type NetworkInterestRoutesDependencies = ActorContextDependencies & {
   readonly interests: InterestService;
   /** ADR 0023: founders' Connection Requests. Absent: none of those routes register. */
   readonly connections?: ConnectionService | undefined;
+  /**
+   * Post-meeting outcomes (2026-10-02): the reads behind the Pass dialog
+   * and the founder's notice. The commands are ADR 0040 app actions.
+   */
+  readonly outcomes?: RelationshipOutcomeService | undefined;
 };
 
 function investorIdOf(request: FastifyRequest): string {
@@ -125,6 +135,37 @@ export function registerNetworkInterestRoutes(
       });
     },
   );
+
+  // Post-meeting outcomes (2026-10-02): the reason categories, and the
+  // current pass as the asking side may see it (a founder: only when the
+  // investor shared the reason; otherwise null).
+  const outcomes = dependencies.outcomes;
+  if (outcomes !== undefined) {
+    app.get(
+      NETWORK_PASS_REASONS_PATH,
+      { onRequest: withContext },
+      async (_request, reply) => {
+        void reply.header("Cache-Control", "private, max-age=300");
+        return PassReasonListDtoSchema.parse({
+          items: await outcomes.passReasons(),
+        });
+      },
+    );
+    app.get(
+      NETWORK_RELATIONSHIP_PASS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const params = request.params as Record<string, unknown>;
+        const raw = params["relationshipId"];
+        const pass = await outcomes.latestPass({
+          actor: getActorContext(request),
+          relationshipId: typeof raw === "string" ? raw : "",
+        });
+        void reply.header("Cache-Control", "no-store");
+        return RelationshipPassResponseDtoSchema.parse({ pass });
+      },
+    );
+  }
 
   // Each side's own relationships (CQ-WEB-030), each row the per-party fold.
   app.get(

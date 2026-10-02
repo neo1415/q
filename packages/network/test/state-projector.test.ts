@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import type { DisclosureScope } from "@capital-q/contracts";
+import {
+  RelationshipStateV1Schema,
+  type DisclosureScope,
+} from "@capital-q/contracts";
 
 import {
   nextStepFor,
-  projectRelationshipState,
-  RELATIONSHIP_PROJECTOR_VERSION,
+  // These are relationship-state.v1's properties, held to v1's own fold so
+  // a v1 projection stays reproducible (v2 continuity: state-projector-v2).
+  projectRelationshipStateV1 as projectRelationshipState,
   RELATIONSHIP_STATE_TRANSITIONS,
   visibleToParty,
   type ProjectableEvent,
@@ -125,7 +129,8 @@ describe("relationship-state.v1 properties over 500 random histories", () => {
           legalTargets,
           `seed ${seed}: ${from} -> ${milestone.state}`,
         ).toContain(milestone.state);
-        from = milestone.state;
+        // v1's fold only ever reaches a v1 state.
+        from = RelationshipStateV1Schema.parse(milestone.state);
       }
       expect(projection.state, `seed ${seed}`).toBe(from);
       const connectedAt = projection.milestones.findIndex(
@@ -191,7 +196,7 @@ describe("relationship-state.v1 examples", () => {
       event(3, "connection_accepted"),
     ]);
     expect(projection).toEqual({
-      version: RELATIONSHIP_PROJECTOR_VERSION,
+      version: "relationship-state.v1",
       state: "CONNECTED",
       stateSince: at(3),
       throughSequence: 3,

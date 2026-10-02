@@ -11,7 +11,12 @@ import type { DatabaseExecutor } from "@capital-q/database";
  */
 
 export type CounterpartNoticeKind =
-  "INTEREST_RECEIVED" | "CONNECTION_REQUESTED" | "Q_MESSAGE" | "TIME_PROPOSED";
+  | "INTEREST_RECEIVED"
+  | "CONNECTION_REQUESTED"
+  | "Q_MESSAGE"
+  | "TIME_PROPOSED"
+  /** A pass, pause or resume on the relationship (2026-10-02). */
+  | "RELATIONSHIP_OUTCOME";
 
 export function createCounterpartNotices(sql: DatabaseExecutor) {
   return {
@@ -22,8 +27,8 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
       readonly kind: CounterpartNoticeKind;
       readonly title: string;
       readonly body: string | null;
-      /** Where they act: their inbox, or their chat with the actor. */
-      readonly target: "INBOX" | "CHAT";
+      /** Where they act: their inbox, their chat, or the relationship page. */
+      readonly target: "INBOX" | "CHAT" | "RELATIONSHIP";
       readonly key: string;
       readonly priority: "NEEDS_YOU" | "UPDATE";
     }): Promise<number> => {
@@ -35,6 +40,10 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
                case
                  when ${input.target} = 'INBOX' and ${input.actingSide} = 'INVESTOR' then '/company/interest'
                  when ${input.target} = 'INBOX' then '/investors'
+                 when ${input.target} = 'RELATIONSHIP' and ${input.actingSide} = 'INVESTOR'
+                   then '/relationships/investor/' || r.investor_organisation_id::text
+                 when ${input.target} = 'RELATIONSHIP'
+                   then '/relationships/company/' || r.company_id::text
                  when ${input.actingSide} = 'INVESTOR'
                    then '/relationships/investor/' || r.investor_organisation_id::text || '/messages'
                  else '/relationships/company/' || r.company_id::text || '/messages'

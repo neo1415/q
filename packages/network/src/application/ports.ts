@@ -20,6 +20,7 @@ import type {
   RelationshipEventId,
   RelationshipId,
 } from "../contracts/index.js";
+import type { PassStanding } from "../domain/reapproach.js";
 
 /**
  * Application-owned persistence ports. Specific to the relationship spine;
@@ -98,6 +99,11 @@ export type RelationshipRepository = {
       readonly after: RelationshipId | null;
       readonly limit: number;
       readonly onlyBehind: boolean;
+      /**
+       * The current projector version: a cache folded by another version
+       * is behind too, so a rebuild rolls a new version out from history.
+       */
+      readonly version?: string | undefined;
     },
   ) => Promise<readonly RelationshipId[]>;
 };
@@ -294,4 +300,12 @@ export type RelationshipQueryPort = {
   readonly getEventById: (
     relationshipEventId: RelationshipEventId,
   ) => Promise<RelationshipEvent | null>;
+  /**
+   * The current pass's time and the mandate it was made under (doc 19
+   * §67), for the re-approach rule; never its reason. Permission-neutral.
+   * Absent: a passed relationship stays closed to discovery.
+   */
+  readonly passStanding?:
+    | ((relationshipId: RelationshipId) => Promise<PassStanding | null>)
+    | undefined;
 };
