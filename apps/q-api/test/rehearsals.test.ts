@@ -26,6 +26,12 @@ import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
 import { createRehearsalAwareTurn } from "../src/voice/rehearsal-turn.js";
 import {
+  asksToEnd,
+  walkOutPlan,
+  WALK_OUT_LINE,
+  WARNING_OPENERS,
+} from "../src/composition/rehearsal-temperament.js";
+import {
   newPresenceState,
   presenceNote,
   presenceReview,
@@ -1353,5 +1359,83 @@ describe("a review is never an empty page (REHEARSE P0, 2026-10-01)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("walking out, with warning (founder live 2026-10-02)", () => {
+  const tough = async (service: ReturnType<typeof setup>["service"]) => {
+    const started = await service.start(actor(FOUNDER), {
+      kind: "INVESTOR_ORGANISATION",
+      id: INVESTOR,
+      difficulty: "TOUGH",
+    });
+    if (started.kind !== "OK") throw new Error(started.kind);
+    return started.rehearsal.id;
+  };
+
+  it("warns twice over two turns, then walks out with a goodbye", async () => {
+    const { service } = setup();
+    const id = await tough(service);
+    const lines: string[] = [];
+    let outcome: string | null = null;
+    for (const text of [
+      "You're useless.",
+      "Rubbish.",
+      "Idiot.",
+      "Fool.",
+      "Still here?",
+    ]) {
+      const said = await service.say(actor(FOUNDER), id, { text });
+      if (said.kind !== "OK") break;
+      lines.push(said.rehearsal.turns.at(-1)?.text ?? "");
+      outcome = said.rehearsal.outcome;
+      if (said.rehearsal.endedAt !== null) break;
+    }
+    const warnings = lines.filter(
+      (l) =>
+        l.startsWith(WARNING_OPENERS[1]) || l.startsWith(WARNING_OPENERS[2]),
+    );
+    expect(warnings.map((l) => l.slice(0, 12))).toEqual([
+      WARNING_OPENERS[1].slice(0, 12),
+      WARNING_OPENERS[2].slice(0, 12),
+    ]);
+    expect(lines.at(-1)).toBe(WALK_OUT_LINE);
+    expect(outcome).toBe("DECLINED");
+    // The goodbye came after both warnings, never before.
+    expect(lines.indexOf(WALK_OUT_LINE)).toBeGreaterThan(
+      lines.findIndex((l) => l.startsWith(WARNING_OPENERS[2])),
+    );
+  });
+
+  it("an early goodbye in anger is turned back into a warning", async () => {
+    const { service, closeNextTurn } = setup();
+    const id = await tough(service);
+    // The first rude line is warning one.
+    await service.say(actor(FOUNDER), id, { text: "You're useless." });
+    closeNextTurn();
+    const said = await service.say(actor(FOUNDER), id, { text: "Idiot." });
+    if (said.kind !== "OK") throw new Error(said.kind);
+    expect(said.rehearsal.endedAt).toBeNull();
+    expect(
+      said.rehearsal.turns
+        .at(-1)
+        ?.text.startsWith("I'm going to stop you there") ||
+        said.rehearsal.turns.at(-1)?.text.startsWith("Last chance"),
+    ).toBe(true);
+  });
+
+  it("when they ask to end it, the played person may leave at once", () => {
+    expect(asksToEnd("You know what? Please get lost.")).toBe(true);
+    expect(asksToEnd("Let's end the call here.")).toBe(true);
+    expect(asksToEnd("Tell me about your churn.")).toBe(false);
+    expect(
+      walkOutPlan({
+        register: "ANGRY",
+        warningsGiven: 0,
+        theyAskedToEnd: true,
+        closing: true,
+        provoked: true,
+      }),
+    ).toEqual({ warning: null, action: "KEEP" });
   });
 });

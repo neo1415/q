@@ -52,6 +52,7 @@ import {
   LOOK_QUALITY,
   LOOK_WIDTH,
   SEE_YOU_CONSENT,
+  readyToLeave,
   shouldLook,
 } from "./meet";
 import {
@@ -85,12 +86,6 @@ import {
 const FRAME_EVERY_MS = 6_000;
 const FRAME_MAX_WIDTH = 1280;
 const SIGNATURE_SIZE = { width: 32, height: 18 } as const;
-/**
- * After the other person's goodbye, a short beat, then they leave (founder
- * live test 2026-10-01: the angry ending must be a spoken goodbye, a
- * beat, then the leave sound).
- */
-const CLOSE_PAUSE_MS = 1_400;
 
 type Layout = "SPOTLIGHT" | "TILED";
 
@@ -395,12 +390,41 @@ export function RehearsalRoom({
     return () => window.cancelAnimationFrame(frame);
   }, [voice, micOn]);
 
-  // The other person closed the meeting: let them finish, then leave.
+  // The other person closed the meeting: their goodbye is heard to the
+  // end, then a beat, then they leave (never mid-sentence).
+  const lastSound = useRef(0);
+  const voiceNow = useRef(voice);
+  const lineLiveNow = useRef(lineLive);
+  const leaveNow = useRef(leave);
   useEffect(() => {
-    if (!ended || voice.state === "Q_SPEAKING") return;
-    const id = window.setTimeout(() => void leave("THEY_LEFT"), CLOSE_PAUSE_MS);
-    return () => window.clearTimeout(id);
-  }, [ended, voice.state, leave]);
+    voiceNow.current = voice;
+    lineLiveNow.current = lineLive;
+    leaveNow.current = leave;
+  });
+  useEffect(() => {
+    if (!ended) return;
+    const endedAt = Date.now();
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      const speaking =
+        voiceNow.current.state === "Q_SPEAKING" ||
+        voiceNow.current.outputLevel() > 0.01;
+      if (speaking) lastSound.current = now;
+      if (
+        readyToLeave({
+          nowMs: now,
+          endedAtMs: endedAt,
+          voiceLine: lineLiveNow.current,
+          lastSoundMs: lastSound.current,
+          speaking,
+        })
+      ) {
+        window.clearInterval(id);
+        void leaveNow.current("THEY_LEFT");
+      }
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [ended]);
 
   // Every track and timer stops with the room.
   useEffect(

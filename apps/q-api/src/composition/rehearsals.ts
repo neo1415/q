@@ -43,7 +43,12 @@ import {
   deliveryFor,
   initialTemperament,
   registerOf,
+  asksToEnd,
   stanceOf,
+  walkOutNote,
+  walkOutPlan,
+  WALK_OUT_LINE,
+  WARNING_OPENERS,
   temperamentNote,
   type Temperament,
 } from "./rehearsal-temperament.js";
@@ -230,6 +235,7 @@ const StoredTurnSchema = z.object({
       hurt: z.number(),
     })
     .optional(),
+  warning: z.number().int().min(1).max(2).optional(),
 });
 
 export type Turn = {
@@ -243,6 +249,8 @@ export type Turn = {
   readonly reaction?: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null | undefined;
   /** The played person's temperament after this line (code-tracked). */
   readonly state?: Temperament | undefined;
+  /** This line was the played person's first or last warning before walking out. */
+  readonly warning?: 1 | 2 | undefined;
 };
 
 export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
@@ -261,6 +269,9 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
       ...(turn.state === undefined ? {} : { state: turn.state }),
+      ...(turn.warning === 1 || turn.warning === 2
+        ? { warning: turn.warning }
+        : {}),
     };
   });
 }
@@ -1101,6 +1112,30 @@ export function yieldTo(previous: readonly Turn[]): {
   };
 }
 
+const warningOf = (answered: object): 1 | 2 | undefined => {
+  const value = (answered as { readonly warning?: unknown }).warning;
+  return value === 1 || value === 2 ? value : undefined;
+};
+
+/** Their latest line that gives new cause: a walk-out may follow. */
+const PROVOKED: ReadonlySet<string> = new Set(["RUDE", "REPEATED_DODGE"]);
+
+/**
+ * The line as a warning: opened with the warning's words; a goodbye the
+ * model wrote early is replaced by the warning itself.
+ */
+function warned(stage: 1 | 2, line: string, wasGoodbye: boolean): string {
+  const opener = WARNING_OPENERS[stage];
+  if (wasGoodbye) {
+    return stage === 1
+      ? `${opener} If we carry on like this, I'll end the meeting.`
+      : `${opener} Speak to me like that again and this meeting is over!`;
+  }
+  return line.toLowerCase().startsWith(opener.toLowerCase().slice(0, 12))
+    ? line
+    : `${opener} ${line}`;
+}
+
 /** Said in character when a turn could not be composed; never an error. */
 /** After a provisional review, Q tries the real one again at these delays. */
 export const REVIEW_RETRY_MS = [30_000, 2 * 60_000, 10 * 60_000] as const;
@@ -1566,6 +1601,7 @@ export function createRehearsalService(dependencies: {
     readonly result: RehearsalTurnResult;
     readonly sawScreen: boolean;
     readonly state: Temperament;
+    readonly warning?: 1 | 2;
   } | null> {
     const persona = personaOf(row.persona);
     if (persona === null) return null;
@@ -1603,6 +1639,9 @@ export function createRehearsalService(dependencies: {
       [...turns].reverse().find((turn) => turn.from === "THEM")?.state ??
       initialTemperament(row.difficulty, persona.temperament.baseline);
     const registerBefore = registerOf(before, row.difficulty);
+    const warningsGiven = turns.filter(
+      (turn) => turn.from === "THEM" && turn.warning !== undefined,
+    ).length;
     const variables = {
       viewerRole: row.userRole,
       viewerOrganisation: viewerOrganisation.slice(0, 200),
@@ -1615,7 +1654,9 @@ export function createRehearsalService(dependencies: {
       minutesElapsed: Math.max(0, Math.min(minutes, 600)),
       cue: wrapUp ? "WRAP_UP" : cue,
       difficulty: row.difficulty,
-      temperament: temperamentNote(before, registerBefore),
+      temperament:
+        temperamentNote(before, registerBefore) +
+        walkOutNote(warningsGiven, registerBefore),
       stance: stanceOf(
         counterpartRoleOf(row.counterpartKind),
         persona.forwardness ?? "TYPICAL",
@@ -1679,21 +1720,52 @@ export function createRehearsalService(dependencies: {
     // the register the voice delivers this line in.
     const after = applyAppraisal(before, result.appraisal, row.difficulty);
     const register = registerOf(after, row.difficulty);
+    // Two warnings over two turns before walking out, unless they asked
+    // to end it themselves (founder live 2026-10-02).
+    const lastYou = [...turns].reverse().find((turn) => turn.from === "YOU");
+    const plan = walkOutPlan({
+      register,
+      warningsGiven,
+      theyAskedToEnd: lastYou !== undefined && asksToEnd(lastYou.text),
+      closing: result.move === "CLOSE",
+      provoked: PROVOKED.has(result.appraisal),
+    });
+    const shaped: RehearsalTurnResult =
+      plan.action === "WARN"
+        ? {
+            ...result,
+            move: result.move === "CLOSE" ? "REMARK" : result.move,
+            conclusion: null,
+            line: warned(
+              plan.warning ?? 1,
+              result.line,
+              result.move === "CLOSE",
+            ),
+          }
+        : plan.action === "WALK_OUT"
+          ? {
+              ...result,
+              move: "CLOSE",
+              conclusion: "DECLINED",
+              line: result.move === "CLOSE" ? result.line : WALK_OUT_LINE,
+            }
+          : result;
     const delivery = deliveryFor(
       register,
       registerBefore,
-      result,
-      result.move === "CLOSE",
+      shaped,
+      shaped.move === "CLOSE",
     );
     return {
       result: {
-        ...result,
+        ...shaped,
         mood: delivery.mood as RehearsalTurnResult["mood"],
         intensity: delivery.intensity,
         reaction: delivery.reaction,
       },
       sawScreen: screenFrame !== null,
       state: after,
+      ...(plan.warning === null ? {} : { warning: plan.warning }),
     };
   }
 
@@ -1706,6 +1778,7 @@ export function createRehearsalService(dependencies: {
     readonly result: RehearsalTurnResult;
     readonly sawScreen: boolean;
     readonly state: Temperament | undefined;
+    readonly warning?: 1 | 2;
   }> {
     const [actor, row, turns, cue, , signal] = args;
     const first = await reply(...args);
@@ -2000,6 +2073,9 @@ export function createRehearsalService(dependencies: {
           intensity: result.intensity,
           reaction: result.reaction,
           ...(answered.state === undefined ? {} : { state: answered.state }),
+          ...(warningOf(answered) === undefined
+            ? {}
+            : { warning: warningOf(answered) }),
         },
       ];
       const saved = await store.saveTurns(actor, row.id, {

@@ -15,6 +15,10 @@ import {
   shouldNudgeSilence,
   stanceWords,
   shouldLook,
+  readyToLeave,
+  GOODBYE_PAUSE_MS,
+  GOODBYE_START_MS,
+  GOODBYE_MAX_MS,
   SEE_YOU_CONSENT,
 } from "../src/features/rehearsal/meet";
 import {
@@ -244,5 +248,63 @@ describe("Q sees you on camera: when a look is sent (founder ask 2026-10-01)", (
     expect(SEE_YOU_CONSENT).toBe(
       "Let Q see you on camera (frames are analysed for this rehearsal only and never stored)",
     );
+  });
+});
+
+describe("the other side leaves only after its goodbye (founder live 2026-10-02)", () => {
+  const ended = 100_000;
+  const base = {
+    endedAtMs: ended,
+    voiceLine: true,
+    lastSoundMs: 0,
+    speaking: false,
+  };
+  it("never while they are still speaking", () => {
+    expect(
+      readyToLeave({
+        ...base,
+        nowMs: ended + 10_000,
+        speaking: true,
+        lastSoundMs: ended + 10_000,
+      }),
+    ).toBe(false);
+  });
+  it("a beat after the goodbye has been heard, not before", () => {
+    const heard = ended + 6_000;
+    expect(
+      readyToLeave({
+        ...base,
+        nowMs: heard + GOODBYE_PAUSE_MS - 100,
+        lastSoundMs: heard,
+      }),
+    ).toBe(false);
+    expect(
+      readyToLeave({
+        ...base,
+        nowMs: heard + GOODBYE_PAUSE_MS,
+        lastSoundMs: heard,
+      }),
+    ).toBe(true);
+  });
+  it("waits for a goodbye that has not started yet, then goes if none comes", () => {
+    expect(readyToLeave({ ...base, nowMs: ended + 1_500 })).toBe(false);
+    expect(
+      readyToLeave({
+        ...base,
+        nowMs: ended + GOODBYE_START_MS + GOODBYE_PAUSE_MS,
+      }),
+    ).toBe(true);
+  });
+  it("typed: a beat after the close; and never past the cap", () => {
+    expect(
+      readyToLeave({
+        ...base,
+        voiceLine: false,
+        nowMs: ended + GOODBYE_PAUSE_MS,
+      }),
+    ).toBe(true);
+    expect(
+      readyToLeave({ ...base, nowMs: ended + GOODBYE_MAX_MS, speaking: true }),
+    ).toBe(true);
   });
 });

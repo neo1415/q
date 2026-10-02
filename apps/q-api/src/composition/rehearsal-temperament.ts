@@ -358,3 +358,70 @@ export function stanceOf(
         : "";
   return { leads: "THEM", note: base + shift };
 }
+
+/**
+ * Walking out, with warning (founder live 2026-10-02: the played person
+ * walked out on the first angry line). In anger they warn twice, over two
+ * turns, before they leave: "I'm going to stop you there…", then "Last
+ * chance…", then the goodbye -- unless the person asks to end the meeting
+ * themselves, which is honoured at once.
+ */
+export const WARNING_OPENERS = {
+  1: "I'm going to stop you there.",
+  2: "Last chance.",
+} as const;
+
+export const WALK_OUT_LINE =
+  "That's it. I'm ending this meeting here. Goodbye!";
+
+/** They asked to end it themselves (their own words, not a model's reading). */
+export function asksToEnd(text: string): boolean {
+  return /\b(end (?:the|this) (?:call|meeting)|let'?s (?:stop|end)|get lost|good ?bye|bye|i'?m done|we'?re done|get out|hang up|leave (?:the|this) (?:call|meeting)|not (?:going to|gonna) (?:\w+ )*(?:moving|move) forward)\b/i.test(
+    text,
+  );
+}
+
+export type WalkOut = {
+  /** This line is warning 1 or 2, or null. */
+  readonly warning: 1 | 2 | null;
+  /** Rewrite the line into a warning, keep it, or end the meeting. */
+  readonly action: "KEEP" | "WARN" | "WALK_OUT";
+};
+
+/**
+ * What an angry line does, by fixed rules: below two warnings it warns
+ * (a close is turned back into a warning); with two given, a provoking
+ * line ends it. Not angry, or they asked to end: the model's line stands.
+ */
+export function walkOutPlan(input: {
+  readonly register: Register;
+  readonly warningsGiven: number;
+  readonly theyAskedToEnd: boolean;
+  readonly closing: boolean;
+  readonly provoked: boolean;
+}): WalkOut {
+  const angry = input.register === "ANGRY" || input.register === "FURIOUS";
+  if (!angry || input.theyAskedToEnd) return { warning: null, action: "KEEP" };
+  if (input.warningsGiven < 2) {
+    return {
+      warning: input.warningsGiven === 0 ? 1 : 2,
+      action: "WARN",
+    };
+  }
+  if (input.closing || input.provoked)
+    return { warning: null, action: "WALK_OUT" };
+  return { warning: null, action: "KEEP" };
+}
+
+/** What the model is told before writing, so its words fit the stage. */
+export function walkOutNote(warningsGiven: number, register: Register): string {
+  const angry = register === "ANGRY" || register === "FURIOUS";
+  if (!angry) return "";
+  if (warningsGiven === 0) {
+    return ' Do not end the meeting yet: this is your first warning -- tell them to stop ("I\'m going to stop you there…").';
+  }
+  if (warningsGiven === 1) {
+    return ' Do not end the meeting yet: this is your last warning ("Last chance…").';
+  }
+  return " You have warned them twice: if they provoke you again, end the meeting with your goodbye.";
+}

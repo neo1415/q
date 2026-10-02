@@ -232,3 +232,34 @@ export function shouldLook(input: {
   const gap = input.nowMs - input.lastLookMs;
   return input.reason === "TURN" ? gap >= LOOK_MIN_GAP_MS : gap >= LOOK_IDLE_MS;
 }
+
+/** After the goodbye has been heard, a beat before they leave. */
+export const GOODBYE_PAUSE_MS = 1_400;
+/** The goodbye's audio usually starts within this of the line arriving. */
+export const GOODBYE_START_MS = 4_000;
+/** Never wait longer than this for a goodbye to finish. */
+export const GOODBYE_MAX_MS = 25_000;
+
+/**
+ * Whether the other person may leave now (founder live 2026-10-02: they
+ * left mid-sentence, cutting off their own goodbye). On a voice line: once
+ * their goodbye has been heard and the line has been quiet for a beat --
+ * or, if no audio came at all, a beat after it should have started. Typed:
+ * a beat after the close. Never later than the cap.
+ */
+export function readyToLeave(input: {
+  readonly nowMs: number;
+  readonly endedAtMs: number;
+  readonly voiceLine: boolean;
+  /** Last time their voice was heard (speaking state or output level). */
+  readonly lastSoundMs: number;
+  readonly speaking: boolean;
+}): boolean {
+  const since = input.nowMs - input.endedAtMs;
+  if (since >= GOODBYE_MAX_MS) return true;
+  if (!input.voiceLine) return since >= GOODBYE_PAUSE_MS;
+  if (input.speaking) return false;
+  const heard = input.lastSoundMs >= input.endedAtMs - 2_000;
+  if (heard) return input.nowMs - input.lastSoundMs >= GOODBYE_PAUSE_MS;
+  return since >= GOODBYE_START_MS + GOODBYE_PAUSE_MS;
+}
