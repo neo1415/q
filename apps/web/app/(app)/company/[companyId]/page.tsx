@@ -2,57 +2,58 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
-  getCompanyNetworkPreview,
+  getCompanyProfile,
   getOwnInterest,
   getRelationshipWithCompany,
+  listTaxonomyNodes,
 } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
-import { ArrowLeft, ChevronRight, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
+import { PageContainer } from "@/components/app-shell/page-container";
 import {
-  PageContainer,
-  PageHeader,
-} from "@/components/app-shell/page-container";
-import { CompanyDeeperView } from "@/features/company/company-deeper-view";
-import { CompanyPitch } from "@/features/discover/company-pitch";
-import { countryLabel, stageLabel } from "@/features/company/declared-labels";
-import { ExpressInterest } from "@/features/network/express-interest";
+  CompanyProfileView,
+  type ProfileTab,
+} from "@/features/company/company-profile-view";
 import { apiSession } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
-import { formatLongDay } from "@/components/date-format";
+import { ArrowLeft, ICON_SIZE } from "@capital-q/ui/icons";
 
 export const metadata: Metadata = { title: "Company" };
 export const dynamic = "force-dynamic";
 
 /**
- * One company, as the network may see it (CQ-WEB-022; doc 17 §126).
+ * One company, as THIS reader may see it (CQ-WEB-022; founder request
+ * 2026-10-02: the profile opened from Discover).
  *
- * The read is `network-preview`, which is the company's own declared
- * projection for investors — not the founder's record. That choice is the
- * authorisation: this page cannot show a private field because the
- * projection does not contain one, and the server decides what is in it
- * under the reader's own session. A company that is not network-visible
- * answers not-found, and this page says so plainly rather than hinting
- * that something exists behind a door.
+ * The read is the API's profile, which decides who is reading and so what
+ * the page receives: an investor gets the overview (the network
+ * projection, the raise only where it is disclosed to them, the deck only
+ * where the company shared it with them) and the decisions; a founder
+ * looking at another company gets its identity and the videos opened to
+ * the network, and nothing to act on. The page renders what it was given;
+ * hiding is never the authorisation. A company the reader may not see is
+ * one plain not-found.
  *
  * Back returns to Discover, where the feed controller restores the same
  * card from the position it persisted (doc 20 §146).
  */
 export default async function CompanyPage({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ readonly companyId: string }>;
+  readonly searchParams?: Promise<{ readonly tab?: string | string[] }>;
 }) {
   const { companyId } = await params;
   const session = await apiSession();
 
-  const company =
+  const profile =
     session === null
       ? null
-      : await getCompanyNetworkPreview(session, companyId).catch(() => null);
+      : await getCompanyProfile(session, companyId).catch(() => null);
 
-  if (company === null) {
+  if (profile === null || session === null) {
     return (
       <PageContainer>
         <BackToDiscover />
@@ -64,133 +65,52 @@ export default async function CompanyPage({
     );
   }
 
-  // Only an investor organisation's member gets an answer here; anyone
-  // else (a founder, a person with no organisation) is refused by the API
-  // and simply sees no Express Interest control.
-  const [interest, standing] =
-    session === null
-      ? [null, null]
-      : await Promise.all([
-          getOwnInterest(session, company.companyId).catch(() => null),
-          // Where their organisation stands with the company; refused for
-          // anyone who is not an investor's member, which reads as none.
-          getRelationshipWithCompany(session, company.companyId).catch(
-            () => null,
-          ),
-        ]);
-  const connected = standing?.relationship?.state === "CONNECTED";
+  const investor = profile.viewer === "INVESTOR";
+  const [interest, standing, sectorLabels] = await Promise.all([
+    investor
+      ? getOwnInterest(session, profile.companyId).catch(() => null)
+      : null,
+    investor
+      ? getRelationshipWithCompany(session, profile.companyId).catch(() => null)
+      : null,
+    // The industry vocabulary is reference data; the profile carries only
+    // node ids. Only the most specific of a lineage is named.
+    profile.overview === null || profile.overview.sectorNodeIds.length === 0
+      ? []
+      : listTaxonomyNodes(session, "industry", { status: "ACTIVE", limit: 100 })
+          .then((page) => {
+            const wanted = new Set(profile.overview?.sectorNodeIds ?? []);
+            const nodes = page.items.filter((node) => wanted.has(node.id));
+            const deepest = Math.max(...nodes.map((node) => node.depth));
+            return nodes
+              .filter((node) => node.depth === deepest)
+              .map((node) => node.displayName);
+          })
+          .catch(() => []),
+  ]);
 
-  const place = [
-    company.headquartersCity,
-    countryLabel(company.headquartersCountry),
-  ]
-    .filter((part): part is string => part !== null)
-    .join(", ");
-
-  const rows: readonly (readonly [string, string])[] = [
-    ["Stage", stageLabel(company.currentStageCode) ?? "Not declared"],
-    ["Where", place === "" ? "Not declared" : place],
-    [
-      "Founded",
-      company.foundedDate == null
-        ? "Not declared"
-        : formatLongDay(company.foundedDate),
-    ],
-    ["Legal name", company.legalName ?? "Not declared"],
-  ];
+  // A founder has only the videos; anyone else opens on the overview.
+  const requested = (await searchParams)?.tab;
+  const tab: ProfileTab =
+    profile.overview === null || requested === "videos" ? "videos" : "overview";
 
   return (
-    <PageContainer>
+    <PageContainer className="flex flex-col gap-6">
       <QPageSubject
         subject={{
           kind: "COMPANY",
-          companyId: company.companyId,
-          label: company.canonicalName,
+          companyId: profile.companyId,
+          label: profile.canonicalName,
           scope: "network_visible",
         }}
       />
       <BackToDiscover />
-      <PageHeader
-        title={company.canonicalName}
-        {...(company.shortDescription === null
-          ? {}
-          : { description: company.shortDescription })}
-      />
-
-      {/*
-        The pitch, for anyone allowed to see the company, whatever they
-        saved or passed in Discover (doc 19 §66–68): a pass hides it from
-        the feed, never from the company itself.
-      */}
-      {company.pitch === null ? null : (
-        <CompanyPitch
-          company={{
-            companyId: company.companyId,
-            canonicalName: company.canonicalName,
-            shortDescription: company.shortDescription,
-            currentStageCode: company.currentStageCode,
-            headquartersCountry: company.headquartersCountry,
-            pitch: company.pitch,
-          }}
-        />
-      )}
-
-      {interest === null ? null : (
-        <div className="flex flex-wrap items-center gap-2">
-          <ExpressInterest
-            companyId={company.companyId}
-            companyName={company.canonicalName}
-            surface="COMPANY_PROFILE"
-            initialInterest={interest.interest}
-          />
-          {/* Where the organisation stands with this company (CQ-WEB-030). */}
-          <Link
-            href={`/relationships/company/${company.companyId}`}
-            className={buttonClassName("quiet")}
-          >
-            Your relationship
-            <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
-          </Link>
-        </div>
-      )}
-
-      <section className="cq-panel">
-        <div className="cq-panel-body cq-panel-rows">
-          {rows.map(([term, value]) => (
-            <div key={term} className="flex justify-between gap-4 py-3">
-              <dt className="cq-label text-(--cq-text-secondary)">{term}</dt>
-              {/* "Not declared" is an honest answer; it is never a zero. */}
-              <dd className="cq-body text-(--cq-text-primary)">{value}</dd>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {company.primaryDescription === null ? null : (
-        <p className="cq-prose text-(--cq-text-secondary)">
-          {company.primaryDescription}
-        </p>
-      )}
-
-      {company.websiteUrl === null ? null : (
-        <p className="flex items-center gap-1.5">
-          <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-          <span className="cq-caption break-all text-(--cq-text-tertiary)">
-            {company.websiteUrl}
-          </span>
-        </p>
-      )}
-
-      {/*
-        The deeper view (CQ-WEB-024): why it is in the reader's feed, and
-        what is known about it on the three evidence axes. Built from the
-        same projection as everything above; nothing is filtered here.
-      */}
-      <CompanyDeeperView
-        companyId={company.companyId}
-        companyName={company.canonicalName}
-        facts={company.facts}
-        connected={connected}
+      <CompanyProfileView
+        profile={profile}
+        tab={tab}
+        interest={interest?.interest ?? null}
+        connected={standing?.relationship?.state === "CONNECTED"}
+        sectorLabels={sectorLabels}
       />
     </PageContainer>
   );
@@ -198,7 +118,10 @@ export default async function CompanyPage({
 
 function BackToDiscover() {
   return (
-    <Link href="/discover" className={buttonClassName("quiet", "compact")}>
+    <Link
+      href="/discover"
+      className={buttonClassName("quiet", "compact", "self-start")}
+    >
       <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
       Back to Discover
     </Link>

@@ -316,6 +316,26 @@ describe("a card", () => {
     expect(container.querySelector('[style*="aspect-ratio"]')).toBeNull();
   });
 
+  it("opens the company's profile from its avatar, on the phone stage and the desktop panel alike (2026-10-02)", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        showMedia={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    const avatar = screen.getByRole("link", { name: "Open Company 1 profile" });
+    expect(avatar.getAttribute("href")).toBe(`/company/${companyId(1)}`);
+    // Not a player and not signed: a lazy image request, or the mark.
+    expect(authorisePlaybackAction).not.toHaveBeenCalled();
+  });
+
   it("keeps Pass neutral -- never the danger variant", () => {
     render(
       <FeedCard

@@ -35,6 +35,10 @@ import {
   registerCompanyRoutes,
   type CompanyRoutesDependencies,
 } from "./http/companies.js";
+import {
+  registerCompanyProfileRoutes,
+  type CompanyProfilePorts,
+} from "./http/company-profile.js";
 import { registerCompanyTeamRoutes } from "./http/company-team.js";
 import {
   registerDocumentRoutes,
@@ -171,6 +175,8 @@ export type ApiModules = {
     CompanyRoutesDependencies["watchesAsInvestor"] | undefined;
   readonly companySectorDeclared?:
     CompanyRoutesDependencies["sectorDeclared"] | undefined;
+  /** A company's profile from Discover. Absent: the route is not served. */
+  readonly companyProfile?: CompanyProfilePorts | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly discovery?:
     | (Pick<DiscoveryRoutesDependencies, "discovery" | "slates"> & {
@@ -348,6 +354,16 @@ export function createApp(
       resolver: security.resolver,
       companies: modules.companies,
     });
+    if (modules.companyProfile !== undefined) {
+      registerCompanyProfileRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        companies: modules.companies,
+        pitches: modules.companyPitches,
+        networkView: modules.companyNetworkView,
+        profile: modules.companyProfile,
+      });
+    }
   }
 
   if (modules.investors !== undefined) {

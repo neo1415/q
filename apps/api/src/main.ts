@@ -719,6 +719,16 @@ const disclosure = createDisclosureAccessService({
 const recommendationVolume = createEntitlementService({ sql: database.sql });
 // end BILLING-2 block
 const companySectors = createPostgresCompanySectorsPort({ sql: database.sql });
+// One composition of the filter facts: Discover's filters read them, and a
+// company's profile reads the same raise and verification answers, so the
+// two can never disagree about what this reader may know.
+const discoverFilterFacts = createDiscoverFilterFacts({
+  companies: disclosurePorts.companies,
+  capital: disclosurePorts.capital,
+  disclosure,
+  verification: () => cardVerification,
+  pitches: () => discoverablePitches,
+});
 const slates = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
@@ -738,13 +748,7 @@ const slates = createSlateReadPipeline({
   queue: createPostgresRefreshQueue({ sql: database.sql }),
   // Discover filters (ux/discover-filters). The verification reader and
   // the pitch port are composed further down; they are read per request.
-  filterFacts: createDiscoverFilterFacts({
-    companies: disclosurePorts.companies,
-    capital: disclosurePorts.capital,
-    disclosure,
-    verification: () => cardVerification,
-    pitches: () => discoverablePitches,
-  }),
+  filterFacts: discoverFilterFacts,
 });
 
 /**
@@ -1287,6 +1291,91 @@ const { app, logger } = createApp(config, security, {
   // "what investors will see" is what the feed shows.
   companyPitches: discoverablePitches,
   companyNetworkView,
+  // A company's profile from Discover (founder request 2026-10-02): each
+  // part through the rule that already governs it (http/company-profile).
+  companyProfile: {
+    viewerIsInvestor: async (actor) =>
+      (await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
+        actor,
+      )) !== null,
+    mayPlay: async (actor, companyId, mediaAssetId) => {
+      const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+      return parsed.success
+        ? media.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
+        : false;
+    },
+    // The Q Card's own `photo` scope, for a signed-in participant.
+    photo: (company) =>
+      publicIdentity.cardPhotoFor({
+        subject: { subjectType: "COMPANY", subjectId: company.id },
+        audience: "PARTICIPANT",
+      }),
+    disclosedRaise: async (actor, companyId) =>
+      (
+        await discoverFilterFacts.disclosedRaises?.({
+          actor,
+          companyIds: [companyId],
+        })
+      )?.get(companyId) ?? null,
+    organisationVerified: async (companyId) =>
+      (await discoverFilterFacts.verified?.([companyId]))?.has(companyId) ===
+      true,
+    sectorNodeIds: async (companyId) =>
+      (await companySectors.sectors?.([companyId]))?.get(companyId) ?? [],
+    // A deck reaches another organisation one way today: the company sends
+    // it in the relationship chat (R34). The reader must be a party to
+    // that thread (the chat decides), the message must be the company's
+    // and not unsent, and Evidence must classify it as a pitch deck.
+    sharedDeck: async (actor, company) => {
+      if (storage === undefined) return null;
+      const relationship = (
+        await interests.listRelationshipsForInvestor({ actor })
+      ).find((listing) => listing.relationship.companyId === company.id);
+      if (relationship === undefined) return null;
+      const thread = await chat.thread({
+        actor,
+        relationshipId: relationship.relationship.id,
+        limit: 100,
+      });
+      const shared = createSharedDocumentDownloads({
+        sql: database.sql,
+        storage,
+      });
+      const candidates = thread.messages
+        .filter(
+          (message) =>
+            message.side === "COMPANY" &&
+            message.kind === "ATTACHMENT" &&
+            !message.unsent &&
+            message.attachment !== null,
+        )
+        .reverse();
+      for (const message of candidates) {
+        if (message.attachment === null) continue;
+        const type = await shared.sharedDocumentType({
+          documentTenantId: company.tenantId,
+          documentId: message.attachment.documentId,
+        });
+        if (type === "PITCH_DECK") {
+          return {
+            relationshipId: thread.relationshipId,
+            messageId: message.messageId,
+            title: message.attachment.title,
+            sharedAt: message.sentAt,
+          };
+        }
+      }
+      return null;
+    },
+    downloadDeck: async (actor, deck) => {
+      const link = await chat.attachment({
+        actor,
+        relationshipId: deck.relationshipId,
+        messageId: deck.messageId,
+      });
+      return { url: link.url, expiresAt: link.expiresAt };
+    },
+  },
   // The readiness view's discoverability note: a declared sector, read as
   // Discover's own filter facts read it.
   companySectorDeclared: async (companyId) =>

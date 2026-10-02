@@ -45,6 +45,8 @@ const CompanyIdInput = z.string().uuid();
 const SlateIdInput = z.string().uuid();
 const ClientEventIdInput = z.string().regex(/^[A-Za-z0-9_:-]{8,64}$/);
 const IntentInput = z.enum(["SAVE", "UNSAVE", "PASS"]);
+/** Where a decision was made; the feed unless a company's profile says so. */
+const SurfaceInput = z.enum(["RECOMMENDATION_FEED", "COMPANY_PROFILE"]);
 
 async function session(): Promise<ApiSession | null> {
   const { apiBaseUrl } = loadWebServerConfig();
@@ -107,12 +109,16 @@ export async function recordDecisionAction(input: {
   readonly intent: "SAVE" | "UNSAVE" | "PASS";
   readonly slateId: string | null;
   readonly clientEventId: string;
+  readonly surface?: "RECOMMENDATION_FEED" | "COMPANY_PROFILE" | undefined;
 }): Promise<FeedActionResult<InteractionRecordedDto>> {
   const active = await session();
   if (active === null) return { ok: false, message: NO_SESSION };
 
   const companyId = CompanyIdInput.safeParse(input.companyId);
   const intent = IntentInput.safeParse(input.intent);
+  const surface = SurfaceInput.safeParse(
+    input.surface ?? "RECOMMENDATION_FEED",
+  );
   const clientEventId = ClientEventIdInput.safeParse(input.clientEventId);
   const slateId =
     input.slateId === null ? null : SlateIdInput.safeParse(input.slateId);
@@ -121,6 +127,7 @@ export async function recordDecisionAction(input: {
     !companyId.success ||
     !intent.success ||
     !clientEventId.success ||
+    !surface.success ||
     (slateId !== null && !slateId.success)
   ) {
     return {
@@ -131,7 +138,7 @@ export async function recordDecisionAction(input: {
 
   const body = {
     clientEventId: clientEventId.data,
-    surface: "RECOMMENDATION_FEED" as const,
+    surface: surface.data,
     ...(slateId === null ? {} : { slateId: slateId.data }),
   };
 
@@ -158,6 +165,8 @@ export async function recordDecisionAction(input: {
 export async function undoPassAction(input: {
   readonly companyId: string;
   readonly clientEventId: string;
+  /** The profile's own Undo; the Passed list otherwise. */
+  readonly surface?: "SAVED_LIST" | "COMPANY_PROFILE" | undefined;
 }): Promise<FeedActionResult<InteractionRecordedDto>> {
   const active = await session();
   if (active === null) return { ok: false, message: NO_SESSION };
@@ -174,7 +183,10 @@ export async function undoPassAction(input: {
       ok: true,
       value: await unpassCompany(active, companyId.data, {
         clientEventId: clientEventId.data,
-        surface: "SAVED_LIST",
+        surface:
+          input.surface === "COMPANY_PROFILE"
+            ? "COMPANY_PROFILE"
+            : "SAVED_LIST",
       }),
     };
   } catch {

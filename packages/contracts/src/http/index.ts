@@ -981,6 +981,24 @@ export {
 } from "./profile-images.js";
 
 export {
+  COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT,
+  COMPANY_PROFILE_PHOTO_SEGMENT,
+  COMPANY_PROFILE_SEGMENT,
+  CompanyProfilePhotoDtoSchema,
+  type CompanyProfilePhotoDto,
+  CompanyProfileDeckDownloadDtoSchema,
+  CompanyProfileDeckSchema,
+  CompanyProfileDtoSchema,
+  CompanyProfileOverviewSchema,
+  CompanyProfileViewerSchema,
+  type CompanyProfileDeck,
+  type CompanyProfileDeckDownloadDto,
+  type CompanyProfileDto,
+  type CompanyProfileOverview,
+  type CompanyProfileViewer,
+} from "./company-profile.js";
+
+export {
   EMAIL_BODY_MAX_LENGTH,
   EMAIL_SUBJECT_MAX_LENGTH,
   EmailAddressSchema,
