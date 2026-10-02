@@ -1316,9 +1316,11 @@ describe("live 2026-10-02 (Zino): a named, misheard company among ALL their rela
       status: "PREPARED",
       awaitingApprovalOf: "Q looks after them for you",
     },
+    meeting?: QHandOverPort["proposeMeeting"],
   ) => {
     const errands: unknown[] = [];
     const handOver: QHandOverPort = {
+      ...(meeting === undefined ? {} : { proposeMeeting: meeting }),
       // Nothing of theirs is waiting: both interests are Zino's own.
       answerConnectionRequest: () =>
         Promise.resolve({
@@ -1408,6 +1410,90 @@ describe("live 2026-10-02 (Zino): a named, misheard company among ALL their rela
     );
   });
 
+  it("connected, 'book a meeting with Nixo' (action parity 2026-10-02): a direct call proposal at their first free time, no errand", async () => {
+    const asked: unknown[] = [];
+    const { line, errands } = await run(
+      "Book a meeting with Nixo",
+      "Nixo",
+      undefined,
+      (_request, subject) => {
+        asked.push(subject);
+        return Promise.resolve({
+          awaitingApprovalOf: "Call with Nixo",
+          local: "Tue 6 Oct, 14:00",
+          alsoFree: ["Tue 6 Oct, 15:00", "Wed 7 Oct, 10:00"],
+        });
+      },
+    );
+    expect(asked).toEqual([{ kind: "RELATIONSHIP", relationshipId: rel(1) }]);
+    expect(errands).toEqual([]);
+    expect(line).toBe(
+      "Call with Nixo: Tue 6 Oct, 14:00 is your first free time. Approve it and I send the invite with a Meet link, or tell me another time (also free: Tue 6 Oct, 15:00 or Wed 7 Oct, 10:00).",
+    );
+  });
+
+  it('"book a meeting with Nixon the next five minutes": Nixo, a direct call inside the window, never an errand', async () => {
+    const asked: unknown[] = [];
+    const errands: unknown[] = [];
+    const handOver: QHandOverPort = {
+      answerConnectionRequest: () =>
+        Promise.resolve({
+          status: "NO_PENDING_REQUESTS",
+          awaitingApprovalOf: "No founder's connection request is waiting.",
+        }),
+      proposeMeeting: (_request, subject, window) => {
+        asked.push({ subject, window });
+        return Promise.resolve({
+          awaitingApprovalOf: "Call with Nixo, Fri 2 Oct, 14:05",
+          local: null,
+          alsoFree: [],
+        });
+      },
+      prepare: (_request, subject) => {
+        errands.push(subject);
+        return Promise.resolve(null);
+      },
+      candidates: () => Promise.resolve(RELATIONSHIPS),
+    };
+    const { answer, stored, delegated } = seam({
+      said: "book a meeting with Nixon the next five minutes",
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: { kind: "MEETING", counterpartName: "Nixon" },
+        timeWindow: { fromMinutes: 0, toMinutes: 5 },
+      } as TurnReaderResult,
+      outcomes: [],
+      handOver,
+    });
+    await answer.answer(request());
+    expect(asked).toEqual([
+      {
+        subject: { kind: "RELATIONSHIP", relationshipId: rel(1) },
+        window: { fromMinutes: 0, toMinutes: 5 },
+      },
+    ]);
+    expect(errands).toEqual([]);
+    expect(stored.at(-1)?.content).toBe(
+      "Call with Nixo, Fri 2 Oct, 14:05: Approve it and I send the invite with a Meet link, or tell me another time.",
+    );
+    expect(delegated()).toBe(0);
+  });
+
+  it("not connected or no calendar: the meeting is not proposed and the errand handles it", async () => {
+    const { errands } = await run(
+      "Book a meeting with Nixo",
+      "Nixo",
+      undefined,
+      () => Promise.resolve(null),
+    );
+    expect(errands).toEqual([{ kind: "RELATIONSHIP", relationshipId: rel(1) }]);
+  });
+
   it("a name that is none of them: the question names every one", async () => {
     const { line, errands } = await run("set it up with Zorblax", "Zorblax");
     expect(errands).toEqual([]);
@@ -1487,6 +1573,138 @@ describe("the hand-over port plans a named relationship before acting (QA 2026-1
       awaitingApprovalOf:
         "Q is already looking after Kazikit for you (the call is booked).",
     });
+  });
+
+  it("proposeMeeting finds their free times and proposes the first one, under the same plan", async () => {
+    const calls: QToolProposal[] = [];
+    const tools = {
+      offer: () => Promise.resolve([]),
+      execute: (proposal: QToolProposal) => {
+        calls.push(proposal);
+        return Promise.resolve(
+          outcome(
+            proposal.name === "find_meeting_times"
+              ? {
+                  status: "OK",
+                  counterpartName: "Nixo",
+                  timeZone: "Europe/London",
+                  slots: [
+                    {
+                      startsAt: "2026-10-06T13:00:00.000Z",
+                      endsAt: "2026-10-06T13:30:00.000Z",
+                      local: "Tue 6 Oct, 14:00",
+                    },
+                  ],
+                  guidance: "",
+                }
+              : { status: "PREPARED", awaitingApprovalOf: "Call with Nixo" },
+          ),
+        );
+      },
+    };
+    const port = createToolHandOverPort({ tools });
+    const meeting = await port.proposeMeeting?.(request(), {
+      kind: "RELATIONSHIP",
+      relationshipId: RELATIONSHIP,
+    });
+    expect(calls.map((call) => call.name)).toEqual([
+      "find_meeting_times",
+      "propose_meeting",
+    ]);
+    expect(calls[1]?.arguments).toEqual({
+      relationshipId: RELATIONSHIP,
+      purpose: "Introductory call",
+      startsAt: "2026-10-06T13:00:00.000Z",
+    });
+    expect(meeting).toEqual({
+      awaitingApprovalOf: "Call with Nixo",
+      local: "Tue 6 Oct, 14:00",
+      alsoFree: [],
+    });
+  });
+
+  it("proposeMeeting searches inside the window they asked for and, with no free slot there, proposes the earliest five-minute mark in it", async () => {
+    const calls: QToolProposal[] = [];
+    const tools = {
+      offer: () => Promise.resolve([]),
+      execute: (proposal: QToolProposal) => {
+        calls.push(proposal);
+        return Promise.resolve(
+          outcome(
+            proposal.name === "find_meeting_times"
+              ? {
+                  status: "OK",
+                  counterpartName: "Nixo",
+                  timeZone: "Europe/London",
+                  slots: [],
+                  guidance: "",
+                }
+              : {
+                  status: "PREPARED",
+                  awaitingApprovalOf: "Call with Nixo, Fri 2 Oct, 14:05",
+                },
+          ),
+        );
+      },
+    };
+    const port = createToolHandOverPort({
+      tools,
+      now: () => new Date("2026-10-02T13:01:30.000Z"),
+    });
+    const meeting = await port.proposeMeeting?.(
+      request(),
+      { kind: "RELATIONSHIP", relationshipId: RELATIONSHIP },
+      { fromMinutes: 0, toMinutes: 5 },
+    );
+    expect(calls[0]?.arguments).toEqual({
+      relationshipId: RELATIONSHIP,
+      from: "2026-10-02T13:02:30.000Z",
+      to: "2026-10-02T13:06:30.000Z",
+    });
+    expect(calls[1]?.arguments).toEqual({
+      relationshipId: RELATIONSHIP,
+      purpose: "Introductory call",
+      startsAt: "2026-10-02T13:05:00.000Z",
+    });
+    expect(meeting).toEqual({
+      awaitingApprovalOf: "Call with Nixo, Fri 2 Oct, 14:05",
+      local: null,
+      alsoFree: [],
+    });
+  });
+
+  it("an errand carries the window they asked for as its callWindow", async () => {
+    const { calls, tools } = fakeTools({
+      status: "PREPARED",
+      awaitingApprovalOf: "Q looks after Nixo for you",
+    });
+    const port = createToolHandOverPort({ tools });
+    await port.prepare(
+      request(),
+      { kind: "RELATIONSHIP", relationshipId: RELATIONSHIP },
+      { fromMinutes: 0, toMinutes: 5 },
+    );
+    expect(calls[0]?.proposal.arguments).toMatchObject({
+      callWindow: { fromMinutes: 0, toMinutes: 5 },
+    });
+  });
+
+  it("proposeMeeting proposes nothing when they are not connected", async () => {
+    const { calls, tools } = fakeTools({
+      status: "NOT_CONNECTED",
+      counterpartName: "Nixo",
+      timeZone: null,
+      slots: [],
+      guidance: "",
+    });
+    const port = createToolHandOverPort({ tools });
+    expect(
+      await port.proposeMeeting?.(request(), {
+        kind: "RELATIONSHIP",
+        relationshipId: RELATIONSHIP,
+      }),
+    ).toBeNull();
+    expect(calls).toHaveLength(1);
   });
 
   it("a relationship the firewall refuses is not acted on: no tool call", async () => {

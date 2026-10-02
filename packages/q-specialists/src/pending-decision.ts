@@ -1,3 +1,4 @@
+import { closestByName } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
 /**
@@ -31,6 +32,15 @@ import type { ActorContext } from "@capital-q/security";
  *   while an errand waited): exactly one is decided as above, its status
  *   line naming it; several are asked about by name.
  * - Read as something else, or not read at all: answered as any other.
+ *
+ * Live 2026-10-02 (Zino):
+ * - With exactly one change waiting, a plain approval ("Okay. I give the
+ *   approval. Go ahead.") approves it by code, with no name to match.
+ * - With several, a name they say picks one, heard slightly wrong
+ *   included ("Nixon" for Nixo), by the same matcher as everywhere.
+ * - With none waiting, a yes to a change already approved is answered
+ *   with where it really stands (an errand's progress from its record),
+ *   never an argument about approval.
  */
 
 /** The plain statuses the Approval Engine's state maps to (q-tools). */
@@ -93,6 +103,16 @@ export type PendingDecisionPort = {
       readonly status: PendingDecisionStatus;
     }[]
   >;
+  /**
+   * Where work an approved change started stands now, in plain words, from
+   * its own records (the receipts port: "Q is looking after Nixo for you:
+   * waiting for them to accept…"); null when it is simply saved. Absent:
+   * the engine status line is said instead.
+   */
+  readonly progress?: (
+    context: PendingDecisionContext,
+    proposalId: string,
+  ) => Promise<string | null>;
 };
 
 export type PendingDecisionOutcome =
@@ -166,7 +186,24 @@ export async function decidePending(
     const elsewhere = await port.recentElsewhere(input.context).catch(() => []);
     pending = elsewhere.filter((proposal) => proposal.status === "PENDING");
   }
-  if (pending.length === 0) return { kind: "NONE" };
+  if (pending.length === 0) {
+    return answeredAlready(port, input, all);
+  }
+  // A plain approval of the one change waiting needs no reading and no
+  // name (live 2026-10-02: "Okay. I give the approval. Go ahead.").
+  if (pending.length === 1 && pending[0] !== undefined) {
+    if (plainApproval(input.utterance)) {
+      const { status } = await port.approve(
+        input.context,
+        pending[0].proposalId,
+      );
+      return { kind: "REPLY", line: statusLine(status, pending[0].summary) };
+    }
+  } else {
+    // Several: a name they said picks one ("Nixon" for Nixo).
+    const chosen = namedIn(input.utterance, pending);
+    if (chosen !== null) pending = [chosen];
+  }
   const only = pending.length === 1 ? pending[0] : undefined;
   const question =
     only === undefined
@@ -206,4 +243,165 @@ export async function decidePending(
   return read.remainder === null
     ? { kind: "REPLY", line }
     : { kind: "ANSWER_THEN", before: line, after: null };
+}
+
+/**
+ * Approval words only, and nothing that names or changes anything: "yes",
+ * "go ahead", "Okay. I give the approval. Go ahead.", "approve it". A
+ * sentence with anything more is left to the decision reader.
+ */
+const APPROVAL_PHRASES: readonly RegExp[] = [
+  /\bgo ahead\b/g,
+  /\bdo it\b/g,
+  /\bsend it\b/g,
+  /\b(?:yes|yeah|yep|yup|ok|okay|sure|approved?|approval|approving|proceed|confirm(?:ed)?)\b/g,
+];
+const FILLER = new Set([
+  "i",
+  "give",
+  "gave",
+  "you",
+  "the",
+  "my",
+  "it",
+  "that",
+  "this",
+  "please",
+  "now",
+  "then",
+  "so",
+  "and",
+  "just",
+  "q",
+  "thanks",
+  "thank",
+  "have",
+  "has",
+  "is",
+  "here",
+  "your",
+  "fine",
+  "good",
+  "great",
+  "you're",
+  "youre",
+  "of",
+  "with",
+  "a",
+]);
+
+export function plainApproval(utterance: string): boolean {
+  let text = utterance.toLowerCase().replace(/[^\p{L}\p{N}'\s]/gu, " ");
+  let approved = false;
+  for (const phrase of APPROVAL_PHRASES) {
+    text = text.replace(phrase, () => {
+      approved = true;
+      return " ";
+    });
+  }
+  if (!approved) return false;
+  return text
+    .split(/\s+/u)
+    .filter((word) => word.length > 0)
+    .every((word) => FILLER.has(word));
+}
+
+/** Words in a change's summary that are not names (titles, days, months). */
+const NOT_NAMES = new Set(
+  (
+    "q call message reminder meeting email send reply accept decline introductory " +
+    "looks after for you your with to move cancel change the a an and of on at in " +
+    "mon tue wed thu fri sat sun jan feb mar apr may jun jul aug sep oct nov dec " +
+    "monday tuesday wednesday thursday friday saturday sunday"
+  ).split(" "),
+);
+
+function namesIn(summary: string): string[] {
+  return summary
+    .split(/[^\p{L}\p{N}'-]+/u)
+    .filter(
+      (word) =>
+        word.length >= 3 &&
+        /^\p{Lu}/u.test(word) &&
+        !NOT_NAMES.has(word.toLowerCase()),
+    );
+}
+
+/** The one waiting change whose counterpart they named, or null. */
+function namedIn<T extends { readonly summary: string }>(
+  utterance: string,
+  pending: readonly T[],
+): T | null {
+  const said = utterance
+    .split(/[^\p{L}\p{N}'-]+/u)
+    .filter((word) => word.length >= 4);
+  const hits = pending.filter((proposal) =>
+    namesIn(proposal.summary).some(
+      (name) => closestByName(said, name, (word) => word).length > 0,
+    ),
+  );
+  return hits.length === 1 ? (hits[0] ?? null) : null;
+}
+
+/**
+ * Nothing waits, and they say yes to a change already decided: where it
+ * really stands, never an argument. Only for words that read as a yes.
+ */
+async function answeredAlready(
+  port: PendingDecisionPort,
+  input: {
+    readonly context: PendingDecisionContext;
+    readonly utterance: string;
+    readonly recentTurns: readonly {
+      readonly role: "USER" | "Q";
+      readonly text: string;
+    }[];
+    readonly signal?: AbortSignal | undefined;
+  },
+  all: readonly {
+    readonly proposalId: string;
+    readonly summary: string;
+    readonly status: PendingDecisionStatus;
+  }[],
+): Promise<PendingDecisionOutcome> {
+  const latest = all.at(-1);
+  if (latest === undefined) return { kind: "NONE" };
+  // An explicit approval needs no reading; a bare "ok" or "yes" might
+  // answer anything, so the reader decides whether it is about this one.
+  let yes =
+    plainApproval(input.utterance) &&
+    /\b(?:approv|go ahead|proceed|confirm|do it|send it)/i.test(
+      input.utterance,
+    );
+  if (!yes) {
+    // A cheap gate before the reader: no approval word, no reading.
+    if (
+      !/\b(?:yes|go ahead|approv|ok|okay|proceed|confirm|do it)/i.test(
+        input.utterance,
+      )
+    ) {
+      return { kind: "NONE" };
+    }
+    const read = await port.read({
+      question: `${named(latest.summary)}. Shall I go ahead?`,
+      utterance: input.utterance,
+      recentTurns: input.recentTurns,
+      context: input.context,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+    yes = read?.decision === "YES" && read.remainder === null;
+  }
+  if (!yes) return { kind: "NONE" };
+  const progress =
+    port.progress === undefined
+      ? null
+      : await port.progress(input.context, latest.proposalId).catch(() => null);
+  return {
+    kind: "REPLY",
+    line:
+      progress ??
+      (latest.status === "SAVED"
+        ? `Already approved and done: ${named(latest.summary)}.`
+        : statusLine(latest.status, latest.summary)),
+  };
 }

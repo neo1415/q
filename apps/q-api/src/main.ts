@@ -205,6 +205,7 @@ import { withTestRouting } from "@capital-q/model-gateway";
 import {
   createQDelegationReader,
   createQTurnReader,
+  type QReceiptPort,
 } from "@capital-q/model-gateway/q";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
@@ -2055,6 +2056,52 @@ const qArtifacts = createQArtifacts({
 // Q's standing with each person (founder direction 2026-09-30): their chosen
 // personality, which every Q surface speaks with, and Q's patience.
 const standingStore = createPostgresStandingStore(database.sql);
+// What this conversation already produced, read back from the owning
+// records as the person (CQ-QX-008): a document through the artifact
+// service (owner-scoped), an action through its approval record.
+const qReceipts: QReceiptPort = {
+  artifact: async (actor: ActorContext, artifactId: string) => {
+    const detail = await qArtifacts.service.read(actor, artifactId);
+    return { status: detail.artifact.status };
+  },
+  // Read as the person, in plain terms: SAVED only when the action
+  // executed, never from the approval row alone (live test 2026-09-27 #2).
+  action: async (actor: ActorContext, proposalId: string) => {
+    const approval = await qActions.findApprovalForAction(
+      actor.tenantId,
+      QActionProposalIdSchema.parse(proposalId),
+    );
+    if (approval === null) return null;
+    const view = await qActions
+      .getApproval({ actor, approvalId: approval.id })
+      .catch(() => null);
+    if (view === null) return null;
+    const status = plainProposalStatus(view);
+    // An errand the approval started (live 2026-10-02, Zino: "have you
+    // booked?" was answered "Q looks after Nixo for you is saved"):
+    // where it stands now, from the errand's own record.
+    if (status !== "SAVED" || view.action.actionType !== ERRAND_START) {
+      return { status };
+    }
+    const rows = await database.sql<
+      {
+        counterpart_name: string;
+        status: string;
+        stage: string;
+        last_step: string | null;
+      }[]
+    >`
+      select counterpart_name, status, stage, last_step
+        from q_runtime.errands
+       where q_action_id = ${view.action.actionId}
+         and user_id = ${actor.userId} and tenant_id = ${actor.tenantId}
+       limit 1`.catch(() => []);
+    const errand = rows[0];
+    return errand === undefined
+      ? { status }
+      : { status, progress: errandProgress(errand) };
+  },
+};
 const qIntelligence = composeQIntelligence({
   // A relationship a hand-over names, planned on its own (QA 2026-10-01).
   firewall,
@@ -2073,6 +2120,11 @@ const qIntelligence = composeQIntelligence({
       logger,
       dataPosture: demoDataPosture,
     }),
+    // A yes to a change already approved: where its work stands, from its
+    // own records (live 2026-10-02), never an argument about approval.
+    progress: async (context, proposalId) =>
+      (await qReceipts.action(context.actor, proposalId).catch(() => null))
+        ?.progress ?? null,
   }),
   personalityOf: ({ tenantId, userId }) =>
     standingStore
@@ -2241,52 +2293,7 @@ const qIntelligence = composeQIntelligence({
   deltas: liveDeltas,
   artifacts: qArtifacts.preparation,
   artifactReviser: qArtifacts.reviser,
-  // What this conversation already produced, read back from the owning
-  // records as the person (CQ-QX-008): a document through the artifact
-  // service (owner-scoped), an action through its approval record.
-  receipts: {
-    artifact: async (actor: ActorContext, artifactId: string) => {
-      const detail = await qArtifacts.service.read(actor, artifactId);
-      return { status: detail.artifact.status };
-    },
-    // Read as the person, in plain terms: SAVED only when the action
-    // executed, never from the approval row alone (live test 2026-09-27 #2).
-    action: async (actor: ActorContext, proposalId: string) => {
-      const approval = await qActions.findApprovalForAction(
-        actor.tenantId,
-        QActionProposalIdSchema.parse(proposalId),
-      );
-      if (approval === null) return null;
-      const view = await qActions
-        .getApproval({ actor, approvalId: approval.id })
-        .catch(() => null);
-      if (view === null) return null;
-      const status = plainProposalStatus(view);
-      // An errand the approval started (live 2026-10-02, Zino: "have you
-      // booked?" was answered "Q looks after Nixo for you is saved"):
-      // where it stands now, from the errand's own record.
-      if (status !== "SAVED" || view.action.actionType !== ERRAND_START) {
-        return { status };
-      }
-      const rows = await database.sql<
-        {
-          counterpart_name: string;
-          status: string;
-          stage: string;
-          last_step: string | null;
-        }[]
-      >`
-        select counterpart_name, status, stage, last_step
-          from q_runtime.errands
-         where q_action_id = ${view.action.actionId}
-           and user_id = ${actor.userId} and tenant_id = ${actor.tenantId}
-         limit 1`.catch(() => []);
-      const errand = rows[0];
-      return errand === undefined
-        ? { status }
-        : { status, progress: errandProgress(errand) };
-    },
-  },
+  receipts: qReceipts,
   visibility: profileBoard,
   logger,
 });

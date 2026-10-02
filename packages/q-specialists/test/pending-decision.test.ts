@@ -111,9 +111,18 @@ describe("a typed decision on a waiting change", () => {
       ],
       reading: { decision: "YES", remainder: null },
     });
-    expect(await decidePending(value, turn("yes"))).toEqual({ kind: "NONE" });
-    expect(calls.read).toBe(0);
+    // Nothing waits: a yes is answered with where the latest one stands
+    // (live 2026-10-02), and nothing is approved.
+    expect(await decidePending(value, turn("yes"))).toEqual({
+      kind: "REPLY",
+      line: "Already approved and done: Done change.",
+    });
     expect(calls.approve).toEqual([]);
+    // Words with no yes in them are not read at all.
+    expect(await decidePending(value, turn("what is Nixo raising?"))).toEqual({
+      kind: "NONE",
+    });
+    expect(calls.read).toBe(1);
   });
 
   it("asks whether to go ahead with exactly this, unchanged, so a yes that changes it is not approved ('yes but change the time')", async () => {
@@ -147,9 +156,12 @@ describe("a typed decision on a waiting change", () => {
   it("approves a yes with more said, then answers the rest", async () => {
     const { value, calls } = port({
       proposals: [REMINDER],
-      reading: { decision: "YES", remainder: "go ahead" },
+      reading: { decision: "YES", remainder: "and what is next for Nixo?" },
     });
-    const outcome = await decidePending(value, turn("yes, go ahead"));
+    const outcome = await decidePending(
+      value,
+      turn("yes, and what is next for Nixo?"),
+    );
     expect(calls.approve).toEqual(["p1"]);
     expect(outcome).toEqual({
       kind: "ANSWER_THEN",
@@ -232,9 +244,8 @@ describe("a yes in a new conversation to a change asked for elsewhere (live 2026
       remainder: null,
     });
     const outcome = await decidePending(value, turn("yes, go ahead"));
-    expect(asked).toEqual([
-      "Q looks after Nixo for you. Shall I go ahead with exactly this, unchanged?",
-    ]);
+    // A plain approval of the only change waiting needs no reading.
+    expect(asked).toEqual([]);
     expect(calls.approve).toEqual(["b23ff5cc"]);
     expect(outcome).toEqual({
       kind: "REPLY",
@@ -296,5 +307,85 @@ describe("a yes in a new conversation to a change asked for elsewhere (live 2026
     });
     expect(await decidePending(value, turn("yes"))).toEqual({ kind: "NONE" });
     expect(calls.approve).toEqual([]);
+  });
+});
+
+describe("the founder's lines, live 2026-10-02 (Zino)", () => {
+  const ERRAND: Proposal = {
+    proposalId: "e1",
+    summary: "Q looks after Nixo for you",
+    status: "PENDING",
+  };
+  const CALL: Proposal = {
+    proposalId: "m1",
+    summary: "Call with Kazikit, Tue 6 Oct, 14:00",
+    status: "PENDING",
+  };
+
+  it('"Okay. I give the approval. Go ahead." approves the one change waiting, with no name and no reading', async () => {
+    const { value, calls } = port({
+      proposals: [ERRAND],
+      // A reader that would not have said YES: code does not ask it.
+      reading: { decision: "UNRELATED", remainder: null },
+    });
+    const outcome = await decidePending(
+      value,
+      turn("Okay. I give the approval. Go ahead."),
+    );
+    expect(calls.read).toBe(0);
+    expect(calls.approve).toEqual(["e1"]);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: "Done: Q looks after Nixo for you.",
+    });
+  });
+
+  it('with two waiting, "approve the Nixon one" picks Nixo by the same name matcher', async () => {
+    const { value, calls } = port({
+      proposals: [CALL, ERRAND],
+      reading: { decision: "YES", remainder: null },
+    });
+    const outcome = await decidePending(value, turn("approve the Nixon one"));
+    expect(calls.approve).toEqual(["e1"]);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: "Done: Q looks after Nixo for you.",
+    });
+  });
+
+  it("with two waiting and no name, asks which; approves nothing", async () => {
+    const { value, calls } = port({
+      proposals: [CALL, ERRAND],
+      reading: { decision: "YES", remainder: null },
+    });
+    const outcome = await decidePending(
+      value,
+      turn("Okay. I give the approval. Go ahead."),
+    );
+    expect(calls.approve).toEqual([]);
+    expect(outcome.kind).toBe("REPLY");
+  });
+
+  it("nothing waiting, an approval again: where the errand really stands, never an argument", async () => {
+    const { value, calls } = port({
+      proposals: [{ ...ERRAND, status: "SAVED" }],
+      reading: { decision: "YES", remainder: null },
+    });
+    const outcome = await decidePending(
+      {
+        ...value,
+        progress: () =>
+          Promise.resolve(
+            "Q is looking after Nixo for you: waiting for them to accept, so nothing is booked yet.",
+          ),
+      },
+      turn("Okay. I give the approval. Go ahead."),
+    );
+    expect(calls.approve).toEqual([]);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: "Q is looking after Nixo for you: waiting for them to accept, so nothing is booked yet.",
+    });
+    expect(JSON.stringify(outcome)).not.toMatch(/waiting for your approval/);
   });
 });

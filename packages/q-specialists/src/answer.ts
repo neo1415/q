@@ -1682,6 +1682,7 @@ export function createSpecialistQAnswer(
         dependencies.handOver,
         request,
         read.handOver,
+        read.timeWindow ?? null,
       ).catch((error: unknown) => {
         logger?.warn(
           { err: error, qRunId: request.runId },

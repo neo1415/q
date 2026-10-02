@@ -45,10 +45,20 @@ export type HandOverOutcome =
   /** Could not prepare (not permitted, not reachable): answer normally. */
   | { readonly kind: "NONE" };
 
+/**
+ * A time they asked for, in minutes from now (TURN_READER v28 timeWindow:
+ * "in the next five minutes" is {0, 5}); null bounds are open.
+ */
+export type HandOverTimeWindow = {
+  readonly fromMinutes: number | null;
+  readonly toMinutes: number | null;
+};
+
 export type QHandOverPort = {
   readonly prepare: (
     request: QAnswerRequest,
     subject: HandOverSubject,
+    window?: HandOverTimeWindow | null,
   ) => Promise<{
     readonly status: string;
     readonly awaitingApprovalOf: string;
@@ -67,6 +77,22 @@ export type QHandOverPort = {
   ) => Promise<{
     readonly status: string;
     readonly awaitingApprovalOf: string;
+  } | null>;
+  /**
+   * "Book a meeting with X" when they are already connected (action parity
+   * 2026-10-02): a direct call proposal at their first free time, not an
+   * errand. Null when it cannot be one (not connected, no calendar, no
+   * free time): the errand below handles those. Absent: never tried.
+   */
+  readonly proposeMeeting?: (
+    request: QAnswerRequest,
+    subject: HandOverSubject,
+    window?: HandOverTimeWindow | null,
+  ) => Promise<{
+    readonly awaitingApprovalOf: string;
+    /** The slot's local time; null when the card's title already says it. */
+    readonly local: string | null;
+    readonly alsoFree: readonly string[];
   } | null>;
   readonly candidates: (request: QAnswerRequest) => Promise<
     readonly {
@@ -116,6 +142,18 @@ export function handOverSubjectOf(
   return null;
 }
 
+/** The first five-minute mark at least a minute ahead inside the window, or null. */
+function earliestInside(at: Date, window: HandOverTimeWindow): string | null {
+  const step = 5 * 60_000;
+  const earliest = at.getTime() + Math.max(window.fromMinutes ?? 0, 1) * 60_000;
+  const start = Math.ceil(earliest / step) * step;
+  const latest =
+    window.toMinutes === null
+      ? Number.POSITIVE_INFINITY
+      : at.getTime() + window.toMinutes * 60_000;
+  return start <= latest ? new Date(start).toISOString() : null;
+}
+
 function listed(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} or ${names.at(-1) ?? ""}`;
@@ -124,7 +162,12 @@ function listed(names: readonly string[]): string {
 export async function actOnHandOver(
   port: QHandOverPort,
   request: QAnswerRequest,
-  handOver: { readonly counterpartName: string | null },
+  handOver: {
+    readonly kind?: "MEETING" | "HAND_OVER" | undefined;
+    readonly counterpartName: string | null;
+  },
+  /** The time they asked for, if any (TURN_READER v28). */
+  window: HandOverTimeWindow | null = null,
 ): Promise<HandOverOutcome> {
   let subject: HandOverSubject | null = null;
   const onScreen = handOverSubjectOf(request);
@@ -199,7 +242,26 @@ export async function actOnHandOver(
     chosen?.state === "INTEREST_EXPRESSED"
       ? `${chosen.name} hasn't accepted your interest yet, so there's nothing to accept. `
       : "";
-  const prepared = await port.prepare(request, subject);
+  if (handOver.kind === "MEETING" && port.proposeMeeting !== undefined) {
+    const meeting = await port.proposeMeeting(request, subject, window);
+    if (meeting !== null) {
+      const also =
+        meeting.alsoFree.length === 0
+          ? ""
+          : ` (also free: ${listed([...meeting.alsoFree])})`;
+      const when =
+        meeting.local === null
+          ? ""
+          : window === null
+            ? ` ${meeting.local} is your first free time.`
+            : ` ${meeting.local}, as you asked.`;
+      return {
+        kind: "PREPARED",
+        line: `${meeting.awaitingApprovalOf}:${when} Approve it and I send the invite with a Meet link, or tell me another time${also}.`,
+      };
+    }
+  }
+  const prepared = await port.prepare(request, subject, window);
   if (prepared?.status === "ALREADY_ACTIVE") {
     // No second card: what Q is already doing there, from its real state.
     return {
@@ -230,8 +292,10 @@ export function createToolHandOverPort(dependencies: {
    */
   readonly firewall?: ContextFirewallPort | undefined;
   readonly logger?: Logger | undefined;
+  readonly now?: (() => Date) | undefined;
 }): QHandOverPort {
   const { tools, firewall, logger } = dependencies;
+  const now = dependencies.now ?? (() => new Date());
   const planFor = async (
     request: QAnswerRequest,
     subject: HandOverSubject,
@@ -284,14 +348,91 @@ export function createToolHandOverPort(dependencies: {
       return null;
     }
   };
+  const refOf = (subject: HandOverSubject) =>
+    subject.kind === "COMPANY"
+      ? { companyId: subject.companyId }
+      : subject.kind === "INVESTOR_ORGANISATION"
+        ? { investorOrganisationId: subject.investorOrganisationId }
+        : { relationshipId: subject.relationshipId };
   return {
-    prepare: async (request, subject) => {
-      const ref =
-        subject.kind === "COMPANY"
-          ? { companyId: subject.companyId }
-          : subject.kind === "INVESTOR_ORGANISATION"
-            ? { investorOrganisationId: subject.investorOrganisationId }
-            : { relationshipId: subject.relationshipId };
+    proposeMeeting: async (
+      request,
+      subject,
+      window: HandOverTimeWindow | null = null,
+    ) => {
+      const plan = await planFor(request, subject).catch(() => null);
+      if (plan === null) return null;
+      const ref = refOf(subject);
+      const at = now();
+      const minutes = (n: number) => new Date(at.getTime() + n * 60_000);
+      // The window they asked for bounds the search; without one, the
+      // tool's own default (the coming week).
+      const range =
+        window === null
+          ? {}
+          : {
+              from: minutes(Math.max(window.fromMinutes ?? 0, 1)).toISOString(),
+              ...(window.toMinutes === null
+                ? {}
+                : { to: minutes(window.toMinutes).toISOString() }),
+            };
+      const found = await call(
+        request,
+        "find_meeting_times",
+        { ...ref, ...range },
+        plan,
+      );
+      if (found === null || typeof found !== "object") return null;
+      const times = found as { status?: unknown; slots?: unknown };
+      if (times.status !== "OK" || !Array.isArray(times.slots)) return null;
+      const slots: { startsAt: string; local: string | null }[] = (
+        times.slots as unknown[]
+      ).flatMap((slot: unknown) => {
+        if (slot === null || typeof slot !== "object") return [];
+        const { startsAt, local } = slot as {
+          startsAt?: unknown;
+          local?: unknown;
+        };
+        return typeof startsAt === "string" && typeof local === "string"
+          ? [{ startsAt, local }]
+          : [];
+      });
+      // No free slot inside a near window ("in the next five minutes"):
+      // the earliest five-minute mark inside it, for them to approve or
+      // move; the card shows the exact time. Not connected stays null.
+      const soonest =
+        slots[0] === undefined && window?.toMinutes != null
+          ? earliestInside(at, window)
+          : null;
+      const first =
+        slots[0] ??
+        (soonest === null ? undefined : { startsAt: soonest, local: null });
+      if (first === undefined) return null;
+      const data = await call(
+        request,
+        "propose_meeting",
+        { ...ref, purpose: HAND_OVER_CALL_PURPOSE, startsAt: first.startsAt },
+        plan,
+      );
+      if (data === null || typeof data !== "object") return null;
+      const record = data as Record<string, unknown>;
+      return record["status"] === "PREPARED" &&
+        typeof record["awaitingApprovalOf"] === "string"
+        ? {
+            awaitingApprovalOf: record["awaitingApprovalOf"],
+            local: first.local,
+            alsoFree: slots
+              .slice(1)
+              .flatMap((slot) => (slot.local === null ? [] : [slot.local])),
+          }
+        : null;
+    },
+    prepare: async (
+      request,
+      subject,
+      window: HandOverTimeWindow | null = null,
+    ) => {
+      const ref = refOf(subject);
       const plan = await planFor(request, subject).catch((error: unknown) => {
         logger?.warn(
           { err: error, qRunId: request.runId },
@@ -309,6 +450,8 @@ export function createToolHandOverPort(dependencies: {
           openingMessage: HAND_OVER_OPENING_MESSAGE,
           brief: null,
           callPurpose: HAND_OVER_CALL_PURPOSE,
+          // The time they asked for travels to the errand's booking.
+          callWindow: window,
         },
         plan,
       );

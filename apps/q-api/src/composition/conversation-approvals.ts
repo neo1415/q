@@ -392,10 +392,13 @@ export function createPendingDecisionPort(dependencies: {
         context: PendingProposalContext,
       ) => Promise<readonly ConversationProposal[]>)
     | undefined;
+  /** Where an approved change's work stands now (the receipts port). */
+  readonly progress?: PendingDecisionPort["progress"];
 }): PendingDecisionPort {
-  const { proposals, decisions, recentElsewhere } = dependencies;
+  const { proposals, decisions, recentElsewhere, progress } = dependencies;
   return {
     ...(recentElsewhere === undefined ? {} : { recentElsewhere }),
+    ...(progress === undefined ? {} : { progress }),
     proposals: (context) => proposals.inConversation(context),
     read: (input) =>
       decisions.read({
