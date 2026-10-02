@@ -131,6 +131,7 @@ function buildApp(
     },
     stateForCompanies: () => Promise.resolve(new Map()),
     savedCompanyIds: () => Promise.resolve(options.saved ?? [COMPANY]),
+    passedCompanyIds: () => Promise.resolve([]),
   };
   const security: ApiSecurityDependencies = {
     authenticator: {

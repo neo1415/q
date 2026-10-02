@@ -125,6 +125,7 @@ function fakeInteractions(
     decide: refuse,
     observe: refuse,
     savedCompanyIds: () => Promise.resolve([]),
+    passedCompanyIds: () => Promise.resolve([]),
     stateForCompanies: ({ companyIds }) =>
       saved instanceof Error
         ? Promise.reject(saved)

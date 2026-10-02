@@ -148,6 +148,16 @@ function memoryInteractions() {
           )
           .map(([, value]) => value.companyId),
       ),
+    passedCompanyIds: (query) =>
+      Promise.resolve(
+        [...state.entries()]
+          .filter(
+            ([key, value]) =>
+              key.startsWith(`${query.investorOrganisationId}:`) &&
+              value.passed,
+          )
+          .map(([, value]) => value.companyId),
+      ),
     historyForCompany: (query) =>
       Promise.resolve(
         events.filter(
