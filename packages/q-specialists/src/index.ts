@@ -220,3 +220,10 @@ export {
   type HandOverSubject,
   type QHandOverPort,
 } from "./hand-over.js";
+export {
+  createToolProfileGapsPort,
+  type ProfileGapReader,
+  type ProfileGapReading,
+  type ProfileGapSource,
+  type QProfileGapsPort,
+} from "./profile-gaps.js";

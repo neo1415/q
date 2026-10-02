@@ -56,6 +56,7 @@ import { TURN_READER_V23 } from "./tasks/turn-reader.v23.js";
 import { TURN_READER_V24 } from "./tasks/turn-reader.v24.js";
 import { TURN_READER_V25 } from "./tasks/turn-reader.v25.js";
 import { TURN_READER_V26 } from "./tasks/turn-reader.v26.js";
+import { TURN_READER_V27 } from "./tasks/turn-reader.v27.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
 import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
@@ -89,6 +90,7 @@ import { MEETING_HOST_TURN_V1 } from "./tasks/meeting-host-turn.v1.js";
 import { REHEARSAL_SCORE_V3 } from "./tasks/rehearsal-score.v3.js";
 import { REHEARSAL_SCORE_V4 } from "./tasks/rehearsal-score.v4.js";
 import { FOUNDER_RESEARCH_READER_V1 } from "./tasks/founder-research-reader.v1.js";
+import { PROFILE_GAP_READER_V1 } from "./tasks/profile-gap-reader.v1.js";
 // DOCS block.
 import { DOCUMENT_POLISH_V1 } from "./tasks/document-polish.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
@@ -338,6 +340,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V24,
     TURN_READER_V25,
     TURN_READER_V26,
+    TURN_READER_V27,
     MEMORY_EXTRACTOR_V1,
     MEETING_NOTES_V1,
     MEETING_NOTES_V2,
@@ -362,6 +365,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     REHEARSAL_SCORE_V3,
     REHEARSAL_SCORE_V4,
     FOUNDER_RESEARCH_READER_V1,
+    PROFILE_GAP_READER_V1,
     // DOCS block.
     DOCUMENT_POLISH_V1,
     GATEQ_INTERVIEWER_V1,

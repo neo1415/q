@@ -14,12 +14,12 @@ import {
  * meeting with them or chatting them up is a hand-over, by meaning.
  */
 describe("TURN_READER v26", () => {
-  it("is the active reader and v25 is deprecated", () => {
+  it("v25 and v26 are deprecated (v27 is active)", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(26);
+    ).toBe(27);
     expect(TURN_READER_V25.status).toBe("DEPRECATED");
-    expect(TURN_READER_V26.status).toBe("ACTIVE");
+    expect(TURN_READER_V26.status).toBe("DEPRECATED");
   });
 
   it("reads accept-and-message, book a meeting and chat them up as a hand-over with the name as said", () => {

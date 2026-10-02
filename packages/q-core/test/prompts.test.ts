@@ -95,6 +95,8 @@ describe("registry", () => {
         "FIT_EXPLANATION",
         // CQ-Q-PRESENCE-001: reads public pages about one subject.
         "PRESENCE_READER",
+        // HARDEN P0 2026-10-02: public sources onto their profile's open fields.
+        "PROFILE_GAP_READER",
         // ADR 0011: a yes, a no or neither, read from the person's words.
         "DECISION_READER",
         // ADR 0012: what a conversation taught Q about the person.

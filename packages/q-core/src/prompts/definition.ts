@@ -73,6 +73,8 @@ export const PROMPT_IDS = [
   "DAILY_Q_TAKE",
   // MEET-HOST block (ADR 0037): Q as a live participant in a booked call.
   "MEETING_HOST_TURN",
+  /** HARDEN P0 2026-10-02: public sources onto their profile's open fields. */
+  "PROFILE_GAP_READER",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -91,6 +93,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   MEMORY_EXTRACTOR: "memory-extractor",
   MEETING_NOTES: "meeting-notes",
   MEETING_HOST_TURN: "meeting-host-turn",
+  PROFILE_GAP_READER: "profile-gap-reader",
   GATEQ_INTERVIEWER: "gateq-interviewer",
   ARTIFACT_REVISION: "artifact-revision",
   TURN_READER: "turn-reader",

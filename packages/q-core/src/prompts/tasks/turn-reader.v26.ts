@@ -30,7 +30,7 @@ export const TURN_READER_V26: PromptDefinition<
 > = {
   ...TURN_READER_V25,
   version: 26,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Live 2026-10-02: accept someone and then message them, book a meeting with them or chat them up is a hand-over (HAND_OVER or MEETING) with counterpartName as said, by meaning.",
   effectiveFrom: "2026-10-02",

@@ -58,6 +58,7 @@ import type {
   QSpecialistTurnReading,
 } from "./contracts.js";
 import { actOnHandOver, type QHandOverPort } from "./hand-over.js";
+import type { QProfileGapsPort } from "./profile-gaps.js";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import { decidePending, type PendingDecisionPort } from "./pending-decision.js";
 import {
@@ -184,6 +185,11 @@ export type SpecialistQAnswerDependencies = {
    * own tools decide, as before.
    */
   readonly handOver?: QHandOverPort | undefined;
+  /**
+   * Their own profile's open fields filled from public sources, by code,
+   * when the turn reader reads saveToOwnProfile (HARDEN P0, 2026-10-02).
+   */
+  readonly profileGaps?: QProfileGapsPort | undefined;
   /** Whether public research exists in this composition at all. */
   readonly researchAvailable?: boolean | undefined;
   /**
@@ -1609,6 +1615,34 @@ export function createSpecialistQAnswer(
     const writingDocument =
       artifacts !== undefined &&
       documents.some((document) => document.documentType === "Q_REPORT");
+    // Permission to put what research finds into their own profile
+    // (TURN_READER v27, by meaning): code fills the open fields and
+    // prepares one change; the answer model is not asked (live
+    // 2026-10-02, Nixo: it lectured about verification instead).
+    if (
+      dependencies.profileGaps !== undefined &&
+      read !== null &&
+      read.confidence !== "LOW" &&
+      read.saveToOwnProfile === true &&
+      !writingDocument
+    ) {
+      const filled = await dependencies.profileGaps
+        .fill(request)
+        .catch((error: unknown) => {
+          logger?.warn(
+            { err: error, qRunId: request.runId },
+            "profile gaps were not filled; answering normally",
+          );
+          return null;
+        });
+      if (filled !== null) {
+        logger?.info(
+          { qRunId: request.runId },
+          "their profile's gaps were filled by code, not by the answer",
+        );
+        return recordAnswer(request, conversationId, filled.line);
+      }
+    }
     if (tool !== null && !writingDocument) {
       const acted = await actOnTool(
         request,

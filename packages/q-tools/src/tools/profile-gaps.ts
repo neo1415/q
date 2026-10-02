@@ -115,6 +115,8 @@ const STATUSES = [
 export const FillProfileGapsOutputSchema = z
   .object({
     status: z.enum(STATUSES),
+    /** Their company's name on Capital Q, for a reader of the sources. */
+    companyName: z.string().max(200).nullable(),
     openFields: z.array(z.string()).max(12),
     /** Fields already filled: never changed by this tool. */
     filledFields: z.array(z.string()).max(12),
@@ -227,6 +229,7 @@ export function createFillProfileGapsTool(
         CompanyIdSchema.parse(grant.companyId),
       );
       const empty = {
+        companyName: profile?.canonicalName.slice(0, 200) ?? null,
         openFields: [],
         filledFields: [],
         sources: [],

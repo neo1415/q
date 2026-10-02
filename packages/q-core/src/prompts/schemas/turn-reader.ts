@@ -499,3 +499,19 @@ export const TurnReaderV25ResultSchema = TurnReaderV24ResultSchema.extend({
   endVoice: z.boolean().default(false),
 }).strict();
 export type TurnReaderV25Result = z.infer<typeof TurnReaderV25ResultSchema>;
+
+/**
+ * v27 (HARDEN P0, live 2026-10-02, Nixo): "go online, search everything …
+ * I'm giving you full permission and approval to update my profile with
+ * what you get online" was read as a research request, and the answer
+ * model lectured about verification instead of filling the profile.
+ * saveToOwnProfile is part of the turn's own reading: true when the person
+ * authorises saving research or findings into their own profile; code then
+ * fills the profile's open fields itself.
+ */
+export const TURN_READER_V27_SCHEMA_VERSION = 27;
+
+export const TurnReaderV27ResultSchema = TurnReaderV25ResultSchema.extend({
+  saveToOwnProfile: z.boolean().default(false),
+}).strict();
+export type TurnReaderV27Result = z.infer<typeof TurnReaderV27ResultSchema>;

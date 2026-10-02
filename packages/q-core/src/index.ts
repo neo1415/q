@@ -208,6 +208,10 @@ export {
   TURN_READER_V26_HAND_OVER,
 } from "./prompts/tasks/turn-reader.v26.js";
 export {
+  TURN_READER_V27,
+  TURN_READER_V27_SAVE_TO_PROFILE,
+} from "./prompts/tasks/turn-reader.v27.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -249,6 +253,9 @@ export {
   TURN_READER_V25_SCHEMA_VERSION,
   TurnReaderV25ResultSchema,
   type TurnReaderV25Result,
+  TURN_READER_V27_SCHEMA_VERSION,
+  TurnReaderV27ResultSchema,
+  type TurnReaderV27Result,
   type TurnReaderV24Result,
   type TurnHandOver,
   type TurnReaderV22Result,
@@ -876,3 +883,12 @@ export {
   type ModelSentenceGestures,
 } from "./speech/gesture.js";
 // end PRESENCE block
+export { PROFILE_GAP_READER_V1 } from "./prompts/tasks/profile-gap-reader.v1.js";
+export {
+  PROFILE_GAP_READER_SCHEMA_NAME,
+  PROFILE_GAP_READER_SCHEMA_VERSION,
+  ProfileGapReaderResultSchema,
+  ProfileGapReaderVariablesSchema,
+  type ProfileGapReaderResult,
+  type ProfileGapReaderVariables,
+} from "./prompts/schemas/profile-gap-reader.js";

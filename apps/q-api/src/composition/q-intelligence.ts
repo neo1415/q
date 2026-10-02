@@ -46,12 +46,14 @@ import {
   createSpecialistQAnswer,
   createToolCanonicalPort,
   createToolHandOverPort,
+  createToolProfileGapsPort,
   createToolOwnMandatePort,
   createToolOwnRecordsPort,
   type ArtifactPreparation,
   type PendingDecisionPort,
   type QVisibilityNotebook,
 } from "@capital-q/q-specialists";
+import { createProfileGapReader } from "./profile-gap-reader.js";
 
 import { MANDATE_LABELS } from "./mandate-labels.js";
 
@@ -338,6 +340,19 @@ export function composeQIntelligence(
       : { pendingDecisions: dependencies.pendingDecisions }),
     // A hand-over read by the turn reader (v22), prepared as Q's errand
     // for the subject on screen through the run's own propose_errand.
+    // TURN_READER v27 saveToOwnProfile: their profile's open fields,
+    // filled from public sources by code (HARDEN P0, 2026-10-02).
+    profileGaps: createToolProfileGapsPort({
+      tools,
+      read: createProfileGapReader({
+        gateway,
+        ...(dependencies.dataPosture === undefined
+          ? {}
+          : { dataPosture: dependencies.dataPosture }),
+        ...(logger === undefined ? {} : { logger }),
+      }),
+      ...(logger === undefined ? {} : { logger }),
+    }),
     handOver: createToolHandOverPort({
       tools,
       ...(dependencies.firewall === undefined

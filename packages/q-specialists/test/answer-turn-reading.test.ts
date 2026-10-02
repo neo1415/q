@@ -23,6 +23,7 @@ import type {
   QAnswerRequest,
   QToolCallOutcome,
   QToolExecutionContext,
+  QToolPort,
   QToolProposal,
   QConversationMessage,
   QResearchDirective,
@@ -31,6 +32,10 @@ import type {
 import { ActorContextSchema } from "@capital-q/security";
 
 import { createSpecialistQAnswer, unknownScreenLine } from "../src/answer.js";
+import {
+  createToolProfileGapsPort,
+  type QProfileGapsPort,
+} from "../src/profile-gaps.js";
 
 /**
  * Every general turn to Q is read before it is answered (CQ-QX-005):
@@ -105,6 +110,8 @@ function seam(options: {
   readonly pendingDecisions?: PendingDecisionPort;
   /** A hand-over prepared by code (TURN_READER v22). */
   readonly handOver?: QHandOverPort;
+  /** Their profile's gaps filled by code (TURN_READER v27). */
+  readonly profileGaps?: QProfileGapsPort;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -227,6 +234,9 @@ function seam(options: {
       ? {}
       : { pendingDecisions: options.pendingDecisions }),
     ...(options.handOver === undefined ? {} : { handOver: options.handOver }),
+    ...(options.profileGaps === undefined
+      ? {}
+      : { profileGaps: options.profileGaps }),
     ...(options.offeredTools === undefined
       ? {}
       : { offeredTools: () => Promise.resolve(options.offeredTools ?? []) }),
@@ -1607,5 +1617,205 @@ describe("speech that was not for Q is kept out of what Q reads back (founder li
     });
     await run.answer.answer(request());
     expect(run.marked).toEqual([]);
+  });
+});
+
+/**
+ * HARDEN P0 (live 2026-10-02 on 1f56545b, Nixo): the exact line below was
+ * read as RESEARCH_REQUEST, a search ran, and the answer model never called
+ * fill_profile_gaps -- it lectured about verification. With TURN_READER
+ * v27's saveToOwnProfile, code fills the gaps: search, a constrained
+ * reader maps sources to the open fields, code checks, ONE change. The
+ * answer model (and the company analysis) is never asked.
+ */
+describe("live 2026-10-02 (Nixo): permission to fill the profile from what is online", () => {
+  const LINE =
+    "I need you to go online, search everything you can find, specifically the answers to the open questions in my profile. I'm giving you full permission and approval to update my profile with what you get online.";
+  const PREPARED =
+    "I filled headquarters city from public sources (nixo.example); approve the card to save it as your stated details. Nothing public for website; it stays open.";
+  const reading = (saveToOwnProfile: boolean) =>
+    ({
+      kind: "RESEARCH_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      saveToOwnProfile,
+    }) as TurnReaderResult;
+  const harness = (second: (args: unknown) => Record<string, unknown>) => {
+    const calls: { name: string; arguments: unknown }[] = [];
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([]),
+      execute: (proposal) => {
+        calls.push({ name: proposal.name, arguments: proposal.arguments });
+        const first = calls.length === 1;
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "profile.gaps.fill",
+          toolVersion: 1,
+          classification: "SIDE_EFFECT",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "CONFIDENTIAL",
+          result: {
+            ok: true,
+            data: first
+              ? {
+                  status: "RESEARCHED",
+                  companyName: "Nixo",
+                  openFields: ["websiteUrl", "headquartersCity"],
+                  filledFields: ["primaryDescription"],
+                  sources: [
+                    {
+                      index: 1,
+                      url: "https://nixo.example/about",
+                      domain: "nixo.example",
+                      title: "About Nixo",
+                      publishedAt: null,
+                      retrievedAt: "2026-10-02T11:10:00.000Z",
+                      excerpt: "Nixo is headquartered in Lagos, Nigeria.",
+                    },
+                  ],
+                  line: "I searched public sources but couldn't settle values for your open fields (website and headquarters city); they stay open.",
+                  guidance: "",
+                  truthClass: "USER_CLAIM",
+                }
+              : second(proposal.arguments),
+          },
+          latencyMs: 2,
+        } as QToolCallOutcome);
+      },
+    };
+    return { tools, calls };
+  };
+
+  it("the exact line: code searches, maps, keeps only what a source says, prepares ONE change; the analyst is never asked", async () => {
+    const readerCalls: unknown[] = [];
+    const { tools, calls } = harness(() => ({
+      status: "PREPARED",
+      companyName: "Nixo",
+      openFields: [],
+      filledFields: [],
+      sources: [],
+      line: PREPARED,
+      guidance: "",
+      truthClass: "USER_CLAIM",
+    }));
+    const { answer, stored, delegated, investigated } = seam({
+      said: LINE,
+      reading: reading(true),
+      outcomes: [],
+      specialistSupports: true,
+      profileGaps: createToolProfileGapsPort({
+        tools,
+        read: (input) => {
+          readerCalls.push(input);
+          return Promise.resolve({
+            wrongSubject: false,
+            values: [
+              {
+                field: "headquartersCity",
+                value: "Lagos",
+                sources: [1],
+                quote: "headquartered in Lagos",
+              },
+              {
+                field: "websiteUrl",
+                value: "https://nixo.example",
+                sources: [1],
+                quote: "visit us at nixo.example",
+              },
+            ],
+            conflicting: [],
+          });
+        },
+      }),
+    });
+    expect((await answer.answer(request())).kind).toBe("ANSWERED");
+    expect(stored.at(-1)?.content).toBe(PREPARED);
+    expect(delegated()).toBe(0);
+    expect(investigated()).toBe(0);
+    expect(readerCalls).toHaveLength(1);
+    expect(readerCalls[0]).toMatchObject({
+      companyName: "Nixo",
+      openFields: ["websiteUrl", "headquartersCity"],
+    });
+    expect(calls.map((call) => call.name)).toEqual([
+      "fill_profile_gaps",
+      "fill_profile_gaps",
+    ]);
+    expect(calls[0]?.arguments).toEqual({});
+    expect(calls[1]?.arguments).toEqual({
+      values: [{ field: "headquartersCity", value: "Lagos", sources: [1] }],
+      conflicting: [],
+    });
+  });
+
+  it("nothing usable: the tool's line names the fields that stay open", async () => {
+    const NOTHING =
+      "I searched public sources and found nothing I could use for your open fields (website and headquarters city); they stay open.";
+    const { tools } = harness(() => ({
+      status: "NOTHING_FOUND",
+      companyName: "Nixo",
+      openFields: ["website", "headquarters city"],
+      filledFields: [],
+      sources: [],
+      line: NOTHING,
+      guidance: "",
+      truthClass: "USER_CLAIM",
+    }));
+    const { answer, stored, delegated } = seam({
+      said: LINE,
+      reading: reading(true),
+      outcomes: [],
+      profileGaps: createToolProfileGapsPort({
+        tools,
+        read: () => Promise.resolve(null),
+      }),
+    });
+    await answer.answer(request());
+    expect(stored.at(-1)?.content).toBe(NOTHING);
+    expect(delegated()).toBe(0);
+  });
+
+  it("'save what you found' after a research turn runs the same path; without the flag the turn is answered as before", async () => {
+    const { tools, calls } = harness(() => ({
+      status: "NOTHING_FOUND",
+      companyName: "Nixo",
+      openFields: [],
+      filledFields: [],
+      sources: [],
+      line: "They stay open.",
+      guidance: "",
+      truthClass: "USER_CLAIM",
+    }));
+    const port = createToolProfileGapsPort({
+      tools,
+      read: () => Promise.resolve(null),
+    });
+    const saved = seam({
+      said: "save what you found to my profile",
+      reading: reading(true),
+      outcomes: [],
+      earlier: [
+        { role: "USER", content: "what does the web say about Nixo?" },
+        { role: "Q", content: "Public sources say Nixo is in Lagos." },
+      ],
+      profileGaps: port,
+    });
+    await saved.answer.answer(request());
+    expect(saved.delegated()).toBe(0);
+    expect(calls.length).toBe(2);
+
+    const plain = seam({
+      said: "what does the web say about Nixo?",
+      reading: reading(false),
+      outcomes: [],
+      profileGaps: port,
+    });
+    await plain.answer.answer(request());
+    expect(plain.delegated()).toBe(1);
+    expect(calls.length).toBe(2);
   });
 });
