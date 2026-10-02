@@ -28,19 +28,40 @@ type MyRelationshipsRead = {
 
 const NAMES_PER_BUCKET = 8;
 
-const STATE_BUCKETS: Readonly<Record<string, string>> = {
-  INTEREST_EXPRESSED: "interest expressed, awaiting an answer",
-  CONNECTED: "connected",
-  DECLINED: "not taken forward",
+/**
+ * Each state said from the viewer's own side, with who is waiting for
+ * whom (live 2026-10-02: Zino was told two companies "have expressed
+ * interest and are awaiting your response" when it was his own interest,
+ * waiting for them). An investor expresses interest in a company; a
+ * company answers it.
+ */
+const INVESTOR_BUCKETS: Readonly<Record<string, string>> = {
+  INTEREST_EXPRESSED:
+    "you expressed interest; waiting for them to accept (nothing for you to answer)",
+  CONNECTED: "connected (both sides agreed)",
+  DECLINED: "you expressed interest; they did not take it forward",
   DISCOVERED: "discovered, no interest expressed",
 };
-
-const FOCUS_STATE: Readonly<Record<string, string>> = {
+const COMPANY_BUCKETS: Readonly<Record<string, string>> = {
   INTEREST_EXPRESSED:
-    "they have expressed interest and are awaiting the answer",
-  CONNECTED: "they are connected -- both sides agreed",
-  DECLINED: "interest was expressed but not taken forward",
+    "they expressed interest in your company; waiting for YOU to accept or decline",
+  CONNECTED: "connected (both sides agreed)",
+  DECLINED: "they expressed interest; you did not take it forward",
+  DISCOVERED: "discovered",
+};
+const INVESTOR_FOCUS: Readonly<Record<string, string>> = {
+  INTEREST_EXPRESSED:
+    "you expressed interest in them and are waiting for them to accept; there is no request from them for you to accept",
+  CONNECTED: "you are connected -- both sides agreed",
+  DECLINED: "you expressed interest but they did not take it forward",
   DISCOVERED: "discovered only; no interest expressed",
+};
+const COMPANY_FOCUS: Readonly<Record<string, string>> = {
+  INTEREST_EXPRESSED:
+    "they expressed interest in your company and are waiting for you to accept or decline",
+  CONNECTED: "you are connected -- both sides agreed",
+  DECLINED: "they expressed interest and you did not take it forward",
+  DISCOVERED: "discovered only",
 };
 
 const text = (value: unknown): string | null =>
@@ -83,7 +104,7 @@ export function ownStandingFact(
     const said: string[] = [];
     const state =
       typeof related?.state === "string"
-        ? FOCUS_STATE[related.state]
+        ? (investor ? INVESTOR_FOCUS : COMPANY_FOCUS)[related.state]
         : undefined;
     said.push(
       state ??
@@ -104,7 +125,10 @@ export function ownStandingFact(
 
   const byState = new Map<string, (string | null)[]>();
   for (const r of relationships) {
-    if (typeof r.state !== "string" || STATE_BUCKETS[r.state] === undefined)
+    if (
+      typeof r.state !== "string" ||
+      (investor ? INVESTOR_BUCKETS : COMPANY_BUCKETS)[r.state] === undefined
+    )
       continue;
     byState.set(r.state, [
       ...(byState.get(r.state) ?? []),
@@ -122,11 +146,24 @@ export function ownStandingFact(
     parts.push(
       `Their relationships with ${counterpart}: ${[...byState.entries()]
         .map(
-          ([state, list]) => `${STATE_BUCKETS[state] ?? state}: ${names(list)}`,
+          ([state, list]) =>
+            `${(investor ? INVESTOR_BUCKETS : COMPANY_BUCKETS)[state] ?? state}: ${names(list)}`,
         )
         .join("; ")}.`,
     );
   }
+  // What waits for THEM to answer, from the current state only: for an
+  // investor nothing does (their interest waits for the company).
+  const forYou = company
+    ? relationships
+        .filter((r) => r.state === "INTEREST_EXPRESSED")
+        .map((r) => text(r.counterpart?.name))
+    : [];
+  parts.push(
+    forYou.length === 0
+      ? "Requests waiting for them to answer: none."
+      : `Requests waiting for them to answer: ${names(forYou)}.`,
+  );
   if (investor) {
     parts.push(
       saved.length === 0

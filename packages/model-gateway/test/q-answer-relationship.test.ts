@@ -293,3 +293,36 @@ describe("relationshipFact", () => {
     ).toBeNull();
   });
 });
+
+describe("the relationship said from the founder's side (live 2026-10-02)", () => {
+  it("an investor's interest waits for the founder, not the other way round", () => {
+    const fact = relationshipFact({
+      ...CONNECTED,
+      yourSide: "COMPANY",
+      counterpart: {
+        kind: "INVESTOR_ORGANISATION",
+        id: INVESTOR,
+        name: "Zino Aviation",
+      },
+      relationship: {
+        ...CONNECTED.relationship,
+        state: "INTEREST_EXPRESSED",
+        nextStep: "ANSWER_INTEREST",
+      },
+    });
+    expect(fact?.statement).toContain(
+      "the investor expressed interest; waiting for you to accept or decline",
+    );
+    const investor = relationshipFact({
+      ...CONNECTED,
+      relationship: {
+        ...CONNECTED.relationship,
+        state: "INTEREST_EXPRESSED",
+        nextStep: "AWAIT_ANSWER",
+      },
+    });
+    expect(investor?.statement).toContain(
+      "you expressed interest; waiting for the company to accept",
+    );
+  });
+});

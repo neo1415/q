@@ -310,3 +310,11 @@ describe("here is the screen (founder live 2026-10-01)", () => {
     expect(screenLines({ route: "OTHER" })).not.toContain(HERE_LINE);
   });
 });
+
+describe("no ids or tool needs said to the person (live 2026-10-02)", () => {
+  it("tells Q to resolve names itself and to say who waits for whom", () => {
+    expect(PLAIN_KNOWING_LINE).toContain("Never ask them for an id");
+    expect(PLAIN_KNOWING_LINE).toContain("never say what a tool needs");
+    expect(PLAIN_KNOWING_LINE).toContain("the other side hasn't answered yet");
+  });
+});

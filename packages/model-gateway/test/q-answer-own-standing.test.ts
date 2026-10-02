@@ -351,7 +351,12 @@ describe("Q knows who it is talking to", () => {
     expect(facts).toContain(
       "About Ajopot: no interest expressed and no relationship yet; passed on in Discover.",
     );
-    expect(facts).toContain("interest expressed, awaiting an answer: Kora");
+    // From their own side: their interest, waiting for Kora (live
+    // 2026-10-02: said backwards as Kora awaiting their response).
+    expect(facts).toContain(
+      "you expressed interest; waiting for them to accept (nothing for you to answer): Kora",
+    );
+    expect(facts).toContain("Requests waiting for them to answer: none.");
     expect(facts).toContain("Saved in Discover: Kora.");
     expect(facts).toContain(
       "The company on their screen (the one they mean by",
@@ -408,7 +413,62 @@ describe("ownStandingFact", () => {
   it("says what is on record for the focus and never turns a save into interest", () => {
     const fact = ownStandingFact(STANDING, OTHER);
     expect(fact?.statement).toContain(
-      "About Kora: they have expressed interest and are awaiting the answer; saved in Discover (a save is not interest).",
+      "About Kora: you expressed interest in them and are waiting for them to accept; there is no request from them for you to accept; saved in Discover (a save is not interest).",
+    );
+  });
+
+  // Live 2026-10-02 (Zino): his own interests were said as theirs, and
+  // a connected company as a pending request.
+  it("says who waits for whom from each side, from the current state", () => {
+    const investor =
+      ownStandingFact(
+        {
+          yourSide: "INVESTOR",
+          relationships: [
+            {
+              counterpart: { kind: "COMPANY", id: "t", name: "Tallyloom" },
+              state: "INTEREST_EXPRESSED",
+            },
+            {
+              counterpart: { kind: "COMPANY", id: "y", name: "Yamfield Agro" },
+              state: "CONNECTED",
+            },
+          ],
+          saved: [],
+          passed: [],
+        },
+        "t",
+      )?.statement ?? "";
+    expect(investor).toContain(
+      "About Tallyloom: you expressed interest in them and are waiting for them to accept; there is no request from them for you to accept",
+    );
+    expect(investor).toContain("connected (both sides agreed): Yamfield Agro");
+    expect(investor).toContain("Requests waiting for them to answer: none.");
+
+    const founder =
+      ownStandingFact(
+        {
+          yourSide: "COMPANY",
+          relationships: [
+            {
+              counterpart: {
+                kind: "INVESTOR_ORGANISATION",
+                id: "z",
+                name: "Zino Aviation",
+              },
+              state: "INTEREST_EXPRESSED",
+            },
+          ],
+          saved: [],
+          passed: [],
+        },
+        null,
+      )?.statement ?? "";
+    expect(founder).toContain(
+      "they expressed interest in your company; waiting for YOU to accept or decline: Zino Aviation",
+    );
+    expect(founder).toContain(
+      "Requests waiting for them to answer: Zino Aviation.",
     );
   });
 
