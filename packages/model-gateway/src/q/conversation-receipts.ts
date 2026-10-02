@@ -210,7 +210,7 @@ export const DAILY_HERE_LINE =
  * context" or "authorised facts" did or did not include.
  */
 export const PLAIN_KNOWING_LINE =
-  "HOW YOU SAY WHAT YOU KNOW: the words in these notes (authorised context, facts supplied, scope, tools, firewall) are Capital Q's, never the person's; never say them. Say plainly what you know, what you don't (\"I don't have that on record\") and what you will do about it.";
+  "HOW YOU SAY WHAT YOU KNOW: the words in these notes (authorised context, facts supplied, scope, tools, firewall) are Capital Q's, never the person's; never say them. Say plainly what you know, what you don't (\"I don't have that on record\") and what you will do about it. Never ask them for an id, a record or a field name, and never say what a tool needs: a name is enough -- find it yourself in their relationships or with search_companies, misheard names included, and act. Who waits for whom is as their own standing says it: when they ask to accept something that is their own interest still waiting for the other side, say plainly that the other side hasn't answered yet, then offer in one line to look after it (wait for the accept, then message and book a call, for their approval) or to send a nudge.";
 
 export function screenLines(
   screen: QScreenContext | undefined,

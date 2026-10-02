@@ -25,7 +25,8 @@ type RelationshipRead = {
 
 const STATE_WORDS: Readonly<Record<string, string>> = {
   DISCOVERED: "discovered (no interest expressed yet)",
-  INTEREST_EXPRESSED: "interest expressed, awaiting the company's answer",
+  INTEREST_EXPRESSED:
+    "you expressed interest; waiting for the company to accept (nothing for you to answer)",
   CONNECTED: "connected -- both sides have agreed to connect",
   DECLINED: "the company has not taken the interest forward",
 };
@@ -55,9 +56,16 @@ export function relationshipFact(data: unknown): AuthorisedFact | null {
   const read = data as RelationshipRead;
   const relationship = read.relationship;
   if (relationship === null || relationship === undefined) return null;
+  // From their own side (live 2026-10-02: an investor's own interest was
+  // said as the company waiting for them).
+  const founderSide = read.yourSide === "COMPANY";
   const state =
     typeof relationship.state === "string"
-      ? STATE_WORDS[relationship.state]
+      ? founderSide && relationship.state === "INTEREST_EXPRESSED"
+        ? "the investor expressed interest; waiting for you to accept or decline"
+        : founderSide && relationship.state === "DECLINED"
+          ? "the investor expressed interest; you did not take it forward"
+          : STATE_WORDS[relationship.state]
       : undefined;
   if (state === undefined) return null;
   const name =
