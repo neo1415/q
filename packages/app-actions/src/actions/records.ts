@@ -592,7 +592,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof CompanyRoleTool>
   >({
     name: "company.team.me.upsert",
-    short: "set their company title",
+    short: "set my title at company",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Records their own place on their company's team, as the team page does.",
@@ -625,7 +625,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
       purposes: COMPANY_TURNS,
       eval: {
         say: [
-          "Change my title to Chief Executive Officer.",
+          "Change my title to Chief Product Officer.",
           "Mark me as a founder of the company.",
         ],
       },
@@ -663,7 +663,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof FounderProfileTool>
   >({
     name: "company.founder_profile.me.update",
-    short: "edit their founder profile",
+    short: "edit my founder bio",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Changes their own founder profile, as the team page does.",
@@ -689,7 +689,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     tool: {
       name: "update_my_founder_profile",
       description:
-        "Prepares a change to their own founder profile, as the team page makes it: professionalSummary and backgroundSummary (null clears one). Nothing changes until they approve exactly it.",
+        "Prepares a change to their own founder bio, as the team page makes it: professionalSummary and backgroundSummary (null clears one). Not their title or role: that is set_my_company_role. Nothing changes until they approve exactly it.",
       input: FounderProfileTool,
       references: {},
       scopes: COMPANY_SCOPES,
@@ -769,7 +769,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof InvestorTool>
   >({
     name: "investor.profile.update",
-    short: "edit the investor profile",
+    short: "edit the fund's profile",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Changes their investor organisation's declared profile, as its page does.",
@@ -812,7 +812,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     tool: {
       name: "update_investor_profile",
       description:
-        "Prepares a change to their own investor organisation's declared profile, as its page makes it: displayName, investorType, websiteUrl, hqCountry (two-letter code), publicDescription, deploymentState, inboundPreference. Every field to change in one call; null clears one. Nothing changes until they approve exactly it.",
+        "Prepares a change to their own investor organisation's declared profile, as its page makes it: displayName, investorType, websiteUrl, hqCountry (two-letter code), publicDescription, deploymentState, inboundPreference. Every field to change in one call; null clears one. Not anyone's own title at the fund: that is set_my_investor_role. Nothing changes until they approve exactly it.",
       input: InvestorTool,
       references: {},
       scopes: INVESTOR_SCOPES,
@@ -860,7 +860,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof InvestorRoleTool>
   >({
     name: "investor.representative.me.upsert",
-    short: "set their fund title",
+    short: "set my title at fund",
     area: "records",
     classification: "CONSEQUENTIAL",
     does: "Records how they represent their investor organisation, as its page does.",
