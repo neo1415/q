@@ -158,6 +158,7 @@ import {
 import { withVerificationDecisions } from "./verification/decide-handler.js";
 import { withReadinessAfterVerification } from "./verification/readiness-handler.js";
 import { withRelationshipProjection } from "./network/relationship-projection-handler.js";
+import { rebuildRelationshipStatesAtStart } from "./network/relationship-rebuild-at-start.js";
 import { withQWorkWake } from "./network/q-work-wake-handler.js";
 import { withInterestNotices } from "./network/interest-notice-handler.js";
 import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
@@ -1086,6 +1087,14 @@ void requestRebuildsForVersionDrift({
     { error: error instanceof Error ? error.name : "UNKNOWN" },
     "discovery.slates.version_drift_failed",
   );
+});
+
+// relationship-state.v2 (2026-10-02): caches folded by an older projector
+// version, or behind their history, are re-folded from history in the
+// background. Compare-and-set, bounded, idempotent; never fatal.
+void rebuildRelationshipStatesAtStart({
+  projector: relationshipProjector,
+  logger,
 });
 
 // The loops hold the process resident; they return only after abort, at which
