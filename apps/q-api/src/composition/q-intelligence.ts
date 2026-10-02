@@ -55,6 +55,7 @@ import {
   type PendingDecisionPort,
   type QVisibilityNotebook,
 } from "@capital-q/q-specialists";
+import { createAppActionArgumentReader } from "./app-action-arguments.js";
 import { createProfileGapReader } from "./profile-gap-reader.js";
 
 import { MANDATE_LABELS } from "./mandate-labels.js";
@@ -364,6 +365,16 @@ export function composeQIntelligence(
       ...(logger === undefined ? {} : { logger }),
     }),
     // ADR 0040: a declared app action the reading names, run by code.
+    // The reader named the action but gave no arguments: one small read of
+    // its inputs against the tool's own schema (parity eval 2026-10-02).
+    appActionArguments: createAppActionArgumentReader({
+      gateway,
+      tools,
+      ...(dependencies.dataPosture === undefined
+        ? {}
+        : { dataPosture: dependencies.dataPosture }),
+      ...(logger === undefined ? {} : { logger }),
+    }),
     appActions: createToolAppActionPort({
       tools,
       names: APP_ACTIONS.flatMap((action) =>

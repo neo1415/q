@@ -204,6 +204,17 @@ export type SpecialistQAnswerDependencies = {
    */
   readonly appActions?: QAppActionPort | undefined;
   /**
+   * One app action's inputs from the person's words, against the tool's own
+   * input schema (APP_ACTION_ARGUMENTS), for a reading that named the
+   * action and gave no arguments. Null: their words don't give them.
+   */
+  readonly appActionArguments?:
+    | ((
+        request: QAnswerRequest,
+        input: { readonly tool: string; readonly utterance: string },
+      ) => Promise<Record<string, unknown> | null>)
+    | undefined;
+  /**
    * Their own profile's open fields filled from public sources, by code,
    * when the turn reader reads saveToOwnProfile (HARDEN P0, 2026-10-02).
    */
@@ -1475,11 +1486,25 @@ export function createSpecialistQAnswer(
     // R20/R33: every tool that changes something is an action to the
     // reader (a Prepare → Approve change, the app's own action in their
     // browser, a Save or Pass): "reload the page" is not a screen.
-    const offeredActions = capabilities.flatMap((capability) =>
-      capability.performedBy.kind === "TOOL" && capability.acts
-        ? [{ name: capability.performedBy.providerName, does: capability.does }]
-        : [],
-    );
+    // The declared app actions lead (parity eval 2026-10-02: Save and Pass
+    // sat last in a long list, past the reader's cut, so "pass on Ajopot"
+    // was read as propose_interest_answer and nothing was done).
+    const appToolNames = dependencies.appActions?.tools ?? new Set<string>();
+    const offeredActions = capabilities
+      .flatMap((capability) =>
+        capability.performedBy.kind === "TOOL" && capability.acts
+          ? [
+              {
+                name: capability.performedBy.providerName,
+                does: capability.does,
+              },
+            ]
+          : [],
+      )
+      .sort(
+        (a, b) =>
+          Number(appToolNames.has(b.name)) - Number(appToolNames.has(a.name)),
+      );
     // ADR 0040 parity: what the registry declares that this run does not
     // offer, marked, so the reader can name what was asked (askedAction)
     // and code can tell "not called" from "missing from the registry".
@@ -1708,7 +1733,36 @@ export function createSpecialistQAnswer(
     // A declared app action the reading names (ADR 0040): code runs its
     // generated tool, with its own authorize step and approval card, and
     // says the tool's own line; the model is not asked to choose it.
-    const appAction = appActionOf(read);
+    // Named but not filled (parity eval 2026-10-02: 3 of 12 Discover turns
+    // read askedAction pass_company / save_company with appAction empty):
+    // one small extraction against that tool's own input schema fills it.
+    const appAction =
+      appActionOf(read) ??
+      (dependencies.appActions !== undefined &&
+      dependencies.appActionArguments !== undefined &&
+      read !== null &&
+      read.kind === "TOOL_REQUEST" &&
+      read.confidence !== "LOW" &&
+      typeof read.askedAction === "string" &&
+      dependencies.appActions.tools.has(read.askedAction) &&
+      offeredNames.has(read.askedAction)
+        ? await (async () => {
+            const tool = read.askedAction ?? "";
+            const args = await dependencies
+              .appActionArguments?.(request, {
+                tool,
+                utterance: latest.content,
+              })
+              .catch(() => null);
+            logger?.info(
+              { qRunId: request.runId, tool, filled: args != null },
+              "app action named without arguments; arguments read for it",
+            );
+            return args === null || args === undefined
+              ? null
+              : { tool, arguments: args };
+          })()
+        : null);
     if (
       dependencies.appActions !== undefined &&
       appAction !== null &&

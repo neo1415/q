@@ -89,3 +89,30 @@ describe("the turn reader knows the run's own actions", () => {
     expect(prompts[0]).not.toContain("propose_handle_claim");
   });
 });
+
+/**
+ * Parity eval 2026-10-02 (live ff7d5a36): with a long offer, Save and Pass
+ * sat past the reader's cut of 40 (30 before v30), so "Pass on Ajopot" was
+ * named propose_interest_answer and "save" propose_express_interest. Every
+ * offered action reaches the reader now.
+ */
+describe("a long offer reaches the reader whole", () => {
+  it("60 offered actions: the 60th (pass_company) is still listed", async () => {
+    const { gateway, prompts } = recording();
+    const reader = createQTurnReader({ gateway, logger });
+    await reader.read({
+      utterance: "Pass on Ajopot.",
+      recentTurns: [],
+      modality: "TEXT",
+      attribution: ATTRIBUTION,
+      actions: [
+        ...Array.from({ length: 59 }, (_, index) => ({
+          name: `propose_thing_${String(index)}`,
+          does: "Prepares a thing for their approval.",
+        })),
+        { name: "pass_company", does: "Passes on a company in Discover." },
+      ],
+    });
+    expect(prompts[0]).toContain("pass_company");
+  });
+});
