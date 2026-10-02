@@ -116,6 +116,50 @@ const TURN_READER_BUDGET = {
  */
 export const TURN_READER_FAST_FIRST_ATTEMPT_MS = 2_500;
 
+/**
+ * The reader's action list budget (HARDEN, 2026-10-02: the app-action
+ * registry grows toward 60-80 entries). Offered actions are listed first
+ * and never cut below this; declared-but-not-offered ones fill what is
+ * left, briefly. A test in q-specialists fails when the registry's acting
+ * tools outgrow it, and an over-budget turn is logged, never silent.
+ */
+export const TURN_READER_ACTIONS_MAX = 160;
+
+/** The actions as the reader is told of them, within the budget. */
+export function readerActions(
+  actions: readonly {
+    readonly name: string;
+    readonly does: string;
+    readonly available?: boolean | undefined;
+  }[],
+): {
+  readonly listed: readonly { readonly name: string; readonly does: string }[];
+  readonly droppedOffered: readonly string[];
+  readonly droppedDeclared: number;
+} {
+  const offered = actions.filter((action) => action.available !== false);
+  const declared = actions.filter((action) => action.available === false);
+  const keptOffered = offered.slice(0, TURN_READER_ACTIONS_MAX);
+  const room = Math.max(0, TURN_READER_ACTIONS_MAX - keptOffered.length);
+  const keptDeclared = declared.slice(0, room);
+  return {
+    listed: [
+      ...keptOffered.map((action) => ({
+        name: action.name.slice(0, 80),
+        does: action.does.slice(0, 240),
+      })),
+      ...keptDeclared.map((action) => ({
+        name: action.name.slice(0, 80),
+        does: `(not available in this conversation) ${action.does.slice(0, 80)}`,
+      })),
+    ],
+    droppedOffered: offered
+      .slice(TURN_READER_ACTIONS_MAX)
+      .map((action) => action.name),
+    droppedDeclared: declared.length - keptDeclared.length,
+  };
+}
+
 export function createQTurnReader(dependencies: {
   readonly gateway: ModelGateway;
   readonly logger: Logger;
@@ -137,6 +181,17 @@ export function createQTurnReader(dependencies: {
     read: async (input) => {
       const utterance = input.utterance.trim().slice(0, 2_000);
       if (utterance.length === 0) return null;
+      const listed = readerActions(input.actions ?? []);
+      if (listed.droppedOffered.length > 0 || listed.droppedDeclared > 0) {
+        logger.warn(
+          {
+            droppedOffered: listed.droppedOffered,
+            droppedDeclared: listed.droppedDeclared,
+            max: TURN_READER_ACTIONS_MAX,
+          },
+          "the turn reader's action list is over budget",
+        );
+      }
       const variables: Omit<
         TurnReaderV7Variables,
         | "operatingMode"
@@ -151,23 +206,9 @@ export function createQTurnReader(dependencies: {
         utterance,
         modality: input.modality,
         // What this run offers first, in full; then, briefly, what the
-        // registry declares that this run does not offer (v30 askedAction).
-        actions: [
-          ...(input.actions ?? [])
-            .filter((action) => action.available !== false)
-            .slice(0, 100)
-            .map((action) => ({
-              name: action.name.slice(0, 80),
-              does: action.does.slice(0, 240),
-            })),
-          ...(input.actions ?? [])
-            .filter((action) => action.available === false)
-            .slice(0, 100)
-            .map((action) => ({
-              name: action.name.slice(0, 80),
-              does: `(not available in this conversation) ${action.does.slice(0, 80)}`,
-            })),
-        ],
+        // registry declares that this run does not offer (v30 askedAction),
+        // within TURN_READER_ACTIONS_MAX.
+        actions: [...listed.listed],
       };
       try {
         const rendered = renderPrompt<TurnReaderV7Variables>(registry, {

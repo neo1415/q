@@ -119,6 +119,8 @@ export {
 } from "./result-blocks.js";
 export {
   createQTurnReader,
+  readerActions,
+  TURN_READER_ACTIONS_MAX,
   type QTurnReader,
   type QTurnReading,
 } from "./turn-reader.js";
