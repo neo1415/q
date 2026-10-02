@@ -37,7 +37,7 @@ function poolEntry(
         ? null
         : {
             generatorId: "STRUCTURED_MANDATE",
-            generatorVersion: "structured-mandate.v4",
+            generatorVersion: "structured-mandate.v5",
             matchedDimensions: ["TAXONOMY"],
             reasonCodes: ["TAXONOMY_EXACT"],
             matchedNodes: preferredNodeIds.map((p) => ({

@@ -50,6 +50,7 @@ import {
   createPostgresRefreshQueue,
   createInteractionSignalService,
   createPostgresInteractionRepository,
+  createPostgresCompanySectorsPort,
   createSlateReadPipeline,
 } from "@capital-q/discovery";
 import {
@@ -713,6 +714,7 @@ const disclosure = createDisclosureAccessService({
 // own number, so nothing changes; ranking never reads a plan.
 const recommendationVolume = createEntitlementService({ sql: database.sql });
 // end BILLING-2 block
+const companySectors = createPostgresCompanySectorsPort({ sql: database.sql });
 const slates = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
@@ -1248,6 +1250,11 @@ const { app, logger } = createApp(config, security, {
   // "what investors will see" is what the feed shows.
   companyPitches: discoverablePitches,
   companyNetworkView,
+  // The readiness view's discoverability note: a declared sector, read as
+  // Discover's own filter facts read it.
+  companySectorDeclared: async (companyId) =>
+    ((await companySectors.sectors?.([companyId]))?.get(companyId) ?? [])
+      .length > 0,
   // An investor watches every publishable video of a company discoverable
   // to them; anyone else only the videos opened to the network (ADR 0021).
   watchesAsInvestor: async (actor) =>

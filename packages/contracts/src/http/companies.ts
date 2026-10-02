@@ -144,6 +144,20 @@ export const MarketplaceReadinessAssessmentSchema = z
       .array(MarketplaceReadinessRequirementResultSchema)
       .length(MARKETPLACE_READINESS_REQUIREMENTS.length),
     assessedAt: UtcTimestampSchema,
+    /**
+     * What investors' declared rules can place the company by (live
+     * 2026-10-02: a ready company with no sector). Not a readiness
+     * requirement and not about any investor: whether the company itself
+     * has declared a sector, a stage and a country. Absent from older APIs.
+     */
+    discoverability: z
+      .object({
+        sectorDeclared: z.boolean(),
+        stageDeclared: z.boolean(),
+        countryDeclared: z.boolean(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type MarketplaceReadinessAssessment = z.infer<

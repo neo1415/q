@@ -676,7 +676,11 @@ describe("structured candidate service", () => {
       companyId(4),
       companyId(6),
       companyId(9),
+      // v5 exploration: series_a, one rung from the seed intent, matched
+      // nothing above; added after the matches, never in their place.
+      companyId(10),
     ]);
+    expect(reasons(r, 10)).toEqual(["STAGE_ADJACENT"]);
     // A: three dimensions on one company, descendant taxonomy match.
     expect(reasons(r, 1)).toEqual([
       "GEOGRAPHY_OVERLAP",
@@ -704,7 +708,8 @@ describe("structured candidate service", () => {
     expect(r.diagnostics).toMatchObject({
       rawHits: 11,
       deduped: 7,
-      eligible: 6,
+      explored: 1,
+      eligible: 7,
       ineligible: 1,
       undetermined: 0,
       truncated: false,
@@ -717,6 +722,49 @@ describe("structured candidate service", () => {
       CHEQUE: 0,
     });
     expect(StructuredCandidateResultSchema.parse(r)).toEqual(r);
+  });
+
+  it("v5 (live 2026-10-02, Nixo): a ready seed company with no sector, for a pre-seed intent, is a candidate; it was never retrieved before", async () => {
+    const w = world();
+    const active = w.mandates[0];
+    if (active === undefined) throw new Error("fixture");
+    w.mandates[0] = {
+      ...active,
+      constraints: [
+        {
+          dimension: "stage",
+          operator: "EQ",
+          value: { kind: "codes", values: ["pre_seed"] },
+          importance: "MUST",
+          isHardExclusion: false,
+          automatedUse: "ELIGIBLE",
+        },
+        {
+          dimension: "red_flag",
+          operator: "EQ",
+          value: { kind: "codes", values: ["adult_content"] },
+          importance: "HARD_EXCLUSION",
+          isHardExclusion: true,
+          automatedUse: "ELIGIBLE",
+        },
+      ],
+      taxonomyPreferences: [],
+    };
+    // Company 4: seed, no taxonomy declared.
+    const r = await generated(w);
+    expect(ids(r)).toContain(companyId(4));
+    expect(reasons(r, 4)).toEqual(["STAGE_ADJACENT"]);
+    const four = r.candidates.find((c) => c.companyId === companyId(4));
+    expect(four?.eligibility.decision).toBe("ELIGIBLE");
+    // Hard rules still hold: the gambling-flagged and not-ready seed
+    // companies are found and removed by REC-001, as any candidate.
+    expect(ids(r)).not.toContain(companyId(7));
+  });
+
+  it("exploration never displaces a declared match: with no room in the pool, none is added", async () => {
+    const r = await generated(world(), { limit: 6 });
+    expect(ids(r)).not.toContain(companyId(10));
+    expect(r.diagnostics.explored ?? 0).toBe(0);
   });
 
   it("H. AVOID is never a positive source and never removes a company found another way", async () => {
@@ -743,8 +791,8 @@ describe("structured candidate service", () => {
           (x) => x.criterion === "HARD_EXCLUSION_TAXONOMY",
         )?.outcome === "UNKNOWN",
     );
-    expect(unverified).toHaveLength(3);
-    expect(r.candidates).toHaveLength(5);
+    expect(unverified).toHaveLength(4);
+    expect(r.candidates).toHaveLength(6);
   });
 
   it("K, Q. a private, undisclosed company in another organisation is never listed and never output", async () => {
@@ -791,7 +839,7 @@ describe("structured candidate service", () => {
     // The live defect was an empty pool here. The same candidates as
     // without the rule, each carrying the unevaluable criterion.
     expect(ids(r)).toEqual(ids(baseline));
-    expect(r.candidates).toHaveLength(6);
+    expect(r.candidates).toHaveLength(7);
     expect(r.diagnostics.undetermined).toBe(0);
     expect(r.diagnostics.ineligible).toBe(1);
     for (const c of r.candidates) {
@@ -829,7 +877,7 @@ describe("structured candidate service", () => {
     };
     const after = await generated(w);
     expect(ids(after)).toEqual([]);
-    expect(before.length).toBe(6);
+    expect(before.length).toBe(7);
     expect(after.diagnostics.rawHits).toBe(0);
   });
 
@@ -1024,11 +1072,13 @@ describe("structured candidate service", () => {
     expect(ids(limited).length).toBeLessThanOrEqual(2);
     expect(limited.diagnostics.truncated).toBe(true);
     expect(CANDIDATE_POOL_MAX).toBe(200);
-    // One query per dimension asked, one expansion per preference node, one eligibility batch.
+    // One query per dimension asked, one expansion per preference node,
+    // one exploration query (v5, adjacent stages), one eligibility batch.
     w.queries.length = 0;
     await generated(w);
     expect(w.queries.sort()).toEqual([
       "companies.byCountry",
+      "companies.byStage",
       "companies.byStage",
       "eligibility.evaluate",
       "taxonomy.expand",
@@ -1041,14 +1091,14 @@ describe("structured candidate service", () => {
     for (const c of r.candidates) {
       expect(c.provenance).toMatchObject({
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v4",
+        generatorVersion: "structured-mandate.v5",
         taxonomyVersion: { industry: 1, geography: 1 },
       });
       expect(c.provenance.reasonCodes.length).toBeGreaterThan(0);
       expect("score" in c).toBe(false);
       expect("rank" in c).toBe(false);
     }
-    expect(r.generatorVersion).toBe("structured-mandate.v4");
+    expect(r.generatorVersion).toBe("structured-mandate.v5");
     expect(r.eligibilityPolicyVersion).toBe("eligibility.v3");
   });
 });

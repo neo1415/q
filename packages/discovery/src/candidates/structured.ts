@@ -204,6 +204,27 @@ function compareNodes(a: MatchedNode, b: MatchedNode): number {
 }
 
 /**
+ * The stages one rung either side of the stage intent that the intent
+ * does not already name (doc 19 §31: plausibly relevant, adjacent). Empty
+ * when there is no stage intent: nothing to be adjacent to.
+ */
+export function adjacentStageCodes(
+  stageCodes: readonly string[],
+): readonly string[] {
+  const ladder = STAGE_LADDER as readonly string[];
+  const named = new Set(stageCodes);
+  const out = new Set<string>();
+  for (const code of stageCodes) {
+    const index = ladder.indexOf(code);
+    if (index < 0) continue;
+    for (const neighbour of [ladder[index - 1], ladder[index + 1]]) {
+      if (neighbour !== undefined && !named.has(neighbour)) out.add(neighbour);
+    }
+  }
+  return [...out].sort();
+}
+
+/**
  * Merge dimension hits by canonical company id: one candidate, every
  * reason it earned, dimensions and reasons sorted, ordered by company id.
  * The order is reproducibility, not desirability; nothing here counts
