@@ -24,6 +24,7 @@ import {
 
 const CLAIM_LABEL: Record<VerificationStandingDto["claimType"], string> = {
   FOUNDER_IDENTITY: "Founder identity",
+  INVESTOR_IDENTITY: "Investor identity",
   ORGANISATION: "Organisation",
   DOMAIN_CONTROL: "Domain",
 };

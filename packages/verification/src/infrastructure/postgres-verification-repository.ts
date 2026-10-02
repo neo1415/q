@@ -111,13 +111,13 @@ export function createPostgresVerificationClaimRepository(): VerificationClaimRe
           select distinct on (c.claim_type, c.subject_key) c.*
             from evidence.verification_claims c
            where c.tenant_id = ${tenantId}
-             and c.claim_type in ('FOUNDER_IDENTITY', 'ORGANISATION')
+             and c.claim_type in ('FOUNDER_IDENTITY', 'INVESTOR_IDENTITY', 'ORGANISATION')
            order by c.claim_type, c.subject_key, c.revision desc
         )
         select *
           from latest
          where (claim_type = 'ORGANISATION' and subject_id = ${organisationId})
-            or (claim_type = 'FOUNDER_IDENTITY' and exists (
+            or (claim_type in ('FOUNDER_IDENTITY', 'INVESTOR_IDENTITY') and exists (
                   select 1 from identity.organisation_memberships m
                    where m.tenant_id = ${tenantId}
                      and m.organisation_id = ${organisationId}

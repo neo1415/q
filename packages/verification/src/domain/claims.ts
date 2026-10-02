@@ -56,9 +56,20 @@ export const SUBJECT_TYPE_OF: Readonly<
   Record<VerificationClaimType, VerificationSubjectType>
 > = {
   FOUNDER_IDENTITY: "PERSON",
+  INVESTOR_IDENTITY: "PERSON",
   ORGANISATION: "ORGANISATION",
   DOMAIN_CONTROL: "DOMAIN",
 };
+
+/**
+ * The person's identity claim for each side (ADR 0038): founders and
+ * investors are verified under different claim types, never one shared one.
+ */
+export function personClaimTypeFor(
+  kind: "COMPANY" | "INVESTOR",
+): "FOUNDER_IDENTITY" | "INVESTOR_IDENTITY" {
+  return kind === "INVESTOR" ? "INVESTOR_IDENTITY" : "FOUNDER_IDENTITY";
+}
 
 /**
  * The standing a current row asserts at `now`. A VERIFIED row past its
@@ -155,9 +166,11 @@ export function describeStanding(
   const subject =
     claimType === "FOUNDER_IDENTITY"
       ? "A founder's identity"
-      : claimType === "ORGANISATION"
-        ? "Your organisation"
-        : "Your domain";
+      : claimType === "INVESTOR_IDENTITY"
+        ? "Your identity"
+        : claimType === "ORGANISATION"
+          ? "Your organisation"
+          : "Your domain";
   switch (status) {
     case "NOT_REQUESTED":
       return `${subject}: not requested yet. Capital Q has made no verification decision.`;

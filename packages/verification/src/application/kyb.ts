@@ -17,7 +17,7 @@ import {
   type AuthorizationService,
 } from "@capital-q/security";
 
-import { standingOf } from "../domain/claims.js";
+import { personClaimTypeFor, standingOf } from "../domain/claims.js";
 import { verificationClaimRecordedEvent } from "../events/index.js";
 import { VERIFICATION_REQUEST } from "./company-verification.js";
 import type { VerificationClaimRepository } from "./ports.js";
@@ -183,6 +183,26 @@ function keyHash(key: string): string {
   return createHash("sha256").update(key).digest("hex").slice(0, 16);
 }
 
+/** The organisation's name and side; an organisation is one or the other. */
+async function organisationOf(
+  executor: DatabaseExecutor,
+  organisationId: string,
+): Promise<{
+  readonly display_name: string;
+  readonly kind: "COMPANY" | "INVESTOR" | null;
+} | null> {
+  const [row] = await executor<
+    { display_name: string; kind: "COMPANY" | "INVESTOR" | null }[]
+  >`
+    select o.display_name,
+           case when exists (select 1 from core.companies c where c.organisation_id = o.id)
+                then 'COMPANY'
+                when exists (select 1 from core.investor_organisations i where i.organisation_id = o.id)
+                then 'INVESTOR' end as kind
+      from identity.organisations o where o.id = ${organisationId}`;
+  return row ?? null;
+}
+
 export function createKybService(dependencies: {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
@@ -215,15 +235,8 @@ export function createKybService(dependencies: {
        where tenant_id = ${tenantId} and organisation_id = ${organisationId}
          and user_id = ${userId}
        order by created_at desc limit 1`;
-    const [organisation] = await executor<
-      { display_name: string; kind: "COMPANY" | "INVESTOR" | null }[]
-    >`
-      select o.display_name,
-             case when exists (select 1 from core.companies c where c.organisation_id = o.id)
-                  then 'COMPANY'
-                  when exists (select 1 from core.investor_organisations i where i.organisation_id = o.id)
-                  then 'INVESTOR' end as kind
-        from identity.organisations o where o.id = ${organisationId}`;
+    const organisation = await organisationOf(executor, organisationId);
+    const personType = personClaimTypeFor(organisation?.kind ?? "COMPANY");
     const claims = await repository.currentForOrganisation(
       executor,
       tenantId,
@@ -235,7 +248,7 @@ export function createKybService(dependencies: {
       ) ?? null;
     const personClaim =
       claims.find(
-        (c) => c.claimType === "FOUNDER_IDENTITY" && c.subjectId === userId,
+        (c) => c.claimType === personType && c.subjectId === userId,
       ) ?? null;
     const personStanding = standingOf(personClaim, now());
     return {
@@ -327,6 +340,10 @@ export function createKybService(dependencies: {
           tenantId,
           organisationId,
         );
+        // ADR 0038: a founder's person claim, or an investor's.
+        const personType = personClaimTypeFor(
+          (await organisationOf(tx.sql, organisationId))?.kind ?? "COMPANY",
+        );
         const currentOf = (claimType: string, subjectId: string) =>
           claims.find(
             (c) => c.claimType === claimType && c.subjectId === subjectId,
@@ -369,10 +386,7 @@ export function createKybService(dependencies: {
           if (openIdentity !== undefined) {
             return { kind: "ALREADY_OPEN", part: "PERSON" };
           }
-          if (
-            standingOf(currentOf("FOUNDER_IDENTITY", userId), now()) ===
-            "VERIFIED"
-          ) {
+          if (standingOf(currentOf(personType, userId), now()) === "VERIFIED") {
             return { kind: "ALREADY_VERIFIED", part: "PERSON" };
           }
           if (
@@ -385,7 +399,7 @@ export function createKybService(dependencies: {
 
         /** The PENDING claim to attach to: the open one, else a new request. */
         const pendingClaim = async (
-          claimType: "ORGANISATION" | "FOUNDER_IDENTITY",
+          claimType: "ORGANISATION" | "FOUNDER_IDENTITY" | "INVESTOR_IDENTITY",
           subjectId: string,
           via: string,
         ): Promise<string> => {
@@ -476,11 +490,7 @@ export function createKybService(dependencies: {
         }
         if (command.person !== null) {
           const input = command.person;
-          const claimId = await pendingClaim(
-            "FOUNDER_IDENTITY",
-            userId,
-            "identity",
-          );
+          const claimId = await pendingClaim(personType, userId, "identity");
           const [row] = await tx.sql<{ id: string }[]>`
             insert into core.identity_submissions
               (tenant_id, organisation_id, user_id, name_on_id, role,

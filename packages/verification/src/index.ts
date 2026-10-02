@@ -27,6 +27,7 @@ export {
   founderIdentityOf,
   isRequestable,
   organisationIdentityOf,
+  personClaimTypeFor,
   standingOf,
   SUBJECT_TYPE_OF,
   type VerificationClaim,
