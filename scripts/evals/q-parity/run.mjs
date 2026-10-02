@@ -27,9 +27,10 @@
  */
 import { randomUUID } from "node:crypto";
 
-const { APP_ACTIONS, MODEL_CALLS_PER_CASE, parityCases } = await import(
-  new URL("../../../packages/app-actions/dist/index.js", import.meta.url).href
-);
+const { APP_ACTIONS, MODEL_CALLS_PER_CASE, parityCases, untitledPitchName } =
+  await import(
+    new URL("../../../packages/app-actions/dist/index.js", import.meta.url).href
+  );
 
 const DRY = process.argv.includes("--dry-run");
 /** USD per model call, upper bound at today's routing (turn reader + answer, ~15k tokens in). */
@@ -49,6 +50,7 @@ const ACCOUNT_OF_READ = {
   media: "FOUNDER",
   documents: "FOUNDER",
   rehearsals: "FOUNDER",
+  feed: "INVESTOR",
 };
 
 const sql = async (query) => {
@@ -77,16 +79,21 @@ const userOf = async (email) =>
 
 /** Real record names on the eval accounts, read the way the pages read them. */
 async function namesFor(founderUser, investorUser) {
-  const pitch = (
+  const pitchRow = (
     await sql(
-      `select coalesce(m.title, 'Pitch') as title from media.media_assets m
+      `select m.title, c.canonical_name as company from media.media_assets m
          join core.companies c on c.id = m.owner_id
          join identity.organisation_memberships om on om.organisation_id = c.organisation_id
         where om.user_id = ${quote(founderUser)} and m.purpose = 'FOUNDER_PITCH'
           and m.deleted_at is null and m.superseded_at is null
         order by m.created_at desc limit 1`,
     )
-  )[0]?.title;
+  )[0];
+  // An untitled pitch by the read registry's own name for it.
+  const pitch =
+    pitchRow === undefined
+      ? undefined
+      : (pitchRow.title ?? untitledPitchName(pitchRow.company));
   const company = (
     await sql(
       `select c.canonical_name as name from recommendation.slate_items i
@@ -103,7 +110,10 @@ async function namesFor(founderUser, investorUser) {
       ...(pitch === undefined ? {} : { MEDIA: pitch }),
       ...(company === undefined ? {} : { COMPANY: company }),
     },
-    reads: pitch === undefined ? {} : { media: pitch },
+    reads: {
+      ...(pitch === undefined ? {} : { media: pitch }),
+      ...(company === undefined ? {} : { feed: company }),
+    },
   };
 }
 
@@ -151,7 +161,12 @@ async function settled(runId) {
     const row = (
       await sql(`select status from q_runtime.runs where id = ${quote(runId)}`)
     )[0];
-    if (row !== undefined && /COMPLETED|FAILED|CANCELLED/.test(row.status))
+    // AWAITING_APPROVAL is where a CONSEQUENTIAL case ends: prepared,
+    // never approved by the eval.
+    if (
+      row !== undefined &&
+      /COMPLETED|FAILED|CANCELLED|AWAITING_APPROVAL/.test(row.status)
+    )
       return row.status;
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }

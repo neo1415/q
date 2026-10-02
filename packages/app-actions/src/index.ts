@@ -33,6 +33,7 @@ export {
   OwnReadKindSchema,
   ownIndex,
   pitchItem,
+  untitledPitchName,
   readOwn,
   type OwnIndexEntry,
   type OwnReadItem,

@@ -138,11 +138,11 @@ describe("the parity eval's cases come from the registry", () => {
     const cases = parityCases(
       APP_ACTIONS,
       { COMPANY: "Kazikit", MEDIA: "Nixo pitch" },
-      { media: "Nixo pitch" },
+      { media: "Nixo pitch", feed: "Kazikit" },
     );
     // Actions still served by a hand tool have no generated eval case yet.
     expect(cases).toHaveLength(
-      APP_ACTIONS.filter((action) => action.tool !== undefined).length * 3 + 2,
+      APP_ACTIONS.filter((action) => action.tool !== undefined).length * 3 + 4,
     );
     expect(
       cases.find((c) => c.id === "discovery.company.pass#misheard")?.say,

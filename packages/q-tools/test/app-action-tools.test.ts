@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ownIndex } from "@capital-q/app-actions";
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
 import type { MediaAsset } from "@capital-q/media";
@@ -241,6 +242,85 @@ describe("read_my", () => {
         ],
       },
     });
+  });
+
+  it("names an untitled pitch by their company, never the bare word 'Pitch' (parity eval 2026-10-02)", async () => {
+    const ports = fakePorts({
+      appActions: {
+        ownCompanyId: () => Promise.resolve(COMPANY_A),
+        ownCompanyName: () => Promise.resolve("Ajopot"),
+        media: {
+          listCompanyMedia: () => Promise.resolve([pitch({ title: null })]),
+          setPitchDetails: () => Promise.reject(new Error("unused")),
+        },
+      },
+    });
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(createDefaultQTools(ports)),
+    });
+    const outcome = await executor.execute(
+      call("read_my", { kind: "media" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { items: [{ id: PITCH, title: "Ajopot pitch video" }] },
+    });
+  });
+
+  it("reads the companies in their Discover feed now, so 'not in Saved' is never 'not in Discover'", async () => {
+    const ports = fakePorts({
+      appActions: {
+        feed: () =>
+          Promise.resolve([
+            {
+              id: TALUM,
+              title: "Ajopot",
+              status: "#1 in their feed",
+              at: null,
+              facts: { stage: "seed" },
+            },
+          ]),
+      },
+    });
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(createDefaultQTools(ports)),
+    });
+    const outcome = await executor.execute(
+      call("read_my", { kind: "feed" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        kind: "feed",
+        available: true,
+        items: [{ title: "Ajopot", status: "#1 in their feed" }],
+      },
+    });
+    const index = await ownIndex(
+      {
+        feed: () =>
+          Promise.resolve([
+            {
+              id: TALUM,
+              title: "Ajopot",
+              status: "#1 in their feed",
+              at: null,
+              facts: {},
+            },
+          ]),
+      },
+      actorA,
+    );
+    expect(index).toEqual([
+      {
+        kind: "feed",
+        label: "Companies in their Discover feed now",
+        total: 1,
+        titles: ["Ajopot (#1 in their feed)"],
+      },
+    ]);
   });
 
   it("says a kind is not readable here, rather than empty", async () => {

@@ -44,6 +44,10 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
     media: ["What pitch videos do I have?", "Can investors play my pitch?"],
     documents: ["What documents have you made for me?", "List my documents."],
     rehearsals: ["How did my rehearsals go?", "Have I rehearsed with anyone?"],
+    feed: [
+      "What's in my Discover feed?",
+      "Which companies are in my feed right now?",
+    ],
   };
 
 export function parityCases(

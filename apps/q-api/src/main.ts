@@ -1360,6 +1360,13 @@ const errandStore = createPostgresErrandStore(database.sql);
 // rehearsals are read as their pages list them; both are closures because
 // those services are composed further down.
 const appActionBoard = createAppActionBoard({ logger });
+const investorFeed = createInvestorFeedPort({
+  reader: slateRead.reader,
+  ports: slateRead.eligibilityPorts,
+  cards: createPostgresCompanyCardPort({ sql: database.sql }),
+  decisions: createPostgresInvestorDecisionReader({ sql: database.sql }),
+  logger,
+});
 const appActionPorts: OwnReadPorts = {
   media: pitchMedia,
   interactions: createInteractionSignalService({
@@ -1370,6 +1377,31 @@ const appActionPorts: OwnReadPorts = {
     logger,
   }),
   ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
+  ownCompanyName: async (actor) => {
+    const companyId = await runtimeDependencies.ownCompany(actor);
+    if (companyId === null) return null;
+    const profile = await companies.findCanonicalCompanyProfile(
+      CompanyIdSchema.parse(companyId),
+    );
+    return profile?.canonicalName ?? null;
+  },
+  // Their Discover feed now, as the feed reader pages it for them.
+  feed: async (actor) => {
+    const page = await investorFeed.page(actor, 30);
+    return page === null
+      ? null
+      : page.items.map((item, index) => ({
+          id: item.companyId,
+          title: item.name,
+          status: `#${String(index + 1)} in their feed`,
+          at: null,
+          facts: {
+            stage: item.stageCode,
+            country: item.headquartersCountry,
+            oneLine: item.shortDescription?.slice(0, 200) ?? null,
+          },
+        }));
+  },
   documents: async (actor) =>
     (await qArtifacts.service.list(actor, { limit: 30 })).items.map((item) => ({
       id: item.artifactId,
@@ -1444,13 +1476,7 @@ const qTools = createQTools({
     // An investor's "what should I look at" is answered from their own
     // feed — the same reader the Discover surface calls — and their own
     // Save/Pass decisions by company id (CQ-QACT-001).
-    investorFeed: createInvestorFeedPort({
-      reader: slateRead.reader,
-      ports: slateRead.eligibilityPorts,
-      cards: createPostgresCompanyCardPort({ sql: database.sql }),
-      decisions: createPostgresInvestorDecisionReader({ sql: database.sql }),
-      logger,
-    }),
+    investorFeed,
     // Why a company is in this person's recommendations, from the
     // recommendation context itself. Without it Q explains nothing about
     // ranking, which is correct rather than degraded: the alternative is a

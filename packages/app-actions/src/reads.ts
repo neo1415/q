@@ -14,7 +14,12 @@ import type { AppActionPorts } from "./ports.js";
  * the same authorization; nothing here reads a table.
  */
 
-export const OWN_READ_KINDS = ["media", "documents", "rehearsals"] as const;
+export const OWN_READ_KINDS = [
+  "media",
+  "documents",
+  "rehearsals",
+  "feed",
+] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
 
@@ -40,7 +45,29 @@ export type OwnReadPorts = AppActionPorts & {
   /** Their own rehearsals, as /rehearsals lists them. */
   readonly rehearsals?:
     ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
+  /**
+   * The companies in their Discover feed now, as the feed shows them
+   * (investors; null for anyone else). Parity eval 2026-10-02: with only
+   * Saved and Passed in the facts, "Pass on Ajopot" was refused as "not in
+   * your Discover record" while Ajopot led their feed.
+   */
+  readonly feed?:
+    | ((actor: ActorContext) => Promise<readonly OwnReadItem[] | null>)
+    | undefined;
+  /** Their own company's name, to name an untitled pitch video by. */
+  readonly ownCompanyName?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
 };
+
+/**
+ * What an untitled pitch is called everywhere Q names it (read_my, the
+ * index, name matching). Parity eval 2026-10-02: an untitled pitch read as
+ * "Pitch", and "Make Pitch visible to everyone on Capital Q" was taken as
+ * their company's visibility.
+ */
+export function untitledPitchName(companyName: string | null): string {
+  return companyName === null ? "Pitch video" : `${companyName} pitch video`;
+}
 
 const MEDIA_STATUS: Readonly<Record<string, string>> = {
   CREATED: "waiting for the file",
@@ -51,7 +78,10 @@ const MEDIA_STATUS: Readonly<Record<string, string>> = {
 };
 
 /** A pitch as the pitch page states it: live, private, in review, … */
-export function pitchItem(asset: MediaAsset): OwnReadItem {
+export function pitchItem(
+  asset: MediaAsset,
+  companyName: string | null = null,
+): OwnReadItem {
   const sharing = sharingOf(asset);
   const playable =
     asset.status === "READY" &&
@@ -72,7 +102,7 @@ export function pitchItem(asset: MediaAsset): OwnReadItem {
               : "waiting for Capital Q review";
   return {
     id: asset.id,
-    title: asset.title ?? "Pitch",
+    title: asset.title ?? untitledPitchName(companyName),
     status,
     at: asset.readyAt ?? asset.createdAt,
     facts: {
@@ -100,7 +130,10 @@ export async function readOwn(
       }
       const companyId = await ports.ownCompanyId(actor);
       if (companyId === null) return [];
-      const assets = await ports.media.listCompanyMedia({ actor, companyId });
+      const [assets, companyName] = await Promise.all([
+        ports.media.listCompanyMedia({ actor, companyId }),
+        ports.ownCompanyName?.(actor).catch(() => null) ?? null,
+      ]);
       return assets
         .filter(
           (asset) =>
@@ -108,12 +141,14 @@ export async function readOwn(
             asset.status !== "DELETED" &&
             asset.supersededAt === null,
         )
-        .map(pitchItem);
+        .map((asset) => pitchItem(asset, companyName));
     }
     case "documents":
       return ports.documents === undefined ? null : ports.documents(actor);
     case "rehearsals":
       return ports.rehearsals === undefined ? null : ports.rehearsals(actor);
+    case "feed":
+      return ports.feed === undefined ? null : ports.feed(actor);
   }
 }
 
@@ -121,6 +156,7 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   media: "Pitch videos",
   documents: "Documents",
   rehearsals: "Rehearsals",
+  feed: "Companies in their Discover feed now",
 };
 
 /** One kind in the "what exists" index: a count and a few titles with state. */

@@ -288,7 +288,7 @@ export const READ_MY = "app.own.read" as const;
 export const ReadMyInputSchema = z
   .object({
     kind: OwnReadKindSchema.describe(
-      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played).",
+      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor).",
     ),
     text: z
       .string()
@@ -322,7 +322,7 @@ export function createReadMyTool(own: OwnReadPorts): AnyQToolDefinition {
     status: "ACTIVE",
     providerName: "read_my",
     description:
-      "Reads the person's own records of one kind exactly as their page shows them: their pitch videos (title, who can watch, whether investors can play it), their documents, or their rehearsals. Use it before saying they have none.",
+      "Reads the person's own records of one kind exactly as their page shows them: their pitch videos (title, who can watch, whether investors can play it), their documents, their rehearsals, or the companies in their Discover feed now. Use it before saying they have none, or that a company is not in their feed.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
