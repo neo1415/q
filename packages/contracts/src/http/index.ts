@@ -375,6 +375,7 @@ export {
   DiligenceShareResultDtoSchema,
   DiligenceRequestResultDtoSchema,
   DiligenceDownloadDtoSchema,
+  DiligenceRevokeResultDtoSchema,
   type DiligenceDto,
   type RequestDiligenceDocumentRequest,
   networkRelationshipOutcomePath,

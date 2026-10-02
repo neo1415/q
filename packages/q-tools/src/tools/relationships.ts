@@ -206,6 +206,19 @@ export const GetRelationshipOutputSchema = z
       })
       .strict()
       .nullable(),
+    /**
+     * The diligence area, once diligence started (2026-10-02): what the
+     * investor asked for, which requests are answered, what was shared.
+     * Absent when there is none or it cannot be read.
+     */
+    diligence: z
+      .object({
+        openRequests: z.array(z.string().max(200)).max(50),
+        answeredRequests: z.array(z.string().max(200)).max(50),
+        sharedDocuments: z.array(z.string().max(300)).max(50),
+      })
+      .strict()
+      .optional(),
     /** Recorded by Capital Q as it happened: not a claim and not an inference. */
     truthClass: z.literal("VERIFIED"),
     source: z.literal("Capital Q relationship history"),
@@ -366,14 +379,30 @@ function createGetRelationshipTool(
         return deny("NOT_AVAILABLE");
       }
     },
-    execute: (_input, _context, grant) =>
-      Promise.resolve({
+    execute: async (_input, context, grant) => {
+      const diligence =
+        grant.status === null || relationships.diligence === undefined
+          ? null
+          : await relationships
+              .diligence(context.actor, grant.status.relationshipId)
+              .catch(() => null);
+      return {
         yourSide: grant.side,
         counterpart: grant.counterpart,
         relationship: relationshipOut(grant.status),
+        ...(diligence === null
+          ? {}
+          : {
+              diligence: {
+                openRequests: [...diligence.openRequests],
+                answeredRequests: [...diligence.answeredRequests],
+                sharedDocuments: [...diligence.sharedDocuments],
+              },
+            }),
         truthClass: "VERIFIED",
         source: "Capital Q relationship history",
-      }),
+      };
+    },
   });
 }
 

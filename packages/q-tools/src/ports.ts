@@ -122,6 +122,20 @@ export type RelationshipIntelligencePort = {
    * actor's own side sees it. The side is decided by the Network context
    * from the actor's membership; null when the actor is not a party.
    */
+  /**
+   * The relationship's diligence area for the actor's own side, once
+   * diligence started (2026-10-02); null when there is none.
+   */
+  readonly diligence?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+      ) => Promise<{
+        readonly openRequests: readonly string[];
+        readonly answeredRequests: readonly string[];
+        readonly sharedDocuments: readonly string[];
+      } | null>)
+    | undefined;
   readonly byRelationship: (
     actor: ActorContext,
     relationshipId: string,

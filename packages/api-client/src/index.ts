@@ -381,3 +381,11 @@ export {
 // ADMIN-3 block
 export * from "./reviews-kyb.js";
 // end ADMIN-3 block
+export {
+  diligenceDownload,
+  fulfilDiligenceRequest,
+  getDiligence,
+  requestDiligenceDocument,
+  revokeDiligenceShare,
+  shareDiligenceDocument,
+} from "./diligence.js";

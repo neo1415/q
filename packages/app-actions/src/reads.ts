@@ -22,6 +22,8 @@ export const OWN_READ_KINDS = [
   // 2026-10-02: their recent calls with Q's notes, so "how did it go?",
   // the follow-ups and what was proposed to Q in the call can be acted on.
   "calls",
+  // Diligence (2026-10-02): requests, answers and shared documents.
+  "diligence",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -63,6 +65,9 @@ export type OwnReadPorts = AppActionPorts & {
    * and, for the organiser, what was proposed to Q in the call.
    */
   readonly calls?:
+    ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
+  /** Their relationships' diligence areas, as the relationship page shows them. */
+  readonly diligenceAreas?:
     ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
   /** Their own company's name, to name an untitled pitch video by. */
   readonly ownCompanyName?:
@@ -161,6 +166,10 @@ export async function readOwn(
       return ports.feed === undefined ? null : ports.feed(actor);
     case "calls":
       return ports.calls === undefined ? null : ports.calls(actor);
+    case "diligence":
+      return ports.diligenceAreas === undefined
+        ? null
+        : ports.diligenceAreas(actor);
   }
 }
 
@@ -170,6 +179,7 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   rehearsals: "Rehearsals",
   feed: "Companies in their Discover feed now",
   calls: "Recent calls with Q's notes",
+  diligence: "Diligence requests and shared documents",
 };
 
 /** One kind in the "what exists" index: a count and a few titles with state. */

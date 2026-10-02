@@ -14,6 +14,10 @@ import {
   NETWORK_INVESTOR_RELATIONSHIPS_PATH,
   NETWORK_COMPANY_RELATIONSHIPS_PATH,
   NETWORK_PASS_REASONS_PATH,
+  NETWORK_RELATIONSHIP_DILIGENCE_PATH,
+  NETWORK_DILIGENCE_DOWNLOAD_PATH,
+  DiligenceDtoSchema,
+  DiligenceDownloadDtoSchema,
   NETWORK_RELATIONSHIP_PASS_PATH,
   PassReasonListDtoSchema,
   RelationshipListDtoSchema,
@@ -21,6 +25,7 @@ import {
   RelationshipStatusResponseDtoSchema,
 } from "@capital-q/contracts";
 import {
+  InterestNotFoundError,
   toConnectionRequestDto,
   toIncomingConnectionRequestDto,
   toIncomingInterestDto,
@@ -31,6 +36,7 @@ import {
   type InterestService,
   type RelationshipOutcomeService,
 } from "@capital-q/network";
+import type { DiligenceService } from "@capital-q/permissions";
 
 import {
   getActorContext,
@@ -67,6 +73,8 @@ export type NetworkInterestRoutesDependencies = ActorContextDependencies & {
    * and the founder's notice. The commands are ADR 0040 app actions.
    */
   readonly outcomes?: RelationshipOutcomeService | undefined;
+  /** Diligence reads: the area and a shared document's signed download. */
+  readonly diligence?: DiligenceService | undefined;
 };
 
 function investorIdOf(request: FastifyRequest): string {
@@ -163,6 +171,52 @@ export function registerNetworkInterestRoutes(
         });
         void reply.header("Cache-Control", "no-store");
         return RelationshipPassResponseDtoSchema.parse({ pass });
+      },
+    );
+  }
+
+  // Diligence (2026-10-02): the relationship's area for the side asking, and
+  // a shared document's short-lived download, decided by the disclosure
+  // layer for this person. Writes are ADR 0040 app actions.
+  const diligence = dependencies.diligence;
+  if (diligence !== undefined) {
+    const param = (request: FastifyRequest, key: string) => {
+      const value = (request.params as Record<string, unknown>)[key];
+      return typeof value === "string" ? value : "";
+    };
+    app.get(
+      NETWORK_RELATIONSHIP_DILIGENCE_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const view = await diligence.view({
+          actor: getActorContext(request),
+          relationshipId: param(request, "relationshipId"),
+        });
+        if (view === null) {
+          // The one not-found: a relationship or a share this person
+          // cannot see is indistinguishable from none.
+          throw new InterestNotFoundError();
+        }
+        void reply.header("Cache-Control", "no-store");
+        return DiligenceDtoSchema.parse(view);
+      },
+    );
+    app.get(
+      NETWORK_DILIGENCE_DOWNLOAD_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const link = await diligence.download({
+          actor: getActorContext(request),
+          relationshipId: param(request, "relationshipId"),
+          documentId: param(request, "documentId"),
+        });
+        if (link === null) {
+          // The one not-found: a relationship or a share this person
+          // cannot see is indistinguishable from none.
+          throw new InterestNotFoundError();
+        }
+        void reply.header("Cache-Control", "no-store");
+        return DiligenceDownloadDtoSchema.parse(link);
       },
     );
   }

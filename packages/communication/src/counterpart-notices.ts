@@ -16,7 +16,9 @@ export type CounterpartNoticeKind =
   | "Q_MESSAGE"
   | "TIME_PROPOSED"
   /** A pass, pause or resume on the relationship (2026-10-02). */
-  | "RELATIONSHIP_OUTCOME";
+  | "RELATIONSHIP_OUTCOME"
+  /** A diligence request or a shared document (2026-10-02). */
+  | "DILIGENCE";
 
 export function createCounterpartNotices(sql: DatabaseExecutor) {
   return {

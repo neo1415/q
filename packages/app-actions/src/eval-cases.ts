@@ -59,6 +59,10 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
       "What did we agree on my last call?",
       "What follow-ups came out of my call?",
     ],
+    diligence: [
+      "What documents have they asked for in diligence?",
+      "Which diligence requests are still open?",
+    ],
   };
 
 export function parityCases(

@@ -745,3 +745,6 @@ export const DiligenceRequestResultDtoSchema = z
 export const DiligenceDownloadDtoSchema = z
   .object({ url: z.string().url(), expiresAt: UtcTimestampSchema })
   .strict();
+export const DiligenceRevokeResultDtoSchema = z
+  .object({ revoked: z.boolean() })
+  .strict();

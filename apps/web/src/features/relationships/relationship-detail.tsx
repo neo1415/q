@@ -30,6 +30,7 @@ import { StatusPill } from "./status-pill";
 import { RelationshipCommitment } from "./relationship-commitment";
 import { RelationshipErrands } from "./relationship-errands";
 import { RelationshipOutcome } from "./relationship-outcome";
+import { RelationshipDiligence } from "./relationship-diligence";
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
   NEXT_STEP_WORDS,
@@ -112,6 +113,18 @@ export function RelationshipDetail({
               <RelationshipCommitment
                 relationshipId={relationship.relationshipId}
                 counterpart={counterpart}
+              />
+            </Card>
+          )}
+
+          {relationship === null ||
+          !relationship.milestones.some(
+            (milestone) => milestone.state === "IN_DILIGENCE",
+          ) ? null : (
+            <Card title="Diligence" id="diligence">
+              <RelationshipDiligence
+                relationshipId={relationship.relationshipId}
+                companyId={relationship.companyId}
               />
             </Card>
           )}

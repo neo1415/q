@@ -57,6 +57,19 @@ export type SharedDocumentDownloads = {
    * to (the pitch rule); this answers only which deck, and the download is
    * `authorizeSharedVersion` on exactly that version.
    */
+  /**
+   * One active document by id, permission-neutral, for a caller whose own
+   * disclosure layer decides who may see it (diligence shares): its tenant,
+   * company, title, type and current version. Nothing of its content.
+   */
+  readonly canonicalDocument: (documentId: string) => Promise<{
+    readonly id: string;
+    readonly tenantId: string;
+    readonly companyId: string | null;
+    readonly title: string;
+    readonly documentType: string;
+    readonly currentVersionId: string | null;
+  } | null>;
   readonly investorAudienceDeck: (company: {
     readonly companyTenantId: string;
     readonly companyId: string;
@@ -125,6 +138,8 @@ export function createSharedDocumentDownloads(options: {
         ? null
         : document.documentType;
     },
+    canonicalDocument: (documentId) =>
+      findActiveDocumentById(options.sql, documentId),
     investorAudienceDeck: async (company) => {
       const tenantId = TenantIdSchema.safeParse(company.companyTenantId);
       if (!tenantId.success) return null;
@@ -135,4 +150,48 @@ export function createSharedDocumentDownloads(options: {
       );
     },
   };
+}
+
+/**
+ * One active document by id, permission-neutral: tenant, company, title,
+ * type and current version, nothing of its content. For a caller whose own
+ * disclosure layer decides who may see it (diligence shares).
+ */
+export async function findActiveDocumentById(
+  sql: DatabaseExecutor,
+  documentId: string,
+): Promise<{
+  readonly id: string;
+  readonly tenantId: string;
+  readonly companyId: string | null;
+  readonly title: string;
+  readonly documentType: string;
+  readonly currentVersionId: string | null;
+} | null> {
+  const id = DocumentIdSchema.safeParse(documentId);
+  if (!id.success) return null;
+  const rows = await sql<
+    {
+      id: string;
+      tenant_id: string;
+      company_id: string | null;
+      title: string;
+      document_type: string;
+      current_version_id: string | null;
+    }[]
+  >`
+    select id, tenant_id, company_id, title, document_type, current_version_id
+      from evidence.documents
+     where id = ${id.data} and status = 'ACTIVE'`;
+  const row = rows[0];
+  return row === undefined
+    ? null
+    : {
+        id: row.id,
+        tenantId: row.tenant_id,
+        companyId: row.company_id,
+        title: row.title,
+        documentType: row.document_type,
+        currentVersionId: row.current_version_id,
+      };
 }

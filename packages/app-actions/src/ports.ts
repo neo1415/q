@@ -30,7 +30,10 @@ import type {
   InterestService,
   RelationshipOutcomeService,
 } from "@capital-q/network";
-import type { VisibilityCentre } from "@capital-q/permissions";
+import type {
+  DiligenceService,
+  VisibilityCentre,
+} from "@capital-q/permissions";
 import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 
 import type { DeckAudiencePort } from "./actions/deck.js";
@@ -167,6 +170,9 @@ export type AppActionPorts = {
         "requestConnection" | "respondToConnectionRequest"
       >
     | undefined;
+  /** Diligence documents and requests (2026-10-02): the diligence service. */
+  readonly diligence?:
+    Pick<DiligenceService, "view" | "share" | "revoke" | "request"> | undefined;
   /** Post-meeting outcomes (2026-10-02): Network's outcome service. */
   readonly outcomes?:
     | Pick<

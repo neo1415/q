@@ -160,6 +160,7 @@ import {
 import {
   createPostgresDocumentQueryPort,
   DocumentIdSchema,
+  findActiveDocumentById,
 } from "@capital-q/evidence";
 import {
   createInvestorService,
@@ -179,6 +180,7 @@ import {
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
   createRelationshipEventAppender,
+  createPostgresDiligenceRequests,
   createRelationshipEventRegistry,
   parseSpokenAmount,
   RELATIONSHIP_EVENT_DEFINITIONS,
@@ -229,6 +231,7 @@ import {
   createPermissionsService,
   createPostgresDisclosurePolicyRepository,
   createRelationshipPartyResolver,
+  createDiligenceService,
   createVisibilityCentre,
   systemDisclosureClock,
 } from "@capital-q/permissions";
@@ -477,6 +480,7 @@ import {
 } from "@capital-q/platform-admin";
 import { withSuspension } from "./composition/suspension.js";
 import { createOwnCalls } from "./composition/own-calls.js";
+import { createOwnDiligence } from "./composition/own-diligence.js";
 // end ADMIN block
 // ADMIN-3 block
 import {
@@ -559,6 +563,11 @@ const disclosurePorts = {
   mandates,
   capital,
   relationships,
+  // Diligence: a company's own document as a disclosure resource.
+  documents: {
+    findCanonicalDocument: (documentId: string) =>
+      findActiveDocumentById(database.sql, documentId),
+  },
 };
 const disclosureResolvers = createDisclosureResourceResolverRegistry(
   createDefaultDisclosureResolvers(disclosurePorts),
@@ -1259,6 +1268,59 @@ const permissionsService = createPermissionsService({
   resolvers: disclosureResolvers,
   relationshipParties,
 });
+/**
+ * Diligence (2026-10-02): Q prepares shares, revokes and requests through
+ * the same service as the relationship page, approved on a card first. Q
+ * never downloads a document.
+ */
+const diligenceService = createDiligenceService({
+  sql: database.sql,
+  transactions: database.transactions,
+  relationships: interestService,
+  policies: permissionsService.policies,
+  policyRepository: createPostgresDisclosurePolicyRepository(),
+  access: disclosure,
+  documents: {
+    ownDocument: async (actor, documentId) => {
+      const document = await researchComposition.evidence
+        .getDocument({ actor, documentId: DocumentIdSchema.parse(documentId) })
+        .catch(() => null);
+      return document === null
+        ? null
+        : {
+            id: document.id,
+            tenantId: document.tenantId,
+            companyId: document.companyId,
+            title: document.title,
+            documentType: document.documentType,
+            currentVersionId: document.currentVersionId,
+          };
+    },
+    canonical: (documentId) => findActiveDocumentById(database.sql, documentId),
+    signedDownload: () => Promise.reject(new Error("Q_NEVER_DOWNLOADS")),
+  },
+  requests: createPostgresDiligenceRequests(),
+  appender: createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  }),
+  audit: createPostgresMaterialActionAuditWriter(),
+  notify: (input) =>
+    createCounterpartNotices(database.sql).notify({
+      relationshipId: input.relationshipId,
+      actingSide: input.actingSide,
+      kind: "DILIGENCE",
+      title: input.title,
+      body: null,
+      target: "RELATIONSHIP",
+      key: input.key,
+      priority: "UPDATE",
+    }),
+  newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+});
 const visibilityCentre = createVisibilityCentre({
   access: permissionsService.access,
   inspect: permissionsService.inspectResourceDisclosure,
@@ -1410,6 +1472,12 @@ const investorFeed = createInvestorFeedPort({
 const appActionPorts: OwnReadPorts = {
   media: pitchMedia,
   outcomes: outcomeService,
+  diligence: diligenceService,
+  diligenceAreas: createOwnDiligence({
+    interests: interestService,
+    diligence: diligenceService,
+    ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
+  }),
   calls: createOwnCalls({ sql: database.sql }),
   // ADR 0041: who may download a pitch deck, through Evidence (which
   // authorises, audits and emits); ids were validated by the action.
@@ -1606,12 +1674,34 @@ const qTools = createQTools({
     ...(researchComposition.profiles === undefined
       ? {}
       : { profiles: researchComposition.profiles }),
-    relationships: createRelationshipIntelligencePort({
-      interests: interestService,
-      board: relationshipBoard,
-      ownCompany: runtimeDependencies.ownCompany,
-      connections: connectionService,
-    }),
+    relationships: {
+      ...createRelationshipIntelligencePort({
+        interests: interestService,
+        board: relationshipBoard,
+        ownCompany: runtimeDependencies.ownCompany,
+        connections: connectionService,
+      }),
+      // Diligence (2026-10-02): get_relationship names the area's requests
+      // and shares, read through the diligence service as the person.
+      diligence: async (actor, relationshipId) => {
+        const view = await diligenceService.view({ actor, relationshipId });
+        if (
+          view === null ||
+          (view.requests.length === 0 && view.shares.length === 0 && !view.open)
+        ) {
+          return null;
+        }
+        return {
+          openRequests: view.requests
+            .filter((r) => r.status === "OPEN")
+            .map((r) => r.title),
+          answeredRequests: view.requests
+            .filter((r) => r.status === "FULFILLED")
+            .map((r) => r.title),
+          sharedDocuments: view.shares.map((s) => s.title.slice(0, 300)),
+        };
+      },
+    },
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {
       momentAround: async (actor, query) => {
