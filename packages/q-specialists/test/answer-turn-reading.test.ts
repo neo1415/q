@@ -763,7 +763,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
     // No company in the run, no artifact service composed here, no
     // visibility notebook: screens only, and never the visibility one.
     // R33: what only the person can do comes with its screen, and a
-    // company's own screens (Pitch, Verification) wait for a company.
+    // company's own screens (Pitch) wait for a company.
     expect(run.capabilities).toEqual([
       {
         navigate: [
@@ -806,6 +806,9 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           // Answer founders' Connection Requests (ADR 0023); sending one
           // is a company's own and waits for a company.
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
+          // Submit organisation verification (KYB, ADR 0040 offer): any
+          // organisation verifies, an investor's included.
+          expect.objectContaining({ destination: "VERIFICATION" }),
         ],
       },
     ]);
