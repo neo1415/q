@@ -29,11 +29,15 @@ export type VerificationQueueRow = {
   /** The KYB details submitted with this request, when there are any. */
   readonly kyb: {
     readonly submissionId: string;
-    readonly legalName: string;
-    readonly registrationNumber: string;
-    readonly jurisdictionCode: string;
+    readonly source: "PERSON" | "AUTO";
+    readonly organisationName: string | null;
+    readonly legalName: string | null;
+    readonly registrationNumber: string | null;
+    readonly jurisdictionCode: string | null;
     readonly registeredAddress: string | null;
     readonly websiteUrl: string | null;
+    readonly contactEmailDomain: string | null;
+    readonly emailDomainMatchesWebsite: boolean | null;
     readonly hasDocument: boolean;
   } | null;
 };
@@ -61,6 +65,10 @@ export async function verificationQueue(
       evidence_source_id: string | null;
       created_at: Date;
       kyb_id: string | null;
+      kyb_source: "PERSON" | "AUTO" | null;
+      kyb_org_name: string | null;
+      kyb_email_domain: string | null;
+      kyb_domain_match: boolean | null;
       kyb_legal_name: string | null;
       kyb_registration_number: string | null;
       kyb_jurisdiction: string | null;
@@ -77,7 +85,10 @@ export async function verificationQueue(
            rp.display_name as requester_name, ru.email::text as requester_email,
            coalesce(ru.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false) as synthetic,
            c.evidence_source_id, c.created_at,
-           k.id as kyb_id, k.legal_name as kyb_legal_name,
+           k.id as kyb_id, k.source as kyb_source, k.organisation_name as kyb_org_name,
+           k.contact_email_domain as kyb_email_domain,
+           k.email_domain_matches_website as kyb_domain_match,
+           k.legal_name as kyb_legal_name,
            k.registration_number as kyb_registration_number,
            k.jurisdiction_code as kyb_jurisdiction, k.registered_address as kyb_address,
            k.website_url as kyb_website, (k.document_id is not null) as kyb_has_document
@@ -116,9 +127,13 @@ export async function verificationQueue(
         ? null
         : {
             submissionId: row.kyb_id,
-            legalName: row.kyb_legal_name ?? "",
-            registrationNumber: row.kyb_registration_number ?? "",
-            jurisdictionCode: row.kyb_jurisdiction ?? "",
+            source: row.kyb_source ?? "PERSON",
+            organisationName: row.kyb_org_name,
+            legalName: row.kyb_legal_name,
+            registrationNumber: row.kyb_registration_number,
+            jurisdictionCode: row.kyb_jurisdiction,
+            contactEmailDomain: row.kyb_email_domain,
+            emailDomainMatchesWebsite: row.kyb_domain_match,
             registeredAddress: row.kyb_address,
             websiteUrl: row.kyb_website,
             hasDocument: row.kyb_has_document === true,

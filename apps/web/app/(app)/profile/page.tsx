@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cache, Suspense, type ReactNode } from "react";
@@ -501,6 +503,8 @@ export default async function ProfilePage() {
             ]}
             verification={company !== null ? data.verification : null}
             verificationHref={company !== null ? "/verification" : null}
+            verificationCompanyId={company !== null ? company.id : null}
+            verificationRequestKey={company !== null ? randomUUID() : null}
           />
         </aside>
       </div>
@@ -589,6 +593,9 @@ type SignalsProps = {
   readonly subjects: readonly SignalsSubjectRef[];
   readonly verification: VerificationState | null;
   readonly verificationHref: string | null;
+  // ADMIN-4 block: the inline "Request verification" button.
+  readonly verificationCompanyId: string | null;
+  readonly verificationRequestKey: string | null;
 };
 
 /**

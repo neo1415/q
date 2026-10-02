@@ -64,6 +64,15 @@ export {
   type RequestCompanyVerificationResult,
 } from "./application/company-verification.js";
 export {
+  createAutoVerificationRequester,
+  createAutoVerificationSweep,
+  createPostgresAutoRequestCandidateSource,
+  emailDomainMatchesWebsite,
+  websiteHost,
+  type AutoRequestCandidate,
+  type AutoRequestOutcome,
+} from "./application/auto-request.js";
+export {
   closeKybForClaim,
   createKybService,
   type KybInput,

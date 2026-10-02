@@ -94,3 +94,31 @@ export async function requestVerificationAction(
   }
   redirect(`/verification?notice=${notice}`);
 }
+
+/**
+ * ADMIN-4: the same request from the profile's verification card, which
+ * returns to the profile. The key is minted when the card renders.
+ */
+export async function requestVerificationFromProfileAction(
+  formData: FormData,
+): Promise<never> {
+  const companyId = CompanyIdInput.safeParse(formData.get("companyId"));
+  const key = KeyInput.safeParse(formData.get("requestKey"));
+  if (!companyId.success || !key.success) {
+    redirect("/verification?notice=not-allowed");
+  }
+  const current = await session();
+  if (current === null) redirect("/verification?notice=sign-in");
+  let notice: VerificationNotice;
+  try {
+    await requestCompanyVerification(current, companyId.data, key.data);
+    notice = "requested";
+  } catch (error) {
+    notice = noticeFor(error);
+  }
+  // Success: the profile card itself now reads "Requested". Anything else
+  // lands where verification notices are explained.
+  redirect(
+    notice === "requested" ? "/profile" : `/verification?notice=${notice}`,
+  );
+}

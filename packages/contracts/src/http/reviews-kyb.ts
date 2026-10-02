@@ -130,13 +130,14 @@ export const KybDtoSchema = z
     submission: z
       .object({
         submissionId: UuidSchema,
-        legalName: z.string().max(300),
-        registrationNumber: z.string().max(100),
-        jurisdictionCode: z.string().max(2),
+        source: z.enum(["PERSON", "AUTO"]),
+        legalName: z.string().max(300).nullable(),
+        registrationNumber: z.string().max(100).nullable(),
+        jurisdictionCode: z.string().max(2).nullable(),
         registeredAddress: z.string().max(500).nullable(),
         websiteUrl: z.string().max(500).nullable(),
         hasDocument: z.boolean(),
-        status: z.enum(["SUBMITTED", "APPROVED", "REJECTED"]),
+        status: z.enum(["SUBMITTED", "APPROVED", "REJECTED", "SUPERSEDED"]),
         decisionReason: z.string().max(1000).nullable(),
         submittedAt: Iso,
         decidedAt: Iso.nullable(),

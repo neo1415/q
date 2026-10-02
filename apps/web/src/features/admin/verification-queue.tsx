@@ -99,6 +99,15 @@ export function VerificationQueue({
 }
 
 /** ADMIN-3: the business details sent with this request, and its document. */
+/** In words, never colour alone; unknown stays unknown. */
+function domainSignal(domain: string | null, matches: boolean | null): string {
+  if (domain === null) return "Email domain: unknown";
+  if (matches === null) return `Email domain ${domain} · no website to compare`;
+  return matches
+    ? `Email domain ${domain} matches the website`
+    : `Email domain ${domain} doesn't match the website`;
+}
+
 function KybDetails({
   kyb,
 }: {
@@ -107,8 +116,21 @@ function KybDetails({
   const [note, setNote] = useState<string | null>(null);
   return (
     <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-(--cq-border-subtle) px-3 py-2">
+      {/* ADMIN-4 block: automatic requests and the email-domain signal. */}
+      {kyb.source === "AUTO" ? (
+        <span className="cq-caption text-(--cq-text-secondary)">
+          Requested automatically from what the organisation had already given
+        </span>
+      ) : null}
       <span className="cq-body-sm text-(--cq-text-primary)">
-        {kyb.legalName} · {kyb.registrationNumber} · {kyb.jurisdictionCode}
+        {[
+          kyb.legalName ?? kyb.organisationName ?? "Legal name not given",
+          kyb.registrationNumber ?? "Registration number not given",
+          kyb.jurisdictionCode ?? "Jurisdiction not given",
+        ].join(" · ")}
+      </span>
+      <span className="cq-caption text-(--cq-text-secondary)">
+        {domainSignal(kyb.contactEmailDomain, kyb.emailDomainMatchesWebsite)}
       </span>
       <span className="cq-caption text-(--cq-text-secondary)">
         {[kyb.registeredAddress, kyb.websiteUrl]

@@ -18,6 +18,7 @@ const STATUS_WORDS = {
   SUBMITTED: "With Capital Q for review",
   APPROVED: "Verified",
   REJECTED: "Not verified",
+  SUPERSEDED: "Replaced by your details",
 } as const;
 
 /**
@@ -29,14 +30,19 @@ const STATUS_WORDS = {
 export function KybSection({ kyb }: { readonly kyb: KybDto }) {
   const router = useRouter();
   const submission = kyb.submission;
-  const open = submission?.status === "SUBMITTED";
+  // ADMIN-4 block: a request Capital Q made on the organisation's behalf
+  // stays open to its own details and document, prefilled from what was
+  // already known.
+  const auto =
+    submission?.status === "SUBMITTED" && submission.source === "AUTO";
+  const open = submission?.status === "SUBMITTED" && !auto;
   const verified = kyb.standing === "VERIFIED";
   const [fields, setFields] = useState({
-    legalName: "",
+    legalName: auto ? (submission.legalName ?? "") : "",
     registrationNumber: "",
-    jurisdictionCode: "",
+    jurisdictionCode: auto ? (submission.jurisdictionCode ?? "") : "",
     registeredAddress: "",
-    websiteUrl: "",
+    websiteUrl: auto ? (submission.websiteUrl ?? "") : "",
   });
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<FormResult | null>(null);
@@ -80,12 +86,21 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
       {submission === null ? null : (
         <div className="flex flex-col gap-1">
           <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-            {submission.legalName} · {STATUS_WORDS[submission.status]}
+            {auto
+              ? "Requested — with Capital Q"
+              : `${submission.legalName ?? "Your organisation"} · ${STATUS_WORDS[submission.status]}`}
           </span>
           <span className="cq-caption text-(--cq-text-secondary)">
-            {submission.registrationNumber} · {submission.jurisdictionCode}
-            {submission.hasDocument ? " · document attached" : ""} · sent{" "}
-            {new Date(submission.submittedAt).toLocaleDateString("en-GB")}
+            {auto
+              ? "We asked on your behalf from what you'd already told us. Add a registration document to speed it up."
+              : [
+                  submission.registrationNumber,
+                  submission.jurisdictionCode,
+                  submission.hasDocument ? "document attached" : null,
+                  `sent ${new Date(submission.submittedAt).toLocaleDateString("en-GB")}`,
+                ]
+                  .filter((part) => part !== null)
+                  .join(" · ")}
           </span>
           {submission.status === "REJECTED" &&
           submission.decisionReason !== null ? (

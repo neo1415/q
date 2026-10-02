@@ -66,13 +66,15 @@ export type KybInput = {
 export type KybView = {
   readonly submission: {
     readonly submissionId: string;
-    readonly legalName: string;
-    readonly registrationNumber: string;
-    readonly jurisdictionCode: string;
+    /** AUTO: Capital Q asked from what it knew; PERSON: they sent details. */
+    readonly source: "PERSON" | "AUTO";
+    readonly legalName: string | null;
+    readonly registrationNumber: string | null;
+    readonly jurisdictionCode: string | null;
     readonly registeredAddress: string | null;
     readonly websiteUrl: string | null;
     readonly hasDocument: boolean;
-    readonly status: "SUBMITTED" | "APPROVED" | "REJECTED";
+    readonly status: "SUBMITTED" | "APPROVED" | "REJECTED" | "SUPERSEDED";
     readonly decisionReason: string | null;
     readonly submittedAt: string;
     readonly decidedAt: string | null;
@@ -95,13 +97,14 @@ const KYB_SUBMITTED = AuditActionTypeSchema.parse("verification.kyb.submitted");
 
 type SubmissionRow = {
   id: string;
-  legal_name: string;
-  registration_number: string;
-  jurisdiction_code: string;
+  source: "PERSON" | "AUTO";
+  legal_name: string | null;
+  registration_number: string | null;
+  jurisdiction_code: string | null;
   registered_address: string | null;
   website_url: string | null;
   document_id: string | null;
-  status: "SUBMITTED" | "APPROVED" | "REJECTED";
+  status: "SUBMITTED" | "APPROVED" | "REJECTED" | "SUPERSEDED";
   decision_reason: string | null;
   created_at: Date;
   decided_at: Date | null;
@@ -110,6 +113,7 @@ type SubmissionRow = {
 function submissionOf(row: SubmissionRow): NonNullable<KybView["submission"]> {
   return {
     submissionId: row.id,
+    source: row.source,
     legalName: row.legal_name,
     registrationNumber: row.registration_number,
     jurisdictionCode: row.jurisdiction_code,
@@ -151,7 +155,7 @@ export function createKybService(dependencies: {
     organisationId: string,
   ): Promise<KybView> {
     const [row] = await executor<SubmissionRow[]>`
-      select id, legal_name, registration_number, jurisdiction_code,
+      select id, source, legal_name, registration_number, jurisdiction_code,
              registered_address, website_url, document_id, status,
              decision_reason, created_at, decided_at
         from core.kyb_submissions
@@ -213,10 +217,12 @@ export function createKybService(dependencies: {
             view: await viewOf(tx.sql, tenantId, organisationId),
           };
         }
-        const [open] = await tx.sql<{ id: string }[]>`
-          select id from core.kyb_submissions
+        const [open] = await tx.sql<{ id: string; source: string }[]>`
+          select id, source from core.kyb_submissions
            where organisation_id = ${organisationId} and status = 'SUBMITTED'`;
-        if (open !== undefined) return { kind: "ALREADY_OPEN" };
+        if (open !== undefined && open.source !== "AUTO") {
+          return { kind: "ALREADY_OPEN" };
+        }
         if (input.documentId !== null) {
           const [document] = await tx.sql<{ id: string }[]>`
             select id from evidence.documents
@@ -281,6 +287,15 @@ export function createKybService(dependencies: {
               },
             ),
           );
+        }
+        // Their own details replace what Capital Q asked with on its own.
+        if (open !== undefined) {
+          await tx.sql`
+            update core.kyb_submissions
+               set status = 'SUPERSEDED',
+                   decision_reason = 'Replaced by the organisation''s own details.',
+                   decided_at = clock_timestamp()
+             where id = ${open.id}`;
         }
         const [row] = await tx.sql<{ id: string }[]>`
           insert into core.kyb_submissions

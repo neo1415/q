@@ -141,6 +141,8 @@ function standingDto(
     verifiedAt: claim?.verifiedAt ?? null,
     expiresAt: claim?.expiresAt ?? null,
     revokedAt: claim?.revokedAt ?? null,
+    declineReason:
+      status === "REVOKED" ? (claim?.revocationReason ?? null) : null,
     description: describeStanding(claimType, status, method),
   };
 }
