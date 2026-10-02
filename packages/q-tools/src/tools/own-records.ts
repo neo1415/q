@@ -82,7 +82,7 @@ export const ReadMyRecordInputSchema = z
     record: z
       .enum(OWN_RECORD_KINDS)
       .describe(
-        "VERIFICATION_STATUS (what is verified), MARKETPLACE_READINESS (the requirements to appear in investor recommendations), COMPANY_NETWORK_PREVIEW (how investors on the network see their company), COMPANY_AUDIENCE_PREVIEW (what one audience sees: give audience), COMPANY_TEAM (their role, founder profile, team facts), RAISE_HISTORY (their raises, past and current), PROFILE_FINDINGS (what Q found about them in public), INVESTOR_ORGANISATION (their organisation's profile), INVESTOR_NETWORK_PREVIEW (how founders see it), INVESTOR_REPRESENTATIVE (their own role there), INVESTOR_MANDATES (their mandates).",
+        "VERIFICATION_STATUS (what is verified), MARKETPLACE_READINESS (the requirements to appear in investor recommendations and feeds: the answer to why investors do not see their company or pitch in Discover; a visible pitch alone is not enough), COMPANY_NETWORK_PREVIEW (how investors on the network see their company), COMPANY_AUDIENCE_PREVIEW (what one audience sees: give audience), COMPANY_TEAM (their role, founder profile, team facts), RAISE_HISTORY (their raises, past and current), PROFILE_FINDINGS (what Q found about them in public), INVESTOR_ORGANISATION (their organisation's profile), INVESTOR_NETWORK_PREVIEW (how founders see it), INVESTOR_REPRESENTATIVE (their own role there), INVESTOR_MANDATES (their mandates).",
       ),
     subject: z
       .enum(["COMPANY", "INVESTOR_ORGANISATION"])
@@ -187,7 +187,7 @@ export function createReassessReadinessTool(
     supportedPurposes: ["OWN_COMPANY_QUESTION", "ACTION_PREPARATION"],
     providerName: "reassess_marketplace_readiness",
     description:
-      "Checks their company's marketplace readiness again, as the visibility page's check does, and returns the fresh assessment. Nothing they declared changes.",
+      "Checks their company's marketplace readiness again, as the visibility page's check does, and returns the fresh assessment. Nothing they declared changes. Use it to answer why investors don't see their company or pitch in Discover: investor feeds and recommendations show only marketplace-ready companies, and being visible or having a ready pitch is not enough on its own (a visible company's pitch still shows on its profile to investors who look it up). Answer from the requirements it returns, naming each one still outstanding and where to meet it (profile, visibility, verification).",
     requiredScopeKinds: ["COMPANY_PROFILE"],
     input: ReassessReadinessInputSchema,
     output: OwnRecordOutputSchema,

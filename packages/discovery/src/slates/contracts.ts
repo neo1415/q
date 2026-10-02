@@ -70,6 +70,8 @@ export const REFRESH_REASONS = [
   "TAXONOMY_CHANGED",
   "DISCLOSURE_CHANGED",
   "RELATIONSHIP_CHANGED",
+  // A founder's pitch became playable, changed audience or was removed.
+  "PITCH_CHANGED",
   "NO_CURRENT_SLATE",
   "SLATE_EXPIRED",
   "SCHEDULED",

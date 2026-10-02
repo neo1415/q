@@ -387,6 +387,57 @@ describe("describeNetworkStanding", () => {
     ).toEqual({ visible: true, sentence: "Investors can now see your pitch." });
   });
 
+  it("visible but not recommended: says so plainly, names each unmet requirement with where to meet it (live 2026-10-02, Nixo)", () => {
+    const outstanding = (requirement: string) => ({
+      requirement,
+      outcome: "OUTSTANDING",
+      description: "x",
+    });
+    const standing = describeNetworkStanding(
+      {
+        marketplaceVisibility: "network_visible",
+        marketplaceReadinessState: "not_ready",
+        pitch: summary,
+      },
+      ready,
+      {
+        requirements: [
+          {
+            requirement: "COMPANY_ACTIVE",
+            outcome: "SATISFIED",
+            description: "x",
+          },
+          outstanding("MINIMUM_COMPANY_PROFILE"),
+          outstanding("FOUNDER_IDENTITY_VERIFIED"),
+          outstanding("ORGANISATION_VERIFIED"),
+        ],
+      } as never,
+    );
+    expect(standing.visible).toBe(false);
+    expect(standing.sentence).toBe(
+      "Your pitch is visible on your profile to investors who look you up. It will appear in investor feeds once your profile has a description, a stage and where you are based, a founder's identity is verified and your company is verified.",
+    );
+    expect(standing.needs?.map((need) => need.href)).toEqual([
+      "/profile",
+      "/verification",
+      "/verification",
+    ]);
+  });
+
+  it("never claims feeds without the readiness answer", () => {
+    const standing = describeNetworkStanding(
+      {
+        marketplaceVisibility: "network_visible",
+        marketplaceReadinessState: "not_assessed",
+        pitch: summary,
+      },
+      ready,
+    );
+    expect(standing.visible).toBe(false);
+    expect(standing.sentence).toContain("visible on your profile");
+    expect(standing.sentence).not.toContain("Investors can now see");
+  });
+
   it("names what is still needed, in order, and never invents a state", () => {
     const standing = describeNetworkStanding(
       {

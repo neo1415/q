@@ -1,4 +1,6 @@
 import type {
+  MarketplaceReadinessAssessment,
+  MarketplaceReadinessRequirement,
   CompanyDto,
   MediaAssetDto,
   MediaUploadSessionDto,
@@ -460,13 +462,68 @@ export function judgeFile(
  * when every gate is actually open; otherwise the sentence names what is
  * still needed, in order, without inventing a state.
  */
+export type ReadinessNeed = {
+  readonly requirement: MarketplaceReadinessRequirement;
+  readonly label: string;
+  readonly href: string;
+};
+
+/** Each unmet recommendation requirement, said short, with where to meet it. */
+const NEEDS: Readonly<
+  Record<MarketplaceReadinessRequirement, { label: string; href: string }>
+> = {
+  COMPANY_ACTIVE: {
+    label: "your company is active again",
+    href: "/company/visibility",
+  },
+  MINIMUM_COMPANY_PROFILE: {
+    label: "your profile has a description, a stage and where you are based",
+    href: "/profile",
+  },
+  DISCOVERY_VISIBILITY_CONFIRMED: {
+    label: "your company is visible to investors",
+    href: "/company/visibility",
+  },
+  FOUNDER_IDENTITY_VERIFIED: {
+    label: "a founder's identity is verified",
+    href: "/verification",
+  },
+  ORGANISATION_VERIFIED: {
+    label: "your company is verified",
+    href: "/verification",
+  },
+  REQUIRED_DOCUMENTATION: {
+    label: "the required documents are in",
+    href: "/documents",
+  },
+};
+
+/** What still stands between the company and investor feeds (PADL #58). */
+export function readinessNeeds(
+  readiness: Pick<MarketplaceReadinessAssessment, "requirements"> | null,
+): readonly ReadinessNeed[] {
+  if (readiness === null) return [];
+  return readiness.requirements
+    .filter((result) => result.outcome === "OUTSTANDING")
+    .map((result) => ({
+      requirement: result.requirement,
+      ...NEEDS[result.requirement],
+    }));
+}
+
 export function describeNetworkStanding(
   company: Pick<
     CompanyDto,
     "marketplaceVisibility" | "marketplaceReadinessState" | "pitch"
   >,
   pitch: MediaAssetDto | null,
-): { readonly visible: boolean; readonly sentence: string } {
+  readiness: Pick<MarketplaceReadinessAssessment, "requirements"> | null = null,
+): {
+  readonly visible: boolean;
+  readonly sentence: string;
+  /** Unmet recommendation requirements, each with where to meet it. */
+  readonly needs?: readonly ReadinessNeed[];
+} {
   const networkVisible =
     company.marketplaceVisibility === "network_visible" ||
     company.marketplaceVisibility === "public_external";
@@ -477,7 +534,21 @@ export function describeNetworkStanding(
     };
   }
   if (company.pitch !== null && networkVisible) {
-    return { visible: true, sentence: "Investors can now see your pitch." };
+    if (company.marketplaceReadinessState === "marketplace_ready") {
+      return { visible: true, sentence: "Investors can now see your pitch." };
+    }
+    // Visible is not recommended (PADL #58; live 2026-10-02: "Investors can
+    // now see your pitch" while no feed could show it). Said plainly, with
+    // what is still needed for feeds.
+    const needs = readinessNeeds(readiness);
+    return {
+      visible: false,
+      sentence:
+        needs.length === 0
+          ? "Your pitch is visible on your profile to investors who look you up. It will appear in investor feeds once your company meets the requirements for investor recommendations."
+          : `Your pitch is visible on your profile to investors who look you up. It will appear in investor feeds once ${listed(needs.map((need) => need.label))}.`,
+      needs,
+    };
   }
   if (pitch.moderationStatus === "BLOCKED") {
     return {

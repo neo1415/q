@@ -183,6 +183,53 @@ describe("reading their own records", () => {
     expect(dataOf(none)).toEqual({ status: "NONE", data: null });
   });
 
+  it("answers 'why can't investors see my pitch?' from the readiness facts: every outstanding requirement reaches Q (live 2026-10-02)", async () => {
+    const assessment = {
+      state: "not_ready",
+      requirements: [
+        {
+          requirement: "MINIMUM_COMPANY_PROFILE",
+          outcome: "OUTSTANDING",
+          description:
+            "Your company profile is missing something investors need first: a description, a stage or where you are based.",
+        },
+        {
+          requirement: "FOUNDER_IDENTITY_VERIFIED",
+          outcome: "OUTSTANDING",
+          description: "A founder's identity has not been verified yet.",
+        },
+      ],
+    };
+    const readiness = createQToolExecutor({
+      registry: createQToolRegistry(
+        createOwnRecordTools({
+          ...fakePorts(),
+          ownRecords: {
+            ...records,
+            reassessReadiness: () => Promise.resolve(assessment),
+          },
+        }),
+      ),
+    });
+    const outcome = await readiness.execute(
+      call("reassess_marketplace_readiness", {}),
+      contextFor(actorA, {
+        ...ownPlan(),
+        purpose: { ...ownPlan().purpose, taskClass: "OWN_COMPANY_QUESTION" },
+      }),
+    );
+    expect(dataOf(outcome)).toEqual({ status: "FOUND", data: assessment });
+    const tool = createOwnRecordTools({
+      ...fakePorts(),
+      ownRecords: records,
+    }).find(
+      (definition) =>
+        definition.providerName === "reassess_marketplace_readiness",
+    );
+    // The tool tells Q what the facts mean: feeds need readiness, not a pitch.
+    expect(tool?.description).toMatch(/feeds/);
+  });
+
   it("is refused with no own company in the plan", async () => {
     const outcome = await executor.execute(
       call("read_my_record", { record: "MARKETPLACE_READINESS" }),

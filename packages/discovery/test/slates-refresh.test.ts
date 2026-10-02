@@ -78,6 +78,73 @@ const mandateData = (changeKinds?: readonly string[]) => ({
   ...(changeKinds === undefined ? {} : { changedFields: ["x"], changeKinds }),
 });
 
+describe("a founder's pitch refreshes the slates showing the company (live 2026-10-02)", () => {
+  const pitch = (extra: Record<string, unknown> = {}) => ({
+    mediaAssetId: randomUUID(),
+    ownerType: "COMPANY",
+    ownerId: COMPANY,
+    purpose: "FOUNDER_PITCH",
+    ...extra,
+  });
+  it("allowed by moderation, or its audience changed: a NORMAL rebuild of the slates that show it", () => {
+    for (const e of [
+      event(
+        REFRESH_TRIGGER_EVENTS.MEDIA_MODERATED,
+        pitch({ moderationStatus: "ALLOWED" }),
+      ),
+      event(
+        REFRESH_TRIGGER_EVENTS.MEDIA_PLAYBACK_POLICY_CHANGED,
+        pitch({ playbackPolicy: "NETWORK" }),
+      ),
+    ]) {
+      expect(refreshDirectiveFor(e)).toEqual({
+        kind: "COMPANY",
+        companyId: COMPANY,
+        scope: "CONTAINING",
+        invalidate: null,
+        reason: "PITCH_CHANGED",
+        priority: "NORMAL",
+      });
+    }
+  });
+  it("held or removed: the slates serving it are invalidated at once", () => {
+    for (const e of [
+      event(
+        REFRESH_TRIGGER_EVENTS.MEDIA_MODERATED,
+        pitch({ moderationStatus: "HELD" }),
+      ),
+      event(REFRESH_TRIGGER_EVENTS.MEDIA_DELETED, pitch()),
+    ]) {
+      expect(refreshDirectiveFor(e)).toMatchObject({
+        scope: "CONTAINING",
+        invalidate: "SECURITY_RESTRICTION",
+        priority: "HIGH",
+      });
+    }
+  });
+  it("never widens: other media, other owners, malformed data are ignored", () => {
+    expect(
+      refreshDirectiveFor(
+        event(
+          REFRESH_TRIGGER_EVENTS.MEDIA_MODERATED,
+          pitch({ purpose: "AVATAR", moderationStatus: "ALLOWED" }),
+        ),
+      ).kind,
+    ).toBe("IGNORED");
+    expect(
+      refreshDirectiveFor(
+        event(
+          REFRESH_TRIGGER_EVENTS.MEDIA_MODERATED,
+          pitch({ ownerType: "PERSON", moderationStatus: "ALLOWED" }),
+        ),
+      ).kind,
+    ).toBe("IGNORED");
+    expect(
+      refreshDirectiveFor(event(REFRESH_TRIGGER_EVENTS.MEDIA_DELETED, {})).kind,
+    ).toBe("IGNORED");
+  });
+});
+
 describe("refresh directives (CQ-REC-006)", () => {
   it("every trigger is a registered event name", () => {
     const names = new Set([
@@ -89,6 +156,10 @@ describe("refresh directives (CQ-REC-006)", () => {
       DisclosureGrantedEvent.name,
       DisclosureRevokedEvent.name,
       RelationshipCreatedEvent.name,
+      // Media events, by name (discovery does not depend on media).
+      "media.asset.moderated",
+      "media.asset.playback_policy_changed",
+      "media.asset.deleted",
     ]);
     for (const trigger of Object.values(REFRESH_TRIGGER_EVENTS)) {
       expect(names.has(trigger), trigger).toBe(true);

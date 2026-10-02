@@ -57,6 +57,11 @@ export const REFRESH_TRIGGER_EVENTS = {
   DISCLOSURE_GRANTED: "permissions.disclosure.granted",
   DISCLOSURE_REVOKED: "permissions.disclosure.revoked",
   RELATIONSHIP_CREATED: "network.relationship.created",
+  // A founder's pitch (live 2026-10-02: a pitch uploaded and allowed at
+  // 08:04 waited for a slate built the evening before).
+  MEDIA_MODERATED: "media.asset.moderated",
+  MEDIA_PLAYBACK_POLICY_CHANGED: "media.asset.playback_policy_changed",
+  MEDIA_DELETED: "media.asset.deleted",
 } as const;
 
 /** Mandate change kinds that change what is eligible, not only how it ranks. */
@@ -79,6 +84,14 @@ const CompanyData = z
   .passthrough();
 const SubjectData = z
   .object({ subjectType: z.string(), subjectId: z.string().uuid() })
+  .passthrough();
+const PitchData = z
+  .object({
+    ownerType: z.string(),
+    ownerId: z.string().uuid(),
+    purpose: z.string(),
+    moderationStatus: z.string().optional(),
+  })
   .passthrough();
 const ResourceData = z
   .object({ resourceType: z.string(), resourceId: z.string().uuid() })
@@ -279,6 +292,34 @@ export function refreshDirectiveFor(
         invalidate: null,
         reason: "RELATIONSHIP_CHANGED",
         priority: "NORMAL",
+      };
+    }
+    case REFRESH_TRIGGER_EVENTS.MEDIA_MODERATED:
+    case REFRESH_TRIGGER_EVENTS.MEDIA_PLAYBACK_POLICY_CHANGED:
+    case REFRESH_TRIGGER_EVENTS.MEDIA_DELETED: {
+      const parsed = PitchData.safeParse(event.data);
+      if (
+        !parsed.success ||
+        parsed.data.ownerType !== "COMPANY" ||
+        parsed.data.purpose !== "FOUNDER_PITCH"
+      ) {
+        return { kind: "IGNORED", why: "NOT_A_COMPANY_PITCH" };
+      }
+      // A pitch taken away (removed, or held by moderation) is a safety
+      // change: slates serving it stop at once. Anything else rebuilds
+      // the slates that show the company, in the ordinary way. A pitch
+      // never makes a company eligible by itself (PADL #58).
+      const withdrawn =
+        event.type === REFRESH_TRIGGER_EVENTS.MEDIA_DELETED ||
+        (event.type === REFRESH_TRIGGER_EVENTS.MEDIA_MODERATED &&
+          parsed.data.moderationStatus !== "ALLOWED");
+      return {
+        kind: "COMPANY",
+        companyId: parsed.data.ownerId,
+        scope: "CONTAINING",
+        invalidate: withdrawn ? "SECURITY_RESTRICTION" : null,
+        reason: "PITCH_CHANGED",
+        priority: withdrawn ? "HIGH" : "NORMAL",
       };
     }
     default:

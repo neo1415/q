@@ -194,6 +194,31 @@ export async function assessMarketplaceReadinessAction(
   }
 }
 
+/** The readiness policy's answer now, read only (never writes). */
+export async function loadMarketplaceReadinessAction(
+  rawCompanyId: string,
+): Promise<VisibilityActionResult<MarketplaceReadinessAssessment>> {
+  const companyId = CompanyIdInput.safeParse(rawCompanyId);
+  if (!companyId.success) {
+    return { ok: false, message: "That company isn't available here." };
+  }
+  const current = await session();
+  if (current === null) {
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
+  }
+  try {
+    return {
+      ok: true,
+      value: await getMarketplaceReadiness(current, companyId.data),
+    };
+  } catch (error) {
+    return translate(error);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The visibility control centre (CQ-BIZ-003)
 // ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import type {
+  MarketplaceReadinessAssessment,
   CompanyDto,
   MediaAssetDto,
   PitchGuidance,
@@ -49,6 +50,10 @@ import {
   type PitchFlowState,
 } from "./pitch-state";
 import { PitchDetails } from "./pitch-details";
+import {
+  assessMarketplaceReadinessAction,
+  loadMarketplaceReadinessAction,
+} from "../company/visibility-actions";
 import { uploadResumable } from "./resumable-upload";
 import {
   clearResume,
@@ -166,6 +171,11 @@ export function PitchUpload({
 }: PitchUploadProps) {
   const [flow, dispatch] = useReducer(pitchFlowReducer, INITIAL_PITCH_FLOW);
   const [company, setCompany] = useState<CompanyDto | null>(null);
+  // What stands between the company and investor feeds (PADL #58), read
+  // only when the pitch is visible but the company is not recommended.
+  const [readiness, setReadiness] =
+    useState<MarketplaceReadinessAssessment | null>(null);
+  const [checking, setChecking] = useState(false);
   const [guidance, setGuidance] = useState<PitchGuidance | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fileNotice, setFileNotice] = useState<string | null>(null);
@@ -186,6 +196,32 @@ export function PitchUpload({
     prefersReducedMotion,
     () => false,
   );
+
+  // Visible but not in feeds: read why, once per change of the record.
+  const notRecommended =
+    company !== null &&
+    company.pitch !== null &&
+    company.marketplaceReadinessState !== "marketplace_ready";
+  useEffect(() => {
+    if (!notRecommended) return;
+    let cancelled = false;
+    void loadMarketplaceReadinessAction(companyId).then((result) => {
+      if (!cancelled && result.ok) setReadiness(result.value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [notRecommended, companyId]);
+
+  /** After fixing something: the policy assesses again, nothing is chosen. */
+  const checkAgain = async () => {
+    setChecking(true);
+    const assessed = await assessMarketplaceReadinessAction(companyId);
+    if (assessed.ok) setReadiness(assessed.value);
+    const overview = await loadPitchOverviewAction(companyId, targetAssetId);
+    if (overview.ok) setCompany(overview.value.company);
+    setChecking(false);
+  };
 
   // The overview, on mount and whenever the company changes. State is
   // set only in the callback, once the server has answered.
@@ -583,7 +619,7 @@ export function PitchUpload({
     flow.kind === "PROCESSING";
   const current =
     flow.kind === "READY" || flow.kind === "PROCESSING" ? flow.pitch : null;
-  const standing = describeNetworkStanding(company, current);
+  const standing = describeNetworkStanding(company, current, readiness);
 
   // Once there is a video to watch, the page reads like a short-video
   // editor: the video tall on the left, what to do with it on the right.
@@ -835,6 +871,33 @@ export function PitchUpload({
           )}
           {standing.sentence}
         </p>
+        {standing.needs !== undefined ? (
+          <div className="mt-3 flex flex-col gap-2" data-pitch-feed-needs>
+            {standing.needs.length > 0 ? (
+              <ul className="flex flex-col gap-1">
+                {standing.needs.map((need) => (
+                  <li key={need.requirement}>
+                    <Link
+                      href={need.href}
+                      className="inline-flex min-h-11 items-center underline underline-offset-4"
+                    >
+                      {need.label.charAt(0).toUpperCase() + need.label.slice(1)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div>
+              <Button
+                variant="secondary"
+                disabled={checking}
+                onClick={() => void checkAgain()}
+              >
+                {checking ? "Checking…" : "Check again"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <p className="mt-3">
           <Link href="/company/visibility" className={buttonClassName("quiet")}>
             Visibility and discovery
