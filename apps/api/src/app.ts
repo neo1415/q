@@ -39,6 +39,7 @@ import {
   registerDocumentRoutes,
   type DocumentRoutesDependencies,
 } from "./http/documents.js";
+import { registerAppActionRoutes } from "./http/app-actions.js";
 import { registerInvestorMandateRoutes } from "./http/investor-mandates.js";
 import {
   registerMediaRoutes,
@@ -384,6 +385,19 @@ export function createApp(
       });
     }
   }
+
+  // ADR 0040 (Proposed): the routes of the app's declared actions, each on
+  // its own path, through the services composed above.
+  registerAppActionRoutes(app, {
+    authenticator: security.authenticator,
+    resolver: security.resolver,
+    ports: {
+      ...(modules.media === undefined ? {} : { media: modules.media }),
+      ...(modules.discovery?.interactions === undefined
+        ? {}
+        : { interactions: modules.discovery.interactions }),
+    },
+  });
 
   if (modules.admin !== undefined) {
     registerAdminRoutes(app, {

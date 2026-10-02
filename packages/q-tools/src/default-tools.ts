@@ -28,6 +28,7 @@ import {
   createDeclinePendingProposalTool,
 } from "./tools/pending-proposal.js";
 import { createOwnWorkTools } from "./tools/own-work.js";
+import { createAppActionTools } from "./tools/app-actions.js";
 import { createOwnSettingsTools } from "./tools/own-settings.js";
 import { createResultsTools } from "./tools/results.js";
 import { createProposeHumanReviewTool } from "./tools/human-review.js";
@@ -199,7 +200,9 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
         ? createOnboardingReminderTools(ports.onboardingReminders)
         : [createSetOnboardingRemindersTool(ports.onboardingReminders)]),
     // R33: their approvals inbox, their documents, Save / Unsave / Pass.
-    ...createOwnWorkTools(ports, ports),
+    ...createOwnWorkTools(ports),
+    // ADR 0040: the app's declared actions and read_my, generated.
+    ...createAppActionTools(ports),
     // Action parity (2026-10-02): Settings switches, by asking.
     ...createOwnSettingsTools(ports),
     // DOCS block: brand kit, a document's audit, their brand applied.

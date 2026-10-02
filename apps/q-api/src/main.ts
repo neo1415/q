@@ -320,7 +320,11 @@ import {
   createVisibilityActionBoard,
 } from "./composition/visibility-actions.js";
 import { createInvestorFeedPort } from "./composition/investor-feed.js";
-import { createDiscoveryDecisionPort } from "./composition/discovery-decisions.js";
+import {
+  createAppActionBoard,
+  createAppActionDefinitions,
+} from "./composition/app-actions.js";
+import { ownIndex, type OwnReadPorts } from "@capital-q/app-actions";
 import {
   createEvidenceDocumentsPort,
   createOwnRecordsPort,
@@ -1351,6 +1355,42 @@ const conversationApprovals = createConversationApprovalPort({
   logger,
 });
 const errandStore = createPostgresErrandStore(database.sql);
+// ADR 0040 (Proposed): the services the app's declared actions call, and
+// the board a CONSEQUENTIAL one Q prepared waits on. Documents and
+// rehearsals are read as their pages list them; both are closures because
+// those services are composed further down.
+const appActionBoard = createAppActionBoard({ logger });
+const appActionPorts: OwnReadPorts = {
+  media: pitchMedia,
+  interactions: createInteractionSignalService({
+    ports: slateRead.eligibilityPorts,
+    eligibility: slateRead.eligibility,
+    slates: slateRead.slates,
+    repository: createPostgresInteractionRepository({ sql: database.sql }),
+    logger,
+  }),
+  ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
+  documents: async (actor) =>
+    (await qArtifacts.service.list(actor, { limit: 30 })).items.map((item) => ({
+      id: item.artifactId,
+      title: item.title,
+      status: item.status.toLowerCase(),
+      at: item.updatedAt,
+      facts: { type: item.type, version: item.currentVersion },
+    })),
+  rehearsals: async (actor) =>
+    (await rehearsals.list(actor)).rehearsals.map((row) => ({
+      id: row.id,
+      title: `Rehearsal with ${row.counterpart.name}`,
+      status: row.status === "ACTIVE" ? "in progress" : "finished",
+      at: row.createdAt,
+      facts: {
+        score: row.score,
+        outcome: row.outcome,
+        exchanges: row.exchanges,
+      },
+    })),
+};
 const pushSettings = createPushSubscriptionStore(database.sql);
 const qTools = createQTools({
   ports: {
@@ -1566,15 +1606,11 @@ const qTools = createQTools({
       researchComposition.evidence,
     ),
     relationshipMail: createRelationshipMailPort(integrations),
-    discoveryDecisions: createDiscoveryDecisionPort(
-      createInteractionSignalService({
-        ports: slateRead.eligibilityPorts,
-        eligibility: slateRead.eligibility,
-        slates: slateRead.slates,
-        repository: createPostgresInteractionRepository({ sql: database.sql }),
-        logger,
-      }),
-    ),
+    // ADR 0040: the app's declared actions and read_my, through the same
+    // services the screens use, as the person; CONSEQUENTIAL ones on the
+    // approval board.
+    appActions: appActionPorts,
+    appApprovals: appActionBoard,
   },
   logger,
 });
@@ -1775,6 +1811,9 @@ const qActionRegistry = createQActionRegistry([
     chat,
     logger,
   }),
+  // ADR 0040: each CONSEQUENTIAL declared app action, run on approval
+  // through its own declaration.
+  ...createAppActionDefinitions(appActionPorts, { logger }),
   // A founder's Connection Request: the investor page's own command.
   createConnectionRequestSendAction({
     connections: connectionService,
@@ -1882,6 +1921,8 @@ const qActionPort = createQActionPort({
   // profile change; one proposal per run either way.
   proposer: chainProposers(
     relationshipBoard.proposer,
+    // ADR 0040: a declared app action Q prepared.
+    appActionBoard.proposer,
     emailBoard.proposer,
     chatBoard.proposer,
     // AUTO block (ADR 0030)
@@ -2123,6 +2164,11 @@ const qReceipts: QReceiptPort = {
   },
 };
 const qIntelligence = composeQIntelligence({
+  // ADR 0040 (HARDEN's WHAT EXISTS fact): per kind of their own records, a
+  // count and up to three titles, from the read registry, every turn.
+  ownIndex: async ({ actor }) => ({
+    kinds: await ownIndex(appActionPorts, actor).catch(() => []),
+  }),
   // A relationship a hand-over names, planned on its own (QA 2026-10-01).
   firewall,
   // A typed yes or no to a waiting change, read and acted on by code

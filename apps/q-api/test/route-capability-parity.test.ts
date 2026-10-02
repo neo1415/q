@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { APP_ACTIONS } from "@capital-q/app-actions";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
 
 /**
@@ -418,11 +419,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_UPLOAD_CANCEL_SUFFIX}`":
     cap("offer.pitch_video_upload"),
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_SYNC_SUFFIX}`": PLAYER,
+  // Who can watch: the same one choice as the registry's pitch.details.set.
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_POLICY_SUFFIX}`":
-    cap("offer.pitch_video_upload"),
-  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_DETAILS_SUFFIX}`": cap(
-    "offer.pitch_video_upload",
-  ),
+    cap("tool.set_pitch_sharing"),
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_SUFFIX}`":
     PLAYER,
   "api/http/media.ts GET `${pitch}/:mediaAssetId${MEDIA_TRANSCRIPT_SUFFIX}`":
@@ -532,9 +531,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     exempt(
       "observations the feed reports (impressions, watch milestones); never an action a person asks for",
     ),
-  "api/http/recommendation-interactions.ts POST path": cap("tool.save_company"),
-  "api/http/recommendation-interactions.ts POST DISCOVERY_COMPANY_PASS_PATH":
-    cap("tool.pass_company"),
   "api/http/recommendation-interactions.ts GET DISCOVERY_SAVED_PATH": cap(
     "tool.discovery_slate",
   ),
@@ -896,6 +892,13 @@ function pageRoutes(): string[] {
 
 const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
 
+/**
+ * ADR 0040: hand-written mutation routes may only shrink. A new action is
+ * declared once in @capital-q/app-actions, which generates its route and
+ * its Q tool; this count is the legacy that has not migrated yet.
+ */
+const LEGACY_MUTATION_ROUTES_MAX = 151;
+
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH",
@@ -935,6 +938,29 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         "exempt" in coverage && /backlog/i.test(coverage.exempt),
     );
     expect(backlog.map(([key]) => key)).toEqual([]);
+  });
+
+  it("no new hand-written mutation route: declare it in the app's action registry (ADR 0040)", () => {
+    const handWritten = routeKeys().filter((key) =>
+      / (POST|PUT|PATCH|DELETE) /.test(key),
+    );
+    expect(
+      handWritten.length,
+      "declare the new action in @capital-q/app-actions: its route and Q tool are generated",
+    ).toBeLessThanOrEqual(LEGACY_MUTATION_ROUTES_MAX);
+  });
+
+  it("every declared action is a route and a Q tool, from one declaration (ADR 0040)", () => {
+    for (const action of APP_ACTIONS) {
+      expect(
+        CAPABILITY_IDS.has(`tool.${action.tool.name}`),
+        `${action.name}: no capability for its generated tool`,
+      ).toBe(true);
+    }
+    const paths = APP_ACTIONS.flatMap((action) =>
+      action.http === undefined ? [] : [action.http.path],
+    );
+    expect(new Set(paths).size).toBe(paths.length);
   });
 
   it("a route that changes something maps to something Q does, never only a read (action parity 2026-10-02)", () => {

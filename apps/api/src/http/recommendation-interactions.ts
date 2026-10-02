@@ -1,20 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
-  DISCOVERY_COMPANY_PASS_PATH,
-  DISCOVERY_COMPANY_SAVE_PATH,
-  DISCOVERY_COMPANY_UNSAVE_PATH,
-  DISCOVERY_COMPANY_UNPASS_PATH,
   DISCOVERY_PASSED_PATH,
   DISCOVERY_INTERACTIONS_PATH,
   DISCOVERY_SAVED_PATH,
   InteractionRecordedDtoSchema,
   parseContract,
-  PassCompanyRequestSchema,
   RecordInteractionRequestSchema,
-  SaveCompanyRequestSchema,
   SavedCompaniesDtoSchema,
-  UuidSchema,
 } from "@capital-q/contracts";
 import type {
   InteractionCommand,
@@ -52,14 +45,6 @@ export type RecommendationInteractionRoutesDependencies =
   };
 
 const SAVED_DEFAULT_LIMIT = 50;
-
-function companyIdOf(request: FastifyRequest): string {
-  return parseContract(
-    UuidSchema,
-    (request.params as { companyId?: string }).companyId,
-    "The company id is not valid.",
-  );
-}
 
 /** One shape for every answer, so no route leaks what another refuses. */
 function answer(
@@ -138,48 +123,9 @@ export function registerRecommendationInteractionRoutes(
     },
   );
 
-  // Decisions: each on its own path, so the verb is in the URL and not in
-  // a field the body could change.
-  for (const [path, type] of [
-    [DISCOVERY_COMPANY_SAVE_PATH, "SAVE"],
-    [DISCOVERY_COMPANY_UNSAVE_PATH, "UNSAVE"],
-    // Undo pass (doc 19 §68): an interaction event like UNSAVE, idempotent
-    // by its client event id; it never changes the mandate.
-    [DISCOVERY_COMPANY_UNPASS_PATH, "UNPASS"],
-  ] as const) {
-    app.post(path, { onRequest: withContext }, async (request, reply) => {
-      const input = parseContract(
-        SaveCompanyRequestSchema,
-        request.body,
-        "The request is not valid.",
-      );
-      const outcome = await interactions.decide(
-        type,
-        commandFrom(request, companyIdOf(request), input),
-      );
-      void reply.header("Cache-Control", "no-store");
-      return answer(outcome, reply);
-    });
-  }
-
-  app.post(
-    DISCOVERY_COMPANY_PASS_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        PassCompanyRequestSchema,
-        request.body,
-        "The request is not valid.",
-      );
-      const outcome = await interactions.decide("PASS", {
-        ...commandFrom(request, companyIdOf(request), input),
-        // Optional, always: doc 17 forbids demanding a reason.
-        ...(input.reason === undefined ? {} : { passReason: input.reason }),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return answer(outcome, reply);
-    },
-  );
+  // Decisions (Save, Unsave, Pass, Undo pass) are declared once in the
+  // app's action registry (ADR 0040); their routes, each on its own path,
+  // are generated from it (http/app-actions.ts), as Q's tools are.
 
   // The Saved section. Identities only: a company that has since become
   // private must not leak because it was once saved, so the caller reads

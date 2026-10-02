@@ -55,7 +55,6 @@ const EVERY_PORT: QToolPorts = {
   approvalInbox: STUB,
   results: STUB,
   humanReviews: STUB,
-  discoveryDecisions: STUB,
   documents: STUB,
   documentRevision: STUB,
   // DOCS block.
@@ -69,6 +68,9 @@ const EVERY_PORT: QToolPorts = {
   work: STUB,
   // DAILY block
   daily: { request: STUB } as never,
+  // ADR 0040: the app's declared actions and read_my.
+  appActions: STUB,
+  appApprovals: STUB,
   // Action parity (2026-10-02): Settings switches.
   notificationSettings: STUB,
   personality: STUB,

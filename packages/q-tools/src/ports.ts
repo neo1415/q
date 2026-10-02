@@ -33,6 +33,8 @@ import type { QEntitlementPort } from "./tools/plan.js";
 // DOCS block.
 import type { DocumentStudioPort } from "./tools/documents.js";
 import type { QDailyToolPort } from "./tools/daily.js";
+import type { OwnReadPorts } from "@capital-q/app-actions";
+import type { AppApprovalPort } from "./tools/app-actions.js";
 import type {
   NotificationSettingsPort,
   QPersonalityPort,
@@ -371,8 +373,13 @@ export type QToolPorts = {
   readonly clientActions?: boolean | undefined;
   /** R33: approvals waiting for this person, across conversations. */
   readonly approvalInbox?: ApprovalInboxPort | undefined;
-  /** R33: Save, Unsave and Pass from a conversation. */
-  readonly discoveryDecisions?: DiscoveryDecisionPort | undefined;
+  /**
+   * ADR 0040: the services the app's declared actions and read_my call,
+   * and the approval board a CONSEQUENTIAL one is prepared on. Absent: no
+   * generated tool exists.
+   */
+  readonly appActions?: OwnReadPorts | undefined;
+  readonly appApprovals?: AppApprovalPort | undefined;
   /** Action parity 2026-10-02: Settings' notification switches. */
   readonly notificationSettings?: NotificationSettingsPort | undefined;
   /** Action parity 2026-10-02: Settings' choice of Q's personality. */
@@ -750,32 +757,6 @@ export type ApprovalInboxPort = {
       readonly requestedAt: string;
       readonly expiresAt: string;
     }[]
-  >;
-};
-
-/**
- * R33: an investor's own Save, Unsave and Pass, recorded by the same
- * interaction service the Discover buttons call (surface Q_CONVERSATION),
- * which re-runs the feed's own eligibility and refuses a company the
- * person could not act on. NOT_AVAILABLE says nothing about why.
- */
-export type DiscoveryDecisionPort = {
-  readonly decide: (
-    actor: ActorContext,
-    decision: {
-      readonly type: "SAVE" | "UNSAVE" | "PASS" | "UNPASS";
-      readonly companyId: string;
-      /** Idempotency identity, derived by the tool from the run. */
-      readonly clientEventId: string;
-    },
-  ) => Promise<
-    | {
-        readonly status: "RECORDED";
-        readonly deduplicated: boolean;
-        readonly saved: boolean | null;
-        readonly passed: boolean | null;
-      }
-    | { readonly status: "NOT_AVAILABLE" }
   >;
 };
 

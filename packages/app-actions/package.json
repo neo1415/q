@@ -1,0 +1,37 @@
+{
+  "name": "@capital-q/app-actions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ADR 0040 (Proposed): the app's own action and read registry. Every user-initiated mutation declared once -- name, Zod input, authorize step, service call, classification, card summary -- and both the HTTP route and the Q tool generated from it, so Q can do whatever the screen does, as the person, through the same service. Plus the read registry behind read_my and the what-exists index.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/discovery": "workspace:*",
+    "@capital-q/media": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

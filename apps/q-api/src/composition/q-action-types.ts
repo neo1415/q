@@ -23,6 +23,7 @@ import { RECORD_CHANGE_ACTION_TYPES } from "./record-change-actions.js";
 import { RELATIONSHIP_INTEREST_RESPOND } from "./respond-to-interest-action.js";
 import { RELATIONSHIP_CONNECTION_REQUEST_RESPOND } from "./connection-request-answer-action.js";
 import { RELATIONSHIP_CONNECTION_REQUEST_SEND } from "./connection-request-send-action.js";
+import { APP_ACTION_TYPES } from "./app-actions.js";
 import {
   DISCLOSURE_RAISE_SHARE,
   DISCLOSURE_SHARE_REVOKE,
@@ -44,6 +45,8 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   RELATIONSHIP_CONNECTION_REQUEST_RESPOND,
   // Action parity 2026-10-02: a founder's Connection Request, by Q.
   RELATIONSHIP_CONNECTION_REQUEST_SEND,
+  // ADR 0040: the app's declared CONSEQUENTIAL actions.
+  ...APP_ACTION_TYPES,
   DISCLOSURE_RAISE_SHARE,
   DISCLOSURE_SHARE_REVOKE,
   PERSON_PROFILE_UPDATE,

@@ -98,7 +98,6 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     approvalInbox: port(),
     results: port(),
     humanReviews: port(),
-    discoveryDecisions: port(),
     documents: port(),
     documentRevision: port(),
     // DOCS block.
@@ -112,6 +111,15 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     work: port(),
     // DAILY block
     daily: port(),
+    // ADR 0040: the app's declared actions and read_my.
+    appActions: {
+      media: port(),
+      interactions: port(),
+      ownCompanyId: port(),
+      documents: port(),
+      rehearsals: port(),
+    },
+    appApprovals: port(),
     // Action parity (2026-10-02): Settings switches.
     notificationSettings: port(),
     personality: port(),
@@ -242,10 +250,11 @@ const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
   propose_express_interest: { companyId: UUID },
   propose_connection_request: { investor: "Kazikit Capital" },
   // "Name exactly one of companyId or company".
-  save_company: { companyId: UUID },
-  unsave_company: { companyId: UUID },
-  pass_company: { companyId: UUID },
-  unpass_company: { companyId: UUID },
+  save_company: { company: UUID },
+  unsave_company: { company: UUID },
+  pass_company: { company: UUID },
+  unpass_company: { company: UUID },
+  set_pitch_sharing: { pitch: "my pitch", sharing: "INVESTORS" },
 };
 
 /** What a field the schema walk could not satisfy is tried as, in order. */

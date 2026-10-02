@@ -11,7 +11,6 @@ import {
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
   MEDIA_CAPTIONS_VTT_SUFFIX,
-  MEDIA_DETAILS_SUFFIX,
   MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_TRANSCRIPT_SUFFIX,
@@ -23,8 +22,6 @@ import {
   PitchTranscriptDtoSchema,
   PlaybackAuthorizationDtoSchema,
   PROBLEM_CONTENT_TYPE,
-  SetPitchDetailsRequestSchema,
-  SetPitchDetailsResponseSchema,
   SetPitchPlaybackPolicyRequestSchema,
   SetPitchPlaybackPolicyResponseSchema,
   SyncMediaAssetRequestSchema,
@@ -420,35 +417,9 @@ function registerPitchRoutes(
   // The owner's name for one video and who may watch it (ADR 0021/0022).
   // Widening the audience is a disclosure decision: `media.manage`,
   // versioned, audited, like the playback policy.
-  app.post(
-    `${pitch}/:mediaAssetId${MEDIA_DETAILS_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const input = parseContract(
-        SetPitchDetailsRequestSchema,
-        request.body ?? {},
-        "The video details are not valid.",
-      );
-      const asset = await service.setPitchDetails({
-        actor,
-        companyId: companyIdParam(request),
-        mediaAssetId: mediaAssetIdParam(request),
-        details: {
-          title: input.title,
-          audience: input.audience,
-          ...(input.playbackPolicy === undefined
-            ? {}
-            : { playbackPolicy: input.playbackPolicy }),
-        },
-        expectedVersion: input.expectedVersion,
-        correlationId: correlation(),
-      });
-      return reply
-        .header("Cache-Control", "no-store")
-        .send(SetPitchDetailsResponseSchema.parse({ pitch: payload(asset) }));
-    },
-  );
+  // The pitch's title and who can watch it are declared once in the app's
+  // action registry (ADR 0040) and their route is generated from it
+  // (http/app-actions.ts), as Q's tool is.
 
   // Playback. Per viewer, short-lived, decided here every time. A provider
   // UID is not access control, which is why it is not in the answer.

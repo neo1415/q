@@ -12,15 +12,12 @@ import {
   createOwnWorkTools,
   createQToolExecutor,
   createQToolRegistry,
-  decisionEventId,
   type ConversationProposal,
-  type DiscoveryDecisionPort,
   type DocumentRevisionPort,
   type PendingProposalPort,
   type ProposalPlainStatus,
 } from "../src/index.js";
 import {
-  COMPANY_A,
   actorA,
   actorB,
   contextFor,
@@ -101,162 +98,6 @@ describe("settings and session client actions", () => {
       contextFor(actorA, ownPlan(actorA, actorB.userId)),
     );
     expect(theirs.status).not.toBe("SUCCEEDED");
-  });
-});
-
-describe("Save, Unsave and Pass from a conversation", () => {
-  function world(refuse = false) {
-    const seen: Parameters<DiscoveryDecisionPort["decide"]>[] = [];
-    const port: DiscoveryDecisionPort = {
-      decide: (actor, decision) => {
-        seen.push([actor, decision]);
-        return Promise.resolve(
-          refuse
-            ? { status: "NOT_AVAILABLE" }
-            : {
-                status: "RECORDED",
-                deduplicated: false,
-                saved: decision.type === "SAVE",
-                passed: decision.type === "PASS",
-              },
-        );
-      },
-    };
-    const executor = createQToolExecutor({
-      registry: createQToolRegistry(
-        createOwnWorkTools({ discoveryDecisions: port }),
-      ),
-    });
-    return { executor, seen };
-  }
-
-  it("records the decision as the actor, with an idempotency key code derives from the run", async () => {
-    const { executor, seen } = world();
-    const outcome = await executor.execute(
-      call("save_company", { companyId: COMPANY_A }),
-      contextFor(
-        actorA,
-        ownPlan(actorA, actorA.userId, "COUNTERPARTY_COMPANY_QUESTION"),
-      ),
-    );
-    expect(outcome.status).toBe("SUCCEEDED");
-    expect((outcome.result as { data: unknown }).data).toEqual({
-      status: "DONE",
-      saved: true,
-      passed: false,
-    });
-    const [actor, decision] = seen[0] ?? [];
-    expect(actor?.userId).toBe(actorA.userId);
-    expect(decision?.clientEventId).toMatch(/^q-[0-9a-f]{40}$/);
-    // Same run, same decision: the same key, so a retry records nothing twice.
-    expect(decision?.clientEventId).toBe(
-      decisionEventId(
-        contextFor(
-          actorA,
-          ownPlan(actorA, actorA.userId, "COUNTERPARTY_COMPANY_QUESTION"),
-        ).runId,
-        "SAVE",
-        COMPANY_A,
-      ),
-    );
-    expect(decisionEventId("run-1", "PASS", COMPANY_A)).not.toBe(
-      decisionEventId("run-1", "SAVE", COMPANY_A),
-    );
-  });
-
-  it("says NOT_AVAILABLE when the service refuses, and never takes a name for an id", async () => {
-    const { executor } = world(true);
-    const refused = await executor.execute(
-      call("pass_company", { companyId: COMPANY_A }),
-      contextFor(
-        actorA,
-        ownPlan(actorA, actorA.userId, "COUNTERPARTY_COMPANY_QUESTION"),
-      ),
-    );
-    expect((refused.result as { data: unknown }).data).toEqual({
-      status: "NOT_AVAILABLE",
-      saved: null,
-      passed: null,
-    });
-    const named = await executor.execute(
-      call("unsave_company", { companyId: "Alpha Robotics" }),
-      contextFor(
-        actorA,
-        ownPlan(actorA, actorA.userId, "COUNTERPARTY_COMPANY_QUESTION"),
-      ),
-    );
-    expect(named.status).not.toBe("SUCCEEDED");
-  });
-});
-
-describe("Save, Pass and Undo pass by name, from any page (action parity 2026-10-02)", () => {
-  const TALUM = "55555555-0000-4000-8000-0000000000a1";
-  function world() {
-    const seen: Parameters<DiscoveryDecisionPort["decide"]>[1][] = [];
-    const port: DiscoveryDecisionPort = {
-      decide: (_actor, decision) => {
-        seen.push(decision);
-        return Promise.resolve({
-          status: "RECORDED",
-          deduplicated: false,
-          saved: decision.type === "SAVE",
-          passed: decision.type === "PASS",
-        });
-      },
-    };
-    const names = {
-      investorFeed: {
-        page: () => Promise.resolve(null),
-        decisions: () =>
-          Promise.resolve([
-            {
-              companyId: TALUM,
-              name: "Talum",
-              stageCode: "SEED",
-              headquartersCountry: "GB",
-              decision: "PASSED" as const,
-            },
-          ]),
-      },
-    };
-    const executor = createQToolExecutor({
-      registry: createQToolRegistry(
-        createOwnWorkTools({ discoveryDecisions: port }, names as never),
-      ),
-    });
-    return { executor, seen };
-  }
-
-  it("undoes a pass on a company named as they said it, on a general (Home) turn", async () => {
-    const { executor, seen } = world();
-    const outcome = await executor.execute(
-      call("unpass_company", { company: "talum" }),
-      contextFor(actorA, ownPlan()),
-    );
-    expect(outcome.status).toBe("SUCCEEDED");
-    expect(seen).toEqual([
-      expect.objectContaining({ type: "UNPASS", companyId: TALUM }),
-    ]);
-  });
-
-  it("refuses a name it cannot find, and an input naming both or neither", async () => {
-    const { executor, seen } = world();
-    const unknown = await executor.execute(
-      call("pass_company", { company: "Nowhere Ltd" }),
-      contextFor(actorA, ownPlan()),
-    );
-    expect(unknown.status).not.toBe("SUCCEEDED");
-    const both = await executor.execute(
-      call("save_company", { company: "Talum", companyId: TALUM }),
-      contextFor(actorA, ownPlan()),
-    );
-    expect(both.status).not.toBe("SUCCEEDED");
-    const neither = await executor.execute(
-      call("save_company", {}),
-      contextFor(actorA, ownPlan()),
-    );
-    expect(neither.status).not.toBe("SUCCEEDED");
-    expect(seen).toEqual([]);
   });
 });
 

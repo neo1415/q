@@ -621,17 +621,20 @@ describe("R35: the company on screen in Discover", () => {
       },
     },
     investorFeed,
-    discoveryDecisions: {
-      decide: (_actor, decision) => {
-        decided.push({ type: decision.type, companyId: decision.companyId });
-        return Promise.resolve({
-          status: "RECORDED",
-          deduplicated: false,
-          saved: decision.type === "SAVE",
-          passed: decision.type === "PASS",
-        });
+    // ADR 0040: the feed's decisions, through the interaction service.
+    appActions: {
+      interactions: {
+        decide: (type, command) => {
+          decided.push({ type, companyId: command.companyId });
+          return Promise.resolve({
+            kind: "RECORDED",
+            deduplicated: false,
+            state: { saved: type === "SAVE", passed: type === "PASS" },
+          } as never);
+        },
       },
     },
+    appApprovals: { prepareForApproval: () => "PREPARED" },
     pitchMoments: {
       momentAround: () =>
         Promise.resolve({
@@ -696,11 +699,11 @@ describe("R35: the company on screen in Discover", () => {
     decided.length = 0;
     expressed.length = 0;
     expect(
-      (await run("save_company", { companyId: NORTHWIND })).result,
-    ).toMatchObject({ ok: true, data: { status: "DONE", saved: true } });
+      (await run("save_company", { company: NORTHWIND })).result,
+    ).toMatchObject({ ok: true, data: { status: "DONE" } });
     expect(
-      (await run("pass_company", { companyId: NORTHWIND })).result,
-    ).toMatchObject({ ok: true, data: { status: "DONE", passed: true } });
+      (await run("pass_company", { company: NORTHWIND })).result,
+    ).toMatchObject({ ok: true, data: { status: "DONE" } });
     expect(
       (await run("propose_express_interest", { companyId: NORTHWIND })).result,
     ).toMatchObject({ ok: true, data: { status: "PREPARED" } });
@@ -720,7 +723,12 @@ describe("R35: the company on screen in Discover", () => {
       "pass_company",
       "propose_express_interest",
     ]) {
-      const outcome = await run(name, { companyId: KESTREL });
+      const outcome = await run(
+        name,
+        name === "propose_express_interest"
+          ? { companyId: KESTREL }
+          : { company: KESTREL },
+      );
       expect(outcome.status).not.toBe("SUCCEEDED");
     }
     expect(decided).toEqual([]);

@@ -50,6 +50,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@capital-q/app-actions':
+        specifier: workspace:*
+        version: link:../../packages/app-actions
       '@capital-q/audit':
         specifier: workspace:*
         version: link:../../packages/audit
@@ -153,6 +156,9 @@ importers:
 
   apps/q-api:
     dependencies:
+      '@capital-q/app-actions':
+        specifier: workspace:*
+        version: link:../../packages/app-actions
       '@capital-q/audit':
         specifier: workspace:*
         version: link:../../packages/audit
@@ -517,6 +523,37 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/app-actions:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/discovery':
+        specifier: workspace:*
+        version: link:../discovery
+      '@capital-q/media':
+        specifier: workspace:*
+        version: link:../media
+      '@capital-q/q-runtime':
+        specifier: workspace:*
+        version: link:../q-runtime
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
@@ -2019,6 +2056,9 @@ importers:
 
   packages/q-tools:
     dependencies:
+      '@capital-q/app-actions':
+        specifier: workspace:*
+        version: link:../app-actions
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../capital

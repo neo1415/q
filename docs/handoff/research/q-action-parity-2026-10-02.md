@@ -318,3 +318,14 @@ Uploads need the person's file. The safety actions are deliberately the person's
 | `/work`                                                     | Q destination | tool.list_q_work                                                                                                                                                 |
 | `/work/[delegationId]`                                      | Q destination | tool.list_q_work                                                                                                                                                 |
 | `/work/[delegationId]/report/[laneId]`                      | exempt        | DOWNLOAD: a document's render or file download (PDF/PPTX, slides, a version), linked from its card; Q lists documents (list_my_documents) and the card carries t |
+
+## Follow-up: ADR 0040 (Proposed)
+
+Per-gap patching is replaced by ADR 0040, which makes Q capability the app's own action and read registry.
+
+- **Gap that closed it.** Q had no pitch facts and no way to change playback. "Let investors play my pitch video" was answered "no record".
+- **Pitch.** `set_pitch_sharing` is generated from `pitch.details.set`. Audience and playback are one choice, and changing them needs approval.
+- **Reads.** `read_my` covers media, documents and rehearsals, plus the WHAT EXISTS index on every turn.
+- **Discovery decisions.** Save, unsave, pass and undo pass are generated from the registry. Their hand routes and hand tools are deleted.
+- **Guard.** Hand-written mutation routes may only shrink.
+- **Remaining areas.** The checklist, sized by area, is in `docs/adr/0040-q-capability-is-the-apps-own-action-and-read-registry.md`.

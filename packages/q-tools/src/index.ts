@@ -62,7 +62,6 @@ export type {
   ResearchableFounderAnswer,
   ProposalPlainStatus,
   ApprovalInboxPort,
-  DiscoveryDecisionPort,
   EvidenceDocumentsPort,
   OwnRecordKind,
   OwnRecordsPort,
@@ -156,12 +155,10 @@ export {
   type DeclinePendingProposalOutput,
 } from "./tools/pending-proposal.js";
 export {
-  createDiscoveryDecisionTool,
   createListMyDocumentsTool,
   createListPendingApprovalsTool,
   createOwnWorkTools,
   createReviseMyDocumentTool,
-  decisionEventId,
   LIST_MY_DOCUMENTS,
   REVISE_MY_DOCUMENT,
   ReviseMyDocumentInputSchema,
@@ -169,10 +166,6 @@ export {
   type ReviseMyDocumentInput,
   type ReviseMyDocumentOutput,
   LIST_PENDING_APPROVALS,
-  PASS_COMPANY,
-  UNPASS_COMPANY,
-  SAVE_COMPANY,
-  UNSAVE_COMPANY,
 } from "./tools/own-work.js";
 export {
   createListUploadedDocumentsTool,
@@ -514,6 +507,19 @@ export {
   PROPOSE_CONNECTION_REQUEST,
   ProposeConnectionRequestInputSchema,
 } from "./tools/connection-request-send.js";
+// ADR 0040 (Proposed): Q tools generated from the app's action registry.
+export {
+  appActionKey,
+  AppToolOutputSchema,
+  createAppActionTools,
+  createReadMyTool,
+  READ_MY,
+  ReadMyInputSchema,
+  ReadMyOutputSchema,
+  referenceCandidates,
+  type AppApprovalPort,
+  type AppToolOutput,
+} from "./tools/app-actions.js";
 // Action parity (2026-10-02): Settings switches, by asking.
 export {
   createOwnSettingsTools,

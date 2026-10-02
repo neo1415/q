@@ -62,6 +62,8 @@ const CORE = [
   // AUTO (ADR 0030): "what are you working on" and "stop" from any turn.
   "list_q_work",
   "stop_q_work",
+  // ADR 0040: their own records of any kind, so Q never says "no record".
+  "read_my",
 ];
 
 const registry = createQToolRegistry(createDefaultQTools(EVERY_PORT));

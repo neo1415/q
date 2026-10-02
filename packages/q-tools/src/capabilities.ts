@@ -1,3 +1,4 @@
+import { APP_ACTIONS } from "@capital-q/app-actions";
 import {
   Q_NAVIGATE_DESTINATIONS,
   type QNavigateDestination,
@@ -352,6 +353,13 @@ const OFFERS: readonly QCapability[] = [
   ),
 ];
 
+/** Where a registry area's actions sit among the capability groups. */
+const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
+  pitch: "MEDIA",
+  discovery: "RELATIONSHIP",
+  documents: "DOCUMENT",
+};
+
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   ...NAVIGATION,
   ...OFFERS,
@@ -578,18 +586,6 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     { acts: true },
   ),
   tool(
-    "save_company",
-    "RELATIONSHIP",
-    "Saves a company to their Saved list in Discover.",
-    { acts: true },
-  ),
-  tool(
-    "unsave_company",
-    "RELATIONSHIP",
-    "Removes a company from their Saved list.",
-    { acts: true },
-  ),
-  tool(
     "open_page",
     "NAVIGATION",
     "Opens one company's page, their relationship with a company or an investor, the chat with them, or a rehearsal of their meeting with them (Q plays that person), by id or by the name they said.",
@@ -660,18 +656,6 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "read_relationship_email",
     "RELATIONSHIP",
     "Reads the email exchanged on one of their relationships, from their connected Gmail.",
-  ),
-  tool(
-    "pass_company",
-    "RELATIONSHIP",
-    "Passes on a company in their Discover feed.",
-    { acts: true },
-  ),
-  tool(
-    "unpass_company",
-    "RELATIONSHIP",
-    "Undoes a pass: the company can appear in their Discover feed again.",
-    { acts: true },
   ),
   tool(
     "propose_share_raise",
@@ -977,6 +961,23 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     ] as const
   ).map(([name, does]) =>
     tool(name, "ONBOARDING", does, { surfaces: ["ONBOARDING"] }),
+  ),
+  // ADR 0040 (Proposed): every action declared in the app's registry, and
+  // read_my, as the tools generated from it.
+  tool(
+    "read_my",
+    "RECORDS",
+    "Reads their own pitch videos, documents or rehearsals exactly as their pages show them.",
+  ),
+  ...APP_ACTIONS.map((action) =>
+    tool(
+      action.tool.name,
+      APP_ACTION_GROUPS[action.area] ?? "RECORDS",
+      action.does,
+      action.classification === "CONSEQUENTIAL"
+        ? { approval: "PREPARE_APPROVE", executes: [`app.${action.name}`] }
+        : { acts: action.classification === "INSTANT" },
+    ),
   ),
 ]);
 

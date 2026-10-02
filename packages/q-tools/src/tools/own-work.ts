@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { z } from "zod";
 
 import {
@@ -18,12 +16,8 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
-import { findRecordByName } from "./client-actions.js";
-import { actionTarget } from "./relationships.js";
 import type {
-  QToolPorts,
   ApprovalInboxPort,
-  DiscoveryDecisionPort,
   DocumentRevisionPort,
   OwnDocumentsPort,
 } from "../ports.js";
@@ -39,10 +33,6 @@ import type {
 export const LIST_PENDING_APPROVALS = "approvals.pending.list" as const;
 export const LIST_MY_DOCUMENTS = "documents.own.list" as const;
 export const REVISE_MY_DOCUMENT = "documents.own.revise" as const;
-export const SAVE_COMPANY = "discovery.company.save" as const;
-export const UNSAVE_COMPANY = "discovery.company.unsave" as const;
-export const PASS_COMPANY = "discovery.company.pass" as const;
-export const UNPASS_COMPANY = "discovery.company.unpass" as const;
 
 /** A person, in their own Q conversation. */
 function ownConversation(
@@ -208,166 +198,8 @@ export function createListMyDocumentsTool(
   });
 }
 
-// --- an investor's Save, Unsave and Pass ----------------------------------
-
-export const DiscoveryDecisionInputSchema = z
-  .object({
-    companyId: z
-      .string()
-      .uuid()
-      .optional()
-      .describe(
-        "The company's id, exactly as a tool or the screen gave it. Never guessed from a name.",
-      ),
-    company: z
-      .string()
-      .trim()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe(
-        "Or the company's name as the person said it (misheard names are matched against what they can already see: their feed, Saved, Passed, relationships). Works from any page.",
-      ),
-  })
-  .strict()
-  .refine(
-    (input) =>
-      (input.companyId === undefined) !== (input.company === undefined),
-    { message: "give companyId or company, not both" },
-  );
-export type DiscoveryDecisionInput = z.infer<
-  typeof DiscoveryDecisionInputSchema
->;
-
-export const DiscoveryDecisionOutputSchema = z
-  .object({
-    status: z.enum(["DONE", "NOT_AVAILABLE"]),
-    saved: z.boolean().nullable(),
-    passed: z.boolean().nullable(),
-  })
-  .strict();
-export type DiscoveryDecisionOutput = z.infer<
-  typeof DiscoveryDecisionOutputSchema
->;
-
-/**
- * The idempotency identity of one decision in one run: a retried call
- * records nothing twice, and a new turn is a new decision (the person may
- * save, unsave and save again). Never the model's to choose.
- */
-export function decisionEventId(
-  runId: string,
-  type: "SAVE" | "UNSAVE" | "PASS" | "UNPASS",
-  companyId: string,
-): string {
-  const digest = createHash("sha256")
-    .update(`${runId}\u0000${type}\u0000${companyId.toLowerCase()}`)
-    .digest("hex")
-    .slice(0, 40);
-  return `q-${digest}`;
-}
-
-const DECISION_WORDS: Readonly<
-  Record<
-    "SAVE" | "UNSAVE" | "PASS" | "UNPASS",
-    { name: string; description: string }
-  >
-> = {
-  SAVE: {
-    name: "save_company",
-    description:
-      "Saves a company to the investor's Saved list, exactly as the Save button in Discover does. Reversible (unsave_company). Call it when they ask to save, bookmark or keep a company. NOT_AVAILABLE means it cannot be saved from their feed; say so without guessing why.",
-  },
-  UNSAVE: {
-    name: "unsave_company",
-    description:
-      "Removes a company from the investor's Saved list, exactly as un-saving it in Discover does. Call it when they ask to unsave or remove a saved company.",
-  },
-  PASS: {
-    name: "pass_company",
-    description:
-      "Passes on a company in the investor's Discover feed, exactly as the Pass button does: it leaves their feed. A neutral decision, not a judgment of the company. Call it only when they clearly ask to pass on or skip that company.",
-  },
-  UNPASS: {
-    name: "unpass_company",
-    description:
-      "Undoes a pass, exactly as Undo pass on the Passed list does: the company can appear in their Discover feed again from the next page. Call it when they ask to undo a pass, bring a company back or reconsider one they passed on.",
-  },
-};
-
-type NamePorts = Pick<
-  QToolPorts,
-  "companies" | "relationships" | "disclosure" | "discovery" | "investorFeed"
->;
-
-export function createDiscoveryDecisionTool(
-  type: "SAVE" | "UNSAVE" | "PASS" | "UNPASS",
-  port: DiscoveryDecisionPort,
-  names?: NamePorts,
-): AnyQToolDefinition {
-  const words = DECISION_WORDS[type];
-  return defineQTool<
-    DiscoveryDecisionInput,
-    DiscoveryDecisionOutput,
-    { readonly companyId: string }
-  >({
-    ...OWN,
-    id:
-      type === "SAVE"
-        ? SAVE_COMPANY
-        : type === "UNSAVE"
-          ? UNSAVE_COMPANY
-          : type === "PASS"
-            ? PASS_COMPANY
-            : UNPASS_COMPANY,
-    providerName: words.name,
-    // From any page and any kind of turn (R20/R33, founder 2026-10-02:
-    // "pass on Souqsheet" from Home was refused): their own feed decision.
-    supportedPurposes: [...Q_TASK_CLASSES],
-    description: words.description,
-    // Their own feed decision, reversible from the page; the interaction
-    // service re-runs the feed's eligibility for this company.
-    classification: "SIDE_EFFECT",
-    riskClass: "LOW_RISK_INTERNAL",
-    input: DiscoveryDecisionInputSchema,
-    output: DiscoveryDecisionOutputSchema,
-    // Their own conversation, and a company the run is about (on screen,
-    // watched or asked about) -- never one a model produced from nowhere.
-    authorize: async (input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
-      // An id: a company the run is about, as before.
-      if (input.companyId !== undefined) {
-        return actionTarget(plan, input.companyId)
-          ? allow("INTERNAL", { companyId: input.companyId })
-          : deny("NOT_AVAILABLE");
-      }
-      // A name: only among what the person can already see, by hand; the
-      // interaction service re-runs the feed's eligibility for it.
-      if (input.company === undefined || names === undefined) {
-        return deny("NOT_AVAILABLE");
-      }
-      const found = await findRecordByName(
-        names,
-        actor,
-        "COMPANY",
-        input.company,
-      ).catch(() => null);
-      return found === null
-        ? deny("NOT_AVAILABLE")
-        : allow("INTERNAL", { companyId: found });
-    },
-    execute: async (_input, context, grant) => {
-      const outcome = await port.decide(context.actor, {
-        type,
-        companyId: grant.companyId,
-        clientEventId: decisionEventId(context.runId, type, grant.companyId),
-      });
-      return outcome.status === "RECORDED"
-        ? { status: "DONE", saved: outcome.saved, passed: outcome.passed }
-        : { status: "NOT_AVAILABLE", saved: null, passed: null };
-    },
-  });
-}
+// Save, Unsave, Pass and Undo pass are declared once in the app's action
+// registry (ADR 0040) and generated as Q tools (tools/app-actions.ts).
 
 // --- revising one of their documents -------------------------------------
 
@@ -471,17 +303,11 @@ export function createReviseMyDocumentTool(
   });
 }
 
-export function createOwnWorkTools(
-  ports: {
-    readonly approvalInbox?: ApprovalInboxPort | undefined;
-    readonly documents?: OwnDocumentsPort | undefined;
-    readonly documentRevision?: DocumentRevisionPort | undefined;
-    readonly discoveryDecisions?: DiscoveryDecisionPort | undefined;
-  },
-  /** What a name is resolved against (open_page's rule); absent: ids only. */
-  names?: NamePorts,
-): readonly AnyQToolDefinition[] {
-  const decisions = ports.discoveryDecisions;
+export function createOwnWorkTools(ports: {
+  readonly approvalInbox?: ApprovalInboxPort | undefined;
+  readonly documents?: OwnDocumentsPort | undefined;
+  readonly documentRevision?: DocumentRevisionPort | undefined;
+}): readonly AnyQToolDefinition[] {
   return [
     ...(ports.approvalInbox === undefined
       ? []
@@ -492,10 +318,5 @@ export function createOwnWorkTools(
     ...(ports.documentRevision === undefined
       ? []
       : [createReviseMyDocumentTool(ports.documentRevision)]),
-    ...(decisions === undefined
-      ? []
-      : (["SAVE", "UNSAVE", "PASS", "UNPASS"] as const).map((type) =>
-          createDiscoveryDecisionTool(type, decisions, names),
-        )),
   ];
 }
