@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global process, console, fetch, URL, setTimeout */
 /**
  * Q parity eval (ADR 0040 §3). For every action declared in the app's
  * action registry, and every read_my kind, it sends the generated
@@ -157,14 +158,14 @@ async function settled(runId) {
   return "TIMEOUT";
 }
 
-const DECISION_TYPE = {
-  "discovery.company.save": "SAVE",
-  "discovery.company.unsave": "UNSAVE",
-  "discovery.company.pass": "PASS",
-  "discovery.company.unpass": "UNPASS",
+const DECISION_STATE = {
+  "discovery.company.save": { field: "saved", value: true },
+  "discovery.company.unsave": { field: "saved", value: false },
+  "discovery.company.pass": { field: "passed", value: true },
+  "discovery.company.unpass": { field: "passed", value: false },
 };
 
-async function check(testCase, runId, userId, startedAt) {
+async function check(testCase, runId, userId, company) {
   const expect = testCase.expect;
   if (expect.kind === "READ") {
     const said = (
@@ -185,13 +186,24 @@ async function check(testCase, runId, userId, startedAt) {
     );
     return proposed.some((row) => row.p.includes(`app.${expect.action}`));
   }
-  const recorded = await sql(
-    `select 1 from recommendation.interaction_events
-      where actor_user_id = ${quote(userId)} and surface = 'Q_CONVERSATION'
-        and interaction_type = ${quote(DECISION_TYPE[expect.action] ?? "")}
-        and recorded_at >= ${quote(startedAt)} limit 1`,
+  // The state the person asked for, by the end of the run. "Already
+  // saved" is the right answer to "save it" when it was: what matters is
+  // that it is so, through the interaction service's own projection.
+  const want = DECISION_STATE[expect.action];
+  const state = (
+    await sql(
+      `select st.saved, st.passed from recommendation.interaction_state st
+         join core.investor_organisations io on io.id = st.investor_organisation_id
+         join identity.organisation_memberships om on om.organisation_id = io.organisation_id
+         join core.companies c on c.id = st.company_id
+        where om.user_id = ${quote(userId)} and c.canonical_name = ${quote(company)}`,
+    )
+  )[0];
+  return (
+    want !== undefined &&
+    state !== undefined &&
+    state[want.field] === want.value
   );
-  return recorded.length > 0;
 }
 
 const placeholder = { MEDIA: "Nixo pitch", COMPANY: "Kazikit" };
@@ -203,7 +215,27 @@ if (!DRY) {
   investorUser = await userOf(env("EVAL_INVESTOR_EMAIL"));
   names = await namesFor(founderUser, investorUser);
 }
-const cases = parityCases(APP_ACTIONS, names.names, names.reads);
+const only = process.argv.find((arg) => arg.startsWith("--only="))?.slice(7);
+// Each decision case must change the state it checks: per phrasing,
+// save, unsave, pass, unpass, so a Q that did nothing cannot pass by
+// inheriting the previous case's state.
+const VARIANT_ORDER = ["PHRASING_1", "PHRASING_2", "MISHEARD"];
+const cases = parityCases(APP_ACTIONS, names.names, names.reads)
+  .filter(
+    (testCase) => only === undefined || new RegExp(only).test(testCase.id),
+  )
+  .map((testCase, index) => ({ testCase, index }))
+  .sort((a, b) => {
+    const decision = (c) =>
+      c.expect.kind === "ACTION" && c.expect.action.startsWith("discovery.");
+    if (!decision(a.testCase) || !decision(b.testCase))
+      return a.index - b.index;
+    return (
+      VARIANT_ORDER.indexOf(a.testCase.variant) -
+        VARIANT_ORDER.indexOf(b.testCase.variant) || a.index - b.index
+    );
+  })
+  .map(({ testCase }) => testCase);
 const calls = cases.length * MODEL_CALLS_PER_CASE;
 console.log(
   `${String(cases.length)} cases, ~${String(calls)} model calls, est. ≤ $${(calls * COST_PER_CALL_USD).toFixed(2)} per run`,
@@ -227,14 +259,13 @@ for (const testCase of cases) {
           APP_ACTIONS.find((a) => a.name === testCase.expect.action)?.area
         ] ?? "INVESTOR");
   const userId = account === "FOUNDER" ? founderUser : investorUser;
-  const startedAt = new Date().toISOString();
   const t0 = Date.now();
   const runId = await ask(tokens[account], testCase.say);
   const status = runId === null ? "NOT_STARTED" : await settled(runId);
   const ok =
     runId !== null &&
     status === "COMPLETED" &&
-    (await check(testCase, runId, userId, startedAt));
+    (await check(testCase, runId, userId, names.names.COMPANY));
   rows.push({
     id: testCase.id,
     variant: testCase.variant,

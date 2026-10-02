@@ -1,3 +1,4 @@
+import { APP_ACTIONS } from "@capital-q/app-actions";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
@@ -46,6 +47,7 @@ import {
   createSpecialistQAnswer,
   createToolCanonicalPort,
   createToolHandOverPort,
+  createToolAppActionPort,
   createToolProfileGapsPort,
   createToolOwnMandatePort,
   createToolOwnRecordsPort,
@@ -359,6 +361,12 @@ export function composeQIntelligence(
           : { dataPosture: dependencies.dataPosture }),
         ...(logger === undefined ? {} : { logger }),
       }),
+      ...(logger === undefined ? {} : { logger }),
+    }),
+    // ADR 0040: a declared app action the reading names, run by code.
+    appActions: createToolAppActionPort({
+      tools,
+      names: APP_ACTIONS.map((action) => action.tool.name),
       ...(logger === undefined ? {} : { logger }),
     }),
     handOver: createToolHandOverPort({

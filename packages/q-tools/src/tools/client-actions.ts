@@ -463,6 +463,13 @@ export async function nameableRecords(
     for (const entry of decisions ?? []) {
       found.push({ id: entry.companyId, name: entry.name });
     }
+    // The companies in their own feed right now (parity eval 2026-10-02:
+    // "Save Ajopot" met "not in your record" while Ajopot led their feed
+    // but was not network-searchable by that name).
+    const feed = await ports.investorFeed?.page(actor, 30).catch(() => null);
+    for (const item of feed?.items ?? []) {
+      found.push({ id: item.companyId, name: item.name });
+    }
     if (name !== null) {
       const network = await networkVisibleCompanies(ports, actor, {
         text: name,

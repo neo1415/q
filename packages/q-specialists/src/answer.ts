@@ -1,3 +1,4 @@
+import { appActionOf, type QAppActionPort } from "./app-action-turn.js";
 import {
   type QNavigateDestination,
   type QResponseMessage,
@@ -185,6 +186,11 @@ export type SpecialistQAnswerDependencies = {
    * own tools decide, as before.
    */
   readonly handOver?: QHandOverPort | undefined;
+  /**
+   * ADR 0040: a declared app action the turn's reading names, done by code
+   * through its generated tool (parity eval 2026-10-02).
+   */
+  readonly appActions?: QAppActionPort | undefined;
   /**
    * Their own profile's open fields filled from public sources, by code,
    * when the turn reader reads saveToOwnProfile (HARDEN P0, 2026-10-02).
@@ -1665,6 +1671,25 @@ export function createSpecialistQAnswer(
           reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
         );
         return acted;
+      }
+    }
+    // A declared app action the reading names (ADR 0040): code runs its
+    // generated tool, with its own authorize step and approval card, and
+    // says the tool's own line; the model is not asked to choose it.
+    const appAction = appActionOf(read);
+    if (
+      dependencies.appActions !== undefined &&
+      appAction !== null &&
+      read !== null &&
+      read.confidence !== "LOW" &&
+      dependencies.appActions.tools.has(appAction.tool) &&
+      !writingDocument
+    ) {
+      const said = await dependencies.appActions
+        .run(request, appAction)
+        .catch(() => null);
+      if (said !== null) {
+        return recordAnswer(request, conversationId, said);
       }
     }
     // A hand-over (TURN_READER v22): "get me a meeting with this person",

@@ -10,6 +10,10 @@ import {
   createToolHandOverPort,
   type QHandOverPort,
 } from "../src/hand-over.js";
+import {
+  createToolAppActionPort,
+  type QAppActionPort,
+} from "../src/app-action-turn.js";
 import type { PendingDecisionPort } from "../src/pending-decision.js";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
@@ -112,6 +116,8 @@ function seam(options: {
   readonly handOver?: QHandOverPort;
   /** Their profile's gaps filled by code (TURN_READER v27). */
   readonly profileGaps?: QProfileGapsPort;
+  /** ADR 0040: a declared app action the reading names. */
+  readonly appActions?: QAppActionPort;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -234,6 +240,9 @@ function seam(options: {
       ? {}
       : { pendingDecisions: options.pendingDecisions }),
     ...(options.handOver === undefined ? {} : { handOver: options.handOver }),
+    ...(options.appActions === undefined
+      ? {}
+      : { appActions: options.appActions }),
     ...(options.profileGaps === undefined
       ? {}
       : { profileGaps: options.profileGaps }),
@@ -2082,5 +2091,112 @@ describe("live 2026-10-02 (Zino): a direct request is not handed over", () => {
     await answer.answer(request());
     expect(prepared).toEqual([]);
     expect(delegated()).toBe(1);
+  });
+});
+
+describe("a declared app action the reading names is done by code (ADR 0040, parity eval 2026-10-02)", () => {
+  const reading = (appAction: unknown) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+      appAction,
+    }) as TurnReaderResult;
+
+  it("'Pass on Ajopot.' runs pass_company and says its own line; the model is not asked", async () => {
+    const ran: unknown[] = [];
+    const appActions: QAppActionPort = {
+      tools: new Set(["pass_company"]),
+      run: (_request, action) => {
+        ran.push(action);
+        return Promise.resolve(
+          "Passed on Ajopot. It stays in Passed, where Undo pass brings it back.",
+        );
+      },
+    };
+    const { answer, stored, delegated } = seam({
+      said: "Pass on Ajopot.",
+      reading: reading({
+        tool: "pass_company",
+        arguments: { company: "Ajopot" },
+      }),
+      outcomes: [],
+      appActions,
+    });
+    await answer.answer(request());
+    expect(ran).toEqual([
+      { tool: "pass_company", arguments: { company: "Ajopot" } },
+    ]);
+    expect(stored.at(-1)?.content).toBe(
+      "Passed on Ajopot. It stays in Passed, where Undo pass brings it back.",
+    );
+    expect(delegated()).toBe(0);
+  });
+
+  it("a tool that is not a declared app action, or one that refuses, falls back to the answer", async () => {
+    const appActions: QAppActionPort = {
+      tools: new Set(["pass_company"]),
+      run: () => Promise.resolve(null),
+    };
+    const refused = seam({
+      said: "Pass on Nowhere Ltd.",
+      reading: reading({
+        tool: "pass_company",
+        arguments: { company: "Nowhere Ltd" },
+      }),
+      outcomes: [],
+      appActions,
+    });
+    await refused.answer.answer(request());
+    expect(refused.delegated()).toBe(1);
+    const other = seam({
+      said: "Delete my account.",
+      reading: reading({ tool: "sign_out", arguments: {} }),
+      outcomes: [],
+      appActions,
+    });
+    await other.answer.answer(request());
+    expect(other.delegated()).toBe(1);
+  });
+
+  it("the port runs only declared tools, through the executor, and returns the tool's line", async () => {
+    const calls: QToolProposal[] = [];
+    const port = createToolAppActionPort({
+      names: ["save_company"],
+      tools: {
+        offer: () => Promise.resolve([]),
+        execute: (proposal: QToolProposal) => {
+          calls.push(proposal);
+          return Promise.resolve({
+            callId: "c",
+            toolName: null,
+            toolVersion: 1,
+            classification: null,
+            status: "SUCCEEDED",
+            failureCode: null,
+            sensitivity: null,
+            result: {
+              ok: true,
+              data: { status: "DONE", says: "Saved Ajopot." },
+            },
+            latencyMs: 1,
+          } as QToolCallOutcome);
+        },
+      },
+    });
+    expect(
+      await port.run(request(), {
+        tool: "save_company",
+        arguments: { company: "Ajopot" },
+      }),
+    ).toBe("Saved Ajopot.");
+    expect(
+      await port.run(request(), { tool: "sign_out", arguments: {} }),
+    ).toBeNull();
+    expect(calls.map((call) => call.name)).toEqual(["save_company"]);
   });
 });

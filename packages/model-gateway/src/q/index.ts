@@ -2428,6 +2428,8 @@ export function createModelGatewayQAnswer(
        * tool's own line. A first call's line ("couldn't settle values")
        * stands only when no second call followed.
        */
+      /** ADR 0040: what each app action that ran said, in its own words. */
+      const actedLines: string[] = [];
       let gaps: { readonly status: string; readonly line: string } | null =
         null;
       // The order matters more than the words: a model handed tools and a
@@ -2754,6 +2756,15 @@ export function createModelGatewayQAnswer(
               }
               if (call.name === FILL_PROFILE_GAPS_TOOL && outcome.result.ok) {
                 gaps = gapsLineOf(outcome.result.data) ?? gaps;
+              }
+              // ADR 0040: an app action that ran (or could not) says so in
+              // Capital Q's own words, from the tool -- the model's talk
+              // about acting is removed below, so this is what is said.
+              const acted = outcome.result.ok
+                ? appActionLineOf(outcome.result.data)
+                : null;
+              if (acted !== null && !actedLines.includes(acted)) {
+                actedLines.push(acted);
               }
               results.push(toolResultMessage(call, outcome));
             }
@@ -3116,6 +3127,7 @@ export function createModelGatewayQAnswer(
             : [
                 ...(approvalLine === null ? [] : [approvalLine]),
                 guarded.text,
+                ...actedLines,
                 ...(statusLine === null ? [] : [statusLine]),
                 ...(recordedStatements.length === 0
                   ? []
@@ -3377,4 +3389,19 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
       }
     },
   };
+}
+
+/**
+ * ADR 0040: the line an app action tool (generated from the registry)
+ * returns when it ran or could not: `{ status: DONE | NOT_DONE, says }`.
+ * Prepared actions are narrated by the Approval Engine, not here.
+ */
+export function appActionLineOf(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const record = data as { readonly status?: unknown; readonly says?: unknown };
+  return (record.status === "DONE" || record.status === "NOT_DONE") &&
+    typeof record.says === "string" &&
+    record.says.trim().length > 0
+    ? record.says.trim()
+    : null;
 }
