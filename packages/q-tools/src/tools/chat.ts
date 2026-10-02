@@ -8,6 +8,7 @@ import {
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
+import { closestByName } from "./connection-requests.js";
 import {
   allow,
   defineQTool,
@@ -205,24 +206,35 @@ export const RelationshipRef = {
   investorOrganisationId: UuidSchema.optional().describe(
     "As a company: the investor organisation.",
   ),
+  counterpartName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe(
+      "Or the other side's name as the person said it (misheard names too), matched against their own relationships. Works from any page; no id needed.",
+    ),
 };
 
 export function exactlyOne(input: {
   readonly relationshipId?: string | undefined;
   readonly companyId?: string | undefined;
   readonly investorOrganisationId?: string | undefined;
+  readonly counterpartName?: string | undefined;
 }): boolean {
   return (
     [
       input.relationshipId,
       input.companyId,
       input.investorOrganisationId,
+      input.counterpartName,
     ].filter((id) => id !== undefined).length === 1
   );
 }
 export const ONE_REF = {
   message:
-    "name exactly one of relationshipId, companyId or investorOrganisationId",
+    "name exactly one of relationshipId, companyId, investorOrganisationId or counterpartName",
 };
 
 /**
@@ -234,11 +246,24 @@ export async function resolveRelationship(
     readonly relationshipId?: string | undefined;
     readonly companyId?: string | undefined;
     readonly investorOrganisationId?: string | undefined;
+    readonly counterpartName?: string | undefined;
   },
   actor: ActorContext,
   plan: PermittedContextPlan,
   relationships: RelationshipIntelligencePort,
 ): Promise<string | null> {
+  // A name (R20/R33, founder 2026-10-02: "send Nixo a message" from Home):
+  // one of their OWN relationships, as their side sees it; the party check
+  // of every service the tool then calls stands as for the page.
+  if (input.counterpartName !== undefined) {
+    const own = await relationships.ownRelationships?.(actor).catch(() => null);
+    const found = closestByName(
+      own?.items ?? [],
+      input.counterpartName,
+      (item) => item.counterpart.name,
+    );
+    return found.length === 1 ? (found[0]?.relationshipId ?? null) : null;
+  }
   if (input.relationshipId !== undefined) {
     const id = input.relationshipId;
     const bound = boundScopeFor(

@@ -24,6 +24,10 @@ import {
   RELATIONSHIP_CONNECTION_REQUEST_RESPOND,
 } from "./connection-request-answer-action.js";
 import {
+  ConnectionRequestSendPayloadSchema,
+  RELATIONSHIP_CONNECTION_REQUEST_SEND,
+} from "./connection-request-send-action.js";
+import {
   ExpressInterestPayloadSchema,
   RELATIONSHIP_INTEREST_EXPRESS,
 } from "./express-interest-action.js";
@@ -54,7 +58,8 @@ type Prepared = {
   readonly actionType:
     | "relationship.interest.express"
     | "relationship.interest.respond"
-    | "relationship.connection_request.respond";
+    | "relationship.connection_request.respond"
+    | "relationship.connection_request.send";
   readonly payload: Readonly<Record<string, string | null>>;
   readonly at: number;
 };
@@ -111,7 +116,9 @@ export function createRelationshipActionBoard(
             ? ExpressInterestPayloadSchema
             : entry.actionType === "relationship.connection_request.respond"
               ? ConnectionRequestAnswerPayloadSchema
-              : RespondToInterestPayloadSchema;
+              : entry.actionType === "relationship.connection_request.send"
+                ? ConnectionRequestSendPayloadSchema
+                : RespondToInterestPayloadSchema;
         const parsed = schema.safeParse(entry.payload);
         if (!parsed.success) {
           options.logger?.warn(
@@ -128,7 +135,9 @@ export function createRelationshipActionBoard(
               ? RELATIONSHIP_INTEREST_EXPRESS
               : entry.actionType === "relationship.connection_request.respond"
                 ? RELATIONSHIP_CONNECTION_REQUEST_RESPOND
-                : RELATIONSHIP_INTEREST_RESPOND,
+                : entry.actionType === "relationship.connection_request.send"
+                  ? RELATIONSHIP_CONNECTION_REQUEST_SEND
+                  : RELATIONSHIP_INTEREST_RESPOND,
           payload: parsed.data,
         });
       },
@@ -174,10 +183,26 @@ export function createRelationshipIntelligencePort(dependencies: {
     ((actor: ActorContext) => Promise<string | null>) | undefined;
   /** An investor's own inbox of founders' Connection Requests (ADR 0023). */
   readonly connections?:
-    Pick<ConnectionService, "listConnectionRequests"> | undefined;
+    | Pick<ConnectionService, "listConnectionRequests" | "connectionStatus">
+    | undefined;
 }): RelationshipIntelligencePort {
   const { interests, board, ownCompany, connections } = dependencies;
   return {
+    // A founder's Connection Request (action parity 2026-10-02): the
+    // investor page's own check, as the person; writes nothing.
+    ...(connections === undefined
+      ? {}
+      : {
+          mayRequestConnection: async (
+            actor: ActorContext,
+            investorOrganisationId: string,
+          ) =>
+            (
+              await connections
+                .connectionStatus({ actor, investorOrganisationId })
+                .catch(() => null)
+            )?.canRequest === true,
+        }),
     ...(connections === undefined
       ? {}
       : {

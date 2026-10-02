@@ -322,7 +322,7 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIP",
     "Dismiss a reminder they have dealt with (on the reminder itself)",
     "RELATIONSHIPS",
-    "Dismissing is the person clearing their own notice once they have acted on it; Q never decides that something was done.",
+    "Dismissing is the person's own call that it was dealt with: Q dismisses one when they say so (dismiss_reminder), never on its own judgement.",
   ),
   // ADR 0023: founders reach investors only by a Connection Request.
   offer(
@@ -330,7 +330,7 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIP",
     "Look at investors who chose to be discoverable and send one a Connection Request (from the investor's page, opened from Discover or Investors)",
     "DISCOVER",
-    "A Connection Request introduces their company to an investor; the founder sends it themselves after reading who the investor is, and only where the investor takes requests.",
+    "Browsing investors to choose one is the founder's own reading; once they name one, propose_connection_request prepares the request for their approval, and only where the investor takes requests.",
     true,
   ),
   offer(
@@ -666,6 +666,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     { acts: true },
   ),
   tool(
+    "unpass_company",
+    "RELATIONSHIP",
+    "Undoes a pass: the company can appear in their Discover feed again.",
+    { acts: true },
+  ),
+  tool(
     "propose_share_raise",
     "VISIBILITY",
     "Shares their raise with a named investor, applied when they approve.",
@@ -698,6 +704,15 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     {
       approval: "PREPARE_APPROVE",
       executes: ["relationship.interest.respond"],
+    },
+  ),
+  tool(
+    "propose_connection_request",
+    "RELATIONSHIP",
+    "For a founder: sends one investor a Connection Request introducing their company, named as they said it -- after their approval.",
+    {
+      approval: "PREPARE_APPROVE",
+      executes: ["relationship.connection_request.send"],
     },
   ),
   tool(
@@ -838,6 +853,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RELATIONSHIP",
     "Reads their upcoming calls (with the prep brief, ready 24 hours before) and open reminders.",
   ),
+  tool(
+    "dismiss_reminder",
+    "RELATIONSHIP",
+    "Dismisses one of their open reminders when they say so, as the reminder's Dismiss does.",
+    { acts: true },
+  ),
   // --- end BIZ-008 ----------------------------------------------------------
   tool(
     "list_incoming_interest",
@@ -901,6 +922,25 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "set_q_daily_preferences",
     "SETTINGS",
     "Changes how they receive The Q Daily (weekly, daily or off; emailed or dashboard only; which sections), at once and reversibly, as Settings does.",
+    { acts: true },
+  ),
+  tool(
+    "request_q_daily",
+    "SETTINGS",
+    "Asks for a fresh edition of The Q Daily now, as Prepare my edition does (one per 20 hours).",
+    { acts: true },
+  ),
+  // Action parity (2026-10-02): Settings switches, by asking.
+  tool(
+    "set_notification_settings",
+    "SETTINGS",
+    "Turns push or email notifications on or off, at once and reversibly, as Settings does.",
+    { acts: true },
+  ),
+  tool(
+    "set_q_personality",
+    "SETTINGS",
+    "Sets the personality Q speaks with for them (auto, warm, witty, sharp or calm), as Settings does.",
     { acts: true },
   ),
   // --- end DAILY block -----------------------------------------------------

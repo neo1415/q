@@ -17,6 +17,7 @@ import type {
   EmailIntelligencePort,
   RelationshipIntelligencePort,
 } from "../ports.js";
+import { closestByName } from "./connection-requests.js";
 import { admitted } from "./relationships.js";
 
 /**
@@ -53,6 +54,15 @@ export const ProposeEmailInputSchema = z
     investorOrganisationId: UuidSchema.optional().describe(
       "As a company: the investor organisation whose people to email.",
     ),
+    counterpartName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe(
+        "Or the other side's name as the person said it (from any page); Capital Q finds it among their own relationships.",
+      ),
     recipientEmail: z
       .email()
       .max(320)
@@ -72,10 +82,11 @@ export const ProposeEmailInputSchema = z
         input.relationshipId,
         input.companyId,
         input.investorOrganisationId,
+        input.counterpartName,
       ].filter((id) => id !== undefined).length === 1,
     {
       message:
-        "name exactly one of relationshipId, companyId or investorOrganisationId",
+        "name exactly one of relationshipId, companyId, investorOrganisationId or counterpartName",
     },
   );
 export type ProposeEmailInput = z.infer<typeof ProposeEmailInputSchema>;
@@ -131,7 +142,25 @@ export function createProposeEmailTool(
     authorize: async (input, { actor, plan }) => {
       try {
         let relationshipId = input.relationshipId;
-        if (relationshipId === undefined && relationships !== undefined) {
+        // A name (action parity 2026-10-02, "email Nixo" from any page):
+        // one of their OWN relationships; the counterpart read below is the
+        // party check, as for the page.
+        const byName = input.counterpartName !== undefined;
+        if (byName && relationships !== undefined) {
+          const own = await relationships
+            .ownRelationships?.(actor)
+            .catch(() => null);
+          const found = closestByName(
+            own?.items ?? [],
+            input.counterpartName ?? "",
+            (item) => item.counterpart.name,
+          );
+          relationshipId =
+            found.length === 1 ? found[0]?.relationshipId : undefined;
+        } else if (
+          relationshipId === undefined &&
+          relationships !== undefined
+        ) {
           const status =
             input.companyId !== undefined
               ? await relationships.withCompany(actor, input.companyId)
@@ -147,7 +176,8 @@ export function createProposeEmailTool(
         const counterpart = await email.counterpart(actor, relationshipId);
         if (
           counterpart === null ||
-          !admitted(plan, { kind: counterpart.kind, id: counterpart.id })
+          (!byName &&
+            !admitted(plan, { kind: counterpart.kind, id: counterpart.id }))
         ) {
           return deny("NOT_AVAILABLE");
         }

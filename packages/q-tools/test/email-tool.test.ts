@@ -141,3 +141,82 @@ describe("propose_email", () => {
     expect(prepared).toEqual([]);
   });
 });
+
+describe("propose_email by name, from any page (action parity 2026-10-02)", () => {
+  it("'email apex' drafts to the relationship they have with Apex; a stranger gets nothing", async () => {
+    const prepared: unknown[] = [];
+    const email: EmailIntelligencePort = {
+      counterpart: (actor, relationshipId) =>
+        Promise.resolve(
+          actor.userId === actorB.userId && relationshipId === RELATIONSHIP
+            ? {
+                kind: "COMPANY" as const,
+                id: COMPANY_B_NETWORK,
+                name: "Apex",
+                contacts: [ADA],
+              }
+            : null,
+        ),
+      mailbox: () => Promise.resolve({ email: "investor@example.invalid" }),
+      prepareForApproval: (entry) => {
+        prepared.push(entry.payload);
+        return "PREPARED";
+      },
+    };
+    const relationships = {
+      ownRelationships: (actor: typeof actorA) =>
+        Promise.resolve({
+          side: "INVESTOR" as const,
+          items:
+            actor.userId === actorB.userId
+              ? [
+                  {
+                    relationshipId: RELATIONSHIP,
+                    counterpart: {
+                      kind: "COMPANY",
+                      id: COMPANY_B_NETWORK,
+                      name: "Apex",
+                    },
+                    state: "CONNECTED",
+                  },
+                ]
+              : [],
+        } as never),
+    } as never;
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(fakePorts({ email, relationships })),
+      ),
+    });
+    const named = {
+      callId: "e9",
+      name: "propose_email",
+      arguments: {
+        counterpartName: "apex",
+        subject: "Next steps",
+        body: "Hi Ada, shall we talk this week? Best, Ben",
+      },
+    };
+    // A Home plan: no relationship on screen.
+    const outcome = await executor.execute(
+      named,
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toHaveLength(1);
+    const stranger = await executor.execute(
+      named,
+      contextFor(
+        actorA,
+        planFor(actorA, "GENERAL_QUESTION", [
+          { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
+        ]),
+      ),
+    );
+    expect(stranger.status).not.toBe("SUCCEEDED");
+    expect(prepared).toHaveLength(1);
+  });
+});

@@ -148,6 +148,7 @@ import {
 import {
   composeChat,
   composeSchedule,
+  createPushSubscriptionStore,
   // AUTO block (2026-10-02)
   createCounterpartNotices,
   meetingIcs,
@@ -307,6 +308,7 @@ import { createCompanyVisibilitySetAction } from "./composition/company-visibili
 import { createExpressInterestAction } from "./composition/express-interest-action.js";
 import { createRespondToInterestAction } from "./composition/respond-to-interest-action.js";
 import { createConnectionRequestAnswerAction } from "./composition/connection-request-answer-action.js";
+import { createConnectionRequestSendAction } from "./composition/connection-request-send-action.js";
 import {
   chainProposers,
   createRelationshipActionBoard,
@@ -1349,6 +1351,7 @@ const conversationApprovals = createConversationApprovalPort({
   logger,
 });
 const errandStore = createPostgresErrandStore(database.sql);
+const pushSettings = createPushSubscriptionStore(database.sql);
 const qTools = createQTools({
   ports: {
     // BILLING block
@@ -1373,6 +1376,18 @@ const qTools = createQTools({
       },
       setPreferences: (actor, patch) =>
         dailyReader.setPreferences(ownDaily(actor), patch, new Date()),
+      // "Prepare my edition now", under the button's own limit.
+      request: (actor) => dailyReader.request(ownDaily(actor), new Date()),
+    },
+    // Action parity (2026-10-02): Settings' switches, by asking -- the
+    // same stores the Settings screen writes, as the person.
+    notificationSettings: {
+      read: (actor) => pushSettings.settings(actor),
+      save: (actor, settings) => pushSettings.saveSettings(actor, settings),
+    },
+    personality: {
+      set: (actor, personality) =>
+        standingStore.setPersonality(actor.userId, actor.tenantId, personality),
     },
     companies,
     capital,
@@ -1758,6 +1773,11 @@ const qActionRegistry = createQActionRegistry([
   createConnectionRequestAnswerAction({
     connections: connectionService,
     chat,
+    logger,
+  }),
+  // A founder's Connection Request: the investor page's own command.
+  createConnectionRequestSendAction({
+    connections: connectionService,
     logger,
   }),
   // Sharing the raise with an investor, and revoking it (CQ-BIZ-003).

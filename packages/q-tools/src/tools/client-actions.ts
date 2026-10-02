@@ -434,6 +434,77 @@ export function matchCounterpart(
 }
 
 /**
+ * Every record of a kind this person may already see, by name: their own
+ * relationships, their own Saves and Passes, and what the network shows
+ * them (network-visible companies; the investors Discover lists to a
+ * founder). Nothing private to someone else is a candidate, so a name
+ * can never open, or reveal, a record they could not reach by hand.
+ */
+export async function nameableRecords(
+  ports: Pick<
+    QToolPorts,
+    "companies" | "relationships" | "disclosure" | "discovery" | "investorFeed"
+  >,
+  actor: ActorContext,
+  kind: "COMPANY" | "INVESTOR_ORGANISATION",
+  name: string | null,
+): Promise<{ readonly id: string; readonly name: string }[]> {
+  const found: { id: string; name: string }[] = [];
+  const own = await ports.relationships
+    ?.ownRelationships?.(actor)
+    .catch(() => null);
+  for (const item of own?.items ?? []) {
+    if (item.counterpart.kind === kind) found.push(item.counterpart);
+  }
+  if (kind === "COMPANY") {
+    const decisions = await ports.investorFeed
+      ?.decisions(actor, 100)
+      .catch(() => []);
+    for (const entry of decisions ?? []) {
+      found.push({ id: entry.companyId, name: entry.name });
+    }
+    if (name !== null) {
+      const network = await networkVisibleCompanies(ports, actor, {
+        text: name,
+        limit: 10,
+      }).catch(() => null);
+      for (const item of network?.items ?? []) {
+        found.push({ id: item.id, name: item.canonicalName });
+      }
+    }
+  } else if (ports.discovery !== undefined) {
+    const slate = await ports.discovery
+      .discoverInvestors({ actor, limit: 50 })
+      .catch(() => null);
+    for (const item of slate?.items ?? []) {
+      found.push({ id: item.investorOrganisationId, name: item.displayName });
+    }
+  }
+  return found;
+}
+
+/**
+ * One record of a kind this person may already see, by the name they said
+ * (misheard names included), or null when none or several are equally
+ * close. The same rule open_page uses, for every tool addressable by name
+ * from any page (R20/R33).
+ */
+export async function findRecordByName(
+  ports: Pick<
+    QToolPorts,
+    "companies" | "relationships" | "disclosure" | "discovery" | "investorFeed"
+  >,
+  actor: ActorContext,
+  kind: "COMPANY" | "INVESTOR_ORGANISATION",
+  name: string,
+): Promise<string | null> {
+  return matchCounterpart(
+    name,
+    await nameableRecords(ports, actor, kind, name),
+  );
+}
+
+/**
  * Open one record's page (R33). The page authorises the read server-side,
  * as for a typed URL; this step only refuses what the person could not
  * open anyway -- a company not in their tenant, or a relationship they are
@@ -445,51 +516,11 @@ export function createOpenPageTool(
     "companies" | "relationships" | "disclosure" | "discovery" | "investorFeed"
   >,
 ): AnyQToolDefinition {
-  /**
-   * Every record of a kind this person may already see, by name: their own
-   * relationships, their own Saves and Passes, and what the network shows
-   * them (network-visible companies; the investors Discover lists to a
-   * founder). Nothing private to someone else is a candidate, so a name
-   * can never open, or reveal, a record they could not reach by hand.
-   */
-  async function candidates(
+  const candidates = (
     actor: ActorContext,
     kind: "COMPANY" | "INVESTOR_ORGANISATION",
     name: string | null,
-  ): Promise<{ readonly id: string; readonly name: string }[]> {
-    const found: { id: string; name: string }[] = [];
-    const own = await ports.relationships
-      ?.ownRelationships?.(actor)
-      .catch(() => null);
-    for (const item of own?.items ?? []) {
-      if (item.counterpart.kind === kind) found.push(item.counterpart);
-    }
-    if (kind === "COMPANY") {
-      const decisions = await ports.investorFeed
-        ?.decisions(actor, 100)
-        .catch(() => []);
-      for (const entry of decisions ?? []) {
-        found.push({ id: entry.companyId, name: entry.name });
-      }
-      if (name !== null) {
-        const network = await networkVisibleCompanies(ports, actor, {
-          text: name,
-          limit: 10,
-        }).catch(() => null);
-        for (const item of network?.items ?? []) {
-          found.push({ id: item.id, name: item.canonicalName });
-        }
-      }
-    } else if (ports.discovery !== undefined) {
-      const slate = await ports.discovery
-        .discoverInvestors({ actor, limit: 50 })
-        .catch(() => null);
-      for (const item of slate?.items ?? []) {
-        found.push({ id: item.investorOrganisationId, name: item.displayName });
-      }
-    }
-    return found;
-  }
+  ) => nameableRecords(ports, actor, kind, name);
 
   return defineQTool<
     OpenPageInput,

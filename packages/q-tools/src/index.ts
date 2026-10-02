@@ -170,6 +170,7 @@ export {
   type ReviseMyDocumentOutput,
   LIST_PENDING_APPROVALS,
   PASS_COMPANY,
+  UNPASS_COMPANY,
   SAVE_COMPANY,
   UNSAVE_COMPANY,
 } from "./tools/own-work.js";
@@ -263,6 +264,7 @@ export {
   FindMeetingTimesInputSchema,
   FindMeetingTimesOutputSchema,
   LIST_SCHEDULE,
+  DISMISS_REMINDER,
   PROPOSE_MEETING_CHANGE,
   ProposeMeetingChangeInputSchema,
   ProposeMeetingInputSchema,
@@ -502,8 +504,26 @@ export {
   GetQDailyOutputSchema,
   SET_Q_DAILY_PREFERENCES,
   SetQDailyPreferencesInputSchema,
+  REQUEST_Q_DAILY,
+  createRequestQDailyTool,
   type QDailyToolPort,
 } from "./tools/daily.js";
+// Action parity (2026-10-02): a founder's Connection Request by name.
+export {
+  createProposeConnectionRequestTool,
+  PROPOSE_CONNECTION_REQUEST,
+  ProposeConnectionRequestInputSchema,
+} from "./tools/connection-request-send.js";
+// Action parity (2026-10-02): Settings switches, by asking.
+export {
+  createOwnSettingsTools,
+  createSetNotificationSettingsTool,
+  createSetQPersonalityTool,
+  SET_NOTIFICATION_SETTINGS,
+  SET_Q_PERSONALITY,
+  type NotificationSettingsPort,
+  type QPersonalityPort,
+} from "./tools/own-settings.js";
 // BILLING block (ADR 0034)
 export {
   createGetMyPlanTool,

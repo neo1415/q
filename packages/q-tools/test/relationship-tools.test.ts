@@ -513,6 +513,49 @@ describe("proposal tools write nothing but a prepared proposal", () => {
     expect(prepared?.payload["companyId"]).toBe(COMPANY_B_NETWORK);
   });
 
+  it("by name from any page (action parity 2026-10-02): 'express interest in beacon analytics' prepares it for that company", async () => {
+    const { port: base, calls } = fakeRelationships(randomHistory(4));
+    // Beacon is a company they already have a relationship with.
+    const port: RelationshipIntelligencePort = {
+      ...base,
+      ownRelationships: () =>
+        Promise.resolve({
+          side: "INVESTOR" as const,
+          items: [
+            {
+              relationshipId: RELATIONSHIP,
+              counterpart: {
+                kind: "COMPANY",
+                id: COMPANY_B_NETWORK,
+                name: "Beacon Analytics",
+              },
+              state: "INTEREST_EXPRESSED",
+            },
+          ],
+        } as never),
+    };
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "p1n",
+        name: "propose_express_interest",
+        arguments: { company: "beacon analytics" },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(calls.prepared[0]?.payload["companyId"]).toBe(COMPANY_B_NETWORK);
+    const unknown = await executorWith(port).execute(
+      {
+        callId: "p1u",
+        name: "propose_express_interest",
+        arguments: { company: "Nowhere Holdings" },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(unknown.status).not.toBe("SUCCEEDED");
+    expect(calls.prepared).toHaveLength(1);
+  });
+
   it("prepares nothing when the command itself would refuse", async () => {
     const { port, calls } = fakeRelationships(randomHistory(5), {
       mayExpress: false,
@@ -617,5 +660,98 @@ describe("proposal tools write nothing but a prepared proposal", () => {
       ["propose_interest_answer", "LOW_RISK_INTERNAL"],
     ]);
     expect(RUN).toBeTruthy();
+  });
+});
+
+describe("a founder's Connection Request by name (action parity 2026-10-02)", () => {
+  const KAZIKIT = "1a000000-0000-4000-8000-0000000000a1";
+  function world(mayRequest: boolean) {
+    const { port: base, calls } = fakeRelationships(randomHistory(7));
+    const asked: string[] = [];
+    const port: RelationshipIntelligencePort = {
+      ...base,
+      mayRequestConnection: (_actor, investorOrganisationId) => {
+        asked.push(investorOrganisationId);
+        return Promise.resolve(mayRequest);
+      },
+    };
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            relationships: port,
+            discovery: {
+              discoverInvestors: () =>
+                Promise.resolve({
+                  items: [
+                    {
+                      investorOrganisationId: KAZIKIT,
+                      displayName: "Kazikit Capital",
+                    },
+                  ],
+                }),
+            } as never,
+          }),
+        ),
+      ),
+    });
+    return { executor, calls, asked };
+  }
+  const plan = planFor(actorA, "GENERAL_QUESTION", [
+    { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
+  ]);
+
+  it("'send Kazikit Capitol a connection request' prepares one, for approval, to Kazikit Capital", async () => {
+    const { executor, calls, asked } = world(true);
+    const outcome = await executor.execute(
+      {
+        callId: "cr1",
+        name: "propose_connection_request",
+        arguments: { investor: "Kazikit Capitol" },
+      },
+      contextFor(actorA, plan),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "PREPARED",
+        awaitingApprovalOf: "Send Kazikit Capital a Connection Request",
+      },
+    });
+    expect(asked).toEqual([KAZIKIT]);
+    expect(calls.prepared).toEqual([
+      {
+        actionType: "relationship.connection_request.send",
+        payload: {
+          investorOrganisationId: KAZIKIT,
+          investorName: "Kazikit Capital",
+        },
+      },
+    ]);
+  });
+
+  it("prepares nothing where the command would refuse, or for a name they cannot see", async () => {
+    const refused = world(false);
+    const no = await refused.executor.execute(
+      {
+        callId: "cr2",
+        name: "propose_connection_request",
+        arguments: { investor: "Kazikit Capital" },
+      },
+      contextFor(actorA, plan),
+    );
+    expect(no.status).toBe("DENIED");
+    expect(refused.calls.prepared).toEqual([]);
+    const unseen = world(true);
+    const nobody = await unseen.executor.execute(
+      {
+        callId: "cr3",
+        name: "propose_connection_request",
+        arguments: { investor: "Zorblax Ventures" },
+      },
+      contextFor(actorA, plan),
+    );
+    expect(nobody.status).toBe("DENIED");
+    expect(unseen.asked).toEqual([]);
   });
 });

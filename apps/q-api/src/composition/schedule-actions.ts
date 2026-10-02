@@ -475,6 +475,9 @@ export function createScheduleIntelligencePort(
           relationshipId: reminder.relationshipId,
         })),
     }),
+    // Action parity (2026-10-02): the reminder's own Dismiss, as the person.
+    dismissReminder: (actor, reminderId) =>
+      schedule.dismissReminder(actor, reminderId),
     organisedMeeting: async (actor, meetingId) =>
       schedule.organisedMeeting(actor, meetingId),
     timeZoneOf: (actor) => schedule.timeZoneOf(actor),

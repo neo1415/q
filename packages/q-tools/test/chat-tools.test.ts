@@ -53,8 +53,10 @@ function world(
     readonly connected?: boolean;
     readonly blocked?: boolean;
     readonly running?: boolean;
+    readonly counterpart?: string;
   } = {},
 ) {
+  const counterpart = options.counterpart ?? "Apex";
   const prepared: unknown[] = [];
   const reads: string[] = [];
   const chat: ChatIntelligencePort = {
@@ -66,7 +68,7 @@ function world(
           ? {
               connected: options.connected ?? true,
               blocked: options.blocked ?? false,
-              counterpartName: "Apex",
+              counterpartName: counterpart,
               messages: [
                 {
                   from: "OTHER_SIDE" as const,
@@ -96,7 +98,27 @@ function world(
           : null,
       ),
   };
-  const relationships = {} as RelationshipIntelligencePort;
+  // Their own relationships by name: only actor B is a party, to Apex.
+  const relationships = {
+    ownRelationships: (actor: typeof actorA) =>
+      Promise.resolve({
+        side: "INVESTOR" as const,
+        items:
+          actor.userId === actorB.userId
+            ? [
+                {
+                  relationshipId: RELATIONSHIP,
+                  counterpart: {
+                    kind: "COMPANY",
+                    id: OTHER,
+                    name: counterpart,
+                  },
+                  state: "CONNECTED",
+                },
+              ]
+            : [],
+      } as never),
+  } as RelationshipIntelligencePort;
   const schedule: ScheduleIntelligencePort = {
     findSlots: () => Promise.resolve({ status: "UNAVAILABLE" }),
     upcoming: () => Promise.resolve({ meetings: [], reminders: [] }),
@@ -191,6 +213,72 @@ describe("chat proposals", () => {
           relationshipId: RELATIONSHIP,
           counterpartName: "Apex",
           body: "Thanks Ada, reading it now.",
+        },
+      },
+    ]);
+  });
+
+  it("prepares a message to a connected party named as they said it, from Home (no relationship on screen)", async () => {
+    const { executor, prepared } = world();
+    const outcome = await executor.execute(
+      {
+        callId: "c4n",
+        name: "propose_chat_message",
+        arguments: { counterpartName: "apex", body: "Shall we talk Tuesday?" },
+      },
+      contextFor(actorB, base(actorB)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toEqual([
+      {
+        actionType: "chat.message.send",
+        payload: {
+          relationshipId: RELATIONSHIP,
+          counterpartName: "Apex",
+          body: "Shall we talk Tuesday?",
+        },
+      },
+    ]);
+    // Someone with no relationship of that name gets nothing prepared.
+    const stranger = await executor.execute(
+      {
+        callId: "c4s",
+        name: "propose_chat_message",
+        arguments: { counterpartName: "Apex", body: "Hi" },
+      },
+      contextFor(actorA, base(actorA)),
+    );
+    expect(stranger.result).not.toMatchObject({ data: { status: "PREPARED" } });
+    expect(prepared).toHaveLength(1);
+  });
+
+  it('"send a message to nixo telling them i am looking forward to the next meeting": a message card for Nixo, from Home', async () => {
+    const { executor, prepared } = world({ counterpart: "Nixo" });
+    const outcome = await executor.execute(
+      {
+        callId: "c4f",
+        name: "propose_chat_message",
+        arguments: {
+          counterpartName: "nixo",
+          body: "I am looking forward to the next meeting.",
+        },
+      },
+      contextFor(actorB, base(actorB)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toEqual([
+      {
+        actionType: "chat.message.send",
+        payload: {
+          relationshipId: RELATIONSHIP,
+          counterpartName: "Nixo",
+          body: "I am looking forward to the next meeting.",
         },
       },
     ]);

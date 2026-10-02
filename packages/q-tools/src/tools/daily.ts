@@ -2,7 +2,9 @@ import { z } from "zod";
 
 import {
   Q_DAILY_OPTIONAL_SECTIONS,
+  Q_TASK_CLASSES,
   type PermittedContextPlan,
+  type QDailyRequestDto,
   type QDailyEdition,
   type QDailyPreferences,
   type SetQDailyPreferencesRequest,
@@ -27,6 +29,7 @@ import { actorWideScope } from "../plan.js";
 
 export const GET_Q_DAILY = "daily.own.get" as const;
 export const SET_Q_DAILY_PREFERENCES = "daily.preferences.set" as const;
+export const REQUEST_Q_DAILY = "daily.edition.request" as const;
 
 export type QDailyToolPort = {
   readonly latest: (actor: ActorContext) => Promise<{
@@ -37,6 +40,11 @@ export type QDailyToolPort = {
     actor: ActorContext,
     patch: SetQDailyPreferencesRequest,
   ) => Promise<QDailyPreferences>;
+  /**
+   * "Prepare my edition now": the reader's own button, with its own limit
+   * (one per 20 hours). Absent: no request_q_daily tool.
+   */
+  readonly request?: (actor: ActorContext) => Promise<QDailyRequestDto>;
 };
 
 function ownConversation(
@@ -252,8 +260,70 @@ export function createSetQDailyPreferencesTool(
   });
 }
 
+export const RequestQDailyInputSchema = z.object({}).strict();
+export const RequestQDailyOutputSchema = z
+  .object({
+    status: z.enum(["QUEUED", "ALREADY_QUEUED", "TOO_SOON", "OFF"]),
+    meaning: z.string().max(200),
+  })
+  .strict();
+
+/**
+ * Action parity (2026-10-02): "prepare my Q Daily now" does what the
+ * reader's Prepare my edition button does, through the same service and
+ * under the same limit; the answer says when the next one can come.
+ */
+export function createRequestQDailyTool(
+  request: NonNullable<QDailyToolPort["request"]>,
+): AnyQToolDefinition {
+  return defineQTool<
+    z.infer<typeof RequestQDailyInputSchema>,
+    z.infer<typeof RequestQDailyOutputSchema>,
+    ActorContext
+  >({
+    ...OWN,
+    id: REQUEST_Q_DAILY,
+    providerName: "request_q_daily",
+    description:
+      "Asks for a new edition of The Q Daily now, exactly as Prepare my edition on The Q Daily does (at most one per 20 hours). Call it only when they ask for a fresh edition now.",
+    classification: "SIDE_EFFECT",
+    riskClass: "LOW_RISK_INTERNAL",
+    supportedPurposes: [...Q_TASK_CLASSES],
+    // The service coalesces: a second ask while one is queued queues nothing.
+    idempotency: "SAFE_TO_REPEAT",
+    input: RequestQDailyInputSchema,
+    output: RequestQDailyOutputSchema,
+    authorize: (_input, { actor, plan }) =>
+      Promise.resolve(
+        ownConversation(actor, plan)
+          ? allow<ActorContext>("INTERNAL", actor)
+          : deny<ActorContext>("NOT_AVAILABLE"),
+      ),
+    execute: async (_input, _context, actor) => {
+      const asked = await request(actor);
+      return {
+        status: asked.status,
+        meaning:
+          asked.status === "QUEUED"
+            ? "A new edition is being prepared; it appears on The Q Daily when ready."
+            : asked.status === "ALREADY_QUEUED"
+              ? "An edition is already being prepared."
+              : asked.status === "OFF"
+                ? "The Q Daily is off; turn it back on first (set_q_daily_preferences)."
+                : `Too soon for another edition${asked.retryAfter === null ? "" : `; the next can be asked for after ${asked.retryAfter}`}.`,
+      };
+    },
+  });
+}
+
 export function createQDailyTools(
   port: QDailyToolPort,
 ): readonly AnyQToolDefinition[] {
-  return [createGetQDailyTool(port), createSetQDailyPreferencesTool(port)];
+  return [
+    createGetQDailyTool(port),
+    createSetQDailyPreferencesTool(port),
+    ...(port.request === undefined
+      ? []
+      : [createRequestQDailyTool(port.request)]),
+  ];
 }
