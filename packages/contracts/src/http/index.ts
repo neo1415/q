@@ -982,7 +982,10 @@ export {
 
 export {
   COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT,
+  COMPANY_PROFILE_PHOTO_SEGMENT,
   COMPANY_PROFILE_SEGMENT,
+  CompanyProfilePhotoDtoSchema,
+  type CompanyProfilePhotoDto,
   CompanyProfileDeckDownloadDtoSchema,
   CompanyProfileDeckSchema,
   CompanyProfileDtoSchema,

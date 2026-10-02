@@ -22,6 +22,7 @@ import {
   Share2,
 } from "@capital-q/ui/icons";
 
+import { CompanyAvatarLink } from "../company/company-avatar";
 import { countryLabel, stageLabel } from "../company/declared-labels";
 import { ExpressInterest } from "../network/express-interest";
 import { useDockAvoid } from "../q-dock";
@@ -247,16 +248,27 @@ export function FeedCard({
             {sinceYouLastSawLine(company.sinceYouLastSaw.change)}
           </p>
         )}
-        <h2 className="cq-title-sm text-(--cq-text-primary)">
-          {/* The name opens the company, as it does in any feed. */}
-          <Link
-            href={`/company/${company.companyId}`}
-            className="underline-offset-4 hover:underline"
-            data-feed-company-link
-          >
-            {company.canonicalName}
-          </Link>
-        </h2>
+        <div className="flex items-center gap-3">
+          {/*
+            The company's photo, or a plain mark, opens its profile
+            (founder request 2026-10-02): over the stage on a phone and in
+            the panel on a desktop, since both are this card.
+          */}
+          <CompanyAvatarLink
+            companyId={company.companyId}
+            companyName={company.canonicalName}
+          />
+          <h2 className="cq-title-sm min-w-0 text-(--cq-text-primary)">
+            {/* The name opens the company, as it does in any feed. */}
+            <Link
+              href={`/company/${company.companyId}`}
+              className="underline-offset-4 hover:underline"
+              data-feed-company-link
+            >
+              {company.canonicalName}
+            </Link>
+          </h2>
+        </div>
 
         {company.shortDescription === null ? null : (
           <p

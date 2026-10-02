@@ -3,7 +3,13 @@ import {
   COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT,
   COMPANY_MARKETPLACE_READINESS_SEGMENT,
   COMPANY_NETWORK_PREVIEW_SEGMENT,
+  COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT,
+  COMPANY_PROFILE_PHOTO_SEGMENT,
+  COMPANY_PROFILE_SEGMENT,
+  CompanyProfilePhotoDtoSchema,
   COMPANY_VISIBILITY_SEGMENT,
+  CompanyProfileDeckDownloadDtoSchema,
+  CompanyProfileDtoSchema,
   CompanyNetworkPreviewSchema,
   MarketplaceReadinessAssessmentSchema,
   type SetCompanyVisibilityRequest,
@@ -82,6 +88,40 @@ export function getCompanyNetworkPreview(
     "GET",
     `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_NETWORK_PREVIEW_SEGMENT}`,
     CompanyNetworkPreviewSchema,
+  );
+}
+
+/** `GET /v1/companies/:companyId/profile` — the company as this reader may see it. */
+export function getCompanyProfile(session: ApiSession, companyId: string) {
+  return call(
+    session,
+    "GET",
+    `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_PROFILE_SEGMENT}`,
+    CompanyProfileDtoSchema,
+  );
+}
+
+/** `GET /v1/companies/:companyId/profile/photo` — the avatar's signed URL, or null. */
+export function getCompanyProfilePhoto(session: ApiSession, companyId: string) {
+  return call(
+    session,
+    "GET",
+    `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_PROFILE_PHOTO_SEGMENT}`,
+    CompanyProfilePhotoDtoSchema,
+  );
+}
+
+/**
+ * `POST /v1/companies/:companyId/profile/deck/download` — a short-lived
+ * signed read of the deck the company shared with this reader. Not found
+ * for anyone it was not shared with.
+ */
+export function downloadCompanyDeck(session: ApiSession, companyId: string) {
+  return call(
+    session,
+    "POST",
+    `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT}`,
+    CompanyProfileDeckDownloadDtoSchema,
   );
 }
 

@@ -35,6 +35,19 @@ export const COMPANY_PROFILE_SEGMENT = "/profile" as const;
 export const COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT =
   "/profile/deck/download" as const;
 
+/**
+ * `GET` — the photo alone, for the avatar over a Discover pitch: the same
+ * visibility and the same Q Card scope as the profile, nothing else read.
+ */
+export const COMPANY_PROFILE_PHOTO_SEGMENT = "/profile/photo" as const;
+
+export const CompanyProfilePhotoDtoSchema = z
+  .object({ photoUrl: z.string().url().nullable() })
+  .strict();
+export type CompanyProfilePhotoDto = z.infer<
+  typeof CompanyProfilePhotoDtoSchema
+>;
+
 export const CompanyProfileViewerSchema = z.enum([
   "INVESTOR",
   "FOUNDER",

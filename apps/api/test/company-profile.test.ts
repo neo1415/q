@@ -403,3 +403,33 @@ describe("POST /v1/companies/:id/profile/deck/download", () => {
     await app.close();
   });
 });
+
+describe("GET /v1/companies/:id/profile/photo", () => {
+  it("answers the photo alone, for any reader the company is visible to", async () => {
+    const { profile, calls } = ports({ investor: false });
+    const app = buildApp({ profile });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_ID}/profile/photo`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ photoUrl: string | null }>()).toEqual({
+      photoUrl: "https://storage.example/photo.webp?sig=1",
+    });
+    expect(calls.played).toEqual([]);
+    expect(calls.raise).toBe(0);
+    await app.close();
+  });
+
+  it("is not-found for a company that is not visible to the reader", async () => {
+    const { profile } = ports({ investor: true });
+    const app = buildApp({ profile, visible: false });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_ID}/profile/photo`,
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.body).not.toContain("photo.webp");
+    await app.close();
+  });
+});

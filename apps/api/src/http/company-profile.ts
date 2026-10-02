@@ -12,7 +12,9 @@ import {
 import {
   COMPANIES_PATH,
   COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT,
+  COMPANY_PROFILE_PHOTO_SEGMENT,
   COMPANY_PROFILE_SEGMENT,
+  CompanyProfilePhotoDtoSchema,
   CompanyProfileDeckDownloadDtoSchema,
   CompanyProfileDtoSchema,
   parseContract,
@@ -38,6 +40,7 @@ import type { CompanyNetworkViewPort } from "./companies.js";
  * A company's profile from Discover (founder request 2026-10-02).
  *
  *   GET  /v1/companies/:companyId/profile                  the profile, for this reader
+ *   GET  /v1/companies/:companyId/profile/photo            the photo alone (Discover's avatar)
  *   POST /v1/companies/:companyId/profile/deck/download    a signed read of the shared deck
  *
  * Nothing here is a new disclosure rule. Each part is read through the
@@ -247,6 +250,20 @@ export function registerCompanyProfileRoutes(
           : null,
         videos,
       });
+    },
+  );
+
+  // The avatar over a Discover pitch: the same visibility and Q Card scope
+  // as the profile, and nothing else is read, so it stays cheap.
+  app.get(
+    `${base}${COMPANY_PROFILE_PHOTO_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const company = await companyFor(actor, companyIdParam(request));
+      const photoUrl = await quietly(profile.photo(company), null);
+      void reply.header("Cache-Control", "no-store");
+      return CompanyProfilePhotoDtoSchema.parse({ photoUrl });
     },
   );
 
