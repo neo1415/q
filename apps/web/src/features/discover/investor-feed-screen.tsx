@@ -25,6 +25,7 @@ import {
   ICON_SIZE,
   ICON_STROKE,
   Play,
+  Users,
 } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -352,6 +353,7 @@ export function InvestorFeedScreen({
     yours: (className: string) => (
       <YourCompaniesRow items={yours} className={className} />
     ),
+    hasYours: yours.length > 0,
   };
   return (
     <>
@@ -382,6 +384,8 @@ type FeedFilterControls = {
   readonly clear: () => void;
   /** "Your companies", with the classes that decide where it shows. */
   readonly yours: (className: string) => React.ReactNode;
+  /** Whether there is a "Your companies" row to reach (the phone's entry). */
+  readonly hasYours: boolean;
 };
 
 function InvestorFeed({
@@ -1096,7 +1100,20 @@ function InvestorFeed({
         </span>
 
         {/* One compact control over the pitch; the row is the desktop's. */}
-        <div className="cq-feed-filter lg:hidden">{controls.button}</div>
+        <div className="cq-feed-filter flex gap-2 lg:hidden">
+          {/* Your companies, one tap from the stage on a phone (2026-10-02). */}
+          {controls.hasYours ? (
+            <Link
+              href="/discover/yours"
+              aria-label="Your companies"
+              className="cq-feed-filter-button"
+              data-your-companies-entry
+            >
+              <Users size={ICON_SIZE.regular} aria-hidden="true" />
+            </Link>
+          ) : null}
+          {controls.button}
+        </div>
 
         {/*
           The scrim is always there on a phone (founder feedback,
