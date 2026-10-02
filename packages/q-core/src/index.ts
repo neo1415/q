@@ -582,6 +582,10 @@ export {
 } from "./prompts/tasks/company-analyst.v13.js";
 export { COMPANY_ANALYST_V14 } from "./prompts/tasks/company-analyst.v14.js";
 export { COMPANY_ANALYST_V15 } from "./prompts/tasks/company-analyst.v15.js";
+export {
+  COMPANY_ANALYST_V16,
+  COMPANY_ANALYST_V16_TURN,
+} from "./prompts/tasks/company-analyst.v16.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export { ARTIFACT_REVISION_V2 } from "./prompts/tasks/artifact-revision.v2.js";
 export { ARTIFACT_REVISION_V3 } from "./prompts/tasks/artifact-revision.v3.js";

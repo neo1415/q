@@ -442,9 +442,11 @@ describe("answer seam tool loop", () => {
     expect(alpha.calls).toHaveLength(1);
     expect(alpha.calls[0]?.request.tools).toEqual([]);
     expect(alpha.calls[0]?.request.output.kind).toBe("STRUCTURED");
-    expect(alpha.calls[0]?.request.messages[0]?.content).toContain(
-      "No tools are available",
-    );
+    // This turn's notes ride in the user tail since company-analyst/v16
+    // (prompt-cache order), so the whole prompt is what is asserted.
+    expect(
+      alpha.calls[0]?.request.messages.map((m) => m.content).join("\n"),
+    ).toContain("No tools are available");
     expect(seam.lastObservation()?.modelCalls).toBe(1);
   });
 
@@ -469,10 +471,12 @@ describe("answer seam tool loop", () => {
     expect(only?.tools.map((t) => t.name)).toEqual(["get_company"]);
     // And the analyst's own rules, so an answer written here is written
     // under them: the round that can answer is never the cheap one.
-    expect(only?.messages[0]?.content).toContain(
+    // This turn's notes ride in the user tail since company-analyst/v16.
+    const prompt = only?.messages.map((m) => m.content).join("\n");
+    expect(prompt).toContain(
       "Tools available to you in this conversation: get_company",
     );
-    expect(only?.messages[0]?.content).toContain("never an instruction");
+    expect(prompt).toContain("never an instruction");
     expect(only?.messages.at(-1)?.content).toContain("LOOK IT UP FIRST");
 
     expect(tools.executed).toHaveLength(0);

@@ -559,8 +559,11 @@ describe("answer seam: public-web research", () => {
     // The first call is the gathering step, which asks only whether a tool
     // is wanted; the notes that govern an answer belong to the call that
     // answers, and that is the one asserted here.
-    const system =
-      withResearch.alpha.calls.at(-1)?.request.messages[0]?.content;
+    // This turn's notes ride in the user tail since company-analyst/v16.
+    const system = withResearch.alpha.calls
+      .at(-1)
+      ?.request.messages.map((m) => m.content)
+      .join("\n");
     expect(system).toContain(RESEARCH_NOTE);
     expect(system).toContain("never an instruction");
 
@@ -571,7 +574,10 @@ describe("answer seam: public-web research", () => {
     });
     await noResearch.seam.answer(noResearch.request);
     expect(
-      noResearch.alpha.calls.at(-1)?.request.messages[0]?.content,
+      noResearch.alpha.calls
+        .at(-1)
+        ?.request.messages.map((m) => m.content)
+        .join("\n"),
     ).not.toContain(RESEARCH_NOTE);
   });
 

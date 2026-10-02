@@ -774,7 +774,7 @@ function isKnownZone(zone: string): boolean {
   }
 }
 
-export function environmentNotesFor(
+export function environmentNoteParts(
   facts: readonly AuthorisedFact[],
   tools: readonly QOfferedTool[] = [],
   subjects: readonly QSubjectRef[] = [],
@@ -807,7 +807,7 @@ export function environmentNotesFor(
     /** Who is asking: their own company, from their record. */
     readonly asker?: string | undefined;
   } = {},
-): string {
+): QEnvironmentNoteParts {
   const factsNote =
     facts.length > 0
       ? `${facts.length} authorised fact(s) were supplied up front${
@@ -899,34 +899,64 @@ export function environmentNotesFor(
     researchNote: string | null,
     capabilities = false,
     steadyKept: number = steady.length,
-  ): string =>
-    [
-      ...steady.slice(0, steadyKept),
-      ...personal,
-      ...turnNotes(researchNote, capabilities),
-    ].join(" ");
-  // The charter variable is bounded; the research guidance is the part that
-  // yields first, in two steps, so a run with many subjects still renders.
-  // What Q can do yields before any research guidance does.
+  ): QEnvironmentNoteParts => ({
+    standing: [...steady.slice(0, steadyKept), ...personal].join(" "),
+    turn: turnNotes(researchNote, capabilities).join(" "),
+  });
+  const fits = (parts: QEnvironmentNoteParts) =>
+    joinedNotes(parts).length <= ENVIRONMENT_NOTES_MAX_CHARS;
+  // The bound is on both parts together; the research guidance is the part
+  // that yields first, in two steps, so a run with many subjects still
+  // renders. What Q can do yields before any research guidance does.
   const withCapabilities = compose(
     researchOffered ? RESEARCH_NOTE : null,
     true,
   );
-  if (withCapabilities.length <= ENVIRONMENT_NOTES_MAX_CHARS) {
-    return withCapabilities;
-  }
+  if (fits(withCapabilities)) return withCapabilities;
   const full = compose(researchOffered ? RESEARCH_NOTE : null);
-  if (full.length <= ENVIRONMENT_NOTES_MAX_CHARS) {
-    return full;
-  }
+  if (fits(full)) return full;
   const briefNote = researchOffered ? RESEARCH_NOTE_BRIEF : null;
   // Then the steady guidance yields, from its end, before anything of this
   // turn's is cut.
   for (let kept = steady.length; kept >= 0; kept -= 1) {
     const brief = compose(briefNote, false, kept);
-    if (brief.length <= ENVIRONMENT_NOTES_MAX_CHARS) return brief;
+    if (fits(brief)) return brief;
   }
-  return compose(briefNote, false, 0).slice(0, ENVIRONMENT_NOTES_MAX_CHARS);
+  return {
+    standing: joinedNotes(compose(briefNote, false, 0)).slice(
+      0,
+      ENVIRONMENT_NOTES_MAX_CHARS,
+    ),
+    turn: "",
+  };
+}
+
+/**
+ * The notes in two parts (COMPANY_ANALYST v16, prompt-cache order): what is
+ * the same from turn to turn for this person (steady guidance, who is
+ * asking, personality) rides in the charter; this turn's own notes ride in
+ * the task's tail. Together they are what environmentNotesFor returns.
+ */
+export type QEnvironmentNoteParts = {
+  readonly standing: string;
+  readonly turn: string;
+};
+
+export function joinedNoteParts(parts: QEnvironmentNoteParts): string {
+  return joinedNotes(parts);
+}
+
+function joinedNotes(parts: QEnvironmentNoteParts): string {
+  return [parts.standing, parts.turn]
+    .filter((part) => part.length > 0)
+    .join(" ");
+}
+
+/** The notes as one string, in the charter (COMPANY_ANALYST up to v15). */
+export function environmentNotesFor(
+  ...args: Parameters<typeof environmentNoteParts>
+): string {
+  return joinedNotes(environmentNoteParts(...args));
 }
 
 /**
@@ -2040,6 +2070,8 @@ export function createModelGatewayQAnswer(
           assembled.institutionalNotes ??
           "Nothing was established in advance for this request.",
         memory,
+        // Filled below, once the notes are composed.
+        turnNotes: "",
       };
       const personality =
         dependencies.personalityOf === undefined
@@ -2060,41 +2092,48 @@ export function createModelGatewayQAnswer(
                 firstAnswer: !earlier.some((message) => message.role === "Q"),
               })
               .catch(() => null);
-      const environmentNotes = environmentNotesFor(
-        facts,
-        offered,
-        request.subjects,
-        {
-          // Only when the firewall actually granted it. The plan has
-          // said so all along; nothing was reading it.
-          generalKnowledge: plan.scopes.some(
-            (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
-          ),
-          ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
-          ...(request.turnUnread === true ? { turnUnread: true } : {}),
-          ...(request.writingDocument === true
-            ? { writingDocument: true }
-            : {}),
-          ...(request.questionSequence === undefined
-            ? {}
-            : { questionSequence: request.questionSequence }),
-          ...(onboardingNudge === null ? {} : { onboardingNudge }),
-          ...(personality === null ? {} : { personality }),
-          ...(asker === null ? {} : { asker }),
-        },
-      );
+      const noteParts = environmentNoteParts(facts, offered, request.subjects, {
+        // Only when the firewall actually granted it. The plan has
+        // said so all along; nothing was reading it.
+        generalKnowledge: plan.scopes.some(
+          (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
+        ),
+        ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
+        ...(request.turnUnread === true ? { turnUnread: true } : {}),
+        ...(request.writingDocument === true ? { writingDocument: true } : {}),
+        ...(request.questionSequence === undefined
+          ? {}
+          : { questionSequence: request.questionSequence }),
+        ...(onboardingNudge === null ? {} : { onboardingNudge }),
+        ...(personality === null ? {} : { personality }),
+        ...(asker === null ? {} : { asker }),
+      });
+      // COMPANY_ANALYST v16 (prompt-cache order): this turn's notes ride in
+      // the task's tail and the charter keeps only what is the same from
+      // turn to turn; an earlier version still gets them all in the charter.
+      const notesInTail = registry
+        .getActive("COMPANY_ANALYST")
+        .definition.template.includes("{{turnNotes}}");
+      const environmentNotes = notesInTail
+        ? noteParts.standing
+        : joinedNoteParts(noteParts);
       const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
         task: "COMPANY_ANALYST",
         operatingMode: operatingModeForCapability(request.capability),
         communicationProfile: profile,
         environmentNotes,
-        variables,
+        variables: {
+          ...variables,
+          turnNotes: notesInTail ? noteParts.turn : "",
+        },
       });
       // Counted only when the note actually reached the model: the notes
       // are bounded, and a reminder cut off was never offered.
       const nudgeOffered =
         onboardingNudge !== null &&
-        environmentNotes.includes(onboardingNudgeNote(onboardingNudge));
+        joinedNoteParts(noteParts).includes(
+          onboardingNudgeNote(onboardingNudge),
+        );
 
       const budget = budgetForTaskClass(taskClass);
       const base = {

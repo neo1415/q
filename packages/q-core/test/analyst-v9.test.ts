@@ -5,6 +5,9 @@ import {
   COMPANY_ANALYST_V9,
   COMPANY_ANALYST_V10,
   COMPANY_ANALYST_V11,
+  COMPANY_ANALYST_V15,
+  COMPANY_ANALYST_V16,
+  COMPANY_ANALYST_V16_TURN,
   createPromptRegistry,
   PROMPT_DEFINITIONS,
 } from "../src/index.js";
@@ -63,7 +66,7 @@ describe("COMPANY_ANALYST v10", () => {
 describe("COMPANY_ANALYST v11", () => {
   it("was the active analyst version until v12 took over", () => {
     const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(15);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(16);
     expect(COMPANY_ANALYST_V11.status).toBe("DEPRECATED");
   });
 
@@ -148,6 +151,33 @@ describe("COMPANY_ANALYST v13 (founder live 2026-09-29)", () => {
     ]) {
       expect(template).toContain(section);
       expect(COMPANY_ANALYST_V12.template).toContain(section);
+    }
+  });
+});
+
+/**
+ * v16 (prompt-cache order, 2026-10-02): the same words as v15, with every
+ * per-turn value moved into one THIS TURN block at the end, so everything
+ * before it is identical across turns and the provider can cache it.
+ */
+describe("COMPANY_ANALYST v16", () => {
+  it("is active, keeps v15's instructions, and puts every variable at the end", () => {
+    const registry = createPromptRegistry(PROMPT_DEFINITIONS);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(16);
+    expect(COMPANY_ANALYST_V15.status).toBe("DEPRECATED");
+    const template = COMPANY_ANALYST_V16.template;
+    const turn = template.indexOf(COMPANY_ANALYST_V16_TURN);
+    expect(turn).toBeGreaterThan(0);
+    expect(template.slice(0, turn)).not.toMatch(/\{\{\w+\}\}/);
+    for (const name of [
+      "capability",
+      "subjectDescription",
+      "turnNotes",
+      "institutionalNotes",
+      "memory",
+      "authorisedFacts",
+    ]) {
+      expect(template.slice(turn)).toContain(`{{${name}}}`);
     }
   });
 });

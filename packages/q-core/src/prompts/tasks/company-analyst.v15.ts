@@ -20,7 +20,7 @@ export const COMPANY_ANALYST_V15: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V14,
   version: 15,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Proposal status 2026-10-01: proposalStatus marks a reply about whether an action is saved, approved or waiting; the runtime states the status from the Approval Engine; v14 otherwise unchanged.",
   effectiveFrom: "2026-10-01",

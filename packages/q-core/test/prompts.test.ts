@@ -249,7 +249,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v15_comm.v1",
+      "q-system.v1_company-analyst.v16_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -351,7 +351,10 @@ describe("renderer", () => {
     // 3,750 since company-analyst/v11 (founder direction D): ~110 tokens
     // telling the model when a list, table or callout helps, so Home can
     // render answers as structure.
-    expect(rendered.characters / 4).toBeLessThan(3_750);
+    // 3,850 since company-analyst/v16 (prompt cache, 2026-10-02): ~45
+    // tokens of section labels and pointers that move this turn's values to
+    // the end, so the instructions before them are one cacheable prefix.
+    expect(rendered.characters / 4).toBeLessThan(3_850);
   });
 });
 

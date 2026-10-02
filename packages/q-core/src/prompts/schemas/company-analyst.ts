@@ -453,6 +453,12 @@ export const CompanyAnalystV4VariablesSchema =
      * recorded words. UNTRUSTED: it is what they told Capital Q.
      */
     memory: z.string().max(4_000).default(NOTHING_REMEMBERED),
+    /**
+     * v16 (prompt-cache order, 2026-10-02): this turn's own notes from
+     * Capital Q, carried in the task's tail instead of the charter; steady
+     * guidance stays in the charter. Trusted. Older versions do not read it.
+     */
+    turnNotes: z.string().max(9_000).default(""),
   }).strict();
 export type CompanyAnalystV4Variables = z.infer<
   typeof CompanyAnalystV4VariablesSchema

@@ -703,6 +703,9 @@ export function createCompanyIntelligenceSpecialist(
         conversation: [...(request.conversation ?? [])],
         authorisedFacts: assembled.facts.map((fact) => fact.fact),
         subjectDescription: assembled.subjectDescription,
+        // The answer seam's per-turn notes (company-analyst/v16); this
+        // specialist's own notes travel as institutionalNotes.
+        turnNotes: "",
         institutionalNotes: notes,
         memory: await recallMemory(
           dependencies.memory,

@@ -759,8 +759,13 @@ describe("the answer prompt's cacheable prefix", () => {
     console.info(
       `answer prompt: ${String(a.length)} chars; shared prefix ${String(shared)} chars (~${String(Math.round(shared / 4))} tokens)`,
     );
-    expect(shared).toBeGreaterThanOrEqual(9_000);
-    // Where it ends: this turn's own notes, after the steady ones.
+    // 15,000 since company-analyst/v16: every variable sits at the end.
+    expect(shared).toBeGreaterThanOrEqual(15_000);
+    // The whole charter and every analyst instruction before THIS TURN is
+    // in it; the two turns first differ inside THIS TURN.
     expect(a.slice(0, shared)).toContain("SAVING IS NOT VERIFYING");
+    const turn = a.indexOf("THIS TURN\nCapability requested");
+    expect(turn).toBeGreaterThan(0);
+    expect(shared).toBeGreaterThanOrEqual(turn);
   });
 });
