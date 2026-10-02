@@ -984,3 +984,102 @@ describe("@capital-q/discovery slate reader over the live local pipeline", () =>
     });
   });
 });
+
+/**
+ * Live 2026-10-02 (Zino × Nixo): a ready seed company with no sector, for
+ * an investor whose stage intent is pre-seed and who declared a hard
+ * exclusion, was never retrieved: the slate rebuilt UNCHANGED after its
+ * readiness change. v5 retrieves the adjacent stage; the unknown sector
+ * never excludes (ADR 0020).
+ */
+describe("a ready, unclassified company reaches the slate after a readiness change (v5)", () => {
+  let db: RequestDatabase;
+  beforeAll(() => {
+    db = createRequestDatabaseClient(
+      parseDatabaseConfig({
+        NODE_ENV: "test",
+        CAPITAL_Q_ENV: "local",
+        DATABASE_URL: TEST_DATABASE_URL,
+        DATABASE_POOL_MAX: "2",
+        DATABASE_CONNECT_TIMEOUT_SECONDS: "5",
+      }),
+    );
+  });
+  afterAll(async () => {
+    await db.close();
+  });
+
+  it("not ready: absent; ready: present, eligible, the exclusion it could not check reported", async () => {
+    let completed = false;
+    try {
+      await db.transactions.run(async (tx) => {
+        const w = await seedRecommendationWorld(tx, {
+          mandate: {
+            name: "Pre-seed",
+            narrative: "Pre-seed software.",
+            stageCodes: ["pre_seed"],
+            countryCodes: [],
+            preferences: [],
+            exclusions: [["industry", "media_entertainment"]],
+          },
+          companies: [
+            {
+              label: "Preseedco",
+              summary: "Pre-seed workflow software.",
+              stage: "pre_seed",
+              country: "NG",
+              nodes: [["industry", "logistics"]],
+              ready: true,
+            },
+            {
+              label: "Nixolike",
+              summary: "A seed company that has not declared a sector.",
+              stage: "seed",
+              country: "US",
+              nodes: [],
+              ready: false,
+            },
+          ],
+          embedder: conceptEmbedder(),
+        });
+        const build = () =>
+          w.pipeline.builder.build({
+            actor: w.investorActor,
+            mode: "INVESTOR_DISCOVER",
+          });
+        const labels = async (slateId: string) =>
+          (
+            await w.pipeline.slates.pageItems({
+              slateId,
+              afterRank: 0,
+              limit: 50,
+            })
+          ).map((item) => w.labelOf(item.companyId));
+
+        const first = await build();
+        if (first.kind !== "PUBLISHED") throw new Error(first.kind);
+        expect(await labels(first.slate.id)).toEqual(["Preseedco"]);
+
+        // The readiness change: the policy's answer moved to ready.
+        const nixo = w.companies["Nixolike"];
+        if (nixo === undefined) throw new Error("fixture");
+        await tx.sql`update core.companies
+          set marketplace_readiness_state = 'marketplace_ready'
+          where id = ${nixo.id}`;
+
+        const second = await build();
+        expect(second.kind).toBe("PUBLISHED");
+        if (second.kind !== "PUBLISHED") return;
+        const after = await labels(second.slate.id);
+        expect(after).toContain("Nixolike");
+        // The declared match still leads; the adjacent stage ranks after it.
+        expect(after[0]).toBe("Preseedco");
+        completed = true;
+        throw new Rollback();
+      });
+    } catch (error) {
+      if (!(error instanceof Rollback)) throw error;
+    }
+    expect(completed).toBe(true);
+  });
+});

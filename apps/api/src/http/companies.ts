@@ -65,6 +65,12 @@ export type CompanyRoutesDependencies = ActorContextDependencies & {
    */
   readonly networkView?: CompanyNetworkViewPort | undefined;
   /**
+   * Whether the company has a declared sector (taxonomy classification),
+   * for the readiness view's discoverability note. Absent: not reported.
+   */
+  readonly sectorDeclared?:
+    ((companyId: string) => Promise<boolean>) | undefined;
+  /**
    * Whether this actor watches as an investor (every publishable video of
    * a company discoverable to them) or as anyone else signed in (only the
    * videos their owners opened to the network, ADR 0021). Absent: everyone
@@ -257,12 +263,33 @@ export function registerCompanyRoutes(
     `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_SEGMENT}`,
     { onRequest: withContext },
     async (request, reply) => {
+      const actor = getActorContext(request);
+      const companyId = companyIdParam(request);
       const assessment = await service.getMarketplaceReadiness({
-        actor: getActorContext(request),
-        companyId: companyIdParam(request),
+        actor,
+        companyId,
       });
+      // Read only after the assessment succeeded, i.e. for someone who
+      // may read this company's readiness: its own declared facts.
+      const discoverability =
+        dependencies.sectorDeclared === undefined
+          ? undefined
+          : await (async () => {
+              const company = await service.getCompany({ actor, companyId });
+              return {
+                sectorDeclared:
+                  (await dependencies
+                    .sectorDeclared?.(companyId)
+                    .catch(() => true)) ?? true,
+                stageDeclared: company.currentStageCode !== null,
+                countryDeclared: company.headquartersCountry !== null,
+              };
+            })().catch(() => undefined);
       void reply.header("Cache-Control", "no-store");
-      return MarketplaceReadinessAssessmentSchema.parse(assessment);
+      return MarketplaceReadinessAssessmentSchema.parse({
+        ...assessment,
+        ...(discoverability === undefined ? {} : { discoverability }),
+      });
     },
   );
 

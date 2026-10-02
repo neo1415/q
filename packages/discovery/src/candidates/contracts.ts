@@ -54,8 +54,18 @@ export const STRUCTURED_GENERATOR_ID = "STRUCTURED_MANDATE" as const;
  * constraint names the stages it alone is the intent: onboarding's min/max
  * is the envelope of the chosen stages, and a range would add ones the
  * investor never chose.
+ *
+ * v5 (doc 19 §22, §31, §78, §80; live 2026-10-02, Nixo): retrieval only
+ * found a company that overlapped a positive dimension, so a ready seed
+ * company with no sector declared never reached an investor whose stage
+ * intent was pre-seed -- not excluded, simply never retrieved, and so never
+ * eligible, ranked or explained. When the pool has room, companies one rung
+ * either side of the stage intent are retrieved as STAGE_ADJACENT
+ * (exploration: plausibly relevant, lower confidence), then go through the
+ * same eligibility and ranking, where the mismatch lowers the rank and is
+ * said on the card.
  */
-export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v4" as const;
+export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v5" as const;
 
 /**
  * Every version a persisted artifact (a feature snapshot's provenance) may
@@ -96,6 +106,8 @@ export const CANDIDATE_REASON_CODES = [
   "TAXONOMY_DESCENDANT_OVERLAP",
   /** Reserved: no canonical, discovery-safe raise projection exists in V1, so this is never produced. */
   "CHEQUE_OVERLAP",
+  /** current_stage_code is one rung either side of the stage intent: exploration (v5), never a match. */
+  "STAGE_ADJACENT",
 ] as const;
 export const CandidateReasonCodeSchema = z.enum(CANDIDATE_REASON_CODES);
 export type CandidateReasonCode = z.infer<typeof CandidateReasonCodeSchema>;
@@ -147,6 +159,8 @@ export const CandidateDiagnosticsSchema = z
     rawHitsByDimension: z.record(CandidateDimensionSchema, z.number().int()),
     rawHits: z.number().int(),
     deduped: z.number().int(),
+    /** Exploration candidates added with room in the pool (v5): STAGE_ADJACENT. */
+    explored: z.number().int().optional(),
     /** True when the merged pool exceeded CANDIDATE_POOL_MAX and was cut on canonical id order. */
     truncated: z.boolean(),
     eligible: z.number().int(),

@@ -514,7 +514,7 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
         "GEOGRAPHY_REGION_OVERLAP",
       ]);
       for (const c of r.candidates) {
-        expect(c.provenance.generatorVersion).toBe("structured-mandate.v4");
+        expect(c.provenance.generatorVersion).toBe("structured-mandate.v5");
         expect(c.provenance.taxonomyVersion).not.toBeNull();
         expect(c.eligibility.decision).toBe("ELIGIBLE");
       }
@@ -673,12 +673,25 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
       expect(r.diagnostics.rawHitsByDimension.STAGE).toBeGreaterThan(0);
       expect(labels).toContain("TaxonomyOnly");
       expect(labels).toContain("RegionOnly");
-      expect(labels).not.toContain("AllThree");
-      expect(labels).not.toContain("StageOnly");
+      // v5: the seed companies one rung below the range come in as
+      // exploration, labelled STAGE_ADJACENT, never as a stage match.
+      const adjacent = r.candidates.filter((c) =>
+        c.provenance.reasonCodes.includes("STAGE_ADJACENT"),
+      );
+      const nameOf = new Map(
+        Object.values(w.companies).map((c) => [c.id, c.label]),
+      );
+      const adjacentLabels = adjacent.map((c) => nameOf.get(c.companyId));
+      // Every seed company not matched above (this mandate now declares
+      // nothing else, so none is excluded or avoided any more).
+      expect(adjacentLabels).toContain("AllThree");
+      expect(adjacentLabels).toContain("StageOnly");
       for (const candidate of r.candidates) {
-        expect(candidate.provenance.reasonCodes).toEqual(["STAGE_OVERLAP"]);
+        expect(candidate.provenance.reasonCodes).toEqual(
+          adjacent.includes(candidate) ? ["STAGE_ADJACENT"] : ["STAGE_OVERLAP"],
+        );
         expect(candidate.provenance.generatorVersion).toBe(
-          "structured-mandate.v4",
+          "structured-mandate.v5",
         );
       }
     });

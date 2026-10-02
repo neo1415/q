@@ -166,6 +166,8 @@ export type ApiModules = {
   /** ADR 0021. Absent: previews offer only videos opened to the network. */
   readonly watchesAsInvestor?:
     CompanyRoutesDependencies["watchesAsInvestor"] | undefined;
+  readonly companySectorDeclared?:
+    CompanyRoutesDependencies["sectorDeclared"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly discovery?:
     | (Pick<DiscoveryRoutesDependencies, "discovery" | "slates"> & {
@@ -331,6 +333,7 @@ export function createApp(
       pitches: modules.companyPitches,
       networkView: modules.companyNetworkView,
       watchesAsInvestor: modules.watchesAsInvestor,
+      sectorDeclared: modules.companySectorDeclared,
     });
     registerCompanyTeamRoutes(app, {
       authenticator: security.authenticator,

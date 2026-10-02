@@ -15,6 +15,7 @@ import {
 } from "./contracts.js";
 import type { StructuredRetrievalPorts } from "./ports.js";
 import {
+  adjacentStageCodes,
   deriveStructuredIntent,
   GEOGRAPHY_VOCABULARY,
   mergeDimensionHits,
@@ -286,7 +287,36 @@ export function createStructuredCandidateService(
         chequeWork,
       ]);
 
-      const merged = mergeDimensionHits(hits, { taxonomyVersion, poolMax });
+      const matched = mergeDimensionHits(hits, { taxonomyVersion, poolMax });
+
+      // Generator F, exploration (v5; doc 19 §31, §80): with room left in
+      // the pool, companies one rung either side of the stage intent that
+      // nothing above retrieved. They never displace a declared match, go
+      // through the same eligibility, and rank by the same features, where
+      // the stage mismatch lowers them and is said.
+      const room = poolMax - matched.candidates.length;
+      const adjacent = adjacentStageCodes(intent.stageCodes);
+      let explored: readonly (typeof matched.candidates)[number][] = [];
+      if (room > 0 && adjacent.length > 0) {
+        const already = new Set(matched.candidates.map((c) => c.companyId));
+        const refs = await retrieval.companies.byStageCodes(
+          adjacent,
+          CANDIDATE_DIMENSION_LIMIT,
+        );
+        const fresh = refs.filter((ref) => !already.has(ref.companyId));
+        explored = mergeDimensionHits(
+          fresh.map((ref) => ({
+            ...ref,
+            dimension: "STAGE" as const,
+            reasonCode: "STAGE_ADJACENT" as const,
+          })),
+          { taxonomyVersion, poolMax: room },
+        ).candidates;
+      }
+      const merged = {
+        candidates: [...matched.candidates, ...explored],
+        truncated: matched.truncated,
+      };
 
       // REC-001 in one batch: the pool is bounded to its batch size by
       // construction. Only ELIGIBLE is rankable; UNDETERMINED is not
@@ -334,7 +364,8 @@ export function createStructuredCandidateService(
       const diagnostics = {
         rawHitsByDimension,
         rawHits: hits.length,
-        deduped: merged.candidates.length,
+        deduped: matched.candidates.length,
+        explored: explored.length,
         truncated: merged.truncated,
         eligible: candidates.length,
         ineligible,

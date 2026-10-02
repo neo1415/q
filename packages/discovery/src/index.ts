@@ -708,3 +708,4 @@ export {
   type PublishablePitchTimesPort,
 } from "./rerank/pitch-reintroductions.js";
 export type { PassReintroduction } from "./rerank/ports.js";
+export { createPostgresCompanySectorsPort } from "./infrastructure/postgres-filter-facts.js";

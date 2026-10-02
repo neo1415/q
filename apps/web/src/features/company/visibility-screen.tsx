@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { discoverabilityNotes } from "./discoverability";
 import type {
   CompanyDto,
   CompanyNetworkPreview,
@@ -297,6 +298,33 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
                 </li>
               ))}
           </ul>
+        )}
+        {readiness === null ||
+        discoverabilityNotes(readiness.discoverability).length === 0 ? null : (
+          <div
+            className="flex max-w-(--cq-layout-reading) flex-col gap-2"
+            data-discoverability
+          >
+            <h3 className="cq-label text-(--cq-text-primary)">
+              How investors can find you
+            </h3>
+            <ul className="flex flex-col gap-2">
+              {discoverabilityNotes(readiness.discoverability).map((note) => (
+                <li
+                  key={note.fact}
+                  className="cq-body-sm text-(--cq-text-secondary)"
+                >
+                  {note.text}{" "}
+                  <Link
+                    href={note.href}
+                    className="underline underline-offset-4"
+                  >
+                    Add it
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         {readiness !== null && !readiness.verificationAvailable ? (
           <p className="cq-status-line max-w-(--cq-layout-reading) items-start">
