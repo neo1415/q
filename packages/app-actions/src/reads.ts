@@ -150,9 +150,16 @@ export async function ownIndex(
         kind,
         label: KIND_LABELS[kind],
         total: items.length,
+        // The state and, where the page shows it, who can watch: "live"
+        // alone read as "not established that investors can play it"
+        // (parity eval 2026-10-02).
         titles: items
           .slice(0, INDEX_TITLES)
-          .map((item) => `${item.title} (${item.status})`),
+          .map((item) =>
+            typeof item.facts["whoCanWatch"] === "string"
+              ? `${item.title} (${item.status}; ${item.facts["whoCanWatch"]} can watch)`
+              : `${item.title} (${item.status})`,
+          ),
       };
     }),
   );

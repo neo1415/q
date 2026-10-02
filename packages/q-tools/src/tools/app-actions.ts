@@ -268,8 +268,8 @@ function toolFor(
           status,
           says:
             status === "PREPARED"
-              ? `${action.card(grant.canonical).summary}: prepared for their approval; nothing changes until they approve it.`
-              : "Another change is already waiting for their approval in this answer.",
+              ? `${action.card(grant.canonical).summary}: it's on the card for your approval; nothing changes until you approve it.`
+              : "Another change is already waiting for your approval in this answer; approve or decline it first.",
         };
       }
       const out = await action.run(own, grant.context, grant.canonical);
