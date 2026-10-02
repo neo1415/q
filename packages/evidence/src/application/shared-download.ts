@@ -4,6 +4,7 @@ import { TenantIdSchema } from "@capital-q/security";
 import {
   DocumentIdSchema,
   DocumentVersionIdSchema,
+  type DocumentType,
 } from "../contracts/index.js";
 import { DocumentNotFoundError } from "../domain/errors.js";
 import {
@@ -38,6 +39,17 @@ export type SharedDocumentDownloads = {
     readonly expiresAt: string;
     readonly mimeType: string;
   }>;
+  /**
+   * What kind of document a SHARED one is (a pitch deck, say), so a
+   * reader's surface can name it. The same precondition as above: the
+   * caller's sharing context has already authorised the reader. Only an
+   * active document answers; anything else is null, and nothing but the
+   * classification leaves.
+   */
+  readonly sharedDocumentType: (share: {
+    readonly documentTenantId: string;
+    readonly documentId: string;
+  }) => Promise<DocumentType | null>;
 };
 
 export function createSharedDocumentDownloads(options: {
@@ -83,6 +95,19 @@ export function createSharedDocumentDownloads(options: {
         expiresAt: authorization.providerExpiresAt,
         mimeType: version.mimeType,
       };
+    },
+    sharedDocumentType: async (share) => {
+      const tenantId = TenantIdSchema.safeParse(share.documentTenantId);
+      const documentId = DocumentIdSchema.safeParse(share.documentId);
+      if (!tenantId.success || !documentId.success) return null;
+      const document = await documents.findInTenant(
+        options.sql,
+        tenantId.data,
+        documentId.data,
+      );
+      return document === null || document.status !== "ACTIVE"
+        ? null
+        : document.documentType;
     },
   };
 }

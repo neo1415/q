@@ -132,6 +132,15 @@ export type PublicIdentityService = {
   readonly resolveCode: (
     code: string,
   ) => Promise<{ readonly handle: string } | null>;
+  /**
+   * An organisation's photo for one audience, exactly as its card would
+   * show it: a signed URL only when the card is active and its own `photo`
+   * scope reaches that audience. Null otherwise; never a public bucket.
+   */
+  readonly cardPhotoFor: (input: {
+    readonly subject: QCardSubject;
+    readonly audience: CardAudience;
+  }) => Promise<string | null>;
 };
 
 function dayOf(date: Date): string {
@@ -461,6 +470,24 @@ export function createPublicIdentityService(
       if (active === null) return null;
       await repository.countScan(sql, card.id, dayOf(now()));
       return { handle: active.handle };
+    },
+
+    cardPhotoFor: async ({ subject, audience }) => {
+      if (dependencies.cardImages === undefined) return null;
+      const card = await repository.findCard(sql, subject);
+      if (card === null || card.status !== "ACTIVE") return null;
+      const scopes = readStoredScopes(subject.subjectType, card.fieldScopes);
+      // The card's own projection decides, with a stand-in value, before
+      // anything is signed: a photo the scope hides is never minted.
+      const shown = projectCardFields(
+        subject.subjectType,
+        scopes,
+        { photo: "shown" },
+        audience,
+      ).some((field) => field.key === "photo");
+      if (!shown) return null;
+      const images = await dependencies.cardImages(subject).catch(() => null);
+      return images?.photo ?? null;
     },
   };
 }
