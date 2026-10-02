@@ -2020,6 +2020,52 @@ const qIntelligence = composeQIntelligence({
       .then((standing) => PERSONALITY_NOTES[standing.personality]),
   // Their own name and company, from their own record in their own
   // tenant: what they would be annoyed to be asked.
+  // Their day (founder demo 2026-10-02): their own finished rehearsals and
+  // saved time zone, keyed by the acting person only.
+  ownDay: async (actor) => {
+    if (actor.actorType !== "HUMAN") return { timeZone: null, rehearsals: [] };
+    const profile = await people.read(actor.userId).catch(() => null);
+    const rows = await database.sql<
+      {
+        with_name: string | null;
+        ended_at: Date | string | null;
+        score: number | null;
+        outcome: string | null;
+        overall: unknown;
+        tip: unknown;
+      }[]
+    >`
+      select coalesce(r.counterpart_name, r.investor_name) as with_name,
+             r.ended_at, r.score, r.outcome,
+             r.scorecard -> 'overall' as overall,
+             r.scorecard -> 'tips' -> 0 as tip
+        from q_runtime.rehearsals r
+       where r.user_id = ${actor.userId}
+         and r.tenant_id = ${actor.tenantId}
+         and r.status = 'FINISHED'
+       order by r.ended_at desc nulls last
+       limit 3`.catch(() => []);
+    const said = (value: unknown): string | null =>
+      typeof value === "string" && value.trim().length > 0
+        ? value.trim()
+        : typeof value === "object" &&
+            value !== null &&
+            typeof (value as { summary?: unknown }).summary === "string"
+          ? (value as { summary: string }).summary
+          : null;
+    return {
+      timeZone: profile?.timeZone ?? null,
+      rehearsals: rows.map((row) => ({
+        withName: row.with_name ?? "a counterpart",
+        endedAt:
+          row.ended_at === null ? null : new Date(row.ended_at).toISOString(),
+        score: row.score,
+        outcome: row.outcome,
+        overall: said(row.overall),
+        tip: said(row.tip),
+      })),
+    };
+  },
   askerOf: async ({ tenantId, userId }) => {
     const rows = await database.sql<
       {

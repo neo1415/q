@@ -84,6 +84,7 @@ import { relationshipFact } from "./relationship-fact.js";
 import { ownStandingFact } from "./own-standing.js";
 import { onScreenCompanyFact } from "./company-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
+import { ownDayFact, type OwnRehearsal } from "./own-day.js";
 import { companiesNamedIn, knownCompaniesOf } from "./named-companies.js";
 import {
   ownOnboardingFacts,
@@ -571,7 +572,8 @@ const RESEARCH_NOTE_BRIEF =
 // 8,000 since 2026-10-01 (founder reports: self-knowledge, expressive
 // requests): LIKELY_INTENT_NOTE and EXPRESSIVE_NOTE add ~720 characters and
 // a production-sized run would otherwise lose what Q can do again.
-export const ENVIRONMENT_NOTES_MAX_CHARS = 8_000;
+// 9,000 since 2026-10-02 (OWN_DAY_NOTE).
+export const ENVIRONMENT_NOTES_MAX_CHARS = 9_000;
 
 /**
  * What Q can do, so it says so rather than claiming it cannot (founder
@@ -701,6 +703,14 @@ export const EXPRESSIVE_NOTE =
 export const NAME_NOTE =
   "Call them only by the name given first here: a name in memory or said in the conversation never replaces it (a new name is a displayName for their confirmation).";
 
+/**
+ * Their day and record (founder demo 2026-10-02): "my tasks for today"
+ * got "I don't have a task list" while the facts held their calls,
+ * reminders and rehearsals.
+ */
+export const OWN_DAY_NOTE =
+  "Their tasks, day, agenda or what's next mean their own day among the facts (calls, reminders, approvals, Q's work), told in their time; how they are doing or their rehearsals means their last rehearsals there (get_my_results for more). Never say a record is unavailable when it is among the facts. If their time zone is not known, say times as UTC once, ask which city they are in, and offer to save it (propose_profile_change, PERSON timeZone).";
+
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
 
@@ -732,6 +742,15 @@ export function questionSequenceNote(step: QQuestionSequenceStep): string {
       return `THAT WAS THEIR ANSWER TO THE LAST OF THE ${step.total} QUESTIONS ${about}. Acknowledge it briefly and close the series; ask no further question of it.`;
     case "STOPPED":
       return `THEY ASKED YOU TO STOP THE QUESTIONS ${about}. Stop: acknowledge in a few words and ask none of the remaining questions.`;
+  }
+}
+
+function isKnownZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -831,6 +850,7 @@ export function environmentNotesFor(
         ? []
         : [NEXT_STEP_NOTE]),
       LIKELY_INTENT_NOTE,
+      OWN_DAY_NOTE,
       EXPRESSIVE_NOTE,
       ...(options.openDocumentTitle === undefined
         ? []
@@ -995,6 +1015,17 @@ export type ModelGatewayQAnswerDependencies = {
   readonly receipts?: QReceiptPort | undefined;
   /** What Capital Q remembers about the person (ADR 0012). Absent: nothing is. */
   readonly memory?: QMemoryRecall | undefined;
+  /**
+   * Their own finished rehearsals and saved time zone, for the own-day
+   * read (founder demo 2026-10-02). Their own records only, keyed by the
+   * actor; absent: those lines are left out.
+   */
+  readonly ownDay?:
+    | ((actor: ActorContext) => Promise<{
+        readonly timeZone: string | null;
+        readonly rehearsals: readonly OwnRehearsal[];
+      }>)
+    | undefined;
   /**
    * The person's own onboarding (CQ-QX-007): read only when the plan holds
    * the actor-wide OWN_ONBOARDING scope. Absent: not read.
@@ -1542,6 +1573,57 @@ export function createModelGatewayQAnswer(
         onScreenDaily = onScreenDailyFact(outcome.result.data);
       }
     })();
+    /**
+     * Their day: now in their zone, calls and reminders for 7 days, what
+     * waits for their approval, Q's work for them, their last rehearsals
+     * (founder demo 2026-10-02). Own records only, through the tools the
+     * model would call under the same plan, plus their own rehearsals.
+     */
+    let ownDay: AuthorisedFact | null = null;
+    const ownDayCalls: QToolCallObservation[] = [];
+    const dayRead = (async (): Promise<void> => {
+      if (!prefetchTools.has("list_schedule")) return;
+      const read = async (name: string): Promise<unknown> => {
+        if (!prefetchTools.has(name)) return null;
+        const outcome = await tools
+          .execute(
+            { callId: `q-own-day-${name}`, name, arguments: {} },
+            toolContext,
+          )
+          .catch(() => null);
+        if (outcome === null) return null;
+        ownDayCalls.push({
+          toolName: outcome.toolName,
+          providerName: name,
+          status: outcome.status,
+          failureCode: outcome.failureCode,
+          latencyMs: outcome.latencyMs,
+        });
+        return outcome.result.ok ? outcome.result.data : null;
+      };
+      const [schedule, approvals, work, own] = await Promise.all([
+        read("list_schedule"),
+        read("list_pending_approvals"),
+        read("list_q_work"),
+        dependencies.ownDay?.(request.actor).catch(() => null) ?? null,
+      ]);
+      const device = plan.screen?.timeZone;
+      const zone =
+        own?.timeZone ??
+        (device !== undefined &&
+        isKnownZone(device) &&
+        !/^(Etc\/)?(UTC|UCT|GMT|Universal|Zulu|Greenwich)$/i.test(device)
+          ? device
+          : null);
+      ownDay = ownDayFact({
+        now: new Date(),
+        timeZone: zone,
+        schedule,
+        approvals,
+        work,
+        rehearsals: own?.rehearsals ?? [],
+      });
+    })();
     const relationshipRead = (async (): Promise<void> => {
       if (counterparty !== undefined && prefetchTools.has("get_relationship")) {
         const call = {
@@ -1661,6 +1743,7 @@ export function createModelGatewayQAnswer(
       companyRead,
       namedRead,
       dailyRead,
+      dayRead,
     ]);
     return {
       history,
@@ -1684,6 +1767,8 @@ export function createModelGatewayQAnswer(
       namedCompanyCalls,
       onScreenDaily,
       onScreenDailyCall,
+      ownDay,
+      ownDayCalls,
       asked,
       counterparty,
       ownStanding,
@@ -1771,6 +1856,8 @@ export function createModelGatewayQAnswer(
         namedCompanyCalls,
         onScreenDaily,
         onScreenDailyCall,
+        ownDay,
+        ownDayCalls,
         ownStanding,
         ownStandingCall,
         pitchMoment,
@@ -1836,6 +1923,7 @@ export function createModelGatewayQAnswer(
         ...(onScreenCompany === null ? [] : [onScreenCompany]),
         ...namedCompanies,
         ...(onScreenDaily === null ? [] : [onScreenDaily]),
+        ...(ownDay === null ? [] : [ownDay]),
         ...(relationship === null ? [] : [relationship]),
         ...(ownStanding === null ? [] : [ownStanding]),
         ...(pitchMoment === null ? [] : [pitchMoment]),
@@ -2299,6 +2387,7 @@ export function createModelGatewayQAnswer(
       if (onScreenDailyCall !== null) {
         toolCalls.push(onScreenDailyCall);
       }
+      toolCalls.push(...ownDayCalls);
       if (ownStandingCall !== null) {
         toolCalls.push(ownStandingCall);
       }
