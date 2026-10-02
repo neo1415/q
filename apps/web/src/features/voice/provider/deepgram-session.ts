@@ -56,6 +56,8 @@ const PLAIN_ERRORS = {
 const SETTINGS_WITHIN_MS = 10_000;
 /** The relay's slowest vendor, its fallback, and a margin. */
 const SPEECH_WITHIN_MS = 10_000;
+/** "Thinking" with no reply at all gives way to listening after this. */
+export const THINKING_GIVE_UP_MS = 14_000;
 /** A working microphone produces frames continuously, silence included. */
 const FRAMES_WITHIN_MS = 4_000;
 
@@ -311,6 +313,22 @@ export function useDeepgramVoiceSession(
       const speechHeard = () => {
         speechWatch = stopWatch(speechWatch);
       };
+      /**
+       * Their words went to Q and no reply came at all (a sound the server
+       * ignored, a turn that produced nothing): never sit on "thinking"
+       * (founder live 2026-10-02). Back to listening after a while.
+       */
+      let thinkingWatch: number | null = null;
+      const watchThinking = () => {
+        thinkingWatch = stopWatch(thinkingWatch);
+        thinkingWatch = window.setTimeout(() => {
+          thinkingWatch = null;
+          if (liveRef.current !== live) return;
+          setState((current) =>
+            current === "THINKING" ? "LISTENING" : current,
+          );
+        }, THINKING_GIVE_UP_MS);
+      };
       session.on("connected", () => {
         setConnected(true);
         // The socket, not the agent: until the settings are applied every
@@ -370,8 +388,13 @@ export function useDeepgramVoiceSession(
         addLine(role, content);
         // The swarm and the page pointer follow what Q says, as it says it.
         if (role === "q") announceQSaid(content);
-        if (role === "user") setState("THINKING");
-        else expectSpeech();
+        if (role === "user") {
+          setState("THINKING");
+          watchThinking();
+        } else {
+          thinkingWatch = stopWatch(thinkingWatch);
+          expectSpeech();
+        }
       });
       /** The pending cough repair, if one is waiting. */
       let repair: number | null = null;
