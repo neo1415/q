@@ -353,22 +353,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/profile-images.ts DELETE `${subjectPath}/:kind`": cap(
     "offer.profile_photo_upload",
   ),
-  "api/http/media.ts POST pitch": cap("offer.pitch_video_upload"),
   "api/http/media.ts GET pitch": cap("tool.get_pitch_moment"),
   "api/http/media.ts GET `${COMPANIES_PATH}/:companyId/media`": cap(
     "tool.get_pitch_moment",
   ),
-  "api/http/media.ts DELETE `${pitch}/:mediaAssetId`": cap(
-    "offer.pitch_video_upload",
-  ),
-  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_UPLOAD_SESSION_SUFFIX}`":
-    cap("offer.pitch_video_upload"),
-  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_UPLOAD_CANCEL_SUFFIX}`":
-    cap("offer.pitch_video_upload"),
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_SYNC_SUFFIX}`": PLAYER,
-  // Who can watch: the same one choice as the registry's pitch.details.set.
-  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_POLICY_SUFFIX}`":
-    cap("tool.set_pitch_sharing"),
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_SUFFIX}`":
     PLAYER,
   "api/http/media.ts GET `${pitch}/:mediaAssetId${MEDIA_TRANSCRIPT_SUFFIX}`":
@@ -827,7 +816,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 119;
+const LEGACY_MUTATION_ROUTES_MAX = 114;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([

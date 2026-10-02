@@ -1,29 +1,17 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
-  CancelMediaUploadRequestSchema,
-  CancelMediaUploadResponseSchema,
   COMPANIES_PATH,
   COMPANY_PITCH_SUFFIX,
   CorrelationIdSchema,
-  CreateCompanyPitchRequestSchema,
-  CreateMediaUploadSessionRequestSchema,
   createProblemDetails,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
   MEDIA_CAPTIONS_VTT_SUFFIX,
-  MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_TRANSCRIPT_SUFFIX,
   MEDIA_SYNC_SUFFIX,
-  MEDIA_UPLOAD_CANCEL_SUFFIX,
-  MEDIA_UPLOAD_SESSION_SUFFIX,
-  MediaUploadSessionDtoSchema,
   parseContract,
   PitchTranscriptDtoSchema,
   PlaybackAuthorizationDtoSchema,
   PROBLEM_CONTENT_TYPE,
-  SetPitchPlaybackPolicyRequestSchema,
-  SetPitchPlaybackPolicyResponseSchema,
   SyncMediaAssetRequestSchema,
   SyncMediaAssetResponseSchema,
   UuidSchema,
@@ -32,11 +20,9 @@ import {
   type ProblemDetails,
 } from "@capital-q/contracts";
 import {
-  DEFAULT_PITCH_DURATION_POLICY,
   MediaAssetIdSchema,
   MediaProviderError,
   MediaProviderNotConfiguredError,
-  PREFERRED_PITCH_ASPECT_RATIO,
   toMediaAssetDto,
   type MediaAsset,
   type MediaAssetId,
@@ -92,14 +78,6 @@ function mediaAssetIdParam(request: FastifyRequest): MediaAssetId {
 function payload(asset: MediaAsset): MediaAssetDto {
   return toMediaAssetDto(asset);
 }
-
-/** Product guidance, served from one place so no client hardcodes it. */
-const GUIDANCE = {
-  targetMinSeconds: DEFAULT_PITCH_DURATION_POLICY.targetMinSeconds,
-  targetMaxSeconds: DEFAULT_PITCH_DURATION_POLICY.targetMaxSeconds,
-  hardMaxSeconds: DEFAULT_PITCH_DURATION_POLICY.hardMaxSeconds,
-  preferredAspectRatio: PREFERRED_PITCH_ASPECT_RATIO,
-} as const;
 
 /**
  * What a caller is told when the video provider is the reason (CQ-MEDIA-010).
@@ -170,58 +148,6 @@ function registerPitchRoutes(
   const service = dependencies.media;
   const pitch = `${COMPANIES_PATH}/:companyId${COMPANY_PITCH_SUFFIX}`;
 
-  app.post(pitch, { onRequest: withContext }, async (request, reply) => {
-    const actor = getActorContext(request);
-    const input = parseContract(
-      CreateCompanyPitchRequestSchema,
-      request.body ?? {},
-      "The pitch request is not valid.",
-    );
-
-    // Replacing supersedes the current pitch, so it is consequential and
-    // must name the intended change: a retry whose answer was lost then
-    // gets the same new asset back rather than a conflict or a second
-    // replacement. A first creation may carry one too, for the same reason.
-    const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-    const idempotencyKey =
-      rawKey === undefined && input.replacesMediaAssetId === undefined
-        ? undefined
-        : parseContract(
-            IdempotencyKeyHeaderSchema,
-            typeof rawKey === "string" ? rawKey : undefined,
-            "An Idempotency-Key header is required to replace a pitch.",
-          );
-
-    const result = await service.createCompanyPitch({
-      actor,
-      companyId: companyIdParam(request),
-      ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-      input: {
-        ...(input.replacesMediaAssetId === undefined
-          ? {}
-          : {
-              replacesMediaAssetId: MediaAssetIdSchema.parse(
-                input.replacesMediaAssetId,
-              ),
-            }),
-      },
-      correlationId: correlation(),
-    });
-
-    return reply
-      .code(result.replayed ? 200 : 201)
-      .header("Cache-Control", "no-store")
-      .header(
-        "Location",
-        `${COMPANIES_PATH}/${result.asset.ownerId}${COMPANY_PITCH_SUFFIX}`,
-      )
-      .send({
-        pitch: payload(result.asset),
-        replacedMediaAssetId: result.replaced?.id ?? null,
-        guidance: GUIDANCE,
-      });
-  });
-
   app.get(pitch, { onRequest: withContext }, async (request, reply) => {
     const actor = getActorContext(request);
     const asset = await service.getCompanyPitch({
@@ -248,118 +174,15 @@ function registerPitchRoutes(
     },
   );
 
-  // Removing a pitch is consequential: it changes what the company presents
-  // and what later projections may show, so it needs its own capability and
-  // is audited. The row is not erased; the history stays interpretable.
-  app.delete(
-    `${pitch}/:mediaAssetId`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const asset = await service.deleteCompanyPitch({
-        actor,
-        companyId: companyIdParam(request),
-        mediaAssetId: mediaAssetIdParam(request),
-        correlationId: correlation(),
-      });
-      return reply
-        .header("Cache-Control", "no-store")
-        .send({ pitch: payload(asset) });
-    },
-  );
+  // Making a pitch, its upload, cancel, removal and playback policy are
+  // generated from the action registry (ADR 0040, http/app-actions.ts),
+  // with the video provider's failures mapped as here.
 
   // The direct upload flow (CQ-MEDIA-011). POSTs on one asset, each
   // answering with a contract DTO that carries no provider identifier: the
   // one-time upload target and the minted playback URL are the only
   // provider-shaped things a client ever sees, and both are the server's
   // to issue.
-
-  // Reserve. The body names the version the client saw and nothing else:
-  // duration allowance, expiry and signed playback are the server's terms.
-  app.post(
-    `${pitch}/:mediaAssetId${MEDIA_UPLOAD_SESSION_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const input = parseContract(
-        CreateMediaUploadSessionRequestSchema,
-        request.body ?? {},
-        "The upload request is not valid.",
-      );
-      // A client that can resume says how many bytes, and must name the
-      // request so a retry can be recognised. Without a length the key is
-      // optional and unused: a one-shot target cannot be issued twice.
-      const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-      const idempotencyKey =
-        input.uploadLengthBytes === undefined
-          ? undefined
-          : parseContract(
-              IdempotencyKeyHeaderSchema,
-              typeof rawKey === "string" ? rawKey : undefined,
-              "An Idempotency-Key header is required for a resumable upload.",
-            );
-      const result = await service.createUploadSession({
-        actor,
-        companyId: companyIdParam(request),
-        mediaAssetId: mediaAssetIdParam(request),
-        expectedVersion: input.expectedVersion,
-        ...(input.uploadLengthBytes === undefined
-          ? {}
-          : { uploadLengthBytes: input.uploadLengthBytes, idempotencyKey }),
-        correlationId: correlation(),
-      });
-      return reply
-        .code(result.replayed ? 200 : 201)
-        .header("Cache-Control", "no-store")
-        .send(
-          MediaUploadSessionDtoSchema.parse({
-            mediaAssetId: result.asset.id,
-            uploadMode: result.session.uploadMode,
-            uploadUrl: result.session.uploadUrl,
-            expiresAt: result.session.expiresAt,
-            maxDurationSeconds: result.maxDurationSeconds,
-            ...(result.session.chunkSizeBytes === undefined
-              ? {}
-              : { chunkSizeBytes: result.session.chunkSizeBytes }),
-            pitch: payload(result.asset),
-          }),
-        );
-    },
-  );
-
-  // Cancel. The founder stops an unfinished upload: the record says
-  // UPLOAD_FAILED and the provider lets go of its target. Idempotent.
-  app.post(
-    `${pitch}/:mediaAssetId${MEDIA_UPLOAD_CANCEL_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      parseContract(
-        CancelMediaUploadRequestSchema,
-        request.body ?? {},
-        "The cancel request is not valid.",
-      );
-      const result = await service.cancelUpload({
-        actor,
-        companyId: companyIdParam(request),
-        mediaAssetId: mediaAssetIdParam(request),
-        correlationId: correlation(),
-      });
-      if (!result.providerReleased) {
-        // The record is already honest; the provider's target lapses at
-        // its expiry, and a repeat of this call retries the release.
-        request.log.warn(
-          { requestId: request.id, mediaAssetId: result.asset.id },
-          "cancelled upload not yet released by the video provider",
-        );
-      }
-      return reply.header("Cache-Control", "no-store").send(
-        CancelMediaUploadResponseSchema.parse({
-          pitch: payload(result.asset),
-        }),
-      );
-    },
-  );
 
   // Sync. Idempotent: the same answer however often it is asked, and the
   // lifecycle refuses any move the provider's answer cannot justify.
@@ -382,35 +205,6 @@ function registerPitchRoutes(
       return reply
         .header("Cache-Control", "no-store")
         .send(SyncMediaAssetResponseSchema.parse({ pitch: payload(asset) }));
-    },
-  );
-
-  // The founder's decision on who may be granted playback (CQ-MEDIA-013).
-  // Reversible and consequential: `media.manage`, versioned, audited. It
-  // opens one gate; discoverability still needs review and visibility.
-  app.post(
-    `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_POLICY_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const input = parseContract(
-        SetPitchPlaybackPolicyRequestSchema,
-        request.body ?? {},
-        "The playback policy request is not valid.",
-      );
-      const asset = await service.setPitchPlaybackPolicy({
-        actor,
-        companyId: companyIdParam(request),
-        mediaAssetId: mediaAssetIdParam(request),
-        playbackPolicy: input.playbackPolicy,
-        expectedVersion: input.expectedVersion,
-        correlationId: correlation(),
-      });
-      return reply
-        .header("Cache-Control", "no-store")
-        .send(
-          SetPitchPlaybackPolicyResponseSchema.parse({ pitch: payload(asset) }),
-        );
     },
   );
 

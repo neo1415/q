@@ -124,7 +124,7 @@ Relationships:
 
 Media and documents:
 
-- [ ] Pitch: create, upload session, cancel and delete. These need the person's file, so they are declared as READ plus an offer. The playback-policy route folds into `pitch.details.set`. **M**
+- [x] Pitch (done 2026-10-02: five declarations with generated routes; the file steps map to the pitch screen's offer, the playback policy to set_pitch_sharing; provider failures map as before): create, upload session, cancel and delete. These need the person's file, so they are declared as READ plus an offer. The playback-policy route folds into `pitch.details.set`. **M**
 - [ ] Documents: upload sessions ×3 (file: offer) and the brand kit ×4 (`q-documents`). **M**
 - [ ] Profile images ×3 (file: offer). **M**
 

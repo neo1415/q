@@ -4,6 +4,7 @@ import { CHAT_ACTIONS } from "./actions/chat.js";
 import { DISCOVERY_DECISIONS } from "./actions/discovery.js";
 import { INTEREST_ACTIONS } from "./actions/interest.js";
 import { MANDATE_ACTIONS } from "./actions/mandate.js";
+import { MEDIA_ACTIONS } from "./actions/media.js";
 import { SET_PITCH_SHARING } from "./actions/pitch.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
 import { SCHEDULE_ACTIONS } from "./actions/schedule.js";
@@ -24,4 +25,5 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...INTEREST_ACTIONS,
   ...CHAT_ACTIONS,
   ...SCHEDULE_ACTIONS,
+  ...MEDIA_ACTIONS,
 ]);

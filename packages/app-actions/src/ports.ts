@@ -64,6 +64,17 @@ export type AppActionPorts = {
   readonly chat?: Pick<ChatService, "send" | "unsend"> | undefined;
   readonly chatSafety?:
     Pick<ChatSafetyService, "block" | "unblock" | "report"> | undefined;
+  /** Pitch media: the record, its upload and playback policy. */
+  readonly pitchUploads?:
+    | Pick<
+        MediaService,
+        | "createCompanyPitch"
+        | "deleteCompanyPitch"
+        | "createUploadSession"
+        | "cancelUpload"
+        | "setPitchPlaybackPolicy"
+      >
+    | undefined;
   /** Calls and reminders: the schedule service. */
   readonly schedule?:
     | Pick<

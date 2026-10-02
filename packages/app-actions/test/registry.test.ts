@@ -145,6 +145,11 @@ describe("the action registry", () => {
       ],
       ["schedule.reminder.create", "legacy:propose_reminder", "CONSEQUENTIAL"],
       ["schedule.reminder.dismiss", "legacy:dismiss_reminder", "INSTANT"],
+      ["pitch.create", "offer.pitch_video_upload", "CONSEQUENTIAL"],
+      ["pitch.delete", "offer.pitch_video_upload", "CONSEQUENTIAL"],
+      ["pitch.upload.start", "offer.pitch_video_upload", "CONSEQUENTIAL"],
+      ["pitch.upload.cancel", "offer.pitch_video_upload", "CONSEQUENTIAL"],
+      ["pitch.playback_policy.set", "via:set_pitch_sharing", "CONSEQUENTIAL"],
     ]);
   });
 });

@@ -11,6 +11,7 @@ import {
   createProblemDetails,
   parseContract,
   PROBLEM_CONTENT_TYPE,
+  type ProblemDetails,
 } from "@capital-q/contracts";
 import { createCorrelationId } from "@capital-q/observability";
 
@@ -34,6 +35,13 @@ import {
 export type AppActionRoutesDependencies = ActorContextDependencies & {
   readonly ports: AppActionPorts;
   readonly actions?: readonly AnyAppAction[] | undefined;
+  /**
+   * A service's own failure as the problem its hand-written route used to
+   * answer (the video provider's, for pitch uploads); null: not its kind,
+   * and the application's handler answers.
+   */
+  readonly problemOf?:
+    ((error: unknown, requestId: string) => ProblemDetails | null) | undefined;
 };
 
 /** The routes this registry declares, as `<METHOD> <path>` (the parity guard reads it). */
@@ -84,7 +92,21 @@ export function registerAppActionRoutes(
           reply.callNotFound();
           return undefined;
         }
-        const out = await action.run(dependencies.ports, context, input);
+        let out: unknown;
+        try {
+          out = await action.run(dependencies.ports, context, input);
+        } catch (error: unknown) {
+          const mapped = dependencies.problemOf?.(error, request.id) ?? null;
+          if (mapped === null) throw error;
+          request.log.warn(
+            { err: error, requestId: request.id },
+            "an app action's service failed",
+          );
+          return reply
+            .status(mapped.status)
+            .type(PROBLEM_CONTENT_TYPE)
+            .send(mapped);
+        }
         const problem = http.problem?.(out) ?? null;
         if (problem !== null) {
           const details = createProblemDetails({

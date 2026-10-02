@@ -43,6 +43,7 @@ import {
 import { registerAppActionRoutes } from "./http/app-actions.js";
 import { registerInvestorMandateRoutes } from "./http/investor-mandates.js";
 import {
+  mediaProviderProblem,
   registerMediaRoutes,
   type MediaRoutesDependencies,
 } from "./http/media.js";
@@ -392,6 +393,8 @@ export function createApp(
   registerAppActionRoutes(app, {
     authenticator: security.authenticator,
     resolver: security.resolver,
+    // The video provider's failures, as the pitch routes always answered.
+    problemOf: mediaProviderProblem,
     ports: {
       ...(modules.media === undefined ? {} : { media: modules.media }),
       ...(modules.companies === undefined
@@ -430,6 +433,7 @@ export function createApp(
         : { connections: modules.connections }),
       ...(modules.chat === undefined ? {} : { chat: modules.chat }),
       ...(modules.schedule === undefined ? {} : { schedule: modules.schedule }),
+      ...(modules.media === undefined ? {} : { pitchUploads: modules.media }),
       ...(modules.chatSafety === undefined
         ? {}
         : { chatSafety: modules.chatSafety }),
