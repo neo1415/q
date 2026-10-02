@@ -332,7 +332,7 @@ export const OUTCOME_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof OutcomeTool>
 >({
   name: "relationship.outcome.change",
-  short: "decide after a meeting",
+  short: "record a relationship decision",
   area: "relationships",
   does: "Records where a connected relationship goes after a meeting: the investor not proceeding for now, pausing or resuming, or a meeting's confirmed outcome, as the relationship page does.",
   members: {
@@ -344,7 +344,7 @@ export const OUTCOME_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   tool: {
     name: "relationship_outcome",
     description:
-      "Prepares, for the person's approval, where a relationship they are connected with goes after a meeting: an investor deciding not to proceed for now (the reason stays private unless they ask to share it), pausing or resuming, or recording what a meeting led to (diligence, a follow-up meeting, materials, introductions). Name the company or investor as they said it. Nothing changes until they approve exactly it.",
+      'Use when the person states a decision about one of their own relationships, even as news ("we\'ve decided not to proceed with Ledgerfold for now", "let\'s pause things with Ledgerfold", "we\'re starting diligence"); never for an opinion or a doubt ("I\'m not sure about Ledgerfold"). Prepares, for the person\'s approval, where a relationship they are connected with goes after a meeting: an investor deciding not to proceed for now (the reason stays private unless they ask to share it), pausing or resuming, or recording what a meeting led to (diligence, a follow-up meeting, materials, introductions). Name the company or investor as they said it. Nothing changes until they approve exactly it.',
     input: OutcomeTool,
     references: { relationship: "RELATIONSHIP" },
     purposes: PURPOSES,

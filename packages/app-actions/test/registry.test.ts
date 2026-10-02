@@ -253,6 +253,26 @@ describe("one coercion for every name", () => {
           : [],
     );
 
+  it("a misheard relationship name resolves to it (parity e445cfb9: 'Ledger fold')", async () => {
+    const relationships: ReferenceCandidates = (kind) =>
+      Promise.resolve(
+        kind === "RELATIONSHIP"
+          ? [
+              { id: "r1", name: "Ledgerfold" },
+              { id: "r2", name: "Nixo" },
+            ]
+          : [],
+      );
+    expect(
+      await resolveReference(
+        relationships,
+        "RELATIONSHIP",
+        actor,
+        "Ledger fold",
+      ),
+    ).toEqual({ kind: "RESOLVED", id: "r1" });
+  });
+
   it("takes one clear match, misheard included; asks about several; finds nothing for none", async () => {
     expect(
       await resolveReference(candidates, "COMPANY", actor, "Nixon"),

@@ -2634,3 +2634,94 @@ describe("the tool offer follows the turn (tool focus)", () => {
     });
   });
 });
+
+/**
+ * Parity eval 2026-10-02 (runs 9a63392f, e445cfb9): a stated decision about
+ * a relationship names relationship_outcome (TURN_READER v35), and code
+ * prepares it for approval through the declared action; an opinion does not.
+ */
+describe("a stated decision about a relationship is prepared, an opinion is not", () => {
+  const port = (ran: unknown[]): QAppActionPort => ({
+    tools: new Set(["relationship_outcome"]),
+    run: (_request, action) => {
+      ran.push(action);
+      return Promise.resolve("I've prepared that for your approval.");
+    },
+  });
+  const named = {
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+    handOver: null,
+    appAction: null,
+    askedAction: "relationship_outcome",
+  } as TurnReaderResult;
+
+  for (const said of [
+    "We've decided not to proceed with Ledgerfold for now.",
+    "We've decided not to proceed with Ledger fold for now.",
+  ]) {
+    it(`'${said}' prepares relationship_outcome for approval`, async () => {
+      const ran: unknown[] = [];
+      const asked: unknown[] = [];
+      const run = seam({
+        said,
+        reading: named,
+        outcomes: [],
+        offeredTools: ["relationship_outcome", "get_relationship"],
+        appActions: port(ran),
+        appActionArguments: (_request, input) => {
+          asked.push(input);
+          return Promise.resolve({
+            relationship: said.includes("Ledger fold")
+              ? "Ledger fold"
+              : "Ledgerfold",
+            operation: "NOT_PROCEED",
+          });
+        },
+      });
+      await run.answer.answer(request());
+      expect(asked).toEqual([
+        { tool: "relationship_outcome", utterance: said },
+      ]);
+      expect(ran).toHaveLength(1);
+      expect(run.stored.at(-1)?.content).toBe(
+        "I've prepared that for your approval.",
+      );
+      expect(run.delegated()).toBe(0);
+    });
+  }
+
+  it("'I'm not sure about Ledgerfold' prepares nothing", async () => {
+    const ran: unknown[] = [];
+    const run = seam({
+      said: "I'm not sure about Ledgerfold.",
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: {
+          kind: "ADVICE",
+          text: "I'm not sure about Ledgerfold.",
+          about: [],
+        },
+        aboutNamedOther: false,
+        tool: null,
+      },
+      outcomes: [],
+      offeredTools: ["relationship_outcome"],
+      appActions: port(ran),
+      appActionArguments: () =>
+        Promise.resolve({
+          relationship: "Ledgerfold",
+          operation: "NOT_PROCEED",
+        }),
+    });
+    await run.answer.answer(request());
+    expect(ran).toEqual([]);
+    expect(run.delegated()).toBe(1);
+  });
+});

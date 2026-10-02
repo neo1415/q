@@ -37,7 +37,7 @@ export const TURN_READER_V34: PromptDefinition<
 > = {
   ...TURN_READER_V33,
   version: 34,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA 2026-10-02 (parity run 1ec08a4b): SET_VISIBILITY is a company's only; a fund's or investor organisation's visibility is its app action (set_investor_visibility). Same schema and order as v33.",
   effectiveFrom: "2026-10-02",
