@@ -114,7 +114,7 @@ const context = {
 describe("relationship.connection_request.respond", () => {
   it("is one approval naming both steps, with the message word for word", () => {
     const { action } = world();
-    const described = action.describe(payload);
+    const described = action.describe(payload, action.targets(payload));
     expect(described.summary).toBe(
       "Accept Kazikit's connection request and send them your message",
     );
@@ -179,7 +179,7 @@ describe("relationship.connection_request.respond", () => {
       result: { messageSent: false, messageFailure: "Error" },
     });
     expect(
-      chatFails.confirm(payload, {
+      chatFails.confirm?.(payload, {
         interestId: INTEREST,
         decision: "ACCEPTED",
         alreadyAnswered: false,

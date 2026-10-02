@@ -120,7 +120,7 @@ type Calls = {
   reads: string[];
   prepared: {
     actionType: string;
-    payload: Readonly<Record<string, string>>;
+    payload: Readonly<Record<string, string | null>>;
   }[];
 };
 
