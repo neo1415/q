@@ -656,6 +656,38 @@ describe("what exists, and the parity gap", () => {
     expect(gap?.data).toMatchObject({ key: "q.parity_gap" });
   });
 
+  it("names the kind of miss from the declaration name: not in the registry, declared but not offered, not called", async () => {
+    const kinds: unknown[] = [];
+    for (const askedAction of [undefined, "pass_company", "get_q_daily"]) {
+      const { warned, logger } = capture();
+      const { seam, request } = build(
+        { status: "SUCCEEDED", data: CONNECTED },
+        undefined,
+        { logger },
+      );
+      await seam.answer({
+        ...request,
+        turnKind: "TOOL_REQUEST",
+        ...(askedAction === undefined ? {} : { askedAction }),
+      });
+      kinds.push(
+        warned.find((entry) => entry.message === "q.parity_gap")?.data,
+      );
+    }
+    expect(kinds).toEqual([
+      expect.objectContaining({ gap: "NOT_IN_REGISTRY", declaration: null }),
+      expect.objectContaining({
+        gap: "DECLARED_NOT_OFFERED",
+        declaration: "pass_company",
+      }),
+      // Offered this run, and the answer never called it.
+      expect.objectContaining({
+        gap: "NOT_CALLED",
+        declaration: "get_q_daily",
+      }),
+    ]);
+  });
+
   it("does not log a gap for a question", async () => {
     const { warned, logger } = capture();
     const { seam, request } = build(

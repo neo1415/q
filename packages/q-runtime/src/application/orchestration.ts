@@ -243,6 +243,11 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * "I'm giving you full permission…" was echoed as a noted statement).
    */
   readonly turnKind?: string | undefined;
+  /**
+   * The declared action the reader read them as asking for, by its name
+   * (TURN_READER v30, ADR 0040), offered here or not. Absent: none named.
+   */
+  readonly askedAction?: string | undefined;
 };
 
 export type QCapabilityManifest = {

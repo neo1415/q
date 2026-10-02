@@ -140,13 +140,24 @@ function seam(options: {
   const capabilities: unknown[] = [];
   let reads = 0;
   const heardActions: unknown[] = [];
+  const declaredActions: string[][] = [];
+  const askedActions: (string | undefined)[] = [];
   const outcomes = [...options.outcomes];
   const modalities: string[] = [];
   const turns: QTurnReader = {
     read: (input) => {
       reads += 1;
       modalities.push(input.modality);
-      heardActions.push(input.actions ?? []);
+      // What this run offers; the registry's other declarations ride along
+      // marked not available (ADR 0040 parity), heard separately below.
+      heardActions.push(
+        (input.actions ?? []).filter((action) => action.available !== false),
+      );
+      declaredActions.push(
+        (input.actions ?? [])
+          .filter((action) => action.available === false)
+          .map((action) => action.name),
+      );
       return Promise.resolve(
         typeof options.reading === "function"
           ? options.reading()
@@ -183,6 +194,7 @@ function seam(options: {
       answer: async (req) => {
         delegated += 1;
         unread.push(req.turnUnread === true);
+        askedActions.push(req.askedAction);
         capabilities.push(req.capabilities);
         directives.push(
           req.research === undefined ? undefined : await req.research,
@@ -257,6 +269,8 @@ function seam(options: {
     capabilities,
     reads: () => reads,
     heardActions,
+    declaredActions,
+    askedActions,
     modalities,
   };
 }
@@ -834,6 +848,8 @@ describe("an action the run offers is never filed as a document (BIZ-004 founder
     });
     await run.answer.answer(request());
     expect(run.heardActions).toEqual([[]]);
+    // It is declared, though: the reader may name it, marked not here.
+    expect(run.declaredActions[0]).toContain("propose_handle_claim");
   });
 });
 
@@ -2082,5 +2098,62 @@ describe("live 2026-10-02 (Zino): a direct request is not handed over", () => {
     await answer.answer(request());
     expect(prepared).toEqual([]);
     expect(delegated()).toBe(1);
+  });
+});
+
+/**
+ * HARDEN (lead 2026-10-02): PASSED reaches /discover/passed end to end
+ * (the reader's NAVIGATE PASSED, the answer's UI_INTENT, the web's route
+ * map, tested in apps/web), and the action the reader names (v30
+ * askedAction) reaches the answer only when it was a name it was given.
+ */
+describe("PASSED and the asked action (ADR 0040 parity)", () => {
+  it("'show me the companies I passed on' opens Passed, by a NAVIGATE intent", async () => {
+    const run = seam({
+      said: "show me the companies I passed on",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "PASSED",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.stored[0]?.content).toBe("Opening Passed.");
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "PASSED" },
+      },
+    ]);
+  });
+
+  it("the reader's askedAction reaches the answer only when it is a listed name", async () => {
+    const reading = (askedAction: string) =>
+      ({
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        askedAction,
+      }) as TurnReaderResult;
+    const listed = seam({
+      said: "pass on Kora",
+      reading: reading("pass_company"),
+      outcomes: [],
+      offeredTools: ["get_company"],
+    });
+    await listed.answer.answer(request());
+    expect(listed.askedActions).toEqual(["pass_company"]);
+    const invented = seam({
+      said: "teleport me to Lagos",
+      reading: reading("teleport_person"),
+      outcomes: [],
+      offeredTools: ["get_company"],
+    });
+    await invented.answer.answer(request());
+    expect(invented.askedActions).toEqual([undefined]);
   });
 });

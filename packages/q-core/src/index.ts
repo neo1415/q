@@ -220,6 +220,10 @@ export {
   TURN_READER_V29_DESTINATIONS,
 } from "./prompts/tasks/turn-reader.v29.js";
 export {
+  TURN_READER_V30,
+  TURN_READER_V30_ASKED_ACTION,
+} from "./prompts/tasks/turn-reader.v30.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -265,6 +269,9 @@ export {
   TurnReaderV27ResultSchema,
   type TurnReaderV27Result,
   TURN_READER_V28_SCHEMA_VERSION,
+  TURN_READER_V30_SCHEMA_VERSION,
+  TurnReaderV30ResultSchema,
+  type TurnReaderV30Result,
   TurnReaderV28ResultSchema,
   TurnTimeWindowSchema,
   type TurnReaderV28Result,

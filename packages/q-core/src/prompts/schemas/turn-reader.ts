@@ -245,7 +245,7 @@ export const TurnReaderV7VariablesSchema = TurnReaderVariablesSchema.extend({
         does: z.string().max(240),
       }),
     )
-    .max(30)
+    .max(100)
     .default([]),
 }).strict();
 export type TurnReaderV7Variables = z.infer<typeof TurnReaderV7VariablesSchema>;
@@ -540,3 +540,17 @@ export const TurnReaderV28ResultSchema = TurnReaderV27ResultSchema.extend({
   timeWindow: TurnTimeWindowSchema.nullable().default(null),
 }).strict();
 export type TurnReaderV28Result = z.infer<typeof TurnReaderV28ResultSchema>;
+
+/**
+ * v30 (HARDEN, ADR 0040 parity, 2026-10-02): which declared action they
+ * asked for, by its name in the actions list (offered this run, or
+ * declared but not available here), or null when none of them does it.
+ * Code compares the name with the registry and the run's calls; a phrase
+ * never decides it.
+ */
+export const TURN_READER_V30_SCHEMA_VERSION = 30;
+
+export const TurnReaderV30ResultSchema = TurnReaderV28ResultSchema.extend({
+  askedAction: z.string().trim().min(1).max(80).nullable().default(null),
+}).strict();
+export type TurnReaderV30Result = z.infer<typeof TurnReaderV30ResultSchema>;

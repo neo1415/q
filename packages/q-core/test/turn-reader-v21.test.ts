@@ -17,7 +17,7 @@ const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
 describe("TURN_READER v21", () => {
   it("is the active reader", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(29);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(30);
   });
 
   it("names every contract destination exactly once", () => {

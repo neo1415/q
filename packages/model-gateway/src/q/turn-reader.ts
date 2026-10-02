@@ -4,12 +4,12 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV28ResultSchema,
+  TurnReaderV30ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
-  type TurnReaderV28Result,
+  type TurnReaderV30Result,
   type TurnReaderV7Variables,
 } from "@capital-q/q-core";
 
@@ -38,7 +38,13 @@ export type QTurnReader = {
      * for one of them is never read as a document (founder live, BIZ-004).
      */
     readonly actions?:
-      readonly { readonly name: string; readonly does: string }[] | undefined;
+      | readonly {
+          readonly name: string;
+          readonly does: string;
+          /** Declared in the registry, but not offered in this run (ADR 0040). */
+          readonly available?: boolean | undefined;
+        }[]
+      | undefined;
     readonly attribution: {
       readonly tenantId: string;
       readonly userId: string;
@@ -68,6 +74,8 @@ export type QTurnReading = Omit<
   readonly endVoice?: boolean | undefined;
   /** v27: they authorise saving research or findings into their own profile. */
   readonly saveToOwnProfile?: boolean | undefined;
+  /** v30: the listed action's name that does what they asked, or null. */
+  readonly askedAction?: string | null | undefined;
   /** v28: a time they asked for, in minutes from now. */
   readonly timeWindow?:
     | { readonly fromMinutes: number | null; readonly toMinutes: number | null }
@@ -134,10 +142,24 @@ export function createQTurnReader(dependencies: {
         })),
         utterance,
         modality: input.modality,
-        actions: (input.actions ?? []).slice(0, 30).map((action) => ({
-          name: action.name.slice(0, 80),
-          does: action.does.slice(0, 240),
-        })),
+        // What this run offers first, in full; then, briefly, what the
+        // registry declares that this run does not offer (v30 askedAction).
+        actions: [
+          ...(input.actions ?? [])
+            .filter((action) => action.available !== false)
+            .slice(0, 40)
+            .map((action) => ({
+              name: action.name.slice(0, 80),
+              does: action.does.slice(0, 240),
+            })),
+          ...(input.actions ?? [])
+            .filter((action) => action.available === false)
+            .slice(0, 60)
+            .map((action) => ({
+              name: action.name.slice(0, 80),
+              does: `(not available in this conversation) ${action.does.slice(0, 80)}`,
+            })),
+        ],
       };
       try {
         const rendered = renderPrompt<TurnReaderV7Variables>(registry, {
@@ -149,7 +171,7 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderV28Result>(
+        const response = await gateway.execute<TurnReaderV30Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             // A closed classification needs little thought; left unset, a
@@ -165,7 +187,7 @@ export function createQTurnReader(dependencies: {
             attribution: input.attribution,
           },
           {
-            schema: TurnReaderV28ResultSchema,
+            schema: TurnReaderV30ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
             ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
               ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
@@ -173,7 +195,7 @@ export function createQTurnReader(dependencies: {
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV28ResultSchema.safeParse(
+        const parsed = TurnReaderV30ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

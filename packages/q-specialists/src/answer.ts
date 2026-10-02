@@ -23,6 +23,7 @@ import {
 } from "@capital-q/q-core";
 import {
   eligibleCapabilities,
+  Q_CAPABILITIES,
   type GetInvestorMandateOutput,
   type QCapability,
 } from "@capital-q/q-tools";
@@ -109,11 +110,18 @@ import {
  * §57, §91, §103).
  */
 
+/** An action the reader is told of; `available: false` is declared but not offered here. */
+type ReaderAction = {
+  readonly name: string;
+  readonly does: string;
+  readonly available?: boolean | undefined;
+};
+
 /** The reader's input: the person's own latest words and own recent turns. */
 function turnReaderInput(
   history: readonly QConversationMessage[],
   latest: QConversationMessage,
-  actions: readonly { readonly name: string; readonly does: string }[],
+  actions: readonly ReaderAction[],
   context: {
     readonly tenantId: string;
     readonly userId: string;
@@ -144,10 +152,14 @@ function turnReaderInput(
   };
 }
 
-const actionsKey = (
-  actions: readonly { readonly name: string; readonly does: string }[],
-): string =>
-  JSON.stringify(actions.map((a) => ({ name: a.name, does: a.does })));
+const actionsKey = (actions: readonly ReaderAction[]): string =>
+  JSON.stringify(
+    actions.map((a) => ({
+      name: a.name,
+      does: a.does,
+      ...(a.available === false ? { available: false } : {}),
+    })),
+  );
 
 export type SpecialistQAnswerDependencies = {
   readonly specialist: QSpecialist<
@@ -1302,7 +1314,7 @@ export function createSpecialistQAnswer(
       const key = lastActions.get(conversationId);
       // A conversation's first turn has no known actions: read later.
       if (key === undefined) return null;
-      const actions = JSON.parse(key) as { name: string; does: string }[];
+      const actions = JSON.parse(key) as ReaderAction[];
       const reading = turns
         .read(
           turnReaderInput(history, latest, actions, {
@@ -1457,11 +1469,31 @@ export function createSpecialistQAnswer(
     // R20/R33: every tool that changes something is an action to the
     // reader (a Prepare → Approve change, the app's own action in their
     // browser, a Save or Pass): "reload the page" is not a screen.
-    const actions = capabilities.flatMap((capability) =>
+    const offeredActions = capabilities.flatMap((capability) =>
       capability.performedBy.kind === "TOOL" && capability.acts
         ? [{ name: capability.performedBy.providerName, does: capability.does }]
         : [],
     );
+    // ADR 0040 parity: what the registry declares that this run does not
+    // offer, marked, so the reader can name what was asked (askedAction)
+    // and code can tell "not called" from "missing from the registry".
+    const offeredNames = new Set(offeredActions.map((action) => action.name));
+    const actions: readonly ReaderAction[] = [
+      ...offeredActions,
+      ...Q_CAPABILITIES.flatMap((capability) =>
+        capability.performedBy.kind === "TOOL" &&
+        capability.acts &&
+        !offeredNames.has(capability.performedBy.providerName)
+          ? [
+              {
+                name: capability.performedBy.providerName,
+                does: capability.does,
+                available: false,
+              },
+            ]
+          : [],
+      ),
+    ];
     // Spoken turns carry the recogniser's utterance; typed ones never do.
     // The reader needs to know which: only speech can be overheard.
     const spoken = latest.utteranceRef !== undefined;
@@ -1728,6 +1760,12 @@ export function createSpecialistQAnswer(
         capabilities: manifestOf(capabilities),
         ...(turnUnread ? { turnUnread: true } : {}),
         ...(read === null ? {} : { turnKind: read.kind }),
+        // Only a name the reader was given counts (ADR 0040 parity).
+        ...(read?.askedAction === undefined ||
+        read.askedAction === null ||
+        !actions.some((action) => action.name === read.askedAction)
+          ? {}
+          : { askedAction: read.askedAction }),
         ...(writingDocument ? { writingDocument: true } : {}),
         ...(series.step === null ? {} : { questionSequence: series.step }),
       },

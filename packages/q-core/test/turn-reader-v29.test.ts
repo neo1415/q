@@ -10,10 +10,10 @@ import {
 
 /** TURN_READER v29 (QA 2026-10-02): PASSED, the Passed list, is a destination. */
 describe("TURN_READER v29", () => {
-  it("is the active reader", () => {
+  it("is superseded by v30, which adds askedAction", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(29);
+    ).toBe(30);
   });
 
   it("names every contract destination exactly once, PASSED included", () => {

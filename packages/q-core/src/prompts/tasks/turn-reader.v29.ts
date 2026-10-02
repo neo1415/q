@@ -23,7 +23,7 @@ export const TURN_READER_V29: PromptDefinition<
 > = {
   ...TURN_READER_V28,
   version: 29,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA 2026-10-02: PASSED (the Passed list, /discover/passed) is a NAVIGATE destination. Same schema as v28.",
   effectiveFrom: "2026-10-02",

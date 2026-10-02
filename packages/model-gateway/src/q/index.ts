@@ -3078,9 +3078,24 @@ export function createModelGatewayQAnswer(
           gaps === null &&
           request.writingDocument !== true
         ) {
+          // Which kind of miss, from names only (TURN_READER v30
+          // askedAction against this run's offer and calls): the registry
+          // has no such action; it does, but this run did not offer it; it
+          // was offered and not called; or called and it did nothing.
+          const asked = request.askedAction;
+          const gap =
+            asked === undefined
+              ? "NOT_IN_REGISTRY"
+              : !offeredByName.has(asked)
+                ? "DECLARED_NOT_OFFERED"
+                : toolCalls.some((call) => call.providerName === asked)
+                  ? "CALLED_DID_NOTHING"
+                  : "NOT_CALLED";
           logger?.warn(
             {
               key: "q.parity_gap",
+              gap,
+              declaration: asked ?? null,
               qRunId: request.runId,
               offered: offered.length,
               called: toolCalls.map(
