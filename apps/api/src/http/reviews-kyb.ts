@@ -143,16 +143,28 @@ export function registerReviewsKybRoutes(
       request.body,
       "Check your business details and try again.",
     );
+    const organisation = input.organisation;
     const outcome = await dependencies.kyb.submit({
       actor: getActorContext(request),
-      input: {
-        legalName: input.legalName,
-        registrationNumber: input.registrationNumber,
-        jurisdictionCode: input.jurisdictionCode,
-        registeredAddress: input.registeredAddress ?? null,
-        websiteUrl: input.websiteUrl ?? null,
-        documentId: input.documentId ?? null,
-      },
+      organisation:
+        organisation === null
+          ? null
+          : {
+              legalName: organisation.legalName,
+              registrationNumber: organisation.registrationNumber,
+              jurisdictionCode: organisation.jurisdictionCode,
+              registeredAddress: organisation.registeredAddress ?? null,
+              websiteUrl: organisation.websiteUrl ?? null,
+              documentId: organisation.documentId ?? null,
+            },
+      person:
+        input.person === null
+          ? null
+          : {
+              nameOnId: input.person.nameOnId,
+              role: input.person.role,
+              documentId: input.person.documentId ?? null,
+            },
       idempotencyKey: key,
       correlationId: correlation(),
     });
@@ -168,21 +180,27 @@ export function registerReviewsKybRoutes(
           request,
           reply,
           "RESOURCE_CONFLICT",
-          "Your business details are already with Capital Q.",
+          outcome.part === "ORGANISATION"
+            ? "Your business details are already with Capital Q."
+            : "Your identity details are already with Capital Q.",
         );
       case "ALREADY_VERIFIED":
         return send(
           request,
           reply,
           "RESOURCE_CONFLICT",
-          "Your organisation is already verified.",
+          outcome.part === "ORGANISATION"
+            ? "Your organisation is already verified."
+            : "You're already verified.",
         );
       case "DOCUMENT_NOT_FOUND":
         return send(
           request,
           reply,
           "VALIDATION_FAILED",
-          "That document isn't one of your organisation's uploads.",
+          outcome.part === "ORGANISATION"
+            ? "That document isn't one of your organisation's uploads."
+            : "That ID document isn't one of your uploads.",
         );
       case "NO_ORGANISATION":
         return send(

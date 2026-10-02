@@ -79,6 +79,8 @@ export {
   type KybProvider,
   type KybService,
   type KybView,
+  type PersonIdentityInput,
+  type VerificationPart,
   type SubmitKybOutcome,
 } from "./application/kyb.js";
 export {

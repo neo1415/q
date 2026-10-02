@@ -100,7 +100,7 @@ export const AdminKybDocumentDtoSchema = z
 
 // --- KYB (the organisation's side) ---------------------------------------------
 
-export const KybRequestSchema = z
+const OrganisationDetailsSchema = z
   .object({
     legalName: z.string().trim().min(1).max(300),
     registrationNumber: z.string().trim().min(1).max(100),
@@ -116,6 +116,32 @@ export const KybRequestSchema = z
     documentId: UuidSchema.nullable().optional(),
   })
   .strict();
+
+/** ADMIN-4: the person's own identity details, sent with the organisation's. */
+export const PersonIdentityRequestSchema = z
+  .object({
+    nameOnId: z.string().trim().min(1).max(200),
+    role: z.string().trim().min(1).max(120),
+    documentId: UuidSchema.nullable().optional(),
+  })
+  .strict();
+export type PersonIdentityRequest = z.infer<typeof PersonIdentityRequestSchema>;
+
+/**
+ * `POST /v1/kyb` -- one flow, "Verify you and <organisation>": the
+ * organisation's details, the person's identity details, or both together
+ * (a part already verified is left out). Both claims are requested in one
+ * transaction.
+ */
+export const KybRequestSchema = z
+  .object({
+    organisation: OrganisationDetailsSchema.nullable(),
+    person: PersonIdentityRequestSchema.nullable(),
+  })
+  .strict()
+  .refine((body) => body.organisation !== null || body.person !== null, {
+    message: "Send the organisation's details, your own, or both.",
+  });
 export type KybRequest = z.infer<typeof KybRequestSchema>;
 
 export const KybDtoSchema = z
@@ -144,6 +170,33 @@ export const KybDtoSchema = z
       })
       .strict()
       .nullable(),
+    organisationName: z.string().max(300).nullable(),
+    organisationKind: z.enum(["COMPANY", "INVESTOR"]).nullable(),
+    /** The signed-in person's own identity claim (ADMIN-4). */
+    person: z
+      .object({
+        standing: z.enum([
+          "NOT_REQUESTED",
+          "PENDING",
+          "VERIFIED",
+          "EXPIRED",
+          "REVOKED",
+        ]),
+        declineReason: z.string().max(500).nullable(),
+        submission: z
+          .object({
+            submissionId: UuidSchema,
+            nameOnId: z.string().max(200),
+            role: z.string().max(120),
+            hasDocument: z.boolean(),
+            status: z.enum(["SUBMITTED", "APPROVED", "REJECTED"]),
+            decisionReason: z.string().max(1000).nullable(),
+            submittedAt: Iso,
+          })
+          .strict()
+          .nullable(),
+      })
+      .strict(),
   })
   .strict();
 export type KybDto = z.infer<typeof KybDtoSchema>;

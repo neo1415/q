@@ -237,6 +237,16 @@ export const AdminVerificationRowDtoSchema = z
       })
       .strict()
       .nullable(),
+    /** ADMIN-4: the identity details a person sent for their own claim. */
+    identity: z
+      .object({
+        submissionId: UuidSchema,
+        nameOnId: z.string().max(200),
+        role: z.string().max(120),
+        hasDocument: z.boolean(),
+      })
+      .strict()
+      .nullable(),
   })
   .strict();
 export const AdminVerificationListDtoSchema = z

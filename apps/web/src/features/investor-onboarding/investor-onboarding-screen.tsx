@@ -173,7 +173,8 @@ export function InvestorOnboardingScreen({
   const finishFromQ = async () => {
     await actions.submit({ kind: "handoff", confirmed: true });
     if (await actions.complete()) {
-      router.push("/discover");
+      // ADMIN-4 block: straight into "Verify you and <fund>", skippable.
+      router.push("/verification?from=setup&next=discover");
     }
   };
 
@@ -288,7 +289,8 @@ export function InvestorOnboardingScreen({
     // recommendations exist.
     await actions.submit({ kind: "handoff", confirmed: true });
     if (await actions.complete()) {
-      router.push("/discover");
+      // ADMIN-4 block: straight into "Verify you and <fund>", skippable.
+      router.push("/verification?from=setup&next=discover");
     }
   };
 

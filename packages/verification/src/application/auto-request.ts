@@ -20,8 +20,8 @@ import type { VerificationClaimRepository } from "./ports.js";
  * Automatic verification requests (founder direction 2026-10-02): once an
  * organisation is on the network -- its onboarding is complete, it turned
  * network-visible, or it has a pitch -- Capital Q asks for its
- * ORGANISATION claim (and, for a company, its founder's FOUNDER_IDENTITY
- * claim) on its behalf. Only acceptance stays with a person: an operator
+ * ORGANISATION claim and the person's identity claim (FOUNDER_IDENTITY,
+ * subject PERSON -- also used for an investor's person) on its behalf. Only acceptance stays with a person: an operator
  * decides by hand (OPERATOR_DECISION).
  *
  * What it records is only what Capital Q already knows -- the
@@ -167,14 +167,9 @@ export function createAutoVerificationRequester(dependencies: {
       await repository.lockOrganisation(tx, tenantId, organisationId);
       const subjects: { type: VerificationClaimType; subjectId: string }[] = [
         { type: "ORGANISATION", subjectId: organisationId },
-        ...(candidate.kind === "COMPANY"
-          ? [
-              {
-                type: "FOUNDER_IDENTITY" as const,
-                subjectId: candidate.requesterUserId,
-              },
-            ]
-          : []),
+        // The person's identity claim, for a founder or an investor alike
+        // ("Verify you and <organisation>").
+        { type: "FOUNDER_IDENTITY", subjectId: candidate.requesterUserId },
       ];
       const requested: VerificationClaimType[] = [];
       let organisationClaimId: string | null = null;

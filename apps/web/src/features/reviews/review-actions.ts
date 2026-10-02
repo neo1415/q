@@ -71,30 +71,52 @@ export async function requestReviewAction(raw: {
   }
 }
 
+/** ADMIN-4: one flow -- the organisation's details, the person's, or both. */
 export async function submitKybAction(raw: {
-  readonly legalName: string;
-  readonly registrationNumber: string;
-  readonly jurisdictionCode: string;
-  readonly registeredAddress: string;
-  readonly websiteUrl: string;
-  readonly documentId: string | null;
+  readonly organisation: {
+    readonly legalName: string;
+    readonly registrationNumber: string;
+    readonly jurisdictionCode: string;
+    readonly registeredAddress: string;
+    readonly websiteUrl: string;
+    readonly documentId: string | null;
+  } | null;
+  readonly person: {
+    readonly nameOnId: string;
+    readonly role: string;
+    readonly documentId: string | null;
+  } | null;
   readonly attemptKey: string;
 }): Promise<FormResult> {
+  const organisation = raw.organisation;
   const input = KybRequestSchema.safeParse({
-    legalName: raw.legalName,
-    registrationNumber: raw.registrationNumber,
-    jurisdictionCode: raw.jurisdictionCode.trim().toUpperCase(),
-    registeredAddress:
-      raw.registeredAddress.trim() === "" ? null : raw.registeredAddress,
-    websiteUrl: raw.websiteUrl.trim() === "" ? null : raw.websiteUrl.trim(),
-    documentId: raw.documentId,
+    organisation:
+      organisation === null
+        ? null
+        : {
+            legalName: organisation.legalName,
+            registrationNumber: organisation.registrationNumber,
+            jurisdictionCode: organisation.jurisdictionCode
+              .trim()
+              .toUpperCase(),
+            registeredAddress:
+              organisation.registeredAddress.trim() === ""
+                ? null
+                : organisation.registeredAddress,
+            websiteUrl:
+              organisation.websiteUrl.trim() === ""
+                ? null
+                : organisation.websiteUrl.trim(),
+            documentId: organisation.documentId,
+          },
+    person: raw.person,
   });
   const key = z.string().min(8).max(200).safeParse(raw.attemptKey);
   if (!input.success || !key.success) {
     return {
       ok: false,
       message:
-        "Enter the legal name, registration number and a 2-letter country code.",
+        "Enter the legal name, registration number and a 2-letter country code, and your name as on your ID with your role.",
     };
   }
   const session = await apiSession();

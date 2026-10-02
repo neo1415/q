@@ -8,6 +8,9 @@ import { DocumentReadyCenter } from "@/features/documents/document-ready-center"
 import { QDock } from "@/features/q-dock";
 import { NO_SUBJECT, type QSubject } from "@/features/q/q-subject";
 
+import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
+import type { VerifyNudge } from "@/features/verification/verify-state";
+
 import { AppHeader } from "./app-header";
 import { DesktopSidebar } from "./desktop-sidebar";
 import { GlobalQProvider } from "./global-q";
@@ -40,6 +43,7 @@ export function AppShell({
   subject = NO_SUBJECT,
   qConnected = false,
   onboarding = null,
+  verifyNudge = null,
 }: {
   readonly children: ReactNode;
   readonly context?: ShellContext | undefined;
@@ -52,6 +56,8 @@ export function AppShell({
    * While set, the shell offers no navigation but the way back to Q.
    */
   readonly onboarding?: string | null | undefined;
+  /** ADMIN-4: "Verify you and <organisation>" while either claim is unverified. */
+  readonly verifyNudge?: VerifyNudge | null | undefined;
 }) {
   if (onboarding !== null) {
     return (
@@ -85,10 +91,15 @@ export function AppShell({
         <div className="cq-shell-body">
           <AppHeader context={context} />
           <NetworkStatus />
+          {verifyNudge === null ? null : (
+            <div className="cq-verify-nudge-desktop justify-end px-6 pt-3">
+              <VerifyNudgeLink nudge={verifyNudge} />
+            </div>
+          )}
           <main id="main" className="cq-shell-main">
             {children}
           </main>
-          <MobileNavigation scope={context.scope} />
+          <MobileNavigation scope={context.scope} verifyNudge={verifyNudge} />
         </div>
       </div>
       {/* DOCS: the one owner of document-ready cards, on every page. */}
