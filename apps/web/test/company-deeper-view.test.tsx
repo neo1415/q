@@ -242,6 +242,30 @@ describe("why it's in your feed", () => {
     expect(explainRecommendationAction).not.toHaveBeenCalled();
   });
 
+  it("a connected company (live 2026-10-02, Zino and Nixo): no feed explanation, a way to the relationship instead", () => {
+    // Even arriving from the feed: Discover no longer serves a company
+    // they are connected with, so there is nothing of the feed to explain.
+    window.sessionStorage.setItem(
+      POSITION_KEY,
+      JSON.stringify({ slateId: SLATE_ID, companyId: COMPANY_ID }),
+    );
+    render(
+      <CompanyDeeperView
+        companyId={COMPANY_ID}
+        companyName="Kivu Freight"
+        facts={FACTS}
+        connected
+      />,
+    );
+    expect(document.querySelector('[data-deeper-view="why"]')).toBeNull();
+    expect(screen.queryByText("Why it's in your feed")).toBeNull();
+    const link = screen.getByRole("link", { name: "See your relationship" });
+    expect(link.getAttribute("href")).toBe(
+      `/relationships/company/${COMPANY_ID}`,
+    );
+    expect(explainRecommendationAction).not.toHaveBeenCalled();
+  });
+
   it("explains from the feed's own slate on first open, and never moves the feed position", async () => {
     const position = JSON.stringify({
       slateId: SLATE_ID,

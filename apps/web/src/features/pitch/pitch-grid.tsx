@@ -135,9 +135,11 @@ function VideoTile({
     <Link
       href={`/pitch/${video.mediaAssetId}`}
       aria-label={`${video.title ?? "Pitch"}: ${state}, ${
-        video.audience === "NETWORK"
-          ? "everyone on Capital Q"
-          : "investors only"
+        video.playbackPolicy === "PRIVATE"
+          ? "only your organisation"
+          : video.audience === "NETWORK"
+            ? "everyone on Capital Q"
+            : "investors only"
       }, ${formatDay(video.createdAt)}`}
       className="group relative block aspect-9/16 w-full overflow-hidden bg-(--cq-stage-canvas) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
       data-pitch-tile={video.mediaAssetId}
@@ -173,8 +175,12 @@ function VideoTile({
           {video.title ?? "Pitch"}
         </span>
         <span className="cq-caption truncate text-(--cq-stage-text-muted)">
-          {video.audience === "NETWORK" ? "Everyone" : "Investors only"} ·{" "}
-          {formatDay(video.createdAt)}
+          {video.playbackPolicy === "PRIVATE"
+            ? "Only your organisation"
+            : video.audience === "NETWORK"
+              ? "Everyone"
+              : "Investors only"}{" "}
+          · {formatDay(video.createdAt)}
         </span>
       </span>
     </Link>

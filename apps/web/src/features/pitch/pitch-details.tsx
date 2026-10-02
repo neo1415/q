@@ -109,9 +109,15 @@ export function PitchDetails({
         id={`${id}-audience`}
         label="Who can watch it"
         description={
-          audience === "NETWORK"
+          // Live 2026-10-02 (Nixo): "Everyone on Capital Q" was chosen on a
+          // pitch still private, and nobody could play it. The choice says
+          // who may watch once it is shared; the words say it is not yet.
+          (record.playbackPolicy === "PRIVATE"
+            ? "It's private now: nobody outside your organisation can play it until you choose Let investors play this pitch. Then: "
+            : "") +
+          (audience === "NETWORK"
             ? "Investors who can find your company, and every founder signed in to Capital Q."
-            : "Only investors who can find your company."
+            : "Only investors who can find your company.")
         }
         options={AUDIENCE_OPTIONS}
         value={audience}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import type {
@@ -130,14 +131,36 @@ export function CompanyDeeperView({
   companyId,
   companyName,
   facts,
+  connected = false,
 }: {
   readonly companyId: string;
   readonly companyName: string;
   readonly facts: readonly CompanyNetworkFact[];
+  /**
+   * The reader's organisation is connected with the company (live
+   * 2026-10-02): Discover is for companies they are not yet connected
+   * with, so a feed explanation would describe a feed it is no longer in.
+   */
+  readonly connected?: boolean | undefined;
 }) {
   return (
     <div className="mt-4 flex flex-col">
-      <WhyInYourFeed companyId={companyId} />
+      {connected ? (
+        <p
+          className="cq-body-sm border-t border-(--cq-border-subtle) py-3 text-(--cq-text-secondary)"
+          data-deeper-view="connected"
+        >
+          Connected.{" "}
+          <Link
+            href={`/relationships/company/${companyId}`}
+            className="underline underline-offset-2"
+          >
+            See your relationship
+          </Link>
+        </p>
+      ) : (
+        <WhyInYourFeed companyId={companyId} />
+      )}
       {facts.length === 0 ? null : (
         <WhatIsKnown companyName={companyName} facts={facts} />
       )}
