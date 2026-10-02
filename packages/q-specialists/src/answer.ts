@@ -1,4 +1,10 @@
 import { appActionOf, type QAppActionPort } from "./app-action-turn.js";
+
+/**
+ * The investor organisation's own visibility action (app action
+ * investor.visibility.set). SET_VISIBILITY is the company's hand only.
+ */
+const INVESTOR_VISIBILITY_TOOL = "set_investor_visibility";
 import {
   type QNavigateDestination,
   type QResponseMessage,
@@ -1721,7 +1727,17 @@ export function createSpecialistQAnswer(
         return recordAnswer(request, conversationId, filled.line);
       }
     }
-    if (tool !== null && !writingDocument) {
+    // SET_VISIBILITY is the company's hand (parity eval 2026-10-02, run
+    // 1ec08a4b: "make our fund visible to founders" was read as it, and an
+    // investor was told Q changes who sees a company). With no company in
+    // this run and the fund's own visibility action offered, the request is
+    // that action's, filled from their words below.
+    const fundVisibility =
+      tool?.kind === "SET_VISIBILITY" &&
+      !request.subjects.some((subject) => subject.kind === "COMPANY") &&
+      offeredNames.has(INVESTOR_VISIBILITY_TOOL) &&
+      (dependencies.appActions?.tools.has(INVESTOR_VISIBILITY_TOOL) ?? false);
+    if (tool !== null && !writingDocument && !fundVisibility) {
       const acted = await actOnTool(
         request,
         conversationId,
@@ -1749,18 +1765,24 @@ export function createSpecialistQAnswer(
     // Named but not filled (parity eval 2026-10-02: 3 of 12 Discover turns
     // read askedAction pass_company / save_company with appAction empty):
     // one small extraction against that tool's own input schema fills it.
-    const appAction =
-      appActionOf(read) ??
-      (dependencies.appActions !== undefined &&
-      dependencies.appActionArguments !== undefined &&
+    const namedAction =
       read !== null &&
       read.kind === "TOOL_REQUEST" &&
       read.confidence !== "LOW" &&
       typeof read.askedAction === "string" &&
-      dependencies.appActions.tools.has(read.askedAction) &&
+      (dependencies.appActions?.tools.has(read.askedAction) ?? false) &&
       offeredNames.has(read.askedAction)
+        ? read.askedAction
+        : fundVisibility
+          ? INVESTOR_VISIBILITY_TOOL
+          : null;
+    const appAction =
+      appActionOf(read) ??
+      (dependencies.appActions !== undefined &&
+      dependencies.appActionArguments !== undefined &&
+      namedAction !== null
         ? await (async () => {
-            const tool = read.askedAction ?? "";
+            const tool = namedAction;
             const args = await dependencies
               .appActionArguments?.(request, {
                 tool,
