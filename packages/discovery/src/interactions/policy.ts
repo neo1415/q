@@ -34,6 +34,7 @@ const STRENGTH_BY_TYPE: Readonly<
   SAVE: "CONSIDERATION",
   UNSAVE: "CONSIDERATION",
   PASS: "CONTEXTUAL_DECISION",
+  UNPASS: "CONTEXTUAL_DECISION",
   INTEREST_OBSERVED: "INTENT",
 };
 
@@ -66,6 +67,7 @@ const CLIENT_WRITABLE: ReadonlySet<InteractionType> = new Set([
   "SAVE",
   "UNSAVE",
   "PASS",
+  "UNPASS",
 ]);
 
 export function isClientWritable(type: InteractionType): boolean {

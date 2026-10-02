@@ -191,6 +191,8 @@ export {
   listNetworkPitches,
   getRecommendationExplanation,
   listSavedCompanies,
+  listPassedCompanies,
+  unpassCompany,
   passCompany,
   saveCompany,
   unsaveCompany,

@@ -317,6 +317,48 @@ describe("@capital-q/discovery interactions against local PostgreSQL", () => {
     });
   });
 
+  it("undo pass (doc 19 §68): unpassed, listed no longer, history intact, and a retried undo is one event", async () => {
+    await withHarness(async (h) => {
+      const passed = await h.repo.append(
+        h.event({ interactionType: "PASS", passReason: "STAGE" }),
+      );
+      await h.repo.project(passed.event);
+      const listed = await h.repo.passedCompanyIds({
+        tenantId: h.w.investorActor.tenantId,
+        investorOrganisationId: h.w.investorOrgId,
+        limit: 10,
+      });
+      expect(listed).toEqual([h.companyId]);
+
+      const undo = h.event({ interactionType: "UNPASS", occurredAt: T1 });
+      const first = await h.repo.append(undo);
+      const state = await h.repo.project(first.event);
+      expect(state).toMatchObject({
+        passed: false,
+        passedAt: null,
+        lastPassReason: null,
+      });
+      // The same press again (same client event id): one row, no new fold.
+      const again = await h.repo.append(undo);
+      expect(again.deduplicated).toBe(true);
+
+      expect(
+        await h.repo.passedCompanyIds({
+          tenantId: h.w.investorActor.tenantId,
+          investorOrganisationId: h.w.investorOrgId,
+          limit: 10,
+        }),
+      ).toEqual([]);
+      const history = await h.repo.historyForCompany({
+        tenantId: h.w.investorActor.tenantId,
+        investorOrganisationId: h.w.investorOrgId,
+        companyId: h.companyId,
+        limit: 10,
+      });
+      expect(history.map((e) => e.interactionType)).toEqual(["UNPASS", "PASS"]);
+    });
+  });
+
   it("impressions accumulate a bounded count, not a popularity score", async () => {
     await withHarness(async (h) => {
       const first = await h.repo.append(

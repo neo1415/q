@@ -56,7 +56,7 @@ export type InteractionOutcome = RecordInteractionResult & {
 export type InteractionSignalService = {
   /** A decision: durable, and the person will meet it again. */
   readonly decide: (
-    type: Extract<InteractionType, "SAVE" | "UNSAVE" | "PASS">,
+    type: Extract<InteractionType, "SAVE" | "UNSAVE" | "PASS" | "UNPASS">,
     command: InteractionCommand,
   ) => Promise<InteractionOutcome>;
   /** An observation: a report about what somebody saw. */
@@ -74,6 +74,11 @@ export type InteractionSignalService = {
   }) => Promise<ReadonlyMap<string, InteractionState>>;
   /** The Saved section's identities. Disclosure is re-checked by the reader. */
   readonly savedCompanyIds: (query: {
+    readonly actor: ActorContext;
+    readonly limit: number;
+  }) => Promise<readonly string[]>;
+  /** The Passed section's identities, newest first, for Undo pass. */
+  readonly passedCompanyIds: (query: {
     readonly actor: ActorContext;
     readonly limit: number;
   }) => Promise<readonly string[]>;
@@ -293,6 +298,16 @@ export function createInteractionSignalService(
       const subject = await investorOf(query.actor);
       if (subject === null) return [];
       return repository.savedCompanyIds({
+        tenantId: query.actor.tenantId,
+        investorOrganisationId: subject.investorOrganisationId,
+        limit: Math.min(Math.max(query.limit, 1), SAVED_LIMIT_MAX),
+      });
+    },
+
+    passedCompanyIds: async (query) => {
+      const subject = await investorOf(query.actor);
+      if (subject === null) return [];
+      return repository.passedCompanyIds({
         tenantId: query.actor.tenantId,
         investorOrganisationId: subject.investorOrganisationId,
         limit: Math.min(Math.max(query.limit, 1), SAVED_LIMIT_MAX),

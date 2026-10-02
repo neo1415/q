@@ -254,12 +254,15 @@ export function createPostgresInteractionRepository(options: {
             else recommendation.interaction_state.saved_at end,
           passed = case
             when excluded.passed then true
+            when ${event.interactionType === "UNPASS"} then false
             else recommendation.interaction_state.passed end,
           passed_at = case
             when excluded.passed then excluded.passed_at
+            when ${event.interactionType === "UNPASS"} then null
             else recommendation.interaction_state.passed_at end,
           last_pass_reason = case
             when excluded.passed then excluded.last_pass_reason
+            when ${event.interactionType === "UNPASS"} then null
             else recommendation.interaction_state.last_pass_reason end,
           impression_count =
             recommendation.interaction_state.impression_count + excluded.impression_count,
@@ -303,6 +306,21 @@ export function createPostgresInteractionRepository(options: {
            and investor_organisation_id = ${query.investorOrganisationId}
            and saved
          order by saved_at desc nulls last, company_id
+         limit ${query.limit}`;
+      return rows.map(
+        (row) =>
+          z.object({ company_id: z.string().uuid() }).parse(row).company_id,
+      );
+    },
+
+    passedCompanyIds: async (query) => {
+      const rows = await sql`
+        select company_id
+          from recommendation.interaction_state
+         where tenant_id = ${query.tenantId}
+           and investor_organisation_id = ${query.investorOrganisationId}
+           and passed
+         order by passed_at desc nulls last, company_id
          limit ${query.limit}`;
       return rows.map(
         (row) =>

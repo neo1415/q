@@ -508,6 +508,37 @@ export function createPostgresDiscoverablePitchQueryPort(options: {
       }
       return pitches;
     },
+    latestReadyAt: async (companyIds) => {
+      const ids = [...new Set(companyIds)].slice(0, DISCOVERABLE_PITCH_BATCH_MAX);
+      const out = new Map<string, string>();
+      if (ids.length === 0) return out;
+      const rows = await options.sql`
+        select m.owner_id::text as company_id, max(m.ready_at) as ready_at
+          from media.media_assets m
+         where m.owner_type = 'COMPANY'
+           and m.owner_id = any(${ids}::uuid[])
+           and m.purpose = 'FOUNDER_PITCH'
+           and m.deleted_at is null
+           and m.superseded_at is null
+           and m.status = 'READY'
+           and m.moderation_status = 'ALLOWED'
+           and m.playback_policy <> 'PRIVATE'
+           and m.ready_at is not null
+         group by m.owner_id`;
+      for (const row of rows) {
+        const parsed = z
+          .object({ company_id: z.string(), ready_at: z.unknown() })
+          .parse(row);
+        const at =
+          parsed.ready_at instanceof Date
+            ? parsed.ready_at.toISOString()
+            : typeof parsed.ready_at === "string"
+              ? new Date(parsed.ready_at).toISOString()
+              : null;
+        if (at !== null) out.set(parsed.company_id, at);
+      }
+      return out;
+    },
   };
 }
 

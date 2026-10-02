@@ -4,6 +4,8 @@ import {
   DISCOVERY_COMPANY_PASS_PATH,
   DISCOVERY_COMPANY_SAVE_PATH,
   DISCOVERY_COMPANY_UNSAVE_PATH,
+  DISCOVERY_COMPANY_UNPASS_PATH,
+  DISCOVERY_PASSED_PATH,
   DISCOVERY_INTERACTIONS_PATH,
   DISCOVERY_SAVED_PATH,
   InteractionRecordedDtoSchema,
@@ -141,6 +143,9 @@ export function registerRecommendationInteractionRoutes(
   for (const [path, type] of [
     [DISCOVERY_COMPANY_SAVE_PATH, "SAVE"],
     [DISCOVERY_COMPANY_UNSAVE_PATH, "UNSAVE"],
+    // Undo pass (doc 19 §68): an interaction event like UNSAVE, idempotent
+    // by its client event id; it never changes the mandate.
+    [DISCOVERY_COMPANY_UNPASS_PATH, "UNPASS"],
   ] as const) {
     app.post(path, { onRequest: withContext }, async (request, reply) => {
       const input = parseContract(
@@ -184,6 +189,21 @@ export function registerRecommendationInteractionRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       const companyIds = await interactions.savedCompanyIds({
+        actor: getActorContext(request),
+        limit: SAVED_DEFAULT_LIMIT,
+      });
+      void reply.header("Cache-Control", "no-store");
+      return SavedCompaniesDtoSchema.parse({ companyIds: [...companyIds] });
+    },
+  );
+
+  // The Passed section (doc 19 §68), for Undo pass. Same shape and the same
+  // rule as Saved: identities only, read back through the company path.
+  app.get(
+    DISCOVERY_PASSED_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const companyIds = await interactions.passedCompanyIds({
         actor: getActorContext(request),
         limit: SAVED_DEFAULT_LIMIT,
       });

@@ -195,7 +195,9 @@ function harness(
     /** Companies this organisation has passed on (CQ-REC-009R). */
     readonly passed?: readonly string[];
     /** A proven reason to offer one of them again; nothing produces one in V1. */
-    readonly reintroduce?: Readonly<Record<string, string>>;
+    readonly reintroduce?: Readonly<
+      Record<string, string | { reason: string; change: string | null }>
+    >;
     /** What is discoverable at all (ADR 0020); nothing by default. */
     readonly pool?: {
       readonly discoverable: number;
@@ -729,6 +731,22 @@ describe("a company this organisation passed on", () => {
     await publish(h.store, KEY, 3);
     const page = await h.reader.pageCompanies({ actor, limit: 10 });
     expect(page.items.map((i) => i.companyId)).toEqual([id(1), id(3)]);
+  });
+
+  it("a new pitch since the pass offers it again, labelled; nothing else is labelled or moved (founder report 2026-10-02)", async () => {
+    const h = harness({
+      passed: [id(2)],
+      reintroduce: {
+        [id(2)]: { reason: "MATERIAL_COMPANY_UPDATE", change: "NEW_PITCH" },
+      },
+    });
+    await publish(h.store, KEY, 3);
+    const page = await h.reader.pageCompanies({ actor, limit: 10 });
+    // Same order as the slate: reintroduction un-withholds, it never ranks.
+    expect(page.items.map((i) => i.companyId)).toEqual([id(1), id(2), id(3)]);
+    expect(page.items[1]?.reintroduced).toEqual({ change: "NEW_PITCH" });
+    expect(page.items[0]?.reintroduced).toBeUndefined();
+    expect(page.items[2]?.reintroduced).toBeUndefined();
   });
 
   it("an unrecognised reason suppresses rather than erroring the page", async () => {

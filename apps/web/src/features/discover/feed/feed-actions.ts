@@ -7,6 +7,7 @@ import {
   listNetworkPitches,
   passCompany,
   saveCompany,
+  unpassCompany,
   unsaveCompany,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -146,6 +147,38 @@ export async function recordDecisionAction(input: {
     return { ok: true, value: recorded };
   } catch {
     return { ok: false, message: "That did not save. Try again." };
+  }
+}
+
+/**
+ * Undo a pass (doc 19 §68), from the Passed list. The company may be
+ * offered again from the next page served. Idempotent by the client's
+ * event id; it changes nothing about the mandate.
+ */
+export async function undoPassAction(input: {
+  readonly companyId: string;
+  readonly clientEventId: string;
+}): Promise<FeedActionResult<InteractionRecordedDto>> {
+  const active = await session();
+  if (active === null) return { ok: false, message: NO_SESSION };
+  const companyId = CompanyIdInput.safeParse(input.companyId);
+  const clientEventId = ClientEventIdInput.safeParse(input.clientEventId);
+  if (!companyId.success || !clientEventId.success) {
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
+  }
+  try {
+    return {
+      ok: true,
+      value: await unpassCompany(active, companyId.data, {
+        clientEventId: clientEventId.data,
+        surface: "SAVED_LIST",
+      }),
+    };
+  } catch {
+    return { ok: false, message: "That did not go through. Try again." };
   }
 }
 

@@ -36,6 +36,8 @@ describe("interaction taxonomy", () => {
       "SAVE",
       "UNSAVE",
       "PASS",
+      // Undo pass (doc 19 §68), the pair of PASS as UNSAVE is of SAVE.
+      "UNPASS",
       "INTEREST_OBSERVED",
     ]);
     expect(WATCH_MILESTONES).toHaveLength(5);

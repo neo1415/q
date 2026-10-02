@@ -63,6 +63,12 @@ export type InteractionRepository = {
     readonly investorOrganisationId: string;
     readonly limit: number;
   }) => Promise<readonly string[]>;
+  /** Passed company identities, most recently passed first. Bounded. */
+  readonly passedCompanyIds: (query: {
+    readonly tenantId: string;
+    readonly investorOrganisationId: string;
+    readonly limit: number;
+  }) => Promise<readonly string[]>;
   /** One investor's history of one company, newest first. Bounded. */
   readonly historyForCompany: (query: {
     readonly tenantId: string;

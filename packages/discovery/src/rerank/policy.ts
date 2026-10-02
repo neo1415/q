@@ -52,14 +52,15 @@ export type PassReintroductionReason =
 /**
  * Which of those reasons V1 can actually prove, and therefore act on.
  *
- * Empty, deliberately. `interaction_state` records that a pass happened
- * and when, not the mandate version it was made under, and no surface
- * issues a reset. Rather than guess, REC-009 keeps a passed company
- * suppressed and leaves the mechanism ready: a later packet supplies the
- * evidence, not the concept.
+ * A material company update, evidenced by a pitch that became playable
+ * after the pass (createPitchReintroductions; founder report 2026-10-02).
+ * An explicit reset is the UNPASS interaction, which clears the pass
+ * itself rather than reintroducing it. The mandate version a pass was
+ * made under is still not recorded, so MANDATE_VERSION_CHANGED stays
+ * unproven.
  */
 export const PROVABLE_PASS_REINTRODUCTION_REASONS: readonly PassReintroductionReason[] =
-  [];
+  ["MATERIAL_COMPANY_UPDATE"];
 
 export const RerankPolicySchema = z
   .object({

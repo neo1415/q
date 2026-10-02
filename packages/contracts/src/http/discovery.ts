@@ -344,6 +344,16 @@ export const DiscoveredCompanyDtoSchema = z
      */
     unverifiedExclusions: z.array(MandateRuleCodeDtoSchema).max(8).optional(),
     /**
+     * Passed before, and offered again because something is new (doc 19
+     * §67): the card says "since you last saw it". `change` is a bounded
+     * code (NEW_PITCH), or null when the reason names no single change.
+     * Absent for everything not reintroduced.
+     */
+    sinceYouLastSaw: z
+      .object({ change: z.enum(["NEW_PITCH"]).nullable() })
+      .strict()
+      .optional(),
+    /**
      * Whether this viewer has saved the company (their own interaction
      * state, never a ranking input). Absent when the state could not be
      * read: the client then shows the card as not saved yet.
@@ -526,6 +536,11 @@ export const DISCOVERY_COMPANY_UNSAVE_PATH =
   "/v1/discovery/companies/:companyId/unsave" as const;
 export const DISCOVERY_COMPANY_PASS_PATH =
   "/v1/discovery/companies/:companyId/pass" as const;
+/** Undo a pass (doc 19 §68): the company may be offered again. */
+export const DISCOVERY_COMPANY_UNPASS_PATH =
+  "/v1/discovery/companies/:companyId/unpass" as const;
+/** The investor's passed companies, for Undo pass. Identities only. */
+export const DISCOVERY_PASSED_PATH = "/v1/discovery/passed" as const;
 
 /** Bounded, opaque, never a device fingerprint. */
 const InteractionOpaqueIdSchema = z.string().regex(/^[A-Za-z0-9_:-]{8,64}$/);

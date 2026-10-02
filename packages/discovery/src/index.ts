@@ -701,3 +701,10 @@ export {
 } from "./explanations/service.js";
 
 export const PACKAGE_NAME = "@capital-q/discovery" as const;
+
+export {
+  createPitchReintroductions,
+  NEW_PITCH_CHANGE,
+  type PublishablePitchTimesPort,
+} from "./rerank/pitch-reintroductions.js";
+export type { PassReintroduction } from "./rerank/ports.js";
