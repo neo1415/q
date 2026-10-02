@@ -160,6 +160,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   PITCH: "their pitch (video and deck)",
   COMPANY_INTEREST: "their company's incoming interest",
   SAVED: "their Saved list",
+  PASSED: "their Passed list",
   INVESTORS: "Investors",
   SEARCH: "Search",
   GATEWAY: "their GateQ gateway",
@@ -221,6 +222,14 @@ export const DAILY_HERE_LINE =
  */
 export const PLAIN_KNOWING_LINE =
   "HOW YOU SAY WHAT YOU KNOW: the words in these notes (authorised context, facts supplied, scope, tools, firewall) are Capital Q's, never the person's; never say them. Say plainly what you know, what you don't (\"I don't have that on record\") and what you will do about it. Never ask them for an id, a record or a field name, and never say what a tool needs: a name is enough -- find it yourself in their relationships or with search_companies, misheard names included, and act. Who waits for whom is as their own standing says it: when they ask to accept something that is their own interest still waiting for the other side, say plainly that the other side hasn't answered yet, then offer in one line to look after it (wait for the accept, then message and book a call, for their approval) or to send a nudge.";
+
+/**
+ * Never "no record" or "can't" without looking (HARDEN, ADR 0040 with QA,
+ * 2026-10-02: gaps were patched one by one; Q told people things did not
+ * exist that did). Code logs every "can't" it can see as q.parity_gap.
+ */
+export const CHECK_BEFORE_CANT_LINE =
+  "CHECK BEFORE NO OR CAN'T: before saying something of theirs does not exist, look at WHAT EXISTS in the facts and read it with read_my or a list or read tool you hold; before saying you can't do something, look for the tool that does it in the list below. Say you can't only when no tool here does it, plainly in one sentence, and never claim a record is missing that WHAT EXISTS counts.";
 
 export function screenLines(
   screen: QScreenContext | undefined,
@@ -304,6 +313,7 @@ export function capabilityNote(
   const lines: string[] = [
     ...screenLines(screen),
     PLAIN_KNOWING_LINE,
+    CHECK_BEFORE_CANT_LINE,
     "WHAT YOU CAN DO IN THIS CONVERSATION (Capital Q, authoritative; you can do nothing else):",
   ];
   const named = (tools: typeof offeredTools): string =>

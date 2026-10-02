@@ -750,6 +750,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           // DAILY: The Q Daily.
           "DAILY",
           "RESULTS",
+          "PASSED",
         ],
         documents: [],
         visibilityChange: false,

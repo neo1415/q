@@ -161,6 +161,8 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   COMPANY_INTEREST:
     "Opens their company's incoming investor interest, to read and answer it.",
   SAVED: "Opens Saved: the companies they saved from Discover to come back to.",
+  PASSED:
+    "Opens Passed: the companies they passed on in Discover, to look back at or undo a pass.",
   INVESTORS:
     "Opens Investors: for a founder, the discoverable investors to request a connection with; for an investor, the connection requests founders sent them.",
   SEARCH: "Opens Search: people by name or handle, and pitch videos.",

@@ -8,16 +8,21 @@ import {
   TURN_READER_V21,
 } from "../src/index.js";
 
+// PASSED arrives with v29.
+const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
+  (name) => name !== "PASSED",
+);
+
 /** TURN_READER v21 (DAILY, on DOCS's v20): The Q Daily is a destination. */
 describe("TURN_READER v21", () => {
   it("is the active reader", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(28);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(29);
   });
 
   it("names every contract destination exactly once", () => {
     // RESULTS arrives with v24.
-    for (const destination of Q_NAVIGATE_DESTINATIONS.filter(
+    for (const destination of DESTINATIONS_BEFORE_V29.filter(
       (name) => name !== "RESULTS",
     )) {
       expect(

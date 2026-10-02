@@ -296,6 +296,8 @@ export const Q_VOICE_DESTINATIONS = [
   "DAILY",
   // Results: what their activity on Capital Q produced, with reports.
   "RESULTS",
+  // The Passed list (/discover/passed).
+  "PASSED",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

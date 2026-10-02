@@ -132,6 +132,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "DAILY",
   // Results (admin spec §5): what their activity produced, with reports.
   "RESULTS",
+  // QA 2026-10-02: the Passed list (/discover/passed).
+  "PASSED",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
