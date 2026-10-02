@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { APP_ACTIONS, qCapabilityId } from "@capital-q/app-actions";
+import {
+  APP_ACTIONS,
+  PERSON_ACTIONS,
+  qCapabilityId,
+} from "@capital-q/app-actions";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
 
 /**
@@ -396,32 +400,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     exempt(
       "Home's briefing reads today's setup reminder for its card; Q is told of the same reminder in its own answer",
     ),
-  "api/http/onboarding.ts POST `${nudgePath}${ONBOARDING_NUDGE_CHOICE_SEGMENT}`":
-    cap("tool.set_onboarding_reminders"),
-  "api/http/onboarding.ts POST `${byId}${ONBOARDING_RESPONSES_SEGMENT}`": cap(
-    "tool.record_answers",
-  ),
-  // ADR 0024: a completed answer revised from the profile, or by Q.
-  "api/http/onboarding.ts POST `${byId}${ONBOARDING_REVISIONS_SEGMENT}`": cap(
-    "tool.propose_profile_answer_change",
-  ),
-  "api/http/onboarding.ts POST `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_SKIP_SEGMENT}`":
-    cap("tool.set_aside"),
-  "api/http/onboarding.ts POST `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_WITHDRAW_SEGMENT}`":
-    cap("tool.correct_answer"),
   "api/http/onboarding.ts POST `${byId}${ONBOARDING_BACK_SEGMENT}`": exempt(
     "the form's Back button (screen position, not a change); in the Q loop the person just says what to revisit",
   ),
-  "api/http/onboarding.ts POST `${byId}${ONBOARDING_COMPLETE_SEGMENT}`": cap(
-    "tool.confirm_and_finish",
-  ),
-  "api/http/onboarding.ts POST `${byId}${ONBOARDING_SUGGESTIONS_SEGMENT}/:suggestionId${ONBOARDING_RESOLVE_SEGMENT}`":
-    cap("tool.accept_recommendation"),
-  "api/http/onboarding.ts POST `${byId}${ONBOARDING_QUESTIONS_SEGMENT}/:questionId${ONBOARDING_ANSWER_SEGMENT}`":
-    cap("tool.record_answers"),
   "api/http/onboarding.ts POST `${byId}${ONBOARDING_SAY_SEGMENT}`": Q_TRANSPORT,
-  "api/http/onboarding.ts POST `${byId}${ONBOARDING_QUESTIONS_SEGMENT}/:questionId${ONBOARDING_DISMISS_SEGMENT}`":
-    cap("tool.set_aside"),
   "api/http/onboarding.ts GET `${byId}${ONBOARDING_TURNS_SEGMENT}`":
     Q_TRANSPORT,
   "api/http/onboarding.ts POST `${byId}${ONBOARDING_TURNS_SEGMENT}`":
@@ -802,7 +784,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 103;
+const LEGACY_MUTATION_ROUTES_MAX = 94;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
@@ -856,7 +838,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
   });
 
   it("every declared action is a route and a Q tool, from one declaration (ADR 0040)", () => {
-    for (const action of APP_ACTIONS) {
+    for (const action of [...APP_ACTIONS, ...PERSON_ACTIONS]) {
       expect(
         CAPABILITY_IDS.has(qCapabilityId(action) ?? ""),
         `${action.name}: no capability for its generated tool`,

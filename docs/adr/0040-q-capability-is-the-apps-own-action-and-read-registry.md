@@ -133,7 +133,7 @@ Media and documents:
 Settings and the rest:
 
 - [x] Settings: notification settings, Q personality, Q Daily ×2. **M** Notification settings done 2026-10-02 (route generated; Q keeps set_notification_settings). Q personality and Q Daily are **exempt** (lead decision 2026-10-02): Q's own q-api surface, like errands and the brand kit.
-- [ ] Onboarding: 9 routes, kept on the ADR 0016 loop's own tools. Declaring them is mostly mapping. **L**
+- [x] Onboarding: 9 routes, kept on the ADR 0016 loop's own tools. Declaring them is mostly mapping. **L** Done 2026-10-02: nine person-scoped declarations (`definePersonAction`, `PERSON_ACTIONS`) whose routes are generated under the onboarding actor, for a person who may have no organisation yet; each names the loop's own tool (`legacyTool`), so no tool is added. The session start, Back, today's Home reminder and the conversational turns stay exempt with their reasons. The `me` profile routes can move onto the same person-scoped generator next.
 - [x] Approvals: approve, reject and email-draft edit. **S** **Exempt** (lead decision 2026-10-02): Q's own approval surface in q-api.
 - [x] Integrations: Google connect and disconnect (OAuth: offer). **S** Done 2026-10-02: two declarations, Q offers Settings; 503 when Google isn't configured, as before.
 - [x] Verification and KYB. **S** Verification request and the review request done 2026-10-02; the KYB submission is declared too, with an offer: the person's own submission, so Q offers the Verification page and never submits it (lead decision 2026-10-02).

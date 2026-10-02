@@ -1,63 +1,37 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
-  AnswerOnboardingQuestionRequestSchema,
   AppendOnboardingInterviewTurnsRequestSchema,
   AppendOnboardingInterviewTurnsResponseSchema,
   ListOnboardingInterviewTurnsQuerySchema,
   ListOnboardingInterviewTurnsResponseSchema,
   ONBOARDING_TURNS_SEGMENT,
-  CompleteOnboardingSessionRequestSchema,
-  DismissOnboardingQuestionRequestSchema,
   CorrelationIdSchema,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
-  ONBOARDING_ANSWER_SEGMENT,
   ONBOARDING_SAY_SEGMENT,
   SayOnboardingRequestSchema,
   SayOnboardingResponseSchema,
   ONBOARDING_BACK_SEGMENT,
-  ONBOARDING_DISMISS_SEGMENT,
-  ONBOARDING_QUESTIONS_SEGMENT,
-  ONBOARDING_COMPLETE_SEGMENT,
   ONBOARDING_CURRENT_SEGMENT,
   OnboardingJourneyTypeSchema,
   ONBOARDING_PATH,
-  ONBOARDING_RESOLVE_SEGMENT,
-  ONBOARDING_RESPONSES_SEGMENT,
-  ONBOARDING_REVISIONS_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
-  ONBOARDING_SKIP_SEGMENT,
-  ONBOARDING_WITHDRAW_SEGMENT,
-  ONBOARDING_STEPS_SEGMENT,
-  ONBOARDING_SUGGESTIONS_SEGMENT,
   OnboardingBackRequestSchema,
   OnboardingSessionViewSchema,
-  OnboardingStepKeySchema,
   parseContract,
-  ResolveOnboardingSuggestionRequestSchema,
-  SkipOnboardingStepRequestSchema,
-  WithdrawOnboardingResponseRequestSchema,
   StartOnboardingSessionRequestSchema,
-  SubmitOnboardingResponseRequestSchema,
   ONBOARDING_NUDGE_SEGMENT,
   ONBOARDING_NUDGE_BRIEFING_SEGMENT,
-  ONBOARDING_NUDGE_CHOICE_SEGMENT,
   OnboardingBriefingNudgeResponseSchema,
-  OnboardingNudgeChoiceRequestSchema,
-  OnboardingNudgeChoiceResponseSchema,
   type CorrelationId,
 } from "@capital-q/contracts";
 import {
-  OnboardingInterviewQuestionIdSchema,
   OnboardingSessionIdSchema,
   OnboardingSessionNotFoundError,
   OnboardingSessionVersionConflictError,
-  OnboardingSuggestionIdSchema,
-  type OnboardingInterviewQuestionId,
   type OnboardingNudges,
   type OnboardingService,
   type OnboardingSessionId,
-  type OnboardingSuggestionId,
 } from "@capital-q/onboarding";
 import { createCorrelationId } from "@capital-q/observability";
 import {
@@ -107,35 +81,6 @@ function sessionIdParam(request: FastifyRequest): OnboardingSessionId {
     OnboardingSessionIdSchema,
     params["sessionId"],
     "The onboarding session identifier is not valid.",
-  );
-}
-
-function stepKeyParam(request: FastifyRequest): string {
-  const params = request.params as Record<string, unknown>;
-  return parseContract(
-    OnboardingStepKeySchema,
-    params["stepKey"],
-    "The step key is not valid.",
-  );
-}
-
-function questionIdParam(
-  request: FastifyRequest,
-): OnboardingInterviewQuestionId {
-  const params = request.params as Record<string, unknown>;
-  return parseContract(
-    OnboardingInterviewQuestionIdSchema,
-    params["questionId"],
-    "The question identifier is not valid.",
-  );
-}
-
-function suggestionIdParam(request: FastifyRequest): OnboardingSuggestionId {
-  const params = request.params as Record<string, unknown>;
-  return parseContract(
-    OnboardingSuggestionIdSchema,
-    params["suggestionId"],
-    "The suggestion identifier is not valid.",
   );
 }
 
@@ -215,102 +160,6 @@ export function registerOnboardingRoutes(
   });
 
   app.post(
-    `${byId}${ONBOARDING_RESPONSES_SEGMENT}`,
-    { onRequest: withActor },
-    async (request, reply) => {
-      const key = idempotencyKey(request, "submit an onboarding response");
-      const input = parseContract(
-        SubmitOnboardingResponseRequestSchema,
-        request.body,
-        "The onboarding response request is not valid.",
-      );
-      const view = await runtime.submitResponse({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        stepKey: input.stepKey,
-        response: input.response,
-        expectedSessionVersion: input.expectedSessionVersion,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return OnboardingSessionViewSchema.parse(view);
-    },
-  );
-
-  // ADR 0024: one answer of a completed session, revised through the same
-  // commit (and write targets) as a submission.
-  app.post(
-    `${byId}${ONBOARDING_REVISIONS_SEGMENT}`,
-    { onRequest: withActor },
-    async (request, reply) => {
-      const key = idempotencyKey(request, "revise an onboarding answer");
-      const input = parseContract(
-        SubmitOnboardingResponseRequestSchema,
-        request.body,
-        "The revision request is not valid.",
-      );
-      const view = await runtime.reviseResponse({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        stepKey: input.stepKey,
-        response: input.response,
-        expectedSessionVersion: input.expectedSessionVersion,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return OnboardingSessionViewSchema.parse(view);
-    },
-  );
-
-  app.post(
-    `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_SKIP_SEGMENT}`,
-    { onRequest: withActor },
-    async (request, reply) => {
-      const key = idempotencyKey(request, "skip an onboarding step");
-      const input = parseContract(
-        SkipOnboardingStepRequestSchema,
-        request.body,
-        "The skip request is not valid.",
-      );
-      const view = await runtime.skipStep({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        stepKey: stepKeyParam(request),
-        expectedSessionVersion: input.expectedSessionVersion,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return OnboardingSessionViewSchema.parse(view);
-    },
-  );
-
-  app.post(
-    `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_WITHDRAW_SEGMENT}`,
-    { onRequest: withActor },
-    async (request, reply) => {
-      const key = idempotencyKey(request, "withdraw an onboarding answer");
-      const input = parseContract(
-        WithdrawOnboardingResponseRequestSchema,
-        request.body,
-        "The withdrawal request is not valid.",
-      );
-      const view = await runtime.withdrawResponse({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        stepKey: stepKeyParam(request),
-        expectedSessionVersion: input.expectedSessionVersion,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return OnboardingSessionViewSchema.parse(view);
-    },
-  );
-
-  app.post(
     `${byId}${ONBOARDING_BACK_SEGMENT}`,
     { onRequest: withActor },
     async (request, reply) => {
@@ -330,76 +179,9 @@ export function registerOnboardingRoutes(
     },
   );
 
-  app.post(
-    `${byId}${ONBOARDING_COMPLETE_SEGMENT}`,
-    { onRequest: withActor },
-    async (request, reply) => {
-      const input = parseContract(
-        CompleteOnboardingSessionRequestSchema,
-        request.body,
-        "The completion request is not valid.",
-      );
-      const view = await runtime.completeSession({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        expectedSessionVersion: input.expectedSessionVersion,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return OnboardingSessionViewSchema.parse(view);
-    },
-  );
-
-  app.post(
-    `${byId}${ONBOARDING_SUGGESTIONS_SEGMENT}/:suggestionId${ONBOARDING_RESOLVE_SEGMENT}`,
-    { onRequest: withActor },
-    async (request, reply) => {
-      const key = idempotencyKey(request, "resolve an onboarding suggestion");
-      const input = parseContract(
-        ResolveOnboardingSuggestionRequestSchema,
-        request.body,
-        "The suggestion resolution request is not valid.",
-      );
-      const view = await runtime.resolveSuggestion({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        suggestionId: suggestionIdParam(request),
-        resolution: input.resolution,
-        response: input.response,
-        expectedSessionVersion: input.expectedSessionVersion,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return OnboardingSessionViewSchema.parse(view);
-    },
-  );
-  // Interview questions (CQ-PRE-REC-001): answering commits a normal
-  // validated response to the mapped step; dismissing writes nothing.
-  app.post(
-    `${byId}${ONBOARDING_QUESTIONS_SEGMENT}/:questionId${ONBOARDING_ANSWER_SEGMENT}`,
-    { onRequest: withActor },
-    async (request, reply) => {
-      const key = idempotencyKey(request, "answer an onboarding question");
-      const input = parseContract(
-        AnswerOnboardingQuestionRequestSchema,
-        request.body,
-        "The answer request is not valid.",
-      );
-      const view = await runtime.answerInterviewQuestion({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        questionId: questionIdParam(request),
-        stepKey: input.stepKey,
-        response: input.response,
-        expectedSessionVersion: input.expectedSessionVersion,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return OnboardingSessionViewSchema.parse(view);
-    },
-  );
+  // Answers, revisions, skip, withdraw, completion, suggestions, interview
+  // questions and the setup-reminder choice are generated from the action
+  // registry under this same onboarding actor (ADR 0040, app-actions.ts).
 
   // The conversational interview (CQ-PRE-REC-001 §16-§21): what a person
   // says about the current step is placed through the same submit and skip
@@ -464,29 +246,6 @@ export function registerOnboardingRoutes(
         ...(turn.conduct === undefined ? {} : { conduct: turn.conduct }),
         ...(turn.gestures === undefined ? {} : { gestures: turn.gestures }),
       });
-    },
-  );
-
-  app.post(
-    `${byId}${ONBOARDING_QUESTIONS_SEGMENT}/:questionId${ONBOARDING_DISMISS_SEGMENT}`,
-    { onRequest: withActor },
-    async (request, reply) => {
-      const key = idempotencyKey(request, "dismiss an onboarding question");
-      const input = parseContract(
-        DismissOnboardingQuestionRequestSchema,
-        request.body,
-        "The dismiss request is not valid.",
-      );
-      const view = await runtime.dismissInterviewQuestion({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        questionId: questionIdParam(request),
-        expectedSessionVersion: input.expectedSessionVersion,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return OnboardingSessionViewSchema.parse(view);
     },
   );
 
@@ -566,22 +325,6 @@ export function registerOnboardingRoutes(
         );
         void reply.header("Cache-Control", "no-store");
         return OnboardingBriefingNudgeResponseSchema.parse({ nudge });
-      },
-    );
-    app.post(
-      `${nudgePath}${ONBOARDING_NUDGE_CHOICE_SEGMENT}`,
-      { onRequest: withActor },
-      async (request, reply) => {
-        const input = parseContract(
-          OnboardingNudgeChoiceRequestSchema,
-          request.body,
-          "The reminder choice is not valid.",
-        );
-        await nudges.choose(getOnboardingActor(request).userId, input.choice);
-        void reply.header("Cache-Control", "no-store");
-        return OnboardingNudgeChoiceResponseSchema.parse({
-          recorded: input.choice,
-        });
       },
     );
   }

@@ -1,9 +1,13 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
   APP_ACTIONS,
   AppActionPortMissingError,
+  PERSON_ACTIONS,
+  type AnyPersonAction,
+  type PersonActionContext,
   type AnyAppAction,
+  type AppActionHttp,
   type AppActionContext,
   type AppActionPorts,
 } from "@capital-q/app-actions";
@@ -21,6 +25,11 @@ import {
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import {
+  getOnboardingActor,
+  requireOnboardingActorHook,
+  type OnboardingActorDependencies,
+} from "../security/onboarding-actor.js";
 
 /**
  * Routes generated from the app's action registry (ADR 0040, Proposed).
@@ -48,12 +57,16 @@ export type AppActionRoutesDependencies = ActorContextDependencies & {
 /** The routes this registry declares, as `<METHOD> <path>` (the parity guard reads it). */
 export function appActionRouteKeys(
   actions: readonly AnyAppAction[] = APP_ACTIONS,
+  people: readonly AnyPersonAction[] = PERSON_ACTIONS,
 ): readonly string[] {
-  return actions.flatMap((action) =>
-    action.http === undefined
-      ? []
-      : [`${action.http.method} ${action.http.path}`],
-  );
+  return [
+    ...actions.flatMap((action) =>
+      action.http === undefined
+        ? []
+        : [`${action.http.method} ${action.http.path}`],
+    ),
+    ...people.map((action) => `${action.http.method} ${action.http.path}`),
+  ];
 }
 
 /**
@@ -71,6 +84,73 @@ function unavailableProblem(
         detail: error.detail,
       })
     : null;
+}
+
+/**
+ * The answer every generated route gives once its input is parsed and its
+ * actor authorised: the one service call, then the declared problem,
+ * status, Location and body. A service missing on this deployment is a
+ * 503, a service's own failure the problem `problemOf` maps it to.
+ */
+async function answer(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: Pick<AppActionRoutesDependencies, "ports" | "problemOf">,
+  http: AppActionHttp<unknown, unknown>,
+  input: unknown,
+  run: () => Promise<unknown>,
+): Promise<unknown> {
+  let out: unknown;
+  try {
+    out = await run();
+  } catch (error: unknown) {
+    const mapped =
+      unavailableProblem(error, request.id) ??
+      dependencies.problemOf?.(error, request.id) ??
+      null;
+    if (mapped === null) throw error;
+    request.log.warn(
+      { err: error, requestId: request.id },
+      "an app action's service failed",
+    );
+    return reply.status(mapped.status).type(PROBLEM_CONTENT_TYPE).send(mapped);
+  }
+  const problem = http.problem?.(out) ?? null;
+  if (problem !== null) {
+    const details = createProblemDetails({
+      code: problem.code,
+      requestId: request.id,
+      detail: problem.detail,
+    });
+    return reply
+      .status(details.status)
+      .type(PROBLEM_CONTENT_TYPE)
+      .header("Cache-Control", "no-store")
+      .send(details);
+  }
+  if (http.notFound?.(out) === true) {
+    reply.callNotFound();
+    return undefined;
+  }
+  void reply.header("Cache-Control", "no-store");
+  if (http.location !== undefined) {
+    void reply.header("Location", http.location(out, input));
+  }
+  const status =
+    typeof http.status === "function" ? http.status(out) : (http.status ?? 200);
+  // 204 answers with no body, whatever `respond` would say.
+  if (status === 204) return reply.status(204).send();
+  void reply.status(status);
+  try {
+    return await http.respond(out, input, dependencies.ports);
+  } catch (error: unknown) {
+    const unavailable = unavailableProblem(error, request.id);
+    if (unavailable === null) throw error;
+    return reply
+      .status(unavailable.status)
+      .type(PROBLEM_CONTENT_TYPE)
+      .send(unavailable);
+  }
 }
 
 export function registerAppActionRoutes(
@@ -110,62 +190,52 @@ export function registerAppActionRoutes(
           reply.callNotFound();
           return undefined;
         }
-        let out: unknown;
-        try {
-          out = await action.run(dependencies.ports, context, input);
-        } catch (error: unknown) {
-          const mapped =
-            unavailableProblem(error, request.id) ??
-            dependencies.problemOf?.(error, request.id) ??
-            null;
-          if (mapped === null) throw error;
-          request.log.warn(
-            { err: error, requestId: request.id },
-            "an app action's service failed",
-          );
-          return reply
-            .status(mapped.status)
-            .type(PROBLEM_CONTENT_TYPE)
-            .send(mapped);
-        }
-        const problem = http.problem?.(out) ?? null;
-        if (problem !== null) {
-          const details = createProblemDetails({
-            code: problem.code,
-            requestId: request.id,
-            detail: problem.detail,
-          });
-          return reply
-            .status(details.status)
-            .type(PROBLEM_CONTENT_TYPE)
-            .header("Cache-Control", "no-store")
-            .send(details);
-        }
-        if (http.notFound?.(out) === true) {
-          reply.callNotFound();
-          return undefined;
-        }
-        void reply.header("Cache-Control", "no-store");
-        if (http.location !== undefined) {
-          void reply.header("Location", http.location(out, input));
-        }
-        const status =
-          typeof http.status === "function"
-            ? http.status(out)
-            : (http.status ?? 200);
-        // 204 answers with no body, whatever `respond` would say.
-        if (status === 204) return reply.status(204).send();
-        void reply.status(status);
-        try {
-          return await http.respond(out, input, dependencies.ports);
-        } catch (error: unknown) {
-          const unavailable = unavailableProblem(error, request.id);
-          if (unavailable === null) throw error;
-          return reply
-            .status(unavailable.status)
-            .type(PROBLEM_CONTENT_TYPE)
-            .send(unavailable);
-        }
+        return answer(request, reply, dependencies, http, input, () =>
+          action.run(dependencies.ports, context, input),
+        );
+      },
+    });
+  }
+}
+
+export type PersonActionRoutesDependencies = OnboardingActorDependencies & {
+  readonly ports: AppActionPorts;
+  readonly actions?: readonly AnyPersonAction[] | undefined;
+};
+
+/**
+ * Person-scoped routes (ADR 0040): the same generated answer, under the
+ * onboarding actor, for a person who may have no organisation yet. The
+ * owning service authorises the person; nothing here widens that.
+ */
+export function registerPersonActionRoutes(
+  app: FastifyInstance,
+  dependencies: PersonActionRoutesDependencies,
+): void {
+  const withPerson = requireOnboardingActorHook(dependencies);
+  for (const action of dependencies.actions ?? PERSON_ACTIONS) {
+    const http = action.http;
+    app.route({
+      method: http.method,
+      url: http.path,
+      onRequest: withPerson,
+      handler: async (request, reply) => {
+        const input = parseContract(
+          action.input,
+          http.fromRequest(
+            request.params as Record<string, string>,
+            request.body ?? {},
+            request.headers,
+          ),
+          "The request is not valid.",
+        );
+        const context: PersonActionContext = {
+          person: getOnboardingActor(request),
+          correlationId: CorrelationIdSchema.parse(createCorrelationId()),
+        };
+        return answer(request, reply, dependencies, http, input, () =>
+          action.run(dependencies.ports, context, input),
+        );
       },
     });
   }

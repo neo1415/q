@@ -17,6 +17,10 @@ import type { InteractionSignalService } from "@capital-q/discovery";
 import type { EvidenceService } from "@capital-q/evidence";
 import type { InvestorService } from "@capital-q/investors";
 import type {
+  OnboardingNudges,
+  OnboardingService,
+} from "@capital-q/onboarding";
+import type {
   ProfileImageService,
   PublicIdentityService,
 } from "@capital-q/public-identity";
@@ -132,6 +136,21 @@ export type AppActionPorts = {
   readonly kyb?: Pick<KybService, "submit"> | undefined;
   /** A person's review, asked for by them. */
   readonly reviews?: Pick<PlatformAdmin, "requestReview"> | undefined;
+  /** Onboarding (person-scoped): the runtime and the setup reminders. */
+  readonly onboarding?:
+    | Pick<
+        OnboardingService["runtime"],
+        | "submitResponse"
+        | "reviseResponse"
+        | "skipStep"
+        | "withdrawResponse"
+        | "completeSession"
+        | "resolveSuggestion"
+        | "answerInterviewQuestion"
+        | "dismissInterviewQuestion"
+      >
+    | undefined;
+  readonly onboardingNudges?: Pick<OnboardingNudges, "choose"> | undefined;
   /** Calls and reminders: the schedule service. */
   readonly schedule?:
     | Pick<

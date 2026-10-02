@@ -4,6 +4,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import {
   APP_ACTIONS,
+  PERSON_ACTIONS,
   misheard,
   parityCases,
   qCapabilityId,
@@ -209,9 +210,28 @@ describe("the action registry", () => {
   });
 });
 
+describe("person-scoped actions (onboarding)", () => {
+  it("each is a route under the onboarding actor, served to Q by its loop's own tool, never a new one", () => {
+    expect(PERSON_ACTIONS.map((action) => action.name)).toEqual([
+      "onboarding.answer.submit",
+      "onboarding.answer.revise",
+      "onboarding.step.skip",
+      "onboarding.answer.withdraw",
+      "onboarding.complete",
+      "onboarding.suggestion.resolve",
+      "onboarding.question.answer",
+      "onboarding.question.dismiss",
+      "onboarding.reminders.choose",
+    ]);
+    for (const action of PERSON_ACTIONS) {
+      expect(qCapabilityId(action), action.name).toMatch(/^tool\.[a-z_]+$/);
+    }
+  });
+});
+
 describe("the reader's compact list", () => {
   it("every declaration has a short label of 2 to 5 words", () => {
-    for (const action of APP_ACTIONS) {
+    for (const action of [...APP_ACTIONS, ...PERSON_ACTIONS]) {
       const words = (action.short ?? "").trim().split(/\s+/).filter(Boolean);
       expect(words.length, action.name).toBeGreaterThanOrEqual(2);
       expect(words.length, action.name).toBeLessThanOrEqual(5);

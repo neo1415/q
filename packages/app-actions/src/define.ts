@@ -7,6 +7,7 @@ import type {
   QSubjectRef,
   QTaskClass,
 } from "@capital-q/contracts";
+import type { OnboardingActor } from "@capital-q/onboarding";
 import type { ActorContext } from "@capital-q/security";
 
 import type { AppActionPorts } from "./ports.js";
@@ -226,14 +227,18 @@ export function defineAppAction<In, Out, ToolIn = In>(
 }
 
 /** The capability id the registry lists for what does this for Q. */
-export function qCapabilityId(action: AnyAppAction): string | null {
+export function qCapabilityId(
+  action: Pick<AnyAppAction, "tool" | "viaTool" | "legacyTool" | "qCapability">,
+): string | null {
   if (action.qCapability !== undefined) return action.qCapability;
   const tool = qToolName(action);
   return tool === null ? null : `tool.${tool}`;
 }
 
 /** The Q tool that does an action: its own, its family's, or a hand tool. */
-export function qToolName(action: AnyAppAction): string | null {
+export function qToolName(
+  action: Pick<AnyAppAction, "tool" | "viaTool" | "legacyTool">,
+): string | null {
   return action.tool?.name ?? action.viaTool ?? action.legacyTool ?? null;
 }
 
@@ -346,6 +351,8 @@ const FEATURES: Readonly<Partial<Record<keyof AppActionPorts, string>>> = {
   verification: "Verification",
   visibility: "Sharing",
   kyb: "Business verification",
+  onboarding: "Setup",
+  onboardingNudges: "Setup reminders",
 };
 
 /** An action's service is not composed on this deployment. */
@@ -362,4 +369,45 @@ export class AppActionPortMissingError extends Error {
 
 export function portMissing(port: keyof AppActionPorts): never {
   throw new AppActionPortMissingError(port);
+}
+
+/**
+ * A person-scoped action: one a person takes before (or without) an
+ * organisation, such as their own onboarding answers. Its route is
+ * generated under the onboarding actor (the person, and their
+ * organisation's context when they have one), never an organisation's
+ * actor context; it has no Q tool of its own: Q takes these through the
+ * onboarding loop's tools (`legacyTool`) or offers the screen.
+ */
+export type PersonActionContext = {
+  /** The person, and their organisation's context when they have one. */
+  readonly person: OnboardingActor;
+  readonly correlationId: CorrelationId;
+};
+
+export type PersonActionDefinition<In, Out> = {
+  readonly name: string;
+  readonly short: string;
+  readonly area: string;
+  readonly classification: AppActionClass;
+  readonly does: string;
+  readonly input: z.ZodType<In>;
+  readonly output: z.ZodType<Out>;
+  /** The one service call; the service authorises the person. */
+  readonly run: (
+    ports: AppActionPorts,
+    context: PersonActionContext,
+    input: In,
+  ) => Promise<Out>;
+  readonly http: AppActionHttp<In, Out>;
+  readonly legacyTool?: string | undefined;
+  readonly qCapability?: `hand.${string}` | `offer.${string}` | undefined;
+};
+
+export type AnyPersonAction = PersonActionDefinition<unknown, unknown>;
+
+export function definePersonAction<In, Out>(
+  definition: PersonActionDefinition<In, Out>,
+): AnyPersonAction {
+  return Object.freeze(definition) as unknown as AnyPersonAction;
 }
