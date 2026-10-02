@@ -790,14 +790,8 @@ export function toResponseValue(
       return label.length > 0 && label.every((w) => phrase.has(w));
     });
     if (byLabel !== undefined) return byLabel.key;
-    if (
-      /\b(?:nothing|none|no|not yet|don't have|dont have|haven't)\b/.test(
-        wanted,
-      )
-    ) {
-      const none = options.find((o) => /^(?:nothing|none)/i.test(o.key));
-      if (none !== undefined) return none.key;
-    }
+    // "We have nothing yet" is read by the model into the option's key or
+    // label (founder order 2026-10-02: no phrase lists over their words).
     const other = options.find((o) => /^other$/i.test(o.key));
     return other?.key ?? null;
   };
