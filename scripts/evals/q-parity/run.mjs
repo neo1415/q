@@ -56,6 +56,8 @@ const ACCOUNT_OF_READ = {
   documents: "FOUNDER",
   rehearsals: "FOUNDER",
   feed: "INVESTOR",
+  calls: "FOUNDER",
+  uploads: "FOUNDER",
 };
 
 const sql = async (query) => {
@@ -123,6 +125,19 @@ async function namesFor(founderUser, investorUser) {
         order by i.rank limit 1`,
     )
   )[0]?.name;
+  // The founder's side of a connection, for founder-account actions on a
+  // relationship (sharing their raise): the investor's name, never Lagoon.
+  const founderRelationship = (
+    await sql(
+      `select io.display_name as name from network.relationships r
+         join core.investor_organisations io on io.id = r.investor_organisation_id
+         join core.companies c on c.id = r.company_id
+         join identity.organisation_memberships om on om.organisation_id = c.organisation_id
+        where om.user_id = ${quote(founderUser)} and r.current_state = 'CONNECTED'
+          and io.display_name not ilike '%lagoon%'
+        order by r.created_at limit 1`,
+    )
+  )[0]?.name?.replace(/\s*\(fictional\)$/i, "");
   // Their company's uploaded pitch deck (set_deck_audience names it).
   const deck = (
     await sql(
@@ -134,6 +149,7 @@ async function namesFor(founderUser, investorUser) {
     )
   )[0]?.title;
   return {
+    founderRelationship,
     names: {
       ...(pitch === undefined ? {} : { MEDIA: pitch }),
       ...(deck === undefined ? {} : { UPLOAD: deck }),
@@ -295,6 +311,14 @@ const cases = parityCases(APP_ACTIONS, names.names, names.reads)
     );
   })
   .map(({ testCase }) => testCase);
+const founderCases =
+  names.founderRelationship === undefined
+    ? []
+    : parityCases(
+        APP_ACTIONS,
+        { ...names.names, RELATIONSHIP: names.founderRelationship },
+        names.reads,
+      );
 const calls = cases.length * MODEL_CALLS_PER_CASE;
 console.log(
   `${String(cases.length)} cases, ~${String(calls)} model calls, est. ≤ $${(calls * COST_PER_CALL_USD).toFixed(2)} per run`,
@@ -324,8 +348,13 @@ for (const testCase of cases) {
       ? ACCOUNT_OF_READ[testCase.expect.read]
       : accountOf(APP_ACTIONS.find((a) => a.name === testCase.expect.action));
   const userId = account === "FOUNDER" ? founderUser : investorUser;
+  // A relationship named from the founder's side when a founder acts.
+  const asked =
+    account === "FOUNDER" && names.founderRelationship !== undefined
+      ? (founderCases.find((c) => c.id === testCase.id) ?? testCase)
+      : testCase;
   const t0 = Date.now();
-  const runId = await ask(tokens[account], testCase.say);
+  const runId = await ask(tokens[account], asked.say);
   const status = runId === null ? "NOT_STARTED" : await settled(runId);
   const ok =
     runId !== null &&
