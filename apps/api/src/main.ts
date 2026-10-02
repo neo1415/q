@@ -67,6 +67,7 @@ import {
   createCompanyService,
   createPostgresCompanyMarketplaceQueryPort,
   createPostgresCompanyQueryPort,
+  createPostgresCompanyTeamProjection,
 } from "@capital-q/companies";
 import {
   createInvestorService,
@@ -191,6 +192,7 @@ import {
   DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
   DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
   createSharedDocumentDownloads,
+  DocumentNotFoundError,
   DocumentIdSchema,
 } from "@capital-q/evidence";
 import {
@@ -719,6 +721,10 @@ const disclosure = createDisclosureAccessService({
 const recommendationVolume = createEntitlementService({ sql: database.sql });
 // end BILLING-2 block
 const companySectors = createPostgresCompanySectorsPort({ sql: database.sql });
+// ADR 0041: the investor-facing team projection (allow-listed fields).
+const companyTeamProjection = createPostgresCompanyTeamProjection({
+  sql: database.sql,
+});
 // One composition of the filter facts: Discover's filters read them, and a
 // company's profile reads the same raise and verification answers, so the
 // two can never disagree about what this reader may know.
@@ -952,6 +958,54 @@ const connections = createConnectionService({
 const marketplaceFacts = createPostgresCompanyMarketplaceQueryPort({
   sql: database.sql,
 });
+/**
+ * Whether an investor may view a company's pitch (CQ-MEDIA-011): the
+ * actor's own investor organisation, its ACTIVE mandate, and the company
+ * eligible for it now. Named because ADR 0041 reuses it as-is for the
+ * deck an owner opened to investors and for the team.
+ */
+const resolveViewableCompany = async (
+  actor: Parameters<typeof actorPrincipal>[0],
+  companyId: string,
+) => {
+  const investor =
+    await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
+      actor,
+    );
+  if (investor === null) return null;
+  const mandate = await slates.eligibilityPorts.mandates.activeMandate({
+    tenantId: actor.tenantId,
+    investorOrganisationId: investor.investorOrganisationId,
+    mandateId: null,
+  });
+  if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE") {
+    return null;
+  }
+  const parsedCompanyId = CompanyIdSchema.safeParse(companyId);
+  if (!parsedCompanyId.success) return null;
+  const evaluation = await slates.eligibility.evaluate({
+    actor,
+    mode: "INVESTOR_DISCOVER",
+    mandateId: mandate.mandate.mandateId,
+    companyIds: [parsedCompanyId.data],
+  });
+  const eligible = evaluation.results.some(
+    (result) =>
+      result.companyId === parsedCompanyId.data &&
+      result.decision === "ELIGIBLE",
+  );
+  if (!eligible) return null;
+  const [facts] = await marketplaceFacts.findCanonicalMarketplaceFacts([
+    parsedCompanyId.data,
+  ]);
+  return facts === undefined
+    ? null
+    : {
+        tenantId: facts.tenantId,
+        ownerOrganisationId: facts.organisationId,
+      };
+};
+
 const media = createMediaService({
   sql: database.sql,
   transactions: database.transactions,
@@ -965,44 +1019,7 @@ const media = createMediaService({
   audit,
   videoProvider,
   viewers: {
-    resolveViewableCompany: async (actor, companyId) => {
-      const investor =
-        await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
-          actor,
-        );
-      if (investor === null) return null;
-      const mandate = await slates.eligibilityPorts.mandates.activeMandate({
-        tenantId: actor.tenantId,
-        investorOrganisationId: investor.investorOrganisationId,
-        mandateId: null,
-      });
-      if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE") {
-        return null;
-      }
-      const parsedCompanyId = CompanyIdSchema.safeParse(companyId);
-      if (!parsedCompanyId.success) return null;
-      const evaluation = await slates.eligibility.evaluate({
-        actor,
-        mode: "INVESTOR_DISCOVER",
-        mandateId: mandate.mandate.mandateId,
-        companyIds: [parsedCompanyId.data],
-      });
-      const eligible = evaluation.results.some(
-        (result) =>
-          result.companyId === parsedCompanyId.data &&
-          result.decision === "ELIGIBLE",
-      );
-      if (!eligible) return null;
-      const [facts] = await marketplaceFacts.findCanonicalMarketplaceFacts([
-        parsedCompanyId.data,
-      ]);
-      return facts === undefined
-        ? null
-        : {
-            tenantId: facts.tenantId,
-            ownerOrganisationId: facts.organisationId,
-          };
-    },
+    resolveViewableCompany,
     // A video its owner opened to everyone on Capital Q (ADR 0021): the
     // same disclosure decision the network preview uses, for any signed-in
     // participant, and only while the company is active.
@@ -1367,6 +1384,46 @@ const { app, logger } = createApp(config, security, {
       }
       return null;
     },
+    // ADR 0041: the deck's own audience and the team, for an investor the
+    // pitch rule admits: the same function media uses, never a looser one.
+    investorMayFind: async (actor, companyId) =>
+      (await resolveViewableCompany(actor, companyId)) !== null,
+    audienceDeck: async (company) => {
+      if (storage === undefined) return null;
+      const deck = await createSharedDocumentDownloads({
+        sql: database.sql,
+        storage,
+      }).investorAudienceDeck({
+        companyTenantId: company.tenantId,
+        companyId: company.id,
+      });
+      return deck === null
+        ? null
+        : {
+            documentId: deck.documentId,
+            documentVersionId: deck.documentVersionId,
+            title: deck.title,
+            sharedAt: deck.updatedAt,
+          };
+    },
+    downloadAudienceDeck: async (company, deck) => {
+      if (storage === undefined) throw new DocumentNotFoundError();
+      const link = await createSharedDocumentDownloads({
+        sql: database.sql,
+        storage,
+      }).authorizeSharedVersion({
+        documentTenantId: company.tenantId,
+        documentId: deck.documentId,
+        documentVersionId: deck.documentVersionId,
+        disposition: "ATTACHMENT",
+      });
+      return { url: link.url, expiresAt: link.expiresAt };
+    },
+    team: (company) =>
+      companyTeamProjection.teamForNetwork({
+        tenantId: company.tenantId,
+        companyId: company.id,
+      }),
     downloadDeck: async (actor, deck) => {
       const link = await chat.attachment({
         actor,

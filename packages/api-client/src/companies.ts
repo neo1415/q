@@ -112,14 +112,14 @@ export function getCompanyProfilePhoto(session: ApiSession, companyId: string) {
 }
 
 /**
- * `POST /v1/companies/:companyId/profile/deck/download` — a short-lived
+ * `GET /v1/companies/:companyId/profile/deck/download` — a short-lived
  * signed read of the deck the company shared with this reader. Not found
  * for anyone it was not shared with.
  */
 export function downloadCompanyDeck(session: ApiSession, companyId: string) {
   return call(
     session,
-    "POST",
+    "GET",
     `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT}`,
     CompanyProfileDeckDownloadDtoSchema,
   );

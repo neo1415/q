@@ -127,6 +127,20 @@ export type DocumentType = z.infer<typeof DocumentTypeSchema>;
 
 export const DOCUMENT_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export const DocumentStatusSchema = z.enum(DOCUMENT_STATUSES);
+
+/**
+ * Who may download a document's file (ADR 0041). ORGANISATION is the
+ * owner only and the default; INVESTORS also admits every investor for
+ * whom the company is viewable (the pitch rule). Only a PITCH_DECK may be
+ * INVESTORS. Never widens `visibilityScope` or anything derived from it.
+ */
+export const DOCUMENT_DOWNLOAD_AUDIENCES = ["ORGANISATION", "INVESTORS"] as const;
+export const DocumentDownloadAudienceSchema = z.enum(
+  DOCUMENT_DOWNLOAD_AUDIENCES,
+);
+export type DocumentDownloadAudience = z.infer<
+  typeof DocumentDownloadAudienceSchema
+>;
 export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
 
 /** Version-level pipeline state. CQ-EVD-002/003 drive the transitions. */
@@ -404,6 +418,8 @@ export type Document = {
   readonly title: string;
   readonly visibilityScope: DisclosureScope;
   readonly sensitivityClass: MessageSensitivity;
+  /** ADR 0041: who may download the file. */
+  readonly downloadAudience: DocumentDownloadAudience;
   readonly currentVersionId: DocumentVersionId | null;
   readonly status: DocumentStatus;
   readonly createdByUserId: UserId;

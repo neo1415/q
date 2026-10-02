@@ -1,6 +1,7 @@
 import type { AnyAppAction } from "./define.js";
 import { CAPITAL_ACTIONS } from "./actions/capital.js";
 import { CHAT_ACTIONS } from "./actions/chat.js";
+import { SET_DECK_AUDIENCE } from "./actions/deck.js";
 import { DISCOVERY_DECISIONS } from "./actions/discovery.js";
 import { INTEREST_ACTIONS } from "./actions/interest.js";
 import { MANDATE_ACTIONS } from "./actions/mandate.js";
@@ -26,4 +27,5 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...CHAT_ACTIONS,
   ...SCHEDULE_ACTIONS,
   ...MEDIA_ACTIONS,
+  SET_DECK_AUDIENCE,
 ]);

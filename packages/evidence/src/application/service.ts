@@ -20,6 +20,7 @@ import {
   createListDocumentsWithVersions,
   createListDocumentVersions,
   createRegisterDocumentVersion,
+  createSetDocumentDownloadAudience,
 } from "./document-use-cases.js";
 import {
   createFindDocumentExtraction,
@@ -58,6 +59,9 @@ export type EvidenceService = {
   readonly getEvidenceSource: ReturnType<typeof createGetEvidenceSource>;
   readonly listEvidenceSources: ReturnType<typeof createListEvidenceSources>;
   readonly createDocument: ReturnType<typeof createCreateDocument>;
+  readonly setDocumentDownloadAudience: ReturnType<
+    typeof createSetDocumentDownloadAudience
+  >;
   readonly registerDocumentVersion: ReturnType<
     typeof createRegisterDocumentVersion
   >;
@@ -138,6 +142,8 @@ export function createEvidenceService(
     listEvidenceSources: createListEvidenceSources(dependencies),
     createDocument: createCreateDocument(dependencies),
     registerDocumentVersion: createRegisterDocumentVersion(dependencies),
+    setDocumentDownloadAudience:
+      createSetDocumentDownloadAudience(dependencies),
     getDocument: createGetDocument(dependencies),
     listDocuments: createListDocuments(dependencies),
     listDocumentVersions: createListDocumentVersions(dependencies),

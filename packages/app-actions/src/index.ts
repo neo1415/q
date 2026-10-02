@@ -30,6 +30,12 @@ export {
   type PitchSharing,
 } from "./actions/pitch.js";
 export { DISCOVERY_DECISIONS } from "./actions/discovery.js";
+export {
+  DeckAudienceResponseSchema,
+  SET_DECK_AUDIENCE,
+  type DeckAudiencePort,
+  type DeckRecord,
+} from "./actions/deck.js";
 export { APP_ACTIONS } from "./registry.js";
 export { scheduleProblem } from "./actions/schedule.js";
 export {

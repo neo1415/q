@@ -64,6 +64,33 @@ export const CompanyProfileDeckSchema = z
   .strict();
 export type CompanyProfileDeck = z.infer<typeof CompanyProfileDeckSchema>;
 
+/**
+ * One team member as an investor who can find the company sees them
+ * (ADR 0041): the person's name, how they relate to the company, the title
+ * they declared, whether they represent themselves as a founder, and their
+ * declared professional summary, bounded. Never contact details, the
+ * background summary, ids, or anything not declared for the team profile.
+ */
+export const COMPANY_TEAM_BIO_MAX = 600;
+export const CompanyProfileTeamMemberSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    relationshipType: z.enum([
+      "team_member",
+      "advisor",
+      "board_member",
+      "contractor",
+      "other",
+    ]),
+    businessTitle: z.string().max(120).nullable(),
+    isFounder: z.boolean(),
+    shortBio: z.string().max(COMPANY_TEAM_BIO_MAX).nullable(),
+  })
+  .strict();
+export type CompanyProfileTeamMember = z.infer<
+  typeof CompanyProfileTeamMemberSchema
+>;
+
 export const CompanyProfileOverviewSchema = z
   .object({
     legalName: z.string().nullable(),
@@ -82,6 +109,11 @@ export const CompanyProfileOverviewSchema = z
      * "no deck exists" and the reader is never told which.
      */
     deck: CompanyProfileDeckSchema.nullable(),
+    /**
+     * The team, for an investor who can find the company (ADR 0041) and
+     * the owner. Empty: none declared, or not shown to this reader.
+     */
+    team: z.array(CompanyProfileTeamMemberSchema).max(50).default([]),
   })
   .strict();
 export type CompanyProfileOverview = z.infer<

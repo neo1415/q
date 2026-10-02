@@ -14,6 +14,8 @@ import type { ConnectionService, InterestService } from "@capital-q/network";
 import type { VisibilityCentre } from "@capital-q/permissions";
 import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 
+import type { DeckAudiencePort } from "./actions/deck.js";
+
 /**
  * The services the declared actions call (ADR 0040). Each composition (the
  * API for routes, the Q API for tools and approved actions) passes its own
@@ -21,6 +23,8 @@ import type { ActorContext, PersonProfileStore } from "@capital-q/security";
  * refuses, never half-runs.
  */
 export type AppActionPorts = {
+  /** ADR 0041: who may download a pitch deck (the Evidence service). */
+  readonly documents?: DeckAudiencePort | undefined;
   readonly media?:
     Pick<MediaService, "listCompanyMedia" | "setPitchDetails"> | undefined;
   readonly interactions?: Pick<InteractionSignalService, "decide"> | undefined;

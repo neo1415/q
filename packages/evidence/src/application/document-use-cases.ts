@@ -22,6 +22,7 @@ import {
   DocumentTitleSchema,
   DocumentTypeSchema,
   DocumentVersionIdSchema,
+  type DocumentDownloadAudience,
   type DocumentType,
   MimeTypeSchema,
   OriginalFilenameSchema,
@@ -45,6 +46,7 @@ import {
 } from "../domain/sensitivity.js";
 import {
   documentCreatedEvent,
+  documentDownloadAudienceChangedEvent,
   documentVersionCreatedEvent,
 } from "../events/index.js";
 import {
@@ -70,6 +72,9 @@ const RESOURCE_DOCUMENT = AuditResourceTypeSchema.parse("document");
 const ACTION = {
   created: AuditActionTypeSchema.parse("document.created"),
   versionRegistered: AuditActionTypeSchema.parse("document.version_registered"),
+  downloadAudienceChanged: AuditActionTypeSchema.parse(
+    "document.download_audience_changed",
+  ),
 };
 
 /** Doc 15 §27 V1 formats. Broader acceptance is a security decision, not a default. */
@@ -627,5 +632,117 @@ export function createListDocumentsWithVersions(
           ? null
           : (byId.get(document.currentVersionId) ?? null),
     }));
+  };
+}
+
+export type SetDocumentDownloadAudienceCommand = {
+  readonly actor: ActorContext;
+  readonly documentId: DocumentId;
+  readonly audience: DocumentDownloadAudience;
+  readonly expectedVersion: number;
+  readonly correlationId: CorrelationId;
+};
+
+/**
+ * Who may download a pitch deck (ADR 0041; founder decision 2026-10-02):
+ * its organisation only, or also investors the company is viewable to.
+ * The owner's own document, the profile-edit level capability
+ * (document.manage, as media.manage is for the pitch), the version the
+ * founder saw, and one audit entry and one event per change. Only a
+ * PITCH_DECK can be opened; the database enforces it too. Setting the
+ * value it already has changes nothing and records nothing.
+ */
+export function createSetDocumentDownloadAudience(
+  dependencies: EvidenceServiceDependencies,
+) {
+  const { transactions, repositories, audit, outbox } = dependencies;
+  return async (command: SetDocumentDownloadAudienceCommand): Promise<Document> => {
+    const { actor } = command;
+    const organisationId = activeOrganisation(actor);
+    const documentId = DocumentIdSchema.parse(command.documentId);
+    const visible = await repositories.documents.findById(
+      dependencies.sql,
+      actor.tenantId,
+      organisationId,
+      documentId,
+    );
+    if (visible === null) {
+      throw new DocumentNotFoundError();
+    }
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: DOCUMENT_MANAGE,
+      resource: documentScope(actor, organisationId, visible.id),
+    });
+    if (
+      command.audience === "INVESTORS" &&
+      visible.documentType !== "PITCH_DECK"
+    ) {
+      throw new EvidenceRuleError("only a pitch deck can be shared with investors");
+    }
+    return transactions.run(async (tx) => {
+      const document = await repositories.documents.lockById(
+        tx,
+        actor.tenantId,
+        organisationId,
+        documentId,
+      );
+      if (document === null) {
+        throw new DocumentNotFoundError();
+      }
+      if (document.version !== command.expectedVersion) {
+        throw new DocumentVersionConflictError();
+      }
+      if (document.downloadAudience === command.audience) {
+        return document;
+      }
+      const updated = await repositories.documents.setDownloadAudience(tx, {
+        tenantId: actor.tenantId,
+        documentId,
+        expectedVersion: document.version,
+        audience: command.audience,
+      });
+      if (!updated) {
+        throw new DocumentVersionConflictError();
+      }
+      await audit.record(tx, {
+        ...auditActorFromContext(actor),
+        auditEventId: createAuditEventId(),
+        actionType: ACTION.downloadAudienceChanged,
+        resourceType: RESOURCE_DOCUMENT,
+        resourceId: document.id,
+        occurredAt: occurredNow(),
+        outcome: "SUCCEEDED",
+        metadata: {
+          from: document.downloadAudience,
+          to: command.audience,
+          companyId: document.companyId,
+        },
+        correlationId: command.correlationId,
+      });
+      await outbox.enqueue(
+        tx,
+        documentDownloadAudienceChangedEvent(
+          { actor, organisationId, correlationId: command.correlationId },
+          {
+            documentId: document.id,
+            ownerOrganisationId: document.ownerOrganisationId,
+            companyId: document.companyId,
+            downloadAudience: command.audience,
+            documentVersion: document.version + 1,
+          },
+        ),
+      );
+      const after = await repositories.documents.findById(
+        tx.sql,
+        actor.tenantId,
+        organisationId,
+        documentId,
+      );
+      if (after === null) {
+        throw new DocumentNotFoundError();
+      }
+      return after;
+    });
   };
 }
