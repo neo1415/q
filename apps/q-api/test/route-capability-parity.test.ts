@@ -397,8 +397,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/media.ts GET `${pitch}/:mediaAssetId${MEDIA_CAPTIONS_VTT_SUFFIX}`":
     PLAYER,
 
-  "api/http/network-interests.ts POST NETWORK_COMPANY_EXPRESS_INTEREST_PATH":
-    cap("tool.propose_express_interest"),
   "api/http/network-interests.ts GET NETWORK_COMPANY_INTEREST_PATH": cap(
     "tool.get_relationship",
   ),
@@ -418,16 +416,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     cap("tool.list_incoming_interest"),
   // ADR 0023: founders' Connection Requests and the investor's inbox. The
   // accept/decline loop is the "POST path" entry below.
-  "api/http/network-interests.ts POST NETWORK_INVESTOR_CONNECTION_REQUEST_PATH":
-    cap("tool.propose_connection_request"),
   "api/http/network-interests.ts GET NETWORK_INVESTOR_CONNECTION_PATH": cap(
     "offer.connection_request",
   ),
   "api/http/network-interests.ts GET NETWORK_CONNECTION_REQUESTS_PATH": cap(
     "offer.connection_request_answer",
-  ),
-  "api/http/network-interests.ts POST path": cap(
-    "tool.propose_interest_answer",
   ),
 
   "api/http/onboarding.ts POST sessions": exempt(
@@ -855,7 +848,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 132;
+const LEGACY_MUTATION_ROUTES_MAX = 128;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([

@@ -100,6 +100,36 @@ describe("the action registry", () => {
       ["investor.visibility.set", "set_investor_visibility", "CONSEQUENTIAL"],
       ["disclosure.raise.share", "share_my_raise", "CONSEQUENTIAL"],
       ["disclosure.share.revoke", "stop_sharing_my_raise", "CONSEQUENTIAL"],
+      [
+        "relationship.interest.express",
+        "legacy:propose_express_interest",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.interest.accept",
+        "legacy:propose_interest_answer",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.interest.decline",
+        "legacy:propose_interest_answer",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.connection_request.send",
+        "legacy:propose_connection_request",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.connection_request.accept",
+        "legacy:propose_connection_request_answer",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.connection_request.decline",
+        "legacy:propose_connection_request_answer",
+        "CONSEQUENTIAL",
+      ],
     ]);
   });
 });

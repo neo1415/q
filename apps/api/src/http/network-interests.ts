@@ -2,36 +2,19 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
   CompanyInterestStatusDtoSchema,
-  ConnectionRequestAnswerDtoSchema,
-  ConnectionRequestRequestSchema,
-  ConnectionRequestResultDtoSchema,
   ConnectionStatusDtoSchema,
   IncomingConnectionRequestListDtoSchema,
-  NETWORK_CONNECTION_REQUEST_ACCEPT_PATH,
-  NETWORK_CONNECTION_REQUEST_DECLINE_PATH,
   NETWORK_CONNECTION_REQUESTS_PATH,
   NETWORK_INVESTOR_CONNECTION_PATH,
-  NETWORK_INVESTOR_CONNECTION_REQUEST_PATH,
-  CorrelationIdSchema,
-  ExpressInterestRequestSchema,
-  ExpressInterestResultDtoSchema,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
   IncomingInterestListDtoSchema,
-  InterestResponseResultDtoSchema,
-  NETWORK_COMPANY_EXPRESS_INTEREST_PATH,
   NETWORK_COMPANY_INCOMING_INTEREST_PATH,
   NETWORK_COMPANY_INTEREST_PATH,
   NETWORK_COMPANY_RELATIONSHIP_PATH,
-  NETWORK_INTEREST_ACCEPT_PATH,
-  NETWORK_INTEREST_DECLINE_PATH,
   NETWORK_INVESTOR_RELATIONSHIP_PATH,
   NETWORK_INVESTOR_RELATIONSHIPS_PATH,
   NETWORK_COMPANY_RELATIONSHIPS_PATH,
   RelationshipListDtoSchema,
-  parseContract,
   RelationshipStatusResponseDtoSchema,
-  RespondToInterestRequestSchema,
 } from "@capital-q/contracts";
 import {
   toConnectionRequestDto,
@@ -43,7 +26,6 @@ import {
   type ConnectionService,
   type InterestService,
 } from "@capital-q/network";
-import { createCorrelationId } from "@capital-q/observability";
 
 import {
   getActorContext,
@@ -90,60 +72,12 @@ function companyIdOf(request: FastifyRequest): string {
   return typeof raw === "string" ? raw : "";
 }
 
-function interestIdOf(request: FastifyRequest): string {
-  const raw = (request.params as { interestId?: unknown }).interestId;
-  return typeof raw === "string" ? raw : "";
-}
-
-function idempotencyKeyOf(request: FastifyRequest): string {
-  const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-  return parseContract(
-    IdempotencyKeyHeaderSchema,
-    typeof rawKey === "string" ? rawKey : undefined,
-    "An Idempotency-Key header is required to answer an interest.",
-  );
-}
-
 export function registerNetworkInterestRoutes(
   app: FastifyInstance,
   dependencies: NetworkInterestRoutesDependencies,
 ): void {
   const withContext = requireActorContextHook(dependencies);
   const service = dependencies.interests;
-
-  app.post(
-    NETWORK_COMPANY_EXPRESS_INTEREST_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-      const idempotencyKey = parseContract(
-        IdempotencyKeyHeaderSchema,
-        typeof rawKey === "string" ? rawKey : undefined,
-        "An Idempotency-Key header is required to express interest.",
-      );
-      const input = parseContract(
-        ExpressInterestRequestSchema,
-        request.body,
-        "The interest request is not valid.",
-      );
-
-      const result = await service.expressInterest({
-        actor: getActorContext(request),
-        companyId: companyIdOf(request),
-        surface: input.surface,
-        idempotencyKey,
-        correlationId: CorrelationIdSchema.parse(createCorrelationId()),
-      });
-
-      void reply
-        .status(result.deduplicated ? 200 : 201)
-        .header("Cache-Control", "no-store");
-      return ExpressInterestResultDtoSchema.parse({
-        interest: toInterestDto(result.interest),
-        deduplicated: result.deduplicated,
-      });
-    },
-  );
 
   app.get(
     NETWORK_COMPANY_INTEREST_PATH,
@@ -243,70 +177,10 @@ export function registerNetworkInterestRoutes(
     },
   );
 
-  // The company's answer: the verb is the path, never a body field.
-  for (const [path, decision] of [
-    [NETWORK_INTEREST_ACCEPT_PATH, "ACCEPTED"],
-    [NETWORK_INTEREST_DECLINE_PATH, "DECLINED"],
-  ] as const) {
-    app.post(path, { onRequest: withContext }, async (request, reply) => {
-      const idempotencyKey = idempotencyKeyOf(request);
-      parseContract(
-        RespondToInterestRequestSchema,
-        request.body ?? {},
-        "An answer carries no body.",
-      );
-      const result = await service.respondToInterest({
-        actor: getActorContext(request),
-        interestId: interestIdOf(request),
-        decision,
-        surface: "INBOX",
-        idempotencyKey,
-        correlationId: CorrelationIdSchema.parse(createCorrelationId()),
-      });
-      void reply
-        .status(result.deduplicated ? 200 : 201)
-        .header("Cache-Control", "no-store");
-      return InterestResponseResultDtoSchema.parse({
-        interest: toIncomingInterestDto(result.interest, result.investor),
-        deduplicated: result.deduplicated,
-      });
-    });
-  }
-
+  // Express Interest, the answers and Connection Requests are generated
+  // from the action registry (ADR 0040, http/app-actions.ts).
   const connections = dependencies.connections;
   if (connections === undefined) return;
-
-  // A founder's Connection Request (ADR 0023): server-confirmed, idempotent.
-  app.post(
-    NETWORK_INVESTOR_CONNECTION_REQUEST_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-      const idempotencyKey = parseContract(
-        IdempotencyKeyHeaderSchema,
-        typeof rawKey === "string" ? rawKey : undefined,
-        "An Idempotency-Key header is required to send a request.",
-      );
-      parseContract(
-        ConnectionRequestRequestSchema,
-        request.body ?? {},
-        "A connection request carries no body.",
-      );
-      const result = await connections.requestConnection({
-        actor: getActorContext(request),
-        investorOrganisationId: investorIdOf(request),
-        idempotencyKey,
-        correlationId: CorrelationIdSchema.parse(createCorrelationId()),
-      });
-      void reply
-        .status(result.deduplicated ? 200 : 201)
-        .header("Cache-Control", "no-store");
-      return ConnectionRequestResultDtoSchema.parse({
-        request: toConnectionRequestDto(result.interest),
-        deduplicated: result.deduplicated,
-      });
-    },
-  );
 
   app.get(
     NETWORK_INVESTOR_CONNECTION_PATH,
@@ -344,36 +218,4 @@ export function registerNetworkInterestRoutes(
       });
     },
   );
-
-  for (const [path, decision] of [
-    [NETWORK_CONNECTION_REQUEST_ACCEPT_PATH, "ACCEPTED"],
-    [NETWORK_CONNECTION_REQUEST_DECLINE_PATH, "DECLINED"],
-  ] as const) {
-    app.post(path, { onRequest: withContext }, async (request, reply) => {
-      const idempotencyKey = idempotencyKeyOf(request);
-      parseContract(
-        RespondToInterestRequestSchema,
-        request.body ?? {},
-        "An answer carries no body.",
-      );
-      const result = await connections.respondToConnectionRequest({
-        actor: getActorContext(request),
-        interestId: interestIdOf(request),
-        decision,
-        surface: "INBOX",
-        idempotencyKey,
-        correlationId: CorrelationIdSchema.parse(createCorrelationId()),
-      });
-      void reply
-        .status(result.deduplicated ? 200 : 201)
-        .header("Cache-Control", "no-store");
-      return ConnectionRequestAnswerDtoSchema.parse({
-        request: toIncomingConnectionRequestDto(
-          result.interest,
-          result.company,
-        ),
-        deduplicated: result.deduplicated,
-      });
-    });
-  }
 }

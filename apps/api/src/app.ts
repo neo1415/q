@@ -422,6 +422,12 @@ export function createApp(
       ...(modules.visibility === undefined
         ? {}
         : { visibility: modules.visibility }),
+      ...(modules.interests === undefined
+        ? {}
+        : { interests: modules.interests }),
+      ...(modules.connections === undefined
+        ? {}
+        : { connections: modules.connections }),
     },
   });
 
