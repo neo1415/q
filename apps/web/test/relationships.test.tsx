@@ -143,6 +143,45 @@ describe("relationship words", () => {
   });
 });
 
+describe("relationship words after a meeting (relationship-state.v2)", () => {
+  it("says every new state and step plainly: a pass is not a rejection", () => {
+    for (const state of [
+      "MEETING_HELD",
+      "IN_DILIGENCE",
+      "PAUSED",
+      "PASSED",
+      "INVESTED",
+    ] as const) {
+      expect(words.STATE_WORDS[state]).not.toMatch(NO_SCORE);
+      expect(words.STATE_WORDS[state]).not.toMatch(/reject/i);
+      for (const side of ["INVESTOR", "COMPANY"] as const) {
+        expect(words.milestoneSentence(state, side, "Apex")).not.toMatch(
+          /reject|declin/i,
+        );
+      }
+    }
+    expect(words.STATE_WORDS.PASSED).toBe("Not proceeding for now");
+    expect(words.milestoneSentence("PASSED", "COMPANY", "Apex")).toBe(
+      "Apex decided not to proceed for now.",
+    );
+    for (const step of ["DECIDE_NEXT_STEP", "FOLLOW_UP", "RESUME"] as const) {
+      expect(words.nextStepSentence(step, "Apex")).not.toMatch(NO_SCORE);
+      expect(words.NEXT_STEP_WORDS[step].length).toBeGreaterThan(0);
+    }
+  });
+
+  it("after a call, deciding and following up need you; a pass does not", () => {
+    const items = [
+      summary({ nextStep: "DECIDE_NEXT_STEP", state: "MEETING_HELD" }),
+      summary({ nextStep: "FOLLOW_UP", state: "IN_DILIGENCE" }),
+      summary({ nextStep: "NONE", state: "PASSED" }),
+    ];
+    expect(
+      words.relationshipsNeedingYou(items).map((item) => item.nextStep),
+    ).toEqual(["DECIDE_NEXT_STEP", "FOLLOW_UP"]);
+  });
+});
+
 describe("RelationshipList", () => {
   it("renders one link row per counterpart with state, date and next step", () => {
     render(

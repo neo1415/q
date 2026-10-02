@@ -10,12 +10,13 @@ import {
   listCompanyRelationships,
   listIncomingInterest,
 } from "@capital-q/api-client";
-import type {
-  ChatThreadDto,
-  CompanyInterestStatusDto,
-  IncomingInterestDto,
-  PitchSummaryDto,
-  RelationshipStatusDto,
+import {
+  isMatchedRelationshipState,
+  type ChatThreadDto,
+  type CompanyInterestStatusDto,
+  type IncomingInterestDto,
+  type PitchSummaryDto,
+  type RelationshipStatusDto,
 } from "@capital-q/contracts";
 
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
@@ -68,7 +69,12 @@ async function threadFor(
   session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
   relationship: RelationshipStatusDto | null,
 ): Promise<ChatThreadDto | null> {
-  if (relationship === null || relationship.state !== "CONNECTED") return null;
+  if (
+    relationship === null ||
+    !isMatchedRelationshipState(relationship.state)
+  ) {
+    return null;
+  }
   return getChatThread(session, relationship.relationshipId).catch(() => null);
 }
 

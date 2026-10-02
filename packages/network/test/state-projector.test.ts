@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { DisclosureScope } from "@capital-q/contracts";
+import {
+  RelationshipStateV1Schema,
+  type DisclosureScope,
+} from "@capital-q/contracts";
 
 import {
   nextStepFor,
@@ -126,7 +129,8 @@ describe("relationship-state.v1 properties over 500 random histories", () => {
           legalTargets,
           `seed ${seed}: ${from} -> ${milestone.state}`,
         ).toContain(milestone.state);
-        from = milestone.state;
+        // v1's fold only ever reaches a v1 state.
+        from = RelationshipStateV1Schema.parse(milestone.state);
       }
       expect(projection.state, `seed ${seed}`).toBe(from);
       const connectedAt = projection.milestones.findIndex(

@@ -12,12 +12,15 @@ import {
   RelationshipOutcomeResultDtoSchema,
   RelationshipPassReasonCodeSchema,
   type KnownErrorCode,
-  type QKnowledgeScopeKind,
   type QTaskClass,
 } from "@capital-q/contracts";
 import type { OutcomeRefusal, OutcomeResult } from "@capital-q/network";
 
-import { defineAppAction, type AnyAppAction } from "../define.js";
+import {
+  defineAppAction,
+  defineAppActionFamily,
+  type AnyAppAction,
+} from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
 /**
@@ -91,8 +94,6 @@ const http = {
 
 const succeeded = (out: OutcomeResult) => out.outcome === "OK";
 
-/** The investor's side of a conversation; never a founder's. */
-const INVESTOR_SCOPES: readonly QKnowledgeScopeKind[] = ["INVESTOR_PROFILE"];
 const PURPOSES: readonly QTaskClass[] = [
   "RELATIONSHIP_QUESTION",
   "ACTION_PREPARATION",
@@ -117,29 +118,7 @@ const Pass = z
   })
   .strict();
 
-const PassTool = Named.extend({
-  reason: RelationshipPassReasonCodeSchema.optional().describe(
-    "Only if they gave one: STAGE, SECTOR, GEOGRAPHY, TRACTION, TEAM, VALUATION, BUSINESS_MODEL, MARKET, TIMING, ROUND or OTHER.",
-  ),
-  note: z
-    .string()
-    .min(1)
-    .max(1000)
-    .optional()
-    .describe("Their own words about why, only if they said any."),
-  shareWithFounder: z
-    .boolean()
-    .optional()
-    .describe(
-      "True only if they explicitly asked for the founder to be told the reason. Default: the reason stays private.",
-    ),
-}).strict();
-
-const PASS = defineAppAction<
-  z.infer<typeof Pass>,
-  OutcomeResult,
-  z.infer<typeof PassTool>
->({
+const PASS = defineAppAction<z.infer<typeof Pass>, OutcomeResult>({
   name: "relationship.outcome.pass",
   short: "decide not to proceed",
   area: "relationships",
@@ -191,32 +170,6 @@ const PASS = defineAppAction<
     }),
     ...http,
   },
-  tool: {
-    name: "decline_to_proceed",
-    description:
-      "Prepares telling a company the investor is connected with (usually after a meeting) that they have decided not to proceed for now. Not Discover's pass. A reason is optional and stays private to the investor unless they explicitly ask to share it with the founder. Nothing is sent until they approve exactly it.",
-    input: PassTool,
-    references: { relationship: "RELATIONSHIP" },
-    scopes: INVESTOR_SCOPES,
-    purposes: PURPOSES,
-    eval: {
-      say: [
-        "We've decided not to proceed with {name}.",
-        "Tell {name} we're passing for now, it's too early for us.",
-      ],
-      names: "RELATIONSHIP",
-    },
-    toCanonical: (tool, context) =>
-      Promise.resolve({
-        relationshipId: tool.relationship,
-        idempotencyKey: context.idempotencyKey,
-        input: {
-          reasonCode: tool.reason ?? null,
-          note: tool.note ?? null,
-          shareWithFounder: tool.shareWithFounder ?? false,
-        },
-      }),
-  },
 });
 
 const Simple = z
@@ -227,11 +180,7 @@ const Simple = z
 
 function pauseOrResume(kind: "PAUSE" | "RESUME"): AnyAppAction {
   const pause = kind === "PAUSE";
-  return defineAppAction<
-    z.infer<typeof Simple>,
-    OutcomeResult,
-    z.infer<typeof Named>
-  >({
+  return defineAppAction<z.infer<typeof Simple>, OutcomeResult>({
     name: pause ? "relationship.outcome.pause" : "relationship.outcome.resume",
     short: pause ? "pause a relationship" : "resume a relationship",
     area: "relationships",
@@ -282,27 +231,6 @@ function pauseOrResume(kind: "PAUSE" | "RESUME"): AnyAppAction {
       fromRequest: (params) => ({ relationshipId: params["relationshipId"] }),
       ...http,
     },
-    tool: {
-      name: pause ? "pause_relationship" : "resume_relationship",
-      description: pause
-        ? "Prepares pausing a relationship the investor is connected with, for now: not a pass. Nothing changes until they approve."
-        : "Prepares resuming a paused relationship, or undoing the investor's own decision not to proceed. Nothing changes until they approve.",
-      input: Named,
-      references: { relationship: "RELATIONSHIP" },
-      scopes: INVESTOR_SCOPES,
-      purposes: PURPOSES,
-      eval: {
-        say: pause
-          ? ["Pause things with {name} for now.", "Put {name} on hold."]
-          : [
-              "Resume things with {name}.",
-              "Actually, let's pick {name} back up.",
-            ],
-        names: "RELATIONSHIP",
-      },
-      toCanonical: (tool) =>
-        Promise.resolve({ relationshipId: tool.relationship }),
-    },
   });
 }
 
@@ -312,12 +240,6 @@ const Outcome = z
     input: RecordMeetingOutcomeRequestSchema,
   })
   .strict();
-
-const OutcomeTool = Named.extend({
-  outcome: RecordMeetingOutcomeRequestSchema.shape.outcome.describe(
-    "What the meeting led to, as they confirmed it.",
-  ),
-}).strict();
 
 const OUTCOME_WORDS: Readonly<
   Record<z.infer<typeof RecordMeetingOutcomeRequestSchema>["outcome"], string>
@@ -329,74 +251,145 @@ const OUTCOME_WORDS: Readonly<
   OTHER: "things are moving forward",
 };
 
-const MEETING_OUTCOME = defineAppAction<
-  z.infer<typeof Outcome>,
-  OutcomeResult,
+const MEETING_OUTCOME = defineAppAction<z.infer<typeof Outcome>, OutcomeResult>(
+  {
+    name: "relationship.outcome.meeting",
+    short: "record how a meeting went",
+    area: "relationships",
+    classification: "CONSEQUENTIAL",
+    does: "Records what a meeting led to (diligence, a follow-up meeting, materials, introductions) on a connected relationship, once the person confirms it.",
+    input: Outcome,
+    output: z.custom<OutcomeResult>(),
+    authorize: servicesDecide,
+    run: (ports, context, input) =>
+      outcomes(ports).recordMeetingOutcome({
+        actor: context.actor,
+        relationshipId: input.relationshipId,
+        outcome:
+          input.input.outcome === "DILIGENCE"
+            ? { kind: "DILIGENCE" }
+            : { kind: "PROGRESSED", step: input.input.outcome },
+        meetingId: input.input.meetingId,
+        correlationId: context.correlationId,
+      }),
+    targets: () => [],
+    card: (input) => ({
+      summary: "Record how the meeting went",
+      preview: `On the relationship, both sides see that ${OUTCOME_WORDS[input.input.outcome]}.`,
+    }),
+    done: (out, input) =>
+      out.outcome === "OK"
+        ? `Recorded: ${OUTCOME_WORDS[input.input.outcome]}.`
+        : (outcomeProblem(out)?.detail ?? "That couldn't be recorded."),
+    succeeded,
+    http: {
+      method: "POST",
+      path: NETWORK_RELATIONSHIP_MEETING_OUTCOME_PATH,
+      fromRequest: (params, body) => ({
+        relationshipId: params["relationshipId"],
+        input: body,
+      }),
+      ...http,
+    },
+  },
+);
+
+/**
+ * One Q tool for the four (ADR 0040 family): a run offers at most
+ * MODEL_TOOLS_MAX tools, and to the person these are one thing -- where
+ * this relationship goes after a meeting. Each operation is still its own
+ * declaration, route, authorize step and service call.
+ */
+const OutcomeTool = Named.extend({
+  operation: z
+    .enum(["NOT_PROCEED", "PAUSE", "RESUME", "MEETING_OUTCOME"])
+    .describe(
+      "NOT_PROCEED: the investor decided not to proceed for now (not Discover's pass). PAUSE / RESUME: the investor pauses, or resumes (also undoes their own decision not to proceed). MEETING_OUTCOME: either side confirms what a meeting led to.",
+    ),
+  reason: RelationshipPassReasonCodeSchema.optional().describe(
+    "NOT_PROCEED only, and only if they gave one: STAGE, SECTOR, GEOGRAPHY, TRACTION, TEAM, VALUATION, BUSINESS_MODEL, MARKET, TIMING, ROUND or OTHER.",
+  ),
+  note: z
+    .string()
+    .min(1)
+    .max(1000)
+    .optional()
+    .describe("NOT_PROCEED only: their own words about why, if they said any."),
+  shareWithFounder: z
+    .boolean()
+    .optional()
+    .describe(
+      "NOT_PROCEED only: true only if they explicitly asked for the founder to be told the reason. Default: the reason stays private.",
+    ),
+  meetingOutcome: RecordMeetingOutcomeRequestSchema.shape.outcome
+    .optional()
+    .describe(
+      "MEETING_OUTCOME only: what the meeting led to, as they confirmed it.",
+    ),
+}).strict();
+
+export const OUTCOME_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof OutcomeTool>
 >({
-  name: "relationship.outcome.meeting",
-  short: "record how a meeting went",
+  name: "relationship.outcome.change",
+  short: "decide after a meeting",
   area: "relationships",
-  classification: "CONSEQUENTIAL",
-  does: "Records what a meeting led to (diligence, a follow-up meeting, materials, introductions) on a connected relationship, once the person confirms it.",
-  input: Outcome,
-  output: z.custom<OutcomeResult>(),
-  authorize: servicesDecide,
-  run: (ports, context, input) =>
-    outcomes(ports).recordMeetingOutcome({
-      actor: context.actor,
-      relationshipId: input.relationshipId,
-      outcome:
-        input.input.outcome === "DILIGENCE"
-          ? { kind: "DILIGENCE" }
-          : { kind: "PROGRESSED", step: input.input.outcome },
-      meetingId: input.input.meetingId,
-      correlationId: context.correlationId,
-    }),
-  targets: () => [],
-  card: (input) => ({
-    summary: "Record how the meeting went",
-    preview: `On the relationship, both sides see that ${OUTCOME_WORDS[input.input.outcome]}.`,
-  }),
-  done: (out, input) =>
-    out.outcome === "OK"
-      ? `Recorded: ${OUTCOME_WORDS[input.input.outcome]}.`
-      : (outcomeProblem(out)?.detail ?? "That couldn't be recorded."),
-  succeeded,
-  http: {
-    method: "POST",
-    path: NETWORK_RELATIONSHIP_MEETING_OUTCOME_PATH,
-    fromRequest: (params, body) => ({
-      relationshipId: params["relationshipId"],
-      input: body,
-    }),
-    ...http,
+  does: "Records where a connected relationship goes after a meeting: the investor not proceeding for now, pausing or resuming, or a meeting's confirmed outcome, as the relationship page does.",
+  members: {
+    NOT_PROCEED: PASS,
+    PAUSE: pauseOrResume("PAUSE"),
+    RESUME: pauseOrResume("RESUME"),
+    MEETING_OUTCOME,
   },
   tool: {
-    name: "record_meeting_outcome",
+    name: "relationship_outcome",
     description:
-      "Prepares recording what a meeting with a connected company or investor led to, once the person confirms it: diligence, a follow-up meeting, materials requested, introductions. Never inferred without their yes.",
+      "Prepares, for the person's approval, where a relationship they are connected with goes after a meeting: an investor deciding not to proceed for now (the reason stays private unless they ask to share it), pausing or resuming, or recording what a meeting led to (diligence, a follow-up meeting, materials, introductions). Name the company or investor as they said it. Nothing changes until they approve exactly it.",
     input: OutcomeTool,
     references: { relationship: "RELATIONSHIP" },
     purposes: PURPOSES,
     eval: {
       say: [
+        "We've decided not to proceed with {name} for now.",
         "We're starting diligence with {name}.",
-        "The call with {name} went well, we'll meet again.",
       ],
       names: "RELATIONSHIP",
     },
-    toCanonical: (tool) =>
-      Promise.resolve({
-        relationshipId: tool.relationship,
-        input: { outcome: tool.outcome },
-      }),
+    toCanonical: (tool, context) => {
+      const relationshipId = tool.relationship;
+      switch (tool.operation) {
+        case "NOT_PROCEED":
+          return Promise.resolve({
+            operation: "NOT_PROCEED",
+            input: {
+              relationshipId,
+              idempotencyKey: context.idempotencyKey,
+              input: {
+                reasonCode: tool.reason ?? null,
+                note: tool.note ?? null,
+                shareWithFounder: tool.shareWithFounder ?? false,
+              },
+            },
+          });
+        case "PAUSE":
+        case "RESUME":
+          return Promise.resolve({
+            operation: tool.operation,
+            input: { relationshipId },
+          });
+        case "MEETING_OUTCOME":
+          return Promise.resolve(
+            tool.meetingOutcome === undefined
+              ? null
+              : {
+                  operation: "MEETING_OUTCOME",
+                  input: {
+                    relationshipId,
+                    input: { outcome: tool.meetingOutcome },
+                  },
+                },
+          );
+      }
+    },
   },
 });
-
-export const OUTCOME_ACTIONS: readonly AnyAppAction[] = [
-  PASS,
-  pauseOrResume("PAUSE"),
-  pauseOrResume("RESUME"),
-  MEETING_OUTCOME,
-];

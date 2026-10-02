@@ -653,3 +653,9 @@ export const RelationshipPassResponseDtoSchema = z
 export type RelationshipPassResponseDto = z.infer<
   typeof RelationshipPassResponseDtoSchema
 >;
+
+/** One relationship's outcome path, filled. The verb names the action. */
+export const networkRelationshipOutcomePath = (
+  relationshipId: string,
+  verb: "pass" | "pause" | "resume" | "meeting-outcome",
+) => `/v1/network/relationships/${encodeURIComponent(relationshipId)}/${verb}`;

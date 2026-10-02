@@ -3,9 +3,10 @@ import "server-only";
 import Link from "next/link";
 
 import { listReminders } from "@capital-q/api-client";
-import type {
-  ChatThreadDto,
-  RelationshipStatusDto,
+import {
+  isMatchedRelationshipState,
+  type ChatThreadDto,
+  type RelationshipStatusDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
@@ -52,7 +53,8 @@ export async function RelationshipConversation({
   readonly thread: ChatThreadDto | null;
   readonly basePath: string;
 }) {
-  const connected = relationship.state === "CONNECTED";
+  // The match outlives CONNECTED (relationship-state.v2).
+  const connected = isMatchedRelationshipState(relationship.state);
   const session = await apiSession();
   const nextReminder =
     session === null

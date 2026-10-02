@@ -14,6 +14,8 @@
  * reads that role is authorised for (briefing-facts.ts).
  */
 
+import type { RelationshipStateV2 } from "@capital-q/contracts";
+
 /** An approval Q prepared that waits on this person. */
 export type ApprovalFact = {
   readonly approvalId: string;
@@ -27,8 +29,7 @@ export type RelationshipFact = {
   readonly relationshipId: string;
   readonly counterpartName: string;
   readonly href: string;
-  readonly state:
-    "DISCOVERED" | "INTEREST_EXPRESSED" | "CONNECTED" | "DECLINED";
+  readonly state: RelationshipStateV2;
   readonly stateSince: string;
   /** For a company, the counterpart's id, so a slate company can be matched. */
   readonly counterpartId: string;
@@ -174,6 +175,15 @@ function relationshipItems(facts: BriefingFacts): BriefingItem[] {
         id,
         title: `You're connected with ${fact.counterpartName}`,
         description: "A first meeting is the natural next step.",
+        href: fact.href,
+      });
+    } else if (fact.state === "PASSED" && facts.role === "FOUNDER") {
+      // Only news to the founder: the investor made that decision. The
+      // reason is on the relationship page, only if they shared it.
+      items.push({
+        id,
+        title: `${fact.counterpartName} has decided not to proceed for now`,
+        description: "Your conversation stays where it is.",
         href: fact.href,
       });
     } else if (fact.state === "DECLINED" && facts.role === "INVESTOR") {

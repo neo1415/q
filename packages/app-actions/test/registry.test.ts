@@ -145,13 +145,26 @@ describe("the action registry", () => {
       ],
       ["schedule.reminder.create", "legacy:propose_reminder", "CONSEQUENTIAL"],
       ["schedule.reminder.dismiss", "legacy:dismiss_reminder", "INSTANT"],
-      // Post-meeting outcomes (2026-10-02): generated tools, all approved.
-      ["relationship.outcome.pass", "decline_to_proceed", "CONSEQUENTIAL"],
-      ["relationship.outcome.pause", "pause_relationship", "CONSEQUENTIAL"],
-      ["relationship.outcome.resume", "resume_relationship", "CONSEQUENTIAL"],
+      // Post-meeting outcomes (2026-10-02): one family tool, all approved.
+      ["relationship.outcome.change", "relationship_outcome", "CONSEQUENTIAL"],
+      [
+        "relationship.outcome.pass",
+        "via:relationship_outcome",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.outcome.pause",
+        "via:relationship_outcome",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.outcome.resume",
+        "via:relationship_outcome",
+        "CONSEQUENTIAL",
+      ],
       [
         "relationship.outcome.meeting",
-        "record_meeting_outcome",
+        "via:relationship_outcome",
         "CONSEQUENTIAL",
       ],
     ]);

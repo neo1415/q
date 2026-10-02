@@ -910,7 +910,7 @@ describe("Express Interest against local PostgreSQL", () => {
       expect(row).toMatchObject({
         current_state: "CONNECTED",
         projected_sequence: 3,
-        projector_version: "relationship-state.v1",
+        projector_version: "relationship-state.v2",
       });
       expect(row?.state_updated_at.toISOString()).toBe(
         first.projection?.stateSince,
@@ -926,7 +926,7 @@ describe("Express Interest against local PostgreSQL", () => {
           state: "INTEREST_EXPRESSED",
           stateSince: new Date().toISOString(),
           throughSequence: 2,
-          version: "relationship-state.v1",
+          version: "relationship-state.v2",
         }),
       ).toBe(false);
       expect((await cached(relationshipId))?.current_state).toBe("CONNECTED");

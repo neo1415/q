@@ -650,8 +650,8 @@ describe("eligibility policy v1 — golden scenarios", () => {
     );
   });
 
-  it("K. relationship standing: none or DISCOVERED passes; an unknown state is UNDETERMINED; no state closes in v1", () => {
-    expect(RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY).toEqual([]);
+  it("K. relationship standing: none or DISCOVERED passes; an unknown state is UNDETERMINED; only PASSED closes", () => {
+    expect(RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY).toEqual(["PASSED"]);
     expect(
       evaluateHardEligibility(
         input({ relationship: { kind: "STATE", currentState: "DISCOVERED" } }),
@@ -662,6 +662,53 @@ describe("eligibility policy v1 — golden scenarios", () => {
     );
     expect(unknown.decision).toBe("UNDETERMINED");
     expect(unknown.reasonCodes).toEqual(["RELATIONSHIP_STATE_UNKNOWN"]);
+  });
+
+  it("L. a post-meeting pass closes the pair until a material change (doc 19 §67)", () => {
+    const passedAt = "2026-10-02T10:00:00.000Z";
+    const passed = (
+      latest: {
+        readonly pitch?: string;
+        readonly objective?: string;
+        readonly version?: number;
+      } = {},
+    ) =>
+      evaluateHardEligibility(
+        input({
+          relationship: {
+            kind: "STATE",
+            currentState: "PASSED",
+            pass: {
+              standing: {
+                passedAt,
+                mandateId: MANDATE,
+                mandateVersion: latest.version ?? 3,
+              },
+              latestPitchReadyAt: latest.pitch ?? null,
+              latestCapitalObjectiveAt: latest.objective ?? null,
+            },
+          },
+        }),
+      );
+    // Closed: no evidence, older evidence, or no pass record read at all.
+    for (const r of [
+      passed(),
+      passed({ pitch: "2026-09-01T00:00:00.000Z" }),
+      evaluateHardEligibility(
+        input({ relationship: { kind: "STATE", currentState: "PASSED" } }),
+      ),
+    ]) {
+      expect(r.decision).toBe("INELIGIBLE");
+      expect(r.reasonCodes).toEqual(["RELATIONSHIP_CLOSED"]);
+    }
+    // Reopened by a new pitch, a new raise, or a mandate that changed.
+    expect(passed({ pitch: "2026-10-05T00:00:00.000Z" }).decision).toBe(
+      "ELIGIBLE",
+    );
+    expect(passed({ objective: "2026-11-01T00:00:00.000Z" }).decision).toBe(
+      "ELIGIBLE",
+    );
+    expect(passed({ version: 2 }).decision).toBe("ELIGIBLE");
   });
 
   it("a FAIL outranks an UNKNOWN: an ineligible company stays ineligible when its stage is unknown", () => {
