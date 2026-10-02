@@ -56,7 +56,7 @@ export const TURN_READER_V24: PromptDefinition<
 > = {
   ...TURN_READER_V23,
   version: 24,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-10-01: addressedToQ also false for dictation meant for someone else and a name said to another person; new earlierNotForQ when the person says what they said before was not for Q. Code keeps such lines out of what Q reads back. QA: names the RESULTS destination.",
   effectiveFrom: "2026-10-01",

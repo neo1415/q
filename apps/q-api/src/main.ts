@@ -200,7 +200,10 @@ import {
   type ModelProvider,
 } from "@capital-q/model-gateway";
 import { withTestRouting } from "@capital-q/model-gateway";
-import { createQDelegationReader } from "@capital-q/model-gateway/q";
+import {
+  createQDelegationReader,
+  createQTurnReader,
+} from "@capital-q/model-gateway/q";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
@@ -3510,6 +3513,12 @@ const voiceTurn = timedVoiceTurns(
     continueApproved,
     // And whether it was a yes is read from their words (ADR 0011).
     decisions: createDecisionReader({
+      gateway: modelGateway,
+      logger,
+      dataPosture: demoDataPosture,
+    }),
+    // Whether a spoken turn is only about ending the line (v25 endVoice).
+    turns: createQTurnReader({
       gateway: modelGateway,
       logger,
       dataPosture: demoDataPosture,

@@ -485,3 +485,17 @@ export const TurnReaderV24ResultSchema = TurnReaderV22ResultSchema.extend({
   earlierNotForQ: z.boolean().default(false),
 }).strict();
 export type TurnReaderV24Result = z.infer<typeof TurnReaderV24ResultSchema>;
+
+/**
+ * v25 (founder live 2026-10-02): "Go ahead and save it. I approve it." on
+ * voice ended the call: a yes/no "stop talking?" reading said YES to an
+ * approval. endVoice is part of the turn's own reading: true only when the
+ * whole message is about ending this voice conversation or switching to
+ * typing, and never when it also approves, asks, requests or answers.
+ */
+export const TURN_READER_V25_SCHEMA_VERSION = 25;
+
+export const TurnReaderV25ResultSchema = TurnReaderV24ResultSchema.extend({
+  endVoice: z.boolean().default(false),
+}).strict();
+export type TurnReaderV25Result = z.infer<typeof TurnReaderV25ResultSchema>;

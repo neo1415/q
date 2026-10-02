@@ -4,12 +4,12 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV24ResultSchema,
+  TurnReaderV25ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
-  type TurnReaderV24Result,
+  type TurnReaderV25Result,
   type TurnReaderV7Variables,
 } from "@capital-q/q-core";
 
@@ -64,6 +64,8 @@ export type QTurnReading = Omit<
   readonly handOver?: TurnReaderV22Result["handOver"] | undefined;
   /** v24: they told Q that what they said just before was not for it. */
   readonly earlierNotForQ?: boolean | undefined;
+  /** v25: the whole spoken message is about ending the voice conversation. */
+  readonly endVoice?: boolean | undefined;
 };
 
 /**
@@ -140,7 +142,7 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderV24Result>(
+        const response = await gateway.execute<TurnReaderV25Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             // A closed classification needs little thought; left unset, a
@@ -156,7 +158,7 @@ export function createQTurnReader(dependencies: {
             attribution: input.attribution,
           },
           {
-            schema: TurnReaderV24ResultSchema,
+            schema: TurnReaderV25ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
             ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
               ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
@@ -164,7 +166,7 @@ export function createQTurnReader(dependencies: {
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV24ResultSchema.safeParse(
+        const parsed = TurnReaderV25ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

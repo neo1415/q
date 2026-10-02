@@ -23,8 +23,11 @@ import {
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import { createVoiceTurnBoard } from "../src/voice/turn-board.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
+import type { QTurnReading } from "@capital-q/model-gateway/q";
+
 import {
   createVoiceTurnHandler,
+  endsVoice,
   latestUtterance,
   spokenAcknowledgement,
 } from "../src/voice/turn.js";
@@ -597,7 +600,24 @@ describe("a spoken category confirmation", () => {
 });
 
 describe("ending the voice line is read by meaning (founder order 2026-10-02)", () => {
-  const ending = (said: string, endRead: "YES" | "UNRELATED") => {
+  // What a model's v25 reading of each line is; code decides from it.
+  const reading = (said: string): QTurnReading => {
+    const approves = /approve|save it|go ahead/i.test(said);
+    const ends =
+      !approves && /bye|type instead|écrire|stop the voice/i.test(said);
+    return {
+      kind: approves ? "ANSWER" : ends ? "CONTROL" : "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      // A model may well set endVoice on an approval: code still refuses
+      // to end a turn that is not only about the channel.
+      endVoice: ends || approves,
+    } as unknown as QTurnReading;
+  };
+  const ending = () => {
     const runtime = fakeRuntime();
     const board = createVoiceTurnBoard();
     const handle = createVoiceTurnHandler({
@@ -619,65 +639,69 @@ describe("ending the voice line is read by meaning (founder order 2026-10-02)", 
         event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
       ]),
       board,
-      decisions: {
-        read: (input) =>
-          Promise.resolve(
-            input.question.startsWith("Do they want to stop")
-              ? { decision: endRead, remainder: null }
-              : { decision: "UNRELATED" as const, remainder: null },
-          ),
-      },
+      turns: { read: (input) => Promise.resolve(reading(input.utterance)) },
       logger,
     });
-    return { handle, board, runtime, said };
+    return { handle, board };
   };
-
-  it("hands over to typing when the reading says so, in any language", async () => {
-    for (const said of [
-      "On arrête là, merci, je vais écrire.",
-      "abeg make we stop the voice thing",
-      "ok that's me for today x",
-    ]) {
-      const { handle, board } = ending(said, "YES");
-      const bound = binding({
-        conversationId: undefined,
-        subjects: undefined,
-        onboarding: undefined,
-      });
-      const speaker = fakeSpeaker();
-      const outcome = await handle(
-        bound,
-        [{ role: "user", content: said }],
-        new AbortController().signal,
-        speaker,
-      );
-      expect(outcome, said).toEqual({ kind: "SPOKEN", path: "MOVE" });
-      expect(board.read(bound.voiceSessionId).handoff, said).toBe("CHAT");
-      expect(speaker.spoken.join(" "), said).not.toContain(
-        "Here is the answer.",
-      );
-    }
-  });
-
-  it("does not end on words that merely sound like it", async () => {
-    const { handle, board } = ending(
-      "let's stop at series A, what next?",
-      "UNRELATED",
-    );
+  const say = async (said: string) => {
+    const { handle, board } = ending();
     const bound = binding({
       conversationId: undefined,
       subjects: undefined,
       onboarding: undefined,
     });
     const speaker = fakeSpeaker();
-    await handle(
+    const outcome = await handle(
       bound,
-      [{ role: "user", content: "let's stop at series A, what next?" }],
+      [{ role: "user", content: said }],
       new AbortController().signal,
       speaker,
     );
-    expect(board.read(bound.voiceSessionId).handoff ?? null).not.toBe("CHAT");
-    expect(speaker.spoken.join(" ")).toContain("Here is the answer.");
+    return {
+      outcome,
+      handoff: board.read(bound.voiceSessionId).handoff ?? null,
+      spoken: speaker.spoken.join(" "),
+    };
+  };
+
+  it("never ends on an approval, in the founder's own words (live 2026-10-02)", async () => {
+    for (const said of [
+      "Go ahead and save it. I approve it.",
+      "Yeah. The description that you just gave me, go ahead and save it. I approve it.",
+      "Save it. I approve it.",
+    ]) {
+      const heard = await say(said);
+      expect(heard.handoff, said).not.toBe("CHAT");
+      expect(heard.spoken, said).toContain("Here is the answer.");
+    }
+  });
+
+  it("ends when the whole message is about ending, in any language", async () => {
+    for (const said of [
+      "ok bye Q",
+      "let me type instead",
+      "On arrête là, je vais écrire.",
+      "abeg make we stop the voice thing",
+    ]) {
+      const heard = await say(said);
+      expect(heard.outcome, said).toEqual({ kind: "SPOKEN", path: "MOVE" });
+      expect(heard.handoff, said).toBe("CHAT");
+      expect(heard.spoken, said).not.toContain("Here is the answer.");
+    }
+  });
+
+  it("only a channel-only reading ends the line", () => {
+    const base = reading("ok bye Q");
+    expect(endsVoice(base)).toBe(true);
+    expect(endsVoice({ ...base, kind: "ANSWER" })).toBe(false);
+    expect(
+      endsVoice({
+        ...base,
+        tool: { kind: "NAVIGATE" },
+      } as unknown as QTurnReading),
+    ).toBe(false);
+    expect(endsVoice(null)).toBe(false);
   });
 });
 
@@ -1562,12 +1586,6 @@ describe("a spoken question for Q", () => {
       decisions: {
         read: (input) => {
           asked.push(input.question);
-          if (input.question.startsWith("Do they want to stop")) {
-            return Promise.resolve({
-              decision: "UNRELATED" as const,
-              remainder: null,
-            });
-          }
           // A model's reading of "Approved. And what's the weather like?"
           return Promise.resolve({
             decision: "YES" as const,
@@ -1602,7 +1620,7 @@ describe("a spoken question for Q", () => {
       new AbortController().signal,
       yes,
     );
-    expect(asked.filter((q) => !q.startsWith("Do they want to stop"))).toEqual([
+    expect(asked).toEqual([
       "Change what I call you to John. Shall I go ahead?",
     ]);
     expect(approvals.approve).toHaveLength(1);

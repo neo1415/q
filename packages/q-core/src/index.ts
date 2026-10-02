@@ -200,6 +200,10 @@ export {
   TURN_READER_V24_ADDRESSED,
 } from "./prompts/tasks/turn-reader.v24.js";
 export {
+  TURN_READER_V25,
+  TURN_READER_V25_END_VOICE,
+} from "./prompts/tasks/turn-reader.v25.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -238,6 +242,9 @@ export {
   TurnReaderV22ResultSchema,
   TURN_READER_V24_SCHEMA_VERSION,
   TurnReaderV24ResultSchema,
+  TURN_READER_V25_SCHEMA_VERSION,
+  TurnReaderV25ResultSchema,
+  type TurnReaderV25Result,
   type TurnReaderV24Result,
   type TurnHandOver,
   type TurnReaderV22Result,

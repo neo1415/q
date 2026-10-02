@@ -18,8 +18,9 @@ describe("TURN_READER v24", () => {
   it("is the active reader and v23 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(24);
+    ).toBe(25);
     expect(TURN_READER_V23.status).toBe("DEPRECATED");
+    expect(TURN_READER_V24.status).toBe("DEPRECATED");
   });
 
   it("adds dictation and earlierNotForQ to the addressed line, and loses nothing of v23", () => {

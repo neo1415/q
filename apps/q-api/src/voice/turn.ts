@@ -51,6 +51,7 @@ import {
 } from "./recognise.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
+import type { QTurnReader, QTurnReading } from "@capital-q/model-gateway/q";
 import type { DecisionReader, DecisionReading } from "./decision.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import {
@@ -123,6 +124,12 @@ export type VoiceTurnDependencies = {
    */
   readonly decisions?: DecisionReader | undefined;
   /**
+   * The turn reader, for whether a spoken turn is only about ending the
+   * voice conversation (v25 endVoice; founder live 2026-10-02: an
+   * approval read as "stop talking" ended the call).
+   */
+  readonly turns?: QTurnReader | undefined;
+  /**
    * Where how a reply should sound waits for the speak relay
    * (CQ-VOICE-010). Absent means every reply is spoken as written.
    */
@@ -179,8 +186,18 @@ const WELCOME_CHOICE = {
  */
 const KEEP_SUGGESTIONS_QUESTION =
   "Q suggested categories for their company. Do they accept them as they are?";
-const END_VOICE_QUESTION =
-  "Do they want to stop talking by voice now -- end this voice conversation, or switch to typing -- rather than say something to Q?";
+
+/** Ends the voice line only on a turn that is about nothing but that. */
+export function endsVoice(read: QTurnReading | null): boolean {
+  return (
+    read !== null &&
+    read.endVoice === true &&
+    (read.kind === "CONTROL" || read.kind === "SMALL_TALK") &&
+    read.tool === null &&
+    (read.handOver ?? null) === null &&
+    read.question === null
+  );
+}
 
 /**
  * Whether the last Q run this line started ended in failure, so that a
@@ -1752,9 +1769,34 @@ export function createVoiceTurnHandler(
     // screen to the typed thread.
     const turn = new AbortController();
     const turnSignal = AbortSignal.any([signal, turn.signal]);
-    const ending = decide(binding, END_VOICE_QUESTION, text, signal).catch(
-      () => ({ decision: "UNRELATED" as const, remainder: null }),
-    );
+    // The turn's own reading, not a yes/no question an approval can
+    // satisfy: it ends the line only when the whole message is about the
+    // channel (endVoice) and the turn is a control word or a remark --
+    // never with a request, an approval, a question or an answer.
+    const ending: Promise<boolean> = (async () => {
+      const reader = dependencies.turns;
+      if (reader === undefined) return false;
+      const read = await reader
+        .read({
+          utterance: text,
+          recentTurns: transcriptOf(binding)
+            .slice(0, -1)
+            .slice(-6)
+            .map((turn) => ({
+              role: turn.role === "person" ? ("USER" as const) : ("Q" as const),
+              text: turn.text,
+            })),
+          modality: "VOICE",
+          attribution: {
+            tenantId: binding.actor.tenantId,
+            userId: binding.actor.userId,
+            correlationId: createCorrelationId(),
+          },
+          signal,
+        })
+        .catch(() => null);
+      return endsVoice(read);
+    })();
     const endNow = async (): Promise<VoiceTurnOutcome> => {
       dependencies.board?.record(binding.voiceSessionId, {
         asking: null,
@@ -1778,7 +1820,7 @@ export function createVoiceTurnHandler(
           : askQ(binding, text, turnSignal, speaker);
     // Never an unhandled rejection when the answer is stopped.
     answering.catch(() => undefined);
-    if ((await ending).decision === "YES") {
+    if (await ending) {
       turn.abort();
       await answering.catch(() => undefined);
       return endNow();
