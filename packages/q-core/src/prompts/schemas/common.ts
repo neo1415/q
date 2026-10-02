@@ -79,7 +79,7 @@ export const TaskFrameSchema = {
   // offered (most Home Q runs) what Q can do still never fitted, and how a
   // reply ends (next step + offer) joined it. The rendered charter stays
   // bounded.
-  environmentNotes: z.string().max(8_000),
+  environmentNotes: z.string().max(9_000),
 };
 
 /** A finding as a model may state it: vocabulary only, no ids, no references. */

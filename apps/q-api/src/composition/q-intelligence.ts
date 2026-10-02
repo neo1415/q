@@ -11,6 +11,7 @@ import {
   type QMemoryRecall,
   type QOnboardingNudgePort,
   type QOwnOnboardingPort,
+  type ModelGatewayQAnswerDependencies,
 } from "@capital-q/model-gateway/q";
 import type { ModelDataPosture } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
@@ -135,6 +136,8 @@ export type QIntelligenceDependencies = {
       }) => Promise<string | null>)
     | undefined;
   /** Who is asking: their own name and company (founder live 2026-09-30). */
+  /** Their own rehearsals and saved zone, for the own-day read. */
+  readonly ownDay?: ModelGatewayQAnswerDependencies["ownDay"];
   readonly askerOf?:
     | ((request: {
         readonly tenantId: string;
@@ -285,6 +288,9 @@ export function composeQIntelligence(
     ...(dependencies.askerOf === undefined
       ? {}
       : { askerOf: dependencies.askerOf }),
+    ...(dependencies.ownDay === undefined
+      ? {}
+      : { ownDay: dependencies.ownDay }),
     ...(dependencies.deltas === undefined
       ? {}
       : { deltas: dependencies.deltas }),
