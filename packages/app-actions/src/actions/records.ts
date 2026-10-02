@@ -487,7 +487,7 @@ const PERSON_PROFILE = defineAppAction<
     name: "update_my_profile",
     purposes: ["GENERAL_QUESTION", ...OWN_TURNS],
     description:
-      "Prepares a change to the person's own profile: displayName (what to call them), headline (one line about themselves; null clears it) and timeZone (IANA, such as Africa/Lagos). Nothing changes until they approve exactly it.",
+      "Prepares a change to the person's own profile: displayName (what to call them), headline (one line about themselves; null clears it) and timeZone (IANA, such as Africa/Lagos). Not their title or role: at their company that is set_my_company_role, at their investor organisation set_my_investor_role. Nothing changes until they approve exactly it.",
     input: PersonTool,
     references: {},
     eval: {
@@ -615,7 +615,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     tool: {
       name: "set_my_company_role",
       description:
-        "Prepares a change to their own place on their company's team, as the team page makes it: relationshipType (team_member, advisor, board_member, contractor, other), businessTitle (null clears it) and whether they are a founder. What they leave out stays as it is. Nothing changes until they approve exactly it.",
+        "Prepares a change to their own place on their company's team, as the team page makes it: their title or role there (businessTitle, e.g. CEO; null clears it), relationshipType (team_member, advisor, board_member, contractor, other) and whether they are a founder. What they leave out stays as it is. Nothing changes until they approve exactly it.",
       input: CompanyRoleTool,
       references: {},
       scopes: COMPANY_SCOPES,
@@ -885,7 +885,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     tool: {
       name: "set_my_investor_role",
       description:
-        "Prepares a change to their own title at their investor organisation, as its page makes it (null clears it). Nothing changes until they approve exactly it.",
+        "Prepares a change to their own title or role at their investor organisation (businessTitle, e.g. Managing Partner), as its page makes it (null clears it). Nothing changes until they approve exactly it.",
       input: InvestorRoleTool,
       references: {},
       scopes: INVESTOR_SCOPES,

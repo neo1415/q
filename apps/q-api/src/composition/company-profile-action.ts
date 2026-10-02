@@ -32,11 +32,13 @@ import {
   COMPANY_VISIBILITY_SET,
   CompanyVisibilitySetPayloadSchema,
 } from "./company-visibility-action.js";
-import {
-  PERSON_PROFILE_UPDATE,
-  PersonProfileUpdatePayloadSchema,
-} from "./person-profile-action.js";
+import { PersonProfileUpdatePayloadSchema } from "./person-profile-action.js";
 import { savedReadsLine } from "./saved-line.js";
+
+/** The registry's own type for a change to the person's profile. */
+const APP_PERSON_PROFILE_UPDATE = QActionTypeSchema.parse(
+  "app.person.profile.update",
+);
 
 /**
  * The first real Q action: a change to the person's own company profile
@@ -440,9 +442,15 @@ export function createProfileUpdateBoard(
             displayName: name.displayName,
           });
           if (parsed.success) {
+            // ADR 0040: the same declaration update_my_profile prepares, so
+            // a name read from the turn and one asked of the tool are one
+            // card type, approved and run the same way.
             return Promise.resolve({
-              actionType: PERSON_PROFILE_UPDATE,
-              payload: parsed.data,
+              actionType: APP_PERSON_PROFILE_UPDATE,
+              payload: {
+                userId: parsed.data.userId,
+                input: { displayName: name.displayName.trim() },
+              },
             });
           }
           options.logger?.info(
