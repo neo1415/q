@@ -1,3 +1,4 @@
+import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
 import { QRehearsalPersonaDtoSchema } from "@capital-q/contracts";
@@ -5,7 +6,7 @@ import type {
   CounterpartPersonaStored as CounterpartPersonaResult,
   PresenceReading,
 } from "@capital-q/q-core";
-import type { ActorContext } from "@capital-q/security";
+import { AuthUserIdSchema, type ActorContext } from "@capital-q/security";
 
 import {
   CAMERA_FRAME_TTL_MS,
@@ -25,6 +26,7 @@ import {
 } from "../src/composition/rehearsals.js";
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
+import { registerRehearsalRoutes } from "../src/http/rehearsals.js";
 import { createRehearsalAwareTurn } from "../src/voice/rehearsal-turn.js";
 import {
   walkOutPlan,
@@ -1505,5 +1507,96 @@ describe("never stuck on thinking (founder live 2026-10-02)", () => {
     expect(seen.turnInputs.length).toBe(calls + 2);
     expect(noiseOnly("Uh, the churn is five percent")).toBe(false);
     expect(noiseOnly("No.")).toBe(false);
+  });
+});
+
+describe("frames through the HTTP route reach the voice turn (live P0 2026-10-02, e53c264f)", () => {
+  const JPEG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD";
+  async function room() {
+    const harness = setup();
+    const rehearsal = await startWith(harness.service);
+    const server = Fastify();
+    registerRehearsalRoutes(server, {
+      authenticator: {
+        authenticate: () =>
+          Promise.resolve({
+            authUserId: AuthUserIdSchema.parse(
+              "a0000000-0000-4000-8000-000000000001",
+            ),
+          }),
+      },
+      resolver: {
+        resolveHumanContext: () =>
+          Promise.resolve({ status: "RESOLVED", context: actor(FOUNDER) }),
+      },
+      rehearsals: harness.service,
+    } as never);
+    const spoken: string[] = [];
+    const turn = createRehearsalAwareTurn({
+      rehearsals: harness.service,
+      fallback: () => Promise.resolve({ kind: "NOTHING" }),
+    });
+    const speaker: VoiceSpeaker = {
+      providerConversationId: "dg_x",
+      isOpen: true,
+      speak: (text) => {
+        if (typeof text === "string") spoken.push(text);
+        return Promise.resolve();
+      },
+      close: () => undefined,
+    };
+    const binding = {
+      actor: actor(FOUNDER),
+      thread: { rehearsal: { rehearsalId: rehearsal.id } },
+    } as unknown as VoiceSessionBinding;
+    const post = (payload: object) =>
+      server.inject({
+        method: "POST",
+        url: `/v1/q/rehearsals/${rehearsal.id}/screen`,
+        payload,
+      });
+    const voice = (content: string) =>
+      turn(
+        binding,
+        [{ role: "user", content }],
+        new AbortController().signal,
+        speaker,
+      );
+    return { ...harness, server, post, voice };
+  }
+
+  it("a camera frame posted through the route is attached to the voice turn's model call", async () => {
+    const { post, voice, seen, server } = await room();
+    const posted = await post({ kind: "CAMERA", image: JPEG });
+    expect(posted.statusCode).toBe(200);
+    const calls = seen.turnInputs.length;
+    await voice("Nixo, can you see me?");
+    expect(seen.turnInputs.slice(calls).map((t) => t.camera)).toEqual([true]);
+    expect(seen.turnInputs.at(-1)?.presenceNote).not.toContain("not shared");
+    await server.close();
+  });
+
+  it("e53c264f: a camera frame 20 s old answers 'can you see me?' in one pass, never replaced by a pass without it", async () => {
+    const { post, voice, seen, server, clock, looks } = await room();
+    looks.asked = (transcript) => transcript.includes("can you see me");
+    expect((await post({ kind: "CAMERA", image: JPEG })).statusCode).toBe(200);
+    clock.at += 20_000;
+    const calls = seen.turnInputs.length;
+    await voice("Hey. Oh, sorry. Nixo, can you see me?");
+    expect(seen.turnInputs.slice(calls).map((t) => t.camera)).toEqual([true]);
+    await server.close();
+  });
+
+  it("a shared screen posted through the route is attached to the voice turn's model call", async () => {
+    const { post, voice, seen, server } = await room();
+    expect((await post({ kind: "SCREEN", image: JPEG })).statusCode).toBe(200);
+    const calls = seen.turnInputs.length;
+    await voice("What do you see on my screen?");
+    await voice("And now?");
+    expect(seen.turnInputs.slice(calls).map((t) => t.screen)).toEqual([
+      true,
+      true,
+    ]);
+    await server.close();
   });
 });
