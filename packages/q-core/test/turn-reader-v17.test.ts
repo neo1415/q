@@ -21,7 +21,7 @@ const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
 describe("TURN_READER v17", () => {
   it("is superseded by v18, which only adds a screen", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(30);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(31);
   });
 
   it("names every contract destination exactly once", () => {

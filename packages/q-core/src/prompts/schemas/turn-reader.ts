@@ -554,3 +554,28 @@ export const TurnReaderV30ResultSchema = TurnReaderV28ResultSchema.extend({
   askedAction: z.string().trim().min(1).max(80).nullable().default(null),
 }).strict();
 export type TurnReaderV30Result = z.infer<typeof TurnReaderV30ResultSchema>;
+
+/**
+ * v31 (QA, ADR 0040 parity eval, 2026-10-02): with 78 tools offered the
+ * answer model described Save or Pass instead of calling them, and "Let
+ * investors play my pitch video" was read as SET_VISIBILITY. appAction is
+ * the one declared app action a direct, specific request asks for, with
+ * the records named as said; code runs it through the executor (its
+ * authorize step and, for a consequential action, its approval card).
+ */
+export const TURN_READER_V31_SCHEMA_VERSION = 31;
+
+export const TurnAppActionSchema = z
+  .object({
+    /** A declared app action's name, exactly as listed. */
+    tool: z.string().trim().min(1).max(80),
+    /** Its arguments; records named exactly as said, never an id guessed. */
+    arguments: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+export type TurnAppAction = z.infer<typeof TurnAppActionSchema>;
+
+export const TurnReaderV31ResultSchema = TurnReaderV30ResultSchema.extend({
+  appAction: TurnAppActionSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV31Result = z.infer<typeof TurnReaderV31ResultSchema>;
