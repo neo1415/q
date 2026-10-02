@@ -7,6 +7,7 @@ import {
   getRelationshipWithCompany,
   listTaxonomyNodes,
 } from "@capital-q/api-client";
+import { isMatchedRelationshipState } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -109,7 +110,9 @@ export default async function CompanyPage({
         profile={profile}
         tab={tab}
         interest={interest?.interest ?? null}
-        connected={standing?.relationship?.state === "CONNECTED"}
+        connected={isMatchedRelationshipState(
+          standing?.relationship?.state ?? "",
+        )}
         sectorLabels={sectorLabels}
       />
     </PageContainer>
