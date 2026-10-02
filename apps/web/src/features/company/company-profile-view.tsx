@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-import type { CompanyProfileDto, InterestDto } from "@capital-q/contracts";
+import type {
+  CompanyProfileDto,
+  CompanyProfileTeamMember,
+  InterestDto,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
   ChevronRight,
@@ -39,6 +43,66 @@ import { countryLabel, stageLabel } from "./declared-labels";
  */
 
 export type ProfileTab = "overview" | "videos";
+
+const RELATIONSHIP_LABELS: Readonly<
+  Record<CompanyProfileTeamMember["relationshipType"], string>
+> = {
+  team_member: "Team",
+  advisor: "Advisor",
+  board_member: "Board",
+  contractor: "Contractor",
+  other: "Other",
+};
+
+/** "Founder · CEO", "Advisor": declared words, never a badge. */
+export function teamRoleLine(member: CompanyProfileTeamMember): string {
+  return [
+    member.isFounder ? "Founder" : RELATIONSHIP_LABELS[member.relationshipType],
+    member.businessTitle,
+  ]
+    .filter((part): part is string => part !== null && part !== "")
+    .join(" · ");
+}
+
+/**
+ * The team, as an investor who can find the company sees it (ADR 0041):
+ * names, declared roles and short bios, as a plain list.
+ */
+function TeamList({
+  team,
+}: {
+  readonly team: readonly CompanyProfileTeamMember[];
+}) {
+  if (team.length === 0) return null;
+  return (
+    <section
+      className="flex max-w-(--cq-layout-narrow) flex-col gap-2"
+      aria-labelledby="company-team"
+      data-profile-team
+    >
+      <h2 id="company-team" className="cq-title-sm text-(--cq-text-primary)">
+        Team
+      </h2>
+      <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
+        {team.map((member, index) => (
+          <li key={`${member.name}-${String(index)}`} className="flex flex-col gap-1 py-3">
+            <p className="cq-body font-medium text-(--cq-text-primary)">
+              {member.name}
+            </p>
+            <p className="cq-caption text-(--cq-text-secondary)">
+              {teamRoleLine(member)}
+            </p>
+            {member.shortBio === null ? null : (
+              <p className="cq-body-sm text-(--cq-text-primary)">
+                {member.shortBio}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 /** "USD 1,500,000" from a decimal string, without ever becoming a float. */
 export function moneyText(money: {
@@ -250,6 +314,8 @@ export function CompanyProfileView({
               </div>
             ))}
           </dl>
+
+          <TeamList team={overview.team} />
 
           {overview.websiteUrl === null ? null : (
             <p className="flex items-center gap-1.5">

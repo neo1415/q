@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  DocumentDownloadAudienceDtoSchema,
   DocumentDownloadAudienceSchema,
   ResourceVersionSchema,
   UuidSchema,
@@ -63,13 +64,7 @@ const WORDS: Readonly<Record<DocumentDownloadAudience, string>> = {
 };
 
 /** The route's answer: the choice as it now stands, never a file or URL. */
-export const DeckAudienceResponseSchema = z
-  .object({
-    documentId: UuidSchema,
-    downloadAudience: DocumentDownloadAudienceSchema,
-    version: ResourceVersionSchema,
-  })
-  .strict();
+export const DeckAudienceResponseSchema = DocumentDownloadAudienceDtoSchema;
 
 const ToolInputSchema = z
   .object({

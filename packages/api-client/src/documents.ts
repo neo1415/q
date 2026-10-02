@@ -1,12 +1,15 @@
 import {
   CreateDocumentUploadSessionResponseSchema,
   DOCUMENT_UPLOAD_SESSIONS_PATH,
+  DOCUMENT_DOWNLOAD_AUDIENCE_SEGMENT,
   DOCUMENTS_PATH,
+  DocumentDownloadAudienceDtoSchema,
   DocumentListResponseSchema,
   DocumentResponseSchema,
   DocumentUploadSessionResponseSchema,
   IDEMPOTENCY_KEY_HEADER,
   type CompleteDocumentUploadSessionRequest,
+  type SetDocumentDownloadAudienceRequest,
   type CreateDocumentUploadSessionRequest,
 } from "@capital-q/contracts";
 
@@ -120,5 +123,24 @@ export function listDocuments(
     "GET",
     `${DOCUMENTS_PATH}${query}`,
     DocumentListResponseSchema,
+  );
+}
+
+/**
+ * `POST /v1/documents/:id/download-audience` — who may download a pitch
+ * deck (ADR 0041): only the organisation, or investors who can find the
+ * company. The version the screen saw; a stale one is refused.
+ */
+export function setDocumentDownloadAudience(
+  session: ApiSession,
+  documentId: string,
+  request: SetDocumentDownloadAudienceRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}${DOCUMENT_DOWNLOAD_AUDIENCE_SEGMENT}`,
+    DocumentDownloadAudienceDtoSchema,
+    { body: request },
   );
 }

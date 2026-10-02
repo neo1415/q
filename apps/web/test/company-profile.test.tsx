@@ -116,6 +116,22 @@ function investorProfile(
       organisationVerified: true,
       facts: [],
       deck: { title: "Kivu seed deck", sharedAt: "2026-09-30T10:00:00.000Z" },
+      team: [
+        {
+          name: "Ada Obi",
+          relationshipType: "team_member",
+          businessTitle: "CEO",
+          isFounder: true,
+          shortBio: "Built grid storage at two utilities.",
+        },
+        {
+          name: "Kemi Ade",
+          relationshipType: "advisor",
+          businessTitle: null,
+          isFounder: false,
+          shortBio: null,
+        },
+      ],
     },
     videos: [video(VIDEO_A, "The pitch"), video(VIDEO_B, null)],
     ...overrides,
@@ -266,6 +282,24 @@ describe("the profile, for an investor", () => {
   });
 });
 
+describe("the team (ADR 0041)", () => {
+  it("lists names, declared roles in words and short bios for an investor", () => {
+    renderProfile(investorProfile());
+    const team = screen.getByRole("region", { name: "Team" });
+    expect(team.textContent).toContain("Ada Obi");
+    expect(team.textContent).toContain("Founder · CEO");
+    expect(team.textContent).toContain("Built grid storage at two utilities.");
+    expect(team.textContent).toContain("Advisor");
+  });
+
+  it("shows no team section when none is shown to this reader", () => {
+    const base = investorProfile();
+    if (base.overview === null) throw new Error("expected an overview");
+    renderProfile({ ...base, overview: { ...base.overview, team: [] } });
+    expect(screen.queryByRole("region", { name: "Team" })).toBeNull();
+  });
+});
+
 describe("the profile, for a founder viewing another company", () => {
   it("shows identity and the videos tab only: no overview, deck, raise or actions", () => {
     const { container } = renderProfile(FOUNDER_VIEW);
@@ -282,6 +316,7 @@ describe("the profile, for a founder viewing another company", () => {
     expect(container.textContent).not.toContain("Raising");
     expect(container.textContent).not.toContain("1,500,000");
     expect(container.querySelector("[data-profile-actions]")).toBeNull();
+    expect(container.querySelector("[data-profile-team]")).toBeNull();
     expect(
       screen.getByRole("button", { name: "Play Open to the network" }),
     ).toBeTruthy();

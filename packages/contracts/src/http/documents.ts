@@ -73,6 +73,17 @@ export const SetDocumentDownloadAudienceRequestSchema = z
 export type SetDocumentDownloadAudienceRequest = z.infer<
   typeof SetDocumentDownloadAudienceRequestSchema
 >;
+/** The choice as it now stands: never a file, a title or a URL. */
+export const DocumentDownloadAudienceDtoSchema = z
+  .object({
+    documentId: UuidSchema,
+    downloadAudience: DocumentDownloadAudienceSchema,
+    version: ResourceVersionSchema,
+  })
+  .strict();
+export type DocumentDownloadAudienceDto = z.infer<
+  typeof DocumentDownloadAudienceDtoSchema
+>;
 
 export const DOCUMENT_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export const DocumentStatusSchema = z.enum(DOCUMENT_STATUSES);

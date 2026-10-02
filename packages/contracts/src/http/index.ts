@@ -608,6 +608,8 @@ export {
   DOCUMENT_DOWNLOAD_AUDIENCES,
   DocumentDownloadAudienceSchema,
   SetDocumentDownloadAudienceRequestSchema,
+  DocumentDownloadAudienceDtoSchema,
+  type DocumentDownloadAudienceDto,
   type DocumentDownloadAudience,
   type SetDocumentDownloadAudienceRequest,
   DOCUMENT_STATUSES,
