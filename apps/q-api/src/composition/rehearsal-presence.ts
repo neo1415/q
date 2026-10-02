@@ -101,7 +101,7 @@ export function presenceNote(
   }
   if (!cameraOn) {
     return {
-      note: "No look at them this turn. Say nothing about how they look or their setup.",
+      note: "Their camera is shared with you, but no clear frame came through this moment. Say nothing about how they look or their setup; if they ask you to look, say you can't quite make them out right now and ask them to hold on a second. Never say their camera isn't shared.",
       offer: null,
     };
   }

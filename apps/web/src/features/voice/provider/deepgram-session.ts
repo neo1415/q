@@ -467,6 +467,9 @@ export function useDeepgramVoiceSession(
         noteEvent("agent-thinking");
         discardUntilRef.current = 0;
         setState("THINKING");
+        // The agent's own "thinking" ends the same way: never for good
+        // (live 2026-10-02: 2.5 min of "thinking" with no reply coming).
+        watchThinking();
       });
       session.on("agent-started-speaking", () => {
         cancelRepair();

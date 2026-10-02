@@ -24,7 +24,7 @@ export const INVESTOR_TWIN_TURN_V8: PromptDefinition<
 > = {
   ...INVESTOR_TWIN_TURN_V7,
   version: 8,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-10-02: wantsToEnd and onlyNoise read by meaning on the turn, in any language, replacing phrase lists in code.",
   effectiveFrom: "2026-10-02",

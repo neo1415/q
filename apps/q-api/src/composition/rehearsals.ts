@@ -1693,30 +1693,44 @@ export function createRehearsalService(dependencies: {
     // consent, the answer comes from a frame from just now; one taken a
     // while ago is not good enough. Without consent the first line already
     // said plainly that Q can't see them.
-    const fresh =
-      held !== null && at - held.at <= CAMERA_FRESH_MS ? held.image : null;
-    const lookAgain =
-      first.askedToSee &&
-      consent &&
-      !(cameraFrame !== null && fresh !== null) &&
-      signal?.aborted !== true;
+    // A look on request goes again only when the first pass had no
+    // camera frame at all and one has arrived since (the browser sends a
+    // fresh frame with the turn). A first pass that saw a frame stands:
+    // live 2026-10-02 (e53c264f) a second pass without the frame replaced
+    // a first that had seen them, and said the camera wasn't shared.
+    const later =
+      cameraFrame === null && first.askedToSee && consent
+        ? peekFrame(row.id, "CAMERA")
+        : null;
+    const fresh = later?.image ?? null;
+    const lookAgain = fresh !== null && signal?.aborted !== true;
     const result = lookAgain
       ? ((await composer.turn(
           actor,
           {
             ...variables,
-            cameraOn: fresh !== null,
+            cameraOn: true,
             presence:
-              fresh !== null
-                ? "They asked you to look: this frame is from just now. Answer about what it shows -- the object, the whiteboard, their setup -- in character, briefly; if it is unclear, say you can't make it out and ask them to hold it closer. Only behaviour, setup and objects; never appearance or identity."
-                : "They asked you to look, but you have no clear look at them right now. Say you can't quite make it out and ask them to hold it up again. Never pretend to see it.",
+              "They asked you to look: this frame is from just now. Answer about what it shows -- the object, the whiteboard, their setup -- in character, briefly; if it is unclear, say you can't make it out and ask them to hold it closer. Only behaviour, setup and objects; never appearance or identity.",
           },
           { screen: screenFrame, camera: fresh },
           signal,
         )) ?? first)
       : first;
+    logger?.info?.(
+      {
+        rehearsalId: row.id,
+        camera: cameraFrame !== null,
+        cameraAgeMs: held === null ? null : at - held.at,
+        consent,
+        screen: screenFrame !== null,
+        askedToSee: first.askedToSee,
+        lookedAgain: lookAgain,
+      },
+      "rehearsal views",
+    );
 
-    const sawYou = cameraFrame !== null || (lookAgain && fresh !== null);
+    const sawYou = cameraFrame !== null || lookAgain;
     if (sawYou || look.offer !== null) {
       const state = seen ?? newPresenceState();
       recordPresence(
