@@ -6,7 +6,7 @@ import {
   APP_ACTIONS,
   misheard,
   parityCases,
-  qToolName,
+  qCapabilityId,
   resolveReference,
   type ReferenceCandidates,
 } from "../src/index.js";
@@ -44,7 +44,7 @@ describe("the action registry", () => {
       // An action is served to Q by a generated tool, its family's tool,
       // or (until its area's second step) the hand tool it names.
       if (action.tool === undefined) {
-        expect(qToolName(action)).toMatch(/^[a-z][a-z_]*$/);
+        expect(qCapabilityId(action)).toMatch(/^(tool|hand)\.[a-z][a-z_]*$/);
       } else {
         expect(action.tool.eval.say).toHaveLength(2);
       }
@@ -56,9 +56,11 @@ describe("the action registry", () => {
       APP_ACTIONS.map((action) => [
         action.name,
         action.tool?.name ??
-          (action.viaTool === undefined
-            ? `legacy:${action.legacyTool ?? ""}`
-            : `via:${action.viaTool}`),
+          (action.viaHand !== undefined
+            ? `hand:${action.viaHand}`
+            : action.viaTool === undefined
+              ? `legacy:${action.legacyTool ?? ""}`
+              : `via:${action.viaTool}`),
         action.classification,
       ]),
     ).toEqual([
@@ -94,6 +96,10 @@ describe("the action registry", () => {
       ["investor.mandate.update", "via:change_my_mandate", "CONSEQUENTIAL"],
       ["investor.mandate.activate", "via:change_my_mandate", "CONSEQUENTIAL"],
       ["investor.mandate.close", "via:change_my_mandate", "CONSEQUENTIAL"],
+      ["company.visibility.set", "hand:set_visibility", "CONSEQUENTIAL"],
+      ["investor.visibility.set", "set_investor_visibility", "CONSEQUENTIAL"],
+      ["disclosure.raise.share", "share_my_raise", "CONSEQUENTIAL"],
+      ["disclosure.share.revoke", "stop_sharing_my_raise", "CONSEQUENTIAL"],
     ]);
   });
 });
@@ -152,7 +158,10 @@ describe("the parity eval's cases come from the registry", () => {
             ? 0
             : action.tool.eval.names === undefined
               ? 2
-              : 3),
+              : action.tool.eval.names === "COMPANY" ||
+                  action.tool.eval.names === "MEDIA"
+                ? 3
+                : 0),
         0,
       ) + 4,
     );

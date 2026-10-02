@@ -375,6 +375,7 @@ describe("profile and records, generated from the registry (ADR 0040 step 2)", (
               isFounder: true,
               businessTitle: "COO",
             } as never),
+          setCompanyVisibility: never("visibility"),
           updateCompany: never("company"),
           upsertMyCompanyMembership: never("membership"),
           updateMyFounderProfile: never("founder"),
@@ -655,6 +656,7 @@ describe("the mandate form, one generated tool for its four declarations", () =>
         ownInvestorOrganisationId: () => Promise.resolve(ORG_INVESTOR),
         investors: {
           getInvestorOrganisation: never,
+          setInvestorVisibility: never,
           updateInvestorOrganisation: never,
           upsertMyInvestorRepresentative: never,
           getInvestorMandate: never,
@@ -731,5 +733,131 @@ describe("the mandate form, one generated tool for its four declarations", () =>
         input: {},
       },
     });
+  });
+});
+
+describe("sharing their raise, by the investor's name (visibility and shares)", () => {
+  const REL = "e1e1e1e1-0000-4000-8000-000000000001";
+  const POLICY = "f1f1f1f1-0000-4000-8000-000000000001";
+  function founderPlan(): PermittedContextPlan {
+    const plan = planFor(actorA, "OWN_COMPANY_QUESTION", [
+      { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        sensitivity: "CONFIDENTIAL",
+        companyId: COMPANY_A,
+      },
+    ]);
+    return {
+      ...plan,
+      scopes: plan.scopes.map((scope) =>
+        scope.kind === "OWN_Q_CONVERSATION"
+          ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+          : scope,
+      ),
+    };
+  }
+  function shares(options: { readonly shared?: boolean } = {}) {
+    const prepared: { actionType: string; payload: unknown }[] = [];
+    const never = () =>
+      Promise.reject(new Error("Q prepares; it never writes"));
+    const ports = fakePorts({
+      relationships: {
+        ownRelationships: () =>
+          Promise.resolve({
+            items: [
+              {
+                relationshipId: REL,
+                counterpart: {
+                  kind: "INVESTOR",
+                  id: "x",
+                  name: "Savanna Seed",
+                },
+              },
+            ],
+          } as never),
+      } as never,
+      appActions: {
+        ownCompanyId: () => Promise.resolve(COMPANY_A),
+        visibility: {
+          state: () =>
+            Promise.resolve({
+              companyId: COMPANY_A,
+              objects: [{ object: "CAPITAL_OBJECTIVE", shareable: true }],
+              shares:
+                options.shared === true
+                  ? [
+                      {
+                        policyId: POLICY,
+                        object: "CAPITAL_OBJECTIVE",
+                        relationshipId: REL,
+                        recipientName: "Savanna Seed",
+                      },
+                    ]
+                  : [],
+              relationships: [{ relationshipId: REL, name: "Savanna Seed" }],
+            } as never),
+          share: never,
+          revoke: never,
+        },
+      },
+      appApprovals: {
+        prepareForApproval: (entry) => {
+          prepared.push({
+            actionType: entry.actionType,
+            payload: entry.payload,
+          });
+          return "PREPARED";
+        },
+      },
+    });
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(createDefaultQTools(ports)),
+    });
+    return { executor, prepared };
+  }
+
+  it("'share our raise with Savana Seed' prepares the share with that relationship, named on the card", async () => {
+    const { executor, prepared } = shares();
+    await executor.execute(
+      call("share_my_raise", { investor: "Savana Seed" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(prepared).toEqual([
+      {
+        actionType: "app.disclosure.raise.share",
+        payload: {
+          companyId: COMPANY_A,
+          idempotencyKey: expect.stringMatching(/^q-/) as unknown,
+          input: { object: "CAPITAL_OBJECTIVE", relationshipId: REL },
+          recipientName: "Savanna Seed",
+        },
+      },
+    ]);
+  });
+
+  it("says they can already see it rather than sharing twice; stopping finds that share", async () => {
+    const { executor, prepared } = shares({ shared: true });
+    const again = await executor.execute(
+      call("share_my_raise", { investor: "Savanna Seed" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(JSON.stringify(again.result)).toContain(
+      "Savanna Seed can already see your raise",
+    );
+    await executor.execute(
+      call("stop_sharing_my_raise", { investor: "Savanna Seed" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(prepared).toEqual([
+      {
+        actionType: "app.disclosure.share.revoke",
+        payload: {
+          companyId: COMPANY_A,
+          policyId: POLICY,
+          recipientName: "Savanna Seed",
+        },
+      },
+    ]);
   });
 });

@@ -59,7 +59,8 @@ export type AppActionHttp<In, Out> = {
     headers: Readonly<Record<string, string | string[] | undefined>>,
   ) => unknown;
   /** The success status the route always answered with (default 200). */
-  readonly status?: 200 | 201 | 204 | undefined;
+  readonly status?:
+    200 | 201 | 204 | ((out: Out) => 200 | 201 | 204) | undefined;
   /** The Location of what it created, for a 201. */
   readonly location?: ((out: Out, input: In) => string) | undefined;
   /** The wire answer, in the route's existing response contract. */
@@ -94,7 +95,12 @@ export type AppActionTool<In, ToolIn> = {
    * own answer instead. Null: nothing to refuse.
    */
   readonly refuse?:
-    ((input: In, ports: AppActionPorts) => Promise<string | null>) | undefined;
+    | ((
+        input: In,
+        ports: AppActionPorts,
+        context: AppActionContext,
+      ) => Promise<string | null>)
+    | undefined;
   /**
    * The conversation scopes it is offered under (any of them): a founder's
    * conversation is not offered an investor organisation's tools. Default:
@@ -176,6 +182,12 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
    * declaration and route. Set by `defineAppActionFamily`.
    */
   readonly viaTool?: string | undefined;
+  /**
+   * A turn-reader hand that does this for Q instead of a tool (the
+   * reading's own kind, e.g. set_visibility); retiring a hand is the turn
+   * reader's owner's change, so it is named here until then.
+   */
+  readonly viaHand?: string | undefined;
 };
 
 /** Erased for the registry; per-action types stay with the action (as q-tools does). */
@@ -185,6 +197,13 @@ export function defineAppAction<In, Out, ToolIn = In>(
   definition: AppActionDefinition<In, Out, ToolIn>,
 ): AnyAppAction {
   return Object.freeze(definition) as unknown as AnyAppAction;
+}
+
+/** The capability id the registry lists for what does this for Q. */
+export function qCapabilityId(action: AnyAppAction): string | null {
+  if (action.viaHand !== undefined) return `hand.${action.viaHand}`;
+  const tool = qToolName(action);
+  return tool === null ? null : `tool.${tool}`;
 }
 
 /** The Q tool that does an action: its own, its family's, or a hand tool. */

@@ -88,7 +88,11 @@ export function registerAppActionRoutes(
         if (http.location !== undefined) {
           void reply.header("Location", http.location(out, input));
         }
-        void reply.status(http.status ?? 200);
+        void reply.status(
+          typeof http.status === "function"
+            ? http.status(out)
+            : (http.status ?? 200),
+        );
         return await http.respond(out, input, dependencies.ports);
       },
     });

@@ -113,7 +113,7 @@ Profile and records (L, highest value; Q already proposes these through hand too
 - [x] Profile: `me`, `companies`, `investors` PATCH; `company-team` ×3; `q-cards` ×2. **L** Done 2026-10-02: eight routes generated and nine generated tools replace `propose_profile_change`, `propose_team_change`, `propose_handle_claim` and `propose_q_card_change`. The two `me` routes stay hand routes, because they serve a person who has no organisation yet and a generated route needs an organisation's actor context; `person.profile.update` is declared for Q only.
 - [x] Capital (raise): `capital-objectives` ×4. **M** Done 2026-10-02: four declarations, one family tool `change_my_raise` replacing `propose_raise_change`.
 - [x] Mandate: `investor-mandates` ×3. **M** Done 2026-10-02: four declarations (activate and close are two), one family tool `change_my_mandate` replacing `propose_mandate_change`.
-- [ ] Visibility and shares: `companies` visibility, `investors` visibility, `visibility` ×2. **M**
+- [x] Visibility and shares: `companies` visibility, `investors` visibility, `visibility` ×2. **M** Done 2026-10-02: four routes generated; `set_investor_visibility`, `share_my_raise` and `stop_sharing_my_raise` (the investor named as said) replace the hand tools. The company's visibility stays on the turn reader's SET_VISIBILITY hand (`viaHand`) until its owner retires the hand.
 
 Relationships:
 

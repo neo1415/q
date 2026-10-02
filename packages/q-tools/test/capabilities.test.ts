@@ -153,7 +153,6 @@ describe("the capability registry is complete", () => {
       "get_q_card",
       "list_pending_approvals",
       "list_my_documents",
-      "propose_investor_visibility",
       "read_my_record",
       "list_uploaded_documents",
       "read_relationship_email",

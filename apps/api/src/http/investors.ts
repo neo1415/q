@@ -15,14 +15,12 @@ import {
   IdempotencyKeyHeaderSchema,
   INVESTOR_NETWORK_PREVIEW_SEGMENT,
   INVESTOR_REPRESENTATIVE_ME_SUFFIX,
-  INVESTOR_VISIBILITY_SEGMENT,
   INVESTORS_CURRENT_PATH,
   INVESTORS_PATH,
   InvestorNetworkPreviewSchema,
   InvestorOrganisationDtoSchema,
   InvestorRepresentativeDtoSchema,
   parseContract,
-  SetInvestorVisibilityRequestSchema,
   type CorrelationId,
 } from "@capital-q/contracts";
 import { createCorrelationId } from "@capital-q/observability";
@@ -132,29 +130,8 @@ export function registerInvestorRoutes(
   // Declared in the app's action registry (ADR 0040); the route is
   // generated (http/app-actions.ts), as Q's path is.
 
-  // Who may see the declared investor profile. An intentional act by an
-  // editor, never a side effect of a mandate being activated.
-  app.post(
-    `${byId}${INVESTOR_VISIBILITY_SEGMENT}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        SetInvestorVisibilityRequestSchema,
-        request.body,
-        "The visibility request is not valid.",
-      );
-      const investor = await service.setInvestorVisibility({
-        actor: getActorContext(request),
-        investorOrganisationId: investorIdParam(request),
-        input,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return InvestorOrganisationDtoSchema.parse(
-        toInvestorOrganisationDto(investor),
-      );
-    },
-  );
+  // Who may see the declared investor profile is set through the route
+  // generated from the action registry (ADR 0040).
 
   // What founders across the network see, returned to the investor as a
   // preview of their own row. The projection is the allowlist.

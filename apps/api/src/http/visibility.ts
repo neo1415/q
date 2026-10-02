@@ -4,19 +4,10 @@ import {
   AudiencePreviewDtoSchema,
   AudiencePreviewQuerySchema,
   COMPANY_AUDIENCE_PREVIEW_PATH,
-  COMPANY_SHARE_REVOKE_PATH,
-  COMPANY_SHARES_PATH,
   COMPANY_VISIBILITY_STATE_PATH,
-  CorrelationIdSchema,
-  CreateVisibilityShareRequestSchema,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
   parseContract,
-  VisibilityRevokeResultDtoSchema,
-  VisibilityShareResultDtoSchema,
   VisibilityStateDtoSchema,
 } from "@capital-q/contracts";
-import { createCorrelationId } from "@capital-q/observability";
 import type { VisibilityCentre } from "@capital-q/permissions";
 
 import {
@@ -43,18 +34,6 @@ export type VisibilityRoutesDependencies = ActorContextDependencies & {
 function param(request: FastifyRequest, name: string): string {
   const raw = (request.params as Record<string, unknown>)[name];
   return typeof raw === "string" ? raw : "";
-}
-
-function requireIdempotencyKey(request: FastifyRequest): void {
-  // A share is consequential; retries of it are collapsed by the policy
-  // manager's own duplicate rule, and the key is required so a client
-  // cannot omit the retry contract.
-  const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-  parseContract(
-    IdempotencyKeyHeaderSchema,
-    typeof rawKey === "string" ? rawKey : undefined,
-    "An Idempotency-Key header is required to share.",
-  );
 }
 
 export function registerVisibilityRoutes(
@@ -94,45 +73,6 @@ export function registerVisibilityRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return AudiencePreviewDtoSchema.parse(preview);
-    },
-  );
-
-  app.post(
-    COMPANY_SHARES_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      requireIdempotencyKey(request);
-      const input = parseContract(
-        CreateVisibilityShareRequestSchema,
-        request.body,
-        "The share request is not valid.",
-      );
-      const result = await centre.share({
-        actor: getActorContext(request),
-        companyId: param(request, "companyId"),
-        object: input.object,
-        relationshipId: input.relationshipId,
-        correlationId: CorrelationIdSchema.parse(createCorrelationId()),
-      });
-      void reply
-        .status(result.outcome === "CREATED" ? 201 : 200)
-        .header("Cache-Control", "no-store");
-      return VisibilityShareResultDtoSchema.parse(result);
-    },
-  );
-
-  app.post(
-    COMPANY_SHARE_REVOKE_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const result = await centre.revoke({
-        actor: getActorContext(request),
-        companyId: param(request, "companyId"),
-        policyId: param(request, "policyId"),
-        correlationId: CorrelationIdSchema.parse(createCorrelationId()),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return VisibilityRevokeResultDtoSchema.parse(result);
     },
   );
 }

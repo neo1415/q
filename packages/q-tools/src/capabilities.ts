@@ -361,6 +361,7 @@ const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   records: "PROFILE",
   capital: "RECORDS",
   mandate: "RECORDS",
+  visibility: "VISIBILITY",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
@@ -588,12 +589,6 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     { approval: "PREPARE_APPROVE", executes: ["onboarding.answer.revise"] },
   ),
   tool(
-    "propose_investor_visibility",
-    "VISIBILITY",
-    "Changes who can see their investor organisation, applied when they approve.",
-    { approval: "PREPARE_APPROVE", executes: ["investor.visibility.set"] },
-  ),
-  tool(
     "read_my_record",
     "RECORDS",
     "Reads their own records as their screens show them: verification, readiness, network and audience previews, team, raise history, Q's public findings, their investor organisation, role and mandates.",
@@ -613,18 +608,6 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "read_relationship_email",
     "RELATIONSHIP",
     "Reads the email exchanged on one of their relationships, from their connected Gmail.",
-  ),
-  tool(
-    "propose_share_raise",
-    "VISIBILITY",
-    "Shares their raise with a named investor, applied when they approve.",
-    { approval: "PREPARE_APPROVE", executes: ["disclosure.raise.share"] },
-  ),
-  tool(
-    "propose_revoke_share",
-    "VISIBILITY",
-    "Stops sharing their raise with an investor, applied when they approve.",
-    { approval: "PREPARE_APPROVE", executes: ["disclosure.share.revoke"] },
   ),
   tool(
     "get_disclosure_state",
@@ -973,6 +956,12 @@ export const Q_CAPABILITY_EXCLUSIONS: Readonly<{
       "Kept so a change approved before ADR 0040's capital tool still executes; Q now prepares it as app.capital.objective.change (change_my_raise).",
     "investor.mandate.change":
       "Kept so a change approved before ADR 0040's mandate tool still executes; Q now prepares it as app.investor.mandate.change (change_my_mandate).",
+    "investor.visibility.set":
+      "Kept so a change approved before ADR 0040's visibility tools still executes; Q now prepares it as app.investor.visibility.set (set_investor_visibility).",
+    "disclosure.raise.share":
+      "Kept so a share approved before ADR 0040's visibility tools still executes; Q now prepares it as app.disclosure.raise.share (share_my_raise).",
+    "disclosure.share.revoke":
+      "Kept so a revoke approved before ADR 0040's visibility tools still executes; Q now prepares it as app.disclosure.share.revoke (stop_sharing_my_raise).",
     "handle.claim":
       "Kept so a claim approved before ADR 0040's profile tools still executes; Q now prepares it as app.q_card.handle.claim (claim_q_card_handle).",
   },

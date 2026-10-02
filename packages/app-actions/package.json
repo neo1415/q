@@ -28,6 +28,7 @@
     "@capital-q/discovery": "workspace:*",
     "@capital-q/investors": "workspace:*",
     "@capital-q/media": "workspace:*",
+    "@capital-q/permissions": "workspace:*",
     "@capital-q/public-identity": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/security": "workspace:*",

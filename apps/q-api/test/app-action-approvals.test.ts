@@ -41,6 +41,7 @@ function fakes() {
       // The record moved on since the card was prepared at version 7.
       getCompany: () => Promise.resolve({ version: 9 } as never),
       getMyCompanyMembership: () => Promise.reject(new Error("unused")),
+      setCompanyVisibility: () => Promise.reject(new Error("unused")),
       updateCompany: (command) => {
         updates.push(command.input);
         return Promise.resolve({ version: 10 } as never);

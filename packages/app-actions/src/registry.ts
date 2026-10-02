@@ -4,6 +4,7 @@ import { DISCOVERY_DECISIONS } from "./actions/discovery.js";
 import { MANDATE_ACTIONS } from "./actions/mandate.js";
 import { SET_PITCH_SHARING } from "./actions/pitch.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
+import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -16,4 +17,5 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...PROFILE_AND_RECORDS,
   ...CAPITAL_ACTIONS,
   ...MANDATE_ACTIONS,
+  ...VISIBILITY_ACTIONS,
 ]);

@@ -419,6 +419,9 @@ export function createApp(
         ? {}
         : { interactions: modules.discovery.interactions }),
       ...(modules.capital === undefined ? {} : { capital: modules.capital }),
+      ...(modules.visibility === undefined
+        ? {}
+        : { visibility: modules.visibility }),
     },
   });
 

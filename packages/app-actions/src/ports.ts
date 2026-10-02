@@ -5,6 +5,7 @@ import type { InteractionSignalService } from "@capital-q/discovery";
 import type { InvestorService } from "@capital-q/investors";
 import type { PublicIdentityService } from "@capital-q/public-identity";
 import type { MediaService } from "@capital-q/media";
+import type { VisibilityCentre } from "@capital-q/permissions";
 import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 
 /**
@@ -23,6 +24,7 @@ export type AppActionPorts = {
         CompanyService,
         | "getCompany"
         | "getMyCompanyMembership"
+        | "setCompanyVisibility"
         | "updateCompany"
         | "upsertMyCompanyMembership"
         | "updateMyFounderProfile"
@@ -33,6 +35,7 @@ export type AppActionPorts = {
     | Pick<
         InvestorService,
         | "getInvestorOrganisation"
+        | "setInvestorVisibility"
         | "updateInvestorOrganisation"
         | "upsertMyInvestorRepresentative"
         | "getInvestorMandate"
@@ -51,6 +54,9 @@ export type AppActionPorts = {
     | undefined;
   /** The person's own profile record (what to call them, their time zone). */
   readonly people?: Pick<PersonProfileStore, "read" | "update"> | undefined;
+  /** Visibility and shares: the visibility centre the page calls. */
+  readonly visibility?:
+    Pick<VisibilityCentre, "state" | "share" | "revoke"> | undefined;
   /** Capital (ADR 0040 checklist): the raise form's own service. */
   readonly capital?:
     | Pick<

@@ -31,8 +31,6 @@ import { ownSubject } from "./q-card.js";
  * owning context's own service writes it. Nothing changes here.
  */
 
-export const PROPOSE_INVESTOR_VISIBILITY =
-  "investor.visibility.propose" as const;
 export const PROPOSE_PROFILE_ANSWER = "profile.answer.propose" as const;
 
 const PURPOSES: readonly QTaskClass[] = [
@@ -117,55 +115,6 @@ function prepareWith(port: RecordChangePort) {
   };
 }
 
-// --- the investor organisation's visibility --------------------------------
-
-export const ProposeInvestorVisibilityInputSchema = z
-  .object({
-    visibility: z
-      .enum(["network_visible", "organisation_private"])
-      .describe(
-        "network_visible: founders on Capital Q can find the organisation. organisation_private: only its own people.",
-      ),
-  })
-  .strict();
-export type ProposeInvestorVisibilityInput = z.infer<
-  typeof ProposeInvestorVisibilityInputSchema
->;
-
-export function createProposeInvestorVisibilityTool(
-  ports: Pick<QToolPorts, "companies" | "investors">,
-  port: RecordChangePort,
-): AnyQToolDefinition {
-  const prepare = prepareWith(port);
-  return defineQTool<
-    ProposeInvestorVisibilityInput,
-    ProposeRecordChangeOutput,
-    Grant
-  >({
-    ...COMMON,
-    id: PROPOSE_INVESTOR_VISIBILITY,
-    supportedPurposes: [
-      "INVESTOR_QUESTION",
-      "ACTION_PREPARATION",
-      "GENERAL_QUESTION",
-    ],
-    providerName: "propose_investor_visibility",
-    description: `Prepares a change to who can see their own investor organisation on Capital Q (visible to founders on the network, or private), as the profile's visibility control makes it. ${RESULT_NOTE}`,
-    requiredScopeKinds: ["INVESTOR_PROFILE"],
-    input: ProposeInvestorVisibilityInputSchema,
-    authorize: subjectAuthorizer(ports, "INVESTOR_ORGANISATION"),
-    execute: (input, context, grant) =>
-      prepare(
-        {
-          kind: "INVESTOR_VISIBILITY",
-          investorOrganisationId: grant.subjectId,
-          fields: { visibility: input.visibility },
-        },
-        context,
-      ),
-  });
-}
-
 // --- a profile fact first given during onboarding (ADR 0024) --------------
 
 const PROFILE_ANSWER_FIELD_NAMES = [
@@ -233,8 +182,5 @@ export function createRecordChangeTools(
   ports: Pick<QToolPorts, "companies" | "investors">,
   port: RecordChangePort,
 ): readonly AnyQToolDefinition[] {
-  return [
-    createProposeInvestorVisibilityTool(ports, port),
-    createProposeProfileAnswerTool(ports, port),
-  ];
+  return [createProposeProfileAnswerTool(ports, port)];
 }
