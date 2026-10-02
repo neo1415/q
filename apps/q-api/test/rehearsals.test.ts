@@ -639,7 +639,7 @@ describe("rehearsals", () => {
     expect(said.kind === "OK" && said.rehearsal.turns).toHaveLength(1);
   });
 
-  it("shows a shared frame to the next turn only", async () => {
+  it("keeps showing a shared screen while it is shared, and stops when the share stops (live 2026-10-02)", async () => {
     const { service, seen } = setup();
     const rehearsal = await startWith(service);
     expect(
@@ -658,8 +658,12 @@ describe("rehearsals", () => {
     await service.say(actor(FOUNDER), rehearsal.id, { text: "Next." });
     expect(seen.turnInputs.slice(-2).map((t) => t.screen)).toEqual([
       true,
-      false,
+      true,
     ]);
+    // The share stops: the next turn no longer sees it.
+    await service.screen(actor(FOUNDER), rehearsal.id, null, "SCREEN");
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "And after." });
+    expect(seen.turnInputs.at(-1)?.screen).toBe(false);
     expect(first.kind === "OK" && first.rehearsal.turns.at(-1)?.sawScreen).toBe(
       true,
     );
@@ -1053,7 +1057,7 @@ describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
     );
   });
 
-  it("a camera frame rides with the next turn only, apart from the screen", async () => {
+  it("the latest camera frame is seen on every turn while fresh, apart from the screen", async () => {
     const { service, seen } = setup();
     const rehearsal = await startWith(service);
     await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
@@ -1061,7 +1065,7 @@ describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
     await service.say(actor(FOUNDER), rehearsal.id, { text: "Next." });
     expect(seen.turnInputs.slice(-2).map((t) => [t.camera, t.screen])).toEqual([
       [true, false],
-      [false, false],
+      [true, false],
     ]);
   });
 
@@ -1204,8 +1208,7 @@ describe('"can you see this?" (2026-10-01)', () => {
     const rehearsal = await startWith(service);
     await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
     await service.say(actor(FOUNDER), rehearsal.id, { text: "Our numbers." });
-    // Two seconds later: inside the ordinary look gap, so an ordinary turn
-    // would get no image; the ask gets the fresh frame it came with.
+    // A fresh frame comes with the ask; it is seen in the one pass.
     clock.at += 2_000;
     await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
     const calls = seen.turnInputs.length;
@@ -1213,10 +1216,8 @@ describe('"can you see this?" (2026-10-01)', () => {
       text: "Look at my whiteboard.",
     });
     const passes = seen.turnInputs.slice(calls);
-    expect(passes.map((p) => p.camera)).toEqual([false, true]);
-    expect(passes.at(-1)?.presenceNote).toContain(
-      "this frame is from just now",
-    );
+    // One pass: the fresh frame is already held for the ask.
+    expect(passes.map((p) => p.camera)).toEqual([true]);
   });
 
   it('without consent, the ask gets the honest "can\'t see you", in one pass', async () => {
@@ -1234,20 +1235,25 @@ describe('"can you see this?" (2026-10-01)', () => {
     expect(passes[0]?.presenceNote).toContain('"Let Q see you"');
   });
 
-  it("an ordinary turn takes no fresh look inside the gap, and no second pass", async () => {
-    const { service, seen, clock } = setup();
+  it("a reply the person spoke over does not cost the next turn its look (live 2026-10-02)", async () => {
+    const { service, seen } = setup();
     const rehearsal = await startWith(service);
     await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
-    await service.say(actor(FOUNDER), rehearsal.id, { text: "One." });
-    clock.at += 2_000;
-    await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+    const spokenOver = new AbortController();
+    spokenOver.abort();
+    await service.say(
+      actor(FOUNDER),
+      rehearsal.id,
+      { text: "Can you" },
+      spokenOver.signal,
+    );
     const calls = seen.turnInputs.length;
-    await service.say(actor(FOUNDER), rehearsal.id, { text: "Two." });
+    await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Can you see me?",
+    });
     const passes = seen.turnInputs.slice(calls);
     expect(passes).toHaveLength(1);
-    expect(passes[0]?.camera).toBe(false);
-    // With consent in force, it is not told it cannot see them.
-    expect(passes[0]?.presenceNote).toContain("No look at them this turn");
+    expect(passes[0]?.camera).toBe(true);
   });
 });
 
