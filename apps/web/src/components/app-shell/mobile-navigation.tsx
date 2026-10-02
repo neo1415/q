@@ -11,6 +11,8 @@ import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { useHomeHref } from "@/features/q/active-conversation";
+import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
+import type { VerifyNudge } from "@/features/verification/verify-state";
 
 import {
   isActiveRoute,
@@ -33,8 +35,10 @@ const TAB_CLASS =
  */
 export function MobileNavigation({
   scope = "unset",
+  verifyNudge = null,
 }: {
   readonly scope?: ContextScope | undefined;
+  readonly verifyNudge?: VerifyNudge | null | undefined;
 }) {
   const pathname = usePathname();
   // Home is the conversation this tab was in, not a new chat each visit.
@@ -92,7 +96,11 @@ export function MobileNavigation({
           );
         })}
         <li className="min-w-0">
-          <MoreSheet scope={scope} pathname={pathname} />
+          <MoreSheet
+            scope={scope}
+            pathname={pathname}
+            verifyNudge={verifyNudge}
+          />
         </li>
       </ul>
     </nav>
@@ -108,9 +116,11 @@ export function MobileNavigation({
 function MoreSheet({
   scope,
   pathname,
+  verifyNudge,
 }: {
   readonly scope: ContextScope;
   readonly pathname: string;
+  readonly verifyNudge: VerifyNudge | null;
 }) {
   const [open, setOpen] = useState(false);
   const items = moreSectionsFor(scope);
@@ -190,6 +200,16 @@ function MoreSheet({
             })}
           </ul>
         </nav>
+        {verifyNudge === null ? null : (
+          <div className="mt-3 border-t border-(--cq-border-subtle) pt-3">
+            <VerifyNudgeLink
+              nudge={verifyNudge}
+              onNavigate={() => {
+                setOpen(false);
+              }}
+            />
+          </div>
+        )}
         <div className="mt-3 flex flex-col gap-2 border-t border-(--cq-border-subtle) px-3 pt-4">
           <span className="cq-label text-(--cq-text-secondary)">
             Appearance

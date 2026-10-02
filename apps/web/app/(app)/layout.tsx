@@ -14,6 +14,7 @@ import {
 } from "@/features/q/context";
 import type { QSubject } from "@/features/q/q-subject";
 import { QSwarmPointer } from "@/features/q-swarm/q-swarm-pointer";
+import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
 import { InstallPrompt } from "@/pwa/install-prompt";
 
 // Session-bound HTML is rendered per request and never prerendered or
@@ -72,12 +73,20 @@ export default async function ApplicationLayout({
   const unfinished = qConnected
     ? onboardingPath(await resolveOnboardingState())
     : null;
+  // ADMIN-4 block: "Verify you and <organisation>" stays in the shell until
+  // both the person and the organisation are verified. A read that fails
+  // shows nothing rather than a wrong state.
+  const verifyNudgeState =
+    unfinished === null && context.kind !== "NONE"
+      ? await loadVerifyNudge()
+      : null;
   return (
     <AppShell
       context={shell}
       subject={subject}
       qConnected={qConnected}
       onboarding={unfinished}
+      verifyNudge={verifyNudgeState}
     >
       {children}
       <InstallPrompt />

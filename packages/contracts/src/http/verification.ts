@@ -95,6 +95,8 @@ export const VerificationStandingDtoSchema = z
     verifiedAt: UtcTimestampSchema.nullable(),
     expiresAt: UtcTimestampSchema.nullable(),
     revokedAt: UtcTimestampSchema.nullable(),
+    /** ADMIN-4: an operator's reason when they declined or withdrew it. */
+    declineReason: z.string().max(500).nullable().optional(),
     /**
      * Plain English for the person, from one place in the Verification
      * context ("Verified (synthetic demo attestation)", "Requested; Capital

@@ -46,6 +46,8 @@ export type VerificationClaim = {
   readonly verifiedAt: UtcTimestamp | null;
   readonly expiresAt: UtcTimestamp | null;
   readonly revokedAt: UtcTimestamp | null;
+  /** Why an operator declined or withdrew it (REVOKED only); shown to the organisation. */
+  readonly revocationReason?: string | null | undefined;
   readonly createdAt: UtcTimestamp;
 };
 

@@ -43,7 +43,13 @@ const REVIEW: OwnReview = {
   createdAt: "2026-10-01T10:00:00.000Z",
 };
 
-const VIEW: KybView = { standing: "PENDING", submission: null };
+const VIEW: KybView = {
+  standing: "PENDING",
+  submission: null,
+  organisationName: "Nixo",
+  organisationKind: "COMPANY",
+  person: { standing: "PENDING", declineReason: null, submission: null },
+};
 
 function security() {
   return {
@@ -194,11 +200,16 @@ describe("POST /v1/reviews", () => {
 });
 
 describe("POST /v1/kyb", () => {
-  const details = {
+  const organisation = {
     legalName: "Nixo Technologies Ltd",
     registrationNumber: "RC 1234567",
     jurisdictionCode: "NG",
     documentId: "f0000000-0000-4000-8000-0000000000d1",
+  };
+  // ADMIN-4: one flow, the person and the organisation together.
+  const details = {
+    organisation,
+    person: { nameOnId: "Ada Example", role: "Founder" },
   };
 
   it("submits for the actor's own organisation", async () => {
@@ -212,10 +223,11 @@ describe("POST /v1/kyb", () => {
     expect(response.statusCode).toBe(201);
     expect(asked[0]).toMatchObject({
       actor: { organisationId: ORG },
-      input: {
+      organisation: {
         legalName: "Nixo Technologies Ltd",
-        documentId: details.documentId,
+        documentId: organisation.documentId,
       },
+      person: { nameOnId: "Ada Example", role: "Founder", documentId: null },
     });
     await app.close();
   });
@@ -226,17 +238,28 @@ describe("POST /v1/kyb", () => {
       method: "POST",
       url: "/v1/kyb",
       headers: KEY,
-      payload: { ...details, jurisdictionCode: "ng" },
+      payload: {
+        ...details,
+        organisation: { ...organisation, jurisdictionCode: "ng" },
+      },
     });
     expect(lower.statusCode).toBe(422);
+    const nothing = await bad.app.inject({
+      method: "POST",
+      url: "/v1/kyb",
+      headers: KEY,
+      payload: { organisation: null, person: null },
+    });
+    expect(nothing.statusCode).toBe(422);
     await bad.app.close();
-    for (const [kind, status] of [
-      ["DOCUMENT_NOT_FOUND", 422],
-      ["ALREADY_OPEN", 409],
-      ["ALREADY_VERIFIED", 409],
-      ["NO_ORGANISATION", 403],
+    for (const [outcome, status] of [
+      [{ kind: "DOCUMENT_NOT_FOUND", part: "PERSON" }, 422],
+      [{ kind: "ALREADY_OPEN", part: "ORGANISATION" }, 409],
+      [{ kind: "ALREADY_VERIFIED", part: "PERSON" }, 409],
+      [{ kind: "NO_ORGANISATION" }, 403],
     ] as const) {
-      const { app } = build({ kyb: { kind } });
+      const kind = outcome.kind;
+      const { app } = build({ kyb: outcome });
       const response = await app.inject({
         method: "POST",
         url: "/v1/kyb",

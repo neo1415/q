@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(22);
+select plan(25);
 
 -- Fixtures (server role) ------------------------------------------------------
 insert into core.human_reviews (id, tenant_id, organisation_id, requester_user_id, subject_type, subject_ref, reason, due_at, idempotency_key) values
@@ -53,6 +53,25 @@ select ok(not has_function_privilege('authenticated', 'private.decide_once_guard
   'the decide-once guard is not callable by clients');
 
 -- Invariants (server role) ---------------------------------------------------------
+-- ADMIN-4: automatic requests may lack details; a person's may not; only the system supersedes.
+select throws_ok(
+  $$insert into core.kyb_submissions (tenant_id, organisation_id, submitted_by_user_id, claim_id, idempotency_key, status, decision_reason, decided_at)
+    values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), pg_temp.rls_id('user_a'), '00000000-0000-4000-8000-00000000da01', 'kyb-a-person-bare',
+            'REJECTED', 'x', now())$$,
+  '23514', null, 'a person''s submission needs its legal name, registration number and jurisdiction');
+select lives_ok(
+  $$insert into core.kyb_submissions (id, tenant_id, organisation_id, submitted_by_user_id, source, organisation_name, contact_email_domain,
+                                     email_domain_matches_website, claim_id, idempotency_key, status, decision_reason, decided_at)
+    values ('00000000-0000-4000-8000-00000000ea02', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), pg_temp.rls_id('user_a'), 'AUTO', 'Org A', 'orga.com', true,
+            '00000000-0000-4000-8000-00000000da01', 'auto:org-a', 'SUPERSEDED', 'Replaced by the organisation''s own details.', now())$$,
+  'an automatic request carries only what is known, and the system supersedes it');
+select throws_ok(
+  $$insert into core.kyb_submissions (tenant_id, organisation_id, submitted_by_user_id, source, claim_id, idempotency_key, status, decision_reason,
+                                     decided_by_user_id, decided_at)
+    values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), pg_temp.rls_id('user_a'), 'AUTO', '00000000-0000-4000-8000-00000000da01', 'auto:org-a-2',
+            'SUPERSEDED', 'x', pg_temp.rls_id('user_a'), now())$$,
+  '23514', null, 'a person never supersedes a request');
+
 select throws_ok(
   $$insert into core.kyb_submissions (tenant_id, organisation_id, submitted_by_user_id, legal_name, registration_number, jurisdiction_code, claim_id, idempotency_key)
     values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), pg_temp.rls_id('user_a'), 'Org A Ltd', 'RC 1', 'NG', '00000000-0000-4000-8000-00000000da01', 'kyb-a-0002')$$,
@@ -92,8 +111,8 @@ select lives_ok(
 select pg_temp.act_as('auth_a');
 select is((select array_agg(id::text) from core.human_reviews),
   array['00000000-0000-4000-8000-00000000ca01'], 'A reads only their own review case');
-select is((select array_agg(id::text) from core.kyb_submissions),
-  array['00000000-0000-4000-8000-00000000ea01'], 'A reads only their organisation''s submission');
+select is((select array_agg(id::text order by id) from core.kyb_submissions),
+  array['00000000-0000-4000-8000-00000000ea01', '00000000-0000-4000-8000-00000000ea02'], 'A reads only their organisation''s submission');
 select is((select count(*)::int from core.human_reviews where tenant_id = pg_temp.rls_id('tenant_b')), 0,
   'A cannot read B''s case (cross-tenant)');
 select throws_ok($$insert into core.human_reviews (tenant_id, requester_user_id, subject_type, reason, due_at, idempotency_key)

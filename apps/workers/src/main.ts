@@ -191,6 +191,15 @@ import {
 } from "./queue/pgmq.js";
 import { createQueueRunner } from "./queue/runner.js";
 import { recordingEmailSender } from "@capital-q/platform-admin";
+// ADMIN-4 block
+import {
+  createAutoVerificationRequester,
+  createAutoVerificationSweep,
+  createPostgresAutoRequestCandidateSource,
+  createPostgresVerificationClaimRepository,
+} from "@capital-q/verification";
+import { runAutoVerificationRequests } from "./verification/auto-request.js";
+// end ADMIN-4 block
 
 const SERVICE_NAME = "workers";
 
@@ -638,6 +647,25 @@ const verificationDecider = createSyntheticVerificationDecider({
 // Requests already PENDING (the earlier seed, or events consumed while the
 // decider refused) are offered to the same decider at startup and then
 // every 10 minutes, at most 200 per run.
+// ADMIN-4 block (founder direction 2026-10-02): verification requested
+// automatically for organisations on the network; acceptance stays manual.
+const autoVerificationSweep = createAutoVerificationSweep({
+  source: createPostgresAutoRequestCandidateSource(database.sql),
+  request: createAutoVerificationRequester({
+    transactions: database.transactions,
+    repository: createPostgresVerificationClaimRepository(),
+    audit: createPostgresMaterialActionAuditWriter(),
+    outbox: createOutboxWriter({ registry }),
+  }),
+  correlation: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+  limit: 100,
+  onFailure: (organisationId, error) =>
+    logger.warn(
+      { organisationId, err: error },
+      "verification auto-request failed",
+    ),
+});
+// end ADMIN-4 block
 const syntheticAutoVerifySweep =
   verification.attestation === null
     ? undefined
@@ -1051,6 +1079,14 @@ await Promise.all([
   ...(daily === undefined
     ? []
     : [runDailyTicker({ daily, signal: shutdownController.signal, logger })]),
+  // ADMIN-4 block
+  runAutoVerificationRequests({
+    sweep: autoVerificationSweep,
+    intervalMs: 10 * 60 * 1000,
+    signal: shutdownController.signal,
+    logger,
+  }),
+  // end ADMIN-4 block
   ...(syntheticAutoVerifySweep === undefined
     ? []
     : [

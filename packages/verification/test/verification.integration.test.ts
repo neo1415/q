@@ -36,6 +36,9 @@ import {
   createPostgresPendingSyntheticClaimSource,
   createSyntheticAutoVerifySweep,
   closeKybForClaim,
+  createAutoVerificationRequester,
+  createAutoVerificationSweep,
+  createPostgresAutoRequestCandidateSource,
   createDecideByOperator,
   createKybService,
   createPostgresVerificationClaimRepository,
@@ -526,7 +529,8 @@ describe("@capital-q/verification against local PostgreSQL", () => {
       const submit = (key: string, documentId: string | null = null) =>
         kyb.submit({
           actor: world.realMemberA.actor,
-          input: { ...details, documentId },
+          organisation: { ...details, documentId },
+          person: null,
           idempotencyKey: key,
           correlationId: CORRELATION(),
         });
@@ -543,7 +547,11 @@ describe("@capital-q/verification against local PostgreSQL", () => {
       expect((await submit("kyb-key-0002")).kind).toBe("ALREADY_OPEN");
       // Another tenant's member sees only their own organisation.
       const other = await kyb.current(world.adminB.actor);
-      expect(other).toEqual({ standing: "NOT_REQUESTED", submission: null });
+      expect(other).toMatchObject({
+        standing: "NOT_REQUESTED",
+        submission: null,
+        person: { standing: "NOT_REQUESTED", submission: null },
+      });
 
       const [claim] = await world.tx.sql<{ id: string }[]>`
         select claim_id as id from core.kyb_submissions
@@ -590,6 +598,301 @@ describe("@capital-q/verification against local PostgreSQL", () => {
       expect(notice?.kind).toBe("VERIFICATION_DECIDED");
       // A rejected organisation may submit again.
       expect((await submit("kyb-key-0003")).kind).toBe("SUBMITTED");
+    });
+  });
+
+  it("asks automatically for a visible organisation once, from what is known, and never re-opens a decision (ADMIN-4)", async () => {
+    await withWorld(async (world) => {
+      const { sql } = world.tx;
+      await sql`update core.companies set marketplace_visibility = 'network_visible' where id = ${world.companyA}`;
+      await sql`update identity.organisations set website_url = 'https://www.company-a.example', country_code = 'NG' where id = ${world.orgA}`;
+      await sql`update auth.users set email = 'ada@company-a.example'
+                 where id = (select auth_user_id from identity.user_profiles
+                              where id = ${world.realMemberA.actor.userId})`;
+      // Only realMemberA stays an active member of A, so they are the requester.
+      await sql`update identity.organisation_memberships set membership_status = 'revoked', left_at = now()
+                 where organisation_id = ${world.orgA} and user_id <> ${world.realMemberA.actor.userId}`;
+      const transactions = nestedTransactions(world.tx);
+      const sweep = createAutoVerificationSweep({
+        source: createPostgresAutoRequestCandidateSource(sql),
+        request: createAutoVerificationRequester({
+          transactions,
+          repository: createPostgresVerificationClaimRepository(),
+          audit: createPostgresMaterialActionAuditWriter(),
+          outbox: createOutboxWriter({ registry }),
+        }),
+        correlation: CORRELATION,
+        limit: 500,
+      });
+      const first = await sweep();
+      expect(first.failed).toBe(0);
+      const claims = await sql<
+        { claim_type: string; status: string; requested_by_user_id: string }[]
+      >`
+        select claim_type, status, requested_by_user_id from evidence.verification_claims
+         where organisation_id = ${world.orgA} order by claim_type`;
+      expect(claims).toEqual([
+        {
+          claim_type: "FOUNDER_IDENTITY",
+          status: "PENDING",
+          requested_by_user_id: world.realMemberA.actor.userId,
+        },
+        {
+          claim_type: "ORGANISATION",
+          status: "PENDING",
+          requested_by_user_id: world.realMemberA.actor.userId,
+        },
+      ]);
+      const [auto] = await sql<
+        {
+          source: string;
+          organisation_name: string;
+          registration_number: string | null;
+          jurisdiction_code: string | null;
+          contact_email_domain: string;
+          email_domain_matches_website: boolean;
+        }[]
+      >`
+        select source, organisation_name, registration_number, jurisdiction_code,
+               contact_email_domain, email_domain_matches_website
+          from core.kyb_submissions where organisation_id = ${world.orgA}`;
+      expect(auto).toEqual({
+        source: "AUTO",
+        organisation_name: "Org A",
+        registration_number: null,
+        jurisdiction_code: "NG",
+        contact_email_domain: "company-a.example",
+        email_domain_matches_website: true,
+      });
+      const [notice] = await sql<{ title: string; body: string }[]>`
+        select title, body from communication.notifications
+         where user_id = ${world.realMemberA.actor.userId} and kind = 'VERIFICATION_REQUESTED'`;
+      expect(notice).toEqual({
+        title: "We've asked Capital Q to verify Org A",
+        body: "Add a registration document to speed it up.",
+      });
+
+      // Idempotent: a second run asks for nothing new.
+      await sweep();
+      const [count] = await sql<{ n: number }[]>`
+        select count(*)::int as n from evidence.verification_claims where organisation_id = ${world.orgA}`;
+      expect(count?.n).toBe(2);
+
+      // A decided claim is never re-opened.
+      const [orgClaim] = await sql<{ id: string }[]>`
+        select id from evidence.verification_claims
+         where organisation_id = ${world.orgA} and claim_type = 'ORGANISATION'`;
+      const [operator] = await sql<{ id: string }[]>`
+        select user_id as id from identity.organisation_memberships where id = ${world.adminB.membershipId}`;
+      await createDecideByOperator({
+        transactions,
+        repository: createPostgresVerificationClaimRepository(),
+        outbox: createOutboxWriter({ registry }),
+        audit: createPostgresMaterialActionAuditWriter(),
+      })({
+        tenantId: world.tenantA,
+        claimId: orgClaim?.id ?? "",
+        operatorUserId: operator?.id ?? "",
+        status: "REVOKED",
+        decisionBasis: "No registry match",
+        revocationReason: "No registry match",
+        correlationId: CORRELATION(),
+      });
+      await sweep();
+      const after = await sql<{ status: string }[]>`
+        select status from evidence.verification_claims
+         where organisation_id = ${world.orgA} and claim_type = 'ORGANISATION' order by revision`;
+      expect(after.map((row) => row.status)).toEqual(["PENDING", "REVOKED"]);
+    });
+  });
+
+  it("lets the organisation's own details replace an automatic request (ADMIN-4)", async () => {
+    await withWorld(async (world) => {
+      const { sql } = world.tx;
+      await sql`update core.companies set marketplace_visibility = 'network_visible' where id = ${world.companyA}`;
+      const transactions = nestedTransactions(world.tx);
+      await createAutoVerificationSweep({
+        source: createPostgresAutoRequestCandidateSource(sql),
+        request: createAutoVerificationRequester({
+          transactions,
+          repository: createPostgresVerificationClaimRepository(),
+          audit: createPostgresMaterialActionAuditWriter(),
+          outbox: createOutboxWriter({ registry }),
+        }),
+        correlation: CORRELATION,
+        limit: 500,
+      })();
+      const kyb = createKybService({
+        sql,
+        transactions,
+        authorization: createAuthorizationService(
+          createPostgresAuthorizationPolicySource({ sql }),
+        ),
+        repository: createPostgresVerificationClaimRepository(),
+        audit: createPostgresMaterialActionAuditWriter(),
+        outbox: createOutboxWriter({ registry }),
+      });
+      const submitted = await kyb.submit({
+        actor: world.realMemberA.actor,
+        person: null,
+        organisation: {
+          legalName: "Company A Ltd",
+          registrationNumber: "RC 0001",
+          jurisdictionCode: "NG",
+          registeredAddress: null,
+          websiteUrl: null,
+          documentId: null,
+        },
+        idempotencyKey: "kyb-own-0001",
+        correlationId: CORRELATION(),
+      });
+      expect(submitted.kind).toBe("SUBMITTED");
+      const rows = await sql<
+        { source: string; status: string; claim_id: string }[]
+      >`
+        select source, status, claim_id from core.kyb_submissions
+         where organisation_id = ${world.orgA} order by created_at`;
+      expect(rows.map((row) => [row.source, row.status])).toEqual([
+        ["AUTO", "SUPERSEDED"],
+        ["PERSON", "SUBMITTED"],
+      ]);
+      expect(rows[0]?.claim_id).toBe(rows[1]?.claim_id);
+    });
+  });
+
+  it("takes the person and the organisation in one submission: both claims at once, idempotent, a verified part never re-opened (ADMIN-4)", async () => {
+    await withWorld(async (world) => {
+      const { sql } = world.tx;
+      const transactions = nestedTransactions(world.tx);
+      const kyb = createKybService({
+        sql,
+        transactions,
+        authorization: createAuthorizationService(
+          createPostgresAuthorizationPolicySource({ sql }),
+        ),
+        repository: createPostgresVerificationClaimRepository(),
+        audit: createPostgresMaterialActionAuditWriter(),
+        outbox: createOutboxWriter({ registry }),
+      });
+      const actor = world.realMemberA.actor;
+      const organisation = {
+        legalName: "Company A Ltd",
+        registrationNumber: "RC 0001",
+        jurisdictionCode: "NG",
+        registeredAddress: null,
+        websiteUrl: null,
+        documentId: null,
+      };
+      const person = {
+        nameOnId: "Ada Example",
+        role: "Founder",
+        documentId: null,
+      };
+      const claimRows = () => sql<
+        { claim_type: string; status: string; revision: number }[]
+      >`
+        select claim_type, status, revision from evidence.verification_claims
+         where organisation_id = ${world.orgA} order by claim_type, revision`;
+
+      // A document that isn't the organisation's refuses the whole thing.
+      const refused = await kyb.submit({
+        actor,
+        organisation,
+        person: { ...person, documentId: randomUUID() },
+        idempotencyKey: "verify-pair-0000",
+        correlationId: CORRELATION(),
+      });
+      expect(refused).toEqual({ kind: "DOCUMENT_NOT_FOUND", part: "PERSON" });
+      expect(await claimRows()).toEqual([]);
+
+      const first = await kyb.submit({
+        actor,
+        organisation,
+        person,
+        idempotencyKey: "verify-pair-0001",
+        correlationId: CORRELATION(),
+      });
+      expect(first.kind).toBe("SUBMITTED");
+      if (first.kind !== "SUBMITTED") throw new Error(first.kind);
+      expect(first.view.standing).toBe("PENDING");
+      expect(first.view.person.standing).toBe("PENDING");
+      expect(first.view.person.submission?.nameOnId).toBe("Ada Example");
+      expect(await claimRows()).toEqual([
+        { claim_type: "FOUNDER_IDENTITY", status: "PENDING", revision: 1 },
+        { claim_type: "ORGANISATION", status: "PENDING", revision: 1 },
+      ]);
+      // The same press again changes nothing.
+      const replay = await kyb.submit({
+        actor,
+        organisation,
+        person,
+        idempotencyKey: "verify-pair-0001",
+        correlationId: CORRELATION(),
+      });
+      expect(replay.kind).toBe("REPLAYED");
+      expect((await claimRows()).length).toBe(2);
+      // A second, different press while both are with Capital Q is refused.
+      expect(
+        (
+          await kyb.submit({
+            actor,
+            organisation: null,
+            person,
+            idempotencyKey: "verify-pair-0002",
+            correlationId: CORRELATION(),
+          })
+        ).kind,
+      ).toBe("ALREADY_OPEN");
+
+      // An operator verifies the person; the person's part is never re-opened.
+      const [identityClaim] = await sql<{ id: string }[]>`
+        select id from evidence.verification_claims
+         where organisation_id = ${world.orgA} and claim_type = 'FOUNDER_IDENTITY'`;
+      const [operator] = await sql<{ id: string }[]>`
+        select user_id as id from identity.organisation_memberships
+         where id = ${world.adminB.membershipId}`;
+      const decide = createDecideByOperator({
+        transactions,
+        repository: createPostgresVerificationClaimRepository(),
+        outbox: createOutboxWriter({ registry }),
+        audit: createPostgresMaterialActionAuditWriter(),
+      });
+      await decide({
+        tenantId: world.tenantA,
+        claimId: identityClaim?.id ?? "",
+        operatorUserId: operator?.id ?? "",
+        status: "VERIFIED",
+        decisionBasis: "Name matches the passport",
+        revocationReason: null,
+        correlationId: CORRELATION(),
+      });
+      expect(
+        await closeKybForClaim(transactions, {
+          claimId: identityClaim?.id ?? "",
+          approved: true,
+          reason: "Name matches the passport",
+          decidedByUserId: operator?.id ?? "",
+        }),
+      ).toBe(true);
+      const after = await kyb.current(actor);
+      expect(after?.person.standing).toBe("VERIFIED");
+      expect(after?.person.submission?.status).toBe("APPROVED");
+      expect(
+        await kyb.submit({
+          actor,
+          organisation: null,
+          person,
+          idempotencyKey: "verify-pair-0003",
+          correlationId: CORRELATION(),
+        }),
+      ).toEqual({ kind: "ALREADY_VERIFIED", part: "PERSON" });
+      const identityRows = (await claimRows()).filter(
+        (row) => row.claim_type === "FOUNDER_IDENTITY",
+      );
+      expect(identityRows.map((row) => row.status)).toEqual([
+        "PENDING",
+        "VERIFIED",
+      ]);
     });
   });
 

@@ -154,6 +154,17 @@
     display: none;
   }
 
+  /* ADMIN-4 block: the verification item sits top-right on desktop; on a
+     phone it lives inside More. */
+  .cq-verify-nudge-desktop {
+    display: none;
+  }
+  @media (min-width: 1024px) {
+    .cq-verify-nudge-desktop {
+      display: flex;
+    }
+  }
+
   /* A 44 px icon control in the sidebar (R24; WCAG 2.5.8). */
   .cq-sidebar-icon {
     display: inline-flex;

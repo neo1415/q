@@ -246,6 +246,46 @@ export async function decideVerificationAction(input: {
   return result;
 }
 
+// ADMIN-4 block: the person and their organisation, verified together.
+/**
+ * One operator action, two decisions: each claim is decided on its own,
+ * through the same route, with the same stated basis -- so each is
+ * recorded separately, with its reason. Stops at the first that fails and
+ * says which went through.
+ */
+export async function verifyPairAction(input: {
+  readonly claimIds: readonly string[];
+  readonly basis: string;
+}): Promise<ConsoleResult> {
+  const ids = z.array(Id).min(2).max(2).safeParse(input.claimIds);
+  const basis = z.string().trim().min(3).max(1000).safeParse(input.basis);
+  if (!ids.success || !basis.success) {
+    return {
+      ok: false,
+      message: "Say what the decision rests on (at least 3 characters).",
+    };
+  }
+  let done = 0;
+  for (const claimId of ids.data) {
+    const result = await decideVerificationAction({
+      claimId,
+      verified: true,
+      basis: basis.data,
+    });
+    if (!result.ok) {
+      return done === 0
+        ? result
+        : {
+            ok: false,
+            message: `One was verified; the other wasn't: ${result.message}`,
+          };
+    }
+    done += 1;
+  }
+  return { ok: true, message: "Both verified." };
+}
+// end ADMIN-4 block
+
 export async function reviewReportAction(input: {
   readonly reportId: string;
   readonly outcome: "NO_ACTION" | "WARNED" | "ACCOUNT_SUSPENDED" | "ESCALATED";

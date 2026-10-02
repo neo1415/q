@@ -157,9 +157,10 @@ export function FounderOnboardingScreen({
   const finishFromQ = async () => {
     await actions.submit({ kind: "snapshot", confirmed: true });
     if (await actions.complete()) {
-      // Founder direction 2026-09-30: done, the founder checks and edits
-      // what Q put together, on their own profile.
-      router.push("/profile");
+      // ADMIN-4 block (founder direction 2026-10-02): straight into
+      // "Verify you and <company>", skippable; skipping goes on to the
+      // profile, where the founder checks what Q put together (2026-09-30).
+      router.push("/verification?from=setup&next=profile");
     }
   };
 
@@ -267,9 +268,10 @@ export function FounderOnboardingScreen({
     // journey completion only; Home decides what comes next.
     await actions.submit({ kind: "snapshot", confirmed: true });
     if (await actions.complete()) {
-      // Founder direction 2026-09-30: done, the founder checks and edits
-      // what Q put together, on their own profile.
-      router.push("/profile");
+      // ADMIN-4 block (founder direction 2026-10-02): straight into
+      // "Verify you and <company>", skippable; skipping goes on to the
+      // profile, where the founder checks what Q put together (2026-09-30).
+      router.push("/verification?from=setup&next=profile");
     }
   };
 

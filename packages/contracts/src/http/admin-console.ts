@@ -222,11 +222,27 @@ export const AdminVerificationRowDtoSchema = z
     kyb: z
       .object({
         submissionId: UuidSchema,
-        legalName: z.string().max(300),
-        registrationNumber: z.string().max(100),
-        jurisdictionCode: z.string().max(2),
+        /** AUTO: Capital Q asked from what it knew (founder 2026-10-02). */
+        source: z.enum(["PERSON", "AUTO"]),
+        organisationName: z.string().max(300).nullable(),
+        legalName: z.string().max(300).nullable(),
+        registrationNumber: z.string().max(100).nullable(),
+        jurisdictionCode: z.string().max(2).nullable(),
         registeredAddress: z.string().max(500).nullable(),
         websiteUrl: z.string().max(500).nullable(),
+        contactEmailDomain: z.string().max(253).nullable(),
+        /** Null when either side is unknown. */
+        emailDomainMatchesWebsite: z.boolean().nullable(),
+        hasDocument: z.boolean(),
+      })
+      .strict()
+      .nullable(),
+    /** ADMIN-4: the identity details a person sent for their own claim. */
+    identity: z
+      .object({
+        submissionId: UuidSchema,
+        nameOnId: z.string().max(200),
+        role: z.string().max(120),
         hasDocument: z.boolean(),
       })
       .strict()

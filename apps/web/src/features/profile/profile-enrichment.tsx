@@ -21,6 +21,7 @@ import {
 import { Skeleton } from "@capital-q/ui/states";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { requestVerificationFromProfileAction } from "@/features/verification/verification-actions";
 import { SourcesDisclosure } from "@/components/sources-disclosure";
 import { formatDay } from "@/components/date-format";
 
@@ -229,6 +230,30 @@ const CLAIM_WORDS: Readonly<
   DOMAIN_CONTROL: "Website ownership",
 };
 
+/**
+ * ADMIN-4 (founder feedback 2026-10-02): each line says its real state,
+ * so the card never reads as verified when nothing is.
+ */
+function standingLine(standing: VerificationStandingDto): string {
+  switch (standing.status) {
+    case "NOT_REQUESTED":
+      return "Not requested";
+    case "PENDING":
+      return "Requested — with Capital Q";
+    case "VERIFIED":
+      return standing.verifiedAt === null
+        ? "Verified"
+        : `Verified on ${new Date(standing.verifiedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+    case "EXPIRED":
+      return "Expired — ask again";
+    case "REVOKED":
+      return standing.declineReason === null ||
+        standing.declineReason === undefined
+        ? "Declined"
+        : `Declined: ${standing.declineReason}`;
+  }
+}
+
 export type VerificationState =
   | {
       readonly status: "READ";
@@ -257,12 +282,18 @@ export function SignalsAndVerification({
   subjects,
   verification,
   verificationHref,
+  verificationCompanyId = null,
+  verificationRequestKey = null,
 }: {
   readonly subjects: readonly SignalsSubject[];
   /** A company's standings; null for an organisation without that workflow. */
   readonly verification: VerificationState | null;
   /** Where verification is asked for; null when this side has no page for it. */
   readonly verificationHref: string | null;
+  /** The company the inline request is for (ADMIN-4); null: no inline request. */
+  readonly verificationCompanyId?: string | null | undefined;
+  /** Minted by the server render, so a double press is the same request. */
+  readonly verificationRequestKey?: string | null | undefined;
 }) {
   const { askAbout } = useGlobalQ();
   const primary = subjects[0];
@@ -352,10 +383,10 @@ export function SignalsAndVerification({
           <ShieldCheck
             size={ICON_SIZE.compact}
             aria-hidden="true"
-            className="text-(--cq-positive)"
+            className="text-(--cq-text-secondary)"
           />
         }
-        title="Verified by Capital Q"
+        title="Verification"
         data="verified"
       >
         {verification !== null && verification.status === "READ" ? (
@@ -371,7 +402,7 @@ export function SignalsAndVerification({
                   {CLAIM_WORDS[standing.claimType]}
                 </dt>
                 <dd className="cq-body-sm text-(--cq-text-primary)">
-                  {standing.description}
+                  {standingLine(standing)}
                 </dd>
               </div>
             ))}
@@ -401,6 +432,35 @@ export function SignalsAndVerification({
             }
           />
         )}
+        {verificationCompanyId !== null &&
+        verificationRequestKey !== null &&
+        verification !== null &&
+        verification.status === "READ" &&
+        verification.standings.some(
+          (standing) =>
+            standing.status === "NOT_REQUESTED" ||
+            standing.status === "EXPIRED",
+        ) ? (
+          <form action={requestVerificationFromProfileAction}>
+            <input
+              type="hidden"
+              name="companyId"
+              value={verificationCompanyId}
+            />
+            <input
+              type="hidden"
+              name="requestKey"
+              value={verificationRequestKey}
+            />
+            <button
+              type="submit"
+              className={buttonClassName("secondary", "compact", "self-start")}
+              data-request-verification
+            >
+              Request verification
+            </button>
+          </form>
+        ) : null}
         {verificationHref === null ? (
           <button
             type="button"

@@ -58,6 +58,7 @@ const Row = z.object({
   verified_at: Timestamp.nullable(),
   expires_at: Timestamp.nullable(),
   revoked_at: Timestamp.nullable(),
+  revocation_reason: z.string().nullable().optional(),
   created_at: Timestamp,
 });
 
@@ -85,6 +86,7 @@ function toClaim(row: unknown): VerificationClaim {
     verifiedAt: r.verified_at,
     expiresAt: r.expires_at,
     revokedAt: r.revoked_at,
+    revocationReason: r.revocation_reason ?? null,
     createdAt: r.created_at,
   };
 }

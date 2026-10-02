@@ -54,13 +54,23 @@ export default async function VerificationPage({
     searchParams,
   ]);
   const notice = noticeOf(params["notice"]);
-  const loaded =
-    context.kind === "FOUNDER"
-      ? await loadCompanyVerification(context.companyId)
-      : null;
-  // ADMIN-3: KYB for the active organisation (founder or investor).
+  // ADMIN-4 block: one flow, "Verify you and <organisation>", for the
+  // active organisation (founder or investor). The per-claim standings
+  // below are only the fallback when that flow can't load.
+  const fromSetup = params["from"] === "setup";
+  // Only a known destination: the query string is input.
+  const skipTo =
+    params["next"] === "profile"
+      ? "/profile"
+      : params["next"] === "discover"
+        ? "/discover"
+        : "/home";
   const session = context.kind === "NONE" ? null : await apiSession();
   const kyb = session === null ? null : await getKyb(session).catch(() => null);
+  const loaded =
+    context.kind === "FOUNDER" && kyb === null
+      ? await loadCompanyVerification(context.companyId)
+      : null;
 
   return (
     <PageContainer>
@@ -72,7 +82,25 @@ export default async function VerificationPage({
             : "Capital Q verifies a founder's identity and your organisation before your company can appear in investor recommendations."
         }
       />
-      {loaded?.ok === true ? (
+      {kyb === null ? null : (
+        <PageSection
+          id="verify"
+          title={`Verify you and ${kyb.organisationName ?? "your organisation"}`}
+          description="Your identity and your organisation's registered details, checked by a person at Capital Q. Verification is not an endorsement."
+        >
+          {fromSetup ? (
+            <p className="cq-body-sm mb-4 text-(--cq-text-secondary)">
+              Your setup is done. Verifying now lets Capital Q show you as
+              verified sooner.{" "}
+              <Link href={skipTo} className="underline underline-offset-4">
+                Skip for now
+              </Link>
+            </p>
+          ) : null}
+          <KybSection kyb={kyb} />
+        </PageSection>
+      )}
+      {kyb !== null ? null : loaded?.ok === true ? (
         <VerificationStandings verification={loaded.value} notice={notice} />
       ) : loaded !== null ||
         (context.kind === "NONE" && context.unavailable === true) ? (
@@ -95,15 +123,6 @@ export default async function VerificationPage({
             </Link>
           }
         />
-      )}
-      {kyb === null ? null : (
-        <PageSection
-          id="business"
-          title="Verify your business"
-          description="Your organisation's registered details, checked by a person at Capital Q. Verification is not an endorsement."
-        >
-          <KybSection kyb={kyb} />
-        </PageSection>
       )}
       {context.kind === "NONE" ? null : (
         <p className="cq-body-sm mt-8 text-(--cq-text-secondary)">
