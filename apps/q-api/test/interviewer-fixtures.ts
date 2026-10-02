@@ -2,6 +2,7 @@ import type {
   OnboardingResponseValue,
   OnboardingSessionView,
 } from "@capital-q/contracts";
+import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding";
 import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
 import type { InterviewConductorResult } from "@capital-q/q-core";
 
@@ -31,6 +32,7 @@ const SESSION_ID = "f0000000-0000-4000-8000-000000000010";
 const NOW = "2026-09-23T09:00:00.000Z";
 
 export type InvestorWorld = {
+  readonly journey?: "founder" | "investor" | undefined;
   readonly fetch: typeof fetch;
   /** What the session holds, as the owning service would report it. */
   readonly recordedValue: (
@@ -53,6 +55,8 @@ export type InvestorWorld = {
 };
 
 export type WorldOptions = {
+  /** The journey the session follows (default investor). */
+  readonly journey?: "founder" | "investor" | undefined;
   readonly currentStepKey: string;
   /** Option keys or text already answered, by step. */
   readonly recorded?: Readonly<Record<string, string>> | undefined;
@@ -81,14 +85,19 @@ export type WorldOptions = {
     | undefined;
 };
 
-const STEPS = INVESTOR_DEFINITION_V1.steps;
+const INVESTOR_STEPS = INVESTOR_DEFINITION_V1.steps;
+const FOUNDER_STEPS_V3 = FOUNDER_DEFINITION_CURRENT.steps;
 
 /** The JSON the client sent. Anything else is not a request this fake serves. */
 function readBody(init: RequestInit | undefined): string {
   return typeof init?.body === "string" ? init.body : "{}";
 }
 
-function valueFor(stepKey: string, raw: string): OnboardingResponseValue {
+function valueFor(
+  stepKey: string,
+  raw: string,
+  STEPS: typeof INVESTOR_STEPS = INVESTOR_STEPS,
+): OnboardingResponseValue {
   const step = STEPS.find((s) => s.stepKey === stepKey);
   const configuration = step?.configuration;
   switch (configuration?.stepType) {
@@ -116,10 +125,12 @@ function valueFor(stepKey: string, raw: string): OnboardingResponseValue {
 }
 
 export function investorSession(options: WorldOptions): InvestorWorld {
+  const journey = options.journey ?? "investor";
+  const STEPS = journey === "founder" ? FOUNDER_STEPS_V3 : INVESTOR_STEPS;
   const held = new Map<string, OnboardingResponseValue>(
     Object.entries(options.recorded ?? {}).map(([key, raw]) => [
       key,
-      valueFor(key, raw),
+      valueFor(key, raw, STEPS),
     ]),
   );
   const setAside = new Set<string>();
@@ -150,7 +161,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     ({
       session: {
         id: SESSION_ID,
-        journeyType: "investor",
+        journeyType: journey,
         definitionVersionId: "22222222-2222-4222-8222-222222222222",
         definitionVersion: 1,
         status: completed ? "COMPLETED" : "ACTIVE",
@@ -484,6 +495,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
   };
 
   return {
+    journey,
     fetch: fetchFake,
     recordedValue: (stepKey) => held.get(stepKey),
     recordedNote: (stepKey) => notes.get(stepKey),
@@ -590,7 +602,7 @@ export function turn(
       fetch: world.fetch,
     },
     onboardingSessionId: SESSION_ID,
-    journeyType: "investor",
+    journeyType: world.journey ?? "investor",
     channel: "text",
     attribution: {
       tenantId: "c0000000-0000-4000-8000-000000000001",

@@ -1208,6 +1208,44 @@ export function createInterviewAgent(
     let rounds = 0;
     let calls = 0;
     let timedOut = false;
+    /**
+     * What the person approved, recorded by code (founder 2026-10-02:
+     * "on any kind of confirmation, record the answers at once or one by
+     * one, as the user tells Q"). The reading decides, by meaning, which
+     * of the findings Q put to them they approved -- all of them for "yes,
+     * all of that is right", exactly the first two for "the first two are
+     * right, change the third". Code then accepts exactly those pending,
+     * heard recommendations, through the same guarded port the model's
+     * accept_recommendation uses, instead of hoping the model calls it.
+     * Once per turn; whatever the model records besides stands.
+     */
+    let approvalsRecorded = false;
+    const recordApproved = async (approved: ReadonlySet<string>) => {
+      if (approvalsRecorded || approved.size === 0) return;
+      approvalsRecorded = true;
+      const pendingNow = new Set(
+        (await port.pendingRecommendations().catch(() => [])).map(
+          (item) => item.stepKey,
+        ),
+      );
+      const stepKeys = [...approved].filter((key) => pendingNow.has(key));
+      if (stepKeys.length === 0) return;
+      const results = await port.accept(stepKeys).catch(() => []);
+      actions.push({
+        tool: "accept_recommendation",
+        input: { stepKeys },
+        result: { results },
+      });
+      logger.info(
+        {
+          approved: stepKeys,
+          committed: results
+            .filter((r) => r.outcome === "COMMITTED")
+            .map((r) => r.stepKey),
+        },
+        "approved findings recorded by code",
+      );
+    };
     try {
       while (
         result === undefined &&
@@ -1217,6 +1255,12 @@ export function createInterviewAgent(
       ) {
         rounds += 1;
         const unread = reading === null;
+        if (reading !== null) {
+          await recordApproved(
+            (reading as ReturnType<typeof readingOf>).authority.approved,
+          );
+          state = await port.state();
+        }
         const response = await gateway.execute(
           {
             ...base,
@@ -1309,6 +1353,9 @@ export function createInterviewAgent(
 
     const { authority, lookup, pronounce, pausing } =
       reading ?? (await readingDone);
+    // A reading that came in after the last round still records what they
+    // approved: the approval is theirs whether or not a round saw it.
+    await recordApproved(authority.approved);
     const view = port.view() ?? (await port.state(), port.view());
     if (view === null) {
       throw new Error("the onboarding session could not be read");
