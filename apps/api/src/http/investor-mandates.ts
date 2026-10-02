@@ -8,23 +8,13 @@ import {
   type InvestorOrganisationId,
 } from "@capital-q/investors";
 import {
-  CorrelationIdSchema,
-  CreateInvestorMandateRequestSchema,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
-  INVESTOR_MANDATE_ACTIVATE_SUFFIX,
-  INVESTOR_MANDATE_CLOSE_SUFFIX,
   INVESTOR_MANDATES_SUFFIX,
   INVESTORS_PATH,
   InvestorMandateDtoSchema,
-  InvestorMandateTransitionRequestSchema,
   ListInvestorMandatesQuerySchema,
   ListInvestorMandatesResponseSchema,
   parseContract,
-  UpdateInvestorMandateRequestSchema,
-  type CorrelationId,
 } from "@capital-q/contracts";
-import { createCorrelationId } from "@capital-q/observability";
 
 import {
   getActorContext,
@@ -40,10 +30,6 @@ import type { InvestorRoutesDependencies } from "./investors.js";
  * service and map the organisation-internal DTO. No mandate rule lives here,
  * no delete route exists, and nothing is ranked.
  */
-
-function correlation(): CorrelationId {
-  return CorrelationIdSchema.parse(createCorrelationId());
-}
 
 function investorIdParam(request: FastifyRequest): InvestorOrganisationId {
   const params = request.params as Record<string, unknown>;
@@ -71,36 +57,6 @@ export function registerInvestorMandateRoutes(
   const service = dependencies.investors;
   const base = `${INVESTORS_PATH}/:investorOrganisationId${INVESTOR_MANDATES_SUFFIX}`;
   const byId = `${base}/:mandateId`;
-
-  app.post(base, { onRequest: withContext }, async (request, reply) => {
-    const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-    const idempotencyKey = parseContract(
-      IdempotencyKeyHeaderSchema,
-      typeof rawKey === "string" ? rawKey : undefined,
-      "An Idempotency-Key header is required to create a mandate.",
-    );
-    const input = parseContract(
-      CreateInvestorMandateRequestSchema,
-      request.body,
-      "The mandate request is not valid.",
-    );
-    const investorOrganisationId = investorIdParam(request);
-    const mandate = await service.createInvestorMandate({
-      actor: getActorContext(request),
-      investorOrganisationId,
-      input,
-      idempotencyKey,
-      correlationId: correlation(),
-    });
-    void reply
-      .status(201)
-      .header(
-        "Location",
-        `${INVESTORS_PATH}/${investorOrganisationId}${INVESTOR_MANDATES_SUFFIX}/${mandate.id}`,
-      )
-      .header("Cache-Control", "no-store");
-    return InvestorMandateDtoSchema.parse(toInvestorMandateDto(mandate));
-  });
 
   app.get(base, { onRequest: withContext }, async (request, reply) => {
     const query = parseContract(
@@ -131,47 +87,4 @@ export function registerInvestorMandateRoutes(
     void reply.header("Cache-Control", "no-store");
     return InvestorMandateDtoSchema.parse(toInvestorMandateDto(mandate));
   });
-
-  app.patch(byId, { onRequest: withContext }, async (request, reply) => {
-    const input = parseContract(
-      UpdateInvestorMandateRequestSchema,
-      request.body,
-      "The mandate update is not valid.",
-    );
-    const mandate = await service.updateInvestorMandate({
-      actor: getActorContext(request),
-      investorOrganisationId: investorIdParam(request),
-      mandateId: mandateIdParam(request),
-      input,
-      correlationId: correlation(),
-    });
-    void reply.header("Cache-Control", "no-store");
-    return InvestorMandateDtoSchema.parse(toInvestorMandateDto(mandate));
-  });
-
-  for (const [suffix, operation] of [
-    [INVESTOR_MANDATE_ACTIVATE_SUFFIX, "activateInvestorMandate"],
-    [INVESTOR_MANDATE_CLOSE_SUFFIX, "closeInvestorMandate"],
-  ] as const) {
-    app.post(
-      `${byId}${suffix}`,
-      { onRequest: withContext },
-      async (request, reply) => {
-        const input = parseContract(
-          InvestorMandateTransitionRequestSchema,
-          request.body ?? {},
-          "The mandate transition request is not valid.",
-        );
-        const mandate = await service[operation]({
-          actor: getActorContext(request),
-          investorOrganisationId: investorIdParam(request),
-          mandateId: mandateIdParam(request),
-          input,
-          correlationId: correlation(),
-        });
-        void reply.header("Cache-Control", "no-store");
-        return InvestorMandateDtoSchema.parse(toInvestorMandateDto(mandate));
-      },
-    );
-  }
 }

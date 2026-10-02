@@ -532,6 +532,9 @@ importers:
 
   packages/app-actions:
     dependencies:
+      '@capital-q/capital':
+        specifier: workspace:*
+        version: link:../capital
       '@capital-q/companies':
         specifier: workspace:*
         version: link:../companies
@@ -547,6 +550,9 @@ importers:
       '@capital-q/media':
         specifier: workspace:*
         version: link:../media
+      '@capital-q/permissions':
+        specifier: workspace:*
+        version: link:../permissions
       '@capital-q/public-identity':
         specifier: workspace:*
         version: link:../public-identity

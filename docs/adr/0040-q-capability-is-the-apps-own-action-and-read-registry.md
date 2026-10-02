@@ -104,14 +104,16 @@ Each area follows the same steps:
 3. Add the area's read kind to read_my.
 4. Run the eval.
 
+A form with several operations (a raise: create, update, close, replace) is one family (`defineAppActionFamily`): each operation keeps its own declaration and route, and Q gets one tool for the form, because a run offers at most MODEL_TOOLS_MAX tools and the operations are one thing to the person.
+
 Exempt routes stay exempt, each with its reason: webhooks, Q transport, the operations console, public surfaces, the player, commitments, billing and meeting-assistant consent.
 
 Profile and records (L, highest value; Q already proposes these through hand tools):
 
 - [x] Profile: `me`, `companies`, `investors` PATCH; `company-team` ×3; `q-cards` ×2. **L** Done 2026-10-02: eight routes generated and nine generated tools replace `propose_profile_change`, `propose_team_change`, `propose_handle_claim` and `propose_q_card_change`. The two `me` routes stay hand routes, because they serve a person who has no organisation yet and a generated route needs an organisation's actor context; `person.profile.update` is declared for Q only.
-- [ ] Capital (raise): `capital-objectives` ×4. **M**
-- [ ] Mandate: `investor-mandates` ×3. **M**
-- [ ] Visibility and shares: `companies` visibility, `investors` visibility, `visibility` ×2. **M**
+- [x] Capital (raise): `capital-objectives` ×4. **M** Done 2026-10-02: four declarations, one family tool `change_my_raise` replacing `propose_raise_change`.
+- [x] Mandate: `investor-mandates` ×3. **M** Done 2026-10-02: four declarations (activate and close are two), one family tool `change_my_mandate` replacing `propose_mandate_change`.
+- [x] Visibility and shares: `companies` visibility, `investors` visibility, `visibility` ×2. **M** Done 2026-10-02: four routes generated; `set_investor_visibility`, `share_my_raise` and `stop_sharing_my_raise` (the investor named as said) replace the hand tools. The company's visibility stays on the turn reader's SET_VISIBILITY hand (`viaHand`) until its owner retires the hand.
 
 Relationships:
 

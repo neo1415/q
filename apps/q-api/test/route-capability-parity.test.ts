@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { APP_ACTIONS } from "@capital-q/app-actions";
+import { APP_ACTIONS, qCapabilityId } from "@capital-q/app-actions";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
 
 /**
@@ -63,16 +63,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   'api/app.ts GET "/health/live"': HEALTH,
   'api/app.ts GET "/health/ready"': HEALTH,
 
-  "api/http/capital-objectives.ts POST base": cap("tool.propose_raise_change"),
   "api/http/capital-objectives.ts GET base": cap("tool.get_capital_objective"),
   "api/http/capital-objectives.ts GET `${base}${CAPITAL_OBJECTIVE_CURRENT_SEGMENT}`":
     cap("tool.get_capital_objective"),
   "api/http/capital-objectives.ts GET byId": cap("tool.get_capital_objective"),
-  "api/http/capital-objectives.ts PATCH byId": cap("tool.propose_raise_change"),
-  "api/http/capital-objectives.ts POST `${byId}${CAPITAL_OBJECTIVE_CLOSE_SUFFIX}`":
-    cap("tool.propose_raise_change"),
-  "api/http/capital-objectives.ts POST `${byId}${CAPITAL_OBJECTIVE_REPLACE_SUFFIX}`":
-    cap("tool.propose_raise_change"),
 
   // BIZ-008 meetings, reminders, notifications.
   "api/http/schedule.ts GET RELATIONSHIP_MEETINGS_PATH":
@@ -140,8 +134,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/companies.ts POST COMPANIES_PATH": ONBOARDING_SETUP,
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId`":
     cap("tool.get_company"),
-  "api/http/companies.ts POST `${COMPANIES_PATH}/:companyId${COMPANY_VISIBILITY_SEGMENT}`":
-    cap("hand.set_visibility"),
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_SEGMENT}`":
     cap("tool.read_my_record"),
   "api/http/companies.ts POST `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT}`":
@@ -348,24 +340,14 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/integrations.ts POST GOOGLE_GMAIL_PUSH_PATH": WEBHOOK,
 
-  "api/http/investor-mandates.ts POST base": cap("tool.propose_mandate_change"),
   "api/http/investor-mandates.ts GET base": cap("tool.get_investor_mandate"),
   "api/http/investor-mandates.ts GET byId": cap("tool.get_investor_mandate"),
-  "api/http/investor-mandates.ts PATCH byId": cap(
-    "tool.propose_mandate_change",
-  ),
-  "api/http/investor-mandates.ts POST `${byId}${suffix}`": cap(
-    "tool.propose_mandate_change",
-  ),
 
   "api/http/investors.ts POST INVESTORS_PATH": ONBOARDING_SETUP,
   "api/http/investors.ts GET INVESTORS_CURRENT_PATH": cap(
     "tool.read_my_record",
   ),
   "api/http/investors.ts GET byId": cap("tool.read_my_record"),
-  "api/http/investors.ts POST `${byId}${INVESTOR_VISIBILITY_SEGMENT}`": cap(
-    "tool.propose_investor_visibility",
-  ),
   "api/http/investors.ts GET `${byId}${INVESTOR_NETWORK_PREVIEW_SEGMENT}`": cap(
     "tool.read_my_record",
   ),
@@ -542,12 +524,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/visibility.ts GET COMPANY_AUDIENCE_PREVIEW_PATH": cap(
     "tool.read_my_record",
-  ),
-  "api/http/visibility.ts POST COMPANY_SHARES_PATH": cap(
-    "tool.propose_share_raise",
-  ),
-  "api/http/visibility.ts POST COMPANY_SHARE_REVOKE_PATH": cap(
-    "tool.propose_revoke_share",
   ),
 
   // ---- apps/q-api -------------------------------------------------------
@@ -879,7 +855,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 143;
+const LEGACY_MUTATION_ROUTES_MAX = 132;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
@@ -935,9 +911,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
   it("every declared action is a route and a Q tool, from one declaration (ADR 0040)", () => {
     for (const action of APP_ACTIONS) {
       expect(
-        CAPABILITY_IDS.has(
-          `tool.${action.tool?.name ?? action.legacyTool ?? ""}`,
-        ),
+        CAPABILITY_IDS.has(qCapabilityId(action) ?? ""),
         `${action.name}: no capability for its generated tool`,
       ).toBe(true);
     }

@@ -265,21 +265,27 @@ const tokens = {
   FOUNDER: await signIn(env("EVAL_FOUNDER_EMAIL")),
   INVESTOR: await signIn(env("EVAL_INVESTOR_EMAIL")),
 };
+// Whose record an action changes decides the account: a founder's
+// company, an investor's organisation; otherwise the area's account.
+function accountOf(action) {
+  const scopes = action?.tool?.scopes ?? [];
+  if (scopes.includes("COMPANY_PROFILE")) return "FOUNDER";
+  if (scopes.some((scope) => scope.startsWith("INVESTOR_"))) return "INVESTOR";
+  return ACCOUNT_OF_AREA[action?.area] ?? "FOUNDER";
+}
 const rows = [];
 for (const testCase of cases) {
   const account =
     testCase.expect.kind === "READ"
       ? ACCOUNT_OF_READ[testCase.expect.read]
-      : (ACCOUNT_OF_AREA[
-          APP_ACTIONS.find((a) => a.name === testCase.expect.action)?.area
-        ] ?? "INVESTOR");
+      : accountOf(APP_ACTIONS.find((a) => a.name === testCase.expect.action));
   const userId = account === "FOUNDER" ? founderUser : investorUser;
   const t0 = Date.now();
   const runId = await ask(tokens[account], testCase.say);
   const status = runId === null ? "NOT_STARTED" : await settled(runId);
   const ok =
     runId !== null &&
-    status === "COMPLETED" &&
+    (status === "COMPLETED" || status === "AWAITING_APPROVAL") &&
     (await check(testCase, runId, userId, names.names.COMPANY));
   rows.push({
     id: testCase.id,

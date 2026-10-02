@@ -171,29 +171,6 @@ describe("get_disclosure_state", () => {
 });
 
 describe("the proposal tools prepare exactly one approval and share nothing", () => {
-  it("propose_share_raise prepares the share for a relationship the company can see", async () => {
-    const { port, prepared } = fakeVisibility();
-    const outcome = await tools(port).execute(
-      {
-        callId: "p1",
-        name: "propose_share_raise",
-        arguments: { companyId: COMPANY_A, relationshipId: HORIZON },
-      },
-      contextFor(actorA, founderPlan),
-    );
-    expect(outcome.status).toBe("SUCCEEDED");
-    expect(prepared).toEqual([
-      {
-        actionType: "disclosure.raise.share",
-        payload: {
-          companyId: COMPANY_A,
-          relationshipId: HORIZON,
-          recipientName: "Horizon Capital",
-        },
-      },
-    ]);
-  });
-
   it("refuses a relationship the company cannot see, and one already shared with", async () => {
     const { port, prepared } = fakeVisibility();
     for (const relationshipId of [
@@ -211,40 +188,5 @@ describe("the proposal tools prepare exactly one approval and share nothing", ()
       expect(outcome.status, relationshipId).toBe("DENIED");
     }
     expect(prepared).toEqual([]);
-  });
-
-  it("propose_revoke_share prepares only a share that exists", async () => {
-    const { port, prepared } = fakeVisibility();
-    const missing = await tools(port).execute(
-      {
-        callId: "r1",
-        name: "propose_revoke_share",
-        arguments: {
-          companyId: COMPANY_A,
-          shareId: "99999999-0000-4000-8000-000000000099",
-        },
-      },
-      contextFor(actorA, founderPlan),
-    );
-    expect(missing.status).toBe("DENIED");
-    const outcome = await tools(port).execute(
-      {
-        callId: "r2",
-        name: "propose_revoke_share",
-        arguments: { companyId: COMPANY_A, shareId: POLICY },
-      },
-      contextFor(actorA, founderPlan),
-    );
-    expect(outcome.status).toBe("SUCCEEDED");
-    expect(prepared).toEqual([
-      {
-        actionType: "disclosure.share.revoke",
-        payload: {
-          companyId: COMPANY_A,
-          policyId: POLICY,
-          recipientName: "Apex Ventures",
-        },
-      },
-    ]);
   });
 });

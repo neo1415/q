@@ -268,7 +268,7 @@ function toolFor(
         );
       }
       const refused = await declared
-        .refuse?.(parsed.data, own)
+        .refuse?.(parsed.data, own, context)
         .catch(() => null);
       if (refused !== undefined && refused !== null) {
         return deny("NOT_AVAILABLE", refused);

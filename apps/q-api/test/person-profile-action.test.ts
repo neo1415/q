@@ -295,9 +295,11 @@ describe("the board, for a name", () => {
       displayName: "John",
       quote: "call me john",
     });
+    // The registry's declaration (ADR 0040), the one update_my_profile
+    // prepares too.
     expect(await board.propose(prepareContext())).toEqual({
-      actionType: PERSON_PROFILE_UPDATE,
-      payload: { userId: USER, displayName: "John" },
+      actionType: "app.person.profile.update",
+      payload: { userId: USER, input: { displayName: "John" } },
     });
     expect(await board.propose(prepareContext())).toBeNull();
 

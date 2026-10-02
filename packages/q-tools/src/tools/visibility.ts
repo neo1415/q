@@ -17,7 +17,6 @@ import {
 } from "../definition.js";
 import { boundScopeFor } from "../plan.js";
 import type { VisibilityIntelligencePort } from "../ports.js";
-import { ProposalOutputSchema, type ProposalOutput } from "./relationships.js";
 
 /**
  * Who can see what, for the person's own company (CQ-BIZ-003; business
@@ -41,8 +40,6 @@ import { ProposalOutputSchema, type ProposalOutput } from "./relationships.js";
  */
 
 export const GET_DISCLOSURE_STATE = "disclosure.state.get" as const;
-export const PROPOSE_SHARE_RAISE = "disclosure.raise.share.propose" as const;
-export const PROPOSE_REVOKE_SHARE = "disclosure.share.revoke.propose" as const;
 
 const PURPOSES: readonly QTaskClass[] = [
   "OWN_COMPANY_QUESTION",
@@ -206,162 +203,8 @@ function createGetDisclosureStateTool(
   });
 }
 
-const ShareRaiseInput = z
-  .object({
-    companyId: UuidSchema.describe(
-      "The person's own company's id, as given in the conversation context.",
-    ),
-    relationshipId: UuidSchema.describe(
-      "The investor to share with, from get_disclosure_state shareableWith.",
-    ),
-  })
-  .strict();
-type ShareRaiseInput = z.infer<typeof ShareRaiseInput>;
-
-function createProposeShareRaiseTool(
-  visibility: VisibilityIntelligencePort,
-): AnyQToolDefinition {
-  return defineQTool<
-    ShareRaiseInput,
-    ProposalOutput,
-    { readonly name: string }
-  >({
-    id: PROPOSE_SHARE_RAISE,
-    version: 1,
-    status: "ACTIVE",
-    providerName: "propose_share_raise",
-    description:
-      "Prepares sharing the company's raise (target, instrument, stage and close date; never the use of funds) with one investor the company has a relationship with, for the person's own approval, when they have asked for it. It shares nothing by itself: the person is shown exactly what that investor will and will not receive, and approves or declines.",
-    classification: "SIDE_EFFECT",
-    riskClass: "LOW_RISK_INTERNAL",
-    requiredCapabilities: [capability("disclosure.manage")],
-    supportedPurposes: [...PURPOSES],
-    requiredScopeKinds: [...SCOPES],
-    approval: "NONE",
-    idempotency: "SAFE_TO_REPEAT",
-    owner: "q-tools",
-    visibleStage: "WAITING_FOR_APPROVAL",
-    input: ShareRaiseInput,
-    output: ProposalOutputSchema,
-    authorize: async (input, { actor, plan }) => {
-      if (!ownCompanyBound(plan, input.companyId)) {
-        return deny("NOT_AVAILABLE");
-      }
-      try {
-        const state = await visibility.state(actor, input.companyId);
-        const raise = state.objects.some(
-          (o) => o.object === "CAPITAL_OBJECTIVE" && o.shareable,
-        );
-        const relationship = state.relationships.find(
-          (r) => r.relationshipId === input.relationshipId,
-        );
-        const already = state.shares.some(
-          (s) =>
-            s.object === "CAPITAL_OBJECTIVE" &&
-            s.relationshipId === input.relationshipId,
-        );
-        if (!raise || relationship === undefined || already) {
-          return deny("NOT_AVAILABLE");
-        }
-        return allow("CONFIDENTIAL", { name: relationship.name });
-      } catch {
-        return deny("NOT_AVAILABLE");
-      }
-    },
-    execute: (input, context, grant) =>
-      Promise.resolve({
-        status: visibility.prepareForApproval({
-          runId: context.runId,
-          tenantId: context.actor.tenantId,
-          actorUserId: context.actor.userId,
-          actionType: "disclosure.raise.share",
-          payload: {
-            companyId: input.companyId,
-            relationshipId: input.relationshipId,
-            recipientName: grant.name,
-          },
-        }),
-        awaitingApprovalOf: `Share your raise with ${grant.name}`,
-      }),
-  });
-}
-
-const RevokeShareInput = z
-  .object({
-    companyId: UuidSchema.describe(
-      "The person's own company's id, as given in the conversation context.",
-    ),
-    shareId: UuidSchema.describe(
-      "The share to revoke, from get_disclosure_state shares.",
-    ),
-  })
-  .strict();
-type RevokeShareInput = z.infer<typeof RevokeShareInput>;
-
-function createProposeRevokeShareTool(
-  visibility: VisibilityIntelligencePort,
-): AnyQToolDefinition {
-  return defineQTool<
-    RevokeShareInput,
-    ProposalOutput,
-    { readonly name: string }
-  >({
-    id: PROPOSE_REVOKE_SHARE,
-    version: 1,
-    status: "ACTIVE",
-    providerName: "propose_revoke_share",
-    description:
-      "Prepares revoking one active share of the company's raise with an investor, for the person's own approval, when they have asked for it. It revokes nothing by itself. Revoking removes future access; what the investor already saw cannot be recalled, and the person is told so.",
-    classification: "SIDE_EFFECT",
-    riskClass: "LOW_RISK_INTERNAL",
-    requiredCapabilities: [capability("disclosure.manage")],
-    supportedPurposes: [...PURPOSES],
-    requiredScopeKinds: [...SCOPES],
-    approval: "NONE",
-    idempotency: "SAFE_TO_REPEAT",
-    owner: "q-tools",
-    visibleStage: "WAITING_FOR_APPROVAL",
-    input: RevokeShareInput,
-    output: ProposalOutputSchema,
-    authorize: async (input, { actor, plan }) => {
-      if (!ownCompanyBound(plan, input.companyId)) {
-        return deny("NOT_AVAILABLE");
-      }
-      try {
-        const state = await visibility.state(actor, input.companyId);
-        const share = state.shares.find((s) => s.policyId === input.shareId);
-        if (share === undefined) return deny("NOT_AVAILABLE");
-        return allow("CONFIDENTIAL", {
-          name: share.recipientName ?? "that investor",
-        });
-      } catch {
-        return deny("NOT_AVAILABLE");
-      }
-    },
-    execute: (input, context, grant) =>
-      Promise.resolve({
-        status: visibility.prepareForApproval({
-          runId: context.runId,
-          tenantId: context.actor.tenantId,
-          actorUserId: context.actor.userId,
-          actionType: "disclosure.share.revoke",
-          payload: {
-            companyId: input.companyId,
-            policyId: input.shareId,
-            recipientName: grant.name,
-          },
-        }),
-        awaitingApprovalOf: `Stop sharing your raise with ${grant.name}`,
-      }),
-  });
-}
-
 export function createVisibilityTools(
   visibility: VisibilityIntelligencePort,
 ): readonly AnyQToolDefinition[] {
-  return [
-    createGetDisclosureStateTool(visibility),
-    createProposeShareRaiseTool(visibility),
-    createProposeRevokeShareTool(visibility),
-  ];
+  return [createGetDisclosureStateTool(visibility)];
 }

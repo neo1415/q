@@ -170,16 +170,10 @@ export {
   REASSESS_READINESS,
 } from "./tools/own-records.js";
 export {
-  createProposeInvestorVisibilityTool,
-  createProposeMandateChangeTool,
   createProposeProfileAnswerTool,
-  createProposeRaiseChangeTool,
   createRecordChangeTools,
   ProposeRecordChangeOutputSchema,
-  PROPOSE_INVESTOR_VISIBILITY,
-  PROPOSE_MANDATE_CHANGE,
   PROPOSE_PROFILE_ANSWER,
-  PROPOSE_RAISE_CHANGE,
 } from "./tools/record-changes.js";
 export {
   createRelationshipTools,
@@ -263,8 +257,6 @@ export {
 export {
   GET_DISCLOSURE_STATE,
   GetDisclosureStateOutputSchema,
-  PROPOSE_REVOKE_SHARE,
-  PROPOSE_SHARE_RAISE,
   type GetDisclosureStateOutput,
 } from "./tools/visibility.js";
 export {

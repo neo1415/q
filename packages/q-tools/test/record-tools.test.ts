@@ -12,19 +12,15 @@ import {
   createOwnRecordTools,
   createQToolExecutor,
   createQToolRegistry,
-  createRecordChangeTools,
   matchCounterpart,
   nameSimilarity,
   type ConversationProposal,
   type OwnRecordsPort,
   type PendingProposalPort,
-  type RecordChange,
-  type RecordChangePort,
   type RelationshipIntelligencePort,
 } from "../src/index.js";
 import {
   COMPANY_A,
-  COMPANY_B_NETWORK,
   actorA,
   actorB,
   contextFor,
@@ -68,86 +64,6 @@ const call = (name: string, args: Record<string, unknown>) => ({
 
 const dataOf = (outcome: { result: unknown }) =>
   (outcome.result as { data: Record<string, unknown> }).data;
-
-describe("record changes are prepared for the person's own record only", () => {
-  function world(answer: Awaited<ReturnType<RecordChangePort["prepare"]>>) {
-    const prepared: RecordChange[] = [];
-    const port: RecordChangePort = {
-      prepare: (entry) => {
-        prepared.push(entry.change);
-        return Promise.resolve(answer);
-      },
-    };
-    const executor = createQToolExecutor({
-      registry: createQToolRegistry(createRecordChangeTools(fakePorts(), port)),
-    });
-    return { executor, prepared };
-  }
-  const PREPARED = {
-    status: "PREPARED" as const,
-    awaitingApprovalOf: "Update your raise",
-    reason: null,
-  };
-
-  it("binds the raise change to their own company from the plan", async () => {
-    const { executor, prepared } = world(PREPARED);
-    const outcome = await executor.execute(
-      call("propose_raise_change", {
-        operation: "UPDATE",
-        target: { amount: "2000000", currency: "USD" },
-      }),
-      contextFor(actorA, ownPlan()),
-    );
-    expect(outcome.status).toBe("SUCCEEDED");
-    expect(dataOf(outcome)["status"]).toBe("PREPARED");
-    expect(prepared).toEqual([
-      {
-        kind: "CAPITAL_OBJECTIVE",
-        companyId: COMPANY_A,
-        operation: "UPDATE",
-        fields: { target: { amount: "2000000", currency: "USD" } },
-      },
-    ]);
-  });
-
-  it("never prepares for a company that is not theirs", async () => {
-    const { executor, prepared } = world(PREPARED);
-    const outcome = await executor.execute(
-      call("propose_raise_change", {
-        operation: "UPDATE",
-        targetStage: "seed",
-      }),
-      contextFor(actorA, ownPlan(actorA, [COMPANY_B_NETWORK])),
-    );
-    expect(outcome.status).not.toBe("SUCCEEDED");
-    expect(prepared).toEqual([]);
-  });
-
-  it("closing needs a reason, and a refusal is reported as the composition said", async () => {
-    const { executor } = world({
-      status: "REFUSED",
-      awaitingApprovalOf: null,
-      reason: "That doesn't fit the form.",
-    });
-    const missing = await executor.execute(
-      call("propose_raise_change", { operation: "CLOSE" }),
-      contextFor(actorA, ownPlan()),
-    );
-    expect(missing.status).not.toBe("SUCCEEDED");
-    const refused = await executor.execute(
-      call("propose_raise_change", {
-        operation: "UPDATE",
-        useOfFundsSummary: "Hiring",
-      }),
-      contextFor(actorA, ownPlan()),
-    );
-    expect(dataOf(refused)).toEqual({
-      status: "REFUSED",
-      awaitingApprovalOf: null,
-      reason: "That doesn't fit the form.",
-    });
-  });
-});
 
 describe("reading their own records", () => {
   const seen: Parameters<OwnRecordsPort["read"]>[1][] = [];

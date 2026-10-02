@@ -1382,6 +1382,8 @@ const appActionPorts: OwnReadPorts = {
     getCompany: (query) => companyService.getCompany(query),
     getMyCompanyMembership: (query) =>
       companyService.getMyCompanyMembership(query),
+    setCompanyVisibility: (command) =>
+      companyService.setCompanyVisibility(command),
     updateCompany: (command) => companyService.updateCompany(command),
     upsertMyCompanyMembership: (command) =>
       companyService.upsertMyCompanyMembership(command),
@@ -1393,12 +1395,43 @@ const appActionPorts: OwnReadPorts = {
   investors: {
     getInvestorOrganisation: (query) =>
       investorService.getInvestorOrganisation(query),
+    setInvestorVisibility: (command) =>
+      investorService.setInvestorVisibility(command),
     updateInvestorOrganisation: (command) =>
       investorService.updateInvestorOrganisation(command),
     upsertMyInvestorRepresentative: (command) =>
       investorService.upsertMyInvestorRepresentative(command),
+    getInvestorMandate: (query) => investorService.getInvestorMandate(query),
+    listInvestorMandates: (query) =>
+      investorService.listInvestorMandates(query),
+    createInvestorMandate: (command) =>
+      investorService.createInvestorMandate(command),
+    updateInvestorMandate: (command) =>
+      investorService.updateInvestorMandate(command),
+    activateInvestorMandate: (command) =>
+      investorService.activateInvestorMandate(command),
+    closeInvestorMandate: (command) =>
+      investorService.closeInvestorMandate(command),
   },
   publicIdentity,
+  visibility: {
+    state: (query) => visibilityCentre.state(query),
+    share: (command) => visibilityCentre.share(command),
+    revoke: (command) => visibilityCentre.revoke(command),
+  },
+  capital: {
+    getCapitalObjective: (query) => capitalService.getCapitalObjective(query),
+    getCurrentCapitalObjective: (query) =>
+      capitalService.getCurrentCapitalObjective(query),
+    createCapitalObjective: (command) =>
+      capitalService.createCapitalObjective(command),
+    updateCapitalObjective: (command) =>
+      capitalService.updateCapitalObjective(command),
+    closeCapitalObjective: (command) =>
+      capitalService.closeCapitalObjective(command),
+    replaceCapitalObjective: (command) =>
+      capitalService.replaceCapitalObjective(command),
+  },
   people: {
     read: (userId) => people.read(userId),
     update: (input) => people.update(input),

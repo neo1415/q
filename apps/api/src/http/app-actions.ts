@@ -60,6 +60,7 @@ export function registerAppActionRoutes(
           http.fromRequest(
             request.params as Record<string, string>,
             request.body ?? {},
+            request.headers,
           ),
           "The request is not valid.",
         );
@@ -84,6 +85,14 @@ export function registerAppActionRoutes(
           return undefined;
         }
         void reply.header("Cache-Control", "no-store");
+        if (http.location !== undefined) {
+          void reply.header("Location", http.location(out, input));
+        }
+        void reply.status(
+          typeof http.status === "function"
+            ? http.status(out)
+            : (http.status ?? 200),
+        );
         return await http.respond(out, input, dependencies.ports);
       },
     });

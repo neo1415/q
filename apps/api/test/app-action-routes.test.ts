@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { APP_ACTIONS } from "@capital-q/app-actions";
+import { APP_ACTIONS, qCapabilityId } from "@capital-q/app-actions";
 import { parseApiConfig } from "@capital-q/config/api";
 import type { MediaAsset, MediaService } from "@capital-q/media";
 import {
@@ -120,9 +120,7 @@ describe("routes generated from the action registry (ADR 0040)", () => {
     // Served to Q by a generated tool or, until its area's second step,
     // by the hand tool it names.
     expect(
-      APP_ACTIONS.every(
-        (action) => (action.tool?.name ?? action.legacyTool ?? "").length > 0,
-      ),
+      APP_ACTIONS.every((action) => (qCapabilityId(action) ?? "").length > 0),
     ).toBe(true);
   });
 

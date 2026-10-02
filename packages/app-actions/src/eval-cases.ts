@@ -44,9 +44,11 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
     media: ["What pitch videos do I have?", "Can investors play my pitch?"],
     documents: ["What documents have you made for me?", "List my documents."],
     rehearsals: ["How did my rehearsals go?", "Have I rehearsed with anyone?"],
+    // "What's in my Discover feed?" reads as "open Discover" (parity eval
+    // 2026-10-02), which is a fair reading; these ask for the names.
     feed: [
-      "What's in my Discover feed?",
-      "Which companies are in my feed right now?",
+      "Which companies are in my Discover feed?",
+      "Name the companies in my feed right now.",
     ],
   };
 

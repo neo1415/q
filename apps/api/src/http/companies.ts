@@ -15,11 +15,9 @@ import {
   COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT,
   COMPANY_MARKETPLACE_READINESS_SEGMENT,
   COMPANY_NETWORK_PREVIEW_SEGMENT,
-  COMPANY_VISIBILITY_SEGMENT,
   CompanyDtoSchema,
   CompanyNetworkPreviewSchema,
   MarketplaceReadinessAssessmentSchema,
-  SetCompanyVisibilityRequestSchema,
   CorrelationIdSchema,
   CreateCompanyRequestSchema,
   IDEMPOTENCY_KEY_HEADER,
@@ -210,30 +208,8 @@ export function registerCompanyRoutes(
 
   // Declared in the app's action registry (ADR 0040); the route is
   // generated (http/app-actions.ts), as Q's path is.
-  // Who may see the declared profile (CQ-PRE-REC-001 §31-§35). An
-  // intentional act by an editor, never a side effect of onboarding.
-  app.post(
-    `${COMPANIES_PATH}/:companyId${COMPANY_VISIBILITY_SEGMENT}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        SetCompanyVisibilityRequestSchema,
-        request.body,
-        "The visibility request is not valid.",
-      );
-      const company = await service.setCompanyVisibility({
-        actor: getActorContext(request),
-        companyId: companyIdParam(request),
-        input,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return CompanyDtoSchema.parse({
-        ...toCompanyDto(company),
-        pitch: await pitchSummaryOf(dependencies.pitches, company.id),
-      });
-    },
-  );
+  // Who may see the declared profile (CQ-PRE-REC-001 §31-§35) is set
+  // through the route generated from the action registry (ADR 0040).
 
   // Marketplace readiness (CQ-MKT-001): what the policy says now, without
   // writing. The body-less POST asks for a reconciliation; there is no
