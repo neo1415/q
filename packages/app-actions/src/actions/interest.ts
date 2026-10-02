@@ -27,7 +27,7 @@ import {
   type InterestService,
 } from "@capital-q/network";
 
-import { defineAppAction, type AnyAppAction } from "../define.js";
+import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
 /**
@@ -44,9 +44,7 @@ import type { AppActionPorts } from "../ports.js";
  * a body field.
  */
 
-const missing = (port: string): never => {
-  throw new Error(`APP_ACTION_PORT_MISSING:${port}`);
-};
+const missing = portMissing;
 
 const serviceResult = <T>(): z.ZodType<T> => z.custom<T>();
 

@@ -46,6 +46,9 @@ export type AppActionVerdict =
       readonly reason: string;
     };
 
+/** A success status a route answers; 202 when work was started, 204 with no body. */
+export type AppActionStatus = 200 | 201 | 202 | 204;
+
 export type AppActionHttp<In, Out> = {
   readonly method: "POST" | "PUT" | "PATCH" | "DELETE";
   /** The route's own path, with :params. Never a catch-all. */
@@ -61,7 +64,7 @@ export type AppActionHttp<In, Out> = {
   ) => unknown;
   /** The success status the route always answered with (default 200). */
   readonly status?:
-    200 | 201 | 204 | ((out: Out) => 200 | 201 | 204) | undefined;
+    AppActionStatus | ((out: Out) => AppActionStatus) | undefined;
   /** The Location of what it created, for a 201. */
   readonly location?: ((out: Out, input: In) => string) | undefined;
   /** The wire answer, in the route's existing response contract. */
@@ -315,4 +318,48 @@ export function defineAppActionFamily<ToolIn>(definition: {
       Object.freeze({ ...member, viaTool: definition.tool.name }),
     ),
   ];
+}
+
+/**
+ * What a deployment says when the service behind an action isn't composed
+ * on it: "<feature> isn't available on this deployment yet", never a 500.
+ * By port, in the person's words.
+ */
+const FEATURES: Readonly<Partial<Record<keyof AppActionPorts, string>>> = {
+  capital: "Your raise",
+  chat: "Chat",
+  chatSafety: "Blocking and reporting in chat",
+  companies: "Company profiles",
+  connections: "Connection requests",
+  documentUploads: "Document uploads",
+  documentUploadLimits: "Document uploads",
+  google: "Google",
+  interests: "Expressing interest",
+  investors: "Investor profiles",
+  notificationSettings: "Notification settings",
+  people: "Your profile",
+  pitchUploads: "Pitch videos",
+  profileImages: "Profile photos",
+  publicIdentity: "Q Cards",
+  reviews: "Reviews",
+  schedule: "Calls and reminders",
+  verification: "Verification",
+  visibility: "Sharing",
+  kyb: "Business verification",
+};
+
+/** An action's service is not composed on this deployment. */
+export class AppActionPortMissingError extends Error {
+  readonly port: keyof AppActionPorts;
+  readonly detail: string;
+  constructor(port: keyof AppActionPorts) {
+    super(`APP_ACTION_PORT_MISSING:${String(port)}`);
+    this.name = "AppActionPortMissingError";
+    this.port = port;
+    this.detail = `${FEATURES[port] ?? "That"} isn't available on this deployment yet.`;
+  }
+}
+
+export function portMissing(port: keyof AppActionPorts): never {
+  throw new AppActionPortMissingError(port);
 }

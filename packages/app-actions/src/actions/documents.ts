@@ -18,7 +18,7 @@ import {
   type EvidenceService,
 } from "@capital-q/evidence";
 
-import { defineAppAction, type AnyAppAction } from "../define.js";
+import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
 import type { AppActionPorts, DocumentUploadLimits } from "../ports.js";
 
 /**
@@ -30,9 +30,7 @@ import type { AppActionPorts, DocumentUploadLimits } from "../ports.js";
  * application's own error handler.
  */
 
-const missing = (port: string): never => {
-  throw new Error(`APP_ACTION_PORT_MISSING:${port}`);
-};
+const missing = portMissing;
 
 const serviceResult = <T>(): z.ZodType<T> => z.custom<T>();
 

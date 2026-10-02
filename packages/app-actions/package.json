@@ -28,13 +28,16 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/discovery": "workspace:*",
     "@capital-q/evidence": "workspace:*",
+    "@capital-q/integrations": "workspace:*",
     "@capital-q/investors": "workspace:*",
     "@capital-q/media": "workspace:*",
     "@capital-q/network": "workspace:*",
     "@capital-q/permissions": "workspace:*",
+    "@capital-q/platform-admin": "workspace:*",
     "@capital-q/public-identity": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/security": "workspace:*",
+    "@capital-q/verification": "workspace:*",
     "zod": "4.5.4"
   },
   "devDependencies": {

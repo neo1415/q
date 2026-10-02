@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 
 import {
   APP_ACTIONS,
+  AppActionPortMissingError,
   type AnyAppAction,
   type AppActionContext,
   type AppActionPorts,
@@ -55,6 +56,23 @@ export function appActionRouteKeys(
   );
 }
 
+/**
+ * A route whose service is not composed on this deployment answers 503
+ * with what is unavailable, in the person's words; never a 500.
+ */
+function unavailableProblem(
+  error: unknown,
+  requestId: string,
+): ProblemDetails | null {
+  return error instanceof AppActionPortMissingError
+    ? createProblemDetails({
+        code: "PROVIDER_UNAVAILABLE",
+        requestId,
+        detail: error.detail,
+      })
+    : null;
+}
+
 export function registerAppActionRoutes(
   app: FastifyInstance,
   dependencies: AppActionRoutesDependencies,
@@ -96,7 +114,10 @@ export function registerAppActionRoutes(
         try {
           out = await action.run(dependencies.ports, context, input);
         } catch (error: unknown) {
-          const mapped = dependencies.problemOf?.(error, request.id) ?? null;
+          const mapped =
+            unavailableProblem(error, request.id) ??
+            dependencies.problemOf?.(error, request.id) ??
+            null;
           if (mapped === null) throw error;
           request.log.warn(
             { err: error, requestId: request.id },
@@ -135,7 +156,16 @@ export function registerAppActionRoutes(
         // 204 answers with no body, whatever `respond` would say.
         if (status === 204) return reply.status(204).send();
         void reply.status(status);
-        return await http.respond(out, input, dependencies.ports);
+        try {
+          return await http.respond(out, input, dependencies.ports);
+        } catch (error: unknown) {
+          const unavailable = unavailableProblem(error, request.id);
+          if (unavailable === null) throw error;
+          return reply
+            .status(unavailable.status)
+            .type(PROBLEM_CONTENT_TYPE)
+            .send(unavailable);
+        }
       },
     });
   }

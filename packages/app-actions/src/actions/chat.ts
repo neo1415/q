@@ -15,7 +15,7 @@ import {
   SendChatMessageResultDtoSchema,
 } from "@capital-q/contracts";
 
-import { defineAppAction, type AnyAppAction } from "../define.js";
+import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
 /**
@@ -28,9 +28,7 @@ import type { AppActionPorts } from "../ports.js";
  * (`qCapability` names the offer), so they have no Q tool at all.
  */
 
-const missing = (port: string): never => {
-  throw new Error(`APP_ACTION_PORT_MISSING:${port}`);
-};
+const missing = portMissing;
 
 const serviceResult = <T>(): z.ZodType<T> => z.custom<T>();
 

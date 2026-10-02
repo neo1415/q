@@ -1,6 +1,8 @@
 export {
   defineAppAction,
   defineAppActionFamily,
+  AppActionPortMissingError,
+  portMissing,
   qCapabilityId,
   qToolName,
   type AppActionFamilyInput,

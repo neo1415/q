@@ -187,6 +187,24 @@ describe("the action registry", () => {
         "CONSEQUENTIAL",
       ],
       ["profile_image.remove", "offer.profile_photo_upload", "CONSEQUENTIAL"],
+      [
+        "settings.notifications.set",
+        "legacy:set_notification_settings",
+        "INSTANT",
+      ],
+      ["integrations.google.connect", "offer.gmail_connect", "CONSEQUENTIAL"],
+      [
+        "integrations.google.disconnect",
+        "offer.gmail_connect",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "verification.company.request",
+        "offer.verification_request",
+        "CONSEQUENTIAL",
+      ],
+      ["review.request", "legacy:propose_human_review", "CONSEQUENTIAL"],
+      ["verification.kyb.submit", "offer.kyb_submission", "CONSEQUENTIAL"],
     ]);
   });
 });

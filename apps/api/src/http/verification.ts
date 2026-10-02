@@ -1,18 +1,11 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   COMPANIES_PATH,
-  COMPANY_VERIFICATION_REQUESTS_SEGMENT,
   COMPANY_VERIFICATION_SEGMENT,
   CompanyVerificationDtoSchema,
-  CorrelationIdSchema,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
   parseContract,
-  RequestCompanyVerificationRequestSchema,
   UuidSchema,
-  type CorrelationId,
 } from "@capital-q/contracts";
-import { createCorrelationId } from "@capital-q/observability";
 import type { CompanyVerificationService } from "@capital-q/verification";
 
 import {
@@ -34,10 +27,6 @@ import {
 export type VerificationRoutesDependencies = ActorContextDependencies & {
   readonly verification: CompanyVerificationService;
 };
-
-function correlation(): CorrelationId {
-  return CorrelationIdSchema.parse(createCorrelationId());
-}
 
 function companyIdParam(request: FastifyRequest): string {
   const params = request.params as Record<string, unknown>;
@@ -66,37 +55,6 @@ export function registerVerificationRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return CompanyVerificationDtoSchema.parse(verification);
-    },
-  );
-
-  app.post(
-    `${base}${COMPANY_VERIFICATION_REQUESTS_SEGMENT}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-      const idempotencyKey = parseContract(
-        IdempotencyKeyHeaderSchema,
-        typeof rawKey === "string" ? rawKey : undefined,
-        "An Idempotency-Key header is required to request verification.",
-      );
-      // Strict and empty: a body that tries to choose anything is refused
-      // rather than ignored, so no client believes it set a standing.
-      parseContract(
-        RequestCompanyVerificationRequestSchema,
-        request.body ?? {},
-        "A verification request carries no body.",
-      );
-      const result = await service.requestCompanyVerification({
-        actor,
-        companyId: companyIdParam(request),
-        idempotencyKey,
-        correlationId: correlation(),
-      });
-      void reply
-        .status(result.requested.length === 0 ? 200 : 202)
-        .header("Cache-Control", "no-store");
-      return CompanyVerificationDtoSchema.parse(result.verification);
     },
   );
 }

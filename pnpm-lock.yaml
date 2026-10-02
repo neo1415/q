@@ -550,6 +550,9 @@ importers:
       '@capital-q/evidence':
         specifier: workspace:*
         version: link:../evidence
+      '@capital-q/integrations':
+        specifier: workspace:*
+        version: link:../integrations
       '@capital-q/investors':
         specifier: workspace:*
         version: link:../investors
@@ -562,6 +565,9 @@ importers:
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../permissions
+      '@capital-q/platform-admin':
+        specifier: workspace:*
+        version: link:../platform-admin
       '@capital-q/public-identity':
         specifier: workspace:*
         version: link:../public-identity
@@ -571,6 +577,9 @@ importers:
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security
+      '@capital-q/verification':
+        specifier: workspace:*
+        version: link:../verification
       zod:
         specifier: 4.5.4
         version: 4.5.4

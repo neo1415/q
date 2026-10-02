@@ -3,7 +3,6 @@ import type { FastifyInstance } from "fastify";
 import {
   NOTIFICATION_SETTINGS_PATH,
   NotificationSettingsDtoSchema,
-  NotificationSettingsRequestSchema,
   parseContract,
   PUSH_KEY_PATH,
   PUSH_SUBSCRIPTION_PATH,
@@ -83,26 +82,6 @@ export function registerPushRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       const settings = await subscriptions.settings(getActorContext(request));
-      void reply.header("Cache-Control", "no-store");
-      return NotificationSettingsDtoSchema.parse({
-        ...settings,
-        pushAvailable: publicKey !== null,
-      });
-    },
-  );
-
-  app.put(
-    NOTIFICATION_SETTINGS_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        NotificationSettingsRequestSchema,
-        request.body,
-        "The settings are not valid.",
-      );
-      const actor = getActorContext(request);
-      await subscriptions.saveSettings(actor, input);
-      const settings = await subscriptions.settings(actor);
       void reply.header("Cache-Control", "no-store");
       return NotificationSettingsDtoSchema.parse({
         ...settings,

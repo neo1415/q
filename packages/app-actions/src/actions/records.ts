@@ -52,6 +52,7 @@ import { UserIdSchema, type PersonProfile } from "@capital-q/security";
 
 import {
   defineAppAction,
+  portMissing,
   type AnyAppAction,
   type AppActionContext,
 } from "../define.js";
@@ -72,9 +73,7 @@ import type { AppActionPorts } from "../ports.js";
  * the body under `input`, where the request contract's own version holds.
  */
 
-const missing = (port: string): never => {
-  throw new Error(`APP_ACTION_PORT_MISSING:${port}`);
-};
+const missing = portMissing;
 
 /** What the service returned; its own type is the contract. */
 const serviceResult = <T>(): z.ZodType<T> => z.custom<T>();

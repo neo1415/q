@@ -23,6 +23,7 @@ import {
 
 import {
   defineAppAction,
+  portMissing,
   defineAppActionFamily,
   type AnyAppAction,
   type AppActionContext,
@@ -38,9 +39,7 @@ import type { AppActionPorts } from "../ports.js";
  * activate and close take no version from Q at all.
  */
 
-const missing = (port: string): never => {
-  throw new Error(`APP_ACTION_PORT_MISSING:${port}`);
-};
+const missing = portMissing;
 
 const serviceResult = <T>(): z.ZodType<T> => z.custom<T>();
 

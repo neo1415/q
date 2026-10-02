@@ -35,6 +35,7 @@ import {
 
 import {
   defineAppAction,
+  portMissing,
   type AnyAppAction,
   type AppActionContext,
 } from "../define.js";
@@ -51,9 +52,7 @@ import type { AppActionPorts } from "../ports.js";
  * through tools generated here, each prepared for the person's approval.
  */
 
-const missing = (port: string): never => {
-  throw new Error(`APP_ACTION_PORT_MISSING:${port}`);
-};
+const missing = portMissing;
 
 const serviceResult = <T>(): z.ZodType<T> => z.custom<T>();
 

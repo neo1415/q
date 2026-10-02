@@ -434,6 +434,14 @@ const OFFERS: readonly QCapability[] = [
     "VERIFICATION",
     "A verification request attests to their authority over the company; the person submits it themselves on the verification screen.",
   ),
+  offer(
+    "kyb_submission",
+    "RECORDS",
+    "Submit their business and identity details for verification",
+    "VERIFICATION",
+    "KYB is the person's own submission of their organisation's details and their ID; they enter and upload it themselves on the Verification page.",
+    false,
+  ),
 ];
 
 /** Where a registry area's actions sit among the capability groups. */

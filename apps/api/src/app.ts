@@ -409,6 +409,7 @@ export function createApp(
 
   // ADR 0040 (Proposed): the routes of the app's declared actions, each on
   // its own path, through the services composed above.
+  const push = modules.push;
   registerAppActionRoutes(app, {
     authenticator: security.authenticator,
     resolver: security.resolver,
@@ -457,6 +458,26 @@ export function createApp(
       ...(modules.profileImages === undefined
         ? {}
         : { profileImages: modules.profileImages }),
+      ...(push === undefined
+        ? {}
+        : {
+            notificationSettings: {
+              settings: (actor) => push.subscriptions.settings(actor),
+              saveSettings: (actor, input) =>
+                push.subscriptions.saveSettings(actor, input),
+              pushAvailable: push.publicKey !== null,
+            },
+          }),
+      ...(modules.integrations === undefined
+        ? {}
+        : { google: modules.integrations.integrations }),
+      ...(modules.verification === undefined
+        ? {}
+        : { verification: modules.verification }),
+      // The person's side of reviews registers with KYB (ADMIN-3).
+      ...(modules.admin === undefined || modules.kyb === undefined
+        ? {}
+        : { reviews: modules.admin, kyb: modules.kyb }),
       ...(modules.evidence === undefined
         ? {}
         : {

@@ -103,6 +103,22 @@ function build() {
 }
 
 describe("routes generated from the action registry (ADR 0040)", () => {
+  it("a route whose service this deployment doesn't compose answers 503 in words, never 500", async () => {
+    // No push module is composed in this app.
+    const { app } = build();
+    const response = await app.inject({
+      method: "PUT",
+      url: "/v1/notifications/settings",
+      payload: { push: true, email: false },
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      code: "PROVIDER_UNAVAILABLE",
+      detail: "Notification settings isn't available on this deployment yet.",
+    });
+    await app.close();
+  });
+
   it("declares one route per action with an HTTP shape, each on its own path", () => {
     const keys = appActionRouteKeys();
     expect(new Set(keys).size).toBe(keys.length);

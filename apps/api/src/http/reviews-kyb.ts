@@ -2,16 +2,9 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
   createProblemDetails,
-  CorrelationIdSchema,
-  HumanReviewDtoSchema,
   HumanReviewListDtoSchema,
-  HumanReviewRequestSchema,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
   KYB_PATH,
   KybDtoSchema,
-  KybRequestSchema,
-  parseContract,
   PROBLEM_CONTENT_TYPE,
   REVIEWS_PATH,
   type CorrelationId,
@@ -53,23 +46,11 @@ function send(
     .send(problem);
 }
 
-function idempotencyKeyOf(request: FastifyRequest, what: string): string {
-  const raw = request.headers[IDEMPOTENCY_KEY_HEADER];
-  return parseContract(
-    IdempotencyKeyHeaderSchema,
-    typeof raw === "string" ? raw : undefined,
-    `An Idempotency-Key header is required to ${what}.`,
-  );
-}
-
 export function registerReviewsKybRoutes(
   app: FastifyInstance,
   dependencies: ReviewsKybRoutesDependencies,
 ): void {
   const withContext = requireActorContextHook(dependencies);
-  const correlation =
-    dependencies.newCorrelationId ??
-    (() => CorrelationIdSchema.parse(`cor_${crypto.randomUUID()}`));
 
   app.get(REVIEWS_PATH, { onRequest: withContext }, async (request, reply) => {
     const actor = getActorContext(request);
@@ -77,49 +58,6 @@ export function registerReviewsKybRoutes(
     return HumanReviewListDtoSchema.parse({
       rows: await dependencies.reviews.ownReviews(actor.userId),
     });
-  });
-
-  app.post(REVIEWS_PATH, { onRequest: withContext }, async (request, reply) => {
-    const actor = getActorContext(request);
-    const key = idempotencyKeyOf(request, "ask for a review");
-    const input = parseContract(
-      HumanReviewRequestSchema,
-      request.body,
-      "Say what you want reviewed and why.",
-    );
-    const outcome = await dependencies.reviews.requestReview(
-      {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        organisationId: actor.organisationId,
-      },
-      {
-        subjectType: input.subjectType,
-        subjectRef: input.subjectRef ?? null,
-        reason: input.reason,
-        idempotencyKey: key,
-      },
-    );
-    if (outcome.kind === "TOO_MANY_OPEN") {
-      return send(
-        request,
-        reply,
-        "RESOURCE_CONFLICT",
-        "You have 5 reviews waiting already. A person will answer those first.",
-      );
-    }
-    if (outcome.kind === "INVALID") {
-      return send(
-        request,
-        reply,
-        "VALIDATION_FAILED",
-        "Say what you want reviewed and why.",
-      );
-    }
-    void reply
-      .status(outcome.kind === "CREATED" ? 201 : 200)
-      .header("Cache-Control", "no-store");
-    return HumanReviewDtoSchema.parse(outcome.review);
   });
 
   app.get(KYB_PATH, { onRequest: withContext }, async (request, reply) => {
@@ -134,81 +72,5 @@ export function registerReviewsKybRoutes(
     }
     void reply.header("Cache-Control", "no-store");
     return KybDtoSchema.parse(view);
-  });
-
-  app.post(KYB_PATH, { onRequest: withContext }, async (request, reply) => {
-    const key = idempotencyKeyOf(request, "submit your business details");
-    const input = parseContract(
-      KybRequestSchema,
-      request.body,
-      "Check your business details and try again.",
-    );
-    const organisation = input.organisation;
-    const outcome = await dependencies.kyb.submit({
-      actor: getActorContext(request),
-      organisation:
-        organisation === null
-          ? null
-          : {
-              legalName: organisation.legalName,
-              registrationNumber: organisation.registrationNumber,
-              jurisdictionCode: organisation.jurisdictionCode,
-              registeredAddress: organisation.registeredAddress ?? null,
-              websiteUrl: organisation.websiteUrl ?? null,
-              documentId: organisation.documentId ?? null,
-            },
-      person:
-        input.person === null
-          ? null
-          : {
-              nameOnId: input.person.nameOnId,
-              role: input.person.role,
-              documentId: input.person.documentId ?? null,
-            },
-      idempotencyKey: key,
-      correlationId: correlation(),
-    });
-    switch (outcome.kind) {
-      case "SUBMITTED":
-      case "REPLAYED":
-        void reply
-          .status(outcome.kind === "SUBMITTED" ? 201 : 200)
-          .header("Cache-Control", "no-store");
-        return KybDtoSchema.parse(outcome.view);
-      case "ALREADY_OPEN":
-        return send(
-          request,
-          reply,
-          "RESOURCE_CONFLICT",
-          outcome.part === "ORGANISATION"
-            ? "Your business details are already with Capital Q."
-            : "Your identity details are already with Capital Q.",
-        );
-      case "ALREADY_VERIFIED":
-        return send(
-          request,
-          reply,
-          "RESOURCE_CONFLICT",
-          outcome.part === "ORGANISATION"
-            ? "Your organisation is already verified."
-            : "You're already verified.",
-        );
-      case "DOCUMENT_NOT_FOUND":
-        return send(
-          request,
-          reply,
-          "VALIDATION_FAILED",
-          outcome.part === "ORGANISATION"
-            ? "That document isn't one of your organisation's uploads."
-            : "That ID document isn't one of your uploads.",
-        );
-      case "NO_ORGANISATION":
-        return send(
-          request,
-          reply,
-          "PERMISSION_DENIED",
-          "Choose your organisation first.",
-        );
-    }
   });
 }

@@ -1,7 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   createProblemDetails,
-  GOOGLE_CONNECT_PATH,
   GOOGLE_GMAIL_PUSH_PATH,
   GOOGLE_INTEGRATION_PATH,
   GOOGLE_OAUTH_CALLBACK_PATH,
@@ -10,8 +9,6 @@ import {
   parseContract,
   PROBLEM_CONTENT_TYPE,
   RelationshipMailListSchema,
-  StartGoogleConnectRequestSchema,
-  StartGoogleConnectResponseSchema,
   UuidSchema,
   type ProblemDetails,
 } from "@capital-q/contracts";
@@ -105,28 +102,6 @@ export function registerIntegrationRoutes(
     },
   );
 
-  app.post(
-    GOOGLE_CONNECT_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      if (!integrations.available) return send(reply, unavailable(request));
-      const input = parseContract(
-        StartGoogleConnectRequestSchema,
-        request.body ?? {},
-        "The connect request is not valid.",
-      );
-      const actor = getActorContext(request);
-      const started = await integrations.startConnect({
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        returnTo: input.returnTo,
-      });
-      return reply
-        .header("Cache-Control", "no-store")
-        .send(StartGoogleConnectResponseSchema.parse(started));
-    },
-  );
-
   // The browser arrives from Google. No session header travels on a
   // top-level redirect; the one-time state binds this to the person who
   // started it, and is consumed before anything else happens.
@@ -149,16 +124,6 @@ export function registerIntegrationRoutes(
       .header("Referrer-Policy", "no-referrer")
       .redirect(target.toString(), 303);
   });
-
-  app.delete(
-    GOOGLE_INTEGRATION_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      if (!integrations.available) return send(reply, unavailable(request));
-      await integrations.disconnect(getActorContext(request).userId);
-      return reply.status(204).header("Cache-Control", "no-store").send();
-    },
-  );
 
   app.get(
     GOOGLE_RELATIONSHIP_MAIL_PATH,

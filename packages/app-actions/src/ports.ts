@@ -2,8 +2,15 @@ import type { CapitalService } from "@capital-q/capital";
 import type {
   ChatSafetyService,
   ChatService,
+  PushSubscriptionStore,
   ScheduleService,
 } from "@capital-q/communication";
+import type { IntegrationsService } from "@capital-q/integrations";
+import type { PlatformAdmin } from "@capital-q/platform-admin";
+import type {
+  CompanyVerificationService,
+  KybService,
+} from "@capital-q/verification";
 import type { CompanyService } from "@capital-q/companies";
 import type { PitchSummaryDto } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
@@ -108,6 +115,23 @@ export type AppActionPorts = {
   readonly profileImages?:
     | Pick<ProfileImageService, "requestUpload" | "completeUpload" | "remove">
     | undefined;
+  /** Settings: their notification switches, and whether push can work here. */
+  readonly notificationSettings?:
+    | (Pick<PushSubscriptionStore, "settings" | "saveSettings"> & {
+        readonly pushAvailable: boolean;
+      })
+    | undefined;
+  /** Google (Gmail and Calendar): connect at Google, and disconnect. */
+  readonly google?:
+    | Pick<IntegrationsService, "available" | "startConnect" | "disconnect">
+    | undefined;
+  /** Their company's verification request. */
+  readonly verification?:
+    Pick<CompanyVerificationService, "requestCompanyVerification"> | undefined;
+  /** Their organisation's business verification (KYB). */
+  readonly kyb?: Pick<KybService, "submit"> | undefined;
+  /** A person's review, asked for by them. */
+  readonly reviews?: Pick<PlatformAdmin, "requestReview"> | undefined;
   /** Calls and reminders: the schedule service. */
   readonly schedule?:
     | Pick<

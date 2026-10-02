@@ -106,6 +106,8 @@ Each area follows the same steps:
 
 A form with several operations (a raise: create, update, close, replace) is one family (`defineAppActionFamily`): each operation keeps its own declaration and route, and Q gets one tool for the form, because a run offers at most MODEL_TOOLS_MAX tools and the operations are one thing to the person.
 
+A generated route whose service a deployment does not compose answers 503 with what is unavailable ("Notification settings isn't available on this deployment yet."), never a 500.
+
 Exempt routes stay exempt, each with its reason: webhooks, Q transport, the operations console, public surfaces, the player, commitments, billing and meeting-assistant consent.
 
 Profile and records (L, highest value; Q already proposes these through hand tools):
@@ -130,11 +132,11 @@ Media and documents:
 
 Settings and the rest:
 
-- [ ] Settings: notification settings, Q personality, Q Daily ×2. **M**
+- [x] Settings: notification settings, Q personality, Q Daily ×2. **M** Notification settings done 2026-10-02 (route generated; Q keeps set_notification_settings). Q personality and Q Daily are **exempt** (lead decision 2026-10-02): Q's own q-api surface, like errands and the brand kit.
 - [ ] Onboarding: 9 routes, kept on the ADR 0016 loop's own tools. Declaring them is mostly mapping. **L**
-- [ ] Approvals: approve, reject and email-draft edit. **S**
-- [ ] Integrations: Google connect and disconnect (OAuth: offer). **S**
-- [ ] Verification and KYB. **S**
+- [x] Approvals: approve, reject and email-draft edit. **S** **Exempt** (lead decision 2026-10-02): Q's own approval surface in q-api.
+- [x] Integrations: Google connect and disconnect (OAuth: offer). **S** Done 2026-10-02: two declarations, Q offers Settings; 503 when Google isn't configured, as before.
+- [x] Verification and KYB. **S** Verification request and the review request done 2026-10-02; the KYB submission is declared too, with an offer: the person's own submission, so Q offers the Verification page and never submits it (lead decision 2026-10-02).
 
 Read kinds to add to read_my, each where its page already reads:
 

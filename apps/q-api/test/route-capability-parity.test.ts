@@ -95,9 +95,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/push.ts GET NOTIFICATION_SETTINGS_PATH": exempt(
     "the notification settings switches, shown in Settings and the notices panel",
   ),
-  "api/http/push.ts PUT NOTIFICATION_SETTINGS_PATH": cap(
-    "tool.set_notification_settings",
-  ),
 
   // R34 relationship chat.
   "api/http/chat.ts GET RELATIONSHIP_MESSAGES_PATH": cap("tool.list_messages"),
@@ -273,12 +270,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/reviews-kyb.ts GET REVIEWS_PATH": exempt(
     "the person's own review cases, read on their Reviews page; Q's side is propose_human_review",
   ),
-  "api/http/reviews-kyb.ts POST REVIEWS_PATH": cap("tool.propose_human_review"),
   "api/http/reviews-kyb.ts GET KYB_PATH": exempt(
     "the organisation's own KYB submission, read on the Verification page",
-  ),
-  "api/http/reviews-kyb.ts POST KYB_PATH": exempt(
-    "business details and a document a person enters and uploads themselves on the Verification page; Q offers the page (navigate.VERIFICATION)",
   ),
   // end ADMIN-3 block
 
@@ -309,13 +302,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/integrations.ts GET GOOGLE_INTEGRATION_PATH": cap(
     "offer.gmail_connect",
   ),
-  "api/http/integrations.ts POST GOOGLE_CONNECT_PATH": cap(
-    "offer.gmail_connect",
-  ),
   "api/http/integrations.ts GET GOOGLE_OAUTH_CALLBACK_PATH": WEBHOOK,
-  "api/http/integrations.ts DELETE GOOGLE_INTEGRATION_PATH": cap(
-    "offer.gmail_connect",
-  ),
   "api/http/integrations.ts GET GOOGLE_RELATIONSHIP_MAIL_PATH": cap(
     "tool.read_relationship_email",
   ),
@@ -478,8 +465,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/verification.ts GET `${base}${COMPANY_VERIFICATION_SEGMENT}`": cap(
     "tool.read_my_record",
   ),
-  "api/http/verification.ts POST `${base}${COMPANY_VERIFICATION_REQUESTS_SEGMENT}`":
-    cap("offer.verification_request"),
 
   "api/http/visibility.ts GET COMPANY_VISIBILITY_STATE_PATH": cap(
     "tool.get_disclosure_state",
@@ -817,7 +802,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 108;
+const LEGACY_MUTATION_ROUTES_MAX = 103;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([

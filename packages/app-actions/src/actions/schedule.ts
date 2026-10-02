@@ -19,7 +19,7 @@ import {
   type KnownErrorCode,
 } from "@capital-q/contracts";
 
-import { defineAppAction, type AnyAppAction } from "../define.js";
+import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
 /**
@@ -33,9 +33,7 @@ import type { AppActionPorts } from "../ports.js";
  * (`legacyTool`), which the meeting and errand paths build on.
  */
 
-const missing = (port: string): never => {
-  throw new Error(`APP_ACTION_PORT_MISSING:${port}`);
-};
+const missing = portMissing;
 
 const serviceResult = <T>(): z.ZodType<T> => z.custom<T>();
 
