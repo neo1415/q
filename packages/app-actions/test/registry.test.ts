@@ -150,6 +150,20 @@ describe("the action registry", () => {
       ["pitch.upload.start", "offer.pitch_video_upload", "CONSEQUENTIAL"],
       ["pitch.upload.cancel", "offer.pitch_video_upload", "CONSEQUENTIAL"],
       ["pitch.playback_policy.set", "via:set_pitch_sharing", "CONSEQUENTIAL"],
+      ["document.upload.start", "offer.document_upload", "CONSEQUENTIAL"],
+      ["document.upload.complete", "offer.document_upload", "CONSEQUENTIAL"],
+      ["document.upload.cancel", "offer.document_upload", "CONSEQUENTIAL"],
+      [
+        "profile_image.upload.start",
+        "offer.profile_photo_upload",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "profile_image.upload.complete",
+        "offer.profile_photo_upload",
+        "CONSEQUENTIAL",
+      ],
+      ["profile_image.remove", "offer.profile_photo_upload", "CONSEQUENTIAL"],
     ]);
   });
 });

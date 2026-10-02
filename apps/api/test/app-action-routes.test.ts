@@ -115,6 +115,8 @@ describe("routes generated from the action registry (ADR 0040)", () => {
         "PUT /v1/companies/:companyId/team/me",
         "PATCH /v1/investors/:investorOrganisationId",
         "PUT /v1/q-cards/:subjectType/:subjectId/handle",
+        "POST /v1/documents/upload-sessions",
+        "DELETE /v1/profile-images/:subjectType/:subjectId/:kind",
       ]),
     );
     // Served to Q by a generated tool or, until its area's second step,

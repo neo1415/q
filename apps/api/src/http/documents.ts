@@ -1,29 +1,18 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
-  CompleteDocumentUploadSessionRequestSchema,
-  CorrelationIdSchema,
-  CreateDocumentUploadSessionRequestSchema,
   DOCUMENT_UPLOAD_SESSIONS_PATH,
   DOCUMENTS_PATH,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
   parseContract,
-  UtcTimestampSchema,
   UuidSchema,
-  type CorrelationId,
-  type DirectUploadTarget,
 } from "@capital-q/contracts";
 import {
   DocumentIdSchema,
   toDocumentDto,
   toDocumentUploadSessionDto,
-  type DirectUploadAuthorization,
   type DocumentId,
-  type DocumentUploadSession,
   type DocumentWithVersion,
   type EvidenceService,
 } from "@capital-q/evidence";
-import { createCorrelationId } from "@capital-q/observability";
 
 import {
   getActorContext,
@@ -46,15 +35,7 @@ import {
 
 export type DocumentRoutesDependencies = ActorContextDependencies & {
   readonly evidence: EvidenceService;
-  readonly uploads: {
-    readonly maxBytes: number;
-    readonly allowedMimeTypes: readonly string[];
-  };
 };
-
-function correlation(): CorrelationId {
-  return CorrelationIdSchema.parse(createCorrelationId());
-}
 
 function uploadSessionIdParam(request: FastifyRequest): string {
   const params = request.params as Record<string, unknown>;
@@ -74,37 +55,8 @@ function documentIdParam(request: FastifyRequest): DocumentId {
   );
 }
 
-function idempotencyKey(request: FastifyRequest, purpose: string): string {
-  const raw = request.headers[IDEMPOTENCY_KEY_HEADER];
-  return parseContract(
-    IdempotencyKeyHeaderSchema,
-    typeof raw === "string" ? raw : undefined,
-    `An Idempotency-Key header is required to ${purpose}.`,
-  );
-}
-
 function documentPayload(entry: DocumentWithVersion) {
   return toDocumentDto(entry.document, entry.currentVersion);
-}
-
-function uploadTarget(
-  authorization: DirectUploadAuthorization,
-  session: DocumentUploadSession,
-  limits: DocumentRoutesDependencies["uploads"],
-): DirectUploadTarget {
-  return {
-    method: authorization.method,
-    url: authorization.url,
-    headers: authorization.headers,
-    // Capital Q stops accepting the upload first; the provider's own token
-    // may outlive that, and finalization after it fails closed.
-    expiresAt: session.expiresAt,
-    providerExpiresAt: UtcTimestampSchema.parse(
-      authorization.providerExpiresAt,
-    ),
-    maxBytes: limits.maxBytes,
-    allowedMimeTypes: [...limits.allowedMimeTypes],
-  };
 }
 
 export function registerDocumentRoutes(
@@ -115,95 +67,8 @@ export function registerDocumentRoutes(
   const service = dependencies.evidence;
   const sessionById = `${DOCUMENT_UPLOAD_SESSIONS_PATH}/:uploadSessionId`;
 
-  app.post(
-    DOCUMENT_UPLOAD_SESSIONS_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const key = idempotencyKey(request, "start a document upload");
-      const input = parseContract(
-        CreateDocumentUploadSessionRequestSchema,
-        request.body,
-        "The upload request is not valid.",
-      );
-
-      const result = await service.createDocumentUploadSession({
-        actor,
-        input,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-
-      return reply
-        .code(201)
-        .header("Cache-Control", "no-store")
-        .header(
-          "Location",
-          `${DOCUMENT_UPLOAD_SESSIONS_PATH}/${result.session.id}`,
-        )
-        .send({
-          uploadSession: toDocumentUploadSessionDto(result.session),
-          document: toDocumentDto(result.document, null),
-          upload:
-            result.upload === undefined
-              ? null
-              : uploadTarget(
-                  result.upload,
-                  result.session,
-                  dependencies.uploads,
-                ),
-        });
-    },
-  );
-
-  app.post(
-    `${sessionById}/complete`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const key = idempotencyKey(request, "complete a document upload");
-      const input = parseContract(
-        CompleteDocumentUploadSessionRequestSchema,
-        request.body ?? {},
-        "The upload completion request is not valid.",
-      );
-
-      const result = await service.completeDocumentUploadSession({
-        actor,
-        uploadSessionId: uploadSessionIdParam(request),
-        input,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-
-      return reply.header("Cache-Control", "no-store").send({
-        uploadSession: toDocumentUploadSessionDto(result.session),
-        document: toDocumentDto(result.document, result.version),
-      });
-    },
-  );
-
-  app.post(
-    `${sessionById}/cancel`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const session = await service.cancelDocumentUploadSession({
-        actor,
-        uploadSessionId: uploadSessionIdParam(request),
-        correlationId: correlation(),
-      });
-      const document = await service.getDocumentWithVersion({
-        actor,
-        documentId: session.documentId,
-      });
-      return reply.header("Cache-Control", "no-store").send({
-        uploadSession: toDocumentUploadSessionDto(session),
-        document: documentPayload(document),
-      });
-    },
-  );
-
+  // Starting, completing and cancelling an upload are generated from the
+  // action registry (ADR 0040, http/app-actions.ts).
   app.get(sessionById, { onRequest: withContext }, async (request, reply) => {
     const actor = getActorContext(request);
     const session = await service.getDocumentUploadSession({
