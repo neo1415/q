@@ -1,5 +1,6 @@
 "use client";
 
+import { primeMeetSounds } from "./meet-sounds";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 
@@ -114,6 +115,8 @@ export function RehearsalLobby({
   }
 
   function join() {
+    // Inside the click: the room's sounds may play later.
+    primeMeetSounds();
     setMessage(null);
     setEntitlement(null);
     startJoining(async () => {

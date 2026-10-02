@@ -64,6 +64,7 @@ import {
 import {
   meetSoundMs,
   playMeetSound,
+  primeMeetSounds,
   readMeetSoundsPreference,
   saveMeetSoundsPreference,
   type MeetSound,
@@ -167,6 +168,16 @@ export function RehearsalRoom({
   // menu, so the server render never disagrees with it on screen.
   const [soundsOn, setSoundsOn] = useState(readMeetSoundsPreference);
   const sounds = useRef(soundsOn);
+  // Any tap in the room keeps the audio context awake for its sounds.
+  useEffect(() => {
+    const wake = () => primeMeetSounds();
+    window.addEventListener("pointerdown", wake);
+    window.addEventListener("keydown", wake);
+    return () => {
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, []);
   const sound = useCallback((which: MeetSound) => {
     playMeetSound(which, sounds.current);
   }, []);

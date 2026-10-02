@@ -187,9 +187,9 @@ describe("meeting sounds (founder live test 2026-10-01)", () => {
     expect(leaveB).toBeLessThan(leaveA);
   });
 
-  it("follow the person's choice, and stay off by default under reduced motion", () => {
+  it("follow the person's choice, and are on by default even under reduced motion (live 2026-10-02)", () => {
     expect(meetSoundsOn(null, false)).toBe(true);
-    expect(meetSoundsOn(null, true)).toBe(false);
+    expect(meetSoundsOn(null, true)).toBe(true);
     expect(meetSoundsOn("on", true)).toBe(true);
     expect(meetSoundsOn("off", false)).toBe(false);
   });

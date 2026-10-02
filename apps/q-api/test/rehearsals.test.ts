@@ -12,6 +12,7 @@ import {
   createRehearsalService,
   HOLDING_LINES,
   minimalPersona,
+  noiseOnly,
   REVIEW_RETRY_MS,
   ownReview,
   scoreOf,
@@ -208,7 +209,7 @@ function memoryStore(): RehearsalStore & {
 function setup(options: { messages?: () => string } = {}) {
   const clock = { at: new Date("2026-10-01T10:05:00Z").getTime() };
   /** Model outages: persona readings and turns that come back empty. */
-  const outage = { persona: false, turns: 0, reviews: 0 };
+  const outage = { persona: false, turns: 0, reviews: 0, hang: false };
   const warnings: { fields: Record<string, unknown>; message: string }[] = [];
   const looks = {
     next: null as PresenceReading | null,
@@ -319,7 +320,13 @@ function setup(options: { messages?: () => string } = {}) {
       );
       return Promise.resolve(outage.persona ? null : PERSONA);
     },
-    turn: (_a, variables, views) => {
+    turn: (_a, variables, views, signal) => {
+      if (outage.hang) {
+        // A model that never answers: only the deadline ends it.
+        return new Promise((resolve) => {
+          signal?.addEventListener("abort", () => resolve(null));
+        });
+      }
       if (outage.turns > 0) {
         outage.turns -= 1;
         seen.turnInputs.push({
@@ -399,6 +406,7 @@ function setup(options: { messages?: () => string } = {}) {
     material,
     composer,
     now: () => new Date(clock.at),
+    turnDeadlineMs: 50,
     logger: {
       warn: (fields: Record<string, unknown>, message: string) => {
         warnings.push({ fields, message });
@@ -1443,5 +1451,38 @@ describe("walking out, with warning (founder live 2026-10-02)", () => {
         provoked: true,
       }),
     ).toEqual({ warning: null, action: "KEEP" });
+  });
+});
+
+describe("never stuck on thinking (founder live 2026-10-02)", () => {
+  it("a turn past its deadline gives the holding line, logged as degraded", async () => {
+    const { service, outage, warnings } = setup();
+    const rehearsal = await startWith(service);
+    outage.hang = true;
+    const said = await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Hello?",
+    });
+    expect(said.kind === "OK" && said.rehearsal.turns.at(-1)?.text).toBe(
+      HOLDING_LINES.TURN,
+    );
+    expect(
+      warnings.some(
+        (w) =>
+          w.message === "rehearsal degraded" && w.fields["timedOut"] === true,
+      ),
+    ).toBe(true);
+  });
+
+  it("noise is not a turn: no reply, nothing recorded", async () => {
+    const { service, seen } = setup();
+    const rehearsal = await startWith(service);
+    const calls = seen.turnInputs.length;
+    for (const text of ["uh", "Hmm.", "...", "um uh"]) {
+      const said = await service.say(actor(FOUNDER), rehearsal.id, { text });
+      expect(said.kind === "OK" && said.rehearsal.turns).toHaveLength(1);
+    }
+    expect(seen.turnInputs.length).toBe(calls);
+    expect(noiseOnly("Uh, the churn is five percent")).toBe(false);
+    expect(noiseOnly("No.")).toBe(false);
   });
 });

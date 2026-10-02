@@ -1136,6 +1136,26 @@ function warned(stage: 1 | 2, line: string, wasGoodbye: boolean): string {
     : `${opener} ${line}`;
 }
 
+/** A turn, retry included, never keeps the room "thinking" longer than this. */
+export const TURN_DEADLINE_MS = 10_000;
+
+/**
+ * Words that carry nothing: no letters at all, or only a hesitation sound.
+ * Background noise transcribed as "uh" or "." is not a turn (founder live
+ * 2026-10-02: the room waited on noise).
+ */
+export function noiseOnly(text: string): boolean {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\p{L}\s']/gu, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+  if (words.length === 0) return true;
+  return words.every((word) =>
+    /^(u+h+|u+m+|h+m+|m+|m+h+m+|a+h+|o+h+|e+r+m*|hu+h)$/.test(word),
+  );
+}
+
 /** Said in character when a turn could not be composed; never an error. */
 /** After a provisional review, Q tries the real one again at these delays. */
 export const REVIEW_RETRY_MS = [30_000, 2 * 60_000, 10 * 60_000] as const;
@@ -1274,8 +1294,11 @@ export function createRehearsalService(dependencies: {
   readonly composer: RehearsalComposer;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
+  /** The whole turn's deadline (tests shorten it). */
+  readonly turnDeadlineMs?: number | undefined;
 }): RehearsalService {
   const { store, material, composer, logger } = dependencies;
+  const turnDeadlineMs = dependencies.turnDeadlineMs ?? TURN_DEADLINE_MS;
   const now = dependencies.now ?? (() => new Date());
   const frames = new Map<string, Frame>();
   /** Presence readings as text, per rehearsal; dropped when it finishes. */
@@ -1778,22 +1801,37 @@ export function createRehearsalService(dependencies: {
     readonly state: Temperament | undefined;
     readonly warning?: 1 | 2;
   }> {
-    const [actor, row, turns, cue, , signal] = args;
-    const first = await reply(...args);
-    if (first !== null || signal?.aborted === true) {
-      return first ?? holdingTurn(turns, cue);
+    const [actor, row, turns, cue, organisation, signal] = args;
+    // One deadline for the whole turn, retry included (founder live
+    // 2026-10-02: the room sat on "thinking"): past it, the holding line.
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(), turnDeadlineMs);
+    timer.unref();
+    const within =
+      signal === undefined
+        ? deadline.signal
+        : AbortSignal.any([signal, deadline.signal]);
+    const attempt = () => reply(actor, row, turns, cue, organisation, within);
+    try {
+      const first = await attempt();
+      if (first !== null || signal?.aborted === true) {
+        return first ?? holdingTurn(turns, cue);
+      }
+      const second = deadline.signal.aborted ? null : await attempt();
+      if (second !== null) return second;
+      logger?.warn(
+        {
+          rehearsalId: row.id,
+          stage: cue === "OPENING" ? "opening" : "turn",
+          userId: actor.userId,
+          timedOut: deadline.signal.aborted,
+        },
+        "rehearsal degraded",
+      );
+      return holdingTurn(turns, cue);
+    } finally {
+      clearTimeout(timer);
     }
-    const second = await reply(...args);
-    if (second !== null) return second;
-    logger?.warn(
-      {
-        rehearsalId: row.id,
-        stage: cue === "OPENING" ? "opening" : "turn",
-        userId: actor.userId,
-      },
-      "rehearsal degraded",
-    );
-    return holdingTurn(turns, cue);
   }
 
   const viewerOf = (actor: ActorContext) =>
@@ -2006,7 +2044,7 @@ export function createRehearsalService(dependencies: {
         return { kind: "FINISHED" };
       }
       // The browser's raised-hand cue is a fixed token, never their words.
-      const words =
+      const heard =
         "text" in said
           ? said.text
               .split(REHEARSAL_HAND_RAISED_SIGNAL)
@@ -2015,6 +2053,8 @@ export function createRehearsalService(dependencies: {
               .join(" ")
               .trim()
           : "";
+      // Noise transcribed as a stray sound is not a turn.
+      const words = noiseOnly(heard) ? "" : heard;
       // Likewise the silence cue: the browser noticed they said nothing.
       const silent =
         ("cue" in said && said.cue === "SILENCE") ||
