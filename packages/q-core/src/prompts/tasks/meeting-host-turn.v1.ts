@@ -48,7 +48,7 @@ export const MEETING_HOST_TURN_V1: PromptDefinition<
 > = {
   id: "MEETING_HOST_TURN",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "NORMAL_DIALOGUE",
   owner: "q-core",

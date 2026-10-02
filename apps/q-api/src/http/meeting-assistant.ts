@@ -50,6 +50,11 @@ const REFUSED: Readonly<
     status: 503,
     detail: "Q can't join calls right now. Try again later.",
   },
+  ORGANISER_ONLY: {
+    status: 409,
+    detail:
+      "Q is the meeting's record for both sides; only the organiser can end recording. You can ask Q to stay quiet in the call.",
+  },
 };
 
 function refused(

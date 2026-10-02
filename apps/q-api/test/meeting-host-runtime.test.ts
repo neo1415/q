@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_HOST_POLICY,
+  HOST_INTRO,
   HOST_REFUSAL,
+  HOST_STAYS,
   hostedJoin,
   type HostContext,
 } from "@capital-q/communication";
-import type { MeetingHostResult } from "@capital-q/q-core";
+import type { MeetingHostResultV2 as MeetingHostResult } from "@capital-q/q-core";
 
 import {
   createMeetingHostRuntime,
@@ -275,9 +277,7 @@ describe("meeting host in a call", () => {
       event("participant_events.join", 1, "Adaeze Okafor"),
       event("participant_events.join", 2, "Tunde Bello"),
     );
-    expect(said[0]).toContain(
-      'Hi Adaeze, welcome. I\'m Q from Capital Q, here to take notes and help; say "Q, leave" to remove me.',
-    );
+    expect(said[0]).toContain(`Hi Adaeze, welcome. ${HOST_INTRO}`);
     expect(
       said.some((line) =>
         line.startsWith("Adaeze, this is Tunde Bello from Zino Aviation."),
@@ -305,7 +305,7 @@ describe("meeting host in a call", () => {
   });
 
   it("an action asked for is noted for the organiser, said in fixed words, never done", async () => {
-    const { said, notes, outcomes, send } = setup({
+    const { said, notes, outcomes, send, clock, runtime } = setup({
       reply: {
         kind: "PROPOSE",
         line: "Done! I moved it.",
@@ -332,7 +332,10 @@ describe("meeting host in a call", () => {
       "I can't do that from the call, but I've noted it for Tunde to approve afterwards.",
     );
     expect(said).not.toContain("Done! I moved it.");
-    await send(event("transcript.data", 1, "Adaeze Okafor", "Q, leave now."));
+    // Q leaves by its own policy (the hard cap); the proposals go to the
+    // organiser then.
+    clock.at = START + DEFAULT_HOST_POLICY.hardCapAfterStartMs;
+    await runtime.tick(MEETING);
     expect(outcomes).toContain("PROPOSALS:1");
   });
 
@@ -367,15 +370,49 @@ describe("meeting host in a call", () => {
     expect(said.at(-1)).toBe(HOST_REFUSAL);
   });
 
-  it("'Q, leave' from an invited person: Q says so, leaves, and their decline is recorded", async () => {
-    const { said, left, removed, send } = setup();
+  it("asked to leave in the call: Q stays, says why, and the ask is recorded -- never removed by a word (ADR 0039)", async () => {
+    const { said, left, removed, notes, send } = setup({
+      reply: { kind: "LEAVE_REQUEST", line: "Okay, bye!" },
+    });
     await send(event("participant_events.join", 1, "Adaeze Okafor"));
     await send(
       event("transcript.data", 1, "Adaeze Okafor", "Q, please leave."),
     );
-    expect(said.at(-1)).toBe("Of course. I'm leaving the call now.");
-    expect(left).toEqual(["bot-1"]);
-    expect(removed).toEqual(["u-founder"]);
+    expect(said.at(-1)).toBe(HOST_STAYS);
+    expect(said).not.toContain("Okay, bye!");
+    expect(left).toEqual([]);
+    expect(removed).toEqual([]);
+    expect(notes).toContainEqual({ kind: "LEAVE_REQUESTED", body: null });
+  });
+
+  it("'be quiet' (read by meaning): Q says nothing more unprompted, and stays", async () => {
+    const { said, left, send } = setup({
+      reply: { kind: "QUIET", line: "Sure!" },
+    });
+    await send(event("participant_events.join", 1, "Adaeze Okafor"));
+    const before = said.length;
+    await send(
+      event("transcript.data", 1, "Adaeze Okafor", "Q, stop talking please."),
+    );
+    await send(event("participant_events.join", 2, "Tunde Bello"));
+    expect(said.slice(before)).toEqual([]);
+    expect(left).toEqual([]);
+  });
+
+  it("cfccb9a9 replay: Q's own greeting captioned under 'Unknown' changes nothing", async () => {
+    const { said, left, asked, send } = setup();
+    await send(event("participant_events.join", 100, "oyeniyi Daniel"));
+    await send(
+      event(
+        "transcript.data",
+        2147483647,
+        "Unknown",
+        "Hi, oyeniyiome! I'm Q from capital Q here to take notes and help, say, Q leave to remove me.",
+      ),
+    );
+    expect(left).toEqual([]);
+    expect(asked).toEqual([]);
+    expect(said).toHaveLength(2);
   });
 
   it("a call already declined opens no session", async () => {

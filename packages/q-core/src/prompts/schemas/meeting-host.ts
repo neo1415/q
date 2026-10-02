@@ -72,3 +72,21 @@ export const MeetingHostResultSchema = z
   })
   .strict();
 export type MeetingHostResult = z.infer<typeof MeetingHostResultSchema>;
+
+// v2 (ADR 0039, live 2026-10-02): asked to leave, Q stays and records the
+// ask (LEAVE_REQUEST); asked to be quiet, Q stops speaking unprompted
+// (QUIET). Both read by meaning, in any language; code says the words.
+export const MEETING_HOST_SCHEMA_VERSION_2 = 2;
+export const MEETING_HOST_KINDS = [
+  "ANSWER",
+  "RECAP",
+  "PROPOSE",
+  "DECLINE",
+  "GUEST",
+  "QUIET",
+  "LEAVE_REQUEST",
+] as const;
+export const MeetingHostResultV2Schema = MeetingHostResultSchema.extend({
+  kind: z.enum(MEETING_HOST_KINDS),
+}).strict();
+export type MeetingHostResultV2 = z.infer<typeof MeetingHostResultV2Schema>;

@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   addressedToQ,
   asksQToBreakRules,
-  asksQToLeave,
   boundedPolicy,
   createMeetingHost,
   DEFAULT_HOST_LIMITS,
   DEFAULT_HOST_POLICY,
   HOST_AT_TIME,
-  HOST_LEAVING,
+  HOST_INTRO,
+  HOST_STAYS,
   HOST_REFUSAL,
   matchParty,
   type CallParticipant,
@@ -92,9 +92,7 @@ describe("meeting host: arrivals, greetings and introductions", () => {
       { kind: "JOIN", participant: TUNDE, at: T0 + 240_000 },
     );
     const lines = said(out).map((s) => s.text);
-    expect(lines[0]).toBe(
-      'Hi Adaeze, welcome. I\'m Q from Capital Q, here to take notes and help; say "Q, leave" to remove me.',
-    );
+    expect(lines[0]).toBe(`Hi Adaeze, welcome. ${HOST_INTRO}`);
     expect(lines[1]).toContain("Hi Tunde, welcome.");
     expect(lines[2]).toBe(
       "Adaeze, this is Tunde Bello from Zino Aviation. Tunde, this is Adaeze Okafor of Nixo. You're meeting about Introductory conversation about Nixo's seed round. I'll keep notes; just say \"Q\" if you need me.",
@@ -323,34 +321,35 @@ describe("meeting host: security (release-blocking)", () => {
     },
   );
 
-  it("anyone may remove Q: it says so once and leaves, and the removal is on the roster", () => {
+  it("asked to leave in the call, Q stays, says why, and the ask is recorded (ADR 0039)", () => {
     const host = createMeetingHost(CONTEXT);
     run(
       host,
       { kind: "JOIN", participant: ADAEZE, at: T0 },
-      { kind: "JOIN", participant: GUEST, at: T0 + 1 },
+      { kind: "JOIN", participant: TUNDE, at: T0 + 1 },
     );
-    expect(asksQToLeave("Q, leave please")).toBe(true);
+    // Read by meaning on the reply, never by a phrase in code.
     const out = host.handle({
       kind: "UTTERANCE",
-      participant: GUEST,
-      text: "Q, leave please.",
+      participant: TUNDE,
+      text: "Q, please leave.",
       at: T0 + 30_000,
     });
-    expect(said(out).map((s) => s.text)).toEqual([HOST_LEAVING]);
-    expect(out).toContainEqual({
-      kind: "LEAVE",
-      reason: "REMOVED",
-      by: GUEST,
-      byUserId: null,
-    });
-    expect(out.find((a) => a.kind === "ROSTER")).toMatchObject({
-      entry: { kind: "REMOVED_Q", participantKey: "3" },
-    });
-    expect(host.phase()).toBe("LEFT");
-    expect(
-      host.handle({ kind: "JOIN", participant: TUNDE, at: T0 + 40_000 }),
-    ).toEqual([]);
+    expect(out.filter((a) => a.kind === "COMPOSE")).toHaveLength(1);
+    const asked = host.leaveRequested(
+      "Tunde Bello",
+      host.userIdOf("Tunde Bello"),
+    );
+    expect(asked).toEqual([
+      {
+        kind: "LEAVE_REQUESTED",
+        byName: "Tunde Bello",
+        byUserId: "u-investor",
+      },
+    ]);
+    const said_ = said(run(host, { kind: "TICK", at: T0 + 40_000 }));
+    expect(said_.map((s) => s.text)).toEqual([HOST_STAYS]);
+    expect(host.phase()).not.toBe("LEFT");
   });
 
   it("an injection hidden in ordinary talk is just data: no compose, no action", () => {
@@ -578,5 +577,91 @@ describe("meeting host: a Google name that is not the Capital Q name", () => {
     });
     const out = run(host, { kind: "TICK", at: T0 + 5_000 });
     expect(said(out).map((s) => s.why)).toContain("INTRO");
+  });
+});
+
+describe("never Q's own voice (live 2026-10-02, cfccb9a9)", () => {
+  // The exact replay: Q greeted the founder; Google's captions gave Q's
+  // own words to an "Unknown" speaker (id 2147483647), and Q obeyed them.
+  const FOUNDER_IN_CALL = P("100", "oyeniyi Daniel");
+  const CAPTIONED_BOT = P("2147483647", "Unknown");
+
+  it("Q's greeting captioned back under an unknown speaker triggers nothing", () => {
+    const host = createMeetingHost(CONTEXT);
+    const joined = run(host, {
+      kind: "JOIN",
+      participant: FOUNDER_IN_CALL,
+      at: T0,
+    });
+    const greeting = said(joined)[0]?.text ?? "";
+    const out = run(host, {
+      kind: "UTTERANCE",
+      participant: CAPTIONED_BOT,
+      text: "Hi, oyeniyiome! I'm Q from capital Q here to take notes and help, say, Q leave to remove me.",
+      at: T0 + 12_000,
+    });
+    expect(out.filter((a) => a.kind !== "SAY")).toEqual([]);
+    expect(said(out)).toEqual([]);
+    expect(host.phase()).not.toBe("LEFT");
+    expect(greeting).not.toContain("leave");
+  });
+
+  it("Q's words echoed through a person's microphone are not that person speaking", () => {
+    const host = createMeetingHost(CONTEXT);
+    const joined = run(
+      host,
+      { kind: "JOIN", participant: ADAEZE, at: T0 },
+      { kind: "JOIN", participant: TUNDE, at: T0 + 1 },
+    );
+    const intro = said(joined).find((s) => s.why === "INTRO")?.text ?? "";
+    const out = host.handle({
+      kind: "UTTERANCE",
+      participant: ADAEZE,
+      // The intro, heard back on her mic, captioned as her.
+      text: intro.slice(0, 120),
+      at: T0 + 20_000,
+    });
+    expect(
+      out.filter((a) => a.kind === "COMPOSE" || a.kind === "READ_GUEST"),
+    ).toEqual([]);
+    // A real question from her right after is still heard.
+    const asked = host.handle({
+      kind: "UTTERANCE",
+      participant: ADAEZE,
+      text: "Q, what's the agenda?",
+      at: T0 + 30_000,
+    });
+    expect(asked.filter((a) => a.kind === "COMPOSE")).toHaveLength(1);
+  });
+});
+
+describe('"Q, be quiet" (ADR 0039)', () => {
+  it("Q stops speaking unprompted, keeps listening, and still answers when asked", () => {
+    const host = createMeetingHost(CONTEXT);
+    run(host, { kind: "JOIN", participant: ADAEZE, at: T0 });
+    host.quiet();
+    // Nobody greeted, nobody introduced, no recap offer.
+    const later = run(host, {
+      kind: "JOIN",
+      participant: TUNDE,
+      at: T0 + 60_000,
+    });
+    expect(said(later)).toEqual([]);
+    const near = CONTEXT.endsAt.getTime() - 60_000;
+    expect(said(run(host, { kind: "TICK", at: near }))).toEqual([]);
+    // The roster still records who came.
+    expect(later.some((a) => a.kind === "ROSTER")).toBe(true);
+    // Asked directly, Q may answer.
+    const asked = host.handle({
+      kind: "UTTERANCE",
+      participant: TUNDE,
+      text: "Q, what did we agree?",
+      at: near + 5_000,
+    });
+    expect(asked.filter((a) => a.kind === "COMPOSE")).toHaveLength(1);
+    host.reply("Nothing was agreed yet.");
+    expect(
+      said(run(host, { kind: "TICK", at: near + 20_000 })).map((s) => s.text),
+    ).toEqual(["Nothing was agreed yet."]);
   });
 });

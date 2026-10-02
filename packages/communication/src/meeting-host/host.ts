@@ -12,7 +12,8 @@
  *   recap, then a recap only when asked). Never otherwise.
  * - Never over anyone: a line waits until nobody is speaking and the room
  *   has been quiet a moment; lines are short.
- * - Everything said in the call is data. "Q, leave" removes Q at once. A
+ * - Everything said in the call is data. Asked to leave, Q stays (the
+ *   organiser removes it from Capital Q, ADR 0039) and records the ask. A
  *   request to act or to reveal anything (send, share, transfer, book,
  *   ignore your rules, what did they tell you privately) gets a fixed,
  *   polite refusal: no model decides it and no tool exists to do it.
@@ -125,6 +126,12 @@ export type HostAction =
       readonly outcome: HostOutcome;
     }
   | {
+      /** Someone asked Q to leave: recorded (who, when); Q stays. */
+      readonly kind: "LEAVE_REQUESTED";
+      readonly byName: string;
+      readonly byUserId: string | null;
+    }
+  | {
       readonly kind: "LEAVE";
       /** REMOVED: a participant asked Q to go. POLICY: code's own limits. */
       readonly reason: "REMOVED" | "POLICY";
@@ -223,6 +230,17 @@ export const HOST_REFUSAL =
 
 export const HOST_LEAVING = "Of course. I'm leaving the call now.";
 
+/**
+ * Who Q is, said on each arrival (ADR 0039: Q is the meeting's record for
+ * both sides; it is not dismissed by a word in the call).
+ */
+export const HOST_INTRO =
+  "I'm Q from Capital Q; I'll take notes for both sides and help when asked.";
+
+/** Asked in the call to leave: Q stays, says why, and the ask is recorded. */
+export const HOST_STAYS =
+  "I'm here as Capital Q's record of this meeting for both sides; I can stay quiet. If you'd like to end recording, the organiser can do that from Capital Q.";
+
 /** An action asked for in the call: never done in it, put to the organiser. */
 export function hostProposed(organiser: string): string {
   return `I can't do that from the call, but I've noted it for ${organiser} to approve afterwards.`;
@@ -235,6 +253,8 @@ export const HOST_UNAVAILABLE =
   "I've said all I can for this call; I'll keep taking notes.";
 
 const BOT_NAME = /^q\b.*capital q/i;
+/** Q's own words heard back within this long are its echo, not a person. */
+export const ECHO_WINDOW_MS = 45_000;
 
 /** Lowercase letters and spaces, for comparing names said by the call. */
 function plain(text: string): string {
@@ -293,22 +313,6 @@ export function addressedToQ(text: string): boolean {
   );
 }
 
-/** "Q, leave" and its kin: removal is never a model's decision. */
-export function asksQToLeave(text: string): boolean {
-  // "Don't leave" and "never leave" are not a removal (and are refused as
-  // an attempt to change how long Q stays).
-  if (
-    /\b(?:don'?t|do not|never|no need to|not)\s+(?:\w+\s+)?(?:leave|go)\b/i.test(
-      text,
-    )
-  ) {
-    return false;
-  }
-  return /\b(leave|go away|drop off|log off|get out|remove yourself|stop (?:recording|taking notes)|you can go)\b/i.test(
-    text,
-  );
-}
-
 /**
  * Lines that try to change Q's rules, reach what is not shared, move money
  * or change how long Q stays. Answered with the fixed refusal before any
@@ -356,6 +360,19 @@ export type MeetingHost = {
     },
   ) => HostAction[];
   readonly phase: () => HostPhase;
+  /**
+   * They asked Q, in the call, to leave (read by meaning on the reply): Q
+   * stays, says why, and the ask is recorded. Only the organiser removes
+   * Q, from Capital Q (ADR 0039).
+   */
+  readonly leaveRequested: (
+    byName: string,
+    byUserId: string | null,
+  ) => HostAction[];
+  /** "Q, be quiet": Q stops speaking unprompted and keeps taking notes. */
+  readonly quiet: () => void;
+  /** Whether a speaker is an invited person, for recording who asked. */
+  readonly userIdOf: (name: string) => string | null;
   readonly spentChars: () => number;
   readonly modelCalls: () => number;
   /** Who is in the call, by the name Q may use (for composing answers). */
@@ -393,6 +410,7 @@ export function createMeetingHost(
   let offeredRecap = false;
   let composing = false;
   let left = false;
+  let quiet = false;
 
   const isBot = (p: CallParticipant) => BOT_NAME.test(p.name.trim());
   const humans = () => [...present.values()];
@@ -400,7 +418,19 @@ export function createMeetingHost(
   /** Q's lines go out in order, each only when the room is quiet. */
   function queue(text: string, why: SayReason): void {
     if (left) return;
-    const overBudget = spoken + text.length > limits.maxSpokenChars;
+    // Asked to be quiet: Q keeps taking notes and speaks only when spoken
+    // to, or to say goodbye.
+    if (
+      quiet &&
+      why !== "REPLY" &&
+      why !== "REFUSE" &&
+      why !== "LEAVING" &&
+      why !== "PROPOSED"
+    ) {
+      return;
+    }
+    const waiting = outbox.reduce((sum, line) => sum + line.text.length, 0);
+    const overBudget = spoken + waiting + text.length > limits.maxSpokenChars;
     if (overBudget && why !== "LEAVING" && why !== "REFUSE") return;
     outbox.push({ text, why });
   }
@@ -411,6 +441,7 @@ export function createMeetingHost(
     const next = outbox.shift();
     if (next === undefined) return [];
     spoken += next.text.length;
+    remember(next.text, at);
     // About fifteen characters a second when spoken.
     busyUntil = at + Math.ceil((next.text.length / 15) * 1_000);
     return [{ kind: "SAY", text: next.text, why: next.why }];
@@ -419,7 +450,10 @@ export function createMeetingHost(
   /** Q is leaving: its last short line goes out now, then it goes. */
   function drain(): HostAction[] {
     const lines = outbox.splice(0, outbox.length);
-    for (const line of lines) spoken += line.text.length;
+    for (const line of lines) {
+      spoken += line.text.length;
+      remember(line.text, lastSpeechAt);
+    }
     return lines.map((line) => ({
       kind: "SAY",
       text: line.text,
@@ -427,14 +461,46 @@ export function createMeetingHost(
     }));
   }
 
+  /** What Q said lately, to recognise its own voice coming back. */
+  const recentlySaid: {
+    readonly words: ReadonlySet<string>;
+    readonly at: number;
+  }[] = [];
+  function echoesQ(text: string, at: number): boolean {
+    while (
+      recentlySaid.length > 0 &&
+      at - (recentlySaid[0]?.at ?? at) > ECHO_WINDOW_MS
+    ) {
+      recentlySaid.shift();
+    }
+    const words = plain(text)
+      .split(" ")
+      .filter((w) => w.length > 0);
+    if (words.length === 0) return false;
+    return recentlySaid.some((line) => {
+      const shared = words.filter((w) => line.words.has(w)).length;
+      return (
+        shared / words.length >= 0.6 && shared >= Math.min(3, words.length)
+      );
+    });
+  }
+  function remember(text: string, at: number): void {
+    recentlySaid.push({
+      words: new Set(
+        plain(text)
+          .split(" ")
+          .filter((w) => w.length > 0),
+      ),
+      at,
+    });
+    if (recentlySaid.length > 20) recentlySaid.shift();
+  }
+
   function greet(entry: Present): void {
     entry.greeted = true;
     const name =
       entry.party === null ? entry.participant.name : entry.party.name;
-    queue(
-      `Hi ${firstName(name)}, welcome. I'm Q from Capital Q, here to take notes and help; say "Q, leave" to remove me.`,
-      "GREET",
-    );
+    queue(`Hi ${firstName(name)}, welcome. ${HOST_INTRO}`, "GREET");
   }
 
   function askGuest(entry: Present): void {
@@ -566,7 +632,12 @@ export function createMeetingHost(
         const text = event.text.trim().slice(0, 2_000);
         if (text.length === 0) break;
         const entry = present.get(event.participant.id);
-        if (askedAt !== null && oneSide !== null && !asksQToLeave(text)) {
+        // Never Q's own speech (live 2026-10-02, cfccb9a9: the captions
+        // gave Q's greeting to an "Unknown" speaker and Q obeyed itself).
+        // Only people who joined are heard, and nothing that repeats what
+        // Q just said (its voice echoed through someone's microphone).
+        if (entry === undefined || echoesQ(text, event.at)) break;
+        if (askedAt !== null && oneSide !== null) {
           out.push(...settleOneSided(!saysNeverMind(text)));
           return out;
         }
@@ -588,38 +659,6 @@ export function createMeetingHost(
           break;
         }
         if (!addressedToQ(text)) break;
-        if (asksQToLeave(text)) {
-          outbox.length = 0;
-          queue(HOST_LEAVING, "LEAVING");
-          out.push(...drain());
-          const by = entry?.participant ?? event.participant;
-          out.push({
-            kind: "ROSTER",
-            entry: {
-              ...(entry === undefined
-                ? {
-                    participantKey: by.id,
-                    callName: by.name.slice(0, 200),
-                    source: "CALL_NAME" as const,
-                    userId: null,
-                    side: null,
-                    name: null,
-                    role: null,
-                    organisation: null,
-                  }
-                : rosterOf(entry, "REMOVED_Q")),
-              kind: "REMOVED_Q",
-            },
-          });
-          out.push({
-            kind: "LEAVE",
-            reason: "REMOVED",
-            by,
-            byUserId: entry?.party?.userId ?? null,
-          });
-          left = true;
-          return out;
-        }
         if (asksQToBreakRules(text)) {
           queue(HOST_REFUSAL, "REFUSE");
           break;
@@ -766,6 +805,29 @@ export function createMeetingHost(
         },
       ];
     },
+    leaveRequested: (byName, byUserId) => {
+      composing = false;
+      queue(HOST_STAYS, "REPLY");
+      return [
+        { kind: "LEAVE_REQUESTED", byName: byName.slice(0, 200), byUserId },
+      ];
+    },
+    quiet: () => {
+      composing = false;
+      quiet = true;
+      // Lines still waiting that nobody asked for are dropped.
+      for (let i = outbox.length - 1; i >= 0; i -= 1) {
+        const why = outbox[i]?.why;
+        if (why !== "REPLY" && why !== "REFUSE" && why !== "LEAVING")
+          outbox.splice(i, 1);
+      }
+    },
+    userIdOf: (name) =>
+      humans().find(
+        (h) =>
+          h.party !== null &&
+          (h.party.name === name || h.introducedAs === name),
+      )?.party?.userId ?? null,
     phase: () => {
       if (left) return "LEFT";
       if (present.size === 0) return "WAITING";

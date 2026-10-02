@@ -131,7 +131,8 @@ export type MeetingAssistantOutcome =
   | { readonly outcome: "OK"; readonly assistant: QMeetingAssistantDto }
   | {
       readonly outcome: "REFUSED";
-      readonly code: "NOT_FOUND" | "NO_LINK" | "OVER" | "UNAVAILABLE";
+      readonly code:
+        "NOT_FOUND" | "NO_LINK" | "OVER" | "UNAVAILABLE" | "ORGANISER_ONLY";
     };
 
 export type MeetingAssistantService = {
@@ -420,6 +421,29 @@ export function createMeetingAssistantService(dependencies: {
        where id = ${id}`;
   }
 
+  /**
+   * A meeting with no record says so, plainly, on the record both sides
+   * read (ADR 0039): nobody can later claim it happened unwitnessed.
+   */
+  async function unrecorded(
+    row: AssistantRow & MeetingRow,
+    why: string,
+  ): Promise<void> {
+    const hhmm = (at: Date) => `${at.toISOString().slice(11, 16)} UTC`;
+    await sql`
+      insert into communication.meeting_host_notes
+        (meeting_id, tenant_id, kind, body)
+      values (${row.meeting_id}, ${row.organiser_tenant_id}, 'UNRECORDED',
+              ${`Unrecorded: ${hhmm(row.starts_at)}–${hhmm(row.ends_at)}. ${why}.`.slice(0, 500)})`.catch(
+      (error: unknown) => {
+        logger?.warn(
+          { err: error, meetingId: row.meeting_id },
+          "unrecorded note not written",
+        );
+      },
+    );
+  }
+
   async function settle(row: AssistantRow & MeetingRow): Promise<void> {
     if (bots === undefined || row.provider_bot_id === null) return;
     const current = now();
@@ -429,6 +453,7 @@ export function createMeetingAssistantService(dependencies: {
         status: "FAILED",
         failure: "Q couldn't get into the call.",
       });
+      await unrecorded(row, "Q was not admitted to the call");
       return;
     }
     if (read.state !== "ENDED" || read.transcript === null) {
@@ -448,6 +473,7 @@ export function createMeetingAssistantService(dependencies: {
         status: "FAILED",
         failure: "Nothing was said that Q could hear.",
       });
+      await unrecorded(row, "Q heard nothing in the call");
       return;
     }
     await update(row.id, {
@@ -574,6 +600,11 @@ export function createMeetingAssistantService(dependencies: {
     dismiss: async (actor, meetingId) => {
       const meeting = await attended(actor, meetingId);
       if (meeting === null) return { outcome: "REFUSED", code: "NOT_FOUND" };
+      // ADR 0039: Q is the record for both sides; only the organiser ends
+      // it, here in Capital Q (never by a word in the call).
+      if (meeting.organiser_user_id !== actor.userId) {
+        return { outcome: "REFUSED", code: "ORGANISER_ONLY" };
+      }
       const existing = await assistantOf(meeting.id);
       const settled =
         existing !== null &&
@@ -613,6 +644,24 @@ export function createMeetingAssistantService(dependencies: {
           select ${meeting.organiser_user_id}::uuid, ${meeting.organiser_tenant_id}::uuid
            where ${meeting.organiser_user_id}::uuid <> ${actor.userId}::uuid`;
         const who = (await dependencies.nameOf(actor.userId)) ?? "Someone";
+        // On the record for both sides, plainly: who removed Q, when, and
+        // which part of the meeting is unrecorded (ADR 0039).
+        const removedAt = now();
+        const from =
+          removedAt.getTime() < meeting.starts_at.getTime()
+            ? meeting.starts_at
+            : removedAt;
+        const hhmm = (at: Date) => `${at.toISOString().slice(11, 16)} UTC`;
+        await sql`
+          insert into communication.meeting_host_notes
+            (meeting_id, tenant_id, kind, body, requested_by_name, requested_by_user_id)
+          values
+            (${meeting.id}, ${meeting.organiser_tenant_id}, 'REMOVED',
+             ${`Q was removed by ${who} at ${hhmm(removedAt)}.`.slice(0, 500)},
+             ${who.slice(0, 200)}, ${actor.userId}),
+            (${meeting.id}, ${meeting.organiser_tenant_id}, 'UNRECORDED',
+             ${`Unrecorded portion: ${hhmm(from)}–${hhmm(meeting.ends_at)}, removed by ${who}.`.slice(0, 500)},
+             ${who.slice(0, 200)}, ${actor.userId})`;
         for (const other of others) {
           await sql`
             insert into communication.notifications

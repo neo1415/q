@@ -24,7 +24,8 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type MeetingHostResult,
+  MEETING_HOST_KINDS,
+  type MeetingHostResultV2 as MeetingHostResult,
   type MeetingHostVariables,
 } from "@capital-q/q-core";
 import { z } from "zod";
@@ -83,7 +84,8 @@ export type MeetingHostStore = {
         | "NO_SHOW"
         | "ONE_SIDED"
         | "RESCHEDULE_WANTED"
-        | "NEVER_MIND";
+        | "NEVER_MIND"
+        | "LEAVE_REQUESTED";
       readonly body: string | null;
       readonly requestedByName: string | null;
       readonly absentSide: "FOUNDER" | "INVESTOR" | null;
@@ -434,6 +436,14 @@ export function createMeetingHostRuntime(dependencies: {
         session.lines.push(`Q: ${action.text}`);
         return;
       }
+      case "LEAVE_REQUESTED":
+        await noteSafely(session, {
+          kind: "LEAVE_REQUESTED",
+          body: null,
+          requestedByName: action.byName,
+          absentSide: null,
+        });
+        return;
       case "OUTCOME": {
         const outcome = action.outcome;
         await noteSafely(session, {
@@ -504,7 +514,18 @@ export function createMeetingHostRuntime(dependencies: {
         // A decline or a proposal is spoken in Capital Q's fixed words,
         // never the model's; a proposal is noted for the organiser to
         // approve after the call and never acted on in it.
-        if (result?.kind === "PROPOSE" && result.proposal !== null) {
+        if (result?.kind === "LEAVE_REQUEST") {
+          // Q is the record for both sides: it stays, says why, and the
+          // ask is recorded (ADR 0039). Only the organiser removes Q.
+          for (const next of session.host.leaveRequested(
+            action.speaker,
+            session.host.userIdOf(action.speaker),
+          )) {
+            await perform(session, next);
+          }
+        } else if (result?.kind === "QUIET") {
+          session.host.quiet();
+        } else if (result?.kind === "PROPOSE" && result.proposal !== null) {
           session.proposals += 1;
           await noteSafely(session, {
             kind: "PROPOSAL",
@@ -714,7 +735,7 @@ export function readHostResult(raw: unknown): MeetingHostResult | null {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw))
     return null;
   const record = raw as Record<string, unknown>;
-  const kinds = ["ANSWER", "RECAP", "PROPOSE", "DECLINE", "GUEST"] as const;
+  const kinds = MEETING_HOST_KINDS;
   const spelled =
     typeof record["kind"] === "string"
       ? record["kind"].trim().toUpperCase()

@@ -326,6 +326,7 @@ export { INVESTOR_TWIN_TURN_V8 } from "./prompts/tasks/investor-twin-turn.v8.js"
 export { INVESTOR_TWIN_TURN_V9 } from "./prompts/tasks/investor-twin-turn.v9.js";
 // MEET-HOST block (ADR 0037)
 export { MEETING_HOST_TURN_V1 } from "./prompts/tasks/meeting-host-turn.v1.js";
+export { MEETING_HOST_TURN_V2 } from "./prompts/tasks/meeting-host-turn.v2.js";
 export {
   MEETING_HOST_SCHEMA_NAME,
   MEETING_HOST_SCHEMA_VERSION,
@@ -333,6 +334,9 @@ export {
   MeetingHostResultSchema,
   MeetingHostVariablesSchema,
   type MeetingHostResult,
+  MEETING_HOST_KINDS,
+  MeetingHostResultV2Schema,
+  type MeetingHostResultV2,
   type MeetingHostVariables,
 } from "./prompts/schemas/meeting-host.js";
 // end MEET-HOST block
