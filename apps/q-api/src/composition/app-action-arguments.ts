@@ -80,9 +80,15 @@ export function createAppActionArgumentReader(dependencies: {
             qRunId: request.runId,
             correlationId: request.correlationId,
           },
+        },
+        {
+          schema: AppActionArgumentsResultSchema,
+          // The signal is the call's option, never part of the request:
+          // the gateway's request contract is strict, and a request with a
+          // signal in it was refused as invalid before any provider was
+          // asked (parity eval 2026-10-02, runs 1371ff20 and e2556e58).
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         },
-        { schema: AppActionArgumentsResultSchema },
       );
       return result.output.kind === "STRUCTURED"
         ? AppActionArgumentsResultSchema.parse(result.output.value).arguments

@@ -703,7 +703,11 @@ describe("answer seam tool loop", () => {
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
     expect(alpha.calls).toHaveLength(2);
-    expect(alpha.calls[1]?.request.output.kind).toBe("STRUCTURED");
+    // Parity eval 2026-10-02: a refused structured round is asked again in
+    // text with the tools kept (a model that meant to act still can); its
+    // answer is accepted by the same schema.
+    expect(alpha.calls[1]?.request.output.kind).toBe("TEXT");
+    expect(alpha.calls[1]?.request.tools.length).toBeGreaterThan(0);
     expect(messages.at(-1)?.content).toBe("repaired");
   });
 

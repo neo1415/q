@@ -1196,3 +1196,37 @@ describe("the no-deck offer is made once per conversation (live Nixo)", () => {
     expect(seen).toEqual([true, false]);
   });
 });
+
+/**
+ * Parity eval 2026-10-02: the tool round's structured answer was refused
+ * ("answer:too_small" -- the model meant to act), and the turn was answered
+ * with no tools at all. The round is now asked once more in text with the
+ * tools, so a model that meant to call one still can.
+ */
+describe("a refused structured tool round keeps the tools", () => {
+  it("asks again in text with the tools, and the tool is called", async () => {
+    const tools = toolPort([RESEARCH], (proposal) =>
+      researchOutcome(proposal, "Ajopot raised a seed round in 2025."),
+    );
+    const { seam, request, alpha, messages } = build({
+      script: [
+        // An empty answer where a tool was meant: the schema refuses it.
+        { kind: "JSON", value: analystResult("") },
+        researchCall,
+        { kind: "JSON", value: analystResult("Ajopot raised a seed round.") },
+      ],
+      tools: tools.port,
+    });
+    await seam.answer(request);
+    expect(tools.executed.map((e) => e.proposal.name)).toContain(
+      "research_public_web",
+    );
+    // The retried round was a text round that still carried the tools.
+    const retried = alpha.calls.find(
+      (call) =>
+        call.request.output.kind === "TEXT" && call.request.tools.length > 0,
+    );
+    expect(retried).toBeDefined();
+    expect(messages.at(-1)?.content).toContain("Ajopot raised a seed round.");
+  });
+});

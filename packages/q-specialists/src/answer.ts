@@ -1790,6 +1790,41 @@ export function createSpecialistQAnswer(
       if (said !== null) {
         return recordAnswer(request, conversationId, said);
       }
+      // The reader's own arguments did not fit the tool (parity eval
+      // 2026-10-02: "Change our fund's website to ..." failed
+      // INVALID_ARGUMENTS): once, the arguments are read again against the
+      // tool's own schema, and the same tool runs with them.
+      if (
+        appActionOf(read) !== null &&
+        dependencies.appActionArguments !== undefined &&
+        offeredNames.has(appAction.tool)
+      ) {
+        const again = await dependencies
+          .appActionArguments(request, {
+            tool: appAction.tool,
+            utterance: latest.content,
+          })
+          .catch(() => null);
+        logger?.info(
+          {
+            qRunId: request.runId,
+            tool: appAction.tool,
+            reread: again !== null,
+          },
+          "app action refused its read arguments; arguments read for it again",
+        );
+        if (
+          again !== null &&
+          JSON.stringify(again) !== JSON.stringify(appAction.arguments)
+        ) {
+          const retried = await dependencies.appActions
+            .run(request, { tool: appAction.tool, arguments: again })
+            .catch(() => null);
+          if (retried !== null) {
+            return recordAnswer(request, conversationId, retried);
+          }
+        }
+      }
     }
     // A hand-over (TURN_READER v22): "get me a meeting with this person",
     // "handle this for me", in any language. Code prepares Q's errand for

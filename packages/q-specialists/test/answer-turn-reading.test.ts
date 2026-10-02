@@ -2382,3 +2382,79 @@ describe("a named app action with no arguments is still done (parity eval 2026-1
     expect(heard[0]?.name).toBe("pass_company");
   });
 });
+
+/**
+ * Parity eval 2026-10-02 (c2c4513a): the reader's appAction arguments did
+ * not fit the tool (INVALID_ARGUMENTS) and nothing was done. The arguments
+ * are read once more against the tool's own schema and the same tool runs.
+ */
+describe("a reader's arguments the tool refuses are read again (parity eval 2026-10-02)", () => {
+  const withAction = (args: Record<string, unknown>) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+      appAction: { tool: "update_investor_profile", arguments: args },
+    }) as TurnReaderResult;
+
+  it("'Change our fund's website to https://lagoon-capital.example.': refused, re-read, done", async () => {
+    const ran: unknown[] = [];
+    const asked: unknown[] = [];
+    const { answer, stored, delegated } = seam({
+      said: "Change our fund's website to https://lagoon-capital.example.",
+      reading: withAction({ website: "https://lagoon-capital.example" }),
+      outcomes: [],
+      offeredTools: ["update_investor_profile"],
+      appActions: {
+        tools: new Set(["update_investor_profile"]),
+        run: (_request, action) => {
+          ran.push(action.arguments);
+          return Promise.resolve(
+            "websiteUrl" in action.arguments
+              ? "Prepared: your fund's website."
+              : null,
+          );
+        },
+      },
+      appActionArguments: (_request, input) => {
+        asked.push(input.tool);
+        return Promise.resolve({
+          websiteUrl: "https://lagoon-capital.example",
+        });
+      },
+    });
+    await answer.answer(request());
+    expect(ran).toEqual([
+      { website: "https://lagoon-capital.example" },
+      { websiteUrl: "https://lagoon-capital.example" },
+    ]);
+    expect(asked).toEqual(["update_investor_profile"]);
+    expect(stored.at(-1)?.content).toBe("Prepared: your fund's website.");
+    expect(delegated()).toBe(0);
+  });
+
+  it("the same arguments read again are not run twice; the answer takes the turn", async () => {
+    const ran: unknown[] = [];
+    const { answer, delegated } = seam({
+      said: "Change our fund's website to https://lagoon-capital.example.",
+      reading: withAction({ websiteUrl: "nope" }),
+      outcomes: [],
+      offeredTools: ["update_investor_profile"],
+      appActions: {
+        tools: new Set(["update_investor_profile"]),
+        run: (_request, action) => {
+          ran.push(action.arguments);
+          return Promise.resolve(null);
+        },
+      },
+      appActionArguments: () => Promise.resolve({ websiteUrl: "nope" }),
+    });
+    await answer.answer(request());
+    expect(ran).toHaveLength(1);
+    expect(delegated()).toBe(1);
+  });
+});

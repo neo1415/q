@@ -2507,6 +2507,7 @@ export function createModelGatewayQAnswer(
           // One more round, once, after fill_profile_gaps searched: the
           // second call carries the values the sources support.
           let gapsRounds = 0;
+          let textRound = false;
           while (
             rounds <
               Q_TOOL_LOOP_MAX_ROUNDS +
@@ -2533,7 +2534,11 @@ export function createModelGatewayQAnswer(
                    * shape to the prompt. Either way the reply is accepted by
                    * the same Zod schema as the call below.
                    */
-                  output: rendered.output,
+                  // After a structured refusal this turn, the round asks
+                  // in text, tools kept (parity eval 2026-10-02).
+                  output: textRound
+                    ? ({ kind: "TEXT" } as const)
+                    : rendered.output,
                   tools: offered.map((tool) => tool.definition),
                 },
                 options,
@@ -2549,6 +2554,19 @@ export function createModelGatewayQAnswer(
                 isModelGatewayError(error) &&
                 error.failureClass === "INVALID_MODEL_OUTPUT"
               ) {
+                // A structured answer the schema refused (parity eval
+                // 2026-10-02: "answer:too_small" -- an empty answer where
+                // the model meant to act) is not a reason to take the tools
+                // away: the round is asked once more in text, tools kept,
+                // and only then is the answer written without them.
+                if (!textRound) {
+                  textRound = true;
+                  logger?.warn(
+                    { qRunId: request.runId, rounds, calls },
+                    "tool round's structured answer refused; asking again in text with the tools",
+                  );
+                  continue;
+                }
                 logger?.warn(
                   { qRunId: request.runId, rounds, calls },
                   "tool round refused by the provider; answering without tools",
