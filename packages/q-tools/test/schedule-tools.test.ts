@@ -435,7 +435,7 @@ describe("schedule tools", () => {
         expect(prepared, zone).toEqual([]);
         const said = JSON.stringify(outcome.result);
         expect(said).toContain("time zone is not known");
-        expect(said).toContain("propose_profile_change");
+        expect(said).toContain("update_my_profile");
         expect(said).toContain("Never assume UTC");
       }
     });

@@ -2,10 +2,7 @@ import { z } from "zod";
 
 import {
   CAPITAL_OBJECTIVE_CLOSURE_REASONS,
-  COMPANY_RELATIONSHIP_TYPES,
   DISCOVERY_MODES,
-  QCardFieldSchema,
-  QCardScopeSchema,
   type PermittedContextPlan,
   type QTaskClass,
 } from "@capital-q/contracts";
@@ -39,8 +36,6 @@ import { ownSubject } from "./q-card.js";
 
 export const PROPOSE_RAISE_CHANGE = "capital.objective.propose" as const;
 export const PROPOSE_MANDATE_CHANGE = "investor.mandate.propose" as const;
-export const PROPOSE_TEAM_CHANGE = "team.propose" as const;
-export const PROPOSE_Q_CARD_CHANGE = "q_card.propose" as const;
 export const PROPOSE_INVESTOR_VISIBILITY =
   "investor.visibility.propose" as const;
 export const PROPOSE_PROFILE_ANSWER = "profile.answer.propose" as const;
@@ -300,176 +295,6 @@ export function createProposeMandateChangeTool(
   });
 }
 
-// --- founder profile, team facts, their own role --------------------------
-
-export const ProposeTeamChangeInputSchema = z
-  .object({
-    change: z
-      .enum([
-        "FOUNDER_PROFILE",
-        "TEAM_FACTS",
-        "MY_COMPANY_ROLE",
-        "MY_INVESTOR_ROLE",
-      ])
-      .describe(
-        "FOUNDER_PROFILE: their professionalSummary / backgroundSummary. TEAM_FACTS: founderCount, fullTimeFounderCount, teamSize. MY_COMPANY_ROLE: their relationshipType, businessTitle, isFounder at their company. MY_INVESTOR_ROLE: their businessTitle at their investor organisation.",
-      ),
-    professionalSummary: z.string().max(2000).optional(),
-    backgroundSummary: z.string().max(2000).optional(),
-    founderCount: z.number().int().min(0).max(100000).optional(),
-    fullTimeFounderCount: z.number().int().min(0).max(100000).optional(),
-    teamSize: z.number().int().min(0).max(10000000).optional(),
-    relationshipType: z.enum(COMPANY_RELATIONSHIP_TYPES).optional(),
-    businessTitle: z.string().max(120).optional(),
-    isFounder: z.boolean().optional(),
-  })
-  .strict();
-export type ProposeTeamChangeInput = z.infer<
-  typeof ProposeTeamChangeInputSchema
->;
-
-export function createProposeTeamChangeTool(
-  ports: Pick<QToolPorts, "companies" | "investors">,
-  port: RecordChangePort,
-): AnyQToolDefinition {
-  const prepare = prepareWith(port);
-  const company = subjectAuthorizer(ports, "COMPANY");
-  const investor = subjectAuthorizer(ports, "INVESTOR_ORGANISATION");
-  return defineQTool<ProposeTeamChangeInput, ProposeRecordChangeOutput, Grant>({
-    ...COMMON,
-    id: PROPOSE_TEAM_CHANGE,
-    providerName: "propose_team_change",
-    description: `Prepares a change to their founder profile, their company's team facts, or their own role and title at their company or investor organisation, as the profile page's team section makes it. ${RESULT_NOTE}`,
-    requiredScopeKinds: ["COMPANY_PROFILE", "INVESTOR_PROFILE"],
-    input: ProposeTeamChangeInputSchema,
-    authorize: (input, context) =>
-      input.change === "MY_INVESTOR_ROLE"
-        ? investor(input, context)
-        : company(input, context),
-    execute: (input, context, grant) => {
-      const { change, ...rest } = input;
-      const pick = (keys: readonly (keyof typeof rest)[]) =>
-        defined(Object.fromEntries(keys.map((key) => [key, rest[key]])));
-      switch (change) {
-        case "FOUNDER_PROFILE":
-          return prepare(
-            {
-              kind: "FOUNDER_PROFILE",
-              companyId: grant.subjectId,
-              fields: pick(["professionalSummary", "backgroundSummary"]),
-            },
-            context,
-          );
-        case "TEAM_FACTS":
-          return prepare(
-            {
-              kind: "TEAM_FACTS",
-              companyId: grant.subjectId,
-              fields: pick([
-                "founderCount",
-                "fullTimeFounderCount",
-                "teamSize",
-              ]),
-            },
-            context,
-          );
-        case "MY_COMPANY_ROLE":
-          return prepare(
-            {
-              kind: "COMPANY_MEMBERSHIP",
-              companyId: grant.subjectId,
-              fields: pick(["relationshipType", "businessTitle", "isFounder"]),
-            },
-            context,
-          );
-        case "MY_INVESTOR_ROLE":
-          return prepare(
-            {
-              kind: "INVESTOR_REPRESENTATIVE",
-              investorOrganisationId: grant.subjectId,
-              fields: pick(["businessTitle"]),
-            },
-            context,
-          );
-      }
-    },
-  });
-}
-
-// --- Q Card details ------------------------------------------------------
-
-export const ProposeQCardChangeInputSchema = z
-  .object({
-    subject: z
-      .enum(["COMPANY", "INVESTOR_ORGANISATION"])
-      .describe("Whose card: their own company's or investor organisation's."),
-    indexable: z
-      .boolean()
-      .optional()
-      .describe("Whether search engines may find the card."),
-    fieldScopes: z
-      .array(
-        z.object({ field: QCardFieldSchema, scope: QCardScopeSchema }).strict(),
-      )
-      .max(20)
-      .optional()
-      .describe("Which fields the card shows, and to whom."),
-  })
-  .strict();
-export type ProposeQCardChangeInput = z.infer<
-  typeof ProposeQCardChangeInputSchema
->;
-
-export function createProposeQCardChangeTool(
-  ports: Pick<QToolPorts, "companies" | "investors">,
-  port: RecordChangePort,
-): AnyQToolDefinition {
-  const prepare = prepareWith(port);
-  const company = subjectAuthorizer(ports, "COMPANY");
-  const investor = subjectAuthorizer(ports, "INVESTOR_ORGANISATION");
-  return defineQTool<ProposeQCardChangeInput, ProposeRecordChangeOutput, Grant>(
-    {
-      ...COMMON,
-      id: PROPOSE_Q_CARD_CHANGE,
-      providerName: "propose_q_card_change",
-      description: `Prepares a change to their own Q Card's details, as the Q Card screen makes it: whether search engines may find it, and which fields it shows to whom. (A new handle is propose_handle_claim.) ${RESULT_NOTE}`,
-      requiredScopeKinds: ["COMPANY_PROFILE", "INVESTOR_PROFILE"],
-      input: ProposeQCardChangeInputSchema,
-      authorize: (input, context) =>
-        input.subject === "COMPANY"
-          ? company(input, context)
-          : investor(input, context),
-      execute: (input, context, grant) => {
-        if (input.indexable === undefined && input.fieldScopes === undefined) {
-          throw new QToolArgumentError(
-            "Say what to change: indexable or fieldScopes.",
-          );
-        }
-        return prepare(
-          {
-            kind: "Q_CARD",
-            subjectType: input.subject,
-            subjectId: grant.subjectId,
-            fields: defined({
-              indexable: input.indexable,
-              fieldScopes:
-                input.fieldScopes === undefined
-                  ? undefined
-                  : Object.fromEntries(
-                      input.fieldScopes.map((entry) => [
-                        entry.field,
-                        entry.scope,
-                      ]),
-                    ),
-            }),
-          },
-          context,
-        );
-      },
-    },
-  );
-}
-
 // --- the investor organisation's visibility --------------------------------
 
 export const ProposeInvestorVisibilityInputSchema = z
@@ -589,8 +414,6 @@ export function createRecordChangeTools(
   return [
     createProposeRaiseChangeTool(ports, port),
     createProposeMandateChangeTool(ports, port),
-    createProposeTeamChangeTool(ports, port),
-    createProposeQCardChangeTool(ports, port),
     createProposeInvestorVisibilityTool(ports, port),
     createProposeProfileAnswerTool(ports, port),
   ];

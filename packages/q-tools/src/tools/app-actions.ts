@@ -98,6 +98,20 @@ function correlationOf(value: string): CorrelationId {
     : CorrelationIdSchema.parse(`cor_${randomUUID()}`);
 }
 
+/** The fields a value did not fit, in plain words (never the value itself). */
+function misfit(error: z.ZodError): string {
+  return error.issues
+    .slice(0, 4)
+    .map((issue) => {
+      const field = issue.path
+        .filter((part): part is string => typeof part === "string")
+        .filter((part) => part !== "input")
+        .join(".");
+      return field.length === 0 ? issue.message : `${field} ${issue.message}`;
+    })
+    .join("; ");
+}
+
 /** Same run, same action, same words: the same key, so a retry does nothing twice. */
 export function appActionKey(
   runId: string,
@@ -168,8 +182,10 @@ function toolFor(
     riskClass:
       action.classification === "READ" ? "SAFE_READ" : "LOW_RISK_INTERNAL",
     requiredCapabilities: [],
-    supportedPurposes: [...Q_TASK_CLASSES],
-    requiredScopeKinds: ["OWN_Q_CONVERSATION"],
+    supportedPurposes: [...(declared.purposes ?? Q_TASK_CLASSES)],
+    // Offered where it can apply (a founder's conversation, not an
+    // investor organisation's tool); authorize still requires their own.
+    requiredScopeKinds: [...(declared.scopes ?? ["OWN_Q_CONVERSATION"])],
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "app-actions",
@@ -241,9 +257,22 @@ function toolFor(
       const canonical = await declared
         .toCanonical(resolved, context, own)
         .catch(() => null);
-      const parsed =
-        canonical === null ? null : action.input.safeParse(canonical);
-      if (parsed === null || !parsed.success) return deny("NOT_AVAILABLE");
+      if (canonical === null) return deny("NOT_AVAILABLE");
+      const parsed = action.input.safeParse(canonical);
+      if (!parsed.success) {
+        // The declaration's own contract refused a value: say which, so Q
+        // can ask for a value that fits instead of going quiet.
+        return deny(
+          "NOT_AVAILABLE",
+          `That doesn't fit: ${misfit(parsed.error)}.`,
+        );
+      }
+      const refused = await declared
+        .refuse?.(parsed.data, own)
+        .catch(() => null);
+      if (refused !== undefined && refused !== null) {
+        return deny("NOT_AVAILABLE", refused);
+      }
       const verdict = await action
         .authorize(own, context, parsed.data)
         .catch(() => ({ ok: false as const, reason: "" }));

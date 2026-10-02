@@ -1,6 +1,11 @@
 import type { z } from "zod";
 
-import type { CorrelationId, QSubjectRef } from "@capital-q/contracts";
+import type {
+  CorrelationId,
+  QKnowledgeScopeKind,
+  QSubjectRef,
+  QTaskClass,
+} from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import type { AppActionPorts } from "./ports.js";
@@ -75,6 +80,25 @@ export type AppActionTool<In, ToolIn> = {
     context: AppActionContext,
     ports: AppActionPorts,
   ) => Promise<In | null>;
+  /**
+   * A check only Q's path needs before preparing a card, in the person's
+   * words (a handle already taken): the screen's route gets the service's
+   * own answer instead. Null: nothing to refuse.
+   */
+  readonly refuse?:
+    ((input: In, ports: AppActionPorts) => Promise<string | null>) | undefined;
+  /**
+   * The conversation scopes it is offered under (any of them): a founder's
+   * conversation is not offered an investor organisation's tools. Default:
+   * every conversation of their own.
+   */
+  readonly scopes?: readonly QKnowledgeScopeKind[] | undefined;
+  /**
+   * The kinds of turn it is offered on. A run offers at most
+   * MODEL_TOOLS_MAX tools, ranked by how few purposes each serves, so a
+   * tool declared for every purpose is the first one cut. Default: all.
+   */
+  readonly purposes?: readonly QTaskClass[] | undefined;
   /**
    * How a person asks for it, for the parity eval (scripts/evals/q-parity):
    * two phrasings, `{name}` standing for the record it names. The eval adds

@@ -87,7 +87,6 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     profileChanges: port(),
     pitchMoments: port(),
     visibility: port(),
-    handleClaims: port(),
     pendingProposals: {
       inConversation: port(),
       approve: port(),

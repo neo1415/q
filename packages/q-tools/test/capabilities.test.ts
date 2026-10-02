@@ -48,7 +48,6 @@ const EVERY_PORT: QToolPorts = {
   profileChanges: STUB,
   pitchMoments: STUB,
   visibility: STUB,
-  handleClaims: STUB,
   pendingProposals: { inConversation: STUB, approve: STUB, decline: STUB },
   qCards: STUB,
   clientActions: true,
@@ -156,8 +155,6 @@ describe("the capability registry is complete", () => {
       "list_my_documents",
       "propose_raise_change",
       "propose_mandate_change",
-      "propose_team_change",
-      "propose_q_card_change",
       "propose_investor_visibility",
       "read_my_record",
       "list_uploaded_documents",
@@ -229,10 +226,10 @@ describe("a run's capabilities come from composed facts, never words", () => {
     eligibleCapabilities(f).map((capability) => capability.id);
 
   it("a tool is a capability only when the run offers it", () => {
-    expect(ids(facts({}))).not.toContain("tool.propose_profile_change");
+    expect(ids(facts({}))).not.toContain("tool.propose_raise_change");
     expect(
-      ids(facts({ offeredTools: new Set(["propose_profile_change"]) })),
-    ).toContain("tool.propose_profile_change");
+      ids(facts({ offeredTools: new Set(["propose_raise_change"]) })),
+    ).toContain("tool.propose_raise_change");
   });
 
   it("the visibility screen and change need a company; the own mandate needs an investor's own organisation", () => {
@@ -266,7 +263,7 @@ describe("a run's capabilities come from composed facts, never words", () => {
     const loop = ids(
       facts({
         surface: "ONBOARDING",
-        offeredTools: new Set(["record_answers", "propose_profile_change"]),
+        offeredTools: new Set(["record_answers", "propose_raise_change"]),
         artifacts: true,
       }),
     );
