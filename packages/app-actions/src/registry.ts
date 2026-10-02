@@ -3,11 +3,13 @@ import { CAPITAL_ACTIONS } from "./actions/capital.js";
 import { CHAT_ACTIONS } from "./actions/chat.js";
 import { SET_DECK_AUDIENCE } from "./actions/deck.js";
 import { DISCOVERY_DECISIONS } from "./actions/discovery.js";
+import { DOCUMENT_ACTIONS } from "./actions/documents.js";
 import { INTEREST_ACTIONS } from "./actions/interest.js";
 import { MANDATE_ACTIONS } from "./actions/mandate.js";
 import { MEDIA_ACTIONS } from "./actions/media.js";
 import { OUTCOME_ACTIONS } from "./actions/outcomes.js";
 import { SET_PITCH_SHARING } from "./actions/pitch.js";
+import { PROFILE_IMAGE_ACTIONS } from "./actions/profile-images.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
 import { SCHEDULE_ACTIONS } from "./actions/schedule.js";
 import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
@@ -30,4 +32,6 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...MEDIA_ACTIONS,
   ...OUTCOME_ACTIONS,
   SET_DECK_AUDIENCE,
+  ...DOCUMENT_ACTIONS,
+  ...PROFILE_IMAGE_ACTIONS,
 ]);

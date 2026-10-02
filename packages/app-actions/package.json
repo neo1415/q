@@ -27,6 +27,7 @@
     "@capital-q/companies": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/discovery": "workspace:*",
+    "@capital-q/evidence": "workspace:*",
     "@capital-q/investors": "workspace:*",
     "@capital-q/media": "workspace:*",
     "@capital-q/network": "workspace:*",

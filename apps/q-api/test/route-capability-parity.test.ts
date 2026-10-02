@@ -156,15 +156,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/discovery.ts GET DISCOVERY_NETWORK_PITCHES_PATH":
     cap("navigate.DISCOVER"),
 
-  "api/http/documents.ts POST DOCUMENT_UPLOAD_SESSIONS_PATH": cap(
-    "offer.document_upload",
-  ),
-  "api/http/documents.ts POST `${sessionById}/complete`": cap(
-    "offer.document_upload",
-  ),
-  "api/http/documents.ts POST `${sessionById}/cancel`": cap(
-    "offer.document_upload",
-  ),
   "api/http/documents.ts GET sessionById": cap("offer.document_upload"),
   "api/http/documents.ts GET DOCUMENTS_PATH": cap(
     "tool.list_uploaded_documents",
@@ -355,13 +346,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
 
   "api/http/media-webhooks.ts POST CLOUDFLARE_STREAM_WEBHOOK_PATH": WEBHOOK,
   "api/http/profile-images.ts GET subjectPath": cap(
-    "offer.profile_photo_upload",
-  ),
-  "api/http/profile-images.ts POST `${subjectPath}/:kind${PROFILE_IMAGE_UPLOADS_SEGMENT}`":
-    cap("offer.profile_photo_upload"),
-  "api/http/profile-images.ts POST `${PROFILE_IMAGES_PATH}${PROFILE_IMAGE_UPLOADS_SEGMENT}/:uploadId${PROFILE_IMAGE_COMPLETE_SEGMENT}`":
-    cap("offer.profile_photo_upload"),
-  "api/http/profile-images.ts DELETE `${subjectPath}/:kind`": cap(
     "offer.profile_photo_upload",
   ),
   "api/http/media.ts GET pitch": cap("tool.get_pitch_moment"),
@@ -833,7 +817,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 114;
+const LEGACY_MUTATION_ROUTES_MAX = 108;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([

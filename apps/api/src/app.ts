@@ -454,6 +454,18 @@ export function createApp(
       ...(modules.chat === undefined ? {} : { chat: modules.chat }),
       ...(modules.schedule === undefined ? {} : { schedule: modules.schedule }),
       ...(modules.media === undefined ? {} : { pitchUploads: modules.media }),
+      ...(modules.profileImages === undefined
+        ? {}
+        : { profileImages: modules.profileImages }),
+      ...(modules.evidence === undefined
+        ? {}
+        : {
+            documentUploads: modules.evidence,
+            documentUploadLimits: {
+              maxBytes: config.public.documentUploadMaxBytes,
+              allowedMimeTypes: ADMISSIBLE_MIME_TYPES,
+            },
+          }),
       ...(modules.chatSafety === undefined
         ? {}
         : { chatSafety: modules.chatSafety }),
@@ -645,10 +657,6 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       evidence: modules.evidence,
-      uploads: {
-        maxBytes: config.public.documentUploadMaxBytes,
-        allowedMimeTypes: ADMISSIBLE_MIME_TYPES,
-      },
     });
   }
 

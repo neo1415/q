@@ -7,8 +7,12 @@ import type {
 import type { CompanyService } from "@capital-q/companies";
 import type { PitchSummaryDto } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
+import type { EvidenceService } from "@capital-q/evidence";
 import type { InvestorService } from "@capital-q/investors";
-import type { PublicIdentityService } from "@capital-q/public-identity";
+import type {
+  ProfileImageService,
+  PublicIdentityService,
+} from "@capital-q/public-identity";
 import type { MediaService } from "@capital-q/media";
 import type {
   ConnectionService,
@@ -26,6 +30,12 @@ import type { DeckAudiencePort } from "./actions/deck.js";
  * instances; an action whose port is absent is not offered and its route
  * refuses, never half-runs.
  */
+/** What a document upload may be, as the screen states it to the browser. */
+export type DocumentUploadLimits = {
+  readonly maxBytes: number;
+  readonly allowedMimeTypes: readonly string[];
+};
+
 export type AppActionPorts = {
   /** ADR 0041: who may download a pitch deck (the Evidence service). */
   readonly deckAudience?: DeckAudiencePort | undefined;
@@ -82,6 +92,21 @@ export type AppActionPorts = {
         | "cancelUpload"
         | "setPitchPlaybackPolicy"
       >
+    | undefined;
+  /** Document uploads: the evidence service and the upload's limits. */
+  readonly documentUploads?:
+    | Pick<
+        EvidenceService,
+        | "createDocumentUploadSession"
+        | "completeDocumentUploadSession"
+        | "cancelDocumentUploadSession"
+        | "getDocumentWithVersion"
+      >
+    | undefined;
+  readonly documentUploadLimits?: DocumentUploadLimits | undefined;
+  /** Profile photos and covers. */
+  readonly profileImages?:
+    | Pick<ProfileImageService, "requestUpload" | "completeUpload" | "remove">
     | undefined;
   /** Calls and reminders: the schedule service. */
   readonly schedule?:

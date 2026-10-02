@@ -173,6 +173,20 @@ describe("the action registry", () => {
         "CONSEQUENTIAL",
       ],
       ["document.deck_audience.set", "set_deck_audience", "CONSEQUENTIAL"],
+      ["document.upload.start", "offer.document_upload", "CONSEQUENTIAL"],
+      ["document.upload.complete", "offer.document_upload", "CONSEQUENTIAL"],
+      ["document.upload.cancel", "offer.document_upload", "CONSEQUENTIAL"],
+      [
+        "profile_image.upload.start",
+        "offer.profile_photo_upload",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "profile_image.upload.complete",
+        "offer.profile_photo_upload",
+        "CONSEQUENTIAL",
+      ],
+      ["profile_image.remove", "offer.profile_photo_upload", "CONSEQUENTIAL"],
     ]);
   });
 });
