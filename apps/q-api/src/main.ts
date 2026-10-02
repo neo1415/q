@@ -357,6 +357,7 @@ import { composeResearch } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
+import { createVoiceSessionSealer } from "./voice/session-token.js";
 import { createInterviewAgent } from "./voice/interview-agent.js";
 import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
 import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
@@ -3258,7 +3259,20 @@ const speechSynthesis = speechWithFallback([
         }),
       ]),
 ]);
-const voiceBindings = createVoiceSessionBindings();
+/**
+ * Voice lines survive a deploy, a restart and a second replica (HARDEN P0,
+ * 2026-10-02): each line's binding is sealed into its token under a key
+ * derived from a server secret every instance holds. Without one, the key
+ * is per process and a restart ends every open line, as before.
+ */
+const voiceSessionSecret =
+  config.secrets.supabaseSecretKey ?? loadDatabaseConfig().secrets.url;
+const voiceBindings = createVoiceSessionBindings({
+  sealer: createVoiceSessionSealer({ secret: voiceSessionSecret }),
+  // A suspended account does not get its line back from a token.
+  stillAllowed: async (actor) =>
+    !(await isAccountSuspended(database.sql, actor.userId)),
+});
 // The interview as a tool-calling Q run (ADR 0016): the same firewall,
 // tool pipeline and gateway as every Q answer.
 const onboardingRecommendations = createOnboardingQRecommendations({
@@ -3784,3 +3798,41 @@ appLogger.info(
   { host: config.network.host, port: config.network.port },
   "service started",
 );
+
+/**
+ * Graceful shutdown (HARDEN P0, 2026-10-02). A deploy sends SIGTERM to the
+ * old container while the new one takes traffic. Until now the process
+ * died at once, mid-turn, under whoever was speaking. Now it stops taking
+ * new connections, closes the voice channel's sockets (a browser on that
+ * transport reconnects at once, to the new container, with its line
+ * restored from its sealed token), lets in-flight requests -- a think
+ * still streaming its answer -- finish, and exits. Bounded, so a request
+ * that never ends cannot hold a deploy (Railway's drain window should be
+ * at least this long: RAILWAY_DEPLOYMENT_DRAINING_SECONDS=30).
+ */
+const SHUTDOWN_DRAIN_MS = 25_000;
+let draining = false;
+const drain = (signal: NodeJS.Signals): void => {
+  if (draining) return;
+  draining = true;
+  appLogger.info({ signal, drainMs: SHUTDOWN_DRAIN_MS }, "draining");
+  const deadline = setTimeout(() => {
+    appLogger.warn({}, "drain window elapsed; exiting with requests open");
+    process.exit(0);
+  }, SHUTDOWN_DRAIN_MS);
+  deadline.unref();
+  void (async () => {
+    const channel = voiceChannel;
+    voiceChannel = undefined;
+    await channel?.close();
+    await app.close();
+    clearTimeout(deadline);
+    appLogger.info({}, "drained");
+    process.exit(0);
+  })().catch((error: unknown) => {
+    appLogger.error({ err: error }, "drain failed");
+    process.exit(1);
+  });
+};
+process.once("SIGTERM", drain);
+process.once("SIGINT", drain);

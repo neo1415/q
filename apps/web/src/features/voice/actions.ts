@@ -1,5 +1,7 @@
 "use server";
 
+import { z } from "zod";
+
 import {
   ApiProblemError,
   createQVoiceSession,
@@ -101,10 +103,15 @@ export async function startVoiceSessionAction(
 }
 
 /** What Q is asking after its latest spoken turn, for the stage; the owner's session only. */
+/** The line's sealed session, as the create response gave it; opaque here. */
+const SessionTokenSchema = z.string().min(1).max(8192).optional();
+
 export async function readVoiceTurnAction(
   rawVoiceSessionId: unknown,
+  rawSessionToken?: unknown,
 ): Promise<VoiceActionResult<QVoiceTurnState>> {
   const parsed = UuidSchema.safeParse(rawVoiceSessionId);
+  const sessionToken = SessionTokenSchema.safeParse(rawSessionToken);
   if (!parsed.success) {
     return failure("That voice session ended. Start voice again.");
   }
@@ -120,6 +127,7 @@ export async function readVoiceTurnAction(
     const value = await getQVoiceTurnState(
       { baseUrl: qApiBaseUrl, accessToken },
       parsed.data,
+      sessionToken.success ? sessionToken.data : undefined,
     );
     return { ok: true, value };
   } catch (error) {
@@ -145,8 +153,10 @@ export async function readVoiceTurnAction(
 export async function sendVoiceScreenAction(
   rawVoiceSessionId: unknown,
   rawScreen: unknown,
+  rawSessionToken?: unknown,
 ): Promise<VoiceActionResult<null>> {
   const id = UuidSchema.safeParse(rawVoiceSessionId);
+  const sessionToken = SessionTokenSchema.safeParse(rawSessionToken);
   const screen = QVoiceScreenUpdateSchema.safeParse(rawScreen);
   if (!id.success || !screen.success) {
     return failure("That screen can't be shared with Q. Reload and try again.");
@@ -164,6 +174,7 @@ export async function sendVoiceScreenAction(
       { baseUrl: qApiBaseUrl, accessToken },
       id.data,
       screen.data,
+      sessionToken.success ? sessionToken.data : undefined,
     );
     return { ok: true, value: null };
   } catch (error) {

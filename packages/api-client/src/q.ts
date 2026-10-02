@@ -168,15 +168,24 @@ export function rejectQApproval(
  * in Capital Q; the provider API key never leaves the Q API.
  */
 /** What Q is asking after its latest spoken turn (owner only). */
+/**
+ * The line's sealed session (from the create response), presented so any
+ * instance of the Q API still knows the line after a deploy or restart.
+ */
+const voiceSessionHeader = (sessionToken: string | undefined) =>
+  sessionToken === undefined ? {} : { "x-q-voice-session": sessionToken };
+
 export function getQVoiceTurnState(
   session: ApiSession,
   voiceSessionId: string,
+  sessionToken?: string,
 ) {
   return call(
     session,
     "GET",
     qVoiceTurnPath(voiceSessionId),
     QVoiceTurnStateSchema,
+    { headers: voiceSessionHeader(sessionToken) },
   );
 }
 
@@ -185,6 +194,7 @@ export async function setQVoiceScreen(
   session: ApiSession,
   voiceSessionId: string,
   screen: QVoiceScreenUpdate,
+  sessionToken?: string,
 ): Promise<void> {
   const doFetch = session.fetch ?? fetch;
   const response = await doFetch(
@@ -195,6 +205,7 @@ export async function setQVoiceScreen(
         accept: "application/json",
         "content-type": "application/json",
         authorization: `Bearer ${session.accessToken}`,
+        ...voiceSessionHeader(sessionToken),
       },
       body: JSON.stringify(screen),
       cache: "no-store",

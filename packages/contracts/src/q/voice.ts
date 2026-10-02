@@ -242,6 +242,14 @@ export const CreateQVoiceSessionResponseSchema = z
      * greeting and the live question). Absent when Q waits for the person.
      */
     firstMessage: z.string().min(1).max(700).optional(),
+    /**
+     * The line's sealed session: presented back (header
+     * `x-q-voice-session`) on the turn and screen routes, so any instance
+     * of the Q API -- after a deploy or a restart -- still knows the line.
+     * Opaque to the browser; it authorises nothing without the person's
+     * own session.
+     */
+    sessionToken: z.string().min(1).max(8192).optional(),
     /** Which transport the browser opens with this credential. */
     provider: QVoiceProviderSchema.default("elevenlabs"),
     /**

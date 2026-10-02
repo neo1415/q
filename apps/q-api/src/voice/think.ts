@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { Logger } from "@capital-q/observability";
 
 import type { VoiceSessionBindings } from "./bindings.js";
+import { voiceTokenFingerprint } from "./session-token.js";
 import { withoutContinueSignal } from "./navigation.js";
 import { sentences } from "./speech.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
@@ -114,7 +115,10 @@ export function registerVoiceThinkRoute(
       typeof header === "string" && header.startsWith("Bearer ")
         ? header.slice("Bearer ".length).trim()
         : "";
-    const bound = token.length === 0 ? null : bindings.byThinkToken(token);
+    // Held here, or restored from the sealed token after a deploy, a
+    // restart or on another replica (HARDEN P0, 2026-10-02).
+    const restored = token.length === 0 ? null : await bindings.restore(token);
+    const bound = restored?.thinkToken === token ? restored : null;
     if (bound === null) {
       // Which it is matters: "no session" is a token for a binding that
       // has been released or swept, and the speech provider keeps calling
@@ -132,7 +136,7 @@ export function registerVoiceThinkRoute(
         {
           reason: "NO_BINDING_FOR_TOKEN",
           boundCount: bindings.size(),
-          presented: token.slice(0, 8),
+          presented: token.length === 0 ? "" : voiceTokenFingerprint(token),
           held: bindings.fingerprints(),
         },
         "voice think refused",

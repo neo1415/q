@@ -6,6 +6,15 @@ import type {
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
+import { randomBytes } from "node:crypto";
+
+import {
+  createVoiceSessionSealer,
+  voiceTokenFingerprint,
+  type VoiceSessionClaims,
+  type VoiceSessionSealer,
+} from "./session-token.js";
+
 /**
  * Voice session bindings (CQ-Q-VOICE-001 C §34, §37; doc 15 §42).
  *
@@ -16,10 +25,11 @@ import type { ActorContext } from "@capital-q/security";
  * When the provider connects with that id, the binding is the authority;
  * the transcript never is (TM-VOICE-01).
  *
- * Process-local by design for V1: a binding is only ever needed by the
- * instance the provider connects to, and a local deployment is one
- * instance. Bounded in count per person and in time to connect, so a
- * credential that is never used cannot accumulate.
+ * Held in memory as a cache, and carried by a sealed token (session-token.ts)
+ * so any instance can restore it: a deploy, a restart or a second replica
+ * no longer ends every open line (HARDEN P0, 2026-10-02). Bounded in count
+ * per person and in time to connect, so a credential that is never used
+ * cannot accumulate.
  */
 
 export type VoiceThread = {
@@ -80,6 +90,8 @@ export type VoiceSessionBinding = {
   readonly speakerVoiceId?: string | undefined;
   /** Deepgram transport: the bearer its think calls carry. Never logged. */
   readonly thinkToken?: string | undefined;
+  /** The sealed token that restores this binding on any instance. Never logged. */
+  readonly sessionToken?: string | undefined;
 };
 
 export type VoiceSessionBindings = {
@@ -101,6 +113,15 @@ export type VoiceSessionBindings = {
   /** Bindings held by this person right now (issued or connected). */
   countFor(userId: string): number;
   size(): number;
+  /** Seal a binding's claims into a token any instance can restore. */
+  seal(claims: VoiceSessionClaims): string;
+  /**
+   * The binding a sealed token names: the one held here, or -- after a
+   * deploy, a restart or on another replica -- restored from the token,
+   * connected, once the person is still allowed. Null for a token that
+   * is tampered, expired, released here, or for a person no longer allowed.
+   */
+  restore(token: string): Promise<VoiceSessionBinding | null>;
 };
 
 export const VOICE_CONNECT_WINDOW_MS = 5 * 60 * 1000;
@@ -118,10 +139,51 @@ export class VoiceSessionLimitError extends Error {
 }
 
 export function createVoiceSessionBindings(
-  options: { readonly now?: () => number } = {},
+  options: {
+    readonly now?: () => number;
+    /**
+     * Seals and opens tokens. Absent, a per-process key is used, which
+     * restores nothing after a restart: production passes one keyed from
+     * a server secret.
+     */
+    readonly sealer?: VoiceSessionSealer | undefined;
+    /**
+     * Is this person still allowed a voice line? Asked before a binding is
+     * restored from a token (a suspended account does not get its line back).
+     */
+    readonly stillAllowed?:
+      ((actor: ActorContext) => Promise<boolean>) | undefined;
+  } = {},
 ): VoiceSessionBindings {
   const now = options.now ?? Date.now;
   const bindings = new Map<string, VoiceSessionBinding>();
+  const sealer =
+    options.sealer ??
+    createVoiceSessionSealer({
+      secret: randomBytes(32).toString("base64url"),
+      now,
+    });
+  /**
+   * Lines ended here: their tokens are not restored again on this instance
+   * (fingerprint -> when the token would have expired anyway).
+   */
+  const released = new Map<string, number>();
+  const forget = (binding: VoiceSessionBinding) => {
+    const token = binding.sessionToken ?? binding.thinkToken;
+    if (token === undefined) return;
+    released.set(voiceTokenFingerprint(token), now() + 4 * 60 * 60 * 1000);
+    if (released.size > VOICE_SESSIONS_MAX * 4) {
+      const at = now();
+      for (const [key, until] of released) if (until < at) released.delete(key);
+    }
+  };
+  const held = (token: string): VoiceSessionBinding | null => {
+    for (const binding of bindings.values()) {
+      if (binding.thinkToken === token || binding.sessionToken === token)
+        return binding;
+    }
+    return null;
+  };
 
   const sweep = () => {
     const at = now();
@@ -173,7 +235,7 @@ export function createVoiceSessionBindings(
       const out: string[] = [];
       for (const binding of bindings.values()) {
         if (binding.thinkToken !== undefined)
-          out.push(binding.thinkToken.slice(0, 8));
+          out.push(voiceTokenFingerprint(binding.thinkToken));
       }
       return out;
     },
@@ -190,7 +252,10 @@ export function createVoiceSessionBindings(
     },
     releaseFor: (userId) => {
       for (const [id, binding] of bindings) {
-        if (binding.actor.userId === userId) bindings.delete(id);
+        if (binding.actor.userId === userId) {
+          forget(binding);
+          bindings.delete(id);
+        }
       }
     },
     byVoiceSessionId: (voiceSessionId) => {
@@ -206,12 +271,47 @@ export function createVoiceSessionBindings(
         : binding;
     },
     release: (providerConversationId) => {
+      const binding = bindings.get(providerConversationId);
+      if (binding !== undefined) forget(binding);
       bindings.delete(providerConversationId);
     },
     countFor,
     size: () => {
       sweep();
       return bindings.size;
+    },
+    seal: (claims) => sealer.seal(claims),
+    restore: async (token) => {
+      sweep();
+      const local = held(token);
+      if (local !== null) return local;
+      if (released.has(voiceTokenFingerprint(token))) return null;
+      const opened = sealer.open(token);
+      if (opened === null) return null;
+      if (
+        options.stillAllowed !== undefined &&
+        !(await options.stillAllowed(opened.actor).catch(() => false))
+      ) {
+        return null;
+      }
+      // Another request may have restored it while we asked.
+      const raced = held(token);
+      if (raced !== null) return raced;
+      const at = now();
+      const { expiresAt: _expiresAt, thinkBearer, ...claims } = opened;
+      const binding: VoiceSessionBinding = {
+        ...claims,
+        // The line was already open elsewhere: restored as connected, so
+        // the connect-once rule does not refuse its own next turn.
+        connectBy: at,
+        connectedAt: at,
+        sessionToken: token,
+        ...(thinkBearer === true ? { thinkToken: token } : {}),
+      };
+      // Restoring is not issuing: the per-person cap guards new lines, and
+      // a restored one is a line the person already holds.
+      bindings.set(binding.providerConversationId, binding);
+      return binding;
     },
   };
 }

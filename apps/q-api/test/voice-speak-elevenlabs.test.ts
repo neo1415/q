@@ -277,6 +277,9 @@ function fakeBindings(bound: VoiceSessionBinding): VoiceSessionBindings {
     get: () => bound,
     byVoiceSessionId: () => bound,
     byThinkToken: (token) => (token === bound.thinkToken ? bound : null),
+    restore: (token) =>
+      Promise.resolve(token === bound.thinkToken ? bound : null),
+    seal: () => "sealed",
     fingerprints: () => [],
     releaseFor: () => undefined,
     release: () => undefined,

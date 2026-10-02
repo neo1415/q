@@ -134,6 +134,11 @@ function RoundButton({
   );
 }
 
+/** A dropped line is retried this many times, after these pauses, before the person is told. */
+const SILENT_RETRY_MS = [800, 2_500] as const;
+/** A line that held this long earns its retries again. */
+const STABLE_LINE_MS = 20_000;
+
 export function RehearsalRoom({
   initial,
   seeYou = false,
@@ -261,6 +266,20 @@ export function RehearsalRoom({
     lookRef.current = look;
   }, [look]);
 
+  // Silent reconnection of a dropped line (see onEnded below).
+  const retries = useRef(0);
+  const upSince = useRef<number | null>(null);
+  const connectNow = useRef<
+    | ((resume: boolean, options?: { quiet?: boolean }) => Promise<boolean>)
+    | null
+  >(null);
+  const dropped = (): void => {
+    retries.current = 0;
+    setVoiceLive("TYPED");
+    setPanel(true);
+    setNotice("The voice line dropped. Reconnect, or keep going by typing.");
+  };
+
   const voice = useVoiceSession({
     onLine: (line: VoiceTranscriptLine) => {
       lastActivity.current = Date.now();
@@ -274,14 +293,28 @@ export function RehearsalRoom({
     },
     onError: (message) => setNotice(message),
     onEnded: (reason) => {
-      if (!left.current && reason !== "ended") {
-        // A dropped line: keep going by typing, or reconnect the voice.
-        setVoiceLive("TYPED");
-        setPanel(true);
-        setNotice(
-          "The voice line dropped. Reconnect, or keep going by typing.",
-        );
+      if (left.current || reason === "ended") return;
+      // A dropped line comes back on its own first (a deploy of the Q API,
+      // a blip in the network): the same rehearsal, resumed without a new
+      // greeting, transcript and turns kept. Only when the retries fail is
+      // the person told, and offered typing (HARDEN P0, 2026-10-02).
+      const heldFor =
+        upSince.current === null ? 0 : Date.now() - upSince.current;
+      upSince.current = null;
+      if (heldFor >= STABLE_LINE_MS) retries.current = 0;
+      const delay = SILENT_RETRY_MS[retries.current];
+      if (delay !== undefined) {
+        retries.current += 1;
+        setVoiceLive("CONNECTING");
+        window.setTimeout(() => {
+          if (left.current) return;
+          void connectNow.current?.(true, { quiet: true }).then((ok) => {
+            if (!ok && !left.current) dropped();
+          });
+        }, delay);
+        return;
       }
+      dropped();
     },
   });
 
@@ -314,7 +347,10 @@ export function RehearsalRoom({
   // Open the voice line once: the other person speaks first.
   // Open the voice line; on a reconnect, resume without a new greeting.
   const connect = useCallback(
-    async (resume: boolean) => {
+    async (
+      resume: boolean,
+      options: { readonly quiet?: boolean } = {},
+    ): Promise<boolean> => {
       setVoiceLive("CONNECTING");
       const started = await startVoiceSessionAction({
         rehearsal: { rehearsalId: initial.id },
@@ -324,10 +360,12 @@ export function RehearsalRoom({
         ...(resume ? { resume: true } : {}),
       });
       if (!started.ok) {
+        // A silent retry says nothing; the caller decides when to tell.
+        if (options.quiet === true) return false;
         setNotice(`${started.message} You can answer by typing.`);
         setVoiceLive("TYPED");
         setPanel(true);
-        return;
+        return false;
       }
       try {
         await voice.start({
@@ -335,19 +373,26 @@ export function RehearsalRoom({
           firstMessage: started.value.firstMessage,
         });
         lastActivity.current = Date.now();
+        upSince.current = Date.now();
         setVoiceLive("LIVE");
         if (!resume) sound("JOIN");
+        return true;
       } catch {
+        if (options.quiet === true) return false;
         // A denied microphone lands here: the room still works by typing.
         setNotice(
           "Voice didn't start (is the microphone allowed?). You can answer by typing.",
         );
         setVoiceLive("TYPED");
         setPanel(true);
+        return false;
       }
     },
     [initial.id, initial.voice, voice, sound],
   );
+  useEffect(() => {
+    connectNow.current = connect;
+  }, [connect]);
   const opened = useRef(false);
   useEffect(() => {
     if (opened.current) return;

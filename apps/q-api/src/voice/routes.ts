@@ -1,9 +1,9 @@
 import type { InterviewAgent } from "./interview-agent.js";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   CreateQSpeechRequestSchema,
   CreateQVoiceSessionRequestSchema,
@@ -32,8 +32,14 @@ import {
 import {
   VOICE_CONNECT_WINDOW_MS,
   VoiceSessionLimitError,
+  type VoiceSessionBinding,
   type VoiceSessionBindings,
+  type VoiceThread,
 } from "./bindings.js";
+import {
+  Q_VOICE_SESSION_TOKEN_HEADER,
+  voiceTokenFingerprint,
+} from "./session-token.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
 import { bounded, speakable } from "./speech.js";
 
@@ -189,6 +195,26 @@ export function registerQVoiceRoutes(
   });
   const throttle = dependencies.speechThrottle ?? createSpeechThrottle();
 
+  /**
+   * The line this voice session id names: held here, or restored from the
+   * sealed token the browser presents (after a deploy, a restart or on
+   * another replica). The token must name this very session; the caller
+   * still has to be its owner, which each route checks.
+   */
+  const ownLine = async (
+    request: FastifyRequest,
+    voiceSessionId: string,
+  ): Promise<VoiceSessionBinding | null> => {
+    const held = dependencies.bindings.byVoiceSessionId(voiceSessionId);
+    if (held !== null) return held;
+    const presented = request.headers[Q_VOICE_SESSION_TOKEN_HEADER];
+    if (typeof presented !== "string" || presented.length === 0) return null;
+    const restored = await dependencies.bindings.restore(presented);
+    return restored !== null && restored.voiceSessionId === voiceSessionId
+      ? restored
+      : null;
+  };
+
   // What Q is asking after its latest spoken turn: the owner's own
   // session only; anyone else sees the same 404 as a session that does
   // not exist.
@@ -199,7 +225,7 @@ export function registerQVoiceRoutes(
       const actor = getActorContext(request);
       const params = request.params as { voiceSessionId?: string };
       const id = params.voiceSessionId ?? "";
-      const binding = dependencies.bindings.byVoiceSessionId(id);
+      const binding = await ownLine(request, id);
       if (binding === null || binding.actor.userId !== actor.userId) {
         // The browser reads this as "the line is gone" and reconnects, so
         // which of the two it was decides whether a reconnect loop is the
@@ -242,9 +268,7 @@ export function registerQVoiceRoutes(
     async (request, reply) => {
       const actor = getActorContext(request);
       const params = request.params as { voiceSessionId?: string };
-      const binding = dependencies.bindings.byVoiceSessionId(
-        params.voiceSessionId ?? "",
-      );
+      const binding = await ownLine(request, params.voiceSessionId ?? "");
       if (binding === null || binding.actor.userId !== actor.userId) {
         return reply.code(404).send({
           type: "about:blank",
@@ -368,14 +392,16 @@ export function registerQVoiceRoutes(
         typeof header === "string" && header.startsWith("Bearer ")
           ? header.slice("Bearer ".length).trim()
           : "";
-      const binding =
-        token.length === 0 ? null : dependencies.bindings.byThinkToken(token);
+      const restored =
+        token.length === 0 ? null : await dependencies.bindings.restore(token);
+      // Only a token issued as the provider's bearer speaks.
+      const binding = restored?.thinkToken === token ? restored : null;
       if (binding === null) {
         request.log.warn(
           {
             reason: "NO_BINDING_FOR_TOKEN",
             boundCount: dependencies.bindings.size(),
-            presented: token.slice(0, 8),
+            presented: token.length === 0 ? "" : voiceTokenFingerprint(token),
           },
           "voice speak relay refused",
         );
@@ -725,21 +751,58 @@ export function registerQVoiceRoutes(
           ?.performOpening?.(actor, input.rehearsal.rehearsalId, voiceSessionId)
           .catch(() => undefined);
       }
+      const thread: VoiceThread = {
+        conversationId: input.conversationId,
+        subjects: input.subjects,
+        onboarding: input.onboarding,
+        ...(input.screen === undefined ? {} : { screen: input.screen }),
+        welcome: input.welcome === true,
+        ...(input.organisationHint === undefined
+          ? {}
+          : { organisationHint: input.organisationHint }),
+        ...(input.rehearsal === undefined
+          ? {}
+          : { rehearsal: input.rehearsal }),
+        ...(firstMessage === undefined ||
+        input.conversationId !== undefined ||
+        input.onboarding !== undefined ||
+        input.welcome === true ||
+        input.rehearsal !== undefined
+          ? {}
+          : { opening: firstMessage }),
+      };
+      // The binding as resolved here, sealed: any instance restores it from
+      // the token, so a deploy or a restart does not end the line.
+      const sealFor = (providerConversationId: string, thinkBearer: boolean) =>
+        dependencies.bindings.seal({
+          voiceSessionId,
+          providerConversationId,
+          actor,
+          accessToken,
+          voice,
+          thread,
+          issuedAt,
+          ...(speakerVoiceId === undefined ? {} : { speakerVoiceId }),
+          ...(thinkBearer ? { thinkBearer: true } : {}),
+        });
       let credentials: {
         readonly token: string;
         readonly providerConversationId: string;
         readonly thinkToken?: string | undefined;
+        readonly sessionToken: string;
         readonly settings?: DeepgramAgentSettings | undefined;
       };
       if (deepgram !== undefined) {
         // One voice session per person on this transport: a new one
         // replaces whatever was left open.
         dependencies.bindings.releaseFor(actor.userId);
-        const thinkToken = randomBytes(32).toString("base64url");
+        const providerConversationId = `dg_${voiceSessionId}`;
+        const thinkToken = sealFor(providerConversationId, true);
         credentials = {
           token: await deepgram.mintToken(),
-          providerConversationId: `dg_${voiceSessionId}`,
+          providerConversationId,
           thinkToken,
+          sessionToken: thinkToken,
           settings: deepgram.settingsFor({
             voice,
             greeting: firstMessage,
@@ -762,6 +825,7 @@ export function registerQVoiceRoutes(
         credentials = {
           token: issued.token,
           providerConversationId: issued.providerConversationId,
+          sessionToken: sealFor(issued.providerConversationId, false),
         };
       } else {
         throw new Error("unreachable: no voice transport");
@@ -772,26 +836,7 @@ export function registerQVoiceRoutes(
         actor,
         accessToken,
         voice,
-        thread: {
-          conversationId: input.conversationId,
-          subjects: input.subjects,
-          onboarding: input.onboarding,
-          ...(input.screen === undefined ? {} : { screen: input.screen }),
-          welcome: input.welcome === true,
-          ...(input.organisationHint === undefined
-            ? {}
-            : { organisationHint: input.organisationHint }),
-          ...(input.rehearsal === undefined
-            ? {}
-            : { rehearsal: input.rehearsal }),
-          ...(firstMessage === undefined ||
-          input.conversationId !== undefined ||
-          input.onboarding !== undefined ||
-          input.welcome === true ||
-          input.rehearsal !== undefined
-            ? {}
-            : { opening: firstMessage }),
-        },
+        thread,
         issuedAt,
         connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,
         connectedAt: undefined,
@@ -799,6 +844,7 @@ export function registerQVoiceRoutes(
           ? {}
           : { thinkToken: credentials.thinkToken }),
         ...(speakerVoiceId === undefined ? {} : { speakerVoiceId }),
+        sessionToken: credentials.sessionToken,
       });
       if (!accepted) {
         throw new VoiceSessionLimitError();
@@ -828,6 +874,7 @@ export function registerQVoiceRoutes(
               issuedAt + VOICE_CONNECT_WINDOW_MS,
             ).toISOString(),
             ...(firstMessage === undefined ? {} : { firstMessage }),
+            sessionToken: credentials.sessionToken,
             provider:
               credentials.settings === undefined ? "elevenlabs" : "deepgram",
             ...(credentials.settings === undefined

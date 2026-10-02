@@ -136,6 +136,11 @@ export function useVoiceInterview(
   const [notice, setNotice] = useState<string | null>(null);
   const [turn, setTurn] = useState<QVoiceTurnState | null>(null);
   const [voiceSessionId, setVoiceSessionId] = useState<string | null>(null);
+  /**
+   * The line's sealed session, presented with every poll and screen move so
+   * a deploy or a restart of the Q API does not lose the line (HARDEN P0).
+   */
+  const sessionToken = useRef<string | undefined>(undefined);
   const lastStart = useRef<{
     thread: VoiceInterviewThread;
     firstMessage: string | undefined;
@@ -179,7 +184,8 @@ export function useVoiceInterview(
       return;
     }
     reconnectAttempts.current += 1;
-    setNotice("The line dropped. Picking it back up…");
+    // Silent: a deploy of the Q API or a network blip is picked back up
+    // before the person needs to know; only giving up is said (HARDEN P0).
     // `talk` clears the notice as it starts and sets its own on failure.
     // The same line coming back, not a new arrival: no greeting, and no
     // second opening recorded (the fixture's repeated "Welcome back").
@@ -245,6 +251,7 @@ export function useVoiceInterview(
         return;
       }
       setVoice(started.value.voice);
+      sessionToken.current = started.value.sessionToken;
       setVoiceSessionId(started.value.voiceSessionId);
       setTurn(null);
       setActive(true);
@@ -270,6 +277,7 @@ export function useVoiceInterview(
   const end = useCallback(async () => {
     setActive(false);
     setVoiceSessionId(null);
+    sessionToken.current = undefined;
     // Back to the remembered choice, so a change made in Settings while
     // the line was closed is the voice of the next session.
     setVoice(null);
@@ -307,9 +315,13 @@ export function useVoiceInterview(
         void sendVoiceScreenAction(
           voiceSessionId,
           viewing === undefined ? screen : { ...screen, viewing },
+          sessionToken.current,
         );
       }
-      const read = await readVoiceTurnAction(voiceSessionId);
+      const read = await readVoiceTurnAction(
+        voiceSessionId,
+        sessionToken.current,
+      );
       if (cancelled) {
         return;
       }
