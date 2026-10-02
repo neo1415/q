@@ -41,6 +41,18 @@ import { z } from "zod";
  */
 export const ELIGIBILITY_POLICY_VERSION = "eligibility.v3" as const;
 
+/**
+ * Every eligibility policy version a persisted artifact may name (feature
+ * snapshots, slates): the read side accepts them all, so a version bump
+ * never makes yesterday's rows unreadable (live 2026-10-02: a generator
+ * bump took Discover down for every investor). Append, never remove.
+ */
+export const ELIGIBILITY_POLICY_VERSIONS = [
+  "eligibility.v1",
+  "eligibility.v2",
+  ELIGIBILITY_POLICY_VERSION,
+] as const;
+
 /** Doc 19 §11. REC-001 evaluates INVESTOR_DISCOVER; the others are reserved. */
 export const RECOMMENDATION_MODES = [
   "INVESTOR_DISCOVER",

@@ -28,6 +28,8 @@ import { FactorPolaritySchema, RankingReasonCodeSchema } from "./config.js";
 export const RANKER_ID = "DETERMINISTIC" as const;
 /** Bumped when the ranking algorithm (not its configuration) changes. */
 export const RANKER_VERSION = "deterministic-ranker.v1" as const;
+/** Every ranker version a persisted slate may name. Append, never remove. */
+export const RANKER_VERSIONS = [RANKER_VERSION] as const;
 
 /** How a factor fared for one candidate. */
 export const FACTOR_OUTCOMES = [

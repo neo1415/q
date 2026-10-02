@@ -7,16 +7,16 @@ import {
   CandidateReasonCodeSchema,
 } from "../candidates/contracts.js";
 import {
-  ELIGIBILITY_POLICY_VERSION,
+  ELIGIBILITY_POLICY_VERSIONS,
   EligibilityDecisionSchema,
   RECOMMENDATION_MODES,
   RecommendationContextSchema,
   RecommendationModeSchema,
 } from "../eligibility/contracts.js";
 import {
-  COMPANY_REPRESENTATION_VERSION,
-  INVESTOR_REPRESENTATION_VERSION,
-  SEMANTIC_GENERATOR_VERSION,
+  COMPANY_REPRESENTATION_VERSIONS,
+  INVESTOR_REPRESENTATION_VERSIONS,
+  SEMANTIC_GENERATOR_VERSIONS,
 } from "../semantic/contracts.js";
 
 /**
@@ -42,6 +42,8 @@ import {
 
 /** The aggregate schema a ranker binds to. Separate from every other version. */
 export const FEATURE_SCHEMA_VERSION = "recommendation-features.v1" as const;
+/** Every feature schema version a persisted snapshot may name. Append, never remove. */
+export const FEATURE_SCHEMA_VERSIONS = [FEATURE_SCHEMA_VERSION] as const;
 
 /** Doc 19 §38. The vocabulary may know a group before any feature uses it. */
 export const FEATURE_GROUPS = [
@@ -242,11 +244,9 @@ export const SnapshotCandidateProvenanceSchema = z
       .nullable(),
     semantic: z
       .object({
-        generatorVersion: z.literal(SEMANTIC_GENERATOR_VERSION),
-        companyRepresentationVersion: z.literal(COMPANY_REPRESENTATION_VERSION),
-        investorRepresentationVersion: z.literal(
-          INVESTOR_REPRESENTATION_VERSION,
-        ),
+        generatorVersion: z.enum(SEMANTIC_GENERATOR_VERSIONS),
+        companyRepresentationVersion: z.enum(COMPANY_REPRESENTATION_VERSIONS),
+        investorRepresentationVersion: z.enum(INVESTOR_REPRESENTATION_VERSIONS),
         configurationVersion: z.string().min(1).max(64),
       })
       .strict()
@@ -284,7 +284,8 @@ export const FEATURE_SNAPSHOT_VALUES_MAX = 64;
  */
 export const RecommendationFeatureSnapshotSchema = z
   .object({
-    featureSchemaVersion: z.literal(FEATURE_SCHEMA_VERSION),
+    // Read side of a persisted artifact: every published version.
+    featureSchemaVersion: z.enum(FEATURE_SCHEMA_VERSIONS),
     context: RecommendationContextSchema,
     mandateId: z.string().uuid(),
     mandateVersion: z.number().int().min(1),
@@ -292,7 +293,7 @@ export const RecommendationFeatureSnapshotSchema = z
     companyTenantId: z.string().uuid(),
     /** The canonical company row version the projection was read at. */
     companyProjectionVersion: z.number().int().min(1),
-    eligibilityPolicyVersion: z.literal(ELIGIBILITY_POLICY_VERSION),
+    eligibilityPolicyVersion: z.enum(ELIGIBILITY_POLICY_VERSIONS),
     eligibilityDecision: EligibilityDecisionSchema,
     candidateProvenance: SnapshotCandidateProvenanceSchema,
     /** The highest sensitivity among the values; the artifact's own class. */

@@ -36,6 +36,10 @@ export const SEMANTIC_GENERATOR_ID = "SEMANTIC_MANDATE" as const;
 
 /** Bumped when retrieval, the merge or the provenance shape changes. */
 export const SEMANTIC_GENERATOR_VERSION = "semantic-mandate.v1" as const;
+/** Every semantic generator version a persisted artifact may name. Append, never remove. */
+export const SEMANTIC_GENERATOR_VERSIONS = [
+  SEMANTIC_GENERATOR_VERSION,
+] as const;
 
 /** The only representation purpose in V1; a new purpose is a new value. */
 export const REPRESENTATION_PURPOSE = "INVESTOR_DISCOVER" as const;
@@ -46,10 +50,18 @@ export const REPRESENTATION_PURPOSE = "INVESTOR_DISCOVER" as const;
  */
 export const COMPANY_REPRESENTATION_VERSION =
   "company-investment-representation.v1" as const;
+/** Append, never remove: persisted provenance names them. */
+export const COMPANY_REPRESENTATION_VERSIONS = [
+  COMPANY_REPRESENTATION_VERSION,
+] as const;
 
 /** Likewise for the investor's mandate text (doc 19 §26). */
 export const INVESTOR_REPRESENTATION_VERSION =
   "investor-mandate-representation.v1" as const;
+/** Append, never remove: persisted provenance names them. */
+export const INVESTOR_REPRESENTATION_VERSIONS = [
+  INVESTOR_REPRESENTATION_VERSION,
+] as const;
 
 /**
  * Cosine, because the configured runtime returns unit vectors and the
