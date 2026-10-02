@@ -40,17 +40,6 @@ export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
 }
 
 /**
- * The person is done talking and wants the typed conversation (or nothing):
- * "end the chat", "stop talking", "let me type", "that's all, thanks".
- */
-const END_RE =
-  /^(?:(?:okay|ok|alright|right|so|well|thanks?|thank you|please)[,.!\s]*)*(?:(?:let'?s )?(?:end|stop|finish|close|leave|quit|exit)(?: the| this| our)? (?:chat|call|conversation|voice|talk(?:ing)?|session)|stop talking|(?:i(?:'ll| will| want to| would rather| prefer to)? )?(?:switch|go|move|change) to (?:typing|text|chat|the chat|keyboard)|let me type|i(?:'d| would) rather type|(?:that'?s|that is|that was) (?:all|it|everything)(?: for now)?(?:,? thanks?| thank you)?|(?:good)?bye(?: for now)?|see you(?: later)?|talk (?:to you )?later|i(?:'m| am) done(?: for now)?|we(?:'re| are) done)(?:,? please| thanks?| thank you)?[.!?\s]*$/i;
-
-export function wantsToEndVoice(text: string): boolean {
-  return END_RE.test(text.trim());
-}
-
-/**
  * A sound the recogniser wrote down that carries no words: a cough, a
  * laugh, a throat cleared, a bare "uh". Not a turn. Also the browser's own
  * cue after a false interruption.
@@ -188,11 +177,4 @@ let resumeTurn = 0;
 export function resumeAcknowledgement(): string {
   resumeTurn += 1;
   return rotate(RESUME_ACKS, resumeTurn);
-}
-
-const DECLINE_RE =
-  /^(?:(?:um+|uh+|no|nope|nah|not (?:now|yet|really)|leave it|don'?t|never mind|cancel|actually no|keep it as it is)[,.!\s]*)+$/i;
-
-export function declines(text: string): boolean {
-  return DECLINE_RE.test(text.trim());
 }

@@ -6,7 +6,6 @@ import {
   recoveryLine,
   recoverySettled,
   resumeAcknowledgement,
-  wantsToEndVoice,
 } from "../src/voice/navigation.js";
 import { unsaidPartOf } from "../src/voice/turn.js";
 
@@ -47,26 +46,6 @@ describe("spoken navigation follows Q's answer, never the words (ADR 0011, R20)"
 });
 
 describe("voice lines, read deterministically", () => {
-  it("hears the person ending the voice conversation", () => {
-    for (const line of [
-      "End the chat.",
-      "okay, let's stop talking",
-      "I'd rather type",
-      "Switch to chat please",
-      "That's all for now, thanks.",
-      "Bye for now",
-    ]) {
-      expect(wantsToEndVoice(line), line).toBe(true);
-    }
-    for (const line of [
-      "End of the quarter was rough",
-      "let's stop at series A",
-      "bye-laws are in the data room",
-    ]) {
-      expect(wantsToEndVoice(line), line).toBe(false);
-    }
-  });
-
   it("treats a cough, a laugh or a bare sound as no turn at all", () => {
     for (const sound of [
       "(coughs)",

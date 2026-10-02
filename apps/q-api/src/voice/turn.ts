@@ -36,14 +36,12 @@ import {
 } from "./interview-steps.js";
 import type { PresenceFound } from "./presence-trigger.js";
 import {
-  declines,
   endsUnfinished,
   followOfAnswer,
   isNonLexical,
   recoveryLine,
   recoverySettled,
   resumeAcknowledgement,
-  wantsToEndVoice,
   withoutContinueSignal,
 } from "./navigation.js";
 import {
@@ -173,8 +171,16 @@ const WELCOME_CHOICE = {
   ],
 };
 
-const AFFIRMATIVE =
-  /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|please)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|go ahead|go on|do it|do that|please do|proceed|confirm(?:ed)?|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*(?:please[.!\s]*)?$/i;
+/**
+ * The closed questions a voice turn may be read against (founder order
+ * 2026-10-02: "no fixed phrases, let Q judge by meaning"). Each is read by
+ * DECISION_READER from the person's words in any language; no list of
+ * words decides it.
+ */
+const KEEP_SUGGESTIONS_QUESTION =
+  "Q suggested categories for their company. Do they accept them as they are?";
+const END_VOICE_QUESTION =
+  "Do they want to stop talking by voice now -- end this voice conversation, or switch to typing -- rather than say something to Q?";
 
 /**
  * Whether the last Q run this line started ended in failure, so that a
@@ -1411,7 +1417,15 @@ export function createVoiceTurnHandler(
       return { kind: "INTERRUPTED", path: "INTERVIEW" };
     }
     const proposal = pendingTaxonomyProposal(before);
-    if (proposal !== null && AFFIRMATIVE.test(text)) {
+    const keep =
+      proposal === null
+        ? null
+        : await decide(binding, KEEP_SUGGESTIONS_QUESTION, text, signal);
+    if (
+      proposal !== null &&
+      keep?.decision === "YES" &&
+      keep.remainder === null
+    ) {
       // "Keep these": the same ACCEPT the tap performs (B §19), spoken.
       const view = await resolveOnboardingSuggestion(
         session,
@@ -1576,8 +1590,7 @@ export function createVoiceTurnHandler(
       });
       if (read !== null) return read;
     }
-    if (AFFIRMATIVE.test(text)) return { decision: "YES", remainder: null };
-    if (declines(text)) return { decision: "NO", remainder: null };
+    // No reading: nothing is decided from the words themselves.
     return { decision: "UNRELATED", remainder: null };
   };
 
@@ -1733,8 +1746,16 @@ export function createVoiceTurnHandler(
       held.delete(binding);
       return resumeHeld(paused, binding, signal, speaker);
     }
-    // "End the chat", "let me type": the screen keeps the typed thread.
-    if (wantsToEndVoice(text)) {
+    // Whether they want to stop talking by voice is read by meaning,
+    // beside the turn (DECISION_READER answers in about a second, before
+    // Q's answer is ready to speak); a YES stops that answer and hands the
+    // screen to the typed thread.
+    const turn = new AbortController();
+    const turnSignal = AbortSignal.any([signal, turn.signal]);
+    const ending = decide(binding, END_VOICE_QUESTION, text, signal).catch(
+      () => ({ decision: "UNRELATED" as const, remainder: null }),
+    );
+    const endNow = async (): Promise<VoiceTurnOutcome> => {
       dependencies.board?.record(binding.voiceSessionId, {
         asking: null,
         navigate: null,
@@ -1744,18 +1765,25 @@ export function createVoiceTurnHandler(
       return (await speakLine(speaker, END_LINE, signal))
         ? { kind: "SPOKEN", path: "MOVE" }
         : { kind: "INTERRUPTED", path: "MOVE" };
-    }
+    };
+
     // "Take me to Discover" is no longer matched here from the words (ADR
     // 0011, R20): it reaches Q like any turn, and the screen follows the
     // navigation block Q's answer carries (askQ), exactly as typed.
-    let outcome: VoiceTurnOutcome;
-    if (binding.thread.welcome === true) {
-      outcome = await welcomeTurn(binding, text, signal, speaker);
-    } else if (binding.thread.onboarding !== undefined) {
-      outcome = await answerInterview(binding, text, signal, speaker);
-    } else {
-      outcome = await askQ(binding, text, signal, speaker);
+    const answering =
+      binding.thread.welcome === true
+        ? welcomeTurn(binding, text, turnSignal, speaker)
+        : binding.thread.onboarding !== undefined
+          ? answerInterview(binding, text, turnSignal, speaker)
+          : askQ(binding, text, turnSignal, speaker);
+    // Never an unhandled rejection when the answer is stopped.
+    answering.catch(() => undefined);
+    if ((await ending).decision === "YES") {
+      turn.abort();
+      await answering.catch(() => undefined);
+      return endNow();
     }
+    const outcome = await answering;
     // An answer the person talked over is theirs to ask for ("go on"),
     // not Q's to append. Live, a second question was answered and then
     // followed by "and to finish what I was saying earlier", which read

@@ -559,6 +559,16 @@ describe("a spoken category confirmation", () => {
       qRuntime: runtime.service,
       qStream: fakeStream([]),
       onboarding: { apiBaseUrl: "http://api.test", fetch: fetchFake },
+      // The yes is read by meaning, in any language (founder order
+      // 2026-10-02): no list of English words decides it.
+      decisions: {
+        read: (input) =>
+          Promise.resolve(
+            input.question.startsWith("Q suggested categories")
+              ? { decision: "YES" as const, remainder: null }
+              : { decision: "UNRELATED" as const, remainder: null },
+          ),
+      },
       logger,
     });
     const speaker = fakeSpeaker();
@@ -568,7 +578,7 @@ describe("a spoken category confirmation", () => {
         subjects: undefined,
         onboarding: { sessionId: SESSION_ID, journeyType: "founder" },
       }),
-      [{ role: "user", content: "Yes, keep these." }],
+      [{ role: "user", content: "Oui, gardez-les comme ça." }],
       new AbortController().signal,
       speaker,
     );
@@ -583,6 +593,91 @@ describe("a spoken category confirmation", () => {
     });
     expect(speaker.spoken).toEqual(["Noted. What do you already have?"]);
     expect(runtime.calls.createRun).toHaveLength(0);
+  });
+});
+
+describe("ending the voice line is read by meaning (founder order 2026-10-02)", () => {
+  const ending = (said: string, endRead: "YES" | "UNRELATED") => {
+    const runtime = fakeRuntime();
+    const board = createVoiceTurnBoard();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.message.delta", {
+          messageId: "m1",
+          text: "Here is the answer.",
+        }),
+        event("q.message.completed", {
+          message: {
+            messageId: "m1",
+            runId: RUN_ID,
+            role: "Q",
+            text: "Here is the answer.",
+            createdAt: NOW,
+          },
+        }),
+        event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
+      ]),
+      board,
+      decisions: {
+        read: (input) =>
+          Promise.resolve(
+            input.question.startsWith("Do they want to stop")
+              ? { decision: endRead, remainder: null }
+              : { decision: "UNRELATED" as const, remainder: null },
+          ),
+      },
+      logger,
+    });
+    return { handle, board, runtime, said };
+  };
+
+  it("hands over to typing when the reading says so, in any language", async () => {
+    for (const said of [
+      "On arrête là, merci, je vais écrire.",
+      "abeg make we stop the voice thing",
+      "ok that's me for today x",
+    ]) {
+      const { handle, board } = ending(said, "YES");
+      const bound = binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: undefined,
+      });
+      const speaker = fakeSpeaker();
+      const outcome = await handle(
+        bound,
+        [{ role: "user", content: said }],
+        new AbortController().signal,
+        speaker,
+      );
+      expect(outcome, said).toEqual({ kind: "SPOKEN", path: "MOVE" });
+      expect(board.read(bound.voiceSessionId).handoff, said).toBe("CHAT");
+      expect(speaker.spoken.join(" "), said).not.toContain(
+        "Here is the answer.",
+      );
+    }
+  });
+
+  it("does not end on words that merely sound like it", async () => {
+    const { handle, board } = ending(
+      "let's stop at series A, what next?",
+      "UNRELATED",
+    );
+    const bound = binding({
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+    });
+    const speaker = fakeSpeaker();
+    await handle(
+      bound,
+      [{ role: "user", content: "let's stop at series A, what next?" }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(board.read(bound.voiceSessionId).handoff ?? null).not.toBe("CHAT");
+    expect(speaker.spoken.join(" ")).toContain("Here is the answer.");
   });
 });
 
@@ -1380,6 +1475,15 @@ describe("a spoken question for Q", () => {
           return Promise.resolve({} as never);
         },
       },
+      // The model's reading of "Yes." against the approval question.
+      decisions: {
+        read: (input) =>
+          Promise.resolve(
+            input.question.includes("Shall I go ahead")
+              ? { decision: "YES" as const, remainder: null }
+              : { decision: "UNRELATED" as const, remainder: null },
+          ),
+      },
       logger,
     });
     const thread = {
@@ -1458,6 +1562,12 @@ describe("a spoken question for Q", () => {
       decisions: {
         read: (input) => {
           asked.push(input.question);
+          if (input.question.startsWith("Do they want to stop")) {
+            return Promise.resolve({
+              decision: "UNRELATED" as const,
+              remainder: null,
+            });
+          }
           // A model's reading of "Approved. And what's the weather like?"
           return Promise.resolve({
             decision: "YES" as const,
@@ -1492,7 +1602,7 @@ describe("a spoken question for Q", () => {
       new AbortController().signal,
       yes,
     );
-    expect(asked).toEqual([
+    expect(asked.filter((q) => !q.startsWith("Do they want to stop"))).toEqual([
       "Change what I call you to John. Shall I go ahead?",
     ]);
     expect(approvals.approve).toHaveLength(1);
