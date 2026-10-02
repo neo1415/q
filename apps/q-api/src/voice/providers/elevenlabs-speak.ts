@@ -242,6 +242,9 @@ function elevenLabsRequest(
               ...VOICE_DEFAULTS,
               ...(speed === undefined ? {} : { speed }),
               ...(stability === undefined ? {} : { stability }),
+              // A Creative-stability line (shouting, crying, excitement)
+              // gets more style too, so the emotion carries.
+              ...(stability === 0 ? { style: 0.6 } : {}),
             },
           }),
     }),

@@ -167,8 +167,10 @@ export function registerOf(
   state: Temperament,
   difficulty: Difficulty = "REALISTIC",
 ): Register {
-  const furyAt = difficulty === "TOUGH" ? 85 : 92;
-  const angerAt = difficulty === "TOUGH" ? 62 : 70;
+  // Founder live 2026-10-02: insulted on Realistic, the played person only
+  // got exasperated and firm. Anger now comes sooner when provoked.
+  const furyAt = difficulty === "TOUGH" ? 78 : 85;
+  const angerAt = difficulty === "TOUGH" ? 55 : 62;
   if (difficulty !== "GENTLE") {
     if (
       state.frustration >= furyAt ||
@@ -251,7 +253,13 @@ export function deliveryFor(
   previous: Register | null,
   model: Delivery,
   closing = false,
+  provoked = false,
 ): Delivery {
+  // Provoked in anger (an insult, a dodge again), it is heard: angry and
+  // raised, never a cold, level line (founder live 2026-10-02).
+  if (provoked && (register === "ANGRY" || register === "FURIOUS")) {
+    return { mood: "ANGRY", intensity: "RAISED", reaction: null };
+  }
   if (closing && (register === "ANGRY" || register === "FURIOUS")) {
     return {
       mood: model.mood === "COLD" ? "COLD" : "ANGRY",

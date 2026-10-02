@@ -38,8 +38,33 @@ describe("temperament", () => {
     ];
     expect(run("TOUGH", dodges).registers.at(-1)).toBe("FURIOUS");
     expect(run("GENTLE", dodges).registers.at(-1)).not.toBe("FURIOUS");
-    // It builds: exasperation comes before anger.
-    expect(run("TOUGH", dodges).registers).toContain("EXASPERATED");
+    // It builds over the lines: even on Tough, one dodge is not fury.
+    expect(run("TOUGH", dodges).registers.slice(0, 2)).not.toContain("FURIOUS");
+  });
+
+  it("insulted on Realistic, the played person gets angry and raises their voice (live 2026-10-02)", () => {
+    // The founder's e5eb53ee: a run of insults on Realistic.
+    const { registers } = run("REALISTIC", ["EVASIVE", "RUDE", "RUDE", "RUDE"]);
+    expect(registers.some((r) => r === "ANGRY" || r === "FURIOUS")).toBe(true);
+    expect(
+      deliveryFor(
+        "ANGRY",
+        "ANGRY",
+        { mood: "COLD", intensity: "NORMAL", reaction: null },
+        false,
+        true,
+      ),
+    ).toEqual({ mood: "ANGRY", intensity: "RAISED", reaction: null });
+    // Unprovoked anger stays at a normal volume.
+    expect(
+      deliveryFor(
+        "ANGRY",
+        "ANGRY",
+        { mood: "ANGRY", intensity: "NORMAL", reaction: null },
+        false,
+        false,
+      ).intensity,
+    ).toBe("NORMAL");
   });
 
   it("good answers and a joke warm them up to delight", () => {
