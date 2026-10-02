@@ -152,6 +152,8 @@ function toolFor(
   approvals: AppApprovalPort | undefined,
   companyName: (companyId: string) => Promise<string>,
 ): AnyQToolDefinition | null {
+  const declared = action.tool;
+  if (declared === undefined) return null;
   if (action.classification === "CONSEQUENTIAL" && approvals === undefined) {
     return null;
   }
@@ -159,8 +161,8 @@ function toolFor(
     id: `app.${action.name}`,
     version: 1,
     status: "ACTIVE",
-    providerName: action.tool.name,
-    description: action.tool.description,
+    providerName: declared.name,
+    description: declared.description,
     classification:
       action.classification === "READ" ? "READ_ONLY" : "SIDE_EFFECT",
     riskClass:
@@ -173,7 +175,7 @@ function toolFor(
     owner: "app-actions",
     visibleStage:
       action.classification === "CONSEQUENTIAL" ? "WAITING_FOR_APPROVAL" : null,
-    input: action.tool.input,
+    input: declared.input,
     output: AppToolOutputSchema,
     authorize: async (input, execution) => {
       const { actor, plan } = execution;
@@ -184,7 +186,7 @@ function toolFor(
       };
       const names: Record<string, string> = {};
       const references: Readonly<Record<string, ReferenceKind | undefined>> =
-        action.tool.references;
+        declared.references;
       for (const [field, kind] of Object.entries(references)) {
         const said = resolved[field];
         if (typeof said !== "string" || kind === undefined) continue;
@@ -236,7 +238,7 @@ function toolFor(
         correlationId: correlationOf(execution.correlationId),
         surface: "Q",
       };
-      const canonical = await action.tool
+      const canonical = await declared
         .toCanonical(resolved, context, own)
         .catch(() => null);
       const parsed =

@@ -22,9 +22,12 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@capital-q/companies": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/discovery": "workspace:*",
+    "@capital-q/investors": "workspace:*",
     "@capital-q/media": "workspace:*",
+    "@capital-q/public-identity": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/security": "workspace:*",
     "zod": "4.5.4"

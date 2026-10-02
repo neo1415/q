@@ -111,11 +111,19 @@ describe("routes generated from the action registry (ADR 0040)", () => {
         "POST /v1/companies/:companyId/pitch/:mediaAssetId/details",
         "POST /v1/discovery/companies/:companyId/save",
         "POST /v1/discovery/companies/:companyId/pass",
+        "PATCH /v1/companies/:companyId",
+        "PUT /v1/companies/:companyId/team/me",
+        "PATCH /v1/investors/:investorOrganisationId",
+        "PUT /v1/q-cards/:subjectType/:subjectId/handle",
       ]),
     );
-    expect(APP_ACTIONS.every((action) => action.tool.name.length > 0)).toBe(
-      true,
-    );
+    // Served to Q by a generated tool or, until its area's second step,
+    // by the hand tool it names.
+    expect(
+      APP_ACTIONS.every(
+        (action) => (action.tool?.name ?? action.legacyTool ?? "").length > 0,
+      ),
+    ).toBe(true);
   });
 
   it("a pitch's audience and playback in one call, on the version the screen saw", async () => {

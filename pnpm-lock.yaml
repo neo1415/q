@@ -532,15 +532,24 @@ importers:
 
   packages/app-actions:
     dependencies:
+      '@capital-q/companies':
+        specifier: workspace:*
+        version: link:../companies
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../contracts
       '@capital-q/discovery':
         specifier: workspace:*
         version: link:../discovery
+      '@capital-q/investors':
+        specifier: workspace:*
+        version: link:../investors
       '@capital-q/media':
         specifier: workspace:*
         version: link:../media
+      '@capital-q/public-identity':
+        specifier: workspace:*
+        version: link:../public-identity
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../q-runtime

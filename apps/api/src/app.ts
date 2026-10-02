@@ -1,3 +1,4 @@
+import { pitchSummary } from "@capital-q/media";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
 import { ADMISSIBLE_MIME_TYPES } from "@capital-q/evidence";
@@ -393,6 +394,27 @@ export function createApp(
     resolver: security.resolver,
     ports: {
       ...(modules.media === undefined ? {} : { media: modules.media }),
+      ...(modules.companies === undefined
+        ? {}
+        : { companies: modules.companies }),
+      ...(modules.investors === undefined
+        ? {}
+        : { investors: modules.investors }),
+      ...(modules.publicIdentity === undefined
+        ? {}
+        : { publicIdentity: modules.publicIdentity }),
+      ...(modules.companyPitches === undefined
+        ? {}
+        : {
+            companyPitch: async (companyId: string) => {
+              const pitch = (
+                await modules.companyPitches?.findDiscoverablePitches([
+                  companyId,
+                ])
+              )?.get(companyId);
+              return pitch === undefined ? null : pitchSummary(pitch);
+            },
+          }),
       ...(modules.discovery?.interactions === undefined
         ? {}
         : { interactions: modules.discovery.interactions }),

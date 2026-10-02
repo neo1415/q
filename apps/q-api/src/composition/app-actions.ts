@@ -30,8 +30,14 @@ const BOARD_TTL_MS = 10 * 60 * 1000;
 export const appActionType = (action: AnyAppAction): string =>
   `app.${action.name}`;
 
+// Only a generated tool prepares an `app.<name>` card. An action still
+// served by its hand tool keeps that tool's own approval type until its
+// area's second step, so composing a card type for it would be unreachable.
 const consequential = (actions: readonly AnyAppAction[]) =>
-  actions.filter((action) => action.classification === "CONSEQUENTIAL");
+  actions.filter(
+    (action) =>
+      action.classification === "CONSEQUENTIAL" && action.tool !== undefined,
+  );
 
 /** The Approval Engine types this registry adds (startup checks the set). */
 export const APP_ACTION_TYPES: readonly string[] = Object.freeze(
