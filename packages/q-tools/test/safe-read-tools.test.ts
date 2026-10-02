@@ -188,6 +188,16 @@ describe("GET_COMPANY", () => {
     );
     expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
     expect(lookups).toBe(0);
+    // Live 2026-10-02: a failed argument reached the person as "I need
+    // its company record ID". What the model is told says not to.
+    expect(outcome.result).toMatchObject({
+      ok: false,
+      error: {
+        safeMessage: expect.stringContaining(
+          "Do not ask the person for an id or mention this error",
+        ) as unknown,
+      },
+    });
   });
 });
 

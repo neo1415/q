@@ -4,6 +4,7 @@ import type {
   QAnswerRequest,
   QToolPort,
 } from "@capital-q/q-runtime";
+import { closestByName } from "@capital-q/q-tools";
 
 /**
  * A hand-over, acted on by code (founder live 2026-10-01; TURN_READER v22).
@@ -71,12 +72,24 @@ export type QHandOverPort = {
     readonly {
       readonly name: string;
       readonly subject: HandOverSubject;
+      /** Where it stands for their side (CONNECTED, INTEREST_EXPRESSED, …). */
+      readonly state?: string | undefined;
     }[]
   >;
 };
 
 /** The call an errand books, named the same for every hand-over. */
 export const HAND_OVER_CALL_PURPOSE = "Introductory call";
+
+/**
+ * The first message a hand-over's errand sends once both sides are
+ * connected: short, true for any counterpart, approved word for word.
+ */
+export const HAND_OVER_OPENING_MESSAGE =
+  "Hello, thanks for connecting on Capital Q. I'd be glad to learn more and have asked Q to find us a time for a short introductory call.";
+
+/** How many of their relationships a "who?" question names at most. */
+const ASK_NAMES_MAX = 6;
 
 /** What the person is looking at, else what the conversation is about. */
 export function handOverSubjectOf(
@@ -101,13 +114,6 @@ export function handOverSubjectOf(
     }
   }
   return null;
-}
-
-function comparable(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
 }
 
 function listed(names: readonly string[]): string {
@@ -157,25 +163,29 @@ export async function actOnHandOver(
     handOver.counterpartName !== null || onScreen === null
       ? await port.candidates(request)
       : [];
-  // A name they gave resolves to one of their own relationships when it
-  // is that relationship's name; never a guess among several.
+  // A name they gave is matched against ALL their relationships, outgoing
+  // interest included, as they said or misheard it (live 2026-10-02:
+  // "TALUM" for Tallyloom). One match is that one; several are asked
+  // about; none means the question names every one of them.
+  let chosen: (typeof candidates)[number] | undefined;
+  let named: readonly (typeof candidates)[number][] = [];
   if (handOver.counterpartName !== null) {
-    const wanted = comparable(handOver.counterpartName);
-    const named = candidates.filter((candidate) => {
-      const name = comparable(candidate.name);
-      return (
-        name.length > 0 &&
-        wanted.length > 0 &&
-        (name === wanted || name.includes(wanted) || wanted.includes(name))
-      );
-    });
+    named = closestByName(
+      candidates,
+      handOver.counterpartName,
+      (candidate) => candidate.name,
+    );
     if (named.length === 1 && named[0] !== undefined) {
-      subject = named[0].subject;
+      chosen = named[0];
+      subject = chosen.subject;
     }
   }
   subject ??= onScreen;
   if (subject === null) {
-    const names = candidates.slice(0, 3).map((candidate) => candidate.name);
+    const pool = named.length > 1 ? named : candidates;
+    const names = pool
+      .slice(0, ASK_NAMES_MAX)
+      .map((candidate) => candidate.name);
     return {
       kind: "ASK",
       line:
@@ -184,12 +194,17 @@ export async function actOnHandOver(
           : `Who should I set this up with: ${listed(names)}?`,
     };
   }
+  // The truth first when there is nothing of theirs to accept.
+  const truth =
+    chosen?.state === "INTEREST_EXPRESSED"
+      ? `${chosen.name} hasn't accepted your interest yet, so there's nothing to accept. `
+      : "";
   const prepared = await port.prepare(request, subject);
   if (prepared?.status === "ALREADY_ACTIVE") {
     // No second card: what Q is already doing there, from its real state.
     return {
       kind: "PREPARED",
-      line: `${prepared.awaitingApprovalOf} Want me to change anything?`,
+      line: `${truth}${prepared.awaitingApprovalOf} Want me to change anything?`,
     };
   }
   if (prepared === null || prepared.status !== "PREPARED") {
@@ -197,7 +212,12 @@ export async function actOnHandOver(
   }
   return {
     kind: "PREPARED",
-    line: `${prepared.awaitingApprovalOf}: once you approve, I express interest where it's still needed, and when you're connected I book an introductory call and send you the link.`,
+    line:
+      chosen?.state === "CONNECTED"
+        ? `${prepared.awaitingApprovalOf}: once you approve, I send them the message on the card, book an introductory call and send you the link.`
+        : chosen?.state === "INTEREST_EXPRESSED"
+          ? `${truth}${prepared.awaitingApprovalOf}: once you approve, I wait for them to accept, then send them the message on the card, book an introductory call and send you the link.`
+          : `${prepared.awaitingApprovalOf}: once you approve, I express interest where it's still needed, and when you're connected I send them the message on the card, book an introductory call and send you the link.`,
   };
 }
 
@@ -286,7 +306,7 @@ export function createToolHandOverPort(dependencies: {
         {
           ...ref,
           expressInterest: true,
-          openingMessage: null,
+          openingMessage: HAND_OVER_OPENING_MESSAGE,
           brief: null,
           callPurpose: HAND_OVER_CALL_PURPOSE,
         },
@@ -330,6 +350,7 @@ export function createToolHandOverPort(dependencies: {
           const row = item as {
             relationshipId?: unknown;
             stateSince?: unknown;
+            state?: unknown;
             counterpart?: { name?: unknown };
           };
           return typeof row.relationshipId === "string" &&
@@ -339,6 +360,7 @@ export function createToolHandOverPort(dependencies: {
                   name: row.counterpart.name,
                   since:
                     typeof row.stateSince === "string" ? row.stateSince : "",
+                  state: typeof row.state === "string" ? row.state : undefined,
                   subject: {
                     kind: "RELATIONSHIP" as const,
                     relationshipId: row.relationshipId,
@@ -348,7 +370,7 @@ export function createToolHandOverPort(dependencies: {
             : [];
         })
         .sort((a, b) => b.since.localeCompare(a.since))
-        .map(({ name, subject }) => ({ name, subject }));
+        .map(({ name, subject, state }) => ({ name, subject, state }));
     },
   };
 }

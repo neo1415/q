@@ -132,40 +132,79 @@ function distance(a: string, b: string): number {
 }
 
 /**
- * The one pending request the words name: its id, its exact name, a name
- * containing or contained in it, else the single one within a small edit
- * distance. Never a guess among several.
+ * A name as it sounds: letters only, vowels (and y) dropped, repeats
+ * collapsed, first letter kept. "TALUM" and "Tallyloom" both read "tlm";
+ * "Kazuki" and "Kazikit" read "kzk" and "kzkt". A rough ear for a name
+ * heard or typed slightly wrong, never a dictionary.
  */
+export function nameSkeleton(name: string): string {
+  const letters = comparable(name).replace(/[^\p{L}]+/gu, "");
+  if (letters.length === 0) return "";
+  const head = letters.charAt(0);
+  const rest = letters.slice(1).replace(/[aeiouy]/g, "");
+  return (head + rest).replace(/(.)\1+/g, "$1");
+}
+
+/**
+ * The items the words name, closest tier first: the id, the exact name,
+ * a name containing or contained in it, a small edit distance, then a
+ * name that sounds the same. Every item of the first tier that matches is
+ * returned, so several equally close names can be asked about; never a
+ * guess among them, and never an item from a weaker tier when a stronger
+ * one matched.
+ */
+export function closestByName<T>(
+  items: readonly T[],
+  said: string,
+  nameOf: (item: T) => string,
+  idOf?: (item: T) => string,
+): readonly T[] {
+  if (idOf !== undefined) {
+    const byId = items.filter((item) => idOf(item) === said.trim());
+    if (byId.length > 0) return byId;
+  }
+  const wanted = comparable(said);
+  if (wanted.length === 0) return [];
+  const tiers: readonly ((name: string) => boolean)[] = [
+    (name) => name === wanted,
+    (name) => name.includes(wanted) || wanted.includes(name),
+    (name) =>
+      name.length >= 4 &&
+      distance(name, wanted) <=
+        Math.max(1, Math.floor(Math.min(name.length, wanted.length) / 3)),
+    (name) => {
+      const a = nameSkeleton(name);
+      const b = nameSkeleton(wanted);
+      return (
+        a.length >= 3 &&
+        b.length >= 3 &&
+        a.charAt(0) === b.charAt(0) &&
+        distance(a, b) <= 1
+      );
+    },
+  ];
+  for (const tier of tiers) {
+    const found = items.filter((item) => {
+      const name = comparable(nameOf(item));
+      return name.length > 0 && tier(name);
+    });
+    if (found.length > 0) return found;
+  }
+  return [];
+}
+
+/** The one pending request the words name; never a guess among several. */
 export function matchPendingRequest(
   pending: readonly PendingConnectionRequest[],
   said: string,
 ): PendingConnectionRequest | null {
-  const byId = pending.find((item) => item.companyId === said.trim());
-  if (byId !== undefined) return byId;
-  const wanted = comparable(said);
-  if (wanted.length === 0) return null;
-  const unique = (
-    found: readonly PendingConnectionRequest[],
-  ): PendingConnectionRequest | null =>
-    found.length === 1 ? (found[0] ?? null) : null;
-  const exact = pending.filter(
-    (item) => comparable(item.companyName) === wanted,
+  const found = closestByName(
+    pending,
+    said,
+    (item) => item.companyName,
+    (item) => item.companyId,
   );
-  if (exact.length > 0) return unique(exact);
-  const partial = pending.filter((item) => {
-    const name = comparable(item.companyName);
-    return name.includes(wanted) || wanted.includes(name);
-  });
-  if (partial.length > 0) return unique(partial);
-  const near = pending.filter((item) => {
-    const name = comparable(item.companyName);
-    const allowed = Math.max(
-      1,
-      Math.floor(Math.min(name.length, wanted.length) / 3),
-    );
-    return name.length >= 4 && distance(name, wanted) <= allowed;
-  });
-  return unique(near);
+  return found.length === 1 ? (found[0] ?? null) : null;
 }
 
 export function listedNames(names: readonly string[]): string {
@@ -298,23 +337,71 @@ export function createProposeConnectionRequestAnswerTool(
         return deny("NOT_AVAILABLE");
       }
     },
-    execute: (input, context, grant) =>
-      Promise.resolve(
-        prepareConnectionAnswer(
-          relationships,
-          {
-            runId: context.runId,
-            tenantId: context.actor.tenantId,
-            actorUserId: context.actor.userId,
-          },
-          grant.pending,
-          {
-            company: input.company,
-            decision: input.decision,
-            openingMessage: input.openingMessage,
-            withMessage: input.withMessage,
-          },
-        ),
-      ),
+    execute: async (input, context, grant) => {
+      const prepared = prepareConnectionAnswer(
+        relationships,
+        {
+          runId: context.runId,
+          tenantId: context.actor.tenantId,
+          actorUserId: context.actor.userId,
+        },
+        grant.pending,
+        {
+          company: input.company,
+          decision: input.decision,
+          openingMessage: input.openingMessage,
+          withMessage: input.withMessage,
+        },
+      );
+      if (
+        input.company === null ||
+        (prepared.status !== "NOT_FOUND" &&
+          prepared.status !== "NO_PENDING_REQUESTS")
+      ) {
+        return prepared;
+      }
+      // Not a request of theirs to accept: say what the relationship
+      // really is, and the one thing Q can do (live 2026-10-02: Zino's own
+      // interest in Tallyloom was met with a request for an id).
+      const own =
+        relationships.ownRelationships === undefined
+          ? null
+          : await relationships
+              .ownRelationships(context.actor)
+              .catch(() => null);
+      const found = closestByName(
+        own?.items ?? [],
+        input.company,
+        (item) => item.counterpart.name,
+        (item) => item.counterpart.id,
+      );
+      const only = found.length === 1 ? found[0] : undefined;
+      return only === undefined
+        ? prepared
+        : {
+            status: prepared.status,
+            awaitingApprovalOf: relationshipTruth(
+              only.counterpart.name,
+              only.state,
+            ),
+          };
+    },
   });
+}
+
+/**
+ * What an existing relationship is, when the person asked to accept it,
+ * and the one thing Q can do next. Plain words; no id, no tool.
+ */
+export function relationshipTruth(name: string, state: string): string {
+  switch (state) {
+    case "CONNECTED":
+      return `You're already connected with ${name}, so there's nothing to accept. I can send them a message or book a call with them.`;
+    case "INTEREST_EXPRESSED":
+      return `${name} hasn't accepted your interest yet, so there's no request of theirs to accept. I can look after it for you: wait for them to accept, then message them and book an introductory call.`;
+    case "DECLINED":
+      return `${name} isn't taking this forward, so there's nothing to accept.`;
+    default:
+      return `There's no request from ${name} to accept. I can express interest and look after it from there.`;
+  }
 }

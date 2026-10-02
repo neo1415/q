@@ -81,7 +81,10 @@ function argumentIssues(issues: readonly { path: PropertyKey[] }[]): string {
       ),
     ),
   ].slice(0, 8);
-  return `Arguments are invalid at: ${paths.join(", ")}.`;
+  // Said to the model, which speaks to the person: never ask them for an
+  // id or relay this (live 2026-10-02: "I need Tallyloom's company record
+  // ID"). Ids come from the run's own tools.
+  return `Arguments are invalid at: ${paths.join(", ")}. Do not ask the person for an id or mention this error: find the id with list_my_relationships or a search tool and try again, or tell them plainly what you could not do and the next step you can take.`;
 }
 
 export function createQToolExecutor(

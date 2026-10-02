@@ -1265,6 +1265,131 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
   });
 });
 
+describe("live 2026-10-02 (Zino): a named, misheard company among ALL their relationships", () => {
+  const rel = (n: number) => `r-${String(n)}`;
+  const RELATIONSHIPS = [
+    {
+      name: "Nixo",
+      subject: { kind: "RELATIONSHIP" as const, relationshipId: rel(1) },
+      state: "CONNECTED",
+    },
+    {
+      name: "Kazikit",
+      subject: { kind: "RELATIONSHIP" as const, relationshipId: rel(2) },
+      state: "INTEREST_EXPRESSED",
+    },
+    {
+      name: "Yamfield Agro",
+      subject: { kind: "RELATIONSHIP" as const, relationshipId: rel(3) },
+      state: "CONNECTED",
+    },
+    {
+      name: "Tallyloom",
+      subject: { kind: "RELATIONSHIP" as const, relationshipId: rel(4) },
+      state: "INTEREST_EXPRESSED",
+    },
+  ];
+  const reading = (counterpartName: string | null) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: { kind: "MEETING", counterpartName },
+    }) as TurnReaderResult;
+  const run = async (
+    said: string,
+    counterpartName: string | null,
+    prepared: { status: string; awaitingApprovalOf: string } = {
+      status: "PREPARED",
+      awaitingApprovalOf: "Q looks after them for you",
+    },
+  ) => {
+    const errands: unknown[] = [];
+    const handOver: QHandOverPort = {
+      // Nothing of theirs is waiting: both interests are Zino's own.
+      answerConnectionRequest: () =>
+        Promise.resolve({
+          status: "NO_PENDING_REQUESTS",
+          awaitingApprovalOf: "No founder's connection request is waiting.",
+        }),
+      prepare: (_request, subject) => {
+        errands.push(subject);
+        return Promise.resolve(prepared);
+      },
+      candidates: () => Promise.resolve(RELATIONSHIPS),
+    };
+    const { answer, stored, delegated } = seam({
+      said,
+      reading: reading(counterpartName),
+      outcomes: [],
+      handOver,
+    });
+    await answer.answer(request());
+    return {
+      line: stored.at(-1)?.content ?? "",
+      errands,
+      delegated: delegated(),
+    };
+  };
+
+  it('"Accept TALUM and send them a message… book a meeting with them": Tallyloom, never a list that omits it', async () => {
+    const { line, errands, delegated } = await run(
+      "Accept TALUM and send them a message… book a meeting with them",
+      "TALUM",
+      {
+        status: "PREPARED",
+        awaitingApprovalOf: "Q looks after Tallyloom for you",
+      },
+    );
+    expect(errands).toEqual([{ kind: "RELATIONSHIP", relationshipId: rel(4) }]);
+    expect(line).toBe(
+      "Tallyloom hasn't accepted your interest yet, so there's nothing to accept. Q looks after Tallyloom for you: once you approve, I wait for them to accept, then send them the message on the card, book an introductory call and send you the link.",
+    );
+    expect(line).not.toMatch(/Who should I/);
+    expect(delegated).toBe(0);
+  });
+
+  it('"Tallyloom, accept their request and chat him up for me": the truth plus one action, and an errand already running is said, not duplicated', async () => {
+    const { line, errands } = await run(
+      "Tallyloom, accept their request and chat him up for me",
+      "Tallyloom",
+      {
+        status: "ALREADY_ACTIVE",
+        awaitingApprovalOf:
+          "Q is already looking after Tallyloom for you (waiting for them to accept).",
+      },
+    );
+    expect(errands).toHaveLength(1);
+    expect(line).toBe(
+      "Tallyloom hasn't accepted your interest yet, so there's nothing to accept. Q is already looking after Tallyloom for you (waiting for them to accept). Want me to change anything?",
+    );
+    expect(line).not.toMatch(/\bid\b|record/i);
+  });
+
+  it("connected, 'send them a message and book a meeting': prepared directly", async () => {
+    const { line, errands } = await run(
+      "Send Nixo a message and book a meeting with them",
+      "Nixo",
+      { status: "PREPARED", awaitingApprovalOf: "Q looks after Nixo for you" },
+    );
+    expect(errands).toEqual([{ kind: "RELATIONSHIP", relationshipId: rel(1) }]);
+    expect(line).toBe(
+      "Q looks after Nixo for you: once you approve, I send them the message on the card, book an introductory call and send you the link.",
+    );
+  });
+
+  it("a name that is none of them: the question names every one", async () => {
+    const { line, errands } = await run("set it up with Zorblax", "Zorblax");
+    expect(errands).toEqual([]);
+    expect(line).toBe(
+      "Who should I set this up with: Nixo, Kazikit, Yamfield Agro or Tallyloom?",
+    );
+  });
+});
+
 describe("the hand-over port plans a named relationship before acting (QA 2026-10-01)", () => {
   const RELATIONSHIP = "11111111-2222-4333-8444-555555555555";
   const outcome = (data: unknown): QToolCallOutcome => ({

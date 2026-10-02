@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ActorContext } from "@capital-q/security";
 
 import {
+  closestByName,
   createDefaultQTools,
   createQToolExecutor,
   createQToolRegistry,
@@ -34,7 +35,12 @@ const TALLYLOOM: PendingConnectionRequest = {
   relationshipId: "88888888-0000-4000-8000-0000000000a2",
 };
 
-function world(pending: readonly PendingConnectionRequest[]) {
+type Own = { name: string; id: string; state: string };
+
+function world(
+  pending: readonly PendingConnectionRequest[],
+  own: readonly Own[] = [],
+) {
   const prepared: { actionType: string; payload: unknown }[] = [];
   const port = {
     withCompany: () => Promise.resolve(null),
@@ -43,6 +49,14 @@ function world(pending: readonly PendingConnectionRequest[]) {
     incomingInterest: () => Promise.reject(new Error("not a company")),
     mayExpressInterest: () => Promise.resolve(false),
     mayAnswerInterest: () => Promise.resolve(false),
+    ownRelationships: () =>
+      Promise.resolve({
+        side: "INVESTOR" as const,
+        items: own.map((item) => ({
+          counterpart: { kind: "COMPANY", id: item.id, name: item.name },
+          state: item.state,
+        })),
+      } as never),
     pendingConnectionRequests: (actor: ActorContext) =>
       actor.userId === actorB.userId
         ? Promise.resolve(pending)
@@ -189,5 +203,58 @@ describe("matchPendingRequest", () => {
         "Kazikit L",
       ),
     ).toBeNull();
+  });
+});
+
+describe("live 2026-10-02 (Zino): nothing of theirs to accept is said plainly, never as an id", () => {
+  const own: Own[] = [
+    {
+      name: "Nixo",
+      id: "66666666-0000-4000-8000-0000000000b1",
+      state: "CONNECTED",
+    },
+    { name: "Tallyloom", id: TALLYLOOM.companyId, state: "INTEREST_EXPRESSED" },
+  ];
+  it('"Tallyloom, accept their request and chat him up for me": their interest is Zino\'s own', async () => {
+    const { ask, prepared } = world([], own);
+    const outcome = await ask({ company: "Tallyloom", withMessage: true });
+    expect(outcome.result).toEqual({
+      ok: true,
+      data: {
+        status: "NO_PENDING_REQUESTS",
+        awaitingApprovalOf:
+          "Tallyloom hasn't accepted your interest yet, so there's no request of theirs to accept. I can look after it for you: wait for them to accept, then message them and book an introductory call.",
+      },
+    });
+    expect(JSON.stringify(outcome.result)).not.toMatch(/\bid\b|record/i);
+    expect(prepared).toEqual([]);
+  });
+
+  it("already connected: says so, and what Q can do instead", async () => {
+    const { ask } = world([KAZIKIT], own);
+    expect((await ask({ company: "Nixo" })).result).toMatchObject({
+      data: {
+        status: "NOT_FOUND",
+        awaitingApprovalOf:
+          "You're already connected with Nixo, so there's nothing to accept. I can send them a message or book a call with them.",
+      },
+    });
+  });
+});
+
+describe("closestByName: a name as said or misheard", () => {
+  const names = ["Nixo", "Kazikit", "Yamfield Agro", "Tallyloom"];
+  it.each([
+    ["TALUM", "Tallyloom"],
+    ["Kazuki", "Kazikit"],
+    ["yamfield", "Yamfield Agro"],
+    ["Nixo", "Nixo"],
+  ])("%j is %s", (said, name) => {
+    expect(closestByName(names, said, (n) => n)).toEqual([name]);
+  });
+  it("unrelated words match nothing", () => {
+    expect(closestByName(names, "classic eight zero three", (n) => n)).toEqual(
+      [],
+    );
   });
 });
