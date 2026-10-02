@@ -532,6 +532,9 @@ importers:
 
   packages/app-actions:
     dependencies:
+      '@capital-q/capital':
+        specifier: workspace:*
+        version: link:../capital
       '@capital-q/companies':
         specifier: workspace:*
         version: link:../companies

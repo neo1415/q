@@ -49,6 +49,18 @@ function fakes() {
       updateMyFounderProfile: () => Promise.reject(new Error("unused")),
       updateCompanyTeamFacts: () => Promise.reject(new Error("unused")),
     },
+    capital: {
+      // The raise moved on since the card was prepared at version 3.
+      getCapitalObjective: () => Promise.resolve({ version: 5 } as never),
+      getCurrentCapitalObjective: () => Promise.reject(new Error("unused")),
+      createCapitalObjective: () => Promise.reject(new Error("unused")),
+      updateCapitalObjective: (command) => {
+        updates.push(command.input);
+        return Promise.resolve({ version: 6 } as never);
+      },
+      closeCapitalObjective: () => Promise.reject(new Error("unused")),
+      replaceCapitalObjective: () => Promise.reject(new Error("unused")),
+    },
     people: {
       read: () => Promise.resolve({ version: 4 } as never),
       update: (input) => {
@@ -146,5 +158,27 @@ describe("approved profile changes run through the declaration", () => {
         changes: { timeZone: "Africa/Lagos" },
       },
     ]);
+  });
+
+  it("the raise form's one card runs through the member it names, at the raise as it stands", async () => {
+    const { definition, updates } = fakes();
+    const action = definition("app.capital.objective.change");
+    const outcome = await action.executor.execute(
+      approved("app.capital.objective.change", {
+        operation: "UPDATE",
+        input: {
+          companyId: COMPANY,
+          capitalObjectiveId: "0bec0000-0000-4000-8000-000000000001",
+          atLatest: true,
+          input: { targetStage: "seed", expectedVersion: 3 },
+        },
+      }),
+      context,
+    );
+    expect(outcome).toMatchObject({
+      outcome: "EXECUTED",
+      result: { says: "Done. Your raise is updated." },
+    });
+    expect(updates).toEqual([{ targetStage: "seed", expectedVersion: 5 }]);
   });
 });

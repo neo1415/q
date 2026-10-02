@@ -504,3 +504,232 @@ describe("profile and records, generated from the registry (ADR 0040 step 2)", (
     expect(prepared).toEqual([]);
   });
 });
+
+describe("the raise form, one generated tool for its four declarations", () => {
+  const OBJECTIVE = "0bec0000-0000-4000-8000-000000000001";
+  function founderPlan(): PermittedContextPlan {
+    const plan = planFor(actorA, "OWN_COMPANY_QUESTION", [
+      { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        sensitivity: "CONFIDENTIAL",
+        companyId: COMPANY_A,
+      },
+    ]);
+    return {
+      ...plan,
+      scopes: plan.scopes.map((scope) =>
+        scope.kind === "OWN_Q_CONVERSATION"
+          ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+          : scope,
+      ),
+    };
+  }
+  function raise(options: { readonly current?: boolean } = {}) {
+    const prepared: { actionType: string; payload: unknown }[] = [];
+    const never = () =>
+      Promise.reject(new Error("Q prepares; it never writes"));
+    const ports = fakePorts({
+      appActions: {
+        ownCompanyId: () => Promise.resolve(COMPANY_A),
+        capital: {
+          getCapitalObjective: never,
+          getCurrentCapitalObjective: () =>
+            options.current === false
+              ? Promise.reject(new Error("NOT_FOUND"))
+              : Promise.resolve({ id: OBJECTIVE, version: 3 } as never),
+          createCapitalObjective: never,
+          updateCapitalObjective: never,
+          closeCapitalObjective: never,
+          replaceCapitalObjective: never,
+        },
+      },
+      appApprovals: {
+        prepareForApproval: (entry) => {
+          prepared.push({
+            actionType: entry.actionType,
+            payload: entry.payload,
+          });
+          return "PREPARED";
+        },
+      },
+    });
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(createDefaultQTools(ports)),
+    });
+    return { executor, prepared };
+  }
+
+  it("'change our target to 2 million' prepares the update of their current raise, applied as it stands when approved", async () => {
+    const { executor, prepared } = raise();
+    await executor.execute(
+      call("change_my_raise", {
+        operation: "UPDATE",
+        target: { amount: "2000000", currency: "USD" },
+      }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(prepared).toEqual([
+      {
+        actionType: "app.capital.objective.change",
+        payload: {
+          operation: "UPDATE",
+          input: {
+            companyId: COMPANY_A,
+            capitalObjectiveId: OBJECTIVE,
+            atLatest: true,
+            input: {
+              target: { amount: "2000000", currency: "USD" },
+              expectedVersion: 3,
+            },
+          },
+        },
+      },
+    ]);
+  });
+
+  it("closing needs its reason, said as the field that is missing; no raise yet means nothing to change", async () => {
+    const { executor, prepared } = raise();
+    const close = await executor.execute(
+      call("change_my_raise", { operation: "CLOSE" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(JSON.stringify(close.result)).toContain("reason");
+    expect(prepared).toEqual([]);
+    const none = raise({ current: false });
+    const update = await none.executor.execute(
+      call("change_my_raise", { operation: "UPDATE", targetStage: "seed" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(update.result).toMatchObject({ ok: false });
+    expect(none.prepared).toEqual([]);
+  });
+
+  it("a new raise carries a key derived from the run, so a retry creates nothing twice", async () => {
+    const { executor, prepared } = raise({ current: false });
+    await executor.execute(
+      call("change_my_raise", {
+        operation: "CREATE",
+        target: { amount: "500000", currency: "GBP" },
+      }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(prepared[0]?.payload).toMatchObject({
+      operation: "CREATE",
+      input: {
+        companyId: COMPANY_A,
+        idempotencyKey: expect.stringMatching(/^q-[0-9a-f]{40}$/) as unknown,
+        input: { target: { amount: "500000", currency: "GBP" } },
+      },
+    });
+  });
+});
+
+describe("the mandate form, one generated tool for its four declarations", () => {
+  const ORG_INVESTOR = "d0000000-0000-4000-8000-0000000000aa";
+  const ACTIVE = "a1a1a1a1-0000-4000-8000-000000000001";
+  function investorPlan(): PermittedContextPlan {
+    const plan = planFor(actorA, "INVESTOR_QUESTION", [
+      { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "INVESTOR_PROFILE",
+        sensitivity: "CONFIDENTIAL",
+        investorOrganisationId: ORG_INVESTOR,
+      },
+    ]);
+    return {
+      ...plan,
+      scopes: plan.scopes.map((scope) =>
+        scope.kind === "OWN_Q_CONVERSATION"
+          ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+          : scope,
+      ),
+    };
+  }
+  function mandates() {
+    const prepared: { actionType: string; payload: unknown }[] = [];
+    const never = () =>
+      Promise.reject(new Error("Q prepares; it never writes"));
+    const ports = fakePorts({
+      appActions: {
+        ownInvestorOrganisationId: () => Promise.resolve(ORG_INVESTOR),
+        investors: {
+          getInvestorOrganisation: never,
+          updateInvestorOrganisation: never,
+          upsertMyInvestorRepresentative: never,
+          getInvestorMandate: never,
+          listInvestorMandates: () =>
+            Promise.resolve({
+              items: [
+                { id: ACTIVE, status: "ACTIVE", version: 4 },
+                {
+                  id: "a1a1a1a1-0000-4000-8000-000000000002",
+                  status: "DRAFT",
+                  version: 1,
+                },
+              ],
+            } as never),
+          createInvestorMandate: never,
+          updateInvestorMandate: never,
+          activateInvestorMandate: never,
+          closeInvestorMandate: never,
+        },
+      },
+      appApprovals: {
+        prepareForApproval: (entry) => {
+          prepared.push({
+            actionType: entry.actionType,
+            payload: entry.payload,
+          });
+          return "PREPARED";
+        },
+      },
+    });
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(createDefaultQTools(ports)),
+    });
+    return { executor, prepared };
+  }
+
+  it("a mandate id the model made up is input, never proof: their active mandate is the one changed", async () => {
+    const { executor, prepared } = mandates();
+    await executor.execute(
+      call("change_my_mandate", {
+        operation: "UPDATE",
+        mandateId: ORG_INVESTOR,
+        minStageCode: "pre_seed",
+      }),
+      contextFor(actorA, investorPlan()),
+    );
+    expect(prepared).toEqual([
+      {
+        actionType: "app.investor.mandate.change",
+        payload: {
+          operation: "UPDATE",
+          input: {
+            investorOrganisationId: ORG_INVESTOR,
+            mandateId: ACTIVE,
+            atLatest: true,
+            input: { minStageCode: "pre_seed", expectedVersion: 4 },
+          },
+        },
+      },
+    ]);
+  });
+
+  it("closing their mandate prepares the close itself, with nothing else to change", async () => {
+    const { executor, prepared } = mandates();
+    await executor.execute(
+      call("change_my_mandate", { operation: "CLOSE" }),
+      contextFor(actorA, investorPlan()),
+    );
+    expect(prepared[0]?.payload).toEqual({
+      operation: "CLOSE",
+      input: {
+        investorOrganisationId: ORG_INVESTOR,
+        mandateId: ACTIVE,
+        input: {},
+      },
+    });
+  });
+});

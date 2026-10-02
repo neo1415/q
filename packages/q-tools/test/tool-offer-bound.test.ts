@@ -105,8 +105,8 @@ describe("the tools a run is offered are bounded by relevance, not by the alphab
     const own = registry
       .eligible(worstCase("OWN_COMPANY_QUESTION"))
       .map((r) => r.definition.providerName);
-    expect(own).not.toContain("propose_mandate_change");
-    expect(own).toContain("propose_raise_change");
+    expect(own).not.toContain("change_my_mandate");
+    expect(own).toContain("change_my_raise");
   });
 
   it("is deterministic for the same catalogue and plan", () => {

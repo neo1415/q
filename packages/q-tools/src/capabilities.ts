@@ -359,6 +359,8 @@ const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   discovery: "RELATIONSHIP",
   documents: "DOCUMENT",
   records: "PROFILE",
+  capital: "RECORDS",
+  mandate: "RECORDS",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
@@ -578,18 +580,6 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "NAVIGATION",
     "Scrolls the page they are on, goes back, shows a section, or opens its book-a-call or reminder dialog.",
     { acts: true },
-  ),
-  tool(
-    "propose_raise_change",
-    "RECORDS",
-    "Creates, changes, closes or replaces their company's raise, applied when they approve.",
-    { approval: "PREPARE_APPROVE", executes: ["capital.objective.change"] },
-  ),
-  tool(
-    "propose_mandate_change",
-    "RECORDS",
-    "Creates, changes, activates or closes their investor mandate, applied when they approve.",
-    { approval: "PREPARE_APPROVE", executes: ["investor.mandate.change"] },
   ),
   tool(
     "propose_profile_answer_change",
@@ -979,6 +969,10 @@ export const Q_CAPABILITY_EXCLUSIONS: Readonly<{
       "Kept so a change approved before ADR 0040's profile tools still executes; Q now prepares it as app.investor.representative.me.upsert (set_my_investor_role).",
     "q_card.update":
       "Kept so a change approved before ADR 0040's profile tools still executes; Q now prepares it as app.q_card.update (update_q_card).",
+    "capital.objective.change":
+      "Kept so a change approved before ADR 0040's capital tool still executes; Q now prepares it as app.capital.objective.change (change_my_raise).",
+    "investor.mandate.change":
+      "Kept so a change approved before ADR 0040's mandate tool still executes; Q now prepares it as app.investor.mandate.change (change_my_mandate).",
     "handle.claim":
       "Kept so a claim approved before ADR 0040's profile tools still executes; Q now prepares it as app.q_card.handle.claim (claim_q_card_handle).",
   },

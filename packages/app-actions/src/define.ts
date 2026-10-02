@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 import type {
   CorrelationId,
@@ -49,11 +49,19 @@ export type AppActionHttp<In, Out> = {
   readonly method: "POST" | "PUT" | "PATCH" | "DELETE";
   /** The route's own path, with :params. Never a catch-all. */
   readonly path: string;
-  /** The canonical input from the URL params and the body (still unknown). */
+  /**
+   * The canonical input from the URL params, the body and the headers
+   * (all still unknown; a header such as Idempotency-Key is input too).
+   */
   readonly fromRequest: (
     params: Record<string, string>,
     body: unknown,
+    headers: Readonly<Record<string, string | string[] | undefined>>,
   ) => unknown;
+  /** The success status the route always answered with (default 200). */
+  readonly status?: 200 | 201 | 204 | undefined;
+  /** The Location of what it created, for a 201. */
+  readonly location?: ((out: Out, input: In) => string) | undefined;
   /** The wire answer, in the route's existing response contract. */
   readonly respond: (out: Out, input: In, ports: AppActionPorts) => unknown;
   /** The idempotency key the screen sent, from the parsed input. */
@@ -162,6 +170,12 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
   readonly tool?: AppActionTool<In, ToolIn> | undefined;
   /** The hand-written Q tool that still does this for Q, until migrated. */
   readonly legacyTool?: string | undefined;
+  /**
+   * The generated tool of the family this action belongs to: one tool for
+   * one form's operations (create, update, close...), each still its own
+   * declaration and route. Set by `defineAppActionFamily`.
+   */
+  readonly viaTool?: string | undefined;
 };
 
 /** Erased for the registry; per-action types stay with the action (as q-tools does). */
@@ -171,4 +185,89 @@ export function defineAppAction<In, Out, ToolIn = In>(
   definition: AppActionDefinition<In, Out, ToolIn>,
 ): AnyAppAction {
   return Object.freeze(definition) as unknown as AnyAppAction;
+}
+
+/** The Q tool that does an action: its own, its family's, or a hand tool. */
+export function qToolName(action: AnyAppAction): string | null {
+  return action.tool?.name ?? action.viaTool ?? action.legacyTool ?? null;
+}
+
+/** What a family's tool prepares: one member, by operation, with its input. */
+export type AppActionFamilyInput = {
+  readonly operation: string;
+  readonly input: unknown;
+};
+
+/**
+ * One Q tool for one form's operations (ADR 0040). Each operation stays its
+ * own declaration -- its own route, authorize step and service call -- and
+ * the family is the one action Q prepares: `{ operation, input }`, checked
+ * against that member's own input and run through that member, so the
+ * screen and Q still share every step. Why one tool, not one per member: a
+ * run offers at most MODEL_TOOLS_MAX tools, and a form's operations are
+ * one thing to the person ("my raise").
+ */
+export function defineAppActionFamily<ToolIn>(definition: {
+  readonly name: string;
+  readonly area: string;
+  readonly does: string;
+  readonly members: Readonly<Record<string, AnyAppAction>>;
+  readonly tool: AppActionTool<AppActionFamilyInput, ToolIn>;
+}): readonly AnyAppAction[] {
+  const operations = Object.keys(definition.members);
+  const memberOf = (operation: string): AnyAppAction => {
+    const member = definition.members[operation];
+    if (member === undefined)
+      throw new Error(`APP_ACTION_OPERATION:${operation}`);
+    return member;
+  };
+  const input = z
+    .object({ operation: z.string(), input: z.unknown() })
+    .strict()
+    .transform((value, context) => {
+      const member = definition.members[value.operation];
+      if (member === undefined) {
+        context.addIssue({
+          code: "custom",
+          message: `expected one of ${operations.join(", ")}`,
+          path: ["operation"],
+        });
+        return z.NEVER;
+      }
+      const parsed = member.input.safeParse(value.input);
+      if (!parsed.success) {
+        for (const issue of parsed.error.issues) {
+          context.addIssue({
+            code: "custom",
+            message: issue.message,
+            path: ["input", ...issue.path],
+          });
+        }
+        return z.NEVER;
+      }
+      return { operation: value.operation, input: parsed.data };
+    });
+  const family = defineAppAction<AppActionFamilyInput, unknown, ToolIn>({
+    name: definition.name,
+    area: definition.area,
+    classification: "CONSEQUENTIAL",
+    does: definition.does,
+    input,
+    output: z.unknown(),
+    authorize: (ports, context, value) =>
+      memberOf(value.operation).authorize(ports, context, value.input),
+    run: (ports, context, value) =>
+      memberOf(value.operation).run(ports, context, value.input),
+    targets: (value) => memberOf(value.operation).targets(value.input),
+    card: (value) => memberOf(value.operation).card(value.input),
+    done: (out, value, names) =>
+      memberOf(value.operation).done(out, value.input, names),
+    tool: definition.tool,
+  });
+  return [
+    family,
+    ...Object.values(definition.members).map((member) =>
+      Object.freeze({ ...member, viaTool: definition.tool.name }),
+    ),
+  ];
 }

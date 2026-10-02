@@ -22,6 +22,7 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@capital-q/capital": "workspace:*",
     "@capital-q/companies": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/discovery": "workspace:*",

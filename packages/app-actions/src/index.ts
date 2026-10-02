@@ -1,5 +1,8 @@
 export {
   defineAppAction,
+  defineAppActionFamily,
+  qToolName,
+  type AppActionFamilyInput,
   type AnyAppAction,
   type AppActionCard,
   type AppActionClass,

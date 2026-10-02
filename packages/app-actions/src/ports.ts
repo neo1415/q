@@ -1,3 +1,4 @@
+import type { CapitalService } from "@capital-q/capital";
 import type { CompanyService } from "@capital-q/companies";
 import type { PitchSummaryDto } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
@@ -34,6 +35,12 @@ export type AppActionPorts = {
         | "getInvestorOrganisation"
         | "updateInvestorOrganisation"
         | "upsertMyInvestorRepresentative"
+        | "getInvestorMandate"
+        | "listInvestorMandates"
+        | "createInvestorMandate"
+        | "updateInvestorMandate"
+        | "activateInvestorMandate"
+        | "closeInvestorMandate"
       >
     | undefined;
   readonly publicIdentity?:
@@ -44,6 +51,18 @@ export type AppActionPorts = {
     | undefined;
   /** The person's own profile record (what to call them, their time zone). */
   readonly people?: Pick<PersonProfileStore, "read" | "update"> | undefined;
+  /** Capital (ADR 0040 checklist): the raise form's own service. */
+  readonly capital?:
+    | Pick<
+        CapitalService,
+        | "getCapitalObjective"
+        | "getCurrentCapitalObjective"
+        | "createCapitalObjective"
+        | "updateCapitalObjective"
+        | "closeCapitalObjective"
+        | "replaceCapitalObjective"
+      >
+    | undefined;
   /** A company's publishable pitch, for the company route's answer. */
   readonly companyPitch?:
     ((companyId: string) => Promise<PitchSummaryDto | null>) | undefined;

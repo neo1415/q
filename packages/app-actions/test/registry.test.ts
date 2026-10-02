@@ -6,6 +6,7 @@ import {
   APP_ACTIONS,
   misheard,
   parityCases,
+  qToolName,
   resolveReference,
   type ReferenceCandidates,
 } from "../src/index.js";
@@ -40,10 +41,10 @@ describe("the action registry", () => {
     expect(new Set(routes).size).toBe(routes.length);
     for (const action of APP_ACTIONS) {
       expect(action.name).toMatch(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/);
-      // An action is served to Q by a generated tool or, until its area's
-      // second step, by the hand tool it names; never by neither.
+      // An action is served to Q by a generated tool, its family's tool,
+      // or (until its area's second step) the hand tool it names.
       if (action.tool === undefined) {
-        expect(action.legacyTool).toMatch(/^[a-z][a-z_]*$/);
+        expect(qToolName(action)).toMatch(/^[a-z][a-z_]*$/);
       } else {
         expect(action.tool.eval.say).toHaveLength(2);
       }
@@ -54,7 +55,10 @@ describe("the action registry", () => {
     expect(
       APP_ACTIONS.map((action) => [
         action.name,
-        action.tool?.name ?? `legacy:${action.legacyTool ?? ""}`,
+        action.tool?.name ??
+          (action.viaTool === undefined
+            ? `legacy:${action.legacyTool ?? ""}`
+            : `via:${action.viaTool}`),
         action.classification,
       ]),
     ).toEqual([
@@ -80,6 +84,16 @@ describe("the action registry", () => {
       ],
       ["q_card.handle.claim", "claim_q_card_handle", "CONSEQUENTIAL"],
       ["q_card.update", "update_q_card", "CONSEQUENTIAL"],
+      ["capital.objective.change", "change_my_raise", "CONSEQUENTIAL"],
+      ["capital.objective.create", "via:change_my_raise", "CONSEQUENTIAL"],
+      ["capital.objective.update", "via:change_my_raise", "CONSEQUENTIAL"],
+      ["capital.objective.close", "via:change_my_raise", "CONSEQUENTIAL"],
+      ["capital.objective.replace", "via:change_my_raise", "CONSEQUENTIAL"],
+      ["investor.mandate.change", "change_my_mandate", "CONSEQUENTIAL"],
+      ["investor.mandate.create", "via:change_my_mandate", "CONSEQUENTIAL"],
+      ["investor.mandate.update", "via:change_my_mandate", "CONSEQUENTIAL"],
+      ["investor.mandate.activate", "via:change_my_mandate", "CONSEQUENTIAL"],
+      ["investor.mandate.close", "via:change_my_mandate", "CONSEQUENTIAL"],
     ]);
   });
 });

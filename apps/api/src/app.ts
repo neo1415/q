@@ -418,6 +418,7 @@ export function createApp(
       ...(modules.discovery?.interactions === undefined
         ? {}
         : { interactions: modules.discovery.interactions }),
+      ...(modules.capital === undefined ? {} : { capital: modules.capital }),
     },
   });
 

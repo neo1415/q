@@ -1,8 +1,6 @@
 import { z } from "zod";
 
 import {
-  CAPITAL_OBJECTIVE_CLOSURE_REASONS,
-  DISCOVERY_MODES,
   type PermittedContextPlan,
   type QTaskClass,
 } from "@capital-q/contracts";
@@ -12,7 +10,6 @@ import {
   allow,
   defineQTool,
   deny,
-  QToolArgumentError,
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
@@ -34,8 +31,6 @@ import { ownSubject } from "./q-card.js";
  * owning context's own service writes it. Nothing changes here.
  */
 
-export const PROPOSE_RAISE_CHANGE = "capital.objective.propose" as const;
-export const PROPOSE_MANDATE_CHANGE = "investor.mandate.propose" as const;
 export const PROPOSE_INVESTOR_VISIBILITY =
   "investor.visibility.propose" as const;
 export const PROPOSE_PROFILE_ANSWER = "profile.answer.propose" as const;
@@ -67,15 +62,6 @@ function ownConversation(
   if (actor.actorType !== "HUMAN") return false;
   const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
   return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
-/** Only defined values: an absent field is not a change. */
-function defined(
-  fields: Readonly<Record<string, unknown>>,
-): Readonly<Record<string, unknown>> {
-  return Object.fromEntries(
-    Object.entries(fields).filter(([, value]) => value !== undefined),
-  );
 }
 
 const COMMON = {
@@ -129,170 +115,6 @@ function prepareWith(port: RecordChangePort) {
       reason: result.reason,
     };
   };
-}
-
-// --- the raise ------------------------------------------------------------
-
-const TargetSchema = z
-  .object({
-    amount: z
-      .string()
-      .max(32)
-      .describe("A positive decimal amount, as digits (e.g. 1500000)."),
-    currency: z.string().max(3).describe("ISO 4217 code, e.g. USD, GBP, NGN."),
-  })
-  .strict();
-
-export const ProposeRaiseChangeInputSchema = z
-  .object({
-    operation: z
-      .enum(["CREATE", "UPDATE", "CLOSE", "REPLACE"])
-      .describe(
-        "CREATE a raise when they have none; UPDATE the current one's fields; CLOSE it (with closureReason); REPLACE it with a deliberately new raise.",
-      ),
-    target: TargetSchema.optional(),
-    targetStage: z
-      .string()
-      .max(64)
-      .optional()
-      .describe("lower_snake_case stage code, e.g. seed, series_a."),
-    instrumentCode: z
-      .string()
-      .max(64)
-      .optional()
-      .describe("lower_snake_case instrument code, e.g. safe, equity."),
-    targetCloseDate: z.string().max(10).optional().describe("YYYY-MM-DD"),
-    useOfFundsSummary: z.string().max(2000).optional(),
-    closureReason: z.enum(CAPITAL_OBJECTIVE_CLOSURE_REASONS).optional(),
-  })
-  .strict();
-export type ProposeRaiseChangeInput = z.infer<
-  typeof ProposeRaiseChangeInputSchema
->;
-
-export function createProposeRaiseChangeTool(
-  ports: Pick<QToolPorts, "companies" | "investors">,
-  port: RecordChangePort,
-): AnyQToolDefinition {
-  const prepare = prepareWith(port);
-  return defineQTool<ProposeRaiseChangeInput, ProposeRecordChangeOutput, Grant>(
-    {
-      ...COMMON,
-      id: PROPOSE_RAISE_CHANGE,
-      supportedPurposes: [
-        "OWN_COMPANY_QUESTION",
-        "ACTION_PREPARATION",
-        "GENERAL_QUESTION",
-      ],
-      providerName: "propose_raise_change",
-      description: `Prepares a change to their own company's raise (capital objective), exactly as the Capital page's form makes it: create one, update target (amount + currency), targetStage, instrumentCode, targetCloseDate or useOfFundsSummary, close it with a closureReason (ACHIEVED, CLOSED_BY_FOUNDER, DISCONTINUED), or replace it with a new raise. ${RESULT_NOTE}`,
-      requiredScopeKinds: ["COMPANY_PROFILE"],
-      input: ProposeRaiseChangeInputSchema,
-      authorize: subjectAuthorizer(ports, "COMPANY"),
-      execute: (input, context, grant) => {
-        const { operation, closureReason, ...fields } = input;
-        if (operation === "CLOSE" && closureReason === undefined) {
-          throw new QToolArgumentError(
-            "Closing a raise needs a closureReason.",
-          );
-        }
-        return prepare(
-          {
-            kind: "CAPITAL_OBJECTIVE",
-            companyId: grant.subjectId,
-            operation,
-            fields:
-              operation === "CLOSE"
-                ? { reason: closureReason }
-                : defined(fields),
-          },
-          context,
-        );
-      },
-    },
-  );
-}
-
-// --- the mandate ----------------------------------------------------------
-
-export const ProposeMandateChangeInputSchema = z
-  .object({
-    operation: z
-      .enum(["CREATE", "UPDATE", "ACTIVATE", "CLOSE"])
-      .describe(
-        "CREATE a new mandate (needs name); UPDATE fields; ACTIVATE it so their feed uses it; CLOSE it.",
-      ),
-    mandateId: z
-      .string()
-      .uuid()
-      .optional()
-      .describe(
-        "Which mandate, exactly as a tool gave it. Omit for their current one.",
-      ),
-    name: z.string().max(120).optional(),
-    discoveryMode: z.enum(DISCOVERY_MODES).optional(),
-    chequeRange: z
-      .object({
-        currency: z.string().max(3),
-        min: z.string().max(32).optional(),
-        typical: z.string().max(32).optional(),
-        max: z.string().max(32).optional(),
-      })
-      .strict()
-      .optional()
-      .describe("Cheque sizes as decimal strings in one ISO currency."),
-    minStageCode: z.string().max(64).optional(),
-    maxStageCode: z.string().max(64).optional(),
-    rawMandateText: z
-      .string()
-      .max(8000)
-      .optional()
-      .describe("Their mandate in their own words."),
-  })
-  .strict();
-export type ProposeMandateChangeInput = z.infer<
-  typeof ProposeMandateChangeInputSchema
->;
-
-export function createProposeMandateChangeTool(
-  ports: Pick<QToolPorts, "companies" | "investors">,
-  port: RecordChangePort,
-): AnyQToolDefinition {
-  const prepare = prepareWith(port);
-  return defineQTool<
-    ProposeMandateChangeInput,
-    ProposeRecordChangeOutput,
-    Grant
-  >({
-    ...COMMON,
-    id: PROPOSE_MANDATE_CHANGE,
-    supportedPurposes: [
-      "INVESTOR_QUESTION",
-      "ACTION_PREPARATION",
-      "GENERAL_QUESTION",
-    ],
-    providerName: "propose_mandate_change",
-    description: `Prepares a change to their own investor organisation's mandate, as the mandate form makes it: create one, update name, discoveryMode, chequeRange, minStageCode, maxStageCode or rawMandateText, activate it, or close it. Sectors, geographies, business models, criteria, founder preferences and exclusions are propose_profile_answer_change. ${RESULT_NOTE}`,
-    requiredScopeKinds: ["INVESTOR_PROFILE", "INVESTOR_MANDATE"],
-    input: ProposeMandateChangeInputSchema,
-    authorize: subjectAuthorizer(ports, "INVESTOR_ORGANISATION"),
-    execute: (input, context, grant) => {
-      const { operation, mandateId, ...fields } = input;
-      return prepare(
-        {
-          kind: "INVESTOR_MANDATE",
-          investorOrganisationId: grant.subjectId,
-          operation,
-          mandateId: mandateId ?? null,
-          fields:
-            operation === "ACTIVATE" || operation === "CLOSE"
-              ? {}
-              : defined(fields),
-        },
-        context,
-      );
-    },
-  });
 }
 
 // --- the investor organisation's visibility --------------------------------
@@ -412,8 +234,6 @@ export function createRecordChangeTools(
   port: RecordChangePort,
 ): readonly AnyQToolDefinition[] {
   return [
-    createProposeRaiseChangeTool(ports, port),
-    createProposeMandateChangeTool(ports, port),
     createProposeInvestorVisibilityTool(ports, port),
     createProposeProfileAnswerTool(ports, port),
   ];

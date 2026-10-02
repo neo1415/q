@@ -153,8 +153,6 @@ describe("the capability registry is complete", () => {
       "get_q_card",
       "list_pending_approvals",
       "list_my_documents",
-      "propose_raise_change",
-      "propose_mandate_change",
       "propose_investor_visibility",
       "read_my_record",
       "list_uploaded_documents",
@@ -226,10 +224,10 @@ describe("a run's capabilities come from composed facts, never words", () => {
     eligibleCapabilities(f).map((capability) => capability.id);
 
   it("a tool is a capability only when the run offers it", () => {
-    expect(ids(facts({}))).not.toContain("tool.propose_raise_change");
+    expect(ids(facts({}))).not.toContain("tool.fill_profile_gaps");
     expect(
-      ids(facts({ offeredTools: new Set(["propose_raise_change"]) })),
-    ).toContain("tool.propose_raise_change");
+      ids(facts({ offeredTools: new Set(["fill_profile_gaps"]) })),
+    ).toContain("tool.fill_profile_gaps");
   });
 
   it("the visibility screen and change need a company; the own mandate needs an investor's own organisation", () => {
@@ -263,7 +261,7 @@ describe("a run's capabilities come from composed facts, never words", () => {
     const loop = ids(
       facts({
         surface: "ONBOARDING",
-        offeredTools: new Set(["record_answers", "propose_raise_change"]),
+        offeredTools: new Set(["record_answers", "fill_profile_gaps"]),
         artifacts: true,
       }),
     );
