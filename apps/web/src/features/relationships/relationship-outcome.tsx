@@ -12,6 +12,7 @@ import { Button } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
 
 import {
+  meetingOutcomeAction,
   passAction,
   passReasonsAction,
   pauseAction,
@@ -41,7 +42,60 @@ function newKey(): string {
   return `web-pass-${crypto.randomUUID()}`;
 }
 
-export function RelationshipOutcome({
+export function RelationshipOutcome(props: {
+  readonly relationshipId: string;
+  readonly state: RelationshipStateV2;
+  readonly side: RelationshipSide;
+  readonly counterpart: string;
+}) {
+  // The notes notice links here (#outcome): "How did it go?" first.
+  return (
+    <div id="outcome" className="flex flex-col items-stretch gap-3">
+      {props.state === "MEETING_HELD" ? (
+        <HowDidItGo relationshipId={props.relationshipId} />
+      ) : null}
+      <SideOutcome {...props} />
+    </div>
+  );
+}
+
+const MEETING_OUTCOMES: readonly {
+  readonly outcome:
+    "DILIGENCE" | "FOLLOW_UP_MEETING" | "MATERIALS_REQUESTED" | "INTRODUCTIONS";
+  readonly label: string;
+}[] = [
+  { outcome: "DILIGENCE", label: "Diligence starts" },
+  { outcome: "FOLLOW_UP_MEETING", label: "We'll meet again" },
+  { outcome: "MATERIALS_REQUESTED", label: "Materials asked for" },
+  { outcome: "INTRODUCTIONS", label: "Introductions next" },
+];
+
+/**
+ * Either side confirms what the call led to (PADL #130: Q proposes, the
+ * person confirms). One press is their confirmation; it is recorded on
+ * the relationship both sides read. Q asks the same in conversation.
+ */
+function HowDidItGo({ relationshipId }: { readonly relationshipId: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="cq-body-sm text-(--cq-text-secondary)">
+        How did the call go? Record what was agreed.
+      </p>
+      {MEETING_OUTCOMES.map((option) => (
+        <OutcomeButton
+          key={option.outcome}
+          label={option.label}
+          busyLabel="Recording…"
+          run={() =>
+            meetingOutcomeAction(relationshipId, { outcome: option.outcome })
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+function SideOutcome({
   relationshipId,
   state,
   side,

@@ -476,6 +476,7 @@ import {
   recordingFirewall,
 } from "@capital-q/platform-admin";
 import { withSuspension } from "./composition/suspension.js";
+import { createOwnCalls } from "./composition/own-calls.js";
 // end ADMIN block
 // ADMIN-3 block
 import {
@@ -1409,6 +1410,7 @@ const investorFeed = createInvestorFeedPort({
 const appActionPorts: OwnReadPorts = {
   media: pitchMedia,
   outcomes: outcomeService,
+  calls: createOwnCalls({ sql: database.sql }),
   interactions: createInteractionSignalService({
     ports: slateRead.eligibilityPorts,
     eligibility: slateRead.eligibility,

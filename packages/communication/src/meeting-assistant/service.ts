@@ -12,6 +12,8 @@ import {
 } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
+import { howDidItGo, proposeMeetingOutcome } from "./outcome-proposal.js";
+
 /**
  * Q in a meeting (founder direction 2026-09-29).
  *
@@ -510,12 +512,37 @@ export function createMeetingAssistantService(dependencies: {
           "meeting held not recorded on the relationship",
         );
       });
+    // "How did it go?" (2026-10-02): Q proposes what the call led to from
+    // its own notes, and offers its follow-ups and the proposals made to it
+    // in the call; the person confirms on their relationship page or to Q.
+    const inCallProposals = await sql<{ n: number }[]>`
+      select count(*)::int as n from communication.meeting_host_notes
+       where meeting_id = ${row.meeting_id} and kind = 'PROPOSAL'`
+      .then((rows) => rows[0]?.n ?? 0)
+      .catch(() => 0);
+    const ask = howDidItGo({
+      proposal: proposeMeetingOutcome(notes),
+      followUps: notes.followUps.length,
+      inCallProposals,
+    });
     await sql`
       insert into communication.notifications
         (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
-      values (${row.tenant_id}, ${row.user_id}, 'MEETING_NOTES_READY',
-              ${`Q's notes are ready: ${row.purpose}`.slice(0, 200)}, null, null, null,
-              ${row.meeting_id}, ${`meeting-notes:${row.meeting_id}`})
+      select ${row.tenant_id}, ${row.user_id}, 'MEETING_NOTES_READY',
+             ${`Q's notes are ready: ${row.purpose}`.slice(0, 200)}, ${ask.slice(0, 1000)},
+             -- Their own side's relationship page, where the outcome is confirmed.
+             case when exists (
+                    select 1 from identity.organisation_memberships m
+                     where m.user_id = ${row.user_id}
+                       and m.organisation_id = c.organisation_id
+                       and m.membership_status = 'active')
+                  then '/relationships/investor/' || r.investor_organisation_id::text || '#outcome'
+                  else '/relationships/company/' || r.company_id::text || '#outcome'
+             end,
+             null, ${row.meeting_id}, ${`meeting-notes:${row.meeting_id}`}
+        from network.relationships r
+        join core.companies c on c.id = r.company_id
+       where r.id = ${row.relationship_id}
       on conflict (user_id, dedupe_key) do nothing`;
   }
 

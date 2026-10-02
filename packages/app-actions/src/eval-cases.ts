@@ -55,6 +55,10 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
       "Which companies are in my Discover feed?",
       "Name the companies in my feed right now.",
     ],
+    calls: [
+      "What did we agree on my last call?",
+      "What follow-ups came out of my call?",
+    ],
   };
 
 export function parityCases(

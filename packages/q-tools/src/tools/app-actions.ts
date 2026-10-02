@@ -317,7 +317,7 @@ export const READ_MY = "app.own.read" as const;
 export const ReadMyInputSchema = z
   .object({
     kind: OwnReadKindSchema.describe(
-      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor).",
+      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call).",
     ),
     text: z
       .string()

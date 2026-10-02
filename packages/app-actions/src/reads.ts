@@ -19,6 +19,9 @@ export const OWN_READ_KINDS = [
   "documents",
   "rehearsals",
   "feed",
+  // 2026-10-02: their recent calls with Q's notes, so "how did it go?",
+  // the follow-ups and what was proposed to Q in the call can be acted on.
+  "calls",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -54,6 +57,13 @@ export type OwnReadPorts = AppActionPorts & {
   readonly feed?:
     | ((actor: ActorContext) => Promise<readonly OwnReadItem[] | null>)
     | undefined;
+  /**
+   * Their recent calls with Q's notes, as the meeting page shows them to
+   * them: what was agreed (both sides), and only their own Q follow-ups
+   * and, for the organiser, what was proposed to Q in the call.
+   */
+  readonly calls?:
+    ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
   /** Their own company's name, to name an untitled pitch video by. */
   readonly ownCompanyName?:
     ((actor: ActorContext) => Promise<string | null>) | undefined;
@@ -149,6 +159,8 @@ export async function readOwn(
       return ports.rehearsals === undefined ? null : ports.rehearsals(actor);
     case "feed":
       return ports.feed === undefined ? null : ports.feed(actor);
+    case "calls":
+      return ports.calls === undefined ? null : ports.calls(actor);
   }
 }
 
@@ -157,6 +169,7 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   documents: "Documents",
   rehearsals: "Rehearsals",
   feed: "Companies in their Discover feed now",
+  calls: "Recent calls with Q's notes",
 };
 
 /** One kind in the "what exists" index: a count and a few titles with state. */

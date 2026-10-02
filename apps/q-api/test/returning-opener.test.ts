@@ -58,3 +58,22 @@ describe("the returning opener", () => {
     );
   });
 });
+
+describe("after a call (2026-10-02)", () => {
+  it("asks how it went, with the outcome Q proposes from its notes", () => {
+    expect(
+      composeReturningOpener(
+        "Zino",
+        {
+          ...none,
+          notesReady: 1,
+          notesQuestion:
+            "How did it go? It sounded like next steps are diligence — record that?",
+        },
+        NOW,
+      ),
+    ).toBe(
+      "Hi Zino. My notes from your last call are ready. How did it go? It sounded like next steps are diligence — record that?",
+    );
+  });
+});
