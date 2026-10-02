@@ -123,14 +123,26 @@ async function namesFor(founderUser, investorUser) {
         order by i.rank limit 1`,
     )
   )[0]?.name;
+  // Their company's uploaded pitch deck (set_deck_audience names it).
+  const deck = (
+    await sql(
+      `select d.title from evidence.documents d
+         join core.companies c on c.id = d.company_id
+         join identity.organisation_memberships om on om.organisation_id = c.organisation_id
+        where om.user_id = ${quote(founderUser)} and d.document_type = 'PITCH_DECK'
+        order by d.created_at desc limit 1`,
+    )
+  )[0]?.title;
   return {
     names: {
       ...(pitch === undefined ? {} : { MEDIA: pitch }),
+      ...(deck === undefined ? {} : { UPLOAD: deck }),
       ...(company === undefined ? {} : { COMPANY: company }),
       ...(relationship === undefined ? {} : { RELATIONSHIP: relationship }),
     },
     reads: {
       ...(pitch === undefined ? {} : { media: pitch }),
+      ...(deck === undefined ? {} : { uploads: deck }),
       ...(company === undefined ? {} : { feed: company }),
     },
   };

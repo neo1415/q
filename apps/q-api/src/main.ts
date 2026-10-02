@@ -1528,6 +1528,22 @@ const appActionPorts: OwnReadPorts = {
       at: item.updatedAt,
       facts: { type: item.type, version: item.currentVersion },
     })),
+  // The files their company uploaded (deck, financials, …), as the
+  // documents page lists them: the evidence service's own read, as them.
+  uploads: async (actor) => {
+    const companyId = await runtimeDependencies.ownCompany(actor);
+    if (companyId === null) return [];
+    const files = await createEvidenceDocumentsPort(
+      researchComposition.evidence,
+    ).list(actor, companyId);
+    return files.slice(0, 30).map((file) => ({
+      id: file.documentId,
+      title: file.title.slice(0, 200),
+      status: file.status.toLowerCase(),
+      at: file.updatedAt,
+      facts: { type: file.documentType, reading: file.processing },
+    }));
+  },
   rehearsals: async (actor) =>
     (await rehearsals.list(actor)).rehearsals.map((row) => ({
       id: row.id,

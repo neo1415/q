@@ -102,7 +102,7 @@ export type AppActionTool<In, ToolIn> = {
     input: ToolIn,
     context: AppActionContext,
     ports: AppActionPorts,
-  ) => Promise<In | null>;
+  ) => Promise<In | AppActionRefusal | null>;
   /**
    * A check only Q's path needs before preparing a card, in the person's
    * words (a handle already taken): the screen's route gets the service's
@@ -216,6 +216,26 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
    */
   readonly qCapability?: `hand.${string}` | `offer.${string}` | undefined;
 };
+
+/**
+ * Nothing to act on, said in the person's words (no Q Card yet, no raise
+ * yet): Q says why rather than "not available".
+ */
+export type AppActionRefusal = { readonly refused: string };
+
+export function refusal(words: string): AppActionRefusal {
+  return { refused: words };
+}
+
+export function isRefusal(value: unknown): value is AppActionRefusal {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "refused" in value &&
+    typeof value.refused === "string" &&
+    Object.keys(value).length === 1
+  );
+}
 
 /** Erased for the registry; per-action types stay with the action (as q-tools does). */
 export type AnyAppAction = AppActionDefinition<unknown, unknown, unknown>;

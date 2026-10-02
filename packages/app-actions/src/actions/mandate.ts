@@ -25,6 +25,7 @@ import {
   defineAppAction,
   portMissing,
   defineAppActionFamily,
+  refusal,
   type AnyAppAction,
   type AppActionContext,
 } from "../define.js";
@@ -374,7 +375,9 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         investorOrganisationId,
         mandateId,
       );
-      if (mandate === null) return null;
+      if (mandate === null) {
+        return refusal("You have no mandate to change yet: create one first.");
+      }
       const which = { investorOrganisationId, mandateId: mandate.id };
       return operation === "UPDATE"
         ? {

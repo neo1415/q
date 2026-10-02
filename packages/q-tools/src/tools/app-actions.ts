@@ -4,12 +4,14 @@ import { z } from "zod";
 
 import {
   APP_ACTIONS,
+  isRefusal,
   OwnReadItemSchema,
   OwnReadKindSchema,
   readOwn,
   resolveReference,
   type AnyAppAction,
   type AppActionContext,
+  type OwnReadKind,
   type OwnReadPorts,
   type ReferenceCandidates,
   type ReferenceKind,
@@ -123,6 +125,14 @@ export function appActionKey(
     .digest("hex")}`;
 }
 
+/** Which of their own records each nameable kind is matched among. */
+const OWN_KIND_OF = {
+  MEDIA: "media",
+  DOCUMENT: "documents",
+  UPLOAD: "uploads",
+  REHEARSAL: "rehearsals",
+} as const satisfies Partial<Record<ReferenceKind, OwnReadKind>>;
+
 /** The records of each kind a person can see, for matching a said name. */
 export function referenceCandidates(
   ports: QToolPorts,
@@ -143,17 +153,23 @@ export function referenceCandidates(
       }
       case "MEDIA":
       case "DOCUMENT":
+      case "UPLOAD":
       case "REHEARSAL": {
-        const items = await readOwn(
-          own,
-          actor,
-          kind === "MEDIA"
-            ? "media"
-            : kind === "DOCUMENT"
-              ? "documents"
-              : "rehearsals",
-        ).catch(() => null);
-        return (items ?? []).map((item) => ({ id: item.id, name: item.title }));
+        const items = await readOwn(own, actor, OWN_KIND_OF[kind]).catch(
+          () => null,
+        );
+        // "my deck" among a deck and their financials: the deck(s) alone,
+        // so pointing words still find the one they mean.
+        const decks =
+          kind === "UPLOAD" && /\bdecks?\b/i.test(said)
+            ? (items ?? []).filter(
+                (item) => item.facts["type"] === "PITCH_DECK",
+              )
+            : [];
+        return (decks.length > 0 ? decks : (items ?? [])).map((item) => ({
+          id: item.id,
+          name: item.title,
+        }));
       }
     }
   };
@@ -258,6 +274,7 @@ function toolFor(
         .toCanonical(resolved, context, own)
         .catch(() => null);
       if (canonical === null) return deny("NOT_AVAILABLE");
+      if (isRefusal(canonical)) return deny("NOT_AVAILABLE", canonical.refused);
       const parsed = action.input.safeParse(canonical);
       if (!parsed.success) {
         // The declaration's own contract refused a value: say which, so Q
@@ -317,7 +334,7 @@ export const READ_MY = "app.own.read" as const;
 export const ReadMyInputSchema = z
   .object({
     kind: OwnReadKindSchema.describe(
-      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call).",
+      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call), uploads (the files their company uploaded: pitch deck, financials and the like, with type and status).",
     ),
     text: z
       .string()
@@ -351,7 +368,7 @@ export function createReadMyTool(own: OwnReadPorts): AnyQToolDefinition {
     status: "ACTIVE",
     providerName: "read_my",
     description:
-      "Reads the person's own records of one kind exactly as their page shows them: their pitch videos (title, who can watch, whether investors can play it), their documents, their rehearsals, or the companies in their Discover feed now. Use it before saying they have none, or that a company is not in their feed.",
+      "Reads the person's own records of one kind exactly as their page shows them: their pitch videos (title, who can watch, whether investors can play it), the documents Q made for them, the files they uploaded (their deck, financials), their rehearsals, or the companies in their Discover feed now. Use it before saying they have none, or that a company is not in their feed.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
