@@ -2108,6 +2108,9 @@ importers:
       '@capital-q/evidence':
         specifier: workspace:*
         version: link:../evidence
+      '@capital-q/media':
+        specifier: workspace:*
+        version: link:../media
       '@capital-q/network':
         specifier: workspace:*
         version: link:../network

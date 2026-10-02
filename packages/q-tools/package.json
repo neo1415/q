@@ -41,6 +41,7 @@
     "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",
     "@capital-q/evidence": "workspace:*",
+    "@capital-q/media": "workspace:*",
     "@capital-q/network": "workspace:*",
     "@capital-q/q-firewall": "workspace:*",
     "@types/node": "^24.13.3",
