@@ -80,7 +80,7 @@ function names(list: readonly (string | null)[]): string {
  */
 export function ownStandingFact(
   data: unknown,
-  focusId: string | null,
+  focus: string | null | readonly string[],
 ): AuthorisedFact | null {
   if (typeof data !== "object" || data === null) return null;
   const read = data as MyRelationshipsRead;
@@ -92,7 +92,9 @@ export function ownStandingFact(
   if (!investor && !company) return null;
 
   const parts: string[] = [];
-  if (focusId !== null) {
+  const focusIds =
+    focus === null ? [] : typeof focus === "string" ? [focus] : [...focus];
+  for (const focusId of focusIds.slice(0, 6)) {
     const related = relationships.find((r) => r.counterpart?.id === focusId);
     const wasSaved = saved.find((d) => d.companyId === focusId);
     const wasPassed = passed.find((d) => d.companyId === focusId);

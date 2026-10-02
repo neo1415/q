@@ -65,3 +65,15 @@ describe("their own companies a turn names (founder live 2026-10-01)", () => {
     expect(coreOf("Kazikit Technologies Ltd (fictional)")).toBe("kazikit");
   });
 });
+
+describe("a single word heard as a name (live 2026-10-02)", () => {
+  it("reads TALUM as Tallyloom, and never 'them' or 'tell me'", () => {
+    expect(
+      companiesNamedIn(
+        "Accept TALUM and send them a message. You can book a meeting with them too.",
+        KNOWN,
+      ).map((c) => c.companyId),
+    ).toEqual(["b"]);
+    expect(companiesNamedIn("tell me about them", KNOWN)).toEqual([]);
+  });
+});

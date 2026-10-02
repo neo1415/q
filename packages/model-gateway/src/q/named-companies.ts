@@ -14,6 +14,8 @@
  * plan, so a company the firewall did not admit is never read.
  */
 
+import { closestByName } from "@capital-q/q-runtime";
+
 export type KnownCompany = {
   readonly companyId: string;
   readonly name: string;
@@ -123,6 +125,22 @@ export function companiesNamedIn(
     const distance = nearestDistance(core, squashed);
     if (distance <= Math.floor(core.length / 3)) {
       scored.push({ company, distance: distance / core.length });
+    }
+  }
+  // A single word heard as a name ("TALUM" for Tallyloom; live
+  // 2026-10-02), with the same ear the tools use: by sound or a small
+  // edit, only for words of five letters or more, and only when exactly
+  // one of their companies is that close.
+  const seen = new Set(scored.map((entry) => entry.company.companyId));
+  for (const word of words.split(/\s+/)) {
+    if (word.length < 5) continue;
+    const near = closestByName(known, word, (company) =>
+      letters(company.name).replace(SUFFIXES, " ").replace(/\s+/g, " ").trim(),
+    );
+    const only = near.length === 1 ? near[0] : undefined;
+    if (only !== undefined && !seen.has(only.companyId)) {
+      seen.add(only.companyId);
+      scored.push({ company: only, distance: 0.5 });
     }
   }
   return scored

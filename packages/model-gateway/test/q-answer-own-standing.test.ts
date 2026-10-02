@@ -158,6 +158,7 @@ function build(
   read: { status: "SUCCEEDED" | "DENIED"; data?: unknown },
   subject: Subject = { kind: "COMPANY", companyId: COMPANY },
   deps: Partial<Parameters<typeof createModelGatewayQAnswer>[0]> = {},
+  scene: { readonly said?: string; readonly standing?: unknown } = {},
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -191,7 +192,7 @@ function build(
       conversationId: CONVERSATION,
       runId: RUN,
       role: "USER",
-      content: "Where are we with Kora?",
+      content: scene.said ?? "Where are we with Kora?",
       contentType: "TEXT",
       createdAt: new Date().toISOString(),
     } as unknown as QConversationMessage,
@@ -234,7 +235,7 @@ function build(
                 ok: true,
                 data:
                   proposal.name === "list_my_relationships"
-                    ? STANDING
+                    ? (scene.standing ?? STANDING)
                     : proposal.name === "get_company"
                       ? ON_SCREEN
                       : proposal.name === "get_q_daily"
@@ -552,5 +553,47 @@ describe("The Q Daily on their screen is read before the model (founder live 202
     const home = build({ status: "SUCCEEDED", data: CONNECTED });
     await home.seam.answer(home.request);
     expect(home.executed.map((call) => call.name)).not.toContain("get_q_daily");
+  });
+});
+
+describe("TALUM is Tallyloom, and his own interest is not a request to accept (live 2026-10-02)", () => {
+  it("states Tallyloom's direction as the turn's focus for the founder's exact line", async () => {
+    const TALLYLOOM = randomUUID();
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: { ...CONNECTED, relationship: null } },
+      undefined,
+      {},
+      {
+        said: "Accept TALUM and send them a message. You can book a meeting with them too.",
+        standing: {
+          yourSide: "INVESTOR",
+          relationships: [
+            {
+              relationshipId: randomUUID(),
+              counterpart: {
+                kind: "COMPANY",
+                id: TALLYLOOM,
+                name: "Tallyloom (fictional)",
+              },
+              state: "INTEREST_EXPRESSED",
+              stateSince: "2026-10-01T10:00:00.000Z",
+              milestones: [],
+              nextStep: "AWAIT_ANSWER",
+            },
+          ],
+          saved: [],
+          passed: [],
+          truthClass: "VERIFIED",
+          source: "Capital Q relationship history",
+        },
+      },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const sent = sentTo(alpha);
+    expect(sent).toContain(
+      "About Tallyloom (fictional): you expressed interest in them and are waiting for them to accept; there is no request from them for you to accept",
+    );
+    expect(sent).toContain("Requests waiting for them to answer: none.");
+    expect(sent).toContain("the other side hasn't answered yet");
   });
 });

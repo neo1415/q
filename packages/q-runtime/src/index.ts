@@ -75,6 +75,12 @@ export {
   withoutSupersededUtterances,
 } from "./domain/utterances.js";
 export {
+  closestByName,
+  comparable,
+  distance,
+  nameSkeleton,
+} from "./domain/names.js";
+export {
   createCapitalObjectiveQSubjectResolver,
   createCompanyQSubjectResolver,
   createDocumentQSubjectResolver,

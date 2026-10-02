@@ -1679,13 +1679,23 @@ export function createModelGatewayQAnswer(
             latencyMs: outcome.latencyMs,
           };
           if (outcome.result.ok) {
-            const focus =
+            const onScreen =
               counterparty?.kind === "COMPANY"
                 ? counterparty.companyId
                 : counterparty?.kind === "INVESTOR_ORGANISATION"
                   ? counterparty.investorOrganisationId
                   : null;
-            ownStanding = ownStandingFact(outcome.result.data, focus);
+            // Their companies this message names, as typed or as heard
+            // ("TALUM" for Tallyloom; live 2026-10-02), are the turn's
+            // focus too: each gets its direction line.
+            const named = companiesNamedIn(
+              latest.content,
+              knownCompaniesOf(outcome.result.data),
+            ).map((company) => company.companyId);
+            ownStanding = ownStandingFact(outcome.result.data, [
+              ...(onScreen === null ? [] : [onScreen]),
+              ...named.filter((id) => id !== onScreen),
+            ]);
           }
         }
       }
