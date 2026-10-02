@@ -4,7 +4,7 @@ import {
   CounterpartPersonaStoredSchema,
   PresenceReadingSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnV6ResultSchema,
+  RehearsalTurnV7ResultSchema,
 } from "@capital-q/q-core";
 
 import {
@@ -64,6 +64,8 @@ const TURN = {
   conclusion: null,
   presence: PRESENCE,
   askedToSee: false,
+  wantsToEnd: false,
+  onlyNoise: false,
 };
 
 const REVIEW = {
@@ -166,7 +168,7 @@ describe("rehearsal readings never refuse whole for one field", () => {
         "an empty list",
       ].includes(how);
     expect(
-      fuzz(TURN, readTurn, RehearsalTurnV6ResultSchema, words),
+      fuzz(TURN, readTurn, RehearsalTurnV7ResultSchema, words),
     ).toBeGreaterThan(100);
   });
 

@@ -33,7 +33,7 @@ import {
   type CounterpartPersonaV5Variables as CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV6Result as RehearsalTurnResult,
+  type RehearsalTurnV7Result as RehearsalTurnResult,
   type RehearsalTurnV6Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -43,7 +43,6 @@ import {
   deliveryFor,
   initialTemperament,
   registerOf,
-  asksToEnd,
   stanceOf,
   walkOutNote,
   walkOutPlan,
@@ -1107,6 +1106,8 @@ export function yieldTo(previous: readonly Turn[]): {
       conclusion: null,
       presence: null,
       askedToSee: false,
+      wantsToEnd: false,
+      onlyNoise: false,
     },
     sawScreen: false,
   };
@@ -1140,20 +1141,12 @@ function warned(stage: 1 | 2, line: string, wasGoodbye: boolean): string {
 export const TURN_DEADLINE_MS = 10_000;
 
 /**
- * Words that carry nothing: no letters at all, or only a hesitation sound.
- * Background noise transcribed as "uh" or "." is not a turn (founder live
- * 2026-10-02: the room waited on noise).
+ * Words with no letters at all (a stray "." or "…" from the transcriber)
+ * are not a turn. Anything with letters goes to the turn, which reads by
+ * meaning whether it was only noise (onlyNoise) -- never a word list.
  */
 export function noiseOnly(text: string): boolean {
-  const words = text
-    .toLowerCase()
-    .replace(/[^\p{L}\s']/gu, " ")
-    .split(/\s+/)
-    .filter((word) => word.length > 0);
-  if (words.length === 0) return true;
-  return words.every((word) =>
-    /^(u+h+|u+m+|h+m+|m+|m+h+m+|a+h+|o+h+|e+r+m*|hu+h)$/.test(word),
-  );
+  return !/\p{L}/u.test(text);
 }
 
 /** Said in character when a turn could not be composed; never an error. */
@@ -1254,6 +1247,8 @@ function holdingTurn(
       conclusion: null,
       presence: null,
       askedToSee: false,
+      wantsToEnd: false,
+      onlyNoise: false,
     },
     sawScreen: false,
   };
@@ -1742,12 +1737,12 @@ export function createRehearsalService(dependencies: {
     const after = applyAppraisal(before, result.appraisal, row.difficulty);
     const register = registerOf(after, row.difficulty);
     // Two warnings over two turns before walking out, unless they asked
-    // to end it themselves (founder live 2026-10-02).
-    const lastYou = [...turns].reverse().find((turn) => turn.from === "YOU");
+    // to end it themselves -- read by meaning on the turn, never by
+    // matching their words (founder live 2026-10-02).
     const plan = walkOutPlan({
       register,
       warningsGiven,
-      theyAskedToEnd: lastYou !== undefined && asksToEnd(lastYou.text),
+      theyAskedToEnd: result.wantsToEnd,
       closing: result.move === "CLOSE",
       provoked: PROVOKED.has(result.appraisal),
     });
@@ -2099,6 +2094,9 @@ export function createRehearsalService(dependencies: {
       // Spoken over: the person carried on, and their grown words come as
       // the next turn. Nothing of this one is kept.
       if (signal?.aborted === true) return ok(row);
+      // Only noise (read by meaning on the turn): not a turn, nothing kept,
+      // no reply -- the line simply goes back to listening.
+      if (words.length > 0 && answered.result.onlyNoise) return ok(row);
       const { result } = answered;
       const closing = result.move === "CLOSE";
       const next: Turn[] = [

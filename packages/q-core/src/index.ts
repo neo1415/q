@@ -304,6 +304,7 @@ export { INVESTOR_PERSONA_V5 } from "./prompts/tasks/investor-persona.v5.js";
 export { INVESTOR_TWIN_TURN_V5 } from "./prompts/tasks/investor-twin-turn.v5.js";
 export { INVESTOR_TWIN_TURN_V6 } from "./prompts/tasks/investor-twin-turn.v6.js";
 export { INVESTOR_TWIN_TURN_V7 } from "./prompts/tasks/investor-twin-turn.v7.js";
+export { INVESTOR_TWIN_TURN_V8 } from "./prompts/tasks/investor-twin-turn.v8.js";
 // MEET-HOST block (ADR 0037)
 export { MEETING_HOST_TURN_V1 } from "./prompts/tasks/meeting-host-turn.v1.js";
 export {
@@ -331,6 +332,8 @@ export {
   RehearsalTurnV6VariablesSchema,
   RehearsalTurnV5ResultSchema,
   RehearsalTurnV6ResultSchema,
+  RehearsalTurnV7ResultSchema,
+  type RehearsalTurnV7Result,
   type RehearsalTurnV6Result,
   PresenceReadingSchema,
   type PresenceReading,

@@ -28,7 +28,7 @@ export const INVESTOR_TWIN_TURN_V7: PromptDefinition<
 > = {
   ...INVESTOR_TWIN_TURN_V6,
   version: 7,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "2026-10-01: askedToSee read by meaning; a look on request from a fresh frame, an honest 'I can't see you' without consent, 'I can't make it out' when unclear; objects they show allowed, never appearance or identity.",
   effectiveFrom: "2026-10-01",

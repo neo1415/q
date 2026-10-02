@@ -74,7 +74,7 @@ describe("lenient rehearsal readings", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(5);
     expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(4);
-    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(7);
+    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(8);
   });
 
   it("tells the played person who holds the leverage, and reads how forward they are", () => {
@@ -276,5 +276,20 @@ describe('"can you see this?" (2026-10-01)', () => {
     // Objects join behaviour and setup; appearance and identity stay out.
     expect(turn).toContain("the objects they show you");
     expect(turn).toContain("no guessing who anyone is");
+  });
+});
+
+describe("readings by meaning, never phrase lists (founder live 2026-10-02)", () => {
+  it("asks the turn whether they want to end and whether it was only noise, in any language", () => {
+    const turn =
+      createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
+        .template;
+    expect(turn).toContain(
+      "wantsToEnd: true when their latest line asks to end",
+    );
+    expect(turn).toContain("by meaning, in any wording or language");
+    expect(turn).toContain(
+      "onlyNoise: true when their latest line carries nothing to answer",
+    );
   });
 });

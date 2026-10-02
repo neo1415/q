@@ -27,7 +27,6 @@ import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
 import { createRehearsalAwareTurn } from "../src/voice/rehearsal-turn.js";
 import {
-  asksToEnd,
   walkOutPlan,
   WALK_OUT_LINE,
   WARNING_OPENERS,
@@ -215,6 +214,9 @@ function setup(options: { messages?: () => string } = {}) {
     next: null as PresenceReading | null,
     /** The person's line asks Q to look, read by meaning. */
     asked: (_text: string) => false,
+    /** The model's readings of their latest line, by meaning. */
+    wantsToEnd: (_text: string) => false,
+    onlyNoise: (_text: string) => false,
   };
   const seen = {
     personaInputs: [] as string[],
@@ -360,6 +362,8 @@ function setup(options: { messages?: () => string } = {}) {
           conclusion: "ADJOURNED",
           presence: views.camera === null ? null : looks.next,
           askedToSee: false,
+          wantsToEnd: false,
+          onlyNoise: false,
         });
       }
       return Promise.resolve({
@@ -374,6 +378,8 @@ function setup(options: { messages?: () => string } = {}) {
         conclusion: null,
         presence: views.camera === null ? null : looks.next,
         askedToSee: looks.asked(variables.rehearsal),
+        wantsToEnd: looks.wantsToEnd(variables.rehearsal),
+        onlyNoise: looks.onlyNoise(variables.rehearsal),
       });
     },
     review: (_a, variables) => {
@@ -1438,10 +1444,19 @@ describe("walking out, with warning (founder live 2026-10-02)", () => {
     ).toBe(true);
   });
 
-  it("when they ask to end it, the played person may leave at once", () => {
-    expect(asksToEnd("You know what? Please get lost.")).toBe(true);
-    expect(asksToEnd("Let's end the call here.")).toBe(true);
-    expect(asksToEnd("Tell me about your churn.")).toBe(false);
+  it("when they ask to end it (read by meaning on the turn), no warning: the line stands", async () => {
+    const { service, looks } = setup();
+    const id = await tough(service);
+    await service.say(actor(FOUNDER), id, { text: "You're useless." });
+    looks.wantsToEnd = (transcript) => transcript.includes("Va-t'en");
+    const said = await service.say(actor(FOUNDER), id, {
+      text: "Va-t'en, c'est fini.",
+    });
+    const last = said.kind === "OK" ? said.rehearsal.turns.at(-1)?.text : "";
+    expect(
+      last?.startsWith(WARNING_OPENERS[1]) ||
+        last?.startsWith(WARNING_OPENERS[2]),
+    ).toBe(false);
     expect(
       walkOutPlan({
         register: "ANGRY",
@@ -1473,15 +1488,21 @@ describe("never stuck on thinking (founder live 2026-10-02)", () => {
     ).toBe(true);
   });
 
-  it("noise is not a turn: no reply, nothing recorded", async () => {
-    const { service, seen } = setup();
+  it("noise is not a turn: read by meaning on the turn, nothing recorded, no reply", async () => {
+    const { service, seen, looks } = setup();
     const rehearsal = await startWith(service);
+    looks.onlyNoise = (transcript) =>
+      /(^|\n)[^\n]*: (uh|mm)\.?$/i.test(transcript.trim());
     const calls = seen.turnInputs.length;
-    for (const text of ["uh", "Hmm.", "...", "um uh"]) {
+    for (const text of ["uh", "mm."]) {
       const said = await service.say(actor(FOUNDER), rehearsal.id, { text });
       expect(said.kind === "OK" && said.rehearsal.turns).toHaveLength(1);
     }
-    expect(seen.turnInputs.length).toBe(calls);
+    // The model judged them (no word list in code), and nothing was kept.
+    expect(seen.turnInputs.length).toBe(calls + 2);
+    // A line with no letters at all never reaches the model.
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "…" });
+    expect(seen.turnInputs.length).toBe(calls + 2);
     expect(noiseOnly("Uh, the churn is five percent")).toBe(false);
     expect(noiseOnly("No.")).toBe(false);
   });

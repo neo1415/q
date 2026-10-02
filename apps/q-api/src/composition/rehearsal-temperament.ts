@@ -382,13 +382,6 @@ export const WARNING_OPENERS = {
 export const WALK_OUT_LINE =
   "That's it. I'm ending this meeting here. Goodbye!";
 
-/** They asked to end it themselves (their own words, not a model's reading). */
-export function asksToEnd(text: string): boolean {
-  return /\b(end (?:the|this) (?:call|meeting)|let'?s (?:stop|end)|get lost|good ?bye|bye|i'?m done|we'?re done|get out|hang up|leave (?:the|this) (?:call|meeting)|not (?:going to|gonna) (?:\w+ )*(?:moving|move) forward)\b/i.test(
-    text,
-  );
-}
-
 export type WalkOut = {
   /** This line is warning 1 or 2, or null. */
   readonly warning: 1 | 2 | null;
