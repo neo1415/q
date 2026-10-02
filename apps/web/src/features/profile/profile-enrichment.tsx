@@ -226,6 +226,7 @@ const CLAIM_WORDS: Readonly<
   Record<VerificationStandingDto["claimType"], string>
 > = {
   FOUNDER_IDENTITY: "Founder identity",
+  INVESTOR_IDENTITY: "Investor identity",
   ORGANISATION: "Organisation",
   DOMAIN_CONTROL: "Website ownership",
 };

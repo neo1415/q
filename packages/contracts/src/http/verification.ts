@@ -20,6 +20,8 @@ import { UtcTimestampSchema } from "../common/time.js";
 
 export const VERIFICATION_CLAIM_TYPES = [
   "FOUNDER_IDENTITY",
+  /** An investor organisation's person (ADR 0038); never a founder. */
+  "INVESTOR_IDENTITY",
   "ORGANISATION",
   "DOMAIN_CONTROL",
 ] as const;

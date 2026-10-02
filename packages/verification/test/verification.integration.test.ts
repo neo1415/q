@@ -896,6 +896,80 @@ describe("@capital-q/verification against local PostgreSQL", () => {
     });
   });
 
+  it("verifies an investor's person as INVESTOR_IDENTITY, never as a founder (ADR 0038)", async () => {
+    await withWorld(async (world) => {
+      const { sql } = world.tx;
+      const tenant = randomUUID();
+      const org = randomUUID();
+      await sql`insert into identity.tenants (id, name) values (${tenant}, 'Verify Zino')`;
+      await sql`insert into identity.organisations (id, tenant_id, organisation_type, display_name, slug)
+        values (${org}, ${tenant}, 'investment_firm', 'Zino Capital', ${`vf-${org.slice(0, 8)}`})`;
+      await sql`insert into identity.tenant_organisations (tenant_id, organisation_id) values (${tenant}, ${org})`;
+      await sql`insert into core.investor_organisations (tenant_id, organisation_id, investor_type, display_name)
+        values (${tenant}, ${org}, 'VC', 'Zino Capital')`;
+      const partner = await insertMember(
+        world.tx,
+        tenant,
+        org,
+        "organisation_admin",
+        "none",
+      );
+      const transactions = nestedTransactions(world.tx);
+      const repository = createPostgresVerificationClaimRepository();
+      const audit = createPostgresMaterialActionAuditWriter();
+      const outbox = createOutboxWriter({ registry });
+      const kyb = createKybService({
+        sql,
+        transactions,
+        authorization: createAuthorizationService(
+          createPostgresAuthorizationPolicySource({ sql }),
+        ),
+        repository,
+        audit,
+        outbox,
+      });
+      // Capital Q asks on its own first; then the partner sends their details.
+      const outcome = await createAutoVerificationRequester({
+        transactions,
+        repository,
+        audit,
+        outbox,
+      })(
+        {
+          tenantId: tenant,
+          organisationId: org,
+          kind: "INVESTOR",
+          requesterUserId: partner.actor.userId,
+        },
+        CORRELATION(),
+      );
+      expect(outcome.claims).toEqual(["ORGANISATION", "INVESTOR_IDENTITY"]);
+      const sent = await kyb.submit({
+        actor: partner.actor,
+        organisation: null,
+        person: { nameOnId: "Zara Example", role: "Partner", documentId: null },
+        idempotencyKey: "verify-investor-0001",
+        correlationId: CORRELATION(),
+      });
+      expect(sent.kind).toBe("SUBMITTED");
+      if (sent.kind !== "SUBMITTED") throw new Error(sent.kind);
+      expect(sent.view.organisationKind).toBe("INVESTOR");
+      expect(sent.view.person.standing).toBe("PENDING");
+      const rows = await sql<{ claim_type: string; revision: number }[]>`
+        select claim_type, revision from evidence.verification_claims
+         where organisation_id = ${org} order by claim_type`;
+      expect(rows).toEqual([
+        { claim_type: "INVESTOR_IDENTITY", revision: 1 },
+        { claim_type: "ORGANISATION", revision: 1 },
+      ]);
+      const [submission] = await sql<{ claim_type: string }[]>`
+        select c.claim_type from core.identity_submissions s
+          join evidence.verification_claims c on c.id = s.claim_id
+         where s.organisation_id = ${org}`;
+      expect(submission?.claim_type).toBe("INVESTOR_IDENTITY");
+    });
+  });
+
   describe("SYNTHETIC_AUTO_VERIFY_POLICY sweep", () => {
     const sweepFor = (world: World, environment: string) => {
       const source = createPostgresPendingSyntheticClaimSource(world.tx.sql);

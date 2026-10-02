@@ -78,7 +78,7 @@ export default async function VerificationPage({
         title="Verification"
         description={
           context.kind === "INVESTOR"
-            ? "Capital Q verifies your organisation's registered business details before it can represent itself as verified."
+            ? "Capital Q verifies your identity as an investor and your fund's registered details before either can show as verified."
             : "Capital Q verifies a founder's identity and your organisation before your company can appear in investor recommendations."
         }
       />

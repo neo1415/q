@@ -13,6 +13,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
 import { OrganisationIdSchema, TenantIdSchema } from "@capital-q/security";
 
+import { personClaimTypeFor } from "../domain/claims.js";
 import { verificationClaimRecordedEvent } from "../events/index.js";
 import type { VerificationClaimRepository } from "./ports.js";
 
@@ -20,8 +21,8 @@ import type { VerificationClaimRepository } from "./ports.js";
  * Automatic verification requests (founder direction 2026-10-02): once an
  * organisation is on the network -- its onboarding is complete, it turned
  * network-visible, or it has a pitch -- Capital Q asks for its
- * ORGANISATION claim and the person's identity claim (FOUNDER_IDENTITY,
- * subject PERSON -- also used for an investor's person) on its behalf. Only acceptance stays with a person: an operator
+ * ORGANISATION claim and the person's identity claim (FOUNDER_IDENTITY for
+ * a founder, INVESTOR_IDENTITY for an investor -- ADR 0038) on its behalf. Only acceptance stays with a person: an operator
  * decides by hand (OPERATOR_DECISION).
  *
  * What it records is only what Capital Q already knows -- the
@@ -169,7 +170,10 @@ export function createAutoVerificationRequester(dependencies: {
         { type: "ORGANISATION", subjectId: organisationId },
         // The person's identity claim, for a founder or an investor alike
         // ("Verify you and <organisation>").
-        { type: "FOUNDER_IDENTITY", subjectId: candidate.requesterUserId },
+        {
+          type: personClaimTypeFor(candidate.kind),
+          subjectId: candidate.requesterUserId,
+        },
       ];
       const requested: VerificationClaimType[] = [];
       let organisationClaimId: string | null = null;

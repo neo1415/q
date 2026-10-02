@@ -13,7 +13,8 @@ import { ReasonAction } from "./console-ui";
 import { verificationGroups } from "./verification-groups";
 
 const CLAIM_WORDS: Readonly<Record<string, string>> = {
-  FOUNDER_IDENTITY: "Identity",
+  FOUNDER_IDENTITY: "Founder identity",
+  INVESTOR_IDENTITY: "Investor identity",
   ORGANISATION: "Organisation",
   DOMAIN_CONTROL: "Domain control",
 };

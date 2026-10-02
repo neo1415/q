@@ -9,6 +9,7 @@ import {
   founderIdentityOf,
   isRequestable,
   organisationIdentityOf,
+  personClaimTypeFor,
   standingOf,
   toCompanyVerification,
   type VerificationClaim,
@@ -164,5 +165,31 @@ describe("the synthetic attestation gate", () => {
     expect(decisionBasisOf(PROOF)).toBe(
       "operator opted in; environment local; database host 127.0.0.1; requesting account marked synthetic",
     );
+  });
+});
+
+describe("INVESTOR_IDENTITY (ADR 0038)", () => {
+  it("picks the person claim by side, never one shared type", () => {
+    expect(personClaimTypeFor("COMPANY")).toBe("FOUNDER_IDENTITY");
+    expect(personClaimTypeFor("INVESTOR")).toBe("INVESTOR_IDENTITY");
+  });
+
+  it("never counts an investor's verified identity as a founder's", () => {
+    const investor = claim({
+      claimType: "INVESTOR_IDENTITY",
+      status: "VERIFIED",
+      method: "OPERATOR_DECISION",
+      provider: "CAPITAL_Q_OPERATOR",
+      decisionBasis: "Matches the passport",
+      decidedByActorType: "HUMAN",
+      decidedByUserId: BOB,
+      decidedAt: ts("2026-09-24T09:30:00.000Z"),
+      verifiedAt: ts("2026-09-24T09:30:00.000Z"),
+    });
+    expect(founderIdentityOf([investor], null, NOW)).toBeNull();
+    expect(founderIdentityOf([investor], ALICE, NOW)).toBeNull();
+    expect(
+      describeStanding("INVESTOR_IDENTITY", "NOT_REQUESTED", null),
+    ).toContain("Your identity");
   });
 });

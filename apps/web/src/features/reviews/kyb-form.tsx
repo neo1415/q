@@ -202,6 +202,11 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
               <Input
                 id={ids.role}
                 label={`Your role at ${name}`}
+                description={
+                  kyb.organisationKind === "INVESTOR"
+                    ? "For example: Partner, Principal, Angel."
+                    : "For example: Founder & CEO."
+                }
                 autoComplete="organization-title"
                 value={person.role}
                 onChange={(e) =>

@@ -25,7 +25,11 @@ export function verificationGroups(
     else group.push(row);
   }
   return [...byOrganisation.entries()].map(([organisationId, group]) => {
-    const person = group.filter((row) => row.claimType === "FOUNDER_IDENTITY");
+    const person = group.filter(
+      (row) =>
+        row.claimType === "FOUNDER_IDENTITY" ||
+        row.claimType === "INVESTOR_IDENTITY",
+    );
     const organisation = group.find((row) => row.claimType === "ORGANISATION");
     const onlyPerson = person.length === 1 ? person[0] : undefined;
     return {
