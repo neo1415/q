@@ -140,36 +140,45 @@ create trigger relationship_passes_append_only
 
 alter table network.relationship_passes enable row level security;
 
+-- Party predicate (security definer: reads canonical rows the caller has no
+-- grant on, and answers only yes or no). Which side of the relationship the
+-- current person is an active member of.
+create function private.is_relationship_side_member(
+  target_relationship_id uuid,
+  target_side text
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+      from network.relationships r
+      join core.companies co on co.id = r.company_id
+      join core.investor_organisations io on io.id = r.investor_organisation_id
+     where r.id = target_relationship_id
+       and (select private.is_organisation_member(
+             case when target_side = 'INVESTOR' then io.organisation_id
+                  else co.organisation_id end))
+  )
+$$;
+
+revoke all on function private.is_relationship_side_member(uuid, text) from public;
+grant execute on function private.is_relationship_side_member(uuid, text) to authenticated;
+
 -- The investor side reads its own passes, reason and note included.
 create policy relationship_passes_select_investor
   on network.relationship_passes for select to authenticated
-  using (
-    exists (
-      select 1
-        from core.investor_organisations io
-        join identity.organisation_memberships m
-          on m.organisation_id = io.organisation_id
-         and m.membership_status = 'active'
-       where io.id = relationship_passes.investor_organisation_id
-         and m.user_id = (select private.current_app_user_id())
-    )
-  );
+  using ((select private.is_relationship_side_member(relationship_id, 'INVESTOR')));
 
 -- The company side reads a pass only when the investor shared its reason.
 create policy relationship_passes_select_company_shared
   on network.relationship_passes for select to authenticated
   using (
     share_with_founder
-    and exists (
-      select 1
-        from network.relationships r
-        join core.companies c on c.id = r.company_id
-        join identity.organisation_memberships m
-          on m.organisation_id = c.organisation_id
-         and m.membership_status = 'active'
-       where r.id = relationship_passes.relationship_id
-         and m.user_id = (select private.current_app_user_id())
-    )
+    and (select private.is_relationship_side_member(relationship_id, 'COMPANY'))
   );
 
 -- Server-written only.

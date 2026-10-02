@@ -140,6 +140,11 @@ describe("relationship event registry", () => {
       "commitment_detected",
       "commitment_disputed",
       "meeting_no_show",
+      "relationship_passed",
+      "relationship_paused",
+      "relationship_resumed",
+      "diligence_started",
+      "relationship_progressed",
     ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",
@@ -368,5 +373,56 @@ describe("network domain events", () => {
         },
       }).ok,
     ).toBe(false);
+  });
+});
+
+/**
+ * Post-meeting outcomes (2026-10-02): shared, because both sides are their
+ * subject, and a pass never carries its reason (founder decision (a)).
+ */
+describe("outcome events", () => {
+  const registry = createRelationshipEventRegistry(
+    RELATIONSHIP_EVENT_DEFINITIONS,
+  );
+  const passId = "00000000-0000-4000-8000-0000000000a1";
+
+  it("a pass carries whether the reason was shared, never the reason", () => {
+    expect(
+      registry.validate({
+        eventType: "relationship_passed",
+        visibilityScope: "relationship_shared",
+        payload: { passId, side: "INVESTOR", reasonShared: false },
+      }),
+    ).toEqual({ passId, side: "INVESTOR", reasonShared: false });
+    for (const extra of [
+      { reasonCode: "VALUATION" },
+      { note: "too early for us" },
+    ]) {
+      expect(() =>
+        registry.validate({
+          eventType: "relationship_passed",
+          visibilityScope: "relationship_shared",
+          payload: { passId, side: "INVESTOR", reasonShared: true, ...extra },
+        }),
+      ).toThrow();
+    }
+  });
+
+  it("is never private to one side", () => {
+    for (const eventType of [
+      "relationship_passed",
+      "relationship_paused",
+      "relationship_resumed",
+      "diligence_started",
+      "relationship_progressed",
+    ]) {
+      expect(() =>
+        registry.validate({
+          eventType,
+          visibilityScope: "investor_private",
+          payload: { side: "INVESTOR" },
+        }),
+      ).toThrow();
+    }
   });
 });

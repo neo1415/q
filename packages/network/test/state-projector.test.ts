@@ -4,8 +4,9 @@ import type { DisclosureScope } from "@capital-q/contracts";
 
 import {
   nextStepFor,
-  projectRelationshipState,
-  RELATIONSHIP_PROJECTOR_VERSION,
+  // These are relationship-state.v1's properties, held to v1's own fold so
+  // a v1 projection stays reproducible (v2 continuity: state-projector-v2).
+  projectRelationshipStateV1 as projectRelationshipState,
   RELATIONSHIP_STATE_TRANSITIONS,
   visibleToParty,
   type ProjectableEvent,
@@ -191,7 +192,7 @@ describe("relationship-state.v1 examples", () => {
       event(3, "connection_accepted"),
     ]);
     expect(projection).toEqual({
-      version: RELATIONSHIP_PROJECTOR_VERSION,
+      version: "relationship-state.v1",
       state: "CONNECTED",
       stateSince: at(3),
       throughSequence: 3,
