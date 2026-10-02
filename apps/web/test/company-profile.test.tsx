@@ -32,7 +32,8 @@ const downloadDeckAction =
     (
       companyId: string,
     ) => Promise<
-      { readonly ok: true; readonly url: string } | { readonly ok: false; readonly message: string }
+      | { readonly ok: true; readonly url: string }
+      | { readonly ok: false; readonly message: string }
     >
   >();
 
@@ -197,7 +198,9 @@ describe("the profile, for an investor", () => {
     expect(tabs.textContent).toContain("Overview");
     expect(tabs.textContent).toContain("Videos");
     expect(
-      screen.getByRole("link", { name: "Overview" }).getAttribute("aria-current"),
+      screen
+        .getByRole("link", { name: "Overview" })
+        .getAttribute("aria-current"),
     ).toBe("page");
     expect(screen.getByText("USD 1,500,000")).toBeTruthy();
     expect(screen.getByText("Energy storage")).toBeTruthy();
@@ -208,7 +211,9 @@ describe("the profile, for an investor", () => {
       screen.getByRole("button", { name: /Download pitch deck/ }),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Pass" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Express interest/i })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Express interest/i }),
+    ).toBeTruthy();
   });
 
   it("keeps Pass neutral, optimistic and undoable", async () => {
@@ -219,9 +224,7 @@ describe("the profile, for an investor", () => {
     expect(pass.getAttribute("data-variant")).not.toBe("danger");
     fireEvent.click(pass);
     // Optimistic: said before the server answers.
-    expect(screen.getByRole("status").textContent).toBe(
-      "Passed on Kivu Grid",
-    );
+    expect(screen.getByRole("status").textContent).toBe("Passed on Kivu Grid");
     await waitFor(() => {
       expect(recordDecisionAction).toHaveBeenCalledTimes(1);
     });
@@ -248,7 +251,9 @@ describe("the profile, for an investor", () => {
       overview: { ...base.overview, raise: null, deck: null },
     });
     expect(screen.getAllByText("Not shared with you")).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: /Download pitch deck/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Download pitch deck/ }),
+    ).toBeNull();
   });
 
   it("formats money from its decimal string without a float", () => {
@@ -306,8 +311,6 @@ describe("the Videos tab", () => {
     expect(
       container.querySelectorAll("[data-company-pitch]").length,
     ).toBeLessThanOrEqual(1);
-    expect(
-      screen.getByRole("button", { name: "Play The pitch" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Play The pitch" })).toBeTruthy();
   });
 });

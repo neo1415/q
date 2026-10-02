@@ -79,10 +79,7 @@ export function ProfilePass({
     <div className="flex flex-wrap items-center gap-2" data-profile-pass>
       {passed ? (
         <>
-          <span
-            className="cq-body-sm text-(--cq-text-secondary)"
-            role="status"
-          >
+          <span className="cq-body-sm text-(--cq-text-secondary)" role="status">
             Passed on {companyName}
           </span>
           <Button

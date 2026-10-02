@@ -107,7 +107,10 @@ export function CompanyProfileView({
           size={72}
         />
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 id="company-name" className="cq-title-lg text-(--cq-text-primary)">
+          <h1
+            id="company-name"
+            className="cq-title-lg text-(--cq-text-primary)"
+          >
             {profile.canonicalName}
           </h1>
           {profile.shortDescription === null ? null : (
@@ -133,10 +136,7 @@ export function CompanyProfileView({
           server-confirmed (CQ-NET-010), Pass is optimistic and undoable,
           and Interest ≠ Save ≠ Pass.
         */
-        <div
-          className="flex flex-wrap items-start gap-3"
-          data-profile-actions
-        >
+        <div className="flex flex-wrap items-start gap-3" data-profile-actions>
           <ExpressInterest
             companyId={profile.companyId}
             companyName={profile.canonicalName}

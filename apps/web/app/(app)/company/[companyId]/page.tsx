@@ -71,9 +71,7 @@ export default async function CompanyPage({
       ? getOwnInterest(session, profile.companyId).catch(() => null)
       : null,
     investor
-      ? getRelationshipWithCompany(session, profile.companyId).catch(
-          () => null,
-        )
+      ? getRelationshipWithCompany(session, profile.companyId).catch(() => null)
       : null,
     // The industry vocabulary is reference data; the profile carries only
     // node ids. Only the most specific of a lineage is named.

@@ -184,7 +184,9 @@ export async function undoPassAction(input: {
       value: await unpassCompany(active, companyId.data, {
         clientEventId: clientEventId.data,
         surface:
-          input.surface === "COMPANY_PROFILE" ? "COMPANY_PROFILE" : "SAVED_LIST",
+          input.surface === "COMPANY_PROFILE"
+            ? "COMPANY_PROFILE"
+            : "SAVED_LIST",
       }),
     };
   } catch {

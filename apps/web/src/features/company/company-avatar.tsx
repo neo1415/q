@@ -51,6 +51,9 @@ export function CompanyAvatar({
         strokeWidth={1.75}
       />
       {src === null || failed ? null : (
+        // A plain <img> on purpose: next/image would route the bytes of a
+        // private, signed photo through the app's optimiser.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt=""
