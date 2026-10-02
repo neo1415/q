@@ -1352,6 +1352,23 @@ describe("live 2026-10-02 (Zino): a named, misheard company among ALL their rela
     expect(delegated).toBe(0);
   });
 
+  it("the founder's exact line (live re-check on 916c0978): a TOOL_REQUEST hand-over runs QA's hand-over for Tallyloom", async () => {
+    const { line, errands, delegated } = await run(
+      "Accept TALUM and send them a message. You can book a meeting with them too.",
+      "TALUM",
+      {
+        status: "PREPARED",
+        awaitingApprovalOf: "Q looks after Tallyloom for you",
+      },
+    );
+    expect(errands).toEqual([{ kind: "RELATIONSHIP", relationshipId: rel(4) }]);
+    expect(line).toBe(
+      "Tallyloom hasn't accepted your interest yet, so there's nothing to accept. Q looks after Tallyloom for you: once you approve, I wait for them to accept, then send them the message on the card, book an introductory call and send you the link.",
+    );
+    expect(line).not.toMatch(/nothing is waiting|Who should I|\bid\b/i);
+    expect(delegated).toBe(0);
+  });
+
   it('"Tallyloom, accept their request and chat him up for me": the truth plus one action, and an errand already running is said, not duplicated', async () => {
     const { line, errands } = await run(
       "Tallyloom, accept their request and chat him up for me",

@@ -25,7 +25,7 @@ export const TURN_READER_V25: PromptDefinition<
 > = {
   ...TURN_READER_V24,
   version: 25,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-10-02: endVoice, true only when the whole spoken message is about ending the voice conversation or switching to typing; never with an approval, request, question or answer.",
   effectiveFrom: "2026-10-02",
