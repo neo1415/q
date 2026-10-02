@@ -185,6 +185,9 @@ export type ApiModules = {
         /** ADR 0023. Absent: investor cards show initials. */
         readonly investorImages?:
           DiscoveryRoutesDependencies["investorImages"] | undefined;
+        /** "Your companies" row (2026-10-02). Absent: the row is empty. */
+        readonly yourCompanies?:
+          DiscoveryRoutesDependencies["yourCompanies"] | undefined;
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
@@ -368,6 +371,7 @@ export function createApp(
       networkPitches: modules.discovery.networkPitches,
       networkCompany: modules.discovery.networkCompany,
       investorImages: modules.discovery.investorImages,
+      yourCompanies: modules.discovery.yourCompanies,
     });
     if (modules.discovery.interactions !== undefined) {
       registerRecommendationInteractionRoutes(app, {

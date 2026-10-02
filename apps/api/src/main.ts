@@ -23,7 +23,10 @@ import {
   createPostgresSecurityEventWriter,
 } from "@capital-q/audit";
 import { createRequestDatabaseClient } from "@capital-q/database";
-import { CorrelationIdSchema } from "@capital-q/contracts";
+import {
+  CorrelationIdSchema,
+  type YourCompanyLabel,
+} from "@capital-q/contracts";
 import { createPlatformAdmin } from "@capital-q/platform-admin";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { createOutboxWriter } from "@capital-q/eventing";
@@ -1228,6 +1231,31 @@ const { app, logger } = createApp(config, security, {
         subjectType: "INVESTOR_ORGANISATION",
         subjectId: investorOrganisationId,
       }),
+    // "Your companies" (founder decision 2026-10-02): the investor's own
+    // connected and interested companies (the Network context's list for
+    // their side) and their saved ones (the interaction projection).
+    // Identities only; the route re-checks disclosure for each.
+    yourCompanies: async (actor) => {
+      const [relationships, saved] = await Promise.all([
+        interests.listRelationshipsForInvestor({ actor }).catch(() => []),
+        interactions
+          .savedCompanyIds({ actor, limit: 100 })
+          .catch(() => [] as readonly string[]),
+      ]);
+      const labelled = new Map<string, YourCompanyLabel>();
+      for (const listing of relationships) {
+        const state = listing.projection.state;
+        const companyId = listing.relationship.companyId;
+        if (state === "CONNECTED") labelled.set(companyId, "CONNECTED");
+        else if (state === "INTEREST_EXPRESSED" && !labelled.has(companyId)) {
+          labelled.set(companyId, "INTERESTED");
+        }
+      }
+      for (const companyId of saved) {
+        if (!labelled.has(companyId)) labelled.set(companyId, "SAVED");
+      }
+      return [...labelled].map(([companyId, label]) => ({ companyId, label }));
+    },
     networkCompany: async (actor, companyId) => {
       const parsed = CompanyIdSchema.safeParse(companyId);
       if (!parsed.success) return null;

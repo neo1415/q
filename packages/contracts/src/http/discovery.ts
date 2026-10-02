@@ -691,6 +691,48 @@ export const NetworkPitchPageDtoSchema = z
   .strict();
 export type NetworkPitchPageDto = z.infer<typeof NetworkPitchPageDtoSchema>;
 
+/**
+ * "Your companies" (founder decision 2026-10-02): pitches from companies
+ * the investor's organisation is connected with, has expressed interest
+ * in, or saved. A separate row beside the recommended feed: it never
+ * touches ranking and is never paid for. Newest pitch first, keyset
+ * cursor. The label says why it is there; nothing else.
+ */
+export const DISCOVERY_YOUR_COMPANIES_PATH =
+  "/v1/discovery/your-companies" as const;
+export const YOUR_COMPANY_LABELS = [
+  "CONNECTED",
+  "INTERESTED",
+  "SAVED",
+] as const;
+export const YourCompanyLabelSchema = z.enum(YOUR_COMPANY_LABELS);
+export type YourCompanyLabel = z.infer<typeof YourCompanyLabelSchema>;
+
+export const YourCompanyPitchItemDtoSchema = z
+  .object({
+    companyId: UuidSchema,
+    canonicalName: z.string(),
+    shortDescription: z.string().nullable(),
+    headquartersCountry: z.string().nullable(),
+    currentStageCode: z.string().nullable(),
+    label: YourCompanyLabelSchema,
+    pitch: PitchSummaryDtoSchema,
+    /** When the pitch became playable: the row's order. */
+    readyAt: UtcTimestampSchema,
+  })
+  .strict();
+export type YourCompanyPitchItemDto = z.infer<
+  typeof YourCompanyPitchItemDtoSchema
+>;
+
+export const YourCompaniesPageDtoSchema = z
+  .object({
+    items: z.array(YourCompanyPitchItemDtoSchema).max(20),
+    nextCursor: z.string().max(200).nullable(),
+  })
+  .strict();
+export type YourCompaniesPageDto = z.infer<typeof YourCompaniesPageDtoSchema>;
+
 /** The network feed's keyset cursor, decoded: the last video's time and id. */
 export const NetworkPitchCursorSchema = z
   .object({ createdAt: UtcTimestampSchema, mediaAssetId: UuidSchema })

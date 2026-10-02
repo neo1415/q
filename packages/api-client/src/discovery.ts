@@ -11,6 +11,8 @@ import {
   DiscoveredInvestorProfileDtoSchema,
   DISCOVERY_NETWORK_PITCHES_PATH,
   DISCOVERY_SAVED_PATH,
+  DISCOVERY_YOUR_COMPANIES_PATH,
+  YourCompaniesPageDtoSchema,
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
   NetworkPitchPageDtoSchema,
@@ -81,6 +83,19 @@ export function getDiscoveredInvestor(
       encodeURIComponent(investorOrganisationId),
     ),
     DiscoveredInvestorProfileDtoSchema,
+  );
+}
+
+/**
+ * `GET /v1/discovery/your-companies` — pitches from the investor's own
+ * connected, interested and saved companies, newest first (2026-10-02).
+ */
+export function listYourCompanies(session: ApiSession, page: Page = {}) {
+  return call(
+    session,
+    "GET",
+    `${DISCOVERY_YOUR_COMPANIES_PATH}${query(page)}`,
+    YourCompaniesPageDtoSchema,
   );
 }
 

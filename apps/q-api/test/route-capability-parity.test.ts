@@ -178,6 +178,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/discovery.ts GET DISCOVERY_INVESTOR_PATH": cap(
     "offer.connection_request",
   ),
+  // The Discover row of their own companies' pitches (2026-10-02).
+  "api/http/discovery.ts GET DISCOVERY_YOUR_COMPANIES_PATH":
+    cap("navigate.DISCOVER"),
   "api/http/discovery.ts GET DISCOVERY_NETWORK_PITCHES_PATH":
     cap("navigate.DISCOVER"),
 
@@ -783,6 +786,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/capital": cap("navigate.CAPITAL"),
   "/discover": cap("navigate.DISCOVER"),
   "/discover/saved": cap("navigate.SAVED"),
+  // Your companies (2026-10-02): reached from Discover's row.
+  "/discover/yours": cap("navigate.DISCOVER"),
   "/discover/passed": exempt(
     "the Passed list (doc 19 §68): its one action, Undo pass, is unpass_company by name from any page; opening the list itself needs a navigate destination in the turn reader, whose versions HARDEN owns",
   ),

@@ -17,6 +17,10 @@ import {
   parseContract,
   NetworkPitchCursorSchema,
   type DiscoverFilters,
+  DISCOVERY_YOUR_COMPANIES_PATH,
+  YourCompaniesPageDtoSchema,
+  type YourCompanyLabel,
+  type YourCompanyPitchItemDto,
 } from "@capital-q/contracts";
 import type {
   DiscoveryService,
@@ -95,7 +99,25 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
         readonly companyStatus: string;
       } | null>)
     | undefined;
+  /**
+   * "Your companies" (founder decision 2026-10-02): the investor's own
+   * connected, interested and saved companies, by identity, from the
+   * Network and interaction contexts. Absent: the row is empty.
+   */
+  readonly yourCompanies?:
+    | ((actor: ActorContext) => Promise<
+        readonly {
+          readonly companyId: string;
+          readonly label: YourCompanyLabel;
+        }[]
+      >)
+    | undefined;
 };
+
+/** How many of their own companies the row considers at most. */
+const YOUR_COMPANIES_MAX = 200;
+const YOUR_COMPANIES_PAGE_DEFAULT = 10;
+const YOUR_COMPANIES_PAGE_MAX = 20;
 
 function encodeNetworkCursor(createdAt: string, mediaAssetId: string): string {
   return Buffer.from(JSON.stringify({ createdAt, mediaAssetId })).toString(
@@ -342,6 +364,102 @@ export function registerDiscoveryRoutes(
         before = decodeNetworkCursor(nextCursor);
       }
       return NetworkPitchPageDtoSchema.parse({ items, nextCursor });
+    },
+  );
+
+  // "Your companies" (founder decision 2026-10-02): a row beside the
+  // recommended feed, never part of it. Their own connected, interested and
+  // saved companies' publishable pitches, newest first. Each company passes
+  // the same disclosure read the network preview uses; each play is still
+  // authorised per viewer by the media service.
+  app.get(
+    DISCOVERY_YOUR_COMPANIES_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const page = pageOf(request);
+      const limit = Math.max(
+        1,
+        Math.min(
+          YOUR_COMPANIES_PAGE_MAX,
+          page.limit ?? YOUR_COMPANIES_PAGE_DEFAULT,
+        ),
+      );
+      void reply.header("Cache-Control", "no-store");
+      const empty = YourCompaniesPageDtoSchema.parse({
+        items: [],
+        nextCursor: null,
+      });
+      const pitches = dependencies.pitches;
+      const networkCompany = dependencies.networkCompany;
+      if (
+        dependencies.yourCompanies === undefined ||
+        pitches === undefined ||
+        networkCompany === undefined
+      ) {
+        return empty;
+      }
+      const own = (
+        await dependencies.yourCompanies(actor).catch(() => [])
+      ).slice(0, YOUR_COMPANIES_MAX);
+      if (own.length === 0) return empty;
+      const ids = own.map((entry) => entry.companyId);
+      const [sets, readyAt] = await Promise.all([
+        pitches.findDiscoverablePitches(ids),
+        pitches.latestReadyAt?.(ids) ??
+          Promise.resolve(new Map<string, string>()),
+      ]);
+      const after = decodeNetworkCursor(page.cursor);
+      const ordered = own
+        .flatMap((entry) => {
+          const set = sets.get(entry.companyId);
+          const at = readyAt.get(entry.companyId);
+          return set === undefined || at === undefined
+            ? []
+            : [{ ...entry, set, at: new Date(at).toISOString() }];
+        })
+        // Newest pitch first; ties by video id, so the cursor is total.
+        .sort((a, b) =>
+          a.at === b.at
+            ? b.set.mediaAssetId.localeCompare(a.set.mediaAssetId)
+            : b.at.localeCompare(a.at),
+        )
+        .filter(
+          (entry) =>
+            after === null ||
+            entry.at < after.createdAt ||
+            (entry.at === after.createdAt &&
+              entry.set.mediaAssetId < after.mediaAssetId),
+        );
+      const items: YourCompanyPitchItemDto[] = [];
+      let last: (typeof ordered)[number] | undefined;
+      for (const entry of ordered) {
+        if (items.length >= limit) break;
+        last = entry;
+        const company = await networkCompany(actor, entry.companyId).catch(
+          () => null,
+        );
+        if (company === null || company.companyStatus !== "active") continue;
+        items.push({
+          companyId: entry.companyId,
+          canonicalName: company.canonicalName,
+          shortDescription: company.shortDescription,
+          headquartersCountry: company.headquartersCountry,
+          currentStageCode: company.currentStageCode,
+          label: entry.label,
+          pitch: pitchSummary(entry.set),
+          readyAt: entry.at,
+        });
+      }
+      const more =
+        last !== undefined && ordered.indexOf(last) < ordered.length - 1;
+      return YourCompaniesPageDtoSchema.parse({
+        items,
+        nextCursor:
+          more && last !== undefined
+            ? encodeNetworkCursor(last.at, last.set.mediaAssetId)
+            : null,
+      });
     },
   );
 

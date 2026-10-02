@@ -8,6 +8,7 @@ import {
   discoverCompanies,
   discoverInvestors,
   listTaxonomyNodes,
+  listYourCompanies,
 } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
@@ -90,7 +91,7 @@ export default async function DiscoverPage({
       (CQ-WEB-020/021). Either read failing just means the client loads as
       before; neither is fatal to the page.
     */
-    const [slate, sectors] = await Promise.all([
+    const [slate, sectors, yours] = await Promise.all([
       discoverCompanies(session, {}).catch(() => null),
       // The sector filter's options: the industry vocabulary, reference
       // data. Failing leaves the filter without sectors, nothing more.
@@ -103,6 +104,11 @@ export default async function DiscoverPage({
             depth: node.depth,
           })),
         )
+        .catch(() => []),
+      // "Your companies" (2026-10-02): names and labels for the row beside
+      // the feed; failing leaves the row out, nothing more.
+      listYourCompanies(session, { limit: 4 })
+        .then((page) => page.items)
         .catch(() => []),
     ]);
     /*
@@ -153,6 +159,7 @@ export default async function DiscoverPage({
         <InvestorFeedScreen
           initial={slate === null ? null : { slate, authorization, warm }}
           sectors={sectors}
+          yours={yours}
         />
       </>
     );

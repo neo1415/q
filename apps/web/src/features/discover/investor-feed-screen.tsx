@@ -16,6 +16,7 @@ import type {
   DiscoveryCompanySlateDto,
   DiscoveryNoteDto,
   PlaybackAuthorizationDto,
+  YourCompanyPitchItemDto,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import {
@@ -34,6 +35,7 @@ import { useQSessionOptional } from "@/features/q/q-session";
 import { QPageSubject } from "@/features/q/q-subject";
 
 import { FeedCard } from "./feed-card";
+import { YourCompaniesRow } from "./your-companies";
 import { ruleList } from "./mandate-rules";
 import {
   actionFeedTransport,
@@ -320,10 +322,13 @@ export type InvestorFeedInitial = {
 export function InvestorFeedScreen({
   initial = null,
   sectors = [],
+  yours = [],
 }: {
   readonly initial?: InvestorFeedInitial | null;
   /** The industry vocabulary, for the sector filter. */
   readonly sectors?: readonly SectorOption[];
+  /** "Your companies" (2026-10-02): a row beside the feed, never in it. */
+  readonly yours?: readonly YourCompanyPitchItemDto[];
 } = {}) {
   const discoverFilters = useDiscoverFilters(sectors);
   const { filters, setFilters, clear, notice } = discoverFilters;
@@ -344,6 +349,9 @@ export function InvestorFeedScreen({
       />
     ),
     clear,
+    yours: (className: string) => (
+      <YourCompaniesRow items={yours} className={className} />
+    ),
   };
   return (
     <>
@@ -372,6 +380,8 @@ type FeedFilterControls = {
   /** The row, with the classes that decide where it shows. */
   readonly row: (className: string) => React.ReactNode;
   readonly clear: () => void;
+  /** "Your companies", with the classes that decide where it shows. */
+  readonly yours: (className: string) => React.ReactNode;
 };
 
 function InvestorFeed({
@@ -1023,6 +1033,7 @@ function InvestorFeed({
                 Ask Q
               </Button>
               <SavedAndPassedLinks className="flex" />
+              {controls.yours("flex")}
             </div>
           }
         />
@@ -1098,6 +1109,7 @@ function InvestorFeed({
         <div className="cq-feed-overlay bg-[linear-gradient(to_top,var(--cq-stage-canvas)_0%,color-mix(in_oklch,var(--cq-stage-canvas)_92%,transparent)_calc(100%-48px),transparent_100%)] lg:bg-none">
           {controls.row("hidden lg:flex")}
           <SavedAndPassedLinks className="hidden lg:flex" />
+          {controls.yours("hidden lg:flex")}
           <FeedCard
             key={card.companyId}
             company={withVideo(card)}
