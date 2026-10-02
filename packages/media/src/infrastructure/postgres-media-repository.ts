@@ -509,7 +509,10 @@ export function createPostgresDiscoverablePitchQueryPort(options: {
       return pitches;
     },
     latestReadyAt: async (companyIds) => {
-      const ids = [...new Set(companyIds)].slice(0, DISCOVERABLE_PITCH_BATCH_MAX);
+      const ids = [...new Set(companyIds)].slice(
+        0,
+        DISCOVERABLE_PITCH_BATCH_MAX,
+      );
       const out = new Map<string, string>();
       if (ids.length === 0) return out;
       const rows = await options.sql`
