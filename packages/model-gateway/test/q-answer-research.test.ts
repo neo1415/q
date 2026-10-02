@@ -1172,7 +1172,11 @@ describe("filling the profile's gaps from public sources (live Nixo)", () => {
 describe("the no-deck offer is made once per conversation (live Nixo)", () => {
   it("is offered on a conversation's first answer only", async () => {
     const seen: (boolean | undefined)[] = [];
-    const askerOf = (request: { readonly firstAnswer?: boolean }) => {
+    const askerOf = (request: {
+      readonly tenantId: string;
+      readonly userId: string;
+      readonly firstAnswer?: boolean | undefined;
+    }): Promise<string | null> => {
       seen.push(request.firstAnswer);
       return Promise.resolve(null);
     };
