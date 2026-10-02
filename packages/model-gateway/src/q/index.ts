@@ -711,6 +711,16 @@ export const NAME_NOTE =
 export const OWN_DAY_NOTE =
   "Their tasks, day, agenda or what's next mean their own day among the facts (calls, reminders, approvals, Q's work), told in their time; how they are doing or their rehearsals means their last rehearsals there (get_my_results for more). Never say a record is unavailable when it is among the facts. If their time zone is not known, say times as UTC once, ask which city they are in, and offer to save it (propose_profile_change, PERSON timeZone).";
 
+/**
+ * Saving is not verifying (ADR-001; founder live 2026-10-02: "regardless
+ * of whether it is verified, I give you permission" was argued with).
+ * A profile field the person authorises is stored as their stated detail
+ * (USER_CLAIM, SELF_REPORTED), never as verified, and it can always be
+ * saved.
+ */
+export const SAVE_NOT_VERIFY_NOTE =
+  'SAVING IS NOT VERIFYING: when they authorise saving details you found, in any words, prepare one propose_profile_change with every found field now and say once: "I\'ll save these as your stated company details (not independently verified)." A conflicting field: use the best-supported value and name the other in one line. Never argue about verification once they have said to save.';
+
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
 
@@ -850,6 +860,7 @@ export function environmentNotesFor(
         ? []
         : [NEXT_STEP_NOTE]),
       LIKELY_INTENT_NOTE,
+      SAVE_NOT_VERIFY_NOTE,
       OWN_DAY_NOTE,
       EXPRESSIVE_NOTE,
       ...(options.openDocumentTitle === undefined

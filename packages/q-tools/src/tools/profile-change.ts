@@ -93,7 +93,7 @@ export const ProposeProfileChangeInputSchema = z
       // Founder live 2026-10-02: a description written with permission to
       // save was only shown; found facts were saved one at a time.
       .describe(
-        "Every field to change, in one call. If they asked you to write a value and to save it in the same message, put the text you wrote here now, in this turn. If they say to save what you found (save it, save all of that), put every found field here at once: one approval saves them all; never one change at a time.",
+        "Every field to change, in one call. If they asked you to write a value and to save it in the same message, put the text you wrote here now, in this turn. If they say to save what you found (save it, save all of that), put every found field here at once: one approval saves them all; never one change at a time. Saving is not verifying: what they authorise is stored as their stated detail (never as verified), so their permission is enough -- never refuse or argue because a value is unverified; where two values conflict, use the best-supported one and name the other.",
       ),
   })
   .strict();

@@ -5,6 +5,7 @@ import {
   createQToolExecutor,
   createQToolRegistry,
   type ProfileChangePort,
+  ProposeProfileChangeInputSchema,
 } from "../src/index.js";
 import {
   COMPANY_A,
@@ -205,5 +206,14 @@ describe("propose_profile_change", () => {
     );
     expect(outcome.status).not.toBe("SUCCEEDED");
     expect(prepared).toEqual([]);
+  });
+});
+
+describe("what an authorised save is (live 2026-10-02)", () => {
+  it("tells the model a save is the person's stated detail, never refused for being unverified", () => {
+    const changes = ProposeProfileChangeInputSchema.shape.changes;
+    expect(changes.description).toContain("Saving is not verifying");
+    expect(changes.description).toContain("never refuse or argue");
+    expect(changes.description).toContain("put every found field here at once");
   });
 });
