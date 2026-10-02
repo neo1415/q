@@ -35,6 +35,7 @@ import { createDocumentStudioTools } from "./tools/documents.js";
 import { createOwnRecordTools } from "./tools/own-records.js";
 import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
+import { createFillProfileGapsTool } from "./tools/profile-gaps.js";
 import { createProposeEmailTool } from "./tools/email.js";
 import { createChatTools } from "./tools/chat.js";
 import { createErrandTools, PROPOSE_ERRAND } from "./tools/errands.js";
@@ -145,6 +146,17 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.profileChanges === undefined
       ? []
       : [createProposeProfileChangeTool(ports, ports.profileChanges)]),
+    // HARDEN P0 (live 2026-10-02): "search online and fill my profile's
+    // gaps" as a tool whose rules are code, not guidance.
+    ...(ports.profileChanges === undefined || research === undefined
+      ? []
+      : [
+          createFillProfileGapsTool({
+            ...ports,
+            research,
+            profileChanges: ports.profileChanges,
+          }),
+        ]),
     // R18: what is said in the pitch being watched, around a moment.
     ...(ports.pitchMoments === undefined
       ? []

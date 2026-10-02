@@ -213,3 +213,20 @@ describe("the prospects fallback (gap 1)", () => {
     expect(result.fallback === true).toBe(false);
   });
 });
+
+/**
+ * HARDEN P0 (live 2026-10-02, Nixo): "go online, search everything … update
+ * my profile" and then "only the gaps" took the research tools away (NEVER),
+ * and Q said it could not search. An instruction, or a clarification of
+ * one outside an interview, keeps them in Q's hands; nothing is forced.
+ */
+describe("an instruction keeps the research tools in hand", () => {
+  it("offers research on a tool request and on a clarification outside an interview", () => {
+    expect(directive(read({ kind: "TOOL_REQUEST" })).mode).toBe("OFFERED");
+    expect(directive(read({ kind: "CLARIFICATION" })).mode).toBe("OFFERED");
+    // Down or exhausted is still never.
+    expect(directive(read({ kind: "TOOL_REQUEST" }), false).mode).toBe("NEVER");
+    // A remark is still not a search.
+    expect(directive(read({ kind: "SMALL_TALK" })).mode).toBe("NEVER");
+  });
+});

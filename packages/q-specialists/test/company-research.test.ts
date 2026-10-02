@@ -620,9 +620,9 @@ describe("specialist answer seam", () => {
     const answer = messages.at(-1)?.content ?? "";
     expect(answer).toContain("Thank you — I have that now.");
     expect(answer).toContain(
-      "Noted as your statement: “Kenya was only a pilot and ended last year”.",
+      "(Noted as what you told me: “Kenya was only a pilot and ended last year”.)",
     );
-    expect(answer).toContain("not as verified fact");
+    expect(answer).not.toContain("not as verified fact");
   });
 });
 

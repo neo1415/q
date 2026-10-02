@@ -3,6 +3,8 @@ export {
   EMPTY_TURN_READING,
   InferenceSuggestionSchema,
   mayWrite,
+  quietlyNoted,
+  statesSomething,
   OPTION_SELECTIONS,
   OptionReferenceSchema,
   OptionSelectionSchema,

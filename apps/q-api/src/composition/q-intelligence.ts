@@ -138,12 +138,7 @@ export type QIntelligenceDependencies = {
   /** Who is asking: their own name and company (founder live 2026-09-30). */
   /** Their own rehearsals and saved zone, for the own-day read. */
   readonly ownDay?: ModelGatewayQAnswerDependencies["ownDay"];
-  readonly askerOf?:
-    | ((request: {
-        readonly tenantId: string;
-        readonly userId: string;
-      }) => Promise<string | null>)
-    | undefined;
+  readonly askerOf?: ModelGatewayQAnswerDependencies["askerOf"];
   /**
    * Where an answer goes as it is written. Absent means it goes out only
    * when it is finished; the stored message and its completion event are

@@ -28,11 +28,16 @@ import { reduceConversation, type ConversationState } from "./state.js";
  * is offered and, if the model does not reach for it, run. ONLY_IF_EMPTY:
  * a question about their own records — Capital Q's authorised context
  * first, and the web only if that came back empty, said out loud as a
- * change of source. NEVER: everything else — advice, a remark, a turn
+ * change of source. OFFERED: they asked Q to do something, or are
+ * directing work already asked for ("only the gaps"), and doing it may
+ * mean looking things up: the model holds the research tools, nothing is
+ * forced (live 2026-10-02, Nixo: "go online … update my profile", then
+ * "only the gaps", answered "I can't start the external search from the
+ * tools available"). NEVER: everything else — advice, a remark, a turn
  * that merely names a company.
  */
 export type ResearchDirective = {
-  readonly mode: "EXPLICIT" | "ONLY_IF_EMPTY" | "NEVER";
+  readonly mode: "EXPLICIT" | "ONLY_IF_EMPTY" | "OFFERED" | "NEVER";
   /** True when Q must say it is leaving authorised context for the web. */
   readonly announceSourceChange: boolean;
   /**
@@ -96,6 +101,21 @@ export function researchDirectiveFor(
     ...(ownRecords ? { contextSufficient: false } : {}),
   });
   if (!decision.run) {
+    // An instruction, or a clarification of one outside an interview,
+    // keeps the research tools in Q's hands: what it was asked to do may
+    // need them. Nothing is forced.
+    const directing =
+      reading.kind === "TOOL_REQUEST" ||
+      (reading.kind === "CLARIFICATION" && state.asked === null);
+    if (
+      directing &&
+      (decision.because === "NOT_ASKED" ||
+        decision.because === "ANSWER_TURN") &&
+      environment.available &&
+      !isExhausted(state.failures, "RESEARCH")
+    ) {
+      return { mode: "OFFERED", announceSourceChange: false };
+    }
     const fallback =
       reading.kind === "QUESTION_TO_Q" &&
       environment.available &&

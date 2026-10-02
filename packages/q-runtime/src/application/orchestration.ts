@@ -236,6 +236,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * prepared. The answer tells the model; it never guesses.
    */
   readonly capabilities?: QCapabilityManifest | undefined;
+  /**
+   * What the conversation core read this turn as (ANSWER, TOOL_REQUEST,
+   * ...). Absent when it was not read. A statement about their company is
+   * recorded only from a turn that states something (live 2026-10-02:
+   * "I'm giving you full permission…" was echoed as a noted statement).
+   */
+  readonly turnKind?: string | undefined;
 };
 
 export type QCapabilityManifest = {
@@ -255,7 +262,8 @@ export type QCapabilityManifest = {
 };
 
 export type QResearchDirective = {
-  readonly mode: "EXPLICIT" | "ONLY_IF_EMPTY" | "NEVER";
+  /** OFFERED: the model holds the research tools; nothing is forced. */
+  readonly mode: "EXPLICIT" | "ONLY_IF_EMPTY" | "OFFERED" | "NEVER";
   readonly announceSourceChange: boolean;
   /**
    * A question to Q with research up: a platform lookup the world can also

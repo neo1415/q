@@ -462,6 +462,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     },
   ),
   tool(
+    "fill_profile_gaps",
+    "PROFILE",
+    "Searches public sources and fills only the open fields of their own company profile, as one change shown to them and saved, as their stated details, only when they approve.",
+    { approval: "PREPARE_APPROVE", executes: ["company.profile.update"] },
+  ),
+  tool(
     "propose_handle_claim",
     "HANDLE",
     "Claims a Capital Q handle and makes the shareable Q Card (with its QR code) for their own company or investor organisation, applied when they approve.",

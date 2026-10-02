@@ -250,3 +250,37 @@ export const WRITING_KINDS: ReadonlySet<TurnKind> = new Set<TurnKind>([
 export function mayWrite(reading: Pick<ConversationTurnReading, "kind">) {
   return WRITING_KINDS.has(reading.kind);
 }
+
+/**
+ * Whether a turn of this kind states something about the world, so a
+ * statement in it may be recorded as theirs (live 2026-10-02, Nixo: "I'm
+ * giving you full permission and approval to update my profile" came back
+ * as "Noted as your statement"). An instruction, a permission, a question
+ * or talk about the conversation states nothing. Unread (undefined): the
+ * answer path's own reading stands, as before.
+ */
+export function statesSomething(kind: string | undefined): boolean {
+  return (
+    kind === undefined ||
+    kind === "ANSWER" ||
+    kind === "CORRECTION" ||
+    kind === "CLARIFICATION"
+  );
+}
+
+/**
+ * The one quiet line that says a statement was recorded as theirs: no
+ * lecture about verification on every turn (live 2026-10-02).
+ */
+export function quietlyNoted(statements: readonly string[]): string {
+  const shown = statements
+    .slice(0, 2)
+    .map((statement) =>
+      statement.length > 80
+        ? `${statement.slice(0, 77).trimEnd()}…`
+        : statement,
+    )
+    .map((statement) => `\u201c${statement}\u201d`)
+    .join("; ");
+  return `(Noted as what you told me: ${shown}.)`;
+}

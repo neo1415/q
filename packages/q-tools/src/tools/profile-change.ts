@@ -131,7 +131,7 @@ const PURPOSES: readonly QTaskClass[] = [
 type Grant = { readonly subjectId: string };
 
 /** The bound scope subjects of `kind`, by the id their filter names. */
-function boundIds(
+export function boundIds(
   plan: PermittedContextPlan,
   kind: "COMPANY_PROFILE" | "INVESTOR_PROFILE",
 ): readonly string[] {

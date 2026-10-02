@@ -19,6 +19,7 @@ import {
   type FailureOperation,
   type QuestionSequence,
   type TurnToolV14,
+  quietlyNoted,
 } from "@capital-q/q-core";
 import {
   eligibleCapabilities,
@@ -1689,6 +1690,7 @@ export function createSpecialistQAnswer(
         research,
         capabilities: manifestOf(capabilities),
         ...(turnUnread ? { turnUnread: true } : {}),
+        ...(read === null ? {} : { turnKind: read.kind }),
         ...(writingDocument ? { writingDocument: true } : {}),
         ...(series.step === null ? {} : { questionSequence: series.step }),
       },
@@ -1847,11 +1849,7 @@ export function createSpecialistQAnswer(
     const acknowledgement =
       result.recordedStatements.length === 0
         ? ""
-        : `\n\nNoted as your statement: ${result.recordedStatements
-            .map((statement) => `\u201c${statement}\u201d`)
-            .join(
-              "; ",
-            )}. Capital Q records it as what you told me, not as verified fact; say so if it needs correcting.`;
+        : `\n\n${quietlyNoted(result.recordedStatements)}`;
     /**
      * Preparing the document they asked for (QX-003D/F; ADR 0013).
      *

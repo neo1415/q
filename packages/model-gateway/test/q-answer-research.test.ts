@@ -194,6 +194,12 @@ function build(options: {
   readonly statements?: QUserStatementRecorder | undefined;
   readonly userText?: string | undefined;
   readonly subjects?: QAnswerRequest["subjects"] | undefined;
+  /** What the conversation core read: the research directive and the turn's kind. */
+  readonly read?: Pick<QAnswerRequest, "research" | "turnKind"> | undefined;
+  readonly askerOf?:
+    Parameters<typeof createModelGatewayQAnswer>[0]["askerOf"] | undefined;
+  /** What Q said earlier in this conversation. */
+  readonly earlierQ?: string | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -211,6 +217,21 @@ function build(options: {
     sleep: () => Promise.resolve(),
   });
   const messages: QConversationMessage[] = [
+    ...(options.earlierQ === undefined
+      ? []
+      : [
+          {
+            id: randomUUID() as QConversationMessage["id"],
+            tenantId: TENANT as QConversationMessage["tenantId"],
+            conversationId:
+              CONVERSATION as QConversationMessage["conversationId"],
+            runId: randomUUID() as QConversationMessage["runId"],
+            role: "Q" as const,
+            content: options.earlierQ,
+            contentType: "TEXT" as const,
+            createdAt: new Date(Date.now() - 60_000).toISOString(),
+          },
+        ]),
     {
       id: randomUUID() as QConversationMessage["id"],
       tenantId: TENANT as QConversationMessage["tenantId"],
@@ -266,6 +287,7 @@ function build(options: {
     transactions: { run: (work) => work({} as never) },
     tools: options.tools,
     statements: options.statements,
+    ...(options.askerOf === undefined ? {} : { askerOf: options.askerOf }),
   });
   const request: QAnswerRequest = {
     runId: RUN as QAnswerRequest["runId"],
@@ -281,6 +303,7 @@ function build(options: {
     subjects: options.subjects ?? [{ kind: "COMPANY", companyId: COMPANY }],
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: plan(),
+    ...options.read,
   };
   return { seam, alpha, messages, stages, request, answerBlocks };
 }
@@ -662,10 +685,12 @@ describe("answer seam: public-web research", () => {
     });
     const answer = messages.at(-1)?.content ?? "";
     expect(answer).toContain("Thank you, noted.");
+    // Quietly: one short line, no lecture about verification (live
+    // 2026-10-02).
     expect(answer).toContain(
-      "Noted as your statement: “Kenya was only a pilot and ended last year”.",
+      "(Noted as what you told me: “Kenya was only a pilot and ended last year”.)",
     );
-    expect(answer).toContain("not as verified fact");
+    expect(answer).not.toContain("not as verified fact");
     expect(answer).not.toContain("exited East Africa");
   });
 
@@ -963,5 +988,207 @@ describe("an empty search is not an empty answer when the company is already kno
     expect(tools.executed.map((e) => e.proposal.name)).toContain(
       "research_public_web",
     );
+  });
+});
+
+/**
+ * HARDEN P0 (live 2026-10-02, Nixo, cf9b22dc live): "go online, search
+ * everything … I'm giving you full permission and approval to update my
+ * profile" was answered "I won't treat every online claim as confirmed
+ * simply because you gave permission"; "only the gaps" then got "I can't
+ * start the external search from the tools available"; and every turn
+ * carried "Noted as your statement …". Now: the research tools stay in
+ * hand on an instruction, fill_profile_gaps searches and then fills, the
+ * reply is the tool's one line plus the card, and an instruction is never
+ * echoed as a statement.
+ */
+describe("filling the profile's gaps from public sources (live Nixo)", () => {
+  const FOUNDER_LINE =
+    "go online, search everything you can find about us and fill in my profile. I'm giving you full permission and approval to update my profile";
+  const GAPS: QOfferedTool = {
+    toolName: "profile.gaps.fill",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "fill_profile_gaps",
+      description: "Fills the open fields of their own company profile.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: "SEARCHING_PUBLIC_SOURCES",
+  };
+  const PREPARED_LINE =
+    "I filled website and headquarters city from public sources (nixo.example); approve the card to save them as your stated details. Nothing public for founding date; it stays open.";
+  const gapsOutcome = (proposal: QToolProposal): QToolCallOutcome => {
+    const second =
+      typeof proposal.arguments === "object" &&
+      proposal.arguments !== null &&
+      "values" in proposal.arguments;
+    return {
+      callId: proposal.callId,
+      toolName: "profile.gaps.fill",
+      toolVersion: 1,
+      classification: "SIDE_EFFECT",
+      status: "SUCCEEDED",
+      failureCode: null,
+      sensitivity: "CONFIDENTIAL",
+      result: {
+        ok: true,
+        data: second
+          ? {
+              status: "PREPARED",
+              openFields: ["website", "headquarters city", "founding date"],
+              filledFields: ["description"],
+              sources: [],
+              line: PREPARED_LINE,
+              guidance: "",
+              truthClass: "USER_CLAIM",
+            }
+          : {
+              status: "RESEARCHED",
+              openFields: ["websiteUrl", "headquartersCity", "foundedDate"],
+              filledFields: ["primaryDescription"],
+              sources: [
+                {
+                  index: 1,
+                  url: "https://nixo.example/about",
+                  domain: "nixo.example",
+                  title: "About Nixo",
+                  publishedAt: null,
+                  retrievedAt: "2026-10-02T10:20:00.000Z",
+                  excerpt: "Nixo is based in Lagos.",
+                },
+              ],
+              line: "I searched public sources but couldn't settle values for your open fields; they stay open.",
+              guidance: "Now call fill_profile_gaps again with values.",
+              truthClass: "USER_CLAIM",
+            },
+      },
+      latencyMs: 3,
+    };
+  };
+
+  it("keeps the research tools on an instruction, searches then fills, and says one line -- never the argument, never 'Noted'", async () => {
+    const tools = toolPort([RESEARCH, GAPS], gapsOutcome);
+    const statements = statementRecorder();
+    const { seam, request, alpha, messages } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "g1", name: "fill_profile_gaps", arguments: {} }],
+        },
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "g2",
+              name: "fill_profile_gaps",
+              arguments: {
+                values: [
+                  {
+                    field: "headquartersCity",
+                    value: "Lagos",
+                    sources: [1],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "I won't treat every online claim as confirmed simply because you gave permission.",
+            {
+              userStatements: [
+                {
+                  quote:
+                    "I'm giving you full permission and approval to update my profile",
+                  statement: "The founder authorised profile updates.",
+                  knowledgeKey: "company.profile.permission",
+                  validFrom: null,
+                },
+              ],
+            },
+          ),
+        },
+      ],
+      tools: tools.port,
+      statements: statements.recorder,
+      userText: FOUNDER_LINE,
+      read: {
+        research: Promise.resolve({
+          mode: "OFFERED",
+          announceSourceChange: false,
+        }),
+        turnKind: "TOOL_REQUEST",
+      },
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    // The research tools were in Q's hands on the instruction.
+    expect(alpha.calls[0]?.request.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(["research_public_web", "fill_profile_gaps"]),
+    );
+    // Searched, then filled: two calls, the second with the values.
+    expect(tools.executed.map((e) => e.proposal.callId)).toEqual(["g1", "g2"]);
+    const answer = messages.at(-1)?.content ?? "";
+    expect(answer).toBe(PREPARED_LINE);
+    expect(answer).not.toMatch(/won't treat|Noted as/);
+    // An instruction is not a statement about their company.
+    expect(statements.commands).toHaveLength(0);
+  });
+
+  it("'only the gaps': when the second call never comes, the first call's line stands, not 'I can't search'", async () => {
+    const tools = toolPort([RESEARCH, GAPS], gapsOutcome);
+    const { seam, request, messages } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "g1", name: "fill_profile_gaps", arguments: {} }],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "I can't start the external search from the tools available in this conversation, so no new profile findings.",
+          ),
+        },
+      ],
+      tools: tools.port,
+      userText: "only the gaps",
+      read: {
+        research: Promise.resolve({
+          mode: "OFFERED",
+          announceSourceChange: false,
+        }),
+        turnKind: "CLARIFICATION",
+      },
+    });
+    await seam.answer(request);
+    const answer = messages.at(-1)?.content ?? "";
+    expect(answer).toContain("I searched public sources");
+    expect(answer).not.toContain("can't start the external search");
+  });
+});
+
+describe("the no-deck offer is made once per conversation (live Nixo)", () => {
+  it("is offered on a conversation's first answer only", async () => {
+    const seen: (boolean | undefined)[] = [];
+    const askerOf = (request: { readonly firstAnswer?: boolean }) => {
+      seen.push(request.firstAnswer);
+      return Promise.resolve(null);
+    };
+    const first = build({
+      script: [{ kind: "JSON", value: analystResult("Hello.") }],
+      userText: "hi",
+      askerOf,
+    });
+    await first.seam.answer(first.request);
+    const later = build({
+      script: [{ kind: "JSON", value: analystResult("Done.") }],
+      userText: "only the gaps",
+      askerOf,
+      earlierQ: "You have no pitch deck yet; I can make one with you now.",
+    });
+    await later.seam.answer(later.request);
+    expect(seen).toEqual([true, false]);
   });
 });

@@ -540,3 +540,11 @@ export {
   type ConnectionRequestAnswerOutput,
   type PendingConnectionRequest,
 } from "./tools/connection-requests.js";
+export {
+  createFillProfileGapsTool,
+  FILL_PROFILE_GAPS,
+  FillProfileGapsInputSchema,
+  FillProfileGapsOutputSchema,
+  type FillProfileGapsInput,
+  type FillProfileGapsOutput,
+} from "./tools/profile-gaps.js";

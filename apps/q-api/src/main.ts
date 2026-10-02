@@ -2092,7 +2092,7 @@ const qIntelligence = composeQIntelligence({
       })),
     };
   },
-  askerOf: async ({ tenantId, userId }) => {
+  askerOf: async ({ tenantId, userId, firstAnswer }) => {
     const rows = await database.sql<
       {
         display_name: string | null;
@@ -2159,8 +2159,9 @@ const qIntelligence = composeQIntelligence({
         : `, ${row.business_title === null ? "of" : `${row.business_title.slice(0, 60)} of`} their own company ${company}${row.website_url === null ? "" : ` (${row.website_url.slice(0, 200)})`}`,
       ".",
       // A founder who has no deck yet (often one who put it off until
-      // setup was done): Q offers once to make it, never presses.
-      row.no_deck === true
+      // setup was done): Q offers once to make it, never presses -- on a
+      // conversation's first answer only (live 2026-10-02: on every turn).
+      row.no_deck === true && firstAnswer === true
         ? " They have no pitch deck yet: when their question is answered, offer once, in one short sentence, to make one with them now."
         : "",
       findings.length === 0

@@ -56,6 +56,8 @@ import {
   stripEmptyPromises,
   withoutRecommendationClaims,
   type RecommendationGrounds,
+  quietlyNoted,
+  statesSomething,
 } from "@capital-q/q-core";
 import {
   appendRunEvent,
@@ -1089,6 +1091,12 @@ export type ModelGatewayQAnswerDependencies = {
     | ((request: {
         readonly tenantId: string;
         readonly userId: string;
+        /**
+         * Q has not answered in this conversation yet: the one turn where a
+         * standing offer (make a deck) may be made (live 2026-10-02: it was
+         * repeated on every turn).
+         */
+        readonly firstAnswer?: boolean | undefined;
       }) => Promise<string | null>)
     | undefined;
   /** Narrows provider eligibility for this composition; never widens it. */
@@ -1202,6 +1210,19 @@ function guardSentence(
   const guarded = withoutRecommendationClaims(withoutPromise, grounds);
   const text = guarded.text.trim();
   return text.length === 0 ? null : text;
+}
+
+const FILL_PROFILE_GAPS_TOOL = "fill_profile_gaps";
+
+/** The fill_profile_gaps result's own line; null for anything else. */
+function gapsLineOf(
+  data: unknown,
+): { readonly status: string; readonly line: string } | null {
+  if (data === null || typeof data !== "object") return null;
+  const { status, line } = data as { status?: unknown; line?: unknown };
+  return typeof status === "string" && typeof line === "string"
+    ? { status, line: line.slice(0, 600) }
+    : null;
 }
 
 async function recordUserStatements(
@@ -1987,6 +2008,7 @@ export function createModelGatewayQAnswer(
               .askerOf({
                 tenantId: request.tenantId,
                 userId: request.actorUserId,
+                firstAnswer: !earlier.some((message) => message.role === "Q"),
               })
               .catch(() => null);
       const environmentNotes = environmentNotesFor(
@@ -2334,7 +2356,11 @@ export function createModelGatewayQAnswer(
       };
 
       const collectSources = (outcome: QToolCallOutcome): void => {
-        if (outcome.toolName !== "public_web.search" || !outcome.result.ok) {
+        if (
+          (outcome.toolName !== "public_web.search" &&
+            outcome.toolName !== "profile.gaps.fill") ||
+          !outcome.result.ok
+        ) {
           return;
         }
         const data = outcome.result.data as {
@@ -2367,6 +2393,13 @@ export function createModelGatewayQAnswer(
       // What Capital Q says about a change approved by conversation this
       // turn, from the approve tool's result (live 2026-09-27 #1, #2).
       let approvalLine: string | null = null;
+      /**
+       * fill_profile_gaps (HARDEN P0, live 2026-10-02): the reply is the
+       * tool's own line. A first call's line ("couldn't settle values")
+       * stands only when no second call followed.
+       */
+      let gaps: { readonly status: string; readonly line: string } | null =
+        null;
       // The order matters more than the words: a model handed tools and a
       // response shape at once reaches for the shape first.
       // What this run can do and what the conversation already produced,
@@ -2437,8 +2470,15 @@ export function createModelGatewayQAnswer(
           // One more round, once, when the answer described doing
           // something instead of calling the tool that does it.
           let sayDoRounds = 0;
+          // One more round, once, after fill_profile_gaps searched: the
+          // second call carries the values the sources support.
+          let gapsRounds = 0;
           while (
-            rounds < Q_TOOL_LOOP_MAX_ROUNDS + recoveryRounds + sayDoRounds &&
+            rounds <
+              Q_TOOL_LOOP_MAX_ROUNDS +
+                recoveryRounds +
+                sayDoRounds +
+                gapsRounds &&
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
@@ -2682,9 +2722,20 @@ export function createModelGatewayQAnswer(
                 approvalLine =
                   approvalStatusLine(outcome.result.data) ?? approvalLine;
               }
+              if (call.name === FILL_PROFILE_GAPS_TOOL && outcome.result.ok) {
+                gaps = gapsLineOf(outcome.result.data) ?? gaps;
+              }
               results.push(toolResultMessage(call, outcome));
             }
             messages = [...messages, assistant, ...results];
+            if (
+              gapsRounds === 0 &&
+              (gaps as { readonly status: string } | null)?.status ===
+                "RESEARCHED" &&
+              calls < Q_TOOL_LOOP_MAX_CALLS
+            ) {
+              gapsRounds = 1;
+            }
             const roundOutcomes = toolCalls.slice(-proposals.length);
             if (
               recoveryRounds === 0 &&
@@ -2744,7 +2795,12 @@ export function createModelGatewayQAnswer(
             // few. Investors exist in the world, so the world is asked too.
             (prospectsThin &&
               (research?.mode !== "NEVER" || research.fallback === true))) &&
-          !toolCalls.some((call) => call.providerName === "research_public_web")
+          !toolCalls.some(
+            (call) =>
+              call.providerName === "research_public_web" ||
+              // Filling the profile's gaps already searched.
+              call.providerName === FILL_PROFILE_GAPS_TOOL,
+          )
         ) {
           if (
             researchTool.visibleStage !== undefined &&
@@ -2861,13 +2917,20 @@ export function createModelGatewayQAnswer(
         // words and the conversation is about a company they own
         // (CQ-Q-RESEARCH-001 §21, §40). The answer says so, deterministically.
         took("guards");
-        const recordedStatements = await recordUserStatements(
-          dependencies.statements,
-          request,
-          latest.content,
-          analyst.userStatements,
-          logger,
-        );
+        // Only a turn that states something puts a statement on the
+        // record: an instruction, a permission or talk about the
+        // conversation is not a claim about their company (live
+        // 2026-10-02: "I'm giving you full permission…" came back as
+        // "Noted as your statement").
+        const recordedStatements = statesSomething(request.turnKind)
+          ? await recordUserStatements(
+              dependencies.statements,
+              request,
+              latest.content,
+              analyst.userStatements,
+              logger,
+            )
+          : [];
         /**
          * A change the person asked for to their own profile (ADR 0011).
          * The model read it; only a reading whose quote is actually in the
@@ -2983,20 +3046,21 @@ export function createModelGatewayQAnswer(
             "an answer about a change's status was given the engine's status",
           );
         }
-        const content = [
-          ...(approvalLine === null ? [] : [approvalLine]),
-          guarded.text,
-          ...(statusLine === null ? [] : [statusLine]),
-          ...(recordedStatements.length === 0
-            ? []
+        // Filling their profile's gaps: one short line from code, plus
+        // the card -- never the model's argument about verification.
+        const gapsSaid = gaps === null || gaps.line.length === 0 ? null : gaps;
+        const content = (
+          gapsSaid !== null
+            ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
             : [
-                `Noted as your statement: ${recordedStatements
-                  .map((statement) => `\u201c${statement}\u201d`)
-                  .join(
-                    "; ",
-                  )}. Capital Q records it as what you told me, not as verified fact; say so if it needs correcting.`,
-              ]),
-        ]
+                ...(approvalLine === null ? [] : [approvalLine]),
+                guarded.text,
+                ...(statusLine === null ? [] : [statusLine]),
+                ...(recordedStatements.length === 0
+                  ? []
+                  : [quietlyNoted(recordedStatements)]),
+              ]
+        )
           .join("\n\n")
           .slice(0, ANSWER_LIMIT_CHARS)
           .trim();
