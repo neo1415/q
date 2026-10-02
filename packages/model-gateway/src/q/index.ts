@@ -2933,15 +2933,22 @@ export function createModelGatewayQAnswer(
          * this turn already says it: an approval by conversation has its
          * own line, and a change prepared this turn shows its own card.
          */
-        const preparedThisTurn = toolCalls.some((call) => {
-          const kind = offeredByName.get(call.providerName)?.classification;
-          return (
-            call.status === "SUCCEEDED" &&
-            kind !== undefined &&
-            kind !== "READ_ONLY" &&
-            kind !== "ANALYTICAL"
-          );
-        });
+        // A change read from their words this turn (proposed/proposedName)
+        // is handed to the proposer and gets its own card after this
+        // answer (live 2026-10-02: "write a description... save it, I
+        // approve" was told "nothing is waiting", then shown the card).
+        const preparedThisTurn =
+          proposed ||
+          proposedName ||
+          toolCalls.some((call) => {
+            const kind = offeredByName.get(call.providerName)?.classification;
+            return (
+              call.status === "SUCCEEDED" &&
+              kind !== undefined &&
+              kind !== "READ_ONLY" &&
+              kind !== "ANALYTICAL"
+            );
+          });
         const statusLine =
           analyst.proposalStatus &&
           approvalLine === null &&

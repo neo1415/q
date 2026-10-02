@@ -105,6 +105,10 @@ function build(
   subject: Subject = { kind: "COMPANY", companyId: COMPANY },
   answer: Record<string, unknown> = {},
   proposals: readonly { id: string; status: string }[] = [],
+  options: {
+    readonly said?: string;
+    readonly deps?: Partial<Parameters<typeof createModelGatewayQAnswer>[0]>;
+  } = {},
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -170,7 +174,7 @@ function build(
       conversationId: CONVERSATION,
       runId: RUN,
       role: "USER",
-      content: "Where are we with Kora?",
+      content: options.said ?? "Where are we with Kora?",
       contentType: "TEXT",
       createdAt: new Date().toISOString(),
     } as unknown as QConversationMessage,
@@ -229,6 +233,7 @@ function build(
     runEvents: { append: () => Promise.resolve({}) },
   } as unknown as QRuntimeRepositories;
   const seam = createModelGatewayQAnswer({
+    ...options.deps,
     gateway,
     repositories,
     sql: {} as never,
@@ -344,5 +349,45 @@ describe("a reply about a change's status says the engine's status", () => {
     );
     await seam.answer(request);
     expect(stored.at(-1)).toBe("You connected with Kora on 25 September.");
+  });
+});
+
+describe("a change prepared this turn is not told 'nothing is waiting' (live 2026-10-02)", () => {
+  it("says no status line when the description is handed to the proposer in this turn", async () => {
+    const said =
+      "Write a short description of my company and save it. I approve it.";
+    const noted: unknown[] = [];
+    const { seam, request, stored } = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      {
+        answer: "Here is a short description: Nixo runs FDEOps for teams.",
+        actionTalk: ["I've saved it."],
+        proposalStatus: true,
+        profileUpdates: [
+          {
+            field: "shortDescription",
+            value: "Nixo runs FDEOps for forward-deployed teams.",
+            quote: "save it. I approve it.",
+          },
+        ],
+      },
+      [],
+      {
+        said,
+        deps: {
+          profileUpdates: {
+            note: (entry) => {
+              noted.push(entry);
+            },
+          },
+        },
+      },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(noted).toHaveLength(1);
+    const reply = stored.at(-1) ?? "";
+    expect(reply).not.toContain("Nothing is waiting for your approval");
+    expect(reply).toContain("Here is a short description");
   });
 });
