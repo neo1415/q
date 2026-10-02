@@ -37,13 +37,15 @@ export function createAppActionArgumentReader(dependencies: {
   const registry = createDefaultPromptRegistry();
   const { gateway, tools, logger } = dependencies;
   return async (request, input) => {
-    // The tool as this run is offered it: never a tool the run does not hold.
+    // The tool as this run is offered it when named (the turn's focus):
+    // never a tool the run's plan does not allow.
     const offered = await tools.offer({
       actor: request.actor,
       runId: request.runId,
       correlationId: request.correlationId,
       capability: request.capability,
       plan: request.plan,
+      focus: { areas: [], tools: [input.tool] },
     });
     const tool = offered.find((entry) => entry.definition.name === input.tool);
     if (tool === undefined) return null;

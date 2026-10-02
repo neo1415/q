@@ -153,6 +153,7 @@ function seam(options: {
   const heardActions: unknown[] = [];
   const declaredActions: string[][] = [];
   const askedActions: (string | undefined)[] = [];
+  const focuses: unknown[] = [];
   const outcomes = [...options.outcomes];
   const modalities: string[] = [];
   const turns: QTurnReader = {
@@ -206,6 +207,7 @@ function seam(options: {
         delegated += 1;
         unread.push(req.turnUnread === true);
         askedActions.push(req.askedAction);
+        focuses.push(req.toolFocus);
         capabilities.push(req.capabilities);
         directives.push(
           req.research === undefined ? undefined : await req.research,
@@ -289,6 +291,7 @@ function seam(options: {
     declaredActions,
     askedActions,
     modalities,
+    focuses,
   };
 }
 
@@ -2557,5 +2560,74 @@ describe("a fund's visibility is its own action, never the company's hand (QA 1e
     await run.answer.answer(request());
     expect(ran).toEqual([]);
     expect(run.stored.at(-1)?.content).toMatch(/who sees a company/);
+  });
+});
+
+/**
+ * Lead 2026-10-02: the tool offer follows what the turn is about. The
+ * fund-visibility and deck-audience lines still run their tools; a named
+ * action reaches the answer as the turn's focus; "yes" keeps the last focus.
+ */
+describe("the tool offer follows the turn (tool focus)", () => {
+  const named = (askedAction: string) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+      appAction: null,
+      askedAction,
+    }) as TurnReaderResult;
+  const port = (ran: unknown[]): QAppActionPort => ({
+    tools: new Set(["set_investor_visibility", "set_deck_audience"]),
+    run: (_request, action) => {
+      ran.push(action);
+      return Promise.resolve(`Done: ${action.tool}.`);
+    },
+  });
+
+  for (const [said, tool, args] of [
+    [
+      "Make our fund visible to founders on Capital Q.",
+      "set_investor_visibility",
+      { visibility: "network_visible" },
+    ],
+    [
+      "Let investors download our deck.",
+      "set_deck_audience",
+      { audience: "INVESTORS" },
+    ],
+  ] as const) {
+    it(`'${said}' still runs ${tool}`, async () => {
+      const ran: unknown[] = [];
+      const run = seam({
+        said,
+        reading: named(tool),
+        outcomes: [],
+        offeredTools: [tool, "get_company"],
+        appActions: port(ran),
+        appActionArguments: () => Promise.resolve({ ...args }),
+      });
+      await run.answer.answer(request());
+      expect(ran).toEqual([{ tool, arguments: args }]);
+      expect(run.delegated()).toBe(0);
+    });
+  }
+
+  it("a named action that is not an app action reaches the answer as the focus", async () => {
+    const run = seam({
+      said: "Book a call with Kora next week.",
+      reading: named("propose_meeting"),
+      outcomes: [],
+      offeredTools: ["propose_meeting", "get_company"],
+    });
+    await run.answer.answer(request());
+    expect(run.focuses[0]).toEqual({
+      areas: ["Relationships"],
+      tools: ["propose_meeting"],
+    });
   });
 });
