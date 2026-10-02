@@ -639,7 +639,7 @@ describe("rehearsals", () => {
     expect(said.kind === "OK" && said.rehearsal.turns).toHaveLength(1);
   });
 
-  it("shows a shared frame to the next turn only", async () => {
+  it("keeps showing a shared screen while it is shared, and stops when the share stops (live 2026-10-02)", async () => {
     const { service, seen } = setup();
     const rehearsal = await startWith(service);
     expect(
@@ -658,8 +658,12 @@ describe("rehearsals", () => {
     await service.say(actor(FOUNDER), rehearsal.id, { text: "Next." });
     expect(seen.turnInputs.slice(-2).map((t) => t.screen)).toEqual([
       true,
-      false,
+      true,
     ]);
+    // The share stops: the next turn no longer sees it.
+    await service.screen(actor(FOUNDER), rehearsal.id, null, "SCREEN");
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "And after." });
+    expect(seen.turnInputs.at(-1)?.screen).toBe(false);
     expect(first.kind === "OK" && first.rehearsal.turns.at(-1)?.sawScreen).toBe(
       true,
     );

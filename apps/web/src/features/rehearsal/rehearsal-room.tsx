@@ -84,6 +84,8 @@ import {
  */
 
 const FRAME_EVERY_MS = 6_000;
+/** While sharing, an unchanged screen is re-sent this often. */
+const SCREEN_KEEPALIVE_MS = 20_000;
 const FRAME_MAX_WIDTH = 1280;
 const SIGNATURE_SIZE = { width: 32, height: 18 } as const;
 
@@ -531,6 +533,7 @@ export function RehearsalRoom({
     }
   }
 
+  const lastScreenSent = useRef(0);
   const sendFrame = useCallback(async () => {
     const video = screenVideo.current;
     if (video === null || video.videoWidth === 0) return;
@@ -543,8 +546,17 @@ export function RehearsalRoom({
     const signature = greySignature(
       tinyContext.getImageData(0, 0, tiny.width, tiny.height).data,
     );
-    if (!screenChanged(lastSignature.current, signature)) return;
+    // An unchanged screen is still sent now and then, so the other person
+    // keeps seeing it while the share is on.
+    const now = Date.now();
+    if (
+      !screenChanged(lastSignature.current, signature) &&
+      now - lastScreenSent.current < SCREEN_KEEPALIVE_MS
+    ) {
+      return;
+    }
     lastSignature.current = signature;
+    lastScreenSent.current = now;
     const scale = Math.min(1, FRAME_MAX_WIDTH / video.videoWidth);
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(video.videoWidth * scale);
@@ -566,7 +578,12 @@ export function RehearsalRoom({
     screenStream.current?.getTracks().forEach((track) => track.stop());
     screenStream.current = null;
     lastSignature.current = null;
+    lastScreenSent.current = 0;
     setSharing(false);
+    // The other person stops seeing it at once.
+    void shareScreenFrameAction(initial.id, null, "SCREEN").catch(
+      () => undefined,
+    );
   }
 
   async function toggleShare() {

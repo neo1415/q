@@ -1245,7 +1245,14 @@ function holdingTurn(
  * consented camera frames are kept apart, the latest of each.
  */
 type Frame = { readonly image: RehearsalImage; readonly at: number };
-export const FRAME_TTL_MS = 90_000;
+/**
+ * A shared screen stays in view while the share is on: the browser sends
+ * a frame when it changes and at least every 20 s, and the latest one is
+ * valid for this long (founder live 2026-10-02: the screen was seen once,
+ * then "I can't see your screen" -- the frame was consumed by one turn and
+ * an unchanged screen sent no new one).
+ */
+export const FRAME_TTL_MS = 45_000;
 /** A camera frame is a look at them now: stale after half a minute. */
 export const CAMERA_FRAME_TTL_MS = 30_000;
 /** A turn that asks Q to look ("can you see this?") wants a frame this fresh. */
@@ -1273,15 +1280,7 @@ export function createRehearsalService(dependencies: {
   const frames = new Map<string, Frame>();
   /** Presence readings as text, per rehearsal; dropped when it finishes. */
   const presence = new Map<string, PresenceState>();
-  const takeFrame = (rehearsalId: string, kind: "SCREEN" | "CAMERA") => {
-    const key = frameKey(rehearsalId, kind);
-    const frame = frames.get(key);
-    frames.delete(key);
-    const ttl = kind === "CAMERA" ? CAMERA_FRAME_TTL_MS : FRAME_TTL_MS;
-    return frame !== undefined && now().getTime() - frame.at <= ttl
-      ? frame
-      : null;
-  };
+
   /** Rehearsals whose person currently lets Q see them (frames arriving). */
   const consenting = new Set<string>();
   /** The latest frame of a kind, left held for later turns. */
@@ -1606,7 +1605,7 @@ export function createRehearsalService(dependencies: {
   } | null> {
     const persona = personaOf(row.persona);
     if (persona === null) return null;
-    const screenFrame = takeFrame(row.id, "SCREEN")?.image ?? null;
+    const screenFrame = peekFrame(row.id, "SCREEN")?.image ?? null;
     // The latest camera frame stays held (never consumed by a turn): a
     // reply the person spoke over must not cost the next turn its look
     // (founder live 2026-10-02: the camera was on and the played person
