@@ -28,8 +28,13 @@ import {
   createSlateInvalidationService,
   REFRESH_TRIGGER_EVENTS,
   refreshDirectiveFor,
+  requestRebuildsForVersionDrift,
+  versionDrift,
+  DEPLOYED_SLATE_VERSIONS,
+  type DeployedSlateVersions,
   type RefreshQueue,
 } from "../src/slates/refresh.js";
+import { RANKING_CONFIG_CURRENT } from "../src/ranking/config.js";
 import { memorySlates } from "./support/memory-slates.js";
 
 /**
@@ -726,5 +731,79 @@ describe("slate invalidation (CQ-REC-006)", () => {
       enqueued: 0,
       coalesced: 0,
     });
+  });
+});
+
+describe("a deploy with newer pipeline versions rebuilds the slates the old one built", () => {
+  const { taxonomyVersion: _taxonomy, ...recorded } = VERSIONS;
+  const same: DeployedSlateVersions = recorded;
+
+  it("the deployed versions are the ones the builder writes", () => {
+    expect(DEPLOYED_SLATE_VERSIONS.rankingConfigVersion).toBe(
+      RANKING_CONFIG_CURRENT.version,
+    );
+    expect(DEPLOYED_SLATE_VERSIONS.rankerVersion).toBe(RANKER_VERSION);
+    expect(versionDrift(recorded, same)).toEqual([]);
+    // A degraded (structured-only) build is not an old one.
+    expect(
+      versionDrift({ ...recorded, semanticGeneratorVersion: null }, same),
+    ).toEqual([]);
+    expect(
+      versionDrift(recorded, {
+        ...same,
+        rankingConfigVersion: "ranking-config.v9",
+      }),
+    ).toEqual(["rankingConfigVersion"]);
+  });
+
+  it("asks once for a NORMAL GENERATOR_VERSION_CHANGED rebuild, keeps serving the old slate, and coalesces on a second start", async () => {
+    const store = memorySlates();
+    const requests = memoryRequests();
+    const queue = collectingQueue();
+    const requester = createRefreshRequester({ requests, queue });
+    const slate = await publishedSlate(store, KEY, [COMPANY]);
+
+    expect(
+      await requestRebuildsForVersionDrift({
+        slates: store.repo,
+        requester,
+        deployed: same,
+      }),
+    ).toEqual({ checked: 1, stale: 0, enqueued: 0, coalesced: 0 });
+    expect(queue.sent).toHaveLength(0);
+
+    const bumped = {
+      ...same,
+      structuredGeneratorVersion: "structured-mandate.v6",
+    };
+    expect(
+      await requestRebuildsForVersionDrift({
+        slates: store.repo,
+        requester,
+        deployed: bumped,
+      }),
+    ).toEqual({ checked: 1, stale: 1, enqueued: 1, coalesced: 0 });
+    expect(queue.sent).toHaveLength(1);
+    const job = RefreshRecommendationSlateJob.dataSchema.parse(
+      (queue.sent[0]?.message as { data: unknown }).data,
+    );
+    expect(job).toMatchObject({
+      investorOrganisationId: INVESTOR,
+      mandateId: MANDATE,
+      reason: "GENERATOR_VERSION_CHANGED",
+      priority: "NORMAL",
+    });
+    // Not invalidated: the feed serves it until the rebuild supersedes it.
+    expect((await store.repo.findById(slate.id))?.status).toBe("CURRENT");
+
+    // Another worker starting before the build ran: one row, no new message.
+    expect(
+      await requestRebuildsForVersionDrift({
+        slates: store.repo,
+        requester,
+        deployed: bumped,
+      }),
+    ).toEqual({ checked: 1, stale: 1, enqueued: 0, coalesced: 1 });
+    expect(queue.sent).toHaveLength(1);
   });
 });

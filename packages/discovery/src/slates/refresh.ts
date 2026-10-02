@@ -9,12 +9,19 @@ import {
 import { getMeter, type Logger } from "@capital-q/observability";
 import { z } from "zod";
 
+import { STRUCTURED_GENERATOR_VERSION } from "../candidates/contracts.js";
+import { ELIGIBILITY_POLICY_VERSION } from "../eligibility/contracts.js";
 import { DISCOVERABLE_VISIBILITIES } from "../eligibility/policy.js";
+import { FEATURE_SCHEMA_VERSION } from "../features/contracts.js";
+import { RANKING_CONFIG_CURRENT } from "../ranking/config.js";
+import { RANKER_VERSION } from "../ranking/contracts.js";
+import { SEMANTIC_GENERATOR_VERSION } from "../semantic/contracts.js";
 import {
   RECOMMENDATION_REFRESH_QUEUE,
   RefreshRecommendationSlateJob,
 } from "../jobs/index.js";
 import type {
+  RecommendationSlate,
   RefreshPriority,
   RefreshReason,
   SlateInvalidationReason,
@@ -581,4 +588,92 @@ export function createSlateInvalidationService(dependencies: {
       return { invalidated, enqueued, coalesced };
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Version drift (live 2026-10-02: a generator bump left every CURRENT slate
+// on the old generator until it expired, so a company the new one admits
+// stayed out of the feed for hours).
+// ---------------------------------------------------------------------------
+
+/** The versions this deployment builds with; a CURRENT slate naming others is stale. */
+export type DeployedSlateVersions = {
+  readonly eligibilityPolicyVersion: string;
+  readonly structuredGeneratorVersion: string;
+  readonly semanticGeneratorVersion: string;
+  readonly featureSchemaVersion: string;
+  readonly rankerVersion: string;
+  readonly rankingConfigVersion: string;
+};
+
+export const DEPLOYED_SLATE_VERSIONS: DeployedSlateVersions = Object.freeze({
+  eligibilityPolicyVersion: ELIGIBILITY_POLICY_VERSION,
+  structuredGeneratorVersion: STRUCTURED_GENERATOR_VERSION,
+  semanticGeneratorVersion: SEMANTIC_GENERATOR_VERSION,
+  featureSchemaVersion: FEATURE_SCHEMA_VERSION,
+  rankerVersion: RANKER_VERSION,
+  rankingConfigVersion: RANKING_CONFIG_CURRENT.version,
+});
+
+/**
+ * Which recorded versions differ from the deployed ones. A null semantic
+ * version is a degraded build, not an old one: it is not drift.
+ */
+export function versionDrift(
+  slate: Pick<RecommendationSlate, keyof DeployedSlateVersions>,
+  deployed: DeployedSlateVersions = DEPLOYED_SLATE_VERSIONS,
+): readonly (keyof DeployedSlateVersions)[] {
+  return (Object.keys(deployed) as (keyof DeployedSlateVersions)[]).filter(
+    (field) => {
+      const recorded = slate[field];
+      return recorded !== null && recorded !== deployed[field];
+    },
+  );
+}
+
+export type VersionDriftOutcome = {
+  readonly checked: number;
+  readonly stale: number;
+  readonly enqueued: number;
+  readonly coalesced: number;
+};
+
+/**
+ * At worker start: ask for a NORMAL rebuild of every CURRENT Discover slate
+ * built by an older pipeline. Nothing is invalidated, so the reader keeps
+ * serving the old slate until the new one supersedes it; the request row
+ * coalesces, so several workers starting at once enqueue one build each.
+ */
+export async function requestRebuildsForVersionDrift(dependencies: {
+  readonly slates: Pick<SlateRepository, "listCurrent">;
+  readonly requester: RefreshRequester;
+  readonly deployed?: DeployedSlateVersions | undefined;
+  readonly limit?: number | undefined;
+  readonly logger?: Logger | undefined;
+}): Promise<VersionDriftOutcome> {
+  const deployed = dependencies.deployed ?? DEPLOYED_SLATE_VERSIONS;
+  const current = await dependencies.slates.listCurrent(
+    dependencies.limit ?? INVALIDATION_FAN_OUT_MAX,
+  );
+  let stale = 0;
+  let enqueued = 0;
+  let coalesced = 0;
+  for (const slate of current) {
+    if (slate.mode !== MODE) continue;
+    if (versionDrift(slate, deployed).length === 0) continue;
+    stale += 1;
+    const result = await dependencies.requester.request({
+      tenantId: slate.tenantId,
+      investorOrganisationId: slate.investorOrganisationId,
+      mandateId: slate.mandateId,
+      mode: slate.mode,
+      reason: "GENERATOR_VERSION_CHANGED",
+      priority: "NORMAL",
+    });
+    if (result.kind === "ENQUEUED") enqueued += 1;
+    else coalesced += 1;
+  }
+  const outcome = { checked: current.length, stale, enqueued, coalesced };
+  dependencies.logger?.info({ ...outcome }, "discovery.slates.version_drift");
+  return outcome;
 }

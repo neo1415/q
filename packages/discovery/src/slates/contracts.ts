@@ -72,6 +72,9 @@ export const REFRESH_REASONS = [
   "RELATIONSHIP_CHANGED",
   // A founder's pitch became playable, changed audience or was removed.
   "PITCH_CHANGED",
+  // The deployed pipeline (a generator, the ranker, its config, the
+  // eligibility policy or the feature schema) is newer than the slate's.
+  "GENERATOR_VERSION_CHANGED",
   "NO_CURRENT_SLATE",
   "SLATE_EXPIRED",
   "SCHEDULED",

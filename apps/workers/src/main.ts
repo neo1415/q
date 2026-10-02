@@ -52,6 +52,7 @@ import {
 import {
   createRecommendationPipeline,
   createRefreshRequester,
+  requestRebuildsForVersionDrift,
   createSlateInvalidationService,
   RECOMMENDATION_REFRESH_DEAD_LETTER_QUEUE,
   RECOMMENDATION_REFRESH_QUEUE,
@@ -1045,6 +1046,21 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 logger.info({ contracts: CONTRACTS_VERSION }, "worker runtime started");
+
+// A deploy that bumps a generator, the ranker, its config, the eligibility
+// policy or the feature schema asks for NORMAL rebuilds of the slates built
+// by the old pipeline; the feed keeps serving them until superseded. Never
+// fatal: an expiry still refreshes a slate this misses.
+void requestRebuildsForVersionDrift({
+  slates: recommendations.slates,
+  requester: refreshRequester,
+  logger,
+}).catch((error: unknown) => {
+  logger.warn(
+    { error: error instanceof Error ? error.name : "UNKNOWN" },
+    "discovery.slates.version_drift_failed",
+  );
+});
 
 // The loops hold the process resident; they return only after abort, at which
 // point the pool is drained and telemetry flushed before exit.

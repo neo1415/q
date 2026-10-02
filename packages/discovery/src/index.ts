@@ -606,6 +606,11 @@ export {
 } from "./jobs/index.js";
 export {
   createRefreshRequester,
+  DEPLOYED_SLATE_VERSIONS,
+  requestRebuildsForVersionDrift,
+  versionDrift,
+  type DeployedSlateVersions,
+  type VersionDriftOutcome,
   createSlateInvalidationService,
   INVALIDATION_FAN_OUT_MAX,
   REFRESH_TRIGGER_EVENTS,
