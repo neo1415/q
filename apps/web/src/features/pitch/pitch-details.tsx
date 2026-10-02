@@ -18,19 +18,46 @@ import { deletePitchMediaAction, setPitchDetailsAction } from "./pitch-actions";
 /**
  * One video's name and who may watch it (ADR 0021/0022), and deleting it.
  *
- * The audience is a disclosure decision: "Investors only" is the default,
- * and "Everyone on Capital Q" also lets signed-in founders watch it. The
+ * Who can watch it is ONE choice (live 2026-10-02, Nixo: "Everyone on
+ * Capital Q" was chosen while playback stayed private, so nobody could
+ * watch): only their organisation (playback PRIVATE), investors who can
+ * find the company, or also every signed-in founder (playback AUTHORISED
+ * with that audience), saved in one server call. The
  * server decides and records; this form sends the version it saw, so a
  * stale screen never overwrites a newer choice.
  */
 
-const AUDIENCE_OPTIONS: readonly {
-  readonly value: PitchAudience;
+type Sharing = "ORGANISATION" | PitchAudience;
+
+const SHARING_OPTIONS: readonly {
+  readonly value: Sharing;
   readonly label: string;
 }[] = [
-  { value: "INVESTORS", label: "Investors only" },
+  { value: "ORGANISATION", label: "Only my organisation" },
+  { value: "INVESTORS", label: "Investors who can find us" },
   { value: "NETWORK", label: "Everyone on Capital Q" },
 ];
+
+/** The one choice a record stands at. */
+export function sharingOf(pitch: {
+  readonly playbackPolicy: string;
+  readonly audience: PitchAudience;
+}): Sharing {
+  return pitch.playbackPolicy === "PRIVATE" ? "ORGANISATION" : pitch.audience;
+}
+
+/** What one choice writes: the audience and who may play it, together. */
+export function detailsFor(
+  sharing: Sharing,
+  current: PitchAudience,
+): {
+  readonly audience: PitchAudience;
+  readonly playbackPolicy: "AUTHORISED" | "PRIVATE";
+} {
+  return sharing === "ORGANISATION"
+    ? { audience: current, playbackPolicy: "PRIVATE" }
+    : { audience: sharing, playbackPolicy: "AUTHORISED" };
+}
 
 export function PitchDetails({
   companyId,
@@ -50,7 +77,7 @@ export function PitchDetails({
   const [saved, setSaved] = useState(pitch);
   const record = pitch.version > saved.version ? pitch : saved;
   const [title, setTitle] = useState(pitch.title ?? "");
-  const [audience, setAudience] = useState<PitchAudience>(pitch.audience);
+  const [sharing, setSharing] = useState<Sharing>(sharingOf(pitch));
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{
     readonly tone: "info" | "warning";
@@ -61,7 +88,7 @@ export function PitchDetails({
 
   const trimmed = title.trim();
   const changed =
-    trimmed !== (record.title ?? "") || audience !== record.audience;
+    trimmed !== (record.title ?? "") || sharing !== sharingOf(record);
 
   const save = async () => {
     setSaving(true);
@@ -69,7 +96,10 @@ export function PitchDetails({
     const result = await setPitchDetailsAction(
       companyId,
       pitch.mediaAssetId,
-      { title: trimmed.length === 0 ? null : trimmed, audience },
+      {
+        title: trimmed.length === 0 ? null : trimmed,
+        ...detailsFor(sharing, record.audience),
+      },
       record.version,
     );
     setSaving(false);
@@ -109,21 +139,21 @@ export function PitchDetails({
         id={`${id}-audience`}
         label="Who can watch it"
         description={
-          // Live 2026-10-02 (Nixo): "Everyone on Capital Q" was chosen on a
-          // pitch still private, and nobody could play it. The choice says
-          // who may watch once it is shared; the words say it is not yet.
-          (record.playbackPolicy === "PRIVATE"
-            ? "It's private now: nobody outside your organisation can play it until you choose Let investors play this pitch. Then: "
-            : "") +
-          (audience === "NETWORK"
-            ? "Investors who can find your company, and every founder signed in to Capital Q."
-            : "Only investors who can find your company.")
+          sharing === "ORGANISATION"
+            ? "Private: only people in your organisation can play it."
+            : sharing === "NETWORK"
+              ? "Investors who can find your company, and every founder signed in to Capital Q."
+              : "Investors who can find your company."
         }
-        options={AUDIENCE_OPTIONS}
-        value={audience}
+        options={SHARING_OPTIONS}
+        value={sharing}
         onChange={(event) =>
-          setAudience(
-            event.target.value === "NETWORK" ? "NETWORK" : "INVESTORS",
+          setSharing(
+            event.target.value === "NETWORK"
+              ? "NETWORK"
+              : event.target.value === "INVESTORS"
+                ? "INVESTORS"
+                : "ORGANISATION",
           )
         }
       />

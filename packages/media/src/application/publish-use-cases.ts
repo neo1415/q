@@ -222,6 +222,14 @@ export const PitchDetailsSchema = z
       .transform((title) => (title.length === 0 ? null : title))
       .nullable(),
     audience: PitchAudienceSchema,
+    /**
+     * Who may play it, decided with the audience as ONE choice (live
+     * 2026-10-02, Nixo: "Everyone on Capital Q" chosen while playback
+     * stayed PRIVATE, so nobody could watch). AUTHORISED with an
+     * investor-facing audience; PRIVATE for "only my organisation".
+     * Absent: the policy is left as it is.
+     */
+    playbackPolicy: OwnerPlaybackPolicySchema.optional(),
   })
   .strict();
 export type PitchDetails = z.input<typeof PitchDetailsSchema>;
@@ -237,7 +245,7 @@ export type SetPitchDetailsCommand = {
 };
 
 export function createSetPitchDetails(dependencies: MediaServiceDependencies) {
-  const { repositories, transactions, audit } = dependencies;
+  const { repositories, transactions, audit, outbox } = dependencies;
 
   return async (command: SetPitchDetailsCommand): Promise<MediaAsset> => {
     const { actor } = command;
@@ -273,22 +281,83 @@ export function createSetPitchDetails(dependencies: MediaServiceDependencies) {
       if (asset.status === "DELETED") {
         throw new MediaRuleError("A deleted video can't be changed.");
       }
-      if (
-        asset.title === details.title &&
-        asset.audience === details.audience
-      ) {
+      const policyChange =
+        details.playbackPolicy !== undefined &&
+        details.playbackPolicy !== asset.playbackPolicy
+          ? details.playbackPolicy
+          : null;
+      const detailsChange =
+        asset.title !== details.title || asset.audience !== details.audience;
+      if (!detailsChange && policyChange === null) {
         return asset;
       }
-      const updated = await repositories.mediaAssets.setDetails(tx, {
-        tenantId: owner.tenantId,
-        mediaAssetId: asset.id,
-        expectedVersion: asset.version,
-        title: details.title,
-        audience: details.audience,
-      });
+      const detailed = !detailsChange
+        ? asset
+        : await repositories.mediaAssets.setDetails(tx, {
+            tenantId: owner.tenantId,
+            mediaAssetId: asset.id,
+            expectedVersion: asset.version,
+            title: details.title,
+            audience: details.audience,
+          });
+      if (detailed === null) {
+        throw new MediaAssetConflictError();
+      }
+      // The same transaction: the audience and who may play it change
+      // together or not at all, so no screen ever shows one without the other.
+      const updated =
+        policyChange === null
+          ? detailed
+          : await repositories.mediaAssets.setStates(tx, {
+              tenantId: owner.tenantId,
+              mediaAssetId: asset.id,
+              expectedVersion: detailed.version,
+              playbackPolicy: policyChange,
+            });
       if (updated === null) {
         throw new MediaAssetConflictError();
       }
+      if (policyChange !== null) {
+        await audit.record(tx, {
+          ...auditActorFromContext(actor),
+          auditEventId: createAuditEventId(),
+          actionType: ACTION.playbackPolicySet,
+          resourceType: RESOURCE_MEDIA,
+          resourceId: asset.id,
+          occurredAt: occurredNow(),
+          outcome: "SUCCEEDED",
+          metadata: {
+            ownerType: asset.ownerType,
+            ownerId: asset.ownerId,
+            purpose: asset.purpose,
+            previousPlaybackPolicy: asset.playbackPolicy,
+            playbackPolicy: policyChange,
+            status: asset.status,
+            moderationStatus: asset.moderationStatus,
+          },
+          correlationId: command.correlationId,
+        });
+        await outbox.enqueue(
+          tx,
+          mediaAssetPlaybackPolicyChangedEvent(
+            {
+              actor,
+              organisationId: activeOrganisation(actor),
+              correlationId: command.correlationId,
+            },
+            updated.version,
+            {
+              mediaAssetId: asset.id,
+              ownerType: asset.ownerType,
+              ownerId: asset.ownerId,
+              purpose: asset.purpose,
+              previousPlaybackPolicy: asset.playbackPolicy,
+              playbackPolicy: policyChange,
+            },
+          ),
+        );
+      }
+      if (!detailsChange) return updated;
       await audit.record(tx, {
         ...auditActorFromContext(actor),
         auditEventId: createAuditEventId(),

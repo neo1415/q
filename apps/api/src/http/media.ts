@@ -434,7 +434,13 @@ function registerPitchRoutes(
         actor,
         companyId: companyIdParam(request),
         mediaAssetId: mediaAssetIdParam(request),
-        details: { title: input.title, audience: input.audience },
+        details: {
+          title: input.title,
+          audience: input.audience,
+          ...(input.playbackPolicy === undefined
+            ? {}
+            : { playbackPolicy: input.playbackPolicy }),
+        },
         expectedVersion: input.expectedVersion,
         correlationId: correlation(),
       });

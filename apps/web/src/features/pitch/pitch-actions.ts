@@ -141,7 +141,11 @@ export async function loadPitchOverviewAction(
 export async function setPitchDetailsAction(
   rawCompanyId: string,
   rawMediaAssetId: string,
-  rawDetails: { readonly title: string | null; readonly audience: string },
+  rawDetails: {
+    readonly title: string | null;
+    readonly audience: string;
+    readonly playbackPolicy?: string | undefined;
+  },
   rawExpectedVersion: number,
 ): Promise<PitchActionResult<MediaAssetDto>> {
   const companyId = UuidInput.safeParse(rawCompanyId);
@@ -151,6 +155,7 @@ export async function setPitchDetailsAction(
     .object({
       title: z.string().trim().max(PITCH_TITLE_MAX).nullable(),
       audience: PitchAudienceSchema,
+      playbackPolicy: OwnerPolicyInput.optional(),
     })
     .safeParse(rawDetails);
   if (!companyId.success || !mediaAssetId.success) {

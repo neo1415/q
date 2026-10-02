@@ -106,6 +106,7 @@ export type PitchTransport = {
     details: {
       readonly title: string | null;
       readonly audience: PitchAudience;
+      readonly playbackPolicy?: "AUTHORISED" | "PRIVATE" | undefined;
     },
     expectedVersion: number,
   ) => Promise<MediaAssetDto>;
@@ -194,6 +195,9 @@ export function apiPitchTransport(session: ApiSession): PitchTransport {
         await setPitchDetails(session, companyId, mediaAssetId, {
           title: details.title,
           audience: details.audience,
+          ...(details.playbackPolicy === undefined
+            ? {}
+            : { playbackPolicy: details.playbackPolicy }),
           expectedVersion,
         })
       ).pitch,

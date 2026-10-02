@@ -329,6 +329,12 @@ export const SetPitchDetailsRequestSchema = z
   .object({
     title: z.string().max(PITCH_TITLE_MAX).nullable(),
     audience: PitchAudienceSchema,
+    /**
+     * Who may play it, set with the audience in the same call (live
+     * 2026-10-02): AUTHORISED for an investor-facing audience, PRIVATE for
+     * "only my organisation". Absent: unchanged.
+     */
+    playbackPolicy: OwnerPlaybackPolicySchema.optional(),
     expectedVersion: ResourceVersionSchema,
   })
   .strict();

@@ -414,6 +414,57 @@ describe("@capital-q/media against local PostgreSQL", () => {
     });
   });
 
+  it("sets who can watch as ONE choice: audience and playback change together, audited, with the policy event (live 2026-10-02)", async () => {
+    await withWorld(async (world) => {
+      const { asset } = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      expect(asset.playbackPolicy).toBe("PRIVATE");
+      const everyone = await world.service.setPitchDetails({
+        actor: world.adminA,
+        companyId: world.companyA,
+        mediaAssetId: asset.id,
+        details: {
+          title: null,
+          audience: "NETWORK",
+          playbackPolicy: "AUTHORISED",
+        },
+        expectedVersion: asset.version,
+        correlationId: CORRELATION(),
+      });
+      expect(everyone.audience).toBe("NETWORK");
+      expect(everyone.playbackPolicy).toBe("AUTHORISED");
+      // "Only my organisation": private, the audience kept for next time.
+      const mine = await world.service.setPitchDetails({
+        actor: world.adminA,
+        companyId: world.companyA,
+        mediaAssetId: asset.id,
+        details: {
+          title: null,
+          audience: "NETWORK",
+          playbackPolicy: "PRIVATE",
+        },
+        expectedVersion: everyone.version,
+        correlationId: CORRELATION(),
+      });
+      expect(mine.playbackPolicy).toBe("PRIVATE");
+      expect(mine.audience).toBe("NETWORK");
+      const policies = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from audit.material_actions
+         where resource_id = ${asset.id}
+           and action_type = 'media.asset.playback_policy_set'`;
+      expect(policies[0]?.n).toBe(2);
+      const events = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from events.outbox
+         where event_type = 'media.asset.playback_policy_changed'
+           and payload::text like ${"%" + asset.id + "%"}`;
+      expect(events[0]?.n).toBe(2);
+    });
+  });
+
   it("replaces a pitch by creating a new asset and keeping the old one", async () => {
     await withWorld(async (world) => {
       const first = await world.service.createCompanyPitch({
