@@ -272,3 +272,8 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - Deployed 5eb4fef2 (all 4 SUCCESS 20:41): rehearsal never fails to start (field-by-field readings, minimal persona fallback, holding line, provisional review with retries, "rehearsal degraded" log); gateway enumFallbacks + label normalisation; camera presence (opt-in) + look-on-demand; time-zone order (no silent UTC); approved-action sweep; dock resume + cross-conversation typed approval; branded emails (packages/email) + per-person meeting emails with Meet link/.ics; meet-host (Recall output audio + ElevenLabs; greet, intros, roster, no-show/one-side paths, injection refusals; ADR 0037 Proposed). Hosted migrations 112/112.
 - Real Zino↔Nixo call Fri 2 Oct 12:30 UTC (cfccb9a9): bot joins T-3; someone must Admit "Q (Capital Q notes)".
 - Pending founder: load supabase/templates into hosted Auth (magic_link shows {{ .Token }}); ADR 0037 accept; billing decisions; hide overheard lines / retire "Neo" memory.
+
+## 2026-10-02 afternoon — lead
+- Deployed 27505fb5: Discover "Your companies" (/discover/yours; connected/interested/saved pitches, list uses the player's own mayPlayPitch predicate, only the first item signed on load, phone entry over the stage); pitch audience+playback as one choice; HARDEN WHAT EXISTS fact (ownIndex port, wired by QA's ADR 0040 registry next), q.parity_gap log, turn reader v29 (PASSED).
+- Live as Zino: Nixo first in Your companies; Ajopot, Ledgerfold listed; out-of-mandate INVESTORS pitches no longer listed.
+- Founder decision: keep the disclosure rule (INVESTORS pitch plays only for mandate-eligible companies; connection/interest does not unlock it).
