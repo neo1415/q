@@ -214,11 +214,6 @@ export function requestFor(
       return check(UpsertMyCompanyMembershipRequestSchema, fields);
     case "INVESTOR_REPRESENTATIVE":
       return check(UpsertMyInvestorRepresentativeRequestSchema, fields);
-    case "INVESTOR_VISIBILITY":
-      return check(SetInvestorVisibilityRequestSchema, {
-        ...fields,
-        expectedVersion: ANY_VERSION,
-      });
     case "Q_CARD":
       return check(UpdateQCardRequestSchema, {
         ...fields,
@@ -1145,15 +1140,6 @@ export function createRecordChangeBoard(
             fields: request.fields,
           },
           summary: "Update your role at your investor organisation",
-        };
-      case "INVESTOR_VISIBILITY":
-        return {
-          actionType: INVESTOR_VISIBILITY_SET,
-          payload: {
-            investorOrganisationId: change.investorOrganisationId,
-            visibility: request.fields["visibility"],
-          },
-          summary: "Change who can see your investor organisation",
         };
       case "PROFILE_ANSWER": {
         const answer = resolveProfileAnswer(change.field, change.value);

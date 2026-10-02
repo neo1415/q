@@ -317,7 +317,6 @@ import {
 import {
   createRevokeShareAction,
   createShareRaiseAction,
-  createVisibilityActionBoard,
 } from "./composition/visibility-actions.js";
 import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import {
@@ -1233,7 +1232,6 @@ const visibilityCentre = createVisibilityCentre({
     })),
 });
 // Shares and revokes Q prepares wait here for the Approval Engine.
-const visibilityBoard = createVisibilityActionBoard({ logger });
 
 // The Tool Registry (CQ-Q-007): four SAFE_READ tools over the same public
 // query ports and the same two authorities the firewall uses, plus the two
@@ -1600,7 +1598,6 @@ const qTools = createQTools({
     profileGaps: profileGapsBoard,
     visibility: {
       state: (actor, companyId) => visibilityCentre.state({ actor, companyId }),
-      prepareForApproval: visibilityBoard.prepareForApproval,
     },
     // ADMIN-3 block
     humanReviews: humanReviewBoard,
@@ -2013,7 +2010,6 @@ const qActionPort = createQActionPort({
     workBoard.proposer,
     profileChangeBoard.proposer,
     profileGapsBoard.proposer,
-    visibilityBoard.proposer,
     humanReviewBoard.proposer,
     recordChangeBoard.proposer,
     profileBoard,

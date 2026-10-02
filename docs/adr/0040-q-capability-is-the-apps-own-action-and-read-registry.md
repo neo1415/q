@@ -117,7 +117,7 @@ Profile and records (L, highest value; Q already proposes these through hand too
 
 Relationships:
 
-- [ ] Interest and connection requests: `network-interests` ×3. **M**
+- [ ] Interest and connection requests: `network-interests` ×3. **M** Step 1 done 2026-10-02: six declarations (express; accept and decline interest; send, accept and decline a Connection Request) with generated routes. Q still uses its relationship tools (`legacyTool`), which errands and the pending-decision path build on; step 2 needs their owner.
 - [ ] Chat: send, unsend, block, unblock, report. Unsend, block and report stay the person's own: INSTANT for the author, never Q-initiated. **M**
 - [ ] Schedule: meetings, cancel, reminders, dismiss. **M**
 - [ ] Errands and Q work: `errands`, `work` ×4. **M**

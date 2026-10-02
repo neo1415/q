@@ -251,13 +251,6 @@ export type VisibilityIntelligencePort = {
     actor: ActorContext,
     companyId: string,
   ) => Promise<VisibilityStateDto>;
-  readonly prepareForApproval: (entry: {
-    readonly runId: string;
-    readonly tenantId: string;
-    readonly actorUserId: string;
-    readonly actionType: "disclosure.raise.share" | "disclosure.share.revoke";
-    readonly payload: Readonly<Record<string, string>>;
-  }) => "PREPARED" | "ONE_PER_TURN";
 };
 
 /**
@@ -518,7 +511,7 @@ export type RecordChange =
       readonly fields: Readonly<Record<string, unknown>>;
     }
   | {
-      readonly kind: "INVESTOR_REPRESENTATIVE" | "INVESTOR_VISIBILITY";
+      readonly kind: "INVESTOR_REPRESENTATIVE";
       readonly investorOrganisationId: string;
       readonly fields: Readonly<Record<string, unknown>>;
     }

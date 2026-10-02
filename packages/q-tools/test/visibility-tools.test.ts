@@ -91,10 +91,6 @@ function fakeVisibility() {
         ? Promise.resolve(STATE)
         : Promise.reject(new Error("not this company's organisation"));
     },
-    prepareForApproval: (entry) => {
-      prepared.push({ actionType: entry.actionType, payload: entry.payload });
-      return "PREPARED";
-    },
   };
   return { port, reads, prepared };
 }

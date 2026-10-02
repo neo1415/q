@@ -100,7 +100,47 @@ describe("the action registry", () => {
       ["investor.visibility.set", "set_investor_visibility", "CONSEQUENTIAL"],
       ["disclosure.raise.share", "share_my_raise", "CONSEQUENTIAL"],
       ["disclosure.share.revoke", "stop_sharing_my_raise", "CONSEQUENTIAL"],
+      [
+        "relationship.interest.express",
+        "legacy:propose_express_interest",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.interest.accept",
+        "legacy:propose_interest_answer",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.interest.decline",
+        "legacy:propose_interest_answer",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.connection_request.send",
+        "legacy:propose_connection_request",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.connection_request.accept",
+        "legacy:propose_connection_request_answer",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "relationship.connection_request.decline",
+        "legacy:propose_connection_request_answer",
+        "CONSEQUENTIAL",
+      ],
     ]);
+  });
+});
+
+describe("the reader's compact list", () => {
+  it("every declaration has a short label of 2 to 5 words", () => {
+    for (const action of APP_ACTIONS) {
+      const words = (action.short ?? "").trim().split(/\s+/).filter(Boolean);
+      expect(words.length, action.name).toBeGreaterThanOrEqual(2);
+      expect(words.length, action.name).toBeLessThanOrEqual(5);
+    }
   });
 });
 

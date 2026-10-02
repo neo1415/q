@@ -152,6 +152,7 @@ async function versionOf(
 
 const CREATE = defineAppAction<z.infer<typeof Create>, CapitalObjective>({
   name: "capital.objective.create",
+  short: "set up a raise",
   area: "capital",
   classification: "CONSEQUENTIAL",
   does: "Sets up their company's raise, as the Capital page's form does.",
@@ -188,6 +189,7 @@ const CREATE = defineAppAction<z.infer<typeof Create>, CapitalObjective>({
 
 const UPDATE = defineAppAction<z.infer<typeof Update>, CapitalObjective>({
   name: "capital.objective.update",
+  short: "change the raise",
   area: "capital",
   classification: "CONSEQUENTIAL",
   does: "Changes their company's current raise, as the Capital page's form does.",
@@ -225,6 +227,7 @@ const UPDATE = defineAppAction<z.infer<typeof Update>, CapitalObjective>({
 
 const CLOSE = defineAppAction<z.infer<typeof Close>, CapitalObjective>({
   name: "capital.objective.close",
+  short: "close the raise",
   area: "capital",
   classification: "CONSEQUENTIAL",
   does: "Closes their company's current raise with its reason, as the Capital page does.",
@@ -265,6 +268,7 @@ const REPLACE = defineAppAction<
   Awaited<ReturnType<CapitalService["replaceCapitalObjective"]>>
 >({
   name: "capital.objective.replace",
+  short: "replace the raise",
   area: "capital",
   classification: "CONSEQUENTIAL",
   does: "Replaces their company's current raise with a deliberately new one, as the Capital page does.",
@@ -343,6 +347,7 @@ export const CAPITAL_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof RaiseTool>
 >({
   name: "capital.objective.change",
+  short: "change their raise",
   area: "capital",
   does: "Sets up, changes, closes or replaces their company's raise, as the Capital page's form does.",
   members: { CREATE, UPDATE, CLOSE, REPLACE },
