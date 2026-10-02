@@ -22,7 +22,6 @@ import {
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
-import { createProposeHandleClaimTool } from "./tools/handle-claim.js";
 import {
   createApprovePendingProposalTool,
   createDeclinePendingProposalTool,
@@ -36,7 +35,6 @@ import { createProposeHumanReviewTool } from "./tools/human-review.js";
 import { createDocumentStudioTools } from "./tools/documents.js";
 import { createOwnRecordTools } from "./tools/own-records.js";
 import { createRecordChangeTools } from "./tools/record-changes.js";
-import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createFillProfileGapsTool } from "./tools/profile-gaps.js";
 import { createProposeEmailTool } from "./tools/email.js";
 import { createChatTools } from "./tools/chat.js";
@@ -144,10 +142,8 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ports.relationships === undefined
       ? []
       : createScheduleTools(ports.schedule, ports.chat, ports.relationships)),
-    // BIZ-002: every profile field the page edits, Q can prepare.
-    ...(ports.profileChanges === undefined
-      ? []
-      : [createProposeProfileChangeTool(ports, ports.profileChanges)]),
+    // BIZ-002: every profile field the page edits, Q prepares through the
+    // tools generated from the app's action registry (ADR 0040).
     // HARDEN P0 (live 2026-10-02): "search online and fill my profile's
     // gaps" as a tool whose rules are code, not guidance.
     ...(ports.profileChanges === undefined || research === undefined
@@ -167,10 +163,6 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.visibility === undefined
       ? []
       : createVisibilityTools(ports.visibility)),
-    // BIZ-004: "make me a Q card" / "change our handle".
-    ...(ports.handleClaims === undefined
-      ? []
-      : [createProposeHandleClaimTool(ports, ports.handleClaims)]),
     // Approval by conversation: the one waiting change, approved as the
     // card approves it (live test 2026-09-27 #1).
     ...(ports.pendingProposals === undefined

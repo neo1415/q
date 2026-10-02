@@ -1748,7 +1748,7 @@ export function createVoiceTurnHandler(
     // "Change my website to …", "make us visible to investors" are not
     // matched here from the words (ADR 0011/0016, as navigation is not):
     // they reach Q like any turn, Q's reading names the change
-    // (propose_profile_change, SET_VISIBILITY) and the platform's approval
+    // (update_company_profile, SET_VISIBILITY) and the platform's approval
     // asks for the yes, spoken or tapped, bound to the exact change.
     const paused = held.get(binding);
     // A cough, a laugh, a bare "uh", or the browser's cue after a false

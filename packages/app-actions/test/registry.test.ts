@@ -63,34 +63,23 @@ describe("the action registry", () => {
       ["discovery.company.unsave", "unsave_company", "INSTANT"],
       ["discovery.company.pass", "pass_company", "INSTANT"],
       ["discovery.company.unpass", "unpass_company", "INSTANT"],
-      [
-        "company.profile.update",
-        "legacy:propose_profile_change",
-        "CONSEQUENTIAL",
-      ],
-      ["company.team.me.upsert", "legacy:propose_team_change", "CONSEQUENTIAL"],
+      ["person.profile.update", "update_my_profile", "CONSEQUENTIAL"],
+      ["company.profile.update", "update_company_profile", "CONSEQUENTIAL"],
+      ["company.team.me.upsert", "set_my_company_role", "CONSEQUENTIAL"],
       [
         "company.founder_profile.me.update",
-        "legacy:propose_team_change",
+        "update_my_founder_profile",
         "CONSEQUENTIAL",
       ],
-      [
-        "company.team_facts.update",
-        "legacy:propose_team_change",
-        "CONSEQUENTIAL",
-      ],
-      [
-        "investor.profile.update",
-        "legacy:propose_profile_change",
-        "CONSEQUENTIAL",
-      ],
+      ["company.team_facts.update", "update_team_facts", "CONSEQUENTIAL"],
+      ["investor.profile.update", "update_investor_profile", "CONSEQUENTIAL"],
       [
         "investor.representative.me.upsert",
-        "legacy:propose_team_change",
+        "set_my_investor_role",
         "CONSEQUENTIAL",
       ],
-      ["q_card.handle.claim", "legacy:propose_handle_claim", "CONSEQUENTIAL"],
-      ["q_card.update", "legacy:propose_q_card_change", "CONSEQUENTIAL"],
+      ["q_card.handle.claim", "claim_q_card_handle", "CONSEQUENTIAL"],
+      ["q_card.update", "update_q_card", "CONSEQUENTIAL"],
     ]);
   });
 });
@@ -140,9 +129,18 @@ describe("the parity eval's cases come from the registry", () => {
       { COMPANY: "Kazikit", MEDIA: "Nixo pitch" },
       { media: "Nixo pitch", feed: "Kazikit" },
     );
-    // Actions still served by a hand tool have no generated eval case yet.
+    // A misheard variant only where the phrasing names a record.
     expect(cases).toHaveLength(
-      APP_ACTIONS.filter((action) => action.tool !== undefined).length * 3 + 4,
+      APP_ACTIONS.reduce(
+        (total, action) =>
+          total +
+          (action.tool === undefined
+            ? 0
+            : action.tool.eval.names === undefined
+              ? 2
+              : 3),
+        0,
+      ) + 4,
     );
     expect(
       cases.find((c) => c.id === "discovery.company.pass#misheard")?.say,

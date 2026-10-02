@@ -113,7 +113,10 @@ describe("record changes are prepared for the person's own record only", () => {
   it("never prepares for a company that is not theirs", async () => {
     const { executor, prepared } = world(PREPARED);
     const outcome = await executor.execute(
-      call("propose_team_change", { change: "TEAM_FACTS", teamSize: 12 }),
+      call("propose_raise_change", {
+        operation: "UPDATE",
+        targetStage: "seed",
+      }),
       contextFor(actorA, ownPlan(actorA, [COMPANY_B_NETWORK])),
     );
     expect(outcome.status).not.toBe("SUCCEEDED");
@@ -132,9 +135,9 @@ describe("record changes are prepared for the person's own record only", () => {
     );
     expect(missing.status).not.toBe("SUCCEEDED");
     const refused = await executor.execute(
-      call("propose_team_change", {
-        change: "FOUNDER_PROFILE",
-        professionalSummary: "Operator",
+      call("propose_raise_change", {
+        operation: "UPDATE",
+        useOfFundsSummary: "Hiring",
       }),
       contextFor(actorA, ownPlan()),
     );

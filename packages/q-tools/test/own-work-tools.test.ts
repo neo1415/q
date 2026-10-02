@@ -17,13 +17,7 @@ import {
   type PendingProposalPort,
   type ProposalPlainStatus,
 } from "../src/index.js";
-import {
-  actorA,
-  actorB,
-  contextFor,
-  fakePorts,
-  planFor,
-} from "./support.js";
+import { actorA, actorB, contextFor, fakePorts, planFor } from "./support.js";
 
 /**
  * R33: Q does what the app's own controls do — Q motion, voice, sign out,

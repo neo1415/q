@@ -5,7 +5,6 @@ import {
   type PublicIdentityService,
   type SubjectDirectory,
 } from "@capital-q/public-identity";
-import type { QActionPrepareContext } from "@capital-q/q-runtime";
 import {
   OrganisationIdSchema,
   TenantIdSchema,
@@ -18,11 +17,11 @@ import {
   HANDLE_CLAIM,
   createHandleClaimAction,
 } from "../src/composition/handle-claim-action.js";
-import { createHandleClaimBoard } from "../src/composition/handle-claim-board.js";
 
 /**
- * "Make me a Q card" / "change our handle" (BIZ-004): the board checks the
- * handle before the person is asked; the approved `handle.claim` is
+ * "Make me a Q card" / "change our handle" (BIZ-004). Q prepares a claim
+ * through the generated claim_q_card_handle tool (ADR 0040); an approved
+ * `handle.claim` from before that still executes: it is
  * authorised on ownership and handle.manage and runs through the same
  * service command the profile page calls.
  */
@@ -40,70 +39,6 @@ const ADMIN: ActorContext = {
   organisationId: OrganisationIdSchema.parse(ORG),
   actorType: "HUMAN",
 };
-
-function prepareContext(userId = USER): QActionPrepareContext {
-  return {
-    runId: RUN,
-    actor: { userId, tenantId: TENANT, actorType: "HUMAN" },
-  } as unknown as QActionPrepareContext;
-}
-
-const base = {
-  runId: RUN,
-  tenantId: TENANT,
-  actorUserId: USER,
-  subjectType: "COMPANY" as const,
-  subjectId: COMPANY,
-};
-
-describe("the handle claim board", () => {
-  const available = (taken: readonly string[]) => ({
-    handleAvailable: (handle: string) =>
-      Promise.resolve(!taken.includes(handle)),
-  });
-
-  it("normalises and prepares an available handle, once", async () => {
-    const board = createHandleClaimBoard({ publicIdentity: available([]) });
-    const prepared = await board.prepareHandleClaim({
-      ...base,
-      handle: "@Kivu-Freight",
-    });
-    expect(prepared).toMatchObject({ status: "PREPARED", reason: null });
-    expect(prepared.awaitingApprovalOf).toContain("@kivu-freight");
-    expect(await board.proposer.propose(prepareContext())).toEqual({
-      actionType: HANDLE_CLAIM,
-      payload: {
-        subjectType: "COMPANY",
-        subjectId: COMPANY,
-        handle: "kivu-freight",
-      },
-    });
-    expect(await board.proposer.propose(prepareContext())).toBeNull();
-  });
-
-  it("refuses a malformed or unavailable handle before anyone is asked", async () => {
-    const board = createHandleClaimBoard({
-      publicIdentity: available(["support", "kivu"]),
-    });
-    expect(
-      (await board.prepareHandleClaim({ ...base, handle: "no--way" })).status,
-    ).toBe("REFUSED");
-    const taken = await board.prepareHandleClaim({ ...base, handle: "kivu" });
-    expect(taken).toMatchObject({ status: "REFUSED" });
-    expect(taken.reason).toContain("@kivu");
-    expect(await board.proposer.propose(prepareContext())).toBeNull();
-  });
-
-  it("never proposes for another person", async () => {
-    const board = createHandleClaimBoard({ publicIdentity: available([]) });
-    await board.prepareHandleClaim({ ...base, handle: "kivu" });
-    expect(
-      await board.proposer.propose(
-        prepareContext("b0000000-0000-4000-8000-000000000009"),
-      ),
-    ).toBeNull();
-  });
-});
 
 function actionFakes(options: { readonly allow?: boolean } = {}) {
   const claims: unknown[] = [];

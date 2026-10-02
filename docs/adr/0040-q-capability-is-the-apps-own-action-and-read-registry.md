@@ -108,7 +108,7 @@ Exempt routes stay exempt, each with its reason: webhooks, Q transport, the oper
 
 Profile and records (L, highest value; Q already proposes these through hand tools):
 
-- [ ] Profile: `me`, `companies`, `investors` PATCH; `company-team` ×3; `q-cards` ×2. **L**
+- [x] Profile: `me`, `companies`, `investors` PATCH; `company-team` ×3; `q-cards` ×2. **L** Done 2026-10-02: eight routes generated and nine generated tools replace `propose_profile_change`, `propose_team_change`, `propose_handle_claim` and `propose_q_card_change`. The two `me` routes stay hand routes, because they serve a person who has no organisation yet and a generated route needs an organisation's actor context; `person.profile.update` is declared for Q only.
 - [ ] Capital (raise): `capital-objectives` ×4. **M**
 - [ ] Mandate: `investor-mandates` ×3. **M**
 - [ ] Visibility and shares: `companies` visibility, `investors` visibility, `visibility` ×2. **M**

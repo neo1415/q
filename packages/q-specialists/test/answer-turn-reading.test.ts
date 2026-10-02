@@ -824,11 +824,11 @@ describe("an action the run offers is never filed as a document (BIZ-004 founder
       said: "Make a Q card for Zino Aviation with the handle zino-aviation",
       reading: ACTION_READING,
       outcomes: [],
-      offeredTools: ["propose_handle_claim", "get_company"],
+      offeredTools: ["claim_q_card_handle", "get_company"],
     });
     await run.answer.answer(request());
     // From the capability registry: the action, never the read.
-    expect(run.heardActions).toEqual([[actionOf("propose_handle_claim")]]);
+    expect(run.heardActions).toEqual([[actionOf("claim_q_card_handle")]]);
     // No document was prepared here; the answer's model took the turn.
     expect(run.delegated()).toBe(1);
     expect(run.stored).toHaveLength(0);
@@ -839,10 +839,10 @@ describe("an action the run offers is never filed as a document (BIZ-004 founder
       said: "change my headline to fintech founder in Lagos",
       reading: ACTION_READING,
       outcomes: [],
-      offeredTools: ["propose_profile_change", "search_companies"],
+      offeredTools: ["update_my_profile", "search_companies"],
     });
     await run.answer.answer(request());
-    expect(run.heardActions).toEqual([[actionOf("propose_profile_change")]]);
+    expect(run.heardActions).toEqual([[actionOf("update_my_profile")]]);
     expect(run.delegated()).toBe(1);
     // Not taken to the profile screen: no navigation message was stored.
     expect(run.stored).toHaveLength(0);
@@ -858,7 +858,7 @@ describe("an action the run offers is never filed as a document (BIZ-004 founder
     await run.answer.answer(request());
     expect(run.heardActions).toEqual([[]]);
     // It is declared, though: the reader may name it, marked not here.
-    expect(run.declaredActions[0]).toContain("propose_handle_claim");
+    expect(run.declaredActions[0]).toContain("claim_q_card_handle");
   });
 });
 

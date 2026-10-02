@@ -53,7 +53,6 @@ export type {
   InvestorFeedDecision,
   InvestorFeedPort,
   ConversationProposal,
-  HandleClaimPort,
   PendingProposalContext,
   PendingProposalPort,
   QCardReadPort,
@@ -126,14 +125,6 @@ export {
   type GetQCardOutput,
 } from "./tools/q-card.js";
 export {
-  createProposeHandleClaimTool,
-  PROPOSE_HANDLE_CLAIM,
-  ProposeHandleClaimInputSchema,
-  ProposeHandleClaimOutputSchema,
-  type ProposeHandleClaimInput,
-  type ProposeHandleClaimOutput,
-} from "./tools/handle-claim.js";
-export {
   OWN_RECORD_KINDS,
   PROFILE_ANSWER_FIELDS,
   RESEARCHABLE_FOUNDER_ANSWERS,
@@ -182,27 +173,14 @@ export {
   createProposeInvestorVisibilityTool,
   createProposeMandateChangeTool,
   createProposeProfileAnswerTool,
-  createProposeQCardChangeTool,
   createProposeRaiseChangeTool,
-  createProposeTeamChangeTool,
   createRecordChangeTools,
   ProposeRecordChangeOutputSchema,
   PROPOSE_INVESTOR_VISIBILITY,
   PROPOSE_MANDATE_CHANGE,
   PROPOSE_PROFILE_ANSWER,
-  PROPOSE_Q_CARD_CHANGE,
   PROPOSE_RAISE_CHANGE,
-  PROPOSE_TEAM_CHANGE,
 } from "./tools/record-changes.js";
-export {
-  createProposeProfileChangeTool,
-  FIELDS_BY_PROFILE,
-  PROPOSE_PROFILE_CHANGE,
-  ProposeProfileChangeInputSchema,
-  ProposeProfileChangeOutputSchema,
-  type ProposeProfileChangeInput,
-  type ProposeProfileChangeOutput,
-} from "./tools/profile-change.js";
 export {
   createRelationshipTools,
   GET_RELATIONSHIP,

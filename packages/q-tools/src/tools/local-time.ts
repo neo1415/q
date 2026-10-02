@@ -290,7 +290,7 @@ export function unresolvedMessage(
 ): string {
   switch (kind) {
     case "NO_TIME_ZONE":
-      return "Their time zone is not known here. Ask once which city or time zone they are in, then pass it as timeZone; and offer to save it to their profile (propose_profile_change, PERSON timeZone) so you never have to ask again. Never assume UTC.";
+      return "Their time zone is not known here. Ask once which city or time zone they are in, then pass it as timeZone; and offer to save it to their profile (update_my_profile, timeZone) so you never have to ask again. Never assume UTC.";
     case "NO_DAY":
       return "Say which day: pass day (today, tomorrow or a weekday) or date (YYYY-MM-DD) with the time.";
     case "DAY_CONFLICT":

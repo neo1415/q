@@ -420,7 +420,6 @@ import {
   createApprovedActionSweep,
 } from "./composition/approved-action-sweep.js";
 import { createApprovedContinuation } from "./composition/approved-continuation.js";
-import { createHandleClaimBoard } from "./composition/handle-claim-board.js";
 import {
   createPostgresPublicIdentityRepository,
   createPublicIdentityService,
@@ -1193,8 +1192,6 @@ const publicIdentity = createPublicIdentityService({
   repository: createPostgresPublicIdentityRepository(),
   subjects: cardSubjects,
 });
-// "Make me a Q card" waits here for approval (BIZ-004).
-const handleClaimBoard = createHandleClaimBoard({ publicIdentity, logger });
 // ADMIN-3 block: appeals Stage 4 -- Q prepares, the person approves.
 const humanReviewBoard = createHumanReviewBoard();
 const humanReviews = createPlatformAdmin({
@@ -1377,6 +1374,35 @@ const appActionPorts: OwnReadPorts = {
     logger,
   }),
   ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
+  ownInvestorOrganisationId: (actor) =>
+    runtimeDependencies.ownInvestorOrganisation(actor),
+  // Profile and records: the owning services and the person's own record,
+  // as the screen's routes call them (closures: composed further down).
+  companies: {
+    getCompany: (query) => companyService.getCompany(query),
+    getMyCompanyMembership: (query) =>
+      companyService.getMyCompanyMembership(query),
+    updateCompany: (command) => companyService.updateCompany(command),
+    upsertMyCompanyMembership: (command) =>
+      companyService.upsertMyCompanyMembership(command),
+    updateMyFounderProfile: (command) =>
+      companyService.updateMyFounderProfile(command),
+    updateCompanyTeamFacts: (command) =>
+      companyService.updateCompanyTeamFacts(command),
+  },
+  investors: {
+    getInvestorOrganisation: (query) =>
+      investorService.getInvestorOrganisation(query),
+    updateInvestorOrganisation: (command) =>
+      investorService.updateInvestorOrganisation(command),
+    upsertMyInvestorRepresentative: (command) =>
+      investorService.upsertMyInvestorRepresentative(command),
+  },
+  publicIdentity,
+  people: {
+    read: (userId) => people.read(userId),
+    update: (input) => people.update(input),
+  },
   ownCompanyName: async (actor) => {
     const companyId = await runtimeDependencies.ownCompany(actor);
     if (companyId === null) return null;
@@ -1543,7 +1569,6 @@ const qTools = createQTools({
       state: (actor, companyId) => visibilityCentre.state({ actor, companyId }),
       prepareForApproval: visibilityBoard.prepareForApproval,
     },
-    handleClaims: handleClaimBoard,
     // ADMIN-3 block
     humanReviews: humanReviewBoard,
     // end ADMIN-3 block
@@ -1956,7 +1981,6 @@ const qActionPort = createQActionPort({
     profileChangeBoard.proposer,
     profileGapsBoard.proposer,
     visibilityBoard.proposer,
-    handleClaimBoard.proposer,
     humanReviewBoard.proposer,
     recordChangeBoard.proposer,
     profileBoard,

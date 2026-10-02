@@ -358,6 +358,7 @@ const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   pitch: "MEDIA",
   discovery: "RELATIONSHIP",
   documents: "DOCUMENT",
+  records: "PROFILE",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
@@ -459,19 +460,6 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     eligible: (facts) => facts.surface === "HOME_Q" && facts.artifacts,
   },
   tool(
-    "propose_profile_change",
-    "PROFILE",
-    "Changes their own profile — their name and headline, their company's profile, or their investor organisation's profile — shown to them exactly and applied only when they approve.",
-    {
-      approval: "PREPARE_APPROVE",
-      executes: [
-        "person.profile.update",
-        "company.profile.update",
-        "investor.profile.update",
-      ],
-    },
-  ),
-  tool(
     "fill_profile_gaps",
     "PROFILE",
     "Searches public sources and fills only the open fields of their own company profile, as one change shown to them and saved, as their stated details, only when they approve.",
@@ -479,12 +467,6 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
       approval: "PREPARE_APPROVE",
       executes: ["profile.gaps.fill", "company.profile.update"],
     },
-  ),
-  tool(
-    "propose_handle_claim",
-    "HANDLE",
-    "Claims a Capital Q handle and makes the shareable Q Card (with its QR code) for their own company or investor organisation, applied when they approve.",
-    { approval: "PREPARE_APPROVE", executes: ["handle.claim"] },
   ),
   // The person's own decision, relayed: it prepares nothing and executes
   // only what the Approval Engine already holds for their approval.
@@ -614,21 +596,6 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "PROFILE",
     "Changes a profile fact first given during onboarding (an investor's sectors, stages, cheque, criteria, exclusions, discovery style; a founder's categories, team facts, traction), applied when they approve.",
     { approval: "PREPARE_APPROVE", executes: ["onboarding.answer.revise"] },
-  ),
-  tool(
-    "propose_team_change",
-    "PROFILE",
-    "Changes their founder profile, their company's team facts, or their own role and title, applied when they approve.",
-    {
-      approval: "PREPARE_APPROVE",
-      executes: ["company.team.change", "investor.representative.update"],
-    },
-  ),
-  tool(
-    "propose_q_card_change",
-    "HANDLE",
-    "Changes their Q Card's details (findable by search engines, which fields it shows), applied when they approve.",
-    { approval: "PREPARE_APPROVE", executes: ["q_card.update"] },
   ),
   tool(
     "propose_investor_visibility",
@@ -998,7 +965,23 @@ export const Q_CAPABILITY_EXCLUSIONS: Readonly<{
   readonly actionTypes: Readonly<Record<string, string>>;
 }> = Object.freeze({
   tools: {},
-  actionTypes: {},
+  // ADR 0040, profile area: the hand tools that prepared these were
+  // replaced by tools generated from the app's action registry; the action
+  // types stay composed so an approval already waiting still executes.
+  actionTypes: {
+    "person.profile.update":
+      "Proposed by code, not a tool, when they say what to call them (the profile board), and kept for approvals made before ADR 0040; Q's tool for it is update_my_profile (app.person.profile.update).",
+    "investor.profile.update":
+      "Kept so a change approved before ADR 0040's profile tools still executes; Q now prepares it as app.investor.profile.update (update_investor_profile).",
+    "company.team.change":
+      "Kept so a change approved before ADR 0040's profile tools still executes; Q now prepares it as app.company.* (set_my_company_role, update_my_founder_profile, update_team_facts).",
+    "investor.representative.update":
+      "Kept so a change approved before ADR 0040's profile tools still executes; Q now prepares it as app.investor.representative.me.upsert (set_my_investor_role).",
+    "q_card.update":
+      "Kept so a change approved before ADR 0040's profile tools still executes; Q now prepares it as app.q_card.update (update_q_card).",
+    "handle.claim":
+      "Kept so a claim approved before ADR 0040's profile tools still executes; Q now prepares it as app.q_card.handle.claim (claim_q_card_handle).",
+  },
 });
 
 /**

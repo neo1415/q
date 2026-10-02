@@ -335,3 +335,172 @@ describe("read_my", () => {
     });
   });
 });
+
+describe("profile and records, generated from the registry (ADR 0040 step 2)", () => {
+  function founderPlan(actor = actorA): PermittedContextPlan {
+    const plan = planFor(actor, "OWN_COMPANY_QUESTION", [
+      { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        sensitivity: "CONFIDENTIAL",
+        companyId: COMPANY_A,
+      },
+    ]);
+    return {
+      ...plan,
+      scopes: plan.scopes.map((scope) =>
+        scope.kind === "OWN_Q_CONVERSATION"
+          ? { ...scope, filter: { ...scope.filter, userId: actor.userId } }
+          : scope,
+      ),
+    };
+  }
+
+  function records(options: { readonly taken?: boolean } = {}) {
+    const prepared: { actionType: string; payload: unknown }[] = [];
+    const writes: string[] = [];
+    const never = (what: string) => () => {
+      writes.push(what);
+      return Promise.reject(new Error("Q prepares; it never writes here"));
+    };
+    const ports = fakePorts({
+      appActions: {
+        ownCompanyId: () => Promise.resolve(COMPANY_A),
+        ownInvestorOrganisationId: () => Promise.resolve(null),
+        companies: {
+          getCompany: () => Promise.resolve({ version: 7 } as never),
+          getMyCompanyMembership: () =>
+            Promise.resolve({
+              relationshipType: "team_member",
+              isFounder: true,
+              businessTitle: "COO",
+            } as never),
+          updateCompany: never("company"),
+          upsertMyCompanyMembership: never("membership"),
+          updateMyFounderProfile: never("founder"),
+          updateCompanyTeamFacts: never("facts"),
+        },
+        publicIdentity: {
+          getCard: () => Promise.resolve(null),
+          claimHandle: never("handle"),
+          updateCard: never("card"),
+          handleAvailable: () => Promise.resolve(options.taken !== true),
+        },
+        people: { read: never("read"), update: never("person") },
+      },
+      appApprovals: {
+        prepareForApproval: (entry) => {
+          prepared.push({
+            actionType: entry.actionType,
+            payload: entry.payload,
+          });
+          return "PREPARED";
+        },
+      },
+    });
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(createDefaultQTools(ports)),
+    });
+    return { executor, prepared, writes };
+  }
+
+  it("'change our website' prepares ONE card on their own company, the website as a URL, applied at the version current when approved", async () => {
+    const { executor, prepared, writes } = records();
+    const outcome = await executor.execute(
+      call("update_company_profile", {
+        websiteUrl: "kivu-freight.example",
+        headquartersCity: "Nairobi",
+      }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toEqual([
+      {
+        actionType: "app.company.profile.update",
+        payload: {
+          companyId: COMPANY_A,
+          input: {
+            websiteUrl: "https://kivu-freight.example",
+            headquartersCity: "Nairobi",
+            expectedVersion: 7,
+          },
+          atLatest: true,
+        },
+      },
+    ]);
+    expect(writes).toEqual([]);
+  });
+
+  it("a role change keeps what they did not mention, as their membership holds it", async () => {
+    const { executor, prepared } = records();
+    await executor.execute(
+      call("set_my_company_role", { businessTitle: "CEO" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(prepared[0]?.payload).toEqual({
+      companyId: COMPANY_A,
+      input: {
+        relationshipType: "team_member",
+        isFounder: true,
+        businessTitle: "CEO",
+      },
+    });
+  });
+
+  it("refuses a taken or malformed handle in words before anyone is asked", async () => {
+    const taken = records({ taken: true });
+    const outcome = await taken.executor.execute(
+      call("claim_q_card_handle", {
+        subject: "COMPANY",
+        handle: "@KivuFreight",
+      }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(JSON.stringify(outcome.result)).toContain(
+      "@kivufreight isn't available",
+    );
+    expect(taken.prepared).toEqual([]);
+    const malformed = records();
+    const bad = await malformed.executor.execute(
+      call("claim_q_card_handle", { subject: "COMPANY", handle: "-k-" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(JSON.stringify(bad.result)).toContain("A handle is 3 to 30");
+    expect(malformed.prepared).toEqual([]);
+  });
+
+  it("their own profile binds to them; a value that does not fit says which field", async () => {
+    const { executor, prepared } = records();
+    await executor.execute(
+      call("update_my_profile", { timeZone: "Africa/Lagos" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(prepared).toEqual([
+      {
+        actionType: "app.person.profile.update",
+        payload: { userId: actorA.userId, input: { timeZone: "Africa/Lagos" } },
+      },
+    ]);
+    const misfit = await executor.execute(
+      call("update_my_profile", { timeZone: "Lagos time" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(JSON.stringify(misfit.result)).toContain(
+      "timeZone needs to be a time zone such as Africa/Lagos",
+    );
+    expect(prepared).toHaveLength(1);
+  });
+
+  it("an investor organisation's tools are not offered on a founder's own-company turn", async () => {
+    const { executor, prepared } = records();
+    const outcome = await executor.execute(
+      call("update_investor_profile", { displayName: "Kivu Capital" }),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(outcome.result).toMatchObject({ ok: false });
+    expect(prepared).toEqual([]);
+  });
+});
