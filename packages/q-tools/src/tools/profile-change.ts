@@ -89,7 +89,12 @@ export const ProposeProfileChangeInputSchema = z
           .strict(),
       )
       .min(1)
-      .max(9),
+      .max(9)
+      // Founder live 2026-10-02: a description written with permission to
+      // save was only shown; found facts were saved one at a time.
+      .describe(
+        "Every field to change, in one call. If they asked you to write a value and to save it in the same message, put the text you wrote here now, in this turn. If they say to save what you found (save it, save all of that), put every found field here at once: one approval saves them all; never one change at a time.",
+      ),
   })
   .strict();
 export type ProposeProfileChangeInput = z.infer<

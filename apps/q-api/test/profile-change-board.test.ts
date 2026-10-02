@@ -67,6 +67,38 @@ describe("the profile change board", () => {
     });
   });
 
+  // Founder 2026-10-02: "save all of that" after Q found several facts is
+  // ONE change with every field, approved once.
+  it("holds everything Q found as one change, approved once", async () => {
+    const board = createProfileChangeBoard();
+    const prepared = await board.prepareForApproval({
+      ...base,
+      profile: "COMPANY",
+      subjectId: COMPANY,
+      changes: [
+        { field: "websiteUrl", value: "nixo.example" },
+        { field: "headquartersCity", value: "Lagos" },
+        {
+          field: "shortDescription",
+          value: "FDEOps for forward-deployed teams.",
+        },
+      ],
+    });
+    expect(prepared.status).toBe("PREPARED");
+    expect(await board.proposer.propose(prepareContext())).toEqual({
+      actionType: COMPANY_PROFILE_UPDATE,
+      payload: {
+        companyId: COMPANY,
+        changes: {
+          websiteUrl: "https://nixo.example",
+          headquartersCity: "Lagos",
+          shortDescription: "FDEOps for forward-deployed teams.",
+        },
+      },
+    });
+    expect(await board.proposer.propose(prepareContext())).toBeNull();
+  });
+
   it("refuses in code's words when a value does not fit, and holds nothing", async () => {
     const board = createProfileChangeBoard();
     const refused = await board.prepareForApproval({
