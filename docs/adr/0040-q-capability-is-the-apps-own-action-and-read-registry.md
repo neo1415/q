@@ -118,8 +118,8 @@ Profile and records (L, highest value; Q already proposes these through hand too
 Relationships:
 
 - [ ] Interest and connection requests: `network-interests` ×3. **M** Step 1 done 2026-10-02: six declarations (express; accept and decline interest; send, accept and decline a Connection Request) with generated routes. Q still uses its relationship tools (`legacyTool`), which errands and the pending-decision path build on; step 2 needs their owner.
-- [ ] Chat: send, unsend, block, unblock, report. Unsend, block and report stay the person's own: INSTANT for the author, never Q-initiated. **M**
-- [ ] Schedule: meetings, cancel, reminders, dismiss. **M**
+- [ ] Chat: send, unsend, block, unblock, report. Unsend, block and report stay the person's own: INSTANT for the author, never Q-initiated. **M** Step 1 done 2026-10-02: five declarations with generated routes; send stays on `propose_chat_message` (`legacyTool`); unsend, block, unblock and report name their screen offers (`qCapability`) and never get a Q tool.
+- [ ] Schedule: meetings, cancel, reminders, dismiss. **M** Step 1 done 2026-10-02: four declarations with generated routes, the schedule refusals as the same problem details (`scheduleProblem`); Q keeps its schedule tools (`legacyTool`).
 - [ ] Errands and Q work: `errands`, `work` ×4. **M**
 
 Media and documents:

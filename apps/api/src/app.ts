@@ -428,6 +428,11 @@ export function createApp(
       ...(modules.connections === undefined
         ? {}
         : { connections: modules.connections }),
+      ...(modules.chat === undefined ? {} : { chat: modules.chat }),
+      ...(modules.schedule === undefined ? {} : { schedule: modules.schedule }),
+      ...(modules.chatSafety === undefined
+        ? {}
+        : { chatSafety: modules.chatSafety }),
     },
   });
 

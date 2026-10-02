@@ -31,6 +31,7 @@ export {
 } from "./actions/pitch.js";
 export { DISCOVERY_DECISIONS } from "./actions/discovery.js";
 export { APP_ACTIONS } from "./registry.js";
+export { scheduleProblem } from "./actions/schedule.js";
 export {
   OWN_READ_KINDS,
   OwnReadItemSchema,

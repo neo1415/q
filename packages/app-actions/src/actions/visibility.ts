@@ -46,7 +46,7 @@ import type { AppActionPorts } from "../ports.js";
  * they have a relationship with, each declared once with its route.
  *
  * Q takes the company's visibility through the turn reader's
- * SET_VISIBILITY hand (its owner retires the hand; `viaHand` names it
+ * SET_VISIBILITY hand (its owner retires the hand; `qCapability` names it
  * until then); the investor organisation's visibility and the shares
  * through tools generated here, each prepared for the person's approval.
  */
@@ -120,7 +120,7 @@ const COMPANY_VISIBILITY = defineAppAction<
             : await ports.companyPitch(input.companyId).catch(() => null),
       }),
   },
-  viaHand: "set_visibility",
+  qCapability: "hand.set_visibility",
 });
 
 const InvestorVisibility = z

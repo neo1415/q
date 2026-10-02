@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type {
   CorrelationId,
+  KnownErrorCode,
   QKnowledgeScopeKind,
   QSubjectRef,
   QTaskClass,
@@ -67,6 +68,15 @@ export type AppActionHttp<In, Out> = {
   readonly respond: (out: Out, input: In, ports: AppActionPorts) => unknown;
   /** The idempotency key the screen sent, from the parsed input. */
   readonly idempotencyKeyOf?: ((input: In) => string) | undefined;
+  /**
+   * An outcome the route answers as a problem (RFC 9457), with the code
+   * and the person's words; null: it succeeded.
+   */
+  readonly problem?:
+    | ((
+        out: Out,
+      ) => { readonly code: KnownErrorCode; readonly detail: string } | null)
+    | undefined;
   /** An outcome the route answers as a 404 (a refusal that must not leak). */
   readonly notFound?: ((out: Out) => boolean) | undefined;
 };
@@ -188,11 +198,12 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
    */
   readonly viaTool?: string | undefined;
   /**
-   * A turn-reader hand that does this for Q instead of a tool (the
-   * reading's own kind, e.g. set_visibility); retiring a hand is the turn
-   * reader's owner's change, so it is named here until then.
+   * The capability that does this for Q when no tool does: a turn-reader
+   * hand (`hand.set_visibility`, the reader owner's to retire) or an offer
+   * of the screen (`offer.chat_block`: the person's own act, never one Q
+   * takes for them). A full capability id from the registry.
    */
-  readonly viaHand?: string | undefined;
+  readonly qCapability?: `hand.${string}` | `offer.${string}` | undefined;
 };
 
 /** Erased for the registry; per-action types stay with the action (as q-tools does). */
@@ -206,7 +217,7 @@ export function defineAppAction<In, Out, ToolIn = In>(
 
 /** The capability id the registry lists for what does this for Q. */
 export function qCapabilityId(action: AnyAppAction): string | null {
-  if (action.viaHand !== undefined) return `hand.${action.viaHand}`;
+  if (action.qCapability !== undefined) return action.qCapability;
   const tool = qToolName(action);
   return tool === null ? null : `tool.${tool}`;
 }

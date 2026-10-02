@@ -535,6 +535,9 @@ importers:
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../capital
+      '@capital-q/communication':
+        specifier: workspace:*
+        version: link:../communication
       '@capital-q/companies':
         specifier: workspace:*
         version: link:../companies

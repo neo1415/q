@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@capital-q/capital": "workspace:*",
+    "@capital-q/communication": "workspace:*",
     "@capital-q/companies": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/discovery": "workspace:*",

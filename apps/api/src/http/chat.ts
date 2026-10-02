@@ -3,24 +3,14 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   CHAT_UNREAD_PATH,
   ChatAttachmentAccessDtoSchema,
-  ChatReportResultDtoSchema,
   ChatListQuerySchema,
   ChatThreadDtoSchema,
   ChatUnreadDtoSchema,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
   MarkChatReadRequestSchema,
   parseContract,
-  RELATIONSHIP_CHAT_BLOCK_PATH,
-  RELATIONSHIP_CHAT_REPORTS_PATH,
-  RELATIONSHIP_CHAT_UNBLOCK_PATH,
   RELATIONSHIP_MESSAGE_ATTACHMENT_PATH,
-  RELATIONSHIP_MESSAGE_UNSEND_PATH,
   RELATIONSHIP_MESSAGES_PATH,
   RELATIONSHIP_MESSAGES_READ_PATH,
-  ReportChatRequestSchema,
-  SendChatMessageRequestSchema,
-  SendChatMessageResultDtoSchema,
 } from "@capital-q/contracts";
 import type { ChatSafetyService, ChatService } from "@capital-q/communication";
 
@@ -53,18 +43,6 @@ function param(request: FastifyRequest, name: string): string {
   return typeof raw === "string" ? raw : "";
 }
 
-function idempotencyKeyOf(
-  request: FastifyRequest,
-  detail = "An Idempotency-Key header is required to send a message.",
-): string {
-  const raw = request.headers[IDEMPOTENCY_KEY_HEADER];
-  return parseContract(
-    IdempotencyKeyHeaderSchema,
-    typeof raw === "string" ? raw : undefined,
-    detail,
-  );
-}
-
 export function registerChatRoutes(
   app: FastifyInstance,
   dependencies: ChatRoutesDependencies,
@@ -93,29 +71,6 @@ export function registerChatRoutes(
   );
 
   app.post(
-    RELATIONSHIP_MESSAGES_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const idempotencyKey = idempotencyKeyOf(request);
-      const input = parseContract(
-        SendChatMessageRequestSchema,
-        request.body,
-        "The message is not valid.",
-      );
-      const result = await chat.send({
-        actor: getActorContext(request),
-        relationshipId: param(request, "relationshipId"),
-        request: input,
-        idempotencyKey,
-      });
-      void reply
-        .status(result.deduplicated ? 200 : 201)
-        .header("Cache-Control", "no-store");
-      return SendChatMessageResultDtoSchema.parse(result);
-    },
-  );
-
-  app.post(
     RELATIONSHIP_MESSAGES_READ_PATH,
     { onRequest: withContext },
     async (request, reply) => {
@@ -128,21 +83,6 @@ export function registerChatRoutes(
         actor: getActorContext(request),
         relationshipId: param(request, "relationshipId"),
         lastReadMessageId: input.lastReadMessageId,
-      });
-      return reply.status(204).header("Cache-Control", "no-store").send();
-    },
-  );
-
-  app.post(
-    RELATIONSHIP_MESSAGE_UNSEND_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const idempotencyKey = idempotencyKeyOf(request);
-      await chat.unsend({
-        actor: getActorContext(request),
-        relationshipId: param(request, "relationshipId"),
-        messageId: param(request, "messageId"),
-        idempotencyKey,
       });
       return reply.status(204).header("Cache-Control", "no-store").send();
     },
@@ -173,71 +113,6 @@ export function registerChatRoutes(
       return ChatUnreadDtoSchema.parse(unread);
     },
   );
-
-  const { safety } = dependencies;
-  if (safety === undefined) return;
-
-  // R34 safety (doc 10): a person blocks or reports for their own side.
-  // The other side is never told who blocked; its sends answer 409 with
-  // "You can't message this relationship right now".
-  app.post(
-    RELATIONSHIP_CHAT_BLOCK_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const idempotencyKey = idempotencyKeyOf(
-        request,
-        "An Idempotency-Key header is required to block.",
-      );
-      await safety.block({
-        actor: getActorContext(request),
-        relationshipId: param(request, "relationshipId"),
-        idempotencyKey,
-      });
-      return reply.status(204).header("Cache-Control", "no-store").send();
-    },
-  );
-
-  app.post(
-    RELATIONSHIP_CHAT_UNBLOCK_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      // Lifting is naturally idempotent; the key is still required so a
-      // client treats it like every other consequential POST.
-      idempotencyKeyOf(
-        request,
-        "An Idempotency-Key header is required to unblock.",
-      );
-      await safety.unblock({
-        actor: getActorContext(request),
-        relationshipId: param(request, "relationshipId"),
-      });
-      return reply.status(204).header("Cache-Control", "no-store").send();
-    },
-  );
-
-  app.post(
-    RELATIONSHIP_CHAT_REPORTS_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const idempotencyKey = idempotencyKeyOf(
-        request,
-        "An Idempotency-Key header is required to report.",
-      );
-      const input = parseContract(
-        ReportChatRequestSchema,
-        request.body,
-        "The report is not valid.",
-      );
-      const result = await safety.report({
-        actor: getActorContext(request),
-        relationshipId: param(request, "relationshipId"),
-        request: input,
-        idempotencyKey,
-      });
-      void reply
-        .status(result.deduplicated ? 200 : 201)
-        .header("Cache-Control", "no-store");
-      return ChatReportResultDtoSchema.parse(result);
-    },
-  );
+  // Sending, unsending, block, unblock and report are generated from the
+  // action registry (ADR 0040, http/app-actions.ts).
 }

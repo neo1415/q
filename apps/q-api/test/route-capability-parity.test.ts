@@ -74,18 +74,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH": cap(
     "tool.find_meeting_times",
   ),
-  "api/http/schedule.ts POST RELATIONSHIP_MEETINGS_PATH": cap(
-    "tool.propose_meeting",
-  ),
-  "api/http/schedule.ts POST MEETING_CANCEL_PATH": cap(
-    "tool.propose_meeting_change",
-  ),
   "api/http/schedule.ts GET MEETING_BRIEF_PATH": cap("tool.list_schedule"),
   "api/http/schedule.ts GET REMINDERS_PATH": cap("tool.list_schedule"),
-  "api/http/schedule.ts POST REMINDERS_PATH": cap("tool.propose_reminder"),
-  "api/http/schedule.ts POST REMINDER_DISMISS_PATH": cap(
-    "tool.dismiss_reminder",
-  ),
   "api/http/schedule.ts GET NOTIFICATIONS_PATH": exempt(
     "the notices panel's own feed of what already happened (a reminder due, an invite, a brief ready); Q reads the calls and reminders behind them with list_schedule",
   ),
@@ -111,20 +101,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
 
   // R34 relationship chat.
   "api/http/chat.ts GET RELATIONSHIP_MESSAGES_PATH": cap("tool.list_messages"),
-  "api/http/chat.ts POST RELATIONSHIP_MESSAGES_PATH": cap(
-    "tool.propose_chat_message",
-  ),
   "api/http/chat.ts POST RELATIONSHIP_MESSAGES_READ_PATH": exempt(
     "the read receipt the chat screen records as messages come into view; not something a person asks for",
   ),
-  "api/http/chat.ts POST RELATIONSHIP_MESSAGE_UNSEND_PATH":
-    cap("offer.chat_unsend"),
-  // R34 safety: person-only, offered as the chat screen.
-  "api/http/chat.ts POST RELATIONSHIP_CHAT_BLOCK_PATH": cap("offer.chat_block"),
-  "api/http/chat.ts POST RELATIONSHIP_CHAT_UNBLOCK_PATH":
-    cap("offer.chat_unblock"),
-  "api/http/chat.ts POST RELATIONSHIP_CHAT_REPORTS_PATH":
-    cap("offer.chat_report"),
   "api/http/chat.ts GET RELATIONSHIP_MESSAGE_ATTACHMENT_PATH": exempt(
     "a shared file's download to the browser from the chat; Q names shared files through list_messages",
   ),
@@ -848,7 +827,7 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 128;
+const LEGACY_MUTATION_ROUTES_MAX = 119;
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([

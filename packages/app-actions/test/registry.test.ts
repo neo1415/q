@@ -44,7 +44,9 @@ describe("the action registry", () => {
       // An action is served to Q by a generated tool, its family's tool,
       // or (until its area's second step) the hand tool it names.
       if (action.tool === undefined) {
-        expect(qCapabilityId(action)).toMatch(/^(tool|hand)\.[a-z][a-z_]*$/);
+        expect(qCapabilityId(action)).toMatch(
+          /^(tool|hand|offer)\.[a-z][a-z_]*$/,
+        );
       } else {
         expect(action.tool.eval.say).toHaveLength(2);
       }
@@ -56,8 +58,8 @@ describe("the action registry", () => {
       APP_ACTIONS.map((action) => [
         action.name,
         action.tool?.name ??
-          (action.viaHand !== undefined
-            ? `hand:${action.viaHand}`
+          (action.qCapability !== undefined
+            ? action.qCapability
             : action.viaTool === undefined
               ? `legacy:${action.legacyTool ?? ""}`
               : `via:${action.viaTool}`),
@@ -96,7 +98,7 @@ describe("the action registry", () => {
       ["investor.mandate.update", "via:change_my_mandate", "CONSEQUENTIAL"],
       ["investor.mandate.activate", "via:change_my_mandate", "CONSEQUENTIAL"],
       ["investor.mandate.close", "via:change_my_mandate", "CONSEQUENTIAL"],
-      ["company.visibility.set", "hand:set_visibility", "CONSEQUENTIAL"],
+      ["company.visibility.set", "hand.set_visibility", "CONSEQUENTIAL"],
       ["investor.visibility.set", "set_investor_visibility", "CONSEQUENTIAL"],
       ["disclosure.raise.share", "share_my_raise", "CONSEQUENTIAL"],
       ["disclosure.share.revoke", "stop_sharing_my_raise", "CONSEQUENTIAL"],
@@ -130,6 +132,19 @@ describe("the action registry", () => {
         "legacy:propose_connection_request_answer",
         "CONSEQUENTIAL",
       ],
+      ["chat.message.send", "legacy:propose_chat_message", "CONSEQUENTIAL"],
+      ["chat.message.unsend", "offer.chat_unsend", "INSTANT"],
+      ["chat.block", "offer.chat_block", "INSTANT"],
+      ["chat.unblock", "offer.chat_unblock", "INSTANT"],
+      ["chat.report", "offer.chat_report", "INSTANT"],
+      ["schedule.meeting.book", "legacy:propose_meeting", "CONSEQUENTIAL"],
+      [
+        "schedule.meeting.cancel",
+        "legacy:propose_meeting_change",
+        "CONSEQUENTIAL",
+      ],
+      ["schedule.reminder.create", "legacy:propose_reminder", "CONSEQUENTIAL"],
+      ["schedule.reminder.dismiss", "legacy:dismiss_reminder", "INSTANT"],
     ]);
   });
 });

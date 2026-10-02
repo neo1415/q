@@ -6,7 +6,12 @@ import {
   type AppActionContext,
   type AppActionPorts,
 } from "@capital-q/app-actions";
-import { CorrelationIdSchema, parseContract } from "@capital-q/contracts";
+import {
+  CorrelationIdSchema,
+  createProblemDetails,
+  parseContract,
+  PROBLEM_CONTENT_TYPE,
+} from "@capital-q/contracts";
 import { createCorrelationId } from "@capital-q/observability";
 
 import {
@@ -80,6 +85,19 @@ export function registerAppActionRoutes(
           return undefined;
         }
         const out = await action.run(dependencies.ports, context, input);
+        const problem = http.problem?.(out) ?? null;
+        if (problem !== null) {
+          const details = createProblemDetails({
+            code: problem.code,
+            requestId: request.id,
+            detail: problem.detail,
+          });
+          return reply
+            .status(details.status)
+            .type(PROBLEM_CONTENT_TYPE)
+            .header("Cache-Control", "no-store")
+            .send(details);
+        }
         if (http.notFound?.(out) === true) {
           reply.callNotFound();
           return undefined;
@@ -88,11 +106,13 @@ export function registerAppActionRoutes(
         if (http.location !== undefined) {
           void reply.header("Location", http.location(out, input));
         }
-        void reply.status(
+        const status =
           typeof http.status === "function"
             ? http.status(out)
-            : (http.status ?? 200),
-        );
+            : (http.status ?? 200);
+        // 204 answers with no body, whatever `respond` would say.
+        if (status === 204) return reply.status(204).send();
+        void reply.status(status);
         return await http.respond(out, input, dependencies.ports);
       },
     });

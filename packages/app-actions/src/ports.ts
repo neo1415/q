@@ -1,4 +1,9 @@
 import type { CapitalService } from "@capital-q/capital";
+import type {
+  ChatSafetyService,
+  ChatService,
+  ScheduleService,
+} from "@capital-q/communication";
 import type { CompanyService } from "@capital-q/companies";
 import type { PitchSummaryDto } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
@@ -55,6 +60,17 @@ export type AppActionPorts = {
     | undefined;
   /** The person's own profile record (what to call them, their time zone). */
   readonly people?: Pick<PersonProfileStore, "read" | "update"> | undefined;
+  /** Relationship chat (R34): sending and the person's own safety acts. */
+  readonly chat?: Pick<ChatService, "send" | "unsend"> | undefined;
+  readonly chatSafety?:
+    Pick<ChatSafetyService, "block" | "unblock" | "report"> | undefined;
+  /** Calls and reminders: the schedule service. */
+  readonly schedule?:
+    | Pick<
+        ScheduleService,
+        "schedule" | "cancel" | "createReminder" | "dismissReminder"
+      >
+    | undefined;
   /** Interest and connection requests: the network services. */
   readonly interests?:
     Pick<InterestService, "expressInterest" | "respondToInterest"> | undefined;
