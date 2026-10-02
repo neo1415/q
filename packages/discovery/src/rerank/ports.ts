@@ -44,15 +44,18 @@ export type RerankSignalsPort = {
 };
 
 /**
- * Where a proven reason to offer a passed company again would come from.
+ * Where a proven reason to offer a passed company again comes from.
  *
- * Nothing implements this in V1, and the composition supplies an empty
- * map, because `interaction_state` records that a pass happened and when —
- * not the mandate version it was made under — and no surface issues a
- * reset. Inventing a reason from a row timestamp is exactly what §12
- * forbids, so REC-009 keeps a passed company suppressed and leaves the
- * seam typed.
+ * Only evidenced changes, never a row timestamp (§12): today, a new pitch
+ * that became playable after the pass (`createPitchReintroductions`). An
+ * explicit reset is UNPASS, which clears the pass itself. `change` names
+ * what is new, for the card's "since you last saw it" line.
  */
+export type PassReintroduction = {
+  readonly reason: string;
+  /** What changed, as a bounded code (NEW_PITCH). */
+  readonly change: string | null;
+};
 export type PassReintroductionPort = {
   readonly reasonsFor: (query: {
     readonly tenantId: string;
@@ -60,5 +63,5 @@ export type PassReintroductionPort = {
     readonly mandateId: string;
     readonly mandateVersion: number;
     readonly companyIds: readonly string[];
-  }) => Promise<ReadonlyMap<string, string>>;
+  }) => Promise<ReadonlyMap<string, string | PassReintroduction>>;
 };

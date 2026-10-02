@@ -716,6 +716,13 @@ const recommendationVolume = createEntitlementService({ sql: database.sql });
 const slates = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
+  // A passed company with a pitch that became playable after the pass is
+  // offered again, labelled (doc 19 §67). Read per request.
+  pitchTimes: {
+    latestReadyAt: (companyIds) =>
+      discoverablePitches.latestReadyAt?.(companyIds) ??
+      Promise.resolve(new Map()),
+  },
   // A plan value is configuration, not a gate: if it cannot be read the
   // feed serves the whole slate rather than failing.
   volume: (actor) =>

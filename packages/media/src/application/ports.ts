@@ -189,6 +189,14 @@ export type DiscoverablePitchQueryPort = {
   readonly findDiscoverablePitches: (
     companyIds: readonly string[],
   ) => Promise<ReadonlyMap<string, DiscoverablePitchSet>>;
+  /**
+   * Each company's newest publishable pitch's READY time (ISO), the same
+   * rule as `findDiscoverablePitches`; absent when it has none. Lets a
+   * passed company with a new pitch be offered again (doc 19 §67).
+   */
+  readonly latestReadyAt?: (
+    companyIds: readonly string[],
+  ) => Promise<ReadonlyMap<string, string>>;
 };
 
 /**

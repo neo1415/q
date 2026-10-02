@@ -14,6 +14,7 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { CompanyDeeperView } from "@/features/company/company-deeper-view";
+import { CompanyPitch } from "@/features/discover/company-pitch";
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { ExpressInterest } from "@/features/network/express-interest";
 import { apiSession } from "@/features/q/context";
@@ -106,6 +107,24 @@ export default async function CompanyPage({
           ? {}
           : { description: company.shortDescription })}
       />
+
+      {/*
+        The pitch, for anyone allowed to see the company, whatever they
+        saved or passed in Discover (doc 19 §66–68): a pass hides it from
+        the feed, never from the company itself.
+      */}
+      {company.pitch === null ? null : (
+        <CompanyPitch
+          company={{
+            companyId: company.companyId,
+            canonicalName: company.canonicalName,
+            shortDescription: company.shortDescription,
+            currentStageCode: company.currentStageCode,
+            headquartersCountry: company.headquartersCountry,
+            pitch: company.pitch,
+          }}
+        />
+      )}
 
       {interest === null ? null : (
         <div className="flex flex-wrap items-center gap-2">

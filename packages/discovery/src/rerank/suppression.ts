@@ -6,7 +6,11 @@ import {
   type PassReintroductionReason,
   type RerankPolicy,
 } from "./policy.js";
-import type { PassReintroductionPort, RerankSignalsPort } from "./ports.js";
+import type {
+  PassReintroduction,
+  PassReintroductionPort,
+  RerankSignalsPort,
+} from "./ports.js";
 
 /**
  * Whether a company may be shown proactively (CQ-REC-009R).
@@ -55,15 +59,28 @@ export function suppressedFromProactiveDiscovery(
  * organisation right now. Absent ids are not suppressed: no history means
  * nobody has passed on anything.
  */
+type SuppressionQuery = {
+  readonly tenantId: string;
+  readonly investorOrganisationId: string;
+  /** The mandate being served: what MANDATE_VERSION_CHANGED would compare against. */
+  readonly mandateId: string;
+  readonly mandateVersion: number;
+  readonly companyIds: readonly string[];
+};
+
 export type ProactiveSuppressionPort = {
-  readonly suppressedCompanyIds: (query: {
-    readonly tenantId: string;
-    readonly investorOrganisationId: string;
-    /** The mandate being served: what MANDATE_VERSION_CHANGED would compare against. */
-    readonly mandateId: string;
-    readonly mandateVersion: number;
-    readonly companyIds: readonly string[];
-  }) => Promise<ReadonlySet<string>>;
+  readonly suppressedCompanyIds: (
+    query: SuppressionQuery,
+  ) => Promise<ReadonlySet<string>>;
+  /**
+   * Passed companies offered again, and why (doc 19 §67): the card says
+   * what is new since the investor last saw it. Absent: none are.
+   */
+  readonly reintroducedCompanies?:
+    | ((
+        query: SuppressionQuery,
+      ) => Promise<ReadonlyMap<string, PassReintroduction>>)
+    | undefined;
 };
 
 export function createProactiveSuppression(dependencies: {
@@ -114,7 +131,8 @@ export function createProactiveSuppression(dependencies: {
 
       const out = new Set<string>();
       for (const companyId of passed) {
-        const raw = reasons.get(companyId);
+        const value = reasons.get(companyId);
+        const raw = typeof value === "object" ? value.reason : value;
         const parsed =
           raw === undefined
             ? null
@@ -131,6 +149,38 @@ export function createProactiveSuppression(dependencies: {
         }
       }
       suppressedCount.record(out.size);
+      return out;
+    },
+    reintroducedCompanies: async (query) => {
+      const out = new Map<string, PassReintroduction>();
+      if (reintroductions === undefined || query.companyIds.length === 0) {
+        return out;
+      }
+      const history = await signals.forCompanies(query);
+      const passed = [...history.entries()]
+        .filter(([, signal]) => signal.passed)
+        .map(([companyId]) => companyId);
+      if (passed.length === 0) return out;
+      const reasons = await reintroductions.reasonsFor({
+        ...query,
+        companyIds: passed,
+      });
+      for (const [companyId, value] of reasons) {
+        const reintroduction =
+          typeof value === "object" ? value : { reason: value, change: null };
+        const parsed = PassReintroductionReasonSchema.safeParse(
+          reintroduction.reason,
+        );
+        if (
+          parsed.success &&
+          !suppressedFromProactiveDiscovery(policy, {
+            passed: true,
+            reintroduction: parsed.data,
+          })
+        ) {
+          out.set(companyId, reintroduction);
+        }
+      }
       return out;
     },
   };

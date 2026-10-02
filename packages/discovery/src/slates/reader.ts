@@ -108,6 +108,11 @@ export type SlatePageItem = CompanyCard & {
    * (kept, never silently excluded). Absent when no filter was applied.
    */
   readonly filterUnknown?: readonly DiscoverFilterDimension[] | undefined;
+  /**
+   * Passed before and offered again because something is new (doc 19
+   * §67): the card says so ("since you last saw it"). Absent otherwise.
+   */
+  readonly reintroduced?: { readonly change: string | null } | undefined;
 };
 
 export type SlatePage = {
@@ -333,20 +338,24 @@ export function createSlateReadService(
     readonly suppressed: number;
   }> => {
     const companyIds = input.items.map((i) => i.companyId);
-    const [evaluation, suppressedIds] = await Promise.all([
+    const query = {
+      tenantId: input.key.tenantId,
+      investorOrganisationId: input.key.investorOrganisationId,
+      mandateId: input.key.mandateId,
+      mandateVersion: input.mandateVersion,
+      companyIds,
+    };
+    const [evaluation, suppressedIds, reintroduced] = await Promise.all([
       eligibility.evaluate({
         actor: input.actor,
         mode: MODE,
         mandateId: input.key.mandateId,
         companyIds,
       }),
-      suppression.suppressedCompanyIds({
-        tenantId: input.key.tenantId,
-        investorOrganisationId: input.key.investorOrganisationId,
-        mandateId: input.key.mandateId,
-        mandateVersion: input.mandateVersion,
-        companyIds,
-      }),
+      suppression.suppressedCompanyIds(query),
+      suppression.reintroducedCompanies === undefined
+        ? Promise.resolve(new Map<string, { change: string | null }>())
+        : suppression.reintroducedCompanies(query),
     ]);
     const resultById = new Map(
       evaluation.results.map((r) => [r.companyId, r] as const),
@@ -378,6 +387,13 @@ export function createSlateReadService(
         ),
         unverifiedExclusions:
           result === undefined ? [] : unverifiedExclusions(result),
+        ...(reintroduced.has(item.companyId)
+          ? {
+              reintroduced: {
+                change: reintroduced.get(item.companyId)?.change ?? null,
+              },
+            }
+          : {}),
       });
     }
     return { items, suppressed: suppressedIds.size };

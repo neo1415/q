@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import {
   getCompanyNetworkPreview,
-  listSavedCompanies,
+  listPassedCompanies,
 } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
@@ -13,34 +13,31 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
-import { SavedCompanies } from "@/features/discover/saved-companies";
+import { PassedCompanies } from "@/features/discover/passed-companies";
 import { apiSession } from "@/features/q/context";
 
-export const metadata: Metadata = { title: "Saved" };
+export const metadata: Metadata = { title: "Passed" };
 export const dynamic = "force-dynamic";
 
 /**
- * Saved (doc 17 §100; ux-direction §13): the companies an investor saved
- * to revisit. A save is "I want to come back to this", never interest.
- *
- * The list is the investor's own interaction state, identities only. Each
- * company is read back through the ordinary company path, which re-checks
- * disclosure: one that has since stopped being discoverable is simply not
- * shown, because once being saved must not leak it.
+ * Passed (doc 19 §66–68): the companies an investor passed on, with Undo
+ * pass. A pass hides a company from the feed, never from the investor:
+ * each is read back through the ordinary company path, which re-checks
+ * disclosure, so one that has since stopped being discoverable is simply
+ * not shown.
  */
-export default async function SavedPage() {
+export default async function PassedPage() {
   const session = await apiSession();
-  const saved =
+  const passed =
     session === null
       ? null
-      : await listSavedCompanies(session).catch(() => null);
-
+      : await listPassedCompanies(session).catch(() => null);
   const companies =
-    session === null || saved === null
+    session === null || passed === null
       ? []
       : (
           await Promise.all(
-            saved.companyIds.map((companyId) =>
+            passed.companyIds.map((companyId) =>
               getCompanyNetworkPreview(session, companyId).catch(() => null),
             ),
           )
@@ -49,16 +46,16 @@ export default async function SavedPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Saved"
-        description="Saving isn’t interest. The company isn’t told."
+        title="Passed"
+        description="Passing only hides a company from your feed. The company isn't told, and your mandate doesn't change."
       />
-      {saved === null ? (
+      {passed === null ? (
         <EmptyState
-          title="Saved couldn't load."
+          title="Passed couldn't load."
           description="Nothing is lost. Capital Q didn't answer just now; try again in a moment."
           action={
             <Link
-              href="/discover/saved"
+              href="/discover/passed"
               className={buttonClassName("secondary")}
             >
               Try again
@@ -67,8 +64,8 @@ export default async function SavedPage() {
         />
       ) : companies.length === 0 ? (
         <EmptyState
-          title="Nothing saved yet."
-          description="Save a company in Discover and it stays here, across visits and devices."
+          title="Nothing passed."
+          description="Companies you pass on in Discover are listed here, so you can bring any of them back."
           action={
             <Link href="/discover" className={buttonClassName("secondary")}>
               Go to Discover
@@ -76,7 +73,7 @@ export default async function SavedPage() {
           }
         />
       ) : (
-        <SavedCompanies
+        <PassedCompanies
           companies={companies.map((company) => {
             const facts = [
               stageLabel(company.currentStageCode),
@@ -86,7 +83,6 @@ export default async function SavedPage() {
               companyId: company.companyId,
               name: company.canonicalName,
               facts: facts.length === 0 ? null : facts.join(" · "),
-              description: company.shortDescription,
               pitch: company.pitch,
             };
           })}

@@ -386,10 +386,10 @@ describe("pass, save, and the two of them together", () => {
     ).toThrow(RerankInputError);
   });
 
-  it("9: V1 can prove none of them, so nothing is resurfaced in practice", () => {
-    // The seam is typed and tested; the evidence does not exist yet, and
-    // guessing at it from a row timestamp is what SS12 forbids.
-    expect(PROVABLE_PASS_REINTRODUCTION_REASONS).toEqual([]);
+  it("9: V1 proves only a material update (a new playable pitch), never a row timestamp", () => {
+    expect(PROVABLE_PASS_REINTRODUCTION_REASONS).toEqual([
+      "MATERIAL_COMPANY_UPDATE",
+    ]);
   });
 
   it("10 and 11: Save changes nothing about the order", () => {

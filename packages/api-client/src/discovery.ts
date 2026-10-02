@@ -3,6 +3,8 @@ import {
   DISCOVERY_COMPANY_PASS_PATH,
   DISCOVERY_COMPANY_SAVE_PATH,
   DISCOVERY_COMPANY_UNSAVE_PATH,
+  DISCOVERY_COMPANY_UNPASS_PATH,
+  DISCOVERY_PASSED_PATH,
   DISCOVERY_EXPLANATION_PATH,
   DISCOVERY_INVESTOR_PATH,
   DISCOVERY_INVESTORS_PATH,
@@ -135,6 +137,26 @@ export function saveCompany(
  */
 export function listSavedCompanies(session: ApiSession) {
   return call(session, "GET", DISCOVERY_SAVED_PATH, SavedCompaniesDtoSchema);
+}
+
+/** `GET /v1/discovery/passed` — the investor's passed companies, newest first. */
+export function listPassedCompanies(session: ApiSession) {
+  return call(session, "GET", DISCOVERY_PASSED_PATH, SavedCompaniesDtoSchema);
+}
+
+/** `POST …/unpass` — undo a pass; idempotent by `clientEventId`. */
+export function unpassCompany(
+  session: ApiSession,
+  companyId: string,
+  body: SaveCompanyRequest,
+) {
+  return call(
+    session,
+    "POST",
+    companyPath(DISCOVERY_COMPANY_UNPASS_PATH, companyId),
+    InteractionRecordedDtoSchema,
+    { body },
+  );
 }
 
 export function unsaveCompany(

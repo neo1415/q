@@ -535,6 +535,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/recommendation-interactions.ts GET DISCOVERY_SAVED_PATH": cap(
     "tool.discovery_slate",
   ),
+  // Founder report 2026-10-02: the Passed list and Undo pass (doc 19 §68).
+  // Not yet a Q destination or tool: the turn reader's destinations are
+  // HARDEN's (v24); Q's own list_my_relationships already reads passes.
+  "api/http/recommendation-interactions.ts GET DISCOVERY_PASSED_PATH": exempt(
+    "the Passed screen's own list; Q reads passes through its relationship tools, a Q destination waits for a turn-reader version",
+  ),
 
   "api/http/taxonomy.ts POST `${TAXONOMY_PATH}${TAXONOMY_CANDIDATES_SEGMENT}`":
     REFERENCE,
@@ -783,6 +789,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/capital": cap("navigate.CAPITAL"),
   "/discover": cap("navigate.DISCOVER"),
   "/discover/saved": cap("navigate.SAVED"),
+  "/discover/passed": exempt(
+    "the Passed list with Undo pass (doc 19 §68); a Q destination waits for a turn-reader version",
+  ),
   "/company/visibility": cap("navigate.COMPANY_VISIBILITY"),
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
   "/relationships": cap("navigate.RELATIONSHIPS"),

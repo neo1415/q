@@ -50,6 +50,10 @@ import {
   createProactiveSuppression,
   type ProactiveSuppressionPort,
 } from "../rerank/suppression.js";
+import {
+  createPitchReintroductions,
+  type PublishablePitchTimesPort,
+} from "../rerank/pitch-reintroductions.js";
 import type { SemanticEmbedder } from "../semantic/ports.js";
 import {
   createSemanticCandidateService,
@@ -192,6 +196,12 @@ export type SlateReadPipelineDependencies = {
   readonly policy?: SlatePolicy | undefined;
   /** BILLING-2 (ADR 0036): the reader's plan volume; see the slate reader. */
   readonly volume?: SlateReadServiceDependencies["volume"];
+  /**
+   * Each company's newest publishable pitch's READY time (the media
+   * context's), so a passed company with a new pitch is offered again
+   * (doc 19 §67). Absent: a passed company stays withheld.
+   */
+  readonly pitchTimes?: PublishablePitchTimesPort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -234,12 +244,19 @@ export function createSlateReadPipeline(
         });
   // REC-009R: what this organisation passed on is checked when the page is
   // served, not when the slate was built, because a pass can happen at any
-  // point in between. No reintroduction source exists, so a passed company
-  // stays suppressed.
+  // point in between. A passed company comes back only with evidence of
+  // something new: a pitch that became playable after the pass.
+  const interactions = createPostgresInteractionRepository({ sql });
   const suppression = createProactiveSuppression({
-    signals: createInteractionRerankSignals({
-      repository: createPostgresInteractionRepository({ sql }),
-    }),
+    signals: createInteractionRerankSignals({ repository: interactions }),
+    ...(dependencies.pitchTimes === undefined
+      ? {}
+      : {
+          reintroductions: createPitchReintroductions({
+            repository: interactions,
+            pitches: dependencies.pitchTimes,
+          }),
+        }),
   });
   const reader = createSlateReadService({
     ports: eligibilityPorts,

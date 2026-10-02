@@ -237,6 +237,16 @@ export function FeedCard({
         in a sheet with its own solid surface -- never bare text over video.
       */}
       <div className="cq-feed-info flex flex-col gap-1.5" data-feed-summary>
+        {company.sinceYouLastSaw === undefined ? null : (
+          // Passed before, offered again because something is new (doc 19
+          // §67). Words, not a colour or a badge.
+          <p
+            className="cq-caption text-(--cq-text-secondary)"
+            data-since-you-last-saw
+          >
+            {sinceYouLastSawLine(company.sinceYouLastSaw.change)}
+          </p>
+        )}
         <h2 className="cq-title-sm text-(--cq-text-primary)">
           {/* The name opens the company, as it does in any feed. */}
           <Link
@@ -511,4 +521,11 @@ export function FeedCard({
       </div>
     </article>
   );
+}
+
+/** The line on a passed company offered again (doc 19 §67). */
+export function sinceYouLastSawLine(change: "NEW_PITCH" | null): string {
+  return change === "NEW_PITCH"
+    ? "New pitch since you last saw it. You passed on it before."
+    : "Updated since you last saw it. You passed on it before.";
 }

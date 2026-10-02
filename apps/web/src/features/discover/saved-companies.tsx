@@ -6,7 +6,11 @@ import { useState } from "react";
 import { Button } from "@capital-q/ui/button";
 import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 
+import type { PitchSummaryDto } from "@capital-q/contracts";
+
 import { useGlobalQ } from "@/components/app-shell/global-q";
+
+import { CompanyPitch } from "./company-pitch";
 
 import {
   canCompare,
@@ -20,6 +24,8 @@ export type SavedCompanyRow = {
   readonly name: string;
   readonly facts: string | null;
   readonly description: string | null;
+  /** Its pitch, playable here whatever the current slate says (doc 19 §68). */
+  readonly pitch?: PitchSummaryDto | null | undefined;
 };
 
 /**
@@ -64,46 +70,57 @@ export function SavedCompanies({
         {companies.map((company) => {
           const checked = selected.includes(company.companyId);
           return (
-            <li key={company.companyId} className="flex items-center gap-3">
-              {companies.length >= 2 ? (
-                <label className="flex size-11 shrink-0 items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={!checked && full}
-                    onChange={() =>
-                      setSelected((current) =>
-                        toggleSelection(current, company.companyId),
-                      )
-                    }
-                    aria-label={`Select ${company.name} to compare`}
-                    className="size-5 accent-(--cq-accent)"
+            <li key={company.companyId} className="flex flex-col gap-2 py-1">
+              <div className="flex items-center gap-3">
+                {companies.length >= 2 ? (
+                  <label className="flex size-11 shrink-0 items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={!checked && full}
+                      onChange={() =>
+                        setSelected((current) =>
+                          toggleSelection(current, company.companyId),
+                        )
+                      }
+                      aria-label={`Select ${company.name} to compare`}
+                      className="size-5 accent-(--cq-accent)"
+                    />
+                  </label>
+                ) : null}
+                <Link
+                  href={`/company/${encodeURIComponent(company.companyId)}`}
+                  className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-3 text-(--cq-text-primary) hover:text-(--cq-accent)"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="cq-body font-medium">{company.name}</span>
+                    {company.facts === null ? null : (
+                      <span className="cq-caption text-(--cq-text-secondary)">
+                        {company.facts}
+                      </span>
+                    )}
+                    {company.description === null ? null : (
+                      <span className="cq-body-sm text-(--cq-text-secondary)">
+                        {company.description}
+                      </span>
+                    )}
+                  </span>
+                  <ChevronRight
+                    aria-hidden="true"
+                    size={ICON_SIZE.compact}
+                    className="shrink-0 text-(--cq-text-tertiary)"
                   />
-                </label>
-              ) : null}
-              <Link
-                href={`/company/${encodeURIComponent(company.companyId)}`}
-                className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-3 text-(--cq-text-primary) hover:text-(--cq-accent)"
-              >
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="cq-body font-medium">{company.name}</span>
-                  {company.facts === null ? null : (
-                    <span className="cq-caption text-(--cq-text-secondary)">
-                      {company.facts}
-                    </span>
-                  )}
-                  {company.description === null ? null : (
-                    <span className="cq-body-sm text-(--cq-text-secondary)">
-                      {company.description}
-                    </span>
-                  )}
-                </span>
-                <ChevronRight
-                  aria-hidden="true"
-                  size={ICON_SIZE.compact}
-                  className="shrink-0 text-(--cq-text-tertiary)"
+                </Link>
+              </div>
+              {company.pitch == null ? null : (
+                <CompanyPitch
+                  company={{
+                    companyId: company.companyId,
+                    canonicalName: company.name,
+                    pitch: company.pitch,
+                  }}
                 />
-              </Link>
+              )}
             </li>
           );
         })}

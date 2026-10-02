@@ -41,6 +41,8 @@ export const INTERACTION_TYPES = [
   "UNSAVE",
   /** Context-specific and reversible. Never a hard exclusion. */
   "PASS",
+  /** The investor undid a pass (doc 19 §68): back in proactive discovery. */
+  "UNPASS",
   /** Server-internal seam for CQ-NET-010. No client route writes this. */
   "INTEREST_OBSERVED",
 ] as const;

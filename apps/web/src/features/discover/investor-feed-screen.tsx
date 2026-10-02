@@ -1016,11 +1016,14 @@ function InvestorFeed({
         <Notes notes={notes} />
         <EmptyState
           title="Nothing to review yet."
-          description="Companies appear here as founders choose to be discoverable. Q can tell you about any of them once they do."
+          description="Companies appear here as founders choose to be discoverable. Companies you saved or passed on are kept in Saved and Passed, with their pitches."
           action={
-            <Button variant="secondary" onClick={() => setOpen(true)}>
-              Ask Q
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" onClick={() => setOpen(true)}>
+                Ask Q
+              </Button>
+              <SavedAndPassedLinks className="flex" />
+            </div>
           }
         />
       </div>
@@ -1094,6 +1097,7 @@ function InvestorFeed({
         */}
         <div className="cq-feed-overlay bg-[linear-gradient(to_top,var(--cq-stage-canvas)_0%,color-mix(in_oklch,var(--cq-stage-canvas)_92%,transparent)_calc(100%-48px),transparent_100%)] lg:bg-none">
           {controls.row("hidden lg:flex")}
+          <SavedAndPassedLinks className="hidden lg:flex" />
           <FeedCard
             key={card.companyId}
             company={withVideo(card)}
@@ -1198,5 +1202,25 @@ function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
         </p>
       ))}
     </div>
+  );
+}
+
+/**
+ * Saved and Passed, one tap from the feed (doc 19 §66–68): a pass or a
+ * save takes a company out of the stream, never out of reach.
+ */
+function SavedAndPassedLinks({ className }: { readonly className: string }) {
+  return (
+    <nav
+      aria-label="Saved and passed companies"
+      className={`${className} flex-wrap items-center gap-2`}
+    >
+      <Link href="/discover/saved" className={buttonClassName("quiet")}>
+        Saved
+      </Link>
+      <Link href="/discover/passed" className={buttonClassName("quiet")}>
+        Passed
+      </Link>
+    </nav>
   );
 }

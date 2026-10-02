@@ -221,6 +221,16 @@ export function registerDiscoveryRoutes(
             reasons: [],
             reasonCodes: item.reasonCodes,
             unverifiedExclusions: item.unverifiedExclusions,
+            ...(item.reintroduced === undefined
+              ? {}
+              : {
+                  sinceYouLastSaw: {
+                    change:
+                      item.reintroduced.change === "NEW_PITCH"
+                        ? ("NEW_PITCH" as const)
+                        : null,
+                  },
+                }),
             ...(item.filterUnknown === undefined
               ? {}
               : { filterUnknown: item.filterUnknown }),
