@@ -45,7 +45,10 @@ import {
   type DocumentRoutesDependencies,
 } from "./http/documents.js";
 import { deckAudiencePort } from "./deck-audience-port.js";
-import { registerAppActionRoutes } from "./http/app-actions.js";
+import {
+  registerAppActionRoutes,
+  registerPersonActionRoutes,
+} from "./http/app-actions.js";
 import { registerInvestorMandateRoutes } from "./http/investor-mandates.js";
 import {
   mediaProviderProblem,
@@ -493,6 +496,20 @@ export function createApp(
       ...(modules.evidence === undefined
         ? {}
         : { deckAudience: deckAudiencePort(modules.evidence) }),
+    },
+  });
+  // ADR 0040: person-scoped routes (onboarding), under the onboarding actor.
+  registerPersonActionRoutes(app, {
+    authenticator: security.authenticator,
+    resolver: security.resolver,
+    identities: security.identities,
+    ports: {
+      ...(modules.onboarding === undefined
+        ? {}
+        : { onboarding: modules.onboarding }),
+      ...(modules.onboardingNudges === undefined
+        ? {}
+        : { onboardingNudges: modules.onboardingNudges }),
     },
   });
 

@@ -1,6 +1,9 @@
 export {
   defineAppAction,
   defineAppActionFamily,
+  definePersonAction,
+  type AnyPersonAction,
+  type PersonActionContext,
   AppActionPortMissingError,
   portMissing,
   qCapabilityId,
@@ -38,7 +41,7 @@ export {
   type DeckAudiencePort,
   type DeckRecord,
 } from "./actions/deck.js";
-export { APP_ACTIONS } from "./registry.js";
+export { APP_ACTIONS, PERSON_ACTIONS } from "./registry.js";
 export { scheduleProblem } from "./actions/schedule.js";
 export {
   OWN_READ_KINDS,

@@ -562,6 +562,9 @@ importers:
       '@capital-q/network':
         specifier: workspace:*
         version: link:../network
+      '@capital-q/onboarding':
+        specifier: workspace:*
+        version: link:../onboarding
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../permissions
