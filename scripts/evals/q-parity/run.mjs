@@ -45,7 +45,12 @@ const env = (name) => {
 };
 
 // Which account each area's actions run as.
-const ACCOUNT_OF_AREA = { pitch: "FOUNDER", discovery: "INVESTOR" };
+const ACCOUNT_OF_AREA = {
+  pitch: "FOUNDER",
+  discovery: "INVESTOR",
+  // Outcomes (pass, pause, meeting) are recorded by the investor.
+  relationships: "INVESTOR",
+};
 const ACCOUNT_OF_READ = {
   media: "FOUNDER",
   documents: "FOUNDER",
@@ -94,6 +99,19 @@ async function namesFor(founderUser, investorUser) {
     pitchRow === undefined
       ? undefined
       : (pitchRow.title ?? untitledPitchName(pitchRow.company));
+  // A connected relationship of the investor's, never Lagoon Angels (its
+  // errands are live): the counterpart company's name.
+  const relationship = (
+    await sql(
+      `select c.canonical_name as name from network.relationships r
+         join core.investor_organisations io on io.id = r.investor_organisation_id
+         join identity.organisation_memberships om on om.organisation_id = io.organisation_id
+         join core.companies c on c.id = r.company_id
+        where om.user_id = ${quote(investorUser)} and r.current_state = 'CONNECTED'
+          and io.display_name not ilike '%lagoon%'
+        order by r.created_at limit 1`,
+    )
+  )[0]?.name;
   const company = (
     await sql(
       `select c.canonical_name as name from recommendation.slate_items i
@@ -109,6 +127,7 @@ async function namesFor(founderUser, investorUser) {
     names: {
       ...(pitch === undefined ? {} : { MEDIA: pitch }),
       ...(company === undefined ? {} : { COMPANY: company }),
+      ...(relationship === undefined ? {} : { RELATIONSHIP: relationship }),
     },
     reads: {
       ...(pitch === undefined ? {} : { media: pitch }),
