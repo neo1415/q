@@ -6,6 +6,7 @@ import {
   createPostgresInvestorOrganisationRepository,
 } from "@capital-q/investors";
 import {
+  createPostgresPassStandingReader,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
   type RelationshipQueryPort,
@@ -23,7 +24,10 @@ import {
   createStructuredCandidateService,
   type StructuredCandidateService,
 } from "../candidates/service.js";
-import type { EligibilityPorts } from "../eligibility/ports.js";
+import type {
+  EligibilityPorts,
+  ReapproachEvidencePort,
+} from "../eligibility/ports.js";
 import {
   createEligibilityService,
   type EligibilityService,
@@ -110,6 +114,8 @@ export type RecommendationPipelineDependencies = {
   readonly disclosure: DisclosureAccessService;
   readonly embedder: SemanticEmbedder;
   readonly policy?: SlatePolicy | undefined;
+  /** Re-approach after a post-meeting pass (doc 19 §67). Absent: it stays closed. */
+  readonly reapproachEvidence?: ReapproachEvidencePort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -134,6 +140,7 @@ export type RecommendationPipeline = {
 function composeEligibility(input: {
   readonly sql: DatabaseExecutor;
   readonly disclosure: DisclosureAccessService;
+  readonly reapproachEvidence?: ReapproachEvidencePort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 }) {
@@ -163,6 +170,7 @@ function composeEligibility(input: {
         limit: page.limit ?? 100,
       }),
     getEventById: (id) => relationshipEventRepository.findById(sql, id),
+    passStanding: createPostgresPassStandingReader(sql),
   };
   const eligibilityPorts = createDomainEligibilityPorts({
     sql,
@@ -173,6 +181,7 @@ function composeEligibility(input: {
     relationships,
     disclosure,
     taxonomy,
+    reapproachEvidence: input.reapproachEvidence,
   });
   const eligibility = createEligibilityService({
     ports: eligibilityPorts,
@@ -202,6 +211,8 @@ export type SlateReadPipelineDependencies = {
    * (doc 19 §67). Absent: a passed company stays withheld.
    */
   readonly pitchTimes?: PublishablePitchTimesPort | undefined;
+  /** Re-approach after a post-meeting pass (doc 19 §67). Absent: it stays closed. */
+  readonly reapproachEvidence?: ReapproachEvidencePort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -228,6 +239,7 @@ export function createSlateReadPipeline(
   const { eligibilityPorts, eligibility } = composeEligibility({
     sql,
     disclosure,
+    reapproachEvidence: dependencies.reapproachEvidence,
     clock,
     logger,
   });
@@ -293,7 +305,13 @@ export function createRecommendationPipeline(
     dependencies;
 
   const { marketplace, assignments, taxonomy, eligibilityPorts, eligibility } =
-    composeEligibility({ sql, disclosure, clock, logger });
+    composeEligibility({
+      sql,
+      disclosure,
+      reapproachEvidence: dependencies.reapproachEvidence,
+      clock,
+      logger,
+    });
 
   const semanticPorts = createDomainSemanticPorts({
     sql,

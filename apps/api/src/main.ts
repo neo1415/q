@@ -55,12 +55,14 @@ import {
   createInteractionSignalService,
   createPostgresInteractionRepository,
   createPostgresCompanySectorsPort,
+  createReapproachEvidence,
   createSlateReadPipeline,
 } from "@capital-q/discovery";
 import {
   CapitalObjectiveNotFoundError,
   createCapitalService,
   createPostgresCapitalObjectiveQueryPort,
+  createPostgresCapitalObjectiveTimes,
 } from "@capital-q/capital";
 import { createResultsReader } from "@capital-q/results";
 import {
@@ -78,6 +80,7 @@ import {
 } from "@capital-q/investors";
 import {
   createCommitmentService,
+  createRelationshipOutcomeService,
   createConnectionService,
   createInterestService,
   createRelationshipEventAppender,
@@ -730,6 +733,16 @@ const slates = createSlateReadPipeline({
       discoverablePitches.latestReadyAt?.(companyIds) ??
       Promise.resolve(new Map()),
   },
+  // After a post-meeting pass, the company comes back only on a material
+  // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
+  reapproachEvidence: createReapproachEvidence({
+    pitchReadyAt: (companyIds) =>
+      discoverablePitches.latestReadyAt?.(companyIds) ??
+      Promise.resolve(new Map()),
+    capitalObjectiveAt: createPostgresCapitalObjectiveTimes({
+      sql: database.sql,
+    }).latestCreatedAt,
+  }),
   // A plan value is configuration, not a gate: if it cannot be read the
   // feed serves the whole slate rather than failing.
   volume: (actor) =>
@@ -836,6 +849,35 @@ const commitments = createCommitmentService({
       events: createPostgresRelationshipEventRepository(),
     },
   }),
+  newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
+});
+/**
+ * Post-meeting outcomes (2026-10-02): the investor's Pass, Pause and Resume
+ * and a confirmed meeting outcome, through Network's own appender and
+ * outbox. A pass records the mandate it was made under (doc 19 §67).
+ */
+const outcomes = createRelationshipOutcomeService({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests,
+  appender: createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  }),
+  outbox,
+  activeMandate: async (actor, investorOrganisationId) => {
+    const found = await slates.eligibilityPorts.mandates.activeMandate({
+      tenantId: actor.tenantId,
+      investorOrganisationId,
+      mandateId: null,
+    });
+    return found.kind === "FOUND"
+      ? { mandateId: found.mandate.mandateId, version: found.mandate.version }
+      : null;
+  },
   newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
 });
 // ADMIN block (spec §5): a person's own results. The raise is the same
@@ -1250,8 +1292,7 @@ const { app, logger } = createApp(config, security, {
         const companyId = listing.relationship.companyId;
         if (isMatchedRelationshipState(state)) {
           labelled.set(companyId, "CONNECTED");
-        }
-        else if (state === "INTEREST_EXPRESSED" && !labelled.has(companyId)) {
+        } else if (state === "INTEREST_EXPRESSED" && !labelled.has(companyId)) {
           labelled.set(companyId, "INTERESTED");
         }
       }
@@ -1304,6 +1345,7 @@ const { app, logger } = createApp(config, security, {
   interests,
   connections,
   commitments,
+  outcomes,
   // BILLING block (ADR 0034)
   billing: {
     entitlements,

@@ -314,3 +314,29 @@ export function createPostgresCapitalObjectiveQueryPort(options: {
     },
   };
 }
+
+/**
+ * When each company last set a capital objective (any status), for the
+ * re-approach rule after a pass (doc 19 §67: a new capital objective).
+ * Times only: no amount, no use of funds. Permission-neutral.
+ */
+export function createPostgresCapitalObjectiveTimes(options: {
+  readonly sql: DatabaseExecutor;
+}) {
+  const { sql } = options;
+  return {
+    latestCreatedAt: async (
+      companyIds: readonly string[],
+    ): Promise<ReadonlyMap<string, string>> => {
+      const out = new Map<string, string>();
+      if (companyIds.length === 0) return out;
+      const rows = await sql<{ company_id: string; at: Date }[]>`
+        select company_id, max(created_at) as at
+          from core.capital_objectives
+         where company_id = any(${[...companyIds]}::uuid[])
+         group by company_id`;
+      for (const row of rows) out.set(row.company_id, row.at.toISOString());
+      return out;
+    },
+  };
+}

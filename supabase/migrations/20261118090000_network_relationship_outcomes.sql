@@ -215,3 +215,17 @@ $$;
 
 comment on column network.relationships.current_state is
   'Derived projection of the ordered history, written only by the deterministic relationship-state projector (CQ-NET-012). relationship-state.v1: DISCOVERED | INTEREST_EXPRESSED | CONNECTED | DECLINED. relationship-state.v2 adds MEETING_HELD | IN_DILIGENCE | PAUSED | PASSED | INVESTED. Never patched by a command.';
+
+-- ---------------------------------------------------------------------------
+-- The other side hears about it: "<Fund> has decided not to proceed for now"
+-- ---------------------------------------------------------------------------
+
+alter table communication.notifications
+  drop constraint notifications_kind_check,
+  add constraint notifications_kind_check
+    check (kind in ('REMINDER', 'MEETING_SCHEDULED', 'MEETING_CANCELLED', 'MEETING_PREP_READY',
+                    'MEETING_NOTES_READY', 'Q_SCOUT', 'Q_ERRAND', 'MEETING_RECORDING_DECLINED',
+                    'COMMITMENT_DETECTED', 'ACCOUNT_PAUSED', 'Q_WORK', 'Q_STAND_IN',
+                    'INTEREST_RECEIVED', 'CONNECTION_REQUESTED', 'Q_MESSAGE', 'TIME_PROPOSED',
+                    'HUMAN_REVIEW', 'VERIFICATION_DECIDED', 'VERIFICATION_REQUESTED',
+                    'RELATIONSHIP_OUTCOME'));

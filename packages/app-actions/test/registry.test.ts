@@ -145,6 +145,15 @@ describe("the action registry", () => {
       ],
       ["schedule.reminder.create", "legacy:propose_reminder", "CONSEQUENTIAL"],
       ["schedule.reminder.dismiss", "legacy:dismiss_reminder", "INSTANT"],
+      // Post-meeting outcomes (2026-10-02): generated tools, all approved.
+      ["relationship.outcome.pass", "decline_to_proceed", "CONSEQUENTIAL"],
+      ["relationship.outcome.pause", "pause_relationship", "CONSEQUENTIAL"],
+      ["relationship.outcome.resume", "resume_relationship", "CONSEQUENTIAL"],
+      [
+        "relationship.outcome.meeting",
+        "record_meeting_outcome",
+        "CONSEQUENTIAL",
+      ],
     ]);
   });
 });

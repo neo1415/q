@@ -484,15 +484,13 @@ export const RelationshipProgressedPayloadSchema = z
   .strict();
 export const RELATIONSHIP_EVENT_RELATIONSHIP_PROGRESSED =
   "relationship_progressed" as const;
-export const RelationshipProgressedRelationshipEvent = defineRelationshipEvent(
-  {
-    type: RELATIONSHIP_EVENT_RELATIONSHIP_PROGRESSED,
-    payloadSchema: RelationshipProgressedPayloadSchema,
-    allowedVisibilityScopes: ["relationship_shared"],
-    description:
-      "A meeting's outcome was confirmed as moving forward (another meeting, materials). Recorded, not a state of its own.",
-  },
-);
+export const RelationshipProgressedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_RELATIONSHIP_PROGRESSED,
+  payloadSchema: RelationshipProgressedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "A meeting's outcome was confirmed as moving forward (another meeting, materials). Recorded, not a state of its own.",
+});
 
 /**
  * Production registry: `discovered` (CQ-NET-001), `interest_expressed`

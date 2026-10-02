@@ -554,3 +554,102 @@ export const ConnectionRequestAnswerDtoSchema = z
 export type ConnectionRequestAnswerDto = z.infer<
   typeof ConnectionRequestAnswerDtoSchema
 >;
+
+/**
+ * Post-meeting outcomes (founder request 2026-10-02; Product Specification
+ * 6.6.10-6.6.14). The investor's Pass, Pause and Resume on a matched
+ * relationship, and either side's confirmed meeting outcome, each a verb in
+ * its own path (no generic action route). Server-confirmed and idempotent.
+ */
+export const NETWORK_RELATIONSHIP_PASS_PATH =
+  "/v1/network/relationships/:relationshipId/pass" as const;
+export const NETWORK_RELATIONSHIP_PAUSE_PATH =
+  "/v1/network/relationships/:relationshipId/pause" as const;
+export const NETWORK_RELATIONSHIP_RESUME_PATH =
+  "/v1/network/relationships/:relationshipId/resume" as const;
+export const NETWORK_RELATIONSHIP_MEETING_OUTCOME_PATH =
+  "/v1/network/relationships/:relationshipId/meeting-outcome" as const;
+/** The reason categories an investor may give (reference data, 6.6.10). */
+export const NETWORK_PASS_REASONS_PATH = "/v1/network/pass-reasons" as const;
+
+/**
+ * Founder decision (a): the reason is the investor's private note and a
+ * learning signal; it reaches the founder only when shareWithFounder.
+ */
+export const PassRelationshipRequestSchema = z
+  .object({
+    reasonCode: RelationshipPassReasonCodeSchema.nullable().optional(),
+    note: z.string().trim().min(1).max(1000).nullable().optional(),
+    shareWithFounder: z.boolean().default(false),
+  })
+  .strict();
+export type PassRelationshipRequest = z.infer<
+  typeof PassRelationshipRequestSchema
+>;
+
+/** What a meeting led to, as the person confirmed it (PADL #130). */
+export const MEETING_OUTCOMES = [
+  "DILIGENCE",
+  "FOLLOW_UP_MEETING",
+  "MATERIALS_REQUESTED",
+  "INTRODUCTIONS",
+  "OTHER",
+] as const;
+export const RecordMeetingOutcomeRequestSchema = z
+  .object({
+    outcome: z.enum(MEETING_OUTCOMES),
+    meetingId: UuidSchema.optional(),
+  })
+  .strict();
+export type RecordMeetingOutcomeRequest = z.infer<
+  typeof RecordMeetingOutcomeRequestSchema
+>;
+
+export const RelationshipOutcomeResultDtoSchema = z
+  .object({
+    relationshipId: UuidSchema,
+    /** True when it was already the case: nothing new was recorded. */
+    deduplicated: z.boolean(),
+  })
+  .strict();
+export type RelationshipOutcomeResultDto = z.infer<
+  typeof RelationshipOutcomeResultDtoSchema
+>;
+
+export const PassReasonListDtoSchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            code: RelationshipPassReasonCodeSchema,
+            label: z.string().min(1).max(60),
+          })
+          .strict(),
+      )
+      .max(64),
+  })
+  .strict();
+export type PassReasonListDto = z.infer<typeof PassReasonListDtoSchema>;
+
+/**
+ * `GET /v1/network/relationships/:relationshipId/pass`: the current pass as
+ * the asking side may see it. The investor side sees its own reason and
+ * note; the company side sees one only when it was shared, and `null`
+ * otherwise -- it learns that the investor passed from the state alone.
+ */
+export const RelationshipPassDtoSchema = z
+  .object({
+    passedAt: UtcTimestampSchema,
+    reasonCode: RelationshipPassReasonCodeSchema.nullable(),
+    reasonLabel: z.string().max(60).nullable(),
+    note: z.string().max(1000).nullable(),
+    sharedWithFounder: z.boolean(),
+  })
+  .strict();
+export const RelationshipPassResponseDtoSchema = z
+  .object({ pass: RelationshipPassDtoSchema.nullable() })
+  .strict();
+export type RelationshipPassResponseDto = z.infer<
+  typeof RelationshipPassResponseDtoSchema
+>;

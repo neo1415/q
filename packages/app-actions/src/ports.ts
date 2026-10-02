@@ -10,7 +10,11 @@ import type { InteractionSignalService } from "@capital-q/discovery";
 import type { InvestorService } from "@capital-q/investors";
 import type { PublicIdentityService } from "@capital-q/public-identity";
 import type { MediaService } from "@capital-q/media";
-import type { ConnectionService, InterestService } from "@capital-q/network";
+import type {
+  ConnectionService,
+  InterestService,
+  RelationshipOutcomeService,
+} from "@capital-q/network";
 import type { VisibilityCentre } from "@capital-q/permissions";
 import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 
@@ -78,6 +82,13 @@ export type AppActionPorts = {
     | Pick<
         ConnectionService,
         "requestConnection" | "respondToConnectionRequest"
+      >
+    | undefined;
+  /** Post-meeting outcomes (2026-10-02): Network's outcome service. */
+  readonly outcomes?:
+    | Pick<
+        RelationshipOutcomeService,
+        "pass" | "pause" | "resume" | "recordMeetingOutcome"
       >
     | undefined;
   /** Visibility and shares: the visibility centre the page calls. */

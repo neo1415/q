@@ -5,6 +5,7 @@ import type {
   MandatePreferenceClass,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
+import type { PassStanding } from "@capital-q/network";
 
 /**
  * What hard eligibility reads, and — as importantly — what it cannot.
@@ -171,7 +172,40 @@ export type DiscoverabilityPort = {
 /** What the Network context says about the pair. Never inferred from interest. */
 export type RelationshipStanding =
   | { readonly kind: "NONE" }
-  | { readonly kind: "STATE"; readonly currentState: string };
+  | {
+      readonly kind: "STATE";
+      readonly currentState: string;
+      /**
+       * PASSED only (relationship-state.v2): when the investor passed, the
+       * mandate it was made under, and the company's newest evidence of a
+       * material change, for the re-approach rule (doc 19 §67). Absent: the
+       * pass stays closed.
+       */
+      readonly pass?:
+        | {
+            readonly standing: PassStanding;
+            readonly latestPitchReadyAt: string | null;
+            readonly latestCapitalObjectiveAt: string | null;
+          }
+        | undefined;
+    };
+
+/**
+ * The company's newest evidence of a material change, by company (doc 19
+ * §67): a pitch that became playable, a capital objective set. Owned by
+ * the media and capital contexts; composed by the app.
+ */
+export type ReapproachEvidencePort = {
+  readonly latest: (companyIds: readonly string[]) => Promise<
+    ReadonlyMap<
+      string,
+      {
+        readonly latestPitchReadyAt: string | null;
+        readonly latestCapitalObjectiveAt: string | null;
+      }
+    >
+  >;
+};
 
 export type RelationshipStandingPort = {
   readonly standings: (

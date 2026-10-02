@@ -218,6 +218,7 @@ export {
 } from "./application/service.js";
 
 export {
+  createPostgresPassStandingReader,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
 } from "./infrastructure/postgres-repositories.js";
@@ -241,6 +242,22 @@ export {
   type CommitmentOutcome,
   type CommitmentService,
 } from "./application/commitments.js";
+export {
+  reapproachAfterPass,
+  type PassStanding,
+  type ReapproachEvidence,
+  type ReapproachReason,
+} from "./domain/reapproach.js";
+export {
+  createRelationshipOutcomeService,
+  PROGRESS_STEPS,
+  type OutcomeRefusal,
+  type OutcomeResult,
+  type PassReason,
+  type PassRecordView,
+  type ProgressStep,
+  type RelationshipOutcomeService,
+} from "./application/outcomes.js";
 export {
   CommitmentActivityPayloadSchema,
   CommitmentConfirmedRelationshipEvent,
