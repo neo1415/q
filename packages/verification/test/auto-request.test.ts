@@ -11,9 +11,13 @@ describe("automatic verification evidence (ADMIN-4)", () => {
   });
 
   it("matches an email domain to the website, and keeps unknown unknown", () => {
-    expect(emailDomainMatchesWebsite("nixo.io", "https://www.nixo.io")).toBe(true);
+    expect(emailDomainMatchesWebsite("nixo.io", "https://www.nixo.io")).toBe(
+      true,
+    );
     expect(emailDomainMatchesWebsite("mail.nixo.io", "nixo.io")).toBe(true);
-    expect(emailDomainMatchesWebsite("gmail.com", "https://nixo.io")).toBe(false);
+    expect(emailDomainMatchesWebsite("gmail.com", "https://nixo.io")).toBe(
+      false,
+    );
     expect(emailDomainMatchesWebsite("evilnixo.io", "nixo.io")).toBe(false);
     expect(emailDomainMatchesWebsite(null, "nixo.io")).toBeNull();
     expect(emailDomainMatchesWebsite("nixo.io", null)).toBeNull();
