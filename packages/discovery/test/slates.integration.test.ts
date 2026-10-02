@@ -455,13 +455,46 @@ describe("@capital-q/discovery slate store against local PostgreSQL", () => {
     });
   });
 
+  it("re-sends a PENDING request that has waited past the stranded window (live 2026-10-02)", async () => {
+    await withHarness(async (h) => {
+      const start = new Date("2026-10-02T13:28:00.000Z");
+      const first = await h.requests.requestRefresh({
+        ...h.key,
+        reason: "GENERATOR_VERSION_CHANGED",
+        priority: "NORMAL",
+        requestedAt: start.toISOString(),
+      });
+      expect(first.coalesced).toBe(false);
+      const soon = await h.requests.requestRefresh({
+        ...h.key,
+        reason: "GENERATOR_VERSION_CHANGED",
+        priority: "NORMAL",
+        requestedAt: new Date(start.getTime() + 60_000).toISOString(),
+      });
+      expect(soon.coalesced).toBe(true);
+      // Its queue message was lost; nobody claimed it for longer than the window.
+      const later = await h.requests.requestRefresh({
+        ...h.key,
+        reason: "GENERATOR_VERSION_CHANGED",
+        priority: "NORMAL",
+        requestedAt: new Date(start.getTime() + 4 * 60_000).toISOString(),
+      });
+      expect(later.coalesced).toBe(false);
+      expect(later.request.status).toBe("PENDING");
+    });
+  });
+
   it("coalesces refresh requests per key, raises priority, reopens when a request lands mid-build, and bounds retries", async () => {
+    // Within the stranded window, so PENDING requests coalesce.
+    const C0 = T0;
+    const C1 = "2026-09-19T10:00:30.000Z";
+    const C2 = "2026-09-19T10:01:00.000Z";
     await withHarness(async (h) => {
       const first = await h.requests.requestRefresh({
         ...h.key,
         reason: "MANDATE_ACTIVATED",
         priority: "NORMAL",
-        requestedAt: T0,
+        requestedAt: C0,
       });
       expect(first.coalesced).toBe(false);
       expect(first.request.status).toBe("PENDING");
@@ -471,7 +504,7 @@ describe("@capital-q/discovery slate store against local PostgreSQL", () => {
         ...h.key,
         reason: "COMPANY_UPDATED",
         priority: "HIGH",
-        requestedAt: T1,
+        requestedAt: C1,
       });
       expect(second.coalesced).toBe(true);
       expect(second.request.id).toBe(first.request.id);
@@ -481,7 +514,7 @@ describe("@capital-q/discovery slate store against local PostgreSQL", () => {
         ...h.key,
         reason: "SCHEDULED",
         priority: "NORMAL",
-        requestedAt: T1,
+        requestedAt: C1,
       });
       expect(lowered.request.priority).toBe("HIGH");
       expect(lowered.request.reason).toBe("SCHEDULED");
@@ -498,7 +531,7 @@ describe("@capital-q/discovery slate store against local PostgreSQL", () => {
         ...h.key,
         reason: "TAXONOMY_CHANGED",
         priority: "NORMAL",
-        requestedAt: T2,
+        requestedAt: C2,
       });
       expect(during.coalesced).toBe(true);
       expect(during.request.status).toBe("CLAIMED");
@@ -530,7 +563,7 @@ describe("@capital-q/discovery slate store against local PostgreSQL", () => {
         ...h.key,
         reason: "MANUAL",
         priority: "NORMAL",
-        requestedAt: T2,
+        requestedAt: C2,
       });
       expect(fresh.coalesced).toBe(false);
       expect(fresh.request.status).toBe("PENDING");

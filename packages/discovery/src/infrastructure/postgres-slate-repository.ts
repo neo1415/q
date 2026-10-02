@@ -398,6 +398,9 @@ function toRequest(row: unknown): RefreshRequest {
   };
 }
 
+/** How long a PENDING refresh may wait for its queue message before it is re-sent. */
+export const PENDING_STRANDED_AFTER_MS = 2 * 60_000;
+
 export function createPostgresRefreshRequestStore(options: {
   readonly sql: DatabaseExecutor;
 }): RefreshRequestStore {
@@ -410,7 +413,7 @@ export function createPostgresRefreshRequestStore(options: {
       // worker sees the moved sequence when it completes and reopens.
       const rows = await sql`
         with prior as (
-          select status as prior_status
+          select status as prior_status, requested_at as prior_requested_at
             from recommendation.refresh_requests
            where investor_organisation_id = ${input.investorOrganisationId}
              and mandate_id = ${input.mandateId}
@@ -433,18 +436,35 @@ export function createPostgresRefreshRequestStore(options: {
               attempts = case when r.status in ('DONE', 'FAILED') then 0 else r.attempts end,
               last_error_code = case when r.status in ('DONE', 'FAILED') then null else r.last_error_code end,
               completed_at = null
-        returning r.*, (select prior_status from prior) as prior_status`;
+        returning r.*, (select prior_status from prior) as prior_status,
+          (select prior_requested_at from prior) as prior_requested_at`;
       const [first] = rows;
       if (first === undefined) {
         throw new Error("refresh request upsert returned no row");
       }
       const request = toRequest(first);
-      const prior = z
-        .object({ prior_status: z.string().nullable() })
-        .parse(first).prior_status;
+      const priorRow = z
+        .object({
+          prior_status: z.string().nullable(),
+          prior_requested_at: z.union([z.date(), z.string()]).nullable(),
+        })
+        .parse(first);
+      const prior = priorRow.prior_status;
+      const priorAt =
+        priorRow.prior_requested_at === null
+          ? null
+          : new Date(priorRow.prior_requested_at).getTime();
+      // A PENDING request nobody has claimed for a while has lost its queue
+      // message (live 2026-10-02: a worker restart stranded every rebuild):
+      // it is not coalesced, so a new message is sent; the claim absorbs a
+      // duplicate.
+      const stranded =
+        prior === "PENDING" &&
+        priorAt !== null &&
+        Date.parse(input.requestedAt) - priorAt > PENDING_STRANDED_AFTER_MS;
       return {
         request,
-        coalesced: prior === "PENDING" || prior === "CLAIMED",
+        coalesced: (prior === "PENDING" && !stranded) || prior === "CLAIMED",
       };
     },
 
