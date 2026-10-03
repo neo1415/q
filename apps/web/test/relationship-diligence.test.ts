@@ -32,7 +32,7 @@ describe("diligence request wording", () => {
       title: "Seed deck",
     });
     expect(requestStatusWords(answered, new Set([DOC]))).toEqual({
-      words: "answered with Seed deck",
+      words: "Answered · Seed deck",
       answerable: false,
     });
   });
@@ -43,14 +43,14 @@ describe("diligence request wording", () => {
       title: "Seed deck",
     });
     expect(requestStatusWords(answered, new Set())).toEqual({
-      words: "answered with Seed deck, which is no longer shared",
+      words: "Needs a new answer · Seed deck no longer shared",
       answerable: true,
     });
   });
 
   it("keeps an open request open", () => {
     expect(requestStatusWords(request("OPEN", null), new Set())).toEqual({
-      words: "open",
+      words: "Open",
       answerable: true,
     });
   });

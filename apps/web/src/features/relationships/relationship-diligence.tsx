@@ -36,14 +36,15 @@ export function requestStatusWords(
   sharedDocumentIds: ReadonlySet<string>,
 ): { readonly words: string; readonly answerable: boolean } {
   if (request.status !== "FULFILLED")
-    return { words: "open", answerable: true };
+    return { words: "Open", answerable: true };
   const by = request.fulfilledBy;
-  if (by === null) return { words: "answered", answerable: false };
+  if (by === null) return { words: "Answered", answerable: false };
   const title = by.title ?? "a document";
   return sharedDocumentIds.has(by.documentId)
-    ? { words: `answered with ${title}`, answerable: false }
+    ? { words: `Answered · ${title}`, answerable: false }
     : {
-        words: `answered with ${title}, which is no longer shared`,
+        // design-48: the state first, then why, in one short line.
+        words: `Needs a new answer · ${title} no longer shared`,
         answerable: true,
       };
 }
@@ -189,11 +190,11 @@ export function RelationshipDiligence({
               const status = requestStatusWords(request, sharedIds);
               return (
                 <li key={request.requestId} className="flex flex-col gap-1">
-                  <span className="cq-body">
-                    {request.title}{" "}
-                    <span className="cq-body-sm text-(--cq-text-secondary)">
-                      — {status.words}
-                    </span>
+                  <span className="cq-body text-(--cq-text-primary)">
+                    {request.title}
+                  </span>
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    {status.words}
                   </span>
                   {request.note === null ? null : (
                     <span className="cq-body-sm text-(--cq-text-secondary)">
