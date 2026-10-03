@@ -3,7 +3,6 @@
 import { z } from "zod";
 
 import {
-  ApiProblemError,
   diligenceDownload,
   fulfilDiligenceRequest,
   getDiligence,
@@ -20,6 +19,11 @@ import {
 } from "@capital-q/contracts";
 
 import { apiSession } from "@/features/q/context";
+
+import {
+  diligenceErrorMessage,
+  DOWNLOAD_UNAVAILABLE,
+} from "./diligence-errors";
 
 /**
  * Diligence, server side (2026-10-02). Server actions so the session token
@@ -40,6 +44,7 @@ const Key = z
 
 async function run<T>(
   work: (session: ApiSession) => Promise<T>,
+  refused?: string,
 ): Promise<DiligenceResult<T>> {
   const session = await apiSession();
   if (session === null) {
@@ -48,15 +53,7 @@ async function run<T>(
   try {
     return { ok: true, value: await work(session) };
   } catch (error: unknown) {
-    return {
-      ok: false,
-      message:
-        error instanceof ApiProblemError &&
-        error.status < 500 &&
-        error.problem?.detail !== undefined
-          ? error.problem.detail
-          : "Couldn't reach Capital Q just now. Please try again.",
-    };
+    return { ok: false, message: diligenceErrorMessage(error, refused) };
   }
 }
 
@@ -138,8 +135,11 @@ export async function diligenceDownloadAction(
   const id = Id.safeParse(relationshipId);
   const document = Id.safeParse(documentId);
   if (!id.success || !document.success)
-    return { ok: false, message: "Not found." };
-  return run(async (session) => ({
-    url: (await diligenceDownload(session, id.data, document.data)).url,
-  }));
+    return { ok: false, message: DOWNLOAD_UNAVAILABLE };
+  return run(
+    async (session) => ({
+      url: (await diligenceDownload(session, id.data, document.data)).url,
+    }),
+    DOWNLOAD_UNAVAILABLE,
+  );
 }

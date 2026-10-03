@@ -7,7 +7,10 @@ import {
   getRelationshipWithCompany,
   listTaxonomyNodes,
 } from "@capital-q/api-client";
-import { isMatchedRelationshipState } from "@capital-q/contracts";
+import {
+  isMatchedRelationshipState,
+  RelationshipStateV2Schema,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -114,6 +117,10 @@ export default async function CompanyPage({
           standing?.relationship?.state ?? "",
         )}
         sectorLabels={sectorLabels}
+        relationshipState={
+          RelationshipStateV2Schema.safeParse(standing?.relationship?.state)
+            .data ?? null
+        }
       />
     </PageContainer>
   );

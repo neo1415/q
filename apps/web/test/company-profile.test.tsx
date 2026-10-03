@@ -238,6 +238,8 @@ describe("the profile, for an investor", () => {
     renderProfile(investorProfile());
     const pass = screen.getByRole("button", { name: "Pass" });
     expect(pass.getAttribute("data-variant")).not.toBe("danger");
+    // A 44px target, like the profile's other actions (QA sweep 2026-10-03).
+    expect(pass.className).toContain("min-h-11");
     fireEvent.click(pass);
     // Optimistic: said before the server answers.
     expect(screen.getByRole("status").textContent).toBe("Passed on Kivu Grid");
@@ -249,6 +251,9 @@ describe("the profile, for an investor", () => {
       intent: "PASS",
       surface: "COMPANY_PROFILE",
     });
+    expect(screen.getByRole("button", { name: "Undo" }).className).toContain(
+      "min-h-11",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Pass" })).toBeTruthy();

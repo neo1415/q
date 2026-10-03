@@ -84,6 +84,7 @@ export function ProfilePass({
           </span>
           <Button
             variant="quiet"
+            className="min-h-11"
             disabled={pending}
             onClick={() => void undo()}
           >
@@ -91,7 +92,11 @@ export function ProfilePass({
           </Button>
         </>
       ) : (
-        <Button variant="secondary" onClick={() => void pass()}>
+        <Button
+          variant="secondary"
+          className="min-h-11"
+          onClick={() => void pass()}
+        >
           Pass
         </Button>
       )}

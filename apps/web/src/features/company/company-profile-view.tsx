@@ -4,6 +4,7 @@ import type {
   CompanyProfileDto,
   CompanyProfileTeamMember,
   InterestDto,
+  RelationshipStateV2,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
@@ -134,11 +135,13 @@ export function CompanyProfileView({
   interest,
   connected,
   sectorLabels,
+  relationshipState = null,
 }: {
   readonly profile: CompanyProfileDto;
   readonly tab: ProfileTab;
   readonly interest: InterestDto | null;
   readonly connected: boolean;
+  readonly relationshipState?: RelationshipStateV2 | null;
   readonly sectorLabels: readonly string[];
 }) {
   const { overview } = profile;
@@ -209,6 +212,7 @@ export function CompanyProfileView({
             companyName={profile.canonicalName}
             surface="COMPANY_PROFILE"
             initialInterest={interest}
+            relationshipState={relationshipState}
           />
           <ProfilePass
             companyId={profile.companyId}

@@ -2,13 +2,14 @@
 
 import { useCallback, useRef, useState } from "react";
 
-import type { InterestDto } from "@capital-q/contracts";
+import type { InterestDto, RelationshipStateV2 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import {
   expressInterestAction,
   type InterestActionResult,
 } from "./interest-actions";
+import { STATE_WORDS } from "../relationships/relationship-words";
 
 /**
  * Express Interest (CQ-NET-010; doc 17 §70, doc 19 §2.5).
@@ -45,6 +46,16 @@ export type ExpressInterestPort = (input: {
   readonly idempotencyKey: string;
 }) => Promise<InterestActionResult>;
 
+/** After connecting, the relationship's own state words, never a stale "Connected". */
+export function connectedLine(
+  companyName: string,
+  state: RelationshipStateV2 | null,
+): string {
+  return state === null || state === "CONNECTED"
+    ? `Connected with ${companyName}. Both sides have agreed to connect.`
+    : `Your relationship with ${companyName}: ${STATE_WORDS[state]}.`;
+}
+
 function newIdempotencyKey(): string {
   return `interest:${crypto.randomUUID()}`;
 }
@@ -57,6 +68,7 @@ export function ExpressInterest({
   express = expressInterestAction,
   onConfirmed,
   startConfirming = false,
+  relationshipState = null,
 }: {
   readonly companyId: string;
   readonly companyName: string;
@@ -71,6 +83,11 @@ export function ExpressInterest({
    * server still confirms nothing until the person confirms here.
    */
   readonly startConfirming?: boolean | undefined;
+  /**
+   * Where the relationship stands now, once connected (QA sweep
+   * 2026-10-03: a relationship in diligence still read "Connected").
+   */
+  readonly relationshipState?: RelationshipStateV2 | null;
 }) {
   const [phase, setPhase] = useState<Phase>(
     initialInterest === null
@@ -164,7 +181,7 @@ export function ExpressInterest({
       return (
         <p className="cq-status-line" role="status">
           {phase.interest.response === "ACCEPTED"
-            ? `Connected with ${companyName}. Both sides have agreed to connect.`
+            ? connectedLine(companyName, relationshipState)
             : phase.interest.response === "DECLINED"
               ? `${companyName} has not taken this forward.`
               : phase.alreadySent
