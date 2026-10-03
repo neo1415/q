@@ -1397,6 +1397,15 @@ const workOwnCompany = (actor: ActorContext): Promise<string | null> =>
 const instructionStore = createPostgresInstructionStore(database.sql);
 // Composed once the runtime, the Approval Engine and the planner exist.
 const instructionEngine: { current?: InstructionEngine } = {};
+// Lead 2026-10-03: Q acts alone only once budget (S5) and quarantine (S6)
+// are live. Off by default: every AUTO step is asked.
+const instructionsAuto = process.env.CQ_INSTRUCTIONS_AUTO === "on";
+logger.info(
+  { instructionsAuto },
+  instructionsAuto
+    ? "standing instructions: autonomy on"
+    : "standing instructions: autonomy off, every step is asked",
+);
 const workPort = createWorkPort({
   instructions: instructionStore,
   // Errands are composed further down; read only when a tool asks.
@@ -2196,6 +2205,7 @@ const qActionRegistry = createQActionRegistry([
   // ADR 0043: a standing instruction's grant, one approval per version.
   ...createInstructionActions({
     store: instructionStore,
+    autoEnabled: instructionsAuto,
     // The first firing, at once (composed further down).
     onActivated: (instructionId, version) => {
       void instructionEngine.current
@@ -3171,6 +3181,7 @@ const workRuntime = createWorkRuntime({
 // declared command as the person, ASK steps become their cards.
 instructionEngine.current = createInstructionEngine({
   store: instructionStore,
+  autoEnabled: instructionsAuto,
   actions: APP_ACTIONS,
   ports: appActionPorts,
   actorFor: createInstructionActor({

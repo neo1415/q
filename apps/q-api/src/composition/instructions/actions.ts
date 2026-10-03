@@ -55,7 +55,10 @@ function hours(grant: InstructionGrant): string {
   return `${dayText} ${grant.workingHours.start}-${grant.workingHours.end} (${grant.workingHours.timeZone})`;
 }
 
-export function grantCard(payload: InstructionGrantPayload): string {
+export function grantCard(
+  payload: InstructionGrantPayload,
+  options: { readonly autoEnabled?: boolean | undefined } = {},
+): string {
   const grant = payload.grant;
   const auto = grant.actions.filter((entry) => entry.mode === "AUTO");
   const ask = grant.actions.filter((entry) => entry.mode === "ASK");
@@ -71,6 +74,9 @@ export function grantCard(payload: InstructionGrantPayload): string {
         })
         .join("\n")}`,
     );
+  }
+  if (auto.length > 0 && options.autoEnabled !== true) {
+    lines.push("Q will ask for each step until autonomy is switched on.");
   }
   if (ask.length > 0) {
     lines.push(
@@ -112,6 +118,8 @@ export function createInstructionActions(dependencies: {
    */
   readonly onActivated?:
     ((instructionId: string, version: number) => void) | undefined;
+  /** CQ_INSTRUCTIONS_AUTO: the card says when Q still asks for each step. */
+  readonly autoEnabled?: boolean | undefined;
   readonly logger?: Logger | undefined;
 }): readonly AnyQActionDefinition[] {
   const { store, logger } = dependencies;
@@ -132,7 +140,9 @@ export function createInstructionActions(dependencies: {
           payload.instructionId === undefined
             ? "Q works on this for you, inside these limits"
             : "Change what Q may do for this instruction",
-        preview: grantCard(payload),
+        preview: grantCard(payload, {
+          autoEnabled: dependencies.autoEnabled,
+        }),
       }),
       confirm: () =>
         "On it. I'll tell you what I do, and ask before anything outside this.",

@@ -107,6 +107,7 @@ export const ASK_WORDS: Readonly<Record<string, string>> = {
   OVER_MESSAGE_CAP: "I've sent them as many messages as you allowed",
   ATTACHMENT: "it shares a document",
   MEETING_OUTSIDE_HOURS: "the time is outside your working hours",
+  AUTONOMY_OFF: "I ask for each step until autonomy is switched on",
 };
 
 // ---------------------------------------------------------------------------
@@ -421,6 +422,11 @@ export type InstructionEngineDependencies = {
       readonly key: string;
     },
   ) => Promise<{ readonly qActionId: string } | null>;
+  /**
+   * CQ_INSTRUCTIONS_AUTO (lead 2026-10-03): off until the budget (S5) and
+   * the quarantine (S6) are live. Off, every AUTO step is asked instead.
+   */
+  readonly autoEnabled: boolean;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -623,7 +629,13 @@ export function createInstructionEngine(
           });
           continue;
         }
-        if (verdict.verdict === "AUTO") {
+        if (verdict.verdict === "AUTO" && !dependencies.autoEnabled) {
+          logger?.info(
+            { instructionId: row.id, action: step.action },
+            "instruction AUTO step asked: autonomy is off",
+          );
+        }
+        if (verdict.verdict === "AUTO" && dependencies.autoEnabled) {
           const context = {
             actor,
             idempotencyKey: key,
@@ -704,13 +716,13 @@ export function createInstructionEngine(
           continue;
         }
         asked += 1;
-        const why =
-          verdict.code === null ? null : (ASK_WORDS[verdict.code] ?? null);
+        const code = verdict.verdict === "AUTO" ? "AUTONOMY_OFF" : verdict.code;
+        const why = code === null ? null : (ASK_WORDS[code] ?? null);
         await record({
           status: "ASKED",
           mode: "ASK",
           words: `Waiting for your yes${why === null ? "" : ` (${why})`}: ${step.words}`,
-          reasonCode: verdict.code,
+          reasonCode: code,
           qActionId: card.qActionId,
         });
       }

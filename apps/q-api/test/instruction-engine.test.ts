@@ -332,7 +332,7 @@ describe("the validator: code decides each step", () => {
 // One firing, end to end over fakes
 // ---------------------------------------------------------------------------
 
-function world(plans: readonly InstructionPlanResult[]) {
+function world(plans: readonly InstructionPlanResult[], autoEnabled = true) {
   const row: InstructionRow = {
     id: randomUUID(),
     tenant_id: tenantId,
@@ -393,6 +393,7 @@ function world(plans: readonly InstructionPlanResult[]) {
       return Promise.resolve({ qActionId: randomUUID() });
     },
     now: () => IN_HOURS,
+    autoEnabled,
   });
   return { engine, row, steps, asked, planned };
 }
@@ -469,5 +470,26 @@ describe("a firing", () => {
     expect([...steps.values()][0]?.words).toContain(
       "isn't among the people this instruction covers",
     );
+  });
+
+  it("with autonomy off (CQ_INSTRUCTIONS_AUTO), every AUTO step is a card instead", async () => {
+    ran.length = 0;
+    const { engine, row, steps, asked } = world(
+      [{ steps: [chat("Hello from Ada's Q.")], cannot: [] }],
+      false,
+    );
+    const result = await engine.fire(row.id, "run-0003");
+    expect(result).toMatchObject({ done: 0, asked: 1 });
+    expect(ran).toHaveLength(0);
+    expect(asked).toEqual([
+      {
+        actionType: "app.chat.message.send",
+        key: `instr:${row.id}:run-0003:0`,
+      },
+    ]);
+    expect([...steps.values()][0]).toMatchObject({
+      status: "ASKED",
+      reasonCode: "AUTONOMY_OFF",
+    });
   });
 });

@@ -73,6 +73,13 @@ describe("the q.instruction.grant card", () => {
     );
     expect(card).toContain("Budget: $5.00 a month");
     expect(card).toContain("Until: 30 days from now");
+    // Autonomy off (the default): their AUTO choices shown, and the line.
+    expect(card).toContain(
+      "Q will ask for each step until autonomy is switched on.",
+    );
+    expect(grantCard(payload(), { autoEnabled: true })).not.toContain(
+      "until autonomy is switched on",
+    );
   });
 
   it("binds to the person who asked, as its target", () => {
