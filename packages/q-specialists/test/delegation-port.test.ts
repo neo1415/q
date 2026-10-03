@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
 
-import { createToolDelegationPort } from "../src/delegation.js";
+import { createToolDelegationPort, delegationLine } from "../src/delegation.js";
 
 /** The delegation port passes only the grant's knobs; the goal is theirs. */
 describe("the delegation port", () => {
@@ -78,5 +78,24 @@ describe("the delegation port", () => {
       more: { workingHours: hours },
     });
     expect(calls[0]?.["workingHours"]).toEqual(hours);
+  });
+});
+
+describe("the delegation reply's wording (lead 2026-10-03)", () => {
+  const prepared = { status: "PREPARED", awaitingApprovalOf: "x" };
+  it("no 'Meanwhile' when nothing came before it", () => {
+    const line = delegationLine(
+      { side: "COMPANY", relationships: 3, outstanding: [] },
+      prepared,
+    );
+    expect(line.startsWith("As a standing instruction")).toBe(true);
+    expect(line).not.toContain("Meanwhile");
+  });
+  it("'Meanwhile' after what was said first", () => {
+    const line = delegationLine(
+      { side: "COMPANY", relationships: 0, outstanding: [] },
+      prepared,
+    );
+    expect(line).toContain(" Meanwhile, as a standing instruction");
   });
 });

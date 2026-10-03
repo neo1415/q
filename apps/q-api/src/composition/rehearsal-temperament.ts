@@ -66,12 +66,17 @@ type Delta = Partial<Record<keyof Temperament, number>>;
  *    REPEATED_DODGE reading is NEUTRAL ("That doesn't answer the
  *    question" came after the founder's opener).
  */
-export type AppliedAppraisal = RehearsalAppraisal | "HONEST_GAP";
+export type AppliedAppraisal =
+  RehearsalAppraisal | "HONEST_GAP" | "DIRECT_ANSWER";
 export function appliedAppraisal(
   appraisal: RehearsalAppraisal,
   questionOpen: boolean,
 ): AppliedAppraisal {
   if (questionOpen && appraisal === "HUMBLE_HONEST") return "HONEST_GAP";
+  // A direct answer to their question, even a thin one, raises no
+  // frustration and gives no cause for a warning (QA rehearsal df5af97b:
+  // the investor got angrier after a numbers-backed answer).
+  if (questionOpen && appraisal === "CLEAR_BUT_THIN") return "DIRECT_ANSWER";
   if (
     !questionOpen &&
     (appraisal === "EVASIVE" || appraisal === "REPEATED_DODGE")
@@ -81,13 +86,34 @@ export function appliedAppraisal(
   return appraisal;
 }
 
-/** Whether the played person's last line put a question to them. */
+/**
+ * Whether the played person's last line put a question to them: by the
+ * move it was stored with (QUESTION or FOLLOW_UP), never by a question
+ * mark -- "Anything else?" closing a remark, or a warning's rhetorical
+ * "Are we done here?", is not a question waiting on them (QA df5af97b:
+ * the founder's closing question was called "not the question I
+ * asked"). Lines stored before moves were kept fall back to the mark.
+ */
 export function questionOpenIn(
-  turns: readonly { readonly from: string; readonly text: string }[],
+  turns: readonly {
+    readonly from: string;
+    readonly text: string;
+    readonly move?: string | undefined;
+  }[],
 ): boolean {
   const lastTheirs = [...turns].reverse().find((turn) => turn.from === "THEM");
-  return lastTheirs !== undefined && lastTheirs.text.includes("?");
+  if (lastTheirs === undefined) return false;
+  if (lastTheirs.move !== undefined) {
+    return lastTheirs.move === "QUESTION" || lastTheirs.move === "FOLLOW_UP";
+  }
+  return lastTheirs.text.includes("?");
 }
+
+/** Readings that answer, and so never heat the delivery. */
+export const ANSWERED: ReadonlySet<AppliedAppraisal> = new Set([
+  "STRONG_ANSWER",
+  "DIRECT_ANSWER",
+]);
 
 /** What the model is told about the question on the table. */
 export function questionNote(questionOpen: boolean): string {
@@ -106,10 +132,17 @@ const PROVOKING: ReadonlySet<AppliedAppraisal> = new Set([
   "HONEST_GAP",
 ]);
 
+/** Whether a reading gives the played person new cause for frustration. */
+export function givesCause(appraisal: AppliedAppraisal): boolean {
+  return PROVOKING.has(appraisal);
+}
+
 /** What each reading of their latest line does to the played person. */
 const EFFECTS: Readonly<Record<AppliedAppraisal, Delta>> = {
   // Candid, but the question is still unanswered.
   HONEST_GAP: { frustration: 10, patience: -10 },
+  // Answered, if briefly: no new cause.
+  DIRECT_ANSWER: { patience: -2 },
   STRONG_ANSWER: { warmth: 12, frustration: -12, patience: 6 },
   CLEAR_BUT_THIN: { frustration: 6, patience: -6 },
   EVASIVE: { frustration: 20, patience: -16, warmth: -6 },
@@ -298,7 +331,18 @@ export function deliveryFor(
   model: Delivery,
   closing = false,
   provoked = false,
+  answered = false,
 ): Delivery {
+  // Answered: whatever is left of their temper, this line is not heated
+  // and not raised (QA df5af97b: a numbers-backed answer was met louder).
+  if (answered && !closing) {
+    const heated = HEATED.has(model.mood) || model.mood === "IMPATIENT";
+    return {
+      mood: heated ? "SKEPTICAL" : model.mood,
+      intensity: model.intensity === "RAISED" ? "NORMAL" : model.intensity,
+      reaction: model.reaction === "CRY" ? null : model.reaction,
+    };
+  }
   // Provoked in anger (an insult, a dodge again), it is heard: angry and
   // raised, never a cold, level line (founder live 2026-10-02).
   if (provoked && (register === "ANGRY" || register === "FURIOUS")) {
@@ -448,6 +492,11 @@ export function walkOutPlan(input: {
   readonly conclusion?: string | null | undefined;
   /** The meeting is at its natural end, where a no is not a walk-out. */
   readonly wrappingUp?: boolean | undefined;
+  /**
+   * Their latest line gave new cause (a provoking reading). Absent: as
+   * before, any line in anger. An answer is never cause for a warning.
+   */
+  readonly newCause?: boolean | undefined;
 }): WalkOut {
   const angry = input.register === "ANGRY" || input.register === "FURIOUS";
   if (input.theyAskedToEnd) return { warning: null, action: "KEEP" };
@@ -463,6 +512,12 @@ export function walkOutPlan(input: {
     return { warning: input.warningsGiven === 0 ? 1 : 2, action: "WARN" };
   }
   if (!angry) return { warning: null, action: "KEEP" };
+  // Still angry from before, but this line gave no new cause (a strong
+  // answer, say): no warning for it (QA df5af97b). A goodbye in anger is
+  // still turned back into a warning until two are given.
+  if (input.newCause === false && !input.closing) {
+    return { warning: null, action: "KEEP" };
+  }
   if (input.warningsGiven < 2) {
     return {
       warning: input.warningsGiven === 0 ? 1 : 2,

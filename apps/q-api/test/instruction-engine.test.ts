@@ -177,6 +177,7 @@ function validate(
     grant?: InstructionGrant;
     now?: Date;
     sent?: Map<string, number>;
+    request?: "PREPARE" | "EXECUTE";
   } = {},
 ) {
   return validateStep(step, {
@@ -186,6 +187,7 @@ function validate(
     sent: options.sent ?? new Map<string, number>(),
     now: options.now ?? IN_HOURS,
     stepKey: "instr:test:run:0",
+    ...(options.request === undefined ? {} : { request: options.request }),
   });
 }
 
@@ -245,6 +247,15 @@ describe("the validator: code decides each step", () => {
     ["a topic they did not approve", { topic: "valuation" }, "ASK:OFF_TOPIC"],
   ] as const)("%s", (_label, overrides, expected) => {
     expect(verdictOf(validate(chat("Hi", overrides)))).toBe(expected);
+  });
+
+  it("a goal read as PREPARE asks for an AUTO-granted step (weekend test 6ea17898)", () => {
+    expect(verdictOf(validate(chat("Hello."), { request: "PREPARE" }))).toBe(
+      "ASK:ASKED_TO_PREPARE",
+    );
+    expect(verdictOf(validate(chat("Hello."), { request: "EXECUTE" }))).toBe(
+      "AUTO",
+    );
   });
 
   it("refuses someone the instruction does not cover", () => {
@@ -426,7 +437,9 @@ const PEOPLE_OVERRIDE: { value: readonly InstructionPerson[] | null } = {
 };
 
 function world(
-  plans: readonly InstructionPlanResult[],
+  plans: readonly (InstructionPlanResult & {
+    readonly request?: "PREPARE" | "EXECUTE";
+  })[],
   autoEnabled = true,
   at = IN_HOURS,
   spent = "0",
@@ -500,8 +513,11 @@ function world(
     plan: (_who, variables, limits) => {
       expect(limits.maxCostUsd).toBeGreaterThanOrEqual(0.08);
       planned.push(variables.refusals);
-      const plan = plans[Math.min(call, plans.length - 1)] ?? null;
+      const next = plans[Math.min(call, plans.length - 1)];
       call += 1;
+      // Handed over unless a case says otherwise.
+      const plan =
+        next === undefined ? null : { request: "EXECUTE" as const, ...next };
       return Promise.resolve({ plan, costUsd: 0.01 });
     },
     ask: (_actor, card) => {
@@ -695,7 +711,10 @@ describe("a firing", () => {
       people: () => Promise.resolve(PEOPLE),
       plan: (_who, variables) => {
         seen.push(variables.people);
-        return Promise.resolve({ plan: { steps: [], cannot: [] }, costUsd: 0 });
+        return Promise.resolve({
+          plan: { steps: [], cannot: [], request: "EXECUTE" as const },
+          costUsd: 0,
+        });
       },
       readThread: (input) => {
         reads.push(input.relationshipId);
@@ -815,6 +834,24 @@ describe("a firing", () => {
         words:
           "Looked at 2 people: nothing to do right now. I'll look again later.",
       }),
+    ]);
+  });
+});
+
+describe("a goal to prepare (weekend test 6ea17898)", () => {
+  it("an AUTO-granted step of a PREPARE plan is asked, never taken", async () => {
+    ran.length = 0;
+    const { engine, row, asked } = world([
+      { steps: [chat("Hello from Ada's Q.")], cannot: [], request: "PREPARE" },
+    ]);
+    const result = await engine.fire(row.id, "run-0002");
+    expect(result).toMatchObject({ outcome: "RAN", done: 0, asked: 1 });
+    expect(ran).toEqual([]);
+    expect(asked).toEqual([
+      {
+        actionType: "app.chat.message.send",
+        key: `instr:${row.id}:run-0002:0`,
+      },
     ]);
   });
 });

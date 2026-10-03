@@ -30,7 +30,10 @@ describe("the instruction planner", () => {
         requests.push(request);
         return Promise.resolve({
           cost: { currency: "USD", amount: 0.012, basis: "ESTIMATED" },
-          output: { kind: "STRUCTURED", value: { steps: [], cannot: [] } },
+          output: {
+            kind: "STRUCTURED",
+            value: { steps: [], cannot: [], request: "EXECUTE" },
+          },
         });
       },
     } as unknown as ModelGateway;
@@ -42,7 +45,7 @@ describe("the instruction planner", () => {
       { maxCostUsd: 0.05 },
     );
     expect(outcome).toEqual({
-      plan: { steps: [], cannot: [] },
+      plan: { steps: [], cannot: [], request: "EXECUTE" },
       costUsd: 0.012,
     });
     expect(requests[0]?.budget.maxEstimatedCostUsd).toBe(0.05);

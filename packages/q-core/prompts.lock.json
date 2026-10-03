@@ -141,7 +141,8 @@
     "work-interview-turn/v1": "7366247a58e5db9f03d2d5c0e68c8b3e538fdfcc894ea19a9c0bc9337ab8d60b",
     "work-shortlist/v1": "901f1389ffedbd8c702574097b87e51f926cc594305d8d43c8b3b4c65c2d10e3",
     "work-slot-reader/v1": "9cc7753d25abaeab63e9a2082567b701e9d370fdcf1583447030b6453f14b3fc",
-    "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0"
+    "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0",
+    "instruction-plan/v2": "2eae76abbb099b3976904147cdc92515c001768a139d43d5d3b4d9afbeb95413"
   },
   "generatedBy": "CQ-Q-006"
 }

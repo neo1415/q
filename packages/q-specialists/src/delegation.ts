@@ -88,10 +88,13 @@ export function delegationLine(
   // The engine's own line says the card is ready and waiting (QA
   // 2026-10-03, runs f8bc8e8d, c2fa5052: "I've prepared..." and "That's
   // ready..." in one reply); this line says only what the card means.
+  // "Meanwhile" only after something was said before it (lead
+  // 2026-10-03: the reply opened "Meanwhile, as a standing instruction…").
+  const preceded = truth.length > 0 || terms !== null;
   const card =
     prepared.status === "PREPARED"
       ? context.side === "COMPANY"
-        ? "Meanwhile, as a standing instruction I'd find investors who match and engage them for you, asking you first before anything goes out. The card shows what I'd do on my own, what I'd ask first and what never happens without you."
+        ? `${preceded ? "Meanwhile, as" : "As"} a standing instruction I'd find investors who match and engage them for you, asking you first before anything goes out. The card shows what I'd do on my own, what I'd ask first and what never happens without you.`
         : "As a standing instruction, the card shows exactly what I'd do on my own, what I'd ask first and what never happens without you."
       : prepared.status === "ONE_PER_TURN"
         ? "Another change is already waiting for your approval in this answer; approve or decline it first, then I'll set this up."
@@ -207,6 +210,7 @@ export function createToolDelegationPort(dependencies: {
       // their words, and an unreadable extra is dropped, not guessed.
       const known = [
         "askFirst",
+        "handsOverDoing",
         "tone",
         "topics",
         "relationshipIds",
