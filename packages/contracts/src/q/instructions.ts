@@ -84,6 +84,11 @@ export const InstructionGrantSchema = z
       .object({
         scope: z.enum(["ALL_MY_RELATIONSHIPS", "LISTED"]),
         relationshipIds: z.array(UuidSchema).max(50).default([]),
+        /**
+         * Also companies from their own feed and saved list they are not yet
+         * in touch with ("monitor new founders"). Never ones they passed.
+         */
+        includeNewCompanies: z.boolean().default(false),
       })
       .strict(),
     workingHours: InstructionWorkingHoursSchema,
@@ -116,6 +121,8 @@ export const InstructionGrantPayloadSchema = z
     instructionId: UuidSchema.optional(),
     goal: z.string().min(1).max(2_000),
     grant: InstructionGrantSchema,
+    /** Why Q asks: the month's budget is used and it asks to continue. */
+    continuation: z.enum(["BUDGET"]).optional(),
   })
   .strict();
 export type InstructionGrantPayload = z.infer<
@@ -132,6 +139,7 @@ export function handleEverythingGrant(input: {
   readonly timeZone: string;
   readonly tone?: string | undefined;
   readonly topics?: readonly string[] | undefined;
+  readonly includeNewCompanies?: boolean | undefined;
 }): InstructionGrant {
   return InstructionGrantSchema.parse({
     actions: [
@@ -145,7 +153,11 @@ export function handleEverythingGrant(input: {
       { action: "schedule.reminder.create", mode: "ASK" },
       { action: "diligence.change", mode: "ASK" },
     ],
-    counterparts: { scope: "ALL_MY_RELATIONSHIPS", relationshipIds: [] },
+    counterparts: {
+      scope: "ALL_MY_RELATIONSHIPS",
+      relationshipIds: [],
+      includeNewCompanies: input.includeNewCompanies ?? false,
+    },
     workingHours: {
       timeZone: input.timeZone,
       days: [1, 2, 3, 4, 5],

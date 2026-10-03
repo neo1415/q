@@ -106,6 +106,10 @@ describe("RelationshipChat", () => {
       />,
     );
     expect(screen.getByText("Deck is attached")).toBeTruthy();
+    // A long unbroken word wraps inside its bubble (break-it 2026-10-03).
+    expect(screen.getByText("Deck is attached").className).toContain(
+      "wrap-anywhere",
+    );
     fireEvent.change(screen.getByLabelText("Message Apex"), {
       target: { value: "Thanks" },
     });

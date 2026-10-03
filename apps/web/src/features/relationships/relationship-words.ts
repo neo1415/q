@@ -145,3 +145,19 @@ export function relationshipsNeedingYou(
       item.nextStep === "FOLLOW_UP",
   );
 }
+
+/**
+ * What a relationship page says when there is no relationship to show:
+ * a failure to load only when the read failed; otherwise that nothing is
+ * on record yet (founder or investor side, from "your company" or "your
+ * organisation").
+ */
+export function absentSentence(
+  loaded: boolean,
+  own: "company" | "organisation",
+  counterpart: string,
+): string {
+  return loaded
+    ? `Nothing is on record yet between your ${own} and ${counterpart}.`
+    : "Where you stand couldn't load just now. Nothing has changed; try again in a moment.";
+}

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 
 import type {
   DiscoveredCompanyDto,
@@ -99,6 +106,12 @@ export type InvestorFeed = {
   readonly pass: (companyId: string) => void;
   readonly decisionFor: (companyId: string) => FeedDecision;
   readonly isDeciding: (companyId: string) => boolean;
+  /**
+   * Why the last Save, Unsave or Pass did not land, in the server's words
+   * ("You are signed out…"), or null. Break-it sweep 2026-10-03: with an
+   * expired session the optimistic flag went back with no word at all.
+   */
+  readonly decisionNotice: string | null;
 };
 
 export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
@@ -231,6 +244,7 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
     });
   }, [state.slateId, state.restoreTargetCompanyId, activeCompanyId]);
 
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
   const decide = useCallback(
     (companyId: string, intent: FeedDecisionIntent) => {
       dispatch({ type: "DECISION_REQUESTED", companyId, intent });
@@ -242,13 +256,15 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
           clientEventId: newClientEventId(),
         })
         .then((recorded) => {
+          setDecisionNotice(null);
           dispatch({
             type: "DECISION_CONFIRMED",
             companyId,
             state: recorded.state,
           });
         })
-        .catch(() => {
+        .catch((error: unknown) => {
+          setDecisionNotice(decisionFailureWords(error));
           // The optimistic flag goes back to what it was. Showing a card as
           // saved when the save did not land is the one outcome worse than
           // showing the delay.
@@ -297,5 +313,14 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
     pass,
     decisionFor: (companyId: string) => decisionFor(state, companyId),
     isDeciding: (companyId: string) => isDecisionPending(state, companyId),
+    decisionNotice,
   };
+}
+
+/** The words for a decision that did not land: the action's own, or a plain retry. */
+export function decisionFailureWords(error: unknown): string {
+  const message = error instanceof Error ? error.message.trim() : "";
+  return message.length > 0
+    ? `That wasn't saved. ${message}`
+    : "That wasn't saved. Try again in a moment.";
 }

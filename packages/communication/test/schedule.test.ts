@@ -354,6 +354,23 @@ describe("schedule, reschedule, cancel", () => {
 });
 
 describe("reminders and briefs", () => {
+  it("refuses a reminder for a time already gone", async () => {
+    const w = world();
+    const past = await w.service.createReminder({
+      actor: FOUNDER,
+      title: "Follow up",
+      dueAt: new Date("2025-01-01T09:00:00Z"),
+      relationshipId: REL,
+      channel: "IN_APP",
+      idempotencyKey: "q-action:past-reminder",
+    });
+    expect(past).toMatchObject({ outcome: "REFUSED", code: "INVALID_TIME" });
+    expect(await w.service.deliverDue("cor")).toEqual({
+      delivered: 0,
+      emailed: 0,
+    });
+  });
+
   it("delivers a due reminder in-app once and by email once", async () => {
     const w = world();
     const created = await w.service.createReminder({

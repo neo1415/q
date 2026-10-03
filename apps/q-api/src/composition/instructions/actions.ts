@@ -55,7 +55,10 @@ function hours(grant: InstructionGrant): string {
   return `${dayText} ${grant.workingHours.start}-${grant.workingHours.end} (${grant.workingHours.timeZone})`;
 }
 
-export function grantCard(payload: InstructionGrantPayload): string {
+export function grantCard(
+  payload: InstructionGrantPayload,
+  options: { readonly autoEnabled?: boolean | undefined } = {},
+): string {
   const grant = payload.grant;
   const auto = grant.actions.filter((entry) => entry.mode === "AUTO");
   const ask = grant.actions.filter((entry) => entry.mode === "ASK");
@@ -72,6 +75,9 @@ export function grantCard(payload: InstructionGrantPayload): string {
         .join("\n")}`,
     );
   }
+  if (auto.length > 0 && options.autoEnabled !== true) {
+    lines.push("Q will ask for each step until autonomy is switched on.");
+  }
   if (ask.length > 0) {
     lines.push(
       `I ask you first:\n${ask.map((entry) => `- ${said(entry.action)}`).join("\n")}`,
@@ -82,7 +88,9 @@ export function grantCard(payload: InstructionGrantPayload): string {
   );
   lines.push(
     grant.counterparts.scope === "ALL_MY_RELATIONSHIPS"
-      ? "Who: everyone you're already in touch with."
+      ? grant.counterparts.includeNewCompanies
+        ? "Who: everyone you're already in touch with, and new companies from your feed and saved list (never ones you passed)."
+        : "Who: everyone you're already in touch with."
       : `Who: ${String(grant.counterparts.relationshipIds.length)} relationships you chose.`,
   );
   lines.push(
@@ -106,6 +114,14 @@ export function grantIsSettled(grant: InstructionGrant): boolean {
 
 export function createInstructionActions(dependencies: {
   readonly store: InstructionStore;
+  /**
+   * Called once an approved grant is current: the first firing, so what Q
+   * does -- and what it can't -- is said at once. Never awaited here.
+   */
+  readonly onActivated?:
+    ((instructionId: string, version: number) => void) | undefined;
+  /** CQ_INSTRUCTIONS_AUTO: the card says when Q still asks for each step. */
+  readonly autoEnabled?: boolean | undefined;
   readonly logger?: Logger | undefined;
 }): readonly AnyQActionDefinition[] {
   const { store, logger } = dependencies;
@@ -123,10 +139,14 @@ export function createInstructionActions(dependencies: {
       ],
       describe: (payload) => ({
         summary:
-          payload.instructionId === undefined
-            ? "Q works on this for you, inside these limits"
-            : "Change what Q may do for this instruction",
-        preview: grantCard(payload),
+          payload.continuation === "BUDGET"
+            ? `I've used this month's budget for this. Continue at $${payload.grant.budgetUsdMonth} a month?`
+            : payload.instructionId === undefined
+              ? "Q works on this for you, inside these limits"
+              : "Change what Q may do for this instruction",
+        preview: grantCard(payload, {
+          autoEnabled: dependencies.autoEnabled,
+        }),
       }),
       confirm: () =>
         "On it. I'll tell you what I do, and ask before anything outside this.",
@@ -172,6 +192,10 @@ export function createInstructionActions(dependencies: {
                 retryable: false,
               };
             }
+            dependencies.onActivated?.(
+              activated.instructionId,
+              activated.version,
+            );
             return { outcome: "EXECUTED", result: activated };
           } catch (error: unknown) {
             logger?.warn(

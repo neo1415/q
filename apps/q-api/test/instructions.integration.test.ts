@@ -32,6 +32,20 @@ const MIGRATION = fileURLToPath(
   ),
 );
 
+const CONVERSATION_MIGRATION = fileURLToPath(
+  new URL(
+    "../../../supabase/migrations/20261122090000_instruction_conversation.sql",
+    import.meta.url,
+  ),
+);
+
+const TRIGGERS_MIGRATION = fileURLToPath(
+  new URL(
+    "../../../supabase/migrations/20261123090000_instruction_triggers.sql",
+    import.meta.url,
+  ),
+);
+
 class Rollback extends Error {}
 
 describe("standing instructions against PostgreSQL", () => {
@@ -59,6 +73,16 @@ describe("standing instructions against PostgreSQL", () => {
         const [present] = await tx<{ found: string | null }[]>`
           select to_regclass('q_runtime.standing_instructions')::text as found`;
         if (present?.found === null) await tx.file(MIGRATION);
+        const [column] = await tx<{ found: number }[]>`
+          select count(*)::int as found from information_schema.columns
+           where table_schema = 'q_runtime' and table_name = 'standing_instructions'
+             and column_name = 'conversation_id'`;
+        if (column?.found === 0) await tx.file(CONVERSATION_MIGRATION);
+        const [cadence] = await tx<{ found: number }[]>`
+          select count(*)::int as found from information_schema.columns
+           where table_schema = 'q_runtime' and table_name = 'standing_instructions'
+             and column_name = 'next_fire_at'`;
+        if (cadence?.found === 0) await tx.file(TRIGGERS_MIGRATION);
 
         const tenant = randomUUID();
         await tx`insert into identity.tenants (id, name) values (${tenant}, 'Instruction tenant')`;
@@ -137,9 +161,92 @@ describe("standing instructions against PostgreSQL", () => {
           ),
         ).rejects.toThrow(/append-only/u);
 
+        // S4: due at once after approval; a claim moves it a cadence on.
+        // Other ACTIVE rows in this database are pushed out of the way first.
+        await tx`update q_runtime.standing_instructions
+                    set next_fire_at = now() + interval '1 day'
+                  where status = 'ACTIVE' and id <> ${id}`;
+        const claimed = await store.claimDue(10);
+        expect(claimed.map((claim) => claim.id)).toEqual([id]);
+        expect(await store.claimDue(10)).toEqual([]);
+        await store.defer(id, 30);
+        expect(await store.claimDue(10)).toEqual([]);
+        const touched = randomUUID();
+        expect(await store.wakeFor(touched)).toBe(0);
+        const live = await store.instruction(id);
+        if (live === null) throw new Error("no instruction");
+        await store.recordStep({
+          instruction: live,
+          runKey: "run-wake-01",
+          stepIndex: 0,
+          action: "chat.message.send",
+          mode: "ASK",
+          status: "ASKED",
+          relationshipId: touched,
+          words: "Asked to say hello.",
+          reasonCode: null,
+          qActionId: null,
+          idempotencyKey: `instr:${id}:run-wake-01:0`,
+        });
+        expect(await store.wakeFor(touched)).toBe(1);
+        expect((await store.claimDue(10)).map((claim) => claim.id)).toEqual([
+          id,
+        ]);
+
+        // S5: spend adds up; a new month starts at zero; pause is once.
+        await store.addSpend(id, 0.012345);
+        await store.addSpend(id, 0.01);
+        expect((await store.own(owner, id))?.spent_this_month).toBe("0.022345");
+        await tx`update q_runtime.standing_instructions
+                    set budget_month = date '2026-01-01' where id = ${id}`;
+        expect((await store.own(owner, id))?.spent_this_month).toBe("0");
+        await store.addSpend(id, 0.5);
+        expect((await store.own(owner, id))?.spent_this_month).toBe("0.500000");
+        expect(await store.pause(id, "BUDGET_EXHAUSTED")).toBe(true);
+        expect(await store.pause(id, "BUDGET_EXHAUSTED")).toBe(false);
+        expect(await store.claimDue(10)).toEqual([]);
+        // A yes on the continuation card: the next version, ACTIVE again.
+        const resumed = await store.activate({
+          owner,
+          qActionId: randomUUID(),
+          instructionId: id,
+          goal: "Handle all the work for me",
+          grant: { ...grant, budgetUsdMonth: "10.00" },
+        });
+        expect(resumed?.version).toBe(3);
+        expect((await store.own(owner, id))?.status).toBe("ACTIVE");
+
         expect(await store.stop(owner, id)).toBe(true);
         expect((await store.own(owner, id))?.status).toBe("STOPPED");
         expect(await store.stop(owner, id)).toBe(false);
+
+        // Steps: once per key, counted per person for the message cap.
+        const instruction = await store.instruction(id);
+        if (instruction === null) throw new Error("no instruction");
+        const relationship = randomUUID();
+        const step = {
+          instruction,
+          runKey: "run-0001",
+          stepIndex: 0,
+          action: "chat.message.send",
+          mode: "AUTO" as const,
+          status: "DONE" as const,
+          relationshipId: relationship,
+          words: "Said hello.",
+          reasonCode: null,
+          qActionId: null,
+          idempotencyKey: `instr:${id}:run-0001:0`,
+        };
+        expect(await store.recordStep(step)).toBe(true);
+        expect(await store.recordStep(step)).toBe(false);
+        expect(await store.stepDone(step.idempotencyKey)).toBe(true);
+        expect((await store.messagesSent(id)).get(relationship)).toBe(1);
+        expect(await store.history(id)).toHaveLength(2);
+        expect(await store.steps(ben$, id)).toHaveLength(0);
+        // Stopped: no wake, no claim, even with a step on the relationship.
+        expect(await store.wakeFor(relationship)).toBe(0);
+        await store.setConversation(id, randomUUID());
+        expect((await store.own(owner, id))?.conversation_id).not.toBeNull();
         throw new Rollback();
       }),
     ).rejects.toBeInstanceOf(Rollback);

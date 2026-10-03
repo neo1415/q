@@ -37,14 +37,23 @@ function localZone(): string | undefined {
   }
 }
 
-function when(iso: string): string {
+/**
+ * A meeting or reminder time in the reader's zone, in en-GB like the rest
+ * of the app; the year is named when it is not this year (break-it sweep
+ * 2026-10-03: "Wed, 1 Jan" for 2025).
+ */
+export function when(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
   return new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
+    ...(date.getFullYear() === now.getFullYear()
+      ? {}
+      : { year: "numeric" as const }),
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(iso));
+  }).format(date);
 }
 
 /** A local "YYYY-MM-DDTHH:mm" for the datetime input. */

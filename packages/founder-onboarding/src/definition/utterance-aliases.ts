@@ -178,7 +178,17 @@ export const FOUNDER_UTTERANCE_ALIASES: OnboardingUtteranceAliases = {
       "immediately",
       "soon",
     ],
-    "3_6": ["3 to 6 months", "in six months", "next two quarters"],
+    // "next six months" was read as 6–12 (break-it sweep 2026-10-03):
+    // within six months is the 3–6 option.
+    "3_6": [
+      "3 to 6 months",
+      "in six months",
+      "next two quarters",
+      "next six months",
+      "next 6 months",
+      "within six months",
+      "within 6 months",
+    ],
     "6_12": ["6 to 12 months", "within a year", "next year", "later this year"],
     unsure: ["not sure", "unsure", "no timeline"],
   },

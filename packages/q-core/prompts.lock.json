@@ -37,6 +37,8 @@
     "founder-onboarding-extraction/v2": "d32307876b2b71bca7193fecc1d1e6c8c5fcb4235609921d9f50ee4678bc4b5a",
     "founder-research-reader/v1": "44b4530961c690fc5582a5ef28ca5a4ac9fa23483b5b56a6ef460e6a6c63e214",
     "gateq-interviewer/v1": "d337ca2fd1a07d10aed2a1c35a990890c2680b4973b211ccd07c5afc709b3aeb",
+    "instruction-plan/v1": "e12faceddcd26911380fb62b09e78e15255fb60f249f8f42e6d03d239c64f83b",
+    "instruction-thread-reader/v1": "ee011b9cfb2377aec51dc183239e9c13deaf1d049679c70085fcde0270e9f99d",
     "interview-agent/v1": "024c9a967f0e25f3cba3b3adf40a3e7af0b96e03bbf43c471764ee735b1be7ef",
     "interview-agent/v10": "2e2ee0a5119081478f7683d5ec959495429c0310ff9447f9f898aa9ee8fc4730",
     "interview-agent/v11": "99b555cdd1928f7d78d62806b24288c0565752a6de50862fc0d16e9cc05144af",

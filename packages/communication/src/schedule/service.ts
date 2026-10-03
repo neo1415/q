@@ -343,6 +343,9 @@ const MEET_LINK_ASK_AFTER_MS = 10 * 60_000;
 /** How long after due an email reminder is still worth retrying. */
 const EMAIL_RETRY_WINDOW_MS = 60 * 60_000;
 
+/** How far in the past a reminder may still be set (a form left open). */
+const REMINDER_PAST_GRACE_MS = 5 * 60_000;
+
 function refusal(code: ScheduleRefusal) {
   return { outcome: "REFUSED" as const, code };
 }
@@ -969,6 +972,12 @@ export function createScheduleService(
     createReminder: async (input) => {
       const { actor } = input;
       if (actor.actorType !== "HUMAN") return refusal("NOT_A_PARTY");
+      // A reminder for a time already gone fired at once, by email too
+      // (break-it sweep 2026-10-03: 1 Jan 2025 was "Reminder set." and
+      // delivered). A few minutes' grace for a form left open.
+      if (input.dueAt.getTime() < now().getTime() - REMINDER_PAST_GRACE_MS) {
+        return refusal("INVALID_TIME");
+      }
       if (
         input.relationshipId !== undefined &&
         (await partyOf(actor, input.relationshipId)) === null

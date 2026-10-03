@@ -99,6 +99,18 @@ import {
 import { createWorkComposers } from "./composition/work/composers.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
+import {
+  createInstructionActor,
+  createInstructionAsk,
+} from "./composition/instructions/ask.js";
+import {
+  createInstructionEngine,
+  instructionPeople,
+  type InstructionEngine,
+} from "./composition/instructions/engine.js";
+import { createInstructionTriggers } from "./composition/instructions/triggers.js";
+import { createInstructionPlanner } from "./composition/instructions/planner.js";
+import { createQuarantinedThreadReader } from "./composition/instructions/quarantine.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -333,7 +345,11 @@ import {
   createAppActionBoard,
   createAppActionDefinitions,
 } from "./composition/app-actions.js";
-import { ownIndex, type OwnReadPorts } from "@capital-q/app-actions";
+import {
+  APP_ACTIONS,
+  ownIndex,
+  type OwnReadPorts,
+} from "@capital-q/app-actions";
 import {
   createEvidenceDocumentsPort,
   createOwnRecordsPort,
@@ -1383,6 +1399,28 @@ const workOwnCompany = (actor: ActorContext): Promise<string | null> =>
   runtimeDependencies.ownCompany(actor).catch(() => null);
 // ADR 0043: standing instructions, listed and stopped with the rest of work.
 const instructionStore = createPostgresInstructionStore(database.sql);
+// Composed once the runtime, the Approval Engine and the planner exist.
+const instructionEngine: { current?: InstructionEngine } = {};
+// S4: cadence, approval and relationship events fire it (claimed in the DB).
+const instructionTriggers = createInstructionTriggers({
+  store: instructionStore,
+  engine: () => instructionEngine.current,
+  logger,
+});
+setInterval(() => {
+  void instructionTriggers.sweep().catch((error: unknown) => {
+    logger.warn({ err: error }, "standing instruction sweep failed");
+  });
+}, 120_000).unref();
+// Lead 2026-10-03: Q acts alone only once budget (S5) and quarantine (S6)
+// are live. Off by default: every AUTO step is asked.
+const instructionsAuto = process.env.CQ_INSTRUCTIONS_AUTO === "on";
+logger.info(
+  { instructionsAuto },
+  instructionsAuto
+    ? "standing instructions: autonomy on"
+    : "standing instructions: autonomy off, every step is asked",
+);
 const workPort = createWorkPort({
   instructions: instructionStore,
   // Errands are composed further down; read only when a tool asks.
@@ -2180,9 +2218,19 @@ const qActionRegistry = createQActionRegistry([
     meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // ADR 0043: a standing instruction's grant, one approval per version.
-  ...createInstructionActions({ store: instructionStore, logger }).map(
-    (definition) =>
-      meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
+  ...createInstructionActions({
+    store: instructionStore,
+    autoEnabled: instructionsAuto,
+    // The first firing, at once (composed further down).
+    onActivated: (instructionId) => {
+      // Due at once (next_fire_at is null): the sweep claims and fires it.
+      void instructionTriggers.sweep().catch((error: unknown) => {
+        logger.warn({ err: error, instructionId }, "instruction not fired");
+      });
+    },
+    logger,
+  }).map((definition) =>
+    meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // end BILLING block
 ]);
@@ -3142,6 +3190,49 @@ const workRuntime = createWorkRuntime({
     ),
   logger,
 });
+// ADR 0043: the standing-instruction engine. Q plans through the gateway;
+// code validates every step against the approved grant; AUTO steps run the
+// declared command as the person, ASK steps become their cards.
+instructionEngine.current = createInstructionEngine({
+  store: instructionStore,
+  autoEnabled: instructionsAuto,
+  actions: APP_ACTIONS,
+  ports: appActionPorts,
+  actorFor: createInstructionActor({
+    resolver: actorContextResolver,
+    authUserOf: async (userId) =>
+      (
+        await database.sql<{ auth_user_id: string | null }[]>`
+          select auth_user_id from identity.user_profiles where id = ${userId}`
+      )[0]?.auth_user_id ?? null,
+  }),
+  people: (actor) =>
+    instructionPeople(actor, {
+      relationships: async (who) =>
+        (await errandRelationships.ownRelationships?.(who)) ?? null,
+      feed: async (who) => (await workFeed.page(who, 15))?.items ?? [],
+      decisions: (who) => workFeed.decisions(who, 30),
+    }),
+  plan: createInstructionPlanner({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  readThread: createQuarantinedThreadReader({
+    gateway: modelGateway,
+    chat,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  ask: createInstructionAsk({
+    runtime: qRuntime,
+    orchestration: orchestrationRuntime,
+    actions: qActions,
+    store: instructionStore,
+  }),
+  logger,
+});
+
 setInterval(() => {
   workRuntime.tick().catch((error: unknown) => {
     logger.warn({ err: error }, "q work run failed");
@@ -3157,6 +3248,10 @@ void createWorkWakeListener({
     void workRuntime.tick().catch(() => undefined);
   },
   targets: [
+    {
+      name: "instructions",
+      wake: (relationshipId) => instructionTriggers.wake(relationshipId),
+    },
     {
       name: "errands",
       wake: async (relationshipId) =>

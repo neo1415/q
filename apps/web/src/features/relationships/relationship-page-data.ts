@@ -26,6 +26,8 @@ import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { investorTypeLabel } from "@/features/investors/investor-labels";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 
+import { absentSentence } from "./relationship-words";
+
 /**
  * What a relationship's pages (overview and conversation) read, once, as
  * the person (founder design 2026-09-28). Each side reads only through its
@@ -185,10 +187,11 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
         (chip): chip is string => chip !== null,
       ),
     },
-    absentSentence:
-      status === null
-        ? "Where you stand couldn't load just now. Nothing has changed; try again in a moment."
-        : `Nothing is on record yet between your organisation and ${company.canonicalName}.`,
+    absentSentence: absentSentence(
+      status !== null,
+      "organisation",
+      company.canonicalName,
+    ),
   };
 }
 
@@ -263,7 +266,9 @@ export async function loadCompanySideRelationship(
             chips: [investorTypeLabel(investor.investorType)],
             profileHref: `/investors/${investorOrganisationId}`,
           },
-    absentSentence:
-      "Where you stand couldn't load just now. Nothing has changed; try again in a moment.",
+    // Loaded with nothing on record is not a failure (break-it sweep
+    // 2026-10-03: a founder opening an investor they had never met read
+    // "couldn't load just now").
+    absentSentence: absentSentence(status !== null, "company", counterpart),
   };
 }
