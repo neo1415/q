@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import type { NotificationDto } from "@capital-q/contracts";
-import { IconButton } from "@capital-q/ui/button";
+import { buttonClassName, IconButton } from "@capital-q/ui/button";
 import { Bell, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
 import { EmptyState, ErrorState, Skeleton } from "@capital-q/ui/states";
 
+import { groupNotices, type NoticeGroup } from "./notice-groups";
 import { PushSetting } from "./push-setting";
 import { listNoticesAction, markReadAction } from "./work-actions";
 
@@ -33,16 +34,22 @@ function when(iso: string): string {
 }
 
 function NoticeRow({
-  notice,
+  group,
   onOpen,
+  needsYou = false,
 }: {
-  readonly notice: NotificationDto;
+  readonly group: NoticeGroup;
   readonly onOpen: () => void;
+  readonly needsYou?: boolean;
 }) {
+  const { notice, count, unread } = group;
+  const linked = notice.linkPath !== null && /^\/(?!\/)/.test(notice.linkPath);
   const body = (
-    <span className="flex flex-col gap-0.5">
-      <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-        {notice.read ? null : <span className="sr-only">New: </span>}
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span
+        className={`cq-body-sm text-(--cq-text-primary) ${unread ? "font-medium" : ""}`}
+      >
+        {unread ? <span className="sr-only">New: </span> : null}
         {notice.title}
       </span>
       {notice.body === null ? null : (
@@ -50,34 +57,48 @@ function NoticeRow({
           {notice.body}
         </span>
       )}
-      <time
-        dateTime={notice.createdAt}
-        className="cq-caption cq-numeric text-(--cq-text-tertiary)"
-        suppressHydrationWarning
-      >
-        {when(notice.createdAt)}
-      </time>
+      <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+        <time dateTime={notice.createdAt} suppressHydrationWarning>
+          {when(notice.createdAt)}
+        </time>
+        {count > 1 ? ` · latest of ${String(count)} like this` : null}
+      </span>
     </span>
   );
   return (
     <li
-      className="flex gap-3 border-b border-(--cq-border-subtle) py-3 last:border-b-0"
+      className="border-b border-(--cq-border-subtle) last:border-b-0"
       data-notice={notice.kind}
+      data-notice-count={count}
     >
-      <span
-        aria-hidden="true"
-        className={`mt-2 size-1.5 shrink-0 rounded-full ${notice.read ? "bg-transparent" : "bg-(--cq-accent)"}`}
-      />
-      {notice.linkPath === null || !/^\/(?!\/)/.test(notice.linkPath) ? (
-        body
-      ) : (
+      {linked ? (
         <Link
-          href={notice.linkPath}
+          href={notice.linkPath ?? "/"}
           onClick={onOpen}
-          className="min-h-11 flex-1 rounded-sm focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="flex min-h-11 items-start gap-3 rounded-sm py-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
+          <span
+            aria-hidden="true"
+            className={`mt-2 size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
+          />
           {body}
+          {needsYou ? (
+            <span
+              aria-hidden="true"
+              className={buttonClassName("secondary", "compact")}
+            >
+              Open
+            </span>
+          ) : null}
         </Link>
+      ) : (
+        <div className="flex items-start gap-3 py-3">
+          <span
+            aria-hidden="true"
+            className={`mt-2 size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
+          />
+          {body}
+        </div>
       )}
     </li>
   );
@@ -127,10 +148,7 @@ export function NotificationCenter() {
     });
   }, [open, items]);
 
-  const needsYou = (items ?? []).filter(
-    (item) => item.priority === "NEEDS_YOU",
-  );
-  const updates = (items ?? []).filter((item) => item.priority !== "NEEDS_YOU");
+  const { needsYou, days } = groupNotices(items ?? []);
   const close = () => setOpen(false);
 
   return (
@@ -168,7 +186,7 @@ export function NotificationCenter() {
           ) : failed && items === null ? (
             <ErrorState
               title="Notifications couldn't load"
-              description="Try again in a moment."
+              description="Anything that needs you is also on Q's work and on each relationship."
               action={
                 <button
                   type="button"
@@ -182,8 +200,8 @@ export function NotificationCenter() {
             />
           ) : (items ?? []).length === 0 ? (
             <EmptyState
-              title="Nothing yet"
-              description="When Q does something for you or needs your word, it shows here."
+              title="You're up to date"
+              description="What needs your answer comes first here; updates follow by day. Q never sends a notification just to bring you back."
               compact
             />
           ) : (
@@ -192,40 +210,38 @@ export function NotificationCenter() {
                 <section aria-labelledby="notices-needs-you">
                   <h3
                     id="notices-needs-you"
-                    className="cq-label text-(--cq-text-secondary)"
+                    className="cq-title-sm text-(--cq-text-primary)"
                   >
                     Needs you
                   </h3>
                   <ul>
-                    {needsYou.map((notice) => (
+                    {needsYou.map((group) => (
                       <NoticeRow
-                        key={notice.id}
-                        notice={notice}
+                        key={group.key}
+                        group={group}
                         onOpen={close}
+                        needsYou
                       />
                     ))}
                   </ul>
                 </section>
               )}
-              {updates.length === 0 ? null : (
-                <section aria-labelledby="notices-updates">
-                  <h3
-                    id="notices-updates"
-                    className="cq-label text-(--cq-text-secondary)"
-                  >
-                    Updates
+              {days.map((day) => (
+                <section
+                  key={day.label}
+                  aria-label={`Updates, ${day.label}`}
+                  data-notice-day={day.label}
+                >
+                  <h3 className="cq-label text-(--cq-text-secondary)">
+                    {day.label}
                   </h3>
                   <ul>
-                    {updates.map((notice) => (
-                      <NoticeRow
-                        key={notice.id}
-                        notice={notice}
-                        onOpen={close}
-                      />
+                    {day.groups.map((group) => (
+                      <NoticeRow key={group.key} group={group} onOpen={close} />
                     ))}
                   </ul>
                 </section>
-              )}
+              ))}
             </>
           )}
           <div className="border-t border-(--cq-border-subtle) pt-4">
