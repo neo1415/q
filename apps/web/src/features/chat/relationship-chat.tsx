@@ -43,6 +43,7 @@ import {
   type ChatSafetyDialog,
 } from "./chat-safety";
 import { useFollowNewest } from "@/features/q/follow-newest";
+import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 
 import { VoiceRecorder } from "./voice-recorder";
 
@@ -149,6 +150,10 @@ export function RelationshipChat({
   const readUpTo = useRef<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLLIElement>(null);
+  // The composer is a control the Q dock must never cover (break-it sweep
+  // 2026-10-03: at 390px the dock sat on Send).
+  const composer = useRef<HTMLFormElement>(null);
+  useDockAvoid(composer, status === "OPEN");
 
   const markRead = useCallback(
     (list: readonly ChatMessageDto[]) => {
@@ -446,11 +451,11 @@ export function RelationshipChat({
         {messages.map((message, index) => (
           <li
             key={message.messageId}
-            className={`group flex max-w-[80%] flex-col gap-0.5 ${message.mine ? "items-end self-end" : "items-start self-start"}`}
+            className={`group flex max-w-[80%] min-w-0 flex-col gap-0.5 ${message.mine ? "items-end self-end" : "items-start self-start"}`}
             data-chat-message={message.mine ? "mine" : "theirs"}
           >
             <div
-              className={`rounded-2xl px-3 py-2 ${
+              className={`max-w-full min-w-0 rounded-2xl px-3 py-2 ${
                 message.mine
                   ? "rounded-br-sm bg-(--cq-accent-soft) text-(--cq-text-primary)"
                   : "rounded-bl-sm bg-(--cq-surface-subtle) text-(--cq-text-primary)"
@@ -505,7 +510,9 @@ export function RelationshipChat({
                     </Button>
                   )}
                   {message.body === null ? null : (
-                    <p className="cq-body whitespace-pre-wrap break-words">
+                    // A long unbroken word or link wraps inside the bubble
+                    // (break-it sweep 2026-10-03: it ran off the left edge).
+                    <p className="cq-body whitespace-pre-wrap wrap-anywhere">
                       {message.body}
                     </p>
                   )}
@@ -574,6 +581,7 @@ export function RelationshipChat({
 
       {status === "OPEN" ? (
         <form
+          ref={composer}
           onSubmit={(event) => void submit(event)}
           className="flex flex-col gap-2 border-t border-(--cq-border-subtle) px-2 py-2"
         >
