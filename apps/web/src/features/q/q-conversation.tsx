@@ -511,11 +511,20 @@ export function QConversationPanel({
     const body = bodyRef.current;
     if (body !== null && !conversing) body.scrollTop = 0;
   }, [conversing]);
+  // An object shown over the presence holds the stage still, at its top:
+  // following newest would scroll the presence and Dismiss off screen
+  // (lead 2026-10-03, live capture at 390px).
+  const [objectShown, setObjectShown] = useState(false);
+  const holdStill = bigPresence && objectShown;
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (body !== null && holdStill) body.scrollTop = 0;
+  }, [holdStill]);
   const threadEnd = useRef<HTMLDivElement>(null);
   useFollowNewest(
     threadEnd,
-    conversing ? newest : "",
-    lines.at(-1)?.role === "person" || liveIsPerson,
+    conversing && !holdStill ? newest : "",
+    !holdStill && (lines.at(-1)?.role === "person" || liveIsPerson),
   );
   const wide = useWide();
   // The Board is closed until its icon is pressed: what Q makes is in the
@@ -824,7 +833,7 @@ export function QConversationPanel({
               >
                 {bigPresence ? (
                   <QPresenceStage
-                    presence={
+                    presence={(compact) => (
                       <div
                         className="flex flex-col items-center gap-2 pt-2"
                         data-q-presence="stage"
@@ -836,12 +845,13 @@ export function QConversationPanel({
                         >
                           <QAperture
                             state={presence.state}
-                            size={200}
+                            size={compact ? 64 : 200}
                             inputLevel={client.inputLevel}
                             outputLevel={client.outputLevel}
                           />
                         </ViewTransition>
-                        {thread.length > latestExchange(thread).length ? (
+                        {!compact &&
+                        thread.length > latestExchange(thread).length ? (
                           <button
                             type="button"
                             className="cq-stage-quiet"
@@ -851,7 +861,8 @@ export function QConversationPanel({
                           </button>
                         ) : null}
                       </div>
-                    }
+                    )}
+                    onShowingChange={setObjectShown}
                     turns={turns}
                     captions={captions}
                     caption={

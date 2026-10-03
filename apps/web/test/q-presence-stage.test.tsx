@@ -62,7 +62,9 @@ const BRIEF = [
 function stage(turns: readonly QTurn[], waiting?: React.ReactNode) {
   return (
     <QPresenceStage
-      presence={<div data-testid="aperture" />}
+      presence={(compact) => (
+        <div data-testid="aperture" data-compact={String(compact)} />
+      )}
       turns={turns}
       captions={false}
       caption={<p>CAPTION TEXT</p>}
@@ -109,7 +111,7 @@ describe("the Q page's presence view", () => {
   it("shows captions only when the person turned them on", () => {
     render(
       <QPresenceStage
-        presence={<div />}
+        presence={() => <div />}
         turns={WITH_BRIEF}
         captions
         caption={<p>CAPTION TEXT</p>}
@@ -121,7 +123,7 @@ describe("the Q page's presence view", () => {
   it("shows an object over the presence, then steps it back after a few answers", () => {
     const { container, rerender } = render(stage(WITH_BRIEF));
     expect(container.querySelector('[data-q-shown="q-1"]')).not.toBeNull();
-    expect(screen.getByText("Acme brief")).toBeTruthy();
+    expect(screen.getAllByText("Acme brief").length).toBeGreaterThan(0);
 
     rerender(stage(plus(WITH_BRIEF, SHOWN_FOR_ANSWERS - 1)));
     expect(container.querySelector('[data-q-shown="q-1"]')).not.toBeNull();
@@ -155,5 +157,43 @@ describe("the Q page's presence view", () => {
     await userEvent.click(toggle);
     await userEvent.click(screen.getByRole("button", { name: "Acme brief" }));
     expect(container.querySelector('[data-q-shown="q-1"]')).not.toBeNull();
+  });
+
+  it("keeps the presence on screen, small, with the object's title and Dismiss outside its scroll area", async () => {
+    const showing = vi.fn();
+    const { container } = render(
+      <QPresenceStage
+        presence={(compact) => (
+          <div data-testid="aperture" data-compact={String(compact)} />
+        )}
+        turns={WITH_BRIEF}
+        captions={false}
+        caption={null}
+        onShowingChange={showing}
+      />,
+    );
+    // The presence is still rendered, compact, above the object.
+    const aperture = screen.getByTestId("aperture");
+    expect(aperture.dataset["compact"]).toBe("true");
+    const shown = container.querySelector("[data-q-shown]");
+    expect(
+      aperture.compareDocumentPosition(shown as Node) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Dismiss sits in the header, not inside the object's own scroll area,
+    // so it is in view without scrolling; and it is a 44px target.
+    const dismiss = screen.getByRole("button", { name: "Dismiss Acme brief" });
+    expect(dismiss.closest("[data-q-shown-header]")).not.toBeNull();
+    expect(dismiss.closest("[data-q-shown-body]")).toBeNull();
+    expect(dismiss.className).toContain("min-h-11");
+    expect(dismiss.className).toContain("min-w-11");
+    expect(container.querySelector("[data-q-shown-body]")?.className).toContain(
+      "overflow-y-auto",
+    );
+    expect(showing).toHaveBeenLastCalledWith(true);
+    // Dismissed: the presence is full size again.
+    await userEvent.click(dismiss);
+    expect(screen.getByTestId("aperture").dataset["compact"]).toBe("false");
+    expect(showing).toHaveBeenLastCalledWith(false);
   });
 });

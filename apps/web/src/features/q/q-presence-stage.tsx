@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { LazyMotion, domAnimation, m, useReducedMotion } from "motion/react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 
 import { History, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
 
@@ -37,9 +38,15 @@ export function QPresenceStage({
   waiting,
   onAsk,
   onOpenArtifact,
+  onShowingChange,
 }: {
-  /** Q's presence: the aperture and anything that belongs with it. */
-  readonly presence: ReactNode;
+  /**
+   * Q's presence: full size, or small and pinned at the top while an
+   * object is shown (lead 2026-10-03: the presence never leaves the screen).
+   */
+  readonly presence: (compact: boolean) => ReactNode;
+  /** Told when an object starts or stops being shown (the stage stops following newest). */
+  readonly onShowingChange?: ((showing: boolean) => void) | undefined;
   readonly turns: readonly QTurn[];
   /** The person's captions setting. */
   readonly captions: boolean;
@@ -76,12 +83,35 @@ export function QPresenceStage({
     if (reopened?.id === item.id) setReopened(null);
   };
 
+  const showing = shown !== null;
+  useEffect(() => {
+    onShowingChange?.(showing);
+  }, [showing, onShowingChange]);
+  const reduced = useReducedMotion() === true;
+
   return (
     <div
       className="flex w-full flex-col items-center gap-4"
-      data-q-presence-stage
+      data-q-presence-stage={showing ? "object" : "presence"}
     >
-      {presence}
+      <LazyMotion features={domAnimation} strict>
+        {/* The presence stays on screen: small while an object is shown,
+            full again once it is dismissed (reduced motion: no scale). */}
+        <m.div
+          key={showing ? "compact" : "full"}
+          className="flex w-full flex-col items-center"
+          data-q-presence-size={showing ? "compact" : "full"}
+          initial={
+            reduced ? false : { opacity: 0.4, scale: showing ? 1.2 : 0.8 }
+          }
+          animate={{ opacity: 1, scale: 1 }}
+          transition={
+            reduced ? { duration: 0 } : { duration: 0.24, ease: [0.2, 0, 0, 1] }
+          }
+        >
+          {presence(showing)}
+        </m.div>
+      </LazyMotion>
 
       {/* Q's words for a screen reader, never as text on the page. */}
       <p className="sr-only" aria-live="polite" data-q-said>
@@ -94,28 +124,42 @@ export function QPresenceStage({
 
       {shown === null ? null : (
         <section
-          aria-label={shown.title}
-          className="relative w-full rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+          aria-labelledby={`${listId}-shown-title`}
+          className="flex max-h-[60dvh] w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
           data-q-shown={shown.id}
         >
-          <button
-            type="button"
-            className="cq-stage-quiet absolute top-2 right-2"
-            aria-label={`Dismiss ${shown.title}`}
-            onClick={() => dismiss(shown)}
-            data-q-shown-dismiss
+          {/* Its title and Dismiss stay in view while the object scrolls. */}
+          <div
+            className="flex min-h-11 flex-none items-center justify-between gap-2 border-b border-(--cq-border-subtle) py-1 pr-1 pl-4"
+            data-q-shown-header
           >
-            <X
-              aria-hidden="true"
-              size={ICON_SIZE.compact}
-              strokeWidth={ICON_STROKE}
+            <h2
+              id={`${listId}-shown-title`}
+              className="cq-body min-w-0 truncate font-medium text-(--cq-text-primary)"
+            >
+              {shown.title}
+            </h2>
+            <button
+              type="button"
+              className="cq-stage-quiet min-h-11 min-w-11 justify-center"
+              aria-label={`Dismiss ${shown.title}`}
+              onClick={() => dismiss(shown)}
+              data-q-shown-dismiss
+            >
+              <X
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            </button>
+          </div>
+          <div className="min-h-0 overflow-y-auto p-4" data-q-shown-body>
+            <QResultBlocks
+              blocks={shown.blocks}
+              onAsk={onAsk}
+              onOpenArtifact={onOpenArtifact}
             />
-          </button>
-          <QResultBlocks
-            blocks={shown.blocks}
-            onAsk={onAsk}
-            onOpenArtifact={onOpenArtifact}
-          />
+          </div>
         </section>
       )}
 
