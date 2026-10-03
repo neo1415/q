@@ -18,6 +18,7 @@ import {
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
   createEventRegistry,
+  handleEverythingGrant,
   CorrelationIdSchema,
   isTerminalQRunStatus,
   QActionProposalIdSchema,
@@ -62,7 +63,9 @@ import { createApprovedContinuation } from "../src/composition/approved-continua
 import { createChatMessageSendAction } from "../src/composition/chat-actions.js";
 import { plainProposalStatus } from "../src/composition/conversation-approvals.js";
 import { createEmailSendAction } from "../src/composition/email-action.js";
+import { createInstructionActions } from "../src/composition/instructions/actions.js";
 import { createPersonProfileUpdateAction } from "../src/composition/person-profile-action.js";
+import { createWorkStartActions } from "../src/composition/work/actions.js";
 import {
   createMeetingScheduleAction,
   createReminderCreateAction,
@@ -214,6 +217,13 @@ describe("approve → continue → execute, per action type (local PostgreSQL)",
       createPersonProfileUpdateAction({
         people: createPostgresPersonProfileStore({ sql: db.sql }),
       }),
+      // Delegated work and standing instructions: proposing only.
+      ...createWorkStartActions({
+        store: {} as never,
+        isInvestor: () => Promise.resolve(true),
+        ownCompany: () => Promise.resolve(randomUUID()),
+      }),
+      ...createInstructionActions({ store: {} as never }),
     ];
     const repositories = createPostgresQRuntimeRepositories();
     const runtime = createQRuntimeService({
@@ -394,6 +404,65 @@ describe("approve → continue → execute, per action type (local PostgreSQL)",
       }),
     ],
   ];
+
+  // QA 2026-10-03: the start cards declared no target, and the engine
+  // refuses a card without one -- each must reach the person as a card.
+  it.each([
+    [
+      "q.work.outreach.start",
+      () => ({
+        ownerUserId: world.actor.userId,
+        grant: {
+          maxCompanies: 3,
+          openingMessage: "Hello from Ben's Q.",
+          brief: null,
+          topics: [],
+          interview: null,
+          call: null,
+        },
+        expiresInDays: 7,
+      }),
+    ],
+    [
+      "q.work.standin.start",
+      () => ({
+        ownerUserId: world.actor.userId,
+        grant: { brief: "We are raising a seed round.", awayAfterMinutes: 30 },
+        expiresInDays: 7,
+      }),
+    ],
+    [
+      "q.instruction.grant",
+      () => ({
+        ownerUserId: world.actor.userId,
+        goal: "Handle all the work for me",
+        grant: handleEverythingGrant({ timeZone: "Europe/London" }),
+      }),
+    ],
+  ] as const)(
+    "%s is proposed as a card for its owner",
+    async (actionType, payload) => {
+      const ref = await pausedRun();
+      const { approval } = await world.service.propose({
+        actor: world.actor,
+        runId: ref.runId,
+        correlationId: CORRELATION(),
+        actionType,
+        payload: payload(),
+      });
+      expect(approval.status).toBe("PENDING");
+      // Someone else's work is never proposed on their behalf.
+      await expect(
+        world.service.propose({
+          actor: world.actor,
+          runId: (await pausedRun()).runId,
+          correlationId: CORRELATION(),
+          actionType,
+          payload: { ...payload(), ownerUserId: randomUUID() },
+        }),
+      ).rejects.toThrow();
+    },
+  );
 
   async function approveAndContinue(
     actionType: string,

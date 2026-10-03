@@ -274,6 +274,8 @@ export type QWorkStandInGrant = z.infer<typeof QWorkStandInGrantSchema>;
 
 export const QWorkOutreachStartPayloadSchema = z
   .object({
+    /** Whose work: the person who asked, and the card's target. */
+    ownerUserId: UuidSchema,
     grant: QWorkOutreachGrantSchema,
     expiresInDays: z.number().int().min(1).max(30),
   })
@@ -284,6 +286,8 @@ export type QWorkOutreachStartPayload = z.infer<
 
 export const QWorkStandInStartPayloadSchema = z
   .object({
+    /** Whose work: the person who asked, and the card's target. */
+    ownerUserId: UuidSchema,
     grant: QWorkStandInGrantSchema,
     expiresInDays: z.number().int().min(1).max(90),
   })

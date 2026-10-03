@@ -400,6 +400,7 @@ export function createQWorkTools(
           proposal: {
             actionType: Q_WORK_OUTREACH_START,
             payload: {
+              ownerUserId: context.actor.userId,
               grant: {
                 maxCompanies: input.maxCompanies,
                 openingMessage: input.openingMessage,
@@ -454,6 +455,7 @@ export function createQWorkTools(
           proposal: {
             actionType: Q_WORK_STANDIN_START,
             payload: {
+              ownerUserId: context.actor.userId,
               grant: {
                 brief: input.brief,
                 awayAfterMinutes: input.awayAfterMinutes,

@@ -126,16 +126,21 @@ export function createWorkStartActions(dependencies: {
         "Starts an investor's delegated outreach: Q picks founders from their own feed up to the approved number, expresses interest, chats within the approved brief and topics, optionally interviews and reports, and books calls in the approved windows, as the approver, until done, stopped or expired.",
       payload: QWorkOutreachStartPayloadSchema,
       result: StartedSchema,
-      targets: (): readonly QSubjectRef[] => [],
+      targets: (payload): readonly QSubjectRef[] => [
+        { kind: "USER", userId: payload.ownerUserId },
+      ],
       describe: (payload) => ({
         summary: `Q handles outreach to up to ${String(payload.grant.maxCompanies)} founders for you`,
         preview: outreachPlan(payload),
       }),
       confirm: () =>
         "On it. I'll go through your feed and tell you who I picked.",
-      authorize: async (_payload, actor) => {
+      authorize: async (payload, actor) => {
         if (actor.actorType !== "HUMAN") {
           return { outcome: "DENY", code: "NOT_A_PERSON" };
+        }
+        if (payload.ownerUserId !== actor.userId) {
+          return { outcome: "DENY", code: "NOT_YOURS" };
         }
         return (await dependencies.isInvestor(actor))
           ? { outcome: "ALLOW" }
@@ -178,16 +183,21 @@ export function createWorkStartActions(dependencies: {
         "Starts a founder's stand-in: while they are away Q answers investors' chat messages only from the approved brief, marked as Q, defers the rest, and hands the chats back when they return, until stopped or expired.",
       payload: QWorkStandInStartPayloadSchema,
       result: StartedSchema,
-      targets: (): readonly QSubjectRef[] => [],
+      targets: (payload): readonly QSubjectRef[] => [
+        { kind: "USER", userId: payload.ownerUserId },
+      ],
       describe: (payload) => ({
         summary: "Q stands in for you while you're away",
         preview: standInPlan(payload),
       }),
       confirm: () =>
         "Done. When you're away, I'll answer investors from your brief and hand the chats back when you return.",
-      authorize: async (_payload, actor) => {
+      authorize: async (payload, actor) => {
         if (actor.actorType !== "HUMAN") {
           return { outcome: "DENY", code: "NOT_A_PERSON" };
+        }
+        if (payload.ownerUserId !== actor.userId) {
+          return { outcome: "DENY", code: "NOT_YOURS" };
         }
         return (await dependencies.ownCompany(actor)) !== null
           ? { outcome: "ALLOW" }
