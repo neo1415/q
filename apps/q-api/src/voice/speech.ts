@@ -234,6 +234,20 @@ function moneyWords(
   return `${spoken} ${value === 1 ? one : many}`;
 }
 
+/**
+ * "https://www.withnixo.com/about." → "withnixo.com." A listener needs the
+ * name, never the scheme or the path; sentence punctuation stays.
+ */
+function spokenDomain(address: string): string {
+  const trailing = /[.,;:!?'"]+$/u.exec(address)?.[0] ?? "";
+  const bare = address.slice(0, address.length - trailing.length);
+  try {
+    return `${new URL(bare).hostname.toLowerCase().replace(/^www\./u, "")}${trailing}`;
+  } catch {
+    return trailing;
+  }
+}
+
 /** Markdown and machine punctuation → plain sentences. */
 export function speakable(text: string): string {
   return (
@@ -255,7 +269,9 @@ export function speakable(text: string): string {
       .replace(/`{1,3}([^`]*)`{1,3}/g, "$1")
       // Links: keep the words, drop the address.
       .replace(/\[([^\]]+)\]\((?:https?:\/\/|mailto:)[^)]*\)/g, "$1")
-      .replace(/\bhttps?:\/\/\S+/g, "")
+      // A bare address is said as its domain (lead 2026-10-03: "Website:
+      // It's being applied now." when the address was dropped whole).
+      .replace(/\bhttps?:\/\/[^\s)\]]+/g, spokenDomain)
       // Bracketed citations and source markers.
       .replace(/\s*\((?:public web )?source\s+S\d{1,2}\)/gi, "")
       .replace(/\s*\[(?:S\d{1,2}|\d{1,2})\]/g, "")

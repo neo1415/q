@@ -54,6 +54,8 @@ export type QActionNarrator = {
         >
       >,
     approval?: { readonly id: string; readonly expiresAt: string },
+    /** The same change was already waiting: shown again, nothing new made. */
+    options?: { readonly alreadyWaiting?: boolean | undefined },
   ) => Promise<void>;
   /** The person asked for something that could not be prepared; `reason` is theirs to read. */
   readonly refused: (run: QRunRef, reason: string) => Promise<void>;
@@ -127,6 +129,11 @@ export function proposalBlocks(
   return proposal.success
     ? [{ kind: "ACTION_PROPOSAL", proposal: proposal.data }]
     : undefined;
+}
+
+/** The same change asked for again: the card it already has, not a new one. */
+export function alreadyWaitingLine(summary: string): string {
+  return `That's ready: ${sentence(summary).replace(/\.$/u, "")}. It's waiting for your yes.`;
 }
 
 export function proposedLine(summary: string): string {
@@ -226,8 +233,14 @@ export function createQActionNarrator(dependencies: {
   };
 
   return {
-    proposed: (run, action, approval) =>
-      say(run, proposedLine(action.summary), proposalBlocks(action, approval)),
+    proposed: (run, action, approval, options) =>
+      say(
+        run,
+        options?.alreadyWaiting === true
+          ? alreadyWaitingLine(action.summary)
+          : proposedLine(action.summary),
+        proposalBlocks(action, approval),
+      ),
     refused: (run, reason) => say(run, refusedLine(reason)),
     settled: async (context, outcome) => {
       const run: QRunRef = {

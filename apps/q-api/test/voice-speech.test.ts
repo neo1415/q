@@ -25,7 +25,20 @@ describe("speakable", () => {
       "`code` and *emphasis*.",
     ].join("\n");
     expect(speakable(text)).toBe(
-      "What I found\nPaystack raised a Series A.\nSee the announcement and.\nquoted\ncode and emphasis.",
+      "What I found\nPaystack raised a Series A.\nSee the announcement and example.com.\nquoted\ncode and emphasis.",
+    );
+  });
+
+  it("says a bare address as its domain, never dropping it (lead 2026-10-03)", () => {
+    expect(
+      speakable(
+        "Approved: Update your company profile. Website: https://www.withnixo.com/about. It's being applied now.",
+      ),
+    ).toBe(
+      "Approved: Update your company profile. Website: withnixo.com. It's being applied now.",
+    );
+    expect(speakable("Website: https://thevaultlyne.com")).toBe(
+      "Website: thevaultlyne.com",
     );
   });
 });

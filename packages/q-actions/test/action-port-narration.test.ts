@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { QActionPrepareContext } from "@capital-q/q-runtime";
 
 import {
+  alreadyWaitingLine,
   createQActionPort,
   proposedLine,
   QActionNotPermittedError,
@@ -108,6 +109,47 @@ describe("what Q says about an action", () => {
     expect(events).toEqual(["proposed", "claimed"]);
     expect(said).toEqual([
       "Update your company profile. Website: https://kivu-freight.example. Not saved yet: tap Approve on the card, or tell me to go ahead.",
+    ]);
+  });
+
+  it("the same change already waiting: its card is shown again with 'That's ready', and this run waits on nothing", async () => {
+    const shown: { line: string; approvalId?: string }[] = [];
+    const port = createQActionPort({
+      service: service(() =>
+        Promise.resolve({
+          action: {
+            id: "11111111-1111-4111-8111-111111111111",
+            summary: "Share your raise with Savanna Seed",
+          },
+          approval: {
+            id: "22222222-2222-4222-8222-222222222222",
+            expiresAt: "2026-10-04T00:00:00.000Z",
+          },
+          existing: true,
+        } as never),
+      ),
+      proposer: proposer({ actionType: "app.raise.share", payload: {} }),
+      narrator: {
+        proposed: (_run, action, approval, options) => {
+          shown.push({
+            line:
+              options?.alreadyWaiting === true
+                ? alreadyWaitingLine(action.summary)
+                : proposedLine(action.summary),
+            ...(approval === undefined ? {} : { approvalId: approval.id }),
+          });
+          return Promise.resolve();
+        },
+        refused: () => Promise.resolve(),
+        settled: () => Promise.resolve(),
+      },
+    });
+    expect(await port.prepare(context)).toEqual({ kind: "NONE" });
+    expect(shown).toEqual([
+      {
+        line: "That's ready: Share your raise with Savanna Seed. It's waiting for your yes.",
+        approvalId: "22222222-2222-4222-8222-222222222222",
+      },
     ]);
   });
 

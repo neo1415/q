@@ -105,6 +105,28 @@ export type QActionRepository = {
     tx: TransactionContext,
     input: QActionTransition,
   ) => Promise<QActionRecord | null>;
+  /**
+   * The proposals still waiting on this person's own approval, of one
+   * action type and version, with their open approval: what a new
+   * proposal is compared with so a restated request never makes a second
+   * identical card (lead 2026-10-03). Newest first, bounded.
+   */
+  readonly listAwaitingForProposer: (
+    executor: DatabaseExecutor,
+    input: {
+      readonly tenantId: TenantId;
+      readonly userId: UserId;
+      readonly organisationId: OrganisationId;
+      readonly actionType: string;
+      readonly actionVersion: number;
+      readonly now: Date;
+    },
+  ) => Promise<
+    readonly {
+      readonly action: QActionRecord;
+      readonly approval: QApprovalRecord;
+    }[]
+  >;
 };
 
 export type QApprovalRecord = {

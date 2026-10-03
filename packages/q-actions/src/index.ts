@@ -114,6 +114,7 @@ export {
   failedLine,
   noQActionNarrator,
   proposalBlocks,
+  alreadyWaitingLine,
   proposedLine,
   refusedLine,
   type QActionNarrator,

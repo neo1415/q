@@ -91,6 +91,7 @@ import {
   type QPendingApprovalRow,
 } from "../ports.js";
 import type { QActionRegistry } from "../registry.js";
+import { proposalContent } from "../domain/same-proposal.js";
 
 /**
  * The Approval Engine (doc 12 §29-§32; doc 15 §50-§53; CQ-Q-008).
@@ -137,6 +138,11 @@ export type ProposeQActionCommand = {
 export type ProposeQActionResult = {
   readonly action: QActionRecord;
   readonly approval: QApprovalRecord;
+  /**
+   * True when nothing new was prepared: the person already has this exact
+   * change waiting for their approval, and that card is returned instead.
+   */
+  readonly existing?: boolean | undefined;
 };
 
 export type QApprovalQuery = {
@@ -866,6 +872,7 @@ export function createQActionService(
     if (actor.actorType !== "HUMAN" || actor.organisationId === undefined) {
       throw new QActionNotPermittedError();
     }
+    const organisationId = actor.organisationId;
     const payload = definition.payload.safeParse(command.payload);
     if (!payload.success) {
       throw new QActionNotPermittedError();
@@ -919,6 +926,48 @@ export function createQActionService(
             }
             if (run.actorOrganisationId !== (actor.organisationId ?? null)) {
               throw new QActionNotPermittedError();
+            }
+            // The same change already waiting for this person, from any
+            // run or conversation: that card, never a second one. Checked
+            // before the run's own state, since nothing here moves it.
+            const content = proposalContent({
+              actionType: definition.actionType,
+              actionVersion: definition.version,
+              targets,
+              payload: payload.data,
+            });
+            const waiting = await repositories.actions.listAwaitingForProposer(
+              tx.sql,
+              {
+                tenantId: actor.tenantId,
+                userId: actor.userId,
+                organisationId,
+                actionType: definition.actionType,
+                actionVersion: definition.version,
+                now,
+              },
+            );
+            const same = waiting.find(
+              ({ action }) =>
+                proposalContent({
+                  actionType: action.actionType,
+                  actionVersion: action.actionVersion,
+                  targets: action.targets,
+                  payload: action.payload,
+                }) === content,
+            );
+            if (same !== undefined) {
+              logger?.info(
+                {
+                  qRunId: run.id,
+                  actionId: same.action.id,
+                  approvalId: same.approval.id,
+                  actionType: definition.actionType,
+                  correlationId,
+                },
+                "q action already waiting for approval; no second card",
+              );
+              return { ...same, existing: true };
             }
             if (!canTransition(run.status, "AWAITING_APPROVAL")) {
               throw new QActionVersionConflictError();

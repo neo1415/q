@@ -1546,7 +1546,7 @@ describe("a spoken question for Q", () => {
     // and under way rather than claiming it is done.
     // Said by name (lead 2026-10-03): what was approved, not just "Saved".
     expect(yes.spoken.join(" ")).toMatch(
-      /^(?:Done|Approved): Update your company profile\./,
+      /^(?:Done|Approved): Update your company profile\. Website: thevaultlyne\.com\./,
     );
     // A yes was the decision; no run was started for the word "yes".
     expect(runtime.calls.createRun).toHaveLength(1);

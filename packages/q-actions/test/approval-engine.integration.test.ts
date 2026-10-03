@@ -330,6 +330,7 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     return run;
   }
 
+  let proposals = 0;
   async function propose(
     world: World,
     person: Person,
@@ -337,6 +338,7 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     run?: QRunRecord,
   ) {
     const current = run ?? (await synthesisRun(world, person));
+    proposals += 1;
     return world.service.propose({
       actor: person.actor,
       runId: current.id,
@@ -344,7 +346,9 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       actionType: TEST_CONFIRM_REQUIRED,
       payload: {
         companyId: COMPANY,
-        note: `Please record this. ${MARKERS.payload}`,
+        // Each call its own change: the same change still waiting is
+        // returned, not proposed again (lead 2026-10-03).
+        note: `Please record this. ${MARKERS.payload} (#${String(proposals)})`,
         ...payload,
       },
     });
@@ -512,6 +516,41 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       assertNoMarkers(JSON.stringify(outbox));
       expect(JSON.stringify(outbox)).not.toContain("sha256:");
       assertNoMarkers(world.logLines.join("\n"));
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("ONE CARD PER CHANGE (lead 2026-10-03): the same change asked for again, in any run or conversation, returns the card already waiting; a different value is a second card", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder } = world;
+      const same = { note: `Share the raise. ${MARKERS.payload}` };
+      const first = await propose(world, founder, same);
+      // Another run: another turn, or another conversation, of theirs.
+      const again = await propose(world, founder, same);
+      expect(again.existing).toBe(true);
+      expect(again.action.id).toBe(first.action.id);
+      expect(again.approval.id).toBe(first.approval.id);
+      // Nothing new was written, and the second run does not wait.
+      const [count] = await db.sql<{ n: number }[]>`
+        select count(*)::int as n from q_runtime.actions
+         where proposed_by_user_id = ${founder.actor.userId}`;
+      expect(count?.n).toBe(1);
+      const different = await propose(world, founder, {
+        note: `Share the raise, only the deck. ${MARKERS.payload}`,
+      });
+      expect(different.existing).toBeUndefined();
+      expect(different.action.id).not.toBe(first.action.id);
+      // Once decided, the same words make a new card.
+      await world.service.reject({
+        actor: founder.actor,
+        approvalId: first.approval.id,
+        correlationId: CORRELATION(),
+      });
+      const afterDecision = await propose(world, founder, same);
+      expect(afterDecision.existing).toBeUndefined();
+      expect(afterDecision.action.id).not.toBe(first.action.id);
     } finally {
       await cleanup(world);
     }
