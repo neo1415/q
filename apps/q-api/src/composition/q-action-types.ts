@@ -3,6 +3,7 @@ import type { QActionRegistry } from "@capital-q/q-actions";
 import { COMPANY_PROFILE_UPDATE } from "./company-profile-action.js";
 import { COMPANY_VISIBILITY_SET } from "./company-visibility-action.js";
 import { EMAIL_SEND } from "./email-action.js";
+import { EMAIL_INBOUND_REPLY } from "./inbound-email.js";
 import { CHAT_MESSAGE_SEND } from "./chat-actions.js";
 import {
   MEETING_CANCEL,
@@ -54,6 +55,8 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   HANDLE_CLAIM,
   INVESTOR_PROFILE_UPDATE,
   EMAIL_SEND,
+  // Inbound email: a reply from Capital Q on the person's behalf.
+  EMAIL_INBOUND_REPLY,
   // R34: relationship chat.
   CHAT_MESSAGE_SEND,
   // BIZ-008: reminders and meetings.

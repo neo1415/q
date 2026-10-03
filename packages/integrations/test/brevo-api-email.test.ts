@@ -37,6 +37,42 @@ describe("Brevo API email sender", () => {
     expect(String(body["htmlContent"])).toContain("Follow up");
   });
 
+  it("sets Reply-To and a display name on Capital Q's own address (inbound reply)", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve(new Response("{}", { status: 201 })),
+    );
+    const sender = createBrevoApiEmailSender({
+      apiKey: key,
+      sender: "Capital Q <q@example.test>",
+      fetch,
+    });
+    await sender.send({
+      to: "sam@example.test",
+      subject: "Re: hello",
+      text: "Thanks",
+      replyTo: "hash+abcdefghijklmnopqrstuvwxyz@inbound.example.test",
+      fromName: "Ada via Capital Q",
+    });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      sender: { email: "q@example.test", name: "Ada via Capital Q" },
+      replyTo: { email: "hash+abcdefghijklmnopqrstuvwxyz@inbound.example.test" },
+    });
+    await expect(
+      sender.send({
+        to: "sam@example.test",
+        subject: "x",
+        text: "x",
+        replyTo: "a@b.test\r\nBcc: c@d.test",
+      }),
+    ).rejects.toThrow("header injection refused");
+    await expect(
+      sender.send({ to: "sam@example.test", subject: "x", text: "x", replyTo: "a@b.test, c@d.test" }),
+    ).rejects.toThrow("header injection refused");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("sends a document's own HTML when it brings one (The Q Daily)", async () => {
     const fetch = vi.fn(() =>
       Promise.resolve(new Response("{}", { status: 201 })),
