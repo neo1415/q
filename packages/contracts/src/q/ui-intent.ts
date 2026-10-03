@@ -123,6 +123,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "SEARCH",
   "GATEWAY",
   "MEMORY",
+  // Lead 2026-10-03: Settings → Usage, what Q used for them this month.
+  "USAGE",
   "NEW_PITCH",
   // REHEARSE: the Rehearsals page (people to rehearse with, history).
   "REHEARSALS",

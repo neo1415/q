@@ -168,6 +168,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   SEARCH: "Search",
   GATEWAY: "their GateQ gateway",
   MEMORY: "what Q remembers about them",
+  USAGE: "what Q used for them this month",
   NEW_PITCH: "a new pitch video",
   REHEARSALS: "Rehearsals",
   DOCUMENTS: "their documents and brand kit",

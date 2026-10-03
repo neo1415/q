@@ -254,6 +254,8 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   GATEWAY:
     "Opens their GateQ gateway: its public link, QR code, website snippet and the applications that came in.",
   MEMORY: "Opens what Q remembers about them, to review or forget it.",
+  USAGE:
+    "Opens what Q used for them this month: the cost by task and by standing instruction, beside their plan's Q limits.",
   NEW_PITCH: "Opens the page to add a new pitch video.",
   // REHEARSE block
   REHEARSALS:
