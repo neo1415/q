@@ -81,6 +81,13 @@ export type QToolRegistry = {
   readonly eligible: (context: QToolExecutionContext) => readonly QToolRecord[];
   /** Every tool relevant to this context, in priority order, unbounded. */
   readonly ranked: (context: QToolExecutionContext) => readonly QToolRecord[];
+  /**
+   * The reader's list: the unfocused offer, then the declared app actions
+   * this plan's scopes allow on any purpose (each executes only when named).
+   */
+  readonly available: (
+    context: QToolExecutionContext,
+  ) => readonly QToolRecord[];
   /** Resolve a model's proposal to the record that was offered, if any. */
   readonly offeredByProviderName: (
     context: QToolExecutionContext,
@@ -223,10 +230,13 @@ export function createQToolRegistry(
     const relevant = (record: QToolRecord): boolean => {
       if (core(record)) return true;
       const name = record.definition.providerName;
-      if (!focused)
-        return record.definition.supportedPurposes.includes(purpose);
-      if (named.has(name)) return true;
-      if (!record.definition.supportedPurposes.includes(purpose)) return false;
+      const forPurpose = record.definition.supportedPurposes.includes(purpose);
+      if (!focused) return forPurpose;
+      // A named tool off this purpose is offered only when it is a declared
+      // app action: what is offered is what may execute.
+      if (named.has(name))
+        return forPurpose || record.definition.eligibleWhenNamed === true;
+      if (!forPurpose) return false;
       const area = TOOL_AREAS.get(name);
       return area === undefined || areas.has(area);
     };
@@ -252,6 +262,38 @@ export function createQToolRegistry(
   const eligible = (context: QToolExecutionContext): readonly QToolRecord[] =>
     ranked(context).slice(0, Math.min(Q_TURN_TOOLS_MAX, MODEL_TOOLS_MAX));
 
+  // What the run's purpose and plan allow, exactly as before a turn's focus
+  // existed, within what one request can carry.
+  const unfocused = (context: QToolExecutionContext): readonly QToolRecord[] =>
+    ranked({ ...context, focus: undefined }).slice(0, MODEL_TOOLS_MAX);
+
+  // The declared app actions this plan's scopes allow, whatever the purpose
+  // (lead 2026-10-03: "We've decided not to proceed with Ledgerfold" plans
+  // as INVESTOR_QUESTION, and relationship_outcome was refused there).
+  const nameable = (context: QToolExecutionContext): readonly QToolRecord[] =>
+    ranked({
+      ...context,
+      focus: {
+        areas: [],
+        tools: [...activeById.values()]
+          .filter(({ definition }) => definition.eligibleWhenNamed === true)
+          .map(({ definition }) => definition.providerName),
+      },
+    }).filter(({ definition }) => definition.eligibleWhenNamed === true);
+
+  const available = (
+    context: QToolExecutionContext,
+  ): readonly QToolRecord[] => {
+    const listed = unfocused(context);
+    const names = new Set(listed.map(({ definition }) => definition.id));
+    return [
+      ...listed,
+      ...nameable(context).filter(
+        ({ definition }) => !names.has(definition.id),
+      ),
+    ];
+  };
+
   return {
     get: (id, version) => byVersion.get(versionIdOf(id, version)),
     getActive: (id) => activeById.get(id),
@@ -262,9 +304,17 @@ export function createQToolRegistry(
     // before a turn's focus existed: the focus narrows what the model is
     // shown (cost), never what the run is authorised to use. A code read
     // of a fact the model was not shown this turn still runs.
+    // A declared app action the turn named may execute on any purpose its
+    // plan's scopes allow; nothing else the focus names widens authority.
     offeredByProviderName: (context, providerName) =>
-      ranked({ ...context, focus: undefined })
-        .slice(0, MODEL_TOOLS_MAX)
-        .find((record) => record.definition.providerName === providerName),
+      unfocused(context).find(
+        (record) => record.definition.providerName === providerName,
+      ) ??
+      (context.focus?.tools.includes(providerName) === true
+        ? nameable(context).find(
+            (record) => record.definition.providerName === providerName,
+          )
+        : undefined),
+    available,
   };
 }

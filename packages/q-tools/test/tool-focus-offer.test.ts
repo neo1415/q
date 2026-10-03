@@ -118,18 +118,51 @@ describe("tools offered by what the turn is about", () => {
     },
   );
 
-  it("an action asked for by name is offered on every purpose the plan allows", () => {
+  it("a declared app action asked for by name is offered and executes on every purpose the plan allows", () => {
     for (const purpose of Q_TASK_CLASSES) {
       for (const record of registry.list()) {
         if (record.definition.status !== "ACTIVE") continue;
         const name = record.definition.providerName;
         // The plan's scopes still decide; the worst case holds them all.
-        const offered = names(
-          registry.eligible(worstCase(purpose, { areas: [], tools: [name] })),
+        const context = worstCase(purpose, { areas: [], tools: [name] });
+        const offered = names(registry.eligible(context));
+        const executes = registry.offeredByProviderName(context, name);
+        // What is offered is what may execute (QA 2026-10-03: a named
+        // relationship_outcome was offered, then refused TOOL_NOT_ELIGIBLE).
+        expect(offered.includes(name), `${purpose}: ${name}`).toBe(
+          executes !== undefined,
         );
-        expect(offered, `${purpose}: ${name}`).toContain(name);
+        if (
+          record.definition.eligibleWhenNamed === true ||
+          record.definition.core === true ||
+          record.definition.supportedPurposes.includes(purpose)
+        ) {
+          expect(offered, `${purpose}: ${name}`).toContain(name);
+        }
       }
     }
+  });
+
+  it("an app action off this purpose executes only when the turn named it", () => {
+    const outcome = "relationship_outcome";
+    expect(
+      registry.list().find((r) => r.definition.providerName === outcome)
+        ?.definition.supportedPurposes,
+    ).not.toContain("INVESTOR_QUESTION");
+    const unnamed = worstCase("INVESTOR_QUESTION");
+    expect(registry.offeredByProviderName(unnamed, outcome)).toBeUndefined();
+    const named = worstCase("INVESTOR_QUESTION", {
+      areas: [],
+      tools: [outcome],
+    });
+    expect(registry.offeredByProviderName(named, outcome)).toBeDefined();
+    expect(names(registry.eligible(named))).toContain(outcome);
+    // A plan without its scope kinds never reaches it, named or not.
+    const scopeless = {
+      ...contextFor(actorA, planFor(actorA, "INVESTOR_QUESTION", [])),
+      focus: { areas: [], tools: [outcome] },
+    };
+    expect(registry.offeredByProviderName(scopeless, outcome)).toBeUndefined();
   });
 
   it("every declared action's tool is reachable by name (ADR 0040 parity)", () => {
@@ -146,14 +179,24 @@ describe("tools offered by what the turn is about", () => {
     }
   });
 
-  it("asked by meaning: the reader's list is unchanged (every relevant tool, unfocused)", async () => {
+  it("asked by meaning: the reader's list is every relevant tool, unfocused, then the app actions on any purpose", async () => {
     const executor = createQToolExecutor({ registry });
     for (const purpose of Q_TASK_CLASSES) {
       const focused = worstCase(purpose, { areas: ["Screens"], tools: [] });
-      const listed = (await executor.available?.(focused)) ?? [];
-      expect(listed.map((tool) => tool.definition.name)).toEqual(
-        names(registry.ranked(worstCase(purpose)).slice(0, MODEL_TOOLS_MAX)),
+      const listed = ((await executor.available?.(focused)) ?? []).map(
+        (tool) => tool.definition.name,
       );
+      const unfocused = names(
+        registry.ranked(worstCase(purpose)).slice(0, MODEL_TOOLS_MAX),
+      );
+      expect(listed.slice(0, unfocused.length)).toEqual(unfocused);
+      for (const name of listed.slice(unfocused.length)) {
+        const record = registry
+          .list()
+          .find((r) => r.definition.providerName === name);
+        expect(record?.definition.eligibleWhenNamed, name).toBe(true);
+      }
+      expect(listed).toContain("relationship_outcome");
     }
   });
 

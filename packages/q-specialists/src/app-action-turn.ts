@@ -69,6 +69,8 @@ export function createToolAppActionPort(dependencies: {
             correlationId: request.correlationId,
             capability: request.capability,
             plan: request.plan,
+            // Named by the turn: eligible wherever its scopes hold.
+            focus: { areas: [], tools: [action.tool] },
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           },
         );

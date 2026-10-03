@@ -1,6 +1,5 @@
 import {
   MODEL_TOOL_RESULT_MAX_CHARS,
-  MODEL_TOOLS_MAX,
   sensitivityWithin,
 } from "@capital-q/contracts";
 import { getMeter, getTracer, type Logger } from "@capital-q/observability";
@@ -390,13 +389,10 @@ export function createQToolExecutor(
     },
     // The reader's list: every tool this purpose and plan allow, unfocused,
     // up to what one request can carry, exactly as the offer was before.
+    // Declared app actions follow on any purpose: the reader may name one,
+    // and a named one executes (lead 2026-10-03).
     available: (context) =>
-      Promise.resolve(
-        registry
-          .ranked({ ...context, focus: undefined })
-          .slice(0, MODEL_TOOLS_MAX)
-          .map(toOfferedTool),
-      ),
+      Promise.resolve(registry.available(context).map(toOfferedTool)),
     execute,
   };
 }

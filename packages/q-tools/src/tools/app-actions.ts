@@ -199,6 +199,9 @@ function toolFor(
       action.classification === "READ" ? "SAFE_READ" : "LOW_RISK_INTERNAL",
     requiredCapabilities: [],
     supportedPurposes: [...(declared.purposes ?? Q_TASK_CLASSES)],
+    // The purposes shape only the unfocused offer: named, it is eligible
+    // wherever its scopes hold (lead 2026-10-03).
+    eligibleWhenNamed: true,
     // Offered where it can apply (a founder's conversation, not an
     // investor organisation's tool); authorize still requires their own.
     requiredScopeKinds: [...(declared.scopes ?? ["OWN_Q_CONVERSATION"])],

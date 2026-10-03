@@ -101,6 +101,14 @@ export type QToolDefinition<I, O, G> = {
    * a run is over the model's tool bound. Absent: false.
    */
   readonly core?: boolean | undefined;
+  /**
+   * A declared app action (ADR 0040; lead 2026-10-03): when the turn names
+   * it (the focus's tools) it is offered and may execute on any purpose
+   * whose plan holds its scope kinds, and the reader is told it is
+   * available; `supportedPurposes` then shapes only the unfocused offer.
+   * Its authorize step still decides. Absent: false.
+   */
+  readonly eligibleWhenNamed?: boolean | undefined;
   /** Offered only when the plan holds at least one of these scope kinds; empty = always. */
   readonly requiredScopeKinds: readonly QKnowledgeScopeKind[];
   readonly approval: "NONE";
