@@ -20,6 +20,17 @@
   --radius-xl: 18px;
 }
 
+/*
+ * Light-mode status colours meet WCAG AA (ADR 0046, design-48). The
+ * package's light values measured 2.93:1 (warning) and 4.39:1 (positive)
+ * on the canvas, too low for text. These reach at least 4.5:1 on the
+ * canvas, the subtle surface and their own soft fills. Dark mode keeps
+ * the package's values: its dark rules are more specific than :root.
+ */
+:root {
+  --cq-warning: oklch(0.53 0.12 70);
+  --cq-positive: oklch(0.5 0.13 151);
+}
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
