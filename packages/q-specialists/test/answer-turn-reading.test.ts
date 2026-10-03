@@ -33,6 +33,7 @@ import type {
   QResearchDirective,
   QRuntimeRepositories,
 } from "@capital-q/q-runtime";
+import type { Logger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
@@ -124,6 +125,8 @@ function seam(options: {
   readonly appActions?: QAppActionPort;
   /** Their relationships' counterpart names (lead 2026-10-03). */
   readonly counterpartNames?: readonly string[];
+  /** A recording logger (lead 2026-10-03: the route is observable). */
+  readonly logger?: Logger;
   /** APP_ACTION_ROUTER, faked (lead 2026-10-03). */
   readonly appActionRouter?: (
     request: QAnswerRequest,
@@ -269,6 +272,7 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
     ...(options.pendingDecisions === undefined
       ? {}
       : { pendingDecisions: options.pendingDecisions }),
@@ -3143,7 +3147,19 @@ describe("a request the reader named nothing for is routed (APP_ACTION_ROUTER)",
     const routedWith: { utterance: string; names: string[] }[] = [];
     const asked: unknown[] = [];
     const ran: unknown[] = [];
+    const lines: [string, unknown][] = [];
+    const record = (fields: unknown, message?: string) => {
+      lines.push([message ?? "", fields]);
+    };
+    const logger = {
+      info: record,
+      warn: record,
+      error: record,
+      debug: record,
+      child: () => logger,
+    } as unknown as Logger;
     const run = seam({
+      logger,
       said,
       reading: untold(),
       outcomes: [],
@@ -3169,6 +3185,15 @@ describe("a request the reader named nothing for is routed (APP_ACTION_ROUTER)",
     });
     await run.answer.answer(request());
     expect(routedWith).toEqual([{ utterance: said, names: TOOLS }]);
+    // Logged before the code-run path returns (lead 2026-10-03).
+    expect(lines).toContainEqual([
+      "q request route",
+      expect.objectContaining({
+        routed: tool,
+        action: tool,
+        readerNamed: null,
+      }),
+    ]);
     expect(asked).toEqual([{ tool, utterance: said }]);
     expect(ran).toEqual([{ tool, arguments: args }]);
     // The engine says the card's status; nothing else is said here.

@@ -2042,6 +2042,24 @@ export function createSpecialistQAnswer(
     const namedAction =
       readerNamed ??
       (fundVisibility ? INVESTOR_VISIBILITY_TOOL : (recordAudience ?? routed));
+    // How a request to act was routed, said once before any path can
+    // return (lead 2026-10-03: the focus line came after the code-run
+    // return, so a request done by code never logged one).
+    if (read?.kind === "TOOL_REQUEST") {
+      logger?.info(
+        {
+          qRunId: request.runId,
+          confidence: read.confidence,
+          readerNamed,
+          readerAppAction: readerAppAction?.tool ?? null,
+          hand: read.tool?.kind ?? null,
+          recordAudience,
+          routed,
+          action: readerAppAction?.tool ?? namedAction,
+        },
+        "q request route",
+      );
+    }
     const appAction =
       readerAppAction ??
       (dependencies.appActions !== undefined &&

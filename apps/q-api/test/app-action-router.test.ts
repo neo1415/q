@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ModelGateway } from "@capital-q/model-gateway";
+import type { Logger } from "@capital-q/observability";
 import {
   APP_ACTION_ROUTER_V1,
   createDefaultPromptRegistry,
@@ -140,6 +141,32 @@ describe("APP_ACTION_ROUTER", () => {
       }),
     ).toBeNull();
     expect(empty.asked).toHaveLength(0);
+  });
+});
+
+describe("the router's line reaches the logger it is given", () => {
+  it("logs 'q app action routed' with the action and latencyMs", async () => {
+    const lines: [string, Record<string, unknown>][] = [];
+    const record = (fields: Record<string, unknown>, message: string) => {
+      lines.push([message, fields]);
+    };
+    const logger = {
+      info: record,
+      warn: record,
+      error: record,
+      debug: record,
+      child: () => logger,
+    } as unknown as Logger;
+    await createAppActionRouter({
+      gateway: gatewayAnswering("set_deck_audience").gateway,
+      logger,
+    })(request, { utterance: "x", candidates: CANDIDATES });
+    const routed = lines.find(([message]) => message === "q app action routed");
+    expect(routed?.[1]).toMatchObject({
+      action: "set_deck_audience",
+      candidates: 3,
+    });
+    expect(typeof routed?.[1]["latencyMs"]).toBe("number");
   });
 });
 
