@@ -829,6 +829,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "SEARCH",
           "GATEWAY",
           "MEMORY",
+          "USAGE",
           "REHEARSALS",
           // DOCS: their documents and brand kit.
           "DOCUMENTS",

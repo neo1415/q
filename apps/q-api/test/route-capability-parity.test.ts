@@ -227,6 +227,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/admin-billing.ts POST ADMIN_BILLING_OVERRIDE_PATH":
     OPERATIONS_CONSOLE,
   "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_PATH": OPERATIONS_CONSOLE,
+  // Platform model cost per tenant and person: the operators' console.
+  "api/http/admin-billing.ts GET ADMIN_BILLING_USAGE_PATH": OPERATIONS_CONSOLE,
   "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_EXPORT_PATH":
     OPERATIONS_CONSOLE,
   "api/http/admin-billing.ts POST ADMIN_BILLING_FEES_ACCRUE_PATH":
@@ -469,6 +471,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   // AUTO (ADR 0030): the "Q is working on" panel's own controls.
   "q-api/http/work.ts GET Q_WORK_PATH": cap("tool.list_q_work"),
+  // Lead 2026-10-03: what Q used for them; Q opens it (navigate USAGE).
+  "q-api/http/usage.ts GET Q_USAGE_PATH": cap("navigate.USAGE"),
   "q-api/http/work.ts GET Q_WORK_ITEM_PATH": cap("tool.list_q_work"),
   "q-api/http/work.ts DELETE Q_WORK_ITEM_PATH": cap("tool.stop_q_work"),
   "q-api/http/work.ts DELETE Q_WORK_LANE_PATH": cap("tool.stop_q_work"),
@@ -695,6 +699,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/daily": cap("navigate.DAILY"),
   "/daily/[editionId]": cap("tool.get_q_daily"),
   "/settings/memory": cap("navigate.MEMORY"),
+  "/settings/usage": cap("navigate.USAGE"),
   "/verification": cap("navigate.VERIFICATION"),
   "/pitch": cap("navigate.PITCH"),
   // One video's page and a new video's, both opened from Pitch & media (ADR 0022).

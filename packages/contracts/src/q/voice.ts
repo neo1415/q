@@ -288,6 +288,8 @@ export const Q_VOICE_DESTINATIONS = [
   "SEARCH",
   "GATEWAY",
   "MEMORY",
+  // Lead 2026-10-03: what Q used for them this month.
+  "USAGE",
   "NEW_PITCH",
   "REHEARSALS",
   // DOCS: their documents and brand kit.

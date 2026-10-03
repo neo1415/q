@@ -190,6 +190,7 @@ const DESTINATION_LABELS: Readonly<
   SEARCH: "Open Search",
   GATEWAY: "Open your gateway",
   MEMORY: "Open what Q remembers",
+  USAGE: "See what Q used for you",
   NEW_PITCH: "Add a pitch video",
   REHEARSALS: "Open Rehearsals",
   DOCUMENTS: "Open Documents",
