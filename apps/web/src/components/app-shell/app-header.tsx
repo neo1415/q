@@ -19,7 +19,7 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
       <div className="flex h-(--cq-header-height) items-center justify-between gap-3 px-4">
         <Link
           href="/home"
-          className="cq-title-md shrink-0 rounded-xs whitespace-nowrap text-(--cq-text-primary)"
+          className="cq-title-md inline-flex min-h-11 shrink-0 items-center rounded-xs whitespace-nowrap text-(--cq-text-primary)"
         >
           Capital Q
         </Link>

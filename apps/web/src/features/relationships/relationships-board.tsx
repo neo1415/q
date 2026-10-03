@@ -330,9 +330,12 @@ function RelationshipCard({
               id={`relationship-${item.relationshipId}`}
               className="cq-body min-w-0 font-semibold text-(--cq-text-primary)"
             >
+              {/* The name is the card's way in: a 44 px tall hit area
+                  around 24 px of text, with no change to the layout
+                  (demo-44 phone pass). */}
               <Link
                 href={href}
-                className="inline-flex items-center gap-1 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                className="relative inline-flex items-center gap-1 underline-offset-4 after:absolute after:inset-x-0 after:-inset-y-2.5 after:content-[''] hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
               >
                 {name}
                 <ArrowUpRight size={ICON_SIZE.compact} aria-hidden="true" />
