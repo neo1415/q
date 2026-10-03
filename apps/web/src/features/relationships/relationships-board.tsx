@@ -11,7 +11,6 @@ import {
 import { cx } from "@capital-q/ui";
 import {
   ArrowUpRight,
-  Bell,
   CalendarDays,
   ICON_SIZE,
   MessageSquare,
@@ -20,7 +19,6 @@ import {
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { useDockAvoid } from "@/features/q-dock";
-import { QAperture } from "@/features/q-aperture/q-aperture";
 import { initials } from "@/features/investors/investor-labels";
 
 import type { RelationshipDigest } from "./relationship-data";
@@ -399,7 +397,7 @@ function RelationshipCard({
 
       <ul
         ref={actions}
-        className="grid grid-cols-2 gap-2 lg:grid-cols-4"
+        className="grid grid-cols-2 gap-2"
         aria-label="At a glance"
       >
         <li>
@@ -432,28 +430,28 @@ function RelationshipCard({
             href={connected ? `${href}#calls` : undefined}
           />
         </li>
-        <li>
-          <Tile
-            icon={<Bell size={ICON_SIZE.compact} aria-hidden="true" />}
-            label="Reminder"
-            value={
-              digest?.nextReminder === null ||
-              digest?.nextReminder === undefined
-                ? "Set a reminder"
-                : `${formatRelationshipDate(digest.nextReminder.dueAt)} · ${digest.nextReminder.title}`
-            }
-            href={`${href}#reminders`}
-          />
-        </li>
-        <li>
-          <Tile
-            icon={<QAperture state="IDLE" size="chrome" />}
-            label="Q insights"
-            value="Ask Q about this"
-            onClick={ask}
-          />
-        </li>
       </ul>
+      {/*
+        Two tiles, the two next steps (re-capture 2026-10-03: four tiles
+        per card were dense on a phone). A reminder and Q are quiet links.
+      */}
+      <div className="flex flex-wrap gap-x-4">
+        <Link
+          href={`${href}#reminders`}
+          className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-secondary) underline-offset-4 hover:underline"
+        >
+          {digest?.nextReminder === null || digest?.nextReminder === undefined
+            ? "Set a reminder"
+            : `Reminder ${formatRelationshipDate(digest.nextReminder.dueAt)}`}
+        </Link>
+        <button
+          type="button"
+          onClick={ask}
+          className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-secondary) underline-offset-4 hover:underline"
+        >
+          Ask Q about this
+        </button>
+      </div>
     </article>
   );
 }

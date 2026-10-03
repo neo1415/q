@@ -51,7 +51,7 @@ describe("RelationshipsIndex", () => {
     expect(card.textContent).toContain("After you connect");
     expect(
       within(card)
-        .getByRole("link", { name: /Reminder/ })
+        .getByRole("link", { name: /reminder/i })
         .getAttribute("href"),
     ).toBe(
       "/relationships/company/c0000000-0000-4000-8000-000000000001#reminders",
