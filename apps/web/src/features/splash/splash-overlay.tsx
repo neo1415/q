@@ -53,7 +53,7 @@ export function SplashOverlay() {
       theme === "light" || theme === "dark" ? theme : "system";
     controller.current = createCapitalQSplash(element, {
       // The formed Q holds for a beat before it hands over.
-      onComplete: () => window.setTimeout(leave, 450),
+      onComplete: () => window.setTimeout(leave, 250),
     });
     const skip = () => leave();
     window.addEventListener("keydown", skip, { once: true });
@@ -105,12 +105,14 @@ export function SplashOverlay() {
         </p>
       </div>
       <div className="cq-splash-foot" aria-hidden="true">
-        <span>DISCOVER</span>
+        <span>Discover</span>
         <i />
-        <span>CONNECT</span>
+        <span>Connect</span>
         <i />
-        <span>BUILD</span>
+        <span>Build</span>
       </div>
+      {/* The tap already skips; now it says so. */}
+      <p className="cq-splash-skip">Tap to skip</p>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 /**
  * Capital Q splash, "Living Convergence" (founder handoff revision 3,
- * 2026-09-29): scattered particles spiral into the Q over 4.8 seconds,
+ * 2026-09-29): scattered particles spiral into the Q (formed in 1.3 s since
+ * the 2026-10-03 demo audit; the choreography is the founder's 4.8 s one,
+ * played faster),
  * then a sparse, irregular glow keeps the formed Q alive. One Canvas2D
  * surface, no dependencies, no network. Ported from the founder's
  * `splash.js` as it was supplied, typed; behaviour is unchanged.
@@ -35,7 +37,15 @@ type Particle = {
   readonly glow: boolean;
 };
 
+/** The founder's choreography, in its own time units. */
 export const SPLASH_DURATION_MS = 4_800;
+/**
+ * How long the formation takes on screen (demo audit 2026-10-03: the
+ * splash held the sign-in form for ~6.5 s; the whole splash, hold and
+ * fade included, now stays under 2 s).
+ */
+export const SPLASH_FORMATION_MS = 1_300;
+const SPEED = SPLASH_DURATION_MS / SPLASH_FORMATION_MS;
 const TAU = Math.PI * 2;
 
 export function createCapitalQSplash(
@@ -264,7 +274,7 @@ export function createCapitalQSplash(
     if (dead || paused || document.hidden) return;
     if (last !== 0) {
       const delta = now - last;
-      elapsed += delta;
+      elapsed += delta * SPEED;
       if (elapsed < SPLASH_DURATION_MS && delta > 28) slow += 1;
       if (slow >= 12) quality = 0.5;
     }
