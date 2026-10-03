@@ -33,6 +33,9 @@ export type InstructionRow = {
   expires_at: Date | null;
   stopped_at: Date | null;
   conversation_id: string | null;
+  next_fire_at?: Date | null;
+  last_fired_at?: Date | null;
+  cadence_minutes?: number;
   created_at: Date;
   updated_at: Date;
   grant_payload: unknown;
@@ -152,7 +155,7 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
               ), moved as (
                 update q_runtime.standing_instructions s
                    set grant_version = granted.version, status = 'ACTIVE',
-                       pause_reason = null,
+                       pause_reason = null, next_fire_at = null,
                        budget_usd_month = ${input.grant.budgetUsdMonth}::numeric,
                        expires_at = ${expiresAt}, updated_at = clock_timestamp()
                   from granted
@@ -215,6 +218,53 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
         update q_runtime.standing_instructions
            set conversation_id = ${conversationId}, updated_at = clock_timestamp()
          where id = ${id} and conversation_id is null`;
+    },
+
+    /**
+     * S4: claims the instructions due now, moving each one's next firing
+     * forward in the same statement (skip locked), so no two instances
+     * fire the same one. Returns each with the instant it was claimed at.
+     */
+    claimDue: async (
+      limit: number,
+    ): Promise<readonly { id: string; claimed_at: Date }[]> =>
+      sql<{ id: string; claimed_at: Date }[]>`
+        update q_runtime.standing_instructions s
+           set last_fired_at = clock_timestamp(),
+               next_fire_at = clock_timestamp() + make_interval(mins => s.cadence_minutes),
+               updated_at = clock_timestamp()
+         where s.id in (
+           select id from q_runtime.standing_instructions
+            where status = 'ACTIVE'
+              and (next_fire_at is null or next_fire_at <= clock_timestamp())
+            order by next_fire_at nulls first
+            limit ${limit}
+            for update skip locked)
+        returning s.id, s.last_fired_at as claimed_at`,
+
+    /** Outside their hours: try again later, not a full cadence later. */
+    defer: async (id: string, minutes: number): Promise<void> => {
+      await sql`
+        update q_runtime.standing_instructions
+           set next_fire_at = clock_timestamp() + make_interval(mins => ${minutes}),
+               updated_at = clock_timestamp()
+         where id = ${id} and status = 'ACTIVE'`;
+    },
+
+    /**
+     * Something happened on a relationship Q has worked on under an
+     * instruction: that instruction is due now.
+     */
+    wakeFor: async (relationshipId: string): Promise<number> => {
+      const rows = await sql<{ id: string }[]>`
+        update q_runtime.standing_instructions s
+           set next_fire_at = clock_timestamp(), updated_at = clock_timestamp()
+         where s.status = 'ACTIVE'
+           and exists (
+             select 1 from q_runtime.instruction_steps t
+              where t.instruction_id = s.id and t.relationship_id = ${relationshipId})
+        returning s.id`;
+      return rows.length;
     },
 
     /** Past its expiry: EXPIRED, once. */

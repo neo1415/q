@@ -105,8 +105,10 @@ import {
 } from "./composition/instructions/ask.js";
 import {
   createInstructionEngine,
+  instructionPeople,
   type InstructionEngine,
 } from "./composition/instructions/engine.js";
+import { createInstructionTriggers } from "./composition/instructions/triggers.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -1397,6 +1399,17 @@ const workOwnCompany = (actor: ActorContext): Promise<string | null> =>
 const instructionStore = createPostgresInstructionStore(database.sql);
 // Composed once the runtime, the Approval Engine and the planner exist.
 const instructionEngine: { current?: InstructionEngine } = {};
+// S4: cadence, approval and relationship events fire it (claimed in the DB).
+const instructionTriggers = createInstructionTriggers({
+  store: instructionStore,
+  engine: () => instructionEngine.current,
+  logger,
+});
+setInterval(() => {
+  void instructionTriggers.sweep().catch((error: unknown) => {
+    logger.warn({ err: error }, "standing instruction sweep failed");
+  });
+}, 120_000).unref();
 // Lead 2026-10-03: Q acts alone only once budget (S5) and quarantine (S6)
 // are live. Off by default: every AUTO step is asked.
 const instructionsAuto = process.env.CQ_INSTRUCTIONS_AUTO === "on";
@@ -2207,12 +2220,11 @@ const qActionRegistry = createQActionRegistry([
     store: instructionStore,
     autoEnabled: instructionsAuto,
     // The first firing, at once (composed further down).
-    onActivated: (instructionId, version) => {
-      void instructionEngine.current
-        ?.fire(instructionId, `activated-v${String(version)}`)
-        .catch((error: unknown) => {
-          logger.warn({ err: error, instructionId }, "instruction not fired");
-        });
+    onActivated: (instructionId) => {
+      // Due at once (next_fire_at is null): the sweep claims and fires it.
+      void instructionTriggers.sweep().catch((error: unknown) => {
+        logger.warn({ err: error, instructionId }, "instruction not fired");
+      });
     },
     logger,
   }).map((definition) =>
@@ -3192,18 +3204,13 @@ instructionEngine.current = createInstructionEngine({
           select auth_user_id from identity.user_profiles where id = ${userId}`
       )[0]?.auth_user_id ?? null,
   }),
-  people: async (actor) => {
-    const own = await errandRelationships.ownRelationships?.(actor);
-    return (own?.items ?? [])
-      .filter((item) => item.state !== "DECLINED")
-      .map((item) => ({
-        relationshipId: item.relationshipId,
-        counterpartKind: item.counterpart.kind,
-        counterpartId: item.counterpart.id,
-        name: item.counterpart.name,
-        state: item.state,
-      }));
-  },
+  people: (actor) =>
+    instructionPeople(actor, {
+      relationships: async (who) =>
+        (await errandRelationships.ownRelationships?.(who)) ?? null,
+      feed: async (who) => (await workFeed.page(who, 15))?.items ?? [],
+      decisions: (who) => workFeed.decisions(who, 30),
+    }),
   plan: (who, variables) => errandComposers.instructionPlan(who, variables),
   ask: createInstructionAsk({
     runtime: qRuntime,
@@ -3229,6 +3236,10 @@ void createWorkWakeListener({
     void workRuntime.tick().catch(() => undefined);
   },
   targets: [
+    {
+      name: "instructions",
+      wake: (relationshipId) => instructionTriggers.wake(relationshipId),
+    },
     {
       name: "errands",
       wake: async (relationshipId) =>

@@ -248,7 +248,11 @@ describe("the validator: code decides each step", () => {
       "REFUSED:OUT_OF_SCOPE",
     );
     const listed = grant({
-      counterparts: { scope: "LISTED", relationshipIds: [REL] },
+      counterparts: {
+        scope: "LISTED",
+        relationshipIds: [REL],
+        includeNewCompanies: false,
+      },
     });
     expect(
       verdictOf(validate(chat("Hi", {}, OTHER_REL), { grant: listed })),
@@ -311,6 +315,50 @@ describe("the validator: code decides each step", () => {
     );
   });
 
+  it("expresses interest in a new company only when the grant includes new companies", () => {
+    const fresh = randomUUID();
+    const step: InstructionPlanStep = {
+      action: "relationship.interest.express",
+      argumentsJson: JSON.stringify({
+        companyId: fresh,
+        idempotencyKey: "y".repeat(8),
+        input: {},
+      }),
+      topic: null,
+      touchesTermsOrMoney: false,
+      words: "Express interest in New Co.",
+    };
+    const people: InstructionPerson[] = [
+      ...PEOPLE,
+      {
+        relationshipId: null,
+        counterpartKind: "COMPANY",
+        counterpartId: fresh,
+        name: "New Co",
+        state: "IN_FEED_NOT_CONTACTED",
+      },
+    ];
+    const check = (includeNewCompanies: boolean) =>
+      verdictOf(
+        validateStep(step, {
+          grant: grant({
+            counterparts: {
+              scope: "ALL_MY_RELATIONSHIPS",
+              relationshipIds: [],
+              includeNewCompanies,
+            },
+          }),
+          actions: ACTIONS,
+          people,
+          sent: new Map<string, number>(),
+          now: IN_HOURS,
+          stepKey: "instr:test:run:0",
+        }),
+      );
+    expect(check(false)).toBe("REFUSED:OUT_OF_SCOPE");
+    expect(check(true)).toBe("AUTO");
+  });
+
   it("never lets a grant make a commitment Q's alone", () => {
     const forged = grant({
       actions: [{ action: "relationship.outcome.change", mode: "AUTO" }],
@@ -332,7 +380,11 @@ describe("the validator: code decides each step", () => {
 // One firing, end to end over fakes
 // ---------------------------------------------------------------------------
 
-function world(plans: readonly InstructionPlanResult[], autoEnabled = true) {
+function world(
+  plans: readonly InstructionPlanResult[],
+  autoEnabled = true,
+  at = IN_HOURS,
+) {
   const row: InstructionRow = {
     id: randomUUID(),
     tenant_id: tenantId,
@@ -392,7 +444,7 @@ function world(plans: readonly InstructionPlanResult[], autoEnabled = true) {
       asked.push({ actionType: card.actionType, key: card.key });
       return Promise.resolve({ qActionId: randomUUID() });
     },
-    now: () => IN_HOURS,
+    now: () => at,
     autoEnabled,
   });
   return { engine, row, steps, asked, planned };
@@ -452,6 +504,18 @@ describe("a firing", () => {
     await engine.fire(row.id, "run-0001");
     expect(ran).toHaveLength(1);
     expect(asked).toHaveLength(1);
+  });
+
+  it("plans nothing (and spends nothing) outside their working hours", async () => {
+    const { engine, row, planned } = world(
+      [{ steps: [chat("Hi")], cannot: [] }],
+      true,
+      AFTER_HOURS,
+    );
+    expect((await engine.fire(row.id, "run-0004")).outcome).toBe(
+      "OUTSIDE_HOURS",
+    );
+    expect(planned).toHaveLength(0);
   });
 
   it(`re-plans at most ${String(MAX_REPLANS)} times, then records the refusal in plain words`, async () => {
