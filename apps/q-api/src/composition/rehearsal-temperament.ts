@@ -45,6 +45,9 @@ export const REGISTERS = [
   "FURIOUS",
   "ANGRY",
   "EXASPERATED",
+  // A person whose ceiling is COLD: as displeased as exasperated, never
+  // louder -- cold, quiet and formal (founder feedback 2026-10-03).
+  "COLD",
   "CRYING",
   "SAD",
   "DELIGHTED",
@@ -197,9 +200,20 @@ export function applyAppraisal(
   state: Temperament,
   appraisal: AppliedAppraisal,
   difficulty: Difficulty,
+  profile?: TemperamentProfile,
+  /** Their line touched what this person warms to, or what cools them. */
+  topic: TopicTouch = null,
 ): Temperament {
-  const { worse, better } = PROFILE[difficulty];
-  const delta: Delta = EFFECTS[appraisal] ?? {};
+  const { worse, better } = profile ?? PROFILE[difficulty];
+  const base: Delta = EFFECTS[appraisal] ?? {};
+  const delta: Delta =
+    topic === null
+      ? base
+      : {
+          ...base,
+          warmth: (base.warmth ?? 0) + (topic === "WARMS" ? 8 : -6),
+          frustration: (base.frustration ?? 0) + (topic === "WARMS" ? -4 : 8),
+        };
   const scale = (key: keyof Temperament, value: number) => {
     // Rising frustration or hurt, or falling warmth or patience, is "worse".
     const bad = key === "frustration" || key === "hurt" ? value > 0 : value < 0;
@@ -265,6 +279,7 @@ export function temperamentNote(
     ANGRY: "you are angry: cutting, blunt, no warmth",
     EXASPERATED:
       "you are exasperated: impatient, frustrated, you may sigh or be sarcastic",
+    COLD: "you have gone cold: quiet, formal and brief; you never raise your voice",
     CRYING:
       "you are deeply upset: your voice breaks, you may cry, you struggle to keep composure",
     SAD: "you are disappointed and sad: quieter, heavier",
@@ -285,6 +300,7 @@ const IN_REGISTER: Readonly<Record<Register, readonly string[]>> = {
   FURIOUS: ["ANGRY"],
   ANGRY: ["ANGRY", "ANNOYED", "COLD"],
   EXASPERATED: ["IMPATIENT", "ANNOYED", "SARCASTIC", "COLD"],
+  COLD: ["COLD", "SKEPTICAL", "INDIFFERENT", "DISAPPOINTED"],
   CRYING: ["SAD"],
   SAD: ["SAD", "DISAPPOINTED", "MEEK"],
   DELIGHTED: ["ENTHUSIASTIC", "HAPPY", "AMUSED"],
@@ -295,6 +311,7 @@ const REGISTER_MOOD: Readonly<Record<Register, string>> = {
   FURIOUS: "ANGRY",
   ANGRY: "ANGRY",
   EXASPERATED: "IMPATIENT",
+  COLD: "COLD",
   CRYING: "SAD",
   SAD: "DISAPPOINTED",
   DELIGHTED: "ENTHUSIASTIC",
@@ -364,6 +381,13 @@ export function deliveryFor(
       return { mood, intensity: "RAISED", reaction: null };
     case "ANGRY":
       return { mood, intensity: "NORMAL", reaction: null };
+    case "COLD":
+      // Quiet displeasure: never raised, no sigh for show.
+      return {
+        mood,
+        intensity: model.intensity === "SOFT" ? "SOFT" : "NORMAL",
+        reaction: null,
+      };
     case "EXASPERATED":
       return {
         mood,
@@ -458,6 +482,189 @@ export const WARNING_OPENERS = {
 
 export const WALK_OUT_LINE =
   "That's it. I'm ending this meeting here. Goodbye!";
+
+/** How a ONE_COLD_REMARK person signals, then leaves: politely, quietly. */
+export const COLD_REMARK = "I'm not sure this is going anywhere.";
+export const POLITE_EXIT_LINE =
+  "I don't think this is for us. Thank you for your time.";
+
+// ---------------------------------------------------------------------------
+// Each played person's own temperament (founder feedback 2026-10-03: "if
+// they all behave the same way, doesn't that defeat the purpose?"). The
+// machine stays the frame; the persona's conduct sets its parameters, and
+// difficulty scales them.
+// ---------------------------------------------------------------------------
+
+export type PersonaConductLike = {
+  readonly patience: "SHORT" | "TYPICAL" | "LONG";
+  readonly warmth: "RESERVED" | "TYPICAL" | "GENEROUS";
+  readonly dodgeTolerance: "LOW" | "TYPICAL" | "HIGH";
+  readonly ceiling: "COLD" | "IMPATIENT" | "ANGRY" | "FURIOUS";
+  readonly leaving: "WARNS_TWICE" | "ONE_COLD_REMARK";
+};
+
+export type TemperamentProfile = {
+  readonly start: Temperament;
+  /** How hard bad moments land (patience drains, frustration rises). */
+  readonly worse: number;
+  /** How much a good answer buys. */
+  readonly better: number;
+  /** Dodges in a row they let pass before pressing (never fewer than 1). */
+  readonly dodgesBeforeWarning: number;
+  /** The loudest register they reach. */
+  readonly ceiling: Register;
+  /** Signals they give before they leave: two warnings, or one cold remark. */
+  readonly signalsBeforeLeaving: 1 | 2;
+};
+
+/**
+ * Their conduct as read by the persona (v6), or for an older reading a
+ * default from what it does say: their baseline mood and forwardness.
+ */
+export function conductOf(persona: {
+  readonly temperament: { readonly baseline: string };
+  readonly forwardness?: "RESERVED" | "TYPICAL" | "FORWARD" | undefined;
+  readonly conduct?: PersonaConductLike | undefined;
+}): PersonaConductLike {
+  if (persona.conduct !== undefined) return persona.conduct;
+  const baseline = persona.temperament.baseline;
+  const forward = persona.forwardness === "FORWARD";
+  const reserved = persona.forwardness === "RESERVED";
+  return {
+    patience:
+      baseline === "IMPATIENT" || forward
+        ? "SHORT"
+        : baseline === "WARM" || baseline === "ENTHUSIASTIC"
+          ? "LONG"
+          : "TYPICAL",
+    warmth:
+      baseline === "WARM" || baseline === "ENTHUSIASTIC"
+        ? "GENEROUS"
+        : baseline === "COLD" || reserved
+          ? "RESERVED"
+          : "TYPICAL",
+    dodgeTolerance: forward ? "LOW" : reserved ? "HIGH" : "TYPICAL",
+    ceiling:
+      baseline === "COLD" || reserved ? "COLD" : forward ? "FURIOUS" : "ANGRY",
+    leaving:
+      baseline === "COLD" || reserved ? "ONE_COLD_REMARK" : "WARNS_TWICE",
+  };
+}
+
+const CEILING_REGISTER: Readonly<
+  Record<PersonaConductLike["ceiling"], Register>
+> = {
+  COLD: "COLD",
+  IMPATIENT: "EXASPERATED",
+  ANGRY: "ANGRY",
+  FURIOUS: "FURIOUS",
+};
+
+/** The persona's conduct, scaled by difficulty: the frame's parameters. */
+export function temperamentProfile(
+  conduct: PersonaConductLike,
+  baseline: string,
+  difficulty: Difficulty,
+): TemperamentProfile {
+  const level = PROFILE[difficulty];
+  const start = initialTemperament(difficulty, baseline);
+  const patience =
+    conduct.patience === "SHORT" ? -15 : conduct.patience === "LONG" ? 15 : 0;
+  const tolerance =
+    (conduct.dodgeTolerance === "HIGH" ? 2 : 1) +
+    (difficulty === "GENTLE" ? 1 : 0);
+  const ceiling = CEILING_REGISTER[conduct.ceiling];
+  return {
+    start: { ...start, patience: clamp(start.patience + patience) },
+    worse:
+      level.worse *
+      (conduct.patience === "SHORT"
+        ? 1.4
+        : conduct.patience === "LONG"
+          ? 0.7
+          : 1),
+    better:
+      level.better *
+      (conduct.warmth === "GENEROUS"
+        ? 1.5
+        : conduct.warmth === "RESERVED"
+          ? 0.6
+          : 1),
+    // Never a warning for a first dodge, whoever they are.
+    dodgesBeforeWarning: Math.max(1, tolerance),
+    // Gentle never goes past exasperation; a cold person stays cold.
+    ceiling:
+      difficulty === "GENTLE" &&
+      ceiling !== "COLD" &&
+      rung(ceiling) > rung("EXASPERATED")
+        ? "EXASPERATED"
+        : ceiling,
+    signalsBeforeLeaving: conduct.leaving === "ONE_COLD_REMARK" ? 1 : 2,
+  };
+}
+
+/** Whether their line touched what this person warms to or cools on. */
+export type TopicTouch = "WARMS" | "COOLS" | null;
+
+const STOP = new Set([
+  "about",
+  "their",
+  "there",
+  "these",
+  "those",
+  "which",
+  "would",
+  "could",
+  "should",
+  "where",
+  "being",
+  "other",
+  "every",
+  "under",
+  "after",
+  "before",
+  "really",
+  "things",
+  "people",
+  "company",
+  "founders",
+  "founder",
+  "investor",
+  "investors",
+  "business",
+  "something",
+]);
+const contentWords = (text: string): Set<string> =>
+  new Set(
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length >= 5 && !STOP.has(word))
+      .map((word) => word.replace(/(?:ies|es|s)$/u, "")),
+  );
+
+/**
+ * Their line against the persona's warmsTo and coolsOn, by shared content
+ * words (two or more with one item): a deterministic modifier on the
+ * numbers and one step of register, never a warning by itself.
+ */
+export function topicTouchOf(
+  line: string,
+  temperament: {
+    readonly warmsTo: readonly string[];
+    readonly coolsOn: readonly string[];
+  },
+): TopicTouch {
+  const said = contentWords(line);
+  const touches = (items: readonly string[]) =>
+    items.some(
+      (item) =>
+        [...contentWords(item)].filter((word) => said.has(word)).length >= 2,
+    );
+  if (touches(temperament.coolsOn)) return "COOLS";
+  if (touches(temperament.warmsTo)) return "WARMS";
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // The temperament machine (QA rehearsal d7ef826e: a first dodge went
@@ -554,6 +761,8 @@ const LADDER: readonly Register[] = [
   "FURIOUS",
 ];
 const rung = (register: Register): number => {
+  // Cold is as displeased as exasperated, only quieter.
+  if (register === "COLD") return LADDER.indexOf("EXASPERATED");
   const at = LADDER.indexOf(register);
   // Grief sits beside the ladder: its level for anger is composed.
   return at === -1 ? LADDER.indexOf("EVEN") : at;
@@ -585,6 +794,10 @@ export type TemperamentInput = {
   readonly modelClose: { readonly conclusion: string | null } | null;
   /** The meeting is at its natural end (code's wrap-up). */
   readonly wrappingUp: boolean;
+  /** This person's own parameters; absent: the shared default. */
+  readonly profile?: TemperamentProfile | undefined;
+  /** Their line touched what this person warms to or cools on. */
+  readonly topic?: TopicTouch | undefined;
 };
 
 export type TemperamentStep = {
@@ -598,6 +811,8 @@ export type TemperamentStep = {
    * end or with a good outcome). NONE: the meeting goes on.
    */
   readonly close: "NONE" | "NATURAL" | "WALK_OUT";
+  /** How this person signals and leaves: in anger, or coolly and politely. */
+  readonly manner: "HEATED" | "COOL";
 };
 
 /**
@@ -618,53 +833,86 @@ export type TemperamentStep = {
  * walk-out (and a no only at the natural end). Anything else is not a close.
  */
 export function nextTemperament(input: TemperamentInput): TemperamentStep {
+  const profile = input.profile;
+  const tolerance = Math.max(1, profile?.dodgesBeforeWarning ?? 1);
+  const leaveAfter = profile?.signalsBeforeLeaving ?? 2;
+  const cool = profile?.ceiling === "COLD" || leaveAfter === 1;
+  const manner: TemperamentStep["manner"] = cool ? "COOL" : "HEATED";
   const from = rung(input.previous);
-  const cap = (index: number) =>
-    input.difficulty === "GENTLE" ? Math.min(index, EXASPERATED_RUNG) : index;
+  const ceilingRung =
+    profile === undefined
+      ? input.difficulty === "GENTLE"
+        ? EXASPERATED_RUNG
+        : LADDER.length - 1
+      : rung(profile.ceiling);
+  const cap = (index: number) => Math.min(index, ceilingRung);
   const provoking =
     input.category === "RUDE" ||
-    (input.category === "DODGE" && input.dodgeStreak >= 1);
-  let register: Register;
+    (input.category === "DODGE" && input.dodgeStreak >= tolerance);
+  const topic = input.topic ?? null;
+  let index: number;
   switch (input.category) {
     case "STRONG":
     case "WARMING":
-      register = at(from - 1);
+      index = from - 1 - (topic === "WARMS" ? 1 : 0);
       break;
     case "DIRECT":
     case "NEUTRAL":
-      register = at(from);
+      // What they warm to softens them a step; what cools them hardens
+      // them a step, never past impatience by itself.
+      index =
+        topic === "WARMS"
+          ? from - 1
+          : topic === "COOLS"
+            ? Math.max(from, Math.min(from + 1, EXASPERATED_RUNG))
+            : from;
       break;
     case "GAP":
-      register = at(Math.max(from, Math.min(from + 1, EXASPERATED_RUNG)));
+      index = Math.max(from, Math.min(from + 1, EXASPERATED_RUNG));
       break;
     case "DODGE":
-      register =
-        input.dodgeStreak >= 1
-          ? at(Math.max(ANGRY_RUNG, from))
-          : at(Math.max(from, EXASPERATED_RUNG));
+      index =
+        input.dodgeStreak >= tolerance
+          ? Math.max(ANGRY_RUNG, from)
+          : Math.max(from, EXASPERATED_RUNG);
       break;
     case "RUDE":
-      register = at(from >= ANGRY_RUNG ? ANGRY_RUNG + 1 : ANGRY_RUNG);
+      index = from >= ANGRY_RUNG ? ANGRY_RUNG + 1 : ANGRY_RUNG;
       break;
     case "ASKED":
-      register = at(Math.min(from, EXASPERATED_RUNG));
+      index = Math.min(from, EXASPERATED_RUNG);
       break;
     case "HURTING":
-      register = input.hurt >= 70 ? "CRYING" : "SAD";
+      index = -1;
       break;
   }
-  if (LADDER.includes(register)) register = at(cap(rung(register)));
+  let register: Register =
+    input.category === "HURTING"
+      ? input.hurt >= 70
+        ? "CRYING"
+        : "SAD"
+      : at(cap(index));
+  // A cold person is never louder than cold: displeasure goes quiet.
+  if (
+    profile?.ceiling === "COLD" &&
+    LADDER.includes(register) &&
+    rung(register) >= EXASPERATED_RUNG
+  ) {
+    register = "COLD";
+  }
   if (input.theyAskedToEnd) {
-    return { register, warning: null, close: "NATURAL" };
+    return { register, warning: null, close: "NATURAL", manner };
   }
   if (provoking) {
-    if (input.warningsGiven >= 2) {
-      return { register, warning: null, close: "WALK_OUT" };
+    // They leave only once they have signalled it, in their own way.
+    if (input.warningsGiven >= leaveAfter) {
+      return { register, warning: null, close: "WALK_OUT", manner };
     }
     return {
       register,
       warning: input.warningsGiven === 0 ? 1 : 2,
       close: "NONE",
+      manner,
     };
   }
   const conclusion = input.modelClose?.conclusion ?? null;
@@ -674,8 +922,15 @@ export function nextTemperament(input: TemperamentInput): TemperamentStep {
     calm &&
     (conclusion === null ||
       !WALK_OUT_CONCLUSIONS.has(conclusion) ||
-      (conclusion === "DECLINED" && input.wrappingUp));
-  return { register, warning: null, close: naturalClose ? "NATURAL" : "NONE" };
+      (conclusion === "DECLINED" &&
+        // A quiet "this isn't for us" stands once they have signalled it.
+        (input.wrappingUp || (cool && input.warningsGiven >= leaveAfter))));
+  return {
+    register,
+    warning: null,
+    close: naturalClose ? "NATURAL" : "NONE",
+    manner,
+  };
 }
 
 /**
@@ -693,8 +948,16 @@ export function withoutWarningTalk(line: string): string {
 }
 
 /** The line as code's warning: its opener once, then the model's words. */
-export function warnedLine(stage: 1 | 2, line: string): string {
+export function warnedLine(
+  stage: 1 | 2,
+  line: string,
+  manner: "HEATED" | "COOL" = "HEATED",
+): string {
   const words = withoutWarningTalk(line);
+  // A cool person signals with one cold remark, not a raised warning.
+  if (manner === "COOL") {
+    return words.length === 0 ? COLD_REMARK : `${COLD_REMARK} ${words}`;
+  }
   const opener = WARNING_OPENERS[stage];
   const follow =
     stage === 1

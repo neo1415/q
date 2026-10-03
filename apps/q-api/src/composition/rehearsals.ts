@@ -53,10 +53,13 @@ import {
   questionOpenIn,
   theyAskedIn,
   deliveryFor,
-  initialTemperament,
   registerOf,
   stanceOf,
   WALK_OUT_LINE,
+  POLITE_EXIT_LINE,
+  conductOf,
+  temperamentProfile,
+  topicTouchOf,
   temperamentNote,
   type Temperament,
 } from "./rehearsal-temperament.js";
@@ -1671,9 +1674,24 @@ export function createRehearsalService(dependencies: {
       (minutes >= WRAP_UP_MINUTES || turns.length >= WRAP_UP_TURNS);
     // The temperament so far: carried on their last line, or where the
     // persona and difficulty start them.
+    // This person's own temperament profile (founder feedback 2026-10-03):
+    // their conduct as the persona reads it, scaled by difficulty.
+    const profile = temperamentProfile(
+      conductOf(persona),
+      persona.temperament.baseline,
+      row.difficulty,
+    );
     const before =
       [...turns].reverse().find((turn) => turn.from === "THEM")?.state ??
-      initialTemperament(row.difficulty, persona.temperament.baseline);
+      profile.start;
+    // Their latest line against what this person warms to or cools on.
+    const theirLatest = [...turns]
+      .reverse()
+      .find((turn) => turn.from === "YOU");
+    const topic =
+      cue === "NONE" && theirLatest !== undefined
+        ? topicTouchOf(theirLatest.text, persona.temperament)
+        : null;
     // The register the machine left them in on their last line; before
     // any, where the persona and difficulty start them.
     // Code's own lines (a yield to a raised hand, a holding line) carry no
@@ -1799,6 +1817,8 @@ export function createRehearsalService(dependencies: {
       before,
       stateAppraisalOf(category, result.appraisal),
       row.difficulty,
+      profile,
+      topic,
     );
     const step = nextTemperament({
       category,
@@ -1812,6 +1832,8 @@ export function createRehearsalService(dependencies: {
       modelClose:
         result.move === "CLOSE" ? { conclusion: result.conclusion } : null,
       wrappingUp: wrapUp,
+      profile,
+      topic,
     });
     const register = step.register;
     const shaped: RehearsalTurnResult =
@@ -1820,7 +1842,8 @@ export function createRehearsalService(dependencies: {
             ...result,
             move: "CLOSE",
             conclusion: "DECLINED",
-            line: WALK_OUT_LINE,
+            // In their own manner: in anger, or a polite, quiet exit.
+            line: step.manner === "COOL" ? POLITE_EXIT_LINE : WALK_OUT_LINE,
           }
         : step.close === "NATURAL"
           ? result
@@ -1832,7 +1855,7 @@ export function createRehearsalService(dependencies: {
               line:
                 step.warning === null
                   ? withoutWarningTalk(result.line) || "Go on."
-                  : warnedLine(step.warning, result.line),
+                  : warnedLine(step.warning, result.line, step.manner),
             };
     const delivery = deliveryFor(
       register,

@@ -100,6 +100,7 @@ import { INVESTOR_TWIN_TURN_V4 } from "./tasks/investor-twin-turn.v4.js";
 import { INVESTOR_PERSONA_V3 } from "./tasks/investor-persona.v3.js";
 import { INVESTOR_PERSONA_V4 } from "./tasks/investor-persona.v4.js";
 import { INVESTOR_PERSONA_V5 } from "./tasks/investor-persona.v5.js";
+import { INVESTOR_PERSONA_V6 } from "./tasks/investor-persona.v6.js";
 import { INVESTOR_TWIN_TURN_V5 } from "./tasks/investor-twin-turn.v5.js";
 import { INVESTOR_TWIN_TURN_V6 } from "./tasks/investor-twin-turn.v6.js";
 import { INVESTOR_TWIN_TURN_V7 } from "./tasks/investor-twin-turn.v7.js";
@@ -392,6 +393,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INVESTOR_PERSONA_V3,
     INVESTOR_PERSONA_V4,
     INVESTOR_PERSONA_V5,
+    INVESTOR_PERSONA_V6,
     INVESTOR_TWIN_TURN_V5,
     INVESTOR_TWIN_TURN_V6,
     INVESTOR_TWIN_TURN_V7,

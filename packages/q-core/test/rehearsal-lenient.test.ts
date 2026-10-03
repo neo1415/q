@@ -72,7 +72,7 @@ describe("lenient rehearsal readings", () => {
 
   it("is what the active persona and review prompts ask for", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(5);
+    expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(6);
     expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(5);
     expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(9);
   });
@@ -83,6 +83,24 @@ describe("lenient rehearsal readings", () => {
         .template;
     expect(template).toContain('as "you" and "your"');
     expect(template).toContain('Never call them "the founder"');
+  });
+
+  it("the persona reads how they conduct themselves under pressure (founder feedback 2026-10-03)", () => {
+    const template =
+      createDefaultPromptRegistry().getActive("INVESTOR_PERSONA").definition
+        .template;
+    for (const field of [
+      "conduct:",
+      "patience: SHORT",
+      "dodgeTolerance: LOW",
+      "ceiling: the loudest they get. COLD",
+      "leaving: WARNS_TWICE",
+    ]) {
+      expect(template).toContain(field);
+    }
+    expect(template.indexOf("11. conduct")).toBeLessThan(
+      template.indexOf("RULES"),
+    );
   });
 
   it("tells the played person who holds the leverage, and reads how forward they are", () => {
