@@ -393,7 +393,7 @@ function instructionWorkDto(row: InstructionRow): QWorkDto | null {
   const summary =
     row.status === "PAUSED"
       ? `Paused (${row.pause_reason ?? "waiting for you"}): ${row.goal_text}`
-      : `${row.goal_text} -- ${String(auto)} things on my own, the rest I ask; $${row.spent_usd_month.replace(/(\.\d{2})\d*$/u, "$1")} of $${row.budget_usd_month} this month.`;
+      : `${row.goal_text} -- ${String(auto)} things on my own, the rest I ask; $${row.spent_this_month.replace(/(\.\d{2})\d*$/u, "$1")} of $${row.budget_usd_month} this month.`;
   return {
     id: row.id,
     kind: "STANDING_INSTRUCTION",

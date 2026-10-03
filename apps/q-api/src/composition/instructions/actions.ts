@@ -139,9 +139,11 @@ export function createInstructionActions(dependencies: {
       ],
       describe: (payload) => ({
         summary:
-          payload.instructionId === undefined
-            ? "Q works on this for you, inside these limits"
-            : "Change what Q may do for this instruction",
+          payload.continuation === "BUDGET"
+            ? `I've used this month's budget for this. Continue at $${payload.grant.budgetUsdMonth} a month?`
+            : payload.instructionId === undefined
+              ? "Q works on this for you, inside these limits"
+              : "Change what Q may do for this instruction",
         preview: grantCard(payload, {
           autoEnabled: dependencies.autoEnabled,
         }),

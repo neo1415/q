@@ -384,7 +384,11 @@ function world(
   plans: readonly InstructionPlanResult[],
   autoEnabled = true,
   at = IN_HOURS,
+  spent = "0",
 ) {
+  const spends: number[] = [];
+  const paused: string[] = [];
+  const asks: { actionType: string; payload: unknown }[] = [];
   const row: InstructionRow = {
     id: randomUUID(),
     tenant_id: tenantId,
@@ -394,7 +398,8 @@ function world(
     status: "ACTIVE",
     grant_version: 1,
     budget_usd_month: "5.00",
-    spent_usd_month: "0",
+    spent_usd_month: spent,
+    spent_this_month: spent,
     pause_reason: null,
     expires_at: new Date("2026-11-01T00:00:00Z"),
     stopped_at: null,
@@ -427,6 +432,14 @@ function world(
     stepDone: (key: string) => Promise.resolve(steps.has(key)),
     messagesSent: () => Promise.resolve(new Map<string, number>()),
     history: () => Promise.resolve([]),
+    addSpend: (_id: string, amount: number) => {
+      spends.push(amount);
+      return Promise.resolve();
+    },
+    pause: (_id: string, reason: string) => {
+      paused.push(reason);
+      return Promise.resolve(true);
+    },
   } as unknown as InstructionStore;
   const engine = createInstructionEngine({
     store,
@@ -434,20 +447,22 @@ function world(
     ports: {},
     actorFor: () => Promise.resolve(actor),
     people: () => Promise.resolve(PEOPLE),
-    plan: (_who, variables) => {
+    plan: (_who, variables, limits) => {
+      expect(limits.maxCostUsd).toBeGreaterThanOrEqual(0.08);
       planned.push(variables.refusals);
       const plan = plans[Math.min(call, plans.length - 1)] ?? null;
       call += 1;
-      return Promise.resolve(plan);
+      return Promise.resolve({ plan, costUsd: 0.01 });
     },
     ask: (_actor, card) => {
       asked.push({ actionType: card.actionType, key: card.key });
+      asks.push({ actionType: card.actionType, payload: card.payload });
       return Promise.resolve({ qActionId: randomUUID() });
     },
     now: () => at,
     autoEnabled,
   });
-  return { engine, row, steps, asked, planned };
+  return { engine, row, steps, asked, planned, spends, paused, asks };
 }
 
 describe("a firing", () => {
@@ -555,5 +570,52 @@ describe("a firing", () => {
       status: "ASKED",
       reasonCode: "AUTONOMY_OFF",
     });
+  });
+
+  it("adds each planning call's cost to the instruction", async () => {
+    const { engine, row, spends } = world([{ steps: [], cannot: [] }]);
+    await engine.fire(row.id, "run-0005");
+    expect(spends).toEqual([0.01]);
+  });
+
+  it("with the month's budget used, it pauses and asks to continue -- no planning call", async () => {
+    const { engine, row, planned, paused, asks } = world(
+      [{ steps: [chat("Hi")], cannot: [] }],
+      true,
+      IN_HOURS,
+      "4.95",
+    );
+    const result = await engine.fire(row.id, "run-0006");
+    expect(result.outcome).toBe("OVER_BUDGET");
+    expect(planned).toHaveLength(0);
+    expect(paused).toEqual(["BUDGET_EXHAUSTED"]);
+    expect(asks).toEqual([
+      {
+        actionType: "q.instruction.grant",
+        payload: expect.objectContaining({
+          instructionId: row.id,
+          continuation: "BUDGET",
+          grant: expect.objectContaining({
+            budgetUsdMonth: "10.00",
+          }) as unknown,
+        }) as unknown,
+      },
+    ]);
+  });
+
+  it("stops re-planning when the budget runs out mid-firing", async () => {
+    // 0.09 left: one call (0.01) leaves 0.08, a second leaves 0.07 -- a
+    // third would risk going over, so it pauses and asks instead.
+    const { engine, row, planned, paused, spends } = world(
+      [{ steps: [chat("Hi", { action: "money.wire.send" })], cannot: [] }],
+      true,
+      IN_HOURS,
+      "4.91",
+    );
+    const result = await engine.fire(row.id, "run-0007");
+    expect(planned).toHaveLength(2);
+    expect(spends).toEqual([0.01, 0.01]);
+    expect(result.outcome).toBe("OVER_BUDGET");
+    expect(paused).toEqual(["BUDGET_EXHAUSTED"]);
   });
 });

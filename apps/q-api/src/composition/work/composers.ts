@@ -6,9 +6,6 @@ import type { ModelDataPosture } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
-  InstructionPlanResultSchema,
-  type InstructionPlanResult,
-  type InstructionPlanVariables,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
@@ -92,13 +89,6 @@ type TaskVariables = {
   >;
   WORK_STAND_IN_REPLY: Omit<
     WorkStandInReplyVariables,
-    | "operatingMode"
-    | "communicationProfile"
-    | "communicationGuidance"
-    | "environmentNotes"
-  >; /** ADR 0043: a standing instruction's next steps. */
-  INSTRUCTION_PLAN: Omit<
-    InstructionPlanVariables,
     | "operatingMode"
     | "communicationProfile"
     | "communicationGuidance"
@@ -221,15 +211,6 @@ export function createWorkComposers(dependencies: {
         WorkStandInReplyResultSchema,
         SMALL,
         CHAT_NOTE,
-      ),
-    instructionPlan: (who: Who, variables: TaskVariables["INSTRUCTION_PLAN"]) =>
-      call<"INSTRUCTION_PLAN", InstructionPlanResult>(
-        "INSTRUCTION_PLAN",
-        who,
-        variables,
-        InstructionPlanResultSchema,
-        LARGE,
-        "You are planning, not acting. Code checks every step against what they approved before anything happens.",
       ),
   };
 }

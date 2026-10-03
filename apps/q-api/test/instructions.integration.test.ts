@@ -193,6 +193,29 @@ describe("standing instructions against PostgreSQL", () => {
           id,
         ]);
 
+        // S5: spend adds up; a new month starts at zero; pause is once.
+        await store.addSpend(id, 0.012345);
+        await store.addSpend(id, 0.01);
+        expect((await store.own(owner, id))?.spent_this_month).toBe("0.022345");
+        await tx`update q_runtime.standing_instructions
+                    set budget_month = date '2026-01-01' where id = ${id}`;
+        expect((await store.own(owner, id))?.spent_this_month).toBe("0");
+        await store.addSpend(id, 0.5);
+        expect((await store.own(owner, id))?.spent_this_month).toBe("0.500000");
+        expect(await store.pause(id, "BUDGET_EXHAUSTED")).toBe(true);
+        expect(await store.pause(id, "BUDGET_EXHAUSTED")).toBe(false);
+        expect(await store.claimDue(10)).toEqual([]);
+        // A yes on the continuation card: the next version, ACTIVE again.
+        const resumed = await store.activate({
+          owner,
+          qActionId: randomUUID(),
+          instructionId: id,
+          goal: "Handle all the work for me",
+          grant: { ...grant, budgetUsdMonth: "10.00" },
+        });
+        expect(resumed?.version).toBe(3);
+        expect((await store.own(owner, id))?.status).toBe("ACTIVE");
+
         expect(await store.stop(owner, id)).toBe(true);
         expect((await store.own(owner, id))?.status).toBe("STOPPED");
         expect(await store.stop(owner, id)).toBe(false);

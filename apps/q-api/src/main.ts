@@ -109,6 +109,7 @@ import {
   type InstructionEngine,
 } from "./composition/instructions/engine.js";
 import { createInstructionTriggers } from "./composition/instructions/triggers.js";
+import { createInstructionPlanner } from "./composition/instructions/planner.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -3211,7 +3212,11 @@ instructionEngine.current = createInstructionEngine({
       feed: async (who) => (await workFeed.page(who, 15))?.items ?? [],
       decisions: (who) => workFeed.decisions(who, 30),
     }),
-  plan: (who, variables) => errandComposers.instructionPlan(who, variables),
+  plan: createInstructionPlanner({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
   ask: createInstructionAsk({
     runtime: qRuntime,
     orchestration: orchestrationRuntime,

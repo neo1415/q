@@ -10,16 +10,15 @@ import {
 import {
   CorrelationIdSchema,
   InstructionGrantSchema,
+  Q_INSTRUCTION_GRANT,
   type InstructionGrant,
   type InstructionWorkingHours,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
-import type {
-  InstructionPlanResult,
-  InstructionPlanVariables,
-} from "@capital-q/q-core";
+import type { InstructionPlanResult } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
+import { PLAN_MAX_COST_USD, type InstructionPlanner } from "./planner.js";
 import type { InstructionRow, InstructionStore } from "./store.js";
 
 /**
@@ -379,6 +378,7 @@ export type InstructionFiringResult = {
     | "EXPIRED"
     | "NO_ACTOR"
     | "OUTSIDE_HOURS"
+    | "OVER_BUDGET"
     | "PLANNER_UNAVAILABLE";
   readonly done: number;
   readonly asked: number;
@@ -400,6 +400,8 @@ export type InstructionEngineDependencies = {
     | "stepDone"
     | "messagesSent"
     | "history"
+    | "addSpend"
+    | "pause"
   >;
   readonly actions: readonly AnyAppAction[];
   readonly ports: AppActionPorts;
@@ -411,16 +413,8 @@ export type InstructionEngineDependencies = {
   readonly principalName?:
     ((actor: ActorContext) => Promise<string | null>) | undefined;
   /** The planner: one structured call through the Q Model Gateway. */
-  readonly plan: (
-    who: { readonly tenantId: string; readonly userId: string },
-    variables: Omit<
-      InstructionPlanVariables,
-      | "operatingMode"
-      | "communicationProfile"
-      | "communicationGuidance"
-      | "environmentNotes"
-    >,
-  ) => Promise<InstructionPlanResult | null>;
+  /** The planner: one structured call through the Q Model Gateway (S5: budgeted). */
+  readonly plan: InstructionPlanner;
   /** An ASK step: the `app.<name>` card, as the person. */
   readonly ask: (
     actor: ActorContext,
@@ -517,6 +511,48 @@ export function createInstructionEngine(
     cannot: [],
   });
 
+  /**
+   * The month's budget is used: the instruction pauses and Q asks, on a
+   * card, whether to continue at a higher monthly budget (a new grant
+   * version the person approves; nothing continues without it).
+   */
+  const pauseForBudget = async (
+    row: InstructionRow,
+    grant: InstructionGrant,
+    actor: ActorContext,
+  ): Promise<void> => {
+    if (!(await store.pause(row.id, "BUDGET_EXHAUSTED"))) return;
+    const raised = Math.min(
+      9_999.99,
+      Math.max(Number(grant.budgetUsdMonth) * 2, 1),
+    ).toFixed(2);
+    const month = now().toISOString().slice(0, 7);
+    await dependencies
+      .ask(actor, {
+        instructionId: row.id,
+        actionType: Q_INSTRUCTION_GRANT,
+        payload: {
+          ownerUserId: row.user_id,
+          instructionId: row.id,
+          goal: row.goal_text,
+          grant: { ...grant, budgetUsdMonth: raised },
+          continuation: "BUDGET",
+        },
+        words: `This month's budget ($${grant.budgetUsdMonth}) is used. Continue at $${raised} a month?`,
+        key: `instr:${row.id}:budget-${month}:0`,
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, instructionId: row.id },
+          "instruction budget card not prepared",
+        );
+      });
+    logger?.info(
+      { instructionId: row.id, budgetUsdMonth: grant.budgetUsdMonth },
+      "standing instruction paused: budget used",
+    );
+  };
+
   return {
     fire: async (instructionId, runKey) => {
       // A run key the steps table accepts, before anything acts.
@@ -550,9 +586,24 @@ export function createInstructionEngine(
       let refusals = "None.";
       let plan: InstructionPlanResult | null = null;
       let verdicts: StepVerdict[] = [];
+      // S5: what is left of this month's budget. Below one planning call,
+      // the instruction pauses and asks to continue (no call is made).
+      // Whole micro-dollars: money is never compared as floats.
+      const micros = (usd: number) => Math.round(usd * 1_000_000);
+      let left =
+        micros(Number(row.budget_usd_month)) -
+        micros(Number(row.spent_this_month));
       for (let attempt = 0; attempt <= MAX_REPLANS; attempt += 1) {
-        plan = await dependencies.plan(
-          { tenantId: row.tenant_id, userId: row.user_id },
+        if (!(left >= micros(PLAN_MAX_COST_USD))) {
+          await pauseForBudget(row, grant.data, actor);
+          return empty("OVER_BUDGET");
+        }
+        const planned = await dependencies.plan(
+          {
+            tenantId: row.tenant_id,
+            userId: row.user_id,
+            instructionId: row.id,
+          },
           {
             principalName:
               (await dependencies.principalName?.(actor).catch(() => null)) ??
@@ -574,7 +625,13 @@ export function createInstructionEngine(
                     .slice(-6_000),
             refusals,
           },
+          { maxCostUsd: left / 1_000_000 },
         );
+        if (planned.costUsd > 0) {
+          left -= micros(planned.costUsd);
+          await store.addSpend(row.id, planned.costUsd);
+        }
+        plan = planned.plan;
         if (plan === null) return empty("PLANNER_UNAVAILABLE");
         const sent = new Map(sentBefore);
         const current = plan;

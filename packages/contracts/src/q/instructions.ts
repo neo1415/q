@@ -121,6 +121,8 @@ export const InstructionGrantPayloadSchema = z
     instructionId: UuidSchema.optional(),
     goal: z.string().min(1).max(2_000),
     grant: InstructionGrantSchema,
+    /** Why Q asks: the month's budget is used and it asks to continue. */
+    continuation: z.enum(["BUDGET"]).optional(),
   })
   .strict();
 export type InstructionGrantPayload = z.infer<
