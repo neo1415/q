@@ -95,7 +95,7 @@ describe("phone folds (design-48 v2)", () => {
       await import("../src/features/relationships/relationship-detail");
     const { container } = render(
       <RelationshipDetail
-        side="FOUNDER"
+        side="COMPANY"
         counterpart="Savanna Seed Partners"
         relationship={rel("IN_DILIGENCE", [
           "CONNECTED",
