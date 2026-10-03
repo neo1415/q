@@ -44,7 +44,14 @@ export type HandOverOutcome =
   /** No subject: a short question naming the likely ones. */
   | { readonly kind: "ASK"; readonly line: string }
   /** Could not prepare (not permitted, not reachable): answer normally. */
-  | { readonly kind: "NONE" };
+  | { readonly kind: "NONE" }
+  /**
+   * Handing over work with no one counterpart to hand it over for ("just
+   * handle it", "handle my investors" with none yet): a standing
+   * instruction is what that means (QA 2026-10-03, runs 5c6dcabe,
+   * 18eb8420). Never a guessed target.
+   */
+  | { readonly kind: "STANDING" };
 
 /**
  * A time they asked for, in minutes from now (TURN_READER v28 timeWindow:
@@ -224,6 +231,22 @@ export async function actOnHandOver(
       subject = chosen.subject;
     }
   }
+  // A hand-over (not a meeting) with no one of theirs to hand over for:
+  // no name and nothing on screen, or a name ("my investors") when they
+  // have no relationships at all to match it. That is work handed over in
+  // general, not an errand for someone Q would have to guess. A name that
+  // misses while they DO have relationships is still asked about by name.
+  const unresolvedName =
+    handOver.counterpartName !== null &&
+    named.length === 0 &&
+    candidates.length === 0;
+  if (
+    handOver.kind !== "MEETING" &&
+    subject === null &&
+    (unresolvedName || (handOver.counterpartName === null && onScreen === null))
+  ) {
+    return { kind: "STANDING" };
+  }
   subject ??= onScreen;
   if (subject === null) {
     const pool = named.length > 1 ? named : candidates;
@@ -271,7 +294,13 @@ export async function actOnHandOver(
     };
   }
   if (prepared === null || prepared.status !== "PREPARED") {
-    return { kind: "NONE" };
+    // Nothing to hand over for the screen's subject (their own company,
+    // say) and no one named: the general meaning, not "could not".
+    return handOver.kind !== "MEETING" &&
+      handOver.counterpartName === null &&
+      chosen === undefined
+      ? { kind: "STANDING" }
+      : { kind: "NONE" };
   }
   return {
     kind: "PREPARED",

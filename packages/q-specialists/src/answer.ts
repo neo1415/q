@@ -93,6 +93,12 @@ import type {
   QSpecialistTurnReading,
 } from "./contracts.js";
 import { actOnHandOver, type QHandOverPort } from "./hand-over.js";
+import {
+  actOnDelegation,
+  DELEGATION_CANDIDATE,
+  DELEGATION_TOOL,
+  type QDelegationPort,
+} from "./delegation.js";
 import type { QProfileGapsPort } from "./profile-gaps.js";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
@@ -291,6 +297,11 @@ export type SpecialistQAnswerDependencies = {
    * own tools decide, as before.
    */
   readonly handOver?: QHandOverPort | undefined;
+  /**
+   * Work handed over in general (QA 2026-10-03): prepares a standing
+   * instruction. Absent: such a turn is answered as before.
+   */
+  readonly delegation?: QDelegationPort | undefined;
   /**
    * ADR 0040: a declared app action the turn's reading names, done by code
    * through its generated tool (parity eval 2026-10-02).
@@ -2057,12 +2068,30 @@ export function createSpecialistQAnswer(
         ? await dependencies
             .appActionRouter(request, {
               utterance: latest.content,
-              candidates: offeredActions.filter((action) =>
-                appTools.has(action.name),
-              ),
+              candidates: [
+                ...offeredActions.filter((action) => appTools.has(action.name)),
+                // Handing work over in general is one of the meanings a
+                // request to act can have; the router weighs it with the
+                // rest (QA 2026-10-03).
+                ...(dependencies.delegation !== undefined &&
+                offeredNames.has(DELEGATION_TOOL)
+                  ? [DELEGATION_CANDIDATE]
+                  : []),
+              ],
             })
             .catch(() => null)
         : null;
+    if (routed === DELEGATION_TOOL && dependencies.delegation !== undefined) {
+      logger?.info(
+        { qRunId: request.runId, routed },
+        "q request route: handed over in general; standing instruction",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        await actOnDelegation(dependencies.delegation, request, latest.content),
+      );
+    }
     const namedAction =
       readerNamed ??
       (fundVisibility ? INVESTOR_VISIBILITY_TOOL : (recordAudience ?? routed));
@@ -2185,7 +2214,19 @@ export function createSpecialistQAnswer(
         );
         return { kind: "NONE" } as const;
       });
-      if (handed.kind !== "NONE") {
+      if (handed.kind === "STANDING") {
+        if (dependencies.delegation !== undefined) {
+          return recordAnswer(
+            request,
+            conversationId,
+            await actOnDelegation(
+              dependencies.delegation,
+              request,
+              latest.content,
+            ),
+          );
+        }
+      } else if (handed.kind !== "NONE") {
         return recordAnswer(request, conversationId, handed.line);
       }
     }

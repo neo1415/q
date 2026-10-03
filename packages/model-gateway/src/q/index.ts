@@ -3624,7 +3624,10 @@ export function couldNotDoLine(gap: string): string {
     case "NOT_CALLED":
       return "I didn't prepare that, so nothing was changed. Tell me again what you'd like done, and to whom, and I'll prepare it for your approval.";
     default:
-      return "I couldn't tell which action that is, so nothing was prepared or changed. Tell me what you'd like done, and to whom, and I'll prepare it for your approval.";
+      // Not "I couldn't tell which action" (QA 2026-10-03, run 18eb8420):
+      // nothing was done, and the one question that moves it is asked --
+      // including handing the work over for Q to keep doing.
+      return "Nothing was prepared or changed yet. What should I take on: one thing now, or should I work on it for you over time? Say which, and I'll prepare it for your approval.";
   }
 }
 
