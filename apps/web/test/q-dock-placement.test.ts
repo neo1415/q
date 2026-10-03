@@ -175,4 +175,28 @@ describe("dock avoid zones", () => {
       placementAvoiding(DEFAULT_PLACEMENT, [], desktop, size, "desktop"),
     ).toEqual(DEFAULT_PLACEMENT);
   });
+  it("on a phone with every corner taken, waits mid-side rather than on Send", () => {
+    // A chat at 390px: its header across the top, its composer across the
+    // bottom (demo-44 phone pass).
+    const header = { left: 0, top: 53, right: 390, bottom: 120 };
+    const composer = { left: 0, top: 700, right: 390, bottom: 784 };
+    const shown = placementAvoiding(
+      DEFAULT_PLACEMENT,
+      [header, composer],
+      phone,
+      size,
+      "mobile",
+    );
+    expect(shown.slot).toBe("middle");
+    expect(shown.side).toBe(DEFAULT_PLACEMENT.side);
+    const at = anchorPoint(shown, phone, size);
+    for (const zone of [header, composer]) {
+      expect(
+        at.x < zone.right &&
+          at.x + size.width > zone.left &&
+          at.y < zone.bottom &&
+          at.y + size.height > zone.top,
+      ).toBe(false);
+    }
+  });
 });

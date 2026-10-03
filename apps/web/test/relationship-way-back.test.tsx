@@ -16,7 +16,7 @@ vi.mock("../src/features/relationships/outcome-actions", () => ({
 
 const { RelationshipOutcome } =
   await import("../src/features/relationships/relationship-outcome");
-const { OUTCOME_FIRST, WAY_BACK } =
+const { OUTCOME_FIRST, WAY_BACK, nothingLeads } =
   await import("../src/features/relationships/relationship-detail");
 
 afterEach(cleanup);
@@ -48,5 +48,16 @@ describe("a paused or passed relationship's way back", () => {
     expect(
       screen.getByRole("button", { name: label }).getAttribute("data-variant"),
     ).toBe("primary");
+  });
+});
+
+describe("a Next card with nothing to lead with", () => {
+  it("says nothing needs you instead of showing a lone More", () => {
+    // Interest sent, waiting for the answer (demo-44 phone pass).
+    expect(nothingLeads(false, false, "INTEREST_EXPRESSED", false)).toBe(true);
+    expect(nothingLeads(true, false, "INTEREST_EXPRESSED", false)).toBe(false);
+    expect(nothingLeads(false, true, "CONNECTED", false)).toBe(false);
+    expect(nothingLeads(false, false, "PAUSED", false)).toBe(false);
+    expect(nothingLeads(false, false, "INTEREST_EXPRESSED", true)).toBe(false);
   });
 });

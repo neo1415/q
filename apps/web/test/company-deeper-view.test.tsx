@@ -186,12 +186,14 @@ describe("what is known, and how well supported", () => {
     );
     if (founded === null) throw new Error("no founded fact");
     expect(founded.getAttribute("data-fact-state")).toBe("contradictory");
-    expect(within(founded).getByText("2021-03-01")).toBeTruthy();
-    expect(within(founded).getByText("2019-06-01")).toBeTruthy();
+    // Written dates, never ISO codes (demo-44 phone pass).
+    expect(within(founded).getByText("1 March 2021")).toBeTruthy();
+    expect(within(founded).getByText("1 June 2019")).toBeTruthy();
+    expect(founded.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
     expect(within(founded).getByText(/Neither has been chosen/)).toBeTruthy();
     expect(within(founded).getByText("Contradicted")).toBeTruthy();
     expect(factQuestion("Kivu Freight", disputed)).toContain(
-      '"2021-03-01" and "2019-06-01"',
+      '"1 March 2021" and "1 June 2019"',
     );
   });
 

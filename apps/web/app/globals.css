@@ -1019,10 +1019,11 @@
   }
   .cq-feed-player-controls {
     position: absolute;
-    top: calc(12px + var(--cq-safe-top));
+    /* Below the stage's top row (people, filters, up) and clear of its
+       right column (down): at 390px a long note ran under the filter
+       buttons (demo audit 2026-10-03; demo-44 phone pass). */
+    top: calc(64px + var(--cq-safe-top));
     left: 12px;
-    /* Clear of the stage's own top-right column (filters, up/down): a
-       long note used to run underneath it (demo audit 2026-10-03). */
     right: 72px;
     display: flex;
     flex-wrap: wrap;

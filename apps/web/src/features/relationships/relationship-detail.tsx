@@ -52,6 +52,22 @@ export const OUTCOME_FIRST: ReadonlySet<string> = new Set([
 export const WAY_BACK: ReadonlySet<string> = new Set(["PAUSED", "PASSED"]);
 
 /**
+ * Whether the Next card has no step of its own to lead with (interest sent,
+ * waiting for the answer). It then says so, rather than showing a lone
+ * "More" (demo-44 phone pass).
+ */
+export function nothingLeads(
+  hasActions: boolean,
+  connected: boolean,
+  state: string,
+  hasCallToRecord: boolean,
+): boolean {
+  return (
+    !hasActions && !connected && !OUTCOME_FIRST.has(state) && !hasCallToRecord
+  );
+}
+
+/**
  * One relationship, for one side (CQ-WEB-030; doc 25 §121: "where are we,
  * what happened, what is next"; founder design 2026-09-28, Relationship
  * overview).
@@ -210,6 +226,17 @@ export function RelationshipDetail({
                   <MessageSquare size={ICON_SIZE.regular} aria-hidden="true" />
                   Send a message
                 </Link>
+              ) : null}
+              {relationship !== null &&
+              nothingLeads(
+                actions !== null && actions !== undefined,
+                connected,
+                relationship.state,
+                call !== null,
+              ) ? (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  Nothing needs you right now.
+                </p>
               ) : null}
               {relationship === null ? null : (
                 <>

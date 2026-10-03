@@ -17,6 +17,7 @@ import { Button } from "@capital-q/ui/button";
 import { ChevronRight, CircleAlert, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { formatLongDay } from "@/components/date-format";
 import { SourcesDisclosure } from "@/components/sources-disclosure";
 
 import {
@@ -91,7 +92,7 @@ const SOURCE_LABELS: Readonly<
   COMPANY_PROFILE: "The company's profile",
 };
 
-/** Codes never reach a reader as codes ("pre_seed", "NG"). */
+/** Codes never reach a reader as codes ("pre_seed", "NG", "2025-04-07"). */
 function displayValue(
   key: CompanyNetworkFactKey,
   statement: CompanyNetworkFactStatement,
@@ -102,6 +103,8 @@ function displayValue(
   if (key === "headquartersCountry") {
     return countryLabel(statement.value) ?? statement.value;
   }
+  // The same written date the Company details above use, not ISO.
+  if (key === "foundedDate") return formatLongDay(statement.value);
   return statement.value;
 }
 

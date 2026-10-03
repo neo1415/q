@@ -216,6 +216,18 @@ export function placementAvoiding(
     const rect = rectOf(candidate);
     if (!avoid.some((zone) => overlaps(rect, zone))) return candidate;
   }
+  // Every corner is taken (a phone chat: header on top, composer below —
+  // demo-44 pass, the dock sat on Send). The middle of a side covers only
+  // scrolling content, so it is the last resort before covering a control.
+  if (dockClass !== "desktop") {
+    for (const side of [
+      chosen.side,
+      chosen.side === "left" ? "right" : "left",
+    ] as const) {
+      const middle: DockPlacement = { side, slot: "middle", stashed: false };
+      if (!avoid.some((zone) => overlaps(rectOf(middle), zone))) return middle;
+    }
+  }
   // Nowhere is free: stay where the person put it.
   return chosen;
 }
