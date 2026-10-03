@@ -2052,6 +2052,22 @@ export function createSpecialistQAnswer(
      * declared actions this person may take here, on any purpose. Not for
      * a hand, a hand-over or a document, which have their own paths.
      */
+    // What else they said about the grant, read against the tool's own
+    // schema by the same small reader app actions use.
+    const readDelegationArguments =
+      (request: QAnswerRequest, utterance: string) =>
+      async (): Promise<Readonly<Record<string, unknown>> | null> => {
+        const args = await dependencies.appActionArguments?.(request, {
+          tool: DELEGATION_TOOL,
+          utterance,
+        });
+        return args !== null &&
+          args !== undefined &&
+          typeof args === "object" &&
+          !Array.isArray(args)
+          ? (args)
+          : null;
+      };
     const routed =
       dependencies.appActionRouter !== undefined &&
       dependencies.appActions !== undefined &&
@@ -2089,7 +2105,12 @@ export function createSpecialistQAnswer(
       return recordAnswer(
         request,
         conversationId,
-        await actOnDelegation(dependencies.delegation, request, latest.content),
+        await actOnDelegation(
+          dependencies.delegation,
+          request,
+          latest.content,
+          readDelegationArguments(request, latest.content),
+        ),
       );
     }
     const namedAction =
@@ -2223,6 +2244,7 @@ export function createSpecialistQAnswer(
               dependencies.delegation,
               request,
               latest.content,
+              readDelegationArguments(request, latest.content),
             ),
           );
         }
