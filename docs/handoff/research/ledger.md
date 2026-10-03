@@ -277,3 +277,10 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - Deployed 27505fb5: Discover "Your companies" (/discover/yours; connected/interested/saved pitches, list uses the player's own mayPlayPitch predicate, only the first item signed on load, phone entry over the stage); pitch audience+playback as one choice; HARDEN WHAT EXISTS fact (ownIndex port, wired by QA's ADR 0040 registry next), q.parity_gap log, turn reader v29 (PASSED).
 - Live as Zino: Nixo first in Your companies; Ajopot, Ledgerfold listed; out-of-mandate INVESTORS pitches no longer listed.
 - Founder decision: keep the disclosure rule (INVESTORS pitch plays only for mandate-eligible companies; connection/interest does not unlock it).
+
+## 2026-10-03 early — lead
+- Deployed through 11a41c9a: Discover "Your companies"; company profile from Discover (ADR 0041 deck audience + team); post-meeting journey (relationship-state v2, Pass/Pause/Resume with private reasons, "how did it go?", other-side debrief, diligence area); ADR 0040 registry migration complete (151 → 92 hand-written mutation routes; errands/Q Daily/approvals/brand kit exempt); tool focus (≤40 tools/turn, ~29 avg, from 80); reader v37; approval safety (only a reply decides a card, typed and voice; one card per change; denial reasons spoken).
+- Hosted migrations 120/120. Relationship states auto-rebuilt at worker start (16 changed, 2 historic anomalies = duplicate requests on connected pairs, producer fixed).
+- Parity eval on 11a41c9a: 13/17 grader, ~16/17 behaviour; remaining are fixture artifacts. Eval spend this span ≈ $0.80 total.
+- Founder decisions: keep INVESTORS-pitch disclosure rule; pass reason shared only if investor ticks; re-approach only on material change; deck audience choice like pitch; team (names/roles/bios) visible to investors who can find the company.
+- Incidents: two VM OOM restarts (full vitest + workers); now vitest --maxWorkers=2, web alone, builds --concurrency=1.
