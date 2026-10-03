@@ -143,7 +143,10 @@ export async function CapitalScreen() {
 
   return (
     <div className="flex flex-col gap-10">
-      <PageSection id="objective" title="Your raise">
+      <PageSection
+        id="objective"
+        title={context.kind === "INVESTOR" ? "Your mandate" : "Your raise"}
+      >
         {objective !== null && objective !== undefined ? (
           <ObjectivePanel objective={objective} />
         ) : (
