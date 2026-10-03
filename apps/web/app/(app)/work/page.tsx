@@ -46,10 +46,7 @@ async function WorkLists() {
 export default function WorkPage() {
   return (
     <PageContainer width="reading">
-      <PageHeader
-        title="Q's work"
-        description="What Q is doing under the instructions you approved. Stop any of it at any time."
-      />
+      <PageHeader title="Q's work" />
       <Suspense fallback={<Skeleton lines={4} />}>
         <WorkLists />
       </Suspense>

@@ -44,24 +44,26 @@ function NoticeRow({
 }) {
   const { notice, count, unread } = group;
   const linked = notice.linkPath !== null && /^\/(?!\/)/.test(notice.linkPath);
+  // One line per notice on a phone (design-48 v2): the title and its time.
+  // The body is on the page the row opens, never repeated here.
   const body = (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+    <span className="flex min-w-0 flex-1 items-baseline gap-3">
       <span
-        className={`cq-body-sm text-(--cq-text-primary) ${unread ? "font-medium" : ""}`}
+        className={`cq-body-sm min-w-0 flex-1 line-clamp-2 text-(--cq-text-primary) ${unread ? "font-medium" : ""}`}
       >
         {unread ? <span className="sr-only">New: </span> : null}
         {notice.title}
       </span>
-      {notice.body === null ? null : (
-        <span className="cq-caption line-clamp-2 whitespace-pre-line text-(--cq-text-secondary)">
-          {notice.body}
-        </span>
-      )}
-      <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+      <span className="cq-caption cq-numeric shrink-0 text-(--cq-text-tertiary)">
         <time dateTime={notice.createdAt} suppressHydrationWarning>
           {when(notice.createdAt)}
         </time>
-        {count > 1 ? ` · latest of ${String(count)} like this` : null}
+        {count > 1 ? (
+          <>
+            <span aria-hidden="true"> ×{count}</span>
+            <span className="sr-only">, latest of {count} like this</span>
+          </>
+        ) : null}
       </span>
     </span>
   );
@@ -75,11 +77,11 @@ function NoticeRow({
         <Link
           href={notice.linkPath ?? "/"}
           onClick={onOpen}
-          className="flex min-h-11 items-start gap-3 rounded-sm py-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="flex min-h-12 items-center gap-3 rounded-sm py-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
           <span
             aria-hidden="true"
-            className={`mt-2 size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
+            className={`size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
           />
           {body}
           {needsYou ? (
@@ -92,10 +94,10 @@ function NoticeRow({
           ) : null}
         </Link>
       ) : (
-        <div className="flex items-start gap-3 py-3">
+        <div className="flex min-h-12 items-center gap-3 py-2">
           <span
             aria-hidden="true"
-            className={`mt-2 size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
+            className={`size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
           />
           {body}
         </div>
@@ -186,7 +188,7 @@ export function NotificationCenter() {
           ) : failed && items === null ? (
             <ErrorState
               title="Notifications couldn't load"
-              description="Anything that needs you is also on Q's work and on each relationship."
+              description="What needs you is also on Q's work."
               action={
                 <button
                   type="button"
@@ -201,7 +203,7 @@ export function NotificationCenter() {
           ) : (items ?? []).length === 0 ? (
             <EmptyState
               title="You're up to date"
-              description="What needs your answer comes first here; updates follow by day. Q never sends a notification just to bring you back."
+              description="What needs you shows first."
               compact
             />
           ) : (

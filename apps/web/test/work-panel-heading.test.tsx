@@ -75,9 +75,7 @@ describe("Q's work loading", () => {
     render(<WorkPanel variant="page" />);
     await flush();
     expect(screen.getByText("Q's work couldn't load")).toBeTruthy();
-    expect(
-      screen.getByText(/nothing is sent without your approval/u),
-    ).toBeTruthy();
+    expect(screen.getByText(/Nothing is sent without your yes/u)).toBeTruthy();
   });
 
   it("shows the error state when the server read failed", () => {
@@ -118,8 +116,12 @@ describe("the Q's work page", () => {
         ]}
       />,
     );
-    expect(screen.getByText("“Handle my investors”")).toBeTruthy();
-    expect(screen.getByText("$0.20 of $5.00 this month (USD)")).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Handle my investors" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/Running · \$0\.20 of \$5\.00 USD this month/u),
+    ).toBeTruthy();
   });
 
   it("renders nothing on home when nothing runs", () => {
@@ -144,7 +146,7 @@ describe("instructionWords", () => {
     ).toEqual({
       goal: "Answer investors",
       how: "0 things on my own, the rest I ask",
-      spend: "$1.23 of $5.00 this month (USD)",
+      spend: "$1.23 of $5.00 USD this month",
       paused: null,
     });
   });

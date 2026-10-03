@@ -233,45 +233,28 @@ function WorkItem({
       className="flex flex-col gap-2 border-b border-(--cq-border-subtle) py-4 last:border-b-0"
       data-work={work.kind}
     >
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="cq-title-sm text-(--cq-text-primary)">
-          {WORK_KIND_LABELS[work.kind]}
+      <header className="flex flex-col gap-0.5">
+        <h3 className="cq-title-sm line-clamp-2 text-(--cq-text-primary)">
+          {words === null || words.goal === ""
+            ? WORK_KIND_LABELS[work.kind]
+            : words.goal}
         </h3>
-        <span className="cq-caption text-(--cq-text-secondary)">
-          {words !== null && words.paused !== null
-            ? "Paused"
-            : STATUS_WORDS[work.status]}
-        </span>
+        <p className="cq-caption cq-numeric text-(--cq-text-secondary)">
+          {[
+            words !== null && words.paused !== null
+              ? `Paused: ${words.paused}`
+              : STATUS_WORDS[work.status],
+            words?.spend ?? null,
+          ]
+            .filter((part) => part !== null)
+            .join(" · ")}
+        </p>
       </header>
-      {words === null ? (
-        work.summary === null ? null : (
-          <p className="cq-body-sm text-(--cq-text-secondary)">
-            {work.summary}
-          </p>
-        )
-      ) : (
-        <div className="flex flex-col gap-1" data-instruction>
-          <p className="cq-body-sm text-(--cq-text-primary)">
-            &ldquo;{words.goal}&rdquo;
-          </p>
-          {words.paused === null ? null : (
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              Paused: {words.paused}
-            </p>
-          )}
-          {words.how === null ? null : (
-            <p className="cq-caption text-(--cq-text-secondary)">{words.how}</p>
-          )}
-          {words.spend === null ? null : (
-            <p
-              className="cq-caption cq-numeric text-(--cq-text-secondary)"
-              data-instruction-spend
-            >
-              {words.spend}
-            </p>
-          )}
-        </div>
-      )}
+      {words === null && work.summary !== null ? (
+        <p className="cq-body-sm line-clamp-2 text-(--cq-text-secondary)">
+          {work.summary}
+        </p>
+      ) : null}
       {work.lanes.length === 0 ? null : (
         <ul>
           {work.lanes.map((lane) => (
@@ -422,7 +405,7 @@ export function WorkPanel({
     ) : items === null ? (
       <ErrorState
         title="Q's work couldn't load"
-        description="Anything already running keeps running within its limits, and nothing is sent without your approval."
+        description="Running work continues. Nothing is sent without your yes."
         action={
           <Button
             variant="secondary"
@@ -440,7 +423,7 @@ export function WorkPanel({
     ) : running.length === 0 && finished.length === 0 ? (
       <EmptyState
         title="Nothing running"
-        description="Hand Q something that repeats, in your own words. For example: “Answer investors while I'm away, but ask me before anything about terms.” You approve the plan before Q starts."
+        description="Hand Q something that repeats, in your own words. You approve the plan first."
         action={
           <Button
             variant="primary"

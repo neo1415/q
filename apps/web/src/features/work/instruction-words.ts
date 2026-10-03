@@ -11,7 +11,7 @@
 export type InstructionWords = {
   readonly goal: string;
   readonly how: string | null;
-  /** "$0.20 of $5.00 this month (USD)" -- the money against its limit. */
+  /** "$0.20 of $5.00 USD this month" -- the money against its limit. */
   readonly spend: string | null;
   readonly paused: string | null;
 };
@@ -48,7 +48,7 @@ export function instructionWords(summary: string | null): InstructionWords {
   return {
     goal: running.goal,
     how: running.how?.trim() ?? null,
-    spend: `${money(running.spent)} of ${money(running.budget)} this month (USD)`,
+    spend: `${money(running.spent)} of ${money(running.budget)} USD this month`,
     paused: null,
   };
 }

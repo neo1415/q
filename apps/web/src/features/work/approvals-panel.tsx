@@ -96,9 +96,22 @@ function OpenApproval({
 
   return (
     <div className="flex flex-col gap-3 py-3" data-approval-open>
-      <p className="cq-caption text-(--cq-text-tertiary)">
-        {position} of {total} · asked {requested(item.requestedAt)} UTC
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+          {position} of {total}
+          <span className="sr-only">
+            , asked {requested(item.requestedAt)} UTC
+          </span>
+        </p>
+        <Button
+          variant="quiet"
+          size="compact"
+          disabled={pending}
+          onClick={onClose}
+        >
+          Not now
+        </Button>
+      </div>
       <h3 className="cq-title-sm text-(--cq-text-primary)">
         {view?.action.summary ?? item.summary}
       </h3>
@@ -124,9 +137,7 @@ function OpenApproval({
       ) : null}
       {view?.action.preview === undefined ? null : (
         <div className="flex flex-col gap-1">
-          <span className="cq-label text-(--cq-text-secondary)">
-            What Q will send
-          </span>
+          <span className="sr-only">What Q will send</span>
           <p
             className="cq-body-sm border-l-2 border-(--cq-border-strong) pl-3 whitespace-pre-wrap text-(--cq-text-primary)"
             data-approval-preview
@@ -143,8 +154,7 @@ function OpenApproval({
       ) : null}
       {view !== null && !canDecide ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          This can&rsquo;t be decided any more: it was already decided or it
-          expired.
+          Already decided or expired.
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -161,9 +171,6 @@ function OpenApproval({
           onClick={() => decide(false)}
         >
           Decline
-        </Button>
-        <Button variant="quiet" disabled={pending} onClick={onClose}>
-          Not now
         </Button>
       </div>
       {message === null ? null : (
@@ -190,85 +197,63 @@ export function ApprovalsPanel({
   if (initial === null) {
     return (
       <section aria-labelledby="work-needs-you" className="flex flex-col gap-2">
-        <h2
-          id="work-needs-you"
-          className="cq-title-sm text-(--cq-text-primary)"
-        >
+        <h2 id="work-needs-you" className="sr-only">
           Needs you
         </h2>
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          What waits for your approval couldn&rsquo;t load. Nothing is sent
-          without your yes; reload the page to see it.
+          Approvals couldn&rsquo;t load. Nothing is sent without your yes.
         </p>
       </section>
     );
   }
   if (items.length === 0 && notice === null) return null;
+  const openIndex = items.findIndex((item) => item.approvalId === openId);
+  const open = openIndex < 0 ? undefined : items[openIndex];
+  const first = items[0];
 
   return (
     <section
       aria-labelledby="work-needs-you"
-      className="flex flex-col gap-1"
+      className="flex flex-col"
       data-work-needs-you
     >
-      <h2 id="work-needs-you" className="cq-title-sm text-(--cq-text-primary)">
+      <h2 id="work-needs-you" className="sr-only">
         Needs you
       </h2>
-      {items.length === 0 ? null : (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          {items.length === 1
-            ? "1 thing waits for your approval."
-            : `${String(items.length)} things wait for your approval.`}{" "}
-          Q sends nothing until you approve each one.
-        </p>
-      )}
-      <ul>
-        {items.map((item, index) => (
-          <li
-            key={item.approvalId}
-            className="border-b border-(--cq-border-subtle) last:border-b-0"
+      {open !== undefined ? (
+        <OpenApproval
+          key={open.approvalId}
+          item={open}
+          position={openIndex + 1}
+          total={items.length}
+          onClose={() => setOpenId(null)}
+          onDone={(words) => {
+            const rest = items.filter(
+              (one) => one.approvalId !== open.approvalId,
+            );
+            setItems(rest);
+            // The next one opens, so a run of approvals is one pass.
+            setOpenId(rest[0]?.approvalId ?? null);
+            setNotice(words);
+          }}
+        />
+      ) : first === undefined ? null : (
+        <div className="flex min-h-14 items-center gap-3 border-b border-(--cq-border-subtle) py-2">
+          <span className="cq-body flex-1 font-medium text-(--cq-text-primary)">
+            <span className="cq-numeric">{items.length}</span> to approve
+          </span>
+          <Button
+            variant="primary"
+            size="compact"
+            onClick={() => {
+              setNotice(null);
+              setOpenId(first.approvalId);
+            }}
           >
-            {openId === item.approvalId ? (
-              <OpenApproval
-                item={item}
-                position={index + 1}
-                total={items.length}
-                onClose={() => setOpenId(null)}
-                onDone={(words) => {
-                  setItems((all) =>
-                    all.filter((one) => one.approvalId !== item.approvalId),
-                  );
-                  setOpenId(null);
-                  setNotice(words);
-                }}
-              />
-            ) : (
-              <div className="flex min-h-14 items-center gap-3 py-2">
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-                    {item.summary}
-                  </span>
-                  <span className="cq-caption text-(--cq-text-tertiary)">
-                    Asked {requested(item.requestedAt)} UTC
-                  </span>
-                </span>
-                <Button
-                  variant={
-                    index === 0 && openId === null ? "primary" : "secondary"
-                  }
-                  size="compact"
-                  onClick={() => {
-                    setNotice(null);
-                    setOpenId(item.approvalId);
-                  }}
-                >
-                  Review
-                </Button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+            Review
+          </Button>
+        </div>
+      )}
       {notice === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
           {notice}

@@ -90,9 +90,7 @@ describe("Needs you on Q's work", () => {
     read.mockResolvedValue({ ok: true, value: view(true) });
     approve.mockResolvedValue({ ok: true, value: null });
     render(<ApprovalsPanel initial={[pending]} />);
-    expect(
-      screen.getByText("1 thing waits for your approval.", { exact: false }),
-    ).toBeTruthy();
+    expect(screen.getByText("to approve", { exact: false })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
     await settle();
     expect(
@@ -123,5 +121,23 @@ describe("Needs you on Q's work", () => {
     expect(approve).not.toHaveBeenCalled();
     expect(reject).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Review" })).toBeTruthy();
+  });
+  it("opens the next one after a decision, so a run is one pass", async () => {
+    const second = QPendingApprovalSchema.parse({
+      ...pending,
+      approvalId: "00000000-0000-4000-8000-0000000000a2",
+      summary: "Reply to Voltron Capital",
+    });
+    read.mockResolvedValue({ ok: true, value: view(true) });
+    reject.mockResolvedValue({ ok: true, value: null });
+    render(<ApprovalsPanel initial={[pending, second]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    await settle();
+    expect(screen.getByText(/^1 of 2/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Decline" }));
+    await settle();
+    expect(reject).toHaveBeenCalledWith(ID);
+    expect(screen.getByText(/^1 of 1/u)).toBeTruthy();
+    expect(screen.getByText("Declined. Nothing was sent.")).toBeTruthy();
   });
 });
