@@ -44,3 +44,14 @@ describe("a reminder's time", () => {
     expect(when("2026-11-01T08:30:00Z", now)).not.toMatch(/2026/);
   });
 });
+
+describe("a paused or passed relationship's way back", () => {
+  it("is shown above More, like a meeting's outcome", async () => {
+    const { OUTCOME_FIRST } =
+      await import("../src/features/relationships/relationship-detail");
+    expect(OUTCOME_FIRST.has("PAUSED")).toBe(true);
+    expect(OUTCOME_FIRST.has("PASSED")).toBe(true);
+    expect(OUTCOME_FIRST.has("MEETING_HELD")).toBe(true);
+    expect(OUTCOME_FIRST.has("CONNECTED")).toBe(false);
+  });
+});
