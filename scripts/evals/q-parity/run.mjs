@@ -140,7 +140,8 @@ async function namesFor(founderUser, investorUser) {
          join core.investor_organisations io on io.id = r.investor_organisation_id
          join core.companies c on c.id = r.company_id
          join identity.organisation_memberships om on om.organisation_id = c.organisation_id
-        where om.user_id = ${quote(founderUser)} and r.current_state = 'CONNECTED'
+        where om.user_id = ${quote(founderUser)}
+          and r.current_state in ('CONNECTED', 'IN_DILIGENCE')
           and io.display_name not ilike '%lagoon%'
         order by r.created_at limit 1`,
     )
