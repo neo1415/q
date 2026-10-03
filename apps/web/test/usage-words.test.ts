@@ -21,6 +21,7 @@ describe("Settings → Usage words", () => {
       totalUsd: "0.173000",
       calls: 5,
       unpricedCalls: 0,
+      failedCalls: 0,
       byTask: [],
       instructions: [],
       plan: null,
