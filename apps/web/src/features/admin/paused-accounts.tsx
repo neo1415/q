@@ -41,8 +41,15 @@ export function PausedAccounts({
                 {row.email === null ? "" : ` · ${row.email}`}
               </span>
               <span className="cq-caption text-(--cq-text-secondary)">
-                Paused {new Date(row.pausedAt).toLocaleString()} after{" "}
-                {row.strikes} warnings
+                Paused{" "}
+                {new Date(row.pausedAt).toLocaleString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                after {row.strikes} warnings
                 {row.reason === null ? "" : `: ${row.reason}`}
               </span>
             </div>

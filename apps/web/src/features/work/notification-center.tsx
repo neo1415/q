@@ -25,7 +25,7 @@ const POLL_MS = 60_000;
 function when(iso: string): string {
   const at = new Date(iso);
   const sameDay = at.toDateString() === new Date().toDateString();
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("en-GB", {
     ...(sameDay ? {} : { day: "numeric", month: "short" }),
     hour: "2-digit",
     minute: "2-digit",

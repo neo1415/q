@@ -40,7 +40,7 @@ function lobbyHref(
 }
 
 const when = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, {
+  new Date(iso).toLocaleString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -203,7 +203,7 @@ export default async function RehearsalsPage() {
                         <span className="cq-caption block text-(--cq-text-secondary)">
                           {person.lastRehearsal === null
                             ? "Not rehearsed yet"
-                            : `Last rehearsal ${new Date(person.lastRehearsal.at).toLocaleDateString()}${
+                            : `Last rehearsal ${new Date(person.lastRehearsal.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}${
                                 person.lastRehearsal.score === null
                                   ? ""
                                   : ` · ${String(person.lastRehearsal.score)} / 100`
@@ -244,7 +244,13 @@ export default async function RehearsalsPage() {
                         {item.counterpart.name}
                       </span>
                       <span className="cq-caption block text-(--cq-text-secondary)">
-                        {new Date(item.createdAt).toLocaleString()}
+                        {new Date(item.createdAt).toLocaleString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                         {" · "}
                         {item.outcome === null
                           ? item.status === "ACTIVE"
