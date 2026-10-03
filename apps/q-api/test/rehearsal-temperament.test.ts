@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyAppraisal,
+  ANSWERED,
   appliedAppraisal,
   deliveryFor,
+  givesCause,
   questionNote,
   questionOpenIn,
   walkOutNote,
@@ -295,5 +297,66 @@ describe("two warnings before leaving, in any register (QA rehearsal e22ea609)",
     });
     expect(plan(0, "ADJOURNED")).toEqual({ warning: null, action: "KEEP" });
     expect(plan(1, "STRONG_LATER")).toEqual({ warning: null, action: "KEEP" });
+  });
+});
+
+describe("an answer is never met with more anger (QA rehearsal df5af97b)", () => {
+  const angry = { patience: 20, warmth: 20, frustration: 70, hurt: 0 };
+
+  it("a strong or direct answer to their question raises no frustration and gives no cause", () => {
+    for (const reading of ["STRONG_ANSWER", "CLEAR_BUT_THIN"] as const) {
+      const applied = appliedAppraisal(reading, true);
+      const after = applyAppraisal(angry, applied, "REALISTIC");
+      expect(after.frustration).toBeLessThanOrEqual(angry.frustration);
+      expect(givesCause(applied)).toBe(false);
+      expect(ANSWERED.has(applied)).toBe(true);
+    }
+  });
+
+  it("still angry from before, an answer gets no warning; a new provocation does", () => {
+    const base = {
+      register: "ANGRY" as const,
+      warningsGiven: 1,
+      theyAskedToEnd: false,
+      closing: false,
+      provoked: false,
+    };
+    expect(walkOutPlan({ ...base, newCause: false })).toEqual({
+      warning: null,
+      action: "KEEP",
+    });
+    expect(walkOutPlan({ ...base, newCause: true })).toEqual({
+      warning: 2,
+      action: "WARN",
+    });
+  });
+
+  it("an answer is delivered neither heated nor raised", () => {
+    const delivered = deliveryFor(
+      "ANGRY",
+      "ANGRY",
+      { mood: "ANGRY", intensity: "RAISED", reaction: null },
+      false,
+      false,
+      true,
+    );
+    expect(delivered.mood).not.toBe("ANGRY");
+    expect(delivered.intensity).not.toBe("RAISED");
+  });
+
+  it("a question is open by their move, not a question mark", () => {
+    expect(
+      questionOpenIn([
+        { from: "THEM", text: "Interesting. Anything else?", move: "REMARK" },
+        { from: "YOU", text: "What would you need to see from us?" },
+      ]),
+    ).toBe(false);
+    expect(
+      questionOpenIn([
+        { from: "THEM", text: "Walk me through churn.", move: "QUESTION" },
+      ]),
+    ).toBe(true);
+    // The founder's question back, with none of theirs open, is no dodge.
+    expect(appliedAppraisal("EVASIVE", false)).toBe("NEUTRAL");
   });
 });

@@ -39,8 +39,10 @@ import {
 import type { ActorContext } from "@capital-q/security";
 
 import {
+  ANSWERED,
   applyAppraisal,
   appliedAppraisal,
+  givesCause,
   questionNote,
   questionOpenIn,
   deliveryFor,
@@ -238,6 +240,8 @@ const StoredTurnSchema = z.object({
     })
     .optional(),
   warning: z.number().int().min(1).max(2).optional(),
+  /** The played person's move for this line; absent on older rows. */
+  move: z.string().max(20).optional(),
 });
 
 export type Turn = {
@@ -253,6 +257,8 @@ export type Turn = {
   readonly state?: Temperament | undefined;
   /** This line was the played person's first or last warning before walking out. */
   readonly warning?: 1 | 2 | undefined;
+  /** Their move (QUESTION, FOLLOW_UP, REMARK…): whether a question is open. */
+  readonly move?: string | undefined;
 };
 
 export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
@@ -274,6 +280,7 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
       ...(turn.warning === 1 || turn.warning === 2
         ? { warning: turn.warning }
         : {}),
+      ...(turn.move === undefined ? {} : { move: turn.move }),
     };
   });
 }
@@ -1769,6 +1776,7 @@ export function createRehearsalService(dependencies: {
       provoked: PROVOKED.has(appraisal),
       conclusion: result.conclusion,
       wrappingUp: wrapUp,
+      newCause: givesCause(appraisal),
     });
     const shaped: RehearsalTurnResult =
       plan.action === "WARN"
@@ -1796,6 +1804,7 @@ export function createRehearsalService(dependencies: {
       shaped,
       shaped.move === "CLOSE",
       PROVOKED.has(appraisal),
+      ANSWERED.has(appraisal),
     );
     return {
       result: {
@@ -2137,6 +2146,7 @@ export function createRehearsalService(dependencies: {
           ...(warningOf(answered) === undefined
             ? {}
             : { warning: warningOf(answered) }),
+          move: result.move,
         },
       ];
       const saved = await store.saveTurns(actor, row.id, {
