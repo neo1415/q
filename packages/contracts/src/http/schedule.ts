@@ -182,6 +182,11 @@ export const NotificationKindSchema = z.enum([
   "CONNECTION_REQUESTED",
   "Q_MESSAGE",
   "TIME_PROPOSED",
+  // Written by the review and verification paths since 20261115010000; the
+  // contract lagged the table, so one such row failed the whole list.
+  "HUMAN_REVIEW",
+  "VERIFICATION_DECIDED",
+  "VERIFICATION_REQUESTED",
   // 2026-10-02: a pass, pause or resume, told to the other side.
   "RELATIONSHIP_OUTCOME",
   "DILIGENCE",

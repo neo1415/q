@@ -10,6 +10,7 @@ import {
   MeetingSlotsResponseSchema,
   NOTIFICATIONS_PATH,
   NOTIFICATIONS_READ_PATH,
+  NotificationDtoSchema,
   NotificationListSchema,
   parseContract,
   PROBLEM_CONTENT_TYPE,
@@ -170,9 +171,11 @@ export function registerScheduleRoutes(
     async (request, reply) => {
       const own = await schedule.listNotifications(getActorContext(request));
       void reply.header("Cache-Control", "no-store");
-      return NotificationListSchema.parse({
-        unread: own.unread,
-        items: own.items.map((item) => ({
+      // A row the contract can't describe (a kind the table accepts before the
+      // contract learns it) is skipped and logged, never allowed to fail the
+      // whole list.
+      const items = own.items.flatMap((item) => {
+        const parsed = NotificationDtoSchema.safeParse({
           id: item.id,
           kind: item.kind,
           title: item.title,
@@ -181,8 +184,15 @@ export function registerScheduleRoutes(
           read: item.readAt !== null,
           createdAt: item.createdAt.toISOString(),
           priority: item.priority ?? "UPDATE",
-        })),
+        });
+        if (parsed.success) return [parsed.data];
+        request.log.warn(
+          { notificationId: item.id, kind: item.kind },
+          "notification skipped: outside the contract",
+        );
+        return [];
       });
+      return NotificationListSchema.parse({ unread: own.unread, items });
     },
   );
 
