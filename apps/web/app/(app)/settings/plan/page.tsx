@@ -19,7 +19,7 @@ import {
   ManageBillingButton,
 } from "@/features/billing/plan-actions";
 import {
-  allowanceLine,
+  countLine,
   resetLine,
   sourceLine,
   usedPercent,
@@ -51,14 +51,11 @@ export default async function PlanPage({
         ]);
   return (
     <PageContainer width="reading">
-      <PageHeader
-        title="Your plan"
-        description="What your plan includes and how much you've used this month. Q's diagnosis, Discover, interest, chat and meetings are never limited by a plan."
-      />
+      <PageHeader title="Plan" />
       {plan === null ? (
         <ErrorState
           title="Your plan couldn't load"
-          description="Nothing has changed. Try again in a moment."
+          description="Nothing changed and nothing was charged."
           action={
             <Link
               href="/settings/plan"
@@ -84,59 +81,95 @@ export default async function PlanPage({
   );
 }
 
+/** Usage at or past this share of a limit shows a meter (design-48). */
+const NEAR_LIMIT = 80;
+
 function CurrentPlan({ plan }: { readonly plan: BillingAccountPlanDto }) {
+  const resets = plan.features
+    .map((feature) => resetLine(feature))
+    .find((line) => line !== null);
+  const free = plan.source === "LAUNCH_DEFAULT";
   return (
-    <PageSection
-      id="current"
-      title={sourceLine({
-        source: plan.source,
-        planName: plan.plan.name,
-        endsAt: plan.endsAt,
-      })}
-      description={
-        plan.account === "PERSON"
-          ? "Your own plan, while you act without an organisation."
-          : "Your organisation's plan, shared by everyone in it."
-      }
-    >
-      <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-        {plan.features.map((feature) => {
-          const percent = usedPercent(feature);
-          const reset = resetLine(feature);
-          return (
-            <li key={feature.key} className="flex flex-col gap-2 py-4">
-              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
-                <span className="cq-body font-medium text-(--cq-text-primary)">
-                  {feature.name}
-                </span>
-                <span className="cq-body-sm cq-numeric text-(--cq-text-secondary)">
-                  {allowanceLine(feature)}
-                </span>
-              </div>
-              <span className="cq-caption text-(--cq-text-secondary)">
-                {feature.description}
-                {reset === null ? "" : ` ${reset}.`}
-                {feature.overridden
-                  ? " Set for your account by Capital Q."
-                  : ""}
-              </span>
-              {percent === null ? null : (
-                <Progress
-                  label={`${feature.name} used`}
-                  value={percent}
-                  className="max-w-md"
-                />
-              )}
-            </li>
-          );
-        })}
-      </ul>
+    <div className="flex flex-col gap-8">
+      <section aria-labelledby="plan-current" className="flex flex-col gap-1">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2
+            id="plan-current"
+            className="cq-title-lg text-(--cq-text-primary)"
+            data-plan-name
+          >
+            {free
+              ? plan.plan.name
+              : sourceLine({
+                  source: plan.source,
+                  planName: plan.plan.name,
+                  endsAt: plan.endsAt,
+                })}
+          </h2>
+          {/* Only the launch plan's price is known here: it is free. No
+              other price is ever shown or guessed (lead, design-48). */}
+          {free ? (
+            <span className="cq-body cq-numeric font-semibold text-(--cq-text-primary)">
+              $0.00/mo USD
+            </span>
+          ) : null}
+        </div>
+        {free ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Free while Capital Q launches
+          </p>
+        ) : null}
+      </section>
+
+      <PageSection id="month" title="This month">
+        <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+          {plan.features.map((feature) => {
+            const percent = usedPercent(feature);
+            return (
+              <li
+                key={feature.key}
+                className="flex min-h-12 flex-col justify-center gap-2 py-2"
+                data-plan-feature={feature.key}
+              >
+                <div className="flex items-baseline justify-between gap-6">
+                  <span className="cq-body text-(--cq-text-primary)">
+                    {feature.name}
+                  </span>
+                  <span className="cq-body-sm cq-numeric shrink-0 text-(--cq-text-primary)">
+                    {countLine(feature)}
+                  </span>
+                </div>
+                {percent === null || percent < NEAR_LIMIT ? null : (
+                  <Progress label={`${feature.name} used`} value={percent} />
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        {resets === undefined ? null : (
+          <p className="cq-caption pt-2 text-(--cq-text-tertiary)">{resets}</p>
+        )}
+      </PageSection>
+
       {plan.hasBillingCustomer && plan.canManage ? (
-        <div className="pt-4">
+        <div>
           <ManageBillingButton />
         </div>
       ) : null}
-    </PageSection>
+
+      <details
+        className="border-y border-(--cq-border-subtle)"
+        data-never-limited
+      >
+        <summary className="cq-body flex min-h-12 cursor-pointer items-center text-(--cq-text-primary)">
+          What&rsquo;s never limited
+        </summary>
+        <p className="cq-body-sm pb-3 text-(--cq-text-secondary)">
+          Q&rsquo;s diagnosis, Discover, interest, chat and meetings, on every
+          plan.
+        </p>
+      </details>
+    </div>
   );
 }
 
@@ -147,12 +180,36 @@ function Plans({
   readonly plan: BillingAccountPlanDto;
   readonly catalogue: BillingCatalogueDto | null;
 }) {
+  if (!plan.checkoutAvailable) {
+    // Online payment is off: no plan list and no prices, one way to ask.
+    return plan.canManage ? (
+      <details data-ask-plan>
+        <summary
+          className={buttonClassName(
+            "secondary",
+            "regular",
+            "w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden",
+          )}
+        >
+          Ask to change plan
+        </summary>
+        <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
+          Reply to any Capital Q email and the team changes it for you. Nothing
+          is charged until you agree a price.
+        </p>
+      </details>
+    ) : (
+      <p className="cq-body-sm text-(--cq-text-secondary)">
+        An admin of your organisation can change its plan.
+      </p>
+    );
+  }
   if (catalogue === null) {
     return (
       <ErrorState
         compact
         title="The plans couldn't load"
-        description="Your own plan above is unaffected. Try again in a moment."
+        description="Your plan above is unaffected."
       />
     );
   }
@@ -163,13 +220,7 @@ function Plans({
     <PageSection
       id="plans"
       title="Plans"
-      description={
-        plan.checkoutAvailable
-          ? "Choose a plan to pay securely with our payment provider. You can cancel any time."
-          : plan.canManage
-            ? "Online payment isn't switched on yet. To change your plan now, reply to any Capital Q email and the team will change it for you."
-            : "An admin of your organisation can change its plan."
-      }
+      description="Pay securely with our payment provider. Cancel any time."
     >
       <ul className="grid gap-4 sm:grid-cols-2">
         {offered.map((candidate) => (
@@ -202,12 +253,10 @@ function Plans({
                 </li>
               ))}
             </ul>
-            {plan.checkoutAvailable ? (
-              <ChoosePlanButton
-                planKey={candidate.key}
-                planName={candidate.name}
-              />
-            ) : null}
+            <ChoosePlanButton
+              planKey={candidate.key}
+              planName={candidate.name}
+            />
           </li>
         ))}
       </ul>
