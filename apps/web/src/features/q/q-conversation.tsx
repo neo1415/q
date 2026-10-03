@@ -59,6 +59,7 @@ import { QAnswer } from "./q-answer";
 import { QBoard } from "./q-board";
 import { QHistorySheet } from "./q-history-sheet";
 import { QNow } from "./q-now";
+import { QPresenceStage } from "./q-presence-stage";
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
@@ -487,17 +488,20 @@ export function QConversationPanel({
   );
   const chooseView = writeStageView;
   const latestAnswer = turns.findLast((turn) => turn.kind === "Q");
-  const structured =
-    latestAnswer?.kind === "Q" &&
-    !latestAnswer.streaming &&
-    isLaidOut(latestAnswer);
   const showingCards =
     !voice.active &&
     !q.working &&
     latestAnswer?.kind === "Q" &&
     !latestAnswer.streaming &&
     latestAnswer.blocks.some((block) => block.kind === "COMPARISON_CARDS");
-  const bigPresence = !conversing || (view === "presence" && !structured);
+  // Presence view is Q's presence only (founder request 2026-10-03): a
+  // laid-out answer is shown over it (QPresenceStage), not as a thread.
+  const bigPresence = !conversing || view === "presence";
+  const captions = useSyncExternalStore(
+    subscribeCaptions,
+    readCaptions,
+    () => false,
+  );
   // Before anything is said the top of the stage -- Q -- is what must be
   // in view (R24); the welcome beneath it can scroll. Once there is a
   // conversation, its newest words are followed while the person is at
@@ -729,6 +733,19 @@ export function QConversationPanel({
                   ))}
                 </div>
               ) : null}
+              {conversing && view === "presence" ? (
+                <button
+                  type="button"
+                  aria-pressed={captions}
+                  className={
+                    captions ? "cq-stage-quiet is-active" : "cq-stage-quiet"
+                  }
+                  onClick={() => writeCaptions(!captions)}
+                  data-q-control="captions"
+                >
+                  Captions
+                </button>
+              ) : null}
               <VoiceMenu
                 voice={voice.voice}
                 onChoose={(choice) => void voice.chooseVoice(choice)}
@@ -799,41 +816,120 @@ export function QConversationPanel({
                 data-q-cards-layout={showingCards ? "aside" : undefined}
               >
                 {bigPresence ? (
-                  <div
-                    className="flex flex-col items-center gap-2 pt-2"
-                    data-q-presence="stage"
-                  >
-                    <ViewTransition
-                      name="q-aperture"
-                      share="cq-q-morph"
-                      default="none"
-                    >
-                      <QAperture
-                        state={presence.state}
-                        size={200}
-                        inputLevel={client.inputLevel}
-                        outputLevel={client.outputLevel}
-                      />
-                    </ViewTransition>
-                    {thread.length > latestExchange(thread).length ? (
-                      <button
-                        type="button"
-                        className="cq-stage-quiet"
-                        onClick={() => chooseView("chat")}
+                  <QPresenceStage
+                    presence={
+                      <div
+                        className="flex flex-col items-center gap-2 pt-2"
+                        data-q-presence="stage"
                       >
-                        Earlier in this conversation
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-                <ol
-                  className="flex w-full flex-col gap-5"
-                  aria-label="Conversation"
-                  aria-live="polite"
-                  data-q-thread
-                >
-                  {(bigPresence ? latestExchange(thread) : thread).map(
-                    (line) =>
+                        <ViewTransition
+                          name="q-aperture"
+                          share="cq-q-morph"
+                          default="none"
+                        >
+                          <QAperture
+                            state={presence.state}
+                            size={200}
+                            inputLevel={client.inputLevel}
+                            outputLevel={client.outputLevel}
+                          />
+                        </ViewTransition>
+                        {thread.length > latestExchange(thread).length ? (
+                          <button
+                            type="button"
+                            className="cq-stage-quiet"
+                            onClick={() => chooseView("chat")}
+                          >
+                            Earlier in this conversation
+                          </button>
+                        ) : null}
+                      </div>
+                    }
+                    turns={turns}
+                    captions={captions}
+                    caption={
+                      <ol
+                        className="flex w-full flex-col gap-5"
+                        aria-label="Conversation"
+
+                        data-q-thread
+                      >
+                        {latestExchange(thread).map((line) =>
+                          line.role === "person" ? (
+                            <li
+                              key={line.id}
+                              className="flex flex-col"
+                              data-q-row="person"
+                            >
+                              <p className="cq-q-bubble cq-body">
+                                <span className="sr-only">You: </span>
+                                {line.text}
+                              </p>
+                              <HideFromQ
+                                conversationId={q.conversationId}
+                                messageId={line.id}
+                              />
+                            </li>
+                          ) : (
+                            <li
+                              key={line.id}
+                              className="flex flex-col"
+                              data-q-row="q"
+                            >
+                              <span className="sr-only">Q: </span>
+                              {line.turn === undefined ? (
+                                <QMarkdown
+                                  text={line.text}
+                                  className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-primary)"
+                                />
+                              ) : (
+                                <QAnswer
+                                  turn={line.turn}
+                                  mark={false}
+                                  onAsk={sayOrAsk}
+                                  onOpenArtifact={showArtifact}
+                                />
+                              )}
+                            </li>
+                          ),
+                        )}
+                        {liveIsPerson ? (
+                          <li
+                            key={live.id}
+                            className="flex flex-col"
+                            data-q-row="person"
+                          >
+                            <p
+                              className="cq-q-bubble is-live cq-body"
+                              data-q-live-line
+                            >
+                              <span className="sr-only">You, speaking: </span>
+                              {live.text}
+                            </p>
+                          </li>
+                        ) : null}
+                      </ol>
+                    }
+                    waiting={
+                      boardDocked ? null : (
+                        <QNow
+                          session={session}
+                          onAct={sayOrAsk}
+                          quietWhenIdle
+                        />
+                      )
+                    }
+                    onAsk={sayOrAsk}
+                    onOpenArtifact={showArtifact}
+                  />
+                ) : (
+                  <ol
+                    className="flex w-full flex-col gap-5"
+                    aria-label="Conversation"
+                    aria-live="polite"
+                    data-q-thread
+                  >
+                    {thread.map((line) =>
                       line.role === "person" ? (
                         <li
                           key={line.id}
@@ -871,23 +967,24 @@ export function QConversationPanel({
                           )}
                         </li>
                       ),
-                  )}
-                  {liveIsPerson ? (
-                    <li
-                      key={live.id}
-                      className="flex flex-col"
-                      data-q-row="person"
-                    >
-                      <p
-                        className="cq-q-bubble is-live cq-body"
-                        data-q-live-line
+                    )}
+                    {liveIsPerson ? (
+                      <li
+                        key={live.id}
+                        className="flex flex-col"
+                        data-q-row="person"
                       >
-                        <span className="sr-only">You, speaking: </span>
-                        {live.text}
-                      </p>
-                    </li>
-                  ) : null}
-                </ol>
+                        <p
+                          className="cq-q-bubble is-live cq-body"
+                          data-q-live-line
+                        >
+                          <span className="sr-only">You, speaking: </span>
+                          {live.text}
+                        </p>
+                      </li>
+                    ) : null}
+                  </ol>
+                )}
 
                 {/* What Q is doing, only while it is doing something: the
                     swarm at work beside it (founder live 2026-09-29), and
@@ -934,7 +1031,7 @@ export function QConversationPanel({
                   </div>
                 ) : null}
 
-                {boardDocked ? null : (
+                {boardDocked || bigPresence ? null : (
                   <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
                 )}
                 {notices}
@@ -1254,31 +1351,48 @@ function readStageView(): QStageView {
   return stageViewInMemory ?? "presence";
 }
 
+/*
+ * Captions on the Q page's presence view: an accessibility setting, off
+ * by default (founder request 2026-10-03: the presence view shows no
+ * text). Per viewer, like the view itself.
+ */
+const CAPTIONS_KEY = "cq.q.captions";
+const CAPTIONS_EVENT = "cq:q-captions";
+let captionsInMemory: boolean | null = null;
+
+function subscribeCaptions(onChange: () => void): () => void {
+  window.addEventListener(CAPTIONS_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(CAPTIONS_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function writeCaptions(next: boolean): void {
+  captionsInMemory = next;
+  try {
+    localStorage.setItem(CAPTIONS_KEY, next ? "on" : "off");
+  } catch {
+    // Private mode: the choice lasts for this page only.
+  }
+  window.dispatchEvent(new Event(CAPTIONS_EVENT));
+}
+
+function readCaptions(): boolean {
+  try {
+    const stored = localStorage.getItem(CAPTIONS_KEY);
+    if (stored === "on" || stored === "off") return stored === "on";
+  } catch {
+    // Storage unavailable: this page's own choice.
+  }
+  return captionsInMemory ?? false;
+}
+
 /** The person's last line and everything Q said after it. */
 function latestExchange<T extends { readonly role: string }>(
   lines: readonly T[],
 ): readonly T[] {
   const at = lines.findLastIndex((line) => line.role === "person");
   return at < 0 ? lines : lines.slice(at);
-}
-
-/**
- * An answer laid out rather than spoken: cards, a table, or a list of key
- * points. Presentation only; nothing here reads what the answer means.
- */
-function isLaidOut(turn: Extract<QTurn, { kind: "Q" }>): boolean {
-  if (
-    turn.blocks.some(
-      (block) =>
-        block.kind === "COMPARISON_CARDS" ||
-        block.kind === "COMPARISON" ||
-        block.kind === "ARTIFACT_REFERENCE",
-    )
-  ) {
-    return true;
-  }
-  const rows = turn.text
-    .split("\n")
-    .filter((line) => /^\s*(?:[-*] |\d+\. |\|)/.test(line));
-  return rows.length >= 3;
 }
