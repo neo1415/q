@@ -23,7 +23,7 @@ import {
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import { ownStandingFact } from "../src/q/own-standing.js";
-import { readinessLeadLines } from "../src/q/own-readiness.js";
+import { afterLeadLines, readinessLeadLines } from "../src/q/own-readiness.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
 /**
@@ -890,6 +890,20 @@ describe("code's opening lines (lead 2026-10-03)", () => {
     expect(sentTo(alpha)).toContain("opens your answer with these gaps");
     expect(readinessLeadLines(READINESS)).toBe(
       "Investors can't find your company in Discover yet. What to do next, most important first:\n1. Make the company visible to investors.\n2. Upload a pitch deck.\n3. Verify your identity.",
+    );
+  });
+
+  it("the model's follow-on never restarts the list (run 56f815aa)", () => {
+    expect(
+      afterLeadLines("1. Choose whether to make your profile visible."),
+    ).toBe("Choose whether to make your profile visible.");
+    expect(afterLeadLines("  1) Choose now.")).toBe("Choose now.");
+    // Prose, and a number that is not an item marker, stay as written.
+    expect(afterLeadLines("That one matters most.")).toBe(
+      "That one matters most.",
+    );
+    expect(afterLeadLines("12 investors are waiting.")).toBe(
+      "12 investors are waiting.",
     );
   });
 });

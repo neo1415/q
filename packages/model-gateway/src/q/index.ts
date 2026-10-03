@@ -88,7 +88,7 @@ import {
   ownStandingFact,
   type QOwnIndex,
 } from "./own-standing.js";
-import { ownReadinessFact } from "./own-readiness.js";
+import { afterLeadLines, ownReadinessFact } from "./own-readiness.js";
 
 export type { QOwnIndex } from "./own-standing.js";
 export { readinessLeadLines } from "./own-readiness.js";
@@ -3332,7 +3332,9 @@ export function createModelGatewayQAnswer(
                 ...(approvalLine === null ? [] : [approvalLine]),
                 // Code's opening lines for this answer, before the model's.
                 ...(request.leadLines === undefined ? [] : [request.leadLines]),
-                statusTalk?.text ?? guarded.text,
+                request.leadLines === undefined
+                  ? (statusTalk?.text ?? guarded.text)
+                  : afterLeadLines(statusTalk?.text ?? guarded.text),
                 ...(couldNot === null ? [] : [couldNot]),
                 ...actedLines,
                 // The status of earlier changes is not an answer to this
