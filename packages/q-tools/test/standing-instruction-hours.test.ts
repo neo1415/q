@@ -177,4 +177,33 @@ describe("propose_standing_instruction: prepare is not do (weekend test 6ea17898
       ),
     ).toBe(true);
   });
+
+  it("keeps on its own only what they named, and leaves out what they said not to do (QA 9a8e8d2a, b4e0db89)", async () => {
+    const out = await world().propose({
+      goal: "Handle it: express interest and send each a short first message. Do not book calls.",
+      handsOverDoing: true,
+      onItsOwnOnly: ["EXPRESS_INTEREST", "MESSAGES"],
+      neverDo: ["BOOK_CALLS"],
+    });
+    const actions = grantOf(out.prepared[0]).actions;
+    const modeOf = (name: string) =>
+      actions.find((entry) => entry.action === name)?.mode;
+    expect(modeOf("relationship.interest.express")).toBe("AUTO");
+    expect(modeOf("chat.message.send")).toBe("AUTO");
+    expect(modeOf("schedule.meeting.book")).toBeUndefined();
+
+    // Named only interest: messages ask, booking stays in the grant as ASK.
+    const narrow = await world().propose({
+      goal: "Handle it: just express interest for me",
+      handsOverDoing: true,
+      onItsOwnOnly: ["EXPRESS_INTEREST"],
+    });
+    const narrowed = grantOf(narrow.prepared[0]).actions;
+    expect(
+      narrowed.filter((entry) => entry.mode === "AUTO").map((e) => e.action),
+    ).toEqual(["relationship.interest.express"]);
+    expect(
+      narrowed.find((entry) => entry.action === "schedule.meeting.book")?.mode,
+    ).toBe("ASK");
+  });
 });
