@@ -284,3 +284,8 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - Parity eval on 11a41c9a: 13/17 grader, ~16/17 behaviour; remaining are fixture artifacts. Eval spend this span ≈ $0.80 total.
 - Founder decisions: keep INVESTORS-pitch disclosure rule; pass reason shared only if investor ticks; re-approach only on material change; deck audience choice like pitch; team (names/roles/bios) visible to investors who can find the company.
 - Incidents: two VM OOM restarts (full vitest + workers); now vitest --maxWorkers=2, web alone, builds --concurrency=1.
+
+## 2026-10-03 05:30 — lead
+- Deployed through 4d6455dc. Approval safety hardened end to end: only a reply decides a card (typed + voice, cross-conversation needs explicit approval naming the counterpart); one card per identical change; setter cards supersede older opposite ones (old card refused, 409); denial reasons spoken; never a status-only answer; one status line per card; reminder for other waiting cards when a new card is prepared.
+- Structural action reach: app actions eligible by area in focus; named counterparts bring Relationships; dedicated APP_ACTION_ROUTER (FAST, closed list, ~1.1–1.7 s, only when the reader names no declared action).
+- Parity eval on 4d6455dc: 17/17 plus reminder sequence; route/reminder log lines visible. Eval spend tonight ≈ $1.2 total.
