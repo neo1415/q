@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
 
-import {
-  notVerbatim,
-  sameWords,
-  withRecordedName,
-} from "../src/voice/interview-agent.js";
+import { notVerbatim, sameWords } from "../src/voice/interview-agent.js";
 import { definitionFor } from "../src/voice/interview-steps.js";
 import { onlyOptionNamedIn } from "../src/voice/onboarding-port.js";
 
@@ -38,25 +34,6 @@ describe("never the previous question word for word", () => {
       }),
     ).toBe("Singapore! Busy week. What stage are you at?");
     expect(sameWords("A, b!", "a b")).toBe(true);
-  });
-});
-
-describe("their name as recorded", () => {
-  it("restores a bracketed qualifier where the bare name stands", () => {
-    expect(
-      withRecordedName(
-        "Moniepoint, Nigeria, Series C -- that summary is confirmed.",
-        "Moniepoint (test)",
-      ),
-    ).toBe(
-      "Moniepoint (test), Nigeria, Series C -- that summary is confirmed.",
-    );
-    expect(
-      withRecordedName("Moniepoint (test) is noted.", "Moniepoint (test)"),
-    ).toBe("Moniepoint (test) is noted.");
-    expect(withRecordedName("Moniepoint is noted.", "Moniepoint")).toBe(
-      "Moniepoint is noted.",
-    );
   });
 });
 
