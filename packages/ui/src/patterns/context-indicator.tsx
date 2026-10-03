@@ -29,6 +29,22 @@ type ScopePresentation = {
   }>;
 };
 
+/**
+ * One word for the compact form: a phone shows no hover title, so an icon
+ * alone left "what is this lock?" unanswered (demo audit 2026-10-03).
+ */
+const SHORT: Record<ContextScope, string> = {
+  personal_private: "Private",
+  organisation_private: "Private",
+  founder_private: "Private",
+  investor_private: "Private",
+  relationship_shared: "Shared",
+  specifically_shared: "Shared",
+  network_visible: "Network",
+  public_external: "Public",
+  unset: "No context",
+};
+
 const presentation: Record<ContextScope, ScopePresentation> = {
   personal_private: { label: "Private to you", Icon: Lock },
   organisation_private: { label: "Private to organisation", Icon: Building2 },
@@ -70,7 +86,7 @@ export function ContextIndicator({
         aria-label={name}
         title={name}
         className={cx(
-          "inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-(--cq-text-secondary)",
+          "cq-caption inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)",
           className,
         )}
       >
@@ -79,6 +95,7 @@ export function ContextIndicator({
           size={ICON_SIZE.compact}
           strokeWidth={ICON_STROKE}
         />
+        <span aria-hidden="true">{SHORT[scope]}</span>
       </span>
     );
   }

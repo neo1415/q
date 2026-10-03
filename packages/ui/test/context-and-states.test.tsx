@@ -27,6 +27,20 @@ describe("ContextIndicator", () => {
     expect(screen.getByText(/Apex Ventures/)).toBeTruthy();
   });
 
+  it("says a word beside the icon when compact, and keeps the full label as its name", () => {
+    render(
+      <ContextIndicator
+        scope="investor_private"
+        detail="Savanna Seed"
+        compact
+      />,
+    );
+    const pill = screen.getByRole("img", {
+      name: "Investor private · Savanna Seed",
+    });
+    expect(pill.textContent).toBe("Private");
+  });
+
   it("says plainly when no context exists rather than inventing one", () => {
     render(<ContextIndicator scope="unset" />);
     expect(screen.getByText("No context set")).toBeTruthy();
