@@ -473,6 +473,23 @@ describe("profile and records, generated from the registry (ADR 0040 step 2)", (
     expect(malformed.prepared).toEqual([]);
   });
 
+  it("'let search engines find our Q Card' with no card says what makes one, whose card unsaid", async () => {
+    const { executor, prepared } = records();
+    for (const args of [
+      { indexable: true },
+      { subject: "INVESTOR_ORGANISATION", indexable: true },
+    ]) {
+      const outcome = await executor.execute(
+        call("update_q_card", args),
+        contextFor(actorA, founderPlan()),
+      );
+      expect(JSON.stringify(outcome.result)).toContain(
+        "You don't have a Q Card yet",
+      );
+    }
+    expect(prepared).toEqual([]);
+  });
+
   it("their own profile binds to them; a value that does not fit says which field", async () => {
     const { executor, prepared } = records();
     await executor.execute(
