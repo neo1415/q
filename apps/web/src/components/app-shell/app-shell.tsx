@@ -13,6 +13,7 @@ import type { VerifyNudge } from "@/features/verification/verify-state";
 
 import { AppHeader } from "./app-header";
 import { DesktopSidebar } from "./desktop-sidebar";
+import { FictionalNames } from "./fictional-names";
 import { GlobalQProvider } from "./global-q";
 import { MobileNavigation } from "./mobile-navigation";
 import { NetworkStatus } from "./network-status";
@@ -98,6 +99,7 @@ export function AppShell({
           )}
           <main id="main" className="cq-shell-main">
             {children}
+            <FictionalNames />
           </main>
           <MobileNavigation scope={context.scope} verifyNudge={verifyNudge} />
         </div>
