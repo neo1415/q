@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import {
   qArtifactExportFormats,
   type QArtifactSummary,
@@ -7,6 +9,7 @@ import {
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
+  ChevronDown,
   CircleAlert,
   FileText,
   ICON_SIZE,
@@ -94,18 +97,19 @@ function DocumentRow({ document }: { readonly document: QArtifactSummary }) {
 export function DocumentsScreen({
   documents,
   brand,
+  decks = null,
 }: {
   /** Null when the list could not be read. */
   readonly documents: readonly QArtifactSummary[] | null;
   readonly brand: QBrandKitState | null;
+  /** Who may download the pitch deck, shown after the list. */
+  readonly decks?: ReactNode;
 }) {
   const { askAbout } = useGlobalQ();
   const items = documents;
 
   return (
     <>
-      <BrandKitPanel initial={brand} />
-
       <section className="flex flex-col gap-3" aria-labelledby="documents-list">
         <h2
           id="documents-list"
@@ -118,13 +122,13 @@ export function DocumentsScreen({
             className="cq-body text-(--cq-text-secondary)"
             data-state="unavailable"
           >
-            Your documents couldn&apos;t be read just now. Reload in a moment.
+            Your documents couldn&apos;t load. Who can open them hasn&apos;t
+            changed.
           </p>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-start gap-3" data-state="empty">
             <p className="cq-body text-(--cq-text-secondary)">
-              No documents yet. Ask Q for a pitch deck, a one-pager or a report,
-              by typing or by voice, from any page.
+              No documents yet.
             </p>
             <button
               type="button"
@@ -143,6 +147,26 @@ export function DocumentsScreen({
           </ul>
         )}
       </section>
+
+      {decks}
+
+      {/* design-48 v2: the brand is set once; it waits behind its heading. */}
+      <details
+        className="group border-y border-(--cq-border-subtle)"
+        data-brand-fold
+      >
+        <summary className="cq-title-sm flex min-h-12 cursor-pointer list-none items-center justify-between text-(--cq-text-primary) [&::-webkit-details-marker]:hidden">
+          Brand
+          <ChevronDown
+            size={ICON_SIZE.regular}
+            aria-hidden="true"
+            className="text-(--cq-text-tertiary) transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <div className="pb-4">
+          <BrandKitPanel initial={brand} />
+        </div>
+      </details>
     </>
   );
 }

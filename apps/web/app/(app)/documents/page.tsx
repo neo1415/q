@@ -63,12 +63,12 @@ export default async function DocumentsPage() {
           .catch(() => []);
   return (
     <PageContainer width="reading" className="flex flex-col gap-8">
-      <PageHeader
-        title="Documents"
-        description="Decks, briefs and reports Q made for you, and the brand they're drawn in."
+      <PageHeader title="Documents" />
+      <DocumentsScreen
+        documents={documents?.items ?? null}
+        brand={brand}
+        decks={<DeckSharing decks={decks} />}
       />
-      <DeckSharing decks={decks} />
-      <DocumentsScreen documents={documents?.items ?? null} brand={brand} />
     </PageContainer>
   );
 }
