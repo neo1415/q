@@ -1,10 +1,13 @@
 import { z } from "zod";
 
 import {
+  Q_INSTRUCTION_GRANT,
   Q_TASK_CLASSES,
   Q_WORK_OUTREACH_START,
   Q_WORK_STANDIN_START,
   QWorkCallWindowSchema,
+  handleEverythingGrant,
+  type InstructionGrantPayload,
   type PermittedContextPlan,
   type QWorkDto,
   type QWorkOutreachStartPayload,
@@ -36,6 +39,7 @@ import { actorWideScope } from "../plan.js";
 
 export const PROPOSE_Q_OUTREACH = "q.work.outreach.propose" as const;
 export const PROPOSE_STAND_IN = "q.work.standin.propose" as const;
+export const PROPOSE_STANDING_INSTRUCTION = "q.instruction.propose" as const;
 export const LIST_Q_WORK = "q.work.list" as const;
 export const STOP_Q_WORK = "q.work.stop" as const;
 export const ANSWER_Q_WORK = "q.work.answer" as const;
@@ -49,6 +53,10 @@ export type QWorkProposal =
   | {
       readonly actionType: typeof Q_WORK_STANDIN_START;
       readonly payload: QWorkStandInStartPayload;
+    }
+  | {
+      readonly actionType: typeof Q_INSTRUCTION_GRANT;
+      readonly payload: InstructionGrantPayload;
     };
 
 /** What the work tools reach, composed by q-api over the work store. */
@@ -88,6 +96,9 @@ export type QWorkIntelligencePort = {
         },
   ) => Promise<"ACCEPTED" | "NOT_FOUND" | "NOT_ACTIVE">;
   readonly setAway: (actor: ActorContext, away: boolean) => Promise<void>;
+  /** The person's own time zone, when known (their working hours are in it). */
+  readonly timeZoneOf?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
   readonly prepareForApproval: (entry: {
     readonly runId: string;
     readonly tenantId: string;
@@ -316,6 +327,51 @@ const AwayInputSchema = z
   .strict();
 type AwayInput = z.output<typeof AwayInputSchema>;
 
+// --- start: a standing instruction (ADR 0043) ------------------------------
+
+export const ProposeStandingInstructionInputSchema = z
+  .object({
+    goal: z
+      .string()
+      .min(1)
+      .max(2_000)
+      .describe(
+        "Their goal in their own words, e.g. 'handle all the work for me'.",
+      ),
+    askFirst: z
+      .boolean()
+      .default(false)
+      .describe(
+        "True when they want Q to ask before every step; false keeps the default (Q expresses interest, chats and books times on its own).",
+      ),
+    tone: z
+      .string()
+      .min(1)
+      .max(300)
+      .nullable()
+      .default(null)
+      .describe(
+        "How Q should write for them, if they said; null for the default.",
+      ),
+    topics: z
+      .array(z.string().min(1).max(120))
+      .max(12)
+      .default([])
+      .describe("What Q may talk about, if they said; empty for the default."),
+    relationshipIds: z
+      .array(Uuid)
+      .max(50)
+      .default([])
+      .describe(
+        "Only these relationships, if they named some; empty means all of theirs.",
+      ),
+    expiresInDays: z.number().int().min(1).max(365).default(30),
+  })
+  .strict();
+type ProposeStandingInstructionInput = z.output<
+  typeof ProposeStandingInstructionInputSchema
+>;
+
 export function createQWorkTools(
   port: QWorkIntelligencePort,
 ): readonly AnyQToolDefinition[] {
@@ -413,13 +469,71 @@ export function createQWorkTools(
       },
     }),
 
+    defineQTool<ProposeStandingInstructionInput, ProposalOutput, null>({
+      ...OWN,
+      id: PROPOSE_STANDING_INSTRUCTION,
+      providerName: "propose_standing_instruction",
+      description:
+        "The person gives Q a goal to work toward over time ('handle all the work for me', 'keep my investor conversations moving'): for ONE approval, Q works on it inside a grant they see in plain words -- on its own only expressing interest, chat messages within their tone and topics (a few per person, then it asks) and booking times in their working hours; everything else a card first; terms, money and commitments never without their yes. Call this at once from what they said; they approve it exactly and can stop it any time. For one founder search or one away-message, prefer propose_q_outreach or propose_stand_in.",
+      classification: "SIDE_EFFECT",
+      riskClass: "LOW_RISK_INTERNAL",
+      approval: "NONE",
+      visibleStage: "WAITING_FOR_APPROVAL",
+      input: ProposeStandingInstructionInputSchema,
+      output: ProposalOutputSchema,
+      authorize: (_input, { actor, plan }) =>
+        Promise.resolve(
+          ownConversation(actor, plan)
+            ? allow<null>("CONFIDENTIAL", null)
+            : deny<null>("NOT_AVAILABLE"),
+        ),
+      execute: async (input, context) => {
+        const timeZone = (await port.timeZoneOf?.(context.actor)) ?? "UTC";
+        const base = handleEverythingGrant({
+          timeZone,
+          tone: input.tone ?? undefined,
+          topics: input.topics.length > 0 ? input.topics : undefined,
+        });
+        const status = port.prepareForApproval({
+          runId: context.runId,
+          tenantId: context.actor.tenantId,
+          actorUserId: context.actor.userId,
+          proposal: {
+            actionType: Q_INSTRUCTION_GRANT,
+            payload: {
+              ownerUserId: context.actor.userId,
+              goal: input.goal,
+              grant: {
+                ...base,
+                actions: input.askFirst
+                  ? base.actions.map((entry) => ({ ...entry, mode: "ASK" }))
+                  : base.actions,
+                counterparts:
+                  input.relationshipIds.length > 0
+                    ? {
+                        scope: "LISTED",
+                        relationshipIds: input.relationshipIds,
+                      }
+                    : base.counterparts,
+                expiresInDays: input.expiresInDays,
+              },
+            },
+          },
+        });
+        return {
+          status,
+          awaitingApprovalOf: "Q works on this for you, inside these limits",
+        };
+      },
+    }),
+
     defineQTool<Record<string, never>, WorkListOutput, null>({
       ...OWN,
       id: LIST_Q_WORK,
       core: true,
       providerName: "list_q_work",
       description:
-        "Reads what Q is working on for them, as it really stands: each outreach or stand-in (per founder or investor the stage, the last step -- e.g. who Q is still waiting on to accept -- any times waiting for their choice, with ids to answer, and a report's verdict), and each errand on one relationship with its last step. Call it for 'what are you working on', 'any news', 'did they accept', 'is my meeting set', or before answering or stopping work. Say only what this returns.",
+        "Reads what Q is working on for them, as it really stands: each standing instruction, outreach or stand-in (per founder or investor the stage, the last step -- e.g. who Q is still waiting on to accept -- any times waiting for their choice, with ids to answer, and a report's verdict), and each errand on one relationship with its last step. Call it for 'what are you working on', 'any news', 'did they accept', 'is my meeting set', or before answering or stopping work. Say only what this returns.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       approval: "NONE",

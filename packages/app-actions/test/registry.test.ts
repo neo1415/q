@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { handleEverythingGrant } from "@capital-q/contracts";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
   APP_ACTIONS,
   delegableOnItsOwn,
+  settleGrant,
   PERSON_ACTIONS,
   misheard,
   parityCases,
@@ -418,5 +420,37 @@ describe("delegation: what Q may do on its own", () => {
     const action = named(name);
     expect(action?.consequence).toBeDefined();
     expect(action === undefined ? true : delegableOnItsOwn(action)).toBe(false);
+  });
+
+  it("settling a grant drops undeclared actions and asks for the rest", () => {
+    const grant = handleEverythingGrant({ timeZone: "UTC" });
+    expect(settleGrant(grant, APP_ACTIONS)).toEqual({
+      grant,
+      dropped: [],
+      askedInstead: [],
+    });
+    const settled = settleGrant(
+      {
+        ...grant,
+        actions: [
+          { action: "relationship.outcome.change", mode: "AUTO" },
+          { action: "capital.objective.change", mode: "AUTO" },
+          { action: "chat.message.send", mode: "AUTO" },
+          { action: "chat.message.send", mode: "ASK" },
+          { action: "money.wire.send", mode: "AUTO" },
+        ],
+      },
+      APP_ACTIONS,
+    );
+    expect(settled.grant.actions).toEqual([
+      { action: "relationship.outcome.change", mode: "ASK" },
+      { action: "capital.objective.change", mode: "ASK" },
+      { action: "chat.message.send", mode: "AUTO" },
+    ]);
+    expect(settled.dropped).toEqual(["money.wire.send"]);
+    expect(settled.askedInstead).toEqual([
+      "relationship.outcome.change",
+      "capital.objective.change",
+    ]);
   });
 });

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
+import { APP_ACTIONS, settleGrant } from "@capital-q/app-actions";
 import {
+  InstructionGrantPayloadSchema,
+  InstructionGrantSchema,
+  Q_INSTRUCTION_GRANT,
   Q_WORK_OUTREACH_START,
   Q_WORK_STANDIN_START,
   QActionTypeSchema,
@@ -21,6 +25,10 @@ import {
 import type { QWorkIntelligencePort, QWorkProposal } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
+import type {
+  InstructionRow,
+  InstructionStore,
+} from "../instructions/store.js";
 import { TERMINAL_STAGES, type LaneRow, type WorkStore } from "./store.js";
 
 /**
@@ -275,6 +283,27 @@ export function createWorkActionBoard(
           return Promise.resolve(null);
         }
         const actionType = QActionTypeSchema.parse(entry.proposal.actionType);
+        if (entry.proposal.actionType === Q_INSTRUCTION_GRANT) {
+          // ADR 0043: the card shows what code will really allow -- unknown
+          // actions dropped, AUTO on anything not delegable shown as ASK.
+          const instruction = InstructionGrantPayloadSchema.safeParse(
+            entry.proposal.payload,
+          );
+          if (
+            !instruction.success ||
+            instruction.data.ownerUserId !== context.actor.userId
+          ) {
+            return Promise.resolve({
+              refused:
+                "that instruction isn't something I can prepare as written",
+            });
+          }
+          const settled = settleGrant(instruction.data.grant, APP_ACTIONS);
+          return Promise.resolve({
+            actionType,
+            payload: { ...instruction.data, grant: settled.grant },
+          });
+        }
         const parsed = (
           entry.proposal.actionType === Q_WORK_OUTREACH_START
             ? QWorkOutreachStartPayloadSchema
@@ -344,8 +373,32 @@ function laneDto(lane: LaneRow): QWorkDto["lanes"][number] {
   };
 }
 
+/** A standing instruction (ADR 0043) on the same list as delegated work. */
+function instructionWorkDto(row: InstructionRow): QWorkDto | null {
+  if (row.status === "DRAFT") return null;
+  const grant = InstructionGrantSchema.safeParse(row.grant_payload);
+  const auto = grant.success
+    ? grant.data.actions.filter((entry) => entry.mode === "AUTO").length
+    : 0;
+  const summary =
+    row.status === "PAUSED"
+      ? `Paused (${row.pause_reason ?? "waiting for you"}): ${row.goal_text}`
+      : `${row.goal_text} -- ${String(auto)} things on my own, the rest I ask; $${row.spent_usd_month.replace(/(\.\d{2})\d*$/u, "$1")} of $${row.budget_usd_month} this month.`;
+  return {
+    id: row.id,
+    kind: "STANDING_INSTRUCTION",
+    status: row.status === "PAUSED" ? "ACTIVE" : row.status,
+    summary: summary.slice(0, 300),
+    createdAt: row.created_at.toISOString(),
+    expiresAt: (row.expires_at ?? row.created_at).toISOString(),
+    lanes: [],
+  };
+}
+
 export function createWorkPort(dependencies: {
   readonly store: WorkStore;
+  /** ADR 0043 standing instructions, listed and stopped beside work. */
+  readonly instructions?: InstructionStore | undefined;
   readonly board: ReturnType<typeof createWorkActionBoard>;
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
@@ -396,10 +449,29 @@ export function createWorkPort(dependencies: {
     isInvestor: dependencies.isInvestor,
     hasCompany: async (actor) =>
       (await dependencies.ownCompany(actor)) !== null,
-    list: async (actor) =>
-      Promise.all((await store.own(actor)).map((row) => toDto(row))),
+    list: async (actor) => {
+      const work = await Promise.all(
+        (await store.own(actor)).map((row) => toDto(row)),
+      );
+      const instructions = (
+        (await dependencies.instructions?.list(actor)) ?? []
+      )
+        .map(instructionWorkDto)
+        .filter((item): item is QWorkDto => item !== null);
+      // Live first, then the most recent; the list stays one list.
+      return [...instructions, ...work].sort(
+        (a, b) =>
+          Number(b.status === "ACTIVE") - Number(a.status === "ACTIVE") ||
+          b.createdAt.localeCompare(a.createdAt),
+      );
+    },
+    timeZoneOf: async (actor) =>
+      (await dependencies.instructions?.timeZoneOf(actor)) ?? null,
     stop: async (actor, delegationId, laneId) =>
       (await store.stop(actor, delegationId, laneId)) ||
+      (laneId === null &&
+        dependencies.instructions !== undefined &&
+        (await dependencies.instructions.stop(actor, delegationId))) ||
       (laneId === null &&
         dependencies.errands !== undefined &&
         (await dependencies.errands.stop(actor, delegationId))),
@@ -420,7 +492,30 @@ export function createWorkPort(dependencies: {
     seen: (actor) => store.seen(actor),
     detail: async (actor, delegationId) => {
       const row = await store.ownDelegation(actor, delegationId);
-      if (row === null) return null;
+      if (row === null) {
+        const instruction = await dependencies.instructions?.own(
+          actor,
+          delegationId,
+        );
+        const work =
+          instruction === undefined || instruction === null
+            ? null
+            : instructionWorkDto(instruction);
+        if (work === null || dependencies.instructions === undefined) {
+          return null;
+        }
+        const steps = await dependencies.instructions.steps(
+          actor,
+          delegationId,
+        );
+        return {
+          work,
+          steps: steps.map((step) => ({
+            words: step.words,
+            at: step.created_at.toISOString(),
+          })),
+        };
+      }
       const steps = await store.steps(actor, delegationId);
       return {
         work: await toDto(row),

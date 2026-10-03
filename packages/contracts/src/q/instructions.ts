@@ -110,7 +110,9 @@ export type InstructionGrant = z.infer<typeof InstructionGrantSchema>;
 /** The Approval Engine payload: the goal and the exact grant approved. */
 export const InstructionGrantPayloadSchema = z
   .object({
-    /** The instruction a DRAFT was recorded for; absent on a first proposal. */
+    /** Whose instruction: the person who asked, and the card's target. */
+    ownerUserId: UuidSchema,
+    /** A new grant version for this instruction; absent on a first one. */
     instructionId: UuidSchema.optional(),
     goal: z.string().min(1).max(2_000),
     grant: InstructionGrantSchema,

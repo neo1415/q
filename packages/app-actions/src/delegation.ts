@@ -1,4 +1,7 @@
-import { INSTRUCTION_AUTO_ELIGIBLE_ACTIONS } from "@capital-q/contracts";
+import {
+  INSTRUCTION_AUTO_ELIGIBLE_ACTIONS,
+  type InstructionGrant,
+} from "@capital-q/contracts";
 
 import type { AnyAppAction } from "./define.js";
 
@@ -17,4 +20,41 @@ export function delegableOnItsOwn(action: AnyAppAction): boolean {
       action.name,
     )
   );
+}
+
+/**
+ * A grant as code allows it: actions that are not declared are dropped, and
+ * AUTO on anything Q may not do alone becomes ASK. The proposer settles a
+ * grant before the card is drawn, so the person approves what will really
+ * happen; authorization refuses a grant that is not already settled.
+ */
+export function settleGrant(
+  grant: InstructionGrant,
+  actions: readonly AnyAppAction[],
+): {
+  readonly grant: InstructionGrant;
+  readonly dropped: readonly string[];
+  readonly askedInstead: readonly string[];
+} {
+  const byName = new Map(actions.map((action) => [action.name, action]));
+  const dropped: string[] = [];
+  const askedInstead: string[] = [];
+  const seen = new Set<string>();
+  const settled: InstructionGrant["actions"][number][] = [];
+  for (const entry of grant.actions) {
+    const declared = byName.get(entry.action);
+    if (declared === undefined || declared.classification !== "CONSEQUENTIAL") {
+      dropped.push(entry.action);
+      continue;
+    }
+    if (seen.has(entry.action)) continue;
+    seen.add(entry.action);
+    if (entry.mode === "AUTO" && !delegableOnItsOwn(declared)) {
+      askedInstead.push(entry.action);
+      settled.push({ action: entry.action, mode: "ASK" });
+      continue;
+    }
+    settled.push(entry);
+  }
+  return { grant: { ...grant, actions: settled }, dropped, askedInstead };
 }

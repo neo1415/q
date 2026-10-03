@@ -60,6 +60,11 @@ create table q_runtime.instruction_grants (
   unique (instruction_id, version)
 );
 
+-- One instruction version per approval: a replayed approval finds it.
+create unique index instruction_grants_approval_idx
+  on q_runtime.instruction_grants (approved_q_action_id)
+  where approved_q_action_id is not null;
+
 comment on table q_runtime.instruction_grants is
   'What Q may do under a standing instruction, version by version (ADR 0043). Append-only: a change is a new version that needs its own approval.';
 

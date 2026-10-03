@@ -24,7 +24,7 @@ export {
   type AppActionVerdict,
 } from "./define.js";
 export type { AppActionPorts } from "./ports.js";
-export { delegableOnItsOwn } from "./delegation.js";
+export { delegableOnItsOwn, settleGrant } from "./delegation.js";
 export {
   REFERENCE_KINDS,
   resolveReference,
