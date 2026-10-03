@@ -9,6 +9,8 @@ import {
 } from "@capital-q/contracts";
 import type { QOfferedTool, QToolExecutionContext } from "@capital-q/q-runtime";
 
+import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
+
 import { capabilityArea, Q_CAPABILITIES } from "./capabilities.js";
 import type { AnyQToolDefinition } from "./definition.js";
 import { planScopeKinds } from "./plan.js";
@@ -141,6 +143,26 @@ export function toOfferedTool(record: QToolRecord): QOfferedTool {
   };
 }
 
+/**
+ * The hand-written proposers that still serve a declared action (a
+ * `legacyTool` named propose_*): as much declared actions as a generated
+ * tool (QA run 92e8545d: "Remind me on Monday at 10am to review
+ * Tallyloom's deck" was refused -- the turn was about a company, the
+ * purpose did not list propose_reminder, and only generated tools were
+ * eligible when named, so the router never saw it).
+ */
+const DECLARED_PROPOSERS: ReadonlySet<string> = new Set(
+  appActionToolNames(APP_ACTIONS).filter((name) => name.startsWith("propose_")),
+);
+
+/** A declared app action's tool: offered when named, on any purpose its scopes allow. */
+function declaredAction(record: QToolRecord): boolean {
+  return (
+    record.definition.eligibleWhenNamed === true ||
+    DECLARED_PROPOSERS.has(record.definition.providerName)
+  );
+}
+
 export function createQToolRegistry(
   definitions: readonly AnyQToolDefinition[],
 ): QToolRegistry {
@@ -232,7 +254,7 @@ export function createQToolRegistry(
       const name = record.definition.providerName;
       const forPurpose = record.definition.supportedPurposes.includes(purpose);
       if (!focused) return forPurpose;
-      const app = record.definition.eligibleWhenNamed === true;
+      const app = declaredAction(record);
       // A named tool off this purpose is offered only when it is a declared
       // app action: what is offered is what may execute.
       if (named.has(name)) return forPurpose || app;
@@ -287,10 +309,10 @@ export function createQToolRegistry(
       focus: {
         areas: [],
         tools: [...activeById.values()]
-          .filter(({ definition }) => definition.eligibleWhenNamed === true)
+          .filter(declaredAction)
           .map(({ definition }) => definition.providerName),
       },
-    }).filter(({ definition }) => definition.eligibleWhenNamed === true);
+    }).filter(declaredAction);
 
   /** The tool's area is one the turn is about. */
   const inFocusArea = (
