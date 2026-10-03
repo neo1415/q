@@ -222,7 +222,11 @@ describe("the profile, for an investor", () => {
         .getByRole("link", { name: "Overview" })
         .getAttribute("aria-current"),
     ).toBe("page");
-    expect(screen.getByText("USD 1,500,000")).toBeTruthy();
+    // Once in the key facts, once under The raise.
+    expect(screen.getAllByText("USD 1,500,000")).toHaveLength(2);
+    expect(
+      screen.getByRole("heading", { name: "In their words" }),
+    ).toBeTruthy();
     expect(screen.getByText("Energy storage")).toBeTruthy();
     expect(
       screen.getAllByText("Organisation verified by Capital Q").length,
