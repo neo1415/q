@@ -205,6 +205,7 @@ describe("instructions on the work list", () => {
     grant_version: 1,
     budget_usd_month: "5.00",
     spent_usd_month: "0.123456",
+    spent_this_month: "0.123456",
     pause_reason: null,
     expires_at: new Date("2026-11-02T10:00:00Z"),
     stopped_at: null,

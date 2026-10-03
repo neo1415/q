@@ -890,8 +890,14 @@ export {
 } from "./prompts/schemas/q-work.js";
 // end AUTO block
 // ADR 0043: standing instructions.
-export { INSTRUCTION_PLAN_V1 } from "./prompts/tasks/instructions.v1.js";
 export {
+  INSTRUCTION_PLAN_V1,
+  INSTRUCTION_THREAD_READER_V1,
+} from "./prompts/tasks/instructions.v1.js";
+export {
+  InstructionThreadFactsSchema,
+  type InstructionThreadFacts,
+  type InstructionThreadReaderVariables,
   InstructionPlanResultSchema,
   type InstructionPlanResult,
   type InstructionPlanVariables,

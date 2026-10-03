@@ -29,6 +29,8 @@ export type InstructionRow = {
   grant_version: number | null;
   budget_usd_month: string;
   spent_usd_month: string;
+  /** This calendar month's spend (a new month starts at zero). */
+  spent_this_month: string;
   pause_reason: string | null;
   expires_at: Date | null;
   stopped_at: Date | null;
@@ -73,7 +75,9 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
     id: string,
   ): Promise<InstructionRow | null> => {
     const rows = await sql<InstructionRow[]>`
-      select i.*, g.grant_payload
+      select i.*, g.grant_payload,
+             (case when i.budget_month < date_trunc('month', now())::date
+                   then 0 else i.spent_usd_month end)::text as spent_this_month
         from q_runtime.standing_instructions i
         left join q_runtime.instruction_grants g
           on g.instruction_id = i.id and g.version = i.grant_version
@@ -177,7 +181,9 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       limit = 10,
     ): Promise<readonly InstructionRow[]> =>
       sql<InstructionRow[]>`
-        select i.*, g.grant_payload
+        select i.*, g.grant_payload,
+             (case when i.budget_month < date_trunc('month', now())::date
+                   then 0 else i.spent_usd_month end)::text as spent_this_month
           from q_runtime.standing_instructions i
           left join q_runtime.instruction_grants g
             on g.instruction_id = i.id and g.version = i.grant_version
@@ -201,7 +207,9 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
     /** The platform's read, for the engine advancing this instruction. */
     instruction: async (id: string): Promise<InstructionRow | null> => {
       const rows = await sql<InstructionRow[]>`
-        select i.*, g.grant_payload
+        select i.*, g.grant_payload,
+             (case when i.budget_month < date_trunc('month', now())::date
+                   then 0 else i.spent_usd_month end)::text as spent_this_month
           from q_runtime.standing_instructions i
           left join q_runtime.instruction_grants g
             on g.instruction_id = i.id and g.version = i.grant_version
@@ -265,6 +273,31 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
               where t.instruction_id = s.id and t.relationship_id = ${relationshipId})
         returning s.id`;
       return rows.length;
+    },
+
+    /** S5: model spend under this instruction; a new month starts at zero. */
+    addSpend: async (id: string, amountUsd: number): Promise<void> => {
+      if (!(amountUsd > 0)) return;
+      await sql`
+        update q_runtime.standing_instructions
+           set spent_usd_month =
+                 case when budget_month < date_trunc('month', now())::date
+                      then ${amountUsd.toFixed(6)}::numeric
+                      else spent_usd_month + ${amountUsd.toFixed(6)}::numeric end,
+               budget_month = date_trunc('month', now())::date,
+               updated_at = clock_timestamp()
+         where id = ${id}`;
+    },
+
+    /** S5: paused, waiting for the person (e.g. the month's budget is used). */
+    pause: async (id: string, reason: string): Promise<boolean> => {
+      const rows = await sql<{ id: string }[]>`
+        update q_runtime.standing_instructions
+           set status = 'PAUSED', pause_reason = ${reason},
+               updated_at = clock_timestamp()
+         where id = ${id} and status = 'ACTIVE'
+        returning id`;
+      return rows.length > 0;
     },
 
     /** Past its expiry: EXPIRED, once. */
