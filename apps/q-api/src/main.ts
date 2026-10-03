@@ -2188,6 +2188,14 @@ const waitingLines = createWaitingLines();
 const qActionPort = createQActionPort({
   service: qActions,
   waitingLines,
+  // The conversation's own cards, read as the person: one still waiting
+  // is named beside a new card (lead 2026-10-03, run 0d1ffa3f).
+  pendingInConversation: (context) =>
+    conversationApprovals.inConversation({
+      actor: context.actor,
+      runId: context.runId,
+      correlationId: context.correlationId,
+    }),
   // A relationship action Q prepared this run first (CQ-Q-030), then a
   // profile change; one proposal per run either way.
   proposer: chainProposers(

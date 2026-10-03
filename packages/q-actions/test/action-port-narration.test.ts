@@ -374,3 +374,132 @@ describe("a deferred waiting line, against the engine's result", () => {
     expect(said).toEqual(["Still waiting for your approval: X."]);
   });
 });
+
+/**
+ * Lead 2026-10-03, run 0d1ffa3f (Ajopot, conversation 95567253): a raise
+ * share card waited; "Share our financial model with Savanna Seed Partners
+ * (fictional)." prepared a diligence card, and nothing named the raise
+ * card. With a new card, any other card still waiting in the conversation
+ * is named once after it, from the conversation's cards.
+ */
+describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
+  const RAISE = "dddddddd-0000-4000-8000-000000000001";
+  const DILIGENCE = "eeeeeeee-0000-4000-8000-000000000001";
+  const build = (
+    cards: readonly { proposalId: string; summary: string; status: string }[],
+    result: Record<string, unknown> = {},
+  ) => {
+    const said: string[] = [];
+    const logged: unknown[] = [];
+    const record = (fields: unknown, message: string) => {
+      if (message === "q waiting reminder") logged.push(fields);
+    };
+    const port = createQActionPort({
+      service: service(() =>
+        Promise.resolve({
+          action: { id: DILIGENCE, summary: "Share this document with them" },
+          approval: {
+            id: "ffffffff-0000-4000-8000-000000000001",
+            expiresAt: "2026-10-04T00:00:00.000Z",
+          },
+          ...result,
+        } as never),
+      ),
+      proposer: proposer({ actionType: "app.diligence.change", payload: {} }),
+      narrator: {
+        proposed: (_run, action) => {
+          said.push(proposedLine(action.summary));
+          return Promise.resolve();
+        },
+        refused: () => Promise.resolve(),
+        settled: () => Promise.resolve(),
+        note: (_run, line) => {
+          said.push(line);
+          return Promise.resolve();
+        },
+      },
+      pendingInConversation: () => Promise.resolve(cards),
+      logger: {
+        info: record,
+        warn: record,
+        error: record,
+        debug: record,
+        child: () => undefined,
+      } as never,
+    });
+    return { port, said, logged };
+  };
+
+  it("the exact sequence: the diligence card, then the raise card still waiting", async () => {
+    const { port, said, logged } = build([
+      {
+        proposalId: RAISE,
+        summary: "Share your raise with Savanna Seed Partners (fictional)",
+        status: "PENDING",
+      },
+      // The new card is in the conversation by now, and is not named.
+      {
+        proposalId: DILIGENCE,
+        summary: "Share this document with them",
+        status: "PENDING",
+      },
+    ]);
+    expect((await port.prepare(context)).kind).toBe("AWAITING_APPROVAL");
+    expect(said).toEqual([
+      "Share this document with them. Not saved yet: tap Approve on the card, or tell me to go ahead.",
+      "Still waiting for your approval: Share your raise with Savanna Seed Partners (fictional).",
+    ]);
+    expect(logged).toEqual([
+      expect.objectContaining({
+        outcome: "said",
+        reason: "other card waiting",
+      }),
+    ]);
+  });
+
+  it("a card this result superseded, or one already decided, is not named", async () => {
+    const { port, said, logged } = build(
+      [
+        { proposalId: RAISE, summary: "Old card", status: "PENDING" },
+        { proposalId: "x", summary: "Decided card", status: "SAVED" },
+        {
+          proposalId: DILIGENCE,
+          summary: "Share this document with them",
+          status: "PENDING",
+        },
+      ],
+      { superseded: [{ id: RAISE, summary: "Old card" }] },
+    );
+    await port.prepare(context);
+    expect(said).toHaveLength(1);
+    expect(logged).toEqual([
+      expect.objectContaining({
+        outcome: "skipped",
+        reason: "no other card waiting",
+      }),
+    ]);
+  });
+
+  it("a turn that prepares nothing stays quiet", async () => {
+    const said: string[] = [];
+    const port = createQActionPort({
+      service: service(() => Promise.reject(new Error("never reached"))),
+      proposer: proposer(null),
+      narrator: {
+        proposed: () => Promise.resolve(),
+        refused: () => Promise.resolve(),
+        settled: () => Promise.resolve(),
+        note: (_run, line) => {
+          said.push(line);
+          return Promise.resolve();
+        },
+      },
+      pendingInConversation: () =>
+        Promise.resolve([
+          { proposalId: RAISE, summary: "Share your raise", status: "PENDING" },
+        ]),
+    });
+    expect(await port.prepare(context)).toEqual({ kind: "NONE" });
+    expect(said).toEqual([]);
+  });
+});

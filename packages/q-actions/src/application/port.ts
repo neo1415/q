@@ -60,6 +60,18 @@ export type QWaitingLines = {
   ) => { readonly line: string; readonly actionId: string } | null;
 };
 
+/** One line naming the cards still waiting beside a new one. */
+export function waitingLine(summaries: readonly string[]): string {
+  const names = summaries.map((summary) =>
+    summary.trim().replace(/[.\s]+$/u, ""),
+  );
+  const list =
+    names.length <= 1
+      ? (names[0] ?? "")
+      : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+  return `Still waiting for your approval: ${list}.`;
+}
+
 export function createQActionPort(options: {
   readonly service: QActionService;
   readonly proposer?: QActionProposer | undefined;
@@ -76,6 +88,20 @@ export function createQActionPort(options: {
    * card. Absent: the turn said them itself.
    */
   readonly waitingLines?: QWaitingLines | undefined;
+  /**
+   * The cards in the run's conversation, with their current status, for
+   * naming one still waiting beside a new card (lead 2026-10-03). Absent:
+   * only deferred lines are said.
+   */
+  readonly pendingInConversation?:
+    | ((context: QActionPrepareContext) => Promise<
+        readonly {
+          readonly proposalId: string;
+          readonly summary: string;
+          readonly status: string;
+        }[]
+      >)
+    | undefined;
 }): QActionPort {
   const proposer = options.proposer ?? noQActionProposer;
   const narrator = options.narrator ?? noQActionNarrator;
@@ -85,18 +111,63 @@ export function createQActionPort(options: {
   ): Promise<QActionPrepareOutcome> => {
     const covered = new Set<string>();
     const outcome = await prepare(context, covered);
-    const waiting = options.waitingLines?.take(context.runId) ?? null;
-    if (waiting !== null && !covered.has(waiting.actionId)) {
-      await narrator
-        .note?.(
-          {
-            runId: context.runId,
-            tenantId: context.actor.tenantId,
-            actorUserId: context.actor.userId,
-          },
-          waiting.line,
-        )
-        .catch(() => undefined);
+    const deferred = options.waitingLines?.take(context.runId) ?? null;
+    const run = {
+      runId: context.runId,
+      tenantId: context.actor.tenantId,
+      actorUserId: context.actor.userId,
+    };
+    const say = async (line: string, reason: string) => {
+      options.logger?.info(
+        { qRunId: context.runId, outcome: "said", reason },
+        "q waiting reminder",
+      );
+      await narrator.note?.(run, line).catch(() => undefined);
+    };
+    const skip = (reason: string) => {
+      options.logger?.info(
+        { qRunId: context.runId, outcome: "skipped", reason },
+        "q waiting reminder",
+      );
+    };
+    // This turn prepared a new card (lead 2026-10-03, run 0d1ffa3f): any
+    // other card of theirs still waiting in this conversation, and not
+    // covered by this result, is named once after the new card's line --
+    // from the conversation's own cards, never from the decision reader.
+    if (outcome.kind === "AWAITING_APPROVAL") {
+      const others =
+        options.pendingInConversation === undefined
+          ? null
+          : await options
+              .pendingInConversation(context)
+              .then((cards) =>
+                cards.filter(
+                  (card) =>
+                    card.status === "PENDING" && !covered.has(card.proposalId),
+                ),
+              )
+              .catch(() => null);
+      if (others === null) {
+        if (deferred !== null && !covered.has(deferred.actionId)) {
+          await say(deferred.line, "deferred line, pending cards unread");
+        } else {
+          skip("pending cards unread");
+        }
+      } else if (others.length === 0) {
+        skip("no other card waiting");
+      } else {
+        await say(
+          waitingLine(others.map((card) => card.summary)),
+          "other card waiting",
+        );
+      }
+      return outcome;
+    }
+    if (deferred === null) return outcome;
+    if (covered.has(deferred.actionId)) {
+      skip("covered by this result");
+    } else {
+      await say(deferred.line, "deferred line");
     }
     return outcome;
   };
