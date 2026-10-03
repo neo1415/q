@@ -63,6 +63,10 @@ export function useFollowNewest(
   useEffect(() => {
     const end = endRef.current;
     if (end === null) return;
+    // Nothing to follow (no conversation yet): leave the scroller where the
+    // page put it. Following here scrolled the Q page's welcome past Q's
+    // own presence on a phone (live 2026-10-03: the swarm cut off at the top).
+    if (newest === "" && !force) return;
     if (pinned.current || force) {
       // The thread's own scroller only: scrollIntoView would also move
       // the page around it.
