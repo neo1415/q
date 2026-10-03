@@ -214,6 +214,11 @@ describe("the action registry", () => {
         "CONSEQUENTIAL",
       ],
       [
+        "integrations.inbound_email.rotate",
+        "offer.q_email_address",
+        "CONSEQUENTIAL",
+      ],
+      [
         "verification.company.request",
         "offer.verification_request",
         "CONSEQUENTIAL",

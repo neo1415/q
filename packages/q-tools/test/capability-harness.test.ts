@@ -105,6 +105,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     ownRecords: port(),
     evidenceDocuments: port(),
     relationshipMail: port(),
+    inboundEmail: port(),
     onboardingReminders: port(),
     // AUTO (ADR 0030): Q's delegated work.
     work: port(),
@@ -234,6 +235,7 @@ const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
   propose_errand: RELATIONSHIP,
   propose_chat_message: { ...RELATIONSHIP, body: "Hello from the harness." },
   propose_email: { ...RELATIONSHIP, subject: "Hello", body: "Hello." },
+  read_my_inbound_email: { inboundEmailId: UUID },
   propose_reminder: {
     ...RELATIONSHIP,
     title: "Follow up",

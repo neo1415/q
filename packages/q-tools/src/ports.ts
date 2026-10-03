@@ -420,6 +420,12 @@ export type QToolPorts = {
   /** R33 / BIZ-007: a relationship's email thread. */
   readonly relationshipMail?: RelationshipMailPort | undefined;
   /**
+   * Inbound email: what arrived at the person's own Q address. Absent when
+   * the deployment receives no email; then neither read tool exists and
+   * propose_email cannot reply.
+   */
+  readonly inboundEmail?: InboundEmailPort | undefined;
+  /**
    * Setup reminders (founder directive 2026-09-27): "remind me later",
    * "stop reminding me", "let's finish my setup". Absent: neither tool exists.
    */
@@ -755,6 +761,80 @@ export type EvidenceDocumentsPort = {
  * R33 / BIZ-007: the email exchanged on one relationship, from the
  * person's own connected Gmail (the Relationships page's thread).
  */
+/** What the quarantined reader reports about one inbound email: fields, never words. */
+export type InboundEmailFacts = {
+  readonly asksQuestion: boolean;
+  readonly wantsToMeet: boolean;
+  /** ISO 8601 with offset, or null. */
+  readonly proposedTime: string | null;
+  /** Which of the topics Q asked about (1-based) it is about. */
+  readonly topicNumbers: readonly number[];
+  readonly mentionsTermsOrMoney: boolean;
+  readonly declined: boolean;
+  readonly tone: "POSITIVE" | "NEUTRAL" | "NEGATIVE";
+};
+
+export type InboundEmailSummary = {
+  readonly id: string;
+  readonly fromAddress: string;
+  readonly fromName: string | null;
+  readonly subject: string;
+  readonly receivedAt: string;
+  readonly attachments: readonly {
+    readonly name: string;
+    readonly contentType: string;
+    readonly size: number;
+  }[];
+};
+
+/**
+ * Inbound email, self-scoped: every call is bound to the actor's own user
+ * and tenant by the integrations context. What a stranger wrote never
+ * reaches a model as words: the body is read only by the quarantined,
+ * tool-less reader, which returns typed fields.
+ */
+export type InboundEmailPort = {
+  /** Their Q email address (issued on first ask), or null when unavailable. */
+  readonly address: (actor: ActorContext) => Promise<string | null>;
+  readonly list: (
+    actor: ActorContext,
+    limit: number,
+  ) => Promise<readonly InboundEmailSummary[]>;
+  /** Null when not theirs or not there; `facts` null when not read. */
+  readonly read: (
+    actor: ActorContext,
+    inboundEmailId: string,
+    topics: readonly string[],
+  ) => Promise<{
+    readonly email: InboundEmailSummary;
+    readonly facts: InboundEmailFacts | null;
+  } | null>;
+  /** Who a reply to one of their own emails goes to; null when not theirs. */
+  readonly replyTarget: (
+    actor: ActorContext,
+    inboundEmailId: string,
+  ) => Promise<{
+    readonly to: string;
+    readonly toName: string;
+    readonly subject: string;
+  } | null>;
+  /** Capital Q's own sender can send replies on this deployment. */
+  readonly canReply: boolean;
+  readonly prepareReplyForApproval: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly actorUserId: string;
+    readonly payload: {
+      readonly inboundEmailId: string;
+      readonly to: string;
+      readonly toName: string;
+      readonly replyTo: string;
+      readonly subject: string;
+      readonly body: string;
+    };
+  }) => "PREPARED" | "ONE_PER_TURN";
+};
+
 export type RelationshipMailPort = {
   readonly list: (
     actor: ActorContext,

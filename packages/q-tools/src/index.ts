@@ -67,6 +67,9 @@ export type {
   RecordChange,
   RecordChangePort,
   RelationshipMailPort,
+  InboundEmailFacts,
+  InboundEmailPort,
+  InboundEmailSummary,
   DocumentRevisionPort,
   OwnDocumentsPort,
   QToolPorts,
@@ -553,3 +556,14 @@ export {
   type FillProfileGapsOutput,
 } from "./tools/profile-gaps.js";
 export { isKnownTimeZone, zoneFromWords } from "./tools/local-time.js";
+export {
+  createInboundEmailTools,
+  createListMyInboundEmailsTool,
+  createReadMyInboundEmailTool,
+  LIST_MY_INBOUND_EMAILS,
+  ListMyInboundEmailsInputSchema,
+  ListMyInboundEmailsOutputSchema,
+  READ_MY_INBOUND_EMAIL,
+  ReadMyInboundEmailInputSchema,
+  ReadMyInboundEmailOutputSchema,
+} from "./tools/inbound-email.js";

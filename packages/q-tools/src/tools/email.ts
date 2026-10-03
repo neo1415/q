@@ -15,6 +15,7 @@ import {
 } from "../definition.js";
 import type {
   EmailIntelligencePort,
+  InboundEmailPort,
   RelationshipIntelligencePort,
 } from "../ports.js";
 import { closestByName } from "./connection-requests.js";
@@ -30,6 +31,12 @@ import { admitted } from "./relationships.js";
  * the proposal is made, at approval and immediately before sending. The
  * person sees the exact draft, can edit the words (which voids the old
  * approval) and approves; the send runs from their own connected mailbox.
+ *
+ * Or a reply to an email that arrived at their Q address (inbound email):
+ * the recipient is always that email's sender, read from the stored row,
+ * never from the model. It is sent by Capital Q's own sender on their
+ * behalf -- not from their mailbox, and the card says so -- with Reply-To
+ * set to their Q address so the answer comes back to Q.
  */
 
 export const PROPOSE_EMAIL = "relationship.email.propose" as const;
@@ -53,6 +60,9 @@ export const ProposeEmailInputSchema = z
     ),
     investorOrganisationId: UuidSchema.optional().describe(
       "As a company: the investor organisation whose people to email.",
+    ),
+    inboundEmailId: UuidSchema.optional().describe(
+      "To reply to an email that arrived at their Q address: its id from list_my_inbound_emails. The reply goes to that email's sender.",
     ),
     counterpartName: z
       .string()
@@ -83,10 +93,11 @@ export const ProposeEmailInputSchema = z
         input.companyId,
         input.investorOrganisationId,
         input.counterpartName,
+        input.inboundEmailId,
       ].filter((id) => id !== undefined).length === 1,
     {
       message:
-        "name exactly one of relationshipId, companyId, investorOrganisationId or counterpartName",
+        "name exactly one of relationshipId, companyId, investorOrganisationId, counterpartName or inboundEmailId",
     },
   );
 export type ProposeEmailInput = z.infer<typeof ProposeEmailInputSchema>;
@@ -97,24 +108,41 @@ export const ProposeEmailOutputSchema = z
      * PREPARED: the draft will be shown for approval; nothing was sent.
      * ONE_PER_TURN: another action is being prepared in this answer.
      * MAILBOX_NOT_CONNECTED: the person must connect Gmail in Settings first.
+     * REPLY_UNAVAILABLE: Capital Q cannot send replies on this deployment.
      */
-    status: z.enum(["PREPARED", "ONE_PER_TURN", "MAILBOX_NOT_CONNECTED"]),
+    status: z.enum([
+      "PREPARED",
+      "ONE_PER_TURN",
+      "MAILBOX_NOT_CONNECTED",
+      "REPLY_UNAVAILABLE",
+    ]),
     awaitingApprovalOf: z.string(),
   })
   .strict();
 export type ProposeEmailOutput = z.infer<typeof ProposeEmailOutputSchema>;
 
-type Grant = {
-  readonly relationshipId: string;
-  readonly counterpartName: string;
-  readonly to: string;
-  readonly toName: string;
-  readonly mailbox: boolean;
-};
+type Grant =
+  | {
+      readonly kind: "RELATIONSHIP";
+      readonly relationshipId: string;
+      readonly counterpartName: string;
+      readonly to: string;
+      readonly toName: string;
+      readonly mailbox: boolean;
+    }
+  | {
+      readonly kind: "REPLY";
+      readonly inboundEmailId: string;
+      readonly to: string;
+      readonly toName: string;
+      /** Their Q address; null when it could not be read. */
+      readonly replyTo: string | null;
+    };
 
 export function createProposeEmailTool(
-  email: EmailIntelligencePort,
+  email: EmailIntelligencePort | undefined,
   relationships: RelationshipIntelligencePort | undefined,
+  inbound?: InboundEmailPort | undefined,
 ): AnyQToolDefinition {
   return defineQTool<ProposeEmailInput, ProposeEmailOutput, Grant>({
     id: PROPOSE_EMAIL,
@@ -122,7 +150,7 @@ export function createProposeEmailTool(
     status: "ACTIVE",
     providerName: "propose_email",
     description:
-      "Drafts an email from the person to the other side of one of their relationships (a company's founders, or an investor organisation's people) for their own approval, when they ask for it or agree to Q's suggestion. It sends nothing: the person sees the exact email, may edit it, and approves it; it then goes from their own connected Gmail. Recipients can only be people on that relationship.",
+      "Drafts an email from the person to the other side of one of their relationships (a company's founders, or an investor organisation's people) for their own approval, when they ask for it or agree to Q's suggestion. It sends nothing: the person sees the exact email, may edit it, and approves it; it then goes from their own connected Gmail. Recipients can only be people on that relationship. Or, with inboundEmailId, a reply to an email that arrived at their Q address: it goes only to that email's sender, from Capital Q's own address on their behalf (not their mailbox), with replies coming back to their Q address.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [],
@@ -140,6 +168,33 @@ export function createProposeEmailTool(
     input: ProposeEmailInputSchema,
     output: ProposeEmailOutputSchema,
     authorize: async (input, { actor, plan }) => {
+      if (input.inboundEmailId !== undefined) {
+        // A reply: only to the sender of an email that came to THEM.
+        if (inbound === undefined) return deny("NOT_AVAILABLE");
+        try {
+          const target = await inbound.replyTarget(actor, input.inboundEmailId);
+          if (target === null) return deny("NOT_AVAILABLE");
+          if (
+            input.recipientEmail !== undefined &&
+            input.recipientEmail.toLowerCase() !== target.to
+          ) {
+            return deny(
+              "NOT_AVAILABLE",
+              "A reply goes only to the person who sent that email.",
+            );
+          }
+          return allow("CONFIDENTIAL", {
+            kind: "REPLY" as const,
+            inboundEmailId: input.inboundEmailId,
+            to: target.to,
+            toName: target.toName,
+            replyTo: await inbound.address(actor).catch(() => null),
+          });
+        } catch {
+          return deny("NOT_AVAILABLE");
+        }
+      }
+      if (email === undefined) return deny("NOT_AVAILABLE");
       try {
         let relationshipId = input.relationshipId;
         // A name (action parity 2026-10-02, "email Nixo" from any page):
@@ -194,6 +249,7 @@ export function createProposeEmailTool(
           );
         }
         return allow("CONFIDENTIAL", {
+          kind: "RELATIONSHIP" as const,
           relationshipId,
           counterpartName: counterpart.name,
           to: recipient.email,
@@ -205,7 +261,37 @@ export function createProposeEmailTool(
       }
     },
     execute: (input, context, grant) => {
-      if (!grant.mailbox) {
+      if (grant.kind === "REPLY") {
+        if (
+          inbound === undefined ||
+          !inbound.canReply ||
+          grant.replyTo === null
+        ) {
+          return Promise.resolve({
+            status: "REPLY_UNAVAILABLE" as const,
+            awaitingApprovalOf:
+              "Capital Q can't send replies on this deployment yet.",
+          });
+        }
+        const status = inbound.prepareReplyForApproval({
+          runId: context.runId,
+          tenantId: context.actor.tenantId,
+          actorUserId: context.actor.userId,
+          payload: {
+            inboundEmailId: grant.inboundEmailId,
+            to: grant.to,
+            toName: grant.toName,
+            replyTo: grant.replyTo,
+            subject: input.subject,
+            body: input.body,
+          },
+        });
+        return Promise.resolve({
+          status,
+          awaitingApprovalOf: `Reply to ${grant.toName}, sent by Capital Q on your behalf (not from your own mailbox): "${input.subject}"`,
+        });
+      }
+      if (email === undefined || !grant.mailbox) {
         return Promise.resolve({
           status: "MAILBOX_NOT_CONNECTED" as const,
           awaitingApprovalOf:
