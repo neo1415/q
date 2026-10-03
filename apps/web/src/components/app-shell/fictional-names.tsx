@@ -54,7 +54,11 @@ export function stripFictionalMarks(root: Node): boolean {
 
 /** Whether the page in view shows a name that carried the mark. */
 function pageShowsOne(): boolean {
-  return document.querySelector("main [data-fictional]") !== null;
+  return (
+    document.querySelector(
+      "main [data-fictional], [data-fictional-scope] [data-fictional]",
+    ) !== null
+  );
 }
 
 /**

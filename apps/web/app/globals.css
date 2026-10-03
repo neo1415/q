@@ -218,6 +218,14 @@
   .cq-shell:has([data-chat-thread]) .cq-shell-main {
     padding-bottom: var(--cq-safe-bottom);
   }
+  /* The "fictional" foot note never sits under a full-height stage or a
+     thread, where it added a strip and a second scroll. The names on those
+     pages still lose their mark; the note shows on the next page. */
+  .cq-shell:has(.cq-q-home) [data-fictional-note],
+  .cq-shell:has([data-chat-thread]) [data-fictional-note],
+  .cq-shell:has([data-feed-immersive]) [data-fictional-note] {
+    display: none;
+  }
 
   /*
    * The Q composer stays reachable: docked to the bottom of the workspace,
@@ -1464,7 +1472,8 @@
    * 2026-10-03: a light rail beside the dark stage read as two apps).
    */
   .cq-stage,
-  .cq-shell:has(.cq-q-home) .cq-shell-sidebar {
+  .cq-shell:has(.cq-q-home) .cq-shell-sidebar,
+  .cq-shell:has([data-feed-immersive]) .cq-shell-sidebar {
     background: var(--cq-stage-canvas);
     color: var(--cq-stage-text);
     color-scheme: dark;
