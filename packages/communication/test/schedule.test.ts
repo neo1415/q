@@ -354,6 +354,27 @@ describe("schedule, reschedule, cancel", () => {
 });
 
 describe("reminders and briefs", () => {
+  it("refuses a reused key carrying a different reminder, and replays an exact retry", async () => {
+    const w = world();
+    const base = {
+      actor: FOUNDER,
+      title: "Follow up",
+      dueAt: new Date("2026-10-09T09:00:00Z"),
+      relationshipId: REL,
+      channel: "IN_APP" as const,
+      idempotencyKey: "q-action:same-key",
+    };
+    const first = await w.service.createReminder(base);
+    expect(first).toMatchObject({ outcome: "OK", alreadyCreated: false });
+    expect(await w.service.createReminder(base)).toMatchObject({
+      outcome: "OK",
+      alreadyCreated: true,
+    });
+    expect(
+      await w.service.createReminder({ ...base, title: "Something else" }),
+    ).toMatchObject({ outcome: "REFUSED", code: "KEY_REUSED" });
+  });
+
   it("refuses a reminder for a time already gone", async () => {
     const w = world();
     const past = await w.service.createReminder({
