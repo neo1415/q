@@ -154,6 +154,7 @@ describe("a typed decision on a waiting change", () => {
       before: null,
       after:
         "Still waiting for your approval: Reminder: Send Savanna the updated deck.",
+      about: "Reminder: Send Savanna the updated deck.",
     });
   });
 
@@ -314,6 +315,7 @@ describe("only a reply to the card decides it (lead 2026-10-03, run ad0b0067)", 
                 before: null,
                 after:
                   "Still waiting for your approval: Decide not to proceed for now.",
+                about: "Decide not to proceed for now",
               },
         );
       }
@@ -381,6 +383,7 @@ describe("a new request never declines the waiting card (QA 2026-10-03)", () => 
         kind: "ANSWER_THEN",
         before: null,
         after: `Still waiting for your approval: ${card.summary}.`,
+        about: card.summary,
       });
     },
   );

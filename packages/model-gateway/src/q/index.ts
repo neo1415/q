@@ -2500,6 +2500,12 @@ export function createModelGatewayQAnswer(
        */
       /** ADR 0040: what each app action that ran said, in its own words. */
       const actedLines: string[] = [];
+      /**
+       * An app action prepared a card this turn: the engine says its status
+       * after the turn, so the model's own approval talk goes (lead
+       * 2026-10-03: one status per card per answer).
+       */
+      let preparedByTool = false;
       let gaps: { readonly status: string; readonly line: string } | null =
         null;
       // The order matters more than the words: a model handed tools and a
@@ -2851,6 +2857,13 @@ export function createModelGatewayQAnswer(
               const acted = outcome.result.ok
                 ? appActionLineOf(outcome.result.data)
                 : null;
+              if (
+                outcome.result.ok &&
+                (outcome.result.data as { readonly status?: unknown } | null)
+                  ?.status === "PREPARED"
+              ) {
+                preparedByTool = true;
+              }
               if (acted !== null && !actedLines.includes(acted)) {
                 actedLines.push(acted);
               }
@@ -3220,7 +3233,9 @@ export function createModelGatewayQAnswer(
         // never says both "nothing is waiting" and "it needs your
         // approval" (QA run 5fd903d3).
         const statusTalk =
-          statusLine === null ? null : withoutStatusTalk(guarded.text);
+          statusLine === null && !preparedByTool
+            ? null
+            : withoutStatusTalk(guarded.text);
         if (statusLine !== null) {
           logger?.info(
             {
@@ -3242,7 +3257,11 @@ export function createModelGatewayQAnswer(
                 statusTalk?.text ?? guarded.text,
                 ...actedLines,
                 ...(statusLine === null ? [] : [statusLine]),
-                ...(statusTalk?.offer == null ? [] : [statusTalk.offer]),
+                // The card the engine shows is the offer when one was
+                // prepared; otherwise the model's one offer follows.
+                ...(statusTalk?.offer == null || preparedByTool
+                  ? []
+                  : [statusTalk.offer]),
                 ...(recordedStatements.length === 0
                   ? []
                   : [quietlyNoted(recordedStatements)]),

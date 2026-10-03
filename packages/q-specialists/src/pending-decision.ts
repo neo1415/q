@@ -180,6 +180,8 @@ export type PendingDecisionOutcome =
       readonly kind: "ANSWER_THEN";
       readonly before: string | null;
       readonly after: string | null;
+      /** The card `after` is about, so it is not said twice for one card. */
+      readonly about?: string | undefined;
     };
 
 function named(summary: string): string {
@@ -334,6 +336,7 @@ export async function decidePending(
       kind: "ANSWER_THEN",
       before: null,
       after: `Still waiting for your approval: ${named(only.summary)}.`,
+      about: only.summary,
     };
   }
   if (read.decision === "YES") {

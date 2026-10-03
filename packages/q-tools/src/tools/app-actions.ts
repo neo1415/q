@@ -65,6 +65,11 @@ export const AppToolOutputSchema = z
     status: z.enum(["DONE", "PREPARED", "ONE_PER_TURN", "NOT_DONE"]),
     /** What to tell the person, from the action's own words. */
     says: z.string().max(600),
+    /**
+     * PREPARED: the card's own summary. The engine says the card's status
+     * after the turn, so a caller can leave it to that one line.
+     */
+    summary: z.string().max(600).optional(),
   })
   .strict();
 export type AppToolOutput = z.infer<typeof AppToolOutputSchema>;
@@ -317,6 +322,9 @@ function toolFor(
         });
         return {
           status,
+          ...(status === "PREPARED"
+            ? { summary: action.card(grant.canonical).summary }
+            : {}),
           says:
             status === "PREPARED"
               ? `${action.card(grant.canonical).summary}: it's on the card for your approval; nothing changes until you approve it.`

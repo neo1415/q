@@ -160,6 +160,16 @@ type ReaderAction = {
 };
 
 /** The reader's input: the person's own latest words and own recent turns. */
+/** Two summaries of one card: the same words, ignoring case and the full stop. */
+function sameCard(a: string, b: string): boolean {
+  const plain = (text: string) =>
+    text
+      .trim()
+      .replace(/[.\s]+$/u, "")
+      .toLowerCase();
+  return plain(a) === plain(b);
+}
+
 function turnReaderInput(
   history: readonly QConversationMessage[],
   latest: QConversationMessage,
@@ -1364,6 +1374,34 @@ export function createSpecialistQAnswer(
   const prereads = new Map<string, Promise<EarlyReading | null>>();
   const PREREADS_MAX = 64;
 
+  /**
+   * The cards this turn handed to the engine, by run: the engine says
+   * their status after the turn, so nothing here says it again (lead
+   * 2026-10-03, runs 7468a83f, 7c39eed0: three lines for one card).
+   */
+  const preparedThisRun = new Map<string, string>();
+  const preparedForEngine = (
+    request: QAnswerRequest,
+    summary: string,
+  ): QAnswerOutcome => {
+    preparedThisRun.set(request.runId, summary);
+    while (preparedThisRun.size > PREREADS_MAX) {
+      const oldest = preparedThisRun.keys().next().value;
+      if (oldest === undefined) break;
+      preparedThisRun.delete(oldest);
+    }
+    logger?.info(
+      { qRunId: request.runId },
+      "a change was prepared for approval; the engine says its status",
+    );
+    return {
+      kind: "ANSWERED",
+      messageId: null,
+      modelPolicyVersion: "none",
+      promptBundleVersion: "none",
+    };
+  };
+
   const preread = (input: QPrereadInput): void => {
     if (turns === undefined || prereads.has(input.runId)) return;
     const started = (async (): Promise<EarlyReading | null> => {
@@ -1465,6 +1503,8 @@ export function createSpecialistQAnswer(
     // Ledgefold for now." -- a request in its own right -- approved and
     // executed the waiting pass. Only a reply decides.
     let afterAnswer: string | null = null;
+    /** The card the after-answer line is about, when it is one. */
+    let afterAbout: string | null = null;
     const pendingDecisions = dependencies.pendingDecisions;
     const decide =
       pendingDecisions === undefined
@@ -1501,6 +1541,7 @@ export function createSpecialistQAnswer(
                 await recordAnswer(request, conversationId, decided.before);
               }
               afterAnswer = decided.after;
+              afterAbout = decided.about ?? null;
             }
             return null;
           };
@@ -1522,6 +1563,18 @@ export function createSpecialistQAnswer(
       latest,
       decideAfterReading,
     );
+    // One status per card per answer: a card this turn handed to the
+    // engine is named by the engine's own line, never also "still waiting".
+    const prepared = preparedThisRun.get(request.runId);
+    preparedThisRun.delete(request.runId);
+    if (
+      afterAnswer !== null &&
+      afterAbout !== null &&
+      prepared !== undefined &&
+      sameCard(prepared, afterAbout)
+    ) {
+      afterAnswer = null;
+    }
     if (afterAnswer !== null && outcome.kind === "ANSWERED") {
       // What the change's real status is, after whatever the answer said
       // about it: from the engine, never from the model's words.
@@ -1902,7 +1955,9 @@ export function createSpecialistQAnswer(
         .run(request, appAction)
         .catch(() => null);
       if (said !== null) {
-        return recordAnswer(request, conversationId, said);
+        return typeof said === "string"
+          ? recordAnswer(request, conversationId, said)
+          : preparedForEngine(request, said.prepared);
       }
       // The reader's own arguments did not fit the tool (parity eval
       // 2026-10-02: "Change our fund's website to ..." failed
@@ -1935,7 +1990,9 @@ export function createSpecialistQAnswer(
             .run(request, { tool: appAction.tool, arguments: again })
             .catch(() => null);
           if (retried !== null) {
-            return recordAnswer(request, conversationId, retried);
+            return typeof retried === "string"
+              ? recordAnswer(request, conversationId, retried)
+              : preparedForEngine(request, retried.prepared);
           }
         }
       }

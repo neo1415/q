@@ -994,6 +994,84 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     expect(stored.at(-1)?.content).toMatch(/^That's ready: Reminder/);
   });
 
+  /**
+   * Lead 2026-10-03 (runs 7468a83f, 7c39eed0): one status per card per
+   * answer. The restated outcome said "…it's on the card for your
+   * approval", "Still waiting for your approval: X." and the engine's
+   * "That's ready: X." -- three lines for one card.
+   */
+  const OUTCOME_CARD = "Decide not to proceed for now";
+  const outcomePending = (declined: string[]): PendingDecisionPort => ({
+    proposals: () =>
+      Promise.resolve([
+        { proposalId: "o1", summary: OUTCOME_CARD, status: "PENDING" },
+      ]),
+    // How the decision reader read the restatement in the live run.
+    read: () => Promise.resolve({ decision: "NO", remainder: null }),
+    approve: () => Promise.resolve({ status: "SAVED" }),
+    decline: (_context, proposalId) => {
+      declined.push(proposalId);
+      return Promise.resolve({ status: "DECLINED" });
+    },
+  });
+  const askedFor = (askedAction: string) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+      appAction: {
+        tool: askedAction,
+        arguments: { relationship: "Ledgefold", operation: "NOT_PROCEED" },
+      },
+      askedAction,
+    }) as TurnReaderResult;
+
+  it("outcome#misheard: the same card asked for again says nothing here; the engine's one 'That's ready' line is all", async () => {
+    const declined: string[] = [];
+    const { answer, stored, delegated } = seam({
+      said: "We've decided not to proceed with Ledgefold for now.",
+      reading: askedFor("relationship_outcome"),
+      outcomes: [],
+      offeredTools: ["relationship_outcome"],
+      pendingDecisions: outcomePending(declined),
+      appActions: {
+        tools: new Set(["relationship_outcome"]),
+        run: () => Promise.resolve({ prepared: OUTCOME_CARD }),
+      },
+    });
+    const outcome = await answer.answer(request());
+    expect(outcome).toMatchObject({ kind: "ANSWERED", messageId: null });
+    expect(declined).toEqual([]);
+    // No "on the card" line and no "Still waiting": the engine names it.
+    expect(stored).toEqual([]);
+    expect(delegated()).toBe(0);
+  });
+
+  it("a different request with a card pending: one short waiting line, after the answer", async () => {
+    const declined: string[] = [];
+    const { answer, stored } = seam({
+      said: "Save Ajopot for later.",
+      reading: askedFor("save_company"),
+      outcomes: [],
+      offeredTools: ["save_company"],
+      pendingDecisions: outcomePending(declined),
+      appActions: {
+        tools: new Set(["save_company"]),
+        run: () => Promise.resolve("Saved Ajopot."),
+      },
+    });
+    await answer.answer(request());
+    expect(declined).toEqual([]);
+    expect(stored.map((m) => m.content)).toEqual([
+      "Saved Ajopot.",
+      `Still waiting for your approval: ${OUTCOME_CARD}.`,
+    ]);
+  });
+
   it("a no with more said is declined first, then the rest is answered", async () => {
     const declined: string[] = [];
     const { answer, stored, delegated } = seam({
