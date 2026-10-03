@@ -297,6 +297,18 @@ export type SpecialistQAnswerDependencies = {
    */
   readonly appActions?: QAppActionPort | undefined;
   /**
+   * A "still waiting" line deferred until the engine's result for this run
+   * is known (lead 2026-10-03). Absent: said right after the answer.
+   */
+  readonly waitingLines?:
+    | {
+        readonly defer: (
+          runId: string,
+          waiting: { readonly line: string; readonly actionId: string },
+        ) => void;
+      }
+    | undefined;
+  /**
    * The names of the counterparts in their own relationships, for telling
    * a request about one of them (lead 2026-10-03). Absent: never known.
    */
@@ -1591,6 +1603,7 @@ export function createSpecialistQAnswer(
     let afterAnswer: string | null = null;
     /** The card the after-answer line is about, when it is one. */
     let afterAbout: string | null = null;
+    let afterAboutId: string | null = null;
     const pendingDecisions = dependencies.pendingDecisions;
     const decide =
       pendingDecisions === undefined
@@ -1628,6 +1641,7 @@ export function createSpecialistQAnswer(
               }
               afterAnswer = decided.after;
               afterAbout = decided.about ?? null;
+              afterAboutId = decided.aboutId ?? null;
             }
             return null;
           };
@@ -1663,8 +1677,18 @@ export function createSpecialistQAnswer(
     }
     if (afterAnswer !== null && outcome.kind === "ANSWERED") {
       // What the change's real status is, after whatever the answer said
-      // about it: from the engine, never from the model's words.
-      await recordAnswer(request, conversationId, afterAnswer);
+      // about it: from the engine, never from the model's words. Deferred
+      // to after the engine's step when composed (runs a05becfe,
+      // a5121124): a card this turn superseded or was is not "still
+      // waiting".
+      if (dependencies.waitingLines !== undefined && afterAboutId !== null) {
+        dependencies.waitingLines.defer(request.runId, {
+          line: afterAnswer,
+          actionId: afterAboutId,
+        });
+      } else {
+        await recordAnswer(request, conversationId, afterAnswer);
+      }
     }
     return outcome;
   };

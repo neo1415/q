@@ -108,6 +108,7 @@ export {
   type QActionProposal,
   type QActionProposer,
   type QActionRefusal,
+  type QWaitingLines,
 } from "./application/port.js";
 export {
   createQActionNarrator,

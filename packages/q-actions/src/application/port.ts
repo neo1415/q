@@ -49,6 +49,17 @@ export const noQActionProposer: QActionProposer = {
 };
 
 /** The orchestration seam over the engine. */
+/**
+ * A reminder the turn deferred about a card still waiting (lead 2026-10-03):
+ * said after the engine's step for the same run, unless that step's card
+ * was the one or replaced it. Taken once.
+ */
+export type QWaitingLines = {
+  readonly take: (
+    runId: string,
+  ) => { readonly line: string; readonly actionId: string } | null;
+};
+
 export function createQActionPort(options: {
   readonly service: QActionService;
   readonly proposer?: QActionProposer | undefined;
@@ -58,11 +69,42 @@ export function createQActionPort(options: {
    */
   readonly narrator?: QActionNarrator | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * "Still waiting for your approval: X." lines the turn deferred until the
+   * engine's result is known (lead 2026-10-03, runs a05becfe, a5121124):
+   * said after this step unless this run's card superseded or was that
+   * card. Absent: the turn said them itself.
+   */
+  readonly waitingLines?: QWaitingLines | undefined;
 }): QActionPort {
   const proposer = options.proposer ?? noQActionProposer;
   const narrator = options.narrator ?? noQActionNarrator;
-  return {
-    prepare: async (context): Promise<QActionPrepareOutcome> => {
+  /** The cards the engine's result covered for this run: no reminder. */
+  const prepareAndRemind = async (
+    context: QActionPrepareContext,
+  ): Promise<QActionPrepareOutcome> => {
+    const covered = new Set<string>();
+    const outcome = await prepare(context, covered);
+    const waiting = options.waitingLines?.take(context.runId) ?? null;
+    if (waiting !== null && !covered.has(waiting.actionId)) {
+      await narrator
+        .note?.(
+          {
+            runId: context.runId,
+            tenantId: context.actor.tenantId,
+            actorUserId: context.actor.userId,
+          },
+          waiting.line,
+        )
+        .catch(() => undefined);
+    }
+    return outcome;
+  };
+  const prepare = async (
+    context: QActionPrepareContext,
+    covered: Set<string>,
+  ): Promise<QActionPrepareOutcome> => {
+    {
       const proposal = await proposer.propose(context);
       if (proposal === null) {
         return { kind: "NONE" };
@@ -85,6 +127,9 @@ export function createQActionPort(options: {
             actionType: proposal.actionType,
             payload: proposal.payload,
           });
+        // What this result covers: the card it is, and the cards it replaced.
+        covered.add(action.id);
+        for (const older of superseded ?? []) covered.add(older.id);
         if (existing === true) {
           // The same change already waits for them (lead 2026-10-03): its
           // card is shown here again, in focus, and nothing new is made.
@@ -141,7 +186,10 @@ export function createQActionPort(options: {
         }
         throw error;
       }
-    },
+    }
+  };
+  return {
+    prepare: prepareAndRemind,
     executeApproved: async (requested) => {
       // The run resumes with the action it first prepared; if the person
       // edited it since, the approval they gave is for the revision, and

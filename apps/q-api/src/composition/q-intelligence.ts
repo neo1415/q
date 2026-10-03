@@ -134,6 +134,15 @@ export type QIntelligenceDependencies = {
    * Required (lead 2026-10-03, run 9b4ef8d1): a composition without it does
    * not compile, rather than quietly never widening the offer.
    */
+  /** Still-waiting reminders deferred to after the engine's step. */
+  readonly waitingLines?:
+    | {
+        readonly defer: (
+          runId: string,
+          waiting: { readonly line: string; readonly actionId: string },
+        ) => void;
+      }
+    | undefined;
   readonly counterpartNames: (
     request: QAnswerRequest,
   ) => Promise<readonly string[]>;
@@ -360,6 +369,9 @@ export function composeQIntelligence(
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),
     counterpartNames: dependencies.counterpartNames,
+    ...(dependencies.waitingLines === undefined
+      ? {}
+      : { waitingLines: dependencies.waitingLines }),
     // A hand-over read by the turn reader (v22), prepared as Q's errand
     // for the subject on screen through the run's own propose_errand.
     // TURN_READER v27 saveToOwnProfile: their profile's open fields,

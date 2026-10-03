@@ -127,6 +127,13 @@ function seam(options: {
   readonly counterpartNames?: readonly string[];
   /** A recording logger (lead 2026-10-03: the route is observable). */
   readonly logger?: Logger;
+  /** Waiting lines deferred to the engine's step (lead 2026-10-03). */
+  readonly waitingLines?: {
+    readonly defer: (
+      runId: string,
+      waiting: { readonly line: string; readonly actionId: string },
+    ) => void;
+  };
   /** APP_ACTION_ROUTER, faked (lead 2026-10-03). */
   readonly appActionRouter?: (
     request: QAnswerRequest,
@@ -273,6 +280,9 @@ function seam(options: {
     transactions: { run: (work) => work({} as never) },
     turns,
     ...(options.logger === undefined ? {} : { logger: options.logger }),
+    ...(options.waitingLines === undefined
+      ? {}
+      : { waitingLines: options.waitingLines }),
     ...(options.pendingDecisions === undefined
       ? {}
       : { pendingDecisions: options.pendingDecisions }),
@@ -1076,6 +1086,30 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     // No "on the card" line and no "Still waiting": the engine names it.
     expect(stored).toEqual([]);
     expect(delegated()).toBe(0);
+  });
+
+  it("with the engine's step composed, the waiting line is deferred to it, with the card's id", async () => {
+    const deferred: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "Save Ajopot for later.",
+      reading: askedFor("save_company"),
+      outcomes: [],
+      offeredTools: ["save_company"],
+      pendingDecisions: outcomePending([]),
+      appActions: {
+        tools: new Set(["save_company"]),
+        run: () => Promise.resolve("Saved Ajopot."),
+      },
+      waitingLines: { defer: (_runId, waiting) => deferred.push(waiting) },
+    });
+    await answer.answer(request());
+    expect(stored.map((m) => m.content)).toEqual(["Saved Ajopot."]);
+    expect(deferred).toEqual([
+      {
+        line: `Still waiting for your approval: ${OUTCOME_CARD}.`,
+        actionId: "o1",
+      },
+    ]);
   });
 
   it("a different request with a card pending: one short waiting line, after the answer", async () => {

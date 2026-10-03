@@ -258,3 +258,119 @@ describe("what Q says about an action", () => {
     expect(said).toEqual(["settled:FAILED"]);
   });
 });
+
+/**
+ * Lead 2026-10-03 (runs a05becfe, a5121124): a "Still waiting for your
+ * approval: X" reminder is decided after the engine's result -- dropped
+ * when this run's card replaced X or was X, kept for any other card.
+ */
+describe("a deferred waiting line, against the engine's result", () => {
+  const OLD_DECK = "aaaaaaaa-0000-4000-8000-000000000001";
+  const OLD_OUTCOME = "aaaaaaaa-0000-4000-8000-000000000002";
+  const RAISE_SHARE = "aaaaaaaa-0000-4000-8000-000000000003";
+  const NEW_CARD = "bbbbbbbb-0000-4000-8000-000000000001";
+  const run = (
+    waiting: { line: string; actionId: string },
+    result: Record<string, unknown>,
+  ) => {
+    const said: string[] = [];
+    let taken = false;
+    const port = createQActionPort({
+      service: service(() =>
+        Promise.resolve({
+          action: { id: NEW_CARD, summary: "The new card" },
+          approval: {
+            id: "cccccccc-0000-4000-8000-000000000001",
+            expiresAt: "2026-10-04T00:00:00.000Z",
+          },
+          ...result,
+        } as never),
+      ),
+      proposer: proposer({ actionType: "app.x", payload: {} }),
+      narrator: {
+        proposed: (_run, action) => {
+          said.push(`card: ${action.summary}`);
+          return Promise.resolve();
+        },
+        refused: () => Promise.resolve(),
+        settled: () => Promise.resolve(),
+        note: (_run, line) => {
+          said.push(line);
+          return Promise.resolve();
+        },
+      },
+      waitingLines: {
+        take: () => {
+          if (taken) return null;
+          taken = true;
+          return waiting;
+        },
+      },
+    });
+    return { port, said };
+  };
+
+  it("deck#2: the new card superseded the old deck card -- no 'Still waiting' for it", async () => {
+    const { port, said } = run(
+      {
+        line: "Still waiting for your approval: Let investors who can find your company download your pitch deck.",
+        actionId: OLD_DECK,
+      },
+      { superseded: [{ id: OLD_DECK, summary: "Let investors…" }] },
+    );
+    await port.prepare(context);
+    expect(said).toEqual(["card: The new card"]);
+  });
+
+  it("outcome#2: the same, for a superseded outcome card", async () => {
+    const { port, said } = run(
+      {
+        line: "Still waiting for your approval: Decide not to proceed for now.",
+        actionId: OLD_OUTCOME,
+      },
+      { superseded: [{ id: OLD_OUTCOME, summary: "Decide not to proceed" }] },
+    );
+    await port.prepare(context);
+    expect(said).toEqual(["card: The new card"]);
+  });
+
+  it("a diligence request while a raise-share card waits keeps the waiting line, after the new card", async () => {
+    const { port, said } = run(
+      {
+        line: "Still waiting for your approval: Share your raise with Savanna Seed.",
+        actionId: RAISE_SHARE,
+      },
+      {},
+    );
+    await port.prepare(context);
+    expect(said).toEqual([
+      "card: The new card",
+      "Still waiting for your approval: Share your raise with Savanna Seed.",
+    ]);
+  });
+
+  it("nothing prepared this run: the waiting line is still said", async () => {
+    const said: string[] = [];
+    const port = createQActionPort({
+      service: service(() => Promise.reject(new Error("never reached"))),
+      proposer: proposer(null),
+      narrator: {
+        proposed: () => Promise.resolve(),
+        refused: () => Promise.resolve(),
+        settled: () => Promise.resolve(),
+        note: (_run, line) => {
+          said.push(line);
+          return Promise.resolve();
+        },
+      },
+      waitingLines: {
+        take: () => ({
+          line: "Still waiting for your approval: X.",
+          actionId: RAISE_SHARE,
+        }),
+      },
+    });
+    expect(await port.prepare(context)).toEqual({ kind: "NONE" });
+    expect(said).toEqual(["Still waiting for your approval: X."]);
+  });
+});

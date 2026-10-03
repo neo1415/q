@@ -16,6 +16,7 @@
  */
 
 import { createCounterpartNames } from "./composition/counterpart-names.js";
+import { createWaitingLines } from "./composition/waiting-lines.js";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -2181,8 +2182,12 @@ const qActions = createQActionService({
   }),
   logger,
 });
+// Reminders of a still-waiting card, said after the engine's step for the
+// run so a card it replaced is never also "still waiting" (lead 2026-10-03).
+const waitingLines = createWaitingLines();
 const qActionPort = createQActionPort({
   service: qActions,
+  waitingLines,
   // A relationship action Q prepared this run first (CQ-Q-030), then a
   // profile change; one proposal per run either way.
   proposer: chainProposers(
@@ -2437,6 +2442,7 @@ const qIntelligence = composeQIntelligence({
   firewall,
   // Who is across their relationships, by name: a request naming one
   // brings the Relationships actions into the offer (lead 2026-10-03).
+  waitingLines,
   counterpartNames: createCounterpartNames({
     ownRelationships: errandRelationships.ownRelationships,
     logger,
