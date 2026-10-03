@@ -169,9 +169,11 @@ async function signIn(email) {
 async function qApi(token, method, path, body) {
   const r = await fetch(`${env("Q_API")}${path}`, {
     method,
+    // A JSON content type with no body is a 400 from Fastify: the stop
+    // (DELETE, no body) failed that way and left instructions ACTIVE.
     headers: {
       authorization: `Bearer ${token}`,
-      "content-type": "application/json",
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
       "idempotency-key": randomUUID(),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
