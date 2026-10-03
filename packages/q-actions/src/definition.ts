@@ -40,6 +40,11 @@ import type {
  * unregistered type has no executor and no way to acquire one.
  */
 
+export type QActionDescription = {
+  readonly summary: string;
+  readonly preview?: string | undefined;
+};
+
 export type QActionAuthorization =
   | { readonly outcome: "ALLOW" }
   | { readonly outcome: "DENY"; readonly code: string };
@@ -116,7 +121,19 @@ export type QActionDefinition<P, R> = {
   readonly describe: (
     payload: P,
     targets: readonly QSubjectRef[],
-  ) => { readonly summary: string; readonly preview?: string | undefined };
+  ) => QActionDescription;
+  /**
+   * The same, naming its targets as the proposing person may see them,
+   * read after authorize allowed them; never writes. Absent: `describe`.
+   * A failure falls back to `describe`: a card is never lost to a name.
+   */
+  readonly describeFor?:
+    | ((
+        payload: P,
+        targets: readonly QSubjectRef[],
+        actor: ActorContext,
+      ) => Promise<QActionDescription>)
+    | undefined;
   readonly authorize: (
     payload: P,
     actor: ActorContext,

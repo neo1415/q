@@ -11,8 +11,10 @@ import {
   CorrelationIdSchema,
   INSTRUCTION_DEFAULT_ACTIONS,
   QActionTypeSchema,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
+import type { ActorContext } from "@capital-q/security";
 import {
   defineQAction,
   type AnyQActionDefinition,
@@ -140,6 +142,14 @@ export function createAppActionDefinitions(
   options: {
     readonly actions?: readonly AnyAppAction[] | undefined;
     readonly logger?: Logger | undefined;
+    /**
+     * The card's counterpart by name, for the person proposing: called
+     * after the action's authorize allowed them that target. Null or a
+     * failure: the card reads without a name.
+     */
+    readonly nameOf?:
+      | ((actor: ActorContext, target: QSubjectRef) => Promise<string | null>)
+      | undefined;
   } = {},
 ): readonly AnyQActionDefinition[] {
   return consequential(options.actions ?? APP_ACTIONS).map((action) =>
@@ -156,6 +166,14 @@ export function createAppActionDefinitions(
       // an additive action's cards coexist (lead 2026-10-03).
       ...(action.supersedes === true ? { supersedes: true } : {}),
       describe: (payload) => action.card(payload),
+      describeFor: async (payload, targets, actor) => {
+        const [first] = targets;
+        const counterpart =
+          first === undefined || options.nameOf === undefined
+            ? null
+            : await options.nameOf(actor, first).catch(() => null);
+        return action.card(payload, { counterpart });
+      },
       confirm: (_payload, result) => result.says,
       authorize: async (payload, actor) => {
         if (actor.actorType !== "HUMAN") {

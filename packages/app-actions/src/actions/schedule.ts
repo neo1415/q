@@ -19,7 +19,12 @@ import {
   type KnownErrorCode,
 } from "@capital-q/contracts";
 
-import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
+import {
+  defineAppAction,
+  portMissing,
+  relationshipTarget,
+  type AnyAppAction,
+} from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
 /**
@@ -134,8 +139,14 @@ const BOOK = defineAppAction<
       idempotencyKey: `web:${context.actor.userId}:${input.idempotencyKey}`,
       correlationId: context.correlationId,
     }),
-  targets: () => [],
-  card: () => ({ summary: "Book this call", preview: "" }),
+  targets: (input) => relationshipTarget(input.relationshipId),
+  card: (input, names) => ({
+    summary:
+      names?.counterpart == null
+        ? "Book this call"
+        : `Book a call with ${names.counterpart}`,
+    preview: `${input.input.purpose}\n${input.input.startsAt} (${input.input.timeZone}), ${String(input.input.durationMinutes)} minutes`,
+  }),
   done: () => "Booked.",
   http: {
     method: "POST",

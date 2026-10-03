@@ -15,7 +15,12 @@ import {
   SendChatMessageResultDtoSchema,
 } from "@capital-q/contracts";
 
-import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
+import {
+  defineAppAction,
+  portMissing,
+  relationshipTarget,
+  type AnyAppAction,
+} from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
 /**
@@ -70,8 +75,20 @@ const SEND = defineAppAction<
       request: input.input,
       idempotencyKey: input.idempotencyKey,
     }),
-  targets: () => [],
-  card: () => ({ summary: "Send this message", preview: "As written." }),
+  targets: (input) => relationshipTarget(input.relationshipId),
+  // The words themselves and who gets them: the card is what they approve.
+  card: (input, names) => ({
+    summary:
+      names?.counterpart == null
+        ? "Send this message"
+        : `Send ${names.counterpart} this message`,
+    preview:
+      input.input.kind === "TEXT"
+        ? input.input.body
+        : input.input.kind === "ATTACHMENT"
+          ? (input.input.body ?? "An attachment, as written.")
+          : "A voice note.",
+  }),
   done: () => "Sent.",
   http: {
     method: "POST",

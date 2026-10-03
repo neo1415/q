@@ -151,6 +151,28 @@ export type AppActionCard = {
   readonly preview: string;
 };
 
+/**
+ * Names for the approval card, resolved by the composition for the card's
+ * first target as the proposing person may see it. Null: not known (the
+ * card still reads, without a name).
+ */
+export type AppActionCardNames = {
+  readonly counterpart: string | null;
+};
+
+const RELATIONSHIP_ID = z.string().uuid();
+
+/**
+ * The relationship an action acts in, as its card's target: what the
+ * Approval Engine binds and names (and refuses without). An id that is not
+ * a relationship id has none, and the engine refuses the card.
+ */
+export function relationshipTarget(id: string): readonly QSubjectRef[] {
+  return RELATIONSHIP_ID.safeParse(id).success
+    ? [{ kind: "RELATIONSHIP", relationshipId: id }]
+    : [];
+}
+
 /** ADR 0043: what is never delegated to Q on its own. */
 export const APP_ACTION_CONSEQUENCES = [
   "TERMS",
@@ -200,7 +222,7 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
    */
   readonly consequence?: AppActionConsequence | undefined;
   /** What the approval card says (CONSEQUENTIAL), and Q's line after. */
-  readonly card: (input: In) => AppActionCard;
+  readonly card: (input: In, names?: AppActionCardNames) => AppActionCard;
   /**
    * Q's sentence once it ran (INSTANT) or ran on approval. `names` holds
    * the display names of the references Q resolved, by tool field.
@@ -355,7 +377,7 @@ export function defineAppActionFamily<ToolIn>(definition: {
     run: (ports, context, value) =>
       memberOf(value.operation).run(ports, context, value.input),
     targets: (value) => memberOf(value.operation).targets(value.input),
-    card: (value) => memberOf(value.operation).card(value.input),
+    card: (value, names) => memberOf(value.operation).card(value.input, names),
     done: (out, value, names) =>
       memberOf(value.operation).done(out, value.input, names),
     tool: definition.tool,

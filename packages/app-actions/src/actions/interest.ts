@@ -93,10 +93,19 @@ const EXPRESS_INTEREST = defineAppAction<
   targets: (input): readonly QSubjectRef[] => [
     { kind: "COMPANY", companyId: input.companyId },
   ],
-  card: () => ({
-    summary: "Express interest",
-    preview: "The company is told you're interested.",
-  }),
+  // Named: a standing instruction prepares several at once, and five
+  // identical "the company is told" cards could not be told apart (QA
+  // 2026-10-03, instruction ff4ceb3f).
+  card: (_input, names) =>
+    names?.counterpart == null
+      ? {
+          summary: "Express interest",
+          preview: "The company is told you're interested.",
+        }
+      : {
+          summary: `Express interest in ${names.counterpart}`,
+          preview: `${names.counterpart} is told you're interested.`,
+        },
   done: () => "Done. They know you're interested.",
   http: {
     method: "POST",
@@ -215,10 +224,16 @@ const CONNECTION_REQUEST = defineAppAction<
       investorOrganisationId: input.investorOrganisationId,
     },
   ],
-  card: () => ({
-    summary: "Send a connection request",
-    preview: "The investor is asked to connect.",
-  }),
+  card: (_input, names) =>
+    names?.counterpart == null
+      ? {
+          summary: "Send a connection request",
+          preview: "The investor is asked to connect.",
+        }
+      : {
+          summary: `Send ${names.counterpart} a connection request`,
+          preview: `${names.counterpart} is asked to connect.`,
+        },
   done: () => "Done. Your request is sent.",
   http: {
     method: "POST",

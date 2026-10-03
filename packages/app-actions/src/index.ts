@@ -16,6 +16,7 @@ export {
   type AppActionFamilyInput,
   type AnyAppAction,
   type AppActionCard,
+  type AppActionCardNames,
   type AppActionClass,
   type AppActionContext,
   type AppActionDefinition,

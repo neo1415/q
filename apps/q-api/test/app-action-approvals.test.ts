@@ -84,7 +84,7 @@ function fakes() {
     if (found === undefined) throw new Error(`no ${type}`);
     return found;
   };
-  return { definition, updates, people };
+  return { definition, updates, people, ports };
 }
 
 const approved = (actionType: string, payload: unknown) =>
@@ -248,5 +248,88 @@ describe("the legacy action types: setters replace, additive cards coexist", () 
     ]) {
       expect(definition.supersedes, definition.actionType).toBe(true);
     }
+  });
+});
+
+describe("app cards name who they are for (QA 2026-10-03, instruction ff4ceb3f)", () => {
+  const RELATIONSHIP = "e0000000-0000-4000-8000-000000000001";
+  const definitions = createAppActionDefinitions(fakes().ports, {
+    nameOf: (_actor, target) =>
+      Promise.resolve(
+        target.kind === "COMPANY"
+          ? "Clinicrest"
+          : target.kind === "RELATIONSHIP"
+            ? "Ajopot"
+            : null,
+      ),
+  });
+  const definition = (type: string) => {
+    const found = definitions.find((entry) => entry.actionType === type);
+    if (found === undefined) throw new Error(`${type} not composed`);
+    return found;
+  };
+
+  it("an interest card names the company", async () => {
+    const express = definition("app.relationship.interest.express");
+    const payload = {
+      companyId: COMPANY,
+      idempotencyKey: "k-express-0001",
+      input: { surface: "FEED" },
+    };
+    const targets = express.targets(payload);
+    expect(await express.describeFor?.(payload, targets, APPROVER)).toEqual({
+      summary: "Express interest in Clinicrest",
+      preview: "Clinicrest is told you're interested.",
+    });
+  });
+
+  it("a message card names who gets it and shows the words; a call card says when", async () => {
+    const send = definition("app.chat.message.send");
+    const message = {
+      relationshipId: RELATIONSHIP,
+      idempotencyKey: "k-chat-0001",
+      input: { kind: "TEXT", body: "Hello from Savanna." },
+    };
+    const targets = send.targets(message);
+    expect(targets).toEqual([
+      { kind: "RELATIONSHIP", relationshipId: RELATIONSHIP },
+    ]);
+    expect(await send.describeFor?.(message, targets, APPROVER)).toEqual({
+      summary: "Send Ajopot this message",
+      preview: "Hello from Savanna.",
+    });
+    const book = definition("app.schedule.meeting.book");
+    const call = {
+      relationshipId: RELATIONSHIP,
+      idempotencyKey: "k-book-0001",
+      input: {
+        purpose: "Intro call",
+        startsAt: "2026-10-05T10:00:00.000Z",
+        durationMinutes: 30,
+        timeZone: "UTC",
+      },
+    };
+    const described = await book.describeFor?.(
+      call,
+      book.targets(call),
+      APPROVER,
+    );
+    expect(described?.summary).toBe("Book a call with Ajopot");
+    expect(described?.preview).toContain("Intro call");
+    expect(described?.preview).toContain("30 minutes");
+  });
+
+  it("no name known: the card still reads, unnamed", async () => {
+    const unnamed = createAppActionDefinitions(fakes().ports).find(
+      (entry) => entry.actionType === "app.relationship.interest.express",
+    );
+    const payload = {
+      companyId: COMPANY,
+      idempotencyKey: "k-express-0002",
+      input: { surface: "FEED" },
+    };
+    expect((await unnamed?.describeFor?.(payload, [], APPROVER))?.summary).toBe(
+      "Express interest",
+    );
   });
 });

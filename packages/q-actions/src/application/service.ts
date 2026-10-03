@@ -948,6 +948,18 @@ export function createQActionService(
     return { action, approval };
   }
 
+  const describedFor = async (
+    definition: AnyQActionDefinition,
+    payload: unknown,
+    targets: readonly QSubjectRef[],
+    actor: ActorContext,
+  ) =>
+    definition.describeFor === undefined
+      ? definition.describe(payload, targets)
+      : definition
+          .describeFor(payload, targets, actor)
+          .catch(() => definition.describe(payload, targets));
+
   const propose: QActionService["propose"] = async (command) => {
     const { actor, correlationId } = command;
     const definition = registry.get(command.actionType);
@@ -982,7 +994,12 @@ export function createQActionService(
       });
       throw new QActionNotPermittedError();
     }
-    const described = definition.describe(payload.data, targets);
+    const described = await describedFor(
+      definition,
+      payload.data,
+      targets,
+      actor,
+    );
     const now = clock.now();
     const actionId = QActionProposalIdSchema.parse(randomUUID());
     const approvalId = QApprovalIdSchema.parse(randomUUID());
@@ -1965,7 +1982,7 @@ export function createQActionService(
         definition,
         payload: next,
         targets,
-        described: definition.describe(next.data, targets),
+        described: await describedFor(definition, next.data, targets, actor),
         actionId: QActionProposalIdSchema.parse(randomUUID()),
         approvalId: QApprovalIdSchema.parse(randomUUID()),
         now,
