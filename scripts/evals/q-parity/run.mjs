@@ -254,12 +254,21 @@ async function check(testCase, runId, userId, company) {
     const proposed = await sql(
       `select payload::text as p from q_runtime.run_events where run_id = ${quote(runId)} and event_type = 'q.action.proposed'`,
     );
-    if (proposed.some((row) => row.p.includes(`app.${expect.action}`))) {
+    // A family (one tool, no route of its own) proposes as one of its
+    // members: relationship.outcome.change as relationship.outcome.pass, …
+    const family =
+      action.http === undefined
+        ? `app.${expect.action.split(".").slice(0, -1).join(".")}.`
+        : null;
+    if (
+      proposed.some(
+        (row) =>
+          row.p.includes(`app.${expect.action}`) ||
+          (family !== null && row.p.includes(family)),
+      )
+    ) {
       return true;
     }
-    // A refusal that is right for this eval account's state (e.g. no Q
-    // Card yet), declared with the action's own eval phrasings.
-    if (expect.orSays === undefined) return false;
     const said = (
       await sql(
         `select payload::text as p from q_runtime.run_events where run_id = ${quote(runId)} and event_type = 'q.message.completed'`,
@@ -267,6 +276,12 @@ async function check(testCase, runId, userId, company) {
     )
       .map((row) => row.p)
       .join(" ");
+    // The same request already waiting on a card (HARDEN harden-18): "That's
+    // ready: … It's waiting for your yes" prepares nothing new, rightly.
+    if (/that.s ready:[^]*waiting for your yes/i.test(said)) return true;
+    // A refusal that is right for this eval account's state (e.g. no Q
+    // Card yet), declared with the action's own eval phrasings.
+    if (expect.orSays === undefined) return false;
     return new RegExp(expect.orSays, "i").test(said);
   }
   // The state the person asked for, by the end of the run. "Already
