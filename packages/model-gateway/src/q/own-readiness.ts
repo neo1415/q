@@ -98,7 +98,7 @@ export function ownReadinessFact(
   ];
   const lead =
     options.alreadySaid === true
-      ? " THEY ASKED WHAT TO DO NEXT: Capital Q opens your answer with these gaps as a numbered list already; do not repeat or reorder them. Add at most two sentences on the first one and offer, as a question, to do it now; nothing about markets, sources or other topics unless they asked."
+      ? " THEY ASKED WHAT TO DO NEXT: Capital Q opens your answer with these gaps as a numbered list already; do not repeat or reorder them. Add at most two sentences of plain prose (no numbers, no list) on the first one and offer, as a question, to do it now; nothing about markets, sources or other topics unless they asked."
       : options.lead
         ? " THEY ASKED WHAT TO DO NEXT: lead with these gaps in this order (and a missing pitch video or deck from what exists on their account), each with the one action that closes it, offering to do it; mention anything else only after."
         : "";
@@ -156,4 +156,15 @@ export function readinessLeadLines(read: unknown): string | null {
     "Investors can't find your company in Discover yet. What to do next, most important first:",
     ...open,
   ].join("\n");
+}
+
+/**
+ * The model's words after code's numbered readiness list. Told to add a
+ * sentence or two on the first gap, it still opened with "1. Choose
+ * whether…", which read as the list starting over (QA 2026-10-03, run
+ * 56f815aa). The list is code's; a leading item number in the model's
+ * follow-on is dropped so the follow-on reads as prose.
+ */
+export function afterLeadLines(text: string): string {
+  return text.replace(/^\s*1[.)]\s+/u, "");
 }
