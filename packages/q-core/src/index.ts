@@ -897,6 +897,7 @@ export {
 export {
   INSTRUCTION_PLAN_V1,
   INSTRUCTION_PLAN_V2,
+  INSTRUCTION_PLAN_V3,
   INSTRUCTION_THREAD_READER_V1,
 } from "./prompts/tasks/instructions.v1.js";
 export {
@@ -905,9 +906,13 @@ export {
   type InstructionThreadReaderVariables,
   InstructionPlanResultSchema,
   InstructionPlanV2ResultSchema,
+  InstructionPlanV3ResultSchema,
   INSTRUCTION_PLAN_REQUESTS,
+  INSTRUCTION_CANNOT_NEEDS,
+  ENGINE_ABILITIES,
   type InstructionPlanResult,
   type InstructionPlanV2Result,
+  type InstructionPlanV3Result,
   type InstructionPlanVariables,
 } from "./prompts/schemas/instructions.js";
 

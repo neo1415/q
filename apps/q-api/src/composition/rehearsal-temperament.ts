@@ -71,7 +71,19 @@ export type AppliedAppraisal =
 export function appliedAppraisal(
   appraisal: RehearsalAppraisal,
   questionOpen: boolean,
+  /**
+   * Their line asks the played person something (it ends on a question):
+   * next steps, or a question back. Never provocation (QA 512b431a:
+   * "What would you need to see from us to move to a second meeting?"
+   * met anger and a warning). Rudeness stays rude.
+   */
+  theyAsked = false,
 ): AppliedAppraisal {
+  if (theyAsked && appraisal !== "RUDE" && PROVOKING_READINGS.has(appraisal)) {
+    return "NEUTRAL";
+  }
+  // Unsure, unknown or not tracked, however candid, is the gap: it costs
+  // (QA e22ea609, 512b431a). The note tells the model to read it so.
   if (questionOpen && appraisal === "HUMBLE_HONEST") return "HONEST_GAP";
   // A direct answer to their question, even a thin one, raises no
   // frustration and gives no cause for a warning (QA rehearsal df5af97b:
@@ -115,12 +127,40 @@ export const ANSWERED: ReadonlySet<AppliedAppraisal> = new Set([
   "DIRECT_ANSWER",
 ]);
 
-/** What the model is told about the question on the table. */
-export function questionNote(questionOpen: boolean): string {
-  return questionOpen
-    ? " Your question is open: an answer that is unsure, unknown or not tracked is a gap, however candid -- it costs you patience; read it CLEAR_BUT_THIN or EVASIVE, never HUMBLE_HONEST."
-    : " No question of yours is waiting on them: their line cannot dodge one, so never say it didn't answer your question.";
+/**
+ * What the model is told about the question on the table, in the same
+ * categories code applies: an unsure or no-data answer is HUMBLE_HONEST
+ * (code scores it HONEST_GAP, a cost) or EVASIVE; CLEAR_BUT_THIN is only a
+ * real answer with little behind it (code scores it DIRECT_ANSWER).
+ */
+export function questionNote(questionOpen: boolean, theyAsked = false): string {
+  const asked = theyAsked
+    ? " Their line asks you something: answer it; a question back or about next steps is never a dodge or a provocation."
+    : "";
+  return (
+    (questionOpen
+      ? " Your question is open: an answer that is unsure, unknown or not tracked is a gap, however candid -- read it HUMBLE_HONEST if candid or EVASIVE if it avoids it, never CLEAR_BUT_THIN; CLEAR_BUT_THIN is only a real answer with little behind it."
+      : " No question of yours is waiting on them: their line cannot dodge one, so never say it didn't answer your question.") +
+    asked
+  );
 }
+
+/** Whether their latest line asks something: it ends on a question. */
+export function theyAskedIn(
+  turns: readonly { readonly from: string; readonly text: string }[],
+): boolean {
+  const last = turns.at(-1);
+  return last !== undefined && last.from === "YOU" && /\?\s*$/u.test(last.text);
+}
+
+/** The model's readings that would give cause, before code applies them. */
+const PROVOKING_READINGS: ReadonlySet<RehearsalAppraisal> = new Set([
+  "EVASIVE",
+  "REPEATED_DODGE",
+  "RUDE",
+  "OVERCLAIM",
+  "CLEAR_BUT_THIN",
+]);
 
 /** Readings that give the played person new cause for frustration. */
 const PROVOKING: ReadonlySet<AppliedAppraisal> = new Set([

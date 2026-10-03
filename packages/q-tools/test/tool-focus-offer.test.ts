@@ -7,7 +7,11 @@ import {
   type QKnowledgeScopeKind,
 } from "@capital-q/contracts";
 import type { QToolFocus } from "@capital-q/q-runtime";
-import { APP_ACTIONS, qToolName } from "@capital-q/app-actions";
+import {
+  APP_ACTIONS,
+  appActionToolNames,
+  qToolName,
+} from "@capital-q/app-actions";
 import { APP_ACTION_GROUPS } from "../src/index.js";
 
 import {
@@ -102,6 +106,10 @@ const TURN_FOCUSES: readonly QToolFocus[] = [
       };
     }), // every action the reader can name
 ];
+
+const PROPOSERS = appActionToolNames(APP_ACTIONS).filter((name) =>
+  name.startsWith("propose_"),
+);
 
 describe("tools offered by what the turn is about", () => {
   it.each(Q_TASK_CLASSES)(
@@ -300,9 +308,16 @@ describe("tools offered by what the turn is about", () => {
         const record = registry
           .list()
           .find((r) => r.definition.providerName === name);
-        expect(record?.definition.eligibleWhenNamed, name).toBe(true);
+        // A generated tool, or the proposer still serving a declared action.
+        expect(
+          record?.definition.eligibleWhenNamed === true ||
+            PROPOSERS.includes(name),
+          name,
+        ).toBe(true);
       }
       expect(listed).toContain("relationship_outcome");
+      // QA run 92e8545d: a reminder is reachable whatever the turn is about.
+      expect(listed, purpose).toContain("propose_reminder");
     }
   });
 

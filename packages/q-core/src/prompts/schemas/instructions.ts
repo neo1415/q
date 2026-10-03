@@ -94,6 +94,47 @@ export type InstructionPlanV2Result = z.infer<
   typeof InstructionPlanV2ResultSchema
 >;
 
+/**
+ * v3 (QA run 40021ae5): each "can't" names what it would need. The engine
+ * itself finds and matches candidates, runs on its trigger and cadence
+ * (the instruction IS the schedule) and orders steps across firings; a
+ * line that needs one of those is not a missing action, and code drops it.
+ * A can't-line must need something no action and no engine ability covers.
+ */
+export const INSTRUCTION_PLAN_V3_SCHEMA_VERSION = 3;
+export const INSTRUCTION_CANNOT_NEEDS = [
+  /** Finding or matching people: the engine does this. */
+  "DISCOVERY",
+  /** A recurring time or cadence: the instruction is the schedule. */
+  "SCHEDULE",
+  /** One step after another: the engine orders steps over firings. */
+  "SEQUENCING",
+  /** Terms, valuation, money or commitments: always theirs. */
+  "TERMS_OR_MONEY",
+  /** Something no listed action does. */
+  "NO_SUCH_ACTION",
+] as const;
+export const ENGINE_ABILITIES: readonly (typeof INSTRUCTION_CANNOT_NEEDS)[number][] =
+  ["DISCOVERY", "SCHEDULE", "SEQUENCING"];
+export const InstructionPlanV3ResultSchema =
+  InstructionPlanV2ResultSchema.extend({
+    cannot: z
+      .array(
+        z
+          .object({
+            what: z.string().trim().min(3).max(200),
+            reason: z.string().trim().min(3).max(300),
+            instead: z.string().trim().min(3).max(300),
+            needs: z.enum(INSTRUCTION_CANNOT_NEEDS),
+          })
+          .strict(),
+      )
+      .max(5),
+  }).strict();
+export type InstructionPlanV3Result = z.infer<
+  typeof InstructionPlanV3ResultSchema
+>;
+
 // ---------------------------------------------------------------------------
 // INSTRUCTION_THREAD_READER: the quarantined extractor (ADR 0043 §6)
 // ---------------------------------------------------------------------------

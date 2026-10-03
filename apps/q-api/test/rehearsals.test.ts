@@ -700,6 +700,8 @@ describe("rehearsals", () => {
     expect(done.kind).toBe("OK");
     if (done.kind !== "OK") return;
     expect(done.rehearsal.status).toBe("FINISHED");
+    // Their close stands as the outcome; the person's finish keeps it.
+    expect(done.rehearsal.outcome).toBe("ADJOURNED");
     expect(done.rehearsal.review?.score).toBe(65);
     expect(done.rehearsal.review?.tips).toEqual([
       "Lead with retention for this fund.",
@@ -710,7 +712,9 @@ describe("rehearsals", () => {
     const { service } = setup();
     const rehearsal = await startWith(service);
     const done = await service.finish(actor(FOUNDER), rehearsal.id);
-    expect(done.kind === "OK" && done.rehearsal.outcome).toBe("LEFT_EARLY");
+    // They ended it themselves: FOUNDER_ENDED, never the played person
+    // leaving (LEFT_EARLY).
+    expect(done.kind === "OK" && done.rehearsal.outcome).toBe("FOUNDER_ENDED");
     expect(done.kind === "OK" && done.rehearsal.review).toBeNull();
   });
 

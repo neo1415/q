@@ -44,6 +44,7 @@ export const OUTCOME_WORDS: Readonly<Record<RehearsalOutcome, string>> = {
   DEAL_AGREED: "Deal agreed",
   DECLINED: "They passed",
   LEFT_EARLY: "Ended early",
+  FOUNDER_ENDED: "You ended the meeting",
 };
 
 export const DIMENSION_WORDS: Readonly<

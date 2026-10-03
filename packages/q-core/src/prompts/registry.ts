@@ -1,6 +1,7 @@
 import {
   INSTRUCTION_PLAN_V1,
   INSTRUCTION_PLAN_V2,
+  INSTRUCTION_PLAN_V3,
   INSTRUCTION_THREAD_READER_V1,
 } from "./tasks/instructions.v1.js";
 import {
@@ -414,6 +415,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // ADR 0043: standing instructions.
     INSTRUCTION_PLAN_V1,
     INSTRUCTION_PLAN_V2,
+    INSTRUCTION_PLAN_V3,
     INSTRUCTION_THREAD_READER_V1,
     // DAILY block
     DAILY_STORY_WRITER_V1,

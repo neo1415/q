@@ -6,9 +6,9 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  InstructionPlanV2ResultSchema,
+  InstructionPlanV3ResultSchema,
   renderPrompt,
-  type InstructionPlanV2Result,
+  type InstructionPlanV3Result,
   type InstructionPlanVariables,
 } from "@capital-q/q-core";
 
@@ -33,7 +33,7 @@ export type PlanVariables = Omit<
 
 export type PlanOutcome = {
   /** Null: refused, failed or unreadable; the firing plans nothing. */
-  readonly plan: InstructionPlanV2Result | null;
+  readonly plan: InstructionPlanV3Result | null;
   /** What it cost, USD (0 when nothing was spent or it was unpriced). */
   readonly costUsd: number;
 };
@@ -65,7 +65,7 @@ export function createInstructionPlanner(dependencies: {
         variables,
       });
       const response =
-        await dependencies.gateway.execute<InstructionPlanV2Result>(
+        await dependencies.gateway.execute<InstructionPlanV3Result>(
           {
             taskClass: "STRUCTURED_EXTRACTION",
             sensitivity: "CONFIDENTIAL",
@@ -91,11 +91,11 @@ export function createInstructionPlanner(dependencies: {
               correlationId: `cor_instr_${who.instructionId}_${randomUUID().slice(0, 8)}`,
             },
           },
-          { schema: InstructionPlanV2ResultSchema },
+          { schema: InstructionPlanV3ResultSchema },
         );
       const costUsd = response.cost.amount;
       if (response.output.kind !== "STRUCTURED") return { plan: null, costUsd };
-      const parsed = InstructionPlanV2ResultSchema.safeParse(
+      const parsed = InstructionPlanV3ResultSchema.safeParse(
         response.output.value,
       );
       return { plan: parsed.success ? parsed.data : null, costUsd };

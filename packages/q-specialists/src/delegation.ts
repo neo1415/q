@@ -37,6 +37,8 @@ export type QDelegationPort = {
   ) => Promise<{
     readonly status: string;
     readonly awaitingApprovalOf: string;
+    /** How many steps the card lets Q take on its own; absent: unknown. */
+    readonly onItsOwn?: number | undefined;
   } | null>;
 };
 
@@ -50,7 +52,11 @@ export const DELEGATION_CANDIDATE = {
 
 export function delegationLine(
   context: DelegationContext,
-  prepared: { readonly status: string; readonly awaitingApprovalOf: string },
+  prepared: {
+    readonly status: string;
+    readonly awaitingApprovalOf: string;
+    readonly onItsOwn?: number | undefined;
+  },
   /** They also asked for terms or money, which Q never takes on. */
   askedTerms = false,
 ): string {
@@ -91,11 +97,20 @@ export function delegationLine(
   // "Meanwhile" only after something was said before it (lead
   // 2026-10-03: the reply opened "Meanwhile, as a standing instruction…").
   const preceded = truth.length > 0 || terms !== null;
+  // What the card shows, drawn from its grant (lead 2026-10-03): with
+  // every step asked first there is nothing Q does on its own to show.
+  const allAsked = prepared.onItsOwn === 0;
   const card =
     prepared.status === "PREPARED"
       ? context.side === "COMPANY"
-        ? `${preceded ? "Meanwhile, as" : "As"} a standing instruction I'd find investors who match and engage them for you, asking you first before anything goes out. The card shows what I'd do on my own, what I'd ask first and what never happens without you.`
-        : "As a standing instruction, the card shows exactly what I'd do on my own, what I'd ask first and what never happens without you."
+        ? `${preceded ? "Meanwhile, as" : "As"} a standing instruction I'd find investors who match and engage them for you, asking you first before anything goes out. ${
+            allAsked
+              ? "The card shows what I'd prepare for your yes and what never happens without you."
+              : "The card shows what I'd do on my own, what I'd ask first and what never happens without you."
+          }`
+        : allAsked
+          ? "As a standing instruction, the card shows what I'd prepare for your yes and what never happens without you."
+          : "As a standing instruction, the card shows exactly what I'd do on my own, what I'd ask first and what never happens without you."
       : prepared.status === "ONE_PER_TURN"
         ? "Another change is already waiting for your approval in this answer; approve or decline it first, then I'll set this up."
         : "What would you like me to take on: your conversations with investors, new founders in your feed, or something else?";
@@ -247,6 +262,9 @@ export function createToolDelegationPort(dependencies: {
         ? {
             status: record["status"],
             awaitingApprovalOf: record["awaitingApprovalOf"],
+            ...(typeof record["onItsOwn"] === "number"
+              ? { onItsOwn: record["onItsOwn"] }
+              : {}),
           }
         : null;
     },

@@ -15,8 +15,9 @@
  *               pitching is the weaker party)
  *   leverage    the investor asks: most of their lines carry a question,
  *               and none pitch the founder
- *   emotion     mood, intensity or code-tracked temperament moves after
- *               the weak answer
+ *   emotion     the weak answer costs: frustration up or patience down
+ *               by at least 5 in code's own state
+ *   asking      their closing ask (next steps) meets no anger, no warning
  *   interrupt   a raised hand gets a short yield and no question
  *   walk-out    if they left, two warnings came first
  *   review      not empty, the founder's dimensions only, a code score
@@ -311,20 +312,36 @@ const stateOf = (line) =>
   stored.find((turn) => turn.from === "THEM" && turn.at === line?.at)?.state;
 const before = stateOf(opener);
 const after = stateOf(weak);
+// The weak answer costs a real amount (QA 512b431a: frustration fell
+// 29 -> 23 and patience only 2, and "something moved" passed): code's
+// own state, frustration up or patience down by at least COST.
+const COST = 5;
 const moved =
-  opener !== undefined &&
-  weak !== undefined &&
-  (opener.mood !== weak.mood ||
-    opener.intensity !== weak.intensity ||
-    (before !== undefined &&
-      after !== undefined &&
-      (after.patience < before.patience ||
-        after.warmth < before.warmth ||
-        after.frustration > before.frustration)));
+  before !== undefined &&
+  after !== undefined &&
+  (after.frustration - before.frustration >= COST ||
+    before.patience - after.patience >= COST) &&
+  after.frustration >= before.frustration;
 check(
   "emotion",
   moved,
   `opener ${opener?.mood ?? "-"}/${opener?.intensity ?? "-"} ${JSON.stringify(before ?? {})} -> weak ${weak?.mood ?? "-"}/${weak?.intensity ?? "-"} ${JSON.stringify(after ?? {})}`,
+);
+
+// Their closing ask is never provocation (QA 512b431a: ANGRY, warning 1).
+const askLine = afterTurn.find((t) => t.kind === "ASK")?.line;
+const askStored = stored.find(
+  (turn) => turn.from === "THEM" && turn.at === askLine?.at,
+);
+check(
+  "asking",
+  endedByThem ||
+    (askLine !== undefined &&
+      askLine.mood !== "ANGRY" &&
+      askStored?.warning === undefined),
+  askLine === undefined
+    ? "no line after the ask"
+    : `[${askLine.mood ?? "-"}] warning ${String(askStored?.warning ?? "none")}`,
 );
 
 // Interruption: a short yield that asks nothing.
@@ -342,7 +359,8 @@ check(
 const warnings = theirs.filter((turn) => turn.warning !== undefined);
 const outcome = row?.outcome ?? dto?.outcome ?? null;
 // Leaving is their close before the script ran out with a no or a
-// walk-out; a LEFT_EARLY written by the founder's own finish is the
+// walk-out; the founder's own finish writes FOUNDER_ENDED (LEFT_EARLY on
+// deploys before 20261128090000), which is the
 // founder ending it, not the investor leaving.
 const left =
   endedByThem && (outcome === "LEFT_EARLY" || outcome === "DECLINED");
@@ -352,6 +370,13 @@ check(
   left
     ? `they left (${String(outcome)}) after ${String(warnings.length)} warning(s); two are required`
     : `${endedByThem ? "they closed" : "the founder ended it"} (${String(warnings.length)} warning(s); outcome ${String(outcome)})`,
+);
+
+// Ending: the founder's own finish is recorded as theirs (20261128090000).
+check(
+  "ending",
+  endedByThem || outcome === "FOUNDER_ENDED",
+  `outcome ${String(outcome)}${endedByThem ? " (they closed it)" : ""}`,
 );
 
 // Review: the founder's, scored by code.

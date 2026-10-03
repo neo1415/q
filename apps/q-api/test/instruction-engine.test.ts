@@ -437,8 +437,16 @@ const PEOPLE_OVERRIDE: { value: readonly InstructionPerson[] | null } = {
 };
 
 function world(
-  plans: readonly (InstructionPlanResult & {
+  plans: readonly (Omit<InstructionPlanResult, "cannot"> & {
     readonly request?: "PREPARE" | "EXECUTE";
+    readonly cannot: readonly (InstructionPlanResult["cannot"][number] & {
+      readonly needs?:
+        | "DISCOVERY"
+        | "SCHEDULE"
+        | "SEQUENCING"
+        | "TERMS_OR_MONEY"
+        | "NO_SUCH_ACTION";
+    })[];
   })[],
   autoEnabled = true,
   at = IN_HOURS,
@@ -517,7 +525,17 @@ function world(
       call += 1;
       // Handed over unless a case says otherwise.
       const plan =
-        next === undefined ? null : { request: "EXECUTE" as const, ...next };
+        next === undefined
+          ? null
+          : {
+              request: "EXECUTE" as const,
+              ...next,
+              // A can't no action covers, unless a case says what it needs.
+              cannot: next.cannot.map((entry) => ({
+                needs: "NO_SUCH_ACTION" as const,
+                ...entry,
+              })),
+            };
       return Promise.resolve({ plan, costUsd: 0.01 });
     },
     ask: (_actor, card) => {
@@ -853,6 +871,55 @@ describe("a goal to prepare (weekend test 6ea17898)", () => {
         key: `instr:${row.id}:run-0002:0`,
       },
     ]);
+  });
+});
+
+describe("the engine's own abilities are never a can't (QA run 40021ae5)", () => {
+  it("drops can't-lines that need discovery, a schedule or sequencing; keeps the real ones", async () => {
+    ran.length = 0;
+    const { engine, row, steps } = world([
+      {
+        steps: [],
+        cannot: [
+          {
+            what: "Find and assess new founders",
+            reason: "No listed action performs founder discovery",
+            instead: "I can work with your feed",
+            needs: "DISCOVERY",
+          },
+          {
+            what: "Run this every weekend",
+            reason: "No listed action creates a recurring schedule",
+            instead: "Ask me each weekend",
+            needs: "SCHEDULE",
+          },
+          {
+            what: "Send introductory messages immediately after expressing interest",
+            reason: "No action chains steps",
+            instead: "I can send them separately",
+            needs: "SEQUENCING",
+          },
+          {
+            what: "Negotiate the valuation",
+            reason: "terms are always yours to agree",
+            instead: "I can prepare the points for you",
+            needs: "TERMS_OR_MONEY",
+          },
+        ],
+      },
+    ]);
+    await engine.fire(row.id, "run-0003");
+    const words = [...steps.values()].map((step) => step.words);
+    expect(words.some((line) => line.includes("Negotiate the valuation"))).toBe(
+      true,
+    );
+    for (const gone of [
+      "founder discovery",
+      "every weekend",
+      "immediately after",
+    ]) {
+      expect(words.some((line) => line.includes(gone))).toBe(false);
+    }
   });
 });
 

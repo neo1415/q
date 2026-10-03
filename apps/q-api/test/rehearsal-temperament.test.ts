@@ -8,6 +8,7 @@ import {
   givesCause,
   questionNote,
   questionOpenIn,
+  theyAskedIn,
   walkOutNote,
   walkOutPlan,
   initialTemperament,
@@ -261,7 +262,7 @@ describe("the question on the table (QA rehearsal e22ea609)", () => {
       const note =
         temperamentNote(furious, registerOf(furious, "TOUGH")) +
         walkOutNote(1, "FURIOUS") +
-        questionNote(open);
+        questionNote(open, true);
       expect(note.length).toBeLessThanOrEqual(1_200);
     }
   });
@@ -358,5 +359,47 @@ describe("an answer is never met with more anger (QA rehearsal df5af97b)", () =>
     ).toBe(true);
     // The founder's question back, with none of theirs open, is no dodge.
     expect(appliedAppraisal("EVASIVE", false)).toBe("NEUTRAL");
+  });
+});
+
+describe("the note and the mapping agree (QA rehearsal 512b431a)", () => {
+  it("an unsure answer is read as the gap, which costs, never as a direct answer", () => {
+    const note = questionNote(true);
+    expect(note).toContain("HUMBLE_HONEST if candid or EVASIVE");
+    expect(note).toContain("never CLEAR_BUT_THIN");
+    const start = initialTemperament("REALISTIC", "NEUTRAL");
+    for (const reading of ["HUMBLE_HONEST", "EVASIVE"] as const) {
+      const after = applyAppraisal(
+        start,
+        appliedAppraisal(reading, true),
+        "REALISTIC",
+      );
+      expect(after.frustration - start.frustration).toBeGreaterThanOrEqual(8);
+      expect(start.patience - after.patience).toBeGreaterThanOrEqual(8);
+    }
+  });
+
+  it("their question back or about next steps is never provocation", () => {
+    const turns = [
+      { from: "THEM", text: "Why now?" },
+      {
+        from: "YOU",
+        text: "What would you need to see from us to move to a second meeting?",
+      },
+    ];
+    expect(theyAskedIn(turns)).toBe(true);
+    for (const reading of [
+      "EVASIVE",
+      "REPEATED_DODGE",
+      "CLEAR_BUT_THIN",
+    ] as const) {
+      const applied = appliedAppraisal(reading, true, true);
+      expect(applied).toBe("NEUTRAL");
+      expect(givesCause(applied)).toBe(false);
+    }
+    expect(appliedAppraisal("RUDE", true, true)).toBe("RUDE");
+    expect(theyAskedIn([{ from: "YOU", text: "We grew 12% a month." }])).toBe(
+      false,
+    );
   });
 });

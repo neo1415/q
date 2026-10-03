@@ -99,3 +99,22 @@ describe("the delegation reply's wording (lead 2026-10-03)", () => {
     expect(line).toContain(" Meanwhile, as a standing instruction");
   });
 });
+
+describe("the card line is drawn from the grant (lead 2026-10-03)", () => {
+  it("with every step asked first, never 'what I'd do on my own'", () => {
+    for (const side of ["INVESTOR", "COMPANY"] as const) {
+      const line = delegationLine(
+        { side, relationships: 3, outstanding: [] },
+        { status: "PREPARED", awaitingApprovalOf: "x", onItsOwn: 0 },
+      );
+      expect(line).not.toContain("on my own");
+      expect(line).toContain("what I'd prepare for your yes");
+    }
+    expect(
+      delegationLine(
+        { side: "INVESTOR", relationships: 3, outstanding: [] },
+        { status: "PREPARED", awaitingApprovalOf: "x", onItsOwn: 3 },
+      ),
+    ).toContain("exactly what I'd do on my own");
+  });
+});

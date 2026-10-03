@@ -15,9 +15,10 @@ import {
   type InstructionWorkingHours,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
-import type {
-  InstructionPlanV2Result as InstructionPlanResult,
-  InstructionThreadFacts,
+import {
+  ENGINE_ABILITIES,
+  type InstructionPlanV3Result as InstructionPlanResult,
+  type InstructionThreadFacts,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
@@ -261,6 +262,15 @@ export function inScope(
   return reachable.filter(
     (person) =>
       person.relationshipId !== null && listed.has(person.relationshipId),
+  );
+}
+
+/** The plan's can't-lines that need neither an action nor the engine. */
+export function realCannots<T extends { readonly needs: string }>(
+  cannot: readonly T[],
+): T[] {
+  return cannot.filter(
+    (entry) => !(ENGINE_ABILITIES as readonly string[]).includes(entry.needs),
   );
 }
 
@@ -817,6 +827,10 @@ export function createInstructionEngine(
           .slice(0, 3_000);
       }
       if (plan === null) return empty("PLANNER_UNAVAILABLE");
+      // The engine's own abilities are never a "can't" (QA run 40021ae5:
+      // "Can't find founders" beside five found, "can't run every weekend"
+      // for the instruction that is the schedule): such lines are dropped.
+      plan = { ...plan, cannot: realCannots(plan.cannot) };
       if (plan.steps.length === 0 && plan.cannot.length === 0) {
         const covered = inScope(grant.data, people).length;
         await note(
