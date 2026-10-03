@@ -42,6 +42,11 @@ export type ChatParty = {
   readonly side: ChatSide;
   /** The relationship, as this party sees it, is CONNECTED. */
   readonly connected: boolean;
+  /**
+   * The per-party projected state, when the resolver knows it. The schedule
+   * service reads it to mark a first call held only while still CONNECTED.
+   */
+  readonly state?: string | undefined;
 };
 
 /** Network's per-party view of one relationship; null for a non-party. */

@@ -25,6 +25,7 @@ import { initials } from "@/features/investors/investor-labels";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
 import { ScheduleDialog } from "./schedule-dialog";
+import { callToRecord } from "./call-to-record";
 
 import { AskQAboutRelationship } from "./relationship-actions";
 import type { CounterpartProfile } from "./relationship-page-data";
@@ -103,6 +104,10 @@ export function RelationshipDetail({
   const connected =
     relationship !== null && isMatchedRelationshipState(relationship.state);
   const messageCount = thread?.messages.length ?? 0;
+  const call =
+    relationship === null
+      ? null
+      : callToRecord(relationship.state, meetings, readAt);
   return (
     <PageContainer className="flex flex-col gap-6">
       <BackToRelationships />
@@ -202,15 +207,17 @@ export function RelationshipDetail({
               ) : null}
               {relationship === null ? null : (
                 <>
-                  {/* After a meeting, "How did it go?" is the next step; when
-                      paused or not proceeding, the way back is (break-it
-                      2026-10-03: Zino could not find Resume). */}
-                  {OUTCOME_FIRST.has(relationship.state) ? (
+                  {/* After a meeting (recorded, or a booked call that has
+                      ended), "How did it go?" is the next step; when paused or
+                      not proceeding, the way back is (break-it 2026-10-03:
+                      Zino could not find Resume). */}
+                  {OUTCOME_FIRST.has(relationship.state) || call !== null ? (
                     <RelationshipOutcome
                       relationshipId={relationship.relationshipId}
                       state={relationship.state}
                       side={side}
                       counterpart={counterpart}
+                      call={call}
                     />
                   ) : null}
                   {/*
@@ -235,7 +242,8 @@ export function RelationshipDetail({
                           focus="reminder"
                         />
                       </ScheduleDialog>
-                      {OUTCOME_FIRST.has(relationship.state) ? null : (
+                      {OUTCOME_FIRST.has(relationship.state) ||
+                      call !== null ? null : (
                         <RelationshipOutcome
                           relationshipId={relationship.relationshipId}
                           state={relationship.state}

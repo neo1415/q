@@ -20,6 +20,7 @@ import {
   resumeAction,
 } from "./outcome-actions";
 import type { RelationshipSide } from "./relationship-words";
+import type { CallToRecord } from "./call-to-record";
 
 /**
  * Where a match goes after a meeting (2026-10-02). The investor's side
@@ -42,17 +43,26 @@ function newKey(): string {
   return `web-pass-${crypto.randomUUID()}`;
 }
 
-export function RelationshipOutcome(props: {
+export function RelationshipOutcome({
+  call = null,
+  ...props
+}: {
   readonly relationshipId: string;
   readonly state: RelationshipStateV2;
   readonly side: RelationshipSide;
   readonly counterpart: string;
+  /** A booked call that has ended on a still-CONNECTED match (no bot). */
+  readonly call?: CallToRecord | null | undefined;
 }) {
   // The notes notice links here (#outcome): "How did it go?" first.
   return (
     <div id="outcome" className="flex flex-col items-stretch gap-3">
-      {props.state === "MEETING_HELD" ? (
-        <HowDidItGo relationshipId={props.relationshipId} />
+      {props.state === "MEETING_HELD" ||
+      (props.state === "CONNECTED" && call !== null) ? (
+        <HowDidItGo
+          relationshipId={props.relationshipId}
+          meetingId={call?.meetingId}
+        />
       ) : null}
       <SideOutcome {...props} />
     </div>
@@ -75,7 +85,14 @@ const MEETING_OUTCOMES: readonly {
  * person confirms). One press is their confirmation; it is recorded on
  * the relationship both sides read. Q asks the same in conversation.
  */
-function HowDidItGo({ relationshipId }: { readonly relationshipId: string }) {
+function HowDidItGo({
+  relationshipId,
+  meetingId,
+}: {
+  readonly relationshipId: string;
+  /** Names the call: answering also marks it held (no bot needed). */
+  readonly meetingId?: string | undefined;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -87,7 +104,10 @@ function HowDidItGo({ relationshipId }: { readonly relationshipId: string }) {
           label={option.label}
           busyLabel="Recording…"
           run={() =>
-            meetingOutcomeAction(relationshipId, { outcome: option.outcome })
+            meetingOutcomeAction(relationshipId, {
+              outcome: option.outcome,
+              ...(meetingId === undefined ? {} : { meetingId }),
+            })
           }
         />
       ))}

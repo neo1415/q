@@ -46,6 +46,7 @@ export function createNetworkChatParties(
       // The match outlives CONNECTED (relationship-state.v2): a thread
       // stays open after a meeting, a pause or a pass.
       connected: isMatchedRelationshipState(view.status.projection.state),
+      state: view.status.projection.state,
     };
   };
 }
