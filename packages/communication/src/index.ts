@@ -44,7 +44,7 @@ export type {
   ChatSide,
   ChatStore,
 } from "./store.js";
-export { createPostgresChatStore } from "./postgres.js";
+export { createPostgresChatStore, type ChatOutbox } from "./postgres.js";
 export {
   composeChat,
   composeChatSafety,

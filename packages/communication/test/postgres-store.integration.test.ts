@@ -43,6 +43,7 @@ describe("@capital-q/communication against PostgreSQL", () => {
     version: randomUUID(),
   };
   const shares: unknown[] = [];
+  const announced: { type: string; data: unknown }[] = [];
   let founder: ActorContext;
   let investor: ActorContext;
 
@@ -103,6 +104,14 @@ describe("@capital-q/communication against PostgreSQL", () => {
       store: createPostgresChatStore({
         sql: db.sql,
         transactions: db.transactions,
+        // QA run 8a1d57b9: each original message is announced in its own
+        // transaction (captured here; the outbox writer has its own tests).
+        outbox: {
+          enqueue: (_tx, event) => {
+            announced.push(event);
+            return Promise.resolve();
+          },
+        },
       }),
       parties: (a, relationshipId) =>
         Promise.resolve(
@@ -180,6 +189,18 @@ describe("@capital-q/communication against PostgreSQL", () => {
     ]);
     expect(events[0]?.visibility_scope).toBe("relationship_shared");
     expect(JSON.stringify(events)).not.toContain("Hello Ben");
+    // Announced once per original, identifiers and side only.
+    expect(announced.map((event) => event.type)).toEqual([
+      "network.relationship.message_sent",
+      "network.relationship.message_sent",
+    ]);
+    expect(announced[0]?.data).toEqual({
+      relationshipId: ids.relationship,
+      conversationId: expect.any(String) as string,
+      messageId: first.message.messageId,
+      senderSide: "COMPANY",
+    });
+    expect(JSON.stringify(announced)).not.toContain("Hello Ben");
 
     expect((await service.unread(investor)).items).toEqual([
       { relationshipId: ids.relationship, unread: 2 },
@@ -219,6 +240,8 @@ describe("@capital-q/communication against PostgreSQL", () => {
       messageId: first.message.messageId,
       idempotencyKey: "it-key-0003",
     });
+    // An unsend is a revision, not a new message: nothing announced.
+    expect(announced).toHaveLength(2);
     const changes = await service.thread({
       actor: investor,
       relationshipId: ids.relationship,

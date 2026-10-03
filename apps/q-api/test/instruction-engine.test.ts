@@ -26,8 +26,10 @@ import {
 } from "../src/composition/instructions/engine.js";
 import {
   companyCardFacts,
+  mandateFacts,
   type InstructionMaterial,
 } from "../src/composition/instructions/material.js";
+import type { ThreadRead } from "../src/composition/instructions/quarantine.js";
 import type {
   InstructionRow,
   InstructionStore,
@@ -443,6 +445,8 @@ const PEOPLE_OVERRIDE: { value: readonly InstructionPerson[] | null } = {
 const MATERIAL_OVERRIDE: { value: InstructionMaterial | null } = {
   value: null,
 };
+/** QA run 8a1d57b9: what the quarantined reader returns, when a case sets it. */
+const THREAD_OVERRIDE: { value: ThreadRead | null } = { value: null };
 
 function world(
   plans: readonly (Omit<InstructionPlanResult, "cannot"> & {
@@ -529,6 +533,16 @@ function world(
     ...(MATERIAL_OVERRIDE.value === null
       ? {}
       : { material: () => Promise.resolve(MATERIAL_OVERRIDE.value) }),
+    ...(THREAD_OVERRIDE.value === null
+      ? {}
+      : {
+          readThread: (input: { relationshipId: string }) =>
+            Promise.resolve(
+              input.relationshipId === REL
+                ? (THREAD_OVERRIDE.value ?? { facts: null, costUsd: 0 })
+                : { facts: null, costUsd: 0 },
+            ),
+        }),
     plan: (_who, variables, limits) => {
       expect(limits.maxCostUsd).toBeGreaterThanOrEqual(0.08);
       planned.push(variables.refusals);
@@ -757,6 +771,7 @@ describe("a firing", () => {
             mentionsTermsOrMoney: false,
             declined: false,
             tone: "POSITIVE",
+            questionAbout: [],
           },
           costUsd: 0.002,
         });
@@ -1044,6 +1059,139 @@ describe("messages Q writes are grounded (QA run 8a1d57b9)", () => {
       );
     } finally {
       MATERIAL_OVERRIDE.value = null;
+    }
+  });
+});
+
+describe("their question gets an answer or goes to the person (QA run 8a1d57b9)", () => {
+  const asked: ThreadRead = {
+    facts: {
+      lastFrom: "THEM",
+      asksQuestion: true,
+      wantsToMeet: false,
+      proposedTime: null,
+      topicNumbers: [],
+      mentionsTermsOrMoney: false,
+      declined: false,
+      tone: "POSITIVE",
+      questionAbout: ["CHEQUE_SIZE", "LEAD_OR_FOLLOW"],
+    },
+    costUsd: 0,
+    question: {
+      messageId: "msg-0001",
+      text: "What's your typical cheque size and do you lead?",
+    },
+  };
+  const mandate = (cheque: boolean) =>
+    mandateFacts(
+      {
+        cheque: cheque ? { currency: "USD", typical: "250000" } : null,
+        stage: { minStageCode: null, maxStageCode: null },
+        constraints: [
+          {
+            dimension: "investment_role",
+            operator: "IN",
+            value: { kind: "codes", values: ["lead"] },
+            isHardExclusion: false,
+          },
+        ],
+        taxonomyPreferences: [],
+      },
+      (code) => (code === "lead" ? "Lead rounds" : undefined),
+    );
+  const reply = chat(
+    "Our typical cheque is $250k, and yes, we lead rounds. What are you raising for?",
+  );
+
+  it("answers from the declared mandate, within MESSAGES AUTO", async () => {
+    ran.length = 0;
+    MATERIAL_OVERRIDE.value = {
+      sender: { side: "INVESTOR", facts: mandate(true) },
+      counterparts: new Map(),
+    };
+    THREAD_OVERRIDE.value = asked;
+    try {
+      const { engine, row, notices } = world([{ steps: [reply], cannot: [] }]);
+      const result = await engine.fire(row.id, "run-0301");
+      expect(result.done).toBe(1);
+      expect(notices).toEqual([]);
+    } finally {
+      MATERIAL_OVERRIDE.value = null;
+      THREAD_OVERRIDE.value = null;
+    }
+  });
+
+  it("with no cheque size declared: never invented -- NEEDS_YOU with the question quoted, noted, and no reply sent", async () => {
+    ran.length = 0;
+    MATERIAL_OVERRIDE.value = {
+      sender: { side: "INVESTOR", facts: mandate(false) },
+      counterparts: new Map(),
+    };
+    THREAD_OVERRIDE.value = asked;
+    try {
+      const { engine, row, notices, steps } = world([
+        { steps: [reply], cannot: [] },
+      ]);
+      const result = await engine.fire(row.id, "run-0302");
+      expect(result.done).toBe(0);
+      expect(ran).toHaveLength(0);
+      expect(notices).toEqual([
+        expect.objectContaining({
+          key: "question:msg-0001",
+          priority: "NEEDS_YOU",
+          title: "Acme Robotics asked something only you can answer",
+          body: expect.stringContaining(
+            '"What\'s your typical cheque size and do you lead?"',
+          ) as string,
+        }),
+      ]);
+      const recorded = [...steps.entries()];
+      expect(recorded).toContainEqual([
+        `instr:${row.id}:question:msg-0001`,
+        expect.objectContaining({ status: "NOTED" }),
+      ]);
+      expect(
+        recorded.some(
+          ([, step]) =>
+            step.status === "REFUSED" &&
+            step.reasonCode === "UNANSWERED_QUESTION",
+        ),
+      ).toBe(true);
+    } finally {
+      MATERIAL_OVERRIDE.value = null;
+      THREAD_OVERRIDE.value = null;
+    }
+  });
+
+  it("terms or money stay theirs: the question goes to them, and a reply is their card", async () => {
+    MATERIAL_OVERRIDE.value = {
+      sender: { side: "INVESTOR", facts: mandate(true) },
+      counterparts: new Map(),
+    };
+    THREAD_OVERRIDE.value = {
+      ...asked,
+      facts:
+        asked.facts === null
+          ? null
+          : { ...asked.facts, mentionsTermsOrMoney: true },
+    };
+    try {
+      const {
+        engine,
+        row,
+        notices,
+        asked: cards,
+      } = world([{ steps: [reply], cannot: [] }]);
+      await engine.fire(row.id, "run-0303");
+      expect(notices.map((notice) => notice.key)).toContain(
+        "question:msg-0001",
+      );
+      expect(cards.map((card) => card.actionType)).toEqual([
+        "app.chat.message.send",
+      ]);
+    } finally {
+      MATERIAL_OVERRIDE.value = null;
+      THREAD_OVERRIDE.value = null;
     }
   });
 });

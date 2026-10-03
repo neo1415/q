@@ -30,6 +30,7 @@ import {
   materialLine,
   senderLines,
   type InstructionMaterial,
+  type MaterialFact,
 } from "./material.js";
 import { factsLine, type QuarantinedThreadReader } from "./quarantine.js";
 import type { InstructionRow, InstructionStore } from "./store.js";
@@ -496,6 +497,53 @@ export function validateStep(
   };
 }
 
+export type QuestionVerdict =
+  "ANSWERABLE" | "TERMS_OR_MONEY" | "NOT_DECLARED" | "MESSAGES_NOT_AUTO";
+
+/**
+ * QA run 8a1d57b9: whether Q may answer their open question itself. Only
+ * from the person's approved facts (declared mandate fields, or an
+ * approved topic), only when messages are AUTO, and never terms or money.
+ * Null: no open question from them.
+ */
+export function questionVerdict(
+  facts: ThreadFacts,
+  grant: InstructionGrant,
+  sender: readonly MaterialFact[] | null,
+): QuestionVerdict | null {
+  if (!facts.asksQuestion || facts.lastFrom !== "THEM") return null;
+  if (facts.mentionsTermsOrMoney) return "TERMS_OR_MONEY";
+  if (
+    !grant.actions.some(
+      (entry) => entry.action === "chat.message.send" && entry.mode === "AUTO",
+    )
+  ) {
+    return "MESSAGES_NOT_AUTO";
+  }
+  const kinds =
+    facts.questionAbout === undefined || facts.questionAbout.length === 0
+      ? ["OTHER" as const]
+      : facts.questionAbout;
+  const declared = kinds.every((kind) =>
+    kind === "OTHER"
+      ? facts.topicNumbers.length > 0
+      : (sender ?? []).some((fact) => fact.answers === kind),
+  );
+  return declared ? "ANSWERABLE" : "NOT_DECLARED";
+}
+
+/** Why their question went to the person, in plain words. */
+export const QUESTION_WORDS: Readonly<
+  Record<Exclude<QuestionVerdict, "ANSWERABLE">, string>
+> = {
+  TERMS_OR_MONEY:
+    "It's about terms or money, so the answer is yours. Reply in the chat when you're ready.",
+  NOT_DECLARED:
+    "The answer isn't among the facts you've declared, so I won't guess. Reply in the chat, or declare it and I can answer next time.",
+  MESSAGES_NOT_AUTO:
+    "You haven't let me send messages on my own under this instruction. Reply in the chat.",
+};
+
 /** Code's check of a message's words against the material it may use. */
 function messageProblem(
   input: unknown,
@@ -512,6 +560,14 @@ function messageProblem(
   const thread = subject === null ? undefined : context.facts?.get(subject);
   const sent = subject === null ? 0 : (context.sent.get(subject) ?? 0);
   const material = context.material ?? null;
+  // Their question Q may not answer has gone to the person: no reply.
+  const open =
+    thread === undefined
+      ? null
+      : questionVerdict(thread, context.grant, material?.sender.facts ?? null);
+  if (open === "NOT_DECLARED" || open === "MESSAGES_NOT_AUTO") {
+    return "UNANSWERED_QUESTION";
+  }
   return checkMessage({
     body: body.body,
     first: sent === 0 && (thread === undefined || thread.lastFrom === "NONE"),
@@ -653,6 +709,7 @@ function peopleLines(
   facts: ReadonlyMap<string, ThreadFacts>,
   topics: readonly string[],
   material: InstructionMaterial | null | undefined,
+  grant: InstructionGrant,
 ): string {
   if (people.length === 0) return "No one yet.";
   return people
@@ -674,6 +731,22 @@ function peopleLines(
               read === undefined ? null : `chat: ${factsLine(read, topics)}`)(
               facts.get(person.relationshipId),
             ),
+        // Their open question: answer it, or leave it to the person.
+        person.relationshipId === null
+          ? null
+          : ((read) => {
+              if (read === undefined || material === undefined) return null;
+              const verdict = questionVerdict(
+                read,
+                grant,
+                material?.sender.facts ?? null,
+              );
+              return verdict === null
+                ? null
+                : verdict === "ANSWERABLE"
+                  ? "their question: answer it from WHO YOU WRITE AS"
+                  : "their question has gone to the person: write no reply";
+            })(facts.get(person.relationshipId)),
         // Their network-visible material, each fact with its source.
         material === undefined
           ? null
@@ -837,6 +910,10 @@ export function createInstructionEngine(
       // S6: their messages, read only through the quarantined extractor,
       // keeping one planning call in reserve.
       const facts = new Map<string, ThreadFacts>();
+      const questions = new Map<
+        string,
+        { readonly messageId: string; readonly text: string }
+      >();
       if (dependencies.readThread !== undefined) {
         const threads = inScope(grant.data, people)
           .map((person) => person.relationshipId)
@@ -857,6 +934,9 @@ export function createInstructionEngine(
             await store.addSpend(row.id, read.costUsd);
           }
           if (read.facts !== null) facts.set(relationshipId, read.facts);
+          if (read.question !== undefined) {
+            questions.set(relationshipId, read.question);
+          }
         }
       }
 
@@ -867,6 +947,53 @@ export function createInstructionEngine(
           : await dependencies
               .material(actor, inScope(grant.data, people))
               .catch(() => null);
+
+      // QA run 8a1d57b9: their question Q may not answer goes to the
+      // person at once, quoted (their words reach the person, never the
+      // planner), and is noted on /work. Once per message.
+      for (const [relationshipId, read] of facts) {
+        const verdict = questionVerdict(
+          read,
+          grant.data,
+          material?.sender.facts ?? null,
+        );
+        const question = questions.get(relationshipId);
+        if (
+          verdict === null ||
+          verdict === "ANSWERABLE" ||
+          question === undefined
+        ) {
+          continue;
+        }
+        const name = (
+          people.find((person) => person.relationshipId === relationshipId)
+            ?.name ?? "They"
+        ).slice(0, 80);
+        await store
+          .notify({
+            instruction: row,
+            key: `question:${question.messageId}`,
+            priority: "NEEDS_YOU",
+            title: `${name} asked something only you can answer`,
+            body: `"${question.text}"\n${QUESTION_WORDS[verdict]}`,
+          })
+          .catch(() => false);
+        await store
+          .recordStep({
+            instruction: row,
+            runKey,
+            stepIndex: 150,
+            action: "q.note",
+            mode: "ASK",
+            status: "NOTED",
+            relationshipId,
+            words: `Passed ${name}'s question to you: ${QUESTION_WORDS[verdict]}`,
+            reasonCode: "QUESTION_FOR_YOU",
+            qActionId: null,
+            idempotencyKey: `instr:${row.id}:question:${question.messageId}`,
+          })
+          .catch(() => false);
+      }
 
       // Plan; validate; re-plan with the reasons at most twice.
       let refusals = "None.";
@@ -898,6 +1025,7 @@ export function createInstructionEngine(
               facts,
               grant.data.topics,
               material,
+              grant.data,
             ),
             history:
               history.length === 0

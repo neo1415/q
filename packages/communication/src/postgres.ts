@@ -1,4 +1,4 @@
-import { CorrelationIdSchema } from "@capital-q/contracts";
+import { CorrelationIdSchema, type CapitalQEvent } from "@capital-q/contracts";
 import type {
   DatabaseExecutor,
   TransactionContext,
@@ -13,6 +13,7 @@ import {
   RELATIONSHIP_EVENT_MESSAGE_SENT,
   RelationshipIdSchema,
 } from "@capital-q/network";
+import { relationshipMessageSentEvent } from "@capital-q/network/events";
 
 import { ChatBlockedError } from "./errors.js";
 import type {
@@ -100,9 +101,23 @@ const SELECT_MESSAGE = (sql: DatabaseExecutor) => sql`
     from communication.messages m
     join identity.user_profiles p on p.id = m.sender_user_id`;
 
+/** The transactional outbox, as the composition provides it. */
+export type ChatOutbox = {
+  readonly enqueue: (
+    tx: TransactionContext,
+    event: CapitalQEvent<unknown>,
+  ) => Promise<unknown>;
+};
+
 export function createPostgresChatStore(options: {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
+  /**
+   * QA run 8a1d57b9: each original message is announced through the
+   * outbox in its own transaction (`network.relationship.message_sent`), so
+   * the other side is told and a standing instruction wakes promptly.
+   */
+  readonly outbox?: ChatOutbox | undefined;
 }): ChatStore {
   const { sql, transactions } = options;
   const appender = createRelationshipEventAppender({
@@ -194,6 +209,18 @@ export function createPostgresChatStore(options: {
           payload: { messageId: id },
           correlationId: CorrelationIdSchema.parse(input.correlationId),
         });
+        await options.outbox?.enqueue(
+          tx,
+          relationshipMessageSentEvent({
+            tenantId: conversation.tenantId,
+            senderUserId: input.senderUserId,
+            correlationId: CorrelationIdSchema.parse(input.correlationId),
+            relationshipId: input.relationshipId,
+            conversationId: conversation.id,
+            messageId: id,
+            senderSide: input.senderSide,
+          }),
+        );
       }
       const rows = await tx.sql<MessageRow[]>`${SELECT_MESSAGE(tx.sql)}
         where m.id = ${id}`;

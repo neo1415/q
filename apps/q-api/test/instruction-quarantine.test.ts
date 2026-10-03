@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import type { ModelGateway } from "@capital-q/model-gateway";
-import type { InstructionThreadFacts } from "@capital-q/q-core";
+import type { InstructionThreadFactsV2 } from "@capital-q/q-core";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
@@ -77,7 +77,7 @@ function setup(facts: unknown) {
   };
 }
 
-const FACTS: InstructionThreadFacts = {
+const FACTS: InstructionThreadFactsV2 = {
   lastFrom: "THEM",
   asksQuestion: true,
   wantsToMeet: false,
@@ -86,6 +86,7 @@ const FACTS: InstructionThreadFacts = {
   mentionsTermsOrMoney: true,
   declined: false,
   tone: "NEUTRAL",
+  questionAbout: [],
 };
 
 describe("the quarantined thread reader", () => {
@@ -105,6 +106,23 @@ describe("the quarantined thread reader", () => {
       "last from THEM; asks a question; about: introductions; raises terms or money; tone NEUTRAL",
     );
     expect(line).not.toContain("IGNORE");
+  });
+
+  it("v2 says what their question is about, and hands CODE (never the planner) their words to quote (QA run 8a1d57b9)", async () => {
+    const { read } = setup({
+      ...FACTS,
+      mentionsTermsOrMoney: false,
+      questionAbout: ["CHEQUE_SIZE", "LEAD_OR_FOLLOW"],
+    });
+    const result = await read();
+    expect(result.question).toEqual({ messageId: "m1", text: INJECTION });
+    const line = factsLine(result.facts ?? FACTS, ["introductions"]);
+    expect(line).toContain(
+      "asks a question about cheque size, whether you lead",
+    );
+    expect(line).not.toContain("IGNORE");
+    // The cached read keeps the quote.
+    expect((await read()).question?.messageId).toBe("m1");
   });
 
   it("reads a thread again only when a new message arrives", async () => {

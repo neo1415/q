@@ -213,6 +213,7 @@ import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
 import {
   QActionProposalIdSchema,
   Q_WORK_WAKE_CHANNEL,
+  Q_INSTRUCTION_WAKE_CHANNEL,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_THINK_PATH,
   Q_VOICE_WS_PATH,
@@ -1222,6 +1223,9 @@ const chat = composeChat({
         };
   },
   newCorrelationId: createCorrelationId,
+  // QA run 8a1d57b9: each new message is announced (the other side is
+  // told; a standing instruction wakes).
+  outbox: createOutboxWriter({ registry: createEventRegistry(NETWORK_EVENTS) }),
 });
 // Meetings and reminders (BIZ-008): the person's own Google Calendar
 // through the integrations context; approved actions execute here. App
@@ -3388,6 +3392,29 @@ void createWorkWakeListener({
   .catch((error: unknown) => {
     // The minute's tick still carries the work; only the instant wake is lost.
     logger.warn({ err: error }, "q work wake listener not started");
+  });
+// QA run 8a1d57b9: a chat message wakes the standing instructions covering
+// its relationship at once (the workers announce it from the outbox).
+void createWorkWakeListener({
+  listen: (channel, onNotify, onListen) =>
+    database.listen(channel, onNotify, onListen),
+  channel: Q_INSTRUCTION_WAKE_CHANNEL,
+  catchUp: () => {
+    void instructionTriggers.sweep().catch(() => undefined);
+  },
+  targets: [
+    {
+      name: "instructions-chat",
+      wake: (relationshipId) => instructionTriggers.wakeChat(relationshipId),
+    },
+  ],
+  logger,
+})
+  .start()
+  .then(() => logger.info({}, "instruction wake listener started"))
+  .catch((error: unknown) => {
+    // The sweep still fires each instruction on its cadence.
+    logger.warn({ err: error }, "instruction wake listener not started");
   });
 // end AUTO block
 

@@ -277,6 +277,56 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       return rows.length;
     },
 
+    /**
+     * QA run 8a1d57b9: a chat message landed on this relationship. Every
+     * ACTIVE instruction that covers it -- owned by someone on the side that
+     * did NOT write the latest message, with the relationship in its grant's
+     * scope and its counterpart not left out -- is due now. Idempotent: a
+     * second call finds them due already.
+     */
+    wakeForChat: async (relationshipId: string): Promise<number> => {
+      const rows = await sql<{ id: string }[]>`
+        with latest as (
+          select m.sender_side
+            from communication.conversations cv
+            join communication.messages m on m.conversation_id = cv.id
+           where cv.relationship_id = ${relationshipId}
+             and m.revises_message_id is null
+           order by m.created_at desc, m.id desc
+           limit 1
+        ), receiving as (
+          select r.id, r.company_id, r.investor_organisation_id,
+                 case when latest.sender_side = 'INVESTOR'
+                      then c.organisation_id else i.organisation_id end as organisation_id
+            from network.relationships r
+            join latest on true
+            join core.companies c on c.id = r.company_id
+            join core.investor_organisations i on i.id = r.investor_organisation_id
+           where r.id = ${relationshipId}
+        )
+        update q_runtime.standing_instructions s
+           set next_fire_at = clock_timestamp(), updated_at = clock_timestamp()
+          from receiving, q_runtime.instruction_grants g
+         where s.status = 'ACTIVE'
+           and g.instruction_id = s.id and g.version = s.grant_version
+           and exists (
+             select 1 from identity.organisation_memberships om
+              where om.user_id = s.user_id
+                and om.organisation_id = receiving.organisation_id
+                and om.membership_status = 'active')
+           and (g.grant_payload->'counterparts'->>'scope' = 'ALL_MY_RELATIONSHIPS'
+                or coalesce(g.grant_payload->'counterparts'->'relationshipIds', '[]'::jsonb)
+                     ? receiving.id::text)
+           and not exists (
+             select 1
+               from jsonb_array_elements(
+                      coalesce(g.grant_payload->'counterparts'->'exclude', '[]'::jsonb)) e
+              where e->>'counterpartId' in (receiving.company_id::text,
+                                            receiving.investor_organisation_id::text))
+        returning s.id`;
+      return rows.length;
+    },
+
     /** S5: model spend under this instruction; a new month starts at zero. */
     addSpend: async (id: string, amountUsd: number): Promise<void> => {
       if (!(amountUsd > 0)) return;

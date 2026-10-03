@@ -1377,6 +1377,9 @@ const chat = composeChat({
           storage,
         }).authorizeSharedVersion,
   newCorrelationId: createCorrelationId,
+  // QA run 8a1d57b9: each new message is announced (the other side is
+  // told; a standing instruction wakes).
+  outbox,
 });
 
 // Chat safety (R34; doc 10): block, unblock and report, each audited in

@@ -52,13 +52,12 @@ describe("instruction triggers", () => {
         },
         wakeFor: () => Promise.resolve(0),
       },
-      engine: () =>
-        ({
-          fire: (id: string, runKey: string) => {
-            fired.push([id, runKey]);
-            return Promise.resolve(result(id === a ? "RAN" : "OUTSIDE_HOURS"));
-          },
-        }),
+      engine: () => ({
+        fire: (id: string, runKey: string) => {
+          fired.push([id, runKey]);
+          return Promise.resolve(result(id === a ? "RAN" : "OUTSIDE_HOURS"));
+        },
+      }),
     });
     // Two sweeps at once on one instance: one pass.
     const [first, second] = await Promise.all([
@@ -92,6 +91,31 @@ describe("instruction triggers", () => {
     expect(swept).toBe(0);
     expect(await triggers.wake("rel-known")).toBe(1);
     await triggers.sweep();
+    expect(swept).toBeGreaterThanOrEqual(1);
+  });
+  it("a chat message on a covered relationship makes its instructions due at once, and sweeps (QA run 8a1d57b9)", async () => {
+    let swept = 0;
+    const woken: string[] = [];
+    const triggers = createInstructionTriggers({
+      store: {
+        claimDue: () => {
+          swept += 1;
+          return Promise.resolve([]);
+        },
+        defer: () => Promise.resolve(),
+        wakeFor: () => Promise.resolve(0),
+        wakeForChat: (relationshipId) => {
+          woken.push(relationshipId);
+          return Promise.resolve(relationshipId === "rel-covered" ? 1 : 0);
+        },
+      },
+      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+    });
+    expect(await triggers.wakeChat("rel-elsewhere")).toBe(0);
+    expect(swept).toBe(0);
+    expect(await triggers.wakeChat("rel-covered")).toBe(1);
+    await triggers.sweep();
+    expect(woken).toEqual(["rel-elsewhere", "rel-covered"]);
     expect(swept).toBeGreaterThanOrEqual(1);
   });
 });
