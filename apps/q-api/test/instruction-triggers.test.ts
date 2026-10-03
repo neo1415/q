@@ -8,7 +8,6 @@ import { ActorContextSchema } from "@capital-q/security";
 import {
   inScope,
   instructionPeople,
-  type InstructionEngine,
   type InstructionFiringResult,
 } from "../src/composition/instructions/engine.js";
 import { createInstructionTriggers } from "../src/composition/instructions/triggers.js";
