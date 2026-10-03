@@ -34,3 +34,13 @@ describe("a Discover decision that did not land", () => {
     );
   });
 });
+
+describe("a reminder's time", () => {
+  it("names the year only when it is not this year", async () => {
+    const { when } =
+      await import("../src/features/schedule/relationship-schedule-controls");
+    const now = new Date("2026-10-03T12:00:00Z");
+    expect(when("2025-01-01T09:00:00Z", now)).toMatch(/2025/);
+    expect(when("2026-11-01T08:30:00Z", now)).not.toMatch(/2026/);
+  });
+});
