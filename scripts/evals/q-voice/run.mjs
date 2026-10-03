@@ -12,8 +12,9 @@
  * Checks, per case:
  *   - outcome from records (a navigate the screen follows, a card
  *     proposed with working hours, a run that answered);
- *   - spoken: something was said, no sentence said twice (the lead list
- *     repeated by the model), and the answer's last sentence was said
+ *   - spoken: something was said, no sentence said more often than the
+ *     answer has it (the lead list repeated by the model), and the
+ *     answer's last sentence was said
  *     (the gateway never streams it; voice says the unsaid tail).
  *
  * Out of reach here: a spoken "yes" to a pending card goes through the
@@ -271,10 +272,17 @@ const sentencesOf = (text) =>
 function spokenProblems(stream, spoken) {
   const problems = [];
   if (spoken.trim().length === 0) return ["nothing spoken"];
-  const seen = new Set();
-  for (const s of sentencesOf(spoken)) {
-    if (seen.has(s)) problems.push(`said twice: "${s.slice(0, 60)}"`);
-    seen.add(s);
+  // Said more often than the answer has it: a sentence the answer
+  // repeats for a different item (one per document) is said each time.
+  const tally = (list) => {
+    const counts = new Map();
+    for (const s of list) counts.set(s, (counts.get(s) ?? 0) + 1);
+    return counts;
+  };
+  const inAnswer = tally(sentencesOf(speakable(stream.message?.text ?? "")));
+  for (const [s, count] of tally(sentencesOf(spoken))) {
+    if (count > Math.max(inAnswer.get(s) ?? 0, 1))
+      problems.push(`said ${String(count)} times: "${s.slice(0, 60)}"`);
   }
   const last = sentencesOf(speakable(stream.message?.text ?? "")).at(-1);
   if (

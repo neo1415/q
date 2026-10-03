@@ -16,7 +16,7 @@ import {
 
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
-import { createVoiceTurnHandler } from "../src/voice/turn.js";
+import { createVoiceTurnHandler, unsaidPartOf } from "../src/voice/turn.js";
 
 const CONTEXT: ActorContext = {
   userId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000001"),
@@ -182,5 +182,20 @@ describe("a spoken answer says what the stream did not carry", () => {
     expect(
       text.endsWith("I can do it now. Nothing was prepared or changed yet."),
     ).toBe(true);
+  });
+
+  it("a sentence repeated for a different item is said for each (run 78feaff4)", async () => {
+    const said = await heard(
+      ["Pitch deck v2 is shared.", "It has not been virus-scanned yet."],
+      "Pitch deck v2 is shared. It has not been virus-scanned yet. Financial model is shared. It has not been virus-scanned yet.",
+    );
+    expect(said.join(" ").split("virus-scanned").length - 1).toBe(2);
+    // Re-collected wording: heard sentences are dropped once per hearing.
+    expect(
+      unsaidPartOf({
+        text: "Pitch deck v2 is shared. It has not been virus-scanned yet. Financial model is shared. It has not been virus-scanned yet.",
+        spoken: "It has not been virus-scanned yet. Pitch deck v2 is shared.",
+      }),
+    ).toBe("Financial model is shared. It has not been virus-scanned yet.");
   });
 });

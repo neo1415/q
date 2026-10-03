@@ -212,7 +212,11 @@ function build(
   read: { status: "SUCCEEDED" | "DENIED"; data?: unknown },
   subject: Subject = { kind: "COMPANY", companyId: COMPANY },
   deps: Partial<Parameters<typeof createModelGatewayQAnswer>[0]> = {},
-  scene: { readonly said?: string; readonly standing?: unknown } = {},
+  scene: {
+    readonly said?: string;
+    readonly standing?: unknown;
+    readonly answer?: string;
+  } = {},
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -220,7 +224,7 @@ function build(
       {
         kind: "TEXT",
         text: JSON.stringify({
-          answer: "You connected with Kora on 25 September.",
+          answer: scene.answer ?? "You connected with Kora on 25 September.",
           responseShape: "CONCISE",
           insufficientEvidence: false,
           recommendation: null,
@@ -251,6 +255,7 @@ function build(
       createdAt: new Date().toISOString(),
     } as unknown as QConversationMessage,
   ];
+  const persisted: string[] = [];
   const executed: QToolProposal[] = [];
   const inFlight = { now: 0, max: 0 };
   const reads = { history: 0 };
@@ -311,13 +316,15 @@ function build(
         reads.history += 1;
         return Promise.resolve([...messages]);
       },
-      insert: (_tx: unknown, input: { content: string }) =>
-        Promise.resolve({
+      insert: (_tx: unknown, input: { content: string }) => {
+        persisted.push(input.content);
+        return Promise.resolve({
           ...messages[0],
           id: randomUUID(),
           role: "Q",
           content: input.content,
-        } as QConversationMessage),
+        } as QConversationMessage);
+      },
       findById: () => Promise.resolve(null),
     },
     runs: { allocateEventSequence: () => Promise.resolve(2) },
@@ -370,7 +377,7 @@ function build(
       maxSensitivity: "PUBLIC",
     } as unknown as PermittedContextPlan,
   } as unknown as QAnswerRequest;
-  return { seam, request, alpha, executed, inFlight, reads };
+  return { seam, request, alpha, executed, inFlight, reads, persisted };
 }
 
 const sentTo = (alpha: ReturnType<typeof build>["alpha"]) =>
@@ -743,6 +750,33 @@ describe("what exists, and the parity gap", () => {
         declaration: "get_q_daily",
       }),
     ]);
+  });
+
+  it("says no could-not line after an answer that already explains why nothing was done (run 2078f553)", async () => {
+    const asked = async (answer: string) => {
+      const { seam, request, persisted } = build(
+        { status: "SUCCEEDED", data: CONNECTED },
+        undefined,
+        {},
+        { said: "Express interest in Ajopot.", answer },
+      );
+      await seam.answer({
+        ...request,
+        turnKind: "TOOL_REQUEST",
+        askedAction: "pass_company",
+      });
+      return persisted.join("\n");
+    };
+    const explained = await asked(
+      "You're already in diligence with Ajopot, so there's no interest left to express.",
+    );
+    expect(explained).toContain("already in diligence with Ajopot");
+    expect(explained).not.toContain("I couldn't do that");
+    // An answer that says nothing about it still gets the plain line.
+    const silent = await asked("Ajopot builds payments rails for SMEs.");
+    expect(silent).toContain(
+      "I couldn't do that from this conversation: that action isn't available to me here",
+    );
   });
 
   it("does not log a gap for a question", async () => {

@@ -3347,7 +3347,11 @@ export function createModelGatewayQAnswer(
           parityGap !== null &&
           actedLines.length === 0 &&
           gapsSaid === null &&
-          !preparedByTool
+          !preparedByTool &&
+          // The answer already says why nothing was done ("you're already
+          // in diligence with Ajopot"): the could-not line after it would
+          // contradict it (lead 2026-10-03, run 2078f553).
+          !explainsNothingDone(statusTalk?.text ?? guarded.text)
             ? couldNotDoLine(parityGap)
             : null;
         if (couldNot !== null) {
@@ -3669,6 +3673,18 @@ export function couldNotDoLine(gap: string): string {
       // including handing the work over for Q to keep doing.
       return "Nothing was prepared or changed yet. What should I take on: one thing now, or should I work on it for you over time? Say which, and I'll prepare it for your approval.";
   }
+}
+
+/**
+ * An answer that itself says nothing was (or needs to be) done, and why:
+ * the thing is already so, or Q says it can't do it. Read narrowly -- a
+ * claim that something WAS done never matches, so a false "done" still
+ * gets the could-not line.
+ */
+const NOTHING_DONE_EXPLAINED =
+  /\b(?:already\b|(?:can(?:no|['’])t|couldn['’]t|could not|unable to|not able to|won['’]t be able to)\s+(?:\w+\s+){0,3}?(?:do|express|send|prepar|mak|chang|record|book|shar|request|ask|add|creat|sav|pass|mov|accept|declin|invit)\w*|nothing (?:was|has been|is) (?:done|prepared|changed|needed)|(?:isn['’]t|is not) (?:needed|necessary|possible|available)|no need to)/iu;
+export function explainsNothingDone(text: string): boolean {
+  return NOTHING_DONE_EXPLAINED.test(text);
 }
 
 export function appActionLineOf(data: unknown): string | null {

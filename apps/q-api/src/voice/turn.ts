@@ -375,14 +375,37 @@ function rememberSpoken(binding: VoiceSessionBinding, text: string): void {
   }
 }
 
+/**
+ * The sentences of `text` less those heard, one heard copy for one copy:
+ * a sentence said again for a different item ("it has not been
+ * virus-scanned yet" for each of two documents, live run 78feaff4) is
+ * dropped only as often as it was actually heard.
+ */
+function lessHeard(text: string, heard: ReadonlyMap<string, number>): string {
+  const left = new Map(heard);
+  return sentences(squash(text))
+    .filter((sentence) => {
+      const key = squash(sentence).toLowerCase();
+      const count = left.get(key) ?? 0;
+      if (count === 0) return true;
+      left.set(key, count - 1);
+      return false;
+    })
+    .join(" ")
+    .trim();
+}
+
+function countsOf(keys: Iterable<string>): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
+  return counts;
+}
+
 /** What of `text` this line has not already heard. */
 function notYetSaid(binding: VoiceSessionBinding, text: string): string {
   const said = spokenBefore.get(binding);
   if (said === undefined) return text.trim();
-  return sentences(squash(text))
-    .filter((sentence) => !said.has(squash(sentence).toLowerCase()))
-    .join(" ")
-    .trim();
+  return lessHeard(text, countsOf(said));
 }
 
 /**
@@ -399,11 +422,12 @@ export function unsaidPartOf(item: {
   const heard = squash(item.spoken);
   if (heard.length === 0) return full;
   if (full.startsWith(heard)) return full.slice(heard.length).trim();
-  const said = new Set(sentences(heard).map(squash));
-  return sentences(full)
-    .filter((sentence) => !said.has(squash(sentence)))
-    .join(" ")
-    .trim();
+  return lessHeard(
+    full,
+    countsOf(
+      sentences(heard).map((sentence) => squash(sentence).toLowerCase()),
+    ),
+  );
 }
 
 /** "Go on", "you were saying", a bare "okay": the person wants the rest. */
