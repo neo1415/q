@@ -533,3 +533,83 @@ describe("eligibility service", () => {
     expect(line).not.toContain("PAYMENTS");
   });
 });
+
+describe("eligibility for VIEW (pitch playback and the INVESTORS deck)", () => {
+  const forPurpose = async (
+    w: World,
+    purpose?: "DISCOVER" | "VIEW",
+  ): Promise<{ decision: string; reasonCodes: readonly string[] }> => {
+    const { results } = await service(w).evaluate({
+      actor: ACTOR,
+      companyIds: [COMPANY],
+      ...(purpose === undefined ? {} : { purpose }),
+    });
+    const [only] = results;
+    if (only === undefined) throw new Error("no result");
+    return only;
+  };
+  const excludeGambling = (w: World) => {
+    const active = w.mandates.get(ACTIVE_MANDATE);
+    if (active === undefined) throw new Error("fixture");
+    w.mandates.set(ACTIVE_MANDATE, {
+      ...active,
+      taxonomyPreferences: [
+        {
+          nodeId: GAMBLING,
+          vocabularyCode: "industry",
+          preferenceStrength: "HARD_EXCLUSION",
+          isExclusion: true,
+          source: "user_selected",
+        },
+      ],
+    });
+    w.classifications.set(COMPANY, [
+      { nodeId: GAMBLING, vocabularyCode: "industry", source: "user_selected" },
+    ]);
+  };
+
+  for (const state of ["CONNECTED", "IN_DILIGENCE"]) {
+    it(`a ${state} investor whose mandate fits may view; Discover still does not re-show the company`, async () => {
+      const w = world();
+      w.relationships.set(COMPANY, { kind: "STATE", currentState: state });
+      expect((await forPurpose(w, "VIEW")).decision).toBe("ELIGIBLE");
+      // The default and an explicit DISCOVER are the feed's rule, unchanged.
+      for (const discover of [
+        await forPurpose(w),
+        await forPurpose(w, "DISCOVER"),
+      ]) {
+        expect(discover.decision).toBe("UNDETERMINED");
+        expect(discover.reasonCodes).toContain("RELATIONSHIP_STATE_UNKNOWN");
+      }
+    });
+
+    it(`a ${state} investor whose mandate excludes the company still may not view`, async () => {
+      const w = world();
+      w.relationships.set(COMPANY, { kind: "STATE", currentState: state });
+      excludeGambling(w);
+      const view = await forPurpose(w, "VIEW");
+      expect(view.decision).toBe("INELIGIBLE");
+      expect(view.reasonCodes).toEqual(["EXPLICIT_HARD_EXCLUSION"]);
+    });
+  }
+
+  it("VIEW never widens disclosure: a company the investor may not see stays ineligible", async () => {
+    const w = world();
+    w.relationships.set(COMPANY, {
+      kind: "STATE",
+      currentState: "IN_DILIGENCE",
+    });
+    w.disclosure.set(COMPANY, false);
+    expect((await forPurpose(w, "VIEW")).decision).toBe("INELIGIBLE");
+  });
+
+  it("VIEW without an ACTIVE mandate is not eligible", async () => {
+    const w = world();
+    w.relationships.set(COMPANY, {
+      kind: "STATE",
+      currentState: "IN_DILIGENCE",
+    });
+    w.activeMandateIds = [];
+    expect((await forPurpose(w, "VIEW")).decision).not.toBe("ELIGIBLE");
+  });
+});

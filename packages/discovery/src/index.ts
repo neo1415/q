@@ -159,6 +159,8 @@ export {
   type EligibilityService,
   type EligibilityServiceDependencies,
   type EvaluateEligibilityQuery,
+  ELIGIBILITY_PURPOSES,
+  type EligibilityPurpose,
   RECOMMENDATION_VIEWPOINTS,
   type RecommendationViewpoint,
 } from "./eligibility/service.js";

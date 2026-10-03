@@ -979,6 +979,9 @@ const pitchMedia = createMediaService({
       const evaluation = await slateRead.eligibility.evaluate({
         actor,
         mode: "INVESTOR_DISCOVER",
+        // Viewing material is mandate fit, not "not yet known": a connected or
+        // in-diligence investor whose mandate fits keeps the pitch and deck.
+        purpose: "VIEW",
         mandateId: mandate.mandate.mandateId,
         companyIds: [parsed.data],
       });

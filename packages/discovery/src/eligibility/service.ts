@@ -73,9 +73,24 @@ export const RECOMMENDATION_VIEWPOINTS = [
 export type RecommendationViewpoint =
   (typeof RECOMMENDATION_VIEWPOINTS)[number];
 
+/**
+ * What the decision is for. `DISCOVER` (the default) is the full policy
+ * that builds Discover: a company the investor already has a relationship
+ * with past DISCOVERED is not re-shown there. `VIEW` asks only whether the
+ * investor may see the company's investor-facing material (pitch playback,
+ * the INVESTORS deck): the same mandate, discoverability and company rules,
+ * without the relationship-standing criterion, because "already known" is a
+ * feed rule, not an access rule. It never admits anything DISCOVER refuses
+ * on mandate fit or disclosure.
+ */
+export const ELIGIBILITY_PURPOSES = ["DISCOVER", "VIEW"] as const;
+export type EligibilityPurpose = (typeof ELIGIBILITY_PURPOSES)[number];
+
 export type EvaluateEligibilityQuery = {
   readonly actor: ActorContext;
   readonly mode?: RecommendationMode | undefined;
+  /** Defaults to DISCOVER: an omitted purpose never widens anything. */
+  readonly purpose?: EligibilityPurpose | undefined;
   /** Pins one of the actor's own mandates; otherwise the single ACTIVE one is used. */
   readonly mandateId?: string | null | undefined;
   readonly companyIds: readonly string[];
@@ -211,7 +226,9 @@ export function createEligibilityService(
             : { kind: "ACTOR", actor: query.actor },
           known,
         ),
-        ports.relationships.standings(investorOrganisationId, known),
+        query.purpose === "VIEW"
+          ? Promise.resolve(new Map<string, RelationshipStanding>())
+          : ports.relationships.standings(investorOrganisationId, known),
       ]);
 
       const evaluatedAt = clock().toISOString();
