@@ -84,11 +84,27 @@ function world(state: string, passRows: PassRow[] = []) {
     if (text.includes("from network.relationship_passes p")) {
       return Promise.resolve(passRows);
     }
+    if (text.includes("for update")) return Promise.resolve([]);
+    if (text.includes("from network.relationship_events")) {
+      const kinds = new Set(values.slice(1).map(String));
+      const latest = events.findLast((event) => kinds.has(event.eventType));
+      return Promise.resolve(
+        latest === undefined ? [] : [{ event_type: latest.eventType }],
+      );
+    }
     return Promise.reject(new Error(`unexpected query: ${text}`));
   };
   const sql = fake as unknown as DatabaseExecutor;
+  // One transaction at a time, as the relationship's row lock makes them.
+  let queue: Promise<unknown> = Promise.resolve();
   const transactions: TransactionManager = {
-    run: (work) => work({ sql: fake as unknown as TransactionContext["sql"] }),
+    run: (work) => {
+      const next = queue.then(() =>
+        work({ sql: fake as unknown as TransactionContext["sql"] }),
+      );
+      queue = next.catch(() => undefined);
+      return next;
+    },
   };
   const appender: RelationshipEventAppender = {
     append: (_tx, input) => {
@@ -343,5 +359,43 @@ describe("what each side reads of a pass", () => {
         relationshipId: RELATIONSHIP,
       }),
     ).toBeNull();
+  });
+});
+
+describe("two tabs deciding at once (break-it sweep 2026-10-03)", () => {
+  it("records one pause when Pause lands twice before either is read back", async () => {
+    // The projection both requests read is still MEETING_HELD.
+    const { service, events } = world("MEETING_HELD");
+    const [first, second] = await Promise.all([
+      service.pause({ actor: investor, relationshipId: RELATIONSHIP }),
+      service.pause({ actor: investor, relationshipId: RELATIONSHIP }),
+    ]);
+    expect(first).toMatchObject({ outcome: "OK" });
+    expect(second).toMatchObject({ outcome: "OK" });
+    expect(
+      events.filter((e) => e.eventType === "relationship_paused"),
+    ).toHaveLength(1);
+  });
+
+  it("records one resume for a double-clicked Resume", async () => {
+    const { service, events } = world("PAUSED");
+    await service.resume({ actor: investor, relationshipId: RELATIONSHIP });
+    const again = await service.resume({
+      actor: investor,
+      relationshipId: RELATIONSHIP,
+    });
+    expect(again).toMatchObject({ outcome: "OK", deduplicated: true });
+    expect(
+      events.filter((e) => e.eventType === "relationship_resumed"),
+    ).toHaveLength(1);
+  });
+
+  it("records one pass for two tabs passing with their own keys", async () => {
+    const { service, events } = world("MEETING_HELD");
+    await pass(service, investor, { idempotencyKey: "tab-one-key-0001" });
+    await pass(service, investor, { idempotencyKey: "tab-two-key-0002" });
+    expect(
+      events.filter((e) => e.eventType === "relationship_passed"),
+    ).toHaveLength(1);
   });
 });
