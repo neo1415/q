@@ -103,3 +103,58 @@ export const MeetingNotesV2ResultSchema = MeetingNotesResultSchema.extend({
     .max(10),
 }).strict();
 export type MeetingNotesV2Result = z.infer<typeof MeetingNotesV2ResultSchema>;
+
+/**
+ * v3 (meet-47, founder direction 2026-10-03: "after the call Q works in the
+ * app"): v2 plus the agreed next steps, each read as the kind of thing it
+ * is, so code (never the model) turns it into the right approval card: a
+ * message, a reminder, the next call, a document asked for, the deck to
+ * share. The call's date is given so a day said in the call ("Friday") can
+ * be written as a date; anything unclear stays null.
+ */
+export const MEETING_NOTES_V3_SCHEMA_VERSION = 3;
+
+export const MeetingNotesV3VariablesSchema = MeetingNotesVariablesSchema.extend(
+  {
+    /** The call's date, YYYY-MM-DD (UTC). Ours, not the call's. */
+    callDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  },
+).strict();
+export type MeetingNotesV3Variables = z.infer<
+  typeof MeetingNotesV3VariablesSchema
+>;
+
+export const MEETING_NEXT_STEP_KINDS = [
+  "MESSAGE",
+  "REMINDER",
+  "NEXT_CALL",
+  "DOCUMENT_REQUEST",
+  "SHARE_DECK",
+  "OTHER",
+] as const;
+
+export const MeetingNextStepSchema = z
+  .object({
+    kind: z.enum(MEETING_NEXT_STEP_KINDS),
+    /** One plain sentence: who does what ("Ada sends the cohort data"). */
+    what: z.string().trim().min(3).max(200),
+    /** Whose step it is, by the name the captions give; null when nobody took it. */
+    owner: z.string().trim().min(1).max(120).nullable(),
+    ownerSide: z.enum(["FOUNDER", "INVESTOR"]).nullable(),
+    /** The day it is due, only when the call named one. */
+    dueDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable(),
+    /** NEXT_CALL only: the agreed start, only when a day AND a time were agreed (UTC). */
+    callAt: z.string().datetime({ offset: true }).nullable(),
+    /** DOCUMENT_REQUEST / SHARE_DECK: the document, as named in the call. */
+    document: z.string().trim().min(1).max(200).nullable(),
+  })
+  .strict();
+export type MeetingNextStep = z.infer<typeof MeetingNextStepSchema>;
+
+export const MeetingNotesV3ResultSchema = MeetingNotesV2ResultSchema.extend({
+  nextSteps: z.array(MeetingNextStepSchema).max(8),
+}).strict();
+export type MeetingNotesV3Result = z.infer<typeof MeetingNotesV3ResultSchema>;

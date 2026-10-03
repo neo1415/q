@@ -109,6 +109,7 @@ export {
   type MeetingBotEnd,
   MEETING_BOT_END,
   type MeetingNotes,
+  type MeetingNextStepNote,
   type MeetingNotesComposer,
   type MeetingTranscriptLine,
 } from "./meeting-assistant/service.js";

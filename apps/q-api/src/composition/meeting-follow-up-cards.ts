@@ -1,0 +1,448 @@
+import { randomUUID } from "node:crypto";
+
+import { APP_ACTIONS } from "@capital-q/app-actions";
+import type { MeetingNextStepNote } from "@capital-q/communication";
+import {
+  CorrelationIdSchema,
+  QConversationIdSchema,
+} from "@capital-q/contracts";
+import type { DatabaseExecutor } from "@capital-q/database";
+import type { Logger } from "@capital-q/observability";
+import type { QActionService } from "@capital-q/q-actions";
+import {
+  runRef,
+  type QOrchestrationRuntime,
+  type QRuntimeService,
+} from "@capital-q/q-runtime";
+import {
+  AuthUserIdSchema,
+  resolveHumanActorContext,
+  type ActorContext,
+  type ActorContextResolver,
+} from "@capital-q/security";
+
+/**
+ * After the call, Q works in the app (meet-47, founder direction
+ * 2026-10-03). From the record Q wrote (MEETING_NOTES v3), each person on
+ * the call gets their own approval cards, built by code from the declared
+ * app actions, never by the model:
+ *
+ * - the organiser: a chat recap of what was agreed, to send to the other side;
+ * - a next call agreed with a day and a time: a booking card, else a reminder;
+ * - a document the investor asked for: the investor's diligence request card;
+ * - the deck the founder will share: the share card for their current deck;
+ * - everything else they took on: a reminder.
+ *
+ * Every card is a proposal through the Approval Engine (Prepare, Recommend,
+ * Human Approval, Execute): nothing runs until that person approves that
+ * exact payload, and the execution gate re-checks their authority then.
+ * Context Firewall: the cards are built only from what both sides read
+ * (agreements and next steps), never from one side's private analysis.
+ * What was said in the call is data: a step only becomes a card for the
+ * side it belongs to, so nobody in a call can make Q act for the other side.
+ */
+
+export const MEETING_FOLLOW_UP_ORCHESTRATION_VERSION = "q-meeting-follow-up-v1";
+
+/** Never a wall of cards after one call. */
+export const FOLLOW_UP_CARDS_MAX = 5;
+
+const FOLLOW_UP_CALL_MINUTES = 30;
+const DEFAULT_DUE_DAYS = 2;
+
+export type FollowUpPerson = {
+  readonly userId: string;
+  readonly side: "FOUNDER" | "INVESTOR";
+  readonly organiser: boolean;
+};
+
+export type FollowUpCard = {
+  readonly actionType: `app.${string}`;
+  readonly payload: Record<string, unknown>;
+  /** What the card is for, in plain words (the run's message). */
+  readonly words: string;
+};
+
+function clip(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
+/** A due time: 09:00 UTC on the day said, else two days after the call. */
+function dueAt(step: MeetingNextStepNote, startsAt: Date, now: Date): string {
+  const said =
+    step.dueDate === null ? null : new Date(`${step.dueDate}T09:00:00.000Z`);
+  if (said !== null && !Number.isNaN(said.getTime()) && said > now) {
+    return said.toISOString();
+  }
+  const fallback = new Date(
+    Math.max(startsAt.getTime(), now.getTime()) +
+      DEFAULT_DUE_DAYS * 24 * 3_600_000,
+  );
+  fallback.setUTCHours(9, 0, 0, 0);
+  return fallback.toISOString();
+}
+
+/** Whose step it is: their side's, or the organiser's when nobody took it. */
+function belongsTo(step: MeetingNextStepNote, person: FollowUpPerson): boolean {
+  return step.ownerSide === null
+    ? person.organiser
+    : step.ownerSide === person.side;
+}
+
+/** The chat recap both sides can read: agreements and next steps, as said. */
+export function recapMessage(input: {
+  readonly agreements: readonly string[];
+  readonly nextSteps: readonly MeetingNextStepNote[];
+}): string | null {
+  const agreed = input.agreements.map((line) => `- ${clip(line, 300)}`);
+  const steps = input.nextSteps.map((step) => `- ${clip(step.what, 200)}`);
+  if (agreed.length === 0 && steps.length === 0) return null;
+  const parts = ["Thanks for the call today. A quick recap:"];
+  if (agreed.length > 0) parts.push(`What we agreed:\n${agreed.join("\n")}`);
+  if (steps.length > 0) parts.push(`Next steps:\n${steps.join("\n")}`);
+  const text = parts.join("\n\n");
+  return text.length > 3_800 ? `${text.slice(0, 3_799)}…` : text;
+}
+
+/**
+ * The cards for one person, in order: recap first, at most five. Pure: the
+ * caller proposes them. Every payload is checked against the declared
+ * action's own input schema; one that does not fit is dropped, never sent.
+ */
+export function followUpCards(input: {
+  readonly person: FollowUpPerson;
+  readonly meetingId: string;
+  readonly relationshipId: string;
+  readonly purpose: string;
+  readonly startsAt: Date;
+  readonly counterpartName: string;
+  readonly agreements: readonly string[];
+  readonly nextSteps: readonly MeetingNextStepNote[];
+  /** The founder's current deck, when they have one. */
+  readonly deckDocumentId: string | null;
+  readonly now: Date;
+}): FollowUpCard[] {
+  const { person, relationshipId, startsAt, now } = input;
+  const keyBase = `meet:${input.meetingId}:${person.userId}`;
+  const cards: FollowUpCard[] = [];
+  const reminder = (
+    title: string,
+    step: MeetingNextStepNote,
+    index: number,
+  ): FollowUpCard => ({
+    actionType: "app.schedule.reminder.create",
+    payload: {
+      idempotencyKey: `${keyBase}:remind-${String(index)}`,
+      input: {
+        title: clip(title, 200),
+        dueAt: dueAt(step, startsAt, now),
+        note: clip(`From your call: ${input.purpose}`, 1_000),
+        relationshipId,
+        channel: "IN_APP",
+      },
+    },
+    words: `Remind you: ${clip(title, 200)}`,
+  });
+
+  const recap = person.organiser
+    ? recapMessage({
+        agreements: input.agreements,
+        nextSteps: input.nextSteps,
+      })
+    : null;
+  if (recap !== null) {
+    cards.push({
+      actionType: "app.chat.message.send",
+      payload: {
+        relationshipId,
+        idempotencyKey: `${keyBase}:recap`,
+        input: { kind: "TEXT", body: recap },
+      },
+      words: `Send ${input.counterpartName} a recap of the call`,
+    });
+  }
+
+  input.nextSteps.forEach((step, index) => {
+    // The investor asks for the document; the founder sees it on their
+    // checklist once the investor approves the request.
+    if (step.kind === "DOCUMENT_REQUEST") {
+      if (person.side !== "INVESTOR") return;
+      const title = clip(step.document ?? step.what, 200);
+      cards.push({
+        actionType: "app.diligence.document.request",
+        payload: {
+          relationshipId,
+          idempotencyKey: `${keyBase}:ask-${String(index)}`,
+          input: {
+            title,
+            note: clip(`Asked for on our call: ${step.what}`, 1_000),
+          },
+        },
+        words: `Ask ${input.counterpartName} for: ${title}`,
+      });
+      return;
+    }
+    if (!belongsTo(step, person)) return;
+    switch (step.kind) {
+      case "NEXT_CALL": {
+        const at = step.callAt === null ? null : new Date(step.callAt);
+        if (at !== null && !Number.isNaN(at.getTime()) && at > now) {
+          cards.push({
+            actionType: "app.schedule.meeting.book",
+            payload: {
+              relationshipId,
+              idempotencyKey: `${keyBase}:book-${String(index)}`,
+              input: {
+                purpose: clip(`Follow-up: ${input.purpose}`, 500),
+                startsAt: at.toISOString(),
+                durationMinutes: FOLLOW_UP_CALL_MINUTES,
+              },
+            },
+            words: `Book the next call with ${input.counterpartName}`,
+          });
+        } else {
+          cards.push(
+            reminder(
+              `Book the next call with ${input.counterpartName}`,
+              step,
+              index,
+            ),
+          );
+        }
+        return;
+      }
+      case "SHARE_DECK":
+        if (person.side !== "FOUNDER") return;
+        if (input.deckDocumentId !== null) {
+          cards.push({
+            actionType: "app.diligence.document.share",
+            payload: {
+              relationshipId,
+              input: { documentId: input.deckDocumentId },
+            },
+            words: `Share your deck with ${input.counterpartName}`,
+          });
+        } else {
+          cards.push(
+            reminder(
+              `Share your deck with ${input.counterpartName}`,
+              step,
+              index,
+            ),
+          );
+        }
+        return;
+      case "MESSAGE":
+        // The organiser's recap carries what was said; anyone else's
+        // promised message is theirs to write, so Q reminds them.
+        if (recap !== null) return;
+        cards.push(reminder(step.what, step, index));
+        return;
+      case "REMINDER":
+      case "OTHER":
+        cards.push(reminder(step.what, step, index));
+        return;
+    }
+  });
+
+  return cards
+    .filter((card) => {
+      const declared = APP_ACTIONS.find(
+        (action) => `app.${action.name}` === card.actionType,
+      );
+      return declared?.input.safeParse(card.payload).success === true;
+    })
+    .slice(0, FOLLOW_UP_CARDS_MAX);
+}
+
+type Person = {
+  readonly user_id: string;
+  readonly auth_user_id: string | null;
+  readonly side: "FOUNDER" | "INVESTOR" | null;
+  readonly organiser: boolean;
+  readonly counterpart: string;
+};
+
+/**
+ * Proposes each person's cards in their own Q conversation for this call,
+ * as them. A run begun under its own orchestration version is never
+ * resumed by the conversational engine: an approval goes straight through
+ * the Approval Engine's execution gate (approved-continuation.ts).
+ */
+export function createMeetingFollowUpCards(dependencies: {
+  readonly sql: DatabaseExecutor;
+  readonly resolver: ActorContextResolver;
+  readonly runtime: Pick<QRuntimeService, "createRun">;
+  readonly orchestration: Pick<
+    QOrchestrationRuntime,
+    "begin" | "advanceThrough" | "fail"
+  >;
+  readonly actions: Pick<QActionService, "propose">;
+  readonly now?: (() => Date) | undefined;
+  readonly logger?: Logger | undefined;
+}) {
+  const { sql, logger } = dependencies;
+  const now = dependencies.now ?? (() => new Date());
+
+  async function actorOf(person: Person): Promise<ActorContext | null> {
+    const auth = AuthUserIdSchema.safeParse(person.auth_user_id);
+    if (!auth.success) return null;
+    const resolution = await resolveHumanActorContext(dependencies.resolver, {
+      principal: { authUserId: auth.data },
+      selection: {},
+    });
+    return resolution.status === "RESOLVED" &&
+      resolution.context.userId === person.user_id
+      ? resolution.context
+      : null;
+  }
+
+  async function propose(
+    actor: ActorContext,
+    card: FollowUpCard,
+    conversationId: string | null,
+  ): Promise<string | null> {
+    const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
+    const own = card.payload["idempotencyKey"];
+    const key =
+      typeof own === "string"
+        ? own
+        : `${card.actionType}:${JSON.stringify(card.payload)}`.slice(0, 200);
+    const created = await dependencies.runtime.createRun({
+      actor,
+      input: {
+        capability: "PREPARE_ACTION",
+        message: { text: `After your call: ${card.words}`.slice(0, 1_000) },
+        modality: "TEXT",
+        ...(conversationId === null
+          ? {}
+          : {
+              conversationId: QConversationIdSchema.parse(conversationId),
+            }),
+      },
+      idempotencyKey: `meet-card:${key}`.slice(0, 255),
+      correlationId,
+    });
+    // Already proposed (a retried settle): the card stands as it was.
+    if (!created.created) return created.conversation.id;
+    const ref = runRef(created.run);
+    await dependencies.orchestration.begin(
+      ref,
+      MEETING_FOLLOW_UP_ORCHESTRATION_VERSION,
+    );
+    await dependencies.orchestration.advanceThrough(ref, [
+      "CONTEXT_RESOLUTION",
+      "POLICY_CHECK",
+      "PLANNING",
+      "SYNTHESIS",
+    ]);
+    try {
+      await dependencies.actions.propose({
+        actor,
+        runId: created.run.id,
+        correlationId,
+        actionType: card.actionType,
+        payload: card.payload,
+      });
+    } catch (error: unknown) {
+      await dependencies.orchestration
+        .fail(ref, "INTERNAL_ERROR")
+        .catch(() => undefined);
+      throw error;
+    }
+    return created.conversation.id;
+  }
+
+  return {
+    /** Returns how many cards were proposed, per user id. */
+    prepare: async (held: {
+      readonly meetingId: string;
+      readonly relationshipId: string;
+      readonly purpose: string;
+      readonly startsAt: Date;
+      readonly agreements: readonly string[];
+      readonly nextSteps: readonly MeetingNextStepNote[];
+    }): Promise<Map<string, number>> => {
+      const people = await sql<Person[]>`
+        select p.user_id, u.auth_user_id,
+               case when exists (
+                      select 1 from identity.organisation_memberships m
+                       where m.user_id = p.user_id
+                         and m.organisation_id = c.organisation_id
+                         and m.membership_status = 'active') then 'FOUNDER'
+                    when exists (
+                      select 1 from identity.organisation_memberships m
+                       where m.user_id = p.user_id
+                         and m.organisation_id = i.organisation_id
+                         and m.membership_status = 'active') then 'INVESTOR'
+               end as side,
+               p.role = 'ORGANISER' as organiser,
+               case when exists (
+                      select 1 from identity.organisation_memberships m
+                       where m.user_id = p.user_id
+                         and m.organisation_id = c.organisation_id
+                         and m.membership_status = 'active')
+                    then i.name else c.name end as counterpart
+          from communication.meeting_participants p
+          join identity.user_profiles u on u.id = p.user_id
+          join network.relationships r on r.id = ${held.relationshipId}
+          join core.companies c on c.id = r.company_id
+          join core.investor_organisations i on i.id = r.investor_organisation_id
+         where p.meeting_id = ${held.meetingId}
+         limit 20`;
+      const deck = await sql<{ id: string }[]>`
+        select d.id from evidence.documents d
+          join network.relationships r on r.company_id = d.company_id
+         where r.id = ${held.relationshipId}
+           and d.document_type = 'PITCH_DECK' and d.status = 'ACTIVE'
+         order by d.created_at desc limit 1`;
+      const proposed = new Map<string, number>();
+      for (const person of people) {
+        if (person.side === null) continue;
+        const cards = followUpCards({
+          person: {
+            userId: person.user_id,
+            side: person.side,
+            organiser: person.organiser,
+          },
+          meetingId: held.meetingId,
+          relationshipId: held.relationshipId,
+          purpose: held.purpose,
+          startsAt: held.startsAt,
+          counterpartName: person.counterpart,
+          agreements: held.agreements,
+          nextSteps: held.nextSteps,
+          deckDocumentId: deck[0]?.id ?? null,
+          now: now(),
+        });
+        if (cards.length === 0) continue;
+        const actor = await actorOf(person);
+        if (actor === null) continue;
+        let conversationId: string | null = null;
+        let count = 0;
+        for (const card of cards) {
+          try {
+            conversationId = await propose(actor, card, conversationId);
+            count += 1;
+          } catch (error: unknown) {
+            logger?.warn(
+              {
+                err: error,
+                meetingId: held.meetingId,
+                action: card.actionType,
+              },
+              "meeting follow-up card not prepared",
+            );
+          }
+        }
+        proposed.set(person.user_id, count);
+      }
+      return proposed;
+    },
+  };
+}
+
+export type MeetingFollowUpCards = ReturnType<
+  typeof createMeetingFollowUpCards
+>;

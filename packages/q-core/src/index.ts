@@ -355,6 +355,7 @@ export {
 } from "./prompts/schemas/memory-extractor.js";
 export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
 export { MEETING_NOTES_V2 } from "./prompts/tasks/meeting-notes.v2.js";
+export { MEETING_NOTES_V3 } from "./prompts/tasks/meeting-notes.v3.js";
 export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
 export { INVESTOR_PERSONA_V1 } from "./prompts/tasks/investor-persona.v1.js";
 export { INVESTOR_TWIN_TURN_V1 } from "./prompts/tasks/investor-twin-turn.v1.js";
@@ -523,9 +524,16 @@ export {
   MEETING_NOTES_SCHEMA_VERSION,
   MeetingNotesResultSchema,
   MeetingNotesV2ResultSchema,
+  MeetingNotesV3ResultSchema,
+  MeetingNotesV3VariablesSchema,
+  MeetingNextStepSchema,
+  MEETING_NEXT_STEP_KINDS,
   MeetingNotesVariablesSchema,
+  type MeetingNextStep,
   type MeetingNotesResult,
   type MeetingNotesV2Result,
+  type MeetingNotesV3Result,
+  type MeetingNotesV3Variables,
   type MeetingNotesVariables,
 } from "./prompts/schemas/meeting-notes.js";
 export { WELCOME_CONDUCTOR_V1 } from "./prompts/tasks/welcome-conductor.v1.js";

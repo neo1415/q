@@ -126,6 +126,27 @@ export type MeetingBotProvider = {
   readonly cancel: (botId: string) => Promise<void>;
 };
 
+/**
+ * An agreed next step as Q read it from the call (MEETING_NOTES v3): what
+ * kind of thing it is, whose, and dates only when they were said. Code
+ * turns it into an approval card; nothing here acts.
+ */
+export type MeetingNextStepNote = {
+  readonly kind:
+    | "MESSAGE"
+    | "REMINDER"
+    | "NEXT_CALL"
+    | "DOCUMENT_REQUEST"
+    | "SHARE_DECK"
+    | "OTHER";
+  readonly what: string;
+  readonly owner: string | null;
+  readonly ownerSide: "FOUNDER" | "INVESTOR" | null;
+  readonly dueDate: string | null;
+  readonly callAt: string | null;
+  readonly document: string | null;
+};
+
 export type MeetingNotes = {
   readonly summary: string;
   readonly flags: readonly QMeetingFlag[];
@@ -133,6 +154,8 @@ export type MeetingNotes = {
   readonly attendees: QMeetingAssistantDto["attendees"];
   readonly agreements: readonly string[];
   readonly commitments: readonly QMeetingCommitmentSignal[];
+  /** Absent from composers before MEETING_NOTES v3. */
+  readonly nextSteps?: readonly MeetingNextStepNote[] | undefined;
   readonly composerVersion: string;
 };
 
@@ -143,6 +166,8 @@ export type MeetingNotesComposer = {
     readonly purpose: string;
     readonly organiserName: string;
     readonly transcript: string;
+    /** The call's date, YYYY-MM-DD (UTC), for days said in the call. */
+    readonly callDate: string;
   }) => Promise<MeetingNotes | null>;
 };
 
@@ -353,6 +378,11 @@ export function createMeetingAssistantService(dependencies: {
         /** Who was there and the money said, from Q's record. */
         readonly attendees: MeetingNotes["attendees"];
         readonly commitments: MeetingNotes["commitments"];
+        /** For the follow-through cards (meet-47). */
+        readonly purpose: string;
+        readonly startsAt: Date;
+        readonly agreements: MeetingNotes["agreements"];
+        readonly nextSteps: readonly MeetingNextStepNote[];
       }) => Promise<void>)
     | undefined;
   /** A participant declined recording: marked on the relationship's history. */
@@ -588,6 +618,7 @@ export function createMeetingAssistantService(dependencies: {
       organiserName:
         (await dependencies.nameOf(row.user_id)) ?? "the organiser",
       transcript,
+      callDate: row.starts_at.toISOString().slice(0, 10),
     });
     if (notes === null) {
       await update(row.id, {
@@ -604,6 +635,10 @@ export function createMeetingAssistantService(dependencies: {
         organiserUserId: row.organiser_user_id,
         attendees: notes.attendees,
         commitments: notes.commitments,
+        purpose: row.purpose,
+        startsAt: row.starts_at,
+        agreements: notes.agreements,
+        nextSteps: notes.nextSteps ?? [],
       })
       .catch((error: unknown) => {
         logger?.warn(

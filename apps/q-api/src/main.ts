@@ -81,6 +81,7 @@ import {
   createDocumentsModule,
   ownCompanyOf,
 } from "./composition/documents.js";
+import { createMeetingFollowUpCards } from "./composition/meeting-follow-up-cards.js";
 import { createRecallBots, transcriberOf } from "./composition/recall-bots.js";
 import {
   createMeetingHostComposer,
@@ -2973,6 +2974,14 @@ const meetingHost = createMeetingHostRuntime({
   logger,
 });
 // end MEET-HOST block
+const meetingFollowUpCards = createMeetingFollowUpCards({
+  sql: database.sql,
+  resolver: actorContextResolver,
+  runtime: qRuntime,
+  orchestration: orchestrationRuntime,
+  actions: qActions,
+  logger,
+});
 const meetingAssistant = createMeetingAssistantService({
   sql: database.sql,
   bots: recallBots,
@@ -2986,6 +2995,34 @@ const meetingAssistant = createMeetingAssistantService({
   // ADR 0027: the call is marked on the relationship's history once its
   // record exists, through Network's own appender.
   onHeld: async (held) => {
+    // meet-47: after the call Q works in the app -- each person's own
+    // approval cards from what was agreed, and any standing instruction or
+    // errand waiting on this relationship continues now.
+    void meetingFollowUpCards
+      .prepare({
+        meetingId: held.meetingId,
+        relationshipId: held.relationshipId,
+        purpose: held.purpose,
+        startsAt: held.startsAt,
+        agreements: held.agreements,
+        nextSteps: held.nextSteps,
+      })
+      .then((proposed) => {
+        logger.info(
+          {
+            meetingId: held.meetingId,
+            cards: [...proposed.values()].reduce((a, b) => a + b, 0),
+          },
+          "meeting follow-up cards prepared",
+        );
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          { err: error, meetingId: held.meetingId },
+          "meeting follow-up cards not prepared",
+        );
+      });
+    void instructionTriggers.wake(held.relationshipId).catch(() => undefined);
     const writer = createNetworkMeetingActivityWriter();
     await database.transactions.run((tx) =>
       writer.record(tx, {
