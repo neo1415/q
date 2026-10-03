@@ -1103,13 +1103,28 @@
     white-space: normal;
     line-height: 1.2;
   }
-  /* Legible over any frame of a pitch, without a box around each control. */
+  /* Legible over any frame of a pitch, without a box around each control.
+     A dark halo in the stage's own colour (not light, so not a glow): a
+     white title slide swallowed the 1-2 px shadow (playback check
+     2026-10-03). */
+  /* The scrim is for video (ADR 0017): each control carries a small dark
+     one, so a bright frame never swallows it. */
+  @media (max-width: 1023px) {
+    .cq-feed-rail .cq-feed-rail-button {
+      border-radius: 14px;
+      background: color-mix(in oklch, var(--cq-stage-canvas) 55%, transparent);
+    }
+  }
   .cq-feed-rail .cq-feed-rail-label {
-    text-shadow: 0 1px 2px var(--cq-stage-canvas);
+    text-shadow:
+      0 0 2px var(--cq-stage-canvas),
+      0 1px 3px var(--cq-stage-canvas),
+      0 0 8px var(--cq-stage-canvas);
   }
   .cq-feed-rail-button > svg {
     flex: none;
-    filter: drop-shadow(0 1px 1px var(--cq-stage-canvas));
+    filter: drop-shadow(0 0 1px var(--cq-stage-canvas))
+      drop-shadow(0 1px 3px var(--cq-stage-canvas));
   }
   /* A landscape pitch is shown whole on the portrait stage, never cropped
      to a sliver of its middle. */
