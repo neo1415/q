@@ -841,7 +841,15 @@ describe("a firing", () => {
       const result = await engine.fire(row.id, "run-0012");
       expect(result.done).toBe(6);
       expect(result.deferred).toBe(2);
-      expect(recorded.size).toBe(6);
+      // Six steps taken, and one NOTED line naming who waits (QA run
+      // 8a1d57b9: Tallyloom was skipped with no record).
+      expect(recorded.size).toBe(7);
+      expect(recorded.get(`instr:${row.id}:run-0012:199`)).toMatchObject({
+        status: "NOTED",
+        action: "q.note",
+        reasonCode: "FANOUT_NEXT_FIRING",
+        words: "Next firing: Co 5, Co 6. I act for at most 5 people at a time.",
+      });
       const first = ran
         .filter(
           (entry) =>

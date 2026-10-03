@@ -1131,6 +1131,33 @@ export function createInstructionEngine(
           { instructionId: row.id, people: acting.length, deferred },
           "standing instruction fan-out capped; the rest waits for the next firing",
         );
+        // QA run 8a1d57b9: Tallyloom was skipped with no record. Who waits
+        // is said on their work page (a NOTED step, once per firing).
+        const nameOf = (who: string): string =>
+          (who.startsWith("company:")
+            ? people.find(
+                (person) =>
+                  person.counterpartKind === "COMPANY" &&
+                  person.counterpartId === who.slice("company:".length),
+              )?.name
+            : people.find((person) => person.relationshipId === who)?.name
+          )?.slice(0, 80) ?? "someone";
+        const waiting = acting.slice(FANOUT_MAX).map(nameOf);
+        await store
+          .recordStep({
+            instruction: row,
+            runKey,
+            stepIndex: 199,
+            action: "q.note",
+            mode: "ASK",
+            status: "NOTED",
+            relationshipId: null,
+            words: `Next firing: ${waiting.join(", ")}. I act for at most ${String(FANOUT_MAX)} people at a time.`,
+            reasonCode: "FANOUT_NEXT_FIRING",
+            qActionId: null,
+            idempotencyKey: keyOf(199),
+          })
+          .catch(() => false);
       }
       const runStep = async (index: number): Promise<void> => {
         const verdict = verdicts[index];
