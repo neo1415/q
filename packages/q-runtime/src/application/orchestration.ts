@@ -390,6 +390,12 @@ export type QToolExecutionContext = {
 export type QToolFocus = {
   readonly areas: readonly string[];
   readonly tools: readonly string[];
+  /**
+   * A request to act that named no tool (lead 2026-10-03, run d396af2f):
+   * the purpose's tools are all kept, and the areas only add the declared
+   * app actions in them. Absent: the areas narrow the purpose's tools.
+   */
+  readonly widen?: boolean | undefined;
 };
 
 /**

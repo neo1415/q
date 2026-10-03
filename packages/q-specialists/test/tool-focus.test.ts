@@ -77,6 +77,21 @@ describe("toolFocusOf", () => {
   it("nothing in the reading, or no reading: the purpose's list as before", () => {
     expect(focus(null)).toBeNull();
     expect(focus(reading({ kind: "ANSWER" }))).toBeNull();
-    expect(focus(reading({ kind: "TOOL_REQUEST" }), ["COMPANY"])).toBeNull();
+    // A request to act about a company widens to its area (run d396af2f).
+    expect(focus(reading({ kind: "TOOL_REQUEST" }), ["COMPANY"])).toEqual({
+      areas: ["Records"],
+      tools: [],
+      widen: true,
+    });
+  });
+
+  it("run d396af2f: a request to act that names no tool keeps the purpose's list and adds its subjects' areas", () => {
+    expect(
+      focus(reading({ kind: "TOOL_REQUEST" }), ["INVESTOR_ORGANISATION"]),
+    ).toEqual({ areas: ["Relationships"], tools: [], widen: true });
+    // Nothing to act on and nothing it is about: the purpose's list.
+    expect(focus(reading({ kind: "TOOL_REQUEST" }), [])).toBeNull();
+    // A question that names nothing is unchanged.
+    expect(focus(reading({}), ["INVESTOR_ORGANISATION"])).toBeNull();
   });
 });

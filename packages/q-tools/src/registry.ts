@@ -232,13 +232,21 @@ export function createQToolRegistry(
       const name = record.definition.providerName;
       const forPurpose = record.definition.supportedPurposes.includes(purpose);
       if (!focused) return forPurpose;
+      const app = record.definition.eligibleWhenNamed === true;
       // A named tool off this purpose is offered only when it is a declared
       // app action: what is offered is what may execute.
-      if (named.has(name))
-        return forPurpose || record.definition.eligibleWhenNamed === true;
-      if (!forPurpose) return false;
+      if (named.has(name)) return forPurpose || app;
       const area = TOOL_AREAS.get(name);
-      return area === undefined || areas.has(area);
+      const inArea = area !== undefined && areas.has(area);
+      // A declared app action is offered whenever its area is in the
+      // turn's focus, whatever the purpose (lead 2026-10-03, run d396af2f:
+      // a reader that named nothing left diligence_documents unreachable).
+      if (!forPurpose) return app && inArea;
+      return focus?.widen === true || area === undefined || inArea;
+    };
+    const focusArea = (record: QToolRecord): boolean => {
+      const area = TOOL_AREAS.get(record.definition.providerName);
+      return area !== undefined && areas.has(area);
     };
     return [...activeById.values()]
       .filter(relevant)
@@ -253,6 +261,9 @@ export function createQToolRegistry(
           // What the turn named leads, so no bound can cut it.
           Number(named.has(b.definition.providerName)) -
             Number(named.has(a.definition.providerName)) ||
+          // Then what is in the turn's areas, so a widened offer keeps
+          // what the turn is about within the bound.
+          Number(focusArea(b)) - Number(focusArea(a)) ||
           a.definition.supportedPurposes.length -
             b.definition.supportedPurposes.length ||
           a.definition.id.localeCompare(b.definition.id),
@@ -280,6 +291,15 @@ export function createQToolRegistry(
           .map(({ definition }) => definition.providerName),
       },
     }).filter(({ definition }) => definition.eligibleWhenNamed === true);
+
+  /** The tool's area is one the turn is about. */
+  const inFocusArea = (
+    context: QToolExecutionContext,
+    providerName: string,
+  ): boolean => {
+    const area = TOOL_AREAS.get(providerName);
+    return area !== undefined && (context.focus?.areas.includes(area) ?? false);
+  };
 
   const available = (
     context: QToolExecutionContext,
@@ -310,7 +330,8 @@ export function createQToolRegistry(
       unfocused(context).find(
         (record) => record.definition.providerName === providerName,
       ) ??
-      (context.focus?.tools.includes(providerName) === true
+      (context.focus?.tools.includes(providerName) === true ||
+      inFocusArea(context, providerName)
         ? nameable(context).find(
             (record) => record.definition.providerName === providerName,
           )

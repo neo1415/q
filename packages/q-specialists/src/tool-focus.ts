@@ -98,11 +98,21 @@ export function toolFocusOf(input: {
     for (const area of input.previous.areas) areas.add(area);
     for (const tool of input.previous.tools) tools.add(tool);
   }
-  // Nothing in the reading itself: the purpose's list, as before.
-  if (areas.size === 0 && tools.size === 0) return null;
-  for (const kind of input.subjectKinds) {
+  const subjectAreas = input.subjectKinds.flatMap((kind) => {
     const area = SUBJECT_AREAS[kind];
-    if (area !== undefined) areas.add(area);
+    return area === undefined ? [] : [area];
+  });
+  // Nothing in the reading itself: the purpose's list, as before -- and a
+  // request to act also brings the declared app actions of what the turn
+  // is about (lead 2026-10-03, run d396af2f: "Ask Ledgerfold for their
+  // management accounts" named no tool, and diligence_documents was not
+  // offered).
+  if (areas.size === 0 && tools.size === 0) {
+    if (reading.kind !== "TOOL_REQUEST" || subjectAreas.length === 0) {
+      return null;
+    }
+    return { areas: [...new Set(subjectAreas)].sort(), tools: [], widen: true };
   }
+  for (const area of subjectAreas) areas.add(area);
   return { areas: [...areas].sort(), tools: [...tools].sort() };
 }
