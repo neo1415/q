@@ -11,9 +11,12 @@ import {
   INSTRUCTION_PLAN_SCHEMA_VERSION,
   INSTRUCTION_PLAN_UNTRUSTED,
   INSTRUCTION_PLAN_V2_SCHEMA_VERSION,
+  INSTRUCTION_PLAN_V3_SCHEMA_VERSION,
   InstructionPlanResultSchema,
   InstructionPlanV2ResultSchema,
+  InstructionPlanV3ResultSchema,
   type InstructionPlanV2Result,
+  type InstructionPlanV3Result,
   InstructionPlanVariablesSchema,
   type InstructionPlanResult,
   type InstructionPlanVariables,
@@ -100,7 +103,7 @@ export const INSTRUCTION_PLAN_V2: PromptDefinition<
   InstructionPlanVariables,
   InstructionPlanV2Result
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -120,6 +123,37 @@ export const INSTRUCTION_PLAN_V2: PromptDefinition<
     schema: InstructionPlanV2ResultSchema,
   },
   template: PLAN_V2,
+};
+
+const PLAN_V3 = PLAN_V2.replace(
+  "- cannot: anything in the goal no listed action can do (for example negotiating terms or moving money), each with the reason in plain words and something you can do instead.",
+  `- cannot: only what neither a listed action nor you yourself can do (for example negotiating terms or moving money), each with the reason in plain words, something you can do instead, and needs: what it would take -- TERMS_OR_MONEY or NO_SUCH_ACTION. You yourself already find and match people (THEIR PEOPLE below holds them), run on this instruction's own schedule and cadence (the instruction IS the schedule: "every weekend" is not missing), and order steps one after another across firings ("message after expressing interest" is a later step, not a missing action). Never list those; if you would, needs is DISCOVERY, SCHEDULE or SEQUENCING and code drops the line.`,
+).replace("(v2, with request)", "(v3, with request and each cannot's needs)");
+
+export const INSTRUCTION_PLAN_V3: PromptDefinition<
+  InstructionPlanVariables,
+  InstructionPlanV3Result
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-03",
+  id: "INSTRUCTION_PLAN",
+  version: 3,
+  changeDescription:
+    "QA run 40021ae5: can't-lines named the engine's own abilities (finding founders, the weekly schedule, messaging after interest). Each can't now says what it needs; code drops DISCOVERY, SCHEDULE and SEQUENCING.",
+  variables: {
+    schema: InstructionPlanVariablesSchema,
+    untrusted: [...INSTRUCTION_PLAN_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_PLAN_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_PLAN_V3_SCHEMA_VERSION,
+    schema: InstructionPlanV3ResultSchema,
+  },
+  template: PLAN_V3,
 };
 
 const THREAD_READER = `TASK: INSTRUCTION_THREAD_READER
