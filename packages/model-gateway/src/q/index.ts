@@ -3182,6 +3182,7 @@ export function createModelGatewayQAnswer(
          * turn is logged under one key, with what was offered and what was
          * tried, so each miss is seen rather than found live.
          */
+        let parityGap: string | null = null;
         if (
           request.turnKind === "TOOL_REQUEST" &&
           !preparedThisTurn &&
@@ -3220,6 +3221,7 @@ export function createModelGatewayQAnswer(
             },
             "q.parity_gap",
           );
+          parityGap = gap;
         }
         const statusLine =
           analyst.proposalStatus &&
@@ -3249,14 +3251,37 @@ export function createModelGatewayQAnswer(
         // Filling their profile's gaps: one short line from code, plus
         // the card -- never the model's argument about verification.
         const gapsSaid = gaps === null || gaps.line.length === 0 ? null : gaps;
+        // A request is never answered with a status line alone (lead
+        // 2026-10-03, run 5dd9bec5: "Ask Ledgerfold for their last 12
+        // months of management accounts." was answered only "Nothing is
+        // waiting for your approval…"). When nothing was done and nothing
+        // else is said, Q says plainly what it could not do, and why.
+        const answerText = (statusTalk?.text ?? guarded.text).trim();
+        const couldNot =
+          parityGap !== null &&
+          answerText.length === 0 &&
+          actedLines.length === 0 &&
+          gapsSaid === null
+            ? couldNotDoLine(parityGap)
+            : null;
+        if (couldNot !== null) {
+          logger?.warn(
+            { qRunId: request.runId, gap: parityGap },
+            "a request had nothing done and nothing said; Q says it could not",
+          );
+        }
         const content = (
           gapsSaid !== null
             ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
             : [
                 ...(approvalLine === null ? [] : [approvalLine]),
-                statusTalk?.text ?? guarded.text,
+                couldNot ?? statusTalk?.text ?? guarded.text,
                 ...actedLines,
-                ...(statusLine === null ? [] : [statusLine]),
+                // The status of earlier changes is not an answer to this
+                // request, and is not said in its place.
+                ...(statusLine === null || couldNot !== null
+                  ? []
+                  : [statusLine]),
                 // The card the engine shows is the offer when one was
                 // prepared; otherwise the model's one offer follows.
                 ...(statusTalk?.offer == null || preparedByTool
@@ -3529,6 +3554,24 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
  * returns when it ran or could not: `{ status: DONE | NOT_DONE, says }`.
  * Prepared actions are narrated by the Approval Engine, not here.
  */
+/**
+ * What Q says when it was asked to do something and did nothing: plainly
+ * that it did not, and why, by the kind of miss -- never a status line in
+ * place of an answer, and never a claim that anything changed.
+ */
+export function couldNotDoLine(gap: string): string {
+  switch (gap) {
+    case "DECLARED_NOT_OFFERED":
+      return "I couldn't do that from this conversation: that action isn't available to me here, so nothing was prepared or changed. You can do it from its page, or ask me again from there.";
+    case "CALLED_DID_NOTHING":
+      return "I tried, but it didn't go through, so nothing was prepared or changed. Ask me again in a moment, or do it from its page.";
+    case "NOT_CALLED":
+      return "I didn't prepare that, so nothing was changed. Tell me again what you'd like done, and to whom, and I'll prepare it for your approval.";
+    default:
+      return "I couldn't tell which action that is, so nothing was prepared or changed. Tell me what you'd like done, and to whom, and I'll prepare it for your approval.";
+  }
+}
+
 export function appActionLineOf(data: unknown): string | null {
   if (typeof data !== "object" || data === null) return null;
   const record = data as { readonly status?: unknown; readonly says?: unknown };

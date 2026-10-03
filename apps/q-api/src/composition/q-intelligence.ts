@@ -34,6 +34,7 @@ import {
 import type {
   ContextFirewallPort,
   QAnswerPort,
+  QAnswerRequest,
   QLiveDeltaBus,
   QRetrievalPort,
   QRuntimeRepositories,
@@ -127,6 +128,9 @@ export type QIntelligenceDependencies = {
    * fixture #1; pending-decision.ts).
    */
   readonly pendingDecisions?: PendingDecisionPort | undefined;
+  /** Their relationships' counterpart names, for what a request is about. */
+  readonly counterpartNames?:
+    ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
   /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
@@ -349,6 +353,9 @@ export function composeQIntelligence(
     ...(dependencies.pendingDecisions === undefined
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),
+    ...(dependencies.counterpartNames === undefined
+      ? {}
+      : { counterpartNames: dependencies.counterpartNames }),
     // A hand-over read by the turn reader (v22), prepared as Q's errand
     // for the subject on screen through the run's own propose_errand.
     // TURN_READER v27 saveToOwnProfile: their profile's open fields,

@@ -1611,7 +1611,11 @@ const appActionPorts: OwnReadPorts = {
       at: file.updatedAt,
       facts: {
         type: file.documentType,
-        reading: file.processing,
+        // Whether Q has read it -- never whether it can be shared or
+        // downloaded, which it can either way (run 8b5ff536: "its reading
+        // status is failed… I have not shared it").
+        qReading: file.processing,
+        shareable: "yes, whether or not Q has read it",
         // Who may download it now, from the record (QA run 581a8862:
         // a declined card's audience was said as the deck's).
         ...(file.downloadAudience === undefined
@@ -2430,6 +2434,14 @@ const qIntelligence = composeQIntelligence({
   }),
   // A relationship a hand-over names, planned on its own (QA 2026-10-01).
   firewall,
+  // Who is across their relationships, by name: a request naming one
+  // brings the Relationships actions into the offer (lead 2026-10-03).
+  counterpartNames: async (request) => {
+    const own = await errandRelationships
+      .ownRelationships?.(request.actor)
+      .catch(() => null);
+    return (own?.items ?? []).map((item) => item.counterpart.name);
+  },
   // A typed yes or no to a waiting change, read and acted on by code
   // through the Approval Engine (founder fixture #1).
   pendingDecisions: createPendingDecisionPort({

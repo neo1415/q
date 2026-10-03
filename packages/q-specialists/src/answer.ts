@@ -53,6 +53,7 @@ import {
   quietlyNoted,
 } from "@capital-q/q-core";
 import {
+  closestByName,
   eligibleCapabilities,
   Q_CAPABILITIES,
   type GetInvestorMandateOutput,
@@ -262,6 +263,12 @@ export type SpecialistQAnswerDependencies = {
    * through its generated tool (parity eval 2026-10-02).
    */
   readonly appActions?: QAppActionPort | undefined;
+  /**
+   * The names of the counterparts in their own relationships, for telling
+   * a request about one of them (lead 2026-10-03). Absent: never known.
+   */
+  readonly counterpartNames?:
+    ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
   /**
    * One app action's inputs from the person's words, against the tool's own
    * input schema (APP_ACTION_ARGUMENTS), for a reading that named the
@@ -1375,6 +1382,40 @@ export function createSpecialistQAnswer(
   const PREREADS_MAX = 64;
 
   /**
+   * The turn is about someone across a relationship: a company subject on
+   * an investor's run (their own organisation bound in the plan), or a
+   * request to act that names one of their relationships' counterparts,
+   * matched by the same name matcher every reference uses. Read only for a
+   * request to act, and never a reason to show anything: it brings the
+   * Relationships area's actions into the offer, which authorize decides.
+   */
+  const aboutCounterparty = async (
+    request: QAnswerRequest,
+    utterance: string,
+    read: { readonly kind: string } | null,
+  ): Promise<boolean> => {
+    if (read?.kind !== "TOOL_REQUEST") return false;
+    if (
+      ownInvestorOrganisationIn(request.plan) !== null &&
+      request.subjects.some((subject) => subject.kind === "COMPANY")
+    ) {
+      return true;
+    }
+    const names = await (
+      dependencies.counterpartNames?.(request) ?? Promise.resolve([])
+    ).catch(() => []);
+    if (names.length === 0) return false;
+    const said = utterance
+      .split(/[^\p{L}\p{N}'-]+/u)
+      .filter((word) => word.length >= 3);
+    return names.some(
+      (name) =>
+        closestByName(said, name.split(/\s*\(/u)[0] ?? name, (word) => word)
+          .length > 0 || utterance.toLowerCase().includes(name.toLowerCase()),
+    );
+  };
+
+  /**
    * The cards this turn handed to the engine, by run: the engine says
    * their status after the turn, so nothing here says it again (lead
    * 2026-10-03, runs 7468a83f, 7c39eed0: three lines for one card).
@@ -2073,6 +2114,7 @@ export function createSpecialistQAnswer(
               handOver: (read.handOver ?? null) !== null,
             },
       subjectKinds: request.subjects.map((subject) => subject.kind),
+      counterparty: await aboutCounterparty(request, latest.content, read),
       areaOf: toolAreaOf,
       previous: focuses.get(conversationId) ?? null,
     });

@@ -349,6 +349,42 @@ describe("a reply about a change's status says the engine's status", () => {
     );
   });
 
+  it("run 5dd9bec5: a request answered with nothing but the status line says plainly what Q couldn't do", async () => {
+    const said =
+      "Ask Ledgerfold for their last 12 months of management accounts.";
+    const { seam, request, stored } = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      {
+        // The model's own line was all approval talk, and is removed.
+        answer: "Nothing is waiting for your approval right now.",
+        proposalStatus: true,
+      },
+      [],
+      { said },
+    );
+    expect(
+      (await seam.answer({ ...request, turnKind: "TOOL_REQUEST" })).kind,
+    ).toBe("ANSWERED");
+    const reply = stored.at(-1) ?? "";
+    expect(reply).not.toContain("Nothing is waiting for your approval");
+    expect(reply).toBe(
+      "I couldn't tell which action that is, so nothing was prepared or changed. Tell me what you'd like done, and to whom, and I'll prepare it for your approval.",
+    );
+  });
+
+  it("a question about a change's status still gets the status line", async () => {
+    const { seam, request, stored } = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      ANSWER,
+    );
+    await seam.answer({ ...request, turnKind: "QUESTION_TO_Q" });
+    expect(stored.at(-1)).toContain(
+      "Nothing is waiting for your approval in this conversation",
+    );
+  });
+
   it("a saved one is said as saved, from its record", async () => {
     const { seam, request, stored } = build(
       { status: "SUCCEEDED", data: RELATIONSHIP_NONE },

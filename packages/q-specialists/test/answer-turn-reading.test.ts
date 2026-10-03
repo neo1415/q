@@ -118,6 +118,8 @@ function seam(options: {
   readonly profileGaps?: QProfileGapsPort;
   /** ADR 0040: a declared app action the reading names. */
   readonly appActions?: QAppActionPort;
+  /** Their relationships' counterpart names (lead 2026-10-03). */
+  readonly counterpartNames?: readonly string[];
   /** The arguments read for a named app action (parity eval 2026-10-02). */
   readonly appActionArguments?: (
     request: QAnswerRequest,
@@ -265,6 +267,12 @@ function seam(options: {
     ...(options.appActions === undefined
       ? {}
       : { appActions: options.appActions }),
+    ...(options.counterpartNames === undefined
+      ? {}
+      : {
+          counterpartNames: () =>
+            Promise.resolve(options.counterpartNames ?? []),
+        }),
     ...(options.profileGaps === undefined
       ? {}
       : { profileGaps: options.profileGaps }),
@@ -2994,5 +3002,72 @@ describe("a stated decision about a relationship is prepared, an opinion is not"
     await run.answer.answer(request());
     expect(ran).toEqual([]);
     expect(run.delegated()).toBe(1);
+  });
+});
+
+/**
+ * Lead 2026-10-03, runs 8b5ff536 and 5dd9bec5: a request to act that named
+ * no tool was planned on the person's own company (Records), so the
+ * Relationships actions -- diligence_documents among them -- were never
+ * offered. A request that names one of their relationships' counterparts
+ * brings the Relationships area; the registry then offers its app actions
+ * on any purpose (q-tools tool-focus-offer: d396af2f).
+ */
+describe("a request naming a counterparty brings Relationships into the offer", () => {
+  const untold = () =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+      appAction: null,
+      askedAction: null,
+    }) as unknown as TurnReaderResult;
+
+  it("8b5ff536 (Ajopot, own company): 'Share our financial model with Savanna Seed Partners (fictional).'", async () => {
+    const run = seam({
+      said: "Share our financial model with Savanna Seed Partners (fictional).",
+      reading: untold(),
+      outcomes: [],
+      counterpartNames: ["Savanna Seed Partners (fictional)", "Lagoon Angels"],
+    });
+    await run.answer.answer({
+      ...request(),
+      subjects: [{ kind: "COMPANY" as const, companyId: COMPANY }],
+    });
+    expect(run.focuses.at(-1)).toEqual({
+      areas: ["Records", "Relationships"],
+      tools: [],
+      widen: true,
+    });
+  });
+
+  it("5dd9bec5 (Savanna, investor): 'Ask Ledgerfold for their last 12 months of management accounts.'", async () => {
+    const run = seam({
+      said: "Ask Ledgerfold for their last 12 months of management accounts.",
+      reading: untold(),
+      outcomes: [],
+      counterpartNames: ["Ledgerfold"],
+    });
+    await run.answer.answer(request());
+    expect(run.focuses.at(-1)).toEqual({
+      areas: ["Relationships"],
+      tools: [],
+      widen: true,
+    });
+  });
+
+  it("a request naming nobody they know is planned as before", async () => {
+    const run = seam({
+      said: "Make my company private.",
+      reading: untold(),
+      outcomes: [],
+      counterpartNames: ["Ledgerfold"],
+    });
+    await run.answer.answer(request());
+    expect(run.focuses.at(-1)).toBeUndefined();
   });
 });

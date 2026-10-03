@@ -74,6 +74,13 @@ const CONTINUES = new Set(["ANSWER", "CLARIFICATION", "CORRECTION"]);
 export function toolFocusOf(input: {
   readonly reading: FocusReading | null;
   readonly subjectKinds: readonly string[];
+  /**
+   * The turn names someone they have a relationship with, or its subject
+   * is a counterparty (lead 2026-10-03, runs 8b5ff536, 5dd9bec5: "Share our
+   * financial model with Savanna Seed Partners" and "Ask Ledgerfold for
+   * …" were planned on their own company, Records, never Relationships).
+   */
+  readonly counterparty?: boolean | undefined;
   readonly areaOf: (toolName: string) => string | null;
   readonly previous: QToolFocus | null;
 }): QToolFocus | null {
@@ -98,10 +105,13 @@ export function toolFocusOf(input: {
     for (const area of input.previous.areas) areas.add(area);
     for (const tool of input.previous.tools) tools.add(tool);
   }
-  const subjectAreas = input.subjectKinds.flatMap((kind) => {
-    const area = SUBJECT_AREAS[kind];
-    return area === undefined ? [] : [area];
-  });
+  const subjectAreas = [
+    ...input.subjectKinds.flatMap((kind) => {
+      const area = SUBJECT_AREAS[kind];
+      return area === undefined ? [] : [area];
+    }),
+    ...(input.counterparty === true ? ["Relationships"] : []),
+  ];
   // Nothing in the reading itself: the purpose's list, as before -- and a
   // request to act also brings the declared app actions of what the turn
   // is about (lead 2026-10-03, run d396af2f: "Ask Ledgerfold for their

@@ -350,7 +350,7 @@ export const DILIGENCE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   tool: {
     name: "diligence_documents",
     description:
-      "Prepares, for the person's approval, a change in a relationship's diligence area: a founder sharing one of their own documents with that investor, taking one back, or answering the investor's request with a document; an investor asking the company for a document. Name the relationship and the document as they said them. Nothing changes until they approve exactly it.",
+      "Prepares, for the person's approval, a change in a relationship's diligence area: a founder sharing one of their own documents with that investor, taking one back, or answering the investor's request with a document; an investor asking the company for a document. Name the relationship and the document as they said them. Sharing never depends on Q having read the file: a document Q could not read is shared exactly like any other. Nothing changes until they approve exactly it.",
     input: DiligenceTool,
     // Diligence shares the company's uploaded (Evidence) documents, never
     // Q's drafts: matched among their uploads.
