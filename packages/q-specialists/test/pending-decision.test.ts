@@ -144,12 +144,15 @@ describe("a typed decision on a waiting change", () => {
     );
     expect(asked).toContain("exactly this, unchanged");
     expect(calls.approve).toEqual([]);
-    expect(calls.decline).toEqual(["p1"]);
+    // Not approved, and not declined either (lead 2026-10-03: only an
+    // explicit no declines): the change they want is answered as its own
+    // proposal, and this one is said to be still waiting.
+    expect(calls.decline).toEqual([]);
     expect(outcome).toEqual({
       kind: "ANSWER_THEN",
-      before:
-        "Declined: Reminder: Send Savanna the updated deck. Nothing was changed.",
-      after: null,
+      before: null,
+      after:
+        "Still waiting for your approval: Reminder: Send Savanna the updated deck.",
     });
   });
 
@@ -247,6 +250,59 @@ describe("a restatement is not an approval (QA 2026-10-03)", () => {
       line: "Done: Share your raise with Savanna Seed.",
     });
     expect(calls.approve).toEqual(["s1"]);
+  });
+});
+
+describe("a new request never declines the waiting card (QA 2026-10-03)", () => {
+  const PASS: Proposal = {
+    proposalId: "o1",
+    summary: "Decide not to proceed for now",
+    status: "PENDING",
+  };
+  const DECK: Proposal = {
+    proposalId: "d1",
+    summary: "Make Ajopot seed deck visible to investors",
+    status: "PENDING",
+  };
+
+  it.each([
+    [PASS, "We're starting diligence with Ledgerfold."],
+    [PASS, "We've decided not to proceed with Ledgefold for now."],
+    [DECK, "Make Ajopot seed deck private to my organisation again"],
+  ])(
+    "%s / %s: read NO, still not declined; the card waits",
+    async (card, words) => {
+      const { value, calls } = port({
+        proposals: [card],
+        reading: { decision: "NO", remainder: words },
+      });
+      const outcome = await decidePending(value, turn(words));
+      expect(calls.decline).toEqual([]);
+      expect(calls.approve).toEqual([]);
+      expect(outcome).toEqual({
+        kind: "ANSWER_THEN",
+        before: null,
+        after: `Still waiting for your approval: ${card.summary}.`,
+      });
+    },
+  );
+
+  it.each([
+    "no",
+    "No thanks.",
+    "cancel that",
+    "don't do it",
+    "no, scrap the Ajopot one",
+  ])("an explicit no declines it: %s", async (words) => {
+    const { value, calls } = port({
+      proposals: [DECK],
+      reading: { decision: "NO", remainder: null },
+    });
+    expect(await decidePending(value, turn(words))).toEqual({
+      kind: "REPLY",
+      line: "Declined: Make Ajopot seed deck visible to investors. Nothing was changed.",
+    });
+    expect(calls.decline).toEqual(["d1"]);
   });
 });
 

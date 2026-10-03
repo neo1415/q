@@ -258,8 +258,19 @@ export async function decidePending(
     // approved and nothing new is prepared.
     return { kind: "REPLY", line: readyLine(only.summary) };
   }
-  // A card elsewhere is declined by words only when they point to it.
+  // A no declines only when the words refuse and point to this card: a
+  // plain "no", "cancel that", or a refusal naming its counterpart (QA
+  // 2026-10-03, runs 9355dc4f, 5010f6bf, 3af14042: a new, different
+  // request was read NO and declined the card). Otherwise the card stays
+  // pending and is mentioned after the answer.
   if (read.decision === "NO" && !points) return { kind: "NONE" };
+  if (read.decision === "NO" && !declines(input.utterance, only)) {
+    return {
+      kind: "ANSWER_THEN",
+      before: null,
+      after: `Still waiting for your approval: ${named(only.summary)}.`,
+    };
+  }
   if (read.decision === "YES") {
     const { status } = await port.approve(input.context, only.proposalId);
     const line = statusLine(status, only.summary);
@@ -278,6 +289,59 @@ export async function decidePending(
 /** Said when the same change is asked for again: ready, waiting for a yes. */
 export function readyLine(summary: string): string {
   return `That's ready: ${named(summary)}. It's waiting for your yes. Tap Approve on the card, or tell me to go ahead.`;
+}
+
+/** Refusal words: without one, nothing is declined. */
+const REFUSAL =
+  /\b(?:no|nope|nah|don'?t|do not|cancel\w*|declin\w*|reject\w*|scrap|stop|never ?mind|forget (?:it|that)|not (?:that|this|it|now))\b/iu;
+/** Words that point to the card in front of them. */
+const DEICTIC =
+  /\b(?:that|this|it|the (?:card|change|proposal|one)|that one)\b/iu;
+const REFUSAL_WORDS = [
+  "no",
+  "nope",
+  "nah",
+  "don't",
+  "dont",
+  "do",
+  "not",
+  "cancel",
+  "decline",
+  "reject",
+  "scrap",
+  "stop",
+  "never",
+  "mind",
+  "nevermind",
+  "forget",
+  "thanks",
+  "one",
+  "card",
+  "change",
+  "proposal",
+  "actually",
+  "wait",
+];
+
+/**
+ * A no that declines this card: a refusal that is all refusal ("no",
+ * "no thanks", "don't do it"), one that points at it ("cancel that"), or
+ * one that names its counterpart. A new request, even read NO, is none.
+ */
+function declines(
+  utterance: string,
+  card: { readonly summary: string },
+): boolean {
+  if (!REFUSAL.test(utterance)) return false;
+  const words = utterance
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}'\s]/gu, " ")
+    .split(/\s+/u)
+    .filter((word) => word.length > 0);
+  if (words.every((word) => REFUSAL_WORDS.includes(word) || FILLER.has(word)))
+    return true;
+  if (words.length <= 6 && DEICTIC.test(utterance)) return true;
+  return namedIn(utterance, [card]) !== null;
 }
 
 /** Any word that can approve; without one, nothing is approved. */
@@ -305,7 +369,7 @@ const APPROVAL_PHRASES: readonly RegExp[] = [
   /\bsend it\b/g,
   /\b(?:yes|yeah|yep|yup|ok|okay|sure|approved?|approval|approving|proceed|confirm(?:ed)?)\b/g,
 ];
-const FILLER = new Set([
+const FILLER_LIST = [
   "i",
   "give",
   "gave",
@@ -337,7 +401,8 @@ const FILLER = new Set([
   "of",
   "with",
   "a",
-]);
+];
+const FILLER: ReadonlySet<string> = new Set(FILLER_LIST);
 
 export function plainApproval(utterance: string): boolean {
   let text = utterance.toLowerCase().replace(/[^\p{L}\p{N}'\s]/gu, " ");
