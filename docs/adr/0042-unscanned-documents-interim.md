@@ -51,7 +51,9 @@ documents to be available to who needs it."
    enqueues one job each under the current `CQ_PIPELINE_VERSION`, which
    must differ from the version they were blocked under). Idempotent: a
    version with a run under the current pipeline version is never
-   selected, and the run table's uniqueness absorbs a duplicate job.
+   selected, and the run table's uniqueness absorbs a duplicate job. The
+   workers also run it once in the background at start, only under this
+   policy, logging one line (`evidence.documents.redriven_at_start`).
 
 ## Risk
 

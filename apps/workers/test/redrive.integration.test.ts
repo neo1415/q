@@ -10,6 +10,7 @@ import {
 
 import {
   redriveBlockedDocuments,
+  redriveBlockedDocumentsAtStart,
   selectBlockedForRedrive,
   selectNotScannedForScan,
 } from "../src/documents/redrive.js";
@@ -152,6 +153,49 @@ describe("re-driving documents blocked for want of a scanner", () => {
             (message as { data: { documentVersionId: string } }).data
               .documentVersionId === blocked,
         ),
+    ).toHaveLength(0);
+  });
+
+  it("at worker start: nothing under REQUIRE_CLEAN; under the interim policy one line, and nothing left to enqueue for an already re-driven version", async () => {
+    const lines: string[] = [];
+    const sent: unknown[] = [];
+    const logger = {
+      info: (_fields: Record<string, unknown>, message: string) => {
+        lines.push(message);
+      },
+      warn: (_fields: Record<string, unknown>, message: string) => {
+        lines.push(message);
+      },
+    };
+    const queues = {
+      send: (_queue: string, message: unknown) => {
+        sent.push(message);
+        return Promise.resolve(sent.length);
+      },
+    };
+    await redriveBlockedDocumentsAtStart({
+      sql: db.sql,
+      queues,
+      pipelineVersion: V2,
+      malwarePolicy: "REQUIRE_CLEAN",
+      logger,
+    });
+    expect(lines).toEqual([]);
+    await redriveBlockedDocumentsAtStart({
+      sql: db.sql,
+      queues,
+      pipelineVersion: V2,
+      malwarePolicy: "ALLOW_UNSCANNED_WITH_WARNING",
+      logger,
+    });
+    expect(lines).toEqual(["evidence.documents.redriven_at_start"]);
+    // The blocked version already has its V2 run (previous test): not again.
+    expect(
+      sent.filter(
+        (message) =>
+          (message as { data: { documentVersionId: string } }).data
+            .documentVersionId === blocked,
+      ),
     ).toHaveLength(0);
   });
 

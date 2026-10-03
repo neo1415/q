@@ -168,3 +168,41 @@ export async function redriveBlockedDocuments(options: {
     enqueued,
   };
 }
+
+/**
+ * At worker start (lead 2026-10-03: no shell on the hosted worker): the
+ * re-drive runs once in the background, only under the interim policy.
+ * Idempotent (see above), bounded by the selection's limit, one log line,
+ * never fatal.
+ */
+export async function redriveBlockedDocumentsAtStart(options: {
+  readonly sql: DatabaseExecutor;
+  readonly queues: Pick<QueueClient, "send">;
+  readonly pipelineVersion: string;
+  readonly malwarePolicy: MalwarePolicy;
+  readonly logger: {
+    readonly info: (fields: Record<string, unknown>, message: string) => void;
+    readonly warn: (fields: Record<string, unknown>, message: string) => void;
+  };
+}): Promise<void> {
+  if (options.malwarePolicy !== "ALLOW_UNSCANNED_WITH_WARNING") return;
+  try {
+    const result = await redriveBlockedDocuments({ ...options, apply: true });
+    options.logger.info(
+      result.kind === "REFUSED"
+        ? { outcome: "refused" }
+        : {
+            outcome: "applied",
+            pipelineVersion: result.pipelineVersion,
+            selected: result.candidates.length,
+            enqueued: result.enqueued,
+          },
+      "evidence.documents.redriven_at_start",
+    );
+  } catch (error: unknown) {
+    options.logger.warn(
+      { error: error instanceof Error ? error.name : "UNKNOWN" },
+      "evidence.documents.redrive_at_start_failed",
+    );
+  }
+}
