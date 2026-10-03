@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
-  isActiveMatchState,
   isMatchedRelationshipState,
   type ChatThreadDto,
   type MeetingDto,
@@ -29,12 +28,12 @@ import { callToRecord } from "./call-to-record";
 
 import { AskQAboutRelationship } from "./relationship-actions";
 import type { CounterpartProfile } from "./relationship-page-data";
-import { StatusPill } from "./status-pill";
 import { RelationshipCommitment } from "./relationship-commitment";
 import { RelationshipErrands } from "./relationship-errands";
 import { RelationshipOutcome } from "./relationship-outcome";
 import { RelationshipDiligence } from "./relationship-diligence";
 import { RelationshipTimeline } from "./relationship-timeline";
+import { JOURNEY, journeyStep } from "./journey";
 import {
   NEXT_STEP_WORDS,
   type RelationshipSide,
@@ -140,6 +139,36 @@ export function RelationshipDetail({
         messageCount={connected ? messageCount : null}
       />
 
+      {relationship !== null &&
+      (OUTCOME_FIRST.has(relationship.state) || call !== null) ? (
+        // Right after a meeting, "How did it go?" comes before Next (lead
+        // decision, design-48); when paused or not proceeding, the way
+        // back does (break-it 2026-10-03: Zino could not find Resume).
+        <section
+          aria-labelledby="relationship-outcome"
+          className="flex max-w-(--cq-layout-reading) flex-col gap-3"
+          data-outcome-first
+        >
+          <h2
+            id="relationship-outcome"
+            className="cq-title-sm text-(--cq-text-primary)"
+          >
+            {WAY_BACK.has(relationship.state)
+              ? "Where this stands"
+              : "How did it go?"}
+          </h2>
+          <DockAvoidZone className="flex flex-col items-stretch gap-2">
+            <RelationshipOutcome
+              relationshipId={relationship.relationshipId}
+              state={relationship.state}
+              side={side}
+              counterpart={counterpart}
+              call={call}
+            />
+          </DockAvoidZone>
+        </section>
+      ) : null}
+
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-8">
           {media === null || media === undefined ? null : (
@@ -240,19 +269,6 @@ export function RelationshipDetail({
               ) : null}
               {relationship === null ? null : (
                 <>
-                  {/* After a meeting (recorded, or a booked call that has
-                      ended), "How did it go?" is the next step; when paused or
-                      not proceeding, the way back is (break-it 2026-10-03:
-                      Zino could not find Resume). */}
-                  {OUTCOME_FIRST.has(relationship.state) || call !== null ? (
-                    <RelationshipOutcome
-                      relationshipId={relationship.relationshipId}
-                      state={relationship.state}
-                      side={side}
-                      counterpart={counterpart}
-                      call={call}
-                    />
-                  ) : null}
                   {/*
                     One primary step above; everything else one tap away
                     (demo audit 2026-10-03: six equal actions under Next).
@@ -337,7 +353,11 @@ export function RelationshipDetail({
   );
 }
 
-/** The top of both relationship pages: who, where, and where it stands. */
+/**
+ * The top of both relationship pages: who, where, and where it stands
+ * (design-48). No card around it: the name, then the state in words with
+ * the step it reached, the bar repeating what the words say.
+ */
 export function RelationshipHero({
   counterpart,
   relationship,
@@ -350,37 +370,75 @@ export function RelationshipHero({
   /** Said under the name when nothing is on record. */
   readonly note?: string | undefined;
 }) {
+  const step = relationship === null ? null : journeyStep(relationship);
   return (
     <section
       aria-label={`${counterpart} at a glance`}
-      className="cq-glow-card flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:p-6"
+      className="flex flex-col gap-4"
       data-relationship-hero
     >
-      <Avatar name={counterpart} photoUrl={profile.photoUrl} />
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <h1 className="cq-title-lg text-(--cq-text-primary)">{counterpart}</h1>
-        <ProfileChips profile={profile} />
-        {note === undefined ? null : (
-          <p className="cq-body-sm text-(--cq-text-secondary)">{note}</p>
-        )}
+      <div className="flex items-center gap-4">
+        <Avatar name={counterpart} photoUrl={profile.photoUrl} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <h1 className="cq-title-lg text-(--cq-text-primary)">
+            {counterpart}
+          </h1>
+          <ProfileChips profile={profile} />
+          {note === undefined ? null : (
+            <p className="cq-body-sm text-(--cq-text-secondary)">{note}</p>
+          )}
+        </div>
       </div>
       {relationship === null ? null : (
-        <div className="flex flex-col items-start gap-1 sm:items-end">
-          <StatusPill
-            tone={
-              isActiveMatchState(relationship.state) ||
-              relationship.state === "INVESTED"
-                ? "positive"
-                : relationship.state === "INTEREST_EXPRESSED"
-                  ? "waiting"
-                  : "neutral"
-            }
+        <div className="flex max-w-(--cq-layout-reading) flex-col gap-2">
+          {step === null ? null : (
+            <ol
+              className="grid grid-cols-5 gap-1"
+              aria-label="Progress"
+              data-journey-step={step}
+            >
+              {JOURNEY.map((entry, index) => (
+                <li
+                  key={entry.label}
+                  className="flex flex-col gap-1"
+                  aria-current={index + 1 === step ? "step" : undefined}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-1 rounded-full ${
+                      index + 1 < step
+                        ? "bg-(--cq-text-secondary)"
+                        : index + 1 === step
+                          ? "bg-(--cq-accent)"
+                          : "bg-(--cq-surface-strong)"
+                    }`}
+                  />
+                  <span
+                    className={`cq-caption max-sm:sr-only ${
+                      index + 1 === step
+                        ? "font-medium text-(--cq-text-primary)"
+                        : "text-(--cq-text-tertiary)"
+                    }`}
+                  >
+                    {entry.label}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p
+            className="cq-body-sm text-(--cq-text-secondary)"
+            data-relationship-state
           >
-            {STATE_WORDS[relationship.state]}
-          </StatusPill>
-          <span className="cq-caption text-(--cq-text-tertiary)">
+            <span className="font-medium text-(--cq-text-primary)">
+              {STATE_WORDS[relationship.state]}
+            </span>
+            {step === null
+              ? null
+              : ` · step ${String(step)} of ${String(JOURNEY.length)}`}
+            {" · "}
             Next: {NEXT_STEP_WORDS[relationship.nextStep]}
-          </span>
+          </p>
         </div>
       )}
     </section>
