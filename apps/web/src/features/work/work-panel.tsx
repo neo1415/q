@@ -44,6 +44,12 @@ const STAGE_WORDS: Readonly<Record<Lane["stage"], string>> = {
   FAILED: "Couldn't continue",
 };
 
+const WORK_KIND_LABELS: Readonly<Record<QWorkDto["kind"], string>> = {
+  INVESTOR_OUTREACH: "Outreach",
+  FOUNDER_STAND_IN: "Stand-in",
+  STANDING_INSTRUCTION: "Standing instruction",
+};
+
 const STATUS_WORDS: Readonly<Record<QWorkDto["status"], string>> = {
   ACTIVE: "Running",
   DONE: "Finished",
@@ -224,7 +230,7 @@ function WorkItem({
     >
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="cq-title-sm text-(--cq-text-primary)">
-          {work.kind === "INVESTOR_OUTREACH" ? "Outreach" : "Stand-in"}
+          {WORK_KIND_LABELS[work.kind]}
         </h3>
         <span className="cq-caption text-(--cq-text-secondary)">
           {STATUS_WORDS[work.status]}

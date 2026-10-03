@@ -97,6 +97,8 @@ import {
   createWorkStartActions,
 } from "./composition/work/actions.js";
 import { createWorkComposers } from "./composition/work/composers.js";
+import { createInstructionActions } from "./composition/instructions/actions.js";
+import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -1379,7 +1381,10 @@ const workIsInvestor = async (actor: ActorContext): Promise<boolean> =>
     .catch(() => null)) !== null;
 const workOwnCompany = (actor: ActorContext): Promise<string | null> =>
   runtimeDependencies.ownCompany(actor).catch(() => null);
+// ADR 0043: standing instructions, listed and stopped with the rest of work.
+const instructionStore = createPostgresInstructionStore(database.sql);
 const workPort = createWorkPort({
+  instructions: instructionStore,
   // Errands are composed further down; read only when a tool asks.
   errands: {
     own: (actor) => errands.own(actor),
@@ -2173,6 +2178,11 @@ const qActionRegistry = createQActionRegistry([
     logger,
   }).map((definition) =>
     meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
+  ),
+  // ADR 0043: a standing instruction's grant, one approval per version.
+  ...createInstructionActions({ store: instructionStore, logger }).map(
+    (definition) =>
+      meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // end BILLING block
 ]);

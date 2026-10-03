@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { handleEverythingGrant } from "@capital-q/contracts";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
   APP_ACTIONS,
+  delegableOnItsOwn,
+  settleGrant,
   PERSON_ACTIONS,
   misheard,
   parityCases,
@@ -381,5 +384,73 @@ describe("a name said without its parenthetical", () => {
         await resolveReference(candidates, "RELATIONSHIP", actor, said),
       ).toEqual({ kind: "RESOLVED", id: SAVANNA });
     }
+  });
+});
+
+/**
+ * ADR 0043 (founder decision 2026-10-03): what Q may ever do on its own
+ * under a standing instruction, and what always needs a yes.
+ */
+describe("delegation: what Q may do on its own", () => {
+  const named = (name: string) =>
+    APP_ACTIONS.find((action) => action.name === name);
+
+  it("only expressing interest, chat messages and booking times are delegable", () => {
+    expect(
+      APP_ACTIONS.filter(delegableOnItsOwn)
+        .map((action) => action.name)
+        .sort(),
+    ).toEqual([
+      "chat.message.send",
+      "relationship.interest.express",
+      "schedule.meeting.book",
+    ]);
+  });
+
+  it.each([
+    "capital.objective.change",
+    "disclosure.raise.share",
+    "relationship.outcome.change",
+    "relationship.outcome.pass",
+    "relationship.interest.decline",
+    "relationship.connection_request.decline",
+    "investor.mandate.change",
+    "verification.kyb.submit",
+  ])("%s carries terms, money or a commitment: never Q's alone", (name) => {
+    const action = named(name);
+    expect(action?.consequence).toBeDefined();
+    expect(action === undefined ? true : delegableOnItsOwn(action)).toBe(false);
+  });
+
+  it("settling a grant drops undeclared actions and asks for the rest", () => {
+    const grant = handleEverythingGrant({ timeZone: "UTC" });
+    expect(settleGrant(grant, APP_ACTIONS)).toEqual({
+      grant,
+      dropped: [],
+      askedInstead: [],
+    });
+    const settled = settleGrant(
+      {
+        ...grant,
+        actions: [
+          { action: "relationship.outcome.change", mode: "AUTO" },
+          { action: "capital.objective.change", mode: "AUTO" },
+          { action: "chat.message.send", mode: "AUTO" },
+          { action: "chat.message.send", mode: "ASK" },
+          { action: "money.wire.send", mode: "AUTO" },
+        ],
+      },
+      APP_ACTIONS,
+    );
+    expect(settled.grant.actions).toEqual([
+      { action: "relationship.outcome.change", mode: "ASK" },
+      { action: "capital.objective.change", mode: "ASK" },
+      { action: "chat.message.send", mode: "AUTO" },
+    ]);
+    expect(settled.dropped).toEqual(["money.wire.send"]);
+    expect(settled.askedInstead).toEqual([
+      "relationship.outcome.change",
+      "capital.objective.change",
+    ]);
   });
 });

@@ -40,7 +40,12 @@ export const qWorkLaneAnswerPath = (delegationId: string, laneId: string) =>
  */
 export const Q_WORK_WAKE_CHANNEL = "q_work_wake" as const;
 
-export const Q_WORK_KINDS = ["INVESTOR_OUTREACH", "FOUNDER_STAND_IN"] as const;
+export const Q_WORK_KINDS = [
+  "INVESTOR_OUTREACH",
+  "FOUNDER_STAND_IN",
+  /** ADR 0043: a goal Q works toward under one approved grant. */
+  "STANDING_INSTRUCTION",
+] as const;
 export const Q_WORK_STATUSES = [
   "ACTIVE",
   "DONE",
@@ -269,6 +274,8 @@ export type QWorkStandInGrant = z.infer<typeof QWorkStandInGrantSchema>;
 
 export const QWorkOutreachStartPayloadSchema = z
   .object({
+    /** Whose work: the person who asked, and the card's target. */
+    ownerUserId: UuidSchema,
     grant: QWorkOutreachGrantSchema,
     expiresInDays: z.number().int().min(1).max(30),
   })
@@ -279,6 +286,8 @@ export type QWorkOutreachStartPayload = z.infer<
 
 export const QWorkStandInStartPayloadSchema = z
   .object({
+    /** Whose work: the person who asked, and the card's target. */
+    ownerUserId: UuidSchema,
     grant: QWorkStandInGrantSchema,
     expiresInDays: z.number().int().min(1).max(90),
   })

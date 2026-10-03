@@ -44,6 +44,7 @@ import {
   createQWorkTools,
   PROPOSE_Q_OUTREACH,
   PROPOSE_STAND_IN,
+  PROPOSE_STANDING_INSTRUCTION,
 } from "./tools/q-work.js";
 import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
@@ -90,6 +91,7 @@ export const Q_TOOL_GATES: Readonly<Record<string, QToolGate>> = {
   [PROPOSE_ERRAND]: { feature: "q.delegations", mode: "CHECK" },
   [PROPOSE_Q_OUTREACH]: { feature: "q.delegations", mode: "CHECK" },
   [PROPOSE_STAND_IN]: { feature: "q.delegations", mode: "CHECK" },
+  [PROPOSE_STANDING_INSTRUCTION]: { feature: "q.delegations", mode: "CHECK" },
   [RESEARCH_PUBLIC_WEB]: { feature: "q.research", mode: "CONSUME" },
 };
 

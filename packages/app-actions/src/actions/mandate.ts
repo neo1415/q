@@ -135,6 +135,7 @@ function previewOf(fields: Readonly<Record<string, unknown>>): string {
 
 const CREATE = defineAppAction<z.infer<typeof Create>, InvestorMandate>({
   name: "investor.mandate.create",
+  consequence: "COMMITMENT",
   short: "create a mandate",
   area: "mandate",
   classification: "CONSEQUENTIAL",
@@ -173,6 +174,7 @@ const CREATE = defineAppAction<z.infer<typeof Create>, InvestorMandate>({
 
 const UPDATE = defineAppAction<z.infer<typeof Update>, InvestorMandate>({
   name: "investor.mandate.update",
+  consequence: "COMMITMENT",
   supersedes: true,
   short: "change the mandate",
   area: "mandate",
@@ -213,6 +215,7 @@ function transition(operation: "ACTIVATE" | "CLOSE"): AnyAppAction {
   const activate = operation === "ACTIVATE";
   return defineAppAction<z.infer<typeof Transition>, InvestorMandate>({
     name: activate ? "investor.mandate.activate" : "investor.mandate.close",
+    consequence: "COMMITMENT",
     supersedes: true,
     short: activate ? "make a mandate active" : "close a mandate",
     area: "mandate",
@@ -328,6 +331,7 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof MandateTool>
 >({
   name: "investor.mandate.change",
+  consequence: "COMMITMENT",
   supersedes: true,
   short: "change their mandate",
   area: "mandate",

@@ -351,6 +351,7 @@ const KYB = defineAppAction<
   Awaited<ReturnType<KybService["submit"]>>
 >({
   name: "verification.kyb.submit",
+  consequence: "COMMITMENT",
   short: "submit business verification",
   area: "verification",
   classification: "CONSEQUENTIAL",
