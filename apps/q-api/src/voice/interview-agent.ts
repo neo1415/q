@@ -426,7 +426,7 @@ export function turnNotesFor(input: {
   switch (input.lookup?.kind) {
     case "RUN":
       notes.push(
-        `A look-up may run right after your reply for their question: "${input.lookup.question.slice(0, 300)}". If their words are a real question that needs looking up, say in a few words that you will look it up; do not answer it yourself, and ask nothing now: the conversation returns to the open question afterwards. If instead they were just chatting (where they are, their week, a joke) and asked nothing to look up, set chatter PERSON, acknowledge it warmly in a few words and carry on with the interview: then nothing is looked up.`,
+        `A look-up will run right after your reply for their question: "${input.lookup.question.slice(0, 300)}". Say in a few words you will look it up; don't answer it or ask anything now. If they were only chatting (no real question), set chatter PERSON, acknowledge it warmly and carry on: then nothing is looked up.`,
       );
       break;
     case "RUNNING":
@@ -484,7 +484,7 @@ export function turnNotesFor(input: {
     }
   }
   notes.push(
-    "When what they say is not about the interview (where they are, how their week is going, a joke), acknowledge it warmly in a few words first, then go on; never repeat your previous question word for word -- ask it in other words, or ask another open question.",
+    "Off-topic remark: acknowledge it in a few words, then go on; never repeat your last question word for word.",
   );
   if (open?.recordedName !== undefined && open.recordedName !== null) {
     notes.push(
@@ -1421,26 +1421,23 @@ export function createInterviewAgent(
         : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
     // Never the previous question word for word (QA 2026-10-03): what they
     // said is acknowledged first, and the question comes in other words.
-    const reply = withRecordedName(
-      notVerbatim(replyWritten, lastQTurn ?? null, {
-        asking: result?.asking ?? null,
-        alternate: (stepKey) => {
-          const step = journeySteps.find((s) => s.stepKey === stepKey);
-          if (step === undefined) return null;
-          const spoken = SPOKEN_QUESTIONS[stepKey] ?? null;
-          const written = step.configuration.prompt;
-          return (
-            [spoken, written].find(
-              (wording): wording is string =>
-                wording !== null &&
-                wording !== undefined &&
-                !sameWords(wording, lastQTurn ?? ""),
-            ) ?? null
-          );
-        },
-      }),
-      open.recordedName ?? null,
-    );
+    const reply = notVerbatim(replyWritten, lastQTurn ?? null, {
+      asking: result?.asking ?? null,
+      alternate: (stepKey) => {
+        const step = journeySteps.find((s) => s.stepKey === stepKey);
+        if (step === undefined) return null;
+        const spoken = SPOKEN_QUESTIONS[stepKey] ?? null;
+        const written = step.configuration.prompt;
+        return (
+          [spoken, written].find(
+            (wording): wording is string =>
+              wording !== null &&
+              wording !== undefined &&
+              !sameWords(wording, lastQTurn ?? ""),
+          ) ?? null
+        );
+      },
+    });
     if (reply !== replyWritten) {
       logger.info(
         { asking: result?.asking ?? null },
@@ -1712,25 +1709,4 @@ export function notVerbatim(
   return other === null
     ? `Noted. Coming back to it: ${reply}`
     : `Noted. ${other}`;
-}
-
-/**
- * Their name as recorded, never shortened (QA 2026-10-03: "Moniepoint
- * (test)" was summarised as "Moniepoint"). Only a bracketed qualifier is
- * restored, where the bare name stands without it.
- */
-export function withRecordedName(
-  reply: string,
-  recordedName: string | null,
-): string {
-  if (recordedName === null) return reply;
-  const bracket = /^(.+?)\s*(\([^)]*\))\s*$/u.exec(recordedName.trim());
-  if (bracket === null) return reply;
-  const [, bare = "", qualifier = ""] = bracket;
-  if (bare.length < 2) return reply;
-  const escaped = bare.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  return reply.replace(
-    new RegExp(`\\b${escaped}\\b(?!\\s*\\()(?![\\p{L}\\p{N}])`, "gu"),
-    `${bare} ${qualifier}`,
-  );
 }

@@ -102,7 +102,7 @@ describe("a question that needs a look-up is handed to Q, in the person's words"
     // Back to the open question afterwards, required first.
     expect(outcome.resume?.stepKey).toBe("I1.mandate_context");
     expect(outcome.resume?.question.length).toBeGreaterThan(0);
-    expect(seen[0]).toContain("A look-up may run right after your reply");
+    expect(seen[0]).toContain("A look-up will run right after your reply");
   });
 
   it("never hands over a model's words: a reading that is not in what they said goes on as what they said", async () => {
@@ -146,7 +146,7 @@ describe("a question that needs a look-up is handed to Q, in the person's words"
     expect(outcome.questionForQ).toBeNull();
     expect(outcome.researching).toBeNull();
     // The loop was told it may be just chatting, and to acknowledge it.
-    expect(seen.at(-1)).toContain("If instead they were just chatting");
+    expect(seen.at(-1)).toContain("If they were only chatting");
   });
 
   it("keeps a ledger: one look-up at a time, and a route that keeps failing stops being offered", async () => {

@@ -36,6 +36,7 @@ export type InstructionRow = {
   stopped_at: Date | null;
   conversation_id: string | null;
   next_fire_at?: Date | null;
+  last_digest_at?: Date | null;
   last_fired_at?: Date | null;
   cadence_minutes?: number;
   created_at: Date;
@@ -299,6 +300,76 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
         returning id`;
       return rows.length > 0;
     },
+
+    /**
+     * S7: a notice to the owner, once per key. NEEDS_YOU for what waits on
+     * them; UPDATE for a digest. Links to their own work page.
+     */
+    notify: async (notice: {
+      readonly instruction: Pick<
+        InstructionRow,
+        "id" | "tenant_id" | "user_id"
+      >;
+      readonly key: string;
+      readonly title: string;
+      readonly body: string | null;
+      readonly priority: "NEEDS_YOU" | "UPDATE";
+    }): Promise<boolean> => {
+      const rows = await sql<{ id: string }[]>`
+        insert into communication.notifications
+          (tenant_id, user_id, kind, title, body, link_path, dedupe_key, priority)
+        values (${notice.instruction.tenant_id}, ${notice.instruction.user_id},
+                'Q_WORK', ${notice.title.slice(0, 200)},
+                ${notice.body === null ? null : notice.body.slice(0, 1000)}, '/work',
+                ${`instr:${notice.instruction.id}:${notice.key}`.slice(0, 200)},
+                ${notice.priority})
+        on conflict (user_id, dedupe_key) do nothing
+        returning id`;
+      return rows.length > 0;
+    },
+
+    /**
+     * S7: claims the instructions whose digest is due by their grant's
+     * cadence (moving last_digest_at to now in the same statement, skip
+     * locked) and returns each with the time of the previous digest.
+     */
+    claimDigestDue: async (
+      limit: number,
+    ): Promise<readonly { id: string; since: Date; claimed_at: Date }[]> =>
+      sql<{ id: string; since: Date; claimed_at: Date }[]>`
+        with due as (
+          select i.id, coalesce(i.last_digest_at, i.created_at) as since
+            from q_runtime.standing_instructions i
+            join q_runtime.instruction_grants g
+              on g.instruction_id = i.id and g.version = i.grant_version
+           where i.status in ('ACTIVE', 'PAUSED')
+             and coalesce(g.grant_payload->>'digest', 'DAILY') <> 'OFF'
+             and coalesce(i.last_digest_at, i.created_at) <= clock_timestamp() -
+                   case when g.grant_payload->>'digest' = 'WEEKLY'
+                        then interval '7 days' else interval '1 day' end
+           order by i.last_digest_at nulls first
+           limit ${limit}
+           for update of i skip locked
+        )
+        update q_runtime.standing_instructions s
+           set last_digest_at = clock_timestamp()
+          from due
+         where s.id = due.id
+        returning s.id, due.since, s.last_digest_at as claimed_at`,
+
+    /** S7: what Q did under an instruction since a time, oldest first. */
+    stepsSince: async (
+      instructionId: string,
+      since: Date,
+      limit = 200,
+    ): Promise<readonly InstructionStepRow[]> =>
+      sql<InstructionStepRow[]>`
+        select run_key, step_index, action, mode, status, relationship_id, words,
+               reason_code, q_action_id, created_at
+          from q_runtime.instruction_steps
+         where instruction_id = ${instructionId} and created_at > ${since}
+         order by created_at, step_index
+         limit ${limit}`,
 
     /** Past its expiry: EXPIRED, once. */
     expire: async (id: string): Promise<void> => {

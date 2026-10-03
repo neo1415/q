@@ -426,6 +426,7 @@ function world(
 ) {
   const spends: number[] = [];
   const paused: string[] = [];
+  const notices: { key: string; title: string; priority: string }[] = [];
   const asks: { actionType: string; payload: unknown }[] = [];
   const row: InstructionRow = {
     id: randomUUID(),
@@ -478,6 +479,10 @@ function world(
       paused.push(reason);
       return Promise.resolve(true);
     },
+    notify: (notice: { key: string; title: string; priority: string }) => {
+      notices.push(notice);
+      return Promise.resolve(true);
+    },
   } as unknown as InstructionStore;
   const engine = createInstructionEngine({
     store,
@@ -500,7 +505,7 @@ function world(
     now: () => at,
     autoEnabled,
   });
-  return { engine, row, steps, asked, planned, spends, paused, asks };
+  return { engine, row, steps, asked, planned, spends, paused, asks, notices };
 }
 
 describe("a firing", () => {
@@ -675,6 +680,7 @@ describe("a firing", () => {
           return Promise.resolve();
         },
         pause: () => Promise.resolve(true),
+        notify: () => Promise.resolve(true),
       },
       actions: ACTIONS,
       ports: {},
@@ -710,5 +716,36 @@ describe("a firing", () => {
     expect(seen[0]).toContain(
       "chat: last from THEM; asks a question; wants to meet; about: times to meet; tone POSITIVE",
     );
+  });
+
+  it("S7: what waits on their yes is one NEEDS_YOU notice per firing; a budget pause is one too", async () => {
+    const asking = world([
+      {
+        steps: [
+          chat("About terms", { touchesTermsOrMoney: true }),
+          chat("And the round", {
+            touchesTermsOrMoney: true,
+            words: "Ask about the round.",
+          }),
+        ],
+        cannot: [],
+      },
+    ]);
+    await asking.engine.fire(asking.row.id, "run-0009");
+    expect(asking.notices).toEqual([
+      expect.objectContaining({
+        key: "run-0009:needs",
+        priority: "NEEDS_YOU",
+        title: '2 things need your yes for "Handle all the work for me"',
+      }),
+    ]);
+    const broke = world([{ steps: [], cannot: [] }], true, IN_HOURS, "5.00");
+    await broke.engine.fire(broke.row.id, "run-0010");
+    expect(broke.notices).toEqual([
+      expect.objectContaining({ priority: "NEEDS_YOU", key: "budget-2026-10" }),
+    ]);
+    const quiet = world([{ steps: [], cannot: [] }]);
+    await quiet.engine.fire(quiet.row.id, "run-0011");
+    expect(quiet.notices).toEqual([]);
   });
 });
