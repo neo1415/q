@@ -15,6 +15,7 @@
  * a credential, a connection or a table.
  */
 
+import { createCounterpartNames } from "./composition/counterpart-names.js";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -2436,12 +2437,10 @@ const qIntelligence = composeQIntelligence({
   firewall,
   // Who is across their relationships, by name: a request naming one
   // brings the Relationships actions into the offer (lead 2026-10-03).
-  counterpartNames: async (request) => {
-    const own = await errandRelationships
-      .ownRelationships?.(request.actor)
-      .catch(() => null);
-    return (own?.items ?? []).map((item) => item.counterpart.name);
-  },
+  counterpartNames: createCounterpartNames({
+    ownRelationships: errandRelationships.ownRelationships,
+    logger,
+  }),
   // A typed yes or no to a waiting change, read and acted on by code
   // through the Approval Engine (founder fixture #1).
   pendingDecisions: createPendingDecisionPort({

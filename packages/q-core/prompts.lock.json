@@ -1,6 +1,7 @@
 {
   "entries": {
     "app-action-arguments/v1": "21532d93daad24dc70a9838e3a6c352b902b0a9f213108d507a27d3193f35ec1",
+    "app-action-router/v1": "8137f33d99a8fb454a95b730addca2833ae4bd25ed937d8b5b71b827b341bf95",
     "artifact-revision/v1": "48f95a797cc00afd36c1afd6bb57660786dc57df154778a63f10bf626a1a5f0e",
     "artifact-revision/v2": "720135bd152bf5d814d9c5319d98150d4e0f1e85f406a98df0b2b8811315ce60",
     "artifact-revision/v3": "a410c771f278697350e5f16648c0ceb558a65db20918199b58ee7c440c73a50d",

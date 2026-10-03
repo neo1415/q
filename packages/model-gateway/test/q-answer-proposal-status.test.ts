@@ -373,6 +373,27 @@ describe("a reply about a change's status says the engine's status", () => {
     );
   });
 
+  it("run 9b4ef8d1: model text that isn't an answer plus the status line gets the could-not line instead of the status", async () => {
+    const said =
+      "Share our financial model with Savanna Seed Partners (fictional).";
+    const { seam, request, stored } = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      {
+        answer: "Your Ajopot financial model is active and shareable.",
+        proposalStatus: true,
+      },
+      [],
+      { said },
+    );
+    await seam.answer({ ...request, turnKind: "TOOL_REQUEST" });
+    const reply = stored.at(-1) ?? "";
+    expect(reply).not.toContain("Nothing is waiting for your approval");
+    expect(reply).toBe(
+      "Your Ajopot financial model is active and shareable.\n\nI couldn't tell which action that is, so nothing was prepared or changed. Tell me what you'd like done, and to whom, and I'll prepare it for your approval.",
+    );
+  });
+
   it("a question about a change's status still gets the status line", async () => {
     const { seam, request, stored } = build(
       { status: "SUCCEEDED", data: RELATIONSHIP_NONE },

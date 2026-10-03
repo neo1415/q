@@ -57,6 +57,7 @@ import {
   type QVisibilityNotebook,
 } from "@capital-q/q-specialists";
 import { createAppActionArgumentReader } from "./app-action-arguments.js";
+import { createAppActionRouter } from "./app-action-router.js";
 import { createProfileGapReader } from "./profile-gap-reader.js";
 
 import { MANDATE_LABELS } from "./mandate-labels.js";
@@ -128,9 +129,14 @@ export type QIntelligenceDependencies = {
    * fixture #1; pending-decision.ts).
    */
   readonly pendingDecisions?: PendingDecisionPort | undefined;
-  /** Their relationships' counterpart names, for what a request is about. */
-  readonly counterpartNames?:
-    ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
+  /**
+   * Their relationships' counterpart names, for what a request is about.
+   * Required (lead 2026-10-03, run 9b4ef8d1): a composition without it does
+   * not compile, rather than quietly never widening the offer.
+   */
+  readonly counterpartNames: (
+    request: QAnswerRequest,
+  ) => Promise<readonly string[]>;
   /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
@@ -353,9 +359,7 @@ export function composeQIntelligence(
     ...(dependencies.pendingDecisions === undefined
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),
-    ...(dependencies.counterpartNames === undefined
-      ? {}
-      : { counterpartNames: dependencies.counterpartNames }),
+    counterpartNames: dependencies.counterpartNames,
     // A hand-over read by the turn reader (v22), prepared as Q's errand
     // for the subject on screen through the run's own propose_errand.
     // TURN_READER v27 saveToOwnProfile: their profile's open fields,
@@ -377,6 +381,15 @@ export function composeQIntelligence(
     appActionArguments: createAppActionArgumentReader({
       gateway,
       tools,
+      ...(dependencies.dataPosture === undefined
+        ? {}
+        : { dataPosture: dependencies.dataPosture }),
+      ...(logger === undefined ? {} : { logger }),
+    }),
+    // A request to act that named no declared action: which one, from the
+    // closed list (APP_ACTION_ROUTER, lead 2026-10-03).
+    appActionRouter: createAppActionRouter({
+      gateway,
       ...(dependencies.dataPosture === undefined
         ? {}
         : { dataPosture: dependencies.dataPosture }),

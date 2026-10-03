@@ -161,6 +161,39 @@ type ReaderAction = {
 };
 
 /** The reader's input: the person's own latest words and own recent turns. */
+/** A name without its parenthetical ("Savanna Seed Partners (fictional)"). */
+function bareName(text: string): string {
+  return text
+    .replace(/\([^)]*\)/gu, " ")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+/**
+ * Whether the words name this counterpart: the whole name, parentheticals
+ * dropped on both sides, or a run of as many words heard slightly wrong
+ * ("Ledgefold" for Ledgerfold), by the shared name matcher.
+ */
+export function namedInWords(utterance: string, name: string): boolean {
+  const wanted = bareName(name);
+  if (wanted.length < 3) return false;
+  const said = bareName(utterance);
+  if (` ${said} `.includes(` ${wanted} `)) return true;
+  const words = said.split(" ").filter((word) => word.length > 0);
+  const size = wanted.split(" ").length;
+  for (let start = 0; start + size <= words.length; start += 1) {
+    const window = words.slice(start, start + size).join(" ");
+    if (
+      window.length >= 4 &&
+      closestByName([wanted], window, (n) => n).length > 0
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Two summaries of one card: the same words, ignoring case and the full stop. */
 function sameCard(a: string, b: string): boolean {
   const plain = (text: string) =>
@@ -279,6 +312,25 @@ export type SpecialistQAnswerDependencies = {
         request: QAnswerRequest,
         input: { readonly tool: string; readonly utterance: string },
       ) => Promise<Record<string, unknown> | null>)
+    | undefined;
+  /**
+   * Which one declared app action a request to act asks for, when the
+   * turn reader named none (APP_ACTION_ROUTER, lead 2026-10-03). Returns a
+   * listed name or null. Absent: only the reader names actions.
+   */
+  readonly appActionRouter?:
+    | ((
+        request: QAnswerRequest,
+        input: {
+          readonly utterance: string;
+          readonly candidates: readonly {
+            readonly name: string;
+            readonly does: string;
+            readonly short?: string | undefined;
+            readonly area?: string | undefined;
+          }[];
+        },
+      ) => Promise<string | null>)
     | undefined;
   /**
    * Their own profile's open fields filled from public sources, by code,
@@ -1405,14 +1457,7 @@ export function createSpecialistQAnswer(
       dependencies.counterpartNames?.(request) ?? Promise.resolve([])
     ).catch(() => []);
     if (names.length === 0) return false;
-    const said = utterance
-      .split(/[^\p{L}\p{N}'-]+/u)
-      .filter((word) => word.length >= 3);
-    return names.some(
-      (name) =>
-        closestByName(said, name.split(/\s*\(/u)[0] ?? name, (word) => word)
-          .length > 0 || utterance.toLowerCase().includes(name.toLowerCase()),
-    );
+    return names.some((name) => namedInWords(utterance, name));
   };
 
   /**
@@ -1951,19 +1996,54 @@ export function createSpecialistQAnswer(
     // Named but not filled (parity eval 2026-10-02: 3 of 12 Discover turns
     // read askedAction pass_company / save_company with appAction empty):
     // one small extraction against that tool's own input schema fills it.
-    const namedAction =
+    const appTools = dependencies.appActions?.tools ?? new Set<string>();
+    const readerNamed =
       read !== null &&
       read.kind === "TOOL_REQUEST" &&
       read.confidence !== "LOW" &&
       typeof read.askedAction === "string" &&
-      (dependencies.appActions?.tools.has(read.askedAction) ?? false) &&
+      appTools.has(read.askedAction) &&
       offeredNames.has(read.askedAction)
         ? read.askedAction
-        : fundVisibility
-          ? INVESTOR_VISIBILITY_TOOL
-          : recordAudience;
+        : null;
+    // The reader's own app action, only when it is a declared one.
+    const readerAppAction = (() => {
+      const own = appActionOf(read);
+      return own !== null && appTools.has(own.tool) ? own : null;
+    })();
+    /**
+     * A request to act that named no declared action (lead 2026-10-03,
+     * runs 9b4ef8d1, 7dd0bc2c, 31d085ac): one small routing call over the
+     * declared actions this person may take here, on any purpose. Not for
+     * a hand, a hand-over or a document, which have their own paths.
+     */
+    const routed =
+      dependencies.appActionRouter !== undefined &&
+      dependencies.appActions !== undefined &&
+      read !== null &&
+      read.kind === "TOOL_REQUEST" &&
+      read.confidence !== "LOW" &&
+      readerNamed === null &&
+      readerAppAction === null &&
+      !fundVisibility &&
+      recordAudience === null &&
+      (read.tool ?? null) === null &&
+      (read.handOver ?? null) === null &&
+      !writingDocument
+        ? await dependencies
+            .appActionRouter(request, {
+              utterance: latest.content,
+              candidates: offeredActions.filter((action) =>
+                appTools.has(action.name),
+              ),
+            })
+            .catch(() => null)
+        : null;
+    const namedAction =
+      readerNamed ??
+      (fundVisibility ? INVESTOR_VISIBILITY_TOOL : (recordAudience ?? routed));
     const appAction =
-      appActionOf(read) ??
+      readerAppAction ??
       (dependencies.appActions !== undefined &&
       dependencies.appActionArguments !== undefined &&
       namedAction !== null
@@ -2101,6 +2181,8 @@ export function createSpecialistQAnswer(
         ? [read.askedAction]
         : []),
       ...(appActionOf(read) === null ? [] : [appActionOf(read)?.tool ?? ""]),
+      // What the router named, so a code-run miss still offers it.
+      ...(routed === null ? [] : [routed]),
     ].filter((name) => name.length > 0);
     const toolFocus = toolFocusOf({
       reading:
@@ -2119,6 +2201,18 @@ export function createSpecialistQAnswer(
       previous: focuses.get(conversationId) ?? null,
     });
     focuses.delete(conversationId);
+    if (read?.kind === "TOOL_REQUEST") {
+      logger?.info(
+        {
+          qRunId: request.runId,
+          areas: toolFocus?.areas ?? null,
+          tools: toolFocus?.tools ?? null,
+          widened: toolFocus?.widen === true,
+          routed,
+        },
+        "q tool focus for a request",
+      );
+    }
     if (toolFocus !== null) {
       focuses.set(conversationId, toolFocus);
       if (focuses.size > MAX_CONVERSATIONS) {

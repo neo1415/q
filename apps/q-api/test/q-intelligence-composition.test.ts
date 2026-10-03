@@ -268,6 +268,7 @@ function build(options: {
   const repositories = fakeRepositories(options.userMessage);
   const subjects = options.subjects ?? [];
   const composition = composeQIntelligence({
+    counterpartNames: () => Promise.resolve([]),
     // No query reaches these: the plan authorises no chunk-backed scope.
     sql: {} as never,
     transactions: {

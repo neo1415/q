@@ -35,7 +35,11 @@ import type {
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
-import { createSpecialistQAnswer, unknownScreenLine } from "../src/answer.js";
+import {
+  createSpecialistQAnswer,
+  namedInWords,
+  unknownScreenLine,
+} from "../src/answer.js";
 import {
   createToolProfileGapsPort,
   type QProfileGapsPort,
@@ -120,6 +124,14 @@ function seam(options: {
   readonly appActions?: QAppActionPort;
   /** Their relationships' counterpart names (lead 2026-10-03). */
   readonly counterpartNames?: readonly string[];
+  /** APP_ACTION_ROUTER, faked (lead 2026-10-03). */
+  readonly appActionRouter?: (
+    request: QAnswerRequest,
+    input: {
+      readonly utterance: string;
+      readonly candidates: readonly { readonly name: string }[];
+    },
+  ) => Promise<string | null>;
   /** The arguments read for a named app action (parity eval 2026-10-02). */
   readonly appActionArguments?: (
     request: QAnswerRequest,
@@ -267,6 +279,9 @@ function seam(options: {
     ...(options.appActions === undefined
       ? {}
       : { appActions: options.appActions }),
+    ...(options.appActionRouter === undefined
+      ? {}
+      : { appActionRouter: options.appActionRouter }),
     ...(options.counterpartNames === undefined
       ? {}
       : {
@@ -3069,5 +3084,147 @@ describe("a request naming a counterparty brings Relationships into the offer", 
     });
     await run.answer.answer(request());
     expect(run.focuses.at(-1)).toBeUndefined();
+  });
+});
+
+/**
+ * Lead 2026-10-03 (runs 9b4ef8d1, 7dd0bc2c, 31d085ac): a request to act the
+ * reader named no declared action for is routed by APP_ACTION_ROUTER over
+ * the declared actions this person may take, then run through the same
+ * arguments read and app action port as a named one.
+ */
+describe("a request the reader named nothing for is routed (APP_ACTION_ROUTER)", () => {
+  const untold = () =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: true,
+      tool: null,
+      handOver: null,
+      appAction: null,
+      askedAction: null,
+    }) as unknown as TurnReaderResult;
+  const TOOLS = [
+    "diligence_documents",
+    "set_deck_audience",
+    "set_pitch_sharing",
+  ];
+
+  it.each([
+    [
+      "9b4ef8d1",
+      "Share our financial model with Savanna Seed Partners (fictional).",
+      "diligence_documents",
+      {
+        relationship: "Savanna Seed Partners",
+        operation: "SHARE",
+        document: "financial model",
+      },
+    ],
+    [
+      "7dd0bc2c",
+      "Ask Ledgerfold for their last 12 months of management accounts.",
+      "diligence_documents",
+      {
+        relationship: "Ledgerfold",
+        operation: "REQUEST",
+        title: "Last 12 months of management accounts",
+      },
+    ],
+    [
+      "31d085ac",
+      "Make Ajoot seed deck private to my organisation again.",
+      "set_deck_audience",
+      { deck: "Ajoot seed deck", audience: "ORGANISATION" },
+    ],
+  ])("%s: '%s' runs %s", async (_run, said, tool, args) => {
+    const routedWith: { utterance: string; names: string[] }[] = [];
+    const asked: unknown[] = [];
+    const ran: unknown[] = [];
+    const run = seam({
+      said,
+      reading: untold(),
+      outcomes: [],
+      offeredTools: TOOLS,
+      appActionRouter: (_request, input) => {
+        routedWith.push({
+          utterance: input.utterance,
+          names: input.candidates.map((c) => c.name).sort(),
+        });
+        return Promise.resolve(tool);
+      },
+      appActionArguments: (_request, input) => {
+        asked.push(input);
+        return Promise.resolve(args);
+      },
+      appActions: {
+        tools: new Set(TOOLS),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve({ prepared: "the card" });
+        },
+      },
+    });
+    await run.answer.answer(request());
+    expect(routedWith).toEqual([{ utterance: said, names: TOOLS }]);
+    expect(asked).toEqual([{ tool, utterance: said }]);
+    expect(ran).toEqual([{ tool, arguments: args }]);
+    // The engine says the card's status; nothing else is said here.
+    expect(run.stored).toEqual([]);
+    expect(run.delegated()).toBe(0);
+  });
+
+  it("a reader that named the action is not routed again; NONE answers as before", async () => {
+    let routed = 0;
+    const none = seam({
+      said: "What is my runway?",
+      reading: untold(),
+      outcomes: [],
+      offeredTools: TOOLS,
+      appActionRouter: () => {
+        routed += 1;
+        return Promise.resolve(null);
+      },
+      appActions: { tools: new Set(TOOLS), run: () => Promise.resolve(null) },
+    });
+    await none.answer.answer(request());
+    expect(routed).toBe(1);
+    expect(none.delegated()).toBe(1);
+  });
+});
+
+describe("counterpart names match through their parentheticals (run 9b4ef8d1)", () => {
+  it.each([
+    [
+      "Share our financial model with Savanna Seed Partners (fictional).",
+      "Savanna Seed Partners (fictional)",
+      true,
+    ],
+    [
+      "Share our financial model with Savanna Seed Partners.",
+      "Savanna Seed Partners (fictional)",
+      true,
+    ],
+    [
+      "Share our deck with Savanna Seed Partners (fictional)",
+      "Savanna Seed Partners",
+      true,
+    ],
+    [
+      "Ask Ledgerfold for their last 12 months of management accounts.",
+      "Ledgerfold",
+      true,
+    ],
+    [
+      "We've decided not to proceed with Ledgefold for now.",
+      "Ledgerfold",
+      true,
+    ],
+    ["Make my company private.", "Ledgerfold", false],
+    ["Share it with the team.", "Savanna Seed Partners (fictional)", false],
+  ])("%s / %s -> %s", (said, name, expected) => {
+    expect(namedInWords(said, name)).toBe(expected);
   });
 });

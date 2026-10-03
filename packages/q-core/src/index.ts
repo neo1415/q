@@ -942,6 +942,15 @@ export {
   type ProfileGapReaderVariables,
 } from "./prompts/schemas/profile-gap-reader.js";
 export { APP_ACTION_ARGUMENTS_V1 } from "./prompts/tasks/app-action-arguments.v1.js";
+export { APP_ACTION_ROUTER_V1 } from "./prompts/tasks/app-action-router.v1.js";
+export {
+  APP_ACTION_ROUTER_SCHEMA_NAME,
+  APP_ACTION_ROUTER_SCHEMA_VERSION,
+  AppActionRouterResultSchema,
+  AppActionRouterVariablesSchema,
+  type AppActionRouterResult,
+  type AppActionRouterVariables,
+} from "./prompts/schemas/app-action-router.js";
 export {
   APP_ACTION_ARGUMENTS_SCHEMA_NAME,
   APP_ACTION_ARGUMENTS_SCHEMA_VERSION,

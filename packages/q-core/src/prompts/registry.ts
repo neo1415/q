@@ -104,6 +104,7 @@ import { REHEARSAL_SCORE_V4 } from "./tasks/rehearsal-score.v4.js";
 import { FOUNDER_RESEARCH_READER_V1 } from "./tasks/founder-research-reader.v1.js";
 import { PROFILE_GAP_READER_V1 } from "./tasks/profile-gap-reader.v1.js";
 import { APP_ACTION_ARGUMENTS_V1 } from "./tasks/app-action-arguments.v1.js";
+import { APP_ACTION_ROUTER_V1 } from "./tasks/app-action-router.v1.js";
 // DOCS block.
 import { DOCUMENT_POLISH_V1 } from "./tasks/document-polish.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
@@ -392,6 +393,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     FOUNDER_RESEARCH_READER_V1,
     PROFILE_GAP_READER_V1,
     APP_ACTION_ARGUMENTS_V1,
+    APP_ACTION_ROUTER_V1,
     // DOCS block.
     DOCUMENT_POLISH_V1,
     GATEQ_INTERVIEWER_V1,

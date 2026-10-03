@@ -3235,7 +3235,7 @@ export function createModelGatewayQAnswer(
         // never says both "nothing is waiting" and "it needs your
         // approval" (QA run 5fd903d3).
         const statusTalk =
-          statusLine === null && !preparedByTool
+          statusLine === null && !preparedByTool && parityGap === null
             ? null
             : withoutStatusTalk(guarded.text);
         if (statusLine !== null) {
@@ -3256,12 +3256,15 @@ export function createModelGatewayQAnswer(
         // months of management accounts." was answered only "Nothing is
         // waiting for your approval…"). When nothing was done and nothing
         // else is said, Q says plainly what it could not do, and why.
-        const answerText = (statusTalk?.text ?? guarded.text).trim();
+        // Whatever else the model said: a request with nothing done gets
+        // the could-not line, and the status of earlier changes never
+        // stands in for it (lead 2026-10-03, run 9b4ef8d1: "…active and
+        // shareable." plus "Nothing is waiting for your approval…").
         const couldNot =
           parityGap !== null &&
-          answerText.length === 0 &&
           actedLines.length === 0 &&
-          gapsSaid === null
+          gapsSaid === null &&
+          !preparedByTool
             ? couldNotDoLine(parityGap)
             : null;
         if (couldNot !== null) {
@@ -3275,7 +3278,8 @@ export function createModelGatewayQAnswer(
             ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
             : [
                 ...(approvalLine === null ? [] : [approvalLine]),
-                couldNot ?? statusTalk?.text ?? guarded.text,
+                statusTalk?.text ?? guarded.text,
+                ...(couldNot === null ? [] : [couldNot]),
                 ...actedLines,
                 // The status of earlier changes is not an answer to this
                 // request, and is not said in its place.
@@ -3284,7 +3288,9 @@ export function createModelGatewayQAnswer(
                   : [statusLine]),
                 // The card the engine shows is the offer when one was
                 // prepared; otherwise the model's one offer follows.
-                ...(statusTalk?.offer == null || preparedByTool
+                ...(statusTalk?.offer == null ||
+                preparedByTool ||
+                couldNot !== null
                   ? []
                   : [statusTalk.offer]),
                 ...(recordedStatements.length === 0

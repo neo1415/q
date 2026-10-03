@@ -77,6 +77,8 @@ export const PROMPT_IDS = [
   "PROFILE_GAP_READER",
   /** HARDEN 2026-10-02 (ADR 0040): one app action's inputs from their words. */
   "APP_ACTION_ARGUMENTS",
+  /** HARDEN 2026-10-03: which one declared app action a request asks for. */
+  "APP_ACTION_ROUTER",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -97,6 +99,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   MEETING_HOST_TURN: "meeting-host-turn",
   PROFILE_GAP_READER: "profile-gap-reader",
   APP_ACTION_ARGUMENTS: "app-action-arguments",
+  APP_ACTION_ROUTER: "app-action-router",
   GATEQ_INTERVIEWER: "gateq-interviewer",
   ARTIFACT_REVISION: "artifact-revision",
   TURN_READER: "turn-reader",

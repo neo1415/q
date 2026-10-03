@@ -99,6 +99,7 @@ describe("registry", () => {
         "PROFILE_GAP_READER",
         // HARDEN 2026-10-02 (ADR 0040): one app action's inputs from their words.
         "APP_ACTION_ARGUMENTS",
+        "APP_ACTION_ROUTER",
         // ADR 0011: a yes, a no or neither, read from the person's words.
         "DECISION_READER",
         // ADR 0012: what a conversation taught Q about the person.
