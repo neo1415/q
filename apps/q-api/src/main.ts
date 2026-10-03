@@ -1539,6 +1539,16 @@ const investorFeed = createInvestorFeedPort({
 });
 const appActionPorts: OwnReadPorts = {
   media: pitchMedia,
+  // The services the dedicated routes call, for the declared actions Q
+  // proposes and standing instructions take (live 2026-10-03, card
+  // 6d184093: an approved express-interest step failed with
+  // APP_ACTION_PORT_MISSING:interests). app-action-ports.test.ts fails CI
+  // when an action Q can take has no port here.
+  interests: interestService,
+  connections: connectionService,
+  chat,
+  schedule,
+  pitchUploads: pitchMedia,
   outcomes: outcomeService,
   diligence: diligenceService,
   diligenceAreas: createOwnDiligence({
