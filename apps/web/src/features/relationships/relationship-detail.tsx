@@ -383,7 +383,9 @@ export function RelationshipHero({
           <h1 className="cq-title-lg text-(--cq-text-primary)">
             {counterpart}
           </h1>
-          <ProfileChips profile={profile} />
+          <div className="max-sm:hidden">
+            <ProfileChips profile={profile} />
+          </div>
           {note === undefined ? null : (
             <p className="cq-body-sm text-(--cq-text-secondary)">{note}</p>
           )}
@@ -433,11 +435,14 @@ export function RelationshipHero({
             <span className="font-medium text-(--cq-text-primary)">
               {STATE_WORDS[relationship.state]}
             </span>
-            {step === null
-              ? null
-              : ` · step ${String(step)} of ${String(JOURNEY.length)}`}
-            {" · "}
-            Next: {NEXT_STEP_WORDS[relationship.nextStep]}
+            {step === null ? null : (
+              <span className="cq-numeric">
+                {` · ${String(step)} of ${String(JOURNEY.length)}`}
+              </span>
+            )}
+            <span className="max-sm:sr-only">
+              {` · Next: ${NEXT_STEP_WORDS[relationship.nextStep]}`}
+            </span>
           </p>
         </div>
       )}

@@ -61,7 +61,7 @@ describe("the relationship journey (design-48)", () => {
       />,
     );
     const line = document.querySelector("[data-relationship-state]");
-    expect(line?.textContent).toContain("In diligence · step 4 of 5");
+    expect(line?.textContent).toContain("In diligence · 4 of 5");
     expect(
       screen.getByText("Diligence").closest("li")?.getAttribute("aria-current"),
     ).toBe("step");
