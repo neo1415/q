@@ -552,3 +552,4 @@ export {
   type FillProfileGapsInput,
   type FillProfileGapsOutput,
 } from "./tools/profile-gaps.js";
+export { isKnownTimeZone, zoneFromWords } from "./tools/local-time.js";

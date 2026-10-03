@@ -1,6 +1,7 @@
 import {
   appActionOf,
-  createPendingAppActions,
+  pendingAppActionStore,
+  type PendingAppActionStore,
   type QAppActionAsks,
   type QAppActionPort,
   type QAppActionPrepared,
@@ -66,6 +67,7 @@ import {
   type GetInvestorMandateOutput,
   type QCapability,
   toolAreaOf,
+  zoneFromWords,
 } from "@capital-q/q-tools";
 import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 
@@ -320,6 +322,8 @@ export type SpecialistQAnswerDependencies = {
    * through its generated tool (parity eval 2026-10-02).
    */
   readonly appActions?: QAppActionPort | undefined;
+  /** Where a declared action waits on their reply (durable when composed). */
+  readonly pendingAppActions?: PendingAppActionStore | undefined;
   /**
    * A "still waiting" line deferred until the engine's result for this run
    * is known (lead 2026-10-03). Absent: said right after the answer.
@@ -647,19 +651,22 @@ export function createSpecialistQAnswer(
    */
   const conversations = new Map<string, ConversationState>();
   /** Declared actions waiting on the person's reply, per conversation. */
-  const pendingActions = createPendingAppActions();
+  const pendingActions = pendingAppActionStore(dependencies.pendingAppActions);
   /** A port result said as the answer: a line, a card, or a question that waits. */
-  const saidByAction = (
+  const saidByAction = async (
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
     action: TurnAppAction,
     said: string | QAppActionPrepared | QAppActionAsks,
-  ): Promise<QAnswerOutcome> | QAnswerOutcome => {
+  ): Promise<QAnswerOutcome> => {
     if (typeof said === "string") {
       return recordAnswer(request, conversationId, said);
     }
     if ("asks" in said) {
-      pendingActions.hold(conversationId, { action, needs: said.needs });
+      await pendingActions.hold(
+        { tenantId: request.tenantId, conversationId },
+        { action, needs: said.needs },
+      );
       return recordAnswer(request, conversationId, said.asks);
     }
     return preparedForEngine(request, said.prepared);
@@ -2070,7 +2077,10 @@ export function createSpecialistQAnswer(
     // action continues, its arguments merged with what this reply adds,
     // read against its own schema. A reply, or the same action asked for
     // again, continues it; anything else is answered as itself.
-    const waiting = pendingActions.take(conversationId);
+    const waiting = await pendingActions.take({
+      tenantId: request.tenantId,
+      conversationId,
+    });
     if (
       waiting !== null &&
       dependencies.appActions !== undefined &&
@@ -2086,14 +2096,26 @@ export function createSpecialistQAnswer(
           utterance: latest.content,
         })
         .catch(() => null);
+      const merged: Record<string, unknown> = {
+        ...waiting.action.arguments,
+        ...(added !== null && added !== undefined && typeof added === "object"
+          ? added
+          : {}),
+      };
+      // The place they gave when asked for their time zone, turned into
+      // one by code (QA runs a87ca38f, 2e053864: "Lagos" was asked about
+      // again); the reader's own reading is the fallback.
+      if (waiting.needs === "TIME_ZONE") {
+        const zone =
+          zoneFromWords(latest.content) ??
+          (typeof merged["timeZone"] === "string"
+            ? zoneFromWords(merged["timeZone"])
+            : null);
+        if (zone !== null) merged["timeZone"] = zone;
+      }
       const action: TurnAppAction = {
         tool: waiting.action.tool,
-        arguments: {
-          ...waiting.action.arguments,
-          ...(added !== null && added !== undefined && typeof added === "object"
-            ? (added)
-            : {}),
-        },
+        arguments: merged,
       };
       logger?.info(
         {

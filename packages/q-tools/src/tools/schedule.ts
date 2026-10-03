@@ -40,6 +40,7 @@ import {
   LocalWhenSchema,
   isUncertainDeviceZone,
   resolveLocalWhen,
+  zoneFromWords,
   unresolvedMessage,
   type LocalWhen,
 } from "./local-time.js";
@@ -159,9 +160,12 @@ export type ScheduleIntelligencePort = {
   ) => Promise<"OK" | Refusal>;
 };
 
+// An IANA zone, or the place they named for it ("Lagos", "Port
+// Harcourt"): resolved to a zone by code before it is used.
 const TimeZone = z
   .string()
-  .regex(/^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/)
+  .trim()
+  .regex(/^[\p{L}][\p{L}0-9 _+'.,/-]*$/u)
   .max(64);
 const Duration = z.number().int().min(15).max(180);
 
@@ -569,10 +573,16 @@ export function createScheduleTools(
     // Precedence: the zone they named, the one saved on their profile,
     // their device's (unless it only says UTC, which privacy browsers and
     // VMs report whatever the place), their calendar's. None: Q asks once.
+    // A zone, or the place they named for it ("Lagos" -> Africa/Lagos):
+    // the city they gave when asked is never taken as a missing zone
+    // (QA runs a87ca38f, 2e053864: "Lagos" was asked about again).
     const named =
-      input.timeZone !== undefined && isKnownTimeZone(input.timeZone)
-        ? input.timeZone
-        : undefined;
+      input.timeZone === undefined
+        ? undefined
+        : isKnownTimeZone(input.timeZone) && input.timeZone.includes("/")
+          ? input.timeZone
+          : (zoneFromWords(input.timeZone) ??
+            (isKnownTimeZone(input.timeZone) ? input.timeZone : undefined));
     let zone = named;
     if (zone === undefined && schedule.profileTimeZoneOf !== undefined) {
       const saved = await schedule

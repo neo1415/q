@@ -245,7 +245,10 @@ export {
 export {
   appActionOf,
   createToolAppActionPort,
+  pendingAppActionStore,
   TurnAppActionSchema,
+  type PendingAppAction,
+  type PendingAppActionStore,
   type QAppActionPort,
   type QAppActionPrepared,
   type TurnAppAction,

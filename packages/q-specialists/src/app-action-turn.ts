@@ -72,6 +72,43 @@ export type PendingAppAction = {
 };
 
 /**
+ * Where a declared action waits for the person's reply: durable when
+ * composed (it outlives a restart or another instance), in memory
+ * otherwise. Scoped by tenant and conversation; read once.
+ */
+export type PendingAppActionStore = {
+  readonly hold: (
+    scope: { readonly tenantId: string; readonly conversationId: string },
+    pending: Omit<PendingAppAction, "at">,
+  ) => Promise<void>;
+  readonly take: (scope: {
+    readonly tenantId: string;
+    readonly conversationId: string;
+  }) => Promise<PendingAppAction | null>;
+};
+
+/** The store over a durable one, falling back to memory when it fails. */
+export function pendingAppActionStore(
+  durable?: PendingAppActionStore,
+): PendingAppActionStore {
+  const memory = createPendingAppActions();
+  return {
+    hold: async (scope, pending) => {
+      memory.hold(scope.conversationId, pending);
+      await durable?.hold(scope, pending).catch(() => undefined);
+    },
+    take: async (scope) => {
+      const kept = memory.take(scope.conversationId);
+      const stored =
+        durable === undefined
+          ? null
+          : await durable.take(scope).catch(() => null);
+      return stored ?? kept;
+    },
+  };
+}
+
+/**
  * The declared action each conversation is waiting to continue (QA runs
  * 7d7e7260 -> 5c2f71aa: "Which city are you in…" then "Lagos" got no
  * card -- the reply was read on its own and the tool was out of focus).

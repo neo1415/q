@@ -502,6 +502,24 @@ describe("schedule tools", () => {
       expect(JSON.stringify(outcome.result)).not.toMatch(/can.t/iu);
     });
 
+    it("the city they gave, as they said it, is their zone (QA a87ca38f)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-03T17:38:13Z"));
+      const { executor, prepared } = world();
+      await executor.execute(
+        { ...asked, arguments: { ...asked.arguments, timeZone: "Lagos" } },
+        contextFor(actorA, ownPlan(actorA)),
+      );
+      expect(prepared).toMatchObject([
+        {
+          payload: {
+            remindAt: "2026-10-05T09:00:00.000Z",
+            timeZone: "Africa/Lagos",
+          },
+        },
+      ]);
+    });
+
     it("with their city, prepares it as their own reminder, the name in its title", async () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2026-10-03T17:38:13Z"));
@@ -539,5 +557,20 @@ describe("schedule tools", () => {
       ok: true,
       data: { meetings: [{ id: MEETING, with: ["Ada"], brief: null }] },
     });
+  });
+});
+
+describe("zoneFromWords: a place as they said it", () => {
+  it("names one IANA zone, or none", async () => {
+    const { zoneFromWords } = await import("../src/index.js");
+    expect(zoneFromWords("Lagos")).toBe("Africa/Lagos");
+    expect(zoneFromWords("I'm in Abuja.")).toBe("Africa/Lagos");
+    expect(zoneFromWords("Port Harcourt")).toBe("Africa/Lagos");
+    expect(zoneFromWords("New York")).toBe("America/New_York");
+    expect(zoneFromWords("london")).toBe("Europe/London");
+    expect(zoneFromWords("Europe/London")).toBe("Europe/London");
+    expect(zoneFromWords("Nairobi, Kenya")).toBe("Africa/Nairobi");
+    expect(zoneFromWords("sounds good")).toBeNull();
+    expect(zoneFromWords("")).toBeNull();
   });
 });

@@ -2590,9 +2590,11 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
           );
         },
       },
+      // The reader finds nothing it can use in "Lagos": the place is
+      // turned into a zone by code, not by this stub (QA a87ca38f).
       appActionArguments: (_request, input) => {
         read.push(input);
-        return Promise.resolve({ timeZone: "Africa/Lagos" });
+        return Promise.resolve({});
       },
     });
     await run.answer.answer(request());

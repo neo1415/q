@@ -105,6 +105,103 @@ export function isUncertainDeviceZone(timeZone: string): boolean {
   );
 }
 
+/**
+ * Common places whose IANA zone is named for another city (Abuja is
+ * Africa/Lagos). Deterministic; anything else is matched against the
+ * runtime's own IANA list by its city part.
+ */
+const PLACE_ZONES: Readonly<Record<string, string>> = {
+  abuja: "Africa/Lagos",
+  "port harcourt": "Africa/Lagos",
+  ibadan: "Africa/Lagos",
+  kano: "Africa/Lagos",
+  nigeria: "Africa/Lagos",
+  ghana: "Africa/Accra",
+  kenya: "Africa/Nairobi",
+  "cape town": "Africa/Johannesburg",
+  "south africa": "Africa/Johannesburg",
+  egypt: "Africa/Cairo",
+  rwanda: "Africa/Kigali",
+  uganda: "Africa/Kampala",
+  "san francisco": "America/Los_Angeles",
+  "silicon valley": "America/Los_Angeles",
+  seattle: "America/Los_Angeles",
+  boston: "America/New_York",
+  washington: "America/New_York",
+  miami: "America/New_York",
+  austin: "America/Chicago",
+  dallas: "America/Chicago",
+  houston: "America/Chicago",
+  uk: "Europe/London",
+  "united kingdom": "Europe/London",
+  england: "Europe/London",
+  manchester: "Europe/London",
+  edinburgh: "Europe/London",
+  france: "Europe/Paris",
+  germany: "Europe/Berlin",
+  munich: "Europe/Berlin",
+  india: "Asia/Kolkata",
+  mumbai: "Asia/Kolkata",
+  delhi: "Asia/Kolkata",
+  "new delhi": "Asia/Kolkata",
+  bangalore: "Asia/Kolkata",
+  bengaluru: "Asia/Kolkata",
+  beijing: "Asia/Shanghai",
+  "abu dhabi": "Asia/Dubai",
+  uae: "Asia/Dubai",
+};
+
+/**
+ * A place or zone as the person said it ("Lagos", "I'm in Abuja",
+ * "Europe/London") to one IANA zone, or null when it names none or
+ * several. Deterministic: their words are matched against known places
+ * and the runtime's IANA list by its city part, the longest name winning.
+ */
+export function zoneFromWords(words: string): string | null {
+  const said = words.trim();
+  if (said.length === 0) return null;
+  if (said.includes("/") && isKnownTimeZone(said)) {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: said,
+    }).resolvedOptions().timeZone;
+  }
+  const text = ` ${said
+    .toLowerCase()
+    .replace(/[^\p{L}\s]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()} `;
+  const found = new Map<string, string>();
+  const consider = (place: string, zone: string) => {
+    if (text.includes(` ${place} `)) found.set(place, zone);
+  };
+  for (const [place, zone] of Object.entries(PLACE_ZONES))
+    consider(place, zone);
+  for (const zone of ianaZones()) {
+    const city = zone.split("/").at(-1)?.replaceAll("_", " ").toLowerCase();
+    if (city !== undefined && city.length > 2) consider(city, zone);
+  }
+  if (found.size === 0) return null;
+  const longest = Math.max(...[...found.keys()].map((place) => place.length));
+  const zones = new Set(
+    [...found.entries()]
+      .filter(([place]) => place.length === longest)
+      .map(([, zone]) => zone),
+  );
+  return zones.size === 1 ? ([...zones][0] ?? null) : null;
+}
+
+let IANA: readonly string[] | null = null;
+function ianaZones(): readonly string[] {
+  if (IANA === null) {
+    try {
+      IANA = Intl.supportedValuesOf("timeZone");
+    } catch {
+      IANA = [];
+    }
+  }
+  return IANA;
+}
+
 export function isKnownTimeZone(timeZone: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone });
