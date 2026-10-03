@@ -360,7 +360,7 @@ function InvestorView({ results }: { readonly results: InvestorResults }) {
       <PageSection
         id="funnel"
         title="Deal flow"
-        description="Distinct companies at each step in this period."
+        description="Distinct companies at each step in this period, as recorded. A step is counted even when the one above it was not recorded (a company saved from a link was never seen in the feed), and a later change, like unsaving, does not remove it."
       >
         {max === 0 ? (
           <EmptyState
@@ -428,7 +428,11 @@ function InvestorView({ results }: { readonly results: InvestorResults }) {
         <Figures
           items={[
             ...results.qWork.runs.map((r) => ({
-              term: sentence(r.capability),
+              // "Answer 133" read as one answer: the count is of runs.
+              term:
+                r.capability.toUpperCase() === "ANSWER"
+                  ? "Answers"
+                  : sentence(r.capability),
               value: String(r.runs),
             })),
             { term: "Errands", value: String(results.qWork.errands) },

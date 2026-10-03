@@ -915,7 +915,9 @@ function StatusLine({ flow }: { readonly flow: PitchFlowState }) {
       case "LOADING":
         return "Loading";
       case "EMPTY":
-        return "No pitch yet";
+        // This upload's state, not the company's: a company with a live
+        // pitch read "No pitch yet" here (demo audit 2026-10-03).
+        return "Nothing uploaded yet";
       case "CREATED":
         return "Ready for a video";
       case "PREPARING":

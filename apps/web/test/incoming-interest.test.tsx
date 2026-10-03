@@ -88,6 +88,22 @@ const accepted = (): Result => ({
   },
 });
 
+describe("an accepted interest, later", () => {
+  it("says where the relationship stands now when it has moved on", () => {
+    render(
+      <IncomingInterest
+        items={[{ ...PENDING, response: "ACCEPTED" }]}
+        currentStates={
+          new Map([[PENDING.investorOrganisationId, "IN_DILIGENCE" as const]])
+        }
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "Now: in diligence.",
+    );
+  });
+});
+
 describe("the founder's inbox", () => {
   it("says so plainly when there is no interest", () => {
     render(<IncomingInterest items={[]} answer={vi.fn()} />);

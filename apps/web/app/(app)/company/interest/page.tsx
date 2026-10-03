@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { listIncomingInterest } from "@capital-q/api-client";
+import {
+  listCompanyRelationships,
+  listIncomingInterest,
+} from "@capital-q/api-client";
+import type { RelationshipStateV2 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -72,8 +76,17 @@ export default async function InvestorInterestPage() {
     );
   }
 
-  const incoming = await listIncomingInterest(session, context.companyId).catch(
-    () => null,
+  const [incoming, relationships] = await Promise.all([
+    listIncomingInterest(session, context.companyId).catch(() => null),
+    // Where each pair stands now: an accepted interest is history, and the
+    // relationship may have moved on (demo audit 2026-10-03: "Connected"
+    // beside a pair in diligence).
+    listCompanyRelationships(session, context.companyId).catch(() => null),
+  ]);
+  const now = new Map<string, RelationshipStateV2>(
+    (relationships?.items ?? [])
+      .filter((item) => item.counterpart.kind === "INVESTOR_ORGANISATION")
+      .map((item) => [item.counterpart.id, item.state]),
   );
   return (
     <PageContainer>
@@ -92,7 +105,7 @@ export default async function InvestorInterestPage() {
           }
         />
       ) : (
-        <IncomingInterest items={incoming.items} />
+        <IncomingInterest items={incoming.items} currentStates={now} />
       )}
     </PageContainer>
   );

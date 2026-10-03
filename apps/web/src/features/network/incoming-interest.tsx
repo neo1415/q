@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 
-import type { IncomingInterestDto } from "@capital-q/contracts";
+import type {
+  IncomingInterestDto,
+  RelationshipStateV2,
+} from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -12,6 +15,7 @@ import {
   type AnswerActionResult,
 } from "./interest-actions";
 import { formatDay } from "@/components/date-format";
+import { STATE_WORDS } from "@/features/relationships/relationship-words";
 
 /**
  * The founder's inbox of investor interest (CQ-NET-011; doc 17 §83-§86).
@@ -64,10 +68,13 @@ function Row({
   item,
   answer,
   onAnswered,
+  currentState,
 }: {
   readonly item: IncomingInterestDto;
   readonly answer: AnswerPort;
   readonly onAnswered?: (() => void) | undefined;
+  /** Where the relationship stands now, when known. */
+  readonly currentState?: RelationshipStateV2 | undefined;
 }) {
   const [current, setCurrent] = useState(item);
   const [phase, setPhase] = useState<RowPhase>({ kind: "IDLE" });
@@ -116,6 +123,9 @@ function Row({
     outcome = (
       <p className="cq-status-line" role="status">
         Connected. You and {name} have both agreed to connect.
+        {currentState === undefined || currentState === "CONNECTED"
+          ? null
+          : ` Now: ${STATE_WORDS[currentState].toLowerCase()}.`}
       </p>
     );
   } else if (current.response === "DECLINED") {
@@ -228,9 +238,12 @@ export function IncomingInterest({
   items,
   answer = answerInterestAction,
   onAnswered,
+  currentStates,
 }: {
   readonly items: readonly IncomingInterestDto[];
   readonly answer?: AnswerPort;
+  /** Investor organisation id → where that relationship stands now. */
+  readonly currentStates?: ReadonlyMap<string, RelationshipStateV2> | undefined;
   /** Called once the server has recorded an answer (CQ-WEB-030). */
   readonly onAnswered?: (() => void) | undefined;
 }) {
@@ -253,6 +266,7 @@ export function IncomingInterest({
           item={item}
           answer={answer}
           onAnswered={onAnswered}
+          currentState={currentStates?.get(item.investorOrganisationId)}
         />
       ))}
     </ul>
