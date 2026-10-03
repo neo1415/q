@@ -24,6 +24,10 @@ import {
   type InstructionPerson,
   type InstructionPlanStep,
 } from "../src/composition/instructions/engine.js";
+import {
+  companyCardFacts,
+  type InstructionMaterial,
+} from "../src/composition/instructions/material.js";
 import type {
   InstructionRow,
   InstructionStore,
@@ -435,6 +439,10 @@ describe("the validator: code decides each step", () => {
 const PEOPLE_OVERRIDE: { value: readonly InstructionPerson[] | null } = {
   value: null,
 };
+/** QA run 8a1d57b9: the material a case's messages are checked against. */
+const MATERIAL_OVERRIDE: { value: InstructionMaterial | null } = {
+  value: null,
+};
 
 function world(
   plans: readonly (Omit<InstructionPlanResult, "cannot"> & {
@@ -518,6 +526,9 @@ function world(
     ports: {},
     actorFor: () => Promise.resolve(actor),
     people: () => Promise.resolve(PEOPLE_OVERRIDE.value ?? PEOPLE),
+    ...(MATERIAL_OVERRIDE.value === null
+      ? {}
+      : { material: () => Promise.resolve(MATERIAL_OVERRIDE.value) }),
     plan: (_who, variables, limits) => {
       expect(limits.maxCostUsd).toBeGreaterThanOrEqual(0.08);
       planned.push(variables.refusals);
@@ -960,5 +971,79 @@ describe("someone they said to leave out ('except Acme')", () => {
     expect(
       verdictOf(validate(chat("Hello", {}, OTHER_REL), { grant: without() })),
     ).not.toContain("REFUSED");
+  });
+});
+
+describe("messages Q writes are grounded (QA run 8a1d57b9)", () => {
+  const material: InstructionMaterial = {
+    sender: { side: "INVESTOR", facts: [] },
+    counterparts: new Map([
+      [
+        COMPANY,
+        companyCardFacts(
+          {
+            currentStageCode: "seed",
+            headquartersCountry: null,
+            shortDescription:
+              "Acme Robotics builds warehouse picking robots for grocery retailers.",
+          },
+          () => undefined,
+          "their Capital Q profile",
+        ),
+      ],
+    ]),
+  };
+
+  it("a generic first message is refused with code's reason and re-planned; the grounded one is sent", async () => {
+    ran.length = 0;
+    MATERIAL_OVERRIDE.value = material;
+    try {
+      const { engine, row, planned } = world([
+        {
+          steps: [
+            chat(
+              "Hi — I've been following Acme Robotics and would be glad to compare notes. If useful, perhaps we could find a time to meet.",
+            ),
+          ],
+          cannot: [],
+        },
+        {
+          steps: [
+            chat(
+              "Hi Acme team — your profile says you build warehouse picking robots for grocery retailers. Which retailers are you piloting with?",
+            ),
+          ],
+          cannot: [],
+        },
+      ]);
+      const result = await engine.fire(row.id, "run-0201");
+      expect(planned).toEqual(["None.", "chat.message.send: FALSE_HISTORY"]);
+      expect(result.done).toBe(1);
+      expect(
+        ran.map(
+          (entry) => (entry.input as { input: { body: string } }).input.body,
+        ),
+      ).toEqual([expect.stringContaining("warehouse picking robots")]);
+    } finally {
+      MATERIAL_OVERRIDE.value = null;
+    }
+  });
+
+  it("a message still ungrounded after the re-plans is recorded as not sent, in plain words", async () => {
+    ran.length = 0;
+    MATERIAL_OVERRIDE.value = material;
+    try {
+      const { engine, row, steps } = world([
+        { steps: [chat("Hi Acme, keen to compare notes.")], cannot: [] },
+      ]);
+      const result = await engine.fire(row.id, "run-0202");
+      expect(result).toMatchObject({ done: 0, refused: 1 });
+      expect(ran).toHaveLength(0);
+      expect([...steps.values()][0]?.words).toContain(
+        "didn't name anything specific",
+      );
+    } finally {
+      MATERIAL_OVERRIDE.value = null;
+    }
   });
 });

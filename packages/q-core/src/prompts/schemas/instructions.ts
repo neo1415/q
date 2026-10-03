@@ -135,6 +135,24 @@ export type InstructionPlanV3Result = z.infer<
   typeof InstructionPlanV3ResultSchema
 >;
 
+/**
+ * v4 (QA run 8a1d57b9): four first messages were the same sentence with the
+ * name changed ("I've been following Tarmacly..."), because the planner saw
+ * names and ids only. It now also reads who it writes as -- the sender's
+ * side and their own approved facts (declared mandate fields, or their own
+ * company's network-visible profile) -- and, per person, the counterpart's
+ * network-visible material with its source. Code checks every message
+ * against that material before anything is sent. The result schema is v3's.
+ */
+export const InstructionPlanV4VariablesSchema =
+  InstructionPlanVariablesSchema.extend({
+    /** The sender's side and approved facts, each with its source. Trusted (their own records). */
+    sender: z.string().max(3_000),
+  }).strict();
+export type InstructionPlanV4Variables = z.infer<
+  typeof InstructionPlanV4VariablesSchema
+>;
+
 // ---------------------------------------------------------------------------
 // INSTRUCTION_THREAD_READER: the quarantined extractor (ADR 0043 §6)
 // ---------------------------------------------------------------------------
@@ -190,4 +208,35 @@ export const InstructionThreadFactsSchema = z
   .strict();
 export type InstructionThreadFacts = z.infer<
   typeof InstructionThreadFactsSchema
+>;
+
+/**
+ * v2 (QA run 8a1d57b9): what their question is about, so code can tell a
+ * question Q may answer from the person's approved facts ("what's your
+ * typical cheque size and do you lead?" -- declared mandate fields) from
+ * one that must go to the person. A general question about a declared
+ * mandate field is not terms; a deal's valuation, an amount for this
+ * company, a commitment or signing still is.
+ */
+export const INSTRUCTION_THREAD_READER_V2_SCHEMA_VERSION = 2;
+export const INSTRUCTION_QUESTION_KINDS = [
+  /** Their typical or range of cheque, as declared. */
+  "CHEQUE_SIZE",
+  /** Whether they lead, co-invest or follow. */
+  "LEAD_OR_FOLLOW",
+  "SECTORS",
+  "STAGES",
+  "GEOGRAPHIES",
+  /** Anything else. */
+  "OTHER",
+] as const;
+export type InstructionQuestionKind =
+  (typeof INSTRUCTION_QUESTION_KINDS)[number];
+export const InstructionThreadFactsV2Schema =
+  InstructionThreadFactsSchema.extend({
+    /** What their unanswered question is about; empty when they ask nothing. */
+    questionAbout: z.array(z.enum(INSTRUCTION_QUESTION_KINDS)).max(6),
+  }).strict();
+export type InstructionThreadFactsV2 = z.infer<
+  typeof InstructionThreadFactsV2Schema
 >;

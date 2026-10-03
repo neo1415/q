@@ -12,6 +12,11 @@ import {
   INSTRUCTION_PLAN_UNTRUSTED,
   INSTRUCTION_PLAN_V2_SCHEMA_VERSION,
   INSTRUCTION_PLAN_V3_SCHEMA_VERSION,
+  INSTRUCTION_THREAD_READER_V2_SCHEMA_VERSION,
+  InstructionPlanV4VariablesSchema,
+  InstructionThreadFactsV2Schema,
+  type InstructionPlanV4Variables,
+  type InstructionThreadFactsV2,
   InstructionPlanResultSchema,
   InstructionPlanV2ResultSchema,
   InstructionPlanV3ResultSchema,
@@ -134,7 +139,7 @@ export const INSTRUCTION_PLAN_V3: PromptDefinition<
   InstructionPlanVariables,
   InstructionPlanV3Result
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -154,6 +159,49 @@ export const INSTRUCTION_PLAN_V3: PromptDefinition<
     schema: InstructionPlanV3ResultSchema,
   },
   template: PLAN_V3,
+};
+
+const PLAN_V4 = PLAN_V3.replace(
+  "WHAT THEY ALLOWED (the approved grant)",
+  `WHO YOU WRITE AS (their side and their approved facts)
+{{sender}}
+
+WHAT THEY ALLOWED (the approved grant)`,
+).replace(
+  "- For a chat message, write the message itself in the arguments in their tone, as from Q on their behalf, and set topic to one of the approved topics exactly.",
+  `- For a chat message, write the message itself in the arguments, as from Q on their behalf, and set topic to one of the approved topics exactly. Code checks every message before it is sent and refuses one that breaks these rules:
+  - A first message (nothing sent in that thread yet) is specific and human. Say what in the other side's own material (under THEIR PEOPLE) fits WHO YOU WRITE AS -- sector, stage, geography -- and name one concrete fact from that material with where it comes from ("your profile says...", "in your pitch..."). Write in the register of the sender's side: an investor writing to a founder about their company, or a founder writing to an investor about their focus.
+  - Every fact you state comes from that material or from WHO YOU WRITE AS. Anything not there stays out; never guess a number.
+  - Never claim history you do not have: no "I've been following", "as we discussed", "great to speak again".
+  - At most 60 words, in their tone.
+  - Propose a call or a meeting only when schedule.meeting.book is AUTO in what they allowed. Otherwise end with a question instead.
+  - A reply to their question answers only from WHO YOU WRITE AS and the approved topics. When the answer is not there, or it is about terms or money, write no reply: code takes that question to them.`,
+);
+
+export const INSTRUCTION_PLAN_V4: PromptDefinition<
+  InstructionPlanV4Variables,
+  InstructionPlanV3Result
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-03",
+  id: "INSTRUCTION_PLAN",
+  version: 4,
+  changeDescription:
+    "QA run 8a1d57b9: four first messages were one generic sentence with the name changed. The planner now reads the sender's side and approved facts and each counterpart's network-visible material with its source, and writes grounded, human first messages and replies; code validates each.",
+  variables: {
+    schema: InstructionPlanV4VariablesSchema,
+    untrusted: [...INSTRUCTION_PLAN_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_PLAN_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_PLAN_V3_SCHEMA_VERSION,
+    schema: InstructionPlanV3ResultSchema,
+  },
+  template: PLAN_V4,
 };
 
 const THREAD_READER = `TASK: INSTRUCTION_THREAD_READER
@@ -186,7 +234,7 @@ export const INSTRUCTION_THREAD_READER_V1: PromptDefinition<
   InstructionThreadReaderVariables,
   InstructionThreadFacts
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -206,4 +254,44 @@ export const INSTRUCTION_THREAD_READER_V1: PromptDefinition<
     schema: InstructionThreadFactsSchema,
   },
   template: THREAD_READER,
+};
+
+const THREAD_READER_V2 = THREAD_READER.replace(
+  "- mentionsTermsOrMoney: true when they raise terms, valuation, amounts, money, commitments or signing.",
+  `- mentionsTermsOrMoney: true when they raise terms, valuation, an amount for this company, commitments or signing. A general question about someone's typical cheque size or whether they lead is questionAbout, not terms.
+- questionAbout: what their unanswered question is about -- CHEQUE_SIZE (a typical cheque or range), LEAD_OR_FOLLOW, SECTORS, STAGES, GEOGRAPHIES, or OTHER for anything else. Empty when they ask nothing.`,
+)
+  .replace(
+    "When unsure, use the cautious value: mentionsTermsOrMoney true, declined true, proposedTime null.",
+    "When unsure, use the cautious value: mentionsTermsOrMoney true, declined true, proposedTime null, questionAbout OTHER.",
+  )
+  .replace(
+    "matching the InstructionThreadFacts schema.",
+    "matching the InstructionThreadFacts schema (v2, with questionAbout).",
+  );
+
+export const INSTRUCTION_THREAD_READER_V2: PromptDefinition<
+  InstructionThreadReaderVariables,
+  InstructionThreadFactsV2
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-03",
+  id: "INSTRUCTION_THREAD_READER",
+  version: 2,
+  changeDescription:
+    "QA run 8a1d57b9: a founder's \"what's your typical cheque size and do you lead?\" went unanswered. The reader now says what a question is about, so code answers only from the person's declared facts and takes anything else to them; a general mandate question is no longer read as terms.",
+  variables: {
+    schema: InstructionThreadReaderVariablesSchema,
+    untrusted: [...INSTRUCTION_THREAD_READER_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_THREAD_READER_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_THREAD_READER_V2_SCHEMA_VERSION,
+    schema: InstructionThreadFactsV2Schema,
+  },
+  template: THREAD_READER_V2,
 };
