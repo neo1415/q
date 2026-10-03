@@ -56,7 +56,7 @@ async function portsUsedBy(action: AnyAppAction): Promise<string[]> {
         {
           actor: anything() as never,
           idempotencyKey: "probe",
-          correlationId: "cor_probe" as never,
+          correlationId: "cor_probe",
           surface: "Q",
         },
         anything(),
