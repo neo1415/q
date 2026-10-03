@@ -754,6 +754,26 @@ export {
   type QPersonality,
   type QStandingDto,
 } from "./conduct.js";
+// Standing instructions (ADR 0043).
+export {
+  handleEverythingGrant,
+  INSTRUCTION_ACTION_MODES,
+  INSTRUCTION_AUTO_ELIGIBLE_ACTIONS,
+  INSTRUCTION_BUDGET_USD_MONTH_DEFAULT,
+  INSTRUCTION_MESSAGES_PER_COUNTERPART_MAX,
+  InstructionGrantPayloadSchema,
+  InstructionGrantSchema,
+  InstructionWorkingHoursSchema,
+  Q_INSTRUCTION_GRANT,
+  STANDING_INSTRUCTION_STATUSES,
+  StandingInstructionDtoSchema,
+  type StandingInstructionDto,
+  type InstructionActionMode,
+  type InstructionGrant,
+  type InstructionGrantPayload,
+  type InstructionWorkingHours,
+  type StandingInstructionStatus,
+} from "./instructions.js";
 // AUTO block: Q's delegated work (ADR 0030).
 export {
   Q_PRESENCE_PATH,

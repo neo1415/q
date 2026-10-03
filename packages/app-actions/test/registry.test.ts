@@ -4,6 +4,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import {
   APP_ACTIONS,
+  delegableOnItsOwn,
   PERSON_ACTIONS,
   misheard,
   parityCases,
@@ -381,5 +382,41 @@ describe("a name said without its parenthetical", () => {
         await resolveReference(candidates, "RELATIONSHIP", actor, said),
       ).toEqual({ kind: "RESOLVED", id: SAVANNA });
     }
+  });
+});
+
+/**
+ * ADR 0043 (founder decision 2026-10-03): what Q may ever do on its own
+ * under a standing instruction, and what always needs a yes.
+ */
+describe("delegation: what Q may do on its own", () => {
+  const named = (name: string) =>
+    APP_ACTIONS.find((action) => action.name === name);
+
+  it("only expressing interest, chat messages and booking times are delegable", () => {
+    expect(
+      APP_ACTIONS.filter(delegableOnItsOwn)
+        .map((action) => action.name)
+        .sort(),
+    ).toEqual([
+      "chat.message.send",
+      "relationship.interest.express",
+      "schedule.meeting.book",
+    ]);
+  });
+
+  it.each([
+    "capital.objective.change",
+    "disclosure.raise.share",
+    "relationship.outcome.change",
+    "relationship.outcome.pass",
+    "relationship.interest.decline",
+    "relationship.connection_request.decline",
+    "investor.mandate.change",
+    "verification.kyb.submit",
+  ])("%s carries terms, money or a commitment: never Q's alone", (name) => {
+    const action = named(name);
+    expect(action?.consequence).toBeDefined();
+    expect(action === undefined ? true : delegableOnItsOwn(action)).toBe(false);
   });
 });

@@ -40,7 +40,12 @@ export const qWorkLaneAnswerPath = (delegationId: string, laneId: string) =>
  */
 export const Q_WORK_WAKE_CHANNEL = "q_work_wake" as const;
 
-export const Q_WORK_KINDS = ["INVESTOR_OUTREACH", "FOUNDER_STAND_IN"] as const;
+export const Q_WORK_KINDS = [
+  "INVESTOR_OUTREACH",
+  "FOUNDER_STAND_IN",
+  /** ADR 0043: a goal Q works toward under one approved grant. */
+  "STANDING_INSTRUCTION",
+] as const;
 export const Q_WORK_STATUSES = [
   "ACTIVE",
   "DONE",

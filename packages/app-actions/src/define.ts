@@ -151,6 +151,14 @@ export type AppActionCard = {
   readonly preview: string;
 };
 
+/** ADR 0043: what is never delegated to Q on its own. */
+export const APP_ACTION_CONSEQUENCES = [
+  "TERMS",
+  "MONEY",
+  "COMMITMENT",
+] as const;
+export type AppActionConsequence = (typeof APP_ACTION_CONSEQUENCES)[number];
+
 export type AppActionDefinition<In, Out, ToolIn = In> = {
   /** Stable, dotted: the Approval Engine's action type is `app.<name>`. */
   readonly name: string;
@@ -185,6 +193,12 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
    * card (lead 2026-10-03). Absent: additive, cards coexist.
    */
   readonly supersedes?: boolean | undefined;
+  /**
+   * ADR 0043: terms, money or a commitment. Never taken by Q on its own
+   * under a standing instruction, whatever the grant says: always an
+   * explicit yes on its card.
+   */
+  readonly consequence?: AppActionConsequence | undefined;
   /** What the approval card says (CONSEQUENTIAL), and Q's line after. */
   readonly card: (input: In) => AppActionCard;
   /**
@@ -292,6 +306,8 @@ export function defineAppActionFamily<ToolIn>(definition: {
   readonly tool: AppActionTool<AppActionFamilyInput, ToolIn>;
   /** The family's own card: a setter (see AppActionDefinition.supersedes). */
   readonly supersedes?: boolean | undefined;
+  /** ADR 0043: the family's consequence (see AppActionDefinition). */
+  readonly consequence?: AppActionConsequence | undefined;
 }): readonly AnyAppAction[] {
   const operations = Object.keys(definition.members);
   const memberOf = (operation: string): AnyAppAction => {
@@ -344,6 +360,9 @@ export function defineAppActionFamily<ToolIn>(definition: {
       memberOf(value.operation).done(out, value.input, names),
     tool: definition.tool,
     ...(definition.supersedes === true ? { supersedes: true } : {}),
+    ...(definition.consequence === undefined
+      ? {}
+      : { consequence: definition.consequence }),
   });
   return [
     family,

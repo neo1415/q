@@ -1,4 +1,6 @@
 export {
+  APP_ACTION_CONSEQUENCES,
+  type AppActionConsequence,
   defineAppAction,
   defineAppActionFamily,
   isRefusal,
@@ -22,6 +24,7 @@ export {
   type AppActionVerdict,
 } from "./define.js";
 export type { AppActionPorts } from "./ports.js";
+export { delegableOnItsOwn } from "./delegation.js";
 export {
   REFERENCE_KINDS,
   resolveReference,

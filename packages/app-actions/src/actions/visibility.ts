@@ -275,6 +275,7 @@ const SHARE_RAISE = defineAppAction<
   z.infer<typeof ShareTool>
 >({
   name: "disclosure.raise.share",
+  consequence: "TERMS",
   supersedes: true,
   short: "share the raise",
   area: "visibility",
@@ -400,6 +401,7 @@ const REVOKE_SHARE = defineAppAction<
   z.infer<typeof RevokeTool>
 >({
   name: "disclosure.share.revoke",
+  consequence: "TERMS",
   supersedes: true,
   short: "stop sharing the raise",
   area: "visibility",

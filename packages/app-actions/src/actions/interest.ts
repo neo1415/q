@@ -133,6 +133,8 @@ function answerInterest(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
     name: accept
       ? "relationship.interest.accept"
       : "relationship.interest.decline",
+    // ADR 0043: a decision on a relationship is never Q's alone.
+    consequence: "COMMITMENT",
     short: accept
       ? "accept an investor's interest"
       : "decline an investor's interest",
@@ -245,6 +247,8 @@ function answerConnection(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
     name: accept
       ? "relationship.connection_request.accept"
       : "relationship.connection_request.decline",
+    // ADR 0043: a decision on a relationship is never Q's alone.
+    consequence: "COMMITMENT",
     short: accept
       ? "accept a connection request"
       : "decline a connection request",
