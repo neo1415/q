@@ -3421,6 +3421,34 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     expect(stored.at(-1)?.content).toContain("standing instruction");
   });
 
+  it("what else they said about the grant is read against the tool and carried", async () => {
+    const proposed: unknown[] = [];
+    const { answer } = seam({
+      said: "take over my founder conversations, but ask me before every step",
+      reading: handOverReading(null),
+      outcomes: [],
+      handOver: noRelationships,
+      appActionArguments: (_request, input) =>
+        Promise.resolve(
+          input.tool === "propose_standing_instruction"
+            ? { askFirst: true, goal: "ignored: their words are the goal" }
+            : null,
+        ),
+      delegation: delegationPort(
+        { side: "INVESTOR", relationships: 2, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(proposed).toEqual([
+      {
+        goal: "take over my founder conversations, but ask me before every step",
+        includeNewCompanies: false,
+        more: { askFirst: true, goal: "ignored: their words are the goal" },
+      },
+    ]);
+  });
+
   it("a meeting with no one named is still asked about by name", async () => {
     const proposed: unknown[] = [];
     const { answer, stored } = seam({

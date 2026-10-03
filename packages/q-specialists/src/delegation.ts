@@ -24,7 +24,16 @@ export type QDelegationPort = {
   readonly context: (request: QAnswerRequest) => Promise<DelegationContext>;
   readonly propose: (
     request: QAnswerRequest,
-    input: { readonly goal: string; readonly includeNewCompanies: boolean },
+    input: {
+      readonly goal: string;
+      readonly includeNewCompanies: boolean;
+      /**
+       * What else they said about the grant (ask first, tone, topics,
+       * digest, how long), read against the tool's own schema; the
+       * tool validates it.
+       */
+      readonly more?: Readonly<Record<string, unknown>> | undefined;
+    },
   ) => Promise<{
     readonly status: string;
     readonly awaitingApprovalOf: string;
@@ -82,18 +91,25 @@ export async function actOnDelegation(
   port: QDelegationPort,
   request: QAnswerRequest,
   utterance: string,
+  /** Their words read against the tool's schema, when a reader is composed. */
+  readArguments?:
+    (() => Promise<Readonly<Record<string, unknown>> | null>)  ,
 ): Promise<string> {
   const context = await port.context(request).catch((): DelegationContext => ({
     side: "NONE",
     relationships: 0,
     outstanding: [],
   }));
+  const more = (await readArguments?.().catch(() => null)) ?? null;
   const prepared = await port
     .propose(request, {
       goal: utterance.trim().slice(0, 2_000) || "Handle everything for me",
-      // Investors with no one yet: Q starts from their feed and saves.
+      // Investors with no one yet: Q starts from their feed and saves; and
+      // whenever their words reach companies they don't know yet.
       includeNewCompanies:
-        context.side === "INVESTOR" && context.relationships === 0,
+        (context.side === "INVESTOR" && context.relationships === 0) ||
+        more?.["includeNewCompanies"] === true,
+      ...(more === null ? {} : { more }),
     })
     .catch(() => null);
   return delegationLine(
@@ -174,10 +190,33 @@ export function createToolDelegationPort(dependencies: {
       };
     },
     propose: async (request, input) => {
-      const data = await call(request, DELEGATION_TOOL, {
-        goal: input.goal,
-        includeNewCompanies: input.includeNewCompanies,
-      });
+      const more = input.more ?? {};
+      // Only the grant's own knobs are taken from the reading; the goal is
+      // their words, and an unreadable extra is dropped, not guessed.
+      const known = [
+        "askFirst",
+        "tone",
+        "topics",
+        "relationshipIds",
+        "expiresInDays",
+        "digest",
+      ] as const;
+      const extra = Object.fromEntries(
+        known.filter((key) => key in more).map((key) => [key, more[key]]),
+      );
+      const data =
+        (await call(request, DELEGATION_TOOL, {
+          ...extra,
+          goal: input.goal,
+          includeNewCompanies: input.includeNewCompanies,
+        })) ??
+        // The extras did not validate: the plain card, their goal only.
+        (Object.keys(extra).length === 0
+          ? null
+          : await call(request, DELEGATION_TOOL, {
+              goal: input.goal,
+              includeNewCompanies: input.includeNewCompanies,
+            }));
       if (data === null || typeof data !== "object") return null;
       const record = data as Record<string, unknown>;
       return typeof record["status"] === "string" &&

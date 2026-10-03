@@ -41,6 +41,8 @@ import type { InstructionRow, InstructionStore } from "./store.js";
  */
 
 export const MAX_REPLANS = 2;
+/** S8: at most this many people are acted for in one firing. */
+export const FANOUT_MAX = 5;
 /** S6: at most this many threads read per firing. */
 export const THREADS_PER_FIRING = 8;
 
@@ -399,6 +401,8 @@ export type InstructionFiringResult = {
   readonly done: number;
   readonly asked: number;
   readonly refused: number;
+  /** S8: steps left for the next firing by the fan-out cap. */
+  readonly deferred?: number | undefined;
   /** What Q cannot do, each with the reason and something it can do instead. */
   readonly cannot: readonly {
     readonly what: string;
@@ -461,6 +465,7 @@ function grantLines(grant: InstructionGrant): string {
     `Tone: ${grant.tone}`,
     `Topics: ${grant.topics.join("; ") || "none"}`,
     `At most ${String(grant.maxMessagesPerCounterpart)} messages per person, then ask.`,
+    `At most ${String(FANOUT_MAX)} people per run; the rest wait for the next run.`,
     "Terms, money and commitments: always theirs to approve.",
   ].join("\n");
 }
@@ -743,11 +748,46 @@ export function createInstructionEngine(
       let asked = 0;
       const askedWords: string[] = [];
       let refusedCount = 0;
-      for (const [index, verdict] of verdicts.entries()) {
-        const step = plan.steps[index];
-        if (step === undefined) continue;
+      // S8 fan-out: at most FANOUT_MAX people are acted for in one firing;
+      // steps for anyone beyond are left for the next firing (not recorded,
+      // so they can be planned again). Each person's steps run in order;
+      // different people's run side by side.
+      const steps = plan.steps;
+      const whoOf = (index: number): string => {
+        const verdict = verdicts[index];
+        if (
+          verdict?.relationshipId !== null &&
+          verdict?.relationshipId !== undefined
+        ) {
+          return verdict.relationshipId;
+        }
+        const raw = steps[index]?.argumentsJson ?? "";
+        const company = /"companyId"\s*:\s*"([^"]+)"/u.exec(raw)?.[1];
+        return company === undefined ? "" : `company:${company}`;
+      };
+      const groups = new Map<string, number[]>();
+      for (const index of verdicts.keys()) {
+        const who = whoOf(index);
+        groups.set(who, [...(groups.get(who) ?? []), index]);
+      }
+      const acting = [...groups.keys()].filter((who) => who !== "");
+      const allowed = new Set(acting.slice(0, FANOUT_MAX));
+      const deferred = acting
+        .slice(FANOUT_MAX)
+        .reduce((sum, who) => sum + (groups.get(who)?.length ?? 0), 0);
+      if (deferred > 0) {
+        logger?.info(
+          { instructionId: row.id, people: acting.length, deferred },
+          "standing instruction fan-out capped; the rest waits for the next firing",
+        );
+      }
+      const runStep = async (index: number): Promise<void> => {
+        const verdict = verdicts[index];
+        if (verdict === undefined) return;
+        const step = steps[index];
+        if (step === undefined) return;
         const key = keyOf(index);
-        if (await store.stepDone(key)) continue;
+        if (await store.stepDone(key)) return;
         const record = (input: {
           readonly status: "DONE" | "ASKED" | "REFUSED" | "FAILED";
           readonly mode: "AUTO" | "ASK";
@@ -775,7 +815,7 @@ export function createInstructionEngine(
             reasonCode: verdict.code,
             qActionId: null,
           });
-          continue;
+          return;
         }
         if (verdict.verdict === "AUTO" && !dependencies.autoEnabled) {
           logger?.info(
@@ -807,7 +847,7 @@ export function createInstructionEngine(
                 reasonCode: "NOT_AUTHORIZED",
                 qActionId: null,
               });
-              continue;
+              return;
             }
             await verdict.action.run(
               dependencies.ports,
@@ -835,7 +875,7 @@ export function createInstructionEngine(
               qActionId: null,
             });
           }
-          continue;
+          return;
         }
         // ASK: the card the person's own request would prepare.
         const card = await dependencies
@@ -861,7 +901,7 @@ export function createInstructionEngine(
             reasonCode: "CARD_NOT_PREPARED",
             qActionId: null,
           });
-          continue;
+          return;
         }
         asked += 1;
         askedWords.push(step.words);
@@ -874,7 +914,14 @@ export function createInstructionEngine(
           reasonCode: code,
           qActionId: card.qActionId,
         });
-      }
+      };
+      await Promise.all(
+        [...groups.entries()]
+          .filter(([who]) => who === "" || allowed.has(who))
+          .map(async ([, indexes]) => {
+            for (const index of indexes) await runStep(index);
+          }),
+      );
 
       // S7: what waits on them is a NEEDS_YOU notice at once.
       const waiting = needsYouNotice({
@@ -915,6 +962,7 @@ export function createInstructionEngine(
         done,
         asked,
         refused: refusedCount,
+        deferred,
         cannot: plan.cannot.map((entry) => ({ ...entry })),
       };
     },
