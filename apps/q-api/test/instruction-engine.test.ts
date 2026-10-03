@@ -790,4 +790,28 @@ describe("a firing", () => {
       PEOPLE_OVERRIDE.value = null;
     }
   });
+
+  it("says so on their work page when it does nothing: outside hours, or nothing to do -- once a day", async () => {
+    const late = world([{ steps: [], cannot: [] }], true, AFTER_HOURS);
+    await late.engine.fire(late.row.id, "run-0013");
+    await late.engine.fire(late.row.id, "run-0014");
+    expect([...late.steps.values()]).toEqual([
+      expect.objectContaining({
+        status: "NOTED",
+        reasonCode: "OUTSIDE_HOURS",
+        words:
+          "Waiting for your working hours (Mon-Fri 09:00-17:00, Europe/London) before I start.",
+      }),
+    ]);
+    const idle = world([{ steps: [], cannot: [] }]);
+    await idle.engine.fire(idle.row.id, "run-0015");
+    expect([...idle.steps.values()]).toEqual([
+      expect.objectContaining({
+        status: "NOTED",
+        reasonCode: "NOTHING_TO_DO",
+        words:
+          "Looked at 2 people: nothing to do right now. I'll look again later.",
+      }),
+    ]);
+  });
 });

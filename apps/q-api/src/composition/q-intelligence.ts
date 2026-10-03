@@ -49,6 +49,7 @@ import {
   createToolCanonicalPort,
   createToolHandOverPort,
   createToolDelegationPort,
+  createToolReadinessLead,
   createToolAppActionPort,
   createToolProfileGapsPort,
   createToolOwnMandatePort,
@@ -415,6 +416,8 @@ export function composeQIntelligence(
       ),
       ...(logger === undefined ? {} : { logger }),
     }),
+    // Lead 2026-10-03: "what should I do next?" opens with their readiness.
+    readinessLead: createToolReadinessLead({ tools }),
     // QA 2026-10-03: work handed over in general is a standing instruction.
     delegation: createToolDelegationPort({
       tools,

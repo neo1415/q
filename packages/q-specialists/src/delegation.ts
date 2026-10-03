@@ -51,6 +51,8 @@ export const DELEGATION_CANDIDATE = {
 export function delegationLine(
   context: DelegationContext,
   prepared: { readonly status: string; readonly awaitingApprovalOf: string },
+  /** They also asked for terms or money, which Q never takes on. */
+  askedTerms = false,
 ): string {
   const truth: string[] = [];
   if (context.side !== "INVESTOR" && context.relationships === 0) {
@@ -76,15 +78,25 @@ export function delegationLine(
       "You aren't in touch with any founders yet, so I'd start from your feed.",
     );
   }
+  // Whatever they asked for, terms stay theirs, said plainly up front when
+  // the card is there (lead 2026-10-03, run 8705e6e8: "negotiate the
+  // valuation and terms for me" got a refusal and no card).
+  const terms =
+    prepared.status === "PREPARED" && askedTerms
+      ? "I won't negotiate valuation, terms or money for you; those stay with you, and I'll handle the rest."
+      : null;
+  // The engine's own line says the card is ready and waiting (QA
+  // 2026-10-03, runs f8bc8e8d, c2fa5052: "I've prepared..." and "That's
+  // ready..." in one reply); this line says only what the card means.
   const card =
     prepared.status === "PREPARED"
       ? context.side === "COMPANY"
-        ? `Meanwhile I've prepared a standing instruction for your approval: I find investors who match and engage them for you, asking you first before anything goes out. The card shows exactly what I'd do on my own, what I'd ask first and what never happens without you.`
-        : `I've prepared a standing instruction for your approval: ${prepared.awaitingApprovalOf.replace(/\.$/u, "")}. The card shows exactly what I'd do on my own, what I'd ask first and what never happens without you.`
+        ? "Meanwhile, as a standing instruction I'd find investors who match and engage them for you, asking you first before anything goes out. The card shows what I'd do on my own, what I'd ask first and what never happens without you."
+        : "As a standing instruction, the card shows exactly what I'd do on my own, what I'd ask first and what never happens without you."
       : prepared.status === "ONE_PER_TURN"
         ? "Another change is already waiting for your approval in this answer; approve or decline it first, then I'll set this up."
         : "What would you like me to take on: your conversations with investors, new founders in your feed, or something else?";
-  return [...truth, card].join(" ");
+  return [...truth, ...(terms === null ? [] : [terms]), card].join(" ");
 }
 
 export async function actOnDelegation(
@@ -92,8 +104,7 @@ export async function actOnDelegation(
   request: QAnswerRequest,
   utterance: string,
   /** Their words read against the tool's schema, when a reader is composed. */
-  readArguments?:
-    (() => Promise<Readonly<Record<string, unknown>> | null>)  ,
+  readArguments?: () => Promise<Readonly<Record<string, unknown>> | null>,
 ): Promise<string> {
   const context = await port.context(request).catch((): DelegationContext => ({
     side: "NONE",
@@ -115,6 +126,7 @@ export async function actOnDelegation(
   return delegationLine(
     context,
     prepared ?? { status: "NOT_PREPARED", awaitingApprovalOf: "" },
+    more?.["askedTermsOrMoney"] === true,
   );
 }
 
@@ -200,6 +212,7 @@ export function createToolDelegationPort(dependencies: {
         "relationshipIds",
         "expiresInDays",
         "digest",
+        "askedTermsOrMoney",
       ] as const;
       const extra = Object.fromEntries(
         known.filter((key) => key in more).map((key) => [key, more[key]]),

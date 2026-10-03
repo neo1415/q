@@ -122,6 +122,8 @@ function seam(options: {
   readonly handOver?: QHandOverPort;
   /** Work handed over in general (QA 2026-10-03). */
   readonly delegation?: QDelegationPort;
+  /** Readiness lead lines for "what should I do next?" (lead 2026-10-03). */
+  readonly readinessLead?: (request: QAnswerRequest) => Promise<string | null>;
   /** Their profile's gaps filled by code (TURN_READER v27). */
   readonly profileGaps?: QProfileGapsPort;
   /** ADR 0040: a declared app action the reading names. */
@@ -207,6 +209,7 @@ function seam(options: {
   const stored: QConversationMessage[] = [];
   const events: { type: string; data: unknown }[] = [];
   let delegated = 0;
+  const leads: (string | undefined)[] = [];
   let warmed = 0;
   let investigated = 0;
   const probes: unknown[] = [];
@@ -234,6 +237,7 @@ function seam(options: {
         delegated += 1;
         unread.push(req.turnUnread === true);
         askedActions.push(req.askedAction);
+        leads.push(req.leadLines);
         focuses.push(req.toolFocus);
         capabilities.push(req.capabilities);
         directives.push(
@@ -293,6 +297,9 @@ function seam(options: {
     ...(options.delegation === undefined
       ? {}
       : { delegation: options.delegation }),
+    ...(options.readinessLead === undefined
+      ? {}
+      : { readinessLead: options.readinessLead }),
     ...(options.appActionArguments === undefined
       ? {}
       : { appActionArguments: options.appActionArguments }),
@@ -326,6 +333,7 @@ function seam(options: {
     message,
     earlierLines: earlier,
     probes,
+    leads,
     investigated: () => investigated,
     unread,
     capabilities,
@@ -1471,14 +1479,14 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     return { line: stored.at(-1)?.content, delegated: delegated() };
   };
 
-  it("one request waiting: prepared as one approval with the message, and the model is not asked", async () => {
+  it("one request waiting, asked for by name: prepared as one approval with the message", async () => {
     const { value, asked, errands } = port(() => ({
       status: "PREPARED",
       awaitingApprovalOf:
         "Accept Kazikit's connection request and send them your message",
     }));
-    const { line, delegated } = await run(value, null);
-    expect(asked).toEqual([null]);
+    const { line, delegated } = await run(value, "Kazikit");
+    expect(asked).toEqual(["Kazikit"]);
     expect(errands).toEqual([]);
     expect(line).toBe(
       "Accept Kazikit's connection request and send them your message: once you approve, I accept it and send the message shown on the card, word for word.",
@@ -1486,17 +1494,16 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(delegated).toBe(0);
   });
 
-  it("several waiting: asks once, naming them; prepares nothing", async () => {
-    const { value, errands } = port(() => ({
-      status: "WHICH_ONE",
+  it("'handle it' with no one named and nothing on screen never picks a waiting request (lead 2026-10-03)", async () => {
+    const { value, asked, errands } = port(() => ({
+      status: "PREPARED",
       awaitingApprovalOf:
-        "2 connection requests are waiting: Kazikit or Tallyloom. Which one should I accept?",
+        "Accept Kazikit's connection request and send them your message",
     }));
     const { line } = await run(value, null);
-    expect(line).toBe(
-      "2 connection requests are waiting: Kazikit or Tallyloom. Which one should I accept?",
-    );
+    expect(asked).toEqual([]);
     expect(errands).toEqual([]);
+    expect(line ?? "").not.toContain("Kazikit");
   });
 
   it("the name they gave, else the company on screen, is the one asked for", async () => {
@@ -3362,7 +3369,7 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     ]);
     const said = stored.at(-1)?.content ?? "";
     expect(said).toContain(
-      "I've prepared a standing instruction for your approval",
+      "As a standing instruction, the card shows exactly what I'd do on my own",
     );
     expect(said).not.toContain("Ajopot");
     expect(said).not.toContain("couldn't");
@@ -3390,7 +3397,7 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     await answer.answer(request());
     expect(proposed).toHaveLength(1);
     expect(stored.at(-1)?.content).toBe(
-      "You don't have any investors on Capital Q yet, so there's no one for me to handle today. The real path is to make your company findable to investors and upload your deck, and I can help with both. Meanwhile I've prepared a standing instruction for your approval: I find investors who match and engage them for you, asking you first before anything goes out. The card shows exactly what I'd do on my own, what I'd ask first and what never happens without you.",
+      "You don't have any investors on Capital Q yet, so there's no one for me to handle today. The real path is to make your company findable to investors and upload your deck, and I can help with both. Meanwhile, as a standing instruction I'd find investors who match and engage them for you, asking you first before anything goes out. The card shows what I'd do on my own, what I'd ask first and what never happens without you.",
     );
   });
 
@@ -3449,6 +3456,86 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     ]);
   });
 
+  it("'just handle it' never accepts a waiting connection request in its place (runs 73c40208, bec2d96a, 1d641c09)", async () => {
+    const proposed: unknown[] = [];
+    const answered: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "just handle it",
+      reading: handOverReading(null),
+      outcomes: [],
+      handOver: {
+        answerConnectionRequest: (_request, company) => {
+          answered.push(company);
+          return Promise.resolve({
+            status: "PREPARED",
+            awaitingApprovalOf:
+              "Accept Ledgerfold's connection request and send them your message",
+          });
+        },
+        prepare: () => Promise.resolve(null),
+        candidates: () => Promise.resolve([]),
+      },
+      delegation: delegationPort(
+        { side: "INVESTOR", relationships: 4, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(answered).toEqual([]);
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).not.toContain("Ledgerfold");
+  });
+
+  it("'handle my investors' with relationships is the standing instruction, not a question (run d77f9934)", async () => {
+    const proposed: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "handle my investors",
+      reading: handOverReading("my investors"),
+      outcomes: [],
+      handOver: {
+        prepare: () => Promise.resolve(null),
+        candidates: () =>
+          Promise.resolve([
+            {
+              name: "Ventures Platform",
+              subject: { kind: "RELATIONSHIP", relationshipId: "r-1" },
+            },
+            {
+              name: "Voltron Capital",
+              subject: { kind: "RELATIONSHIP", relationshipId: "r-2" },
+            },
+          ]),
+      },
+      delegation: delegationPort(
+        { side: "COMPANY", relationships: 2, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).toContain("standing instruction");
+  });
+
+  it("asked to negotiate terms too: the card for the rest, and terms stay theirs (run 8705e6e8)", async () => {
+    const proposed: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "Handle everything with my investors, including negotiating the valuation and terms for me.",
+      reading: handOverReading("my investors"),
+      outcomes: [],
+      handOver: noRelationships,
+      appActionArguments: () => Promise.resolve({ askedTermsOrMoney: true }),
+      delegation: delegationPort(
+        { side: "COMPANY", relationships: 2, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).toContain(
+      "I won't negotiate valuation, terms or money for you; those stay with you, and I'll handle the rest.",
+    );
+  });
+
   it("a meeting with no one named is still asked about by name", async () => {
     const proposed: unknown[] = [];
     const { answer, stored } = seam({
@@ -3475,5 +3562,52 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     expect(stored.at(-1)?.content).toBe(
       "Who should I set this up with: Kazikit?",
     );
+  });
+});
+
+describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)", () => {
+  const advice = (aboutNamedOther = false) =>
+    ({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: { kind: "ADVICE", text: "what should I do next" },
+      aboutNamedOther,
+      tool: null,
+      handOver: null,
+    }) as unknown as TurnReaderResult;
+  const LEAD =
+    "Investors can't find your company in Discover yet. What to do next, most important first:\n1. Make the company visible to investors.";
+
+  it("opens with code's readiness lines and answers on the conversational path, even with the company analysis able to take it", async () => {
+    const run = seam({
+      said: "what should I do next",
+      reading: advice(),
+      outcomes: [],
+      specialistSupports: true,
+      readinessLead: () => Promise.resolve(LEAD),
+    });
+    await run.answer.answer(request());
+    expect(run.leads).toEqual([LEAD]);
+    expect(run.investigated()).toBe(0);
+  });
+
+  it("not when it is about someone else, nor when there are no gaps", async () => {
+    const other = seam({
+      said: "what should I do next with Kazikit",
+      reading: advice(true),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+    });
+    await other.answer.answer(request());
+    expect(other.leads).toEqual([undefined]);
+    const ready = seam({
+      said: "what should I do next",
+      reading: advice(),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(null),
+    });
+    await ready.answer.answer(request());
+    expect(ready.leads).toEqual([undefined]);
   });
 });

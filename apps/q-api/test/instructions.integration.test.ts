@@ -54,6 +54,13 @@ const DIGEST_MIGRATION = fileURLToPath(
   ),
 );
 
+const NOTED_MIGRATION = fileURLToPath(
+  new URL(
+    "../../../supabase/migrations/20261125090000_instruction_noted_steps.sql",
+    import.meta.url,
+  ),
+);
+
 class Rollback extends Error {}
 
 describe("standing instructions against PostgreSQL", () => {
@@ -96,6 +103,8 @@ describe("standing instructions against PostgreSQL", () => {
            where table_schema = 'q_runtime' and table_name = 'standing_instructions'
              and column_name = 'last_digest_at'`;
         if (digestColumn?.found === 0) await tx.file(DIGEST_MIGRATION);
+        // Re-applied inside this rolled-back transaction: it only widens a check.
+        await tx.file(NOTED_MIGRATION);
 
         const tenant = randomUUID();
         await tx`insert into identity.tenants (id, name) values (${tenant}, 'Instruction tenant')`;
@@ -283,10 +292,20 @@ describe("standing instructions against PostgreSQL", () => {
           idempotencyKey: `instr:${id}:run-0001:0`,
         };
         expect(await store.recordStep(step)).toBe(true);
+        expect(
+          await store.recordStep({
+            ...step,
+            status: "NOTED",
+            action: "q.note",
+            relationshipId: null,
+            words: "Waiting for your working hours.",
+            idempotencyKey: `instr:${id}:note-hours:2026-10-03`,
+          }),
+        ).toBe(true);
         expect(await store.recordStep(step)).toBe(false);
         expect(await store.stepDone(step.idempotencyKey)).toBe(true);
         expect((await store.messagesSent(id)).get(relationship)).toBe(1);
-        expect(await store.history(id)).toHaveLength(2);
+        expect(await store.history(id)).toHaveLength(3);
         expect(await store.steps(ben$, id)).toHaveLength(0);
         // Stopped: no wake, no claim, even with a step on the relationship.
         expect(await store.wakeFor(relationship)).toBe(0);

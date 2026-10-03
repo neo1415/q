@@ -49,7 +49,8 @@ export type InstructionStepRow = {
   step_index: number;
   action: string;
   mode: "AUTO" | "ASK";
-  status: "DONE" | "ASKED" | "REFUSED" | "FAILED";
+  /** NOTED: what Q tells them about its own work; never counted as done. */
+  status: "DONE" | "ASKED" | "REFUSED" | "FAILED" | "NOTED";
   relationship_id: string | null;
   words: string;
   reason_code: string | null;
