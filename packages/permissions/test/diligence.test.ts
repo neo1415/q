@@ -81,6 +81,8 @@ function world(options: { readonly diligence?: boolean } = {}) {
       title: "Management accounts",
       documentType: "FINANCIAL",
       currentVersionId: "00000000-0000-4000-8000-0000000003e1",
+      // ADR 0042: processed with no scanner yet.
+      scanned: false,
     },
     [FOREIGN_DOC]: {
       id: FOREIGN_DOC,
@@ -218,6 +220,7 @@ function world(options: { readonly diligence?: boolean } = {}) {
         Promise.resolve({
           url: `https://storage.example/${document.id}?sig=short`,
           expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          scanned: document.scanned !== false,
         }),
     },
     requests,
@@ -317,6 +320,8 @@ describe("diligence: access", () => {
       relationshipId: R1,
     });
     expect(mine?.shares.map((s) => s.title)).toEqual(["Management accounts"]);
+    // ADR 0042: an unscanned share says so, to its own investor.
+    expect(mine?.shares[0]?.scanned).toBe(false);
     // investorTwo is not a party to R1 at all, and R2 holds no share.
     expect(
       await w.service.view({ actor: investorTwo, relationshipId: R1 }),
@@ -340,6 +345,7 @@ describe("diligence: access", () => {
       }),
     ).toMatchObject({
       url: "https://storage.example/" + DOC + "?sig=short",
+      scanned: false,
     });
   });
 

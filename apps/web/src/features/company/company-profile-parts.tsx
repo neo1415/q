@@ -12,6 +12,7 @@ import {
   undoPassAction,
 } from "../discover/feed/feed-actions";
 
+import { NotScannedNote } from "../documents/not-scanned-note";
 import { downloadDeckAction } from "./profile-actions";
 
 /**
@@ -112,9 +113,12 @@ export function ProfilePass({
 export function DeckDownload({
   companyId,
   title,
+  scanned = true,
 }: {
   readonly companyId: string;
   readonly title: string;
+  /** False: "Not virus-scanned yet" beside it (ADR 0042). */
+  readonly scanned?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -140,6 +144,7 @@ export function DeckDownload({
       <span id="deck-title" className="cq-caption text-(--cq-text-tertiary)">
         {title}
       </span>
+      {scanned ? null : <NotScannedNote />}
       {notice === null ? null : (
         <p role="alert" className="cq-body-sm text-(--cq-text-primary)">
           {notice}

@@ -187,7 +187,10 @@ function stateOf(document: {
     };
   }
   if (version.textExtractionStatus === "COMPLETED") {
-    return { state: "ready", label: "Read" };
+    // ADR 0042: read and shareable, but no scanner has looked at it.
+    return version.malwareScanStatus === "NOT_SCANNED"
+      ? { state: "ready", label: "Read · Not virus-scanned yet" }
+      : { state: "ready", label: "Read" };
   }
   switch (version.processingStatus) {
     case "NOT_STARTED":

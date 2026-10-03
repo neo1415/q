@@ -39,6 +39,8 @@ export type SharedDocumentDownloads = {
     readonly url: string;
     readonly expiresAt: string;
     readonly mimeType: string;
+    /** False for a NOT_SCANNED version (ADR 0042): say so where it is offered. */
+    readonly scanned: boolean;
   }>;
   /**
    * What kind of document a SHARED one is (a pitch deck, say), so a
@@ -69,6 +71,7 @@ export type SharedDocumentDownloads = {
     readonly title: string;
     readonly documentType: string;
     readonly currentVersionId: string | null;
+    readonly scanned: boolean;
   } | null>;
   readonly investorAudienceDeck: (company: {
     readonly companyTenantId: string;
@@ -78,13 +81,21 @@ export type SharedDocumentDownloads = {
     readonly documentVersionId: string;
     readonly title: string;
     readonly updatedAt: string;
+    readonly scanned: boolean;
   } | null>;
 };
 
 export function createSharedDocumentDownloads(options: {
   readonly sql: DatabaseExecutor;
   readonly storage: PrivateDocumentDownloadAuthorizer;
+  /**
+   * ADR 0042 (founder decision 2026-10-03): a NOT_SCANNED version may be
+   * handed to the same callers, flagged scanned:false. Default false:
+   * only CLEAN. Never PENDING, BLOCKED or ERROR, under any setting.
+   */
+  readonly serveUnscanned?: boolean | undefined;
 }): SharedDocumentDownloads {
+  const serveUnscanned = options.serveUnscanned === true;
   const documents = createPostgresDocumentRepository();
   const versions = createPostgresDocumentVersionRepository();
   return {
@@ -106,8 +117,12 @@ export function createSharedDocumentDownloads(options: {
         version === null ||
         document.status !== "ACTIVE" ||
         version.documentId !== document.id ||
-        // Unscanned is not clean; nothing unscanned is ever handed out.
-        version.malwareScanStatus !== "CLEAN"
+        // Unscanned is not clean. Only CLEAN is handed out -- or, under
+        // ADR 0042's interim policy, NOT_SCANNED, flagged as such.
+        !(
+          version.malwareScanStatus === "CLEAN" ||
+          (serveUnscanned && version.malwareScanStatus === "NOT_SCANNED")
+        )
       ) {
         throw new DocumentNotFoundError();
       }
@@ -123,6 +138,7 @@ export function createSharedDocumentDownloads(options: {
         url: authorization.url,
         expiresAt: authorization.providerExpiresAt,
         mimeType: version.mimeType,
+        scanned: version.malwareScanStatus === "CLEAN",
       };
     },
     sharedDocumentType: async (share) => {
@@ -147,6 +163,7 @@ export function createSharedDocumentDownloads(options: {
         options.sql,
         tenantId.data,
         company.companyId,
+        serveUnscanned,
       );
     },
   };
@@ -167,6 +184,8 @@ export async function findActiveDocumentById(
   readonly title: string;
   readonly documentType: string;
   readonly currentVersionId: string | null;
+  /** False when its current version was never virus-scanned (ADR 0042). */
+  readonly scanned: boolean;
 } | null> {
   const id = DocumentIdSchema.safeParse(documentId);
   if (!id.success) return null;
@@ -178,11 +197,15 @@ export async function findActiveDocumentById(
       title: string;
       document_type: string;
       current_version_id: string | null;
+      malware_scan_status: string | null;
     }[]
   >`
-    select id, tenant_id, company_id, title, document_type, current_version_id
-      from evidence.documents
-     where id = ${id.data} and status = 'ACTIVE'`;
+    select d.id, d.tenant_id, d.company_id, d.title, d.document_type,
+           d.current_version_id, v.malware_scan_status
+      from evidence.documents d
+      left join evidence.document_versions v
+        on v.id = d.current_version_id and v.document_id = d.id
+     where d.id = ${id.data} and d.status = 'ACTIVE'`;
   const row = rows[0];
   return row === undefined
     ? null
@@ -193,5 +216,6 @@ export async function findActiveDocumentById(
         title: row.title,
         documentType: row.document_type,
         currentVersionId: row.current_version_id,
+        scanned: row.malware_scan_status === "CLEAN",
       };
 }

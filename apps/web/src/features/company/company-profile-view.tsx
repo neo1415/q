@@ -218,6 +218,7 @@ export function CompanyProfileView({
             <DeckDownload
               companyId={profile.companyId}
               title={overview.deck.title}
+              scanned={overview.deck.scanned}
             />
           )}
           <Link

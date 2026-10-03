@@ -1618,6 +1618,17 @@ const appActionPorts: OwnReadPorts = {
         // status is failed… I have not shared it").
         qReading: file.processing,
         shareable: "yes, whether or not Q has read it",
+        // ADR 0042: no scanner yet. Q says so whenever it offers the file.
+        ...(file.malwareScanStatus === undefined
+          ? {}
+          : {
+              virusScanned:
+                file.malwareScanStatus === "CLEAN"
+                  ? "yes"
+                  : file.malwareScanStatus === "NOT_SCANNED"
+                    ? "not yet: say 'not virus-scanned yet' whenever you offer or share it"
+                    : "no",
+            }),
         // Who may download it now, from the record (QA run 581a8862:
         // a declined card's audience was said as the deck's).
         ...(file.downloadAudience === undefined

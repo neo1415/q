@@ -398,6 +398,8 @@ describe("POST /v1/companies/:id/profile/deck/download", () => {
     expect(response.json<{ url: string; expiresAt: string }>()).toEqual({
       url: "https://storage.example/deck.pdf?sig=2",
       expiresAt: "2026-10-02T10:01:00.000Z",
+      // ADR 0042: every deck download says whether it was scanned.
+      scanned: true,
     });
     expect(calls.download).toBe(1);
     await app.close();
@@ -496,6 +498,46 @@ describe("ADR 0041: a deck opened to investors who can find the company", () => 
     expect(response.json<{ url: string }>().url).toContain("audience-deck");
     expect(calls.audienceDownload).toBe(1);
     expect(calls.download).toBe(0);
+    await app.close();
+  });
+
+  it("ADR 0042: an unscanned audience deck is offered and downloaded with scanned:false, to the same admitted investor", async () => {
+    const { profile } = ports({
+      investor: true,
+      findable: true,
+      audience: { ...AUDIENCE_DECK, scanned: false },
+      deck: null,
+    });
+    const unscanned = {
+      ...profile,
+      downloadAudienceDeck: () =>
+        Promise.resolve({
+          url: "https://storage.example/audience-deck.pdf?sig=4",
+          expiresAt: "2026-10-02T10:01:00.000Z",
+          scanned: false,
+        }),
+    };
+    const app = buildApp({ profile: unscanned });
+    const read = (
+      await app.inject({ method: "GET", url: PROFILE_URL })
+    ).json<ProfileBody>();
+    expect(read.overview?.deck).toMatchObject({ scanned: false });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
+    expect(response.json<{ scanned: boolean }>().scanned).toBe(false);
+    await app.close();
+  });
+
+  it("ADR 0042: the same unscanned deck is still refused to an investor the pitch rule does not admit", async () => {
+    const { profile, calls } = ports({
+      investor: true,
+      findable: false,
+      audience: { ...AUDIENCE_DECK, scanned: false },
+      deck: null,
+    });
+    const app = buildApp({ profile });
+    const response = await app.inject({ method: "GET", url: DECK_URL });
+    expect(response.statusCode).toBe(404);
+    expect(calls.audienceDownload).toBe(0);
     await app.close();
   });
 
