@@ -85,11 +85,14 @@ export function delegationLine(
     prepared.status === "PREPARED" && askedTerms
       ? "I won't negotiate valuation, terms or money for you; those stay with you, and I'll handle the rest."
       : null;
+  // The engine's own line says the card is ready and waiting (QA
+  // 2026-10-03, runs f8bc8e8d, c2fa5052: "I've prepared..." and "That's
+  // ready..." in one reply); this line says only what the card means.
   const card =
     prepared.status === "PREPARED"
       ? context.side === "COMPANY"
-        ? `Meanwhile I've prepared a standing instruction for your approval: I find investors who match and engage them for you, asking you first before anything goes out. The card shows exactly what I'd do on my own, what I'd ask first and what never happens without you.`
-        : `I've prepared a standing instruction for your approval: ${prepared.awaitingApprovalOf.replace(/\.$/u, "")}. The card shows exactly what I'd do on my own, what I'd ask first and what never happens without you.`
+        ? "Meanwhile, as a standing instruction I'd find investors who match and engage them for you, asking you first before anything goes out. The card shows what I'd do on my own, what I'd ask first and what never happens without you."
+        : "As a standing instruction, the card shows exactly what I'd do on my own, what I'd ask first and what never happens without you."
       : prepared.status === "ONE_PER_TURN"
         ? "Another change is already waiting for your approval in this answer; approve or decline it first, then I'll set this up."
         : "What would you like me to take on: your conversations with investors, new founders in your feed, or something else?";

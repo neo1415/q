@@ -3369,7 +3369,7 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     ]);
     const said = stored.at(-1)?.content ?? "";
     expect(said).toContain(
-      "I've prepared a standing instruction for your approval",
+      "As a standing instruction, the card shows exactly what I'd do on my own",
     );
     expect(said).not.toContain("Ajopot");
     expect(said).not.toContain("couldn't");
@@ -3397,7 +3397,7 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     await answer.answer(request());
     expect(proposed).toHaveLength(1);
     expect(stored.at(-1)?.content).toBe(
-      "You don't have any investors on Capital Q yet, so there's no one for me to handle today. The real path is to make your company findable to investors and upload your deck, and I can help with both. Meanwhile I've prepared a standing instruction for your approval: I find investors who match and engage them for you, asking you first before anything goes out. The card shows exactly what I'd do on my own, what I'd ask first and what never happens without you.",
+      "You don't have any investors on Capital Q yet, so there's no one for me to handle today. The real path is to make your company findable to investors and upload your deck, and I can help with both. Meanwhile, as a standing instruction I'd find investors who match and engage them for you, asking you first before anything goes out. The card shows what I'd do on my own, what I'd ask first and what never happens without you.",
     );
   });
 
