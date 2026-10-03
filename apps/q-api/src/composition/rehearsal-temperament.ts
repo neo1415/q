@@ -55,17 +55,61 @@ export type Register = (typeof REGISTERS)[number];
 
 type Delta = Partial<Record<keyof Temperament, number>>;
 
+/**
+ * The reading code applies: the model's, corrected by two fixed rules
+ * about the question on the table (QA rehearsal e22ea609).
+ *  - Honesty without substance does not cancel the cost of a gap: "I'm
+ *    not sure about the numbers" to their direct question was read
+ *    HUMBLE_HONEST and warmed them. With a question open it is a gap
+ *    (HONEST_GAP): it costs patience and raises frustration.
+ *  - A dodge needs a question to dodge: with none open, an EVASIVE or
+ *    REPEATED_DODGE reading is NEUTRAL ("That doesn't answer the
+ *    question" came after the founder's opener).
+ */
+export type AppliedAppraisal = RehearsalAppraisal | "HONEST_GAP";
+export function appliedAppraisal(
+  appraisal: RehearsalAppraisal,
+  questionOpen: boolean,
+): AppliedAppraisal {
+  if (questionOpen && appraisal === "HUMBLE_HONEST") return "HONEST_GAP";
+  if (
+    !questionOpen &&
+    (appraisal === "EVASIVE" || appraisal === "REPEATED_DODGE")
+  ) {
+    return "NEUTRAL";
+  }
+  return appraisal;
+}
+
+/** Whether the played person's last line put a question to them. */
+export function questionOpenIn(
+  turns: readonly { readonly from: string; readonly text: string }[],
+): boolean {
+  const lastTheirs = [...turns].reverse().find((turn) => turn.from === "THEM");
+  return lastTheirs !== undefined && lastTheirs.text.includes("?");
+}
+
+/** What the model is told about the question on the table. */
+export function questionNote(questionOpen: boolean): string {
+  return questionOpen
+    ? " Your question is open: an answer that is unsure, unknown or not tracked is a gap, however candid -- it costs you patience; read it CLEAR_BUT_THIN or EVASIVE, never HUMBLE_HONEST."
+    : " No question of yours is waiting on them: their line cannot dodge one, so never say it didn't answer your question.";
+}
+
 /** Readings that give the played person new cause for frustration. */
-const PROVOKING: ReadonlySet<RehearsalAppraisal> = new Set([
+const PROVOKING: ReadonlySet<AppliedAppraisal> = new Set([
   "EVASIVE",
   "REPEATED_DODGE",
   "RUDE",
   "OVERCLAIM",
   "CLEAR_BUT_THIN",
+  "HONEST_GAP",
 ]);
 
 /** What each reading of their latest line does to the played person. */
-const EFFECTS: Readonly<Record<RehearsalAppraisal, Delta>> = {
+const EFFECTS: Readonly<Record<AppliedAppraisal, Delta>> = {
+  // Candid, but the question is still unanswered.
+  HONEST_GAP: { frustration: 10, patience: -10 },
   STRONG_ANSWER: { warmth: 12, frustration: -12, patience: 6 },
   CLEAR_BUT_THIN: { frustration: 6, patience: -6 },
   EVASIVE: { frustration: 20, patience: -16, warmth: -6 },
@@ -129,7 +173,7 @@ export function initialTemperament(
 /** The state after their latest line, by fixed rules. */
 export function applyAppraisal(
   state: Temperament,
-  appraisal: RehearsalAppraisal,
+  appraisal: AppliedAppraisal,
   difficulty: Difficulty,
 ): Temperament {
   const { worse, better } = PROFILE[difficulty];
@@ -400,9 +444,25 @@ export function walkOutPlan(input: {
   readonly theyAskedToEnd: boolean;
   readonly closing: boolean;
   readonly provoked: boolean;
+  /** How the model's close would end it (LEFT_EARLY, DECLINED…). */
+  readonly conclusion?: string | null | undefined;
+  /** The meeting is at its natural end, where a no is not a walk-out. */
+  readonly wrappingUp?: boolean | undefined;
 }): WalkOut {
   const angry = input.register === "ANGRY" || input.register === "FURIOUS";
-  if (!angry || input.theyAskedToEnd) return { warning: null, action: "KEEP" };
+  if (input.theyAskedToEnd) return { warning: null, action: "KEEP" };
+  // Leaving early is a walk-out in any register, and never comes before
+  // two warnings (QA rehearsal e22ea609: the investor left after one,
+  // once their register had dropped below angry and the model's close
+  // stood). A no at the meeting's natural end is not leaving.
+  const walkingOut =
+    input.closing &&
+    (input.conclusion === "LEFT_EARLY" ||
+      (input.conclusion === "DECLINED" && input.wrappingUp !== true));
+  if (walkingOut && input.warningsGiven < 2) {
+    return { warning: input.warningsGiven === 0 ? 1 : 2, action: "WARN" };
+  }
+  if (!angry) return { warning: null, action: "KEEP" };
   if (input.warningsGiven < 2) {
     return {
       warning: input.warningsGiven === 0 ? 1 : 2,

@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyAppraisal,
+  appliedAppraisal,
   deliveryFor,
+  questionNote,
+  questionOpenIn,
+  walkOutNote,
+  walkOutPlan,
   initialTemperament,
   registerOf,
   stanceOf,
@@ -203,5 +208,92 @@ describe("leaving in anger (founder live test 2026-10-01)", () => {
     expect(deliveryFor("EVEN", "EVEN", model, true).intensity).toBe("NORMAL");
     // Mid-meeting anger without fury stays at a normal volume.
     expect(deliveryFor("ANGRY", "ANGRY", model).intensity).toBe("NORMAL");
+  });
+});
+
+describe("the question on the table (QA rehearsal e22ea609)", () => {
+  const asked = [
+    { from: "YOU", text: "We help small businesses get paid faster." },
+    { from: "THEM", text: "What's your monthly revenue?" },
+    { from: "YOU", text: "Honestly, I'm not sure about the numbers." },
+  ];
+  const opened = [{ from: "YOU", text: "Thanks for making the time." }];
+
+  it("knows whether their last line asked something", () => {
+    expect(questionOpenIn(asked)).toBe(true);
+    expect(questionOpenIn(opened)).toBe(false);
+    expect(
+      questionOpenIn([...asked, { from: "THEM", text: "Go ahead." }]),
+    ).toBe(false);
+  });
+
+  it("an honest gap in answering their question costs patience and raises frustration", () => {
+    const start = initialTemperament("REALISTIC", "NEUTRAL");
+    const after = applyAppraisal(
+      start,
+      appliedAppraisal("HUMBLE_HONEST", true),
+      "REALISTIC",
+    );
+    expect(after.patience).toBeLessThan(start.patience);
+    expect(after.frustration).toBeGreaterThan(start.frustration);
+    expect(after.warmth).toBeLessThanOrEqual(start.warmth);
+    // Candour with no question pending still warms them.
+    const unprompted = applyAppraisal(
+      start,
+      appliedAppraisal("HUMBLE_HONEST", false),
+      "REALISTIC",
+    );
+    expect(unprompted.warmth).toBeGreaterThan(start.warmth);
+  });
+
+  it("a dodge needs a question to dodge", () => {
+    expect(appliedAppraisal("EVASIVE", false)).toBe("NEUTRAL");
+    expect(appliedAppraisal("REPEATED_DODGE", false)).toBe("NEUTRAL");
+    expect(appliedAppraisal("EVASIVE", true)).toBe("EVASIVE");
+    expect(questionNote(false)).toContain("never say it didn't answer");
+  });
+
+  it("the whole note to the model stays within its bound", () => {
+    const furious = { patience: 0, warmth: 0, frustration: 100, hurt: 100 };
+    for (const open of [true, false]) {
+      const note =
+        temperamentNote(furious, registerOf(furious, "TOUGH")) +
+        walkOutNote(1, "FURIOUS") +
+        questionNote(open);
+      expect(note.length).toBeLessThanOrEqual(1_200);
+    }
+  });
+});
+
+describe("two warnings before leaving, in any register (QA rehearsal e22ea609)", () => {
+  const plan = (
+    warningsGiven: number,
+    conclusion: string,
+    wrappingUp = false,
+  ) =>
+    walkOutPlan({
+      register: "EXASPERATED",
+      warningsGiven,
+      theyAskedToEnd: false,
+      closing: true,
+      provoked: false,
+      conclusion,
+      wrappingUp,
+    });
+
+  it("a close that leaves early becomes the next warning until two are given", () => {
+    expect(plan(0, "LEFT_EARLY")).toEqual({ warning: 1, action: "WARN" });
+    expect(plan(1, "LEFT_EARLY")).toEqual({ warning: 2, action: "WARN" });
+    expect(plan(1, "DECLINED")).toEqual({ warning: 2, action: "WARN" });
+    expect(plan(2, "LEFT_EARLY")).toEqual({ warning: null, action: "KEEP" });
+  });
+
+  it("a no at the natural end, or a good close, is not a walk-out", () => {
+    expect(plan(0, "DECLINED", true)).toEqual({
+      warning: null,
+      action: "KEEP",
+    });
+    expect(plan(0, "ADJOURNED")).toEqual({ warning: null, action: "KEEP" });
+    expect(plan(1, "STRONG_LATER")).toEqual({ warning: null, action: "KEEP" });
   });
 });

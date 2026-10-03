@@ -40,6 +40,9 @@ import type { ActorContext } from "@capital-q/security";
 
 import {
   applyAppraisal,
+  appliedAppraisal,
+  questionNote,
+  questionOpenIn,
   deliveryFor,
   initialTemperament,
   registerOf,
@@ -1658,6 +1661,9 @@ export function createRehearsalService(dependencies: {
     const warningsGiven = turns.filter(
       (turn) => turn.from === "THEM" && turn.warning !== undefined,
     ).length;
+    // Whether their last line put a question to the person: a dodge
+    // needs one, and a gap in answering one costs (QA e22ea609).
+    const questionOpen = questionOpenIn(turns);
     const variables = {
       viewerRole: row.userRole,
       viewerOrganisation: viewerOrganisation.slice(0, 200),
@@ -1672,7 +1678,8 @@ export function createRehearsalService(dependencies: {
       difficulty: row.difficulty,
       temperament:
         temperamentNote(before, registerBefore) +
-        walkOutNote(warningsGiven, registerBefore),
+        walkOutNote(warningsGiven, registerBefore) +
+        (cue === "NONE" ? questionNote(questionOpen) : ""),
       stance: stanceOf(
         counterpartRoleOf(row.counterpartKind),
         persona.forwardness ?? "TYPICAL",
@@ -1748,7 +1755,8 @@ export function createRehearsalService(dependencies: {
     }
     // Their latest line moves the state by fixed rules; the state decides
     // the register the voice delivers this line in.
-    const after = applyAppraisal(before, result.appraisal, row.difficulty);
+    const appraisal = appliedAppraisal(result.appraisal, questionOpen);
+    const after = applyAppraisal(before, appraisal, row.difficulty);
     const register = registerOf(after, row.difficulty);
     // Two warnings over two turns before walking out, unless they asked
     // to end it themselves -- read by meaning on the turn, never by
@@ -1758,7 +1766,9 @@ export function createRehearsalService(dependencies: {
       warningsGiven,
       theyAskedToEnd: result.wantsToEnd,
       closing: result.move === "CLOSE",
-      provoked: PROVOKED.has(result.appraisal),
+      provoked: PROVOKED.has(appraisal),
+      conclusion: result.conclusion,
+      wrappingUp: wrapUp,
     });
     const shaped: RehearsalTurnResult =
       plan.action === "WARN"
@@ -1785,7 +1795,7 @@ export function createRehearsalService(dependencies: {
       registerBefore,
       shaped,
       shaped.move === "CLOSE",
-      PROVOKED.has(result.appraisal),
+      PROVOKED.has(appraisal),
     );
     return {
       result: {

@@ -41,24 +41,28 @@ const DIFFICULTY =
 /** Upper bound per model call at today's routing (rehearsal prompts are long). */
 const COST_PER_CALL_USD = Number(process.env.COST_PER_CALL_USD ?? "0.03");
 
-/** The founder's side; `kind` says what the turn is testing. */
+/**
+ * The founder's side, from the seeded founder's own material (Ajopot's
+ * deck, scripts/seed/narrated-deck-scripts.json): their claims, so the
+ * investor's questions meet real answers. `kind` says what the turn tests.
+ */
 const SCRIPT = [
   {
     kind: "OPENER",
-    text: "Thanks for making the time. We help small businesses get paid faster, and we're raising a seed round to grow from 40 to 200 paying customers this year.",
+    text: "Thanks for making the time. Ajopot digitises ajo, the rotating savings circle. Members' funds sit at a licensed partner bank, contributions are auto-debited, and every member carries a reliability score.",
   },
   {
     kind: "WEAK",
-    text: "Honestly, I'm not sure about the numbers. Revenue is, uh, okay I think? We haven't really tracked churn yet.",
+    text: "Honestly, I'm not sure about the numbers. Defaults are, uh, fine I think? We haven't really tracked repayment by circle yet.",
   },
   {
     kind: "DODGE",
-    text: "That's a great question, but I'd rather talk about the vision. The market is huge and we're going to be everywhere.",
+    text: "That's a great question, but I'd rather talk about the vision. Everyone in Nigeria saves in ajo, and we're going to be everywhere.",
   },
   { kind: "INTERRUPT", cue: "HAND_RAISED" },
   {
     kind: "STRONG",
-    text: "Fair challenge, so here are the numbers. Revenue is 18 million naira a month, up 12% month on month for six months. Churn is 3% a month, and 70% of new customers come by referral. We're raising 1.5 million dollars to hire two sales leads and reach 200 customers by the third quarter.",
+    text: "Fair challenge, so here are the numbers. Fifty-two thousand registered users in thirty-nine hundred circles. Monthly actives went from forty-two hundred last September to eighteen thousand seven hundred in March. We earn one percent on each payout, and we're raising one point two billion naira on a SAFE to open Abuja and Port Harcourt and start small loans against circle history.",
   },
   {
     kind: "ASK",
@@ -103,7 +107,15 @@ const sql = async (query) => {
     },
   );
   const rows = await r.json().catch(() => []);
-  return Array.isArray(rows) ? rows : [];
+  // A query error is said, never read as "no rows" (the cost query once
+  // named a column that does not exist and reported nothing).
+  if (!r.ok || !Array.isArray(rows)) {
+    console.log(
+      `     sql ${String(r.status)}: ${JSON.stringify(rows).slice(0, 200)}`,
+    );
+    return [];
+  }
+  return rows;
 };
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -216,7 +228,9 @@ const rehearsalId = started.body.id;
 console.log(`     rehearsal ${rehearsalId}`);
 
 // 3. The founder's turns.
-let walkedOut = false;
+// They closed it before the founder's script ran out (their own CLOSE
+// sets endedAt); the founder's finish afterwards is not them leaving.
+let endedByThem = false;
 let sent = 0;
 const afterTurn = [];
 for (const turn of SCRIPT) {
@@ -228,7 +242,7 @@ for (const turn of SCRIPT) {
   );
   if (turn.text !== undefined) sent += 1;
   if (said.status === 409) {
-    walkedOut = true;
+    endedByThem = true;
     console.log(`     ${turn.kind}: the meeting had ended`);
     break;
   }
@@ -246,7 +260,7 @@ for (const turn of SCRIPT) {
     `     ${turn.kind.padEnd(9)} -> [${them?.mood ?? "-"}/${them?.intensity ?? "-"}] ${(them?.text ?? "").slice(0, 140)}`,
   );
   if (said.body.status === "FINISHED" || said.body.endedAt !== null) {
-    walkedOut = said.body.outcome === "LEFT_EARLY";
+    endedByThem = true;
     break;
   }
 }
@@ -317,7 +331,7 @@ check(
 const yielded = afterTurn.find((t) => t.kind === "INTERRUPT")?.line;
 check(
   "interrupt",
-  walkedOut ||
+  endedByThem ||
     (yielded !== undefined &&
       !yielded.text.includes("?") &&
       yielded.text.split(/\s+/u).length <= 12),
@@ -326,13 +340,18 @@ check(
 
 // Walk-out: warned twice first.
 const warnings = theirs.filter((turn) => turn.warning !== undefined);
-const left = (row?.outcome ?? dto?.outcome) === "LEFT_EARLY" && walkedOut;
+const outcome = row?.outcome ?? dto?.outcome ?? null;
+// Leaving is their close before the script ran out with a no or a
+// walk-out; a LEFT_EARLY written by the founder's own finish is the
+// founder ending it, not the investor leaving.
+const left =
+  endedByThem && (outcome === "LEFT_EARLY" || outcome === "DECLINED");
 check(
   "walk-out",
   !left || warnings.length >= 2,
   left
-    ? `left after ${String(warnings.length)} warning(s)`
-    : `stayed (${String(warnings.length)} warning(s); outcome ${String(dto?.outcome ?? row?.outcome)})`,
+    ? `they left (${String(outcome)}) after ${String(warnings.length)} warning(s); two are required`
+    : `${endedByThem ? "they closed" : "the founder ended it"} (${String(warnings.length)} warning(s); outcome ${String(outcome)})`,
 );
 
 // Review: the founder's, scored by code.
@@ -370,7 +389,7 @@ const cost =
                   count(*) filter (where cost_usd is null)::int as unpriced
              from ai_ops.model_usage
             where user_id = ${quote(row.user_id)} and purpose = 'REHEARSAL'
-              and created_at >= ${quote(startedAt)}`,
+              and occurred_at >= ${quote(startedAt)}`,
         )
       )[0];
 console.log(
