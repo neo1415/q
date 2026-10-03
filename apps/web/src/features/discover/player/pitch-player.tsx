@@ -203,14 +203,10 @@ export function PitchPlayer({
     if (video !== null) setStreamWarmth(video, warmth);
   }, [warmth]);
 
-  // Attaching and detaching is the strategy's job, including cancelling an
-  // in-flight fetch when this card goes cold (doc 20 §236).
-  useEffect(() => {
-    const video = videoRef.current;
-    if (video === null || playbackUrl === null) return;
-    return attachSource(video, playbackUrl);
-  }, [attachSource, playbackUrl]);
-
+  // Declared before the attach effect on purpose: effects run in order, so
+  // the failure listeners are on the element before any source is attached
+  // and a failure raised while attaching is never missed (a flaky test
+  // dispatched one in the gap, design-48).
   // A source that cannot play here says so, rather than leaving a poster
   // that never moves: an error on the element, a fatal error from the
   // stream engine, or no first frame within a bounded time of being asked
@@ -246,6 +242,14 @@ export function PitchPlayer({
       video.removeEventListener("pause", stopWaiting);
     };
   }, [playbackUrl]);
+  // Attaching and detaching is the strategy's job, including cancelling an
+  // in-flight fetch when this card goes cold (doc 20 §236).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video === null || playbackUrl === null) return;
+    return attachSource(video, playbackUrl);
+  }, [attachSource, playbackUrl]);
+
   // Only for the source that failed: a new authorization is a new chance.
   const cannotPlay = unplayable !== null && unplayable === playbackUrl;
 
