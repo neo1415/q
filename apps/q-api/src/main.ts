@@ -109,6 +109,7 @@ import {
   type InstructionEngine,
 } from "./composition/instructions/engine.js";
 import { createInstructionTriggers } from "./composition/instructions/triggers.js";
+import { createOwnUsage } from "./composition/usage.js";
 import { createInstructionPlanner } from "./composition/instructions/planner.js";
 import { createQuarantinedThreadReader } from "./composition/instructions/quarantine.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
@@ -220,6 +221,7 @@ import {
   createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
   createPostgresModelUsageRepository,
+  createPostgresUsageReader,
   createProcessLocalProviderHealth,
   type ModelProvider,
 } from "@capital-q/model-gateway";
@@ -4134,6 +4136,20 @@ const { app, logger: appLogger } = createApp(
     errands,
     // AUTO block (ADR 0030)
     work: workPort,
+    // Lead 2026-10-03: the person's own usage this month.
+    usage: createOwnUsage({
+      ownMonth: createPostgresUsageReader(database.sql).ownMonth,
+      instructions: async (actor) =>
+        (await instructionStore.list(actor, 20)).map((row) => ({
+          id: row.id,
+          goal: row.goal_text,
+          budgetUsdMonth: row.budget_usd_month,
+        })),
+      plan: async (actor) => {
+        const summary = await entitlements.summary(billingAccountOf(actor));
+        return { name: summary.plan.name, features: summary.features };
+      },
+    }),
     rehearsals,
     // BILLING block (ADR 0034)
     rehearsalEntitlements: entitlements,

@@ -339,6 +339,7 @@ export {
   getQWork,
   getQWorkReport,
   getQWorkReportPdf,
+  getMyUsage,
   listQWork,
   saveNotificationSettings,
   setQPresence,

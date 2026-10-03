@@ -823,6 +823,7 @@ export {
   type QWorkSlot,
   type QWorkStepDto,
 } from "./work.js";
+export { Q_USAGE_PATH, QUsageDtoSchema, type QUsageDto } from "./usage.js";
 // end AUTO block
 
 // DAILY block (The Q Daily, docs/specs/2026-10/daily.md)

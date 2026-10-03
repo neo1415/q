@@ -1,3 +1,5 @@
+import type { OwnUsage } from "./composition/usage.js";
+import { registerUsageRoutes } from "./http/usage.js";
 import type { MeetingHostRuntime } from "./composition/meeting-host-runtime.js";
 import { registerMeetingHostRoutes } from "./http/meeting-host.js";
 import { randomUUID } from "node:crypto";
@@ -134,6 +136,8 @@ export type QApiModules = {
   readonly errands?: ErrandRoutesDependencies["errands"] | undefined;
   /** AUTO: Q's delegated work, the person's own, read, answered, stopped. */
   readonly work?: WorkRoutesDependencies["work"] | undefined;
+  /** The person's own usage this month (lead 2026-10-03). */
+  readonly usage?: OwnUsage | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
   // BILLING block (ADR 0034): the plan's rehearsal allowance.
   readonly rehearsalEntitlements?:
@@ -404,6 +408,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       daily: modules.daily,
+    });
+  }
+
+  if (modules.usage !== undefined && security.resolver !== undefined) {
+    registerUsageRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      usage: modules.usage,
     });
   }
 

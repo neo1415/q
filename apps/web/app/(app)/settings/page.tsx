@@ -114,6 +114,14 @@ export default async function SettingsPage({
                 Open
               </Link>
             </SettingRow>
+            <SettingRow term="What Q used for you">
+              <Link
+                href="/settings/usage"
+                className={buttonClassName("secondary", "compact")}
+              >
+                Usage
+              </Link>
+            </SettingRow>
           </dl>
         </PageSection>
         {/* end BILLING block */}
