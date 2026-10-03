@@ -479,6 +479,10 @@ for (const testCase of cases) {
     ok,
     status,
     ms: Date.now() - t0,
+    // What was actually said and which run, so a report quotes the case's
+    // own words (QA 2026-10-03: a misheard case reuses phrasing #1).
+    said: asked.say,
+    run: runId?.slice(0, 8) ?? "-",
   });
   console.log(
     `${ok ? "PASS" : "FAIL"}  ${testCase.id}  (${status}, ${String(Date.now() - t0)} ms)`,
@@ -486,10 +490,12 @@ for (const testCase of cases) {
 }
 await unshare();
 const passed = rows.filter((row) => row.ok).length;
-console.log(`\n| case | variant | result | run | ms |\n|---|---|---|---|---|`);
+console.log(
+  `\n| case | variant | result | run | ms | run id | said |\n|---|---|---|---|---|---|---|`,
+);
 for (const row of rows) {
   console.log(
-    `| ${row.id} | ${row.variant} | ${row.ok ? "pass" : "FAIL"} | ${row.status} | ${String(row.ms)} |`,
+    `| ${row.id} | ${row.variant} | ${row.ok ? "pass" : "FAIL"} | ${row.status} | ${String(row.ms)} | ${row.run} | ${row.said} |`,
   );
 }
 console.log(`\n${String(passed)}/${String(rows.length)} passed`);
