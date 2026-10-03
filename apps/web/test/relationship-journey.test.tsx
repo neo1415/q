@@ -6,6 +6,26 @@ import type { RelationshipStatusDto } from "@capital-q/contracts";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/relationships",
+}));
+// The detail's data-reading children are out of scope here.
+vi.mock("../src/features/integrations/relationship-mail", () => ({
+  RelationshipMail: () => null,
+}));
+vi.mock("../src/features/relationships/relationship-diligence", () => ({
+  RelationshipDiligence: () => <p>diligence body</p>,
+}));
+vi.mock("../src/features/relationships/relationship-commitment", () => ({
+  RelationshipCommitment: () => null,
+}));
+vi.mock("../src/features/relationships/relationship-errands", () => ({
+  RelationshipErrands: () => null,
+}));
+vi.mock("../src/features/schedule/relationship-schedule", () => ({
+  RelationshipSchedule: () => null,
+}));
+vi.mock("../src/features/relationships/relationship-outcome", () => ({
+  RelationshipOutcome: () => null,
 }));
 
 const { journeyStep } = await import("../src/features/relationships/journey");
@@ -66,5 +86,42 @@ describe("the relationship journey (design-48)", () => {
       screen.getByText("Diligence").closest("li")?.getAttribute("aria-current"),
     ).toBe("step");
     expect(document.querySelector(".cq-glow-card")).toBeNull();
+  });
+});
+
+describe("phone folds (design-48 v2)", () => {
+  it("folds What happened and Diligence behind their headings, with the count", async () => {
+    const { RelationshipDetail } =
+      await import("../src/features/relationships/relationship-detail");
+    const { container } = render(
+      <RelationshipDetail
+        side="FOUNDER"
+        counterpart="Savanna Seed Partners"
+        relationship={rel("IN_DILIGENCE", [
+          "CONNECTED",
+          "MEETING_HELD",
+          "IN_DILIGENCE",
+        ])}
+        actions={null}
+        absentSentence=""
+        askQ={false}
+        profile={profile}
+        readAt={Date.parse(at)}
+        basePath="/relationships/investor/x"
+      />,
+    );
+    const history = container.querySelector(
+      "details[data-collapsible=history]",
+    );
+    const diligence = container.querySelector(
+      "details[data-collapsible=diligence]",
+    );
+    expect(history?.hasAttribute("open")).toBe(false);
+    expect(diligence?.hasAttribute("open")).toBe(false);
+    expect(history?.querySelector("summary")?.textContent).toContain(
+      "What happened · 3",
+    );
+    // A link to #diligence lands inside the fold, which opens it.
+    expect(diligence?.querySelector("#diligence")).not.toBeNull();
   });
 });
