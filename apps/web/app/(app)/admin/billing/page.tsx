@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getAdminFeeLedger, getAdminUsage } from "@capital-q/api-client";
@@ -39,7 +40,15 @@ export default async function AdminBillingPage() {
   const rate = ledger.schedule.rateBps;
   return (
     <div className="flex flex-col gap-8">
-      {usage === null ? null : <ModelCost usage={usage} />}
+      {usage === null ? (
+        <ErrorState
+          compact
+          title="Model cost couldn't load"
+          description="Spend is still recorded; only this view failed."
+        />
+      ) : (
+        <ModelCost usage={usage} />
+      )}
       <PageSection
         id="schedule"
         title="Facilitation fee"
@@ -122,9 +131,15 @@ function ModelCost({ usage }: { readonly usage: AdminUsageDto }) {
   return (
     <PageSection
       id="model-cost"
-      title={`Model cost this month: ${usd(usage.totalUsd)}`}
-      description={`${usage.month} · from the usage ledger; operational cost, not a charge.`}
+      title="Model cost this month"
+      description={`${usage.month} · operational cost, not a charge`}
     >
+      <p className="flex items-baseline gap-2 pb-4" data-model-cost-total>
+        <span className="cq-numeric text-4xl font-semibold tracking-tight text-(--cq-text-primary)">
+          {usd(usage.totalUsd)}
+        </span>
+        <span className="cq-body text-(--cq-text-secondary)">USD</span>
+      </p>
       <div className="grid gap-6 md:grid-cols-3">
         <CostList
           title="By tenant"
@@ -154,6 +169,12 @@ function ModelCost({ usage }: { readonly usage: AdminUsageDto }) {
           }))}
         />
       </div>
+      <Link
+        href="/admin/q?window=30d"
+        className="cq-body-sm inline-flex min-h-11 items-center underline underline-offset-4"
+      >
+        Failed and refused calls (not charged to anyone)
+      </Link>
     </PageSection>
   );
 }
@@ -188,7 +209,8 @@ function CostList({
                 {row.label}
               </span>
               <span className="cq-caption cq-numeric shrink-0 text-(--cq-text-secondary)">
-                {usd(row.usd)} · {String(row.calls)}
+                {usd(row.usd)} · {String(row.calls)}{" "}
+                {row.calls === 1 ? "call" : "calls"}
               </span>
             </li>
           ))}

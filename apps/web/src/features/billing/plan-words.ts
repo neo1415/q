@@ -42,6 +42,22 @@ export function allowanceLine(feature: BillingFeatureStandingDto): string {
     : `${String(used)} of ${String(feature.limit)} ${unitsOf(feature, feature.limit)}`;
 }
 
+/**
+ * The allowance as a figure for a phone row (design-48): "27 of 30",
+ * "Unlimited", "Included", "Up to 200", "Not included".
+ */
+export function countLine(feature: BillingFeatureStandingDto): string {
+  if (!feature.included) return "Not included";
+  if (feature.kind === "ACCESS") return "Included";
+  if (feature.kind === "VALUE") {
+    return feature.limit === null
+      ? "No limit"
+      : `Up to ${String(feature.limit)}`;
+  }
+  if (feature.limit === null) return "Unlimited";
+  return `${String(feature.used ?? 0)} of ${String(feature.limit)}`;
+}
+
 /** Units left this month, or null when unlimited / not metered. */
 export function remainingOf(feature: BillingFeatureStandingDto): number | null {
   if (!feature.included) return 0;

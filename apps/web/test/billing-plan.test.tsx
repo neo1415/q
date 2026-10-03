@@ -7,6 +7,7 @@ import type { BillingFeatureStandingDto } from "@capital-q/contracts";
 import { EntitlementNotice } from "@/features/billing/entitlement-notice";
 import {
   allowanceLine,
+  countLine,
   remainingOf,
   resetLine,
   sourceLine,
@@ -41,6 +42,12 @@ describe("plan words", () => {
     expect(remainingOf(REHEARSALS)).toBe(17);
     expect(usedPercent(REHEARSALS)).toBe(15);
     expect(resetLine(REHEARSALS)).toBe("Resets on 1 November");
+  });
+
+  it("gives a phone row its figure alone (design-48)", () => {
+    expect(countLine(REHEARSALS)).toMatch(/^\d+ of \d+$/u);
+    expect(countLine({ ...REHEARSALS, limit: null })).toBe("Unlimited");
+    expect(countLine({ ...REHEARSALS, included: false })).toBe("Not included");
   });
 
   it("says unlimited, a single unit and not included plainly", () => {

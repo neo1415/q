@@ -199,7 +199,7 @@ function RecordSection({
 }) {
   return (
     <section className="flex flex-col gap-1.5" aria-label={label}>
-      <h4 className="cq-caption text-(--cq-text-tertiary)">{label}</h4>
+      <h4 className="cq-label text-(--cq-text-primary)">{label}</h4>
       {children}
     </section>
   );
@@ -213,26 +213,33 @@ function RecordSection({
 function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
   return (
     <details className="flex flex-col gap-2" data-meeting-q="DONE">
-      <summary className="cq-label cursor-pointer text-(--cq-text-primary)">
+      <summary className="cq-label flex min-h-11 cursor-pointer items-center text-(--cq-text-primary)">
         Meeting record
       </summary>
       <div className="flex flex-col gap-4 pt-2">
         {record.summary === null ? null : (
-          <p className="cq-body-sm whitespace-pre-line text-(--cq-text-secondary)">
+          <p className="cq-body-sm line-clamp-4 whitespace-pre-line text-(--cq-text-secondary)">
             {record.summary}
           </p>
         )}
-        {record.attendees.length === 0 ? null : (
-          <RecordSection label="Who was there">
-            <p className="cq-body-sm text-(--cq-text-primary)">
-              {record.attendees
-                .map((person) =>
-                  person.side === null
-                    ? person.name
-                    : `${person.name} (${SIDE_WORDS[person.side] ?? person.side})`,
-                )
-                .join(", ")}
-            </p>
+        {record.followUps.length === 0 ? null : (
+          <RecordSection label="Next">
+            <ul className="flex flex-col gap-1">
+              {record.followUps.map((item) => (
+                <li
+                  key={item.text}
+                  className="cq-body-sm text-(--cq-text-primary)"
+                >
+                  {item.text}
+                  {item.owner === null ? null : (
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      {" "}
+                      · {item.owner}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </RecordSection>
         )}
         {record.agreements.length === 0 ? null : (
@@ -277,36 +284,39 @@ function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
                   key={`${flag.kind}:${flag.text}`}
                   className="cq-body-sm text-(--cq-text-primary)"
                 >
-                  <span className="cq-caption text-(--cq-text-tertiary)">
-                    {FLAG_WORDS[flag.kind] ?? flag.kind}
-                    {flag.speaker === null ? "" : ` · ${flag.speaker}`}
-                  </span>
-                  <br />
+                  <span className="font-medium">
+                    {FLAG_WORDS[flag.kind] ?? flag.kind}:
+                  </span>{" "}
                   {flag.text}
+                  {flag.speaker === null ? null : (
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      {" "}
+                      · {flag.speaker}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
           </RecordSection>
         )}
-        {record.followUps.length === 0 ? null : (
-          <RecordSection label="Next">
-            <ul className="flex flex-col gap-1">
-              {record.followUps.map((item) => (
-                <li
-                  key={item.text}
-                  className="cq-body-sm text-(--cq-text-primary)"
-                >
-                  {item.text}
-                  {item.owner === null ? "" : ` (${item.owner})`}
-                </li>
-              ))}
-            </ul>
+        {record.attendees.length === 0 ? null : (
+          <RecordSection label="Who was there">
+            <p className="cq-body-sm text-(--cq-text-primary)">
+              {record.attendees
+                .map((person) =>
+                  person.side === null
+                    ? person.name
+                    : `${person.name} (${SIDE_WORDS[person.side] ?? person.side})`,
+                )
+                .join(", ")}
+            </p>
           </RecordSection>
         )}
         {record.transcript.length === 0 ? null : (
           <details>
-            <summary className="cq-caption cursor-pointer text-(--cq-text-secondary)">
-              Full transcript
+            <summary className="cq-body-sm flex min-h-11 cursor-pointer items-center text-(--cq-text-secondary)">
+              Full transcript · {record.transcript.length}{" "}
+              {record.transcript.length === 1 ? "line" : "lines"}
             </summary>
             <ol className="flex max-h-80 flex-col gap-1.5 overflow-y-auto pt-2">
               {record.transcript.map((line, index) => (
