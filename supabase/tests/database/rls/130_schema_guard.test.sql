@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing'), ('integrations');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -157,6 +157,14 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('network', 'diligence_requests',         'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'diligence_fulfilments',      'INTERNAL_SERVER_ONLY', '{}'),
   ('identity', 'platform_admins',           'INTERNAL_SERVER_ONLY', '{}'),
+  -- BIZ-007 integrations, guarded from the inbound email packet on: a
+  -- person reads their own rows (suites 530 and 710); OAuth states are the
+  -- server's alone. google_accounts' SELECT is column-scoped.
+  ('integrations', 'google_accounts',       'RLS_REQUIRED',         '{SELECT}'),
+  ('integrations', 'oauth_states',          'INTERNAL_SERVER_ONLY', '{}'),
+  ('integrations', 'email_messages',        'RLS_REQUIRED',         '{SELECT}'),
+  ('integrations', 'inbound_addresses',     'RLS_REQUIRED',         '{SELECT}'),
+  ('integrations', 'inbound_emails',        'RLS_REQUIRED',         '{SELECT}'),
   -- BILLING block (ADR 0034): server-only; people read their plan through the API.
   ('billing', 'features',                   'INTERNAL_SERVER_ONLY', '{}'),
   ('billing', 'plans',                      'INTERNAL_SERVER_ONLY', '{}'),
