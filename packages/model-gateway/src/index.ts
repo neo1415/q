@@ -120,6 +120,13 @@ export {
   createInMemoryModelUsageRepository,
   createPostgresModelUsageRepository,
 } from "./infrastructure/postgres-usage.js";
+export {
+  createPostgresUsageReader,
+  monthOf,
+  type AdminMonthUsage,
+  type OwnMonthUsage,
+  type UsageReader,
+} from "./infrastructure/usage-reader.js";
 
 export const PACKAGE_NAME = "@capital-q/model-gateway" as const;
 

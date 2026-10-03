@@ -6,7 +6,9 @@ import {
   PUSH_SUBSCRIPTION_REMOVE_PATH,
   PushKeyDtoSchema,
   Q_PRESENCE_PATH,
+  Q_USAGE_PATH,
   Q_WORK_PATH,
+  QUsageDtoSchema,
   QWorkAcceptedDtoSchema,
   QWorkDetailDtoSchema,
   qWorkItemPath,
@@ -27,6 +29,11 @@ import { call, type ApiSession } from "./request.js";
  * AUTO (ADR 0030): Q's delegated work (a Q API session) and Web Push with
  * notification settings (an API session).
  */
+
+/** The person's own usage this month (a Q API session). Read-only. */
+export function getMyUsage(session: ApiSession) {
+  return call(session, "GET", Q_USAGE_PATH, QUsageDtoSchema);
+}
 
 export function listQWork(session: ApiSession) {
   return call(session, "GET", Q_WORK_PATH, QWorkListDtoSchema);

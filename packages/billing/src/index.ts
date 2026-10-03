@@ -18,5 +18,6 @@ export * from "./accounts.js";
 export * from "./provider.js";
 export * from "./webhooks.js";
 export * from "./fees.js";
+export * from "./credits.js";
 
 export const PACKAGE_NAME = "@capital-q/billing" as const;

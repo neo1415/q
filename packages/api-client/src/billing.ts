@@ -21,6 +21,8 @@ import {
   FeeLedgerExportDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
   type EntitlementProblemExtension,
+  ADMIN_BILLING_USAGE_PATH,
+  AdminUsageDtoSchema,
 } from "@capital-q/contracts";
 
 import { ApiProblemError } from "./problem.js";
@@ -123,6 +125,11 @@ export function setAdminBillingOverride(
     AdminBillingChangedDtoSchema,
     { body },
   );
+}
+
+/** Platform admin: model cost this month by tenant, person and driver. */
+export function getAdminUsage(session: ApiSession) {
+  return call(session, "GET", ADMIN_BILLING_USAGE_PATH, AdminUsageDtoSchema);
 }
 
 export function getAdminFeeLedger(session: ApiSession) {
