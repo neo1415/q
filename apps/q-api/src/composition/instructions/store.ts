@@ -203,6 +203,8 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       const rows = await sql<{ id: string }[]>`
         update q_runtime.standing_instructions
            set status = 'STOPPED', stopped_at = clock_timestamp(),
+               -- QA run 8a1d57b9: a stopped instruction is due never.
+               next_fire_at = null,
                updated_at = clock_timestamp()
          where id = ${id} and user_id = ${owner.userId}
            and tenant_id = ${owner.tenantId}
@@ -271,7 +273,8 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
     },
 
     /**
-     * S4: claims the instructions due now, moving each one's next firing
+     * S4: claims the instructions due now -- ACTIVE only: a STOPPED or
+     * PAUSED one is never claimed, whatever its next_fire_at -- moving each one's next firing
      * forward in the same statement (skip locked), so no two instances
      * fire the same one. Returns each with the instant it was claimed at.
      */
@@ -386,6 +389,7 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       const rows = await sql<{ id: string }[]>`
         update q_runtime.standing_instructions
            set status = 'PAUSED', pause_reason = ${reason},
+               next_fire_at = null,
                updated_at = clock_timestamp()
          where id = ${id} and status = 'ACTIVE'
         returning id`;

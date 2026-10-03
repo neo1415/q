@@ -1203,3 +1203,21 @@ describe("their question gets an answer or goes to the person (QA run 8a1d57b9)"
     }
   });
 });
+
+describe("a stopped or paused instruction never fires (QA run 8a1d57b9)", () => {
+  it.each(["STOPPED", "PAUSED"] as const)(
+    "%s: a firing claimed just before is NOT_ACTIVE -- no plan, no step",
+    async (status) => {
+      ran.length = 0;
+      const { engine, row, planned, steps } = world([
+        { steps: [chat("Hello.")], cannot: [] },
+      ]);
+      (row as { status: string }).status = status;
+      const result = await engine.fire(row.id, "run-0401");
+      expect(result.outcome).toBe("NOT_ACTIVE");
+      expect(planned).toEqual([]);
+      expect(steps.size).toBe(0);
+      expect(ran).toHaveLength(0);
+    },
+  );
+});

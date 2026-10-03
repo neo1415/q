@@ -447,11 +447,29 @@ describe("standing instructions against PostgreSQL", () => {
         });
         await later();
         expect(await store.wakeForChat(ids.relationship)).toBe(1);
-        // Paused or stopped: never woken.
+        // Paused or stopped: never woken, never due, never claimed --
+        // even with a firing time in the past (QA run 8a1d57b9).
+        const nextFire = async () =>
+          (
+            await tx<{ next_fire_at: Date | null }[]>`
+              select next_fire_at from q_runtime.standing_instructions where id = ${id}`
+          )[0]?.next_fire_at;
+        await tx`update q_runtime.standing_instructions
+                    set next_fire_at = now() + interval '1 day'
+                  where status = 'ACTIVE' and id <> ${id}`;
         expect(await store.pause(id, "BUDGET_EXHAUSTED")).toBe(true);
+        expect(await nextFire()).toBeNull();
         expect(await store.wakeForChat(ids.relationship)).toBe(0);
+        await tx`update q_runtime.standing_instructions
+                    set next_fire_at = now() - interval '1 hour' where id = ${id}`;
+        expect(await store.claimDue(10)).toEqual([]);
         expect(await store.stop(owner, id)).toBe(true);
+        expect(await nextFire()).toBeNull();
         expect(await store.wakeForChat(ids.relationship)).toBe(0);
+        expect(await store.wakeFor(ids.relationship)).toBe(0);
+        await tx`update q_runtime.standing_instructions
+                    set next_fire_at = now() - interval '1 hour' where id = ${id}`;
+        expect(await store.claimDue(10)).toEqual([]);
         throw new Rollback();
       }),
     ).rejects.toBeInstanceOf(Rollback);
