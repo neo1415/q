@@ -336,6 +336,10 @@ describe("the parity eval's cases come from the registry", () => {
       cases.find((c) => c.id === "discovery.company.pass#misheard")?.say,
     ).toBe(`Pass on ${misheard("Kazikit")}.`);
     expect(misheard("Kazikit")).not.toBe("Kazikit");
+    // The name proper is misheard, never a parenthetical.
+    expect(misheard("Savanna Seed Partners (fictional)")).toBe(
+      "Savanna Seed Parters (fictional)",
+    );
   });
 });
 
