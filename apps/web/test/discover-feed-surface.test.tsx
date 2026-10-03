@@ -460,6 +460,32 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     expect(rail.textContent).not.toMatch(/\d/);
   });
 
+  it("does not show Save as done before it is: unsaved Save is quiet, like Pass", () => {
+    renderCard();
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save.getAttribute("aria-pressed")).toBe("false");
+    const pass = screen.getByRole("button", { name: "Pass" });
+    expect(save.className).toBe(pass.className);
+  });
+
+  it("says why it is here beside the pitch on a desktop only", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(min-width: 1024px)",
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    try {
+      const { container } = renderCard();
+      expect(container.querySelector("[data-feed-why]")).not.toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    cleanup();
+    const { container } = renderCard();
+    expect(container.querySelector("[data-feed-why]")).toBeNull();
+  });
+
   it("keeps the summary short: name, one line, stage · place", () => {
     const { container } = renderCard();
     const summary = container.querySelector("[data-feed-summary]");

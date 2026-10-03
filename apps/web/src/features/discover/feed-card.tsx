@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import type {
   DiscoveredCompanyDto,
@@ -145,6 +145,24 @@ function Reasons({
   );
 }
 
+const DESKTOP = "(min-width: 1024px)";
+function subscribeDesktop(onChange: () => void): () => void {
+  if (typeof window.matchMedia !== "function") return () => undefined;
+  const query = window.matchMedia(DESKTOP);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+/** The intelligence panel's width: a desktop shows the fit beside the pitch. */
+function useDesktopPanel(): boolean {
+  return useSyncExternalStore(
+    subscribeDesktop,
+    () =>
+      typeof window.matchMedia === "function" &&
+      window.matchMedia(DESKTOP).matches,
+    () => false,
+  );
+}
+
 export function FeedCard({
   company,
   policy,
@@ -202,6 +220,7 @@ export function FeedCard({
   const filterUnknown = company.filterUnknown ?? [];
   const sheetDrag = useRef<number | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const wide = useDesktopPanel();
   const [confirming, setConfirming] = useState(false);
   const openDetails = (confirm: boolean) => {
     setConfirming(confirm);
@@ -308,6 +327,26 @@ export function FeedCard({
           <ChevronUp aria-hidden="true" size={ICON_SIZE.compact} />
         </button>
       </div>
+
+      {/*
+        Why it is here, in the panel on a desktop (spec §9.2; demo audit
+        2026-10-03: the panel said nothing about fit). A phone keeps it
+        behind More, where there is room. Declared alignment only.
+      */}
+      {wide ? (
+        <div className="cq-feed-why flex flex-col gap-1" data-feed-why>
+          <h3 className="cq-label text-(--cq-text-secondary)">
+            Why it&apos;s here
+          </h3>
+          <Reasons
+            reasons={
+              company.reasons.length > 0
+                ? company.reasons
+                : slateReasons(company)
+            }
+          />
+        </div>
+      ) : null}
 
       <SheetRoot
         open={expanded}
@@ -433,8 +472,11 @@ export function FeedCard({
         role="group"
         aria-label="Decide"
       >
+        {/* Unsaved reads as a quiet choice like Pass; saved is marked by
+            the filled icon and the word (demo audit 2026-10-03: a filled
+            Save read as already saved). */}
         <Button
-          variant={saved ? "secondary" : "primary"}
+          variant={saved ? "secondary" : "quiet"}
           aria-pressed={saved}
           disabled={deciding}
           onClick={onSave}

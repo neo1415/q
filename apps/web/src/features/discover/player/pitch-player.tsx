@@ -437,14 +437,11 @@ export function PitchPlayer({
               </button>
             ) : null}
             {failed ? (
-              <span className="cq-caption text-(--cq-text-secondary)">
+              <span className="cq-caption cq-feed-player-note">
                 This pitch couldn&apos;t load right now. Try again in a moment.
               </span>
             ) : cannotPlay ? (
-              <span
-                className="cq-caption text-(--cq-text-secondary)"
-                role="status"
-              >
+              <span className="cq-caption cq-feed-player-note" role="status">
                 {CANNOT_PLAY}
               </span>
             ) : null}

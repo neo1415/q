@@ -1005,10 +1005,20 @@
     position: absolute;
     top: calc(12px + var(--cq-safe-top));
     left: 12px;
+    /* Clear of the stage's own top-right column (filters, up/down): a
+       long note used to run underneath it (demo audit 2026-10-03). */
+    right: 72px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+  }
+  .cq-feed-player-note {
+    max-width: 32ch;
+    border-radius: 8px;
+    padding: 6px 10px;
+    background: var(--cq-stage-surface-strong);
+    color: var(--cq-stage-text);
   }
   .cq-feed-still {
     position: absolute;
