@@ -110,6 +110,7 @@ import {
 } from "./composition/instructions/engine.js";
 import { createInstructionTriggers } from "./composition/instructions/triggers.js";
 import { createInstructionPlanner } from "./composition/instructions/planner.js";
+import { createQuarantinedThreadReader } from "./composition/instructions/quarantine.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -3214,6 +3215,12 @@ instructionEngine.current = createInstructionEngine({
     }),
   plan: createInstructionPlanner({
     gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  readThread: createQuarantinedThreadReader({
+    gateway: modelGateway,
+    chat,
     dataPosture: demoDataPosture,
     logger,
   }),

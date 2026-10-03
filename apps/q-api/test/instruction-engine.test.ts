@@ -8,7 +8,10 @@ import {
   handleEverythingGrant,
   type InstructionGrant,
 } from "@capital-q/contracts";
-import type { InstructionPlanResult } from "@capital-q/q-core";
+import type {
+  InstructionPlanResult,
+  InstructionThreadFacts,
+} from "@capital-q/q-core";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
@@ -359,6 +362,41 @@ describe("the validator: code decides each step", () => {
     expect(check(true)).toBe("AUTO");
   });
 
+  it("where they raised terms or money, or declined, Q's message is their card (code reads the thread's facts)", () => {
+    const facts = (over: Partial<InstructionThreadFacts>) =>
+      new Map<string, InstructionThreadFacts>([
+        [
+          REL,
+          {
+            lastFrom: "THEM",
+            asksQuestion: false,
+            wantsToMeet: false,
+            proposedTime: null,
+            topicNumbers: [],
+            mentionsTermsOrMoney: false,
+            declined: false,
+            tone: "NEUTRAL",
+            ...over,
+          },
+        ],
+      ]);
+    const check = (over: Partial<InstructionThreadFacts>) =>
+      verdictOf(
+        validateStep(chat("Thanks!"), {
+          grant: grant(),
+          actions: ACTIONS,
+          people: PEOPLE,
+          sent: new Map<string, number>(),
+          now: IN_HOURS,
+          stepKey: "instr:test:run:0",
+          facts: facts(over),
+        }),
+      );
+    expect(check({})).toBe("AUTO");
+    expect(check({ mentionsTermsOrMoney: true })).toBe("ASK:THEY_RAISED_TERMS");
+    expect(check({ declined: true })).toBe("ASK:THEY_DECLINED");
+  });
+
   it("never lets a grant make a commitment Q's alone", () => {
     const forged = grant({
       actions: [{ action: "relationship.outcome.change", mode: "AUTO" }],
@@ -617,5 +655,60 @@ describe("a firing", () => {
     expect(spends).toEqual([0.01, 0.01]);
     expect(result.outcome).toBe("OVER_BUDGET");
     expect(paused).toEqual(["BUDGET_EXHAUSTED"]);
+  });
+
+  it("reads covered threads through the quarantine first; the planner gets the facts line and the spend is counted", async () => {
+    const { engine, row, spends } = world([{ steps: [], cannot: [] }]);
+    void engine;
+    const seen: string[] = [];
+    const reads: string[] = [];
+    const quarantined = createInstructionEngine({
+      store: {
+        instruction: () => Promise.resolve(row),
+        expire: () => Promise.resolve(),
+        recordStep: () => Promise.resolve(true),
+        stepDone: () => Promise.resolve(false),
+        messagesSent: () => Promise.resolve(new Map<string, number>()),
+        history: () => Promise.resolve([]),
+        addSpend: (_id: string, amount: number) => {
+          spends.push(amount);
+          return Promise.resolve();
+        },
+        pause: () => Promise.resolve(true),
+      },
+      actions: ACTIONS,
+      ports: {},
+      actorFor: () => Promise.resolve(actor),
+      people: () => Promise.resolve(PEOPLE),
+      plan: (_who, variables) => {
+        seen.push(variables.people);
+        return Promise.resolve({ plan: { steps: [], cannot: [] }, costUsd: 0 });
+      },
+      readThread: (input) => {
+        reads.push(input.relationshipId);
+        return Promise.resolve({
+          facts: {
+            lastFrom: "THEM",
+            asksQuestion: true,
+            wantsToMeet: true,
+            proposedTime: null,
+            topicNumbers: [2],
+            mentionsTermsOrMoney: false,
+            declined: false,
+            tone: "POSITIVE",
+          },
+          costUsd: 0.002,
+        });
+      },
+      ask: () => Promise.resolve(null),
+      now: () => IN_HOURS,
+      autoEnabled: true,
+    });
+    await quarantined.fire(row.id, "run-0008");
+    expect(reads).toEqual([REL, OTHER_REL]);
+    expect(spends).toEqual([0.002, 0.002]);
+    expect(seen[0]).toContain(
+      "chat: last from THEM; asks a question; wants to meet; about: times to meet; tone POSITIVE",
+    );
   });
 });

@@ -15,10 +15,14 @@ import {
   type InstructionWorkingHours,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
-import type { InstructionPlanResult } from "@capital-q/q-core";
+import type {
+  InstructionPlanResult,
+  InstructionThreadFacts,
+} from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
 import { PLAN_MAX_COST_USD, type InstructionPlanner } from "./planner.js";
+import { factsLine, type QuarantinedThreadReader } from "./quarantine.js";
 import type { InstructionRow, InstructionStore } from "./store.js";
 
 /**
@@ -36,6 +40,8 @@ import type { InstructionRow, InstructionStore } from "./store.js";
  */
 
 export const MAX_REPLANS = 2;
+/** S6: at most this many threads read per firing. */
+export const THREADS_PER_FIRING = 8;
 
 export type InstructionPerson = {
   /** Null for a candidate with no relationship yet (a saved company). */
@@ -107,6 +113,8 @@ export const ASK_WORDS: Readonly<Record<string, string>> = {
   ATTACHMENT: "it shares a document",
   MEETING_OUTSIDE_HOURS: "the time is outside your working hours",
   AUTONOMY_OFF: "I ask for each step until autonomy is switched on",
+  THEY_RAISED_TERMS: "they raised terms or money",
+  THEY_DECLINED: "they said no or not now",
 };
 
 // ---------------------------------------------------------------------------
@@ -194,6 +202,8 @@ export type ValidationContext = {
   readonly now: Date;
   /** The idempotency key this step runs under. */
   readonly stepKey: string;
+  /** S6: what the quarantined reader found in each thread. */
+  readonly facts?: ReadonlyMap<string, InstructionThreadFacts> | undefined;
 };
 
 const Args = z.record(z.string(), z.unknown());
@@ -319,6 +329,11 @@ export function validateStep(
   // AUTO as granted -- but what Q may do alone is fixed in code.
   if (!delegableOnItsOwn(action)) return ask("NOT_DELEGABLE");
   if (step.touchesTermsOrMoney) return ask("TERMS_OR_MONEY");
+  // Code, not the planner, reads the thread's facts: where they raised
+  // terms or money, or said no, Q does not act alone.
+  const thread = subject === null ? undefined : context.facts?.get(subject);
+  if (thread?.mentionsTermsOrMoney === true) return ask("THEY_RAISED_TERMS");
+  if (thread?.declined === true) return ask("THEY_DECLINED");
   if (!withinWorkingHours(context.now, context.grant.workingHours)) {
     return {
       verdict: "REFUSED",
@@ -415,6 +430,8 @@ export type InstructionEngineDependencies = {
   /** The planner: one structured call through the Q Model Gateway. */
   /** The planner: one structured call through the Q Model Gateway (S5: budgeted). */
   readonly plan: InstructionPlanner;
+  /** S6: the quarantined extractor; absent, the planner sees no thread facts. */
+  readonly readThread?: QuarantinedThreadReader | undefined;
   /** An ASK step: the `app.<name>` card, as the person. */
   readonly ask: (
     actor: ActorContext,
@@ -469,6 +486,8 @@ function actionLines(
 function peopleLines(
   people: readonly InstructionPerson[],
   sent: ReadonlyMap<string, number>,
+  facts: ReadonlyMap<string, InstructionThreadFacts>,
+  topics: readonly string[],
 ): string {
   if (people.length === 0) return "No one yet.";
   return people
@@ -483,6 +502,13 @@ function peopleLines(
         person.relationshipId === null
           ? null
           : `Q messages sent ${String(sent.get(person.relationshipId) ?? 0)}`,
+        // Their messages only as typed facts from the quarantined reader.
+        person.relationshipId === null
+          ? null
+          : ((read) =>
+              read === undefined ? null : `chat: ${factsLine(read, topics)}`)(
+              facts.get(person.relationshipId),
+            ),
       ]
         .filter((part): part is string => part !== null)
         .join(" | "),
@@ -582,10 +608,6 @@ export function createInstructionEngine(
       const keyOf = (index: number) =>
         `instr:${row.id}:${runKey}:${String(index)}`;
 
-      // Plan; validate; re-plan with the reasons at most twice.
-      let refusals = "None.";
-      let plan: InstructionPlanResult | null = null;
-      let verdicts: StepVerdict[] = [];
       // S5: what is left of this month's budget. Below one planning call,
       // the instruction pauses and asks to continue (no call is made).
       // Whole micro-dollars: money is never compared as floats.
@@ -593,6 +615,37 @@ export function createInstructionEngine(
       let left =
         micros(Number(row.budget_usd_month)) -
         micros(Number(row.spent_this_month));
+
+      // S6: their messages, read only through the quarantined extractor,
+      // keeping one planning call in reserve.
+      const facts = new Map<string, InstructionThreadFacts>();
+      if (dependencies.readThread !== undefined) {
+        const threads = inScope(grant.data, people)
+          .map((person) => person.relationshipId)
+          .filter((id): id is string => id !== null)
+          .slice(0, THREADS_PER_FIRING);
+        for (const relationshipId of threads) {
+          const spare = left - micros(PLAN_MAX_COST_USD);
+          const read = await dependencies.readThread({
+            actor,
+            instructionId: row.id,
+            relationshipId,
+            topics: grant.data.topics,
+            now: at,
+            maxCostUsd: Math.max(0, spare) / 1_000_000,
+          });
+          if (read.costUsd > 0) {
+            left -= micros(read.costUsd);
+            await store.addSpend(row.id, read.costUsd);
+          }
+          if (read.facts !== null) facts.set(relationshipId, read.facts);
+        }
+      }
+
+      // Plan; validate; re-plan with the reasons at most twice.
+      let refusals = "None.";
+      let plan: InstructionPlanResult | null = null;
+      let verdicts: StepVerdict[] = [];
       for (let attempt = 0; attempt <= MAX_REPLANS; attempt += 1) {
         if (!(left >= micros(PLAN_MAX_COST_USD))) {
           await pauseForBudget(row, grant.data, actor);
@@ -612,7 +665,12 @@ export function createInstructionEngine(
             grant: grantLines(grant.data),
             actions: actionLines(grant.data, dependencies.actions),
             now: `${at.toISOString()} (their zone ${grant.data.workingHours.timeZone})`,
-            people: peopleLines(inScope(grant.data, people), sentBefore),
+            people: peopleLines(
+              inScope(grant.data, people),
+              sentBefore,
+              facts,
+              grant.data.topics,
+            ),
             history:
               history.length === 0
                 ? "Nothing yet."
@@ -643,6 +701,7 @@ export function createInstructionEngine(
             sent,
             now: at,
             stepKey: keyOf(index),
+            facts,
           }),
         );
         const refused = verdicts

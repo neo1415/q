@@ -76,3 +76,60 @@ export const InstructionPlanResultSchema = z
   })
   .strict();
 export type InstructionPlanResult = z.infer<typeof InstructionPlanResultSchema>;
+
+// ---------------------------------------------------------------------------
+// INSTRUCTION_THREAD_READER: the quarantined extractor (ADR 0043 §6)
+// ---------------------------------------------------------------------------
+
+/**
+ * What the other side wrote reaches the planner only through this reader:
+ * a model with no tools that returns typed fields -- booleans, enums,
+ * indexes and one validated instant -- never free text, so nothing they
+ * wrote can become words the planner reads as instructions.
+ */
+export const INSTRUCTION_THREAD_READER_SCHEMA_NAME = "InstructionThreadFacts";
+export const INSTRUCTION_THREAD_READER_SCHEMA_VERSION = 1;
+
+export const InstructionThreadReaderVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    /** The approved topics, numbered from 1. Trusted. */
+    topics: z.string().max(2_000),
+    /** Now, as an ISO instant, for "tomorrow" and the like. Trusted. */
+    now: z.string().max(40),
+    /** The latest messages, oldest first, each marked THEM or US. UNTRUSTED. */
+    thread: z.string().max(12_000),
+  })
+  .strict();
+export type InstructionThreadReaderVariables = z.infer<
+  typeof InstructionThreadReaderVariablesSchema
+>;
+export const INSTRUCTION_THREAD_READER_UNTRUSTED = ["thread"] as const;
+
+export const InstructionThreadFactsSchema = z
+  .object({
+    /** Who wrote last. */
+    lastFrom: z.enum(["THEM", "US", "NONE"]),
+    /** Their latest messages ask something that has not been answered. */
+    asksQuestion: z.boolean(),
+    /** They want a call or a meeting. */
+    wantsToMeet: z.boolean(),
+    /** A specific start time they proposed, ISO 8601 with offset; else null. */
+    proposedTime: z
+      .string()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/u,
+      )
+      .nullable(),
+    /** Which approved topics (1-based) their latest messages are about. */
+    topicNumbers: z.array(z.number().int().min(1).max(12)).max(12),
+    /** They raise terms, valuation, amounts, money, commitments or signing. */
+    mentionsTermsOrMoney: z.boolean(),
+    /** They said no, not now, or to stop contacting them. */
+    declined: z.boolean(),
+    tone: z.enum(["POSITIVE", "NEUTRAL", "NEGATIVE"]),
+  })
+  .strict();
+export type InstructionThreadFacts = z.infer<
+  typeof InstructionThreadFactsSchema
+>;
