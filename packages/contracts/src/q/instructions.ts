@@ -135,25 +135,69 @@ export type InstructionGrantPayload = z.infer<
   typeof InstructionGrantPayloadSchema
 >;
 
-/**
- * The declared app actions (ADR 0040 names) a standing instruction's grant
- * holds, and how each is taken by default. q-api composes an `app.<name>`
- * approval card type for each, so an ASK step can always prepare its card.
- */
-export const INSTRUCTION_DEFAULT_ACTIONS: readonly {
+type InstructionActionEntry = {
   readonly action: string;
   readonly mode: InstructionActionMode;
-}[] = Object.freeze([
-  { action: "relationship.interest.express", mode: "AUTO" },
-  { action: "chat.message.send", mode: "AUTO" },
-  { action: "schedule.meeting.book", mode: "AUTO" },
-  { action: "relationship.connection_request.send", mode: "ASK" },
-  { action: "relationship.interest.accept", mode: "ASK" },
-  { action: "relationship.interest.decline", mode: "ASK" },
-  { action: "relationship.outcome.change", mode: "ASK" },
-  { action: "schedule.reminder.create", mode: "ASK" },
-  { action: "diligence.change", mode: "ASK" },
-]);
+};
+
+/**
+ * The declared app actions (ADR 0040 names) a standing instruction's grant
+ * holds by default, and how each is taken, per side: a founder never
+ * expresses interest and an investor never asks an investor to connect, so
+ * neither card lists what its owner cannot do (QA 2026-10-03: an
+ * investor's card said "Ask an investor to connect"). Unknown side: both.
+ */
+export const INSTRUCTION_ACTIONS_BY_SIDE: Readonly<
+  Record<"COMPANY" | "INVESTOR" | "UNKNOWN", readonly InstructionActionEntry[]>
+> = {
+  COMPANY: [
+    { action: "chat.message.send", mode: "AUTO" },
+    { action: "schedule.meeting.book", mode: "AUTO" },
+    { action: "relationship.connection_request.send", mode: "ASK" },
+    { action: "relationship.interest.accept", mode: "ASK" },
+    { action: "relationship.interest.decline", mode: "ASK" },
+    { action: "relationship.outcome.change", mode: "ASK" },
+    { action: "schedule.reminder.create", mode: "ASK" },
+    { action: "diligence.change", mode: "ASK" },
+  ],
+  INVESTOR: [
+    { action: "relationship.interest.express", mode: "AUTO" },
+    { action: "chat.message.send", mode: "AUTO" },
+    { action: "schedule.meeting.book", mode: "AUTO" },
+    { action: "relationship.connection_request.accept", mode: "ASK" },
+    { action: "relationship.connection_request.decline", mode: "ASK" },
+    { action: "relationship.outcome.change", mode: "ASK" },
+    { action: "schedule.reminder.create", mode: "ASK" },
+    { action: "diligence.change", mode: "ASK" },
+  ],
+  UNKNOWN: [
+    { action: "relationship.interest.express", mode: "AUTO" },
+    { action: "chat.message.send", mode: "AUTO" },
+    { action: "schedule.meeting.book", mode: "AUTO" },
+    { action: "relationship.connection_request.send", mode: "ASK" },
+    { action: "relationship.interest.accept", mode: "ASK" },
+    { action: "relationship.interest.decline", mode: "ASK" },
+    { action: "relationship.outcome.change", mode: "ASK" },
+    { action: "schedule.reminder.create", mode: "ASK" },
+    { action: "diligence.change", mode: "ASK" },
+  ],
+};
+
+/**
+ * Every action any default grant holds. q-api composes an `app.<name>`
+ * approval card type for each, so an ASK step can always prepare its card.
+ */
+export const INSTRUCTION_DEFAULT_ACTIONS: readonly InstructionActionEntry[] =
+  Object.freeze(
+    [
+      ...INSTRUCTION_ACTIONS_BY_SIDE.UNKNOWN,
+      ...INSTRUCTION_ACTIONS_BY_SIDE.INVESTOR,
+      ...INSTRUCTION_ACTIONS_BY_SIDE.COMPANY,
+    ].filter(
+      (entry, index, all) =>
+        all.findIndex((other) => other.action === entry.action) === index,
+    ),
+  );
 
 /**
  * "Handle all the work for me": the founder's default grant (2026-10-03).
@@ -166,9 +210,13 @@ export function handleEverythingGrant(input: {
   readonly tone?: string | undefined;
   readonly topics?: readonly string[] | undefined;
   readonly includeNewCompanies?: boolean | undefined;
+  /** Whose grant: only the actions their side can take. */
+  readonly side?: "COMPANY" | "INVESTOR" | undefined;
 }): InstructionGrant {
   return InstructionGrantSchema.parse({
-    actions: INSTRUCTION_DEFAULT_ACTIONS.map((entry) => ({ ...entry })),
+    actions: INSTRUCTION_ACTIONS_BY_SIDE[input.side ?? "UNKNOWN"].map(
+      (entry) => ({ ...entry }),
+    ),
     counterparts: {
       scope: "ALL_MY_RELATIONSHIPS",
       relationshipIds: [],

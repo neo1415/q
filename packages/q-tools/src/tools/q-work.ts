@@ -531,9 +531,15 @@ export function createQWorkTools(
             : deny<null>("NOT_AVAILABLE"),
         ),
       execute: async (input, context) => {
-        const timeZone = (await port.timeZoneOf?.(context.actor)) ?? "UTC";
+        const [timeZone, investor, company] = await Promise.all([
+          port.timeZoneOf?.(context.actor) ?? Promise.resolve(null),
+          port.isInvestor(context.actor).catch(() => false),
+          port.hasCompany(context.actor).catch(() => false),
+        ]);
         const base = handleEverythingGrant({
-          timeZone,
+          timeZone: timeZone ?? "UTC",
+          // Only what their side can do is on their card.
+          side: investor ? "INVESTOR" : company ? "COMPANY" : undefined,
           tone: input.tone ?? undefined,
           topics: input.topics.length > 0 ? input.topics : undefined,
           includeNewCompanies: input.includeNewCompanies,

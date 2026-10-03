@@ -109,4 +109,13 @@ describe("propose_standing_instruction: their working hours", () => {
       expect(prepared).toHaveLength(0);
     }
   });
+
+  it("an investor's grant holds only investor actions", async () => {
+    const { prepared } = await world().propose({});
+    const actions = grantOf(prepared[0]).actions.map((entry) => entry.action);
+    expect(actions).toContain("relationship.interest.express");
+    expect(actions).toContain("relationship.connection_request.accept");
+    expect(actions).not.toContain("relationship.connection_request.send");
+    expect(actions).not.toContain("relationship.interest.accept");
+  });
 });

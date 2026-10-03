@@ -103,6 +103,26 @@ describe("the q.instruction.grant card", () => {
     expect(card).toContain("On my own, within Mon-Sun 08:00-22:00 (UTC)");
   });
 
+  it("lists only what the owner's side can do (QA 2026-10-03)", () => {
+    const investor = grantCard(
+      payload({
+        grant: handleEverythingGrant({ timeZone: "UTC", side: "INVESTOR" }),
+      }),
+    );
+    expect(investor).toContain("Express interest in company");
+    expect(investor).toContain("Accept a connection request");
+    expect(investor).not.toContain("Ask an investor to connect");
+    expect(investor).not.toContain("an investor's interest");
+    const founder = grantCard(
+      payload({
+        grant: handleEverythingGrant({ timeZone: "UTC", side: "COMPANY" }),
+      }),
+    );
+    expect(founder).not.toContain("Express interest");
+    expect(founder).toContain("Ask an investor to connect");
+    expect(founder).toContain("Accept an investor's interest");
+  });
+
   it("binds to the person who asked, as its target", () => {
     expect(definition.targets(payload())).toEqual([{ kind: "USER", userId }]);
   });
