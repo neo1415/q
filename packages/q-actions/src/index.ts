@@ -116,6 +116,7 @@ export {
   proposalBlocks,
   alreadyWaitingLine,
   proposedLine,
+  replacesLine,
   refusedLine,
   type QActionNarrator,
   type QRunRef,

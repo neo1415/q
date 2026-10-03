@@ -81,7 +81,9 @@ export class QApprovalAlreadyDecidedError extends Error {
         ? "This action has already been approved."
         : status === "REJECTED"
           ? "This action has already been declined."
-          : "This approval is no longer open.",
+          : status === "REVOKED"
+            ? "This card was replaced by a newer one or withdrawn, so it can't be approved."
+            : "This approval is no longer open.",
     );
     this.name = "QApprovalAlreadyDecidedError";
     this.status = status;

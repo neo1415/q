@@ -6,6 +6,7 @@ import {
   alreadyWaitingLine,
   createQActionPort,
   proposedLine,
+  replacesLine,
   QActionNotPermittedError,
   refusedLine,
   type QActionNarrator,
@@ -150,6 +151,51 @@ describe("what Q says about an action", () => {
         line: "That's ready: Share your raise with Savanna Seed. It's waiting for your yes.",
         approvalId: "22222222-2222-4222-8222-222222222222",
       },
+    ]);
+  });
+
+  it("a card that replaced an older one says so, naming both, in one line", async () => {
+    const said: string[] = [];
+    const port = createQActionPort({
+      service: service(() =>
+        Promise.resolve({
+          action: {
+            id: "11111111-1111-4111-8111-111111111111",
+            summary:
+              "Make your pitch deck downloadable by your organisation only",
+          },
+          approval: {
+            id: "22222222-2222-4222-8222-222222222222",
+            expiresAt: "2026-10-04T00:00:00.000Z",
+          },
+          superseded: [
+            {
+              summary:
+                "Let investors who can find your company download your pitch deck",
+            },
+          ],
+        } as never),
+      ),
+      proposer: proposer({
+        actionType: "app.document.deck_audience.set",
+        payload: {},
+      }),
+      narrator: {
+        proposed: (_run, action, _approval, options) => {
+          said.push(
+            options?.replaces === undefined
+              ? proposedLine(action.summary)
+              : `${proposedLine(action.summary)} ${replacesLine(options.replaces)}`,
+          );
+          return Promise.resolve();
+        },
+        refused: () => Promise.resolve(),
+        settled: () => Promise.resolve(),
+      },
+    });
+    expect((await port.prepare(context)).kind).toBe("AWAITING_APPROVAL");
+    expect(said).toEqual([
+      "Make your pitch deck downloadable by your organisation only. Not saved yet: tap Approve on the card, or tell me to go ahead. This replaces the earlier card: Let investors who can find your company download your pitch deck (no longer waiting).",
     ]);
   });
 

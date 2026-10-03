@@ -77,13 +77,14 @@ export function createQActionPort(options: {
         return { kind: "NONE" };
       }
       try {
-        const { action, approval, existing } = await options.service.propose({
-          actor: context.actor,
-          runId: context.runId,
-          correlationId: context.correlationId,
-          actionType: proposal.actionType,
-          payload: proposal.payload,
-        });
+        const { action, approval, existing, superseded } =
+          await options.service.propose({
+            actor: context.actor,
+            runId: context.runId,
+            correlationId: context.correlationId,
+            actionType: proposal.actionType,
+            payload: proposal.payload,
+          });
         if (existing === true) {
           // The same change already waits for them (lead 2026-10-03): its
           // card is shown here again, in focus, and nothing new is made.
@@ -98,10 +99,17 @@ export function createQActionPort(options: {
         }
         // Only now, with the proposal and its approval request committed,
         // may Q say it has prepared anything.
-        await narrator.proposed(run, action, {
-          id: approval.id,
-          expiresAt: approval.expiresAt,
-        });
+        await narrator.proposed(
+          run,
+          action,
+          {
+            id: approval.id,
+            expiresAt: approval.expiresAt,
+          },
+          superseded === undefined || superseded.length === 0
+            ? undefined
+            : { replaces: superseded.map((older) => older.summary) },
+        );
         return {
           kind: "AWAITING_APPROVAL",
           actionId: action.id,

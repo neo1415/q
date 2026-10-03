@@ -143,6 +143,11 @@ export type ProposeQActionResult = {
    * change waiting for their approval, and that card is returned instead.
    */
   readonly existing?: boolean | undefined;
+  /**
+   * Older waiting cards of the same type and target this one replaced:
+   * they can no longer be approved (lead 2026-10-03).
+   */
+  readonly superseded?: readonly QActionRecord[] | undefined;
 };
 
 export type QApprovalQuery = {
@@ -258,6 +263,7 @@ const AUDIT = {
   executed: AuditActionTypeSchema.parse("q.action.executed"),
   executionFailed: AuditActionTypeSchema.parse("q.action.execution_failed"),
   executionBlocked: AuditActionTypeSchema.parse("q.action.execution_blocked"),
+  superseded: AuditActionTypeSchema.parse("q.action.superseded"),
 } as const;
 
 function iso(date: Date): UtcTimestamp {
@@ -681,6 +687,86 @@ export function createQActionService(
   }
 
   /**
+   * An older waiting card replaced by a newer one of the same type and
+   * target (lead 2026-10-03): its approval is REVOKED and its action
+   * WITHDRAWN -- the engine's existing terminal states, so it can never be
+   * approved -- its run ends, and the history and an audit entry record
+   * which card replaced it. Nothing is deleted. False when it was decided
+   * meanwhile (the newer card stands either way).
+   */
+  async function supersede(
+    tx: TransactionContext,
+    older: {
+      readonly action: QActionRecord;
+      readonly approval: QApprovalRecord;
+    },
+    by: QActionRecord,
+    actor: ActorContext,
+    now: Date,
+    correlationId: CorrelationId,
+  ): Promise<boolean> {
+    const approval = await repositories.approvals.decide(tx, {
+      tenantId: older.approval.tenantId,
+      approvalId: older.approval.id,
+      expectedVersion: older.approval.version,
+      status: "REVOKED",
+      revokedAt: iso(now),
+      revokedByUserId: actor.userId,
+    });
+    if (approval === null) return false;
+    const action = await repositories.actions.transition(tx, {
+      tenantId: older.action.tenantId,
+      actionId: older.action.id,
+      expectedVersion: older.action.version,
+      status: "WITHDRAWN",
+    });
+    if (action === null) throw new QActionVersionConflictError();
+    // Its run waited only for this card: it ends, as a declined one does.
+    const run = await runtime.runs.lockForActor(
+      tx,
+      actor.tenantId,
+      older.action.proposedByUserId,
+      older.action.runId,
+    );
+    if (run !== null && canTransition(run.status, "COMPLETED")) {
+      await moveRun(tx, run, "COMPLETED", {
+        complete: true,
+        events: [
+          {
+            type: "q.run.completed",
+            data: { status: "COMPLETED", completedAt: iso(now) },
+          },
+        ],
+      });
+    }
+    await audit.record(tx, {
+      auditEventId: createAuditEventId(),
+      ...humanActor(actor),
+      actionType: AUDIT.superseded,
+      resourceType: RESOURCE_Q_ACTION,
+      resourceId: older.action.id,
+      occurredAt: iso(now),
+      outcome: "SUCCEEDED",
+      metadata: auditMetadata(action, {
+        approvalId: older.approval.id,
+        supersededBy: by.id,
+      }),
+      correlationId,
+    });
+    logger?.info(
+      {
+        actionId: older.action.id,
+        approvalId: older.approval.id,
+        supersededBy: by.id,
+        actionType: by.actionType,
+        correlationId,
+      },
+      "q action superseded by a newer card for the same target",
+    );
+    return true;
+  }
+
+  /**
    * Persist one proposal and its approval request inside the caller's
    * transaction: the exact payload and its binding hash, the run's events,
    * audit and the outbox. A first proposal moves the run to
@@ -972,7 +1058,7 @@ export function createQActionService(
             if (!canTransition(run.status, "AWAITING_APPROVAL")) {
               throw new QActionVersionConflictError();
             }
-            return recordProposal(tx, {
+            const recorded = await recordProposal(tx, {
               run,
               actor,
               definition,
@@ -985,6 +1071,35 @@ export function createQActionService(
               expiresAt,
               correlationId,
             });
+            // The same change to the same thing, but different: the new
+            // card replaces the older ones (lead 2026-10-03, run
+            // a4618f34: "investors" and "my organisation only" both
+            // waited for one deck, and approving both applied the last).
+            const targetKey = canonicalJsonStringify([...targets]);
+            const replaced: QActionRecord[] = [];
+            for (const older of waiting) {
+              if (
+                older.action.runId === run.id ||
+                canonicalJsonStringify([...older.action.targets]) !== targetKey
+              ) {
+                continue;
+              }
+              if (
+                await supersede(
+                  tx,
+                  older,
+                  recorded.action,
+                  actor,
+                  now,
+                  correlationId,
+                )
+              ) {
+                replaced.push(older.action);
+              }
+            }
+            return replaced.length === 0
+              ? recorded
+              : { ...recorded, superseded: replaced };
           });
         } finally {
           span.end();

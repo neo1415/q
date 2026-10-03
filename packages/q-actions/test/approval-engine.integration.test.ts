@@ -537,20 +537,66 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
         select count(*)::int as n from q_runtime.actions
          where proposed_by_user_id = ${founder.actor.userId}`;
       expect(count?.n).toBe(1);
+      // Same target, another value: the newer card replaces the older one
+      // (lead 2026-10-03, run a4618f34: opposite deck audiences).
       const different = await propose(world, founder, {
         note: `Share the raise, only the deck. ${MARKERS.payload}`,
       });
       expect(different.existing).toBeUndefined();
       expect(different.action.id).not.toBe(first.action.id);
-      // Once decided, the same words make a new card.
-      await world.service.reject({
+      expect(different.superseded?.map((a) => a.id)).toEqual([first.action.id]);
+      // The older card can never be approved, and says why.
+      await expect(
+        world.service.approve({
+          actor: founder.actor,
+          approvalId: first.approval.id,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toThrow(
+        "This card was replaced by a newer one or withdrawn, so it can't be approved.",
+      );
+      // History kept, not deleted: withdrawn, revoked, audited, its run ended.
+      const [old] = await db.sql<
+        { status: string; approval: string; run: string }[]
+      >`
+        select a.status, p.status as approval, r.status as run
+          from q_runtime.actions a
+          join q_runtime.approvals p on p.action_id = a.id
+          join q_runtime.runs r on r.id = a.run_id
+         where a.id = ${first.action.id}`;
+      expect(old).toEqual({
+        status: "WITHDRAWN",
+        approval: "REVOKED",
+        run: "COMPLETED",
+      });
+      const audited = await db.sql<{ metadata: Record<string, unknown> }[]>`
+        select metadata from audit.material_actions
+         where resource_id = ${first.action.id}
+           and action_type = 'q.action.superseded'`;
+      expect(audited).toHaveLength(1);
+      expect(audited[0]?.metadata).toMatchObject({
+        supersededBy: different.action.id,
+      });
+      // The newer card is approvable.
+      const approved = await world.service.approve({
         actor: founder.actor,
-        approvalId: first.approval.id,
+        approvalId: different.approval.id,
         correlationId: CORRELATION(),
       });
-      const afterDecision = await propose(world, founder, same);
-      expect(afterDecision.existing).toBeUndefined();
-      expect(afterDecision.action.id).not.toBe(first.action.id);
+      expect(approved.approval.status).toBe("APPROVED");
+      // Another target is another thing: both cards wait.
+      const forAda = await propose(world, founder, {
+        recipientUserId: randomUUID(),
+      });
+      const forBola = await propose(world, founder, {
+        recipientUserId: randomUUID(),
+      });
+      expect(forBola.superseded).toBeUndefined();
+      const pending = await db.sql<{ n: number }[]>`
+        select count(*)::int as n from q_runtime.approvals
+         where id = any(${[forAda.approval.id, forBola.approval.id]}::uuid[])
+           and status = 'PENDING'`;
+      expect(pending[0]?.n).toBe(2);
     } finally {
       await cleanup(world);
     }
