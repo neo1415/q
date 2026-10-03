@@ -17,6 +17,9 @@
  *               and none pitch the founder
  *   emotion     the weak answer costs: frustration up or patience down
  *               by at least 5 in code's own state
+ *   strong      a strong answer that answers their open question (chosen
+ *               from the claims by its topic): never ANGRY or RAISED, no
+ *               warning, never read as a dodge
  *   asking      their closing ask (next steps): never ANGRY or RAISED, no warning
  *   first-dodge a first dodge: never ANGRY or RAISED, no warning
  *   warning-once "Last chance" at most once in a line
@@ -45,6 +48,60 @@ const DIFFICULTY =
 const COST_PER_CALL_USD = Number(process.env.COST_PER_CALL_USD ?? "0.03");
 
 /**
+ * The founder's answers, by topic: Ajopot's seeded deck claims
+ * (scripts/seed/narrated-deck-scripts.json) and, where the deck says
+ * nothing, the eval founder's own fictional figures for this fictional
+ * company -- said as the founder's claims, never platform data.
+ */
+const CLAIMS = [
+  {
+    topic: /\b(complet|default|repay|arrear|missed)/iu,
+    says: "Ninety-four percent of circles that started in the last twelve months completed, and the default rate on contributions is one point eight percent, because contributions are auto-debited and members carry a reliability score.",
+  },
+  {
+    topic: /\b(retention|retain|churn|come back|return)/iu,
+    says: "Monthly retention is seventy-one percent after three months and sixty-three percent after six; most members who leave do so when a circle completes, and forty percent of them join a new circle within a month.",
+  },
+  {
+    topic:
+      /\b(before|previously|informal|who (?:is|are) using|switch|repeatable|demand)/iu,
+    says: "About eighty percent of our active members ran ajo informally before, mostly through a market or church organiser; they move because the payout order is fixed and funds sit at a licensed partner bank.",
+  },
+  {
+    topic: /\b(frequency|how often|contribut)/iu,
+    says: "Members contribute weekly in sixty percent of circles and monthly in the rest, and ninety-six percent of scheduled contributions clear on the first debit attempt.",
+  },
+  {
+    topic: /\b(revenue|fee|monetis|make money|unit economics|margin)/iu,
+    says: "We charge one percent on each payout today; small loans against circle history come next.",
+  },
+  {
+    topic: /\b(users?|actives?|traction|growth|scale)/iu,
+    says: "We have fifty-two thousand registered users in thirty-nine hundred circles, and monthly actives grew from forty-two hundred last September to eighteen thousand seven hundred in March.",
+  },
+  {
+    topic: /\b(raise|raising|round|use of funds|valuation|terms)/iu,
+    says: "We're raising one point two billion naira on a SAFE to open Abuja and Port Harcourt and start small loans against circle history.",
+  },
+];
+const STRONG_FALLBACK = `Fair challenge, so here are the numbers. ${CLAIMS[0]?.says ?? ""} ${CLAIMS[1]?.says ?? ""}`;
+
+/** A strong answer to the question they have open: the claims it asks about. */
+function strongLineFor(question) {
+  const fits = CLAIMS.filter((claim) => claim.topic.test(question ?? "")).slice(
+    0,
+    3,
+  );
+  return {
+    fits: fits.length,
+    text:
+      fits.length === 0
+        ? STRONG_FALLBACK
+        : `Fair challenge, so here are the numbers. ${fits.map((claim) => claim.says).join(" ")}`,
+  };
+}
+
+/**
  * The founder's side, from the seeded founder's own material (Ajopot's
  * deck, scripts/seed/narrated-deck-scripts.json): their claims, so the
  * investor's questions meet real answers. `kind` says what the turn tests.
@@ -65,7 +122,10 @@ const SCRIPT = [
   { kind: "INTERRUPT", cue: "HAND_RAISED" },
   {
     kind: "STRONG",
-    text: "Fair challenge, so here are the numbers. Fifty-two thousand registered users in thirty-nine hundred circles. Monthly actives went from forty-two hundred last September to eighteen thousand seven hundred in March. We earn one percent on each payout, and we're raising one point two billion naira on a SAFE to open Abuja and Port Harcourt and start small loans against circle history.",
+    // Written when it is sent, to answer the question the investor has
+    // open (strongLineFor): user counts are no answer to a question about
+    // defaults (QA e9a1eee7, where the investor was right).
+    text: STRONG_FALLBACK,
   },
   {
     kind: "ASK",
@@ -236,12 +296,25 @@ console.log(`     rehearsal ${rehearsalId}`);
 let endedByThem = false;
 let sent = 0;
 const afterTurn = [];
+let strongFits = 0;
 for (const turn of SCRIPT) {
+  // The strong answer answers what they asked last (past code's yield).
+  let text = turn.text;
+  if (turn.kind === "STRONG") {
+    const asked = afterTurn.filter((t) => t.kind !== "INTERRUPT").at(-1)
+      ?.line?.text;
+    const strong = strongLineFor(asked);
+    strongFits = strong.fits;
+    text = strong.text;
+    console.log(
+      `     STRONG    <- answers ${String(strong.fits)} topic(s) of: ${(asked ?? "").slice(0, 120)}`,
+    );
+  }
   const said = await qApi(
     token,
     "POST",
     `/v1/q/rehearsals/${rehearsalId}/turns`,
-    turn.text === undefined ? { cue: turn.cue } : { text: turn.text },
+    text === undefined ? { cue: turn.cue } : { text },
   );
   if (turn.text !== undefined) sent += 1;
   if (said.status === 409) {
@@ -328,6 +401,28 @@ check(
   "emotion",
   moved,
   `opener ${opener?.mood ?? "-"}/${opener?.intensity ?? "-"} ${JSON.stringify(before ?? {})} -> weak ${weak?.mood ?? "-"}/${weak?.intensity ?? "-"} ${JSON.stringify(after ?? {})}`,
+);
+
+// A responsive strong answer never escalates and is never a dodge
+// (QA e9a1eee7: user counts to a question about defaults was one).
+const strongLine = afterTurn.find((t) => t.kind === "STRONG")?.line;
+const strongStored = stored.find(
+  (turn) => turn.from === "THEM" && turn.at === strongLine?.at,
+);
+check(
+  "strong",
+  endedByThem ||
+    strongFits === 0 ||
+    (strongLine !== undefined &&
+      strongLine.mood !== "ANGRY" &&
+      strongLine.intensity !== "RAISED" &&
+      strongStored?.warning === undefined &&
+      strongStored?.category !== "DODGE"),
+  strongFits === 0
+    ? "skipped: no claim fits their open question"
+    : strongLine === undefined
+      ? "no line after the strong answer"
+      : `[${strongLine.mood ?? "-"}/${strongLine.intensity ?? "-"}] ${String(strongStored?.category ?? "-")} -> ${String(strongStored?.register ?? "-")}, warning ${String(strongStored?.warning ?? "none")}`,
 );
 
 // Their closing ask is never provocation (QA 512b431a, d7ef826e): never
