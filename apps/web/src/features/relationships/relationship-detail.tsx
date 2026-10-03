@@ -47,6 +47,9 @@ export const OUTCOME_FIRST: ReadonlySet<string> = new Set([
   "PASSED",
 ]);
 
+/** States whose primary action is the way back (Resume, Reconsider). */
+export const WAY_BACK: ReadonlySet<string> = new Set(["PAUSED", "PASSED"]);
+
 /**
  * One relationship, for one side (CQ-WEB-030; doc 25 §121: "where are we,
  * what happened, what is next"; founder design 2026-09-28, Relationship
@@ -174,7 +177,12 @@ export function RelationshipDetail({
             <DockAvoidZone className="flex flex-col items-stretch gap-2">
               {actions}
               {connected && relationship !== null ? (
-                <ScheduleDialog kind="call" primary={actions === null}>
+                <ScheduleDialog
+                  kind="call"
+                  primary={
+                    actions === null && !WAY_BACK.has(relationship.state)
+                  }
+                >
                   <RelationshipSchedule
                     relationshipId={relationship.relationshipId}
                     counterpart={counterpart}
@@ -196,7 +204,7 @@ export function RelationshipDetail({
                 <>
                   {/* After a meeting, "How did it go?" is the next step; when
                       paused or not proceeding, the way back is (break-it
-                      2026-10-03: Resume was only under More). */}
+                      2026-10-03: Zino could not find Resume). */}
                   {OUTCOME_FIRST.has(relationship.state) ? (
                     <RelationshipOutcome
                       relationshipId={relationship.relationshipId}

@@ -147,9 +147,31 @@ export function createRelationshipOutcomeService(dependencies: {
             tx: Parameters<Parameters<TransactionManager["run"]>[0]>[0],
           ) => Promise<string | null>)
         | undefined;
+      /**
+       * Already done: true when, under the relationship's row lock, the
+       * newest pause/resume/pass event is already this one. Two tabs
+       * pressing Pause at once both read MEETING_HELD before either wrote
+       * (break-it sweep 2026-10-03: two relationship_paused events 60ms
+       * apart); the second is now a replay, with no event.
+       */
+      readonly unlessLatestIs?: string | undefined;
     },
   ): Promise<boolean> {
     return transactions.run(async (tx) => {
+      if (input.unlessLatestIs !== undefined) {
+        await tx.sql`
+          select id from network.relationships
+           where id = ${party.relationshipId} for update`;
+        const latest = await tx.sql<{ event_type: string }[]>`
+          select event_type from network.relationship_events
+           where relationship_id = ${party.relationshipId}
+             and event_type in (${RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED},
+                                ${RELATIONSHIP_EVENT_RELATIONSHIP_RESUMED},
+                                ${RELATIONSHIP_EVENT_RELATIONSHIP_PASSED})
+           order by sequence desc
+           limit 1`;
+        if (latest[0]?.event_type === input.unlessLatestIs) return false;
+      }
       let passId: string | undefined;
       if (input.before !== undefined) {
         const made = await input.before(tx);
@@ -250,6 +272,7 @@ export function createRelationshipOutcomeService(dependencies: {
       const recorded = await record(command.actor, party, {
         eventType: RELATIONSHIP_EVENT_RELATIONSHIP_PASSED,
         outcome: "PASSED",
+        unlessLatestIs: RELATIONSHIP_EVENT_RELATIONSHIP_PASSED,
         correlationId: command.correlationId ?? dependencies.newCorrelationId(),
         // The shared event says only whether a reason was shared.
         payload: (passId) => ({
@@ -287,13 +310,14 @@ export function createRelationshipOutcomeService(dependencies: {
       if (party.side !== "INVESTOR") return refused("NOT_ALLOWED");
       if (party.state === "PAUSED") return ok(party.relationshipId, true);
       if (!PAUSABLE.has(party.state)) return refused("NOT_IN_STATE");
-      await record(command.actor, party, {
+      const recorded = await record(command.actor, party, {
         eventType: RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED,
         outcome: "PAUSED",
         payload: () => ({ side: "INVESTOR" }),
         correlationId: command.correlationId ?? dependencies.newCorrelationId(),
+        unlessLatestIs: RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED,
       });
-      return ok(party.relationshipId, false);
+      return ok(party.relationshipId, !recorded);
     },
 
     /**
@@ -314,13 +338,14 @@ export function createRelationshipOutcomeService(dependencies: {
           ? ok(party.relationshipId, true)
           : refused("NOT_IN_STATE");
       }
-      await record(command.actor, party, {
+      const recorded = await record(command.actor, party, {
         eventType: RELATIONSHIP_EVENT_RELATIONSHIP_RESUMED,
         outcome: "RESUMED",
         payload: () => ({ side: "INVESTOR" }),
         correlationId: command.correlationId ?? dependencies.newCorrelationId(),
+        unlessLatestIs: RELATIONSHIP_EVENT_RELATIONSHIP_RESUMED,
       });
-      return ok(party.relationshipId, false);
+      return ok(party.relationshipId, !recorded);
     },
 
     /**

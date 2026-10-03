@@ -122,6 +122,7 @@ function SideOutcome({
         <OutcomeButton
           label="Reconsider"
           busyLabel="Reopening…"
+          primary
           run={() => resumeAction(relationshipId)}
         />
       </div>
@@ -134,6 +135,7 @@ function SideOutcome({
         <OutcomeButton
           label="Resume"
           busyLabel="Resuming…"
+          primary
           run={() => resumeAction(relationshipId)}
         />
       ) : (
@@ -152,9 +154,12 @@ function OutcomeButton({
   label,
   busyLabel,
   run,
+  primary = false,
 }: {
   readonly label: string;
   readonly busyLabel: string;
+  /** The way back from a pause or a pass is the next step, so it leads. */
+  readonly primary?: boolean;
   readonly run: () => Promise<
     { readonly ok: true } | { readonly ok: false; readonly message: string }
   >;
@@ -165,7 +170,7 @@ function OutcomeButton({
   return (
     <>
       <Button
-        variant="secondary"
+        variant={primary ? "primary" : "secondary"}
         className="min-h-11"
         disabled={busy}
         onClick={() => {
