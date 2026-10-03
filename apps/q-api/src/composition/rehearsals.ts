@@ -39,10 +39,16 @@ import {
 import type { ActorContext } from "@capital-q/security";
 
 import {
-  ANSWERED,
   applyAppraisal,
-  appliedAppraisal,
-  givesCause,
+  categoryOf,
+  machineNote,
+  nextTemperament,
+  REGISTERS,
+  stateAppraisalOf,
+  warnedLine,
+  withoutWarningTalk,
+  type Register,
+  type TurnCategory,
   questionNote,
   questionOpenIn,
   theyAskedIn,
@@ -50,10 +56,7 @@ import {
   initialTemperament,
   registerOf,
   stanceOf,
-  walkOutNote,
-  walkOutPlan,
   WALK_OUT_LINE,
-  WARNING_OPENERS,
   temperamentNote,
   type Temperament,
 } from "./rehearsal-temperament.js";
@@ -243,6 +246,9 @@ const StoredTurnSchema = z.object({
   warning: z.number().int().min(1).max(2).optional(),
   /** The played person's move for this line; absent on older rows. */
   move: z.string().max(20).optional(),
+  /** Code's register and reading of the line it answered (the machine). */
+  register: z.string().max(20).optional(),
+  category: z.string().max(20).optional(),
 });
 
 export type Turn = {
@@ -260,6 +266,10 @@ export type Turn = {
   readonly warning?: 1 | 2 | undefined;
   /** Their move (QUESTION, FOLLOW_UP, REMARK…): whether a question is open. */
   readonly move?: string | undefined;
+  /** The register code delivered this line in. */
+  readonly register?: string | undefined;
+  /** Code's category for the person's line this answered (DODGE…). */
+  readonly category?: string | undefined;
 };
 
 export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
@@ -282,6 +292,8 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
         ? { warning: turn.warning }
         : {}),
       ...(turn.move === undefined ? {} : { move: turn.move }),
+      ...(turn.register === undefined ? {} : { register: turn.register }),
+      ...(turn.category === undefined ? {} : { category: turn.category }),
     };
   });
 }
@@ -1124,29 +1136,24 @@ export function yieldTo(previous: readonly Turn[]): {
   };
 }
 
+/** The machine's register and category on a reply, when it ran. */
+const machineOf = (
+  answered: object,
+): { register?: string; category?: string } => {
+  const { register, category } = answered as {
+    readonly register?: unknown;
+    readonly category?: unknown;
+  };
+  return {
+    ...(typeof register === "string" ? { register } : {}),
+    ...(typeof category === "string" ? { category } : {}),
+  };
+};
+
 const warningOf = (answered: object): 1 | 2 | undefined => {
   const value = (answered as { readonly warning?: unknown }).warning;
   return value === 1 || value === 2 ? value : undefined;
 };
-
-/** Their latest line that gives new cause: a walk-out may follow. */
-const PROVOKED: ReadonlySet<string> = new Set(["RUDE", "REPEATED_DODGE"]);
-
-/**
- * The line as a warning: opened with the warning's words; a goodbye the
- * model wrote early is replaced by the warning itself.
- */
-function warned(stage: 1 | 2, line: string, wasGoodbye: boolean): string {
-  const opener = WARNING_OPENERS[stage];
-  if (wasGoodbye) {
-    return stage === 1
-      ? `${opener} If we carry on like this, I'll end the meeting.`
-      : `${opener} Speak to me like that again and this meeting is over!`;
-  }
-  return line.toLowerCase().startsWith(opener.toLowerCase().slice(0, 12))
-    ? line
-    : `${opener} ${line}`;
-}
 
 /** A turn, retry included, never keeps the room "thinking" longer than this. */
 export const TURN_DEADLINE_MS = 10_000;
@@ -1630,6 +1637,8 @@ export function createRehearsalService(dependencies: {
     readonly result: RehearsalTurnResult;
     readonly sawScreen: boolean;
     readonly state: Temperament;
+    readonly register?: Register;
+    readonly category?: TurnCategory;
     readonly warning?: 1 | 2;
   } | null> {
     const persona = personaOf(row.persona);
@@ -1665,7 +1674,23 @@ export function createRehearsalService(dependencies: {
     const before =
       [...turns].reverse().find((turn) => turn.from === "THEM")?.state ??
       initialTemperament(row.difficulty, persona.temperament.baseline);
-    const registerBefore = registerOf(before, row.difficulty);
+    // The register the machine left them in on their last line; before
+    // any, where the persona and difficulty start them.
+    const lastTheirs = [...turns]
+      .reverse()
+      .find((turn) => turn.from === "THEM");
+    const registerBefore: Register = (REGISTERS as readonly string[]).includes(
+      lastTheirs?.register ?? "",
+    )
+      ? (lastTheirs?.register as Register)
+      : registerOf(before, row.difficulty);
+    // Their dodges in a row, newest first, as code categorised them.
+    let dodgeStreak = 0;
+    for (const turn of [...turns].reverse()) {
+      if (turn.from !== "THEM") continue;
+      if (turn.category !== "DODGE") break;
+      dodgeStreak += 1;
+    }
     const warningsGiven = turns.filter(
       (turn) => turn.from === "THEM" && turn.warning !== undefined,
     ).length;
@@ -1687,7 +1712,7 @@ export function createRehearsalService(dependencies: {
       difficulty: row.difficulty,
       temperament:
         temperamentNote(before, registerBefore) +
-        walkOutNote(warningsGiven, registerBefore) +
+        machineNote(registerBefore) +
         (cue === "NONE" ? questionNote(questionOpen, theyAsked) : ""),
       stance: stanceOf(
         counterpartRoleOf(row.counterpartKind),
@@ -1762,55 +1787,56 @@ export function createRehearsalService(dependencies: {
         if (oldest !== undefined) presence.delete(oldest);
       }
     }
-    // Their latest line moves the state by fixed rules; the state decides
-    // the register the voice delivers this line in.
-    const appraisal = appliedAppraisal(
-      result.appraisal,
-      questionOpen,
-      theyAsked,
+    // The machine decides (QA d7ef826e): the model's reading is an input,
+    // its words only words. The numbers move with the category; the
+    // register, any warning and any close are code's.
+    const category = categoryOf(result.appraisal, questionOpen, theyAsked);
+    const after = applyAppraisal(
+      before,
+      stateAppraisalOf(category, result.appraisal),
+      row.difficulty,
     );
-    const after = applyAppraisal(before, appraisal, row.difficulty);
-    const register = registerOf(after, row.difficulty);
-    // Two warnings over two turns before walking out, unless they asked
-    // to end it themselves -- read by meaning on the turn, never by
-    // matching their words (founder live 2026-10-02).
-    const plan = walkOutPlan({
-      register,
+    const step = nextTemperament({
+      category,
+      questionOpen,
       warningsGiven,
+      previous: registerBefore,
+      dodgeStreak,
+      difficulty: row.difficulty,
+      hurt: after.hurt,
       theyAskedToEnd: result.wantsToEnd,
-      closing: result.move === "CLOSE",
-      provoked: PROVOKED.has(appraisal),
-      conclusion: result.conclusion,
+      modelClose:
+        result.move === "CLOSE" ? { conclusion: result.conclusion } : null,
       wrappingUp: wrapUp,
-      newCause: givesCause(appraisal),
     });
+    const register = step.register;
     const shaped: RehearsalTurnResult =
-      plan.action === "WARN"
+      step.close === "WALK_OUT"
         ? {
             ...result,
-            move: result.move === "CLOSE" ? "REMARK" : result.move,
-            conclusion: null,
-            line: warned(
-              plan.warning ?? 1,
-              result.line,
-              result.move === "CLOSE",
-            ),
+            move: "CLOSE",
+            conclusion: "DECLINED",
+            line: WALK_OUT_LINE,
           }
-        : plan.action === "WALK_OUT"
-          ? {
+        : step.close === "NATURAL"
+          ? result
+          : {
               ...result,
-              move: "CLOSE",
-              conclusion: "DECLINED",
-              line: result.move === "CLOSE" ? result.line : WALK_OUT_LINE,
-            }
-          : result;
+              // A close the machine did not decide is no close.
+              move: result.move === "CLOSE" ? "REMARK" : result.move,
+              conclusion: null,
+              line:
+                step.warning === null
+                  ? withoutWarningTalk(result.line) || "Go on."
+                  : warnedLine(step.warning, result.line),
+            };
     const delivery = deliveryFor(
       register,
       registerBefore,
       shaped,
       shaped.move === "CLOSE",
-      PROVOKED.has(appraisal),
-      ANSWERED.has(appraisal),
+      category === "RUDE" || step.warning !== null || step.close === "WALK_OUT",
+      category === "STRONG" || category === "DIRECT" || category === "ASKED",
     );
     return {
       result: {
@@ -1821,7 +1847,9 @@ export function createRehearsalService(dependencies: {
       },
       sawScreen: screenFrame !== null,
       state: after,
-      ...(plan.warning === null ? {} : { warning: plan.warning }),
+      register,
+      category,
+      ...(step.warning === null ? {} : { warning: step.warning }),
     };
   }
 
@@ -1834,6 +1862,8 @@ export function createRehearsalService(dependencies: {
     readonly result: RehearsalTurnResult;
     readonly sawScreen: boolean;
     readonly state: Temperament | undefined;
+    readonly register?: Register;
+    readonly category?: TurnCategory;
     readonly warning?: 1 | 2;
   }> {
     const [actor, row, turns, cue, organisation, signal] = args;
@@ -2153,6 +2183,7 @@ export function createRehearsalService(dependencies: {
             ? {}
             : { warning: warningOf(answered) }),
           move: result.move,
+          ...machineOf(answered),
         },
       ];
       const saved = await store.saveTurns(actor, row.id, {

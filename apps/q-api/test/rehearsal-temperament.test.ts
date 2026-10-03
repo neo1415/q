@@ -2,16 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyAppraisal,
-  ANSWERED,
-  appliedAppraisal,
+  categoryOf,
   deliveryFor,
-  givesCause,
+  machineNote,
+  nextTemperament,
   questionNote,
   questionOpenIn,
+  stateAppraisalOf,
   theyAskedIn,
-  walkOutNote,
-  walkOutPlan,
+  warnedLine,
+  withoutWarningTalk,
   initialTemperament,
+  type TemperamentInput,
   registerOf,
   stanceOf,
   temperamentNote,
@@ -214,138 +216,8 @@ describe("leaving in anger (founder live test 2026-10-01)", () => {
   });
 });
 
-describe("the question on the table (QA rehearsal e22ea609)", () => {
-  const asked = [
-    { from: "YOU", text: "We help small businesses get paid faster." },
-    { from: "THEM", text: "What's your monthly revenue?" },
-    { from: "YOU", text: "Honestly, I'm not sure about the numbers." },
-  ];
-  const opened = [{ from: "YOU", text: "Thanks for making the time." }];
-
-  it("knows whether their last line asked something", () => {
-    expect(questionOpenIn(asked)).toBe(true);
-    expect(questionOpenIn(opened)).toBe(false);
-    expect(
-      questionOpenIn([...asked, { from: "THEM", text: "Go ahead." }]),
-    ).toBe(false);
-  });
-
-  it("an honest gap in answering their question costs patience and raises frustration", () => {
-    const start = initialTemperament("REALISTIC", "NEUTRAL");
-    const after = applyAppraisal(
-      start,
-      appliedAppraisal("HUMBLE_HONEST", true),
-      "REALISTIC",
-    );
-    expect(after.patience).toBeLessThan(start.patience);
-    expect(after.frustration).toBeGreaterThan(start.frustration);
-    expect(after.warmth).toBeLessThanOrEqual(start.warmth);
-    // Candour with no question pending still warms them.
-    const unprompted = applyAppraisal(
-      start,
-      appliedAppraisal("HUMBLE_HONEST", false),
-      "REALISTIC",
-    );
-    expect(unprompted.warmth).toBeGreaterThan(start.warmth);
-  });
-
-  it("a dodge needs a question to dodge", () => {
-    expect(appliedAppraisal("EVASIVE", false)).toBe("NEUTRAL");
-    expect(appliedAppraisal("REPEATED_DODGE", false)).toBe("NEUTRAL");
-    expect(appliedAppraisal("EVASIVE", true)).toBe("EVASIVE");
-    expect(questionNote(false)).toContain("never say it didn't answer");
-  });
-
-  it("the whole note to the model stays within its bound", () => {
-    const furious = { patience: 0, warmth: 0, frustration: 100, hurt: 100 };
-    for (const open of [true, false]) {
-      const note =
-        temperamentNote(furious, registerOf(furious, "TOUGH")) +
-        walkOutNote(1, "FURIOUS") +
-        questionNote(open, true);
-      expect(note.length).toBeLessThanOrEqual(1_200);
-    }
-  });
-});
-
-describe("two warnings before leaving, in any register (QA rehearsal e22ea609)", () => {
-  const plan = (
-    warningsGiven: number,
-    conclusion: string,
-    wrappingUp = false,
-  ) =>
-    walkOutPlan({
-      register: "EXASPERATED",
-      warningsGiven,
-      theyAskedToEnd: false,
-      closing: true,
-      provoked: false,
-      conclusion,
-      wrappingUp,
-    });
-
-  it("a close that leaves early becomes the next warning until two are given", () => {
-    expect(plan(0, "LEFT_EARLY")).toEqual({ warning: 1, action: "WARN" });
-    expect(plan(1, "LEFT_EARLY")).toEqual({ warning: 2, action: "WARN" });
-    expect(plan(1, "DECLINED")).toEqual({ warning: 2, action: "WARN" });
-    expect(plan(2, "LEFT_EARLY")).toEqual({ warning: null, action: "KEEP" });
-  });
-
-  it("a no at the natural end, or a good close, is not a walk-out", () => {
-    expect(plan(0, "DECLINED", true)).toEqual({
-      warning: null,
-      action: "KEEP",
-    });
-    expect(plan(0, "ADJOURNED")).toEqual({ warning: null, action: "KEEP" });
-    expect(plan(1, "STRONG_LATER")).toEqual({ warning: null, action: "KEEP" });
-  });
-});
-
-describe("an answer is never met with more anger (QA rehearsal df5af97b)", () => {
-  const angry = { patience: 20, warmth: 20, frustration: 70, hurt: 0 };
-
-  it("a strong or direct answer to their question raises no frustration and gives no cause", () => {
-    for (const reading of ["STRONG_ANSWER", "CLEAR_BUT_THIN"] as const) {
-      const applied = appliedAppraisal(reading, true);
-      const after = applyAppraisal(angry, applied, "REALISTIC");
-      expect(after.frustration).toBeLessThanOrEqual(angry.frustration);
-      expect(givesCause(applied)).toBe(false);
-      expect(ANSWERED.has(applied)).toBe(true);
-    }
-  });
-
-  it("still angry from before, an answer gets no warning; a new provocation does", () => {
-    const base = {
-      register: "ANGRY" as const,
-      warningsGiven: 1,
-      theyAskedToEnd: false,
-      closing: false,
-      provoked: false,
-    };
-    expect(walkOutPlan({ ...base, newCause: false })).toEqual({
-      warning: null,
-      action: "KEEP",
-    });
-    expect(walkOutPlan({ ...base, newCause: true })).toEqual({
-      warning: 2,
-      action: "WARN",
-    });
-  });
-
-  it("an answer is delivered neither heated nor raised", () => {
-    const delivered = deliveryFor(
-      "ANGRY",
-      "ANGRY",
-      { mood: "ANGRY", intensity: "RAISED", reaction: null },
-      false,
-      false,
-      true,
-    );
-    expect(delivered.mood).not.toBe("ANGRY");
-    expect(delivered.intensity).not.toBe("RAISED");
-  });
-
-  it("a question is open by their move, not a question mark", () => {
+describe("the question on the table", () => {
+  it("is open by their move, not a question mark; their own question is read from their line", () => {
     expect(
       questionOpenIn([
         { from: "THEM", text: "Interesting. Anything else?", move: "REMARK" },
@@ -357,49 +229,274 @@ describe("an answer is never met with more anger (QA rehearsal df5af97b)", () =>
         { from: "THEM", text: "Walk me through churn.", move: "QUESTION" },
       ]),
     ).toBe(true);
-    // The founder's question back, with none of theirs open, is no dodge.
-    expect(appliedAppraisal("EVASIVE", false)).toBe("NEUTRAL");
+    expect(
+      theyAskedIn([
+        { from: "YOU", text: "What would you need to see from us?" },
+      ]),
+    ).toBe(true);
+    expect(theyAskedIn([{ from: "YOU", text: "We grew 12% a month." }])).toBe(
+      false,
+    );
+  });
+
+  it("the whole note to the model stays within its bound", () => {
+    const furious = { patience: 0, warmth: 0, frustration: 100, hurt: 100 };
+    for (const open of [true, false]) {
+      const note =
+        temperamentNote(furious, "FURIOUS") +
+        machineNote("FURIOUS") +
+        questionNote(open, true);
+      expect(note.length).toBeLessThanOrEqual(1_200);
+    }
   });
 });
 
-describe("the note and the mapping agree (QA rehearsal 512b431a)", () => {
-  it("an unsure answer is read as the gap, which costs, never as a direct answer", () => {
-    const note = questionNote(true);
-    expect(note).toContain("HUMBLE_HONEST if candid or EVASIVE");
-    expect(note).toContain("never CLEAR_BUT_THIN");
-    const start = initialTemperament("REALISTIC", "NEUTRAL");
-    for (const reading of ["HUMBLE_HONEST", "EVASIVE"] as const) {
-      const after = applyAppraisal(
-        start,
-        appliedAppraisal(reading, true),
-        "REALISTIC",
-      );
-      expect(after.frustration - start.frustration).toBeGreaterThanOrEqual(8);
-      expect(start.patience - after.patience).toBeGreaterThanOrEqual(8);
-    }
+/**
+ * The temperament machine (QA rehearsal d7ef826e): one table, decided by
+ * code. Each row: the person's line as categorised, what came before, and
+ * what code delivers -- register, warning, close.
+ */
+describe("the temperament machine", () => {
+  const base: TemperamentInput = {
+    category: "NEUTRAL",
+    questionOpen: true,
+    warningsGiven: 0,
+    previous: "EVEN",
+    dodgeStreak: 0,
+    difficulty: "REALISTIC",
+    hurt: 0,
+    theyAskedToEnd: false,
+    modelClose: null,
+    wrappingUp: false,
+  };
+  const step = (input: Partial<TemperamentInput>) =>
+    nextTemperament({ ...base, ...input });
+
+  it.each([
+    [
+      "first dodge: impatient, no warning",
+      { category: "DODGE" },
+      "EXASPERATED",
+      null,
+      "NONE",
+    ],
+    [
+      "second dodge in a row: angry and warning 1",
+      { category: "DODGE", dodgeStreak: 1, previous: "EXASPERATED" },
+      "ANGRY",
+      1,
+      "NONE",
+    ],
+    [
+      "a dodge in a row after one warning: warning 2",
+      {
+        category: "DODGE",
+        dodgeStreak: 2,
+        previous: "ANGRY",
+        warningsGiven: 1,
+      },
+      "ANGRY",
+      2,
+      "NONE",
+    ],
+    [
+      "a weak or honest gap: up a step, no warning",
+      { category: "GAP" },
+      "EXASPERATED",
+      null,
+      "NONE",
+    ],
+    [
+      "a gap when already impatient: no higher, no warning",
+      { category: "GAP", previous: "EXASPERATED" },
+      "EXASPERATED",
+      null,
+      "NONE",
+    ],
+    [
+      "a strong answer when angry: one step down, no warning",
+      { category: "STRONG", previous: "ANGRY", warningsGiven: 1 },
+      "EXASPERATED",
+      null,
+      "NONE",
+    ],
+    [
+      "a strong answer when calm: warmer",
+      { category: "STRONG" },
+      "WARM",
+      null,
+      "NONE",
+    ],
+    [
+      "a direct answer: no change, no warning",
+      { category: "DIRECT", previous: "ANGRY", warningsGiven: 1 },
+      "ANGRY",
+      null,
+      "NONE",
+    ],
+    [
+      "their question when angry: no higher than impatient, no warning",
+      { category: "ASKED", previous: "FURIOUS", warningsGiven: 2 },
+      "EXASPERATED",
+      null,
+      "NONE",
+    ],
+    [
+      "their question when calm: stays calm",
+      { category: "ASKED" },
+      "EVEN",
+      null,
+      "NONE",
+    ],
+    ["rude: angry and a warning", { category: "RUDE" }, "ANGRY", 1, "NONE"],
+    [
+      "rude again: furious and warning 2",
+      { category: "RUDE", previous: "ANGRY", warningsGiven: 1 },
+      "FURIOUS",
+      2,
+      "NONE",
+    ],
+    [
+      "new cause after two warnings: they leave",
+      { category: "RUDE", previous: "FURIOUS", warningsGiven: 2 },
+      "FURIOUS",
+      null,
+      "WALK_OUT",
+    ],
+    [
+      "a dodge again after two warnings: they leave",
+      {
+        category: "DODGE",
+        dodgeStreak: 1,
+        previous: "ANGRY",
+        warningsGiven: 2,
+      },
+      "ANGRY",
+      null,
+      "WALK_OUT",
+    ],
+    [
+      "a strong answer after two warnings: no close",
+      { category: "STRONG", previous: "FURIOUS", warningsGiven: 2 },
+      "ANGRY",
+      null,
+      "NONE",
+    ],
+    [
+      "their model writing a walk-out close: no close",
+      {
+        category: "GAP",
+        previous: "EXASPERATED",
+        modelClose: { conclusion: "LEFT_EARLY" },
+      },
+      "EXASPERATED",
+      null,
+      "NONE",
+    ],
+    [
+      "a calm close with a good outcome: stands",
+      { category: "STRONG", modelClose: { conclusion: "STRONG_LATER" } },
+      "WARM",
+      null,
+      "NATURAL",
+    ],
+    [
+      "a no before the natural end: no close",
+      { category: "NEUTRAL", modelClose: { conclusion: "DECLINED" } },
+      "EVEN",
+      null,
+      "NONE",
+    ],
+    [
+      "a no at the natural end: stands",
+      {
+        category: "NEUTRAL",
+        modelClose: { conclusion: "DECLINED" },
+        wrappingUp: true,
+      },
+      "EVEN",
+      null,
+      "NATURAL",
+    ],
+    [
+      "they asked to end it: honoured",
+      { category: "RUDE", theyAskedToEnd: true },
+      "ANGRY",
+      null,
+      "NATURAL",
+    ],
+    [
+      "on Gentle, rude stays exasperated (still a warning)",
+      { category: "RUDE", difficulty: "GENTLE" },
+      "EXASPERATED",
+      1,
+      "NONE",
+    ],
+    ["bad news: sad", { category: "HURTING", hurt: 50 }, "SAD", null, "NONE"],
+  ] as const)("%s", (_label, input, register, warning, close) => {
+    expect(step(input as Partial<TemperamentInput>)).toEqual({
+      register,
+      warning,
+      close,
+    });
   });
 
-  it("their question back or about next steps is never provocation", () => {
-    const turns = [
-      { from: "THEM", text: "Why now?" },
-      {
-        from: "YOU",
-        text: "What would you need to see from us to move to a second meeting?",
-      },
-    ];
-    expect(theyAskedIn(turns)).toBe(true);
-    for (const reading of [
-      "EVASIVE",
-      "REPEATED_DODGE",
-      "CLEAR_BUT_THIN",
-    ] as const) {
-      const applied = appliedAppraisal(reading, true, true);
-      expect(applied).toBe("NEUTRAL");
-      expect(givesCause(applied)).toBe(false);
-    }
-    expect(appliedAppraisal("RUDE", true, true)).toBe("RUDE");
-    expect(theyAskedIn([{ from: "YOU", text: "We grew 12% a month." }])).toBe(
+  it("categories: a dodge needs a question; their question is ASKED unless rude; unsure is the gap", () => {
+    expect(categoryOf("EVASIVE", false, false)).toBe("NEUTRAL");
+    expect(categoryOf("EVASIVE", true, false)).toBe("DODGE");
+    expect(categoryOf("REPEATED_DODGE", true, true)).toBe("ASKED");
+    expect(categoryOf("RUDE", true, true)).toBe("RUDE");
+    expect(categoryOf("HUMBLE_HONEST", true, false)).toBe("GAP");
+    expect(categoryOf("HUMBLE_HONEST", false, false)).toBe("WARMING");
+    expect(categoryOf("CLEAR_BUT_THIN", true, false)).toBe("DIRECT");
+  });
+
+  it("a weak or honest gap raises frustration and cuts patience; a strong answer cools", () => {
+    const start = initialTemperament("REALISTIC", "NEUTRAL");
+    const gap = applyAppraisal(
+      start,
+      stateAppraisalOf("GAP", "HUMBLE_HONEST"),
+      "REALISTIC",
+    );
+    expect(gap.frustration - start.frustration).toBeGreaterThanOrEqual(8);
+    expect(start.patience - gap.patience).toBeGreaterThanOrEqual(8);
+    const strong = applyAppraisal(
+      gap,
+      stateAppraisalOf("STRONG", "STRONG_ANSWER"),
+      "REALISTIC",
+    );
+    expect(strong.frustration).toBeLessThan(gap.frustration);
+  });
+
+  it("their question is delivered neither angry nor raised", () => {
+    const register = step({
+      category: "ASKED",
+      previous: "FURIOUS",
+      warningsGiven: 1,
+    }).register;
+    const delivered = deliveryFor(
+      register,
+      "FURIOUS",
+      { mood: "ANGRY", intensity: "RAISED", reaction: null },
       false,
+      false,
+      true,
+    );
+    expect(delivered.mood).not.toBe("ANGRY");
+    expect(delivered.intensity).not.toBe("RAISED");
+  });
+
+  it("the model's own warning and goodbye talk is stripped; code's warning is said once", () => {
+    expect(
+      withoutWarningTalk(
+        "Last chance. You've avoided the core evidence twice. What is your churn?",
+      ),
+    ).toBe("You've avoided the core evidence twice. What is your churn?");
+    const line = warnedLine(2, "Last chance. Give me the churn number.");
+    expect(line).toBe("Last chance. Give me the churn number.");
+    expect(line.match(/last chance/giu)?.length).toBe(1);
+    expect(warnedLine(1, "I'm going to stop you there. Goodbye.")).toBe(
+      "I'm going to stop you there. If we carry on like this, I'll end the meeting.",
     );
   });
 });

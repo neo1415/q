@@ -56,47 +56,12 @@ export type Register = (typeof REGISTERS)[number];
 type Delta = Partial<Record<keyof Temperament, number>>;
 
 /**
- * The reading code applies: the model's, corrected by two fixed rules
- * about the question on the table (QA rehearsal e22ea609).
- *  - Honesty without substance does not cancel the cost of a gap: "I'm
- *    not sure about the numbers" to their direct question was read
- *    HUMBLE_HONEST and warmed them. With a question open it is a gap
- *    (HONEST_GAP): it costs patience and raises frustration.
- *  - A dodge needs a question to dodge: with none open, an EVASIVE or
- *    REPEATED_DODGE reading is NEUTRAL ("That doesn't answer the
- *    question" came after the founder's opener).
+ * The reading the numbers move by: the model's, or code's own for a gap
+ * (HONEST_GAP: unsure, unknown or not tracked, however candid, costs) and
+ * a direct answer (DIRECT_ANSWER: no cost). See categoryOf.
  */
 export type AppliedAppraisal =
   RehearsalAppraisal | "HONEST_GAP" | "DIRECT_ANSWER";
-export function appliedAppraisal(
-  appraisal: RehearsalAppraisal,
-  questionOpen: boolean,
-  /**
-   * Their line asks the played person something (it ends on a question):
-   * next steps, or a question back. Never provocation (QA 512b431a:
-   * "What would you need to see from us to move to a second meeting?"
-   * met anger and a warning). Rudeness stays rude.
-   */
-  theyAsked = false,
-): AppliedAppraisal {
-  if (theyAsked && appraisal !== "RUDE" && PROVOKING_READINGS.has(appraisal)) {
-    return "NEUTRAL";
-  }
-  // Unsure, unknown or not tracked, however candid, is the gap: it costs
-  // (QA e22ea609, 512b431a). The note tells the model to read it so.
-  if (questionOpen && appraisal === "HUMBLE_HONEST") return "HONEST_GAP";
-  // A direct answer to their question, even a thin one, raises no
-  // frustration and gives no cause for a warning (QA rehearsal df5af97b:
-  // the investor got angrier after a numbers-backed answer).
-  if (questionOpen && appraisal === "CLEAR_BUT_THIN") return "DIRECT_ANSWER";
-  if (
-    !questionOpen &&
-    (appraisal === "EVASIVE" || appraisal === "REPEATED_DODGE")
-  ) {
-    return "NEUTRAL";
-  }
-  return appraisal;
-}
 
 /**
  * Whether the played person's last line put a question to them: by the
@@ -120,12 +85,6 @@ export function questionOpenIn(
   }
   return lastTheirs.text.includes("?");
 }
-
-/** Readings that answer, and so never heat the delivery. */
-export const ANSWERED: ReadonlySet<AppliedAppraisal> = new Set([
-  "STRONG_ANSWER",
-  "DIRECT_ANSWER",
-]);
 
 /**
  * What the model is told about the question on the table, in the same
@@ -153,15 +112,6 @@ export function theyAskedIn(
   return last !== undefined && last.from === "YOU" && /\?\s*$/u.test(last.text);
 }
 
-/** The model's readings that would give cause, before code applies them. */
-const PROVOKING_READINGS: ReadonlySet<RehearsalAppraisal> = new Set([
-  "EVASIVE",
-  "REPEATED_DODGE",
-  "RUDE",
-  "OVERCLAIM",
-  "CLEAR_BUT_THIN",
-]);
-
 /** Readings that give the played person new cause for frustration. */
 const PROVOKING: ReadonlySet<AppliedAppraisal> = new Set([
   "EVASIVE",
@@ -171,11 +121,6 @@ const PROVOKING: ReadonlySet<AppliedAppraisal> = new Set([
   "CLEAR_BUT_THIN",
   "HONEST_GAP",
 ]);
-
-/** Whether a reading gives the played person new cause for frustration. */
-export function givesCause(appraisal: AppliedAppraisal): boolean {
-  return PROVOKING.has(appraisal);
-}
 
 /** What each reading of their latest line does to the played person. */
 const EFFECTS: Readonly<Record<AppliedAppraisal, Delta>> = {
@@ -510,74 +455,251 @@ export const WARNING_OPENERS = {
 export const WALK_OUT_LINE =
   "That's it. I'm ending this meeting here. Goodbye!";
 
-export type WalkOut = {
-  /** This line is warning 1 or 2, or null. */
+// ---------------------------------------------------------------------------
+// The temperament machine (QA rehearsal d7ef826e: a first dodge went
+// straight to anger and a warning, a strong answer drew "Last chance", and
+// the closing ask was delivered angry and raised). One deterministic table,
+// decided by code: the model's reading of their line is only an input, and
+// the model's words are only words -- it never decides the register, a
+// warning or a close.
+// ---------------------------------------------------------------------------
+
+/** What their latest line was, as code applies it. */
+export const TURN_CATEGORIES = [
+  "STRONG",
+  "DIRECT",
+  "GAP",
+  "DODGE",
+  "RUDE",
+  "ASKED",
+  "WARMING",
+  "HURTING",
+  "NEUTRAL",
+] as const;
+export type TurnCategory = (typeof TURN_CATEGORIES)[number];
+
+/**
+ * The model's reading, read against the table's inputs: a dodge needs a
+ * question to dodge; an unsure answer to their question is the gap; their
+ * own question (next steps, or back at them) is ASKED, whatever else the
+ * reading says -- unless it was rude.
+ */
+export function categoryOf(
+  appraisal: RehearsalAppraisal,
+  questionOpen: boolean,
+  theyAsked: boolean,
+): TurnCategory {
+  if (appraisal === "RUDE") return "RUDE";
+  if (theyAsked) return "ASKED";
+  switch (appraisal) {
+    case "STRONG_ANSWER":
+      return "STRONG";
+    case "CLEAR_BUT_THIN":
+      return questionOpen ? "DIRECT" : "NEUTRAL";
+    case "HUMBLE_HONEST":
+      return questionOpen ? "GAP" : "WARMING";
+    case "OVERCLAIM":
+      return "GAP";
+    case "EVASIVE":
+    case "REPEATED_DODGE":
+      return questionOpen ? "DODGE" : "NEUTRAL";
+    case "FUNNY":
+    case "APOLOGY":
+    case "GOOD_NEWS_FOR_THEM":
+      return "WARMING";
+    case "BAD_NEWS_FOR_THEM":
+    case "HARD_NO_FOR_THEM":
+      return "HURTING";
+    case "NEUTRAL":
+      return "NEUTRAL";
+  }
+}
+
+/** The appraisal the numbers move by, for each category. */
+export function stateAppraisalOf(
+  category: TurnCategory,
+  appraisal: RehearsalAppraisal,
+): AppliedAppraisal {
+  switch (category) {
+    case "STRONG":
+      return "STRONG_ANSWER";
+    case "DIRECT":
+      return "DIRECT_ANSWER";
+    case "GAP":
+      return appraisal === "OVERCLAIM" ? "OVERCLAIM" : "HONEST_GAP";
+    case "DODGE":
+      return appraisal === "REPEATED_DODGE" ? "REPEATED_DODGE" : "EVASIVE";
+    case "RUDE":
+      return "RUDE";
+    case "ASKED":
+    case "NEUTRAL":
+      return "NEUTRAL";
+    case "WARMING":
+    case "HURTING":
+      return appraisal;
+  }
+}
+
+/** Calm to furious: the ladder anger climbs and answers come down. */
+const LADDER: readonly Register[] = [
+  "DELIGHTED",
+  "WARM",
+  "EVEN",
+  "EXASPERATED",
+  "ANGRY",
+  "FURIOUS",
+];
+const rung = (register: Register): number => {
+  const at = LADDER.indexOf(register);
+  // Grief sits beside the ladder: its level for anger is composed.
+  return at === -1 ? LADDER.indexOf("EVEN") : at;
+};
+const at = (index: number): Register =>
+  LADDER[Math.max(0, Math.min(LADDER.length - 1, index))] ?? "EVEN";
+const EXASPERATED_RUNG = rung("EXASPERATED");
+const ANGRY_RUNG = rung("ANGRY");
+
+/** Conclusions that end a meeting by walking out, not by its natural end. */
+const WALK_OUT_CONCLUSIONS: ReadonlySet<string> = new Set([
+  "LEFT_EARLY",
+  "DECLINED",
+]);
+
+export type TemperamentInput = {
+  readonly category: TurnCategory;
+  readonly questionOpen: boolean;
+  readonly warningsGiven: number;
+  readonly previous: Register;
+  /** Their dodges in a row just before this line (0: none). */
+  readonly dodgeStreak: number;
+  readonly difficulty: Difficulty;
+  /** Hurt after this line, for grief (BAD_NEWS, HARD_NO). */
+  readonly hurt: number;
+  /** They asked to end the meeting themselves: honoured at once. */
+  readonly theyAskedToEnd: boolean;
+  /** The model wrote a close, and how it would end. */
+  readonly modelClose: { readonly conclusion: string | null } | null;
+  /** The meeting is at its natural end (code's wrap-up). */
+  readonly wrappingUp: boolean;
+};
+
+export type TemperamentStep = {
+  /** The register this line is delivered in. */
+  readonly register: Register;
+  /** This line is warning 1 or 2; null: no warning. */
   readonly warning: 1 | 2 | null;
-  /** Rewrite the line into a warning, keep it, or end the meeting. */
-  readonly action: "KEEP" | "WARN" | "WALK_OUT";
+  /**
+   * WALK_OUT: they leave (code's goodbye, DECLINED). NATURAL: the model's
+   * close stands (they asked to end it, or a calm close at the natural
+   * end or with a good outcome). NONE: the meeting goes on.
+   */
+  readonly close: "NONE" | "NATURAL" | "WALK_OUT";
 };
 
 /**
- * What an angry line does, by fixed rules: below two warnings it warns
- * (a close is turned back into a warning); with two given, a provoking
- * line ends it. Not angry, or they asked to end: the model's line stands.
+ * The table, by category:
+ *  STRONG   one step down the ladder; never a warning.
+ *  DIRECT   stays; never a warning.
+ *  GAP      one step up, no higher than exasperated; never a warning.
+ *  DODGE    the first in a row: exasperated (impatient), no warning; the
+ *           second in a row: angry and a warning; with two given: they leave.
+ *  RUDE     angry (furious if already angry) and a warning; with two
+ *           given: they leave.
+ *  ASKED    no higher than exasperated; never angry, never a warning.
+ *  WARMING  one step down.  HURTING  sad, or crying when hurt runs deep.
+ *  NEUTRAL  stays.
+ * Gentle never goes past exasperated. A close: walking out only after two
+ * warnings and new cause (a dodge or rudeness); the model's own close only
+ * when they asked to end it, or calmly with an outcome that is not a
+ * walk-out (and a no only at the natural end). Anything else is not a close.
  */
-export function walkOutPlan(input: {
-  readonly register: Register;
-  readonly warningsGiven: number;
-  readonly theyAskedToEnd: boolean;
-  readonly closing: boolean;
-  readonly provoked: boolean;
-  /** How the model's close would end it (LEFT_EARLY, DECLINED…). */
-  readonly conclusion?: string | null | undefined;
-  /** The meeting is at its natural end, where a no is not a walk-out. */
-  readonly wrappingUp?: boolean | undefined;
-  /**
-   * Their latest line gave new cause (a provoking reading). Absent: as
-   * before, any line in anger. An answer is never cause for a warning.
-   */
-  readonly newCause?: boolean | undefined;
-}): WalkOut {
-  const angry = input.register === "ANGRY" || input.register === "FURIOUS";
-  if (input.theyAskedToEnd) return { warning: null, action: "KEEP" };
-  // Leaving early is a walk-out in any register, and never comes before
-  // two warnings (QA rehearsal e22ea609: the investor left after one,
-  // once their register had dropped below angry and the model's close
-  // stood). A no at the meeting's natural end is not leaving.
-  const walkingOut =
-    input.closing &&
-    (input.conclusion === "LEFT_EARLY" ||
-      (input.conclusion === "DECLINED" && input.wrappingUp !== true));
-  if (walkingOut && input.warningsGiven < 2) {
-    return { warning: input.warningsGiven === 0 ? 1 : 2, action: "WARN" };
+export function nextTemperament(input: TemperamentInput): TemperamentStep {
+  const from = rung(input.previous);
+  const cap = (index: number) =>
+    input.difficulty === "GENTLE" ? Math.min(index, EXASPERATED_RUNG) : index;
+  const provoking =
+    input.category === "RUDE" ||
+    (input.category === "DODGE" && input.dodgeStreak >= 1);
+  let register: Register;
+  switch (input.category) {
+    case "STRONG":
+    case "WARMING":
+      register = at(from - 1);
+      break;
+    case "DIRECT":
+    case "NEUTRAL":
+      register = at(from);
+      break;
+    case "GAP":
+      register = at(Math.max(from, Math.min(from + 1, EXASPERATED_RUNG)));
+      break;
+    case "DODGE":
+      register =
+        input.dodgeStreak >= 1
+          ? at(Math.max(ANGRY_RUNG, from))
+          : at(Math.max(from, EXASPERATED_RUNG));
+      break;
+    case "RUDE":
+      register = at(from >= ANGRY_RUNG ? ANGRY_RUNG + 1 : ANGRY_RUNG);
+      break;
+    case "ASKED":
+      register = at(Math.min(from, EXASPERATED_RUNG));
+      break;
+    case "HURTING":
+      register = input.hurt >= 70 ? "CRYING" : "SAD";
+      break;
   }
-  if (!angry) return { warning: null, action: "KEEP" };
-  // Still angry from before, but this line gave no new cause (a strong
-  // answer, say): no warning for it (QA df5af97b). A goodbye in anger is
-  // still turned back into a warning until two are given.
-  if (input.newCause === false && !input.closing) {
-    return { warning: null, action: "KEEP" };
+  if (LADDER.includes(register)) register = at(cap(rung(register)));
+  if (input.theyAskedToEnd) {
+    return { register, warning: null, close: "NATURAL" };
   }
-  if (input.warningsGiven < 2) {
+  if (provoking) {
+    if (input.warningsGiven >= 2) {
+      return { register, warning: null, close: "WALK_OUT" };
+    }
     return {
+      register,
       warning: input.warningsGiven === 0 ? 1 : 2,
-      action: "WARN",
+      close: "NONE",
     };
   }
-  if (input.closing || input.provoked)
-    return { warning: null, action: "WALK_OUT" };
-  return { warning: null, action: "KEEP" };
+  const conclusion = input.modelClose?.conclusion ?? null;
+  const calm = rung(register) <= EXASPERATED_RUNG;
+  const naturalClose =
+    input.modelClose !== null &&
+    calm &&
+    (conclusion === null ||
+      !WALK_OUT_CONCLUSIONS.has(conclusion) ||
+      (conclusion === "DECLINED" && input.wrappingUp));
+  return { register, warning: null, close: naturalClose ? "NATURAL" : "NONE" };
 }
 
-/** What the model is told before writing, so its words fit the stage. */
-export function walkOutNote(warningsGiven: number, register: Register): string {
-  const angry = register === "ANGRY" || register === "FURIOUS";
-  if (!angry) return "";
-  if (warningsGiven === 0) {
-    return ' Do not end the meeting yet: this is your first warning -- tell them to stop ("I\'m going to stop you there…").';
-  }
-  if (warningsGiven === 1) {
-    return ' Do not end the meeting yet: this is your last warning ("Last chance…").';
-  }
-  return " You have warned them twice: if they provoke you again, end the meeting with your goodbye.";
+/**
+ * Warning, threat and goodbye talk the model wrote itself: code decides
+ * those, so its own are taken out, and a warning code gives is said once
+ * ("Last chance" twice in one line, live d7ef826e).
+ */
+const WARNING_TALK =
+  /(?:^|(?<=[.!?]\s))[^.!?]*\b(?:last chance|final warning|(?:i'?m|i am) going to stop you(?: right)? there|(?:i'?ll|i will|i'?m going to) (?:end|stop|walk out of|leave) (?:this|the) (?:meeting|conversation)|this meeting is over|(?:i'?m|i am) (?:ending|done with) this(?: meeting)?|we'?re done here|goodbye)\b[^.!?]*[.!?]?\s*/giu;
+export function withoutWarningTalk(line: string): string {
+  return line
+    .replace(WARNING_TALK, "")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
+}
+
+/** The line as code's warning: its opener once, then the model's words. */
+export function warnedLine(stage: 1 | 2, line: string): string {
+  const words = withoutWarningTalk(line);
+  const opener = WARNING_OPENERS[stage];
+  const follow =
+    stage === 1
+      ? "If we carry on like this, I'll end the meeting."
+      : "Do that again and this meeting is over.";
+  return words.length === 0 ? `${opener} ${follow}` : `${opener} ${words}`;
+}
+
+/** What the model is told before writing: words only, in this register. */
+export function machineNote(previous: Register): string {
+  return ` You are in the ${previous} register: write your words in it. Never warn them, threaten to leave or say goodbye yourself -- Capital Q decides warnings and when the meeting ends, and adds those words itself.`;
 }

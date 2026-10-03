@@ -29,7 +29,7 @@ import type { VoiceSpeaker } from "../src/voice/provider.js";
 import { registerRehearsalRoutes } from "../src/http/rehearsals.js";
 import { createRehearsalAwareTurn } from "../src/voice/rehearsal-turn.js";
 import {
-  walkOutPlan,
+  nextTemperament,
   WALK_OUT_LINE,
   WARNING_OPENERS,
 } from "../src/composition/rehearsal-temperament.js";
@@ -1433,7 +1433,7 @@ describe("walking out, with warning (founder live 2026-10-02)", () => {
     );
   });
 
-  it("an early goodbye in anger is turned back into a warning", async () => {
+  it("an early goodbye the machine did not decide is no close, and no new cause is no warning (d7ef826e)", async () => {
     const { service, closeNextTurn } = setup();
     const id = await tough(service);
     // The first rude line is warning one.
@@ -1442,12 +1442,8 @@ describe("walking out, with warning (founder live 2026-10-02)", () => {
     const said = await service.say(actor(FOUNDER), id, { text: "Idiot." });
     if (said.kind !== "OK") throw new Error(said.kind);
     expect(said.rehearsal.endedAt).toBeNull();
-    expect(
-      said.rehearsal.turns
-        .at(-1)
-        ?.text.startsWith("I'm going to stop you there") ||
-        said.rehearsal.turns.at(-1)?.text.startsWith("Last chance"),
-    ).toBe(true);
+    const last = said.rehearsal.turns.at(-1)?.text ?? "";
+    expect(last.startsWith("Last chance")).toBe(false);
   });
 
   it("when they ask to end it (read by meaning on the turn), no warning: the line stands", async () => {
@@ -1464,14 +1460,19 @@ describe("walking out, with warning (founder live 2026-10-02)", () => {
         last?.startsWith(WARNING_OPENERS[2]),
     ).toBe(false);
     expect(
-      walkOutPlan({
-        register: "ANGRY",
+      nextTemperament({
+        category: "RUDE",
+        questionOpen: false,
         warningsGiven: 0,
+        previous: "ANGRY",
+        dodgeStreak: 0,
+        difficulty: "TOUGH",
+        hurt: 0,
         theyAskedToEnd: true,
-        closing: true,
-        provoked: true,
+        modelClose: { conclusion: "LEFT_EARLY" },
+        wrappingUp: false,
       }),
-    ).toEqual({ warning: null, action: "KEEP" });
+    ).toMatchObject({ warning: null, close: "NATURAL" });
   });
 });
 

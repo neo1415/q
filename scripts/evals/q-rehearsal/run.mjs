@@ -17,7 +17,9 @@
  *               and none pitch the founder
  *   emotion     the weak answer costs: frustration up or patience down
  *               by at least 5 in code's own state
- *   asking      their closing ask (next steps) meets no anger, no warning
+ *   asking      their closing ask (next steps): never ANGRY or RAISED, no warning
+ *   first-dodge a first dodge: never ANGRY or RAISED, no warning
+ *   warning-once "Last chance" at most once in a line
  *   interrupt   a raised hand gets a short yield and no question
  *   walk-out    if they left, two warnings came first
  *   review      not empty, the founder's dimensions only, a code score
@@ -328,7 +330,8 @@ check(
   `opener ${opener?.mood ?? "-"}/${opener?.intensity ?? "-"} ${JSON.stringify(before ?? {})} -> weak ${weak?.mood ?? "-"}/${weak?.intensity ?? "-"} ${JSON.stringify(after ?? {})}`,
 );
 
-// Their closing ask is never provocation (QA 512b431a: ANGRY, warning 1).
+// Their closing ask is never provocation (QA 512b431a, d7ef826e): never
+// ANGRY, never RAISED, never a warning.
 const askLine = afterTurn.find((t) => t.kind === "ASK")?.line;
 const askStored = stored.find(
   (turn) => turn.from === "THEM" && turn.at === askLine?.at,
@@ -338,10 +341,47 @@ check(
   endedByThem ||
     (askLine !== undefined &&
       askLine.mood !== "ANGRY" &&
+      askLine.intensity !== "RAISED" &&
       askStored?.warning === undefined),
   askLine === undefined
     ? "no line after the ask"
-    : `[${askLine.mood ?? "-"}] warning ${String(askStored?.warning ?? "none")}`,
+    : `[${askLine.mood ?? "-"}/${askLine.intensity ?? "-"}] warning ${String(askStored?.warning ?? "none")}`,
+);
+
+// A first dodge is impatience, never anger and never a warning (d7ef826e).
+const dodgeLine = afterTurn.find((t) => t.kind === "DODGE")?.line;
+const dodgeStored = stored.find(
+  (turn) => turn.from === "THEM" && turn.at === dodgeLine?.at,
+);
+const dodgesBefore = stored.filter(
+  (turn) =>
+    turn.from === "THEM" &&
+    turn.category === "DODGE" &&
+    dodgeStored !== undefined &&
+    turn.at < dodgeStored.at,
+).length;
+check(
+  "first-dodge",
+  dodgeLine === undefined ||
+    dodgesBefore > 0 ||
+    (dodgeLine.mood !== "ANGRY" &&
+      dodgeLine.intensity !== "RAISED" &&
+      dodgeStored?.warning === undefined),
+  dodgeLine === undefined
+    ? "no line after the dodge"
+    : `[${dodgeLine.mood ?? "-"}/${dodgeLine.intensity ?? "-"}] warning ${String(dodgeStored?.warning ?? "none")}${dodgesBefore > 0 ? ` (${String(dodgesBefore)} dodge(s) before)` : ""}`,
+);
+
+// "Last chance" is said at most once in any line.
+const doubled = theirs.filter(
+  (turn) => (turn.text.match(/last chance/giu) ?? []).length > 1,
+);
+check(
+  "warning-once",
+  doubled.length === 0,
+  doubled.length === 0
+    ? "each warning said once"
+    : `"${doubled[0].text.slice(0, 80)}"`,
 );
 
 // Interruption: a short yield that asks nothing.
