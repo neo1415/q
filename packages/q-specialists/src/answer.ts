@@ -2065,7 +2065,7 @@ export function createSpecialistQAnswer(
           args !== undefined &&
           typeof args === "object" &&
           !Array.isArray(args)
-          ? (args)
+          ? args
           : null;
       };
     const routed =
@@ -2089,8 +2089,10 @@ export function createSpecialistQAnswer(
                 // Handing work over in general is one of the meanings a
                 // request to act can have; the router weighs it with the
                 // rest (QA 2026-10-03).
-                ...(dependencies.delegation !== undefined &&
-                offeredNames.has(DELEGATION_TOOL)
+                // Always, when composed: the tool is called under the run's
+                // own plan, whatever this turn's focus offered (QA
+                // 2026-10-03, run d77f9934).
+                ...(dependencies.delegation !== undefined
                   ? [DELEGATION_CANDIDATE]
                   : []),
               ],

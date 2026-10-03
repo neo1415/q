@@ -1471,14 +1471,14 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     return { line: stored.at(-1)?.content, delegated: delegated() };
   };
 
-  it("one request waiting: prepared as one approval with the message, and the model is not asked", async () => {
+  it("one request waiting, asked for by name: prepared as one approval with the message", async () => {
     const { value, asked, errands } = port(() => ({
       status: "PREPARED",
       awaitingApprovalOf:
         "Accept Kazikit's connection request and send them your message",
     }));
-    const { line, delegated } = await run(value, null);
-    expect(asked).toEqual([null]);
+    const { line, delegated } = await run(value, "Kazikit");
+    expect(asked).toEqual(["Kazikit"]);
     expect(errands).toEqual([]);
     expect(line).toBe(
       "Accept Kazikit's connection request and send them your message: once you approve, I accept it and send the message shown on the card, word for word.",
@@ -1486,17 +1486,16 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(delegated).toBe(0);
   });
 
-  it("several waiting: asks once, naming them; prepares nothing", async () => {
-    const { value, errands } = port(() => ({
-      status: "WHICH_ONE",
+  it("'handle it' with no one named and nothing on screen never picks a waiting request (lead 2026-10-03)", async () => {
+    const { value, asked, errands } = port(() => ({
+      status: "PREPARED",
       awaitingApprovalOf:
-        "2 connection requests are waiting: Kazikit or Tallyloom. Which one should I accept?",
+        "Accept Kazikit's connection request and send them your message",
     }));
     const { line } = await run(value, null);
-    expect(line).toBe(
-      "2 connection requests are waiting: Kazikit or Tallyloom. Which one should I accept?",
-    );
+    expect(asked).toEqual([]);
     expect(errands).toEqual([]);
+    expect(line ?? "").not.toContain("Kazikit");
   });
 
   it("the name they gave, else the company on screen, is the one asked for", async () => {
@@ -3447,6 +3446,66 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
         more: { askFirst: true, goal: "ignored: their words are the goal" },
       },
     ]);
+  });
+
+  it("'just handle it' never accepts a waiting connection request in its place (runs 73c40208, bec2d96a, 1d641c09)", async () => {
+    const proposed: unknown[] = [];
+    const answered: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "just handle it",
+      reading: handOverReading(null),
+      outcomes: [],
+      handOver: {
+        answerConnectionRequest: (_request, company) => {
+          answered.push(company);
+          return Promise.resolve({
+            status: "PREPARED",
+            awaitingApprovalOf:
+              "Accept Ledgerfold's connection request and send them your message",
+          });
+        },
+        prepare: () => Promise.resolve(null),
+        candidates: () => Promise.resolve([]),
+      },
+      delegation: delegationPort(
+        { side: "INVESTOR", relationships: 4, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(answered).toEqual([]);
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).not.toContain("Ledgerfold");
+  });
+
+  it("'handle my investors' with relationships is the standing instruction, not a question (run d77f9934)", async () => {
+    const proposed: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "handle my investors",
+      reading: handOverReading("my investors"),
+      outcomes: [],
+      handOver: {
+        prepare: () => Promise.resolve(null),
+        candidates: () =>
+          Promise.resolve([
+            {
+              name: "Ventures Platform",
+              subject: { kind: "RELATIONSHIP", relationshipId: "r-1" },
+            },
+            {
+              name: "Voltron Capital",
+              subject: { kind: "RELATIONSHIP", relationshipId: "r-2" },
+            },
+          ]),
+      },
+      delegation: delegationPort(
+        { side: "COMPANY", relationships: 2, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).toContain("standing instruction");
   });
 
   it("a meeting with no one named is still asked about by name", async () => {

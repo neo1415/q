@@ -184,6 +184,18 @@ export async function actOnHandOver(
   // name they gave, else the company on screen, else (one waiting) that
   // one, else they are asked once, by name. A name or company that is not
   // a waiting request falls through to the errand below.
+  // Work handed over with no one named and nothing on screen ("just handle
+  // it", "handle all my work") is a standing instruction, decided before
+  // anything else: never a waiting request or an errand Q would have to
+  // pick for them (QA 2026-10-03, runs 73c40208, bec2d96a, 1d641c09: a
+  // pending connection request was accepted in its place).
+  if (
+    handOver.kind !== "MEETING" &&
+    handOver.counterpartName === null &&
+    onScreen === null
+  ) {
+    return { kind: "STANDING" };
+  }
   if (port.answerConnectionRequest !== undefined) {
     const named =
       handOver.counterpartName ??
@@ -231,19 +243,17 @@ export async function actOnHandOver(
       subject = chosen.subject;
     }
   }
-  // A hand-over (not a meeting) with no one of theirs to hand over for:
-  // no name and nothing on screen, or a name ("my investors") when they
-  // have no relationships at all to match it. That is work handed over in
-  // general, not an errand for someone Q would have to guess. A name that
-  // misses while they DO have relationships is still asked about by name.
-  const unresolvedName =
-    handOver.counterpartName !== null &&
-    named.length === 0 &&
-    candidates.length === 0;
+  // Work handed over (not a meeting) for a name that is none of their
+  // relationships ("my investors", "everyone", "new founders") is work in
+  // general: a standing instruction, whether or not they have relationships
+  // (QA 2026-10-03, run d77f9934). A meeting with an unknown name is still
+  // asked about by name.
   if (
     handOver.kind !== "MEETING" &&
     subject === null &&
-    (unresolvedName || (handOver.counterpartName === null && onScreen === null))
+    onScreen === null &&
+    handOver.counterpartName !== null &&
+    named.length === 0
   ) {
     return { kind: "STANDING" };
   }
