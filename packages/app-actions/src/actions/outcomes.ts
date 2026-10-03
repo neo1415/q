@@ -137,7 +137,9 @@ const PASS = defineAppAction<z.infer<typeof Pass>, OutcomeResult>({
       idempotencyKey: input.idempotencyKey,
       correlationId: context.correlationId,
     }),
-  targets: () => [],
+  targets: (input) => [
+    { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+  ],
   card: (input) => {
     const shared =
       input.input.shareWithFounder &&
@@ -203,7 +205,9 @@ function pauseOrResume(kind: "PAUSE" | "RESUME"): AnyAppAction {
             relationshipId: input.relationshipId,
             correlationId: context.correlationId,
           }),
-    targets: () => [],
+    targets: (input) => [
+      { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+    ],
     card: () =>
       pause
         ? {
@@ -272,7 +276,9 @@ const MEETING_OUTCOME = defineAppAction<z.infer<typeof Outcome>, OutcomeResult>(
         meetingId: input.input.meetingId,
         correlationId: context.correlationId,
       }),
-    targets: () => [],
+    targets: (input) => [
+      { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+    ],
     card: (input) => ({
       summary: "Record how the meeting went",
       preview: `On the relationship, both sides see that ${OUTCOME_WORDS[input.input.outcome]}.`,

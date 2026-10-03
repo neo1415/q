@@ -103,7 +103,9 @@ const SHARE = defineAppAction<
       documentId: input.input.documentId,
       correlationId: context.correlationId,
     }),
-  targets: () => [],
+  targets: (input) => [
+    { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+  ],
   card: () => ({
     summary: "Share this document with them",
     preview:
@@ -154,7 +156,9 @@ const REVOKE = defineAppAction<
       policyId: input.policyId,
       correlationId: context.correlationId,
     }),
-  targets: () => [],
+  targets: (input) => [
+    { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+  ],
   card: () => ({
     summary: "Stop sharing this document",
     preview: "They can no longer open or download it.",
@@ -208,7 +212,9 @@ const REQUEST = defineAppAction<
       idempotencyKey: input.idempotencyKey,
       correlationId: context.correlationId,
     }),
-  targets: () => [],
+  targets: (input) => [
+    { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+  ],
   card: (input) => ({
     summary: `Ask for: ${input.input.title}`,
     preview:
@@ -267,7 +273,9 @@ const FULFIL = defineAppAction<
       requestId: input.requestId,
       correlationId: context.correlationId,
     }),
-  targets: () => [],
+  targets: (input) => [
+    { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+  ],
   card: () => ({
     summary: "Answer their request with this document",
     preview:
@@ -344,7 +352,9 @@ export const DILIGENCE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
     description:
       "Prepares, for the person's approval, a change in a relationship's diligence area: a founder sharing one of their own documents with that investor, taking one back, or answering the investor's request with a document; an investor asking the company for a document. Name the relationship and the document as they said them. Nothing changes until they approve exactly it.",
     input: DiligenceTool,
-    references: { relationship: "RELATIONSHIP", document: "DOCUMENT" },
+    // Diligence shares the company's uploaded (Evidence) documents, never
+    // Q's drafts: matched among their uploads.
+    references: { relationship: "RELATIONSHIP", document: "UPLOAD" },
     purposes: ["RELATIONSHIP_QUESTION", "COUNTERPARTY_COMPANY_QUESTION"],
     eval: {
       say: [

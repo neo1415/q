@@ -51,6 +51,13 @@ const ACCOUNT_OF_AREA = {
   // Outcomes (pass, pause, meeting) are recorded by the investor.
   relationships: "INVESTOR",
 };
+// A family's phrasings can belong to different sides: diligence's first
+// phrasing (and its misheard copy) is the founder sharing, the second the
+// investor asking.
+const ACCOUNT_OF_CASE = {
+  "diligence.change#1": "FOUNDER",
+  "diligence.change#misheard": "FOUNDER",
+};
 const ACCOUNT_OF_READ = {
   media: "FOUNDER",
   documents: "FOUNDER",
@@ -344,9 +351,10 @@ function accountOf(action) {
 const rows = [];
 for (const testCase of cases) {
   const account =
-    testCase.expect.kind === "READ"
+    ACCOUNT_OF_CASE[testCase.id] ??
+    (testCase.expect.kind === "READ"
       ? ACCOUNT_OF_READ[testCase.expect.read]
-      : accountOf(APP_ACTIONS.find((a) => a.name === testCase.expect.action));
+      : accountOf(APP_ACTIONS.find((a) => a.name === testCase.expect.action)));
   const userId = account === "FOUNDER" ? founderUser : investorUser;
   // A relationship named from the founder's side when a founder acts.
   const asked =

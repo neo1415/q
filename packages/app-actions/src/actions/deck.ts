@@ -125,7 +125,7 @@ export const SET_DECK_AUDIENCE = defineAppAction<
       correlationId: context.correlationId,
     });
   },
-  targets: () => [],
+  targets: (input) => [{ kind: "DOCUMENT", documentId: input.documentId }],
   card: (input) => ({
     summary:
       input.audience === "INVESTORS"

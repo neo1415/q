@@ -338,3 +338,28 @@ describe("the parity eval's cases come from the registry", () => {
     expect(misheard("Kazikit")).not.toBe("Kazikit");
   });
 });
+
+describe("what Q proposes names what it touches (parity eval 2026-10-03)", () => {
+  // The Approval Engine refuses a proposal with no targets
+  // (ACTION_NOT_PERMITTED): every consequential action Q prepares through
+  // its generated tool must name its subject from the payload.
+  const ID = "6a0c1f5e-0000-4000-8000-0000000000aa";
+  const sample = new Proxy<Record<string, unknown>>(
+    {},
+    { get: (_target, key) => (typeof key === "string" ? ID : undefined) },
+  );
+  const proposed = APP_ACTIONS.filter(
+    (action) =>
+      action.classification === "CONSEQUENTIAL" &&
+      // A family's one tool proposes as its members, each tested here.
+      action.http !== undefined &&
+      (action.tool !== undefined || action.viaTool !== undefined),
+  );
+
+  it.each(proposed.map((action) => [action.name, action] as const))(
+    "%s has at least one target",
+    (_name, action) => {
+      expect(action.targets(sample as never).length).toBeGreaterThan(0);
+    },
+  );
+});
