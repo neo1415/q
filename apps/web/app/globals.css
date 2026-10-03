@@ -210,6 +210,14 @@
     flex: 1 1 auto;
     padding-bottom: calc(var(--cq-bottom-nav-height) + var(--cq-safe-bottom));
   }
+  /* A conversation thread owns the screen: no bottom navigation under its
+     composer (demo audit 2026-10-03). Back is in the thread's header. */
+  .cq-shell:has([data-chat-thread]) .cq-bottom-nav {
+    display: none;
+  }
+  .cq-shell:has([data-chat-thread]) .cq-shell-main {
+    padding-bottom: var(--cq-safe-bottom);
+  }
 
   /*
    * The Q composer stays reachable: docked to the bottom of the workspace,

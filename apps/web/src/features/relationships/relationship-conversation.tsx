@@ -72,7 +72,13 @@ export async function RelationshipConversation({
   // that page"): one full-height column, the header carrying who and the
   // few actions, everything else one tap away in the info sheet.
   return (
-    <div className="mx-auto flex h-[calc(100dvh-8.5rem)] w-full max-w-3xl flex-col lg:h-[calc(100dvh-1rem)]">
+    // A thread is the whole screen on a phone: the bottom navigation steps
+    // aside while it is open (CSS keyed on data-chat-thread; demo audit
+    // 2026-10-03), so the column is the screen less the header.
+    <div
+      className="mx-auto flex h-[calc(100dvh-3.5rem-var(--cq-safe-bottom))] w-full max-w-3xl flex-col lg:h-[calc(100dvh-1rem)]"
+      data-chat-thread
+    >
       <RelationshipChat
         relationshipId={relationship.relationshipId}
         counterpart={counterpart}
@@ -87,9 +93,12 @@ export async function RelationshipConversation({
             >
               <ArrowLeft size={ICON_SIZE.regular} aria-hidden="true" />
             </Link>
-            <ChatAvatar name={counterpart} photoUrl={profile.photoUrl} />
+            {/* On a phone the name needs the room more than the avatar. */}
+            <span className="max-sm:hidden">
+              <ChatAvatar name={counterpart} photoUrl={profile.photoUrl} />
+            </span>
             <span className="flex min-w-0 flex-col">
-              <span className="cq-body truncate font-semibold text-(--cq-text-primary)">
+              <span className="cq-body line-clamp-2 leading-tight font-semibold text-(--cq-text-primary)">
                 {counterpart}
               </span>
               <span className="cq-caption truncate text-(--cq-text-secondary)">
@@ -104,7 +113,7 @@ export async function RelationshipConversation({
               <Link
                 href={`${basePath}#calls`}
                 aria-label="Book a call"
-                className="flex size-11 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+                className="flex size-11 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) max-sm:hidden"
               >
                 <CalendarDays size={ICON_SIZE.regular} aria-hidden="true" />
               </Link>
@@ -144,6 +153,18 @@ export async function RelationshipConversation({
                       />
                     </Link>
                   )}
+                  {connected ? (
+                    <Link
+                      href={`${basePath}#calls`}
+                      className={buttonClassName("primary", "compact")}
+                    >
+                      <CalendarDays
+                        size={ICON_SIZE.compact}
+                        aria-hidden="true"
+                      />
+                      Book a call
+                    </Link>
+                  ) : null}
                   <Link
                     href={`${basePath}#reminders`}
                     className={buttonClassName("secondary", "compact")}
