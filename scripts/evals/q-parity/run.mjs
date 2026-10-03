@@ -422,6 +422,7 @@ async function unshare() {
       tokens.FOUNDER,
       "POST",
       `${sharesPath(target.company)}/${share.policyId}/revoke`,
+      {},
     );
   }
 }

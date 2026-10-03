@@ -367,3 +367,19 @@ describe("what Q proposes names what it touches (parity eval 2026-10-03)", () =>
     },
   );
 });
+
+describe("a name said without its parenthetical", () => {
+  it("'Savanna Seed Parters' finds 'Savanna Seed Partners (fictional)'", async () => {
+    const SAVANNA = "6a0c1f5e-0000-4000-8000-0000000000b1";
+    const candidates: ReferenceCandidates = () =>
+      Promise.resolve([
+        { id: SAVANNA, name: "Savanna Seed Partners (fictional)" },
+        { id: "6a0c1f5e-0000-4000-8000-0000000000b2", name: "Ledgerfold" },
+      ]);
+    for (const said of ["Savanna Seed Parters", "Savanna Seed Partners"]) {
+      expect(
+        await resolveReference(candidates, "RELATIONSHIP", actor, said),
+      ).toEqual({ kind: "RESOLVED", id: SAVANNA });
+    }
+  });
+});

@@ -56,8 +56,18 @@ export async function resolveReference(
   if (POINTING.test(value) && seen.length === 1 && seen[0] !== undefined) {
     return { kind: "RESOLVED", id: seen[0].id };
   }
+  // A name is matched with and without its parenthetical ("Savanna Seed
+  // Partners (fictional)", "Acme Capital (UK)"): people rarely say it
+  // (parity eval 2026-10-03: "Savanna Seed Parters" matched nothing).
+  const bare = (name: string) => name.replace(/\s*\([^)]*\)\s*/g, " ").trim();
+  const named = seen.flatMap((candidate) => {
+    const short = bare(candidate.name);
+    return short.length > 0 && short !== candidate.name
+      ? [candidate, { ...candidate, name: short }]
+      : [candidate];
+  });
   const found = closestByName(
-    seen,
+    named,
     value,
     (candidate) => candidate.name,
     (candidate) => candidate.id,
@@ -68,5 +78,16 @@ export async function resolveReference(
   }
   return ids.length === 0
     ? { kind: "NONE" }
-    : { kind: "SEVERAL", names: found.map((candidate) => candidate.name) };
+    : {
+        kind: "SEVERAL",
+        names: [
+          ...new Set(
+            found.map(
+              (candidate) =>
+                seen.find((one) => one.id === candidate.id)?.name ??
+                candidate.name,
+            ),
+          ),
+        ],
+      };
 }
