@@ -26,6 +26,7 @@ export function createInstructionTriggers(dependencies: {
         | "instruction"
         | "notify"
         | "wakeForChat"
+        | "resolveAnswered"
       >
     >;
   readonly engine: () => InstructionEngine | undefined;
@@ -68,6 +69,11 @@ export function createInstructionTriggers(dependencies: {
     }
     await digests().catch((error: unknown) => {
       logger?.warn({ err: error }, "standing instruction digests failed");
+    });
+    // QA run 8a1d57b9: a "needs your yes" notice whose cards are all
+    // answered (or rejected) stops asking for attention.
+    await store.resolveAnswered?.().catch((error: unknown) => {
+      logger?.warn({ err: error }, "standing instruction notices not resolved");
     });
     return due.length;
   };

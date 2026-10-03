@@ -193,7 +193,12 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
          order by i.created_at desc
          limit ${limit}`,
 
-    /** One sentence or one tap: stops the person's own live instruction. */
+    /**
+     * One sentence or one tap: stops the person's own live instruction.
+     * What it asked them is no longer waiting (QA run 8a1d57b9: "5 things
+     * need your yes" stayed after a stop): its NEEDS_YOU notices are
+     * resolved (marked read; never deleted).
+     */
     stop: async (owner: Owner, id: string): Promise<boolean> => {
       const rows = await sql<{ id: string }[]>`
         update q_runtime.standing_instructions
@@ -203,7 +208,42 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
            and tenant_id = ${owner.tenantId}
            and status in ('DRAFT', 'ACTIVE', 'PAUSED')
         returning id`;
-      return rows.length > 0;
+      if (rows.length === 0) return false;
+      await sql`
+        update communication.notifications
+           set read_at = clock_timestamp()
+         where user_id = ${owner.userId} and kind = 'Q_WORK'
+           and priority = 'NEEDS_YOU' and read_at is null
+           and dedupe_key like ${`instr:${id}:%`}`;
+      return true;
+    },
+
+    /**
+     * QA run 8a1d57b9: "N things need your yes" stayed after every card in
+     * it was answered. A run's NEEDS_YOU notice is resolved (marked read)
+     * once none of the cards it asked about still waits on the person --
+     * approved, rejected, withdrawn or expired alike. Recent notices only.
+     */
+    resolveAnswered: async (): Promise<number> => {
+      const rows = await sql<{ id: string }[]>`
+        update communication.notifications n
+           set read_at = clock_timestamp()
+         where n.kind = 'Q_WORK' and n.priority = 'NEEDS_YOU'
+           and n.read_at is null
+           and n.dedupe_key like 'instr:%:needs'
+           and n.created_at > clock_timestamp() - interval '30 days'
+           and exists (
+             select 1 from q_runtime.instruction_steps t
+              where t.user_id = n.user_id and t.status = 'ASKED'
+                and n.dedupe_key = 'instr:' || t.instruction_id::text || ':' || t.run_key || ':needs')
+           and not exists (
+             select 1 from q_runtime.instruction_steps t
+               join q_runtime.actions a on a.id = t.q_action_id
+              where t.user_id = n.user_id and t.status = 'ASKED'
+                and n.dedupe_key = 'instr:' || t.instruction_id::text || ':' || t.run_key || ':needs'
+                and a.status in ('PROPOSED', 'AWAITING_APPROVAL'))
+        returning n.id`;
+      return rows.length;
     },
 
     /** The platform's read, for the engine advancing this instruction. */

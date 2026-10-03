@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 
-import type {
-  IncomingInterestDto,
-  RelationshipStateV2,
+import {
+  isMatchedRelationshipState,
+  type IncomingInterestDto,
+  type RelationshipStateV2,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
@@ -118,14 +119,26 @@ function Row({
 
   const name = current.investorName;
 
+  // Where it stands after the accept (QA run 8a1d57b9: the line read
+  // "Connected... Now: interest expressed" -- the state loaded with the
+  // page, from before the answer). Accepted means connected at least: a
+  // state from before connecting is stale and never shown; only a later
+  // move (a meeting, diligence, a pause) is.
+  const nowState =
+    currentState === undefined ||
+    currentState === "CONNECTED" ||
+    !isMatchedRelationshipState(currentState)
+      ? null
+      : currentState;
+
   let outcome: React.ReactNode;
   if (current.response === "ACCEPTED") {
     outcome = (
       <p className="cq-status-line" role="status">
         Connected. You and {name} have both agreed to connect.
-        {currentState === undefined || currentState === "CONNECTED"
+        {nowState === null
           ? null
-          : ` Now: ${STATE_WORDS[currentState].toLowerCase()}.`}
+          : ` Now: ${STATE_WORDS[nowState].toLowerCase()}.`}
       </p>
     );
   } else if (current.response === "DECLINED") {

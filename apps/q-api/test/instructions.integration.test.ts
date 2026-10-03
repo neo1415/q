@@ -456,4 +456,93 @@ describe("standing instructions against PostgreSQL", () => {
       }),
     ).rejects.toBeInstanceOf(Rollback);
   });
+
+  it("a 'needs your yes' notice is resolved once its cards are answered, and every one on stop (QA run 8a1d57b9)", async () => {
+    await expect(
+      db.transactions.run(async ({ sql: tx }) => {
+        await ensureMigrations(tx);
+        const tenant = randomUUID();
+        await tx`insert into identity.tenants (id, name) values (${tenant}, 'Needs tenant')`;
+        const authId = randomUUID();
+        await tx`insert into auth.users (id, email) values (${authId}, ${`${authId.slice(0, 8)}@needs.example.invalid`})`;
+        const [profile] = await tx<{ id: string }[]>`
+          select id from identity.user_profiles where auth_user_id = ${authId}`;
+        const userId = profile?.id ?? "";
+        const owner = { tenantId: tenant, userId, organisationId: null };
+        const store = createPostgresInstructionStore(tx);
+        const live = await store.activate({
+          owner,
+          qActionId: randomUUID(),
+          instructionId: undefined,
+          goal: "Handle my investors",
+          grant: handleEverythingGrant({ timeZone: "Europe/London" }),
+        });
+        const id = live?.instructionId ?? "";
+        const row = await store.instruction(id);
+        if (row === null) throw new Error("no instruction");
+        const [run] = await tx<{ id: string }[]>`
+          insert into q_runtime.runs (tenant_id, actor_user_id, objective, capability,
+                                      consequence_class, correlation_id)
+          values (${tenant}, ${userId}, 'Instruction cards', 'PREPARE_ACTION', 'LOW',
+                  ${`cor_${randomUUID()}`})
+          returning id`;
+        const card = async (status: string) => {
+          const actionId = randomUUID();
+          await tx`
+            insert into q_runtime.actions
+              (id, tenant_id, run_id, proposed_by_user_id, action_type, action_version,
+               risk_class, target_refs, proposed_payload, proposed_payload_hash, summary,
+               status, idempotency_key)
+            values (${actionId}, ${tenant}, ${run?.id ?? ""}, ${userId}, 'app.chat.message.send', 1,
+                    'CONFIRM_REQUIRED', ${tx.json([{ type: "relationship", id: randomUUID() }])},
+                    ${tx.json({})}, ${`sha256:${"a".repeat(64)}`}, 'Send this message',
+                    ${status}, ${`q_action:${run?.id ?? ""}:${actionId}`})`;
+          return actionId;
+        };
+        const ask = async (runKey: string, actionId: string, index: number) => {
+          await store.recordStep({
+            instruction: row,
+            runKey,
+            stepIndex: index,
+            action: "chat.message.send",
+            mode: "ASK",
+            status: "ASKED",
+            relationshipId: null,
+            words: "Waiting for your yes: say hello.",
+            reasonCode: null,
+            qActionId: actionId,
+            idempotencyKey: `instr:${id}:${runKey}:${String(index)}`,
+          });
+          await store.notify({
+            instruction: row,
+            key: `${runKey}:needs`,
+            title: "Things need your yes",
+            body: "- Say hello.",
+            priority: "NEEDS_YOU",
+          });
+        };
+        const unread = async (runKey: string) =>
+          (
+            await tx<{ unread: boolean }[]>`
+              select read_at is null as unread from communication.notifications
+               where dedupe_key = ${`instr:${id}:${runKey}:needs`}`
+          )[0]?.unread;
+
+        // One card still waiting, one rejected: the notice stays.
+        await ask("run-needs-01", await card("AWAITING_APPROVAL"), 0);
+        await ask("run-needs-01", await card("REJECTED"), 1);
+        // Every card of this run answered (rejected, withdrawn): resolved.
+        await ask("run-needs-02", await card("REJECTED"), 0);
+        await ask("run-needs-02", await card("WITHDRAWN"), 1);
+        await store.resolveAnswered();
+        expect(await unread("run-needs-01")).toBe(true);
+        expect(await unread("run-needs-02")).toBe(false);
+
+        // A stop resolves what is left.
+        expect(await store.stop(owner, id)).toBe(true);
+        expect(await unread("run-needs-01")).toBe(false);
+        throw new Rollback();
+      }),
+    ).rejects.toBeInstanceOf(Rollback);
+  });
 });

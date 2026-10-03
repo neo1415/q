@@ -93,6 +93,24 @@ describe("instruction triggers", () => {
     await triggers.sweep();
     expect(swept).toBeGreaterThanOrEqual(1);
   });
+  it("each sweep resolves 'needs your yes' notices whose cards are all answered (QA run 8a1d57b9)", async () => {
+    let resolved = 0;
+    const triggers = createInstructionTriggers({
+      store: {
+        claimDue: () => Promise.resolve([]),
+        defer: () => Promise.resolve(),
+        wakeFor: () => Promise.resolve(0),
+        resolveAnswered: () => {
+          resolved += 1;
+          return Promise.resolve(2);
+        },
+      },
+      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+    });
+    await triggers.sweep();
+    expect(resolved).toBe(1);
+  });
+
   it("a chat message on a covered relationship makes its instructions due at once, and sweeps (QA run 8a1d57b9)", async () => {
     let swept = 0;
     const woken: string[] = [];

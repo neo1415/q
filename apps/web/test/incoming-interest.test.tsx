@@ -102,6 +102,30 @@ describe("an accepted interest, later", () => {
       "Now: in diligence.",
     );
   });
+
+  it("after accepting here, never shows the state from before the answer (QA run 8a1d57b9)", async () => {
+    const port = vi.fn<(input: Answer) => Promise<Result>>(() =>
+      Promise.resolve(accepted()),
+    );
+    render(
+      <IncomingInterest
+        items={[PENDING]}
+        answer={port}
+        currentStates={
+          new Map([
+            [PENDING.investorOrganisationId, "INTEREST_EXPRESSED" as const],
+          ])
+        }
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    const line = await screen.findByText(
+      "Connected. You and Apex Ventures have both agreed to connect.",
+    );
+    expect(line.textContent).not.toContain("Now:");
+    expect(document.body.textContent ?? "").not.toMatch(/interest expressed/i);
+  });
 });
 
 describe("the founder's inbox", () => {

@@ -52,12 +52,15 @@ function harness(party: "INVESTOR" | "COMPANY", fail = false) {
     actingSide: string;
     key: string;
   }[] = [];
-  const sql = (() =>
-    fail
+  const queries: { text: string; values: unknown[] }[] = [];
+  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    queries.push({ text: strings.join("?"), values });
+    return fail
       ? Promise.reject(new Error("db down"))
       : Promise.resolve([
           { party, company: "Pay Co", investor: "Ada Capital" },
-        ])) as unknown;
+        ]);
+  }) as unknown;
   const passed: unknown[] = [];
   const handle = withInterestNotices(
     (inner): Promise<MessageOutcome> => {
@@ -81,7 +84,7 @@ function harness(party: "INVESTOR" | "COMPANY", fail = false) {
       logger: createRecordingLogger(),
     },
   );
-  return { handle, told, passed };
+  return { handle, told, passed, queries };
 }
 
 describe("withInterestNotices", () => {
@@ -109,6 +112,48 @@ describe("withInterestNotices", () => {
     });
   });
 
+  it("resolves the notice once the interest is answered, accepted or declined (QA run 8a1d57b9)", async () => {
+    for (const decision of ["ACCEPTED", "DECLINED"] as const) {
+      const h = harness("INVESTOR");
+      await h.handle(
+        message(
+          interestAnsweredEvent({
+            ...envelope,
+            correlationId: cor(),
+            decision,
+            interestId: INTEREST,
+            matchId:
+              decision === "ACCEPTED"
+                ? "55555555-0000-4000-8000-000000000001"
+                : null,
+          }),
+        ),
+      );
+      expect(h.told).toEqual([]);
+      expect(h.passed).toHaveLength(1);
+      expect(h.queries).toHaveLength(1);
+      expect(h.queries[0]?.text).toContain("set read_at");
+      expect(h.queries[0]?.values).toEqual([
+        `interest_received:${INTEREST}`,
+        `connection_requested:${INTEREST}`,
+      ]);
+    }
+    const failing = harness("INVESTOR", true);
+    expect(
+      await failing.handle(
+        message(
+          interestAnsweredEvent({
+            ...envelope,
+            correlationId: cor(),
+            decision: "ACCEPTED",
+            interestId: INTEREST,
+            matchId: "55555555-0000-4000-8000-000000000001",
+          }),
+        ),
+      ),
+    ).toEqual({ kind: "RETRY", errorCode: "INTEREST_NOTICE_FAILED" });
+  });
+
   it("ignores other events and retries when it cannot write", async () => {
     const quiet = harness("INVESTOR");
     await quiet.handle(
@@ -122,6 +167,7 @@ describe("withInterestNotices", () => {
         }),
       ),
     );
+    // An answer tells nobody anything new.
     expect(quiet.told).toEqual([]);
     const failing = harness("INVESTOR", true);
     expect(await failing.handle(message(expressed()))).toEqual({
