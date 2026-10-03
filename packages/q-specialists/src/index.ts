@@ -238,5 +238,6 @@ export {
   createToolAppActionPort,
   TurnAppActionSchema,
   type QAppActionPort,
+  type QAppActionPrepared,
   type TurnAppAction,
 } from "./app-action-turn.js";

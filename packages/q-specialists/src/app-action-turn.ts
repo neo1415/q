@@ -37,13 +37,21 @@ export function appActionOf(read: object | null): TurnAppAction | null {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * A change prepared for approval: the engine says its status after the
+ * turn ("…Not saved yet" for a new card, "That's ready…" for one already
+ * waiting), so the turn itself says nothing more about it (lead
+ * 2026-10-03: one status per card per answer).
+ */
+export type QAppActionPrepared = { readonly prepared: string };
+
 export type QAppActionPort = {
   /** Tool names that are declared app actions (the registry's). */
   readonly tools: ReadonlySet<string>;
   readonly run: (
     request: QAnswerRequest,
     action: TurnAppAction,
-  ) => Promise<string | null>;
+  ) => Promise<string | QAppActionPrepared | null>;
 };
 
 /** Refusals that say nothing about why: never said as the answer. */
@@ -96,7 +104,15 @@ export function createToolAppActionPort(dependencies: {
         const data = outcome.result.data as {
           readonly status?: unknown;
           readonly says?: unknown;
+          readonly summary?: unknown;
         };
+        if (
+          data.status === "PREPARED" &&
+          typeof data.summary === "string" &&
+          data.summary.trim().length > 0
+        ) {
+          return { prepared: data.summary.trim() };
+        }
         return typeof data.says === "string" && data.says.trim().length > 0
           ? data.says.trim()
           : null;
