@@ -409,6 +409,7 @@ export {
 } from "./tools/note-preference.js";
 
 export {
+  APP_ACTION_GROUPS,
   eligibleCapabilities,
   HOME_Q_CAPABILITY_GROUPS,
   Q_CAPABILITIES,

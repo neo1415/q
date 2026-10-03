@@ -445,14 +445,27 @@ const OFFERS: readonly QCapability[] = [
 ];
 
 /** Where a registry area's actions sit among the capability groups. */
-const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
+// Every declared area has its group (lead 2026-10-03, run d396af2f: the
+// relationships area fell through to RECORDS, so a turn about a
+// relationship never brought its own actions into focus). The registry
+// test fails for an area missing here.
+export const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   pitch: "MEDIA",
+  media: "MEDIA",
   discovery: "RELATIONSHIP",
+  relationships: "RELATIONSHIP",
+  chat: "RELATIONSHIP",
+  schedule: "RELATIONSHIP",
   documents: "DOCUMENT",
   records: "PROFILE",
+  "profile-images": "PROFILE",
+  verification: "PROFILE",
   capital: "RECORDS",
   mandate: "RECORDS",
   visibility: "VISIBILITY",
+  onboarding: "ONBOARDING",
+  settings: "SETTINGS",
+  integrations: "SETTINGS",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([

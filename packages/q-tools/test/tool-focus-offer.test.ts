@@ -8,6 +8,7 @@ import {
 } from "@capital-q/contracts";
 import type { QToolFocus } from "@capital-q/q-runtime";
 import { APP_ACTIONS, qToolName } from "@capital-q/app-actions";
+import { APP_ACTION_GROUPS } from "../src/index.js";
 
 import {
   createDefaultQTools,
@@ -177,6 +178,111 @@ describe("tools offered by what the turn is about", () => {
       );
       expect(offered, action.name).toContain(tool);
     }
+  });
+
+  it("every declared area has its capability group, so its actions sit in their own area", () => {
+    for (const action of APP_ACTIONS) {
+      expect(APP_ACTION_GROUPS[action.area], action.name).toBeDefined();
+    }
+  });
+
+  it("a declared app action is offered and executes whenever its area is in the turn's focus, on any purpose (run d396af2f)", () => {
+    expect(toolAreaOf("diligence_documents")).toBe("Relationships");
+    expect(toolAreaOf("relationship_outcome")).toBe("Relationships");
+    const app = registry
+      .list()
+      .filter((record) => record.definition.eligibleWhenNamed === true);
+    for (const purpose of Q_TASK_CLASSES) {
+      for (const widen of [true, false]) {
+        const context = worstCase(purpose, {
+          areas: ["Relationships"],
+          tools: [],
+          ...(widen ? { widen } : {}),
+        });
+        const offered = names(registry.eligible(context));
+        expect(offered.length).toBeLessThanOrEqual(Q_TURN_TOOLS_MAX);
+        for (const record of app) {
+          const name = record.definition.providerName;
+          if (toolAreaOf(name) !== "Relationships") continue;
+          // What is offered may execute; the bound may cut what is shown,
+          // never what the run may use.
+          if (offered.includes(name)) {
+            expect(
+              registry.offeredByProviderName(context, name),
+              `${purpose}: ${name}`,
+            ).toBeDefined();
+          }
+        }
+        expect(offered, `${purpose} widen=${String(widen)}`).toContain(
+          "diligence_documents",
+        );
+      }
+    }
+    // Widened, nothing outside the purpose's list or the area's app
+    // actions is offered.
+    const allowed = new Set([
+      ...names(registry.ranked(worstCase("INVESTOR_QUESTION"))),
+      ...registry
+        .list()
+        .filter(
+          (r) =>
+            r.definition.eligibleWhenNamed === true &&
+            toolAreaOf(r.definition.providerName) === "Relationships",
+        )
+        .map((r) => r.definition.providerName),
+    ]);
+    const widened = names(
+      registry.eligible(
+        worstCase("INVESTOR_QUESTION", {
+          areas: ["Relationships"],
+          tools: [],
+          widen: true,
+        }),
+      ),
+    );
+    for (const name of widened) expect(allowed.has(name), name).toBe(true);
+    // Another area's off-purpose app actions are not brought in by this one.
+    const relationshipsOnly = names(
+      registry.eligible(
+        worstCase("INVESTOR_QUESTION", { areas: ["Relationships"], tools: [] }),
+      ),
+    );
+    for (const record of registry.list()) {
+      const name = record.definition.providerName;
+      if (
+        record.definition.eligibleWhenNamed === true &&
+        !record.definition.supportedPurposes.includes("INVESTOR_QUESTION") &&
+        toolAreaOf(name) !== "Relationships"
+      ) {
+        expect(relationshipsOnly, name).not.toContain(name);
+      }
+    }
+  });
+
+  it("run d396af2f: 'Ask Ledgerfold for their last 12 months of management accounts.' on INVESTOR_QUESTION, no tool named, runs diligence_documents", async () => {
+    // The focus q-specialists derives for TOOL_REQUEST with nothing named
+    // and the investor organisation as the subject.
+    const context = worstCase("INVESTOR_QUESTION", {
+      areas: ["Relationships"],
+      tools: [],
+      widen: true,
+    });
+    expect(names(registry.eligible(context))).toContain("diligence_documents");
+    const executor = createQToolExecutor({ registry });
+    const outcome = await executor.execute(
+      {
+        callId: "d396af2f",
+        name: "diligence_documents",
+        arguments: {
+          relationship: "Ledgerfold",
+          operation: "REQUEST",
+          title: "Last 12 months of management accounts",
+        },
+      },
+      context,
+    );
+    // Reached: its own authorize step decides, never TOOL_NOT_ELIGIBLE.
+    expect(outcome.failureCode).not.toBe("TOOL_NOT_ELIGIBLE");
   });
 
   it("asked by meaning: the reader's list is every relevant tool, unfocused, then the app actions on any purpose", async () => {
