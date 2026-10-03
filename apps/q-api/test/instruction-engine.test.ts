@@ -154,7 +154,7 @@ function grant(overrides: Partial<InstructionGrant> = {}): InstructionGrant {
 function chat(
   body: string,
   overrides: Partial<InstructionPlanStep> = {},
-  relationshipId = REL,
+  relationshipId: string = REL,
 ): InstructionPlanStep {
   return {
     action: "chat.message.send",
@@ -418,6 +418,10 @@ describe("the validator: code decides each step", () => {
 // One firing, end to end over fakes
 // ---------------------------------------------------------------------------
 
+const PEOPLE_OVERRIDE: { value: readonly InstructionPerson[] | null } = {
+  value: null,
+};
+
 function world(
   plans: readonly InstructionPlanResult[],
   autoEnabled = true,
@@ -489,7 +493,7 @@ function world(
     actions: ACTIONS,
     ports: {},
     actorFor: () => Promise.resolve(actor),
-    people: () => Promise.resolve(PEOPLE),
+    people: () => Promise.resolve(PEOPLE_OVERRIDE.value ?? PEOPLE),
     plan: (_who, variables, limits) => {
       expect(limits.maxCostUsd).toBeGreaterThanOrEqual(0.08);
       planned.push(variables.refusals);
@@ -747,5 +751,43 @@ describe("a firing", () => {
     const quiet = world([{ steps: [], cannot: [] }]);
     await quiet.engine.fire(quiet.row.id, "run-0011");
     expect(quiet.notices).toEqual([]);
+  });
+
+  it("S8: acts for at most 5 people per firing; the rest wait, unrecorded; each person's steps stay in order", async () => {
+    ran.length = 0;
+    const many: InstructionPerson[] = Array.from({ length: 7 }, (_, n) => ({
+      relationshipId: randomUUID(),
+      counterpartKind: "COMPANY" as const,
+      counterpartId: randomUUID(),
+      name: `Co ${String(n)}`,
+      state: "CONNECTED",
+    }));
+    const steps = many.flatMap((person, n) => [
+      chat(`Hello ${String(n)}`, {}, person.relationshipId ?? ""),
+      ...(n === 0
+        ? [chat("Second to the first", {}, person.relationshipId ?? "")]
+        : []),
+    ]);
+    const { engine, row, steps: recorded } = world([{ steps, cannot: [] }]);
+    // People come from the world's PEOPLE; widen it for this firing.
+    PEOPLE_OVERRIDE.value = many;
+    try {
+      const result = await engine.fire(row.id, "run-0012");
+      expect(result.done).toBe(6);
+      expect(result.deferred).toBe(2);
+      expect(recorded.size).toBe(6);
+      const first = ran
+        .filter(
+          (entry) =>
+            (entry.input as { relationshipId: string }).relationshipId ===
+            many[0]?.relationshipId,
+        )
+        .map(
+          (entry) => (entry.input as { input: { body: string } }).input.body,
+        );
+      expect(first).toEqual(["Hello 0", "Second to the first"]);
+    } finally {
+      PEOPLE_OVERRIDE.value = null;
+    }
   });
 });
