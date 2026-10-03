@@ -182,17 +182,39 @@ export async function decidePending(
 ): Promise<PendingDecisionOutcome> {
   const all = await port.proposals(input.context);
   let pending = all.filter((proposal) => proposal.status === "PENDING");
+  // Waiting in another of their conversations: not on the screen in front
+  // of them (QA 2026-10-03: a restated "share my raise with Savanna Seed"
+  // in a new conversation approved the card another one had prepared).
+  let elsewhere = false;
   if (pending.length === 0 && port.recentElsewhere !== undefined) {
-    const elsewhere = await port.recentElsewhere(input.context).catch(() => []);
-    pending = elsewhere.filter((proposal) => proposal.status === "PENDING");
+    const others = await port.recentElsewhere(input.context).catch(() => []);
+    pending = others.filter((proposal) => proposal.status === "PENDING");
+    elsewhere = pending.length > 0;
   }
   if (pending.length === 0) {
     return answeredAlready(port, input, all);
   }
+  // Approval binds to words that approve. Asking for the same thing again
+  // is not a yes: with no approval word, a reading that it is about this
+  // change says it is ready and waiting, and nothing is approved.
+  const approves = approvalCue(input.utterance);
+  // Elsewhere, the words must also point to this card: its counterpart
+  // named, or the first words of a conversation opened to answer it
+  // (live 2026-10-01: "yes, go ahead" after a reload).
+  let points = !elsewhere;
+  if (elsewhere) {
+    const chosen = namedIn(input.utterance, pending);
+    if (chosen !== null) pending = [chosen];
+    points = chosen !== null || input.recentTurns.length === 0;
+  }
+  // What may approve by words: an approval word, and elsewhere an explicit
+  // one ("approve", "go ahead") that points to this card.
+  const mayApprove =
+    approves && (!elsewhere || (points && explicitApproval(input.utterance)));
   // A plain approval of the one change waiting needs no reading and no
   // name (live 2026-10-02: "Okay. I give the approval. Go ahead.").
   if (pending.length === 1 && pending[0] !== undefined) {
-    if (plainApproval(input.utterance)) {
+    if (plainApproval(input.utterance) && mayApprove) {
       const { status } = await port.approve(
         input.context,
         pending[0].proposalId,
@@ -230,6 +252,14 @@ export async function decidePending(
       line: whichLine(pending.map((proposal) => proposal.summary)),
     };
   }
+  if (read.decision === "YES" && !mayApprove) {
+    // The same request again, or a yes elsewhere that does not approve
+    // this card by name: it is ready and waits for theirs. Nothing is
+    // approved and nothing new is prepared.
+    return { kind: "REPLY", line: readyLine(only.summary) };
+  }
+  // A card elsewhere is declined by words only when they point to it.
+  if (read.decision === "NO" && !points) return { kind: "NONE" };
   if (read.decision === "YES") {
     const { status } = await port.approve(input.context, only.proposalId);
     const line = statusLine(status, only.summary);
@@ -243,6 +273,25 @@ export async function decidePending(
   return read.remainder === null
     ? { kind: "REPLY", line }
     : { kind: "ANSWER_THEN", before: line, after: null };
+}
+
+/** Said when the same change is asked for again: ready, waiting for a yes. */
+export function readyLine(summary: string): string {
+  return `That's ready: ${named(summary)}. It's waiting for your yes. Tap Approve on the card, or tell me to go ahead.`;
+}
+
+/** Any word that can approve; without one, nothing is approved. */
+function approvalCue(utterance: string): boolean {
+  return /\b(?:yes|yeah|yep|yup|ok|okay|sure|approv\w*|go ahead|proceed|confirm\w*|do it|send it|agreed?)\b/iu.test(
+    utterance,
+  );
+}
+
+/** An approval that says so: not a bare "yes" or "ok", which answer anything. */
+function explicitApproval(utterance: string): boolean {
+  return /\b(?:approv\w*|go ahead|proceed|confirm\w*|do it|send it)\b/iu.test(
+    utterance,
+  );
 }
 
 /**

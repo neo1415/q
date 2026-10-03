@@ -214,6 +214,42 @@ describe("a typed decision on a waiting change", () => {
   });
 });
 
+describe("a restatement is not an approval (QA 2026-10-03)", () => {
+  const SHARE: Proposal = {
+    proposalId: "s1",
+    summary: "Share your raise with Savanna Seed",
+    status: "PENDING",
+  };
+
+  it("the same request again, with the card waiting here: ready and waiting, nothing approved", async () => {
+    const { value, calls } = port({
+      proposals: [SHARE],
+      reading: { decision: "YES", remainder: null },
+    });
+    const outcome = await decidePending(
+      value,
+      turn("share my raise with Savanna Seed"),
+    );
+    expect(calls.approve).toEqual([]);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: "That's ready: Share your raise with Savanna Seed. It's waiting for your yes. Tap Approve on the card, or tell me to go ahead.",
+    });
+  });
+
+  it('"yes, go ahead" approves it', async () => {
+    const { value, calls } = port({
+      proposals: [SHARE],
+      reading: { decision: "YES", remainder: null },
+    });
+    expect(await decidePending(value, turn("yes, go ahead"))).toEqual({
+      kind: "REPLY",
+      line: "Done: Share your raise with Savanna Seed.",
+    });
+    expect(calls.approve).toEqual(["s1"]);
+  });
+});
+
 describe("a yes in a new conversation to a change asked for elsewhere (live 2026-10-01)", () => {
   const ERRAND: Proposal = {
     proposalId: "b23ff5cc",
@@ -298,6 +334,64 @@ describe("a yes in a new conversation to a change asked for elsewhere (live 2026
       await decidePending(unrelated.value, turn("what's Nixo's runway?")),
     ).toEqual({ kind: "NONE" });
     expect(unrelated.calls.approve).toEqual([]);
+  });
+
+  const SHARE: Proposal = {
+    proposalId: "s1",
+    summary: "Share your raise with Savanna Seed",
+    status: "PENDING",
+  };
+  const midConversation = (utterance: string) => ({
+    context,
+    utterance,
+    recentTurns: [{ role: "USER" as const, text: "what's my runway?" }],
+  });
+
+  it("QA 2026-10-03: a restated request in another conversation never approves the card there", async () => {
+    // The reader hears the same request as agreeing; that is not a yes.
+    for (const words of [
+      turn("share my raise with Savanna Seed"),
+      midConversation("share my raise with Savanna Seed"),
+    ]) {
+      const { value, calls } = withElsewhere([SHARE], {
+        decision: "YES",
+        remainder: null,
+      });
+      const outcome = await decidePending(value, words);
+      expect(calls.approve).toEqual([]);
+      expect(calls.decline).toEqual([]);
+      expect(outcome).toEqual({
+        kind: "REPLY",
+        line: "That's ready: Share your raise with Savanna Seed. It's waiting for your yes. Tap Approve on the card, or tell me to go ahead.",
+      });
+    }
+  });
+
+  it("elsewhere, mid-conversation: a bare yes does not approve; an approval naming the card does", async () => {
+    const bare = withElsewhere([SHARE], { decision: "YES", remainder: null });
+    await decidePending(bare.value, midConversation("yes, go ahead"));
+    expect(bare.calls.approve).toEqual([]);
+    const ok = withElsewhere([SHARE], { decision: "YES", remainder: null });
+    const outcome = await decidePending(
+      ok.value,
+      midConversation("go ahead and share it with Savanna Seed, approved"),
+    );
+    expect(ok.calls.approve).toEqual(["s1"]);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: "Done: Share your raise with Savanna Seed.",
+    });
+  });
+
+  it("elsewhere, a no that does not point to the card declines nothing", async () => {
+    const { value, calls } = withElsewhere([SHARE], {
+      decision: "NO",
+      remainder: null,
+    });
+    expect(await decidePending(value, midConversation("no, not that"))).toEqual(
+      { kind: "NONE" },
+    );
+    expect(calls.decline).toEqual([]);
   });
 
   it("a decided change elsewhere is not offered again", async () => {
