@@ -88,6 +88,7 @@ import {
   ownStandingFact,
   type QOwnIndex,
 } from "./own-standing.js";
+import { ownReadinessFact } from "./own-readiness.js";
 
 export type { QOwnIndex } from "./own-standing.js";
 import { onScreenCompanyFact } from "./company-fact.js";
@@ -1994,6 +1995,7 @@ export function createModelGatewayQAnswer(
         ownIndex,
         pitchMoment,
         onboardingFacts,
+        counterparty,
       } = prepared;
       took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
       /**
@@ -2049,7 +2051,55 @@ export function createModelGatewayQAnswer(
       })();
       await nudgeRead;
       took("nudge");
+      /**
+       * "What should I do next?" (ADVICE): their own readiness leads the
+       * answer (QA 2026-10-03, run 2cba241a). Read through read_my_record,
+       * under this plan, only for advice and own-record questions; a person
+       * with no company of their own gets nothing here.
+       */
+      let ownReadiness: AuthorisedFact | null = null;
+      const prefetchable = new Set(
+        offeredForRun.map((tool) => tool.definition.name),
+      );
+      if (
+        (request.questionKind === "ADVICE" ||
+          request.questionKind === "THEIR_OWN_RECORDS") &&
+        prefetchable.has("read_my_record")
+      ) {
+        const outcome = await tools
+          .execute(
+            {
+              callId: "q-own-readiness",
+              name: "read_my_record",
+              arguments: { record: "MARKETPLACE_READINESS" },
+            },
+            toolContext,
+          )
+          .catch(() => null);
+        if (outcome?.result.ok === true) {
+          const data = outcome.result.data as {
+            data?: { companyId?: unknown };
+          };
+          const ownCompanyId =
+            typeof data.data?.companyId === "string"
+              ? data.data.companyId
+              : null;
+          // It leads only when the question is not about someone else.
+          const aboutSomeoneElse =
+            counterparty !== undefined &&
+            !(
+              counterparty.kind === "COMPANY" &&
+              counterparty.companyId === ownCompanyId
+            );
+          ownReadiness = ownReadinessFact(outcome.result.data, {
+            lead: request.questionKind === "ADVICE" && !aboutSomeoneElse,
+          });
+        }
+        took("own-readiness");
+      }
       const facts: readonly AuthorisedFact[] = [
+        // Their readiness first when it leads this answer.
+        ...(ownReadiness === null ? [] : [ownReadiness]),
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
         ...(onScreenCompany === null ? [] : [onScreenCompany]),

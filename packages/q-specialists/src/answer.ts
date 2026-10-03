@@ -2269,6 +2269,9 @@ export function createSpecialistQAnswer(
         capabilities: manifestOf(capabilities),
         ...(turnUnread ? { turnUnread: true } : {}),
         ...(read === null ? {} : { turnKind: read.kind }),
+        ...(read?.question?.kind === undefined
+          ? {}
+          : { questionKind: read.question.kind }),
         // Only a name the reader was given counts (ADR 0040 parity).
         ...(read?.askedAction === undefined ||
         read.askedAction === null ||

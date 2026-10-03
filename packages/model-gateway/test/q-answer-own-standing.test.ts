@@ -86,6 +86,59 @@ const ON_SCREEN = {
   truthClass: "USER_CLAIM",
 };
 
+const READINESS_TOOL: QOfferedTool = {
+  ...RELATIONSHIP_TOOL,
+  toolName: "own_records.read",
+  definition: {
+    name: "read_my_record",
+    description: "One of their own records as its screen shows it.",
+    inputJsonSchema: { type: "object", properties: {} },
+  },
+};
+const OWN_COMPANY = randomUUID();
+const READINESS = {
+  status: "FOUND",
+  data: {
+    companyId: OWN_COMPANY,
+    policyVersion: "marketplace-readiness.v1",
+    state: "requirements_outstanding",
+    verificationAvailable: true,
+    requirements: [
+      {
+        requirement: "COMPANY_ACTIVE",
+        outcome: "SATISFIED",
+        description: "Active.",
+      },
+      {
+        requirement: "MINIMUM_COMPANY_PROFILE",
+        outcome: "SATISFIED",
+        description: "Profile complete.",
+      },
+      {
+        requirement: "DISCOVERY_VISIBILITY_CONFIRMED",
+        outcome: "OUTSTANDING",
+        description: "Make the company visible to investors.",
+      },
+      {
+        requirement: "FOUNDER_IDENTITY_VERIFIED",
+        outcome: "OUTSTANDING",
+        description: "Verify your identity.",
+      },
+      {
+        requirement: "ORGANISATION_VERIFIED",
+        outcome: "OUTSTANDING",
+        description: "Verify the company.",
+      },
+      {
+        requirement: "REQUIRED_DOCUMENTATION",
+        outcome: "OUTSTANDING",
+        description: "Upload a pitch deck.",
+      },
+    ],
+    assessedAt: "2026-10-03T08:00:00.000Z",
+  },
+};
+
 const DAILY_TOOL: QOfferedTool = {
   ...RELATIONSHIP_TOOL,
   toolName: "q_daily.get",
@@ -207,6 +260,7 @@ function build(
         STANDING_TOOL,
         COMPANY_TOOL,
         DAILY_TOOL,
+        READINESS_TOOL,
       ]),
     execute: async (proposal) => {
       inFlight.now += 1;
@@ -240,7 +294,9 @@ function build(
                       ? ON_SCREEN
                       : proposal.name === "get_q_daily"
                         ? DAILY
-                        : read.data,
+                        : proposal.name === "read_my_record"
+                          ? READINESS
+                          : read.data,
               },
         latencyMs: 2,
       } as QToolCallOutcome;
@@ -767,5 +823,49 @@ describe("the answer prompt's cacheable prefix", () => {
     const turn = a.indexOf("THIS TURN\nCapability requested");
     expect(turn).toBeGreaterThan(0);
     expect(shared).toBeGreaterThanOrEqual(turn);
+  });
+});
+
+describe("what should I do next (QA 2026-10-03, run 2cba241a)", () => {
+  it("advice about themselves: their readiness is read and leads, gaps in order", async () => {
+    const { seam, request, alpha, executed } = build(
+      { status: "SUCCEEDED", data: { ...CONNECTED, relationship: null } },
+      { kind: "COMPANY", companyId: OWN_COMPANY },
+      {},
+      { said: "what should I do next" },
+    );
+    await seam.answer({ ...request, questionKind: "ADVICE" });
+    expect(executed.some((call) => call.name === "read_my_record")).toBe(true);
+    const prompt = sentTo(alpha);
+    expect(prompt).toContain("THEY ASKED WHAT TO DO NEXT");
+    expect(prompt).toContain(
+      "1) Make the company visible to investors. 2) Upload a pitch deck. 3) Verify your identity. 4) Verify the company.",
+    );
+    // It comes before their other facts.
+    expect(prompt.indexOf("THEIR OWN READINESS")).toBeLessThan(
+      prompt.indexOf("Kora"),
+    );
+  });
+
+  it("advice about another company: readiness is there but does not lead", async () => {
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: { ...CONNECTED, relationship: null } },
+      { kind: "COMPANY", companyId: COMPANY },
+      {},
+      { said: "should I talk to Ajopot next?" },
+    );
+    await seam.answer({ ...request, questionKind: "ADVICE" });
+    const prompt = sentTo(alpha);
+    expect(prompt).toContain("THEIR OWN READINESS");
+    expect(prompt).not.toContain("THEY ASKED WHAT TO DO NEXT");
+  });
+
+  it("not read for other kinds of turn", async () => {
+    const { seam, request, executed } = build({
+      status: "SUCCEEDED",
+      data: { ...CONNECTED, relationship: null },
+    });
+    await seam.answer(request);
+    expect(executed.some((call) => call.name === "read_my_record")).toBe(false);
   });
 });
