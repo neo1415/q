@@ -3334,7 +3334,10 @@ export function createModelGatewayQAnswer(
                 ...(request.leadLines === undefined ? [] : [request.leadLines]),
                 request.leadLines === undefined
                   ? (statusTalk?.text ?? guarded.text)
-                  : afterLeadLines(statusTalk?.text ?? guarded.text),
+                  : afterLeadLines(
+                      statusTalk?.text ?? guarded.text,
+                      request.leadLines,
+                    ),
                 ...(couldNot === null ? [] : [couldNot]),
                 ...actedLines,
                 // The status of earlier changes is not an answer to this

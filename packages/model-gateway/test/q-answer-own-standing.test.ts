@@ -893,16 +893,28 @@ describe("code's opening lines (lead 2026-10-03)", () => {
     );
   });
 
-  it("the model's follow-on never restarts the list (run 56f815aa)", () => {
+  it("the model's follow-on never restarts the list (runs 56f815aa, a69d64a9)", () => {
+    const lead = readinessLeadLines(READINESS) ?? "";
+    // a69d64a9: the whole list again, its first item unnumbered.
     expect(
-      afterLeadLines("1. Choose whether to make your profile visible."),
-    ).toBe("Choose whether to make your profile visible.");
-    expect(afterLeadLines("  1) Choose now.")).toBe("Choose now.");
+      afterLeadLines(
+        "Make the company visible to investors. 2. Upload a pitch deck. 3. Verify your identity.  The first step matters most. Want me to open it?",
+        lead,
+      ),
+    ).toBe("The first step matters most. Want me to open it?");
+    // 56f815aa: a numbered restart of the first item.
+    expect(
+      afterLeadLines(
+        "1. Make the company visible to investors. Do it now?",
+        lead,
+      ),
+    ).toBe("Do it now?");
+    expect(afterLeadLines("1) Choose now.", lead)).toBe("Choose now.");
     // Prose, and a number that is not an item marker, stay as written.
-    expect(afterLeadLines("That one matters most.")).toBe(
+    expect(afterLeadLines("That one matters most.", lead)).toBe(
       "That one matters most.",
     );
-    expect(afterLeadLines("12 investors are waiting.")).toBe(
+    expect(afterLeadLines("12 investors are waiting.", lead)).toBe(
       "12 investors are waiting.",
     );
   });
