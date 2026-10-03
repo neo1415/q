@@ -98,7 +98,7 @@ export function ownReadinessFact(
   ];
   const lead =
     options.alreadySaid === true
-      ? " THEY ASKED WHAT TO DO NEXT: Capital Q opens your answer with these gaps as a numbered list already; do not repeat or reorder them. Add at most two sentences on the first one and offer, as a question, to do it now; nothing about markets, sources or other topics unless they asked."
+      ? " THEY ASKED WHAT TO DO NEXT: Capital Q opens your answer with these gaps as a numbered list already; do not repeat or reorder them. Add at most two sentences of plain prose (no numbers, no list) on the first one and offer, as a question, to do it now; nothing about markets, sources or other topics unless they asked."
       : options.lead
         ? " THEY ASKED WHAT TO DO NEXT: lead with these gaps in this order (and a missing pitch video or deck from what exists on their account), each with the one action that closes it, offering to do it; mention anything else only after."
         : "";
@@ -156,4 +156,28 @@ export function readinessLeadLines(read: unknown): string | null {
     "Investors can't find your company in Discover yet. What to do next, most important first:",
     ...open,
   ].join("\n");
+}
+
+/**
+ * The model's words after code's numbered readiness list. Told not to,
+ * it still restated the list: first as "1. Choose whether…" (run
+ * 56f815aa), then the whole list again, numbered or not (run a69d64a9).
+ * The list is code's, so whatever the model opens with that is one of
+ * its items, in any order and with or without its number, is dropped;
+ * the model's own sentences after it stay.
+ */
+export function afterLeadLines(text: string, leadLines: string): string {
+  const items = leadLines
+    .split("\n")
+    .map((line) => /^\d+[.)]\s+(.+)$/u.exec(line.trim())?.[1]?.trim())
+    .filter((item): item is string => item !== undefined && item.length > 0);
+  let rest = text.trimStart();
+  for (;;) {
+    const unnumbered = rest.replace(/^\d+[.)]\s+/u, "");
+    const repeated = items.find((item) => unnumbered.startsWith(item));
+    if (repeated === undefined) break;
+    rest = unnumbered.slice(repeated.length).trimStart();
+  }
+  // A bare leading item marker with nothing repeated is still a list restart.
+  return rest.replace(/^1[.)]\s+/u, "");
 }

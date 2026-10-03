@@ -82,6 +82,24 @@ describe("the q.instruction.grant card", () => {
     );
   });
 
+  it("says their own hours when they set them ('including weekends, 8am to 10pm')", () => {
+    const base = handleEverythingGrant({ timeZone: "UTC" });
+    const card = grantCard(
+      payload({
+        grant: {
+          ...base,
+          workingHours: {
+            timeZone: "UTC",
+            days: [1, 2, 3, 4, 5, 6, 7],
+            start: "08:00",
+            end: "22:00",
+          },
+        },
+      }),
+    );
+    expect(card).toContain("On my own, within Mon-Sun 08:00-22:00 (UTC)");
+  });
+
   it("binds to the person who asked, as its target", () => {
     expect(definition.targets(payload())).toEqual([{ kind: "USER", userId }]);
   });
