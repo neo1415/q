@@ -62,12 +62,15 @@ const workerEnvSchema = z.object({
     .max(64)
     .default("evidence-processing-v1"),
   /**
-   * REQUIRE_CLEAN is the only setting permitted outside development: no
-   * scanner verdict, no parsing. ALLOW_UNSCANNED exists so a local stack can
-   * exercise the pipeline, and the run it produces records that no scan ran.
+   * REQUIRE_CLEAN is the default: no scanner verdict, no parsing.
+   * ALLOW_UNSCANNED exists so a local stack can exercise the pipeline, and
+   * the run it produces records that no scan ran. ALLOW_UNSCANNED_WITH_WARNING
+   * (ADR 0042, founder decision 2026-10-03) is the hosted interim while no
+   * scanner exists: set only explicitly, it processes unscanned files and
+   * marks them NOT_SCANNED, never CLEAN.
    */
   CQ_MALWARE_POLICY: z
-    .enum(["REQUIRE_CLEAN", "ALLOW_UNSCANNED"])
+    .enum(["REQUIRE_CLEAN", "ALLOW_UNSCANNED", "ALLOW_UNSCANNED_WITH_WARNING"])
     .default("REQUIRE_CLEAN"),
   CQ_DOCUMENTS_BATCH_SIZE: boundedInt(5, 1, 50),
   CQ_DOCUMENTS_POLL_INTERVAL_MS: boundedInt(1_000, 250, 30_000),
@@ -104,7 +107,8 @@ export type WorkerPublicConfig = {
 
 export type DocumentProcessingConfig = {
   readonly pipelineVersion: string;
-  readonly malwarePolicy: "REQUIRE_CLEAN" | "ALLOW_UNSCANNED";
+  readonly malwarePolicy:
+    "REQUIRE_CLEAN" | "ALLOW_UNSCANNED" | "ALLOW_UNSCANNED_WITH_WARNING";
   readonly batchSize: number;
   readonly pollIntervalMs: number;
   readonly parserTimeoutMs: number;

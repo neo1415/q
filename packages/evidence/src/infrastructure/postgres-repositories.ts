@@ -356,14 +356,21 @@ export async function findInvestorAudienceDeck(
   executor: DatabaseExecutor,
   tenantId: TenantId,
   companyId: string,
+  /**
+   * ADR 0042: also a NOT_SCANNED version, under the founder's interim
+   * policy. The same audience either way; only the scan state widens.
+   */
+  serveUnscanned = false,
 ): Promise<{
   readonly documentId: DocumentId;
   readonly documentVersionId: DocumentVersionId;
   readonly title: string;
   readonly updatedAt: string;
+  /** False when the version was never scanned (NOT_SCANNED). */
+  readonly scanned: boolean;
 } | null> {
   const rows = await executor`
-    select d.id, d.current_version_id, d.title, d.updated_at
+    select d.id, d.current_version_id, d.title, d.updated_at, v.malware_scan_status
       from evidence.documents d
       join evidence.document_versions v
         on v.id = d.current_version_id and v.document_id = d.id
@@ -372,7 +379,8 @@ export async function findInvestorAudienceDeck(
        and d.document_type = 'PITCH_DECK'
        and d.download_audience = 'INVESTORS'
        and d.status = 'ACTIVE'
-       and v.malware_scan_status = 'CLEAN'
+       and (v.malware_scan_status = 'CLEAN'
+            or (${serveUnscanned}::boolean and v.malware_scan_status = 'NOT_SCANNED'))
      order by d.updated_at desc, d.id desc
      limit 1`;
   if (rows.length === 0) return null;
@@ -382,6 +390,7 @@ export async function findInvestorAudienceDeck(
       current_version_id: DocumentVersionIdSchema,
       title: z.string(),
       updated_at: Timestamp,
+      malware_scan_status: z.string(),
     })
     .parse(rows[0]);
   return {
@@ -389,6 +398,7 @@ export async function findInvestorAudienceDeck(
     documentVersionId: row.current_version_id,
     title: row.title,
     updatedAt: row.updated_at,
+    scanned: row.malware_scan_status === "CLEAN",
   };
 }
 

@@ -170,6 +170,9 @@ export function createEvidenceDocumentsPort(
         processing: entry.currentVersion?.processingStatus ?? null,
         updatedAt: entry.document.updatedAt,
         downloadAudience: entry.document.downloadAudience,
+        ...(entry.currentVersion === null || entry.currentVersion === undefined
+          ? {}
+          : { malwareScanStatus: entry.currentVersion.malwareScanStatus }),
       }));
     },
   };

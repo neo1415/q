@@ -43,6 +43,11 @@ describe("shared document downloads against PostgreSQL", () => {
     document: randomUUID(),
     clean: randomUUID(),
     pending: randomUUID(),
+    notScanned: randomUUID(),
+    blocked: randomUUID(),
+    company: randomUUID(),
+    deck: randomUUID(),
+    deckVersion: randomUUID(),
   };
 
   beforeAll(async () => {
@@ -71,11 +76,22 @@ describe("shared document downloads against PostgreSQL", () => {
       for (const [version, n, status] of [
         [ids.clean, 1, "CLEAN"],
         [ids.pending, 2, "PENDING"],
+        [ids.notScanned, 3, "NOT_SCANNED"],
+        [ids.blocked, 4, "BLOCKED"],
       ] as const) {
         await sql`insert into evidence.document_versions (id, tenant_id, document_id, version_number, storage_bucket, storage_key, original_filename, mime_type, size_bytes, sha256, uploaded_by_user_id, malware_scan_status)
           values (${version}, ${ids.tenant}, ${ids.document}, ${n}, 'cq-documents-private', ${`raw/${ids.tenant}/${version.replaceAll("-", "")}`},
                   'deck.pdf', 'application/pdf', 2048, ${"a".repeat(64)}, ${user}, ${status})`;
       }
+      // ADR 0042: a company's investor-audience deck that was never scanned.
+      await sql`insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug)
+        values (${ids.company}, ${ids.tenant}, ${ids.org}, 'Unscanned Co', ${`unscanned-${ids.company.slice(0, 8)}`})`;
+      await sql`insert into evidence.documents (id, tenant_id, company_id, owner_organisation_id, document_type, title, visibility_scope, sensitivity_class, created_by_user_id, download_audience)
+        values (${ids.deck}, ${ids.tenant}, ${ids.company}, ${ids.org}, 'PITCH_DECK', 'Seed deck', 'organisation_private', 'CONFIDENTIAL', ${user}, 'INVESTORS')`;
+      await sql`insert into evidence.document_versions (id, tenant_id, document_id, version_number, storage_bucket, storage_key, original_filename, mime_type, size_bytes, sha256, uploaded_by_user_id, malware_scan_status)
+        values (${ids.deckVersion}, ${ids.tenant}, ${ids.deck}, 1, 'cq-documents-private', ${`raw/${ids.tenant}/${ids.deckVersion.replaceAll("-", "")}`},
+                'deck.pdf', 'application/pdf', 2048, ${"a".repeat(64)}, ${user}, 'NOT_SCANNED')`;
+      await sql`update evidence.documents set current_version_id = ${ids.deckVersion} where id = ${ids.deck}`;
     });
   });
 
@@ -107,5 +123,80 @@ describe("shared document downloads against PostgreSQL", () => {
       );
     }
     expect(signed).toHaveLength(1);
+  });
+
+  it("ADR 0042: a NOT_SCANNED version is handed out only under the interim policy, flagged scanned:false; never PENDING or BLOCKED, never another tenant", async () => {
+    const share = {
+      documentTenantId: ids.tenant,
+      documentId: ids.document,
+      disposition: "ATTACHMENT" as const,
+    };
+    const strict = createSharedDocumentDownloads({ sql: db.sql, storage });
+    const interim = createSharedDocumentDownloads({
+      sql: db.sql,
+      storage,
+      serveUnscanned: true,
+    });
+    const before = signed.length;
+    // Default: CLEAN only.
+    await expect(
+      strict.authorizeSharedVersion({
+        ...share,
+        documentVersionId: ids.notScanned,
+      }),
+    ).rejects.toBeInstanceOf(DocumentNotFoundError);
+    // Interim: the same caller's NOT_SCANNED version, flagged.
+    await expect(
+      interim.authorizeSharedVersion({
+        ...share,
+        documentVersionId: ids.notScanned,
+      }),
+    ).resolves.toMatchObject({ scanned: false });
+    await expect(
+      interim.authorizeSharedVersion({
+        ...share,
+        documentVersionId: ids.clean,
+      }),
+    ).resolves.toMatchObject({ scanned: true });
+    // Nothing wider: PENDING, BLOCKED and another tenant stay refused.
+    for (const wrong of [
+      { ...share, documentVersionId: ids.pending },
+      { ...share, documentVersionId: ids.blocked },
+      {
+        ...share,
+        documentVersionId: ids.notScanned,
+        documentTenantId: ids.otherTenant,
+      },
+    ]) {
+      await expect(
+        interim.authorizeSharedVersion(wrong),
+      ).rejects.toBeInstanceOf(DocumentNotFoundError);
+    }
+    expect(signed.length - before).toBe(2);
+  });
+
+  it("ADR 0042: an unscanned investor-audience deck is found only under the interim policy, flagged; never for another tenant", async () => {
+    const company = { companyTenantId: ids.tenant, companyId: ids.company };
+    await expect(
+      createSharedDocumentDownloads({
+        sql: db.sql,
+        storage,
+      }).investorAudienceDeck(company),
+    ).resolves.toBeNull();
+    const interim = createSharedDocumentDownloads({
+      sql: db.sql,
+      storage,
+      serveUnscanned: true,
+    });
+    await expect(interim.investorAudienceDeck(company)).resolves.toMatchObject({
+      documentId: ids.deck,
+      scanned: false,
+    });
+    await expect(
+      interim.investorAudienceDeck({
+        ...company,
+        companyTenantId: ids.otherTenant,
+      }),
+    ).resolves.toBeNull();
   });
 });

@@ -162,6 +162,13 @@ export const MALWARE_SCAN_STATUSES = [
   "CLEAN",
   "BLOCKED",
   "ERROR",
+  /**
+   * ADR 0042: processed with no scanner attached, under the founder's
+   * interim policy. Never clean; downloadable only to the audiences that
+   * already have access, with a visible "not virus-scanned" note, and only
+   * while that policy is set. A real scanner later scans every one.
+   */
+  "NOT_SCANNED",
 ] as const;
 export const MalwareScanStatusSchema = z.enum(MALWARE_SCAN_STATUSES);
 export type MalwareScanStatus = z.infer<typeof MalwareScanStatusSchema>;

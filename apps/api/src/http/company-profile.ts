@@ -84,6 +84,8 @@ export type AudienceCompanyDeck = {
   readonly documentVersionId: string;
   readonly title: string;
   readonly sharedAt: string;
+  /** False: never virus-scanned (ADR 0042). Absent: scanned. */
+  readonly scanned?: boolean | undefined;
 };
 
 type ResolvedDeck =
@@ -136,7 +138,11 @@ export type CompanyProfilePorts = {
   readonly downloadAudienceDeck: (
     company: CompanyProfileFacts,
     deck: AudienceCompanyDeck,
-  ) => Promise<{ readonly url: string; readonly expiresAt: string }>;
+  ) => Promise<{
+    readonly url: string;
+    readonly expiresAt: string;
+    readonly scanned?: boolean | undefined;
+  }>;
   /** The allow-listed team projection (companies context). */
   readonly team: (
     company: CompanyProfileFacts,
@@ -310,7 +316,12 @@ export function registerCompanyProfileRoutes(
               deck:
                 deck === null
                   ? null
-                  : { title: deck.title, sharedAt: deck.sharedAt },
+                  : {
+                      title: deck.title,
+                      sharedAt: deck.sharedAt,
+                      scanned:
+                        deck.kind !== "AUDIENCE" || deck.scanned !== false,
+                    },
               team: [...team],
             }
           : null,

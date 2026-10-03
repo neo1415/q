@@ -115,7 +115,11 @@ function investorProfile(
       raise: { amount: "1500000.00", currency: "USD" },
       organisationVerified: true,
       facts: [],
-      deck: { title: "Kivu seed deck", sharedAt: "2026-09-30T10:00:00.000Z" },
+      deck: {
+        title: "Kivu seed deck",
+        sharedAt: "2026-09-30T10:00:00.000Z",
+        scanned: true,
+      },
       team: [
         {
           name: "Ada Obi",
@@ -230,6 +234,21 @@ describe("the profile, for an investor", () => {
     expect(
       screen.getByRole("button", { name: /Express interest/i }),
     ).toBeTruthy();
+  });
+
+  it("ADR 0042: an unscanned deck says 'Not virus-scanned yet' beside its download; a scanned one does not", () => {
+    const base = investorProfile();
+    const overview = base.overview;
+    if (overview === null || overview.deck === null) throw new Error("fixture");
+    const { unmount } = renderProfile(
+      investorProfile({
+        overview: { ...overview, deck: { ...overview.deck, scanned: false } },
+      }),
+    );
+    expect(screen.getByText("Not virus-scanned yet")).toBeTruthy();
+    unmount();
+    renderProfile(investorProfile());
+    expect(screen.queryByText("Not virus-scanned yet")).toBeNull();
   });
 
   it("keeps Pass neutral, optimistic and undoable", async () => {
