@@ -312,6 +312,8 @@ describe("the feed controller over the discovery endpoint", () => {
       expect(result.current.isDeciding(companyId(1))).toBe(false),
     );
     expect(result.current.decisionFor(companyId(1)).saved).toBe(false);
+    // And says so (break-it sweep 2026-10-03: the revert was silent).
+    expect(result.current.decisionNotice).toBe("That wasn't saved. rejected");
   });
 
   it("remembers the card and comes back to it, not to the top of the slate", async () => {

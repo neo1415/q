@@ -19,3 +19,18 @@ describe("a relationship page with nothing on record", () => {
     );
   });
 });
+
+describe("a Discover decision that did not land", () => {
+  it("says it wasn't saved, in the action's own words", async () => {
+    const { decisionFailureWords } =
+      await import("../src/features/discover/feed/use-investor-feed");
+    expect(
+      decisionFailureWords(
+        new Error("You are signed out. Sign in and try again."),
+      ),
+    ).toBe("That wasn't saved. You are signed out. Sign in and try again.");
+    expect(decisionFailureWords(new Error(""))).toBe(
+      "That wasn't saved. Try again in a moment.",
+    );
+  });
+});
