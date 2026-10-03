@@ -248,6 +248,21 @@ type RelationshipGrant = {
   readonly connected: boolean;
 };
 
+/** The time zone is what is missing: asked for, not refused. */
+class NoTimeZoneError extends QToolArgumentError {}
+
+/** "Monday at 10:00", as they said it, for a question back. */
+function whenWords(when: LocalWhen | undefined): string {
+  if (when === undefined) return "that time";
+  const day =
+    when.date ??
+    (when.day === undefined
+      ? undefined
+      : `${when.day.charAt(0).toUpperCase()}${when.day.slice(1)}`);
+  if (when.time === undefined) return day ?? "that time";
+  return day === undefined ? when.time : `${day} at ${when.time}`;
+}
+
 async function relationshipGrant(
   input: {
     readonly relationshipId?: string | undefined;
@@ -588,6 +603,9 @@ export function createScheduleTools(
       return { iso: new Date(input.startsAt).toISOString(), timeZone: zone };
     }
     const resolved = resolveLocalWhen(input.when, zone, now());
+    if (resolved.kind === "NO_TIME_ZONE") {
+      throw new NoTimeZoneError(unresolvedMessage(resolved.kind));
+    }
     if (resolved.kind !== "OK") {
       throw new QToolArgumentError(unresolvedMessage(resolved.kind));
     }
@@ -778,30 +796,45 @@ export function createScheduleTools(
             ? allow("INTERNAL", { relationship: null })
             : deny("NOT_AVAILABLE");
         }
-        try {
-          const grant = await relationshipGrant(
-            input,
-            actor,
-            plan,
-            chat,
-            relationships,
-          );
-          return grant === null
-            ? deny("NOT_AVAILABLE")
-            : allow("CONFIDENTIAL", { relationship: grant });
-        } catch {
-          return deny("NOT_AVAILABLE");
-        }
+        // A reminder about someone they are not in a relationship with
+        // ("review Tallyloom's deck", QA run f99e507c) is still theirs to
+        // set: a personal reminder, the name kept in its title. Only a
+        // relationship they share links it.
+        const grant = await relationshipGrant(
+          input,
+          actor,
+          plan,
+          chat,
+          relationships,
+        ).catch(() => null);
+        if (grant !== null)
+          return allow("CONFIDENTIAL", { relationship: grant });
+        return ownConversation(actor, plan)
+          ? allow("INTERNAL", { relationship: null })
+          : deny("NOT_AVAILABLE");
       },
       execute: async (input, context, grant) => {
-        const at = await instantOf(
-          {
-            when: input.when,
-            startsAt: input.remindAt,
-            timeZone: input.timeZone,
-          },
-          context,
-        );
+        let at: Awaited<ReturnType<typeof instantOf>>;
+        try {
+          at = await instantOf(
+            {
+              when: input.when,
+              startsAt: input.remindAt,
+              timeZone: input.timeZone,
+            },
+            context,
+          );
+        } catch (error: unknown) {
+          // Their time zone is not known: one short question, never "I
+          // can't" (QA run f99e507c). Their answer comes back as timeZone.
+          if (!(error instanceof NoTimeZoneError)) throw error;
+          return {
+            status: "NEEDS_TIME_ZONE" as const,
+            awaitingApprovalOf: "",
+            says: `Which city are you in, so ${whenWords(input.when)} is right? Then I'll set the reminder.`,
+            guidance: error.safeMessage,
+          };
+        }
         return prepare(
           context,
           {

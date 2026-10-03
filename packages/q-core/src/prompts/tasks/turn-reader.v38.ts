@@ -26,7 +26,7 @@ export const TURN_READER_V38: PromptDefinition<
 > = {
   ...TURN_READER_V37,
   version: 38,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Lead 2026-10-03: USAGE (Settings → Usage, /settings/usage) is a NAVIGATE destination. Same schema and order as v37.",
   effectiveFrom: "2026-10-03",

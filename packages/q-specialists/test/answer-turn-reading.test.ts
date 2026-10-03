@@ -2474,6 +2474,45 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
     expect(other.delegated()).toBe(1);
   });
 
+  it("a reminder whose time zone is unknown is answered with its one question (QA run f99e507c)", async () => {
+    const question =
+      "Which city are you in, so Monday at 10:00 is right? Then I'll set the reminder.";
+    const port = createToolAppActionPort({
+      names: ["propose_reminder"],
+      tools: {
+        offer: () => Promise.resolve([]),
+        execute: () =>
+          Promise.resolve({
+            callId: "c",
+            toolName: null,
+            toolVersion: 1,
+            classification: null,
+            status: "SUCCEEDED",
+            failureCode: null,
+            sensitivity: null,
+            result: {
+              ok: true,
+              data: {
+                status: "NEEDS_TIME_ZONE",
+                awaitingApprovalOf: "",
+                says: question,
+              },
+            },
+            latencyMs: 1,
+          } as QToolCallOutcome),
+      },
+    });
+    expect(
+      await port.run(request(), {
+        tool: "propose_reminder",
+        arguments: {
+          title: "Review Tallyloom's deck",
+          when: { day: "monday", time: "10:00" },
+        },
+      }),
+    ).toBe(question);
+  });
+
   it("a legacy proposal tool's PREPARED output is a prepared card (QA run 4e3b1903)", async () => {
     const port = createToolAppActionPort({
       names: ["propose_express_interest"],

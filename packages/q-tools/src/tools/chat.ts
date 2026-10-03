@@ -391,8 +391,17 @@ export const ChatProposalOutputSchema = z
       "CALENDAR_NOT_CONNECTED",
       /** Q already runs an errand for this subject: nothing new prepared. */
       "ALREADY_ACTIVE",
+      /**
+       * Their time zone is not known, so the time they said cannot be
+       * placed: nothing prepared yet; `says` asks where they are, once.
+       */
+      "NEEDS_TIME_ZONE",
     ]),
     awaitingApprovalOf: z.string(),
+    /** The one short question to put to them (NEEDS_TIME_ZONE). */
+    says: z.string().max(300).optional(),
+    /** For Q: what to do with their answer (NEEDS_TIME_ZONE). */
+    guidance: z.string().max(600).optional(),
   })
   .strict();
 export type ChatProposalOutput = z.infer<typeof ChatProposalOutputSchema>;

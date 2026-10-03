@@ -143,7 +143,8 @@
     "work-slot-reader/v1": "9cc7753d25abaeab63e9a2082567b701e9d370fdcf1583447030b6453f14b3fc",
     "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0",
     "instruction-plan/v2": "2eae76abbb099b3976904147cdc92515c001768a139d43d5d3b4d9afbeb95413",
-    "instruction-plan/v3": "0b7a9075969d331d0a2fee80ac69d66224e86b06c753cd8bf50f364b0ab8d279"
+    "instruction-plan/v3": "0b7a9075969d331d0a2fee80ac69d66224e86b06c753cd8bf50f364b0ab8d279",
+    "turn-reader/v39": "34f08890ae739dda08c68ff5cc1b6bf28f04f21ed2a8dad85b4f5c6ec1b95c93"
   },
   "generatedBy": "CQ-Q-006"
 }

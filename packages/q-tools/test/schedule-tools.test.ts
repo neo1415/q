@@ -467,6 +467,68 @@ describe("schedule tools", () => {
     });
   });
 
+  // QA run f99e507c (investor.savanna-seed, no time zone): "Remind me on
+  // Monday at 10am to review Tallyloom's deck." was refused.
+  describe("a reminder about someone they are not in touch with, time zone unknown (f99e507c)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    const asked = {
+      callId: "f99e507c",
+      name: "propose_reminder",
+      arguments: {
+        title: "Review Tallyloom's deck",
+        when: { day: "monday", time: "10:00" },
+        counterpartName: "Tallyloom",
+      },
+    };
+
+    it("asks one short question for their city; nothing refused, nothing prepared yet", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-03T17:38:13Z"));
+      const { executor, prepared } = world();
+      const outcome = await executor.execute(
+        asked,
+        contextFor(actorA, ownPlan(actorA)),
+      );
+      expect(prepared).toEqual([]);
+      expect(outcome.result).toMatchObject({
+        ok: true,
+        data: {
+          status: "NEEDS_TIME_ZONE",
+          says: "Which city are you in, so Monday at 10:00 is right? Then I'll set the reminder.",
+        },
+      });
+      expect(JSON.stringify(outcome.result)).not.toMatch(/can.t/iu);
+    });
+
+    it("with their city, prepares it as their own reminder, the name in its title", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-03T17:38:13Z"));
+      const { executor, prepared } = world();
+      await executor.execute(
+        {
+          ...asked,
+          arguments: { ...asked.arguments, timeZone: "Africa/Lagos" },
+        },
+        contextFor(actorA, ownPlan(actorA)),
+      );
+      expect(prepared).toMatchObject([
+        {
+          actionType: "reminder.create",
+          payload: {
+            title: "Review Tallyloom's deck",
+            remindAt: "2026-10-05T09:00:00.000Z",
+            timeZone: "Africa/Lagos",
+          },
+        },
+      ]);
+      expect(
+        (prepared[0]?.payload as { relationshipId?: string }).relationshipId,
+      ).toBeUndefined();
+    });
+  });
+
   it("lists the invoker's own schedule", async () => {
     const { executor } = world();
     const outcome = await executor.execute(

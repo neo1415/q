@@ -10,10 +10,10 @@ import {
 
 /** TURN_READER v38 (lead 2026-10-03): USAGE, Settings → Usage, is a destination. */
 describe("TURN_READER v38", () => {
-  it("is the active reader", () => {
+  it("is followed by v39", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(38);
+    ).toBe(39);
   });
 
   it("names every contract destination exactly once, USAGE included", () => {
