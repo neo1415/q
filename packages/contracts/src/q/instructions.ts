@@ -136,6 +136,26 @@ export type InstructionGrantPayload = z.infer<
 >;
 
 /**
+ * The declared app actions (ADR 0040 names) a standing instruction's grant
+ * holds, and how each is taken by default. q-api composes an `app.<name>`
+ * approval card type for each, so an ASK step can always prepare its card.
+ */
+export const INSTRUCTION_DEFAULT_ACTIONS: readonly {
+  readonly action: string;
+  readonly mode: InstructionActionMode;
+}[] = Object.freeze([
+  { action: "relationship.interest.express", mode: "AUTO" },
+  { action: "chat.message.send", mode: "AUTO" },
+  { action: "schedule.meeting.book", mode: "AUTO" },
+  { action: "relationship.connection_request.send", mode: "ASK" },
+  { action: "relationship.interest.accept", mode: "ASK" },
+  { action: "relationship.interest.decline", mode: "ASK" },
+  { action: "relationship.outcome.change", mode: "ASK" },
+  { action: "schedule.reminder.create", mode: "ASK" },
+  { action: "diligence.change", mode: "ASK" },
+]);
+
+/**
  * "Handle all the work for me": the founder's default grant (2026-10-03).
  * AUTO: express interest, chat messages (bounded), book times in working
  * hours. Everything else listed is ASK; pass, decline and relationship
@@ -148,17 +168,7 @@ export function handleEverythingGrant(input: {
   readonly includeNewCompanies?: boolean | undefined;
 }): InstructionGrant {
   return InstructionGrantSchema.parse({
-    actions: [
-      { action: "relationship.interest.express", mode: "AUTO" },
-      { action: "chat.message.send", mode: "AUTO" },
-      { action: "schedule.meeting.book", mode: "AUTO" },
-      { action: "relationship.connection_request.send", mode: "ASK" },
-      { action: "relationship.interest.accept", mode: "ASK" },
-      { action: "relationship.interest.decline", mode: "ASK" },
-      { action: "relationship.outcome.change", mode: "ASK" },
-      { action: "schedule.reminder.create", mode: "ASK" },
-      { action: "diligence.change", mode: "ASK" },
-    ],
+    actions: INSTRUCTION_DEFAULT_ACTIONS.map((entry) => ({ ...entry })),
     counterparts: {
       scope: "ALL_MY_RELATIONSHIPS",
       relationshipIds: [],

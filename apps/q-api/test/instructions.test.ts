@@ -4,10 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   handleEverythingGrant,
+  INSTRUCTION_DEFAULT_ACTIONS,
   Q_INSTRUCTION_GRANT,
   type InstructionGrantPayload,
 } from "@capital-q/contracts";
 import { ActorContextSchema } from "@capital-q/security";
+
+import { APP_ACTION_TYPES } from "../src/composition/app-actions.js";
 
 import {
   createInstructionActions,
@@ -276,5 +279,13 @@ describe("instructions on the work list", () => {
 
   it("knows the person's time zone for their working hours", async () => {
     expect(await port.timeZoneOf?.(actor)).toBe("Africa/Lagos");
+  });
+});
+
+describe("an instruction's ASK step can always prepare its card", () => {
+  it("every action a grant holds has its app.<name> approval type composed (instruction f27b346a)", () => {
+    for (const entry of INSTRUCTION_DEFAULT_ACTIONS) {
+      expect(APP_ACTION_TYPES).toContain(`app.${entry.action}`);
+    }
   });
 });

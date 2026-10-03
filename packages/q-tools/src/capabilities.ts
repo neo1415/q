@@ -1,5 +1,6 @@
 import { APP_ACTIONS } from "@capital-q/app-actions";
 import {
+  INSTRUCTION_DEFAULT_ACTIONS,
   Q_NAVIGATE_DESTINATIONS,
   type QNavigateDestination,
 } from "@capital-q/contracts";
@@ -834,7 +835,19 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "propose_standing_instruction",
     "RELATIONSHIP",
     "A standing goal for one approval: Q works on it over time inside a grant in plain words -- alone only interest, capped chat messages and booking in working hours; the rest a card; terms and money never. Stoppable.",
-    { approval: "PREPARE_APPROVE", executes: ["q.instruction.grant"] },
+    {
+      approval: "PREPARE_APPROVE",
+      // The grant, then each ASK step's card for an action no generated
+      // tool already prepares (ADR 0043).
+      executes: [
+        "q.instruction.grant",
+        ...INSTRUCTION_DEFAULT_ACTIONS.filter(
+          (entry) =>
+            APP_ACTIONS.find((action) => action.name === entry.action)?.tool ===
+            undefined,
+        ).map((entry) => `app.${entry.action}`),
+      ],
+    },
   ),
   tool(
     "list_q_work",
