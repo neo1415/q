@@ -19,6 +19,7 @@ import {
   allow,
   defineQTool,
   deny,
+  QToolArgumentError,
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
@@ -96,6 +97,23 @@ export type QWorkIntelligencePort = {
         },
   ) => Promise<"ACCEPTED" | "NOT_FOUND" | "NOT_ACTIVE">;
   readonly setAway: (actor: ActorContext, away: boolean) => Promise<void>;
+  /**
+   * The people they named to leave out, matched by name against the people
+   * a standing instruction could reach (their relationships, feed and
+   * saved list): one match each is found, anything else is unknown.
+   */
+  readonly counterpartsNamed?:
+    | ((
+        actor: ActorContext,
+        names: readonly string[],
+      ) => Promise<{
+        readonly found: readonly {
+          readonly counterpartId: string;
+          readonly name: string;
+        }[];
+        readonly unknown: readonly string[];
+      }>)
+    | undefined;
   /** The person's own time zone, when known (their working hours are in it). */
   readonly timeZoneOf?:
     ((actor: ActorContext) => Promise<string | null>) | undefined;
@@ -388,6 +406,13 @@ export const ProposeStandingInstructionInputSchema = z
       .enum(["DAILY", "WEEKLY", "OFF"])
       .default("DAILY")
       .describe("How often they want a summary of what Q did, if they said."),
+    excludeNames: z
+      .array(z.string().min(1).max(120))
+      .max(10)
+      .default([])
+      .describe(
+        "Companies or investors they said to leave out, as they named them ('except Nixo' -> ['Nixo']); empty when they named none.",
+      ),
     workingHours: z
       .object({
         days: z
@@ -536,6 +561,29 @@ export function createQWorkTools(
           port.isInvestor(context.actor).catch(() => false),
           port.hasCompany(context.actor).catch(() => false),
         ]);
+        // Who they said to leave out, by id. A name that matches no one (or
+        // several) is asked about, never dropped: a card that silently
+        // covered them would act on someone they excluded.
+        let exclude: readonly {
+          readonly counterpartId: string;
+          readonly name: string;
+        }[] = [];
+        if (input.excludeNames.length > 0) {
+          const named = await port.counterpartsNamed?.(
+            context.actor,
+            input.excludeNames,
+          );
+          if (named === undefined || named.unknown.length > 0) {
+            throw new QToolArgumentError(
+              `I couldn't tell who ${
+                named === undefined
+                  ? input.excludeNames.join(", ")
+                  : named.unknown.join(", ")
+              } is among your relationships and feed; say the name as it appears there.`,
+            );
+          }
+          exclude = named.found;
+        }
         const base = handleEverythingGrant({
           timeZone: timeZone ?? "UTC",
           // Only what their side can do is on their card.
@@ -558,14 +606,16 @@ export function createQWorkTools(
                 actions: input.askFirst
                   ? base.actions.map((entry) => ({ ...entry, mode: "ASK" }))
                   : base.actions,
-                counterparts:
-                  input.relationshipIds.length > 0
+                counterparts: {
+                  ...(input.relationshipIds.length > 0
                     ? {
                         scope: "LISTED",
                         relationshipIds: input.relationshipIds,
                         includeNewCompanies: false,
                       }
-                    : base.counterparts,
+                    : base.counterparts),
+                  exclude: exclude.map((entry) => ({ ...entry })),
+                },
                 expiresInDays: input.expiresInDays,
                 digest: input.digest,
                 // Their own hours when they gave them, in their own zone;

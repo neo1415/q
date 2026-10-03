@@ -123,6 +123,23 @@ describe("the q.instruction.grant card", () => {
     expect(founder).toContain("Accept an investor's interest");
   });
 
+  it("says who it never acts for ('except Nixo')", () => {
+    const base = handleEverythingGrant({ timeZone: "UTC", side: "INVESTOR" });
+    const card = grantCard(
+      payload({
+        grant: {
+          ...base,
+          counterparts: {
+            ...base.counterparts,
+            exclude: [{ counterpartId: randomUUID(), name: "Nixo" }],
+          },
+        },
+      }),
+    );
+    expect(card).toContain("Never: Nixo.");
+    expect(grantCard(payload())).not.toContain("Never: ");
+  });
+
   it("binds to the person who asked, as its target", () => {
     expect(definition.targets(payload())).toEqual([{ kind: "USER", userId }]);
   });

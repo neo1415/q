@@ -77,6 +77,7 @@ export const REFUSAL_CODES = [
   "NOT_IN_GRANT",
   "BAD_ARGUMENTS",
   "OUT_OF_SCOPE",
+  "EXCLUDED",
   "OUTSIDE_HOURS",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
@@ -100,6 +101,10 @@ export const REFUSAL_WORDS: Readonly<
   OUT_OF_SCOPE: {
     reason: "that person isn't among the people this instruction covers",
     instead: "name them and I'll prepare a change to cover them",
+  },
+  EXCLUDED: {
+    reason: "you told me to leave them out",
+    instead: "say so if you want them included and I'll prepare that change",
   },
   OUTSIDE_HOURS: {
     reason: "it's outside the working hours you set",
@@ -232,14 +237,21 @@ export function inScope(
   grant: InstructionGrant,
   people: readonly InstructionPerson[],
 ): readonly InstructionPerson[] {
+  // Who they said to leave out is never covered, by any other rule.
+  const excluded = new Set(
+    grant.counterparts.exclude.map((entry) => entry.counterpartId),
+  );
+  const reachable = people.filter(
+    (person) => !excluded.has(person.counterpartId),
+  );
   // A company they are not in touch with only when the grant says so.
   if (grant.counterparts.scope === "ALL_MY_RELATIONSHIPS") {
     return grant.counterparts.includeNewCompanies
-      ? people
-      : people.filter((person) => person.relationshipId !== null);
+      ? reachable
+      : reachable.filter((person) => person.relationshipId !== null);
   }
   const listed = new Set(grant.counterparts.relationshipIds);
-  return people.filter(
+  return reachable.filter(
     (person) =>
       person.relationshipId !== null && listed.has(person.relationshipId),
   );
@@ -287,6 +299,25 @@ export function validateStep(
       : null;
   const companyId =
     typeof args.data["companyId"] === "string" ? args.data["companyId"] : null;
+  // Someone they said to leave out, named by id in any field: never.
+  const excluded = new Set(
+    context.grant.counterparts.exclude.map((entry) => entry.counterpartId),
+  );
+  const named = ["companyId", "investorOrganisationId"]
+    .map((field) => args.data[field])
+    .filter((value): value is string => typeof value === "string");
+  const ofRelationship =
+    relationshipId === null
+      ? undefined
+      : context.people.find(
+          (person) => person.relationshipId === relationshipId,
+        )?.counterpartId;
+  if (
+    named.some((id) => excluded.has(id)) ||
+    (ofRelationship !== undefined && excluded.has(ofRelationship))
+  ) {
+    return { verdict: "REFUSED", code: "EXCLUDED", relationshipId };
+  }
   const covered = inScope(context.grant, context.people);
   if (
     relationshipId !== null &&

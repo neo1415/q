@@ -16,6 +16,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import {
   createInstructionEngine,
+  inScope,
   MAX_REPLANS,
   meetingWithinWorkingHours,
   validateStep,
@@ -255,6 +256,7 @@ describe("the validator: code decides each step", () => {
         scope: "LISTED",
         relationshipIds: [REL],
         includeNewCompanies: false,
+        exclude: [],
       },
     });
     expect(
@@ -349,6 +351,7 @@ describe("the validator: code decides each step", () => {
               scope: "ALL_MY_RELATIONSHIPS",
               relationshipIds: [],
               includeNewCompanies,
+              exclude: [],
             },
           }),
           actions: ACTIONS,
@@ -813,5 +816,45 @@ describe("a firing", () => {
           "Looked at 2 people: nothing to do right now. I'll look again later.",
       }),
     ]);
+  });
+});
+
+describe("someone they said to leave out ('except Acme')", () => {
+  const without = (base: InstructionGrant = grant()): InstructionGrant => ({
+    ...base,
+    counterparts: {
+      ...base.counterparts,
+      exclude: [{ counterpartId: COMPANY, name: "Acme Robotics" }],
+    },
+  });
+
+  it("is never covered, and a step for them is refused, whatever else allows it", () => {
+    expect(inScope(without(), PEOPLE).map((p) => p.name)).toEqual([
+      "Beta Foods",
+    ]);
+    // By relationship, and by company id.
+    expect(verdictOf(validate(chat("Hello"), { grant: without() }))).toBe(
+      "REFUSED:EXCLUDED",
+    );
+    expect(
+      verdictOf(
+        validate(
+          {
+            ...chat("Hello"),
+            action: "relationship.interest.express",
+            argumentsJson: JSON.stringify({
+              companyId: COMPANY,
+              idempotencyKey: "k",
+              input: {},
+            }),
+          },
+          { grant: without() },
+        ),
+      ),
+    ).toBe("REFUSED:EXCLUDED");
+    // Everyone else as before.
+    expect(
+      verdictOf(validate(chat("Hello", {}, OTHER_REL), { grant: without() })),
+    ).not.toContain("REFUSED");
   });
 });

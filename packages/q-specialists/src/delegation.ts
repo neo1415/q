@@ -214,6 +214,7 @@ export function createToolDelegationPort(dependencies: {
         "digest",
         "askedTermsOrMoney",
         "workingHours",
+        "excludeNames",
       ] as const;
       const extra = Object.fromEntries(
         known.filter((key) => key in more).map((key) => [key, more[key]]),
@@ -224,8 +225,12 @@ export function createToolDelegationPort(dependencies: {
           goal: input.goal,
           includeNewCompanies: input.includeNewCompanies,
         })) ??
-        // The extras did not validate: the plain card, their goal only.
-        (Object.keys(extra).length === 0
+        // The extras did not validate: the plain card, their goal only --
+        // never when they named someone to leave out, since the plain card
+        // would cover them.
+        (Object.keys(extra).length === 0 ||
+        (Array.isArray(extra["excludeNames"]) &&
+          extra["excludeNames"].length > 0)
           ? null
           : await call(request, DELEGATION_TOOL, {
               goal: input.goal,

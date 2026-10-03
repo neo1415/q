@@ -93,6 +93,22 @@ export const InstructionGrantSchema = z
          * in touch with ("monitor new founders"). Never ones they passed.
          */
         includeNewCompanies: z.boolean().default(false),
+        /**
+         * Who they said to leave out ("except Nixo"), by canonical id with
+         * the name the card shows. Never a step for them, whatever else
+         * the grant covers.
+         */
+        exclude: z
+          .array(
+            z
+              .object({
+                counterpartId: UuidSchema,
+                name: z.string().min(1).max(200),
+              })
+              .strict(),
+          )
+          .max(20)
+          .default([]),
       })
       .strict(),
     workingHours: InstructionWorkingHoursSchema,

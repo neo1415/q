@@ -19,6 +19,8 @@ import { actorA, contextFor, planFor } from "./support.js";
  * in their own time zone; nothing said keeps Monday-Friday 09:00-17:00.
  */
 
+const NIXO = "9d1c0000-0000-4000-8000-000000000001";
+
 function ownPlan(): PermittedContextPlan {
   const plan = planFor(actorA, "GENERAL_QUESTION", [
     { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
@@ -44,6 +46,13 @@ function world() {
     answer: unused,
     setAway: unused,
     timeZoneOf: () => Promise.resolve("Africa/Lagos"),
+    counterpartsNamed: (_actor, names) =>
+      Promise.resolve({
+        found: names
+          .filter((name) => name === "Nixo")
+          .map((name) => ({ counterpartId: NIXO, name })),
+        unknown: names.filter((name) => name !== "Nixo"),
+      }),
     prepareForApproval: (entry) => {
       prepared.push(entry.proposal.payload);
       return "PREPARED";
@@ -117,5 +126,18 @@ describe("propose_standing_instruction: their working hours", () => {
     expect(actions).toContain("relationship.connection_request.accept");
     expect(actions).not.toContain("relationship.connection_request.send");
     expect(actions).not.toContain("relationship.interest.accept");
+  });
+
+  it("'except Nixo' leaves Nixo out by id; a name that matches no one is asked about, never dropped", async () => {
+    const { outcome, prepared } = await world().propose({
+      excludeNames: ["Nixo"],
+    });
+    expect(outcome.result.ok).toBe(true);
+    expect(grantOf(prepared[0]).counterparts.exclude).toEqual([
+      { counterpartId: NIXO, name: "Nixo" },
+    ]);
+    const unknown = await world().propose({ excludeNames: ["Nobody Ltd"] });
+    expect(unknown.outcome.result.ok).toBe(false);
+    expect(unknown.prepared).toHaveLength(0);
   });
 });

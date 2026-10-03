@@ -93,6 +93,11 @@ export function grantCard(
         : "Who: everyone you're already in touch with."
       : `Who: ${String(grant.counterparts.relationshipIds.length)} relationships you chose.`,
   );
+  if (grant.counterparts.exclude.length > 0) {
+    lines.push(
+      `Never: ${grant.counterparts.exclude.map((entry) => entry.name).join(", ")}.`,
+    );
+  }
   lines.push(
     `Budget: $${grant.budgetUsdMonth} a month of Q's work; then I pause and ask.`,
   );

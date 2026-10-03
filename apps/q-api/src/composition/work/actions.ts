@@ -22,6 +22,7 @@ import {
   type AnyQActionDefinition,
   type QActionProposer,
 } from "@capital-q/q-actions";
+import { closestByName } from "@capital-q/q-runtime";
 import type { QWorkIntelligencePort, QWorkProposal } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
@@ -410,6 +411,17 @@ export function createWorkPort(dependencies: {
   /** ADR 0043 standing instructions, listed and stopped beside work. */
   readonly instructions?: InstructionStore | undefined;
   readonly board: ReturnType<typeof createWorkActionBoard>;
+  /**
+   * Who a standing instruction could reach (relationships, feed, saved):
+   * what a name they said to leave out is matched against.
+   */
+  readonly reachable?:
+    | ((
+        actor: ActorContext,
+      ) => Promise<
+        readonly { readonly counterpartId: string; readonly name: string }[]
+      >)
+    | undefined;
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
   /** ADR 0028 errands, read and stopped beside delegated work. */
@@ -477,6 +489,28 @@ export function createWorkPort(dependencies: {
     },
     timeZoneOf: async (actor) =>
       (await dependencies.instructions?.timeZoneOf(actor)) ?? null,
+    counterpartsNamed:
+      dependencies.reachable === undefined
+        ? undefined
+        : async (actor, names) => {
+            const people = (await dependencies.reachable?.(actor)) ?? [];
+            const found: { counterpartId: string; name: string }[] = [];
+            const unknown: string[] = [];
+            for (const said of names) {
+              // The same matcher every name a person says goes through.
+              const matches = closestByName(people, said, (p) => p.name);
+              const [only] = matches;
+              if (matches.length === 1 && only !== undefined) {
+                found.push({
+                  counterpartId: only.counterpartId,
+                  name: only.name,
+                });
+              } else {
+                unknown.push(said);
+              }
+            }
+            return { found, unknown };
+          },
     stop: async (actor, delegationId, laneId) =>
       (await store.stop(actor, delegationId, laneId)) ||
       (laneId === null &&

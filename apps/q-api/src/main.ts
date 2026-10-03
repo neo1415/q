@@ -1426,6 +1426,17 @@ logger.info(
     ? "standing instructions: autonomy on"
     : "standing instructions: autonomy off, every step is asked",
 );
+// Who a standing instruction could reach: relationships, feed, saved. A
+// function declaration (hoisted): its reads are composed further down and
+// are read only when it is called.
+async function instructionPeopleOf(actor: ActorContext) {
+  return instructionPeople(actor, {
+    relationships: async (who) =>
+      (await errandRelationships.ownRelationships?.(who)) ?? null,
+    feed: async (who) => (await workFeed.page(who, 15))?.items ?? [],
+    decisions: (who) => workFeed.decisions(who, 30),
+  });
+}
 const workPort = createWorkPort({
   instructions: instructionStore,
   // Errands are composed further down; read only when a tool asks.
@@ -1437,6 +1448,13 @@ const workPort = createWorkPort({
   board: workBoard,
   isInvestor: workIsInvestor,
   ownCompany: workOwnCompany,
+  // "Except Nixo": matched against who an instruction could reach. The
+  // reads are composed further down; called only when a tool asks.
+  reachable: async (actor) =>
+    (await instructionPeopleOf(actor)).map((person) => ({
+      counterpartId: person.counterpartId,
+      name: person.name,
+    })),
 });
 // end AUTO block
 
@@ -2139,7 +2157,40 @@ const qActionRegistry = createQActionRegistry([
   }),
   // ADR 0040: each CONSEQUENTIAL declared app action, run on approval
   // through its own declaration.
-  ...createAppActionDefinitions(appActionPorts, { logger }),
+  ...createAppActionDefinitions(appActionPorts, {
+    logger,
+    // The card names who it is for (QA 2026-10-03: five identical
+    // "Express interest" cards from one standing instruction).
+    nameOf: async (actor, target) => {
+      switch (target.kind) {
+        case "RELATIONSHIP":
+          return (
+            (await relationshipCounterparts.of(actor, target.relationshipId))
+              ?.name ?? null
+          );
+        case "COMPANY": {
+          const companyId = CompanyIdSchema.safeParse(target.companyId);
+          return companyId.success
+            ? ((await companies.findCanonicalCompanyProfile(companyId.data))
+                ?.canonicalName ?? null)
+            : null;
+        }
+        case "INVESTOR_ORGANISATION":
+          return (
+            (
+              await emailInvestorNames.findCanonicalInvestorProfile(
+                target.investorOrganisationId,
+              )
+            )?.displayName ?? null
+          );
+        case "CAPITAL_OBJECTIVE":
+        case "DOCUMENT":
+        case "USER":
+        case "ORGANISATION":
+          return null;
+      }
+    },
+  }),
   // A founder's Connection Request: the investor page's own command.
   createConnectionRequestSendAction({
     connections: connectionService,
@@ -3211,13 +3262,7 @@ instructionEngine.current = createInstructionEngine({
           select auth_user_id from identity.user_profiles where id = ${userId}`
       )[0]?.auth_user_id ?? null,
   }),
-  people: (actor) =>
-    instructionPeople(actor, {
-      relationships: async (who) =>
-        (await errandRelationships.ownRelationships?.(who)) ?? null,
-      feed: async (who) => (await workFeed.page(who, 15))?.items ?? [],
-      decisions: (who) => workFeed.decisions(who, 30),
-    }),
+  people: (actor) => instructionPeopleOf(actor),
   plan: createInstructionPlanner({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
