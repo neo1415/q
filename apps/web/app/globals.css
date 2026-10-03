@@ -1459,8 +1459,12 @@
    * semantic tokens are re-pointed at them inside the stage, so the shared
    * controls, the composer and Q's presence render on it unchanged and no
    * component carries a literal colour or alpha.
+   *
+   * On the Q page the desktop sidebar joins the same night (demo audit
+   * 2026-10-03: a light rail beside the dark stage read as two apps).
    */
-  .cq-stage {
+  .cq-stage,
+  .cq-shell:has(.cq-q-home) .cq-shell-sidebar {
     background: var(--cq-stage-canvas);
     color: var(--cq-stage-text);
     color-scheme: dark;
