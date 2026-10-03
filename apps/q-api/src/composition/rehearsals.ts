@@ -45,6 +45,7 @@ import {
   givesCause,
   questionNote,
   questionOpenIn,
+  theyAskedIn,
   deliveryFor,
   initialTemperament,
   registerOf,
@@ -1671,6 +1672,7 @@ export function createRehearsalService(dependencies: {
     // Whether their last line put a question to the person: a dodge
     // needs one, and a gap in answering one costs (QA e22ea609).
     const questionOpen = questionOpenIn(turns);
+    const theyAsked = cue === "NONE" && theyAskedIn(turns);
     const variables = {
       viewerRole: row.userRole,
       viewerOrganisation: viewerOrganisation.slice(0, 200),
@@ -1686,7 +1688,7 @@ export function createRehearsalService(dependencies: {
       temperament:
         temperamentNote(before, registerBefore) +
         walkOutNote(warningsGiven, registerBefore) +
-        (cue === "NONE" ? questionNote(questionOpen) : ""),
+        (cue === "NONE" ? questionNote(questionOpen, theyAsked) : ""),
       stance: stanceOf(
         counterpartRoleOf(row.counterpartKind),
         persona.forwardness ?? "TYPICAL",
@@ -1762,7 +1764,11 @@ export function createRehearsalService(dependencies: {
     }
     // Their latest line moves the state by fixed rules; the state decides
     // the register the voice delivers this line in.
-    const appraisal = appliedAppraisal(result.appraisal, questionOpen);
+    const appraisal = appliedAppraisal(
+      result.appraisal,
+      questionOpen,
+      theyAsked,
+    );
     const after = applyAppraisal(before, appraisal, row.difficulty);
     const register = registerOf(after, row.difficulty);
     // Two warnings over two turns before walking out, unless they asked
