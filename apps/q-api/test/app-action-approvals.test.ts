@@ -12,6 +12,14 @@ import {
   APP_ACTION_TYPES,
   createAppActionDefinitions,
 } from "../src/composition/app-actions.js";
+import { createChatMessageSendAction } from "../src/composition/chat-actions.js";
+import { createCompanyVisibilitySetAction } from "../src/composition/company-visibility-action.js";
+import { createEmailSendAction } from "../src/composition/email-action.js";
+import {
+  createMeetingRescheduleAction,
+  createMeetingScheduleAction,
+  createReminderCreateAction,
+} from "../src/composition/schedule-actions.js";
 
 /**
  * ADR 0040, profile area: a change Q prepared through a generated tool is
@@ -181,5 +189,64 @@ describe("approved profile changes run through the declaration", () => {
       result: { says: "Done. Your raise is updated." },
     });
     expect(updates).toEqual([{ targetStage: "seed", expectedVersion: 5 }]);
+  });
+});
+
+/**
+ * Lead 2026-10-03: only a setter's newer card replaces an older one for the
+ * same target; additive actions (messages, diligence requests and shares,
+ * reminders, meetings) keep every card waiting.
+ */
+describe("which cards replace older ones for the same target", () => {
+  const definitions = createAppActionDefinitions({});
+  const supersedes = (type: string) =>
+    definitions.find((definition) => definition.actionType === type)
+      ?.supersedes === true;
+
+  it.each([
+    "app.document.deck_audience.set",
+    "app.pitch.details.set",
+    "app.disclosure.raise.share",
+    "app.disclosure.share.revoke",
+    "app.investor.visibility.set",
+    "app.company.profile.update",
+    "app.person.profile.update",
+    "app.q_card.update",
+    "app.relationship.outcome.change",
+    "app.capital.objective.change",
+    "app.investor.mandate.change",
+  ])("%s is a setter: a newer card replaces the older", (type) => {
+    expect(supersedes(type)).toBe(true);
+  });
+
+  it.each(["app.diligence.change"])(
+    "%s is additive: two different cards for one target both wait",
+    (type) => {
+      expect(definitions.some((d) => d.actionType === type)).toBe(true);
+      expect(supersedes(type)).toBe(false);
+    },
+  );
+});
+
+describe("the legacy action types: setters replace, additive cards coexist", () => {
+  const none = {} as never;
+  it("messages, emails, reminders and new meetings are additive", () => {
+    for (const definition of [
+      createChatMessageSendAction(none),
+      createEmailSendAction(none),
+      createReminderCreateAction(none),
+      createMeetingScheduleAction(none),
+    ]) {
+      expect(definition.supersedes, definition.actionType).not.toBe(true);
+    }
+  });
+
+  it("a meeting's new time and their company's visibility are setters", () => {
+    for (const definition of [
+      createMeetingRescheduleAction(none),
+      createCompanyVisibilitySetAction(none),
+    ]) {
+      expect(definition.supersedes, definition.actionType).toBe(true);
+    }
   });
 });

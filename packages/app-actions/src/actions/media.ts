@@ -310,6 +310,7 @@ const Policy = z
 
 const POLICY = defineAppAction<z.infer<typeof Policy>, MediaAsset>({
   name: "pitch.playback_policy.set",
+  supersedes: true,
   short: "set pitch playback",
   area: "media",
   classification: "CONSEQUENTIAL",

@@ -180,6 +180,11 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
   ) => Promise<Out>;
   /** The canonical records it acts on: the approval binds to them (CONSEQUENTIAL). */
   readonly targets: (input: In) => readonly QSubjectRef[];
+  /**
+   * A setter: a newer waiting value for the same target replaces the older
+   * card (lead 2026-10-03). Absent: additive, cards coexist.
+   */
+  readonly supersedes?: boolean | undefined;
   /** What the approval card says (CONSEQUENTIAL), and Q's line after. */
   readonly card: (input: In) => AppActionCard;
   /**
@@ -285,6 +290,8 @@ export function defineAppActionFamily<ToolIn>(definition: {
   readonly does: string;
   readonly members: Readonly<Record<string, AnyAppAction>>;
   readonly tool: AppActionTool<AppActionFamilyInput, ToolIn>;
+  /** The family's own card: a setter (see AppActionDefinition.supersedes). */
+  readonly supersedes?: boolean | undefined;
 }): readonly AnyAppAction[] {
   const operations = Object.keys(definition.members);
   const memberOf = (operation: string): AnyAppAction => {
@@ -336,6 +343,7 @@ export function defineAppActionFamily<ToolIn>(definition: {
     done: (out, value, names) =>
       memberOf(value.operation).done(out, value.input, names),
     tool: definition.tool,
+    ...(definition.supersedes === true ? { supersedes: true } : {}),
   });
   return [
     family,

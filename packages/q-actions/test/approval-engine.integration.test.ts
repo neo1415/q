@@ -51,6 +51,7 @@ import {
 import {
   createTestConfirmRequiredAction,
   TEST_CONFIRM_REQUIRED,
+  TEST_SETTER,
   type TestActionExecutorState,
 } from "../src/testing/index.js";
 
@@ -236,7 +237,14 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       transactions: db.transactions,
       repositories: createPostgresQActionRepositories(),
       runtime: repositories,
-      registry: createQActionRegistry([test.definition]),
+      registry: createQActionRegistry([
+        test.definition,
+        // The same action as a setter (lead 2026-10-03): newer replaces older.
+        createTestConfirmRequiredAction({
+          actionType: TEST_SETTER,
+          supersedes: true,
+        }).definition,
+      ]),
       authorization: createAuthorizationService(
         createPostgresAuthorizationPolicySource({ sql: db.sql }),
       ),
@@ -336,6 +344,7 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     person: Person,
     payload: Record<string, unknown>,
     run?: QRunRecord,
+    actionType: typeof TEST_CONFIRM_REQUIRED = TEST_CONFIRM_REQUIRED,
   ) {
     const current = run ?? (await synthesisRun(world, person));
     proposals += 1;
@@ -343,7 +352,7 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       actor: person.actor,
       runId: current.id,
       correlationId: CORRELATION(),
-      actionType: TEST_CONFIRM_REQUIRED,
+      actionType,
       payload: {
         companyId: COMPANY,
         // Each call its own change: the same change still waiting is
@@ -526,20 +535,23 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     try {
       const { founder } = world;
       const same = { note: `Share the raise. ${MARKERS.payload}` };
-      const first = await propose(world, founder, same);
+      const setter = (payload: Record<string, unknown>) =>
+        propose(world, founder, payload, undefined, TEST_SETTER);
+      const first = await setter(same);
       // Another run: another turn, or another conversation, of theirs.
-      const again = await propose(world, founder, same);
+      const again = await setter(same);
       expect(again.existing).toBe(true);
       expect(again.action.id).toBe(first.action.id);
       expect(again.approval.id).toBe(first.approval.id);
       // Nothing new was written, and the second run does not wait.
       const [count] = await db.sql<{ n: number }[]>`
         select count(*)::int as n from q_runtime.actions
-         where proposed_by_user_id = ${founder.actor.userId}`;
+         where proposed_by_user_id = ${founder.actor.userId}
+           and action_type = ${TEST_SETTER}`;
       expect(count?.n).toBe(1);
       // Same target, another value: the newer card replaces the older one
       // (lead 2026-10-03, run a4618f34: opposite deck audiences).
-      const different = await propose(world, founder, {
+      const different = await setter({
         note: `Share the raise, only the deck. ${MARKERS.payload}`,
       });
       expect(different.existing).toBeUndefined();
@@ -585,18 +597,28 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       });
       expect(approved.approval.status).toBe("APPROVED");
       // Another target is another thing: both cards wait.
-      const forAda = await propose(world, founder, {
-        recipientUserId: randomUUID(),
-      });
-      const forBola = await propose(world, founder, {
-        recipientUserId: randomUUID(),
-      });
+      const forAda = await setter({ recipientUserId: randomUUID() });
+      const forBola = await setter({ recipientUserId: randomUUID() });
       expect(forBola.superseded).toBeUndefined();
       const pending = await db.sql<{ n: number }[]>`
         select count(*)::int as n from q_runtime.approvals
          where id = any(${[forAda.approval.id, forBola.approval.id]}::uuid[])
            and status = 'PENDING'`;
       expect(pending[0]?.n).toBe(2);
+      // Additive actions coexist (lead 2026-10-03): two different
+      // requests or messages to one target both wait.
+      const askOne = await propose(world, founder, {
+        note: `Please send the management accounts. ${MARKERS.payload}`,
+      });
+      const askTwo = await propose(world, founder, {
+        note: `Please send the cap table. ${MARKERS.payload}`,
+      });
+      expect(askTwo.superseded).toBeUndefined();
+      const additive = await db.sql<{ n: number }[]>`
+        select count(*)::int as n from q_runtime.approvals
+         where id = any(${[askOne.approval.id, askTwo.approval.id]}::uuid[])
+           and status = 'PENDING'`;
+      expect(additive[0]?.n).toBe(2);
     } finally {
       await cleanup(world);
     }

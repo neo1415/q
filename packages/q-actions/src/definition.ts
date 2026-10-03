@@ -130,6 +130,13 @@ export type QActionDefinition<P, R> = {
    */
   readonly revisable?: ((previous: P, next: P) => boolean) | undefined;
   /**
+   * A setter (lead 2026-10-03): two waiting values for the same target
+   * contradict each other, so a newer card replaces the older one. Absent
+   * or false: an additive action (a message, a request, a reminder), and
+   * several cards for one target coexist.
+   */
+  readonly supersedes?: boolean | undefined;
+  /**
    * What Q tells the person once the gate has persisted EXECUTED, from the
    * approved payload and the executor's validated result — never from a
    * model. Absent: the approval summary, prefixed "Done".

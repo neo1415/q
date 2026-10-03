@@ -113,6 +113,7 @@ export function createShareRaiseAction(
   const { visibility, logger } = dependencies;
   return defineQAction<ShareRaisePayload, z.infer<typeof ShareResultSchema>>({
     actionType: DISCLOSURE_RAISE_SHARE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",
@@ -178,6 +179,7 @@ export function createRevokeShareAction(
   const { visibility, logger } = dependencies;
   return defineQAction<RevokeSharePayload, z.infer<typeof RevokeResultSchema>>({
     actionType: DISCLOSURE_SHARE_REVOKE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",

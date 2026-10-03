@@ -115,6 +115,7 @@ export const SET_PITCH_SHARING = defineAppAction<
   z.infer<typeof ToolInputSchema>
 >({
   name: "pitch.details.set",
+  supersedes: true,
   short: "set who sees a pitch",
   area: "pitch",
   classification: "CONSEQUENTIAL",

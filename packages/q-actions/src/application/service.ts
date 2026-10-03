@@ -1077,7 +1077,7 @@ export function createQActionService(
             // waited for one deck, and approving both applied the last).
             const targetKey = canonicalJsonStringify([...targets]);
             const replaced: QActionRecord[] = [];
-            for (const older of waiting) {
+            for (const older of definition.supersedes === true ? waiting : []) {
               if (
                 older.action.runId === run.id ||
                 canonicalJsonStringify([...older.action.targets]) !== targetKey

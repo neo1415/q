@@ -130,6 +130,7 @@ export function createProfileGapsFillAction(deps: {
 }): AnyQActionDefinition {
   return defineQAction<ProfileGapsPayload, z.infer<typeof Done>>({
     actionType: PROFILE_GAPS_FILL,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",

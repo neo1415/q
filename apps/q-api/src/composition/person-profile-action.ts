@@ -136,6 +136,7 @@ export function createPersonProfileUpdateAction(
   const { people, logger } = dependencies;
   return defineQAction<PersonProfileUpdatePayload, PersonProfileUpdateResult>({
     actionType: PERSON_PROFILE_UPDATE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",

@@ -457,6 +457,7 @@ export function createRecordChangeActions(
     Done
   >({
     actionType: CAPITAL_OBJECTIVE_CHANGE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",
@@ -584,6 +585,7 @@ export function createRecordChangeActions(
     Done
   >({
     actionType: INVESTOR_MANDATE_CHANGE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",
@@ -707,6 +709,7 @@ export function createRecordChangeActions(
     Done
   >({
     actionType: COMPANY_TEAM_CHANGE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",
@@ -786,6 +789,7 @@ export function createRecordChangeActions(
     Done
   >({
     actionType: INVESTOR_REPRESENTATIVE_UPDATE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",
@@ -840,6 +844,7 @@ export function createRecordChangeActions(
 
   const card = defineQAction<z.infer<typeof QCardUpdatePayloadSchema>, Done>({
     actionType: Q_CARD_UPDATE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",
@@ -914,6 +919,7 @@ export function createRecordChangeActions(
     Done
   >({
     actionType: INVESTOR_VISIBILITY_SET,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",

@@ -82,6 +82,7 @@ const COMPANY_VISIBILITY = defineAppAction<
   Company
 >({
   name: "company.visibility.set",
+  supersedes: true,
   short: "set company visibility",
   area: "visibility",
   classification: "CONSEQUENTIAL",
@@ -144,6 +145,7 @@ const INVESTOR_VISIBILITY = defineAppAction<
   z.infer<typeof InvestorVisibilityTool>
 >({
   name: "investor.visibility.set",
+  supersedes: true,
   short: "set fund visibility",
   area: "visibility",
   classification: "CONSEQUENTIAL",
@@ -273,6 +275,7 @@ const SHARE_RAISE = defineAppAction<
   z.infer<typeof ShareTool>
 >({
   name: "disclosure.raise.share",
+  supersedes: true,
   short: "share the raise",
   area: "visibility",
   classification: "CONSEQUENTIAL",
@@ -397,6 +400,7 @@ const REVOKE_SHARE = defineAppAction<
   z.infer<typeof RevokeTool>
 >({
   name: "disclosure.share.revoke",
+  supersedes: true,
   short: "stop sharing the raise",
   area: "visibility",
   classification: "CONSEQUENTIAL",

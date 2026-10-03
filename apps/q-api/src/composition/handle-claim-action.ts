@@ -71,6 +71,7 @@ export function createHandleClaimAction(
   const { publicIdentity, subjects, authorization, logger } = dependencies;
   return defineQAction<HandleClaimPayload, HandleClaimResult>({
     actionType: HANDLE_CLAIM,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",

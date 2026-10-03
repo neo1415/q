@@ -276,6 +276,7 @@ export function createProfileAnswerAction(deps: {
 }): AnyQActionDefinition {
   return defineQAction<ProfileAnswerPayload, z.infer<typeof Done>>({
     actionType: ONBOARDING_ANSWER_REVISE,
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",

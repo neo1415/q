@@ -100,6 +100,7 @@ export const SET_DECK_AUDIENCE = defineAppAction<
   z.infer<typeof ToolInputSchema>
 >({
   name: "document.deck_audience.set",
+  supersedes: true,
   short: "set deck download audience",
   area: "documents",
   classification: "CONSEQUENTIAL",

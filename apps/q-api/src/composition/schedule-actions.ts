@@ -353,6 +353,8 @@ export function createMeetingRescheduleAction(dependencies: {
     z.infer<typeof MeetingResultSchema>
   >({
     actionType: MEETING_RESCHEDULE,
+    // Two waiting new times for one meeting contradict: the newer stands.
+    supersedes: true,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",

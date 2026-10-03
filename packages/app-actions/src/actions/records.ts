@@ -459,6 +459,7 @@ const PERSON_PROFILE = defineAppAction<
   z.infer<typeof PersonTool>
 >({
   name: "person.profile.update",
+  supersedes: true,
   short: "change their name or headline",
   area: "records",
   classification: "CONSEQUENTIAL",
@@ -520,6 +521,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof CompanyTool>
   >({
     name: "company.profile.update",
+    supersedes: true,
     short: "edit the company profile",
     area: "records",
     classification: "CONSEQUENTIAL",
@@ -602,6 +604,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof CompanyRoleTool>
   >({
     name: "company.team.me.upsert",
+    supersedes: true,
     short: "set my title at company",
     area: "records",
     classification: "CONSEQUENTIAL",
@@ -673,6 +676,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof FounderProfileTool>
   >({
     name: "company.founder_profile.me.update",
+    supersedes: true,
     short: "edit my founder bio",
     area: "records",
     classification: "CONSEQUENTIAL",
@@ -727,6 +731,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof TeamFactsTool>
   >({
     name: "company.team_facts.update",
+    supersedes: true,
     short: "change team size facts",
     area: "records",
     classification: "CONSEQUENTIAL",
@@ -779,6 +784,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof InvestorTool>
   >({
     name: "investor.profile.update",
+    supersedes: true,
     short: "edit the fund's profile",
     area: "records",
     classification: "CONSEQUENTIAL",
@@ -870,6 +876,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof InvestorRoleTool>
   >({
     name: "investor.representative.me.upsert",
+    supersedes: true,
     short: "set my title at fund",
     area: "records",
     classification: "CONSEQUENTIAL",
@@ -935,6 +942,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof HandleClaimTool>
   >({
     name: "q_card.handle.claim",
+    supersedes: true,
     short: "claim a Q Card handle",
     area: "records",
     classification: "CONSEQUENTIAL",
@@ -1008,6 +1016,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     z.infer<typeof QCardTool>
   >({
     name: "q_card.update",
+    supersedes: true,
     short: "change Q Card settings",
     area: "records",
     classification: "CONSEQUENTIAL",

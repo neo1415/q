@@ -141,6 +141,9 @@ export function createAppActionDefinitions(
       payload: action.input,
       result: ResultSchema,
       targets: (payload) => action.targets(payload),
+      // A setter's newer card replaces an older one for the same target;
+      // an additive action's cards coexist (lead 2026-10-03).
+      ...(action.supersedes === true ? { supersedes: true } : {}),
       describe: (payload) => action.card(payload),
       confirm: (_payload, result) => result.says,
       authorize: async (payload, actor) => {

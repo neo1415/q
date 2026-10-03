@@ -21,6 +21,9 @@ export const TEST_CONFIRM_REQUIRED = QActionTypeSchema.parse(
   "test.confirm_required",
 );
 
+/** The same test action as a setter: a newer card replaces an older one. */
+export const TEST_SETTER = QActionTypeSchema.parse("test.setter");
+
 export const TestConfirmRequiredPayloadSchema = z
   .object({
     /** The company the test action is about; part of the binding as a target. */
@@ -63,7 +66,12 @@ export type TestActionExecutorState = {
  * every member holds it, and revoking the membership revokes it — which is
  * exactly what the execution-time reauthorization tests need to observe.
  */
-export function createTestConfirmRequiredAction(): {
+export function createTestConfirmRequiredAction(
+  options: {
+    readonly actionType?: typeof TEST_CONFIRM_REQUIRED | undefined;
+    readonly supersedes?: boolean | undefined;
+  } = {},
+): {
   readonly definition: AnyQActionDefinition;
   readonly state: TestActionExecutorState;
 } {
@@ -76,7 +84,8 @@ export function createTestConfirmRequiredAction(): {
     TestConfirmRequiredPayload,
     TestConfirmRequiredResult
   >({
-    actionType: TEST_CONFIRM_REQUIRED,
+    actionType: options.actionType ?? TEST_CONFIRM_REQUIRED,
+    ...(options.supersedes === true ? { supersedes: true } : {}),
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-actions (test only)",

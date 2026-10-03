@@ -120,6 +120,7 @@ const Pass = z
 
 const PASS = defineAppAction<z.infer<typeof Pass>, OutcomeResult>({
   name: "relationship.outcome.pass",
+  supersedes: true,
   short: "decide not to proceed",
   area: "relationships",
   classification: "CONSEQUENTIAL",
@@ -184,6 +185,7 @@ function pauseOrResume(kind: "PAUSE" | "RESUME"): AnyAppAction {
   const pause = kind === "PAUSE";
   return defineAppAction<z.infer<typeof Simple>, OutcomeResult>({
     name: pause ? "relationship.outcome.pause" : "relationship.outcome.resume",
+    supersedes: true,
     short: pause ? "pause a relationship" : "resume a relationship",
     area: "relationships",
     classification: "CONSEQUENTIAL",
@@ -258,6 +260,7 @@ const OUTCOME_WORDS: Readonly<
 const MEETING_OUTCOME = defineAppAction<z.infer<typeof Outcome>, OutcomeResult>(
   {
     name: "relationship.outcome.meeting",
+    supersedes: true,
     short: "record how a meeting went",
     area: "relationships",
     classification: "CONSEQUENTIAL",
@@ -338,6 +341,7 @@ export const OUTCOME_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof OutcomeTool>
 >({
   name: "relationship.outcome.change",
+  supersedes: true,
   // The reader's list shows `short` (QA runs a6b19977 / 06289687: a label
   // about meetings let "we've decided not to proceed" name no action).
   short: "relationship decisions and meeting outcomes",

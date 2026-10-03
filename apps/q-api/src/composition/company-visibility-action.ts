@@ -105,6 +105,7 @@ export function createCompanyVisibilitySetAction(dependencies: {
   return defineQAction<CompanyVisibilitySetPayload, CompanyVisibilitySetResult>(
     {
       actionType: COMPANY_VISIBILITY_SET,
+      supersedes: true,
       version: 1,
       riskClass: "CONFIRM_REQUIRED",
       owner: "q-api",

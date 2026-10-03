@@ -191,6 +191,7 @@ export function createCompanyProfileUpdateAction(
   return defineQAction<CompanyProfileUpdatePayload, CompanyProfileUpdateResult>(
     {
       actionType: COMPANY_PROFILE_UPDATE,
+      supersedes: true,
       version: 1,
       riskClass: "CONFIRM_REQUIRED",
       owner: "q-api",

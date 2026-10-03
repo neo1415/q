@@ -173,6 +173,7 @@ const CREATE = defineAppAction<z.infer<typeof Create>, InvestorMandate>({
 
 const UPDATE = defineAppAction<z.infer<typeof Update>, InvestorMandate>({
   name: "investor.mandate.update",
+  supersedes: true,
   short: "change the mandate",
   area: "mandate",
   classification: "CONSEQUENTIAL",
@@ -212,6 +213,7 @@ function transition(operation: "ACTIVATE" | "CLOSE"): AnyAppAction {
   const activate = operation === "ACTIVATE";
   return defineAppAction<z.infer<typeof Transition>, InvestorMandate>({
     name: activate ? "investor.mandate.activate" : "investor.mandate.close",
+    supersedes: true,
     short: activate ? "make a mandate active" : "close a mandate",
     area: "mandate",
     classification: "CONSEQUENTIAL",
@@ -326,6 +328,7 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof MandateTool>
 >({
   name: "investor.mandate.change",
+  supersedes: true,
   short: "change their mandate",
   area: "mandate",
   does: "Creates, changes, activates or closes their investor organisation's mandate, as the mandate form does.",
