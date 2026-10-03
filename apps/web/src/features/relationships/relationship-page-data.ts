@@ -3,6 +3,7 @@ import "server-only";
 import {
   getChatThread,
   getCompanyNetworkPreview,
+  getCompanyProfile,
   getDiscoveredInvestor,
   getOwnInterest,
   getRelationshipWithCompany,
@@ -115,10 +116,15 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
         "This company isn't available to you. It may not be discoverable, or it may no longer exist.",
     };
   }
-  const [status, own] = await Promise.all([
+  const [status, own, profile] = await Promise.all([
     getRelationshipWithCompany(session, company.companyId).catch(() => null),
     getOwnInterest(session, company.companyId).catch(() => null),
+    // The profile's videos are already asked of the player's own rule, so
+    // this page offers exactly the pitch the profile counts and playback
+    // admits -- never one that then fails to load.
+    getCompanyProfile(session, company.companyId).catch(() => null),
   ]);
+  const playable = profile?.videos[0] ?? null;
   const relationship = status?.relationship ?? null;
   const location = [
     company.headquartersCity,
@@ -132,10 +138,11 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
     counterpart: company.canonicalName,
     relationship,
     own,
-    // The same publishable pitch the company page plays (live
-    // 2026-10-02: a connected investor saw none here).
+    // The same playable pitch the company page lists (live 2026-10-02: a
+    // connected investor saw none here; 2026-10-03: one was offered here
+    // that playback then refused).
     pitch:
-      company.pitch === null
+      playable === null
         ? null
         : {
             companyId: company.companyId,
@@ -143,7 +150,7 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
             shortDescription: company.shortDescription,
             currentStageCode: company.currentStageCode,
             headquartersCountry: company.headquartersCountry,
-            pitch: company.pitch,
+            pitch: playable,
           },
     thread: await threadFor(session, relationship),
     profile: {
