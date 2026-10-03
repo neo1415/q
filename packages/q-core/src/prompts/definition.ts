@@ -66,6 +66,8 @@ export const PROMPT_IDS = [
   "WORK_INTERVIEW_REPORT",
   "WORK_STAND_IN_REPLY",
   "WORK_SLOT_READER",
+  /** ADR 0043: a standing instruction's next steps, as declared actions. */
+  "INSTRUCTION_PLAN",
   // DOCS block: the wording pass over a composed deck.
   "DOCUMENT_POLISH",
   // DAILY block: The Q Daily's story writer and Q's take column.
@@ -118,6 +120,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   WORK_INTERVIEW_REPORT: "work-interview-report",
   WORK_STAND_IN_REPLY: "work-stand-in-reply",
   WORK_SLOT_READER: "work-slot-reader",
+  INSTRUCTION_PLAN: "instruction-plan",
   // DOCS block.
   DOCUMENT_POLISH: "document-polish",
   // DAILY block

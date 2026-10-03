@@ -1,3 +1,4 @@
+import { INSTRUCTION_PLAN_V1 } from "./tasks/instructions.v1.js";
 import {
   promptContentHash,
   promptVersionId,
@@ -404,6 +405,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     WORK_INTERVIEW_REPORT_V1,
     WORK_STAND_IN_REPLY_V1,
     WORK_SLOT_READER_V1,
+    // ADR 0043: standing instructions.
+    INSTRUCTION_PLAN_V1,
     // DAILY block
     DAILY_STORY_WRITER_V1,
     DAILY_Q_TAKE_V1,

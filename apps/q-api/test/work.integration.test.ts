@@ -112,6 +112,7 @@ describe("Q's delegated work against PostgreSQL", () => {
         Promise.resolve({ status: "RESOLVED", context: actor }),
     };
     const composers: WorkComposers = {
+      instructionPlan: () => Promise.resolve(null),
       shortlist: () =>
         Promise.resolve({
           picks: [

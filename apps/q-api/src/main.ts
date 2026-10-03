@@ -99,6 +99,14 @@ import {
 import { createWorkComposers } from "./composition/work/composers.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
+import {
+  createInstructionActor,
+  createInstructionAsk,
+} from "./composition/instructions/ask.js";
+import {
+  createInstructionEngine,
+  type InstructionEngine,
+} from "./composition/instructions/engine.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -333,7 +341,11 @@ import {
   createAppActionBoard,
   createAppActionDefinitions,
 } from "./composition/app-actions.js";
-import { ownIndex, type OwnReadPorts } from "@capital-q/app-actions";
+import {
+  APP_ACTIONS,
+  ownIndex,
+  type OwnReadPorts,
+} from "@capital-q/app-actions";
 import {
   createEvidenceDocumentsPort,
   createOwnRecordsPort,
@@ -1383,6 +1395,8 @@ const workOwnCompany = (actor: ActorContext): Promise<string | null> =>
   runtimeDependencies.ownCompany(actor).catch(() => null);
 // ADR 0043: standing instructions, listed and stopped with the rest of work.
 const instructionStore = createPostgresInstructionStore(database.sql);
+// Composed once the runtime, the Approval Engine and the planner exist.
+const instructionEngine: { current?: InstructionEngine } = {};
 const workPort = createWorkPort({
   instructions: instructionStore,
   // Errands are composed further down; read only when a tool asks.
@@ -2180,9 +2194,19 @@ const qActionRegistry = createQActionRegistry([
     meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // ADR 0043: a standing instruction's grant, one approval per version.
-  ...createInstructionActions({ store: instructionStore, logger }).map(
-    (definition) =>
-      meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
+  ...createInstructionActions({
+    store: instructionStore,
+    // The first firing, at once (composed further down).
+    onActivated: (instructionId, version) => {
+      void instructionEngine.current
+        ?.fire(instructionId, `activated-v${String(version)}`)
+        .catch((error: unknown) => {
+          logger.warn({ err: error, instructionId }, "instruction not fired");
+        });
+    },
+    logger,
+  }).map((definition) =>
+    meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // end BILLING block
 ]);
@@ -3142,6 +3166,43 @@ const workRuntime = createWorkRuntime({
     ),
   logger,
 });
+// ADR 0043: the standing-instruction engine. Q plans through the gateway;
+// code validates every step against the approved grant; AUTO steps run the
+// declared command as the person, ASK steps become their cards.
+instructionEngine.current = createInstructionEngine({
+  store: instructionStore,
+  actions: APP_ACTIONS,
+  ports: appActionPorts,
+  actorFor: createInstructionActor({
+    resolver: actorContextResolver,
+    authUserOf: async (userId) =>
+      (
+        await database.sql<{ auth_user_id: string | null }[]>`
+          select auth_user_id from identity.user_profiles where id = ${userId}`
+      )[0]?.auth_user_id ?? null,
+  }),
+  people: async (actor) => {
+    const own = await errandRelationships.ownRelationships?.(actor);
+    return (own?.items ?? [])
+      .filter((item) => item.state !== "DECLINED")
+      .map((item) => ({
+        relationshipId: item.relationshipId,
+        counterpartKind: item.counterpart.kind,
+        counterpartId: item.counterpart.id,
+        name: item.counterpart.name,
+        state: item.state,
+      }));
+  },
+  plan: (who, variables) => errandComposers.instructionPlan(who, variables),
+  ask: createInstructionAsk({
+    runtime: qRuntime,
+    orchestration: orchestrationRuntime,
+    actions: qActions,
+    store: instructionStore,
+  }),
+  logger,
+});
+
 setInterval(() => {
   workRuntime.tick().catch((error: unknown) => {
     logger.warn({ err: error }, "q work run failed");

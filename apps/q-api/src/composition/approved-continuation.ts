@@ -5,6 +5,7 @@ import type {
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
+  QOrchestrationVersionError,
   QRunAlreadyTerminalError,
   QRunNotResumableError,
   type QActionPort,
@@ -59,9 +60,13 @@ export function createApprovedContinuation(dependencies: {
           "approved action's run failed on resume; executing through the gate",
         );
       } catch (error: unknown) {
+        // A run the conversational engine never ran (a standing
+        // instruction's card, ADR 0043) or a version this build cannot
+        // continue: the gate executes it, re-verifying everything.
         if (
           !(error instanceof QRunNotResumableError) &&
-          !(error instanceof QRunAlreadyTerminalError)
+          !(error instanceof QRunAlreadyTerminalError) &&
+          !(error instanceof QOrchestrationVersionError)
         ) {
           throw error;
         }

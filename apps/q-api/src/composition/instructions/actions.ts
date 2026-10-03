@@ -106,6 +106,12 @@ export function grantIsSettled(grant: InstructionGrant): boolean {
 
 export function createInstructionActions(dependencies: {
   readonly store: InstructionStore;
+  /**
+   * Called once an approved grant is current: the first firing, so what Q
+   * does -- and what it can't -- is said at once. Never awaited here.
+   */
+  readonly onActivated?:
+    ((instructionId: string, version: number) => void) | undefined;
   readonly logger?: Logger | undefined;
 }): readonly AnyQActionDefinition[] {
   const { store, logger } = dependencies;
@@ -172,6 +178,10 @@ export function createInstructionActions(dependencies: {
                 retryable: false,
               };
             }
+            dependencies.onActivated?.(
+              activated.instructionId,
+              activated.version,
+            );
             return { outcome: "EXECUTED", result: activated };
           } catch (error: unknown) {
             logger?.warn(

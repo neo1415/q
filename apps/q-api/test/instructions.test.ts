@@ -201,6 +201,7 @@ describe("instructions on the work list", () => {
     pause_reason: null,
     expires_at: new Date("2026-11-02T10:00:00Z"),
     stopped_at: null,
+    conversation_id: null,
     created_at: now,
     updated_at: now,
     grant_payload: handleEverythingGrant({ timeZone: "UTC" }),
