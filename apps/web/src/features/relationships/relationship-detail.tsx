@@ -186,25 +186,47 @@ export function RelationshipDetail({
               ) : null}
               {relationship === null ? null : (
                 <>
-                  <RelationshipErrands
-                    relationshipId={relationship.relationshipId}
-                    counterpart={counterpart}
-                    connected={connected}
-                  />
-                  <ScheduleDialog kind="reminder">
-                    <RelationshipSchedule
+                  {/* After a meeting, "How did it go?" is the next step. */}
+                  {relationship.state === "MEETING_HELD" ? (
+                    <RelationshipOutcome
                       relationshipId={relationship.relationshipId}
+                      state={relationship.state}
+                      side={side}
                       counterpart={counterpart}
-                      connected={connected}
-                      focus="reminder"
                     />
-                  </ScheduleDialog>
-                  <RelationshipOutcome
-                    relationshipId={relationship.relationshipId}
-                    state={relationship.state}
-                    side={side}
-                    counterpart={counterpart}
-                  />
+                  ) : null}
+                  {/*
+                    One primary step above; everything else one tap away
+                    (demo audit 2026-10-03: six equal actions under Next).
+                  */}
+                  <details className="group" data-next-more>
+                    <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-center rounded-md text-(--cq-text-secondary) hover:text-(--cq-text-primary) [&::-webkit-details-marker]:hidden">
+                      More
+                    </summary>
+                    <div className="flex flex-col items-stretch gap-2 pt-2">
+                      <RelationshipErrands
+                        relationshipId={relationship.relationshipId}
+                        counterpart={counterpart}
+                        connected={connected}
+                      />
+                      <ScheduleDialog kind="reminder">
+                        <RelationshipSchedule
+                          relationshipId={relationship.relationshipId}
+                          counterpart={counterpart}
+                          connected={connected}
+                          focus="reminder"
+                        />
+                      </ScheduleDialog>
+                      {relationship.state === "MEETING_HELD" ? null : (
+                        <RelationshipOutcome
+                          relationshipId={relationship.relationshipId}
+                          state={relationship.state}
+                          side={side}
+                          counterpart={counterpart}
+                        />
+                      )}
+                    </div>
+                  </details>
                 </>
               )}
             </DockAvoidZone>
@@ -244,7 +266,7 @@ export function RelationshipDetail({
           {askQ ? (
             <section
               aria-label="Ask Q"
-              className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-4"
+              className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-5"
             >
               <AskQAboutRelationship counterpart={counterpart} />
             </section>
@@ -432,7 +454,7 @@ function Card({
   return (
     <section
       aria-labelledby={`relationship-${id}`}
-      className="flex scroll-mt-24 flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 sm:p-5"
+      className="flex scroll-mt-24 flex-col gap-4 border-t border-(--cq-border-subtle) pt-5"
     >
       <div className="flex items-center justify-between gap-3">
         <h2
