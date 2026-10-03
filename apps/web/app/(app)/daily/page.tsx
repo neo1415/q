@@ -49,7 +49,7 @@ export default async function DailyPage({
           className="cq-body text-(--cq-text-secondary)"
           data-state="unavailable"
         >
-          Your editions couldn&apos;t load. Reload in a moment.
+          Your editions couldn&apos;t load. None was used.
         </p>
         <Link
           href="/daily"
@@ -95,32 +95,30 @@ export default async function DailyPage({
     <PageContainer width="reading" className="flex flex-col gap-5">
       <PageHeader
         title="The Q Daily"
-        description="Your own newspaper: news about your sectors, markets, deals and the people you know, every story with its source."
+        description="Your news, every story sourced."
       />
       {preferences.frequency === "OFF" ? (
         <div className="flex flex-col gap-3" data-state="off">
           <p className="cq-body text-(--cq-text-secondary)">
-            The Q Daily is off. Turn it on to get an edition every Monday, or
-            every morning.
+            The Q Daily is off.
           </p>
           <Link
             href="/settings#q-daily"
             className={buttonClassName("primary", "regular", "self-start")}
           >
-            Turn it on in Settings
+            Turn it on
           </Link>
         </div>
       ) : home.preparing ? (
         <PreparingNotice />
       ) : (
         <div className="flex flex-col gap-3" data-state="empty">
-          <p className="cq-body text-(--cq-text-secondary)">
+          <p className="cq-body text-(--cq-text-primary)">
             {preferences.nextDueAt === null
-              ? "Your first edition is on its way."
-              : `Your first edition arrives ${formatDayTime(preferences.nextDueAt)}.`}{" "}
-            Want it now?
+              ? "First edition on its way"
+              : `First edition: ${formatDayTime(preferences.nextDueAt)}`}
           </p>
-          <PrepareEditionButton label="Prepare my first edition" />
+          <PrepareEditionButton label="Get it now" />
         </div>
       )}
     </PageContainer>
