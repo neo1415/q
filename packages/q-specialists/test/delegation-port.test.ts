@@ -58,6 +58,50 @@ describe("the delegation port", () => {
     ]);
   });
 
+  it("drops only the extras that failed, keeps who they excluded, and asks first when a limit was lost (QA 43894445)", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const tools = {
+      execute: (proposal: { arguments: Record<string, unknown> }) => {
+        calls.push(proposal.arguments);
+        const ok = !("neverDo" in proposal.arguments);
+        return Promise.resolve({
+          result: ok
+            ? {
+                ok: true,
+                data: { status: "PREPARED", awaitingApprovalOf: "Q works" },
+              }
+            : {
+                ok: false,
+                error: {
+                  code: "INVALID_ARGUMENTS",
+                  safeMessage:
+                    "Arguments are invalid at: neverDo.0. Do not ask the person for an id.",
+                },
+              },
+        });
+      },
+    } as unknown as QToolPort;
+    const port = createToolDelegationPort({ tools });
+    expect(
+      await port.propose(request, {
+        goal: "g",
+        includeNewCompanies: true,
+        more: {
+          handsOverDoing: true,
+          excludeNames: ["Nixo"],
+          neverDo: [{ odd: true }],
+        },
+      }),
+    ).toEqual({ status: "PREPARED", awaitingApprovalOf: "Q works" });
+    expect(calls[1]).toEqual({
+      handsOverDoing: true,
+      excludeNames: ["Nixo"],
+      askFirst: true,
+      goal: "g",
+      includeNewCompanies: true,
+    });
+  });
+
   it("their working hours ('weekends too, 8am to 10pm') reach the tool as read", async () => {
     const calls: Record<string, unknown>[] = [];
     const tools = {

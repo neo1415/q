@@ -154,11 +154,15 @@ export function createToolDelegationPort(dependencies: {
   readonly logger?: Logger | undefined;
 }): QDelegationPort {
   const { tools, logger } = dependencies;
+  // The fields a failed call named as invalid, from its safe message
+  // ("Arguments are invalid at: neverDo.0, workingHours"), top level only.
+  let lastInvalid: readonly string[] = [];
   const call = async (
     request: QAnswerRequest,
     name: string,
     args: Record<string, unknown>,
   ): Promise<unknown> => {
+    lastInvalid = [];
     try {
       const outcome = await tools.execute(
         { callId: `q-delegation-${name}`, name, arguments: args },
@@ -171,7 +175,21 @@ export function createToolDelegationPort(dependencies: {
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         },
       );
-      return outcome.result.ok ? outcome.result.data : null;
+      if (outcome.result.ok) return outcome.result.data;
+      if (outcome.result.error.code === "INVALID_ARGUMENTS") {
+        const at = /invalid at: (.*?)\. Do not/u.exec(
+          outcome.result.error.safeMessage,
+        );
+        lastInvalid = (at?.[1] ?? "")
+          .split(", ")
+          .map((path) => path.split(".")[0] ?? "")
+          .filter((key) => key.length > 0);
+        logger?.info(
+          { qRunId: request.runId, tool: name, invalid: lastInvalid },
+          "a delegation step's arguments did not validate",
+        );
+      }
+      return null;
     } catch (error: unknown) {
       if (request.signal?.aborted === true) throw error;
       logger?.warn(
@@ -240,23 +258,38 @@ export function createToolDelegationPort(dependencies: {
       const extra = Object.fromEntries(
         known.filter((key) => key in more).map((key) => [key, more[key]]),
       );
-      const data =
-        (await call(request, DELEGATION_TOOL, {
-          ...extra,
-          goal: input.goal,
-          includeNewCompanies: input.includeNewCompanies,
-        })) ??
-        // The extras did not validate: the plain card, their goal only --
-        // never when they named someone to leave out, since the plain card
-        // would cover them.
-        (Object.keys(extra).length === 0 ||
-        (Array.isArray(extra["excludeNames"]) &&
-          extra["excludeNames"].length > 0)
-          ? null
-          : await call(request, DELEGATION_TOOL, {
-              goal: input.goal,
-              includeNewCompanies: input.includeNewCompanies,
-            }));
+      const base = {
+        goal: input.goal,
+        includeNewCompanies: input.includeNewCompanies,
+      };
+      let data = await call(request, DELEGATION_TOOL, { ...extra, ...base });
+      if (data === null && Object.keys(extra).length > 0) {
+        // QA 43894445: one unreadable extra failed the whole card, and the
+        // old fallback refused whenever someone was excluded. Drop only the
+        // fields that failed; keep who they excluded (a card without them
+        // would cover someone they left out); and when a limit on what Q
+        // does alone could not be read, every step asks.
+        // Unknown which failed: every extra but who they excluded goes.
+        const invalid = new Set(
+          lastInvalid.length > 0
+            ? lastInvalid
+            : Object.keys(extra).filter((key) => key !== "excludeNames"),
+        );
+        if (invalid.has("excludeNames")) return null;
+        const kept = Object.fromEntries(
+          Object.entries(extra).filter(([key]) => !invalid.has(key)),
+        );
+        const lostALimit =
+          kept["handsOverDoing"] === true &&
+          ["neverDo", "onItsOwnOnly", "askFirst"].some((key) =>
+            invalid.has(key),
+          );
+        data = await call(request, DELEGATION_TOOL, {
+          ...kept,
+          ...(lostALimit ? { askFirst: true } : {}),
+          ...base,
+        });
+      }
       if (data === null || typeof data !== "object") return null;
       const record = data as Record<string, unknown>;
       return typeof record["status"] === "string" &&
