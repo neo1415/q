@@ -68,6 +68,7 @@ describe("rehearsal room helpers", () => {
   it("names every outcome in words", () => {
     expect(OUTCOME_WORDS.STRONG_LATER).toBe("Strong chance later");
     expect(OUTCOME_WORDS.ADJOURNED).toContain("missing");
+    expect(OUTCOME_WORDS.FOUNDER_ENDED).toBe("You ended the meeting");
   });
 });
 

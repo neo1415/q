@@ -162,6 +162,8 @@ export const REHEARSAL_OUTCOMES = [
   "DEAL_AGREED",
   "DECLINED",
   "LEFT_EARLY",
+  /** The person rehearsing ended it themselves (20261128090000). */
+  "FOUNDER_ENDED",
 ] as const;
 export const RehearsalOutcomeSchema = z.enum(REHEARSAL_OUTCOMES);
 export type RehearsalOutcome = z.infer<typeof RehearsalOutcomeSchema>;

@@ -359,7 +359,8 @@ check(
 const warnings = theirs.filter((turn) => turn.warning !== undefined);
 const outcome = row?.outcome ?? dto?.outcome ?? null;
 // Leaving is their close before the script ran out with a no or a
-// walk-out; a LEFT_EARLY written by the founder's own finish is the
+// walk-out; the founder's own finish writes FOUNDER_ENDED (LEFT_EARLY on
+// deploys before 20261128090000), which is the
 // founder ending it, not the investor leaving.
 const left =
   endedByThem && (outcome === "LEFT_EARLY" || outcome === "DECLINED");
@@ -369,6 +370,13 @@ check(
   left
     ? `they left (${String(outcome)}) after ${String(warnings.length)} warning(s); two are required`
     : `${endedByThem ? "they closed" : "the founder ended it"} (${String(warnings.length)} warning(s); outcome ${String(outcome)})`,
+);
+
+// Ending: the founder's own finish is recorded as theirs (20261128090000).
+check(
+  "ending",
+  endedByThem || outcome === "FOUNDER_ENDED",
+  `outcome ${String(outcome)}${endedByThem ? " (they closed it)" : ""}`,
 );
 
 // Review: the founder's, scored by code.

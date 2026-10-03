@@ -1569,7 +1569,7 @@ export function createRehearsalService(dependencies: {
             `${row.counterpartName} (played by Q)`,
             row.userRole,
           ),
-          ending: row.outcome ?? "LEFT_EARLY",
+          ending: row.outcome ?? "FOUNDER_ENDED",
         });
         if (review === null) {
           reviewLater(actor, rehearsalId, looks, attempt + 1);
@@ -2196,9 +2196,9 @@ export function createRehearsalService(dependencies: {
       presence.delete(row.id);
       const turns = normaliseTurns(row.turns, row.userRole);
       if (!turns.some((turn) => turn.from === "YOU")) {
-        // Nothing to review: they left before saying anything.
+        // Nothing to review: they ended it before saying anything.
         const left = await store.finish(actor, row.id, {
-          outcome: "LEFT_EARLY",
+          outcome: "FOUNDER_ENDED",
           score: null,
           review: null,
         });
@@ -2208,7 +2208,9 @@ export function createRehearsalService(dependencies: {
       if (viewer === null) return { kind: "NOT_A_PARTICIPANT" };
       const persona = personaOf(row.persona);
       if (persona === null) return { kind: "NOT_FOUND" };
-      const outcome: RehearsalConclusion = row.outcome ?? "LEFT_EARLY";
+      // No close of theirs recorded: the person ended it themselves, which
+      // is not the played person leaving (LEFT_EARLY).
+      const outcome: RehearsalConclusion = row.outcome ?? "FOUNDER_ENDED";
       const review = await composer.review(actor, {
         viewerRole: row.userRole,
         viewerOrganisation: viewer.organisationName.slice(0, 200),

@@ -77,7 +77,8 @@ export function RehearsalReview({
 
       {review === null ? (
         <p className="cq-body text-(--cq-text-secondary)">
-          {rehearsal.outcome === "LEFT_EARLY"
+          {rehearsal.outcome === "LEFT_EARLY" ||
+          rehearsal.outcome === "FOUNDER_ENDED"
             ? "You left before answering anything, so there's nothing to review yet."
             : "Q couldn't write the review just now. Open this page again in a moment."}
         </p>
