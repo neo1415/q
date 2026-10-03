@@ -192,7 +192,7 @@ async function signIn(email) {
   return body.access_token;
 }
 
-async function ask(token, text) {
+async function ask(token, text, conversationId) {
   const r = await fetch(`${env("Q_API")}/v1/q/runs`, {
     method: "POST",
     headers: {
@@ -204,6 +204,7 @@ async function ask(token, text) {
       capability: "ANSWER",
       message: { text },
       modality: "TEXT",
+      ...(conversationId === undefined ? {} : { conversationId }),
     }),
   });
   const body = await r.json().catch(() => ({}));
@@ -349,6 +350,7 @@ function accountOf(action) {
   return ACCOUNT_OF_AREA[action?.area] ?? "FOUNDER";
 }
 const rows = [];
+const conversationOf = new Map();
 for (const testCase of cases) {
   const account =
     ACCOUNT_OF_CASE[testCase.id] ??
@@ -362,7 +364,28 @@ for (const testCase of cases) {
       ? (founderCases.find((c) => c.id === testCase.id) ?? testCase)
       : testCase;
   const t0 = Date.now();
-  const runId = await ask(tokens[account], asked.say);
+  // One conversation per action (lead 2026-10-03): its phrasings follow
+  // one another, so a restated request meeting a pending card is covered.
+  const action =
+    testCase.expect.kind === "READ" ? null : testCase.expect.action;
+  const runId = await ask(
+    tokens[account],
+    asked.say,
+    action === null ? undefined : conversationOf.get(`${account}:${action}`),
+  );
+  if (
+    runId !== null &&
+    action !== null &&
+    !conversationOf.has(`${account}:${action}`)
+  ) {
+    const row = (
+      await sql(
+        `select conversation_id from q_runtime.runs where id = ${quote(runId)}`,
+      )
+    )[0];
+    if (row?.conversation_id)
+      conversationOf.set(`${account}:${action}`, row.conversation_id);
+  }
   const status = runId === null ? "NOT_STARTED" : await settled(runId);
   const ok =
     runId !== null &&
