@@ -254,6 +254,11 @@ const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
   pass_company: { company: UUID },
   unpass_company: { company: UUID },
   set_pitch_sharing: { pitch: "my pitch", sharing: "INVESTORS" },
+  // Working hours must be "HH:MM" with the day ending after it starts.
+  propose_standing_instruction: {
+    goal: "Handle all the work for me",
+    workingHours: { days: [1, 2, 3, 4, 5, 6, 7], start: "08:00", end: "22:00" },
+  },
 };
 
 /** What a field the schema walk could not satisfy is tried as, in order. */

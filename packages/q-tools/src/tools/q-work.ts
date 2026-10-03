@@ -329,6 +329,12 @@ type AwayInput = z.output<typeof AwayInputSchema>;
 
 // --- start: a standing instruction (ADR 0043) ------------------------------
 
+/** A time of day, 24-hour "HH:MM". */
+const WorkingTime = z
+  .string()
+  .regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/u)
+  .describe('A time of day, 24-hour "HH:MM".');
+
 export const ProposeStandingInstructionInputSchema = z
   .object({
     goal: z
@@ -382,6 +388,25 @@ export const ProposeStandingInstructionInputSchema = z
       .enum(["DAILY", "WEEKLY", "OFF"])
       .default("DAILY")
       .describe("How often they want a summary of what Q did, if they said."),
+    workingHours: z
+      .object({
+        days: z
+          .array(z.number().int().min(1).max(7))
+          .min(1)
+          .max(7)
+          .describe("ISO weekdays Q may work on, 1 = Monday ... 7 = Sunday."),
+        start: WorkingTime,
+        end: WorkingTime,
+      })
+      .strict()
+      .refine((hours) => hours.start < hours.end, {
+        message: "the working day ends after it starts",
+      })
+      .nullable()
+      .default(null)
+      .describe(
+        "Only when they said when Q may work ('weekends too, 8am to 10pm' -> days [1,2,3,4,5,6,7], start '08:00', end '22:00'), in their own time zone; null keeps the default, Monday-Friday 09:00-17:00.",
+      ),
   })
   .strict();
 type ProposeStandingInstructionInput = z.output<
@@ -492,7 +517,7 @@ export function createQWorkTools(
       id: PROPOSE_STANDING_INSTRUCTION,
       providerName: "propose_standing_instruction",
       description:
-        "The person gives Q a goal to work toward over time ('handle all the work for me', 'keep my investor conversations moving'): for ONE approval, Q works on it inside a grant they see in plain words -- on its own only expressing interest, chat messages within their tone and topics (a few per person, then it asks) and booking times in their working hours; everything else a card first; terms, money and commitments never without their yes. Call this at once from what they said; they approve it exactly and can stop it any time. For one founder search or one away-message, prefer propose_q_outreach or propose_stand_in.",
+        "The person gives Q a goal to work toward over time ('handle all the work for me', 'keep my investor conversations moving'): for ONE approval, Q works on it inside a grant they see in plain words -- on its own only expressing interest, chat messages within their tone and topics (a few per person, then it asks) and booking times in their working hours (Monday-Friday 09:00-17:00 unless they said otherwise); everything else a card first; terms, money and commitments never without their yes. Call this at once from what they said; they approve it exactly and can stop it any time. For one founder search or one away-message, prefer propose_q_outreach or propose_stand_in.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       approval: "NONE",
@@ -537,6 +562,19 @@ export function createQWorkTools(
                     : base.counterparts,
                 expiresInDays: input.expiresInDays,
                 digest: input.digest,
+                // Their own hours when they gave them, in their own zone;
+                // the card says them in plain words before they approve.
+                workingHours:
+                  input.workingHours === null
+                    ? base.workingHours
+                    : {
+                        timeZone: base.workingHours.timeZone,
+                        days: [...new Set(input.workingHours.days)].sort(
+                          (a, b) => a - b,
+                        ),
+                        start: input.workingHours.start,
+                        end: input.workingHours.end,
+                      },
               },
             },
           },

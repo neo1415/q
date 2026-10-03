@@ -57,4 +57,26 @@ describe("the delegation port", () => {
       { goal: "g", includeNewCompanies: true },
     ]);
   });
+
+  it("their working hours ('weekends too, 8am to 10pm') reach the tool as read", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const tools = {
+      execute: (proposal: { arguments: Record<string, unknown> }) => {
+        calls.push(proposal.arguments);
+        return Promise.resolve({
+          result: {
+            ok: true,
+            data: { status: "PREPARED", awaitingApprovalOf: "Q works on this" },
+          },
+        });
+      },
+    } as unknown as QToolPort;
+    const hours = { days: [1, 2, 3, 4, 5, 6, 7], start: "08:00", end: "22:00" };
+    await createToolDelegationPort({ tools }).propose(request, {
+      goal: "monitor new founders, including weekends",
+      includeNewCompanies: true,
+      more: { workingHours: hours },
+    });
+    expect(calls[0]?.["workingHours"]).toEqual(hours);
+  });
 });

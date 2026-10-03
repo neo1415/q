@@ -1,0 +1,112 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  InstructionGrantPayloadSchema,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
+
+import {
+  createQToolExecutor,
+  createQToolRegistry,
+  createQWorkTools,
+  type QWorkIntelligencePort,
+} from "../src/index.js";
+import { actorA, contextFor, planFor } from "./support.js";
+
+/**
+ * Their own working hours on a standing instruction (lead 2026-10-03):
+ * "including weekends, 8am to 10pm" is what the grant they approve says,
+ * in their own time zone; nothing said keeps Monday-Friday 09:00-17:00.
+ */
+
+function ownPlan(): PermittedContextPlan {
+  const plan = planFor(actorA, "GENERAL_QUESTION", [
+    { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+  ]);
+  return {
+    ...plan,
+    scopes: plan.scopes.map((scope) =>
+      scope.kind === "OWN_Q_CONVERSATION"
+        ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+        : scope,
+    ),
+  };
+}
+
+function world() {
+  const prepared: unknown[] = [];
+  const unused = () => Promise.reject(new Error("not this tool"));
+  const port: QWorkIntelligencePort = {
+    isInvestor: () => Promise.resolve(true),
+    hasCompany: () => Promise.resolve(false),
+    list: () => Promise.resolve([]),
+    stop: unused,
+    answer: unused,
+    setAway: unused,
+    timeZoneOf: () => Promise.resolve("Africa/Lagos"),
+    prepareForApproval: (entry) => {
+      prepared.push(entry.proposal.payload);
+      return "PREPARED";
+    },
+  };
+  const executor = createQToolExecutor({
+    registry: createQToolRegistry(createQWorkTools(port)),
+  });
+  const propose = async (args: Record<string, unknown>) => {
+    const outcome = await executor.execute(
+      {
+        callId: "c-1",
+        name: "propose_standing_instruction",
+        arguments: { goal: "Monitor new founders", ...args },
+      },
+      contextFor(actorA, ownPlan()),
+    );
+    return { outcome, prepared };
+  };
+  return { propose };
+}
+
+const grantOf = (payload: unknown) =>
+  InstructionGrantPayloadSchema.parse(payload).grant;
+
+describe("propose_standing_instruction: their working hours", () => {
+  it("nothing said keeps the default, Monday-Friday 09:00-17:00 in their zone", async () => {
+    const { outcome, prepared } = await world().propose({});
+    expect(outcome.result.ok).toBe(true);
+    expect(grantOf(prepared[0]).workingHours).toEqual({
+      timeZone: "Africa/Lagos",
+      days: [1, 2, 3, 4, 5],
+      start: "09:00",
+      end: "17:00",
+    });
+  });
+
+  it("'including weekends, 8am to 10pm' is every day 08:00-22:00, in their zone", async () => {
+    const { outcome, prepared } = await world().propose({
+      workingHours: {
+        days: [7, 1, 2, 3, 4, 5, 6],
+        start: "08:00",
+        end: "22:00",
+      },
+    });
+    expect(outcome.result.ok).toBe(true);
+    expect(grantOf(prepared[0]).workingHours).toEqual({
+      timeZone: "Africa/Lagos",
+      days: [1, 2, 3, 4, 5, 6, 7],
+      start: "08:00",
+      end: "22:00",
+    });
+  });
+
+  it("a day that ends before it starts, or a day outside 1-7, is refused, never guessed", async () => {
+    for (const workingHours of [
+      { days: [6, 7], start: "22:00", end: "08:00" },
+      { days: [0], start: "08:00", end: "22:00" },
+      { days: [1], start: "8am", end: "10pm" },
+    ]) {
+      const { outcome, prepared } = await world().propose({ workingHours });
+      expect(outcome.result.ok).toBe(false);
+      expect(prepared).toHaveLength(0);
+    }
+  });
+});
