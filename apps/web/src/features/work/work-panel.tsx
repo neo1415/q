@@ -356,10 +356,19 @@ export function WorkPanel({
     };
   }, [load]);
 
+  // The full page lists stopped plans too, so it leads with what is still
+  // running and does not call a stopped plan "working on" (demo-44 pass).
   const shown =
     variant === "home"
       ? (items ?? []).filter((item) => item.status === "ACTIVE")
-      : (items ?? []);
+      : (items ?? []).toSorted(
+          (a, b) =>
+            Number(b.status === "ACTIVE") - Number(a.status === "ACTIVE"),
+        );
+  const heading =
+    variant === "home" || shown.every((item) => item.status === "ACTIVE")
+      ? "Q is working on"
+      : "Plans you approved";
 
   if (variant === "home" && (items === null || shown.length === 0)) return null;
 
@@ -373,7 +382,7 @@ export function WorkPanel({
         id={`q-work-${variant}`}
         className="cq-title-sm text-(--cq-text-primary)"
       >
-        Q is working on
+        {heading}
       </h2>
       {items === null && !failed ? (
         <Skeleton lines={3} />
