@@ -142,7 +142,9 @@ export type ScheduleRefusal =
   | "NOT_FOUND"
   | "NOT_ORGANISER"
   | "CANCELLED"
-  | "INVALID_TIME";
+  | "INVALID_TIME"
+  /** An idempotency key already used for a different request. */
+  | "KEY_REUSED";
 
 export type ScheduleOutcome<T> =
   | ({ readonly outcome: "OK" } & T)
@@ -995,6 +997,18 @@ export function createScheduleService(
         qActionId: input.qActionId ?? null,
         idempotencyKey: input.idempotencyKey,
       });
+      // The same key with a different reminder is not a retry: it would
+      // silently answer with the first one (break-it sweep 2026-10-03).
+      if (
+        !created.created &&
+        (created.record.title !== input.title ||
+          created.record.dueAt.getTime() !== input.dueAt.getTime() ||
+          created.record.relationshipId !== (input.relationshipId ?? null) ||
+          created.record.channel !== input.channel ||
+          created.record.note !== (input.note ?? null))
+      ) {
+        return refusal("KEY_REUSED");
+      }
       return {
         outcome: "OK",
         reminder: reminderView(created.record),
