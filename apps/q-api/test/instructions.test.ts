@@ -73,6 +73,13 @@ describe("the q.instruction.grant card", () => {
     );
     expect(card).toContain("Budget: $5.00 a month");
     expect(card).toContain("Until: 30 days from now");
+    // Autonomy off (the default): their AUTO choices shown, and the line.
+    expect(card).toContain(
+      "Q will ask for each step until autonomy is switched on.",
+    );
+    expect(grantCard(payload(), { autoEnabled: true })).not.toContain(
+      "until autonomy is switched on",
+    );
   });
 
   it("binds to the person who asked, as its target", () => {
@@ -201,6 +208,7 @@ describe("instructions on the work list", () => {
     pause_reason: null,
     expires_at: new Date("2026-11-02T10:00:00Z"),
     stopped_at: null,
+    conversation_id: null,
     created_at: now,
     updated_at: now,
     grant_payload: handleEverythingGrant({ timeZone: "UTC" }),

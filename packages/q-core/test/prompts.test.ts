@@ -134,6 +134,8 @@ describe("registry", () => {
         "WORK_INTERVIEW_REPORT",
         "WORK_STAND_IN_REPLY",
         "WORK_SLOT_READER",
+        // ADR 0043: standing instructions.
+        "INSTRUCTION_PLAN",
         // DOCS: the wording pass over a composed deck.
         "DOCUMENT_POLISH",
         // DAILY: The Q Daily's story writer and Q's take column.

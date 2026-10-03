@@ -32,6 +32,7 @@ export type InstructionRow = {
   pause_reason: string | null;
   expires_at: Date | null;
   stopped_at: Date | null;
+  conversation_id: string | null;
   created_at: Date;
   updated_at: Date;
   grant_payload: unknown;
@@ -193,6 +194,110 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
         returning id`;
       return rows.length > 0;
     },
+
+    /** The platform's read, for the engine advancing this instruction. */
+    instruction: async (id: string): Promise<InstructionRow | null> => {
+      const rows = await sql<InstructionRow[]>`
+        select i.*, g.grant_payload
+          from q_runtime.standing_instructions i
+          left join q_runtime.instruction_grants g
+            on g.instruction_id = i.id and g.version = i.grant_version
+         where i.id = ${id}`;
+      return rows[0] ?? null;
+    },
+
+    /** The conversation its cards are asked in, set once. */
+    setConversation: async (
+      id: string,
+      conversationId: string,
+    ): Promise<void> => {
+      await sql`
+        update q_runtime.standing_instructions
+           set conversation_id = ${conversationId}, updated_at = clock_timestamp()
+         where id = ${id} and conversation_id is null`;
+    },
+
+    /** Past its expiry: EXPIRED, once. */
+    expire: async (id: string): Promise<void> => {
+      await sql`
+        update q_runtime.standing_instructions
+           set status = 'EXPIRED', updated_at = clock_timestamp()
+         where id = ${id} and status in ('ACTIVE', 'PAUSED')
+           and expires_at is not null and expires_at <= now()`;
+    },
+
+    /**
+     * One step, once: a replayed firing finds the step already recorded
+     * (unique idempotency key) and records nothing new.
+     */
+    recordStep: async (step: {
+      readonly instruction: Pick<
+        InstructionRow,
+        "id" | "tenant_id" | "user_id" | "grant_version"
+      >;
+      readonly runKey: string;
+      readonly stepIndex: number;
+      readonly action: string;
+      readonly mode: "AUTO" | "ASK";
+      readonly status: InstructionStepRow["status"];
+      readonly relationshipId: string | null;
+      readonly words: string;
+      readonly reasonCode: string | null;
+      readonly qActionId: string | null;
+      readonly idempotencyKey: string;
+    }): Promise<boolean> => {
+      const rows = await sql<{ id: string }[]>`
+        insert into q_runtime.instruction_steps
+          (tenant_id, user_id, instruction_id, grant_version, run_key, step_index,
+           action, mode, status, relationship_id, words, reason_code, q_action_id,
+           idempotency_key)
+        values (${step.instruction.tenant_id}, ${step.instruction.user_id},
+                ${step.instruction.id}, ${step.instruction.grant_version ?? 1},
+                ${step.runKey}, ${step.stepIndex}, ${step.action.slice(0, 80)},
+                ${step.mode}, ${step.status}, ${step.relationshipId},
+                ${step.words.slice(0, 500)}, ${step.reasonCode}, ${step.qActionId},
+                ${step.idempotencyKey})
+        on conflict (idempotency_key) do nothing
+        returning id`;
+      return rows.length > 0;
+    },
+
+    /** Whether this step already ran (a replayed firing skips it). */
+    stepDone: async (idempotencyKey: string): Promise<boolean> =>
+      (
+        await sql<{ found: number }[]>`
+          select 1 as found from q_runtime.instruction_steps
+           where idempotency_key = ${idempotencyKey}`
+      ).length > 0,
+
+    /** Q's sent chat messages per relationship under this instruction. */
+    messagesSent: async (
+      instructionId: string,
+    ): Promise<ReadonlyMap<string, number>> => {
+      const rows = await sql<{ relationship_id: string; sent: number }[]>`
+        select relationship_id, count(*)::int as sent
+          from q_runtime.instruction_steps
+         where instruction_id = ${instructionId}
+           and action = 'chat.message.send' and status = 'DONE'
+           and relationship_id is not null
+         group by relationship_id`;
+      return new Map(rows.map((row) => [row.relationship_id, row.sent]));
+    },
+
+    /** The platform's read of what Q did, newest last, for the planner. */
+    history: async (
+      instructionId: string,
+      limit = 30,
+    ): Promise<readonly InstructionStepRow[]> =>
+      (
+        await sql<InstructionStepRow[]>`
+          select run_key, step_index, action, mode, status, relationship_id, words,
+                 reason_code, q_action_id, created_at
+            from q_runtime.instruction_steps
+           where instruction_id = ${instructionId}
+           order by created_at desc, step_index desc
+           limit ${limit}`
+      ).reverse(),
 
     /** The person's own time zone, when they set one. */
     timeZoneOf: async (owner: Owner): Promise<string | null> =>

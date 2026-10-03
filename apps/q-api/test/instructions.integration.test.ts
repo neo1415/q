@@ -32,6 +32,13 @@ const MIGRATION = fileURLToPath(
   ),
 );
 
+const CONVERSATION_MIGRATION = fileURLToPath(
+  new URL(
+    "../../../supabase/migrations/20261122090000_instruction_conversation.sql",
+    import.meta.url,
+  ),
+);
+
 class Rollback extends Error {}
 
 describe("standing instructions against PostgreSQL", () => {
@@ -59,6 +66,11 @@ describe("standing instructions against PostgreSQL", () => {
         const [present] = await tx<{ found: string | null }[]>`
           select to_regclass('q_runtime.standing_instructions')::text as found`;
         if (present?.found === null) await tx.file(MIGRATION);
+        const [column] = await tx<{ found: number }[]>`
+          select count(*)::int as found from information_schema.columns
+           where table_schema = 'q_runtime' and table_name = 'standing_instructions'
+             and column_name = 'conversation_id'`;
+        if (column?.found === 0) await tx.file(CONVERSATION_MIGRATION);
 
         const tenant = randomUUID();
         await tx`insert into identity.tenants (id, name) values (${tenant}, 'Instruction tenant')`;
@@ -140,6 +152,32 @@ describe("standing instructions against PostgreSQL", () => {
         expect(await store.stop(owner, id)).toBe(true);
         expect((await store.own(owner, id))?.status).toBe("STOPPED");
         expect(await store.stop(owner, id)).toBe(false);
+
+        // Steps: once per key, counted per person for the message cap.
+        const instruction = await store.instruction(id);
+        if (instruction === null) throw new Error("no instruction");
+        const relationship = randomUUID();
+        const step = {
+          instruction,
+          runKey: "run-0001",
+          stepIndex: 0,
+          action: "chat.message.send",
+          mode: "AUTO" as const,
+          status: "DONE" as const,
+          relationshipId: relationship,
+          words: "Said hello.",
+          reasonCode: null,
+          qActionId: null,
+          idempotencyKey: `instr:${id}:run-0001:0`,
+        };
+        expect(await store.recordStep(step)).toBe(true);
+        expect(await store.recordStep(step)).toBe(false);
+        expect(await store.stepDone(step.idempotencyKey)).toBe(true);
+        expect((await store.messagesSent(id)).get(relationship)).toBe(1);
+        expect(await store.history(id)).toHaveLength(1);
+        expect(await store.steps(ben$, id)).toHaveLength(0);
+        await store.setConversation(id, randomUUID());
+        expect((await store.own(owner, id))?.conversation_id).not.toBeNull();
         throw new Rollback();
       }),
     ).rejects.toBeInstanceOf(Rollback);

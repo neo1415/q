@@ -23,6 +23,7 @@ import {
   isTerminalQRunStatus,
   QActionProposalIdSchema,
   QApprovalIdSchema,
+  QRunIdSchema,
   type CorrelationId,
 } from "@capital-q/contracts";
 import {
@@ -44,6 +45,7 @@ import {
   createQOrchestrationRuntime,
   createQRuntimeService,
   createQSubjectResolverRegistry,
+  QOrchestrationVersionError,
   QRunAlreadyTerminalError,
   runRef,
   type QOrchestrator,
@@ -64,6 +66,10 @@ import { createChatMessageSendAction } from "../src/composition/chat-actions.js"
 import { plainProposalStatus } from "../src/composition/conversation-approvals.js";
 import { createEmailSendAction } from "../src/composition/email-action.js";
 import { createInstructionActions } from "../src/composition/instructions/actions.js";
+import {
+  createInstructionAsk,
+  INSTRUCTION_ORCHESTRATION_VERSION,
+} from "../src/composition/instructions/ask.js";
 import { createPersonProfileUpdateAction } from "../src/composition/person-profile-action.js";
 import { createWorkStartActions } from "../src/composition/work/actions.js";
 import {
@@ -512,6 +518,93 @@ describe("approve → continue → execute, per action type (local PostgreSQL)",
     });
     return { view, action };
   }
+
+  // ADR 0043: a standing instruction's ASK step is a card in its own run,
+  // begun under the instruction's orchestration version. Approving it never
+  // resumes the conversational engine: the gate executes it.
+  it("an instruction's card: proposed in its own run, approved, executed through the gate", async () => {
+    const instructionId = randomUUID();
+    const ask = createInstructionAsk({
+      runtime: world.runtime,
+      orchestration: world.orchestration,
+      actions: world.service,
+      store: {
+        own: (_owner: unknown, id: string) =>
+          Promise.resolve(
+            id === instructionId
+              ? ({
+                  id,
+                  goal_text: "Handle all the work for me",
+                  conversation_id: null,
+                } as never)
+              : null,
+          ),
+        setConversation: () => Promise.resolve(),
+      },
+    });
+    const card = await ask(world.actor, {
+      instructionId,
+      actionType: "reminder.create",
+      payload: {
+        ownerUserId: world.actor.userId,
+        title: "Follow up with Acme",
+        remindAt: "2030-10-09T08:00:00.000Z",
+        timeZone: "Europe/London",
+        channel: "EMAIL",
+      },
+      words: "Remind you to follow up with Acme.",
+      key: `instr:${instructionId}:run:0`,
+    });
+    expect(card).not.toBeNull();
+    // Someone else's instruction never asks in their name.
+    expect(
+      await ask(world.actor, {
+        instructionId: randomUUID(),
+        actionType: "reminder.create",
+        payload: {},
+        words: "x",
+        key: `instr:${randomUUID()}:run:0`,
+      }),
+    ).toBeNull();
+    const [row] = await db.sql<
+      { run_id: string; approval_id: string; orchestration_version: string }[]
+    >`
+      select a.run_id, ap.id as approval_id, r.orchestration_version
+        from q_runtime.actions a
+        join q_runtime.approvals ap on ap.action_id = a.id
+        join q_runtime.runs r on r.id = a.run_id
+       where a.id = ${card?.qActionId ?? randomUUID()}`;
+    expect(row?.orchestration_version).toBe(INSTRUCTION_ORCHESTRATION_VERSION);
+    const correlationId = CORRELATION();
+    await world.service.approve({
+      actor: world.actor,
+      approvalId: QApprovalIdSchema.parse(row?.approval_id),
+      correlationId,
+    });
+    // The real orchestrator refuses a version it does not run.
+    const continueApproved = createApprovedContinuation({
+      orchestrator: () =>
+        ({
+          resume: () =>
+            Promise.reject(
+              new QOrchestrationVersionError(INSTRUCTION_ORCHESTRATION_VERSION),
+            ),
+        }) as unknown as QOrchestrator,
+      actions: world.port,
+    });
+    await continueApproved({
+      actor: world.actor,
+      runId: QRunIdSchema.parse(row?.run_id),
+      actionId: QActionProposalIdSchema.parse(card?.qActionId),
+      correlationId,
+    });
+    const view = await world.service.getApproval({
+      actor: world.actor,
+      approvalId: QApprovalIdSchema.parse(row?.approval_id),
+      correlationId: CORRELATION(),
+    });
+    expect(view.action.actionStatus).toBe("EXECUTED");
+  });
 
   it.each(payloads)(
     "%s: approved on a paused run executes, and reads SAVED",

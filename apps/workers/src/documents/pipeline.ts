@@ -128,14 +128,23 @@ export function createDocumentProcessingPipeline(
     const { documentVersionId } = job.data;
 
     // The pipeline version comes from this worker's configuration; a job
-    // asking for a different one is not honoured silently.
+    // asking for a different one is not honoured silently. Nor is it a
+    // decision: during a deploy the old and new workers overlap, and a job
+    // the new version enqueued can reach the old worker first (live
+    // 2026-10-03: three re-driven v2 jobs dead-lettered by the v1 worker
+    // within a second). It goes back on the queue for the worker of its
+    // version; the attempt limit still dead-letters a job no worker runs.
     if (job.data.pipelineVersion !== pipelineVersion) {
       logger.warn(
-        { msgId: message.msgId, requested: job.data.pipelineVersion },
-        "process job names another pipeline version",
+        {
+          msgId: message.msgId,
+          requested: job.data.pipelineVersion,
+          running: pipelineVersion,
+        },
+        "process job names another pipeline version; left for its worker",
       );
       observe("PIPELINE_VERSION_MISMATCH", startedAt);
-      return { kind: "PERMANENT", errorCode: "PIPELINE_VERSION_MISMATCH" };
+      return { kind: "RETRY", errorCode: "PIPELINE_VERSION_MISMATCH" };
     }
 
     const target = await evidence.resolveProcessingTarget(documentVersionId);
