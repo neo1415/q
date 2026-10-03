@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import {
-  discoverInvestors,
   listConnectionRequests,
   listInvestorRelationships,
 } from "@capital-q/api-client";
@@ -14,7 +14,6 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
-import { InvestorCards } from "@/features/investors/investor-cards";
 import { ConnectionRequestsInbox } from "@/features/network/connection-requests-inbox";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 
@@ -28,11 +27,7 @@ export const dynamic = "force-dynamic";
  * requests founders sent their organisation. The person's own side decides
  * which; every list is the API's, read under their own session.
  */
-export default async function InvestorsPage({
-  searchParams,
-}: {
-  readonly searchParams?: Promise<{ readonly cursor?: string | string[] }>;
-} = {}) {
+export default async function InvestorsPage() {
   const context = await resolveOwnContext();
   const session = await apiSession();
 
@@ -113,45 +108,7 @@ export default async function InvestorsPage({
     );
   }
 
-  const raw = (await searchParams)?.cursor;
-  const cursor = typeof raw === "string" && raw.length <= 200 ? raw : null;
-  const slate = await discoverInvestors(session, {
-    ...(cursor === null ? {} : { cursor }),
-  }).catch(() => null);
-
-  return (
-    <PageContainer>
-      <PageHeader title="Investors" />
-      {slate === null ? (
-        <EmptyState
-          title="Investors couldn't load."
-          description="Nothing is wrong with your profile. Try again in a moment."
-          action={
-            <Link href="/investors" className={buttonClassName("secondary")}>
-              Try again
-            </Link>
-          }
-        />
-      ) : slate.items.length === 0 ? (
-        <EmptyState
-          title="No investors are discoverable yet."
-          description="An investor appears here when they choose to be found. Nothing about their mandate is shown unless they publish it."
-        />
-      ) : (
-        <>
-          <InvestorCards items={slate.items} />
-          {slate.nextCursor === null ? null : (
-            <div className="flex justify-center">
-              <Link
-                href={`/investors?cursor=${encodeURIComponent(slate.nextCursor)}`}
-                className={buttonClassName("secondary")}
-              >
-                More investors
-              </Link>
-            </div>
-          )}
-        </>
-      )}
-    </PageContainer>
-  );
+  // A founder's investor list is Discover's Investors tab (demo audit
+  // 2026-10-03: the same list lived at two addresses). Old links land there.
+  redirect("/discover");
 }

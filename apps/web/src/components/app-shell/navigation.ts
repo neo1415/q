@@ -92,16 +92,10 @@ export const FOUNDER_MEDIA_NAVIGATION: NavigationItem = {
 };
 
 /**
- * Investors (ADR 0023). For a founder: the investors they may look at and
- * ask to connect with. For an investor: founders' Connection Requests to
- * their organisation. Same route, the person's own side decides the page;
- * the server decides what either may see.
+ * Founder requests (ADR 0023): founders' Connection Requests to an
+ * investor's organisation. A founder's /investors now opens Discover's
+ * Investors tab, so only investors see this entry.
  */
-export const INVESTORS_NAVIGATION: NavigationItem = {
-  href: "/investors",
-  label: "Investors",
-  icon: Handshake,
-};
 export const FOUNDER_REQUESTS_NAVIGATION: NavigationItem = {
   href: "/investors",
   label: "Founder requests",
@@ -186,7 +180,9 @@ export function sectionsFor(scope: ContextScope): readonly NavigationItem[] {
   const investor = scope === "investor_private";
   return [
     ...PRIMARY_NAVIGATION,
-    ...(founder ? [INVESTORS_NAVIGATION, FOUNDER_MEDIA_NAVIGATION] : []),
+    // Founder Discover's Investors tab is the investor list; a second
+    // "Investors" entry showed the same list (demo audit 2026-10-03).
+    ...(founder ? [FOUNDER_MEDIA_NAVIGATION] : []),
     ...(investor ? [FOUNDER_REQUESTS_NAVIGATION] : []),
     ...(founder || investor ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION] : []),
     DOCUMENTS_NAVIGATION,

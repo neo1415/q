@@ -5,13 +5,15 @@ import type { DiscoveredInvestorDto } from "@capital-q/contracts";
 import { ICON_SIZE, MapPin } from "@capital-q/ui/icons";
 
 import { countryLabel } from "../company/declared-labels";
+import { AskQAboutFit } from "./ask-q-about-fit";
 import { inboundLabel, initials, investorTypeLabel } from "./investor-labels";
 
 /**
- * Investors a founder may look at (ADR 0023), as cards: cover, photo,
- * name, type, where they are, what they said publicly, and how they take
- * requests, in words. Each opens the investor's page. Order is the
- * server's; nothing here ranks, scores or counts.
+ * Investors a founder may look at (ADR 0023), as cards: cover (only when
+ * they set one -- an empty grey band read as unfinished), photo, name,
+ * type, where they are, what they said publicly, and how they take
+ * requests, in words. Each opens the investor's page, and Q can be asked
+ * about fit. Order is the server's; nothing here ranks, scores or counts.
  */
 export function InvestorCards({
   items,
@@ -46,69 +48,80 @@ function InvestorCard({
   const photo = item.photoUrl ?? null;
   const cover = item.coverUrl ?? null;
   return (
-    <Link
-      href={`/investors/${item.investorOrganisationId}`}
-      className="group flex h-full flex-col overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) transition-colors duration-(--cq-motion-base) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+    <div
+      className="flex h-full flex-col overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) transition-colors duration-(--cq-motion-base) hover:border-(--cq-border-strong)"
       data-investor-card={item.investorOrganisationId}
     >
-      <div className="relative aspect-[4/1] w-full bg-(--cq-surface-strong)">
+      <Link
+        href={`/investors/${item.investorOrganisationId}`}
+        className="group flex flex-1 flex-col focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+      >
         {cover === null ? null : (
-          // eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived storage URL fetched by the browser directly
-          <img
-            src={cover}
-            alt=""
-            className="absolute inset-0 size-full object-cover"
-            loading="lazy"
-            decoding="async"
-          />
-        )}
-      </div>
-      <div className="flex flex-1 flex-col gap-2 px-4 pb-4">
-        <div className="relative -mt-7 size-14 overflow-hidden rounded-xl border-2 border-(--cq-surface) bg-(--cq-surface-subtle)">
-          {photo === null ? (
-            <span
-              aria-hidden="true"
-              className="cq-title-sm flex size-full items-center justify-center text-(--cq-text-secondary)"
-            >
-              {initials(item.displayName)}
-            </span>
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
+          <div className="relative aspect-[4/1] w-full bg-(--cq-surface-strong)">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived storage URL fetched by the browser directly */}
             <img
-              src={photo}
+              src={cover}
               alt=""
-              className="size-full object-cover"
+              className="absolute inset-0 size-full object-cover"
               loading="lazy"
               decoding="async"
             />
+          </div>
+        )}
+        <div
+          className={`flex flex-1 flex-col gap-2 px-4 pb-2 ${cover === null ? "pt-4" : ""}`}
+        >
+          <div
+            className={`relative size-14 overflow-hidden rounded-xl border-2 border-(--cq-surface) bg-(--cq-surface-subtle) ${cover === null ? "" : "-mt-7"}`}
+          >
+            {photo === null ? (
+              <span
+                aria-hidden="true"
+                className="cq-title-sm flex size-full items-center justify-center text-(--cq-text-secondary)"
+              >
+                {initials(item.displayName)}
+              </span>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
+              <img
+                src={photo}
+                alt=""
+                className="size-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <h3 className="cq-title-sm text-(--cq-text-primary) group-hover:underline group-hover:underline-offset-4">
+              {item.displayName}
+            </h3>
+            <p className="cq-caption flex flex-wrap items-center gap-x-1.5 text-(--cq-text-tertiary)">
+              <span>{investorTypeLabel(item.investorType)}</span>
+              {where === null ? null : (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin size={ICON_SIZE.compact} aria-hidden="true" />
+                  {where}
+                </span>
+              )}
+            </p>
+          </div>
+          {item.publicDescription === null ? null : (
+            <p className="cq-body-sm line-clamp-3 text-(--cq-text-secondary)">
+              {item.publicDescription}
+            </p>
+          )}
+          {footer}
+          {inboundLabel(item.inboundPreference) === null ? null : (
+            <span className="cq-caption mt-auto self-start rounded-full border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)">
+              {inboundLabel(item.inboundPreference)}
+            </span>
           )}
         </div>
-        <div className="flex flex-col gap-0.5">
-          <h3 className="cq-title-sm text-(--cq-text-primary) group-hover:underline group-hover:underline-offset-4">
-            {item.displayName}
-          </h3>
-          <p className="cq-caption flex flex-wrap items-center gap-x-1.5 text-(--cq-text-tertiary)">
-            <span>{investorTypeLabel(item.investorType)}</span>
-            {where === null ? null : (
-              <span className="inline-flex items-center gap-1">
-                <MapPin size={ICON_SIZE.compact} aria-hidden="true" />
-                {where}
-              </span>
-            )}
-          </p>
-        </div>
-        {item.publicDescription === null ? null : (
-          <p className="cq-body-sm line-clamp-3 text-(--cq-text-secondary)">
-            {item.publicDescription}
-          </p>
-        )}
-        {footer}
-        {inboundLabel(item.inboundPreference) === null ? null : (
-          <span className="cq-caption mt-auto self-start rounded-full border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)">
-            {inboundLabel(item.inboundPreference)}
-          </span>
-        )}
+      </Link>
+      <div className="px-2 pb-2">
+        <AskQAboutFit name={item.displayName} />
       </div>
-    </Link>
+    </div>
   );
 }
