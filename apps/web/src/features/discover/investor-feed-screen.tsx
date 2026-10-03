@@ -1168,12 +1168,22 @@ function InvestorFeed({
             feedNotes={
               notes.length === 0 &&
               unverifiableLine === null &&
-              controls.notice === null ? null : (
+              controls.notice === null &&
+              feed.decisionNotice === null ? null : (
                 <div className="flex flex-col gap-1">
                   <Notes notes={notes} />
                   {unverifiableLine}
                   {controls.notice === null ? null : (
                     <p className="cq-status-line">{controls.notice}</p>
+                  )}
+                  {feed.decisionNotice === null ? null : (
+                    <p
+                      className="cq-status-line"
+                      role="status"
+                      data-feed-decision-notice
+                    >
+                      {feed.decisionNotice}
+                    </p>
                   )}
                 </div>
               )
