@@ -1,5 +1,6 @@
 import type { Logger } from "@capital-q/observability";
 
+import { digestOf } from "./digest.js";
 import type { InstructionEngine } from "./engine.js";
 import type { InstructionStore } from "./store.js";
 
@@ -15,7 +16,13 @@ const CLAIM_LIMIT = 10;
 const OUTSIDE_HOURS_RETRY_MINUTES = 30;
 
 export function createInstructionTriggers(dependencies: {
-  readonly store: Pick<InstructionStore, "claimDue" | "defer" | "wakeFor">;
+  readonly store: Pick<InstructionStore, "claimDue" | "defer" | "wakeFor"> &
+    Partial<
+      Pick<
+        InstructionStore,
+        "claimDigestDue" | "stepsSince" | "instruction" | "notify"
+      >
+    >;
   readonly engine: () => InstructionEngine | undefined;
   readonly logger?: Logger | undefined;
 }) {
@@ -54,7 +61,38 @@ export function createInstructionTriggers(dependencies: {
         );
       }
     }
+    await digests().catch((error: unknown) => {
+      logger?.warn({ err: error }, "standing instruction digests failed");
+    });
     return due.length;
+  };
+
+  /** S7: each due digest, once, from the recorded steps. */
+  const digests = async (): Promise<void> => {
+    if (
+      store.claimDigestDue === undefined ||
+      store.stepsSince === undefined ||
+      store.instruction === undefined ||
+      store.notify === undefined
+    ) {
+      return;
+    }
+    for (const claim of await store.claimDigestDue(CLAIM_LIMIT)) {
+      const row = await store.instruction(claim.id);
+      if (row === null) continue;
+      const digest = digestOf(
+        row.goal_text,
+        await store.stepsSince(claim.id, claim.since),
+      );
+      if (digest === null) continue;
+      await store.notify({
+        instruction: row,
+        key: `digest:${claim.claimed_at.toISOString()}`,
+        title: digest.title,
+        body: digest.body,
+        priority: "UPDATE",
+      });
+    }
   };
 
   /** One pass at a time per instance; a call during one joins it. */

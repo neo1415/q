@@ -1,6 +1,8 @@
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
+import { narrationOf } from "../composition/instructions/digest.js";
+
 /**
  * What Q opens with for somebody coming back (founder direction
  * 2026-09-29: "a very proactive Q"). Not "I'm listening": the one or two
@@ -26,6 +28,11 @@ export type OpenerFacts = {
   readonly unreadNotices: number;
   /** What the scout found about their company that they have not seen. */
   readonly scoutFinding?: string | null | undefined;
+  /**
+   * ADR 0043 S7: what Q did under their standing instruction and what
+   * waits on them, composed by code from the recorded steps.
+   */
+  readonly instructionNews?: string | null | undefined;
 };
 
 const TRIM = 70;
@@ -58,6 +65,9 @@ export function composeReturningOpener(
         ? ` And ${String(facts.remindersDue)} reminder${facts.remindersDue === 1 ? "" : "s"} due today.`
         : "";
     return `${hello} ${call}${also} Want me to prep you for it?`;
+  }
+  if (facts.instructionNews !== undefined && facts.instructionNews !== null) {
+    return `${hello} ${facts.instructionNews}`;
   }
   if (facts.notesReady > 0) {
     return facts.notesQuestion === undefined || facts.notesQuestion === null
@@ -112,7 +122,35 @@ export function createOpenerFacts(dependencies: {
          group by kind`,
     ]);
     const call = calls[0];
+    // Their standing instruction's last day, from its own steps; what waits
+    // on them, from its unread NEEDS_YOU notices. Absent tables (before the
+    // migration) read as nothing.
+    const instruction = await sql<
+      { goal_text: string; done: number; needs_you: number }[]
+    >`
+      select i.goal_text,
+             (select count(*)::int from q_runtime.instruction_steps s
+               where s.instruction_id = i.id and s.status = 'DONE'
+                 and s.created_at > ${new Date(current.getTime() - 24 * 3_600_000)}) as done,
+             (select count(*)::int from communication.notifications n
+               where n.user_id = ${actor.userId} and n.read_at is null
+                 and n.priority = 'NEEDS_YOU'
+                 and n.dedupe_key like 'instr:' || i.id::text || ':%') as needs_you
+        from q_runtime.standing_instructions i
+       where i.user_id = ${actor.userId} and i.tenant_id = ${actor.tenantId}
+         and i.status in ('ACTIVE', 'PAUSED')
+       order by i.updated_at desc
+       limit 1`.catch(() => []);
+    const latest = instruction[0];
     return {
+      instructionNews:
+        latest === undefined
+          ? null
+          : narrationOf({
+              goal: latest.goal_text,
+              done: latest.done,
+              needsYou: latest.needs_you,
+            }),
       nextCall:
         call === undefined
           ? null

@@ -99,6 +99,11 @@ export function grantCard(
   lines.push(
     `Until: ${String(grant.expiresInDays)} days from now, or when you say stop.`,
   );
+  lines.push(
+    grant.digest === "OFF"
+      ? "Updates: anything that needs you comes at once; no summaries."
+      : `Updates: anything that needs you comes at once, and a summary of what I did ${grant.digest === "WEEKLY" ? "weekly" : "daily"}.`,
+  );
   return lines.join("\n\n");
 }
 

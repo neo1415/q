@@ -33,6 +33,10 @@ export const INSTRUCTION_AUTO_ELIGIBLE_ACTIONS = [
   "schedule.meeting.book",
 ] as const;
 
+export const INSTRUCTION_DIGEST_CADENCES = ["DAILY", "WEEKLY", "OFF"] as const;
+export type InstructionDigestCadence =
+  (typeof INSTRUCTION_DIGEST_CADENCES)[number];
+
 export const INSTRUCTION_ACTION_MODES = ["AUTO", "ASK"] as const;
 export type InstructionActionMode = (typeof INSTRUCTION_ACTION_MODES)[number];
 
@@ -108,6 +112,8 @@ export const InstructionGrantSchema = z
       .regex(/^\d{1,4}(\.\d{1,2})?$/u)
       .default(INSTRUCTION_BUDGET_USD_MONTH_DEFAULT),
     expiresInDays: z.number().int().min(1).max(365),
+    /** S7: how often Q sums up what it did; NEEDS_YOU notices come at once. */
+    digest: z.enum(INSTRUCTION_DIGEST_CADENCES).default("DAILY"),
   })
   .strict();
 export type InstructionGrant = z.infer<typeof InstructionGrantSchema>;

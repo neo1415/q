@@ -10,6 +10,7 @@ import {
   type RequestDatabase,
 } from "@capital-q/database";
 
+import { createOpenerFacts } from "../src/voice/returning-opener.js";
 import {
   createPostgresInstructionStore,
   grantHash,
@@ -42,6 +43,13 @@ const CONVERSATION_MIGRATION = fileURLToPath(
 const TRIGGERS_MIGRATION = fileURLToPath(
   new URL(
     "../../../supabase/migrations/20261123090000_instruction_triggers.sql",
+    import.meta.url,
+  ),
+);
+
+const DIGEST_MIGRATION = fileURLToPath(
+  new URL(
+    "../../../supabase/migrations/20261124090000_instruction_digest.sql",
     import.meta.url,
   ),
 );
@@ -83,6 +91,11 @@ describe("standing instructions against PostgreSQL", () => {
            where table_schema = 'q_runtime' and table_name = 'standing_instructions'
              and column_name = 'next_fire_at'`;
         if (cadence?.found === 0) await tx.file(TRIGGERS_MIGRATION);
+        const [digestColumn] = await tx<{ found: number }[]>`
+          select count(*)::int as found from information_schema.columns
+           where table_schema = 'q_runtime' and table_name = 'standing_instructions'
+             and column_name = 'last_digest_at'`;
+        if (digestColumn?.found === 0) await tx.file(DIGEST_MIGRATION);
 
         const tenant = randomUUID();
         await tx`insert into identity.tenants (id, name) values (${tenant}, 'Instruction tenant')`;
@@ -215,6 +228,38 @@ describe("standing instructions against PostgreSQL", () => {
         });
         expect(resumed?.version).toBe(3);
         expect((await store.own(owner, id))?.status).toBe("ACTIVE");
+
+        // S7: a digest is due a day after the last one (or creation),
+        // claimed once; a NEEDS_YOU notice is written once per key.
+        await tx`update q_runtime.standing_instructions
+                    set last_digest_at = now() + interval '1 day'
+                  where id <> ${id} and status in ('ACTIVE', 'PAUSED')`;
+        expect(await store.claimDigestDue(10)).toEqual([]);
+        await tx`update q_runtime.standing_instructions
+                    set last_digest_at = now() - interval '25 hours' where id = ${id}`;
+        const digests = await store.claimDigestDue(10);
+        expect(digests.map((claim) => claim.id)).toEqual([id]);
+        expect(await store.claimDigestDue(10)).toEqual([]);
+        expect(
+          (await store.stepsSince(id, digests[0]?.since ?? new Date(0))).length,
+        ).toBeGreaterThan(0);
+        const live2 = await store.instruction(id);
+        if (live2 === null) throw new Error("no instruction");
+        const notice = {
+          instruction: live2,
+          key: "run-0001:needs",
+          title: "1 thing needs your yes",
+          body: "- Ask Acme.",
+          priority: "NEEDS_YOU" as const,
+        };
+        expect(await store.notify(notice)).toBe(true);
+        expect(await store.notify(notice)).toBe(false);
+        // The opener reads it back for them.
+        const facts = await createOpenerFacts({ sql: tx })({
+          userId: ada,
+          tenantId: tenant,
+        } as never);
+        expect(facts.instructionNews).toContain("1 thing needs your yes");
 
         expect(await store.stop(owner, id)).toBe(true);
         expect((await store.own(owner, id))?.status).toBe("STOPPED");

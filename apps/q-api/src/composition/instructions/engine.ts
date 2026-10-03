@@ -22,6 +22,7 @@ import type {
 import type { ActorContext } from "@capital-q/security";
 
 import { PLAN_MAX_COST_USD, type InstructionPlanner } from "./planner.js";
+import { needsYouNotice } from "./digest.js";
 import { factsLine, type QuarantinedThreadReader } from "./quarantine.js";
 import type { InstructionRow, InstructionStore } from "./store.js";
 
@@ -417,6 +418,7 @@ export type InstructionEngineDependencies = {
     | "history"
     | "addSpend"
     | "pause"
+    | "notify"
   >;
   readonly actions: readonly AnyAppAction[];
   readonly ports: AppActionPorts;
@@ -573,6 +575,21 @@ export function createInstructionEngine(
           "instruction budget card not prepared",
         );
       });
+    const notice = needsYouNotice({
+      goal: row.goal_text,
+      asked: [],
+      overBudget: true,
+    });
+    if (notice !== null) {
+      await store
+        .notify({
+          instruction: row,
+          key: `budget-${month}`,
+          priority: "NEEDS_YOU",
+          ...notice,
+        })
+        .catch(() => false);
+    }
     logger?.info(
       { instructionId: row.id, budgetUsdMonth: grant.budgetUsdMonth },
       "standing instruction paused: budget used",
@@ -724,6 +741,7 @@ export function createInstructionEngine(
 
       let done = 0;
       let asked = 0;
+      const askedWords: string[] = [];
       let refusedCount = 0;
       for (const [index, verdict] of verdicts.entries()) {
         const step = plan.steps[index];
@@ -846,6 +864,7 @@ export function createInstructionEngine(
           continue;
         }
         asked += 1;
+        askedWords.push(step.words);
         const code = verdict.verdict === "AUTO" ? "AUTONOMY_OFF" : verdict.code;
         const why = code === null ? null : (ASK_WORDS[code] ?? null);
         await record({
@@ -855,6 +874,23 @@ export function createInstructionEngine(
           reasonCode: code,
           qActionId: card.qActionId,
         });
+      }
+
+      // S7: what waits on them is a NEEDS_YOU notice at once.
+      const waiting = needsYouNotice({
+        goal: row.goal_text,
+        asked: askedWords,
+        overBudget: false,
+      });
+      if (waiting !== null) {
+        await store
+          .notify({
+            instruction: row,
+            key: `${runKey}:needs`,
+            priority: "NEEDS_YOU",
+            ...waiting,
+          })
+          .catch(() => false);
       }
 
       // What no declared action can do: said now, with an alternative.
