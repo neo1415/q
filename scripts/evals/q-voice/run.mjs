@@ -38,8 +38,13 @@ const only = process.argv.find((arg) => arg.startsWith("--only="))?.slice(7);
 const COST_PER_CALL_USD = Number(process.env.COST_PER_CALL_USD ?? "0.02");
 /** Turn reader, router, answer. */
 const CALLS_PER_CASE = 3;
-/** The company the investor's prepared action names (fictional seed). */
-const COMPANY = process.env.EVAL_COMPANY_NAME ?? "Ajopot";
+/**
+ * The company the investor's prepared action names: a fictional feed
+ * company the eval investor has no relationship with, so there is an
+ * interest to express (Ajopot is already in diligence with Savanna Seed;
+ * run 2078f553 rightly prepared nothing).
+ */
+const COMPANY = process.env.EVAL_COMPANY_NAME ?? "Clinicrest";
 
 /**
  * `expect`: NAVIGATE <destination> | CARD <action type> | ANSWER.
