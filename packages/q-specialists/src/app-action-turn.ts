@@ -45,14 +45,73 @@ export function appActionOf(read: object | null): TurnAppAction | null {
  */
 export type QAppActionPrepared = { readonly prepared: string };
 
+/**
+ * The action asked one thing it needs before it can be prepared (their
+ * time zone, QA run 7d7e7260): `asks` is the question said to them; the
+ * action and its arguments wait on the conversation for their reply.
+ */
+export type QAppActionAsks = {
+  readonly asks: string;
+  readonly needs: string;
+};
+
 export type QAppActionPort = {
   /** Tool names that are declared app actions (the registry's). */
   readonly tools: ReadonlySet<string>;
   readonly run: (
     request: QAnswerRequest,
     action: TurnAppAction,
-  ) => Promise<string | QAppActionPrepared | null>;
+  ) => Promise<string | QAppActionPrepared | QAppActionAsks | null>;
 };
+
+/** What a declared action is waiting on, kept on the conversation. */
+export type PendingAppAction = {
+  readonly action: TurnAppAction;
+  readonly needs: string;
+  readonly at: number;
+};
+
+/**
+ * The declared action each conversation is waiting to continue (QA runs
+ * 7d7e7260 -> 5c2f71aa: "Which city are you in…" then "Lagos" got no
+ * card -- the reply was read on its own and the tool was out of focus).
+ * Kept per conversation, briefly; the reply continues that action with
+ * its arguments, never by re-reading phrases.
+ */
+export function createPendingAppActions(
+  options: {
+    readonly ttlMs?: number | undefined;
+    readonly max?: number | undefined;
+    readonly now?: (() => number) | undefined;
+  } = {},
+): {
+  readonly hold: (
+    conversationId: string,
+    pending: Omit<PendingAppAction, "at">,
+  ) => void;
+  readonly take: (conversationId: string) => PendingAppAction | null;
+} {
+  const ttl = options.ttlMs ?? 30 * 60_000;
+  const max = options.max ?? 2_000;
+  const now = options.now ?? Date.now;
+  const held = new Map<string, PendingAppAction>();
+  return {
+    hold: (conversationId, pending) => {
+      held.delete(conversationId);
+      held.set(conversationId, { ...pending, at: now() });
+      while (held.size > max) {
+        const oldest = held.keys().next().value;
+        if (oldest === undefined) break;
+        held.delete(oldest);
+      }
+    },
+    take: (conversationId) => {
+      const pending = held.get(conversationId) ?? null;
+      held.delete(conversationId);
+      return pending !== null && now() - pending.at <= ttl ? pending : null;
+    },
+  };
+}
 
 /** Refusals that say nothing about why: never said as the answer. */
 const GENERIC_REFUSALS: ReadonlySet<string> = new Set([
@@ -118,6 +177,14 @@ export function createToolAppActionPort(dependencies: {
               : "";
         if (data.status === "PREPARED" && prepared.trim().length > 0) {
           return { prepared: prepared.trim() };
+        }
+        // It needs one thing from them first: ask it, and wait for it.
+        if (
+          data.status === "NEEDS_TIME_ZONE" &&
+          typeof data.says === "string" &&
+          data.says.trim().length > 0
+        ) {
+          return { asks: data.says.trim(), needs: "TIME_ZONE" };
         }
         return typeof data.says === "string" && data.says.trim().length > 0
           ? data.says.trim()

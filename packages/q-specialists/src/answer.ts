@@ -1,4 +1,11 @@
-import { appActionOf, type QAppActionPort } from "./app-action-turn.js";
+import {
+  appActionOf,
+  createPendingAppActions,
+  type QAppActionAsks,
+  type QAppActionPort,
+  type QAppActionPrepared,
+  type TurnAppAction,
+} from "./app-action-turn.js";
 import { toolFocusOf } from "./tool-focus.js";
 
 /**
@@ -639,6 +646,24 @@ export function createSpecialistQAnswer(
    * texture, not a record; a restart forgets a count, never a fact.
    */
   const conversations = new Map<string, ConversationState>();
+  /** Declared actions waiting on the person's reply, per conversation. */
+  const pendingActions = createPendingAppActions();
+  /** A port result said as the answer: a line, a card, or a question that waits. */
+  const saidByAction = (
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    action: TurnAppAction,
+    said: string | QAppActionPrepared | QAppActionAsks,
+  ): Promise<QAnswerOutcome> | QAnswerOutcome => {
+    if (typeof said === "string") {
+      return recordAnswer(request, conversationId, said);
+    }
+    if ("asks" in said) {
+      pendingActions.hold(conversationId, { action, needs: said.needs });
+      return recordAnswer(request, conversationId, said.asks);
+    }
+    return preparedForEngine(request, said.prepared);
+  };
   const MAX_CONVERSATIONS = 500;
   const remember = (conversationId: string, state: ConversationState) => {
     conversations.delete(conversationId);
@@ -2040,6 +2065,52 @@ export function createSpecialistQAnswer(
     // read askedAction pass_company / save_company with appAction empty):
     // one small extraction against that tool's own input schema fills it.
     const appTools = dependencies.appActions?.tools ?? new Set<string>();
+    // The reply to a question a declared action asked (QA 7d7e7260 ->
+    // 5c2f71aa: "Lagos" after "Which city are you in…" got no card): that
+    // action continues, its arguments merged with what this reply adds,
+    // read against its own schema. A reply, or the same action asked for
+    // again, continues it; anything else is answered as itself.
+    const waiting = pendingActions.take(conversationId);
+    if (
+      waiting !== null &&
+      dependencies.appActions !== undefined &&
+      read !== null &&
+      (read.kind === "ANSWER" ||
+        read.kind === "CLARIFICATION" ||
+        read.kind === "CORRECTION" ||
+        read.askedAction === waiting.action.tool)
+    ) {
+      const added = await dependencies
+        .appActionArguments?.(request, {
+          tool: waiting.action.tool,
+          utterance: latest.content,
+        })
+        .catch(() => null);
+      const action: TurnAppAction = {
+        tool: waiting.action.tool,
+        arguments: {
+          ...waiting.action.arguments,
+          ...(added !== null && added !== undefined && typeof added === "object"
+            ? (added)
+            : {}),
+        },
+      };
+      logger?.info(
+        {
+          qRunId: request.runId,
+          tool: action.tool,
+          needs: waiting.needs,
+          added: added !== null && added !== undefined,
+        },
+        "a declared action waiting on their reply continues",
+      );
+      const continued = await dependencies.appActions
+        .run(request, action)
+        .catch(() => null);
+      if (continued !== null) {
+        return saidByAction(request, conversationId, action, continued);
+      }
+    }
     const readerNamed =
       read !== null &&
       read.kind === "TOOL_REQUEST" &&
@@ -2178,9 +2249,7 @@ export function createSpecialistQAnswer(
         .run(request, appAction)
         .catch(() => null);
       if (said !== null) {
-        return typeof said === "string"
-          ? recordAnswer(request, conversationId, said)
-          : preparedForEngine(request, said.prepared);
+        return saidByAction(request, conversationId, appAction, said);
       }
       // The reader's own arguments did not fit the tool (parity eval
       // 2026-10-02: "Change our fund's website to ..." failed
@@ -2213,9 +2282,12 @@ export function createSpecialistQAnswer(
             .run(request, { tool: appAction.tool, arguments: again })
             .catch(() => null);
           if (retried !== null) {
-            return typeof retried === "string"
-              ? recordAnswer(request, conversationId, retried)
-              : preparedForEngine(request, retried.prepared);
+            return saidByAction(
+              request,
+              conversationId,
+              { tool: appAction.tool, arguments: again },
+              retried,
+            );
           }
         }
       }

@@ -13,6 +13,7 @@ import {
 } from "../src/hand-over.js";
 import {
   createToolAppActionPort,
+  type TurnAppAction,
   type QAppActionPort,
 } from "../src/app-action-turn.js";
 import type { PendingDecisionPort } from "../src/pending-decision.js";
@@ -2510,7 +2511,71 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
           when: { day: "monday", time: "10:00" },
         },
       }),
-    ).toBe(question);
+    ).toEqual({ asks: question, needs: "TIME_ZONE" });
+  });
+
+  it("the reply to the question continues the action, its arguments merged (QA runs 7d7e7260 -> 5c2f71aa)", async () => {
+    const asked =
+      "Which city are you in, so Monday at 10:00 is right? Then I'll set the reminder.";
+    const first = {
+      title: "Review Tallyloom's deck",
+      when: { day: "monday", time: "10:00" },
+      counterpartName: "Tallyloom",
+    };
+    const reading = (kind: string, appAction: unknown) =>
+      ({
+        kind,
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: null,
+        appAction,
+        askedAction: null,
+      }) as unknown as TurnReaderResult;
+    let turn = 0;
+    const ran: TurnAppAction[] = [];
+    const read: { tool: string; utterance: string }[] = [];
+    const run = seam({
+      said: "Remind me on Monday at 10am to review Tallyloom's deck.",
+      reading: () =>
+        turn === 0
+          ? reading("TOOL_REQUEST", {
+              tool: "propose_reminder",
+              arguments: first,
+            })
+          : reading("ANSWER", null),
+      outcomes: [],
+      appActions: {
+        tools: new Set(["propose_reminder"]),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve(
+            ran.length === 1
+              ? { asks: asked, needs: "TIME_ZONE" }
+              : { prepared: "Reminder: Review Tallyloom's deck" },
+          );
+        },
+      },
+      appActionArguments: (_request, input) => {
+        read.push(input);
+        return Promise.resolve({ timeZone: "Africa/Lagos" });
+      },
+    });
+    await run.answer.answer(request());
+    expect(run.stored.at(-1)?.content).toBe(asked);
+    turn = 1;
+    (run.message as { content: string }).content = "Lagos";
+    await run.answer.answer(request());
+    expect(read).toEqual([{ tool: "propose_reminder", utterance: "Lagos" }]);
+    expect(ran).toEqual([
+      { tool: "propose_reminder", arguments: first },
+      {
+        tool: "propose_reminder",
+        arguments: { ...first, timeZone: "Africa/Lagos" },
+      },
+    ]);
   });
 
   it("a legacy proposal tool's PREPARED output is a prepared card (QA run 4e3b1903)", async () => {
