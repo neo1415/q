@@ -13,22 +13,49 @@ describe("the mandate review, readable on a phone", () => {
       {
         label: "Cheque",
         items: [
-          { stepKey: "currency", title: "Currency", value: "US dollar" },
-          { stepKey: "lead", title: "Lead or follow", value: null },
+          {
+            stepKey: "currency",
+            title: "Currency",
+            value: "US dollar",
+            editorId: undefined,
+          },
+          {
+            stepKey: "lead",
+            title: "Lead or follow",
+            value: null,
+            editorId: undefined,
+          },
         ],
       },
       {
         label: "Preferences",
         items: [
-          { stepKey: "models", title: "Business models", value: null },
-          { stepKey: "own", title: "Your own criteria", value: words },
+          {
+            stepKey: "models",
+            title: "Business models",
+            value: null,
+            editorId: undefined,
+          },
+          {
+            stepKey: "own",
+            title: "Your own criteria",
+            value: words,
+            editorId: undefined,
+          },
         ],
       },
       {
         label: "Unknowns",
-        items: [{ stepKey: "words", title: "In your own words", value: words }],
+        items: [
+          {
+            stepKey: "words",
+            title: "In your own words",
+            value: words,
+            editorId: undefined,
+          },
+        ],
       },
-    ] as Groups;
+    ];
     const { stated, unstated } = splitReview(review);
     expect(stated.map((group) => group.label)).toEqual([
       "Cheque",
