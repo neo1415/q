@@ -175,6 +175,7 @@ import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeSchedule,
   // AUTO block (ADR 0030)
+  createChatMessageNotices,
   createCounterpartNotices,
   createMeetingMailer,
   createNotificationDelivery,
@@ -831,6 +832,8 @@ const documentEvents = createQueueRunner({
         notify: async (channel, payload) => {
           await database.sql`select pg_notify(${channel}, ${payload})`;
         },
+        // QA run 8a1d57b9: the recipient is told, one notice per conversation.
+        notices: createChatMessageNotices(database.sql),
         logger,
       },
     ),

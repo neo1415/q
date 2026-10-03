@@ -40,8 +40,14 @@ const sent = () =>
     senderSide: "COMPANY",
   });
 
-function harness(fail = false) {
+function harness(fail = false, noticeFails = false) {
   const notified: { channel: string; payload: string }[] = [];
+  const told: {
+    relationshipId: string;
+    conversationId: string;
+    senderSide: string;
+    at: Date;
+  }[] = [];
   const passed: unknown[] = [];
   const handle = withChatMessageEvents(
     (inner): Promise<MessageOutcome> => {
@@ -56,10 +62,17 @@ function harness(fail = false) {
         notified.push({ channel, payload });
         return Promise.resolve();
       },
+      notices: {
+        notify: (input) => {
+          if (noticeFails) return Promise.reject(new Error("db down"));
+          told.push(input);
+          return Promise.resolve(1);
+        },
+      },
       logger: createRecordingLogger(),
     },
   );
-  return { handle, notified, passed };
+  return { handle, notified, passed, told };
 }
 
 describe("a chat message wakes standing instructions", () => {
@@ -73,8 +86,28 @@ describe("a chat message wakes standing instructions", () => {
     expect(passed).toEqual([event]);
   });
 
+  it("tells the other side, per conversation, at the message's own time (replay-safe)", async () => {
+    const { handle, told } = harness();
+    const event = sent();
+    await handle(message(event));
+    expect(told).toEqual([
+      {
+        relationshipId: RELATIONSHIP,
+        conversationId: "99999999-0000-4000-8000-000000000001",
+        senderSide: "COMPANY",
+        at: new Date(event.time),
+      },
+    ]);
+  });
+
+  it("retries when the notice cannot be written", async () => {
+    const { handle, notified } = harness(false, true);
+    expect((await handle(message(sent()))).kind).toBe("RETRY");
+    expect(notified).toEqual([]);
+  });
+
   it("leaves other events alone", async () => {
-    const { handle, notified } = harness();
+    const { handle, notified, told } = harness();
     await handle(
       message(
         relationshipInterestExpressedEvent({
@@ -90,6 +123,7 @@ describe("a chat message wakes standing instructions", () => {
       ),
     );
     expect(notified).toEqual([]);
+    expect(told).toEqual([]);
   });
 
   it("retries when the announcement fails", async () => {

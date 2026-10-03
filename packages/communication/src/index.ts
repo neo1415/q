@@ -146,7 +146,9 @@ export {
 } from "./schedule/meeting-mail.js";
 // end AUTO block
 export {
+  createChatMessageNotices,
   createCounterpartNotices,
+  type ChatMessageNotices,
   type CounterpartNoticeKind,
   type CounterpartNotices,
 } from "./counterpart-notices.js";

@@ -190,6 +190,8 @@ export const NotificationKindSchema = z.enum([
   // 2026-10-02: a pass, pause or resume, told to the other side.
   "RELATIONSHIP_OUTCOME",
   "DILIGENCE",
+  // QA run 8a1d57b9: a new chat message, one notice per conversation.
+  "CHAT_MESSAGE",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

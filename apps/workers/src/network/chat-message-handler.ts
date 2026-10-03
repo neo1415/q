@@ -1,3 +1,4 @@
+import type { ChatMessageNotices } from "@capital-q/communication";
 import type { EventRegistry } from "@capital-q/contracts";
 import { RelationshipMessageSentEvent } from "@capital-q/network/events";
 
@@ -18,6 +19,9 @@ import type { MessageOutcome } from "../queue/runner.js";
  * announcement finds the firing already claimed. A failed announcement is
  * retried with the message; the instruction's own cadence is the last
  * safety net.
+ *
+ * And the other side is told (neither side was): one notice per person per
+ * conversation, folded while unread, raised again after they read it.
  */
 
 const UUID =
@@ -28,6 +32,8 @@ export type ChatMessageEventOptions = {
   readonly channel: string;
   /** `select pg_notify(channel, payload)`, as the composition provides it. */
   readonly notify: (channel: string, payload: string) => Promise<void>;
+  /** The recipient's notice; absent, only the wake is announced. */
+  readonly notices?: Pick<ChatMessageNotices, "notify"> | undefined;
   readonly logger: RunnerLogger;
 };
 
@@ -50,11 +56,17 @@ export function withChatMessageEvents(
       return inner(message);
     }
     try {
+      await options.notices?.notify({
+        relationshipId: data.data.relationshipId,
+        conversationId: data.data.conversationId,
+        senderSide: data.data.senderSide,
+        at: new Date(parsed.message.time),
+      });
       await options.notify(options.channel, data.data.relationshipId);
     } catch (error: unknown) {
       options.logger.warn(
         { msgId: message.msgId, err: error },
-        "instruction wake not announced; retrying",
+        "chat message notice or wake not done; retrying",
       );
       return { kind: "RETRY", errorCode: "INSTRUCTION_WAKE_FAILED" };
     }
