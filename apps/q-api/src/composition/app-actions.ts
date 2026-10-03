@@ -7,7 +7,11 @@ import {
   type AnyAppAction,
   type AppActionPorts,
 } from "@capital-q/app-actions";
-import { CorrelationIdSchema, QActionTypeSchema } from "@capital-q/contracts";
+import {
+  CorrelationIdSchema,
+  INSTRUCTION_DEFAULT_ACTIONS,
+  QActionTypeSchema,
+} from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   defineQAction,
@@ -30,13 +34,20 @@ const BOARD_TTL_MS = 10 * 60 * 1000;
 export const appActionType = (action: AnyAppAction): string =>
   `app.${action.name}`;
 
-// Only a generated tool prepares an `app.<name>` card. An action still
-// served by its hand tool keeps that tool's own approval type until its
-// area's second step, so composing a card type for it would be unreachable.
+// A generated tool prepares an `app.<name>` card in conversation. A
+// standing instruction's ASK step (ADR 0043) prepares one for each action
+// its grant holds, including ones still served in conversation by a hand
+// tool. Composing only the generated ones left every ASK step for interest,
+// messages, meetings and reminders unpreparable (QA 2026-10-03,
+// instruction f27b346a: five "Express interest" steps, ACTION_UNAVAILABLE).
+const INSTRUCTION_ACTION_NAMES: ReadonlySet<string> = new Set(
+  INSTRUCTION_DEFAULT_ACTIONS.map((entry) => entry.action),
+);
 const consequential = (actions: readonly AnyAppAction[]) =>
   actions.filter(
     (action) =>
-      action.classification === "CONSEQUENTIAL" && action.tool !== undefined,
+      action.classification === "CONSEQUENTIAL" &&
+      (action.tool !== undefined || INSTRUCTION_ACTION_NAMES.has(action.name)),
   );
 
 /** The Approval Engine types this registry adds (startup checks the set). */
