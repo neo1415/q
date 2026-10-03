@@ -1365,6 +1365,17 @@
   .cq-q-dock-stop:hover {
     background: var(--cq-surface-subtle);
   }
+  /* A 36 px disc inside the 44 px pill, with a 44 px hit area: Stop and
+     End voice are the controls a person reaches for fastest (demo-44). */
+  .cq-q-dock-stop {
+    position: relative;
+  }
+  .cq-q-dock-stop::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: var(--cq-radius-full);
+  }
   /* Stashed: a sliver of the light against the edge, still 44 px tall. */
   .cq-q-dock-stash {
     position: relative;

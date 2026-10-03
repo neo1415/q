@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+
+import { isMatchedRelationshipState } from "@capital-q/contracts";
 
 import { QPageSubject } from "@/features/q/q-subject";
 import { RelationshipConversation } from "@/features/relationships/relationship-conversation";
@@ -21,6 +24,12 @@ export default async function CompanyConversationPage({
   }
   if (loaded.relationship === null) {
     return <RelationshipUnavailable sentence={loaded.absentSentence} />;
+  }
+  // Messages open only once both sides have agreed to connect. Before
+  // that the thread cannot load, so the relationship page is the answer,
+  // not "Messages couldn't load" over a live composer (demo-44 phone pass).
+  if (!isMatchedRelationshipState(loaded.relationship.state)) {
+    redirect(`/relationships/investor/${investorOrganisationId}`);
   }
   return (
     <>
