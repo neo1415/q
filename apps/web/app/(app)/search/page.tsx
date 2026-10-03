@@ -14,6 +14,7 @@ import {
   publicExternalFields,
 } from "@/features/q-card/card-content";
 import { loadPublicCard } from "@/features/q-card/public-card-data";
+import { nameMatches } from "@/features/search/name-matches";
 
 export const metadata: Metadata = { title: "Search" };
 export const dynamic = "force-dynamic";
@@ -23,7 +24,9 @@ type Tab = "people" | "videos";
 /**
  * Search (founder direction 2026-09-29, "like Instagram"): one box, two
  * tabs. People opens a Q Card by its whole @handle; a handle has a live
- * card or it does not, and nothing lists or suggests anyone else. Videos
+ * card or it does not, and nothing lists or suggests strangers. A name
+ * (demo audit 2026-10-03) is matched only among people the person already
+ * sees: their relationships and, for a founder, Discover's investors. Videos
  * is the founders' videos open to everyone on Capital Q whose company name
  * or line matches, as a grid; the API matches only what disclosure already
  * shows the viewer.
@@ -53,6 +56,11 @@ export default async function SearchPage({
       ? await loadPublicCard(handle).catch(() => null)
       : null;
   const card = found !== null && found.kind === "CARD" ? found : null;
+  // A name, not a handle: look among people this person already sees.
+  const names =
+    tab === "people" && text.length >= 2 && !text.startsWith("@")
+      ? await nameMatches(text).catch(() => [])
+      : [];
   const tabHref = (next: Tab) =>
     `/search?${new URLSearchParams({ ...(text.length === 0 ? {} : { q: text }), tab: next }).toString()}`;
 
@@ -82,7 +90,9 @@ export default async function SearchPage({
               autoCapitalize="none"
               spellCheck={false}
               placeholder={
-                tab === "people" ? "@their-handle" : "Company or what they do"
+                tab === "people"
+                  ? "A name, or @their-handle"
+                  : "Company or what they do"
               }
               className="cq-body min-w-0 flex-1 bg-transparent text-(--cq-text-primary) outline-none"
             />
@@ -117,14 +127,42 @@ export default async function SearchPage({
         <NetworkVideos key={text} text={text} />
       ) : text.length === 0 ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Search by @handle.
+          Search a name among your relationships and Discover, or open
+          anyone&apos;s Q Card by their @handle.
         </p>
       ) : card === null ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          {validHandle
-            ? `No Q Card at @${handle}. Check the spelling with them.`
-            : "A handle is 3 to 30 lowercase letters, digits or hyphens."}
-        </p>
+        <div className="flex flex-col gap-4">
+          {names.length === 0 ? null : (
+            <ul
+              aria-label="Names you can already see"
+              className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
+              data-search-names
+            >
+              {names.map((match) => (
+                <li key={match.href}>
+                  <Link
+                    href={match.href}
+                    className="flex min-h-14 flex-col justify-center px-1 py-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                  >
+                    <span className="cq-body text-(--cq-text-primary)">
+                      {match.name}
+                    </span>
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      {match.detail}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
+            {validHandle
+              ? `No Q Card at @${handle}.${names.length === 0 ? " Check the spelling with them." : ""}`
+              : names.length === 0
+                ? "No one by that name among your relationships or Discover. Anyone else is found by their @handle."
+                : "Anyone else is found by their @handle."}
+          </p>
+        </div>
       ) : (
         <Link
           href={`/@${card.handle}`}
