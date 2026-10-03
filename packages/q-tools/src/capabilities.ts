@@ -338,6 +338,13 @@ const OFFERS: readonly QCapability[] = [
     "Google's OAuth consent is given by the person in Google's own window; no tool may hold or grant it.",
   ),
   offer(
+    "q_email_address",
+    "SETTINGS",
+    "Copy their Q email address, or get a new one so the old one stops receiving",
+    "SETTINGS",
+    "A new address cuts off everyone who has the old one at once; the person does that themselves in Settings, where they copy the new one.",
+  ),
+  offer(
     "pitch_video_upload",
     "MEDIA",
     "Upload several pitch videos, name, replace or remove each, and choose who can watch each one (investors only, or everyone on Capital Q)",

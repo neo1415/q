@@ -12,6 +12,7 @@ import { loadDatabaseConfig } from "@capital-q/config/database";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeGoogleIntegrations,
+  createInboundEmailService,
   unavailableAppEmailSender,
   createGoogleKeySource,
   platformGoogleHttp,
@@ -31,6 +32,7 @@ import {
 } from "@capital-q/contracts";
 import { createPlatformAdmin } from "@capital-q/platform-admin";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
+import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createCorrelationId,
@@ -1344,6 +1346,17 @@ const integrations = composeGoogleIntegrations({
   pushTopic: googleWorkspace.push?.topic,
 });
 
+// Inbound email (Postmark): each person's Q address, and the webhook that
+// stores what arrives with its notice and outbox event in one transaction.
+// Off, and saying so, unless both names are set.
+const inboundEmailConfig = loadInboundEmailConfig(process.env);
+const inboundEmail = createInboundEmailService({
+  sql: database.sql,
+  transactions: database.transactions,
+  baseAddress: inboundEmailConfig.inbound?.address,
+  outbox,
+});
+
 // Relationship chat (R34): parties through Network as the caller, shared
 // documents through Evidence as the caller (their own, scanned clean).
 const chat = composeChat({
@@ -1746,6 +1759,10 @@ const { app, logger } = createApp(config, security, {
   visibility,
   publicIdentity,
   profileImages,
+  inboundEmail: {
+    inboundEmail,
+    webhookSecret: inboundEmailConfig.inbound?.webhookSecret.reveal(),
+  },
   integrations: {
     integrations,
     webOrigin: googleWorkspace.webOrigin,
@@ -1767,6 +1784,13 @@ if (googleWorkspace.oauth === undefined) {
   logger.warn(
     { missing: googleWorkspace.missing },
     "Google workspace integration disabled: configuration missing",
+  );
+}
+
+if (inboundEmailConfig.inbound === undefined) {
+  logger.warn(
+    { missing: inboundEmailConfig.missing },
+    "inbound email disabled: configuration missing",
   );
 }
 

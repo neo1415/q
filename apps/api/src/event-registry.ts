@@ -2,6 +2,7 @@ import { createEventRegistry, type EventRegistry } from "@capital-q/contracts";
 import { CAPITAL_EVENTS } from "@capital-q/capital/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
 import { EVIDENCE_EVENTS } from "@capital-q/evidence/events";
+import { INTEGRATIONS_EVENTS } from "@capital-q/integrations/events";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import { MEDIA_EVENTS } from "@capital-q/media/events";
 import { NETWORK_EVENTS } from "@capital-q/network/events";
@@ -29,5 +30,6 @@ export function createProductionEventRegistry(): EventRegistry {
     ...ONBOARDING_EVENTS,
     ...MEDIA_EVENTS,
     ...VERIFICATION_EVENTS,
+    ...INTEGRATIONS_EVENTS,
   ]);
 }

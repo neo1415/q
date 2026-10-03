@@ -61,6 +61,10 @@ import {
 } from "./http/integrations.js";
 import { registerMediaWebhookRoutes } from "./http/media-webhooks.js";
 import {
+  registerInboundEmailRoutes,
+  type InboundEmailRoutesDependencies,
+} from "./http/inbound-email.js";
+import {
   registerChatRoutes,
   type ChatRoutesDependencies,
 } from "./http/chat.js";
@@ -261,6 +265,10 @@ export type ApiModules = {
   /** CQ-BIZ-003: the visibility control centre. */
   readonly visibility?: VisibilityRoutesDependencies["visibility"] | undefined;
   /** BIZ-007: a person's own connected Gmail and reply push. */
+  /** Inbound email (Postmark): the person's Q address and the webhook. */
+  readonly inboundEmail?:
+    | Pick<InboundEmailRoutesDependencies, "inboundEmail" | "webhookSecret">
+    | undefined;
   readonly integrations?:
     | Pick<IntegrationRoutesDependencies, "integrations" | "webOrigin" | "push">
     | undefined;
@@ -480,6 +488,9 @@ export function createApp(
       ...(modules.integrations === undefined
         ? {}
         : { google: modules.integrations.integrations }),
+      ...(modules.inboundEmail === undefined
+        ? {}
+        : { inboundEmail: modules.inboundEmail.inboundEmail }),
       ...(modules.verification === undefined
         ? {}
         : { verification: modules.verification }),
@@ -738,6 +749,16 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       ...modules.integrations,
+    });
+  }
+
+  // Inbound email: the webhook's authority is basic auth in the hook URL;
+  // without its secret it answers 503 -- a closed door, never an open one.
+  if (modules.inboundEmail !== undefined) {
+    registerInboundEmailRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      ...modules.inboundEmail,
     });
   }
 

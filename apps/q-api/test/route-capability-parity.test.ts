@@ -44,7 +44,7 @@ const Q_TRANSPORT = exempt(
   "the Q conversation's own transport (runs, messages, events, voice): Q is the one using it",
 );
 const WEBHOOK = exempt(
-  "provider webhook or OAuth callback: called by Google/Cloudflare, never by a person",
+  "provider webhook or OAuth callback: called by Google/Cloudflare/Postmark, never by a person",
 );
 const PUBLIC = exempt(
   "public or anonymous surface (Q Card by handle/code, GateQ applicant): no signed-in Q session",
@@ -313,6 +313,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "tool.read_relationship_email",
   ),
   "api/http/integrations.ts POST GOOGLE_GMAIL_PUSH_PATH": WEBHOOK,
+  // Inbound email: Postmark's delivery, and the person's own Q address
+  // (list_my_inbound_emails names it; a new one is offered in Settings).
+  "api/http/inbound-email.ts POST INBOUND_EMAIL_POSTMARK_PATH": WEBHOOK,
+  "api/http/inbound-email.ts GET INBOUND_EMAIL_ADDRESS_PATH": cap(
+    "tool.list_my_inbound_emails",
+  ),
 
   "api/http/investor-mandates.ts GET base": cap("tool.get_investor_mandate"),
   "api/http/investor-mandates.ts GET byId": cap("tool.get_investor_mandate"),
