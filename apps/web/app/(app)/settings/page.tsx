@@ -12,6 +12,7 @@ import {
 } from "@/components/app-shell/page-container";
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { GmailConnection } from "@/features/integrations/gmail-connection";
+import { QEmailAddress } from "@/features/integrations/q-email-address";
 import { QMotionToggle } from "@/features/q-aperture";
 import { DailySetting } from "@/features/daily/daily-setting";
 import { qApiSession, resolveQStanding } from "@/features/q/context";
@@ -145,6 +146,9 @@ export default async function SettingsPage({
               <GmailConnection
                 outcome={typeof google === "string" ? google : undefined}
               />
+            </SettingRow>
+            <SettingRow term="Your Q email address">
+              <QEmailAddress />
             </SettingRow>
           </dl>
         </PageSection>
