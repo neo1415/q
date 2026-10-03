@@ -129,8 +129,26 @@ const ASK_NAMES_MAX = 6;
 export function handOverSubjectOf(
   request: Pick<QAnswerRequest, "plan" | "subjects">,
 ): HandOverSubject | null {
+  // Their own company is never something to hand over (QA 2026-10-03,
+  // runs 4e9dc7c0, 02eb9643: a founder's run always carries it as a
+  // subject, so "handle my investors" was taken as an errand for it and
+  // refused). Own: the plan is about their own company, or it grants the
+  // owner-only private financials scope for it.
+  const own = new Set<string>();
+  for (const scope of request.plan.scopes) {
+    if (
+      scope.kind === "COMPANY_PRIVATE_FINANCIALS" &&
+      scope.subject?.kind === "COMPANY"
+    ) {
+      own.add(scope.subject.companyId);
+    }
+  }
+  const ownQuestion = request.plan.purpose.taskClass === "OWN_COMPANY_QUESTION";
+  const isOwn = (companyId: string) => ownQuestion || own.has(companyId);
   const screen = request.plan.screen;
-  if (screen?.companyId !== undefined) {
+  // The page they are on names its company; only the owner-only scope says
+  // it is theirs.
+  if (screen?.companyId !== undefined && !own.has(screen.companyId)) {
     return { kind: "COMPANY", companyId: screen.companyId };
   }
   if (screen?.investorOrganisationId !== undefined) {
@@ -143,7 +161,7 @@ export function handOverSubjectOf(
     if (subject.kind === "RELATIONSHIP") {
       return { kind: "RELATIONSHIP", relationshipId: subject.relationshipId };
     }
-    if (subject.kind === "COMPANY") {
+    if (subject.kind === "COMPANY" && !isOwn(subject.companyId)) {
       return { kind: "COMPANY", companyId: subject.companyId };
     }
   }

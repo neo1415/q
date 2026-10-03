@@ -3536,6 +3536,45 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     );
   });
 
+  it("a founder's own company in the run is never the hand-over's subject (runs 4e9dc7c0, 02eb9643)", async () => {
+    const proposed: unknown[] = [];
+    const errands: unknown[] = [];
+    const own = request();
+    const ownRequest = {
+      ...own,
+      subjects: [{ kind: "COMPANY", companyId: COMPANY }],
+    } as QAnswerRequest;
+    const { answer, stored } = seam({
+      said: "Handle everything with my investors, including negotiating the valuation and terms for me.",
+      reading: handOverReading("my investors"),
+      outcomes: [],
+      handOver: {
+        prepare: (_request, subject) => {
+          errands.push(subject);
+          return Promise.resolve(null);
+        },
+        candidates: () =>
+          Promise.resolve([
+            {
+              name: "Ventures Platform",
+              subject: { kind: "RELATIONSHIP", relationshipId: "r-1" },
+            },
+          ]),
+      },
+      appActionArguments: () => Promise.resolve({ askedTermsOrMoney: true }),
+      delegation: delegationPort(
+        { side: "COMPANY", relationships: 4, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(ownRequest);
+    expect(errands).toEqual([]);
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).toContain(
+      "those stay with you, and I'll handle the rest",
+    );
+  });
+
   it("a meeting with no one named is still asked about by name", async () => {
     const proposed: unknown[] = [];
     const { answer, stored } = seam({
