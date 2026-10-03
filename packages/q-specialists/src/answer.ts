@@ -94,7 +94,13 @@ import type {
 import { actOnHandOver, type QHandOverPort } from "./hand-over.js";
 import type { QProfileGapsPort } from "./profile-gaps.js";
 import type { QOwnRecordsPort } from "./own-records-port.js";
-import { decidePending, type PendingDecisionPort } from "./pending-decision.js";
+import {
+  decidePending,
+  plainApproval,
+  plainRefusal,
+  type PendingDecisionPort,
+  type PendingTurnReading,
+} from "./pending-decision.js";
 import {
   NO_OWN_RECORDS,
   resolveOwnRecord,
@@ -1452,49 +1458,69 @@ export function createSpecialistQAnswer(
     ) {
       return answerOnce(request);
     }
-    // A change waiting for their decision is decided first, by code, from
-    // the reading of their words; never left to the answer's own tools.
+    // A change waiting for their decision is decided by code, from two
+    // readings of their words, never by the answer's own tools: the turn's
+    // (is this a reply to the card at all?) and the decision's (yes or
+    // no?). Run 2026-10-03 ad0b0067: "We've decided not to proceed with
+    // Ledgefold for now." -- a request in its own right -- approved and
+    // executed the waiting pass. Only a reply decides.
     let afterAnswer: string | null = null;
-    if (dependencies.pendingDecisions !== undefined) {
-      const decided = await decidePending(dependencies.pendingDecisions, {
-        context: {
-          actor: request.actor,
-          runId: request.runId,
-          correlationId: request.correlationId,
-          tenantId: request.tenantId,
-          userId: request.actor.userId,
-        },
-        utterance: latest.content,
-        recentTurns: history
-          .filter((m) => m.id !== latest.id)
-          .slice(-6)
-          .map((m) => ({
-            role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
-            text: m.content,
-          })),
-        signal: request.signal,
-      }).catch((error: unknown) => {
-        logger?.warn(
-          { err: error, qRunId: request.runId },
-          "a decision on a waiting change was not read; answering normally",
-        );
-        return { kind: "NONE" } as const;
-      });
-      if (decided.kind === "REPLY") {
-        return recordAnswer(request, conversationId, decided.line);
-      }
-      if (decided.kind === "ANSWER_THEN") {
-        if (decided.before !== null) {
-          await recordAnswer(request, conversationId, decided.before);
-        }
-        afterAnswer = decided.after;
-      }
+    const pendingDecisions = dependencies.pendingDecisions;
+    const decide =
+      pendingDecisions === undefined
+        ? undefined
+        : async (turn: PendingTurnReading | null): Promise<string | null> => {
+            const decided = await decidePending(pendingDecisions, {
+              context: {
+                actor: request.actor,
+                runId: request.runId,
+                correlationId: request.correlationId,
+                tenantId: request.tenantId,
+                userId: request.actor.userId,
+              },
+              utterance: latest.content,
+              recentTurns: history
+                .filter((m) => m.id !== latest.id)
+                .slice(-6)
+                .map((m) => ({
+                  role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
+                  text: m.content,
+                })),
+              turn,
+              signal: request.signal,
+            }).catch((error: unknown) => {
+              logger?.warn(
+                { err: error, qRunId: request.runId },
+                "a decision on a waiting change was not read; answering normally",
+              );
+              return { kind: "NONE" } as const;
+            });
+            if (decided.kind === "REPLY") return decided.line;
+            if (decided.kind === "ANSWER_THEN") {
+              if (decided.before !== null) {
+                await recordAnswer(request, conversationId, decided.before);
+              }
+              afterAnswer = decided.after;
+            }
+            return null;
+          };
+    // Words that are nothing but a yes or a no hold no request of their
+    // own, so they are a reply whatever the reading: decided before it.
+    let decideAfterReading = decide;
+    if (
+      decide !== undefined &&
+      (plainApproval(latest.content) || plainRefusal(latest.content))
+    ) {
+      const line = await decide(null);
+      if (line !== null) return recordAnswer(request, conversationId, line);
+      decideAfterReading = undefined;
     }
     const outcome = await answerTurnRead(
       request,
       history,
       conversationId,
       latest,
+      decideAfterReading,
     );
     if (afterAnswer !== null && outcome.kind === "ANSWERED") {
       // What the change's real status is, after whatever the answer said
@@ -1509,6 +1535,8 @@ export function createSpecialistQAnswer(
     history: readonly QConversationMessage[],
     conversationId: QConversationMessage["conversationId"],
     latest: QConversationMessage,
+    /** A waiting change, decided from this turn's reading; a line ends the turn. */
+    decide?: (turn: PendingTurnReading | null) => Promise<string | null>,
   ): Promise<QAnswerOutcome> => {
     if (turns === undefined) return answerOnce(request);
     const state =
@@ -1640,6 +1668,25 @@ export function createSpecialistQAnswer(
         },
         "q turn read",
       );
+    }
+    if (decide !== undefined) {
+      const line = await decide(
+        read === null
+          ? null
+          : {
+              kind: read.kind,
+              addressedToQ: read.addressedToQ ?? true,
+              // A turn that asks for an action in its own right is a request,
+              // never a reply to the card (the reader named one, or a hand).
+              namesAction:
+                (typeof read.askedAction === "string" &&
+                  read.askedAction.length > 0) ||
+                appActionOf(read) !== null ||
+                (read.tool ?? null) !== null ||
+                (read.handOver ?? null) !== null,
+            },
+      );
+      if (line !== null) return recordAnswer(request, conversationId, line);
     }
     // Spoken words plainly meant for someone else (a call, a colleague,
     // the room) are not a turn to Q: nothing is answered, nothing is

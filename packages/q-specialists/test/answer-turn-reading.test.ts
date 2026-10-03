@@ -963,11 +963,49 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     expect(reads()).toBe(0);
   });
 
+  it("run ad0b0067: 'We've decided not to proceed with Ledgefold for now.' read as a request approves nothing", async () => {
+    const approved: string[] = [];
+    const declined: string[] = [];
+    const { answer, stored } = seam({
+      said: "We've decided not to proceed with Ledgefold for now.",
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: null,
+        appAction: null,
+        askedAction: "relationship_outcome",
+      } as TurnReaderResult,
+      outcomes: [],
+      pendingDecisions: {
+        ...waiting(approved),
+        decline: (_context, proposalId) => {
+          declined.push(proposalId);
+          return Promise.resolve({ status: "DECLINED" });
+        },
+      },
+    });
+    await answer.answer(request());
+    expect(approved).toEqual([]);
+    expect(declined).toEqual([]);
+    expect(stored.at(-1)?.content).toMatch(/^That's ready: Reminder/);
+  });
+
   it("a no with more said is declined first, then the rest is answered", async () => {
     const declined: string[] = [];
     const { answer, stored, delegated } = seam({
       said: "no, cancel that. Change the time to 3pm",
-      reading: null,
+      // A reply to the card (lead 2026-10-03: only a reply decides).
+      reading: {
+        kind: "ANSWER",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+      } as TurnReaderResult,
       outcomes: [],
       pendingDecisions: {
         ...waiting([]),
@@ -2318,6 +2356,58 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
       await port.run(request(), { tool: "sign_out", arguments: {} }),
     ).toBeNull();
     expect(calls.map((call) => call.name)).toEqual(["save_company"]);
+  });
+
+  it("QA run 938a39b7: a refusal with its own reason is the answer; a generic refusal or a failure is not", async () => {
+    const outcomeOf = (
+      status: "DENIED" | "FAILED",
+      code: string,
+      safeMessage: string,
+    ): QToolCallOutcome => ({
+      callId: "c",
+      toolName: null,
+      toolVersion: 1,
+      classification: null,
+      status,
+      failureCode: code,
+      sensitivity: null,
+      result: { ok: false, error: { code, safeMessage } },
+      latencyMs: 1,
+    });
+    const portFor = (outcome: QToolCallOutcome) =>
+      createToolAppActionPort({
+        names: ["update_q_card"],
+        tools: {
+          offer: () => Promise.resolve([]),
+          execute: () => Promise.resolve(outcome),
+        },
+      });
+    const action = {
+      tool: "update_q_card",
+      arguments: { searchable: true },
+    };
+    const reason =
+      "You don't have a Q Card yet. Make one first, then I can change who finds it.";
+    expect(
+      await portFor(outcomeOf("DENIED", "NOT_AVAILABLE", reason)).run(
+        request(),
+        action,
+      ),
+    ).toBe(reason);
+    expect(
+      await portFor(
+        outcomeOf(
+          "DENIED",
+          "NOT_AVAILABLE",
+          "Not available in this conversation's context.",
+        ),
+      ).run(request(), action),
+    ).toBeNull();
+    expect(
+      await portFor(
+        outcomeOf("FAILED", "INVALID_ARGUMENTS", "Arguments did not fit."),
+      ).run(request(), action),
+    ).toBeNull();
   });
 });
 

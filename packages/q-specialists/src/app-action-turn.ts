@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Logger } from "@capital-q/observability";
+import { NOT_AVAILABLE_MESSAGE } from "@capital-q/q-tools";
 import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
 
 /**
@@ -45,6 +46,12 @@ export type QAppActionPort = {
   ) => Promise<string | null>;
 };
 
+/** Refusals that say nothing about why: never said as the answer. */
+const GENERIC_REFUSALS: ReadonlySet<string> = new Set([
+  NOT_AVAILABLE_MESSAGE,
+  "That tool is not available in this conversation.",
+]);
+
 /** Runs one generated tool, as this run, and returns its own line. */
 export function createToolAppActionPort(dependencies: {
   readonly tools: QToolPort;
@@ -74,7 +81,18 @@ export function createToolAppActionPort(dependencies: {
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           },
         );
-        if (!outcome.result.ok) return null;
+        if (!outcome.result.ok) {
+          // Refused with its own reason ("You don't have a Q Card yet…"):
+          // that reason is the answer (QA run 938a39b7: it was dropped and
+          // Q asked "Want me to proceed?"). A generic refusal or a failure
+          // says nothing worth saying, and the answer runs as before.
+          const reason = outcome.result.error.safeMessage.trim();
+          return outcome.status === "DENIED" &&
+            !GENERIC_REFUSALS.has(reason) &&
+            reason.length > 0
+            ? reason
+            : null;
+        }
         const data = outcome.result.data as {
           readonly status?: unknown;
           readonly says?: unknown;

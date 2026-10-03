@@ -5,6 +5,7 @@ import {
   statusLine,
   type PendingDecisionPort,
   type PendingDecisionStatus,
+  type PendingTurnReading,
 } from "../src/pending-decision.js";
 
 /**
@@ -250,6 +251,103 @@ describe("a restatement is not an approval (QA 2026-10-03)", () => {
       line: "Done: Share your raise with Savanna Seed.",
     });
     expect(calls.approve).toEqual(["s1"]);
+  });
+});
+
+describe("only a reply to the card decides it (lead 2026-10-03, run ad0b0067)", () => {
+  const PASS: Proposal = {
+    proposalId: "be4511b3",
+    summary: "Decide not to proceed for now",
+    status: "PENDING",
+  };
+  const request = {
+    kind: "TOOL_REQUEST",
+    addressedToQ: true,
+    namesAction: true,
+  } as const;
+  const statement = {
+    kind: "ANSWER",
+    addressedToQ: true,
+    namesAction: true,
+  } as const;
+  const reply = {
+    kind: "ANSWER",
+    addressedToQ: true,
+    namesAction: false,
+  } as const;
+  const said = (utterance: string, turn: PendingTurnReading | null) => ({
+    ...turn_(utterance),
+    turn,
+  });
+  const turn_ = (utterance: string) => ({
+    context,
+    utterance,
+    recentTurns: [],
+  });
+
+  it.each([
+    ["We've decided not to proceed with Ledgefold for now.", request],
+    ["We've decided not to proceed with Ledgefold for now.", statement],
+    ["We've decided not to proceed with Ledgefold for now.", null],
+    ["don't proceed", request],
+    ["let's proceed with the pass", request],
+    ["Let's proceed with the pass on Ledgerfold.", statement],
+  ] as const)(
+    "%s (%o): neither approved nor declined, whatever the decision reading",
+    async (utterance, turn) => {
+      for (const decision of ["YES", "NO"] as const) {
+        const { value, calls } = port({
+          proposals: [PASS],
+          reading: { decision, remainder: null },
+        });
+        const outcome = await decidePending(value, said(utterance, turn));
+        expect(calls.approve).toEqual([]);
+        expect(calls.decline).toEqual([]);
+        expect(outcome).toEqual(
+          decision === "YES"
+            ? {
+                kind: "REPLY",
+                line: "That's ready: Decide not to proceed for now. It's waiting for your yes. Tap Approve on the card, or tell me to go ahead.",
+              }
+            : {
+                kind: "ANSWER_THEN",
+                before: null,
+                after:
+                  "Still waiting for your approval: Decide not to proceed for now.",
+              },
+        );
+      }
+    },
+  );
+
+  it.each([
+    ["yes, go ahead", request],
+    ["approve it", request],
+    ["yes, go ahead", null],
+    ["Yes, send it to them", reply],
+  ] as const)("%s (%o) still approves", async (utterance, turn) => {
+    const { value, calls } = port({
+      proposals: [PASS],
+      reading: { decision: "YES", remainder: null },
+    });
+    expect(await decidePending(value, said(utterance, turn))).toEqual({
+      kind: "REPLY",
+      line: "Done: Decide not to proceed for now.",
+    });
+    expect(calls.approve).toEqual(["be4511b3"]);
+  });
+
+  it("a request with nothing waiting is never answered 'already done'", async () => {
+    const { value } = port({
+      proposals: [{ ...PASS, status: "SAVED" }],
+      reading: { decision: "YES", remainder: null },
+    });
+    expect(
+      await decidePending(
+        value,
+        said("let's proceed with the pass on Ajopot", request),
+      ),
+    ).toEqual({ kind: "NONE" });
   });
 });
 
