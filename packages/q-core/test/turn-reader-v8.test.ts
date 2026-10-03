@@ -23,7 +23,7 @@ describe("TURN_READER v8", () => {
   it("states the unknown-screen rule once, and the active reader (v13) keeps it", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(36);
+    expect(active.version).toBe(37);
     for (const template of [TURN_READER_V8.template, active.template]) {
       expect(template.split("unknownScreen is set").length - 1).toBe(1);
       expect(template).toContain(

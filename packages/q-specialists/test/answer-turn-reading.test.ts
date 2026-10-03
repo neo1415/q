@@ -966,7 +966,7 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
   it("a no with more said is declined first, then the rest is answered", async () => {
     const declined: string[] = [];
     const { answer, stored, delegated } = seam({
-      said: "yes but change the time to 3pm",
+      said: "no, cancel that. Change the time to 3pm",
       reading: null,
       outcomes: [],
       pendingDecisions: {
@@ -986,6 +986,33 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     expect(declined).toEqual(["p1"]);
     expect(stored[0]?.content).toMatch(/^Declined: Reminder/);
     expect(delegated()).toBe(1);
+  });
+
+  it("a change asked for instead, with no no, leaves the card waiting and says so after the answer (QA 2026-10-03)", async () => {
+    const declined: string[] = [];
+    const { answer, stored, delegated } = seam({
+      said: "yes but change the time to 3pm",
+      reading: null,
+      outcomes: [],
+      pendingDecisions: {
+        ...waiting([]),
+        read: () =>
+          Promise.resolve({
+            decision: "NO",
+            remainder: "change the time to 3pm",
+          }),
+        decline: (_context, proposalId) => {
+          declined.push(proposalId);
+          return Promise.resolve({ status: "DECLINED" });
+        },
+      },
+    });
+    await answer.answer(request());
+    expect(declined).toEqual([]);
+    expect(delegated()).toBe(1);
+    expect(stored.at(-1)?.content).toMatch(
+      /^Still waiting for your approval: Reminder/,
+    );
   });
 });
 
@@ -2462,6 +2489,82 @@ describe("a reader's arguments the tool refuses are read again (parity eval 2026
     await answer.answer(request());
     expect(ran).toHaveLength(1);
     expect(delegated()).toBe(1);
+  });
+});
+
+/**
+ * QA run 3af14042 (2026-10-03): "Make Ajopot seed deck private to my
+ * organisation again" was read SET_VISIBILITY and "Make your company
+ * private" was prepared. A deck's or pitch's audience is its own action.
+ */
+describe("a deck's audience is its own action, never the company's visibility (QA 3af14042)", () => {
+  const deckPort = (ran: unknown[]): QAppActionPort => ({
+    tools: new Set(["set_deck_audience", "set_pitch_sharing"]),
+    run: (_request, action) => {
+      ran.push(action);
+      return Promise.resolve(`Prepared: ${action.tool}.`);
+    },
+  });
+  const companyTurn = () =>
+    ({
+      ...request(),
+      subjects: [{ kind: "COMPANY" as const, companyId: COMPANY }],
+    }) as QAnswerRequest;
+  const privateReading = () =>
+    toolReading({
+      kind: "SET_VISIBILITY",
+      destination: null,
+      visibility: "organisation_private",
+    });
+
+  it.each([
+    [
+      "Make Ajopot seed deck private to my organisation again",
+      "set_deck_audience",
+      { deck: "Ajopot seed deck", audience: "ORGANISATION" },
+    ],
+    [
+      "Only my team should be able to play my pitch video",
+      "set_pitch_sharing",
+      { pitch: "my pitch video", sharing: "ORGANISATION" },
+    ],
+  ])(
+    "%s -> %s; the company is never made private",
+    async (said, tool, args) => {
+      const ran: unknown[] = [];
+      const noted: unknown[] = [];
+      const run = seam({
+        said,
+        reading: privateReading(),
+        outcomes: [],
+        visibility: { noteVisibility: (entry) => noted.push(entry) },
+        offeredTools: ["set_deck_audience", "set_pitch_sharing", "get_company"],
+        appActions: deckPort(ran),
+        appActionArguments: (_request, input) =>
+          Promise.resolve(input.tool === tool ? args : null),
+      });
+      await run.answer.answer(companyTurn());
+      expect(noted).toEqual([]);
+      expect(ran).toEqual([{ tool, arguments: args }]);
+      expect(run.stored.at(-1)?.content).toBe(`Prepared: ${tool}.`);
+    },
+  );
+
+  it("'make my company private' is still the company's hand", async () => {
+    const ran: unknown[] = [];
+    const noted: unknown[] = [];
+    const run = seam({
+      said: "make my company private",
+      reading: privateReading(),
+      outcomes: [],
+      visibility: { noteVisibility: (entry) => noted.push(entry) },
+      offeredTools: ["set_deck_audience", "set_pitch_sharing"],
+      appActions: deckPort(ran),
+      appActionArguments: () => Promise.resolve(null),
+    });
+    await run.answer.answer(companyTurn());
+    expect(ran).toEqual([]);
+    expect(noted).toHaveLength(1);
   });
 });
 

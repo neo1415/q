@@ -295,8 +295,10 @@ export function readyLine(summary: string): string {
 const REFUSAL =
   /\b(?:no|nope|nah|don'?t|do not|cancel\w*|declin\w*|reject\w*|scrap|stop|never ?mind|forget (?:it|that)|not (?:that|this|it|now))\b/iu;
 /** Words that point to the card in front of them. */
-const DEICTIC =
-  /\b(?:that|this|it|the (?:card|change|proposal|one)|that one)\b/iu;
+const POINTED =
+  /\b(?:cancel|decline|scrap|drop|forget|reject|stop|don'?t do|do not do|not)\s+(?:that|this|it|the (?:card|change|proposal|one)|that one)\b/iu;
+/** "No," or "Nope." opening what they say: an explicit no. */
+const OPENING_NO = /^\s*(?:no|nope|nah)\b[\s,.!;:-]/iu;
 const REFUSAL_WORDS = [
   "no",
   "nope",
@@ -325,8 +327,8 @@ const REFUSAL_WORDS = [
 
 /**
  * A no that declines this card: a refusal that is all refusal ("no",
- * "no thanks", "don't do it"), one that points at it ("cancel that"), or
- * one that names its counterpart. A new request, even read NO, is none.
+ * "no thanks"), one that opens with "no,", one that points at it ("cancel
+ * that", "don't do it"), or one that names its counterpart. A new request, even read NO, is none.
  */
 function declines(
   utterance: string,
@@ -340,7 +342,7 @@ function declines(
     .filter((word) => word.length > 0);
   if (words.every((word) => REFUSAL_WORDS.includes(word) || FILLER.has(word)))
     return true;
-  if (words.length <= 6 && DEICTIC.test(utterance)) return true;
+  if (POINTED.test(utterance) || OPENING_NO.test(`${utterance} `)) return true;
   return namedIn(utterance, [card]) !== null;
 }
 

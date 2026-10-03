@@ -6,6 +6,29 @@ import { toolFocusOf } from "./tool-focus.js";
  * investor.visibility.set). SET_VISIBILITY is the company's hand only.
  */
 const INVESTOR_VISIBILITY_TOOL = "set_investor_visibility";
+/**
+ * One of their own records' audience is that record's declared action,
+ * never the company's visibility (QA run 3af14042: "Make Ajopot seed deck
+ * private to my organisation again" prepared "Make your company private").
+ * A deck, document or upload first ("pitch deck" is a deck), then a pitch
+ * video. The tool resolves the name among their own records and refuses
+ * one it cannot find.
+ */
+const RECORD_AUDIENCE: readonly (readonly [RegExp, string])[] = [
+  [
+    /\b(?:decks?|documents?|docs?|files?|uploads?|one-pagers?|financials)\b/iu,
+    "set_deck_audience",
+  ],
+  [/\b(?:pitch(?:es)?|videos?|recordings?)\b/iu, "set_pitch_sharing"],
+];
+
+/** The record-audience action the words name, or null. */
+export function recordAudienceTool(utterance: string): string | null {
+  for (const [words, tool] of RECORD_AUDIENCE) {
+    if (words.test(utterance)) return tool;
+  }
+  return null;
+}
 import {
   type QNavigateDestination,
   type QResponseMessage,
@@ -1742,7 +1765,24 @@ export function createSpecialistQAnswer(
       !request.subjects.some((subject) => subject.kind === "COMPANY") &&
       offeredNames.has(INVESTOR_VISIBILITY_TOOL) &&
       (dependencies.appActions?.tools.has(INVESTOR_VISIBILITY_TOOL) ?? false);
-    if (tool !== null && !writingDocument && !fundVisibility) {
+    // SET_VISIBILITY read for words that name a deck or a pitch of theirs:
+    // that record's own action, when this run offers it.
+    const audienceTool =
+      tool?.kind === "SET_VISIBILITY"
+        ? recordAudienceTool(latest.content)
+        : null;
+    const recordAudience =
+      audienceTool !== null &&
+      offeredNames.has(audienceTool) &&
+      (dependencies.appActions?.tools.has(audienceTool) ?? false)
+        ? audienceTool
+        : null;
+    if (
+      tool !== null &&
+      !writingDocument &&
+      !fundVisibility &&
+      recordAudience === null
+    ) {
       const acted = await actOnTool(
         request,
         conversationId,
@@ -1780,7 +1820,7 @@ export function createSpecialistQAnswer(
         ? read.askedAction
         : fundVisibility
           ? INVESTOR_VISIBILITY_TOOL
-          : null;
+          : recordAudience;
     const appAction =
       appActionOf(read) ??
       (dependencies.appActions !== undefined &&

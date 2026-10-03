@@ -36,7 +36,7 @@ export const TURN_READER_V36: PromptDefinition<
 > = {
   ...TURN_READER_V35,
   version: 36,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA parity runs a6b19977, 11cae894, 06289687 (v35): a stated decision about one of their relationships names relationship_outcome in askedAction, a near-miss name is still that relationship, and appAction shows its arguments. Same schema and order as v35.",
   effectiveFrom: "2026-10-02",

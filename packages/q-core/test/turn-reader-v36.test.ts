@@ -13,10 +13,10 @@ import {
  * in askedAction, with its arguments shown for appAction.
  */
 describe("TURN_READER v36", () => {
-  it("is the active reader and v35 is deprecated", () => {
+  it("is superseded by v37, and v35 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(36);
+    ).toBe(37);
     expect(TURN_READER_V35.status).toBe("DEPRECATED");
   });
 
