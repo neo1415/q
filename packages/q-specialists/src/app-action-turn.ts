@@ -105,13 +105,19 @@ export function createToolAppActionPort(dependencies: {
           readonly status?: unknown;
           readonly says?: unknown;
           readonly summary?: unknown;
+          readonly awaitingApprovalOf?: unknown;
         };
-        if (
-          data.status === "PREPARED" &&
-          typeof data.summary === "string" &&
-          data.summary.trim().length > 0
-        ) {
-          return { prepared: data.summary.trim() };
+        // A declared action's own tool says `summary`; the hand-written
+        // tool serving one (`legacyTool`) says `awaitingApprovalOf`. Both
+        // prepared the same card.
+        const prepared =
+          typeof data.summary === "string"
+            ? data.summary
+            : typeof data.awaitingApprovalOf === "string"
+              ? data.awaitingApprovalOf
+              : "";
+        if (data.status === "PREPARED" && prepared.trim().length > 0) {
+          return { prepared: prepared.trim() };
         }
         return typeof data.says === "string" && data.says.trim().length > 0
           ? data.says.trim()

@@ -86,7 +86,9 @@ const CASES = [
     id: "app-action",
     as: "INVESTOR",
     text: `Express interest in ${COMPANY}.`,
-    expect: "CARD app.",
+    // Express interest is still prepared by its hand-written proposer,
+    // under its own type.
+    expect: "CARD app.|relationship.interest.express",
   },
 ];
 
@@ -318,9 +320,13 @@ async function outcomeProblems(testCase, runId, message) {
   if (kind === "CARD") {
     const actions = await proposedOf(runId);
     const card = actions.find((a) =>
-      target.endsWith(".")
-        ? a.action_type.startsWith(target)
-        : a.action_type === target,
+      target
+        .split("|")
+        .some((one) =>
+          one.endsWith(".")
+            ? a.action_type.startsWith(one)
+            : a.action_type === one,
+        ),
     );
     if (card === undefined)
       return [

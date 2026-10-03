@@ -1,4 +1,4 @@
-import { APP_ACTIONS } from "@capital-q/app-actions";
+import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
@@ -411,9 +411,11 @@ export function composeQIntelligence(
     }),
     appActions: createToolAppActionPort({
       tools,
-      names: APP_ACTIONS.flatMap((action) =>
-        action.tool === undefined ? [] : [action.tool.name],
-      ),
+      // A declared action served by its hand-written tool (`legacyTool`,
+      // e.g. propose_express_interest) is as much a declared action as
+      // one with its own: left out, the router never saw it and "Express
+      // interest in Clinicrest" was asked back (QA run 4e3b1903).
+      names: appActionToolNames(APP_ACTIONS),
       ...(logger === undefined ? {} : { logger }),
     }),
     // Lead 2026-10-03: "what should I do next?" opens with their readiness.

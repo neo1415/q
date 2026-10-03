@@ -13,6 +13,7 @@ export {
   portMissing,
   qCapabilityId,
   qToolName,
+  appActionToolNames,
   type AppActionFamilyInput,
   type AnyAppAction,
   type AppActionCard,

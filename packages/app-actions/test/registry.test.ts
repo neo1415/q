@@ -5,6 +5,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import {
   APP_ACTIONS,
+  appActionToolNames,
   delegableOnItsOwn,
   settleGrant,
   PERSON_ACTIONS,
@@ -452,5 +453,25 @@ describe("delegation: what Q may do on its own", () => {
       "relationship.outcome.change",
       "capital.objective.change",
     ]);
+  });
+});
+
+describe("the tools that take declared actions (QA run 4e3b1903)", () => {
+  it("include the hand-written proposers, once, and not the interview's own tools", () => {
+    const names = appActionToolNames(APP_ACTIONS);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "propose_express_interest",
+        "propose_interest_answer",
+        "propose_meeting",
+      ]),
+    );
+    expect(new Set(names).size).toBe(names.length);
+    for (const interview of [
+      "record_answers",
+      "set_aside",
+      "confirm_and_finish",
+    ])
+      expect(names).not.toContain(interview);
   });
 });

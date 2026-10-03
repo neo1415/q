@@ -3351,7 +3351,11 @@ export function createModelGatewayQAnswer(
           // The answer already says why nothing was done ("you're already
           // in diligence with Ajopot"): the could-not line after it would
           // contradict it (lead 2026-10-03, run 2078f553).
-          !explainsNothingDone(statusTalk?.text ?? guarded.text)
+          !explainsNothingDone(statusTalk?.text ?? guarded.text) &&
+          // A reply that asks them something ("Would you like me to…?")
+          // is waiting on them; a could-not line after it contradicts the
+          // question (QA run 4e3b1903).
+          !asksThePerson(statusTalk?.text ?? guarded.text)
             ? couldNotDoLine(parityGap)
             : null;
         if (couldNot !== null) {
@@ -3685,6 +3689,11 @@ const NOTHING_DONE_EXPLAINED =
   /\b(?:already\b|(?:can(?:no|['’])t|couldn['’]t|could not|unable to|not able to|won['’]t be able to)\s+(?:\w+\s+){0,3}?(?:do|express|send|prepar|mak|chang|record|book|shar|request|ask|add|creat|sav|pass|mov|accept|declin|invit)\w*|nothing (?:was|has been|is) (?:done|prepared|changed|needed)|(?:isn['’]t|is not) (?:needed|necessary|possible|available)|no need to)/iu;
 export function explainsNothingDone(text: string): boolean {
   return NOTHING_DONE_EXPLAINED.test(text);
+}
+
+/** A reply that puts a question to the person: any sentence ending "?". */
+export function asksThePerson(text: string): boolean {
+  return /\?["'’”)]*(?:\s|$)/u.test(text);
 }
 
 export function appActionLineOf(data: unknown): string | null {

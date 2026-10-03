@@ -772,6 +772,11 @@ describe("what exists, and the parity gap", () => {
     );
     expect(explained).toContain("already in diligence with Ajopot");
     expect(explained).not.toContain("I couldn't do that");
+    // A question back to them is waiting on them (QA run 4e3b1903).
+    const asking = await asked(
+      "Would you like to express interest in Clinicrest?",
+    );
+    expect(asking).not.toContain("I couldn't do that");
     // An answer that says nothing about it still gets the plain line.
     const silent = await asked("Ajopot builds payments rails for SMEs.");
     expect(silent).toContain(

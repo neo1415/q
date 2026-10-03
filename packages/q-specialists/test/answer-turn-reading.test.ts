@@ -2474,6 +2474,39 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
     expect(other.delegated()).toBe(1);
   });
 
+  it("a legacy proposal tool's PREPARED output is a prepared card (QA run 4e3b1903)", async () => {
+    const port = createToolAppActionPort({
+      names: ["propose_express_interest"],
+      tools: {
+        offer: () => Promise.resolve([]),
+        execute: () =>
+          Promise.resolve({
+            callId: "c",
+            toolName: null,
+            toolVersion: 1,
+            classification: null,
+            status: "SUCCEEDED",
+            failureCode: null,
+            sensitivity: null,
+            result: {
+              ok: true,
+              data: {
+                status: "PREPARED",
+                awaitingApprovalOf: "Express interest in Clinicrest",
+              },
+            },
+            latencyMs: 1,
+          } as QToolCallOutcome),
+      },
+    });
+    expect(
+      await port.run(request(), {
+        tool: "propose_express_interest",
+        arguments: { company: "Clinicrest" },
+      }),
+    ).toEqual({ prepared: "Express interest in Clinicrest" });
+  });
+
   it("the port runs only declared tools, through the executor, and returns the tool's line", async () => {
     const calls: QToolProposal[] = [];
     const port = createToolAppActionPort({

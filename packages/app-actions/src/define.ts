@@ -303,6 +303,35 @@ export function qToolName(
   return action.tool?.name ?? action.viaTool ?? action.legacyTool ?? null;
 }
 
+/**
+ * The Q tools code may take a declared action with, one by one: an
+ * action's own tool, or the hand-written proposer that still serves a
+ * Prepare -> Approve action (`legacyTool` named `propose_*`, which
+ * prepares the card and says PREPARED). Other hand tools (the onboarding
+ * interview's) keep their own loop; a family's shared tool (`viaTool`)
+ * takes an operation, not one action.
+ */
+export function appActionToolNames(
+  actions: readonly Pick<
+    AnyAppAction,
+    "tool" | "legacyTool" | "classification"
+  >[],
+): string[] {
+  return [
+    ...new Set(
+      actions.flatMap((action) => {
+        if (action.tool !== undefined) return [action.tool.name];
+        const legacy = action.legacyTool;
+        return legacy !== undefined &&
+          action.classification === "CONSEQUENTIAL" &&
+          legacy.startsWith("propose_")
+          ? [legacy]
+          : [];
+      }),
+    ),
+  ];
+}
+
 /** What a family's tool prepares: one member, by operation, with its input. */
 export type AppActionFamilyInput = {
   readonly operation: string;
