@@ -296,7 +296,10 @@ const SubjectTool = z
 async function ownSubject(
   ports: AppActionPorts,
   context: AppActionContext,
-  subject: "COMPANY" | "INVESTOR_ORGANISATION",
+  // Absent when the turn did not say whose (parity eval 2026-10-03: "Let
+  // search engines find our Q Card" was read without it and failed as
+  // INVALID_ARGUMENTS): their company first, else their organisation.
+  subject: "COMPANY" | "INVESTOR_ORGANISATION" = "COMPANY",
 ) {
   const of = (kind: "COMPANY" | "INVESTOR_ORGANISATION") =>
     own(
@@ -405,7 +408,7 @@ const InvestorRoleTool = z
 
 const HandleClaimTool = z
   .object({
-    subject: SubjectTool,
+    subject: SubjectTool.optional(),
     handle: z
       .string()
       .max(40)
@@ -415,7 +418,7 @@ const HandleClaimTool = z
 
 const QCardTool = z
   .object({
-    subject: SubjectTool,
+    subject: SubjectTool.optional(),
     indexable: z
       .boolean()
       .optional()
