@@ -12,6 +12,7 @@ import {
   rejectQApproval,
   createQRun,
   getCurrentOnboardingSession,
+  getQApproval,
   getQArtifact,
   getQArtifactVersion,
   getQConversation,
@@ -31,6 +32,7 @@ import {
   type ListQConversationsResponse,
   type QArtifactDetail,
   type QConversationDetail,
+  type QApprovalView,
   type QPendingApproval,
   type QRunSummary,
 } from "@capital-q/contracts";
@@ -398,6 +400,21 @@ export async function pendingQApprovalsAction(): Promise<
   QActionResult<readonly QPendingApproval[]>
 > {
   return run(async (session) => (await listPendingQApprovals(session)).items);
+}
+
+/**
+ * One approval as its requested approver may read it: what Q would do, to
+ * whom, and the exact content the decision binds to (design-48: Q's work
+ * shows it before the person says yes).
+ */
+export async function readQApprovalAction(
+  rawApprovalId: string,
+): Promise<QActionResult<QApprovalView>> {
+  const approvalId = ApprovalIdSchema.safeParse(rawApprovalId);
+  if (!approvalId.success) {
+    return failure("That approval isn't available.");
+  }
+  return run((session) => getQApproval(session, approvalId.data));
 }
 
 export async function rejectQApprovalAction(
