@@ -19,6 +19,7 @@ import {
 
 import { PageContainer } from "@/components/app-shell/page-container";
 import { RelationshipMail } from "@/features/integrations/relationship-mail";
+import { DockAvoidZone } from "@/features/q-dock";
 import { initials } from "@/features/investors/investor-labels";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
@@ -153,7 +154,7 @@ export function RelationshipDetail({
           aria-label="Next"
         >
           <Card title="Next" id="next">
-            <div className="flex flex-col items-stretch gap-2">
+            <DockAvoidZone className="flex flex-col items-stretch gap-2">
               {actions}
               {connected ? (
                 <Link
@@ -199,7 +200,7 @@ export function RelationshipDetail({
                   />
                 </>
               )}
-            </div>
+            </DockAvoidZone>
           </Card>
 
           <Card

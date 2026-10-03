@@ -43,6 +43,7 @@ import {
   type ChatSafetyDialog,
 } from "./chat-safety";
 import { useFollowNewest } from "@/features/q/follow-newest";
+import { useDockAvoid } from "@/features/q-dock";
 
 import { VoiceRecorder } from "./voice-recorder";
 
@@ -149,6 +150,9 @@ export function RelationshipChat({
   const readUpTo = useRef<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLLIElement>(null);
+  // The composer (Send, mic, attach) is never under the Q dock (ADR 0017 F1).
+  const composer = useRef<HTMLFormElement>(null);
+  useDockAvoid(composer, status === "OPEN");
 
   const markRead = useCallback(
     (list: readonly ChatMessageDto[]) => {
@@ -574,6 +578,7 @@ export function RelationshipChat({
 
       {status === "OPEN" ? (
         <form
+          ref={composer}
           onSubmit={(event) => void submit(event)}
           className="flex flex-col gap-2 border-t border-(--cq-border-subtle) px-2 py-2"
         >
