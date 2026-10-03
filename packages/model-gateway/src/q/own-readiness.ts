@@ -38,7 +38,7 @@ type Assessment = {
 /** From read_my_record MARKETPLACE_READINESS output ({status, data}). */
 export function ownReadinessFact(
   read: unknown,
-  options: { readonly lead: boolean },
+  options: { readonly lead: boolean; readonly alreadySaid?: boolean },
 ): AuthorisedFact | null {
   if (typeof read !== "object" || read === null) return null;
   const { status, data } = read as { status?: unknown; data?: unknown };
@@ -96,9 +96,12 @@ export function ownReadinessFact(
           "Verification cannot be completed by anyone yet; do not suggest it as a step.",
         ]),
   ];
-  const lead = options.lead
-    ? " THEY ASKED WHAT TO DO NEXT: lead with these gaps in this order (and a missing pitch video or deck from what exists on their account), each with the one action that closes it, offering to do it; mention anything else only after."
-    : "";
+  const lead =
+    options.alreadySaid === true
+      ? " THEY ASKED WHAT TO DO NEXT: Capital Q opens your answer with these gaps as a numbered list already; do not repeat or reorder them. Add at most two sentences on the first one and offer, as a question, to do it now; nothing about markets, sources or other topics unless they asked."
+      : options.lead
+        ? " THEY ASKED WHAT TO DO NEXT: lead with these gaps in this order (and a missing pitch video or deck from what exists on their account), each with the one action that closes it, offering to do it; mention anything else only after."
+        : "";
   return {
     scope: "COMPANY_PROFILE",
     statement:
@@ -110,4 +113,47 @@ export function ownReadinessFact(
     evidenceStatus: "PLATFORM_VERIFIED",
     source: "Capital Q readiness check",
   };
+}
+
+/**
+ * The first lines of an answer to "what should I do next?" about their own
+ * company, composed by code from the readiness check (lead 2026-10-03, run
+ * 2cba241a: the guidance alone did not make the model lead with it). Null
+ * when the company is ready or nothing is outstanding: then the model
+ * answers as usual.
+ */
+export function readinessLeadLines(read: unknown): string | null {
+  if (typeof read !== "object" || read === null) return null;
+  const { status, data } = read as { status?: unknown; data?: unknown };
+  if (status !== "FOUND" || typeof data !== "object" || data === null) {
+    return null;
+  }
+  const assessment = data as Assessment;
+  if (assessment.state === "marketplace_ready") return null;
+  const verifiable = assessment.verificationAvailable !== false;
+  const open = (assessment.requirements ?? [])
+    .filter(
+      (entry) =>
+        entry.outcome === "OUTSTANDING" &&
+        typeof entry.requirement === "string" &&
+        typeof entry.description === "string" &&
+        (verifiable ||
+          (entry.requirement !== "FOUNDER_IDENTITY_VERIFIED" &&
+            entry.requirement !== "ORGANISATION_VERIFIED")),
+    )
+    .sort(
+      (a, b) =>
+        ORDER.indexOf(String(a.requirement)) -
+        ORDER.indexOf(String(b.requirement)),
+    )
+    .slice(0, 3)
+    .map(
+      (entry, index) =>
+        `${String(index + 1)}. ${String(entry.description).replace(/\s+/gu, " ").trim().slice(0, 200)}`,
+    );
+  if (open.length === 0) return null;
+  return [
+    "Investors can't find your company in Discover yet. What to do next, most important first:",
+    ...open,
+  ].join("\n");
 }

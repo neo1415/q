@@ -250,6 +250,11 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly questionKind?: string | undefined;
   /**
+   * Lines code composed to open this answer (readiness for "what should I
+   * do next?"), said before the model's own words. Absent: none.
+   */
+  readonly leadLines?: string | undefined;
+  /**
    * The declared action the reader read them as asking for, by its name
    * (TURN_READER v30, ADR 0040), offered here or not. Absent: none named.
    */

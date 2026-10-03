@@ -303,6 +303,12 @@ export type SpecialistQAnswerDependencies = {
    */
   readonly delegation?: QDelegationPort | undefined;
   /**
+   * Their own readiness gaps as the opening lines of "what should I do
+   * next?", or null when there are none (or no company of theirs).
+   */
+  readonly readinessLead?:
+    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
+  /**
    * ADR 0040: a declared app action the turn's reading names, done by code
    * through its generated tool (parity eval 2026-10-02).
    */
@@ -2277,8 +2283,20 @@ export function createSpecialistQAnswer(
     // record by the conversational path, which reads it directly; the
     // company analysis is for assessment (lead decision 2026-10-01: the
     // analysis took 12.4 s and 1,100 tokens to restate a profile).
+    // "What should I do next?" about themselves (ADVICE, no one else
+    // named): their readiness gaps open the answer, composed by code, and
+    // the conversational path answers the rest (lead 2026-10-03, run
+    // 2cba241a: the company analysis led with an operating-market detail).
+    const readinessLead =
+      !writingDocument &&
+      read?.question?.kind === "ADVICE" &&
+      read.aboutNamedOther !== true &&
+      dependencies.readinessLead !== undefined
+        ? await dependencies.readinessLead(request).catch(() => null)
+        : null;
     const ownRecords =
-      !writingDocument && read?.question?.kind === "THEIR_OWN_RECORDS";
+      readinessLead !== null ||
+      (!writingDocument && read?.question?.kind === "THEIR_OWN_RECORDS");
     // What the turn is about narrows the tool offer (lead 2026-10-02);
     // "yes" to Q's own offer keeps the previous turn's focus.
     const named = [
@@ -2337,6 +2355,7 @@ export function createSpecialistQAnswer(
         ...(read?.question?.kind === undefined
           ? {}
           : { questionKind: read.question.kind }),
+        ...(readinessLead === null ? {} : { leadLines: readinessLead }),
         // Only a name the reader was given counts (ADR 0040 parity).
         ...(read?.askedAction === undefined ||
         read.askedAction === null ||

@@ -122,6 +122,8 @@ function seam(options: {
   readonly handOver?: QHandOverPort;
   /** Work handed over in general (QA 2026-10-03). */
   readonly delegation?: QDelegationPort;
+  /** Readiness lead lines for "what should I do next?" (lead 2026-10-03). */
+  readonly readinessLead?: (request: QAnswerRequest) => Promise<string | null>;
   /** Their profile's gaps filled by code (TURN_READER v27). */
   readonly profileGaps?: QProfileGapsPort;
   /** ADR 0040: a declared app action the reading names. */
@@ -207,6 +209,7 @@ function seam(options: {
   const stored: QConversationMessage[] = [];
   const events: { type: string; data: unknown }[] = [];
   let delegated = 0;
+  const leads: (string | undefined)[] = [];
   let warmed = 0;
   let investigated = 0;
   const probes: unknown[] = [];
@@ -234,6 +237,7 @@ function seam(options: {
         delegated += 1;
         unread.push(req.turnUnread === true);
         askedActions.push(req.askedAction);
+        leads.push(req.leadLines);
         focuses.push(req.toolFocus);
         capabilities.push(req.capabilities);
         directives.push(
@@ -293,6 +297,9 @@ function seam(options: {
     ...(options.delegation === undefined
       ? {}
       : { delegation: options.delegation }),
+    ...(options.readinessLead === undefined
+      ? {}
+      : { readinessLead: options.readinessLead }),
     ...(options.appActionArguments === undefined
       ? {}
       : { appActionArguments: options.appActionArguments }),
@@ -326,6 +333,7 @@ function seam(options: {
     message,
     earlierLines: earlier,
     probes,
+    leads,
     investigated: () => investigated,
     unread,
     capabilities,
@@ -3534,5 +3542,52 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     expect(stored.at(-1)?.content).toBe(
       "Who should I set this up with: Kazikit?",
     );
+  });
+});
+
+describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)", () => {
+  const advice = (aboutNamedOther = false) =>
+    ({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: { kind: "ADVICE", text: "what should I do next" },
+      aboutNamedOther,
+      tool: null,
+      handOver: null,
+    }) as unknown as TurnReaderResult;
+  const LEAD =
+    "Investors can't find your company in Discover yet. What to do next, most important first:\n1. Make the company visible to investors.";
+
+  it("opens with code's readiness lines and answers on the conversational path, even with the company analysis able to take it", async () => {
+    const run = seam({
+      said: "what should I do next",
+      reading: advice(),
+      outcomes: [],
+      specialistSupports: true,
+      readinessLead: () => Promise.resolve(LEAD),
+    });
+    await run.answer.answer(request());
+    expect(run.leads).toEqual([LEAD]);
+    expect(run.investigated()).toBe(0);
+  });
+
+  it("not when it is about someone else, nor when there are no gaps", async () => {
+    const other = seam({
+      said: "what should I do next with Kazikit",
+      reading: advice(true),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+    });
+    await other.answer.answer(request());
+    expect(other.leads).toEqual([undefined]);
+    const ready = seam({
+      said: "what should I do next",
+      reading: advice(),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(null),
+    });
+    await ready.answer.answer(request());
+    expect(ready.leads).toEqual([undefined]);
   });
 });

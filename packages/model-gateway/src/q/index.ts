@@ -91,6 +91,7 @@ import {
 import { ownReadinessFact } from "./own-readiness.js";
 
 export type { QOwnIndex } from "./own-standing.js";
+export { readinessLeadLines } from "./own-readiness.js";
 import { onScreenCompanyFact } from "./company-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
@@ -2093,6 +2094,7 @@ export function createModelGatewayQAnswer(
             );
           ownReadiness = ownReadinessFact(outcome.result.data, {
             lead: request.questionKind === "ADVICE" && !aboutSomeoneElse,
+            alreadySaid: request.leadLines !== undefined,
           });
         }
         took("own-readiness");
@@ -3328,6 +3330,8 @@ export function createModelGatewayQAnswer(
             ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
             : [
                 ...(approvalLine === null ? [] : [approvalLine]),
+                // Code's opening lines for this answer, before the model's.
+                ...(request.leadLines === undefined ? [] : [request.leadLines]),
                 statusTalk?.text ?? guarded.text,
                 ...(couldNot === null ? [] : [couldNot]),
                 ...actedLines,

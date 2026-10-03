@@ -23,6 +23,7 @@ import {
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import { ownStandingFact } from "../src/q/own-standing.js";
+import { readinessLeadLines } from "../src/q/own-readiness.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
 /**
@@ -867,5 +868,28 @@ describe("what should I do next (QA 2026-10-03, run 2cba241a)", () => {
     });
     await seam.answer(request);
     expect(executed.some((call) => call.name === "read_my_record")).toBe(false);
+  });
+});
+
+describe("code's opening lines (lead 2026-10-03)", () => {
+  it("open the answer before the model's words, and the model is told they are said", async () => {
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: { ...CONNECTED, relationship: null } },
+      { kind: "COMPANY", companyId: OWN_COMPANY },
+      {},
+      { said: "what should I do next" },
+    );
+    const lead =
+      "Investors can't find your company in Discover yet. What to do next, most important first:\n1. Make the company visible to investors.";
+    const outcome = await seam.answer({
+      ...request,
+      questionKind: "ADVICE",
+      leadLines: lead,
+    });
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(sentTo(alpha)).toContain("opens your answer with these gaps");
+    expect(readinessLeadLines(READINESS)).toBe(
+      "Investors can't find your company in Discover yet. What to do next, most important first:\n1. Make the company visible to investors.\n2. Upload a pitch deck.\n3. Verify your identity.",
+    );
   });
 });
