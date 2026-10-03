@@ -134,9 +134,12 @@ async function namesFor(founderUser, investorUser) {
   )[0]?.name;
   // The founder's side of a connection, for founder-account actions on a
   // relationship (sharing their raise): the investor's name, never Lagoon.
-  const founderRelationship = (
+  // The name exactly as the app shows it (lead 2026-10-03: a misheard
+  // name is misspelt within the real displayed name, suffix and all).
+  const founderRow = (
     await sql(
-      `select io.display_name as name from network.relationships r
+      `select io.display_name as name, r.id as relationship, c.id as company
+         from network.relationships r
          join core.investor_organisations io on io.id = r.investor_organisation_id
          join core.companies c on c.id = r.company_id
          join identity.organisation_memberships om on om.organisation_id = c.organisation_id
@@ -145,7 +148,8 @@ async function namesFor(founderUser, investorUser) {
           and io.display_name not ilike '%lagoon%'
         order by r.created_at limit 1`,
     )
-  )[0]?.name?.replace(/\s*\(fictional\)$/i, "");
+  )[0];
+  const founderRelationship = founderRow?.name;
   // Their company's uploaded pitch deck (set_deck_audience names it).
   const deck = (
     await sql(
@@ -158,6 +162,13 @@ async function namesFor(founderUser, investorUser) {
   )[0]?.title;
   return {
     founderRelationship,
+    founderShare:
+      founderRow === undefined
+        ? undefined
+        : {
+            relationship: founderRow.relationship,
+            company: founderRow.company,
+          },
     names: {
       ...(pitch === undefined ? {} : { MEDIA: pitch }),
       ...(deck === undefined ? {} : { UPLOAD: deck }),
@@ -367,7 +378,61 @@ function accountOf(action) {
 }
 const rows = [];
 const conversationOf = new Map();
+// A revoke needs something to revoke (lead 2026-10-03): before the first
+// revoke case, their raise is shared with that relationship through the
+// screen's own route, as the founder; afterwards it is unshared again.
+async function screen(token, method, path, body) {
+  const r = await fetch(`${env("API")}${path}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      "idempotency-key": randomUUID(),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const json = await r.json().catch(() => null);
+  console.log(
+    `  ${method} ${path.replace(/[0-9a-f-]{36}/g, ":id")} ${String(r.status)}`,
+  );
+  return json;
+}
+const sharesPath = (company) => `/v1/companies/${company}/visibility/shares`;
+let shareSeeded = false;
+async function seedShare() {
+  const target = names.founderShare;
+  if (shareSeeded || target === undefined) return;
+  shareSeeded = true;
+  await screen(tokens.FOUNDER, "POST", sharesPath(target.company), {
+    object: "CAPITAL_OBJECTIVE",
+    relationshipId: target.relationship,
+  });
+}
+async function unshare() {
+  const target = names.founderShare;
+  if (!shareSeeded || target === undefined) return;
+  const state = await screen(
+    tokens.FOUNDER,
+    "GET",
+    `/v1/companies/${target.company}/visibility/state`,
+  );
+  for (const share of state?.shares ?? []) {
+    if (share.relationshipId !== target.relationship) continue;
+    await screen(
+      tokens.FOUNDER,
+      "POST",
+      `${sharesPath(target.company)}/${share.policyId}/revoke`,
+    );
+  }
+}
+
 for (const testCase of cases) {
+  if (
+    testCase.expect.kind === "ACTION" &&
+    testCase.expect.action === "disclosure.share.revoke"
+  ) {
+    await seedShare();
+  }
   const account =
     ACCOUNT_OF_CASE[testCase.id] ??
     (testCase.expect.kind === "READ"
@@ -418,6 +483,7 @@ for (const testCase of cases) {
     `${ok ? "PASS" : "FAIL"}  ${testCase.id}  (${status}, ${String(Date.now() - t0)} ms)`,
   );
 }
+await unshare();
 const passed = rows.filter((row) => row.ok).length;
 console.log(`\n| case | variant | result | run | ms |\n|---|---|---|---|---|`);
 for (const row of rows) {

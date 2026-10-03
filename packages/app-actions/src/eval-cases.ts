@@ -30,12 +30,20 @@ export type ParityCase = {
   readonly expect: ParityExpectation;
 };
 
-/** A deterministic mishearing: one letter dropped from the longest word. */
+/**
+ * A deterministic mishearing: one letter dropped from the longest word of
+ * the name proper. A parenthetical ("(fictional)") is never the word
+ * misheard: misspelling it would not test the matcher (lead 2026-10-03).
+ */
 export function misheard(name: string): string {
   const words = name.split(/\s+/);
-  let longest = 0;
+  const proper = (word: string) => !/^\(.*\)?$/.test(word);
+  let longest = words.findIndex(proper);
+  if (longest === -1) longest = 0;
   words.forEach((word, index) => {
-    if (word.length > (words[longest]?.length ?? 0)) longest = index;
+    if (proper(word) && word.length > (words[longest]?.length ?? 0)) {
+      longest = index;
+    }
   });
   const word = words[longest] ?? name;
   if (word.length < 4) return `${name}e`;
