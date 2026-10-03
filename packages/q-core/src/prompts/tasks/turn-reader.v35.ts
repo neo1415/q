@@ -35,7 +35,7 @@ export const TURN_READER_V35: PromptDefinition<
 > = {
   ...TURN_READER_V34,
   version: 35,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Parity eval 2026-10-02 (runs 9a63392f, e445cfb9): a decision stated about one of their own relationships is a TOOL_REQUEST for relationship_outcome; an opinion or doubt is not. Same schema and order as v34.",
   effectiveFrom: "2026-10-02",
