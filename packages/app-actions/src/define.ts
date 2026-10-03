@@ -224,6 +224,19 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
   /** What the approval card says (CONSEQUENTIAL), and Q's line after. */
   readonly card: (input: In, names?: AppActionCardNames) => AppActionCard;
   /**
+   * The card's counterpart by name when its input names no target the
+   * composition can name (an interest or a request by id): read through
+   * the action's own service, as the proposing person, from their own
+   * inbox. Null: not theirs or not found, and the card reads without one.
+   */
+  readonly counterpartOf?:
+    | ((
+        ports: AppActionPorts,
+        actor: ActorContext,
+        input: In,
+      ) => Promise<string | null>)
+    | undefined;
+  /**
    * Q's sentence once it ran (INSTANT) or ran on approval. `names` holds
    * the display names of the references Q resolved, by tool field.
    */

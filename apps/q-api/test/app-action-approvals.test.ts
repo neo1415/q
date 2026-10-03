@@ -319,6 +319,70 @@ describe("app cards name who they are for (QA 2026-10-03, instruction ff4ceb3f)"
     expect(described?.preview).toContain("30 minutes");
   });
 
+  it("interest and connection-request answers name who, read from their own inbox (lead 2026-10-03)", async () => {
+    const INTEREST = "f0000000-0000-4000-8000-000000000001";
+    const REQUEST = "f0000000-0000-4000-8000-000000000002";
+    const inbox = createAppActionDefinitions(
+      {
+        ...fakes().ports,
+        ownCompanyId: () => Promise.resolve(COMPANY),
+        interests: {
+          expressInterest: () => Promise.reject(new Error("unused")),
+          respondToInterest: () => Promise.reject(new Error("unused")),
+          listIncomingInterest: ({ companyId }) =>
+            Promise.resolve(
+              companyId === COMPANY
+                ? ([
+                    {
+                      interest: { id: INTEREST },
+                      investor: { displayName: "Kazikit Capital" },
+                    },
+                  ] as never)
+                : [],
+            ),
+        },
+        connections: {
+          requestConnection: () => Promise.reject(new Error("unused")),
+          respondToConnectionRequest: () => Promise.reject(new Error("unused")),
+          listConnectionRequests: (() =>
+            Promise.resolve([
+              {
+                interest: { id: REQUEST },
+                company: { canonicalName: "Savanna Health" },
+              },
+            ])) as never,
+        },
+      },
+      {},
+    );
+    const card = async (type: string, interestId: string) => {
+      const found = inbox.find((entry) => entry.actionType === type);
+      const payload = {
+        interestId,
+        idempotencyKey: "k-answer-0001",
+        input: {},
+      };
+      return found?.describeFor?.(payload, [], APPROVER);
+    };
+    expect(await card("app.relationship.interest.accept", INTEREST)).toEqual({
+      summary: "Accept Kazikit Capital's interest",
+      preview: "Kazikit Capital is told you'd like to talk.",
+    });
+    expect(
+      (await card("app.relationship.interest.decline", INTEREST))?.summary,
+    ).toBe("Decline Kazikit Capital's interest");
+    expect(
+      await card("app.relationship.connection_request.accept", REQUEST),
+    ).toEqual({
+      summary: "Accept Savanna Health's connection request",
+      preview: "Savanna Health is told you'd like to connect.",
+    });
+    // Not in their inbox: the card reads without a name.
+    expect(
+      (await card("app.relationship.interest.accept", REQUEST))?.summary,
+    ).toBe("Accept their interest");
+  });
+
   it("no name known: the card still reads, unnamed", async () => {
     const unnamed = createAppActionDefinitions(fakes().ports).find(
       (entry) => entry.actionType === "app.relationship.interest.express",

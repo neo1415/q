@@ -23,7 +23,11 @@ import {
 import { actorWideScope, boundScopeFor } from "../plan.js";
 import { findRecordByName } from "./client-actions.js";
 import { createProposeConnectionRequestTool } from "./connection-request-send.js";
-import { createProposeConnectionRequestAnswerTool } from "./connection-requests.js";
+import {
+  closestByName,
+  createProposeConnectionRequestAnswerTool,
+  listedNames,
+} from "./connection-requests.js";
 import type {
   InvestorFeedPort,
   OwnRelationships,
@@ -613,11 +617,21 @@ function createProposeExpressInterestTool(
 
 export const ProposeInterestAnswerInputSchema = z
   .object({
-    companyId: UuidSchema.describe(
-      "The person's own company's id, as given in the conversation context.",
+    investor: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .nullable()
+      .default(null)
+      .describe(
+        "The investor organisation whose interest this answers, as the person named it (or its id). Null when they did not say which: with one interest waiting it is that one, with several the result names them to ask once.",
+      ),
+    companyId: UuidSchema.optional().describe(
+      "Only when given in the conversation context: the person's own company's id. Otherwise their own company is used.",
     ),
-    investorOrganisationId: UuidSchema.describe(
-      "The investor organisation whose interest is being answered, from list_incoming_interest.",
+    investorOrganisationId: UuidSchema.optional().describe(
+      "Only an id from list_incoming_interest; otherwise name the investor.",
     ),
     decision: z
       .enum(["ACCEPTED", "DECLINED"])
@@ -626,24 +640,127 @@ export const ProposeInterestAnswerInputSchema = z
       ),
   })
   .strict();
-export type ProposeInterestAnswerInput = z.infer<
+export type ProposeInterestAnswerInput = z.output<
   typeof ProposeInterestAnswerInputSchema
 >;
+
+export const InterestAnswerOutputSchema = z
+  .object({
+    /**
+     * PREPARED: shown for approval, nothing happened yet. ONE_PER_TURN:
+     * another action waits in this answer. NO_PENDING_INTEREST /
+     * NOT_FOUND / WHICH_ONE: nothing prepared; `awaitingApprovalOf` says
+     * exactly why and names what is pending, to say as it is.
+     */
+    status: z.enum([
+      "PREPARED",
+      "ONE_PER_TURN",
+      "NO_PENDING_INTEREST",
+      "NOT_FOUND",
+      "WHICH_ONE",
+    ]),
+    awaitingApprovalOf: z.string(),
+  })
+  .strict();
+export type InterestAnswerOutput = z.infer<typeof InterestAnswerOutputSchema>;
+
+type PendingInterest = {
+  readonly interestId: string;
+  readonly companyId: string;
+  readonly investorOrganisationId: string;
+  readonly investorName: string;
+};
+
+/** What an approval of this answer is called, for the card and for Q. */
+export function interestAnswerSummary(
+  investorName: string,
+  decision: "ACCEPTED" | "DECLINED",
+): string {
+  return decision === "ACCEPTED"
+    ? `Accept ${investorName}'s interest`
+    : `Decline ${investorName}'s interest`;
+}
+
+/**
+ * The one pending interest the words name, or exactly why not: none
+ * waiting, none matching (with what is waiting), or several matching
+ * (asked which). Never a guess among several.
+ */
+export function choosePendingInterest(
+  pending: readonly PendingInterest[],
+  said: string | null,
+  decision: "ACCEPTED" | "DECLINED",
+):
+  | { readonly chosen: PendingInterest }
+  | { readonly chosen: null; readonly output: InterestAnswerOutput } {
+  const verb = decision === "ACCEPTED" ? "accept" : "decline";
+  if (pending.length === 0) {
+    return {
+      chosen: null,
+      output: {
+        status: "NO_PENDING_INTEREST",
+        awaitingApprovalOf: `No investor's interest is waiting for your answer, so there is nothing to ${verb}.`,
+      },
+    };
+  }
+  const names = pending.map((item) => item.investorName);
+  if (said === null) {
+    const only = pending.length === 1 ? pending[0] : undefined;
+    return only !== undefined
+      ? { chosen: only }
+      : {
+          chosen: null,
+          output: {
+            status: "WHICH_ONE",
+            awaitingApprovalOf: `${String(pending.length)} investors' interest is waiting: ${listedNames(names)}. Which one should I ${verb}?`,
+          },
+        };
+  }
+  const byId = pending.find(
+    (item) => item.investorOrganisationId === said.toLowerCase(),
+  );
+  const found =
+    byId === undefined
+      ? closestByName(
+          pending,
+          said,
+          (item) => item.investorName,
+          (item) => item.interestId,
+        )
+      : [byId];
+  const only = found.length === 1 ? found[0] : undefined;
+  if (only !== undefined) return { chosen: only };
+  return found.length === 0
+    ? {
+        chosen: null,
+        output: {
+          status: "NOT_FOUND",
+          awaitingApprovalOf: `"${said}" isn't one of the interests waiting for your answer; those are from ${listedNames(names)}.`,
+        },
+      }
+    : {
+        chosen: null,
+        output: {
+          status: "WHICH_ONE",
+          awaitingApprovalOf: `More than one interest waiting matches "${said}": ${listedNames(found.map((item) => item.investorName))}. Which one should I ${verb}?`,
+        },
+      };
+}
 
 function createProposeInterestAnswerTool(
   relationships: RelationshipIntelligencePort,
 ): AnyQToolDefinition {
   return defineQTool<
     ProposeInterestAnswerInput,
-    ProposalOutput,
-    { readonly interestId: string; readonly investorName: string }
+    InterestAnswerOutput,
+    { readonly pending: readonly PendingInterest[] }
   >({
     id: PROPOSE_INTEREST_ANSWER,
     version: 1,
     status: "ACTIVE",
     providerName: "propose_interest_answer",
     description:
-      "Prepares the person's company's answer to an investor organisation's interest -- accept (both sides agree to connect) or decline (not taken forward, no reason shared) -- for their own approval, when they have said which. It answers nothing by itself: the person approves or declines what is shown. Only an interest still awaiting an answer can be answered. For an investor answering a founder's Connection Request, use propose_connection_request_answer instead.",
+      "Prepares the person's company's answer to an investor organisation's interest -- accept (both sides agree to connect) or decline (not taken forward, no reason shared) -- for their own approval, when they have said which. Name the investor as they did; it is matched against the interest waiting in their own inbox. It answers nothing by itself: the person approves or declines what is shown. If the result is not PREPARED, tell them its words as they are. For an investor answering a founder's Connection Request, use propose_connection_request_answer instead.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [capability("company.interest.respond")],
@@ -654,53 +771,84 @@ function createProposeInterestAnswerTool(
     owner: "q-tools",
     visibleStage: "WAITING_FOR_APPROVAL",
     input: ProposeInterestAnswerInputSchema,
-    output: ProposalOutputSchema,
+    output: InterestAnswerOutputSchema,
     authorize: async (input, { actor, plan }) => {
-      if (!admitted(plan, { kind: "COMPANY", id: input.companyId })) {
-        return deny("NOT_AVAILABLE");
-      }
       try {
-        const pending = (
-          await relationships.incomingInterest(actor, input.companyId)
-        ).find(
-          (item) =>
-            item.investorOrganisationId === input.investorOrganisationId &&
-            item.response === "PENDING",
-        );
-        if (
-          pending === undefined ||
-          !(await relationships.mayAnswerInterest(actor, pending.interestId))
-        ) {
+        // Their own inbox only: the company the plan admits, or their own
+        // company read by the Network context from their membership.
+        let pending: readonly PendingInterest[];
+        if (input.companyId !== undefined) {
+          if (!admitted(plan, { kind: "COMPANY", id: input.companyId })) {
+            return deny("NOT_AVAILABLE");
+          }
+          const companyId = input.companyId;
+          pending = (await relationships.incomingInterest(actor, companyId))
+            .filter((item) => item.response === "PENDING")
+            .map((item) => ({
+              interestId: item.interestId,
+              companyId,
+              investorOrganisationId: item.investorOrganisationId,
+              investorName: item.investorName,
+            }));
+        } else if (relationships.pendingInterests !== undefined) {
+          pending = await relationships.pendingInterests(actor);
+        } else {
           return deny("NOT_AVAILABLE");
         }
-        return allow("CONFIDENTIAL", {
-          interestId: pending.interestId,
-          investorName: pending.investorName,
-        });
+        // An id from the inbox: exactly that interest, still waiting, or
+        // nothing (an answered or another company's interest).
+        if (input.investorOrganisationId !== undefined) {
+          const exact = pending.find(
+            (item) =>
+              item.investorOrganisationId === input.investorOrganisationId,
+          );
+          if (exact === undefined) return deny("NOT_AVAILABLE");
+          pending = [exact];
+        }
+        return allow("CONFIDENTIAL", { pending });
       } catch {
         return deny("NOT_AVAILABLE");
       }
     },
-    execute: (input, context, grant) => {
+    execute: async (input, context, grant) => {
+      const picked = choosePendingInterest(
+        grant.pending,
+        input.investorOrganisationId === undefined ? input.investor : null,
+        input.decision,
+      );
+      if (picked.chosen === null) return picked.output;
+      const chosen = picked.chosen;
+      // The answer command's own question, before anything is shown.
+      if (
+        !(await relationships.mayAnswerInterest(
+          context.actor,
+          chosen.interestId,
+        ))
+      ) {
+        return {
+          status: "NOT_FOUND",
+          awaitingApprovalOf: `${chosen.investorName}'s interest can't be answered from here.`,
+        };
+      }
       const status = relationships.prepareForApproval({
         runId: context.runId,
         tenantId: context.actor.tenantId,
         actorUserId: context.actor.userId,
         actionType: "relationship.interest.respond",
         payload: {
-          interestId: grant.interestId,
-          companyId: input.companyId,
+          interestId: chosen.interestId,
+          companyId: chosen.companyId,
           decision: input.decision,
-          investorName: grant.investorName,
+          investorName: chosen.investorName,
         },
       });
-      return Promise.resolve({
+      return {
         status,
-        awaitingApprovalOf:
-          input.decision === "ACCEPTED"
-            ? `Accept ${grant.investorName}'s interest`
-            : `Decline ${grant.investorName}'s interest`,
-      });
+        awaitingApprovalOf: interestAnswerSummary(
+          chosen.investorName,
+          input.decision,
+        ),
+      };
     },
   });
 }

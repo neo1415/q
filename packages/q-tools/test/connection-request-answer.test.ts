@@ -161,6 +161,29 @@ describe("propose_connection_request_answer", () => {
     expect(two.prepared).toEqual([]);
   });
 
+  it("two waiting requests match the name: asks which, prepares nothing (lead 2026-10-03)", async () => {
+    const KAZIKIT_LABS: PendingConnectionRequest = {
+      ...KAZIKIT,
+      interestId: "77777777-0000-4000-8000-0000000000a3",
+      companyId: "66666666-0000-4000-8000-0000000000a3",
+      companyName: "Kazikit Labs",
+    };
+    const { ask, prepared } = world([
+      { ...KAZIKIT, companyName: "Kazikit Health" },
+      KAZIKIT_LABS,
+    ]);
+    const outcome = await ask({ company: "Kazikit", decision: "DECLINED" });
+    expect(prepared).toEqual([]);
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "WHICH_ONE",
+        awaitingApprovalOf:
+          'More than one connection request waiting matches "Kazikit": Kazikit Health or Kazikit Labs. Which one should I decline?',
+      },
+    });
+  });
+
   it("a decline carries no message", async () => {
     const { ask, prepared } = world([KAZIKIT]);
     await ask({

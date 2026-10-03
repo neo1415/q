@@ -174,6 +174,22 @@ function fakeRelationships(
       }
       return Promise.resolve(options.incoming ?? []);
     },
+    pendingInterests: (actor: ActorContext) => {
+      calls.reads.push("pendingInterests");
+      if (actor.userId !== actorA.userId) {
+        return Promise.reject(new Error("not a company's member"));
+      }
+      return Promise.resolve(
+        (options.incoming ?? [])
+          .filter((item) => item.response === "PENDING")
+          .map((item) => ({
+            interestId: item.interestId,
+            companyId: COMPANY_A,
+            investorOrganisationId: item.investorOrganisationId,
+            investorName: item.investorName,
+          })),
+      );
+    },
     mayExpressInterest: () => Promise.resolve(options.mayExpress ?? true),
     mayAnswerInterest: () => Promise.resolve(true),
     prepareForApproval: (entry) => {
@@ -604,6 +620,81 @@ describe("proposal tools write nothing but a prepared proposal", () => {
         },
       ]);
     }
+  });
+
+  it("names the investor: one match is prepared and named; several are asked about; none says what is waiting (lead 2026-10-03)", async () => {
+    const KAZIKIT: IncomingInterestDto = {
+      ...PENDING,
+      interestId: "77777777-0000-4000-8000-000000000002",
+      investorOrganisationId: "99999999-0000-4000-8000-000000000002",
+      investorName: "Kazikit Capital",
+    };
+    const KAZIKIT_TWO: IncomingInterestDto = {
+      ...PENDING,
+      interestId: "77777777-0000-4000-8000-000000000003",
+      investorOrganisationId: "99999999-0000-4000-8000-000000000003",
+      investorName: "Kazikit Partners",
+    };
+    const ask = async (
+      incoming: readonly IncomingInterestDto[],
+      investor: string | null,
+    ) => {
+      const { port, calls } = fakeRelationships(randomHistory(10), {
+        incoming,
+      });
+      const outcome = await executorWith(port).execute(
+        {
+          callId: "named",
+          name: "propose_interest_answer",
+          arguments: { investor, decision: "ACCEPTED" },
+        },
+        contextFor(actorA, founderPlan),
+      );
+      return { outcome, calls };
+    };
+    const one = await ask([PENDING, KAZIKIT], "Kazikit");
+    expect(one.outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "PREPARED",
+        awaitingApprovalOf: "Accept Kazikit Capital's interest",
+      },
+    });
+    expect(one.calls.prepared).toEqual([
+      {
+        actionType: "relationship.interest.respond",
+        payload: {
+          interestId: KAZIKIT.interestId,
+          companyId: COMPANY_A,
+          decision: "ACCEPTED",
+          investorName: "Kazikit Capital",
+        },
+      },
+    ]);
+    const several = await ask([KAZIKIT, KAZIKIT_TWO], "Kazikit");
+    expect(several.outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "WHICH_ONE",
+        awaitingApprovalOf:
+          'More than one interest waiting matches "Kazikit": Kazikit Capital or Kazikit Partners. Which one should I accept?',
+      },
+    });
+    expect(several.calls.prepared).toEqual([]);
+    const none = await ask([PENDING], "Ledgerfold");
+    expect(none.outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "NOT_FOUND",
+        awaitingApprovalOf:
+          '"Ledgerfold" isn\'t one of the interests waiting for your answer; those are from Beacon Ventures.',
+      },
+    });
+    const empty = await ask([], "Kazikit");
+    expect(empty.outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "NO_PENDING_INTEREST" },
+    });
   });
 
   it("an interest already answered, or another company's inbox, prepares nothing", async () => {

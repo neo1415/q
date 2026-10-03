@@ -188,6 +188,28 @@ export function createRelationshipIntelligencePort(dependencies: {
 }): RelationshipIntelligencePort {
   const { interests, board, ownCompany, connections } = dependencies;
   return {
+    // Interest waiting in their own company's inbox, named so "accept
+    // Kazikit's interest" can find it (lead 2026-10-03): the company from
+    // their membership, the list from the Network context's own read.
+    ...(ownCompany === undefined
+      ? {}
+      : {
+          pendingInterests: async (actor: ActorContext) => {
+            const companyId = await ownCompany(actor);
+            if (companyId === null) return [];
+            return (await interests.listIncomingInterest({ actor, companyId }))
+              .filter(
+                ({ interest }) =>
+                  interest.status === "EXPRESSED" && interest.response === null,
+              )
+              .map(({ interest, investor }) => ({
+                interestId: interest.id,
+                companyId,
+                investorOrganisationId: interest.investorOrganisationId,
+                investorName: investor.displayName,
+              }));
+          },
+        }),
     // A founder's Connection Request (action parity 2026-10-02): the
     // investor page's own check, as the person; writes nothing.
     ...(connections === undefined

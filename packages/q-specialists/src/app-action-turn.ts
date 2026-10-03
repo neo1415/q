@@ -120,6 +120,14 @@ const GENERIC_REFUSALS: ReadonlySet<string> = new Set([
 ]);
 
 /** Runs one generated tool, as this run, and returns its own line. */
+/** Statuses whose words are the answer, said as they are. */
+const SAID_AS_IS: ReadonlySet<string> = new Set([
+  "WHICH_ONE",
+  "NOT_FOUND",
+  "NO_PENDING_INTEREST",
+  "NO_PENDING_REQUESTS",
+]);
+
 export function createToolAppActionPort(dependencies: {
   readonly tools: QToolPort;
   readonly names: readonly string[];
@@ -185,6 +193,17 @@ export function createToolAppActionPort(dependencies: {
           data.says.trim().length > 0
         ) {
           return { asks: data.says.trim(), needs: "TIME_ZONE" };
+        }
+        // A proposer that prepared nothing and said exactly why -- none
+        // waiting, none matching (with what is waiting), or which one --
+        // is answered with those words as they are (lead 2026-10-03).
+        if (
+          typeof data.status === "string" &&
+          SAID_AS_IS.has(data.status) &&
+          typeof data.awaitingApprovalOf === "string" &&
+          data.awaitingApprovalOf.trim().length > 0
+        ) {
+          return data.awaitingApprovalOf.trim();
         }
         return typeof data.says === "string" && data.says.trim().length > 0
           ? data.says.trim()

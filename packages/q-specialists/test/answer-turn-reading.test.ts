@@ -2514,6 +2514,38 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
     ).toEqual({ asks: question, needs: "TIME_ZONE" });
   });
 
+  it("a proposer's which-one or none-matching line is the answer, said as it is (lead 2026-10-03)", async () => {
+    const line =
+      'More than one interest waiting matches "Kazikit": Kazikit Capital or Kazikit Partners. Which one should I accept?';
+    const port = createToolAppActionPort({
+      names: ["propose_interest_answer"],
+      tools: {
+        offer: () => Promise.resolve([]),
+        execute: () =>
+          Promise.resolve({
+            callId: "c",
+            toolName: null,
+            toolVersion: 1,
+            classification: null,
+            status: "SUCCEEDED",
+            failureCode: null,
+            sensitivity: null,
+            result: {
+              ok: true,
+              data: { status: "WHICH_ONE", awaitingApprovalOf: line },
+            },
+            latencyMs: 1,
+          } as QToolCallOutcome),
+      },
+    });
+    expect(
+      await port.run(request(), {
+        tool: "propose_interest_answer",
+        arguments: { investor: "Kazikit", decision: "ACCEPTED" },
+      }),
+    ).toBe(line);
+  });
+
   it("the reply to the question continues the action, its arguments merged (QA runs 7d7e7260 -> 5c2f71aa)", async () => {
     const asked =
       "Which city are you in, so Monday at 10:00 is right? Then I'll set the reminder.";

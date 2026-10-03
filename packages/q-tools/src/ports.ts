@@ -172,6 +172,22 @@ export type RelationshipIntelligencePort = {
     interestId: string,
   ) => Promise<boolean>;
   /**
+   * Investors' interest in the actor's own company still awaiting its
+   * answer: their own inbox, the company read by the Network context from
+   * their membership. Rejects for anyone who may not answer it. Absent:
+   * not composed.
+   */
+  readonly pendingInterests?:
+    | ((actor: ActorContext) => Promise<
+        readonly {
+          readonly interestId: string;
+          readonly companyId: string;
+          readonly investorOrganisationId: string;
+          readonly investorName: string;
+        }[]
+      >)
+    | undefined;
+  /**
    * Founders' Connection Requests to the actor's own investor organisation
    * still awaiting its answer (ADR 0023): its own inbox, so always theirs
    * to know. Rejects for anyone who is not an investor organisation's

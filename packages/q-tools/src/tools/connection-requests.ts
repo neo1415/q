@@ -170,12 +170,28 @@ export function prepareConnectionAnswer(
     };
   }
   const names = pending.map((item) => item.companyName);
+  // Several waiting requests match the name: asked which, never a guess.
+  const matches =
+    input.company === null
+      ? []
+      : closestByName(
+          pending,
+          input.company,
+          (item) => item.companyName,
+          (item) => item.interestId,
+        );
+  if (input.company !== null && matches.length > 1) {
+    return {
+      status: "WHICH_ONE",
+      awaitingApprovalOf: `More than one connection request waiting matches "${input.company}": ${listedNames(matches.map((item) => item.companyName))}. Which one should I ${input.decision === "ACCEPTED" ? "accept" : "decline"}?`,
+    };
+  }
   const chosen =
     input.company === null
       ? pending.length === 1
         ? (pending[0] ?? null)
         : null
-      : matchPendingRequest(pending, input.company);
+      : (matches[0] ?? null);
   if (chosen === null) {
     return input.company === null
       ? {

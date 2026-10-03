@@ -165,10 +165,44 @@ function answerInterest(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
         correlationId: context.correlationId,
       }),
     targets: () => [],
-    card: () => ({
-      summary: accept ? "Accept their interest" : "Decline their interest",
-      preview: "They are told your answer.",
-    }),
+    // Named from their own inbox (lead 2026-10-03: the card said only
+    // "Accept their interest").
+    counterpartOf: async (ports, actor, input) => {
+      const companyId = await ports.ownCompanyId?.(actor);
+      if (companyId === null || companyId === undefined) return null;
+      const incoming = await interests(ports).listIncomingInterest({
+        actor,
+        companyId,
+      });
+      return (
+        incoming.find(({ interest }) => interest.id === input.interestId)
+          ?.investor.displayName ?? null
+      );
+    },
+    card: (_input, names) => {
+      const who = names?.counterpart ?? null;
+      return accept
+        ? {
+            summary:
+              who === null
+                ? "Accept their interest"
+                : `Accept ${who}'s interest`,
+            preview:
+              who === null
+                ? "They are told you'd like to talk."
+                : `${who} is told you'd like to talk.`,
+          }
+        : {
+            summary:
+              who === null
+                ? "Decline their interest"
+                : `Decline ${who}'s interest`,
+            preview:
+              who === null
+                ? "They are told you're not taking it forward. No reason is shared."
+                : `${who} is told you're not taking it forward. No reason is shared.`,
+          };
+    },
     done: () => (accept ? "Done. You accepted." : "Done. You declined."),
     http: {
       method: "POST",
@@ -285,10 +319,35 @@ function answerConnection(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
         correlationId: context.correlationId,
       }),
     targets: () => [],
-    card: () => ({
-      summary: accept ? "Accept their request" : "Decline their request",
-      preview: "The founder is told your answer.",
-    }),
+    // Named from their own inbox of requests (lead 2026-10-03).
+    counterpartOf: async (ports, actor, input) =>
+      (await connections(ports).listConnectionRequests({ actor })).find(
+        ({ interest }) => interest.id === input.interestId,
+      )?.company.canonicalName ?? null,
+    card: (_input, names) => {
+      const who = names?.counterpart ?? null;
+      return accept
+        ? {
+            summary:
+              who === null
+                ? "Accept their connection request"
+                : `Accept ${who}'s connection request`,
+            preview:
+              who === null
+                ? "The founders are told you'd like to connect."
+                : `${who} is told you'd like to connect.`,
+          }
+        : {
+            summary:
+              who === null
+                ? "Decline their connection request"
+                : `Decline ${who}'s connection request`,
+            preview:
+              who === null
+                ? "The founders are told you're not taking it forward. No reason is shared."
+                : `${who} is told you're not taking it forward. No reason is shared.`,
+          };
+    },
     done: () => (accept ? "Done. You accepted." : "Done. You declined."),
     http: {
       method: "POST",

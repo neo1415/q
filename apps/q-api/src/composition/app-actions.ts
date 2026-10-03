@@ -168,10 +168,16 @@ export function createAppActionDefinitions(
       describe: (payload) => action.card(payload),
       describeFor: async (payload, targets, actor) => {
         const [first] = targets;
+        // The action's own read names an inbox item it acts on by id (an
+        // interest, a connection request); otherwise its first target.
         const counterpart =
-          first === undefined || options.nameOf === undefined
-            ? null
-            : await options.nameOf(actor, first).catch(() => null);
+          action.counterpartOf !== undefined
+            ? await action
+                .counterpartOf(ports, actor, payload)
+                .catch(() => null)
+            : first === undefined || options.nameOf === undefined
+              ? null
+              : await options.nameOf(actor, first).catch(() => null);
         return action.card(payload, { counterpart });
       },
       confirm: (_payload, result) => result.says,

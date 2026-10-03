@@ -167,11 +167,17 @@ export type AppActionPorts = {
     | undefined;
   /** Interest and connection requests: the network services. */
   readonly interests?:
-    Pick<InterestService, "expressInterest" | "respondToInterest"> | undefined;
+    | Pick<
+        InterestService,
+        "expressInterest" | "respondToInterest" | "listIncomingInterest"
+      >
+    | undefined;
   readonly connections?:
     | Pick<
         ConnectionService,
-        "requestConnection" | "respondToConnectionRequest"
+        | "requestConnection"
+        | "respondToConnectionRequest"
+        | "listConnectionRequests"
       >
     | undefined;
   /** Diligence documents and requests (2026-10-02): the diligence service. */
