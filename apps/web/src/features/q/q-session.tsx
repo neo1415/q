@@ -26,7 +26,7 @@ import {
   readActiveConversation,
   rememberActiveConversation,
 } from "./active-conversation";
-import { listQConversationsAction, pendingQApprovalsAction } from "./actions";
+import { resumeQAction } from "./actions";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
 import { performClientAction, registerClientRouter } from "./client-actions";
@@ -172,19 +172,18 @@ export function QSessionProvider({
     if (!connected || loadedNamed.current) return;
     if (window.location.pathname === Q_PAGE) return;
     let current = true;
-    void Promise.all([
-      pendingQApprovalsAction(),
-      listQConversationsAction(),
-    ]).then(([pending, conversations]) => {
-      if (!current) return;
-      const found = resumableConversation({
-        now: Date.now(),
-        subject: resumeSubject.current,
-        pending: pending.ok ? pending.value : [],
-        conversations: conversations.ok ? conversations.value.items : [],
+    void resumeQAction()
+      .catch(() => null)
+      .then((resume) => {
+        if (!current || resume?.ok !== true) return;
+        const found = resumableConversation({
+          now: Date.now(),
+          subject: resumeSubject.current,
+          pending: resume.value.pending,
+          conversations: resume.value.conversations,
+        });
+        if (found !== null) setConversationId((now) => now ?? found);
       });
-      if (found !== null) setConversationId((now) => now ?? found);
-    });
     return () => {
       current = false;
     };

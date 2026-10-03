@@ -11,6 +11,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import {
   ArrowLeft,
   ArrowUpRight,
+  ChevronDown,
   Globe,
   ICON_SIZE,
   MapPin,
@@ -190,7 +191,7 @@ export function RelationshipDetail({
           !relationship.milestones.some(
             (milestone) => milestone.state === "IN_DILIGENCE",
           ) ? null : (
-            <Card title="Diligence" id="diligence">
+            <Card title="Diligence" id="diligence" collapsible>
               <RelationshipDiligence
                 relationshipId={relationship.relationshipId}
                 companyId={relationship.companyId}
@@ -200,7 +201,12 @@ export function RelationshipDetail({
 
           {relationship === null ||
           relationship.milestones.length === 0 ? null : (
-            <Card title="What happened" id="history">
+            <Card
+              title="What happened"
+              id="history"
+              collapsible
+              count={relationship.milestones.length}
+            >
               <RelationshipTimeline
                 milestones={relationship.milestones}
                 meetings={meetings}
@@ -568,26 +574,66 @@ function Card({
   id,
   action,
   className,
+  collapsible = false,
+  count,
   children,
 }: {
   readonly title: string;
   readonly id: string;
   readonly action?: ReactNode;
   readonly className?: string | undefined;
+  /**
+   * Folded on a phone, open on a large screen (design-48 v2: fewer sections
+   * above the fold). The large-screen rule shows a closed <details>'s
+   * content through ::details-content; a browser without it shows the
+   * section folded, one tap from open.
+   */
+  readonly collapsible?: boolean;
+  readonly count?: number | undefined;
   readonly children: ReactNode;
 }) {
+  const heading = (
+    <h2
+      id={`relationship-${id}`}
+      className="cq-title-sm text-(--cq-text-primary)"
+    >
+      {title}
+      {count === undefined ? null : (
+        <span className="cq-numeric font-normal text-(--cq-text-secondary) lg:hidden">
+          {` · ${String(count)}`}
+        </span>
+      )}
+    </h2>
+  );
+  if (collapsible) {
+    return (
+      <details
+        aria-labelledby={`relationship-${id}`}
+        className={`group scroll-mt-24 border-t border-(--cq-border-subtle) pt-2 lg:pt-5 lg:[&::details-content]:[content-visibility:visible] ${className ?? ""}`}
+        data-collapsible={id}
+      >
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 lg:pointer-events-none lg:min-h-0 [&::-webkit-details-marker]:hidden">
+          {heading}
+          <ChevronDown
+            size={ICON_SIZE.regular}
+            aria-hidden="true"
+            className="text-(--cq-text-tertiary) transition-transform group-open:rotate-180 lg:hidden"
+          />
+        </summary>
+        {/* The id is inside the fold so a link to #diligence opens it. */}
+        <div id={id} className="flex scroll-mt-24 flex-col gap-4 pt-3 lg:pt-4">
+          {children}
+        </div>
+      </details>
+    );
+  }
   return (
     <section
       aria-labelledby={`relationship-${id}`}
       className={`flex scroll-mt-24 flex-col gap-4 border-t border-(--cq-border-subtle) pt-5 ${className ?? ""}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <h2
-          id={`relationship-${id}`}
-          className="cq-title-sm text-(--cq-text-primary)"
-        >
-          {title}
-        </h2>
+        {heading}
         {action}
       </div>
       {children}

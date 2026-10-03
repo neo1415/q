@@ -14,23 +14,22 @@ Dark-mode values already pass (9.97:1 and 8.23:1).
 
 ## Decision
 
-In light mode, `apps/web/app/globals.css` sets:
+In light mode, `packages/ui/src/tokens/tokens.css` sets:
 
 - `--cq-warning: oklch(0.53 0.12 70)`: 4.77:1 or more on the canvas,
   `--cq-surface-subtle` and `--cq-warning-soft`.
 - `--cq-positive: oklch(0.5 0.13 151)`: 4.95:1 or more on the same
   backgrounds, including `--cq-positive-soft`.
 
-The override is a plain `:root` rule after the package import. The
-package's dark rules (`:root:not([data-theme="light"])` and
-`:root[data-theme="dark"]`) are more specific, so dark mode is unchanged.
+The values live in the package's light `:root` block, the one source of
+truth; `globals.css` does not redefine them (a test enforces both the
+contrast and the absence of an override). Dark values are unchanged.
 Hue and chroma stay within the existing families. Status is still never
 carried by colour alone; the words stay.
+
+This amends doc 18's light token table for these two values.
 
 ## Consequences
 
 - Status text in these colours is legible on every light surface the app
   uses.
-- `packages/ui/src/tokens/tokens.css` keeps its old light values. If the
-  package becomes the single source again, move these values there and
-  delete the override.

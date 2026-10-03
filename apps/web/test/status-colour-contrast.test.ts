@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 /**
  * ADR 0046: light-mode status colours reach WCAG AA (4.5:1) on every light
- * surface they sit on. Reads the real token values from globals.css (the
- * override) and tokens.css (the surfaces) and computes contrast.
+ * surface they sit on. Reads the real light values from tokens.css, the
+ * one source of truth, and computes contrast.
  */
 const globals = readFileSync(
   new URL("../app/globals.css", import.meta.url),
@@ -58,7 +58,7 @@ describe("light-mode status colours (ADR 0046)", () => {
   it.each(["warning", "positive"])(
     "%s reaches 4.5:1 on light surfaces",
     (name) => {
-      const colour = read(globals, name);
+      const colour = read(lightBlock, name);
       for (const surface of [...surfaces, `${name}-soft`]) {
         expect(ratio(colour, read(lightBlock, surface))).toBeGreaterThanOrEqual(
           4.5,
@@ -67,9 +67,7 @@ describe("light-mode status colours (ADR 0046)", () => {
     },
   );
 
-  it("measures the package's old light warning as failing (the math is right)", () => {
-    const old = ratio(read(lightBlock, "warning"), read(lightBlock, "canvas"));
-    expect(old).toBeGreaterThan(2.8);
-    expect(old).toBeLessThan(3.1);
+  it("has one source of truth: globals.css does not redefine them", () => {
+    expect(globals).not.toMatch(/--cq-(warning|positive):/u);
   });
 });

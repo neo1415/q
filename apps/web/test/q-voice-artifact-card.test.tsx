@@ -29,6 +29,8 @@ vi.mock("../src/features/q/actions", () => ({
   pendingQApprovalsAction: () => Promise.resolve({ ok: true, value: [] }),
   listQConversationsAction: () =>
     Promise.resolve({ ok: true, value: { items: [] } }),
+  resumeQAction: () =>
+    Promise.resolve({ ok: true, value: { pending: [], conversations: [] } }),
   askQAction: vi.fn(),
   continueQRunAction: vi.fn(),
   cancelQRunAction: vi.fn(),

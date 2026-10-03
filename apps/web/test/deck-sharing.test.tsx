@@ -106,3 +106,26 @@ describe("deck sharing", () => {
     expect(container.textContent).toBe("");
   });
 });
+
+describe("Documents page order (design-48 v2)", () => {
+  it("lists documents first, then the deck, with the brand folded", async () => {
+    vi.doMock("../src/components/app-shell/global-q", () => ({
+      useGlobalQ: () => ({ askAbout: vi.fn() }),
+    }));
+    vi.doMock("../src/features/documents/brand-kit-panel", () => ({
+      BrandKitPanel: () => <p>brand panel</p>,
+    }));
+    const { DocumentsScreen } =
+      await import("../src/features/documents/documents-screen");
+    const { container } = render(
+      <DocumentsScreen documents={[]} brand={null} decks={<p>deck rows</p>} />,
+    );
+    const text = container.textContent ?? "";
+    expect(text.indexOf("No documents yet.")).toBeLessThan(
+      text.indexOf("deck rows"),
+    );
+    const brand = container.querySelector("details[data-brand-fold]");
+    expect(brand?.hasAttribute("open")).toBe(false);
+    expect(brand?.textContent).toContain("brand panel");
+  });
+});

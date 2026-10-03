@@ -140,6 +140,20 @@ describe("the newspaper", () => {
     expect(pdf.getAttribute("href")).toBe(`/api/q-daily/${EDITION.id}/pdf`);
   });
 
+  it("folds a story's body below the lead, keeping its sources out of the fold (design-48)", () => {
+    render(<Newspaper edition={EDITION} />);
+    const folds = document.querySelectorAll("details[data-story-fold]");
+    expect(folds.length).toBeGreaterThan(0);
+    for (const fold of folds) {
+      expect(fold.hasAttribute("open")).toBe(false);
+      expect(fold.querySelector("a[href^='https://']")).toBeNull();
+    }
+    // The lead is never folded.
+    expect(
+      document.querySelector("[data-daily-lead] details[data-story-fold]"),
+    ).toBeNull();
+  });
+
   it("names and links every story's source, opening outside the app", () => {
     render(<Newspaper edition={EDITION} />);
     const sources = screen.getAllByRole("link", { name: /TechCabal/ });
