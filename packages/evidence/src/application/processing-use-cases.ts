@@ -265,6 +265,11 @@ export const CompleteDocumentProcessingInputSchema = z
     causationId: CausationIdSchema.optional(),
     /** True only when a scanner actually returned a clean verdict. */
     scannedClean: z.boolean(),
+    /**
+     * ADR 0042: no scanner ran, under the interim policy; the version is
+     * recorded NOT_SCANNED. Ignored when scannedClean is true.
+     */
+    notScanned: z.boolean().optional(),
     provenance: z
       .object({
         extractorVersion: z.string().min(1).max(64).optional(),
@@ -337,7 +342,9 @@ export function createCompleteDocumentProcessing(
             // document keeps the state it already had.
             ...(parsed.scannedClean
               ? ({ malwareScanStatus: "CLEAN" } as const)
-              : {}),
+              : parsed.notScanned === true
+                ? ({ malwareScanStatus: "NOT_SCANNED" } as const)
+                : {}),
           },
         },
       );

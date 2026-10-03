@@ -182,7 +182,7 @@ export function createDocumentProcessingPipeline(
       status: "FAILED" | "BLOCKED",
       errorCode: string,
       textExtractionStatus: "FAILED" | "UNSUPPORTED",
-      malwareScanStatus?: "BLOCKED" | "ERROR" | "CLEAN",
+      malwareScanStatus?: "BLOCKED" | "ERROR" | "CLEAN" | "NOT_SCANNED",
     ): Promise<void> => {
       await evidence.advanceVersionProcessingState({
         tenantId,
@@ -278,7 +278,11 @@ export function createDocumentProcessingPipeline(
         "FAILED",
         "NOT_A_TEXT_DOCUMENT",
         "UNSUPPORTED",
-        decision.scanned ? "CLEAN" : undefined,
+        decision.scanned
+          ? "CLEAN"
+          : decision.recordNotScanned === true
+            ? "NOT_SCANNED"
+            : undefined,
       );
       observe("AUDIO_STORED", startedAt);
       return { kind: "DONE" };
@@ -418,6 +422,7 @@ export function createDocumentProcessingPipeline(
       correlationId,
       causationId: CausationIdSchema.parse(`cau_${job.id}`),
       scannedClean: decision.scanned,
+      ...(decision.recordNotScanned === true ? { notScanned: true } : {}),
       provenance: {
         extractorVersion: result.output.metadata.parserVersion,
         ...(chunking?.chunkingVersion === undefined
@@ -434,6 +439,8 @@ export function createDocumentProcessingPipeline(
           truncated: result.output.metadata.truncated === true,
           parseDurationMs: result.durationMs,
           scanned: decision.scanned,
+          // The policy this run was made under (ADR 0042).
+          malwarePolicy: options.malwarePolicy,
           ...(chunking === undefined
             ? {}
             : {

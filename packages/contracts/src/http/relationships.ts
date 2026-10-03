@@ -696,6 +696,8 @@ export const DiligenceDtoSchema = z
             title: z.string().max(300),
             documentType: z.string().max(64),
             sharedAt: UtcTimestampSchema,
+            /** ADR 0042: false shows "Not virus-scanned yet". */
+            scanned: z.boolean().default(true),
           })
           .strict(),
       )
@@ -743,7 +745,12 @@ export const DiligenceRequestResultDtoSchema = z
   .object({ requestId: UuidSchema })
   .strict();
 export const DiligenceDownloadDtoSchema = z
-  .object({ url: z.string().url(), expiresAt: UtcTimestampSchema })
+  .object({
+    url: z.string().url(),
+    expiresAt: UtcTimestampSchema,
+    /** ADR 0042: false when the file was never virus-scanned. */
+    scanned: z.boolean().default(true),
+  })
   .strict();
 export const DiligenceRevokeResultDtoSchema = z
   .object({ revoked: z.boolean() })

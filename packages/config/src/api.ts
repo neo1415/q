@@ -51,6 +51,14 @@ const apiEnvSchema = z.object({
   SUPABASE_SECRET_KEY: supabaseSecretKeySchema.optional(),
   // Adjustable implementation limit, not a locked product decision. Bounded
   // by the 50 MiB ceiling a document version may ever carry.
+  // ADR 0042 (founder decision 2026-10-03): with no scanner attached, files
+  // processed under ALLOW_UNSCANNED_WITH_WARNING are NOT_SCANNED and may be
+  // downloaded by the audiences that already have access, flagged
+  // scanned:false. Any other value (the default) serves CLEAN files only.
+  // Set with the workers' value; never on by default.
+  CQ_MALWARE_POLICY: z
+    .enum(["REQUIRE_CLEAN", "ALLOW_UNSCANNED", "ALLOW_UNSCANNED_WITH_WARNING"])
+    .default("REQUIRE_CLEAN"),
   CQ_DOCUMENT_UPLOAD_MAX_BYTES: z.coerce
     .number()
     .int()
@@ -89,6 +97,8 @@ export type ApiSecrets = {
 /** Non-secret operational values safe to expose in diagnostics. */
 export type ApiPublicConfig = {
   readonly documentUploadMaxBytes: number;
+  /** ADR 0042: NOT_SCANNED files may be downloaded, flagged. Default false. */
+  readonly serveUnscannedDocuments: boolean;
   /** Absolute base URL of the Q service, or undefined when not composed. */
   readonly qApiBaseUrl: string | undefined;
   /** Which providers are configured. Names and booleans, never keys. */
@@ -126,6 +136,8 @@ export function parseApiConfig(env: EnvironmentInput): ApiConfig {
         : undefined,
     public: {
       documentUploadMaxBytes: parsed.CQ_DOCUMENT_UPLOAD_MAX_BYTES,
+      serveUnscannedDocuments:
+        parsed.CQ_MALWARE_POLICY === "ALLOW_UNSCANNED_WITH_WARNING",
       qApiBaseUrl: parsed.CQ_Q_API_URL?.replace(/\/$/, ""),
       modelProviders: modelProviderConfigStatus(toModelProviderSecrets(parsed)),
       videoProviders: videoProviderConfigStatus(videoProviders),

@@ -159,6 +159,7 @@ import { withVerificationDecisions } from "./verification/decide-handler.js";
 import { withReadinessAfterVerification } from "./verification/readiness-handler.js";
 import { withRelationshipProjection } from "./network/relationship-projection-handler.js";
 import { rebuildRelationshipStatesAtStart } from "./network/relationship-rebuild-at-start.js";
+import { redriveBlockedDocumentsAtStart } from "./documents/redrive.js";
 import { withQWorkWake } from "./network/q-work-wake-handler.js";
 import { withInterestNotices } from "./network/interest-notice-handler.js";
 import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
@@ -1094,6 +1095,17 @@ void requestRebuildsForVersionDrift({
 // background. Compare-and-set, bounded, idempotent; never fatal.
 void rebuildRelationshipStatesAtStart({
   projector: relationshipProjector,
+  logger,
+});
+
+// ADR 0042: documents blocked for want of a scanner are re-driven once in
+// the background, only under ALLOW_UNSCANNED_WITH_WARNING. Idempotent,
+// bounded, one log line; the CLI (redrive-documents) does the same by hand.
+void redriveBlockedDocumentsAtStart({
+  sql: database.sql,
+  queues,
+  pipelineVersion: config.documents.pipelineVersion,
+  malwarePolicy: config.documents.malwarePolicy,
   logger,
 });
 

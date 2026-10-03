@@ -60,6 +60,8 @@ export type DiligenceDocumentPort = {
   readonly signedDownload: (document: DiligenceDocument) => Promise<{
     readonly url: string;
     readonly expiresAt: string;
+    /** False for a NOT_SCANNED file (ADR 0042). Absent: scanned. */
+    readonly scanned?: boolean | undefined;
   }>;
 };
 
@@ -70,6 +72,8 @@ export type DiligenceDocument = {
   readonly title: string;
   readonly documentType: string;
   readonly currentVersionId: string | null;
+  /** False when its current version was never virus-scanned (ADR 0042). */
+  readonly scanned?: boolean | undefined;
 };
 
 export type DiligenceView = {
@@ -83,6 +87,8 @@ export type DiligenceView = {
     readonly title: string;
     readonly documentType: string;
     readonly sharedAt: string;
+    /** False: "Not virus-scanned yet" beside it (ADR 0042). */
+    readonly scanned: boolean;
   }[];
   readonly requests: readonly {
     readonly requestId: string;
@@ -222,6 +228,7 @@ export function createDiligenceService(dependencies: {
                   title: document.title,
                   documentType: document.documentType,
                   sharedAt: policy.createdAt,
+                  scanned: document.scanned !== false,
                 },
               ];
         }),

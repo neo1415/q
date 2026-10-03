@@ -140,6 +140,7 @@ describe("per-service isolation", () => {
       "documentUploadMaxBytes",
       "modelProviders",
       "qApiBaseUrl",
+      "serveUnscannedDocuments",
       "videoProviders",
     ]);
     expect(api.public.documentUploadMaxBytes).toBe(26214400);
@@ -317,5 +318,38 @@ describe("configuration errors are safe to log", () => {
     }
 
     expect(JSON.stringify(error)).not.toContain(SYNTHETIC_SECRET);
+  });
+});
+
+/** ADR 0042 (founder decision 2026-10-03): the interim malware policy. */
+describe("CQ_MALWARE_POLICY", () => {
+  const hosted = { CAPITAL_Q_ENV: "production", NODE_ENV: "production" };
+
+  it("defaults to REQUIRE_CLEAN, and the API serves CLEAN files only", () => {
+    expect(parseWorkerConfig(hosted).documents.malwarePolicy).toBe(
+      "REQUIRE_CLEAN",
+    );
+    expect(parseApiConfig(hosted).public.serveUnscannedDocuments).toBe(false);
+  });
+
+  it("allows ALLOW_UNSCANNED_WITH_WARNING in a hosted environment only when set explicitly", () => {
+    const env = {
+      ...hosted,
+      CQ_MALWARE_POLICY: "ALLOW_UNSCANNED_WITH_WARNING",
+    };
+    expect(parseWorkerConfig(env).documents.malwarePolicy).toBe(
+      "ALLOW_UNSCANNED_WITH_WARNING",
+    );
+    expect(parseApiConfig(env).public.serveUnscannedDocuments).toBe(true);
+  });
+
+  it("still refuses ALLOW_UNSCANNED outside a local environment", () => {
+    expect(() =>
+      parseWorkerConfig({ ...hosted, CQ_MALWARE_POLICY: "ALLOW_UNSCANNED" }),
+    ).toThrow(ConfigurationError);
+    expect(
+      parseApiConfig({ ...hosted, CQ_MALWARE_POLICY: "ALLOW_UNSCANNED" }).public
+        .serveUnscannedDocuments,
+    ).toBe(false);
   });
 });

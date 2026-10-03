@@ -13,6 +13,7 @@ import {
   revokeDiligenceAction,
   shareDiligenceAction,
 } from "./diligence-actions";
+import { NotScannedNote } from "../documents/not-scanned-note";
 
 /**
  * The diligence area (2026-10-02): once diligence starts, the founder shares
@@ -91,7 +92,10 @@ export function RelationshipDiligence({
                 key={share.policyId}
                 className="flex flex-wrap items-center justify-between gap-2"
               >
-                <span className="cq-body">{share.title}</span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="cq-body">{share.title}</span>
+                  {share.scanned ? null : <NotScannedNote />}
+                </span>
                 <span className="flex gap-2">
                   <Button
                     variant="secondary"

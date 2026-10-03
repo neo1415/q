@@ -1125,10 +1125,20 @@ const permissions = createPermissionsService({
  * download is decided by the access service, then signed straight from
  * storage; requests and their answers are Network's, append-only.
  */
+// ADR 0042 (founder decision 2026-10-03): with no scanner attached, a
+// NOT_SCANNED file may reach the audiences that already have access,
+// flagged scanned:false. Off unless CQ_MALWARE_POLICY says so explicitly.
+// Only the deck audience and diligence shares take it; chat attachments
+// and admin KYB reads stay CLEAN-only.
+const serveUnscanned = config.public.serveUnscannedDocuments;
 const diligenceDocuments =
   storage === undefined
     ? undefined
-    : createSharedDocumentDownloads({ sql: database.sql, storage });
+    : createSharedDocumentDownloads({
+        sql: database.sql,
+        storage,
+        serveUnscanned,
+      });
 const diligence = createDiligenceService({
   sql: database.sql,
   transactions: database.transactions,
@@ -1152,6 +1162,8 @@ const diligence = createDiligenceService({
             currentVersionId: document.currentVersionId,
           };
     },
+    // Its scan state rides along (ADR 0042): the list says "Not
+    // virus-scanned yet" beside a NOT_SCANNED file.
     canonical: (documentId) => diligenceDocumentLookup(documentId),
     signedDownload: async (document) => {
       if (
@@ -1166,7 +1178,11 @@ const diligence = createDiligenceService({
         documentVersionId: document.currentVersionId,
         disposition: "ATTACHMENT",
       });
-      return { url: link.url, expiresAt: link.expiresAt };
+      return {
+        url: link.url,
+        expiresAt: link.expiresAt,
+        scanned: link.scanned,
+      };
     },
   },
   requests: createPostgresDiligenceRequests(),
@@ -1314,8 +1330,10 @@ const chat = composeChat({
   downloads:
     storage === undefined
       ? undefined
-      : createSharedDocumentDownloads({ sql: database.sql, storage })
-          .authorizeSharedVersion,
+      : createSharedDocumentDownloads({
+          sql: database.sql,
+          storage,
+        }).authorizeSharedVersion,
   newCorrelationId: createCorrelationId,
 });
 
@@ -1522,6 +1540,7 @@ const { app, logger } = createApp(config, security, {
       const deck = await createSharedDocumentDownloads({
         sql: database.sql,
         storage,
+        serveUnscanned,
       }).investorAudienceDeck({
         companyTenantId: company.tenantId,
         companyId: company.id,
@@ -1533,6 +1552,7 @@ const { app, logger } = createApp(config, security, {
             documentVersionId: deck.documentVersionId,
             title: deck.title,
             sharedAt: deck.updatedAt,
+            scanned: deck.scanned,
           };
     },
     downloadAudienceDeck: async (company, deck) => {
@@ -1540,13 +1560,18 @@ const { app, logger } = createApp(config, security, {
       const link = await createSharedDocumentDownloads({
         sql: database.sql,
         storage,
+        serveUnscanned,
       }).authorizeSharedVersion({
         documentTenantId: company.tenantId,
         documentId: deck.documentId,
         documentVersionId: deck.documentVersionId,
         disposition: "ATTACHMENT",
       });
-      return { url: link.url, expiresAt: link.expiresAt };
+      return {
+        url: link.url,
+        expiresAt: link.expiresAt,
+        scanned: link.scanned,
+      };
     },
     team: (company) =>
       companyTeamProjection.teamForNetwork({

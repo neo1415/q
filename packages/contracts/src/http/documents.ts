@@ -113,6 +113,8 @@ export const DOCUMENT_MALWARE_SCAN_STATUSES = [
   "CLEAN",
   "BLOCKED",
   "ERROR",
+  /** ADR 0042: processed with no scanner attached; never clean. */
+  "NOT_SCANNED",
 ] as const;
 export const DocumentMalwareScanStatusSchema = z.enum(
   DOCUMENT_MALWARE_SCAN_STATUSES,

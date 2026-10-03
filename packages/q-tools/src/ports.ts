@@ -729,6 +729,8 @@ export type EvidenceDocumentsPort = {
        * about a deck's audience, never a card's proposal (QA 581a8862).
        */
       readonly downloadAudience?: string | undefined;
+      /** Its current version's malware scan state (ADR 0042). */
+      readonly malwareScanStatus?: string | undefined;
     }[]
   >;
 };

@@ -60,6 +60,8 @@ export const CompanyProfileDeckSchema = z
   .object({
     title: z.string().min(1).max(300),
     sharedAt: UtcTimestampSchema,
+    /** ADR 0042: false shows "Not virus-scanned yet" beside it. */
+    scanned: z.boolean().default(true),
   })
   .strict();
 export type CompanyProfileDeck = z.infer<typeof CompanyProfileDeckSchema>;
@@ -146,6 +148,8 @@ export const CompanyProfileDeckDownloadDtoSchema = z
   .object({
     url: z.string().url(),
     expiresAt: UtcTimestampSchema,
+    /** ADR 0042: false when the deck was never virus-scanned. */
+    scanned: z.boolean().default(true),
   })
   .strict();
 export type CompanyProfileDeckDownloadDto = z.infer<
