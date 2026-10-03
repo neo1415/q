@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-import type { NotificationDto } from "@capital-q/contracts";
 import { buttonClassName, IconButton } from "@capital-q/ui/button";
 import { Bell, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
@@ -11,7 +10,8 @@ import { EmptyState, ErrorState, Skeleton } from "@capital-q/ui/states";
 
 import { groupNotices, type NoticeGroup } from "./notice-groups";
 import { PushSetting } from "./push-setting";
-import { listNoticesAction, markReadAction } from "./work-actions";
+import { markReadAction } from "./work-actions";
+import { noticesRead, refreshNotices, useNotices } from "./notice-store";
 
 /**
  * The notification centre (AUTO; spec auto.md §3.5): one bell with the
@@ -20,8 +20,6 @@ import { listNoticesAction, markReadAction } from "./work-actions";
  * where it is acted on. Opening marks what is shown as read. Refreshes
  * every minute while the page is visible, and on focus.
  */
-
-const POLL_MS = 60_000;
 
 function when(iso: string): string {
   const at = new Date(iso);
@@ -108,37 +106,9 @@ function NoticeRow({
 
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<readonly NotificationDto[] | null>(null);
-  const [unread, setUnread] = useState(0);
-  const [failed, setFailed] = useState(false);
-
-  const load = useCallback(async () => {
-    // A thrown action (deploy skew, signed-out tab) is a failed load,
-    // never an unhandled rejection.
-    const result = await listNoticesAction().catch(() => null);
-    if (result?.ok === true) {
-      setItems(result.value.items);
-      setUnread(result.value.unread);
-      setFailed(false);
-    } else {
-      setFailed(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    const refresh = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    refresh();
-    const timer = window.setInterval(refresh, POLL_MS);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [load]);
+  // Shared by both bells (phone header, desktop sidebar): one read.
+  const { items, unread, failed } = useNotices();
+  const load = () => refreshNotices(true);
 
   // Seen once shown: what the person opened the centre to read is read.
   useEffect(() => {
@@ -146,7 +116,7 @@ export function NotificationCenter() {
     const ids = items.filter((item) => !item.read).map((item) => item.id);
     if (ids.length === 0) return;
     void markReadAction(ids.slice(0, 50)).then((result) => {
-      if (result.ok) setUnread((count) => Math.max(0, count - ids.length));
+      if (result.ok) noticesRead(ids.length);
     });
   }, [open, items]);
 
