@@ -17,8 +17,10 @@ import type {
   OnboardingSessionView,
   TaxonomyCandidateResponse,
 } from "@capital-q/contracts";
+import { FOUNDER_UTTERANCE_ALIASES } from "@capital-q/founder-onboarding";
 import {
   INVESTOR_CONCEPT_FAMILIES,
+  INVESTOR_UTTERANCE_ALIASES,
   investorPlausibility,
 } from "@capital-q/investor-onboarding";
 import type {
@@ -1234,9 +1236,24 @@ export function createOnboardingPort(input: {
     // it is said back and agreed, never recorded silently (live
     // 2026-09-30: "we did YC summer 25" became "pilots running"). A figure
     // or their own text is checked against their words below.
+    // A choice they named themselves, unambiguously, in the words the
+    // reader says stated this step ("110 million US dollars" for the
+    // currency) is their answer, not Q's reading: recorded once the step
+    // is open, never held and asked again (QA 2026-10-03, 345a7155: the
+    // currency was re-asked for several turns).
+    const namedByThem =
+      readerStated &&
+      resolved.value.type === "SINGLE_SELECT" &&
+      onlyOptionNamedIn(
+        input.journeyType,
+        resolved.step,
+        resolved.value.optionKey,
+        answer.quote,
+      );
     if (
       input.authority !== undefined &&
       !latestStated &&
+      !namedByThem &&
       answer.basis !== "DELEGATED" &&
       (resolved.value.type === "SINGLE_SELECT" ||
         resolved.value.type === "MULTI_SELECT" ||
@@ -1878,4 +1895,52 @@ export function createOnboardingPort(input: {
       return out;
     },
   };
+}
+
+function normalisedWords(text: string): string {
+  return ` ${text
+    .toLowerCase()
+    .replace(/[’']/gu, "'")
+    .replace(/[^\p{L}\p{N}'$£€₦ ]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()} `;
+}
+
+/**
+ * Whether their own words name exactly one of a single-select step's
+ * choices -- by its label, its key or the journey's own aliases for it --
+ * and that one is the choice given. Several named ("dollars ... no, naira")
+ * is not unambiguous.
+ */
+export function onlyOptionNamedIn(
+  journeyType: "founder" | "investor",
+  step: { readonly stepKey: string; readonly configuration: unknown },
+  optionKey: string,
+  quote: string,
+): boolean {
+  const configuration = step.configuration as {
+    readonly options?: readonly {
+      readonly key?: string;
+      readonly optionKey?: string;
+      readonly label?: string;
+    }[];
+  };
+  const aliases = (
+    journeyType === "founder"
+      ? FOUNDER_UTTERANCE_ALIASES
+      : INVESTOR_UTTERANCE_ALIASES
+  )[step.stepKey];
+  const said = normalisedWords(quote);
+  const named = (configuration.options ?? []).filter((option) => {
+    const key = option.optionKey ?? option.key ?? "";
+    const names = [
+      option.label ?? "",
+      ...(key.length >= 3 ? [key.replace(/_/gu, " ")] : []),
+      ...(aliases?.[key] ?? []),
+    ].filter((name) => name.trim().length > 0);
+    return names.some((name) => said.includes(normalisedWords(name)));
+  });
+  return (
+    named.length === 1 && (named[0]?.optionKey ?? named[0]?.key) === optionKey
+  );
 }

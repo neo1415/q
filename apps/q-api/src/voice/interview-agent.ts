@@ -370,6 +370,8 @@ export type JourneyOpenings = {
   readonly signupName: string | null;
   readonly signupNameIs: string;
   readonly signupStepKey: string;
+  /** The name on their record now, said exactly whenever it is named. */
+  readonly recordedName?: string | null | undefined;
   readonly unsaidFindings: readonly {
     readonly stepKey: string;
     readonly value: string;
@@ -424,7 +426,7 @@ export function turnNotesFor(input: {
   switch (input.lookup?.kind) {
     case "RUN":
       notes.push(
-        `A look-up will run right after your reply for their question: "${input.lookup.question.slice(0, 300)}". Say in a few words that you will look it up; do not answer it yourself, and ask nothing now: the conversation returns to the open question afterwards.`,
+        `A look-up may run right after your reply for their question: "${input.lookup.question.slice(0, 300)}". If their words are a real question that needs looking up, say in a few words that you will look it up; do not answer it yourself, and ask nothing now: the conversation returns to the open question afterwards. If instead they were just chatting (where they are, their week, a joke) and asked nothing to look up, set chatter PERSON, acknowledge it warmly in a few words and carry on with the interview: then nothing is looked up.`,
       );
       break;
     case "RUNNING":
@@ -480,6 +482,14 @@ export function turnNotesFor(input: {
           .join("; ")}`,
       );
     }
+  }
+  notes.push(
+    "When what they say is not about the interview (where they are, how their week is going, a joke), acknowledge it warmly in a few words first, then go on; never repeat your previous question word for word -- ask it in other words, or ask another open question.",
+  );
+  if (open?.recordedName !== undefined && open.recordedName !== null) {
+    notes.push(
+      `Their ${open.signupNameIs} on record is "${open.recordedName.slice(0, 120)}": whenever you name it, say it exactly so, including anything in brackets.`,
+    );
   }
   notes.push(
     'An optional question they have not answered after you asked it twice is passed over: move on, never press it. Something you could not record is mentioned once, never again in later replies. Record a number as the number they said, in any words; never ask them to repeat anything in particular words or another form. When their answer fits none of a step\'s choices (a country not listed, "Founder" for a role), record their own words for it with ownWords true; they are kept, never forced into a near choice. Ask only when their words are unclear.',
@@ -953,6 +963,10 @@ export function createInterviewAgent(
           signupName.length > 0 && !textStatedIn(signupName, qSaid)
             ? signupName
             : null,
+        recordedName: (() => {
+          const named = textAnswerOf(view, signupStepKey).trim();
+          return named.length > 0 ? named : null;
+        })(),
         signupNameIs:
           input.journeyType === "investor" ? "firm's name" : "company's name",
         signupStepKey,
@@ -1400,11 +1414,39 @@ export function createInterviewAgent(
       );
     }
     const recorded = port.recorded();
-    const reply =
+    const replyWritten =
       result?.reply ??
       (recorded.length > 0
         ? "That's on your record. I lost my train of thought for a second — say that last part again?"
         : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
+    // Never the previous question word for word (QA 2026-10-03): what they
+    // said is acknowledged first, and the question comes in other words.
+    const reply = withRecordedName(
+      notVerbatim(replyWritten, lastQTurn ?? null, {
+        asking: result?.asking ?? null,
+        alternate: (stepKey) => {
+          const step = journeySteps.find((s) => s.stepKey === stepKey);
+          if (step === undefined) return null;
+          const spoken = SPOKEN_QUESTIONS[stepKey] ?? null;
+          const written = step.configuration.prompt;
+          return (
+            [spoken, written].find(
+              (wording): wording is string =>
+                wording !== null &&
+                wording !== undefined &&
+                !sameWords(wording, lastQTurn ?? ""),
+            ) ?? null
+          );
+        },
+      }),
+      open.recordedName ?? null,
+    );
+    if (reply !== replyWritten) {
+      logger.info(
+        { asking: result?.asking ?? null },
+        "interview reply repeated the last question verbatim; reworded",
+      );
+    }
 
     // Q's patience, decided by code from Q's reading of the turn.
     const conduct =
@@ -1452,7 +1494,16 @@ export function createInterviewAgent(
         .filter((row) => row.coveredBy !== undefined)
         .map((row) => row.stepKey) ?? [],
     );
-    const handingOver = lookup?.kind === "RUN";
+    // The loop's own reading decides between a question and a remark (QA
+    // 2026-10-03, 345a7155: "I'm in Singapore this week ... time zones are
+    // a mess" became an 82 s look-up, then the open question verbatim).
+    const handingOver = lookup?.kind === "RUN" && result?.chatter !== "PERSON";
+    if (lookup?.kind === "RUN" && !handingOver) {
+      logger.info(
+        {},
+        "a look-up was read but the turn was small talk; not run",
+      );
+    }
     const askedOpen =
       askedStep === undefined ||
       covered.has(askedStep.stepKey) ||
@@ -1629,4 +1680,57 @@ export function createInterviewAgent(
   };
 
   return { turn, researchEnded };
+}
+
+/** The same words, ignoring case, spacing and punctuation. */
+export function sameWords(a: string, b: string): boolean {
+  const words = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  const left = words(a);
+  return left.length > 0 && left === words(b);
+}
+
+/**
+ * A reply that is the previous question again, word for word, is not
+ * said as is: a short acknowledgement first, and the open step asked in
+ * its other wording when there is one (QA 2026-10-03, 345a7155).
+ */
+export function notVerbatim(
+  reply: string,
+  previous: string | null,
+  options: {
+    readonly asking: string | null;
+    readonly alternate: (stepKey: string) => string | null;
+  },
+): string {
+  if (previous === null || !sameWords(reply, previous)) return reply;
+  const other =
+    options.asking === null ? null : options.alternate(options.asking);
+  return other === null
+    ? `Noted. Coming back to it: ${reply}`
+    : `Noted. ${other}`;
+}
+
+/**
+ * Their name as recorded, never shortened (QA 2026-10-03: "Moniepoint
+ * (test)" was summarised as "Moniepoint"). Only a bracketed qualifier is
+ * restored, where the bare name stands without it.
+ */
+export function withRecordedName(
+  reply: string,
+  recordedName: string | null,
+): string {
+  if (recordedName === null) return reply;
+  const bracket = /^(.+?)\s*(\([^)]*\))\s*$/u.exec(recordedName.trim());
+  if (bracket === null) return reply;
+  const [, bare = "", qualifier = ""] = bracket;
+  if (bare.length < 2) return reply;
+  const escaped = bare.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return reply.replace(
+    new RegExp(`\\b${escaped}\\b(?!\\s*\\()(?![\\p{L}\\p{N}])`, "gu"),
+    `${bare} ${qualifier}`,
+  );
 }

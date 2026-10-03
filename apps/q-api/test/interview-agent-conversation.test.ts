@@ -102,7 +102,7 @@ describe("a question that needs a look-up is handed to Q, in the person's words"
     // Back to the open question afterwards, required first.
     expect(outcome.resume?.stepKey).toBe("I1.mandate_context");
     expect(outcome.resume?.question.length).toBeGreaterThan(0);
-    expect(seen[0]).toContain("A look-up will run right after your reply");
+    expect(seen[0]).toContain("A look-up may run right after your reply");
   });
 
   it("never hands over a model's words: a reading that is not in what they said goes on as what they said", async () => {
@@ -122,6 +122,31 @@ describe("a question that needs a look-up is handed to Q, in the person's words"
       ),
     }).turn({ ...turn(world, said), actor });
     expect(outcome.questionForQ).toBe(said);
+  });
+
+  it("a remark read as a look-up is not run when Q's own reading is small talk (QA 2026-10-03, 345a7155)", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: SO_FAR,
+    });
+    const said =
+      "I'm in Singapore this week, my cofounder is in San Francisco... time zones are a mess";
+    const { gateway, seen } = replying("I2.stages", { chatter: "PERSON" });
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(
+        reading({
+          lookup: "time difference between Singapore and San Francisco",
+        }),
+      ),
+    }).turn({ ...turn(world, said), actor });
+    expect(outcome.questionForQ).toBeNull();
+    expect(outcome.researching).toBeNull();
+    // The loop was told it may be just chatting, and to acknowledge it.
+    expect(seen.at(-1)).toContain("If instead they were just chatting");
   });
 
   it("keeps a ledger: one look-up at a time, and a route that keeps failing stops being offered", async () => {
