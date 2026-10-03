@@ -1,3 +1,4 @@
+import type { DelegationContext, QDelegationPort } from "../src/delegation.js";
 import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
@@ -119,6 +120,8 @@ function seam(options: {
   readonly pendingDecisions?: PendingDecisionPort;
   /** A hand-over prepared by code (TURN_READER v22). */
   readonly handOver?: QHandOverPort;
+  /** Work handed over in general (QA 2026-10-03). */
+  readonly delegation?: QDelegationPort;
   /** Their profile's gaps filled by code (TURN_READER v27). */
   readonly profileGaps?: QProfileGapsPort;
   /** ADR 0040: a declared app action the reading names. */
@@ -287,6 +290,9 @@ function seam(options: {
       ? {}
       : { pendingDecisions: options.pendingDecisions }),
     ...(options.handOver === undefined ? {} : { handOver: options.handOver }),
+    ...(options.delegation === undefined
+      ? {}
+      : { delegation: options.delegation }),
     ...(options.appActionArguments === undefined
       ? {}
       : { appActionArguments: options.appActionArguments }),
@@ -3285,5 +3291,161 @@ describe("counterpart names match through their parentheticals (run 9b4ef8d1)", 
     ["Share it with the team.", "Savanna Seed Partners (fictional)", false],
   ])("%s / %s -> %s", (said, name, expected) => {
     expect(namedInWords(said, name)).toBe(expected);
+  });
+});
+
+describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)", () => {
+  const delegationPort = (
+    context: DelegationContext,
+    proposed: unknown[],
+  ): QDelegationPort => ({
+    context: () => Promise.resolve(context),
+    propose: (_request, input) => {
+      proposed.push(input);
+      return Promise.resolve({
+        status: "PREPARED",
+        awaitingApprovalOf: "Q works on this for you, inside these limits",
+      });
+    },
+  });
+  const base = (
+    handOver: {
+      kind: "MEETING" | "HAND_OVER";
+      counterpartName: string | null;
+    } | null,
+  ) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver,
+    }) as TurnReaderResult;
+  const handOverReading = (counterpartName: string | null) =>
+    base({ kind: "HAND_OVER", counterpartName });
+  const noRelationships: QHandOverPort = {
+    prepare: () => Promise.resolve(null),
+    candidates: () => Promise.resolve([]),
+  };
+
+  it("'just handle it' with nothing on screen: the standing-instruction card, never an invented target", async () => {
+    const proposed: unknown[] = [];
+    const prepared: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "just handle it",
+      reading: handOverReading(null),
+      outcomes: [],
+      handOver: {
+        prepare: (_request, subject) => {
+          prepared.push(subject);
+          return Promise.resolve(null);
+        },
+        candidates: () =>
+          Promise.resolve([
+            {
+              name: "Ajopot",
+              subject: { kind: "RELATIONSHIP", relationshipId: "r-ajopot" },
+            },
+          ]),
+      },
+      delegation: delegationPort(
+        { side: "INVESTOR", relationships: 1, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(prepared).toEqual([]);
+    expect(proposed).toEqual([
+      { goal: "just handle it", includeNewCompanies: false },
+    ]);
+    const said = stored.at(-1)?.content ?? "";
+    expect(said).toContain(
+      "I've prepared a standing instruction for your approval",
+    );
+    expect(said).not.toContain("Ajopot");
+    expect(said).not.toContain("couldn't");
+  });
+
+  it("'handle my investors' from a founder with none: says so, gives the real path, prepares the card", async () => {
+    const proposed: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "handle my investors",
+      reading: handOverReading("my investors"),
+      outcomes: [],
+      handOver: noRelationships,
+      delegation: delegationPort(
+        {
+          side: "COMPANY",
+          relationships: 0,
+          outstanding: [
+            "DISCOVERY_VISIBILITY_CONFIRMED",
+            "REQUIRED_DOCUMENTATION",
+          ],
+        },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).toBe(
+      "You don't have any investors on Capital Q yet, so there's no one for me to handle today. The real path is to make your company findable to investors and upload your deck, and I can help with both. Meanwhile I've prepared a standing instruction for your approval: I find investors who match and engage them for you, asking you first before anything goes out. The card shows exactly what I'd do on my own, what I'd ask first and what never happens without you.",
+    );
+  });
+
+  it("the router may name it among the actions: routed there, it is the standing instruction", async () => {
+    const proposed: unknown[] = [];
+    const candidates: string[][] = [];
+    const { answer, stored } = seam({
+      said: "take care of all of this for me",
+      reading: base(null),
+      outcomes: [],
+      offeredTools: ["propose_standing_instruction"],
+      appActionRouter: (_request, input) => {
+        candidates.push(input.candidates.map((candidate) => candidate.name));
+        return Promise.resolve("propose_standing_instruction");
+      },
+      appActions: {
+        tools: new Set<string>(),
+        run: () => Promise.resolve(null),
+      },
+      delegation: delegationPort(
+        { side: "INVESTOR", relationships: 3, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(candidates[0]).toContain("propose_standing_instruction");
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).toContain("standing instruction");
+  });
+
+  it("a meeting with no one named is still asked about by name", async () => {
+    const proposed: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "get me a meeting with them",
+      reading: base({ kind: "MEETING", counterpartName: null }),
+      outcomes: [],
+      handOver: {
+        prepare: () => Promise.resolve(null),
+        candidates: () =>
+          Promise.resolve([
+            {
+              name: "Kazikit",
+              subject: { kind: "RELATIONSHIP", relationshipId: "r-k" },
+            },
+          ]),
+      },
+      delegation: delegationPort(
+        { side: "INVESTOR", relationships: 1, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(proposed).toEqual([]);
+    expect(stored.at(-1)?.content).toBe(
+      "Who should I set this up with: Kazikit?",
+    );
   });
 });

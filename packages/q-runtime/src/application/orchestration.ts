@@ -244,6 +244,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly turnKind?: string | undefined;
   /**
+   * What kind of question the reader read it as (ADVICE, THEIR_OWN_RECORDS,
+   * ...), when it is one. "What should I do next?" is ADVICE: their own
+   * readiness leads that answer (QA 2026-10-03, run 2cba241a).
+   */
+  readonly questionKind?: string | undefined;
+  /**
    * The declared action the reader read them as asking for, by its name
    * (TURN_READER v30, ADR 0040), offered here or not. Absent: none named.
    */

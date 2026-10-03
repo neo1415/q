@@ -48,6 +48,7 @@ import {
   createSpecialistQAnswer,
   createToolCanonicalPort,
   createToolHandOverPort,
+  createToolDelegationPort,
   createToolAppActionPort,
   createToolProfileGapsPort,
   createToolOwnMandatePort,
@@ -412,6 +413,11 @@ export function composeQIntelligence(
       names: APP_ACTIONS.flatMap((action) =>
         action.tool === undefined ? [] : [action.tool.name],
       ),
+      ...(logger === undefined ? {} : { logger }),
+    }),
+    // QA 2026-10-03: work handed over in general is a standing instruction.
+    delegation: createToolDelegationPort({
+      tools,
       ...(logger === undefined ? {} : { logger }),
     }),
     handOver: createToolHandOverPort({

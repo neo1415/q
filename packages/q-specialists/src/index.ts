@@ -227,6 +227,15 @@ export {
   type QHandOverPort,
 } from "./hand-over.js";
 export {
+  actOnDelegation,
+  createToolDelegationPort,
+  DELEGATION_CANDIDATE,
+  DELEGATION_TOOL,
+  delegationLine,
+  type DelegationContext,
+  type QDelegationPort,
+} from "./delegation.js";
+export {
   createToolProfileGapsPort,
   type ProfileGapReader,
   type ProfileGapReading,

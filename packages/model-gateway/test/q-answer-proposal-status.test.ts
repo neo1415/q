@@ -369,7 +369,7 @@ describe("a reply about a change's status says the engine's status", () => {
     const reply = stored.at(-1) ?? "";
     expect(reply).not.toContain("Nothing is waiting for your approval");
     expect(reply).toBe(
-      "I couldn't tell which action that is, so nothing was prepared or changed. Tell me what you'd like done, and to whom, and I'll prepare it for your approval.",
+      "Nothing was prepared or changed yet. What should I take on: one thing now, or should I work on it for you over time? Say which, and I'll prepare it for your approval.",
     );
   });
 
@@ -390,7 +390,7 @@ describe("a reply about a change's status says the engine's status", () => {
     const reply = stored.at(-1) ?? "";
     expect(reply).not.toContain("Nothing is waiting for your approval");
     expect(reply).toBe(
-      "Your Ajopot financial model is active and shareable.\n\nI couldn't tell which action that is, so nothing was prepared or changed. Tell me what you'd like done, and to whom, and I'll prepare it for your approval.",
+      "Your Ajopot financial model is active and shareable.\n\nNothing was prepared or changed yet. What should I take on: one thing now, or should I work on it for you over time? Say which, and I'll prepare it for your approval.",
     );
   });
 
