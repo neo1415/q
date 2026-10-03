@@ -191,3 +191,26 @@ describe("rehearsal readings never refuse whole for one field", () => {
     ).toBe("INDECISIVE");
   });
 });
+
+describe("the persona's conduct (founder feedback 2026-10-03)", () => {
+  it("is read field by field; an unknown value takes its default, and an older reading has none", () => {
+    const read = readPersona({
+      summary: "A quiet LP.",
+      conduct: {
+        patience: "LONG",
+        warmth: "RESERVED",
+        dodgeTolerance: "nonsense",
+        ceiling: "COLD",
+        leaving: "ONE_COLD_REMARK",
+      },
+    });
+    expect(read?.conduct).toEqual({
+      patience: "LONG",
+      warmth: "RESERVED",
+      dodgeTolerance: "TYPICAL",
+      ceiling: "COLD",
+      leaving: "ONE_COLD_REMARK",
+    });
+    expect(readPersona({ summary: "Older." })?.conduct).toBeUndefined();
+  });
+});

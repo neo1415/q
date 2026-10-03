@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   applyAppraisal,
   categoryOf,
+  conductOf,
+  COLD_REMARK,
   deliveryFor,
+  temperamentProfile,
+  topicTouchOf,
+  type PersonaConductLike,
+  type Register,
+  type TurnCategory,
   machineNote,
   nextTemperament,
   questionNote,
@@ -453,7 +460,7 @@ describe("the temperament machine", () => {
       "NONE",
     ],
   ] as const)("%s", (_label, input, register, warning, close) => {
-    expect(step(input as Partial<TemperamentInput>)).toEqual({
+    expect(step(input as Partial<TemperamentInput>)).toMatchObject({
       register,
       warning,
       close,
@@ -517,5 +524,223 @@ describe("the temperament machine", () => {
     expect(warnedLine(1, "I'm going to stop you there. Goodbye.")).toBe(
       "I'm going to stop you there. If we carry on like this, I'll end the meeting.",
     );
+  });
+});
+
+/**
+ * Each played person their own (founder feedback 2026-10-03: "if they all
+ * behave the same way, doesn't that defeat the purpose?"). The same
+ * founder lines, three people: different trajectories, the same fairness.
+ */
+describe("the same founder lines, three different people", () => {
+  const LINES: readonly TurnCategory[] = [
+    "NEUTRAL", // the opener
+    "DODGE",
+    "DODGE",
+    "DODGE",
+    "STRONG",
+    "ASKED", // their closing question
+  ];
+  const ANGEL: PersonaConductLike = {
+    patience: "LONG",
+    warmth: "GENEROUS",
+    dodgeTolerance: "HIGH",
+    ceiling: "IMPATIENT",
+    leaving: "WARNS_TWICE",
+  };
+  const VC: PersonaConductLike = {
+    patience: "SHORT",
+    warmth: "RESERVED",
+    dodgeTolerance: "LOW",
+    ceiling: "FURIOUS",
+    leaving: "WARNS_TWICE",
+  };
+  const LP: PersonaConductLike = {
+    patience: "TYPICAL",
+    warmth: "RESERVED",
+    dodgeTolerance: "TYPICAL",
+    ceiling: "COLD",
+    leaving: "ONE_COLD_REMARK",
+  };
+  const play = (conduct: PersonaConductLike, baseline: string) => {
+    const profile = temperamentProfile(conduct, baseline, "REALISTIC");
+    let previous: Register = "EVEN";
+    let warnings = 0;
+    let streak = 0;
+    const steps: {
+      register: Register;
+      warning: number | null;
+      close: string;
+    }[] = [];
+    for (const category of LINES) {
+      const step = nextTemperament({
+        category,
+        questionOpen: true,
+        warningsGiven: warnings,
+        previous,
+        dodgeStreak: streak,
+        difficulty: "REALISTIC",
+        hurt: 0,
+        theyAskedToEnd: false,
+        modelClose: null,
+        wrappingUp: false,
+        profile,
+      });
+      steps.push({
+        register: step.register,
+        warning: step.warning,
+        close: step.close,
+      });
+      if (step.close === "WALK_OUT") break;
+      previous = step.register;
+      if (step.warning !== null) warnings += 1;
+      streak = category === "DODGE" ? streak + 1 : 0;
+    }
+    return steps;
+  };
+  const angel = play(ANGEL, "WARM");
+  const vc = play(VC, "IMPATIENT");
+  const lp = play(LP, "NEUTRAL");
+
+  it("a warm operator angel lets two dodges go, presses on the third, never past impatience", () => {
+    expect(angel.map((s) => s.register)).toEqual([
+      "EVEN",
+      "EXASPERATED",
+      "EXASPERATED",
+      "EXASPERATED",
+      "EVEN",
+      "EVEN",
+    ]);
+    expect(angel.map((s) => s.warning)).toEqual([
+      null,
+      null,
+      null,
+      1,
+      null,
+      null,
+    ]);
+  });
+
+  it("a blunt numbers-first VC presses on the second dodge and warns twice", () => {
+    expect(vc.map((s) => s.register)).toEqual([
+      "EVEN",
+      "EXASPERATED",
+      "ANGRY",
+      "ANGRY",
+      "EXASPERATED",
+      "EXASPERATED",
+    ]);
+    expect(vc.map((s) => s.warning)).toEqual([null, null, 1, 2, null, null]);
+  });
+
+  it("a quiet institutional LP goes cold, makes one cool remark, then leaves politely", () => {
+    expect(lp.map((s) => s.register)).toEqual(["EVEN", "COLD", "COLD", "COLD"]);
+    expect(lp.map((s) => s.warning)).toEqual([null, null, 1, null]);
+    expect(lp.at(-1)?.close).toBe("WALK_OUT");
+  });
+
+  it("the trajectories differ, and the fairness rules hold for all three", () => {
+    const shape = (steps: typeof angel) =>
+      steps
+        .map((s) => `${s.register}:${String(s.warning)}:${s.close}`)
+        .join(",");
+    expect(new Set([shape(angel), shape(vc), shape(lp)]).size).toBe(3);
+    for (const steps of [angel, vc, lp]) {
+      // Never angry at a first dodge.
+      expect(steps[1]?.register).not.toBe("ANGRY");
+      expect(steps[1]?.warning).toBeNull();
+      steps.forEach((s, i) => {
+        const before = steps[i - 1];
+        if (LINES[i] === "STRONG" && before !== undefined) {
+          // A responsive strong answer never escalates and never warns.
+          expect(s.warning).toBeNull();
+          expect(["ANGRY", "FURIOUS"]).not.toContain(s.register);
+        }
+        if (LINES[i] === "ASKED") {
+          // Their question back is never provocation.
+          expect(s.warning).toBeNull();
+          expect(["ANGRY", "FURIOUS"]).not.toContain(s.register);
+        }
+        if (s.close === "WALK_OUT") {
+          // Whoever leaves has signalled it first, in their own way.
+          expect(steps.slice(0, i).some((p) => p.warning !== null)).toBe(true);
+        }
+      });
+    }
+  });
+
+  it("their own manner: a cool remark, not a raised warning", () => {
+    expect(warnedLine(1, "Let's talk about retention.", "COOL")).toBe(
+      `${COLD_REMARK} Let's talk about retention.`,
+    );
+  });
+
+  it("an older reading gets a sensible default from its mood and forwardness", () => {
+    expect(
+      conductOf({ temperament: { baseline: "COLD" }, forwardness: "RESERVED" }),
+    ).toMatchObject({ ceiling: "COLD", leaving: "ONE_COLD_REMARK" });
+    expect(
+      conductOf({
+        temperament: { baseline: "NEUTRAL" },
+        forwardness: "TYPICAL",
+      }),
+    ).toMatchObject({
+      ceiling: "ANGRY",
+      leaving: "WARNS_TWICE",
+      dodgeTolerance: "TYPICAL",
+    });
+    expect(
+      conductOf({ temperament: { baseline: "NEUTRAL" }, conduct: LP }),
+    ).toBe(LP);
+  });
+
+  it("difficulty scales the person, never replaces them", () => {
+    const gentle = temperamentProfile(VC, "IMPATIENT", "GENTLE");
+    const tough = temperamentProfile(VC, "IMPATIENT", "TOUGH");
+    expect(gentle.ceiling).toBe("EXASPERATED");
+    expect(tough.ceiling).toBe("FURIOUS");
+    expect(tough.worse).toBeGreaterThan(gentle.worse);
+    expect(gentle.dodgesBeforeWarning).toBeGreaterThan(
+      tough.dodgesBeforeWarning,
+    );
+    // A cold person stays cold at any difficulty.
+    expect(temperamentProfile(LP, "NEUTRAL", "TOUGH").ceiling).toBe("COLD");
+  });
+
+  it("a line on what they warm to softens them; on what cools them, hardens them a step, never a warning", () => {
+    const temperament = {
+      warmsTo: ["Clear unit economics and repayment discipline"],
+      coolsOn: ["Vague market size claims without evidence"],
+    };
+    expect(
+      topicTouchOf(
+        "Our repayment discipline drives our unit economics.",
+        temperament,
+      ),
+    ).toBe("WARMS");
+    expect(
+      topicTouchOf(
+        "The market size is huge, the claims speak for themselves.",
+        temperament,
+      ),
+    ).toBe("COOLS");
+    expect(topicTouchOf("Hello there.", temperament)).toBeNull();
+    const base = {
+      category: "NEUTRAL" as const,
+      questionOpen: true,
+      warningsGiven: 0,
+      previous: "EVEN" as Register,
+      dodgeStreak: 0,
+      difficulty: "REALISTIC" as const,
+      hurt: 0,
+      theyAskedToEnd: false,
+      modelClose: null,
+      wrappingUp: false,
+    };
+    expect(nextTemperament({ ...base, topic: "WARMS" }).register).toBe("WARM");
+    expect(nextTemperament({ ...base, topic: "COOLS" })).toMatchObject({
+      register: "EXASPERATED",
+      warning: null,
+    });
   });
 });

@@ -276,12 +276,44 @@ const KnownTrait = z
   })
   .strict();
 
+/**
+ * v6 (founder feedback 2026-10-03: "if they all behave the same way,
+ * doesn't that defeat the purpose?"): how this person conducts themselves
+ * when a meeting goes badly, as typed fields code turns into their
+ * temperament profile. Q reads; code decides every step.
+ */
+export const PERSONA_PATIENCE = ["SHORT", "TYPICAL", "LONG"] as const;
+export const PERSONA_WARMTH = ["RESERVED", "TYPICAL", "GENEROUS"] as const;
+export const PERSONA_DODGE_TOLERANCE = ["LOW", "TYPICAL", "HIGH"] as const;
+/** The loudest they get: COLD never raises their voice, they go quiet. */
+export const PERSONA_CEILING = [
+  "COLD",
+  "IMPATIENT",
+  "ANGRY",
+  "FURIOUS",
+] as const;
+/** How they leave: two warnings, or one cold remark and a polite exit. */
+export const PERSONA_LEAVING = ["WARNS_TWICE", "ONE_COLD_REMARK"] as const;
+
+export const PersonaConductSchema = z
+  .object({
+    patience: z.enum(PERSONA_PATIENCE),
+    warmth: z.enum(PERSONA_WARMTH),
+    dodgeTolerance: z.enum(PERSONA_DODGE_TOLERANCE),
+    ceiling: z.enum(PERSONA_CEILING),
+    leaving: z.enum(PERSONA_LEAVING),
+  })
+  .strict();
+export type PersonaConduct = z.infer<typeof PersonaConductSchema>;
+
 /** The stored reading: v2's shape, plus v4's stance and traits when read by v4. */
 export const CounterpartPersonaStoredSchema =
   CounterpartPersonaResultSchema.extend({
     forwardness: z.enum(PERSONA_FORWARDNESS).optional(),
     forwardnessWhy: z.string().trim().max(300).optional(),
     knownTraits: z.array(KnownTrait).max(8).optional(),
+    /** v6: how they conduct themselves; absent on older readings. */
+    conduct: PersonaConductSchema.optional(),
     /**
      * The INVESTOR_PERSONA version that wrote this reading, set by code.
      * A reading by an older prompt is rebuilt from scratch (live
@@ -348,3 +380,19 @@ export const COUNTERPART_PERSONA_V5_UNTRUSTED = [
   ...COUNTERPART_PERSONA_UNTRUSTED,
   "counterpartName",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// v6 (founder feedback 2026-10-03): the reading says how this person
+// conducts themselves under pressure (conduct), so each played person has
+// their own temperament profile instead of one shared set of thresholds.
+// ---------------------------------------------------------------------------
+
+export const COUNTERPART_PERSONA_V6_SCHEMA_VERSION = 6;
+
+export const CounterpartPersonaV6LenientSchema =
+  CounterpartPersonaV4LenientSchema.extend({
+    conduct: PersonaConductSchema,
+  }).strict();
+export type CounterpartPersonaV6Lenient = z.infer<
+  typeof CounterpartPersonaV6LenientSchema
+>;

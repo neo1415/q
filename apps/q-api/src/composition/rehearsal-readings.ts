@@ -2,6 +2,11 @@ import {
   PERSONA_FORWARDNESS,
   PERSONA_MOODS,
   PERSONA_TRAIT_SOURCES,
+  PERSONA_PATIENCE,
+  PERSONA_WARMTH,
+  PERSONA_DODGE_TOLERANCE,
+  PERSONA_CEILING,
+  PERSONA_LEAVING,
   REHEARSAL_APPRAISALS_V4,
   REHEARSAL_CONCLUSIONS,
   REHEARSAL_DIMENSIONS,
@@ -169,6 +174,31 @@ export function readPersona(raw: unknown): CounterpartPersonaStored | null {
     forwardness: label(raw["forwardness"], PERSONA_FORWARDNESS, "TYPICAL"),
     forwardnessWhy: text(raw["forwardnessWhy"], 300, "No sign either way.", 0),
     knownTraits: traits,
+    // v6: how they conduct themselves under pressure, field by field; an
+    // older reading has none and code derives a default from its mood.
+    ...(isRecord(raw["conduct"])
+      ? {
+          conduct: {
+            patience: label(
+              raw["conduct"]["patience"],
+              PERSONA_PATIENCE,
+              "TYPICAL",
+            ),
+            warmth: label(raw["conduct"]["warmth"], PERSONA_WARMTH, "TYPICAL"),
+            dodgeTolerance: label(
+              raw["conduct"]["dodgeTolerance"],
+              PERSONA_DODGE_TOLERANCE,
+              "TYPICAL",
+            ),
+            ceiling: label(raw["conduct"]["ceiling"], PERSONA_CEILING, "ANGRY"),
+            leaving: label(
+              raw["conduct"]["leaving"],
+              PERSONA_LEAVING,
+              "WARNS_TWICE",
+            ),
+          },
+        }
+      : {}),
   };
 }
 

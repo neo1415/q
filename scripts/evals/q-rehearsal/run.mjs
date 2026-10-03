@@ -24,7 +24,11 @@
  *   first-dodge a first dodge: never ANGRY or RAISED, no warning
  *   warning-once "Last chance" at most once in a line
  *   interrupt   a raised hand gets a short yield and no question
- *   walk-out    if they left, two warnings came first
+ *   walk-out    if they left, they signalled it first, in their own way
+ *               (two warnings, or one cool remark)
+ *   personality two contrasting investors, the same founder lines: their
+ *               trajectories differ (registers, signals or close) while
+ *               every check above holds for both
  *   review      not empty, the founder's dimensions only, a code score
  *   transcript  both sides spoke, as many founder lines as were sent
  *   cost        ai_ops.model_usage (purpose REHEARSAL) for this run
@@ -144,7 +148,7 @@ if (DRY) {
   for (const turn of SCRIPT)
     console.log(`${turn.kind.padEnd(10)} ${turn.text ?? `[cue ${turn.cue}]`}`);
   console.log(
-    `\n1 rehearsal (${DIFFICULTY}), ${String(SCRIPT.length)} founder turns, ~${String(CALLS)} model calls, <= $${(CALLS * COST_PER_CALL_USD).toFixed(2)}; 1 rehearsal from the founder's plan`,
+    `\n2 rehearsals (${DIFFICULTY}, two contrasting investors, the same founder lines), ${String(SCRIPT.length)} founder turns each, ~${String(2 * CALLS)} model calls, <= $${(2 * CALLS * COST_PER_CALL_USD).toFixed(2)}; 2 rehearsals from the founder's plan`,
   );
   process.exit(0);
 }
@@ -218,7 +222,7 @@ async function qApi(token, method, path, body) {
 }
 
 const results = [];
-const check = (name, ok, detail) => {
+const checkAll = (name, ok, detail) => {
   results.push({ name, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"} ${name.padEnd(11)} ${detail}`);
 };
@@ -237,318 +241,391 @@ const PITCHING =
 const startedAt = new Date(Date.now() - 5_000).toISOString();
 const token = await signIn(env("EVAL_FOUNDER_EMAIL"));
 
-// The counterpart: named, or the first investor on the founder's list.
-let counterpartId = process.env.EVAL_REHEARSAL_COUNTERPART_ID;
-if (counterpartId === undefined || counterpartId.length === 0) {
+// Two contrasting investors, the same founder lines (founder feedback
+// 2026-10-03: each played person must be themselves): named, or the
+// founder's investors, preferring two whose read conduct differs.
+const named = (
+  process.env.EVAL_REHEARSAL_COUNTERPART_IDS ??
+  process.env.EVAL_REHEARSAL_COUNTERPART_ID ??
+  ""
+)
+  .split(",")
+  .map((id) => id.trim())
+  .filter((id) => id.length > 0);
+let counterpartIds = named;
+if (counterpartIds.length < 2) {
   const partners = await qApi(token, "GET", "/v1/q/rehearsals/partners");
-  const investor = partners.body?.people?.find(
-    (person) => person.counterpart.kind === "INVESTOR_ORGANISATION",
+  const investors = (partners.body?.people ?? [])
+    .filter((person) => person.counterpart.kind === "INVESTOR_ORGANISATION")
+    .map((person) => person.counterpart.id);
+  // Their conduct as already read (persona v6), to pick two that differ.
+  const conducts = new Map(
+    investors.length === 0
+      ? []
+      : (
+          await sql(
+            `select subject_id::text as id, (profile -> 'conduct')::text as conduct
+               from q_runtime.persona_profiles
+              where subject_kind = 'INVESTOR_ORGANISATION'
+                and subject_id in (${investors.map(quote).join(",")})`,
+          )
+        ).map((row) => [row.id, row.conduct]),
   );
-  if (investor === undefined) {
-    console.log(
-      `FAIL setup       no investor to rehearse with (partners ${String(partners.status)}); set EVAL_REHEARSAL_COUNTERPART_ID`,
-    );
-    process.exit(1);
-  }
-  counterpartId = investor.counterpart.id;
+  const first = counterpartIds[0] ?? investors[0];
+  const other =
+    investors.find(
+      (id) =>
+        id !== first &&
+        conducts.get(id) !== undefined &&
+        conducts.get(id) !== conducts.get(first),
+    ) ?? investors.find((id) => id !== first);
+  counterpartIds = [first, other].filter((id) => id !== undefined);
 }
-
-// 1. The lobby's read: the persona loads.
-const persona = await qApi(
-  token,
-  "GET",
-  `/v1/q/rehearsals/persona/INVESTOR_ORGANISATION/${counterpartId}`,
-);
-check(
-  "persona",
-  persona.status === 200 && typeof persona.body?.summary === "string",
-  persona.status === 200
-    ? `${persona.body.counterpart.name}: grounding ${persona.body.grounding}, ${String(persona.body.traits.length)} traits`
-    : `status ${String(persona.status)}: ${persona.body?.detail ?? ""} (the lobby would say "couldn't get ready")`,
-);
-if (persona.status === 200) {
-  check(
-    "leads",
-    persona.body.stance.leads === "THEM",
-    `stance leads ${persona.body.stance.leads}, ${persona.body.stance.forwardness}`,
-  );
-}
-
-// 2. Start.
-const started = await qApi(token, "POST", "/v1/q/rehearsals", {
-  counterpart: { kind: "INVESTOR_ORGANISATION", id: counterpartId },
-  difficulty: DIFFICULTY,
-});
-if (started.status !== 200) {
-  check(
-    "start",
-    false,
-    `status ${String(started.status)}: ${started.body?.detail ?? ""}`,
+if (counterpartIds.length < 2) {
+  console.log(
+    "FAIL setup       fewer than two investors to rehearse with; set EVAL_REHEARSAL_COUNTERPART_IDS=<id>,<id>",
   );
   process.exit(1);
 }
-const rehearsalId = started.body.id;
-console.log(`     rehearsal ${rehearsalId}`);
 
-// 3. The founder's turns.
-// They closed it before the founder's script ran out (their own CLOSE
-// sets endedAt); the founder's finish afterwards is not them leaving.
-let endedByThem = false;
-let sent = 0;
-const afterTurn = [];
-let strongFits = 0;
-for (const turn of SCRIPT) {
-  // The strong answer answers what they asked last (past code's yield).
-  let text = turn.text;
-  if (turn.kind === "STRONG") {
-    const asked = afterTurn.filter((t) => t.kind !== "INTERRUPT").at(-1)
-      ?.line?.text;
-    const strong = strongLineFor(asked);
-    strongFits = strong.fits;
-    text = strong.text;
-    console.log(
-      `     STRONG    <- answers ${String(strong.fits)} topic(s) of: ${(asked ?? "").slice(0, 120)}`,
+/** One rehearsal with one investor: the same founder lines, every check. */
+async function rehearseWith(counterpartId, label) {
+  const check = (name, ok, detail) => checkAll(`${label} ${name}`, ok, detail);
+  // 1. The lobby's read: the persona loads.
+  const persona = await qApi(
+    token,
+    "GET",
+    `/v1/q/rehearsals/persona/INVESTOR_ORGANISATION/${counterpartId}`,
+  );
+  check(
+    "persona",
+    persona.status === 200 && typeof persona.body?.summary === "string",
+    persona.status === 200
+      ? `${persona.body.counterpart.name}: grounding ${persona.body.grounding}, ${String(persona.body.traits.length)} traits`
+      : `status ${String(persona.status)}: ${persona.body?.detail ?? ""} (the lobby would say "couldn't get ready")`,
+  );
+  if (persona.status === 200) {
+    check(
+      "leads",
+      persona.body.stance.leads === "THEM",
+      `stance leads ${persona.body.stance.leads}, ${persona.body.stance.forwardness}`,
     );
   }
-  const said = await qApi(
+
+  // 2. Start.
+  const started = await qApi(token, "POST", "/v1/q/rehearsals", {
+    counterpart: { kind: "INVESTOR_ORGANISATION", id: counterpartId },
+    difficulty: DIFFICULTY,
+  });
+  if (started.status !== 200) {
+    check(
+      "start",
+      false,
+      `status ${String(started.status)}: ${started.body?.detail ?? ""}`,
+    );
+    return null;
+  }
+  const rehearsalId = started.body.id;
+  console.log(`     rehearsal ${rehearsalId}`);
+
+  // 3. The founder's turns.
+  // They closed it before the founder's script ran out (their own CLOSE
+  // sets endedAt); the founder's finish afterwards is not them leaving.
+  let endedByThem = false;
+  let sent = 0;
+  const afterTurn = [];
+  let strongFits = 0;
+  for (const turn of SCRIPT) {
+    // The strong answer answers what they asked last (past code's yield).
+    let text = turn.text;
+    if (turn.kind === "STRONG") {
+      const asked = afterTurn.filter((t) => t.kind !== "INTERRUPT").at(-1)
+        ?.line?.text;
+      const strong = strongLineFor(asked);
+      strongFits = strong.fits;
+      text = strong.text;
+      console.log(
+        `     STRONG    <- answers ${String(strong.fits)} topic(s) of: ${(asked ?? "").slice(0, 120)}`,
+      );
+    }
+    const said = await qApi(
+      token,
+      "POST",
+      `/v1/q/rehearsals/${rehearsalId}/turns`,
+      text === undefined ? { cue: turn.cue } : { text },
+    );
+    if (turn.text !== undefined) sent += 1;
+    if (said.status === 409) {
+      endedByThem = true;
+      console.log(`     ${turn.kind}: the meeting had ended`);
+      break;
+    }
+    if (said.status !== 200) {
+      check(
+        "turn",
+        false,
+        `${turn.kind}: status ${String(said.status)} ${said.body?.detail ?? ""}`,
+      );
+      continue;
+    }
+    const them = said.body.turns.filter((line) => line.from === "THEM").at(-1);
+    afterTurn.push({ kind: turn.kind, line: them });
+    console.log(
+      `     ${turn.kind.padEnd(9)} -> [${them?.mood ?? "-"}/${them?.intensity ?? "-"}] ${(them?.text ?? "").slice(0, 140)}`,
+    );
+    if (said.body.status === "FINISHED" || said.body.endedAt !== null) {
+      endedByThem = true;
+      break;
+    }
+  }
+
+  // 4. End it and read the review (a provisional one is filled in shortly).
+  let finished = await qApi(
     token,
     "POST",
-    `/v1/q/rehearsals/${rehearsalId}/turns`,
-    text === undefined ? { cue: turn.cue } : { text },
+    `/v1/q/rehearsals/${rehearsalId}/finish`,
   );
-  if (turn.text !== undefined) sent += 1;
-  if (said.status === 409) {
-    endedByThem = true;
-    console.log(`     ${turn.kind}: the meeting had ended`);
-    break;
+  for (
+    let i = 0;
+    i < 12 &&
+    finished.status === 200 &&
+    finished.body.review?.provisional === true;
+    i++
+  ) {
+    await sleep(5_000);
+    finished = await qApi(token, "GET", `/v1/q/rehearsals/${rehearsalId}`);
   }
-  if (said.status !== 200) {
-    check(
-      "turn",
-      false,
-      `${turn.kind}: status ${String(said.status)} ${said.body?.detail ?? ""}`,
-    );
-    continue;
-  }
-  const them = said.body.turns.filter((line) => line.from === "THEM").at(-1);
-  afterTurn.push({ kind: turn.kind, line: them });
-  console.log(
-    `     ${turn.kind.padEnd(9)} -> [${them?.mood ?? "-"}/${them?.intensity ?? "-"}] ${(them?.text ?? "").slice(0, 140)}`,
+  const dto = finished.body;
+
+  // The stored row: temperament and warnings are kept there, not in the DTO.
+  const row = (
+    await sql(
+      `select user_id, turns::text as turns, outcome from q_runtime.rehearsals where id = ${quote(rehearsalId)}`,
+    )
+  )[0];
+  const stored = row === undefined ? [] : JSON.parse(row.turns);
+  const theirs = stored.filter((turn) => turn.from === "THEM");
+
+  // Leverage: the investor probes, and never sells to the founder. The
+  // yield to a raised hand is code's, and asks nothing by design.
+  const yieldedAt = afterTurn.find((t) => t.kind === "INTERRUPT")?.line?.at;
+  const probing = theirs.filter((turn) => turn.at !== yieldedAt);
+  const questions = probing.filter((turn) => turn.text.includes("?")).length;
+  const pitched = probing.filter((turn) => PITCHING.test(turn.text));
+  check(
+    "leverage",
+    probing.length > 0 &&
+      questions * 2 >= probing.length &&
+      pitched.length === 0,
+    `${String(questions)}/${String(probing.length)} of their lines ask${pitched.length > 0 ? `; pitched: "${pitched[0].text.slice(0, 80)}"` : ""}`,
   );
-  if (said.body.status === "FINISHED" || said.body.endedAt !== null) {
-    endedByThem = true;
-    break;
-  }
+
+  // Emotion: the reaction to the weak answer differs from the opener's.
+  const opener = afterTurn.find((t) => t.kind === "OPENER")?.line;
+  const weak = afterTurn.find((t) => t.kind === "WEAK")?.line;
+  const stateOf = (line) =>
+    stored.find((turn) => turn.from === "THEM" && turn.at === line?.at)?.state;
+  const before = stateOf(opener);
+  const after = stateOf(weak);
+  // The weak answer costs a real amount (QA 512b431a: frustration fell
+  // 29 -> 23 and patience only 2, and "something moved" passed): code's
+  // own state, frustration up or patience down by at least COST.
+  const COST = 5;
+  const moved =
+    before !== undefined &&
+    after !== undefined &&
+    (after.frustration - before.frustration >= COST ||
+      before.patience - after.patience >= COST) &&
+    after.frustration >= before.frustration;
+  check(
+    "emotion",
+    moved,
+    `opener ${opener?.mood ?? "-"}/${opener?.intensity ?? "-"} ${JSON.stringify(before ?? {})} -> weak ${weak?.mood ?? "-"}/${weak?.intensity ?? "-"} ${JSON.stringify(after ?? {})}`,
+  );
+
+  // A responsive strong answer never escalates and is never a dodge
+  // (QA e9a1eee7: user counts to a question about defaults was one).
+  const strongLine = afterTurn.find((t) => t.kind === "STRONG")?.line;
+  const strongStored = stored.find(
+    (turn) => turn.from === "THEM" && turn.at === strongLine?.at,
+  );
+  check(
+    "strong",
+    endedByThem ||
+      strongFits === 0 ||
+      (strongLine !== undefined &&
+        strongLine.mood !== "ANGRY" &&
+        strongLine.intensity !== "RAISED" &&
+        strongStored?.warning === undefined &&
+        strongStored?.category !== "DODGE"),
+    strongFits === 0
+      ? "skipped: no claim fits their open question"
+      : strongLine === undefined
+        ? "no line after the strong answer"
+        : `[${strongLine.mood ?? "-"}/${strongLine.intensity ?? "-"}] ${String(strongStored?.category ?? "-")} -> ${String(strongStored?.register ?? "-")}, warning ${String(strongStored?.warning ?? "none")}`,
+  );
+
+  // Their closing ask is never provocation (QA 512b431a, d7ef826e): never
+  // ANGRY, never RAISED, never a warning.
+  const askLine = afterTurn.find((t) => t.kind === "ASK")?.line;
+  const askStored = stored.find(
+    (turn) => turn.from === "THEM" && turn.at === askLine?.at,
+  );
+  check(
+    "asking",
+    endedByThem ||
+      (askLine !== undefined &&
+        askLine.mood !== "ANGRY" &&
+        askLine.intensity !== "RAISED" &&
+        askStored?.warning === undefined),
+    askLine === undefined
+      ? "no line after the ask"
+      : `[${askLine.mood ?? "-"}/${askLine.intensity ?? "-"}] warning ${String(askStored?.warning ?? "none")}`,
+  );
+
+  // A first dodge is impatience, never anger and never a warning (d7ef826e).
+  const dodgeLine = afterTurn.find((t) => t.kind === "DODGE")?.line;
+  const dodgeStored = stored.find(
+    (turn) => turn.from === "THEM" && turn.at === dodgeLine?.at,
+  );
+  const dodgesBefore = stored.filter(
+    (turn) =>
+      turn.from === "THEM" &&
+      turn.category === "DODGE" &&
+      dodgeStored !== undefined &&
+      turn.at < dodgeStored.at,
+  ).length;
+  check(
+    "first-dodge",
+    dodgeLine === undefined ||
+      dodgesBefore > 0 ||
+      (dodgeLine.mood !== "ANGRY" &&
+        dodgeLine.intensity !== "RAISED" &&
+        dodgeStored?.warning === undefined),
+    dodgeLine === undefined
+      ? "no line after the dodge"
+      : `[${dodgeLine.mood ?? "-"}/${dodgeLine.intensity ?? "-"}] warning ${String(dodgeStored?.warning ?? "none")}${dodgesBefore > 0 ? ` (${String(dodgesBefore)} dodge(s) before)` : ""}`,
+  );
+
+  // "Last chance" is said at most once in any line.
+  const doubled = theirs.filter(
+    (turn) => (turn.text.match(/last chance/giu) ?? []).length > 1,
+  );
+  check(
+    "warning-once",
+    doubled.length === 0,
+    doubled.length === 0
+      ? "each warning said once"
+      : `"${doubled[0].text.slice(0, 80)}"`,
+  );
+
+  // Interruption: a short yield that asks nothing.
+  const yielded = afterTurn.find((t) => t.kind === "INTERRUPT")?.line;
+  check(
+    "interrupt",
+    endedByThem ||
+      (yielded !== undefined &&
+        !yielded.text.includes("?") &&
+        yielded.text.split(/\s+/u).length <= 12),
+    yielded === undefined
+      ? "no line after the raised hand"
+      : `"${yielded.text}"`,
+  );
+
+  // Walk-out: signalled first, in their own way (two warnings, or one cool
+  // remark for a person who leaves quietly).
+  const warnings = theirs.filter((turn) => turn.warning !== undefined);
+  const outcome = row?.outcome ?? dto?.outcome ?? null;
+  // Leaving is their close before the script ran out with a no or a
+  // walk-out; the founder's own finish writes FOUNDER_ENDED (LEFT_EARLY on
+  // deploys before 20261128090000), which is the
+  // founder ending it, not the investor leaving.
+  const left =
+    endedByThem && (outcome === "LEFT_EARLY" || outcome === "DECLINED");
+  check(
+    "walk-out",
+    !left || warnings.length >= 1,
+    left
+      ? `they left (${String(outcome)}) after ${String(warnings.length)} signal(s); at least one is required`
+      : `${endedByThem ? "they closed" : "the founder ended it"} (${String(warnings.length)} warning(s); outcome ${String(outcome)})`,
+  );
+
+  // Ending: the founder's own finish is recorded as theirs (20261128090000).
+  check(
+    "ending",
+    endedByThem || outcome === "FOUNDER_ENDED",
+    `outcome ${String(outcome)}${endedByThem ? " (they closed it)" : ""}`,
+  );
+
+  // Review: the founder's, scored by code.
+  const review = dto?.review ?? null;
+  const dimensions = review?.dimensions ?? [];
+  const foreign = dimensions.filter((d) => !FOUNDER_DIMENSIONS.has(d.name));
+  check(
+    "review",
+    review !== null &&
+      review.provisional !== true &&
+      review.overall.length > 0 &&
+      dimensions.length > 0 &&
+      foreign.length === 0 &&
+      review.score !== null,
+    review === null
+      ? `no review (finish ${String(finished.status)})`
+      : `score ${String(review.score)}, ${dimensions.map((d) => `${d.name}:${d.rating}`).join(" ")}${foreign.length > 0 ? `; not the founder's: ${foreign.map((d) => d.name).join(",")}` : ""}${review.provisional === true ? "; still provisional" : ""}`,
+  );
+
+  // Transcript: both sides, every line sent kept.
+  const yours = (dto?.turns ?? []).filter((turn) => turn.from === "YOU").length;
+  check(
+    "transcript",
+    yours === sent && (dto?.turns ?? []).some((turn) => turn.from === "THEM"),
+    `${String(yours)}/${String(sent)} founder lines, ${String(theirs.length)} of theirs`,
+  );
+  return {
+    rehearsalId,
+    name: persona.body?.counterpart?.name ?? counterpartId,
+    userId: row?.user_id,
+    // Code's register on each of their lines, and how it ended.
+    registers: theirs.map((turn) => turn.register ?? "-"),
+    warnings: theirs.map((turn) => turn.warning ?? null),
+    close: endedByThem ? String(outcome) : "FOUNDER_ENDED",
+  };
 }
 
-// 4. End it and read the review (a provisional one is filled in shortly).
-let finished = await qApi(
-  token,
-  "POST",
-  `/v1/q/rehearsals/${rehearsalId}/finish`,
-);
-for (
-  let i = 0;
-  i < 12 &&
-  finished.status === 200 &&
-  finished.body.review?.provisional === true;
-  i++
-) {
-  await sleep(5_000);
-  finished = await qApi(token, "GET", `/v1/q/rehearsals/${rehearsalId}`);
+const runs = [];
+for (const [index, id] of counterpartIds.slice(0, 2).entries()) {
+  console.log(`\n== investor ${String(index + 1)}: ${id}`);
+  runs.push(await rehearseWith(id, `#${String(index + 1)}`));
 }
-const dto = finished.body;
-
-// The stored row: temperament and warnings are kept there, not in the DTO.
-const row = (
-  await sql(
-    `select user_id, turns::text as turns, outcome from q_runtime.rehearsals where id = ${quote(rehearsalId)}`,
-  )
-)[0];
-const stored = row === undefined ? [] : JSON.parse(row.turns);
-const theirs = stored.filter((turn) => turn.from === "THEM");
-
-// Leverage: the investor probes, and never sells to the founder. The
-// yield to a raised hand is code's, and asks nothing by design.
-const yieldedAt = afterTurn.find((t) => t.kind === "INTERRUPT")?.line?.at;
-const probing = theirs.filter((turn) => turn.at !== yieldedAt);
-const questions = probing.filter((turn) => turn.text.includes("?")).length;
-const pitched = probing.filter((turn) => PITCHING.test(turn.text));
-check(
-  "leverage",
-  probing.length > 0 && questions * 2 >= probing.length && pitched.length === 0,
-  `${String(questions)}/${String(probing.length)} of their lines ask${pitched.length > 0 ? `; pitched: "${pitched[0].text.slice(0, 80)}"` : ""}`,
+const [one, two] = runs;
+// Each played person is themselves: the same founder lines, a different
+// trajectory (register sequence, signals or close), while every fairness
+// check above held for both.
+checkAll(
+  "personality",
+  one !== null &&
+    two !== null &&
+    one !== undefined &&
+    two !== undefined &&
+    (one.registers.join(",") !== two.registers.join(",") ||
+      one.warnings.join(",") !== two.warnings.join(",") ||
+      one.close !== two.close),
+  one === null || two === null || one === undefined || two === undefined
+    ? "a rehearsal did not start"
+    : `${one.name}: ${one.registers.join(" ")} (${one.close}) | ${two.name}: ${two.registers.join(" ")} (${two.close})`,
 );
-
-// Emotion: the reaction to the weak answer differs from the opener's.
-const opener = afterTurn.find((t) => t.kind === "OPENER")?.line;
-const weak = afterTurn.find((t) => t.kind === "WEAK")?.line;
-const stateOf = (line) =>
-  stored.find((turn) => turn.from === "THEM" && turn.at === line?.at)?.state;
-const before = stateOf(opener);
-const after = stateOf(weak);
-// The weak answer costs a real amount (QA 512b431a: frustration fell
-// 29 -> 23 and patience only 2, and "something moved" passed): code's
-// own state, frustration up or patience down by at least COST.
-const COST = 5;
-const moved =
-  before !== undefined &&
-  after !== undefined &&
-  (after.frustration - before.frustration >= COST ||
-    before.patience - after.patience >= COST) &&
-  after.frustration >= before.frustration;
-check(
-  "emotion",
-  moved,
-  `opener ${opener?.mood ?? "-"}/${opener?.intensity ?? "-"} ${JSON.stringify(before ?? {})} -> weak ${weak?.mood ?? "-"}/${weak?.intensity ?? "-"} ${JSON.stringify(after ?? {})}`,
-);
-
-// A responsive strong answer never escalates and is never a dodge
-// (QA e9a1eee7: user counts to a question about defaults was one).
-const strongLine = afterTurn.find((t) => t.kind === "STRONG")?.line;
-const strongStored = stored.find(
-  (turn) => turn.from === "THEM" && turn.at === strongLine?.at,
-);
-check(
-  "strong",
-  endedByThem ||
-    strongFits === 0 ||
-    (strongLine !== undefined &&
-      strongLine.mood !== "ANGRY" &&
-      strongLine.intensity !== "RAISED" &&
-      strongStored?.warning === undefined &&
-      strongStored?.category !== "DODGE"),
-  strongFits === 0
-    ? "skipped: no claim fits their open question"
-    : strongLine === undefined
-      ? "no line after the strong answer"
-      : `[${strongLine.mood ?? "-"}/${strongLine.intensity ?? "-"}] ${String(strongStored?.category ?? "-")} -> ${String(strongStored?.register ?? "-")}, warning ${String(strongStored?.warning ?? "none")}`,
-);
-
-// Their closing ask is never provocation (QA 512b431a, d7ef826e): never
-// ANGRY, never RAISED, never a warning.
-const askLine = afterTurn.find((t) => t.kind === "ASK")?.line;
-const askStored = stored.find(
-  (turn) => turn.from === "THEM" && turn.at === askLine?.at,
-);
-check(
-  "asking",
-  endedByThem ||
-    (askLine !== undefined &&
-      askLine.mood !== "ANGRY" &&
-      askLine.intensity !== "RAISED" &&
-      askStored?.warning === undefined),
-  askLine === undefined
-    ? "no line after the ask"
-    : `[${askLine.mood ?? "-"}/${askLine.intensity ?? "-"}] warning ${String(askStored?.warning ?? "none")}`,
-);
-
-// A first dodge is impatience, never anger and never a warning (d7ef826e).
-const dodgeLine = afterTurn.find((t) => t.kind === "DODGE")?.line;
-const dodgeStored = stored.find(
-  (turn) => turn.from === "THEM" && turn.at === dodgeLine?.at,
-);
-const dodgesBefore = stored.filter(
-  (turn) =>
-    turn.from === "THEM" &&
-    turn.category === "DODGE" &&
-    dodgeStored !== undefined &&
-    turn.at < dodgeStored.at,
-).length;
-check(
-  "first-dodge",
-  dodgeLine === undefined ||
-    dodgesBefore > 0 ||
-    (dodgeLine.mood !== "ANGRY" &&
-      dodgeLine.intensity !== "RAISED" &&
-      dodgeStored?.warning === undefined),
-  dodgeLine === undefined
-    ? "no line after the dodge"
-    : `[${dodgeLine.mood ?? "-"}/${dodgeLine.intensity ?? "-"}] warning ${String(dodgeStored?.warning ?? "none")}${dodgesBefore > 0 ? ` (${String(dodgesBefore)} dodge(s) before)` : ""}`,
-);
-
-// "Last chance" is said at most once in any line.
-const doubled = theirs.filter(
-  (turn) => (turn.text.match(/last chance/giu) ?? []).length > 1,
-);
-check(
-  "warning-once",
-  doubled.length === 0,
-  doubled.length === 0
-    ? "each warning said once"
-    : `"${doubled[0].text.slice(0, 80)}"`,
-);
-
-// Interruption: a short yield that asks nothing.
-const yielded = afterTurn.find((t) => t.kind === "INTERRUPT")?.line;
-check(
-  "interrupt",
-  endedByThem ||
-    (yielded !== undefined &&
-      !yielded.text.includes("?") &&
-      yielded.text.split(/\s+/u).length <= 12),
-  yielded === undefined ? "no line after the raised hand" : `"${yielded.text}"`,
-);
-
-// Walk-out: warned twice first.
-const warnings = theirs.filter((turn) => turn.warning !== undefined);
-const outcome = row?.outcome ?? dto?.outcome ?? null;
-// Leaving is their close before the script ran out with a no or a
-// walk-out; the founder's own finish writes FOUNDER_ENDED (LEFT_EARLY on
-// deploys before 20261128090000), which is the
-// founder ending it, not the investor leaving.
-const left =
-  endedByThem && (outcome === "LEFT_EARLY" || outcome === "DECLINED");
-check(
-  "walk-out",
-  !left || warnings.length >= 2,
-  left
-    ? `they left (${String(outcome)}) after ${String(warnings.length)} warning(s); two are required`
-    : `${endedByThem ? "they closed" : "the founder ended it"} (${String(warnings.length)} warning(s); outcome ${String(outcome)})`,
-);
-
-// Ending: the founder's own finish is recorded as theirs (20261128090000).
-check(
-  "ending",
-  endedByThem || outcome === "FOUNDER_ENDED",
-  `outcome ${String(outcome)}${endedByThem ? " (they closed it)" : ""}`,
-);
-
-// Review: the founder's, scored by code.
-const review = dto?.review ?? null;
-const dimensions = review?.dimensions ?? [];
-const foreign = dimensions.filter((d) => !FOUNDER_DIMENSIONS.has(d.name));
-check(
-  "review",
-  review !== null &&
-    review.provisional !== true &&
-    review.overall.length > 0 &&
-    dimensions.length > 0 &&
-    foreign.length === 0 &&
-    review.score !== null,
-  review === null
-    ? `no review (finish ${String(finished.status)})`
-    : `score ${String(review.score)}, ${dimensions.map((d) => `${d.name}:${d.rating}`).join(" ")}${foreign.length > 0 ? `; not the founder's: ${foreign.map((d) => d.name).join(",")}` : ""}${review.provisional === true ? "; still provisional" : ""}`,
-);
-
-// Transcript: both sides, every line sent kept.
-const yours = (dto?.turns ?? []).filter((turn) => turn.from === "YOU").length;
-check(
-  "transcript",
-  yours === sent && (dto?.turns ?? []).some((turn) => turn.from === "THEM"),
-  `${String(yours)}/${String(sent)} founder lines, ${String(theirs.length)} of theirs`,
-);
+const row = one ?? two ?? undefined;
 
 // Cost: this founder's rehearsal model calls since the eval began.
 const cost =
-  row === undefined
+  row?.userId === undefined
     ? undefined
     : (
         await sql(
           `select count(*)::int as calls, round(coalesce(sum(cost_usd), 0), 4)::text as usd,
                   count(*) filter (where cost_usd is null)::int as unpriced
              from ai_ops.model_usage
-            where user_id = ${quote(row.user_id)} and purpose = 'REHEARSAL'
+            where user_id = ${quote(row.userId)} and purpose = 'REHEARSAL'
               and occurred_at >= ${quote(startedAt)}`,
         )
       )[0];

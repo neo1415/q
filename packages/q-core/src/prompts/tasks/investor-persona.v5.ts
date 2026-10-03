@@ -62,7 +62,7 @@ export const INVESTOR_PERSONA_V5: PromptDefinition<
 > = {
   ...INVESTOR_PERSONA_V4,
   version: 5,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Live re-run 2026-10-01: the person read is named and every block of material is labelled by side, so a reading of the founder Q plays never describes the investor rehearsing (or the reverse).",
   effectiveFrom: "2026-10-01",

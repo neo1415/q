@@ -368,6 +368,10 @@ export { INVESTOR_TWIN_TURN_V4 } from "./prompts/tasks/investor-twin-turn.v4.js"
 export { INVESTOR_PERSONA_V3 } from "./prompts/tasks/investor-persona.v3.js";
 export { INVESTOR_PERSONA_V4 } from "./prompts/tasks/investor-persona.v4.js";
 export { INVESTOR_PERSONA_V5 } from "./prompts/tasks/investor-persona.v5.js";
+export {
+  INVESTOR_PERSONA_V6,
+  INVESTOR_PERSONA_V6_CONDUCT,
+} from "./prompts/tasks/investor-persona.v6.js";
 export { INVESTOR_TWIN_TURN_V5 } from "./prompts/tasks/investor-twin-turn.v5.js";
 export { INVESTOR_TWIN_TURN_V6 } from "./prompts/tasks/investor-twin-turn.v6.js";
 export { INVESTOR_TWIN_TURN_V7 } from "./prompts/tasks/investor-twin-turn.v7.js";
@@ -451,6 +455,15 @@ export {
   type CounterpartPersonaV5Variables,
   PERSONA_FORWARDNESS,
   PERSONA_TRAIT_SOURCES,
+  PERSONA_PATIENCE,
+  PERSONA_WARMTH,
+  PERSONA_DODGE_TOLERANCE,
+  PERSONA_CEILING,
+  PERSONA_LEAVING,
+  PersonaConductSchema,
+  type PersonaConduct,
+  CounterpartPersonaV6LenientSchema,
+  type CounterpartPersonaV6Lenient,
   type CounterpartPersonaStored,
   type CounterpartPersonaV4Lenient,
   type PersonaForwardness,
