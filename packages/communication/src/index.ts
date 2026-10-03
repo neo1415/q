@@ -106,6 +106,8 @@ export {
   HOST_WAIT_AFTER_START_MS,
   HOST_MAX_CALL_MS,
   type MeetingBotState,
+  type MeetingBotEnd,
+  MEETING_BOT_END,
   type MeetingNotes,
   type MeetingNotesComposer,
   type MeetingTranscriptLine,

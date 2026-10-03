@@ -81,7 +81,7 @@ import {
   createDocumentsModule,
   ownCompanyOf,
 } from "./composition/documents.js";
-import { createRecallBots } from "./composition/recall-bots.js";
+import { createRecallBots, transcriberOf } from "./composition/recall-bots.js";
 import {
   createMeetingHostComposer,
   createMeetingHostRuntime,
@@ -2907,6 +2907,7 @@ const recallKey = process.env.RECALL_API_KEY ?? process.env.RECALL_API;
 const recallBots = createRecallBots({
   apiKey: recallKey,
   region: process.env.RECALL_REGION ?? "eu-central-1",
+  transcriber: transcriberOf(process.env.RECALL_TRANSCRIBER),
 });
 const meetingHost = createMeetingHostRuntime({
   enabled:

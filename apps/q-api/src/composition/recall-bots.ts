@@ -1,4 +1,5 @@
 import type {
+  MeetingBotEnd,
   MeetingBotHosting,
   MeetingBotProvider,
   MeetingBotState,
@@ -9,8 +10,10 @@ import { z } from "zod";
 /**
  * Recall.ai behind the meeting-bot port (founder direction 2026-09-29).
  *
- * The bot joins under Q's name and uses the call's own captions for its
- * transcript (no separate transcription bill). Only the meeting link, a
+ * The bot joins under Q's name and transcribes with the provider chosen by
+ * `transcriber`: the call's own captions by default (no separate bill), or
+ * Recall's own streaming transcription, which hears Google Meet without
+ * captions and attributes speakers per participant. Only the meeting link, a
  * join time and the bot's name leave Capital Q. A key that is absent or a
  * disabled placeholder composes nothing, so tests and local stacks never
  * reach the provider.
@@ -21,7 +24,11 @@ const TIMEOUT_MS = 15_000;
 const BotSchema = z.object({
   id: z.string(),
   status_changes: z
-    .array(z.object({ code: z.string() }).passthrough())
+    .array(
+      z
+        .object({ code: z.string(), sub_code: z.string().nullish() })
+        .passthrough(),
+    )
     .default([]),
   recordings: z
     .array(
@@ -31,6 +38,10 @@ const BotSchema = z.object({
             .object({
               transcript: z
                 .object({
+                  status: z
+                    .object({ code: z.string() })
+                    .passthrough()
+                    .nullish(),
                   data: z
                     .object({ download_url: z.string().url().nullish() })
                     .passthrough()
@@ -67,9 +78,87 @@ export function stateOf(codes: readonly string[]): MeetingBotState {
   if (last === "done" || last === "call_ended" || last === "analysis_done") {
     return "ENDED";
   }
-  if (last.startsWith("in_call") || last === "in_waiting_room")
-    return "IN_CALL";
+  // Held in the Meet lobby: nobody has admitted Q yet (live 2026-09-30 and
+  // 2026-10-02: two of three bots waited there until Recall's timeout).
+  if (last === "in_waiting_room") return "LOBBY";
+  if (last.startsWith("in_call")) return "IN_CALL";
   return "WAITING";
+}
+
+/**
+ * Why a call ended with nothing recorded, from the `call_ended` sub-code
+ * (Recall v1 status_changes). Unlisted codes are a plain early end.
+ */
+export function endOf(subCodes: readonly (string | null)[]): MeetingBotEnd {
+  const known = subCodes.filter((code): code is string => code !== null);
+  const has = (...codes: string[]) => known.some((c) => codes.includes(c));
+  if (
+    has(
+      "timeout_exceeded_waiting_room",
+      "bot_kicked_from_waiting_room",
+      "call_ended_by_platform_waiting_room_timeout",
+    )
+  ) {
+    return "NOT_ADMITTED";
+  }
+  if (has("bot_kicked_from_call")) return "REMOVED";
+  if (has("timeout_exceeded_noone_joined")) return "NOBODY_CAME";
+  if (
+    has(
+      "timeout_exceeded_recording_permission_denied",
+      "timeout_exceeded_in_call_not_recording",
+      "recording_permission_denied",
+    )
+  ) {
+    return "NOT_RECORDED";
+  }
+  return "NO_RECORDING";
+}
+
+/**
+ * Which transcription the bot uses. `recallai_streaming` (Recall's own,
+ * billed per hour on the Recall account) hears every participant's audio;
+ * `meeting_captions` depends on Google Meet's captions turning on and
+ * attributes poorly. The founder chooses with RECALL_TRANSCRIBER.
+ */
+export type RecallTranscriber = "meeting_captions" | "recallai_streaming";
+
+export function transcriberOf(value: string | undefined): RecallTranscriber {
+  return value === "recallai_streaming" ? value : "meeting_captions";
+}
+
+function providerBody(transcriber: RecallTranscriber): Record<string, unknown> {
+  return transcriber === "recallai_streaming"
+    ? // Low latency is the mode that streams transcript.data during the
+      // call, which the host needs to hear when it is addressed.
+      {
+        recallai_streaming: {
+          mode: "prioritize_low_latency",
+          language_code: "en",
+        },
+      }
+    : { meeting_captions: {} };
+}
+
+/** Q's own spoken lines, as the captions hand them back unattributed. */
+const Q_OWN_LINE = /\b(?:i'?m|i am) q from capital q\b/i;
+const Q_BOT_NAME = /^q\b.*capital q/i;
+
+/**
+ * A transcript line's speaker. Q's own voice comes back as "Unknown"
+ * (Recall's unattributed participant) or under the bot's name; it is
+ * labelled Q so it is never mistaken for a person in the notes.
+ */
+export function speakerOf(
+  name: string | null | undefined,
+  text: string,
+): string | null {
+  const trimmed = name?.trim() ?? "";
+  if (Q_BOT_NAME.test(trimmed)) return "Q";
+  if ((trimmed === "" || /^unknown$/i.test(trimmed)) && Q_OWN_LINE.test(text)) {
+    return "Q";
+  }
+  return trimmed === "" || /^unknown$/i.test(trimmed) ? null : trimmed;
 }
 
 /**
@@ -95,6 +184,7 @@ export function botRequest(input: {
   readonly joinAt: Date | null;
   readonly botName: string;
   readonly hosting?: MeetingBotHosting;
+  readonly transcriber?: RecallTranscriber;
 }): Record<string, unknown> {
   const hosting = input.hosting;
   const seconds = (ms: number) => Math.max(30, Math.round(ms / 1_000));
@@ -103,7 +193,9 @@ export function botRequest(input: {
     bot_name: input.botName,
     ...(input.joinAt === null ? {} : { join_at: input.joinAt.toISOString() }),
     recording_config: {
-      transcript: { provider: { meeting_captions: {} } },
+      transcript: {
+        provider: providerBody(input.transcriber ?? "meeting_captions"),
+      },
       ...(hosting === undefined
         ? {}
         : {
@@ -140,6 +232,7 @@ export function createRecallBots(options: {
   readonly apiKey: string | undefined;
   /** e.g. "eu-central-1": the region the account lives in. */
   readonly region: string;
+  readonly transcriber?: RecallTranscriber;
   readonly fetch?: typeof fetch;
 }): MeetingBotProvider | undefined {
   const key = options.apiKey;
@@ -179,7 +272,10 @@ export function createRecallBots(options: {
       const created = BotSchema.parse(
         await request("/bot/", {
           method: "POST",
-          body: botRequest(input),
+          body: botRequest({
+            ...input,
+            transcriber: options.transcriber ?? "meeting_captions",
+          }),
         }),
       );
       return { botId: created.id };
@@ -201,20 +297,37 @@ export function createRecallBots(options: {
       );
       const state = stateOf(bot.status_changes.map((change) => change.code));
       if (state !== "ENDED") return { state, transcript: null };
-      const url =
-        bot.recordings[0]?.media_shortcuts?.transcript?.data?.download_url;
-      if (url === undefined || url === null)
-        return { state: "IN_CALL", transcript: null };
+      const recording = bot.recordings[0];
+      // Ended with nothing recorded (never admitted, removed, nobody came):
+      // say why now rather than wait hours for a transcript that never comes.
+      if (recording === undefined) {
+        return {
+          state,
+          transcript: null,
+          ended: endOf(
+            bot.status_changes.map((change) => change.sub_code ?? null),
+          ),
+        };
+      }
+      const shortcut = recording.media_shortcuts?.transcript;
+      const status = shortcut?.status?.code;
+      if (status === "failed") {
+        return { state, transcript: null, ended: "TRANSCRIPT_FAILED" };
+      }
+      const url = shortcut?.data?.download_url;
+      // Still processing: read again on the next tick.
+      if (url === undefined || url === null) return { state, transcript: null };
+      // A presigned link: no Recall authorization goes with it.
       const response = await doFetch(url, {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      if (!response.ok) return { state: "IN_CALL", transcript: null };
+      if (!response.ok) return { state, transcript: null };
       const parsed = TranscriptSchema.safeParse(await response.json());
       if (!parsed.success) return { state, transcript: [] };
-      const transcript: MeetingTranscriptLine[] = parsed.data.map((part) => ({
-        speaker: part.participant?.name ?? null,
-        text: part.words.map((word) => word.text).join(" "),
-      }));
+      const transcript: MeetingTranscriptLine[] = parsed.data.map((part) => {
+        const text = part.words.map((word) => word.text).join(" ");
+        return { speaker: speakerOf(part.participant?.name, text), text };
+      });
       return { state, transcript };
     },
     // A scheduled bot is deleted; one already in the call is asked to

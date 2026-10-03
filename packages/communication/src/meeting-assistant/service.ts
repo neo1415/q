@@ -36,7 +36,55 @@ type Logger = {
   ) => void;
 };
 
-export type MeetingBotState = "WAITING" | "IN_CALL" | "ENDED" | "FAILED";
+export type MeetingBotState =
+  | "WAITING"
+  /** Held in the call's lobby until someone admits Q. */
+  | "LOBBY"
+  | "IN_CALL"
+  | "ENDED"
+  | "FAILED";
+
+/** Why a call ended with nothing recorded (the provider's own reason). */
+export type MeetingBotEnd =
+  | "NOT_ADMITTED"
+  | "REMOVED"
+  | "NOBODY_CAME"
+  | "NOT_RECORDED"
+  | "TRANSCRIPT_FAILED"
+  | "NO_RECORDING";
+
+/** What each end means, said plainly on the assistant row and the record. */
+export const MEETING_BOT_END: Readonly<
+  Record<
+    MeetingBotEnd,
+    { readonly failure: string; readonly unrecorded: string }
+  >
+> = {
+  NOT_ADMITTED: {
+    failure: "Nobody let Q in from the call's lobby, so it heard nothing.",
+    unrecorded: "Q was not admitted from the lobby",
+  },
+  REMOVED: {
+    failure: "Q was removed from the call.",
+    unrecorded: "Q was removed from the call",
+  },
+  NOBODY_CAME: {
+    failure: "Nobody joined the call while Q was there.",
+    unrecorded: "Nobody joined while Q was there",
+  },
+  NOT_RECORDED: {
+    failure: "The call didn't let Q record.",
+    unrecorded: "The call did not permit recording",
+  },
+  TRANSCRIPT_FAILED: {
+    failure: "Q was in the call but its transcript failed.",
+    unrecorded: "Q's transcript of the call failed",
+  },
+  NO_RECORDING: {
+    failure: "The call ended before Q could record anything.",
+    unrecorded: "The call ended before Q recorded anything",
+  },
+};
 
 export type MeetingTranscriptLine = {
   readonly speaker: string | null;
@@ -70,8 +118,10 @@ export type MeetingBotProvider = {
   readonly leave?: (botId: string) => Promise<void>;
   readonly read: (botId: string) => Promise<{
     readonly state: MeetingBotState;
-    /** Present once the call has ended and its captions are ready. */
+    /** Present once the call has ended and its transcript is ready. */
     readonly transcript: readonly MeetingTranscriptLine[] | null;
+    /** Ended with nothing to read, and why (absent while still processing). */
+    readonly ended?: MeetingBotEnd;
   }>;
   readonly cancel: (botId: string) => Promise<void>;
 };
@@ -446,6 +496,40 @@ export function createMeetingAssistantService(dependencies: {
     );
   }
 
+  /**
+   * Q is held in the call's lobby: everyone on the booking hears it once,
+   * in the app, so someone admits it (Google Meet asks the organiser of the
+   * Meet to let an unsigned-in guest in; nobody saw that live).
+   */
+  async function inLobby(row: AssistantRow & MeetingRow): Promise<void> {
+    await sql`
+      insert into communication.notifications
+        (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
+      select p.participant_tenant_id, p.user_id, 'Q_MESSAGE',
+             ${`Q is waiting to be let in: ${row.purpose}`.slice(0, 200)},
+             ${'Q is in the call\'s lobby as "Q (Capital Q notes)". Admit it in the call so it can keep the record for both sides; until then it hears nothing.'},
+             case when exists (
+                    select 1 from identity.organisation_memberships m
+                     where m.user_id = p.user_id
+                       and m.organisation_id = c.organisation_id
+                       and m.membership_status = 'active')
+                  then '/relationships/investor/' || r.investor_organisation_id::text
+                  else '/relationships/company/' || r.company_id::text
+             end,
+             null, ${row.meeting_id}, ${`meeting-lobby:${row.meeting_id}`}
+        from communication.meeting_participants p
+        join network.relationships r on r.id = ${row.relationship_id}
+        join core.companies c on c.id = r.company_id
+       where p.meeting_id = ${row.meeting_id}
+       limit 20
+      on conflict (user_id, dedupe_key) do nothing`.catch((error: unknown) => {
+      logger?.warn(
+        { err: error, meetingId: row.meeting_id },
+        "the lobby notice was not written",
+      );
+    });
+  }
+
   async function settle(row: AssistantRow & MeetingRow): Promise<void> {
     if (bots === undefined || row.provider_bot_id === null) return;
     const current = now();
@@ -458,11 +542,21 @@ export function createMeetingAssistantService(dependencies: {
       await unrecorded(row, "Q was not admitted to the call");
       return;
     }
+    if (read.state === "ENDED" && read.ended !== undefined) {
+      const end = MEETING_BOT_END[read.ended];
+      await update(row.id, { status: "FAILED", failure: end.failure });
+      await unrecorded(row, end.unrecorded);
+      return;
+    }
+    if (read.state === "LOBBY") await inLobby(row);
     if (read.state !== "ENDED" || read.transcript === null) {
       if (current.getTime() > row.ends_at.getTime() + GIVE_UP_AFTER_END_MS) {
         await update(row.id, {
           status: "FAILED",
-          failure: "The call's captions never came back.",
+          failure:
+            read.state === "ENDED"
+              ? "Q's transcript of the call never came back."
+              : "Q never got into the call.",
         });
       } else if (read.state === "IN_CALL" && row.status !== "IN_CALL") {
         await update(row.id, { status: "IN_CALL" });
@@ -470,7 +564,12 @@ export function createMeetingAssistantService(dependencies: {
       return;
     }
     const transcript = transcriptText(read.transcript);
-    if (transcript.length === 0) {
+    // Only Q's own voice came back (live cfccb9a9: its greeting was the
+    // whole transcript): no person was heard, so there is nothing to note.
+    const heardPeople = read.transcript.some(
+      (line) => line.speaker !== "Q" && line.text.trim().length > 0,
+    );
+    if (transcript.length === 0 || !heardPeople) {
       await update(row.id, {
         status: "FAILED",
         failure: "Nothing was said that Q could hear.",
