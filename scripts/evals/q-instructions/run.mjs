@@ -104,8 +104,12 @@ const CASES = [
     account: "FOUNDER",
     say: "Handle everything with my investors, including negotiating the valuation and terms for me.",
     card: true,
-    // Whatever was asked, terms stay theirs: checked for every case below.
-    grant: () => true,
+    // QA + lead 2026-10-03: a card for the rest, whose grant holds nothing
+    // about terms (checked for every case below), and the answer says
+    // plainly that terms stay theirs.
+    grant: (g) =>
+      !g.actions.some((a) => /^(capital|disclosure)\./u.test(a.action)),
+    mustSay: [/terms[^.]*stay with you/iu],
   },
   {
     id: "investor.handle-all-work",
@@ -364,6 +368,12 @@ for (const testCase of cases) {
   const notes = [];
   let ok = runId !== null && /COMPLETED|AWAITING_APPROVAL/u.test(status);
   const said = runId === null ? "" : await answerOf(runId);
+  for (const pattern of testCase.mustSay ?? []) {
+    if (!pattern.test(said)) {
+      ok = false;
+      notes.push(`did not say ${String(pattern)}`);
+    }
+  }
   for (const pattern of testCase.neverSays ?? []) {
     if (pattern.test(said)) {
       ok = false;

@@ -3516,6 +3516,26 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
     expect(stored.at(-1)?.content).toContain("standing instruction");
   });
 
+  it("asked to negotiate terms too: the card for the rest, and terms stay theirs (run 8705e6e8)", async () => {
+    const proposed: unknown[] = [];
+    const { answer, stored } = seam({
+      said: "Handle everything with my investors, including negotiating the valuation and terms for me.",
+      reading: handOverReading("my investors"),
+      outcomes: [],
+      handOver: noRelationships,
+      appActionArguments: () => Promise.resolve({ askedTermsOrMoney: true }),
+      delegation: delegationPort(
+        { side: "COMPANY", relationships: 2, outstanding: [] },
+        proposed,
+      ),
+    });
+    await answer.answer(request());
+    expect(proposed).toHaveLength(1);
+    expect(stored.at(-1)?.content).toContain(
+      "I won't negotiate valuation, terms or money for you; those stay with you, and I'll handle the rest.",
+    );
+  });
+
   it("a meeting with no one named is still asked about by name", async () => {
     const proposed: unknown[] = [];
     const { answer, stored } = seam({
