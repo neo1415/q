@@ -46,9 +46,11 @@ type Phase =
 function Row({
   item,
   answer,
+  alreadyMatched,
 }: {
   readonly item: IncomingConnectionRequestDto;
   readonly answer: AnswerConnectionPort;
+  readonly alreadyMatched: boolean;
 }) {
   const [current, setCurrent] = useState(item);
   const [phase, setPhase] = useState<Phase>({ kind: "IDLE" });
@@ -95,6 +97,23 @@ function Row({
       <div className="flex flex-wrap items-center gap-3">
         <p className="cq-status-line" role="status">
           Connected. You and {name} have both agreed to connect.
+        </p>
+        <Link
+          href={`/relationships/company/${current.companyId}`}
+          className="cq-body-sm text-(--cq-text-primary) underline underline-offset-4"
+        >
+          Open the relationship
+        </Link>
+      </div>
+    );
+  } else if (alreadyMatched) {
+    // Messy real use: the pair matched another way (both expressed
+    // interest) while this request stayed open. Accepting would add
+    // nothing; the relationship is the one place to act.
+    outcome = (
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="cq-status-line" role="status">
+          You&apos;re already connected with {name}; nothing to answer here.
         </p>
         <Link
           href={`/relationships/company/${current.companyId}`}
@@ -208,12 +227,17 @@ function Row({
   );
 }
 
+const NONE: ReadonlySet<string> = new Set();
+
 export function ConnectionRequestsInbox({
   items,
   answer = answerConnectionRequestAction,
+  matchedCompanyIds = NONE,
 }: {
   readonly items: readonly IncomingConnectionRequestDto[];
   readonly answer?: AnswerConnectionPort;
+  /** Companies this organisation is already matched with. */
+  readonly matchedCompanyIds?: ReadonlySet<string>;
 }) {
   if (items.length === 0) {
     return (
@@ -229,7 +253,16 @@ export function ConnectionRequestsInbox({
       className="cq-panel-rows flex flex-col"
     >
       {items.map((item) => (
-        <Row key={item.interestId} item={item} answer={answer} />
+        <Row
+          key={item.interestId}
+          item={item}
+          answer={answer}
+          alreadyMatched={
+            item.response !== "ACCEPTED" &&
+            item.response !== "DECLINED" &&
+            matchedCompanyIds.has(item.companyId)
+          }
+        />
       ))}
     </ul>
   );

@@ -163,6 +163,23 @@ describe("ConnectionRequestsInbox", () => {
     );
   });
 
+  it("offers no Accept on a request whose pair already matched", () => {
+    const answer = vi.fn();
+    render(
+      <ConnectionRequestsInbox
+        items={[ROW]}
+        answer={answer}
+        matchedCompanyIds={new Set([ROW.companyId])}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+    expect(screen.getByText(/already connected with Ledgerfold/)).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Open the relationship" }),
+    ).toBeTruthy();
+    expect(answer).not.toHaveBeenCalled();
+  });
+
   it("is an honest empty state when no founder has asked", () => {
     render(<ConnectionRequestsInbox items={[]} />);
     expect(screen.getByText("No requests from founders yet.")).toBeTruthy();

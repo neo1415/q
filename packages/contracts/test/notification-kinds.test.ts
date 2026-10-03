@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { NotificationKindSchema, NotificationListSchema } from "../src/index.js";
+import {
+  NotificationKindSchema,
+  NotificationListSchema,
+} from "../src/index.js";
 
 /**
  * The notifications list is parsed whole, so a kind the table accepts but the
@@ -24,9 +27,10 @@ function latestTableKinds(): string[] {
   let latest: string | undefined;
   for (const file of files) {
     const sql = readFileSync(join(MIGRATIONS, file), "utf8");
-    const match = /add constraint notifications_kind_check\s+check \(kind in \(([^)]*)\)\)/.exec(
-      sql,
-    );
+    const match =
+      /add constraint notifications_kind_check\s+check \(kind in \(([^)]*)\)\)/.exec(
+        sql,
+      );
     if (match?.[1] !== undefined) latest = match[1];
   }
   if (latest === undefined) throw new Error("no notifications_kind_check");

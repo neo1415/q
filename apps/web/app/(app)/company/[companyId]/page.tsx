@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import {
   getCompanyProfile,
+  getDiligence,
   getOwnInterest,
   getRelationshipWithCompany,
   listTaxonomyNodes,
@@ -93,6 +94,23 @@ export default async function CompanyPage({
           .catch(() => []),
   ]);
 
+  // In diligence, what the company shared with this relationship, read
+  // through the diligence area's own authorisation (never inferred here).
+  const relationship = standing?.relationship ?? null;
+  const inDiligence =
+    relationship !== null &&
+    relationship.milestones.some((m) => m.state === "IN_DILIGENCE") &&
+    isMatchedRelationshipState(relationship.state);
+  const area = inDiligence
+    ? await getDiligence(session, relationship.relationshipId).catch(() => null)
+    : null;
+  const diligence = inDiligence
+    ? {
+        href: `/relationships/company/${encodeURIComponent(profile.companyId)}#diligence`,
+        titles: (area?.shares ?? []).map((share) => share.title),
+      }
+    : null;
+
   // A founder has only the videos; anyone else opens on the overview.
   const requested = (await searchParams)?.tab;
   const tab: ProfileTab =
@@ -117,6 +135,7 @@ export default async function CompanyPage({
           standing?.relationship?.state ?? "",
         )}
         sectorLabels={sectorLabels}
+        diligence={diligence}
         relationshipState={
           RelationshipStateV2Schema.safeParse(standing?.relationship?.state)
             .data ?? null

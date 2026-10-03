@@ -24,6 +24,29 @@ import { NotScannedNote } from "../documents/not-scanned-note";
  */
 
 type Doc = { readonly id: string; readonly title: string };
+type DiligenceRequest = DiligenceDto["requests"][number];
+
+/**
+ * A request's state as it stands now. A request answered with a document the
+ * founder later stopped sharing is not "answered" any more from the
+ * investor's seat: say both facts rather than pick one (messy real use).
+ */
+export function requestStatusWords(
+  request: DiligenceRequest,
+  sharedDocumentIds: ReadonlySet<string>,
+): { readonly words: string; readonly answerable: boolean } {
+  if (request.status !== "FULFILLED")
+    return { words: "open", answerable: true };
+  const by = request.fulfilledBy;
+  if (by === null) return { words: "answered", answerable: false };
+  const title = by.title ?? "a document";
+  return sharedDocumentIds.has(by.documentId)
+    ? { words: `answered with ${title}`, answerable: false }
+    : {
+        words: `answered with ${title}, which is no longer shared`,
+        answerable: true,
+      };
+}
 
 function newKey(): string {
   return `web-diligence-${crypto.randomUUID()}`;
@@ -72,6 +95,10 @@ export function RelationshipDiligence({
 
   if (area === null || (!area.open && area.shares.length === 0)) return null;
   const founder = area.side === "COMPANY";
+  const sharedIds = new Set(area.shares.map((share) => share.documentId));
+  const everAnswered = area.requests.some(
+    (request) => request.status === "FULFILLED",
+  );
 
   return (
     <div className="flex flex-col gap-5" data-diligence>
@@ -81,9 +108,11 @@ export function RelationshipDiligence({
         </h3>
         {area.shares.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            {founder
-              ? "Nothing shared yet. Only what you choose is shared, and only with them."
-              : "Nothing shared yet."}
+            {everAnswered
+              ? "Nothing is shared right now."
+              : founder
+                ? "Nothing shared yet. Only what you choose is shared, and only with them."
+                : "Nothing shared yet."}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -156,40 +185,40 @@ export function RelationshipDiligence({
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {area.requests.map((request) => (
-              <li key={request.requestId} className="flex flex-col gap-1">
-                <span className="cq-body">
-                  {request.title}{" "}
-                  <span className="cq-body-sm text-(--cq-text-secondary)">
-                    —{" "}
-                    {request.status === "FULFILLED"
-                      ? `answered${request.fulfilledBy?.title == null ? "" : ` with ${request.fulfilledBy.title}`}`
-                      : "open"}
+            {area.requests.map((request) => {
+              const status = requestStatusWords(request, sharedIds);
+              return (
+                <li key={request.requestId} className="flex flex-col gap-1">
+                  <span className="cq-body">
+                    {request.title}{" "}
+                    <span className="cq-body-sm text-(--cq-text-secondary)">
+                      — {status.words}
+                    </span>
                   </span>
-                </span>
-                {request.note === null ? null : (
-                  <span className="cq-body-sm text-(--cq-text-secondary)">
-                    {request.note}
-                  </span>
-                )}
-                {founder && area.open && request.status === "OPEN" ? (
-                  <DocumentPicker
-                    documents={documents}
-                    label="Answer with a document"
-                    busy={busy}
-                    onPick={(documentId) =>
-                      void act(() =>
-                        shareDiligenceAction(
-                          relationshipId,
-                          documentId,
-                          request.requestId,
-                        ),
-                      )
-                    }
-                  />
-                ) : null}
-              </li>
-            ))}
+                  {request.note === null ? null : (
+                    <span className="cq-body-sm text-(--cq-text-secondary)">
+                      {request.note}
+                    </span>
+                  )}
+                  {founder && area.open && status.answerable ? (
+                    <DocumentPicker
+                      documents={documents}
+                      label="Answer with a document"
+                      busy={busy}
+                      onPick={(documentId) =>
+                        void act(() =>
+                          shareDiligenceAction(
+                            relationshipId,
+                            documentId,
+                            request.requestId,
+                          ),
+                        )
+                      }
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
         {!founder && area.open ? (

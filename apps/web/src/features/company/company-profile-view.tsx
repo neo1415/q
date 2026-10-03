@@ -45,6 +45,12 @@ import { countryLabel, stageLabel } from "./declared-labels";
 
 export type ProfileTab = "overview" | "videos";
 
+/** What the company shared with this reader in diligence, by title. */
+export type DiligenceShared = {
+  readonly href: string;
+  readonly titles: readonly string[];
+};
+
 const RELATIONSHIP_LABELS: Readonly<
   Record<CompanyProfileTeamMember["relationshipType"], string>
 > = {
@@ -121,6 +127,18 @@ export function moneyText(money: {
   return `${money.currency} ${negative ? "-" : ""}${grouped}${cents}`;
 }
 
+/** In diligence, "not shared" is a next step, not a dead end. */
+function NotSharedYet({ href }: { readonly href: string }) {
+  return (
+    <span className="flex flex-wrap items-baseline justify-end gap-x-2">
+      <span>Not shared with you yet</span>
+      <Link href={href} className="cq-body-sm underline underline-offset-4">
+        Ask in diligence
+      </Link>
+    </span>
+  );
+}
+
 function tabClass(active: boolean): string {
   return `cq-body-sm inline-flex min-h-11 items-center border-b-2 px-1 ${
     active
@@ -136,6 +154,7 @@ export function CompanyProfileView({
   connected,
   sectorLabels,
   relationshipState = null,
+  diligence = null,
 }: {
   readonly profile: CompanyProfileDto;
   readonly tab: ProfileTab;
@@ -143,6 +162,11 @@ export function CompanyProfileView({
   readonly connected: boolean;
   readonly relationshipState?: RelationshipStateV2 | null;
   readonly sectorLabels: readonly string[];
+  /**
+   * Present only while this reader's relationship is in diligence: what
+   * the diligence area (its own authorisation) says the company shared.
+   */
+  readonly diligence?: DiligenceShared | null;
 }) {
   const { overview } = profile;
   const investor = profile.viewer === "INVESTOR";
@@ -297,9 +321,13 @@ export function CompanyProfileView({
                 // reader; "not shared" never says whether one exists.
                 [
                   "Raising",
-                  overview.raise === null
-                    ? "Not shared with you"
-                    : moneyText(overview.raise),
+                  overview.raise !== null ? (
+                    moneyText(overview.raise)
+                  ) : diligence === null ? (
+                    "Not shared with you"
+                  ) : (
+                    <NotSharedYet href={diligence.href} />
+                  ),
                 ],
                 [
                   "Verification",
@@ -309,7 +337,30 @@ export function CompanyProfileView({
                 ],
                 // A deck is named only where it was shared with them.
                 ...(investor && overview.deck === null
-                  ? ([["Pitch deck", "Not shared with you"]] as const)
+                  ? ([
+                      [
+                        "Pitch deck",
+                        diligence === null ? (
+                          "Not shared with you"
+                        ) : (
+                          <NotSharedYet href={diligence.href} />
+                        ),
+                      ],
+                    ] as const)
+                  : []),
+                ...(diligence !== null && diligence.titles.length > 0
+                  ? ([
+                      [
+                        "Shared in diligence",
+                        <Link
+                          key="shared"
+                          href={diligence.href}
+                          className="underline underline-offset-4"
+                        >
+                          {diligence.titles.join(", ")}
+                        </Link>,
+                      ],
+                    ] as const)
                   : []),
               ] as const
             ).map(([term, value]) => (

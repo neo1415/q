@@ -296,6 +296,33 @@ describe("the profile, for an investor", () => {
     ).toBeNull();
   });
 
+  it("in diligence, turns 'not shared' into a next step and names what was shared there", () => {
+    const base = investorProfile();
+    if (base.overview === null) throw new Error("expected an overview");
+    render(
+      <CompanyProfileView
+        profile={{
+          ...base,
+          overview: { ...base.overview, raise: null, deck: null },
+        }}
+        tab="overview"
+        interest={null}
+        connected={true}
+        sectorLabels={["Energy storage"]}
+        diligence={{
+          href: "/relationships/company/x#diligence",
+          titles: ["Cap table"],
+        }}
+      />,
+    );
+    expect(screen.queryByText("Not shared with you")).toBeNull();
+    expect(screen.getAllByText("Not shared with you yet")).toHaveLength(2);
+    expect(
+      screen.getAllByRole("link", { name: "Ask in diligence" }),
+    ).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "Cap table" })).toBeTruthy();
+  });
+
   it("formats money from its decimal string without a float", () => {
     expect(moneyText({ amount: "1500000.00", currency: "USD" })).toBe(
       "USD 1,500,000",

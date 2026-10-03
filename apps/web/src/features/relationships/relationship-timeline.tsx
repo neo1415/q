@@ -6,6 +6,7 @@ import {
   type RelationshipSide,
   visibilityWords,
 } from "./relationship-words";
+import { timelineRuns } from "./timeline-runs";
 
 /**
  * What happened, in order (CQ-WEB-030; doc 17 §84; spec §12.5).
@@ -25,43 +26,64 @@ export function RelationshipTimeline({
   readonly side: RelationshipSide;
   readonly counterpart: string;
 }) {
+  const runs = timelineRuns(milestones);
   return (
     <ol
       aria-label="What happened"
       className="flex max-w-(--cq-layout-reading) flex-col"
     >
-      {milestones.map((milestone, index) => (
-        <li
-          key={`${milestone.state}-${milestone.at}`}
-          className="relative flex gap-3 pb-5 last:pb-0"
-          data-milestone={milestone.state}
-        >
-          {/* The line and dot are decoration; the text carries everything. */}
-          <span
-            aria-hidden="true"
-            className="relative flex w-3 shrink-0 justify-center"
+      {runs.map((run, index) => {
+        const first = run.steps[0];
+        if (first === undefined) return null;
+        const last = run.steps[run.steps.length - 1] ?? first;
+        return (
+          <li
+            key={`${index}-${first.state}-${first.at}`}
+            className="relative flex gap-3 pb-5 last:pb-0"
+            data-milestone={first.state}
           >
-            <span className="mt-1.5 size-2 rounded-full border border-(--cq-border-strong) bg-(--cq-surface)" />
-            {index < milestones.length - 1 ? (
-              <span className="absolute top-4 bottom-[-0.25rem] w-px bg-(--cq-border)" />
-            ) : null}
-          </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <time
-              dateTime={milestone.at}
-              className="cq-caption cq-numeric text-(--cq-text-tertiary)"
+            {/* The line and dot are decoration; the text carries everything. */}
+            <span
+              aria-hidden="true"
+              className="relative flex w-3 shrink-0 justify-center"
             >
-              {formatRelationshipDate(milestone.at)}
-            </time>
-            <span className="cq-body text-(--cq-text-primary)">
-              {milestoneSentence(milestone.state, side, counterpart)}
+              <span className="mt-1.5 size-2 rounded-full border border-(--cq-border-strong) bg-(--cq-surface)" />
+              {index < runs.length - 1 ? (
+                <span className="absolute top-4 bottom-[-0.25rem] w-px bg-(--cq-border)" />
+              ) : null}
             </span>
-            <span className="cq-caption text-(--cq-text-secondary)">
-              {visibilityWords(milestone.state, counterpart)}
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <time
+                dateTime={first.at}
+                className="cq-caption cq-numeric text-(--cq-text-tertiary)"
+              >
+                {formatRelationshipDate(first.at)}
+              </time>
+              <span className="cq-body text-(--cq-text-primary)">
+                {milestoneSentence(first.state, side, counterpart)}
+              </span>
+              {run.steps.slice(1).map((step) => (
+                <span
+                  key={step.state}
+                  className="cq-body text-(--cq-text-primary)"
+                >
+                  Then: {milestoneSentence(step.state, side, counterpart)}
+                </span>
+              ))}
+              {run.times > 1 ? (
+                <span className="cq-caption cq-numeric text-(--cq-text-secondary)">
+                  {run.steps.length > 1
+                    ? `This back-and-forth happened ${run.times} times that day.`
+                    : `Happened ${run.times} times that day.`}
+                </span>
+              ) : null}
+              <span className="cq-caption text-(--cq-text-secondary)">
+                {visibilityWords(last.state, counterpart)}
+              </span>
             </span>
-          </span>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ol>
   );
 }
