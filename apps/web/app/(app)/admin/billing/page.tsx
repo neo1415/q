@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getAdminFeeLedger } from "@capital-q/api-client";
+import { getAdminFeeLedger, getAdminUsage } from "@capital-q/api-client";
+import type { AdminUsageDto } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState, ErrorState, InlineNotice } from "@capital-q/ui/states";
 
@@ -23,7 +24,10 @@ export const metadata: Metadata = { title: "Billing · Admin" };
 export default async function AdminBillingPage() {
   const context = await adminContext();
   if (context === null || !context.can("billing.fees.read")) notFound();
-  const ledger = await getAdminFeeLedger(context.session).catch(() => null);
+  const [ledger, usage] = await Promise.all([
+    getAdminFeeLedger(context.session).catch(() => null),
+    getAdminUsage(context.session).catch(() => null),
+  ]);
   if (ledger === null) {
     return (
       <ErrorState
@@ -35,6 +39,7 @@ export default async function AdminBillingPage() {
   const rate = ledger.schedule.rateBps;
   return (
     <div className="flex flex-col gap-8">
+      {usage === null ? null : <ModelCost usage={usage} />}
       <PageSection
         id="schedule"
         title="Facilitation fee"
@@ -102,6 +107,93 @@ export default async function AdminBillingPage() {
           </ul>
         )}
       </PageSection>
+    </div>
+  );
+}
+
+const usd = (value: string) => `$${Number(value).toFixed(2)}`;
+
+/**
+ * What Q cost to run this month (lead 2026-10-03): per tenant, per person,
+ * and the top drivers, from the append-only usage ledger. Operational cost,
+ * not revenue; nobody is charged from it.
+ */
+function ModelCost({ usage }: { readonly usage: AdminUsageDto }) {
+  return (
+    <PageSection
+      id="model-cost"
+      title={`Model cost this month: ${usd(usage.totalUsd)}`}
+      description={`${usage.month} · from the usage ledger; operational cost, not a charge.`}
+    >
+      <div className="grid gap-6 md:grid-cols-3">
+        <CostList
+          title="By tenant"
+          rows={usage.tenants.map((row) => ({
+            key: row.tenantId,
+            label: row.name ?? row.tenantId.slice(0, 8),
+            usd: row.usd,
+            calls: row.calls,
+          }))}
+        />
+        <CostList
+          title="By person"
+          rows={usage.users.map((row) => ({
+            key: `${row.tenantId}:${row.userId ?? "guest"}`,
+            label: row.name ?? row.userId?.slice(0, 8) ?? "Guest",
+            usd: row.usd,
+            calls: row.calls,
+          }))}
+        />
+        <CostList
+          title="Top drivers"
+          rows={usage.drivers.map((row) => ({
+            key: `${row.purpose}:${row.taskClass}:${row.model}`,
+            label: `${words(row.purpose)} · ${words(row.taskClass)} · ${row.model}`,
+            usd: row.usd,
+            calls: row.calls,
+          }))}
+        />
+      </div>
+    </PageSection>
+  );
+}
+
+function CostList({
+  title,
+  rows,
+}: {
+  readonly title: string;
+  readonly rows: readonly {
+    readonly key: string;
+    readonly label: string;
+    readonly usd: string;
+    readonly calls: number;
+  }[];
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="cq-body-sm font-medium text-(--cq-text-primary)">
+        {title}
+      </h3>
+      {rows.length === 0 ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)">Nothing yet.</p>
+      ) : (
+        <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+          {rows.slice(0, 10).map((row) => (
+            <li
+              key={row.key}
+              className="flex items-baseline justify-between gap-4 py-2"
+            >
+              <span className="cq-body-sm truncate text-(--cq-text-primary)">
+                {row.label}
+              </span>
+              <span className="cq-caption cq-numeric shrink-0 text-(--cq-text-secondary)">
+                {usd(row.usd)} · {String(row.calls)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

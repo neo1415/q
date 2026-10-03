@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   ADMIN_BILLING_ACCOUNT_PATH,
+  ADMIN_BILLING_USAGE_PATH,
+  AdminUsageDtoSchema,
+  type AdminUsageDto,
   ADMIN_BILLING_ASSIGN_PATH,
   ADMIN_BILLING_FEE_RATE_PATH,
   ADMIN_BILLING_FEES_ACCRUE_PATH,
@@ -52,6 +55,8 @@ export type AdminBillingRoutesDependencies = ActorContextDependencies & {
   readonly admin: Pick<PlatformAdmin, "authorize" | "recordAction">;
   readonly accounts: BillingAccounts;
   readonly fees: FeeLedger;
+  /** This month's model cost (lead 2026-10-03). Absent: not served. */
+  readonly usage?: (() => Promise<AdminUsageDto>) | undefined;
   /** COUNT features for one organisation (gateways), for the account view. */
   readonly countsFor?:
     | ((organisationId: string) => Promise<Readonly<Record<string, number>>>)
@@ -133,6 +138,20 @@ export function registerAdminBillingRoutes(
       return send(request, reply, "RESOURCE_NOT_FOUND", "Not found.");
     }
     throw error;
+  }
+
+  if (dependencies.usage !== undefined) {
+    const usage = dependencies.usage;
+    app.get(
+      ADMIN_BILLING_USAGE_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        // Platform admins who read the fee ledger read what Q costs.
+        const grant = await guard(request, reply, "billing.fees.read");
+        if (grant === null) return reply;
+        return AdminUsageDtoSchema.parse(await usage());
+      },
+    );
   }
 
   app.get(

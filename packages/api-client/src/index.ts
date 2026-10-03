@@ -369,6 +369,7 @@ export {
   entitlementOf,
   exportAdminFeeLedger,
   getAdminBillingAccount,
+  getAdminUsage,
   getAdminFeeLedger,
   getMyPlan,
   getPlanCatalogue,

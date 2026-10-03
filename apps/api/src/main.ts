@@ -27,6 +27,7 @@ import {
   CorrelationIdSchema,
   isMatchedRelationshipState,
   type YourCompanyLabel,
+  type AdminUsageDto,
 } from "@capital-q/contracts";
 import { createPlatformAdmin } from "@capital-q/platform-admin";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
@@ -134,6 +135,8 @@ import {
   createProcessLocalProviderHealth,
   createSyntheticDemoRoutingAllowance,
   type ModelProvider,
+  createPostgresUsageReader,
+  monthOf,
 } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
@@ -258,6 +261,42 @@ await telemetry.start();
 // through ActorContext and AuthorizationService.
 const databaseConfig = loadDatabaseConfig();
 const database = createRequestDatabaseClient(databaseConfig);
+
+// Lead 2026-10-03: what Q cost this month, for the admin console. Names
+// are read for display only; the ledger itself is read-only.
+const usageReader = createPostgresUsageReader(database.sql);
+async function adminUsage(at: Date): Promise<AdminUsageDto> {
+  const month = await usageReader.adminMonth(at, 25);
+  const tenantIds = [...new Set(month.tenants.map((row) => row.tenantId))];
+  const userIds = month.users
+    .map((row) => row.userId)
+    .filter((id): id is string => id !== null);
+  const [tenants, people] = await Promise.all([
+    database.sql<{ id: string; name: string }[]>`
+      select id, name from identity.tenants where id = any(${tenantIds}::uuid[])`,
+    database.sql<{ id: string; name: string | null }[]>`
+      select id, display_name as name from identity.user_profiles
+       where id = any(${userIds}::uuid[])`,
+  ]);
+  const tenantName = new Map(tenants.map((row) => [row.id, row.name]));
+  const personName = new Map(people.map((row) => [row.id, row.name]));
+  return {
+    month: monthOf(at).label,
+    totalUsd: month.totalUsd,
+    tenants: month.tenants.map((row) => ({
+      ...row,
+      name: tenantName.get(row.tenantId) ?? null,
+    })),
+    users: month.users.map((row) => ({
+      ...row,
+      name:
+        row.userId === null
+          ? "Guest (GateQ)"
+          : (personName.get(row.userId) ?? null),
+    })),
+    drivers: month.drivers.map((row) => ({ ...row })),
+  };
+}
 
 // ADMIN block: the console's email panel reads which sender this
 // deployment uses (never the key itself).
@@ -1640,6 +1679,7 @@ const { app, logger } = createApp(config, security, {
       transactions: database.transactions,
     }),
     countsFor: (organisationId) => gatewayCounts(organisationId),
+    usage: () => adminUsage(new Date()),
   },
   // end BILLING block
   // ADMIN block (ADR 0033)

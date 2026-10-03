@@ -311,3 +311,58 @@ export function createEntitlementProblem(input: {
     entitlement: input.entitlement,
   };
 }
+
+/**
+ * Admin (platform admin only): model cost this month per tenant and per
+ * person, and what costs most (lead 2026-10-03). Decimal USD strings from
+ * the append-only usage ledger; operational cost, never a charge.
+ */
+export const ADMIN_BILLING_USAGE_PATH = "/v1/admin/billing/usage" as const;
+
+const AdminUsd = z.string().regex(/^\d{1,9}(\.\d{1,8})?$/u);
+
+export const AdminUsageDtoSchema = z
+  .object({
+    month: z.string().regex(/^\d{4}-\d{2}$/u),
+    totalUsd: AdminUsd,
+    tenants: z
+      .array(
+        z
+          .object({
+            tenantId: UuidSchema,
+            name: z.string().max(200).nullable(),
+            usd: AdminUsd,
+            calls: z.number().int().min(0),
+          })
+          .strict(),
+      )
+      .max(50),
+    users: z
+      .array(
+        z
+          .object({
+            tenantId: UuidSchema,
+            userId: UuidSchema.nullable(),
+            name: z.string().max(200).nullable(),
+            usd: AdminUsd,
+            calls: z.number().int().min(0),
+          })
+          .strict(),
+      )
+      .max(50),
+    drivers: z
+      .array(
+        z
+          .object({
+            purpose: z.string().max(40),
+            taskClass: z.string().max(40),
+            model: z.string().max(120),
+            usd: AdminUsd,
+            calls: z.number().int().min(0),
+          })
+          .strict(),
+      )
+      .max(50),
+  })
+  .strict();
+export type AdminUsageDto = z.infer<typeof AdminUsageDtoSchema>;

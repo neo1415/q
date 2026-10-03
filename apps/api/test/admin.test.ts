@@ -120,6 +120,14 @@ function appFor(
       adminBilling: {
         accounts: fakeBillingAccounts(),
         fees: fakeFeeLedger(),
+        usage: () =>
+          Promise.resolve({
+            month: "2026-10",
+            totalUsd: "1.173000",
+            tenants: [],
+            users: [],
+            drivers: [],
+          }),
       },
       // end BILLING block
     },
@@ -386,6 +394,12 @@ const ROUTES: readonly Route[] = [
   {
     method: "GET",
     url: "/v1/admin/billing/fees",
+    permission: "billing.fees.read",
+    listOk: true,
+  },
+  {
+    method: "GET",
+    url: "/v1/admin/billing/usage",
     permission: "billing.fees.read",
     listOk: true,
   },
