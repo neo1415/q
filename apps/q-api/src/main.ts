@@ -1609,7 +1609,20 @@ const appActionPorts: OwnReadPorts = {
       title: file.title.slice(0, 200),
       status: file.status.toLowerCase(),
       at: file.updatedAt,
-      facts: { type: file.documentType, reading: file.processing },
+      facts: {
+        type: file.documentType,
+        reading: file.processing,
+        // Who may download it now, from the record (QA run 581a8862:
+        // a declined card's audience was said as the deck's).
+        ...(file.downloadAudience === undefined
+          ? {}
+          : {
+              downloadableBy:
+                file.downloadAudience === "INVESTORS"
+                  ? "investors who can find the company"
+                  : "only their organisation",
+            }),
+      },
     }));
   },
   rehearsals: async (actor) =>

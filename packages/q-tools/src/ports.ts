@@ -724,6 +724,11 @@ export type EvidenceDocumentsPort = {
       readonly status: string;
       readonly processing: string | null;
       readonly updatedAt: string;
+      /**
+       * Who may download it now (ADR 0041), from the record: what Q says
+       * about a deck's audience, never a card's proposal (QA 581a8862).
+       */
+      readonly downloadAudience?: string | undefined;
     }[]
   >;
 };

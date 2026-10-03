@@ -79,7 +79,7 @@ import { isModelGatewayError } from "../errors.js";
 import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
-import { withoutActionTalk } from "./action-talk.js";
+import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
 import { ownProfileFact } from "./own-profile.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
@@ -162,7 +162,9 @@ export {
 } from "./own-onboarding.js";
 export {
   withoutActionTalk,
+  withoutStatusTalk,
   type ActionTalkStripResult,
+  type StatusTalkResult,
 } from "./action-talk.js";
 export {
   onboardingNudgeNote,
@@ -3213,9 +3215,19 @@ export function createModelGatewayQAnswer(
           dependencies.receipts !== undefined
             ? proposalStatusLine(receipts)
             : null;
+        // The engine's status replaces the model's: its status sentences
+        // go, and its one offer follows the status line, so the answer
+        // never says both "nothing is waiting" and "it needs your
+        // approval" (QA run 5fd903d3).
+        const statusTalk =
+          statusLine === null ? null : withoutStatusTalk(guarded.text);
         if (statusLine !== null) {
           logger?.info(
-            { qRunId: request.runId, actionTalkRemoved: spoken.removed },
+            {
+              qRunId: request.runId,
+              actionTalkRemoved: spoken.removed,
+              statusTalkRemoved: statusTalk?.removed ?? 0,
+            },
             "an answer about a change's status was given the engine's status",
           );
         }
@@ -3227,9 +3239,10 @@ export function createModelGatewayQAnswer(
             ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
             : [
                 ...(approvalLine === null ? [] : [approvalLine]),
-                guarded.text,
+                statusTalk?.text ?? guarded.text,
                 ...actedLines,
                 ...(statusLine === null ? [] : [statusLine]),
+                ...(statusTalk?.offer == null ? [] : [statusTalk.offer]),
                 ...(recordedStatements.length === 0
                   ? []
                   : [quietlyNoted(recordedStatements)]),

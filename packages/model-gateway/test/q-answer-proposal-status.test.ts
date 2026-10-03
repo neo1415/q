@@ -329,6 +329,26 @@ describe("a reply about a change's status says the engine's status", () => {
     );
   });
 
+  it("QA 5fd903d3: with nothing waiting, the model's 'still needs your approval' goes too, and its offer follows the status line", async () => {
+    const claim = "I've updated your Q Card so search engines can find it.";
+    const { seam, request, stored } = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      {
+        answer: `${claim} The change still needs your approval before it is saved. Want me to update the Q Card now?`,
+        actionTalk: [claim],
+        proposalStatus: true,
+      },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const reply = stored.at(-1) ?? "";
+    expect(reply).not.toContain(claim);
+    expect(reply).not.toContain("still needs your approval");
+    expect(reply).toBe(
+      "Nothing is waiting for your approval in this conversation, and nothing has been saved here.\n\nWant me to update the Q Card now?",
+    );
+  });
+
   it("a saved one is said as saved, from its record", async () => {
     const { seam, request, stored } = build(
       { status: "SUCCEEDED", data: RELATIONSHIP_NONE },

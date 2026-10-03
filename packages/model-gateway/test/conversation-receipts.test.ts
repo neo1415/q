@@ -11,6 +11,7 @@ import {
   collectReceipts,
   PLAIN_KNOWING_LINE,
   POINTING_LINE,
+  proposalStatusLine,
   type QCapabilityManifest,
   type QReceiptPort,
 } from "../src/q/index.js";
@@ -317,4 +318,36 @@ describe("no ids or tool needs said to the person (live 2026-10-02)", () => {
     expect(PLAIN_KNOWING_LINE).toContain("never say what a tool needs");
     expect(PLAIN_KNOWING_LINE).toContain("the other side hasn't answered yet");
   });
+});
+
+/**
+ * QA run 581a8862: a declined card's audience ("investors can download
+ * it") was said as the deck's own. A card that is not saved changed
+ * nothing, and Q is told so beside each one.
+ */
+describe("pending and declined changes are never described as done", () => {
+  const card = (status: string) => ({
+    kind: "ACTION" as const,
+    id: `p-${status}`,
+    actionType: "document.deck_audience.set",
+    summary: "Let investors who can find Ajopot download Ajopot seed deck",
+    status,
+  });
+
+  it.each(["PENDING", "DECLINED", "EXPIRED"])(
+    "%s: the note says nothing changed, and the status line never says done or saved",
+    (status) => {
+      const note = capabilityNote(undefined, [], [card(status)]).content;
+      expect(note).toContain(
+        "A change that is not saved changed nothing: never describe what a pending, declined or lapsed change would do as how things are now.",
+      );
+      const line = note
+        .split("\n")
+        .find((entry) => entry.includes(`id p-${status}`));
+      expect(line).toMatch(/nothing (?:has )?changed/u);
+      expect(line).not.toMatch(/: (?:saved|approved, still being saved)\b/u);
+      const status_ = proposalStatusLine([card(status)]);
+      expect(status_).not.toMatch(/\bis saved\b|\bdone\b|already/iu);
+    },
+  );
 });

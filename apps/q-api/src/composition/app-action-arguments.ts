@@ -48,7 +48,13 @@ export function createAppActionArgumentReader(dependencies: {
       focus: { areas: [], tools: [input.tool] },
     });
     const tool = offered.find((entry) => entry.definition.name === input.tool);
-    if (tool === undefined) return null;
+    if (tool === undefined) {
+      logger?.info(
+        { qRunId: request.runId, tool: input.tool, reason: "NOT_OFFERED" },
+        "app action arguments were not read",
+      );
+      return null;
+    }
     const rendered = renderPrompt<AppActionArgumentsVariables>(registry, {
       task: "APP_ACTION_ARGUMENTS",
       operatingMode: "ASSESSMENT",
@@ -92,9 +98,28 @@ export function createAppActionArgumentReader(dependencies: {
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         },
       );
-      return result.output.kind === "STRUCTURED"
-        ? AppActionArgumentsResultSchema.parse(result.output.value).arguments
-        : null;
+      const read =
+        result.output.kind === "STRUCTURED"
+          ? AppActionArgumentsResultSchema.parse(result.output.value).arguments
+          : null;
+      // Null by the prompt's rule when a required input is not in their
+      // words (run 5fd903d3: update_q_card required a subject "Let search
+      // engines find our Q Card" never said). Logged, so a skipped re-read
+      // says why.
+      if (read === null) {
+        logger?.info(
+          {
+            qRunId: request.runId,
+            tool: input.tool,
+            reason:
+              result.output.kind === "STRUCTURED"
+                ? "REQUIRED_INPUT_NOT_SAID"
+                : "NOT_STRUCTURED",
+          },
+          "app action arguments were not read",
+        );
+      }
+      return read;
     } catch (error: unknown) {
       logger?.warn(
         { err: error, qRunId: request.runId, tool: input.tool },

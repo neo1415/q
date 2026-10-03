@@ -169,6 +169,7 @@ export function createEvidenceDocumentsPort(
         status: entry.document.status,
         processing: entry.currentVersion?.processingStatus ?? null,
         updatedAt: entry.document.updatedAt,
+        downloadAudience: entry.document.downloadAudience,
       }));
     },
   };

@@ -116,3 +116,53 @@ export function withoutActionTalk(
     .trim();
   return { text: tidy, removed };
 }
+
+/**
+ * When Capital Q says a change's status from the engine (proposalStatusLine),
+ * the model's own status sentences go, and so does its offer, which moves
+ * after the status line (QA run 5fd903d3: "Nothing is waiting for your
+ * approval…" beside the model's "The change still needs your approval
+ * before it is saved. Want me to update the Q Card now?"). Matched on the
+ * status words a sentence uses, never on what the change was: whatever the
+ * model said about approval is replaced by the engine's record of it.
+ */
+const STATUS_TALK =
+  /\b(?:approv\w*|pending|waiting for (?:you|your)|saved yet|not (?:been )?saved|(?:is|was|has been|have been) (?:saved|applied|updated|changed|done)|needs? your (?:ok|okay|yes|go-ahead|confirmation|sign-off))\b/iu;
+const OFFER =
+  /^(?:(?:do you )?want me to|shall i|should i|would you like me to|can i)\b[^?]*\?$/iu;
+
+export type StatusTalkResult = {
+  readonly text: string;
+  readonly removed: number;
+  /** The model's one offer to do it, said after the status line; or null. */
+  readonly offer: string | null;
+};
+
+export function withoutStatusTalk(answer: string): StatusTalkResult {
+  let removed = 0;
+  let offer: string | null = null;
+  const kept = answer
+    .split("\n")
+    .map((line) =>
+      line.replace(SENTENCE, (sentence) => {
+        const trimmed = sentence.trim();
+        if (OFFER.test(trimmed)) {
+          offer ??= trimmed;
+          removed += 1;
+          return "";
+        }
+        if (STATUS_TALK.test(trimmed)) {
+          removed += 1;
+          return "";
+        }
+        return sentence;
+      }),
+    )
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return removed === 0
+    ? { text: answer, removed, offer: null }
+    : { text: kept, removed, offer };
+}

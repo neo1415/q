@@ -81,12 +81,15 @@ export const APPROVE_PENDING_TOOL = "approve_pending_proposal";
  * is shown as given and claims nothing.
  */
 const CHANGE_STATUS_MEANS: Readonly<Record<string, string>> = {
-  PENDING: "not saved yet, waiting for their approval",
+  PENDING:
+    "not saved yet, waiting for their approval: nothing has changed, so what it would do is not how things are",
   SAVING: "approved, still being saved",
   SAVED: "saved",
   NOT_SAVED: "approved but it did not go through, so it is not saved",
-  DECLINED: "declined, nothing changed",
-  EXPIRED: "lapsed before a decision, nothing changed",
+  DECLINED:
+    "declined: nothing changed, so what it would have done is not how things are",
+  EXPIRED:
+    "lapsed before a decision: nothing changed, so what it would have done is not how things are",
 };
 
 /**
@@ -407,6 +410,8 @@ export function capabilityNote(
     "- Say something was done, opened, prepared, saved, sent or ended ONLY when a tool result in this turn or a record below says so. Otherwise say plainly what you can do instead.",
     // Live 2026-09-27: "the authorised conversation record states…". The
     // person needs the status, not where it was read from.
+    // QA run 581a8862: a declined card's audience was said as the deck's.
+    "- A change that is not saved changed nothing: never describe what a pending, declined or lapsed change would do as how things are now. How a record is now comes only from a tool result about that record; if you have none, say you would check rather than guess.",
     "- About a change, state its status in a few plain words (saved; or not saved yet and how to approve it) and never explain it with Capital Q's internal terms: records, authorisation, context, supplied or the conversation record. One change has one status: never call the same change both waiting for approval and done.",
   );
   if (canApprove) {
