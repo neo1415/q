@@ -26,6 +26,7 @@ import {
   ProfilePass,
 } from "./company-profile-parts";
 import { countryLabel, stageLabel } from "./declared-labels";
+import { ReadMore } from "./read-more";
 
 /**
  * A company's profile (founder request 2026-10-02): an identity header,
@@ -125,6 +126,29 @@ export function moneyText(money: {
   const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const cents = /^0*$/.test(fraction) ? "" : `.${fraction}`;
   return `${money.currency} ${negative ? "-" : ""}${grouped}${cents}`;
+}
+
+/** A hairline definition list: words, never badges. */
+function ProfileRows({
+  rows,
+}: {
+  readonly rows: readonly (readonly [string, React.ReactNode])[];
+}) {
+  return (
+    <dl className="flex flex-col divide-y divide-(--cq-border-subtle)">
+      {rows.map(([term, value]) => (
+        <div
+          key={term}
+          className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-3"
+        >
+          <dt className="cq-label text-(--cq-text-secondary)">{term}</dt>
+          <dd className="cq-body text-right text-(--cq-text-primary)">
+            {value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 /** In diligence, "not shared" is a next step, not a dead end. */
@@ -289,34 +313,83 @@ export function CompanyProfileView({
       {tab === "videos" || overview === null ? (
         <CompanyVideos company={company} videos={profile.videos} />
       ) : (
-        <div className="flex flex-col gap-6" data-profile-overview>
-          {overview.primaryDescription === null ? null : (
-            <p className="cq-prose max-w-(--cq-layout-narrow) text-(--cq-text-primary)">
-              {overview.primaryDescription}
-            </p>
-          )}
-
-          <dl className="flex max-w-(--cq-layout-narrow) flex-col divide-y divide-(--cq-border-subtle)">
+        <div className="flex flex-col gap-8" data-profile-overview>
+          {/*
+            Key facts first: declared values only, one hairline strip -- not
+            a metric-card grid, no score. Unknown stays a word, never a zero.
+          */}
+          <dl
+            className="flex flex-wrap gap-x-8 gap-y-3 border-y border-(--cq-border-subtle) py-4"
+            data-profile-key-facts
+          >
             {(
               [
-                [
-                  "Sector",
-                  sectorLabels.length === 0
-                    ? "Not declared"
-                    : sectorLabels.join(", "),
-                ],
                 [
                   "Stage",
                   stageLabel(profile.currentStageCode) ?? "Not declared",
                 ],
-                ["Where", place === "" ? "Not declared" : place],
+                [
+                  "Raising",
+                  overview.raise !== null
+                    ? moneyText(overview.raise)
+                    : diligence === null
+                      ? "Not shared"
+                      : "Not shared yet",
+                ],
                 [
                   "Founded",
-                  overview.foundedDate === null
-                    ? "Not declared"
-                    : formatLongDay(overview.foundedDate),
+                  // A declared ISO date; the strip shows its year only.
+                  /^\d{4}/.exec(overview.foundedDate ?? "")?.[0] ??
+                    "Not declared",
                 ],
-                ["Legal name", overview.legalName ?? "Not declared"],
+                ["Where", place === "" ? "Not declared" : place],
+                ...(overview.team.length === 0
+                  ? []
+                  : ([
+                      ["Team", `${String(overview.team.length)} named`],
+                    ] as const)),
+              ] as const
+            ).map(([term, value]) => (
+              <div key={term} className="flex min-w-0 flex-col gap-0.5">
+                <dt className="cq-caption text-(--cq-text-secondary)">
+                  {term}
+                </dt>
+                <dd className="cq-title-sm cq-numeric text-(--cq-text-primary)">
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          {overview.primaryDescription === null ? null : (
+            <section
+              className="flex flex-col gap-2"
+              aria-labelledby="company-words"
+            >
+              <h2
+                id="company-words"
+                className="cq-title-sm text-(--cq-text-primary)"
+              >
+                In their words
+              </h2>
+              <ReadMore text={overview.primaryDescription} />
+            </section>
+          )}
+
+          <TeamList team={overview.team} />
+
+          <section
+            className="flex max-w-(--cq-layout-narrow) flex-col gap-1"
+            aria-labelledby="company-raise"
+          >
+            <h2
+              id="company-raise"
+              className="cq-title-sm text-(--cq-text-primary)"
+            >
+              The raise
+            </h2>
+            <ProfileRows
+              rows={[
                 // The raise is founder-private until shared with this
                 // reader; "not shared" never says whether one exists.
                 [
@@ -328,12 +401,6 @@ export function CompanyProfileView({
                   ) : (
                     <NotSharedYet href={diligence.href} />
                   ),
-                ],
-                [
-                  "Verification",
-                  overview.organisationVerified
-                    ? "Organisation verified by Capital Q"
-                    : "Not verified by Capital Q yet",
                 ],
                 // A deck is named only where it was shared with them.
                 ...(investor && overview.deck === null
@@ -347,7 +414,9 @@ export function CompanyProfileView({
                         ),
                       ],
                     ] as const)
-                  : []),
+                  : overview.deck === null
+                    ? []
+                    : ([["Pitch deck", overview.deck.title]] as const)),
                 ...(diligence !== null && diligence.titles.length > 0
                   ? ([
                       [
@@ -362,28 +431,58 @@ export function CompanyProfileView({
                       ],
                     ] as const)
                   : []),
-              ] as const
-            ).map(([term, value]) => (
-              <div
-                key={term}
-                className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-3"
-              >
-                <dt className="cq-label text-(--cq-text-secondary)">{term}</dt>
-                <dd className="cq-body text-(--cq-text-primary)">{value}</dd>
-              </div>
-            ))}
-          </dl>
+              ]}
+            />
+          </section>
 
-          <TeamList team={overview.team} />
-
-          {overview.websiteUrl === null ? null : (
-            <p className="flex items-center gap-1.5">
-              <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-              <span className="cq-caption break-all text-(--cq-text-secondary)">
-                {overview.websiteUrl}
-              </span>
-            </p>
-          )}
+          <section
+            className="flex max-w-(--cq-layout-narrow) flex-col gap-1"
+            aria-labelledby="company-details"
+          >
+            <h2
+              id="company-details"
+              className="cq-title-sm text-(--cq-text-primary)"
+            >
+              Company details
+            </h2>
+            <ProfileRows
+              rows={[
+                [
+                  "Sector",
+                  sectorLabels.length === 0
+                    ? "Not declared"
+                    : sectorLabels.join(", "),
+                ],
+                [
+                  "Founded",
+                  overview.foundedDate === null
+                    ? "Not declared"
+                    : formatLongDay(overview.foundedDate),
+                ],
+                ["Legal name", overview.legalName ?? "Not declared"],
+                [
+                  "Verification",
+                  overview.organisationVerified
+                    ? "Organisation verified by Capital Q"
+                    : "Not verified by Capital Q yet",
+                ],
+                ...(overview.websiteUrl === null
+                  ? []
+                  : ([
+                      [
+                        "Website",
+                        <span
+                          key="web"
+                          className="flex items-center gap-1.5 break-all"
+                        >
+                          <Globe size={ICON_SIZE.compact} aria-hidden="true" />
+                          {overview.websiteUrl}
+                        </span>,
+                      ],
+                    ] as const)),
+              ]}
+            />
+          </section>
 
           {/*
             What is known on the three evidence axes, and why it is in the

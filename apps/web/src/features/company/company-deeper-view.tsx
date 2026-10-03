@@ -171,10 +171,13 @@ export function CompanyDeeperView({
 function Disclosure({
   title,
   onFirstOpen,
+  defaultOpen = false,
   children,
   ...data
 }: {
   readonly title: string;
+  /** Open on arrival (the evidence on a profile, P0-4 2026-10-03). */
+  readonly defaultOpen?: boolean;
   readonly onFirstOpen?: (() => void) | undefined;
   readonly children: ReactNode;
   readonly "data-deeper-view": string;
@@ -182,6 +185,7 @@ function Disclosure({
   const opened = useRef(false);
   return (
     <details
+      open={defaultOpen}
       className="group border-t border-(--cq-border-subtle)"
       onToggle={(event) => {
         if (event.currentTarget.open && !opened.current) {
@@ -344,6 +348,7 @@ function WhatIsKnown({
   return (
     <Disclosure
       title="What is known, and how well supported"
+      defaultOpen
       data-deeper-view="evidence"
     >
       <p className="cq-body-sm max-w-(--cq-layout-reading) text-(--cq-text-secondary)">

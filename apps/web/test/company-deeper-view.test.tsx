@@ -94,6 +94,21 @@ afterEach(() => {
 });
 
 describe("what is known, and how well supported", () => {
+  it("is open on arrival", () => {
+    render(
+      <CompanyDeeperView
+        companyId={COMPANY_ID}
+        companyName="Kivu Freight"
+        facts={FACTS}
+      />,
+    );
+    expect(
+      document.querySelector<HTMLDetailsElement>(
+        '[data-deeper-view="evidence"]',
+      )?.open,
+    ).toBe(true);
+  });
+
   it("keeps the three axes and the source separate, in words", () => {
     render(
       <CompanyDeeperView
