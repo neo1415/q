@@ -108,3 +108,19 @@ export {
   createPostgresIntegrationsStore,
 } from "./postgres.js";
 export { composeGoogleIntegrations } from "./compose.js";
+export {
+  createInboundEmailService,
+  INBOUND_TEXT_MAX_CHARS,
+  newInboundToken,
+  PostmarkInboundSchema,
+  readPostmarkInbound,
+  type InboundAttachment,
+  type InboundEmailActor,
+  type InboundEmailItem,
+  type InboundEmailMessage,
+  type InboundEmailOutbox,
+  type InboundEmailService,
+  type NormalisedInboundEmail,
+  type PostmarkInbound,
+  type ReceiveInboundOutcome,
+} from "./inbound-email.js";

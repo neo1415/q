@@ -9,6 +9,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "default": "./dist/events.js"
+    },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
@@ -37,6 +41,7 @@
   },
   "devDependencies": {
     "@capital-q/config": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
     "@types/node": "^24.13.3",
     "@types/nodemailer": "8.0.2",
     "typescript": "5.9.3"
