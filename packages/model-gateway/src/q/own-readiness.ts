@@ -166,6 +166,11 @@ export function readinessLeadLines(read: unknown): string | null {
  * its items, in any order and with or without its number, is dropped;
  * the model's own sentences after it stay.
  */
+function firstSentence(item: string): string {
+  const end = item.search(/[.!?](\s|$)/u);
+  return end === -1 ? item : item.slice(0, end + 1);
+}
+
 export function afterLeadLines(text: string, leadLines: string): string {
   const items = leadLines
     .split("\n")
@@ -174,7 +179,14 @@ export function afterLeadLines(text: string, leadLines: string): string {
   let rest = text.trimStart();
   for (;;) {
     const unnumbered = rest.replace(/^\d+[.)]\s+/u, "");
-    const repeated = items.find((item) => unnumbered.startsWith(item));
+    // The whole item, else its first sentence: the model repeated "You
+    // have not yet chosen…" without the item's second sentence (run
+    // d6b2fffc), so only the whole item never matched.
+    const repeated = items
+      .flatMap((item) => [item, firstSentence(item)])
+      .find(
+        (candidate) => candidate.length > 0 && unnumbered.startsWith(candidate),
+      );
     if (repeated === undefined) break;
     rest = unnumbered.slice(repeated.length).trimStart();
   }

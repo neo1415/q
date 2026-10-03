@@ -910,6 +910,15 @@ describe("code's opening lines (lead 2026-10-03)", () => {
       ),
     ).toBe("Do it now?");
     expect(afterLeadLines("1) Choose now.", lead)).toBe("Choose now.");
+    // d6b2fffc: an item restated by its first sentence only.
+    const twoSentences =
+      "Head:\n1. You have not chosen to be visible. Readiness never chooses for you.\n2. Verify your identity.";
+    expect(
+      afterLeadLines(
+        "You have not chosen to be visible. 2. Verify your identity.  Want me to open it?",
+        twoSentences,
+      ),
+    ).toBe("Want me to open it?");
     // Prose, and a number that is not an item marker, stay as written.
     expect(afterLeadLines("That one matters most.", lead)).toBe(
       "That one matters most.",
