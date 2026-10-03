@@ -14,6 +14,7 @@ import { describeQStreamTransport } from "@capital-q/api-client";
 import { Q_SPEECH_MAX_CHARS } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import {
+  Captions,
   Download,
   History,
   PanelRight,
@@ -743,7 +744,13 @@ export function QConversationPanel({
                   onClick={() => writeCaptions(!captions)}
                   data-q-control="captions"
                 >
-                  Captions
+                  <Captions
+                    aria-hidden="true"
+                    size={ICON_SIZE.compact}
+                    strokeWidth={ICON_STROKE}
+                  />
+                  {/* An icon on a phone, where the top line is full. */}
+                  <span className="max-sm:sr-only">Captions</span>
                 </button>
               ) : null}
               <VoiceMenu
