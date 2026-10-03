@@ -291,12 +291,21 @@ async function approveAndWatch(token, userId, card) {
     await sleep(2000);
   }
   notes.push(`${String(steps.length)} steps`);
+  // A firing that did nothing must say why on their work page (NOTED).
+  const noted = steps.filter((s) => s.status === "NOTED");
+  if (noted.length > 0) {
+    notes.push(`noted: ${noted.map((s) => s.reason_code).join(",")}`);
+  }
   const autoDone = steps.filter((s) => s.status === "DONE");
   const forbidden = autoDone.filter((s) =>
     NEVER_AUTO.some((pattern) => pattern.test(s.action)),
   );
   if (forbidden.length > 0)
     notes.push(`FORBIDDEN AUTO: ${forbidden[0].action}`);
+  if (steps.length === 0) {
+    notes.push("SILENT first firing");
+    forbidden.push({ action: "silent first firing" });
+  }
   if (steps.some((s) => s.status === "ASKED")) {
     const needs = await sql(
       `select 1 from communication.notifications

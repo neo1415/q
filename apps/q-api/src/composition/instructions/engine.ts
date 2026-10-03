@@ -601,6 +601,31 @@ export function createInstructionEngine(
     );
   };
 
+  /** A NOTED step: what Q tells them about its own work, once a day per kind. */
+  const note = async (
+    row: InstructionRow,
+    kind: string,
+    words: string,
+    reasonCode: string,
+  ): Promise<void> => {
+    const day = now().toISOString().slice(0, 10);
+    await store
+      .recordStep({
+        instruction: row,
+        runKey: `note-${kind}-${day}`,
+        stepIndex: 0,
+        action: "q.note",
+        mode: "ASK",
+        status: "NOTED",
+        relationshipId: null,
+        words,
+        reasonCode,
+        qActionId: null,
+        idempotencyKey: `instr:${row.id}:note-${kind}:${day}`,
+      })
+      .catch(() => false);
+  };
+
   return {
     fire: async (instructionId, runKey) => {
       // A run key the steps table accepts, before anything acts.
@@ -616,8 +641,17 @@ export function createInstructionEngine(
       }
       const grant = InstructionGrantSchema.safeParse(row.grant_payload);
       if (!grant.success) return empty("NOT_ACTIVE");
-      // Q works in their working hours: no planning (and no spend) outside.
+      // Q works in their working hours: no planning (and no spend) outside,
+      // and it says so once a day on their work page (QA 2026-10-03: two
+      // approved instructions sat ACTIVE with nothing to show on a Saturday).
       if (!withinWorkingHours(at, grant.data.workingHours)) {
+        const hours = grant.data.workingHours;
+        await note(
+          row,
+          "hours",
+          `Waiting for your working hours (${dayRange(hours.days)} ${hours.start}-${hours.end}, ${hours.timeZone}) before I start.`,
+          "OUTSIDE_HOURS",
+        );
         return empty("OUTSIDE_HOURS");
       }
       const actor = await dependencies.actorFor(row);
@@ -743,6 +777,17 @@ export function createInstructionEngine(
           .slice(0, 3_000);
       }
       if (plan === null) return empty("PLANNER_UNAVAILABLE");
+      if (plan.steps.length === 0 && plan.cannot.length === 0) {
+        const covered = inScope(grant.data, people).length;
+        await note(
+          row,
+          "idle",
+          covered === 0
+            ? "Nothing to work on yet: no one is in reach of this instruction. I'll look again later."
+            : `Looked at ${String(covered)} ${covered === 1 ? "person" : "people"}: nothing to do right now. I'll look again later.`,
+          "NOTHING_TO_DO",
+        );
+      }
 
       let done = 0;
       let asked = 0;
@@ -1050,4 +1095,18 @@ export async function instructionPeople(
     candidate(item.companyId, item.name, "IN_FEED_NOT_CONTACTED");
   }
   return people;
+}
+
+const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** "Mon-Fri" for consecutive ISO days, else a list. */
+export function dayRange(days: readonly number[]): string {
+  const sorted = [...days].sort((a, b) => a - b);
+  const name = (day: number) => DAY_SHORT[day - 1] ?? "";
+  const consecutive = sorted.every(
+    (day, index) => index === 0 || day === (sorted[index - 1] ?? 0) + 1,
+  );
+  return consecutive && sorted.length > 2
+    ? `${name(sorted[0] ?? 1)}-${name(sorted[sorted.length - 1] ?? 1)}`
+    : sorted.map(name).join(", ");
 }

@@ -53,8 +53,10 @@ export type InstructionDigest = {
 /** The digest of the steps since the last one; null when nothing happened. */
 export function digestOf(
   goal: string,
-  steps: readonly InstructionStepRow[],
+  all: readonly InstructionStepRow[],
 ): InstructionDigest | null {
+  // What Q noted about its own work is on /work, not news.
+  const steps = all.filter((step) => step.status !== "NOTED");
   if (steps.length === 0) return null;
   const done = steps.filter((step) => step.status === "DONE");
   const asked = steps.filter((step) => step.status === "ASKED");

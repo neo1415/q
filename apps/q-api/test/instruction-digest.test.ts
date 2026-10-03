@@ -42,6 +42,9 @@ describe("the digest, from recorded steps only", () => {
     );
     expect(digest?.body.split("\n")).toHaveLength(4);
     expect(digestOf("x", [])).toBeNull();
+    expect(
+      digestOf("x", [step("NOTED", "Waiting for your working hours.")]),
+    ).toBeNull();
   });
 
   it("NEEDS_YOU only when something waits", () => {
