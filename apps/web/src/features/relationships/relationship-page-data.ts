@@ -8,6 +8,7 @@ import {
   getOwnInterest,
   getRelationshipWithCompany,
   getRelationshipWithInvestor,
+  listRelationshipMeetings,
   listCompanyRelationships,
   listIncomingInterest,
 } from "@capital-q/api-client";
@@ -16,6 +17,7 @@ import {
   type ChatThreadDto,
   type CompanyInterestStatusDto,
   type IncomingInterestDto,
+  type MeetingDto,
   type PitchSummaryDto,
   type RelationshipStatusDto,
 } from "@capital-q/contracts";
@@ -62,9 +64,28 @@ type Loaded<Extra> =
       readonly profile: CounterpartProfile;
       /** The first page of messages; null when not open or unreadable. */
       readonly thread: ChatThreadDto | null;
+      /** The relationship's calls (booked, past, cancelled); [] if none. */
+      readonly meetings: readonly MeetingDto[];
+      /** When this was read (request time), for past vs booked calls. */
+      readonly readAt: number;
       /** Said when nothing is on record that this side can see. */
       readonly absentSentence: string;
     } & Extra);
+
+async function meetingsFor(
+  session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
+  relationship: RelationshipStatusDto | null,
+): Promise<readonly MeetingDto[]> {
+  if (
+    relationship === null ||
+    !isMatchedRelationshipState(relationship.state)
+  ) {
+    return [];
+  }
+  return listRelationshipMeetings(session, relationship.relationshipId)
+    .then((list) => list.items)
+    .catch(() => []);
+}
 
 async function threadFor(
   session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
@@ -153,6 +174,8 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
             pitch: playable,
           },
     thread: await threadFor(session, relationship),
+    meetings: await meetingsFor(session, relationship),
+    readAt: Date.now(),
     profile: {
       ...NO_PROFILE,
       about: company.shortDescription ?? company.primaryDescription,
@@ -227,6 +250,8 @@ export async function loadCompanySideRelationship(
     pending:
       fromThisInvestor.find((item) => item.response === "PENDING") ?? null,
     thread: await threadFor(session, relationship),
+    meetings: await meetingsFor(session, relationship),
+    readAt: Date.now(),
     profile:
       investor === null
         ? NO_PROFILE

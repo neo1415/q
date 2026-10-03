@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import {
   isActiveMatchState,
@@ -19,6 +19,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { useDockAvoid } from "@/features/q-dock";
 import { QAperture } from "@/features/q-aperture/q-aperture";
 import { initials } from "@/features/investors/investor-labels";
 
@@ -286,6 +287,9 @@ function RelationshipCard({
   readonly unread: number;
 }) {
   const { askAbout } = useGlobalQ();
+  // The card's actions are never under the Q dock (ADR 0017 F1).
+  const actions = useRef<HTMLUListElement>(null);
+  useDockAvoid(actions);
   const href = relationshipHref(item);
   const name = item.counterpart.name;
   // The match outlives CONNECTED: the thread and calls stay open after it.
@@ -394,6 +398,7 @@ function RelationshipCard({
       )}
 
       <ul
+        ref={actions}
         className="grid grid-cols-2 gap-2 lg:grid-cols-4"
         aria-label="At a glance"
       >

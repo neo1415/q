@@ -57,6 +57,8 @@ export default async function CompanyRelationshipPage({
         relationship={relationship}
         profile={loaded.profile}
         thread={loaded.thread}
+        meetings={loaded.meetings}
+        readAt={loaded.readAt}
         basePath={`/relationships/investor/${investorOrganisationId}`}
         absentSentence={loaded.absentSentence}
         actions={
