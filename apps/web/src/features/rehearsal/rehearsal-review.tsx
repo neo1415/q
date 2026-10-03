@@ -85,8 +85,8 @@ export function RehearsalReview({
         <>
           {review.provisional === true ? (
             <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-              Q is still writing the full review; this page updates when it&rsquo;s
-              ready.
+              Q is still writing the full review; this page updates when
+              it&rsquo;s ready.
               <ReviewRefresh />
             </p>
           ) : null}
