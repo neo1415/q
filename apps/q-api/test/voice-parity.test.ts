@@ -16,7 +16,6 @@ import {
 
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
-import { createSpeechPerformanceBoard } from "../src/voice/speech-performance.js";
 import { createVoiceTurnHandler } from "../src/voice/turn.js";
 
 const CONTEXT: ActorContext = {
