@@ -483,7 +483,7 @@ function Tile({
     </>
   );
   const className =
-    "flex h-full min-h-16 w-full min-w-0 flex-col items-start justify-center gap-1 rounded-lg border border-(--cq-border-subtle) px-3 py-2 text-left";
+    "flex h-full min-h-14 w-full min-w-0 flex-col items-start justify-center gap-1 rounded-md px-2 py-2 text-left";
   const interactive =
     "hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
   if (href !== undefined) {

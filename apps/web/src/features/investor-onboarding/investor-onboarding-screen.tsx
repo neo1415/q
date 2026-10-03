@@ -114,6 +114,7 @@ export function InvestorOnboardingScreen({
       session.raw === undefined
         ? []
         : reviewLines(session.raw, INVESTOR_VOCABULARY, session.labels);
+    const { stated, unstated } = splitReview(review);
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-10">
         <header className="flex flex-col gap-2">
@@ -130,7 +131,7 @@ export function InvestorOnboardingScreen({
           </p>
         ) : (
           <div className="flex flex-col gap-6" data-mandate-review>
-            {review.map((group) => (
+            {stated.map((group) => (
               <section key={group.label} className="flex flex-col gap-2">
                 <h2 className="cq-label text-(--cq-text-secondary)">
                   {group.label}
@@ -145,13 +146,35 @@ export function InvestorOnboardingScreen({
                         {item.title}
                       </dt>
                       <dd className="cq-body-sm text-(--cq-text-primary)">
-                        {item.value ?? "Not stated"}
+                        {item.value}
                       </dd>
                     </div>
                   ))}
                 </dl>
               </section>
             ))}
+            {unstated.length === 0 ? null : (
+              // Unknown stays visible, one tap away: it is a valid state,
+              // not a gap to fill before anything works.
+              <details
+                className="group border-t border-(--cq-border-subtle) pt-3"
+                data-mandate-unstated
+              >
+                <summary className="cq-body-sm flex min-h-11 cursor-pointer items-center text-(--cq-text-secondary)">
+                  Not stated yet ({unstated.length})
+                </summary>
+                <ul className="flex flex-col gap-1 pt-2">
+                  {unstated.map((item) => (
+                    <li
+                      key={item.stepKey}
+                      className="cq-body-sm text-(--cq-text-secondary)"
+                    >
+                      {item.title}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
         )}
         <div className="flex flex-wrap gap-2">
@@ -327,4 +350,39 @@ export function InvestorOnboardingScreen({
       </div>
     </OnboardingShell>
   );
+}
+
+type ReviewGroup = ReturnType<typeof reviewLines>[number];
+type ReviewItem = ReviewGroup["items"][number];
+
+/**
+ * The review, readable (demo audit 2026-10-03: ~2,400 px of mostly "Not
+ * stated" on a phone). Stated answers stay in their groups; every unstated
+ * one is listed once, collapsed, at the end. A long free-text answer shown
+ * word for word under a second heading is shown once.
+ */
+export function splitReview(review: readonly ReviewGroup[]): {
+  readonly stated: readonly { label: string; items: readonly ReviewItem[] }[];
+  readonly unstated: readonly ReviewItem[];
+} {
+  const seenText = new Set<string>();
+  const unstated: ReviewItem[] = [];
+  const stated = review
+    .map((group) => ({
+      label: group.label,
+      items: group.items.filter((item) => {
+        const value = item.value;
+        if (value === null || value === undefined || value.trim() === "") {
+          unstated.push(item);
+          return false;
+        }
+        if (value.length > 40) {
+          if (seenText.has(value)) return false;
+          seenText.add(value);
+        }
+        return true;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
+  return { stated, unstated };
 }

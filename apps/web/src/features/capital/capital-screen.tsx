@@ -20,6 +20,7 @@ import { formatDay } from "@/components/date-format";
 
 import { AskQChips } from "./ask-q-chips";
 import { FundraisingPanel } from "./fundraising-panel";
+import { MandateSummary } from "./mandate-summary";
 import { ReadinessBlueprintEntry } from "./readiness-blueprint-entry";
 
 /**
@@ -143,60 +144,45 @@ export async function CapitalScreen() {
 
   return (
     <div className="flex flex-col gap-10">
-      <PageSection
-        id="objective"
-        title={context.kind === "INVESTOR" ? "Your mandate" : "Your raise"}
-      >
-        {objective !== null && objective !== undefined ? (
-          <ObjectivePanel objective={objective} />
-        ) : (
-          <QuietEmpty
-            sentence={
-              objective === undefined
-                ? "Your raise couldn't load. Try again in a moment."
-                : context.kind === "INVESTOR"
-                  ? "Your mandate stands in for an objective on this side of the table. Review it whenever it changes."
-                  : "No raise yet. Tell Q what you're raising and this page gathers around it."
-            }
-            action={
-              context.kind === "INVESTOR" ? (
-                <span className="flex flex-wrap gap-2">
-                  <Link
-                    href="/onboarding/investor?review=1"
-                    className={buttonClassName("secondary")}
-                  >
-                    Review my mandate
-                  </Link>
-                  <Link
-                    href="/discover/saved"
-                    className={buttonClassName("secondary")}
-                  >
-                    Saved companies
-                  </Link>
-                  <Link
-                    href="/gateway"
-                    className={buttonClassName("secondary")}
-                  >
-                    Your gateway
-                  </Link>
-                </span>
-              ) : objective === null ? (
-                <Link href="/home#q" className={buttonClassName("secondary")}>
-                  Tell Q your objective
-                </Link>
-              ) : undefined
-            }
+      {context.kind === "INVESTOR" ? (
+        <PageSection id="mandate" title="Your mandate">
+          <MandateSummary
+            investorOrganisationId={context.investorOrganisationId}
           />
-        )}
-        {fundraising === null ? null : (
-          <div className="pt-6">
-            <FundraisingPanel fundraising={fundraising} />
+          <div className="pt-4">
+            <AskQChips asks={asks} />
           </div>
-        )}
-        <div className="pt-4">
-          <AskQChips asks={asks} />
-        </div>
-      </PageSection>
+        </PageSection>
+      ) : (
+        <PageSection id="objective" title="Your raise">
+          {objective !== null && objective !== undefined ? (
+            <ObjectivePanel objective={objective} />
+          ) : (
+            <QuietEmpty
+              sentence={
+                objective === undefined
+                  ? "Your raise couldn't load. Try again in a moment."
+                  : "No raise yet. Tell Q what you're raising and this page gathers around it."
+              }
+              action={
+                objective === null ? (
+                  <Link href="/home#q" className={buttonClassName("secondary")}>
+                    Tell Q your objective
+                  </Link>
+                ) : undefined
+              }
+            />
+          )}
+          {fundraising === null ? null : (
+            <div className="pt-6">
+              <FundraisingPanel fundraising={fundraising} />
+            </div>
+          )}
+          <div className="pt-4">
+            <AskQChips asks={asks} />
+          </div>
+        </PageSection>
+      )}
 
       {/* BILLING-2 block (ADR 0036): the Pro layer's entry point, not built yet. */}
       {context.kind === "FOUNDER" ? <ReadinessBlueprintEntry /> : null}

@@ -18,7 +18,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Arrival (CQ-Q-VOICE-001 rework). A person Capital Q has onboarded goes
- * straight to Discover; anyone else meets Q, which onboards them first.
+ * straight to the Q page (Home); anyone else meets Q, which onboards them
+ * first.
  * `?again=1` lets anyone come back to it.
  */
 export default async function WelcomePage({
@@ -32,13 +33,14 @@ export default async function WelcomePage({
     redirect("/discover");
   }
   // Founder direction 2026-09-30: whoever has not finished onboarding goes
-  // straight back into it, with Q; whoever has is at home in Discover.
+  // straight back into it, with Q. Founder decision 2026-10-03 (demo
+  // audit): whoever has lands on the Q page, Home, for both roles.
   const state = await resolveOnboardingState();
   if (params["again"] !== "1") {
     if (state.kind === "UNFINISHED") {
       redirect(`/onboarding/${state.journey}?talk=1&from=home`);
     }
-    if (state.kind === "DONE") redirect("/discover");
+    if (state.kind === "DONE") redirect("/home");
   }
   let knownName: string | null = null;
   let knownOrganisation: string | null = null;

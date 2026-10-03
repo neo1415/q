@@ -111,9 +111,12 @@
       color-mix(in oklch, var(--cq-qcard-surface) 70%, var(--cq-surface-raised))
         100%
     );
-    box-shadow: 0 0 28px var(--cq-qcard-glow);
   }
+  /* No halo and no arc here: glow belongs to Q alone (ADR 0017 F2, ADR
+     0045; demo audit 2026-10-03). Kept as a rule so the shape is one edit
+     away if the founder wants a mark back. */
   .cq-glow-card::before {
+    display: none;
     content: "";
     position: absolute;
     z-index: -1;
@@ -1880,8 +1883,16 @@
     align-items: center;
     gap: 11px;
     color: var(--cq-splash-muted);
-    font-size: 10px;
-    letter-spacing: 0.15em;
+    font-size: 12px;
+  }
+  .cq-splash-skip {
+    position: absolute;
+    z-index: 3;
+    top: max(20px, env(safe-area-inset-top));
+    right: 20px;
+    margin: 0;
+    color: var(--cq-splash-muted);
+    font-size: 13px;
   }
   .cq-splash-foot i {
     height: 3px;

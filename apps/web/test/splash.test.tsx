@@ -96,6 +96,19 @@ describe("the splash", () => {
     window.removeEventListener(SPLASH_DONE_EVENT, done);
   });
 
+  it("hands over within 2 s of the Q forming, says it can be skipped, and shouts nothing", () => {
+    boot("/discover");
+    const { container } = render(<SplashOverlay />);
+    expect(container.textContent).toContain("Tap to skip");
+    // Sentence case: no all-caps words in the lockup (CLAUDE.md eyebrows).
+    expect(container.textContent).not.toMatch(/\b[A-Z]{3,}\b/);
+    act(() => {
+      complete?.();
+      vi.advanceTimersByTime(600);
+    });
+    expect(container.querySelector(".cq-splash")).toBeNull();
+  });
+
   it("is skipped at once by a key", () => {
     boot("/discover");
     const { container } = render(<SplashOverlay />);
