@@ -190,6 +190,8 @@ export const NotificationKindSchema = z.enum([
   // 2026-10-02: a pass, pause or resume, told to the other side.
   "RELATIONSHIP_OUTCOME",
   "DILIGENCE",
+  // Inbound email (20261130090000); 20261201090000 keeps it in the check.
+  "EMAIL_RECEIVED",
   // QA run 8a1d57b9: a new chat message, one notice per conversation.
   "CHAT_MESSAGE",
 ]);
