@@ -24,9 +24,12 @@ const KINDS = {
  */
 export function ScheduleDialog({
   kind,
+  primary = false,
   children,
 }: {
   readonly kind: keyof typeof KINDS;
+  /** The page's one next step (Book a call once connected, P0-6). */
+  readonly primary?: boolean;
   readonly children: ReactNode;
 }) {
   const { hash, title, Icon } = KINDS[kind];
@@ -50,7 +53,10 @@ export function ScheduleDialog({
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogTrigger>
-        <button type="button" className={buttonClassName("secondary")}>
+        <button
+          type="button"
+          className={buttonClassName(primary ? "primary" : "secondary")}
+        >
           <Icon size={ICON_SIZE.regular} aria-hidden="true" />
           {title}
         </button>

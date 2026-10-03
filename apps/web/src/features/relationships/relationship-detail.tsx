@@ -5,6 +5,7 @@ import {
   isActiveMatchState,
   isMatchedRelationshipState,
   type ChatThreadDto,
+  type MeetingDto,
   type RelationshipStatusDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -61,6 +62,8 @@ export function RelationshipDetail({
   askQ = true,
   profile,
   thread = null,
+  meetings = [],
+  readAt,
   basePath,
   media = null,
 }: {
@@ -76,6 +79,10 @@ export function RelationshipDetail({
   readonly profile: CounterpartProfile;
   /** The first page of messages, when the chat is open. */
   readonly thread?: ChatThreadDto | null | undefined;
+  /** The relationship's calls, shown in What happened. */
+  readonly meetings?: readonly MeetingDto[] | undefined;
+  /** When the page was read, for past vs booked calls. */
+  readonly readAt: number;
   /** This relationship's own page, e.g. /relationships/company/{id}. */
   readonly basePath: string;
   /** The counterpart's pitch, when this side may play it. */
@@ -135,6 +142,8 @@ export function RelationshipDetail({
             <Card title="What happened" id="history">
               <RelationshipTimeline
                 milestones={relationship.milestones}
+                meetings={meetings}
+                now={readAt}
                 side={side}
                 counterpart={counterpart}
               />
@@ -156,12 +165,20 @@ export function RelationshipDetail({
           <Card title="Next" id="next">
             <DockAvoidZone className="flex flex-col items-stretch gap-2">
               {actions}
+              {connected && relationship !== null ? (
+                <ScheduleDialog kind="call" primary={actions === null}>
+                  <RelationshipSchedule
+                    relationshipId={relationship.relationshipId}
+                    counterpart={counterpart}
+                    connected={connected}
+                    focus="call"
+                  />
+                </ScheduleDialog>
+              ) : null}
               {connected ? (
                 <Link
                   href={`${basePath}/messages`}
-                  className={buttonClassName(
-                    actions === null ? "primary" : "secondary",
-                  )}
+                  className={buttonClassName("secondary")}
                 >
                   <MessageSquare size={ICON_SIZE.regular} aria-hidden="true" />
                   Send a message
@@ -174,16 +191,6 @@ export function RelationshipDetail({
                     counterpart={counterpart}
                     connected={connected}
                   />
-                  {connected ? (
-                    <ScheduleDialog kind="call">
-                      <RelationshipSchedule
-                        relationshipId={relationship.relationshipId}
-                        counterpart={counterpart}
-                        connected={connected}
-                        focus="call"
-                      />
-                    </ScheduleDialog>
-                  ) : null}
                   <ScheduleDialog kind="reminder">
                     <RelationshipSchedule
                       relationshipId={relationship.relationshipId}

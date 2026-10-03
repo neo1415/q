@@ -327,6 +327,57 @@ describe("RelationshipTimeline", () => {
   });
 });
 
+describe("RelationshipTimeline: calls", () => {
+  const meeting = (
+    id: string,
+    startsAt: string,
+    status: "SCHEDULED" | "CANCELLED" | "SCHEDULING",
+  ) => ({
+    id,
+    relationshipId: "33333333-0000-4000-8000-000000000009",
+    purpose: "First call",
+    startsAt,
+    endsAt: new Date(Date.parse(startsAt) + 30 * 60_000).toISOString(),
+    timeZone: "Africa/Lagos",
+    status,
+    organisedByYou: true,
+    organiserName: "Amara",
+    meetLink: null,
+    attendees: [],
+    hasBrief: false,
+  });
+
+  it("places calls among the milestones, in words that claim only what the calendar knows", () => {
+    render(
+      <RelationshipTimeline
+        milestones={[
+          { state: "CONNECTED", at: "2026-09-27T09:00:00.000Z" },
+          { state: "IN_DILIGENCE", at: "2026-10-03T09:00:00.000Z" },
+        ]}
+        meetings={[
+          meeting("a1", "2026-09-30T10:00:00.000Z", "SCHEDULED"),
+          meeting("a2", "2026-10-10T10:00:00.000Z", "SCHEDULED"),
+          meeting("a3", "2026-09-29T10:00:00.000Z", "CANCELLED"),
+          meeting("a4", "2026-09-29T11:00:00.000Z", "SCHEDULING"),
+        ]}
+        side="INVESTOR"
+        counterpart="Harbour Labs"
+        now={Date.parse("2026-10-03T12:00:00.000Z")}
+      />,
+    );
+    const entries = within(
+      screen.getByRole("list", { name: "What happened" }),
+    ).getAllByRole("listitem");
+    const text = entries.map((entry) => entry.textContent ?? "");
+    expect(entries).toHaveLength(5);
+    expect(text[0]).toContain("Both sides agreed to connect.");
+    expect(text[1]).toContain("was cancelled");
+    expect(text[2]).toContain("Call with Harbour Labs on 30 Sept 2026");
+    expect(text[2]).not.toContain("held");
+    expect(text[4]).toContain("booked for 10 Oct 2026");
+  });
+});
+
 describe("relationship actions", () => {
   it("re-reads the page only after the server confirms an interest", async () => {
     const interest: InterestDto = {
