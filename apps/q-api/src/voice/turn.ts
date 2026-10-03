@@ -948,6 +948,8 @@ export function createVoiceTurnHandler(
     /** The answer has been handed to the speaker, streamed or whole. */
     let answerGiven = false;
     let spokenCharacters = 0;
+    /** The streamed sentences as written, to know what is still unsaid. */
+    let streamedRaw = "";
     let laughed = false;
     let proposedSummary: string | null = null;
     const record = await qStream.authorize(actor, runId, correlationId);
@@ -981,6 +983,7 @@ export function createVoiceTurnHandler(
               break;
             }
             streamedDeltas = true;
+            streamedRaw += `${event.data.text} `;
             spokenCharacters += spoken.length + 1;
             // Cue before the sentence is handed over, so the relay finds
             // it when the provider asks to hear this sentence.
@@ -1045,6 +1048,21 @@ export function createVoiceTurnHandler(
             if (!streamedDeltas && text !== undefined) {
               answerGiven = true;
               yield bounded(speakable(text));
+            } else if (text !== undefined) {
+              // The stream carries every sentence but the last, which only
+              // the completed message holds, and code's own closing lines
+              // (the could-not line, what was done, a status) are only
+              // there too: what the person has not heard yet is said now,
+              // as a reader reads it (voice parity, lead 2026-10-03).
+              const rest = speakable(
+                unsaidPartOf({ text, spoken: streamedRaw }),
+              );
+              const room = SPOKEN_MAX_CHARS - spokenCharacters;
+              if (rest.length > 0 && room > 0) {
+                answerGiven = true;
+                spokenCharacters += rest.length + 1;
+                yield bounded(rest, Math.max(room, 1));
+              }
             }
             break;
           }

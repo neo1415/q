@@ -224,6 +224,21 @@ describe("an answer that arrives as it is written", () => {
     }
   });
 
+  it("streams code's lead lines first, and never the model's repeat of them (voice parity, lead 2026-10-03)", async () => {
+    const lead =
+      "Investors can't find your company in Discover yet. What to do next, most important first:\n1. Make the company visible to investors.\n2. Upload a pitch deck.";
+    const { seam, request, published } = build(
+      "1. Make the company visible to investors. 2. Upload a pitch deck. Start with visibility today. I can do it now.",
+    );
+    await seam.answer({ ...request, leadLines: lead } as QAnswerRequest);
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Investors can't find your company in Discover yet. What to do next, most important first:",
+      "1. Make the company visible to investors.",
+      "2. Upload a pitch deck.",
+      "Start with visibility today.",
+    ]);
+  });
+
   it("leaves the last sentence to the completed message, which is the durable form", async () => {
     // The final fragment is the one thing that cannot be known to be
     // whole while text is still arriving, so it is never guessed at.

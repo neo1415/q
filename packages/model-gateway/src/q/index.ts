@@ -2264,9 +2264,29 @@ export function createModelGatewayQAnswer(
        * it is released the moment the answer goes on.
        */
       let heldPromise: string | null = null;
+      /** Code's lead list was the last thing said (see publish below). */
+      let leadListOpen = request.leadLines !== undefined;
       /** When the person got the first sentence, from the seam's start. */
       let firstPublishedMs: number | null = null;
       const publish = (text: string): void => {
+        // Code's opening lines come first on every surface that listens to
+        // the stream (voice parity, lead 2026-10-03: a spoken "what should
+        // I do next?" heard the model's words and never the readiness
+        // lines the stored answer opens with).
+        if (firstPublishedMs === null && request.leadLines !== undefined) {
+          firstPublishedMs = Date.now() - startedAt;
+          for (const line of request.leadLines.split("\n")) {
+            const said = line.trim();
+            if (said.length === 0) continue;
+            streamedText += `${said} `;
+            deltas?.publish({
+              runId: request.runId,
+              tenantId: request.tenantId,
+              messageId,
+              text: `${said} `,
+            });
+          }
+        }
         firstPublishedMs ??= Date.now() - startedAt;
         streamedText += `${text} `;
         deltas?.publish({
@@ -2298,15 +2318,26 @@ export function createModelGatewayQAnswer(
           if (guarded === null || guarded.length === 0) {
             continue;
           }
+          // While code's lead list is what was last said, a sentence of
+          // the model's that only repeats one of its items is not said
+          // again (lead 2026-10-03; the stored answer drops it the same
+          // way, afterLeadLines).
+          let said = guarded;
+          if (leadListOpen && request.leadLines !== undefined) {
+            said = afterLeadLines(guarded, request.leadLines).trim();
+            // A bare item number cut off as its own sentence ("1.").
+            if (said.length === 0 || /^\d+[.)]$/u.test(said)) continue;
+            leadListOpen = false;
+          }
           if (heldPromise !== null) {
             publish(heldPromise);
             heldPromise = null;
           }
-          if (isEmptyPromise(guarded)) {
-            heldPromise = guarded;
+          if (isEmptyPromise(said)) {
+            heldPromise = said;
             continue;
           }
-          publish(guarded);
+          publish(said);
         }
       };
 
