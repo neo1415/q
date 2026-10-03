@@ -796,9 +796,10 @@ async function executeRouting(
   }
   const before = snapshot(world);
   const person = world.people.FOUNDER;
-  // Groq's reviewed ceiling is CONFIDENTIAL (groq.v1 zero-retention review,
-  // migration 20260914090000), so the request no configured provider may
-  // serve is HIGHLY_CONFIDENTIAL; INTERNAL still has exactly one route.
+  // The reviewed ceiling is CONFIDENTIAL (gpt-5.6-luna, 20261006100000; the
+  // routing policies name no other reviewed model since 20261008120000), so
+  // the request no configured provider may serve is HIGHLY_CONFIDENTIAL;
+  // INTERNAL still has exactly one route.
   const sensitivity =
     execution.scenario === "INELIGIBLE_PROVIDER_EXCLUDED"
       ? "HIGHLY_CONFIDENTIAL"

@@ -20,8 +20,10 @@ import {
  * The Q Daily against PostgreSQL (migration 20261114000000): each person's
  * topics come from their own organisation's records only; due readers are
  * claimed once; editions are read back by their owner only. Editions are
- * history, so this suite leaves its rows: run it against a scratch or
- * local database (CQ_TEST_DATABASE_URL).
+ * history, so the guard refuses their deletion; the cleanup disables it
+ * for this suite's own rows only, as the ledger suites do. Left behind,
+ * the rows broke other suites' whole-table assertions (taxonomy's
+ * "a denied accept writes no assignment" counted this company's).
  */
 
 const TEST_DATABASE_URL =
@@ -94,6 +96,40 @@ describe("@capital-q/q-daily against PostgreSQL", () => {
   });
 
   afterAll(async () => {
+    const tenants = [ids.tenantCo, ids.tenantInv];
+    await db.transactions.run(async (tx) => {
+      const sql = tx.sql;
+      const editions = await sql<{ cluster_issue_id: string | null }[]>`
+        select cluster_issue_id from q_runtime.daily_editions where tenant_id = any(${tenants}::uuid[])`;
+      await sql`alter table q_runtime.daily_editions disable trigger daily_editions_guard`;
+      await sql`delete from q_runtime.daily_editions where tenant_id = any(${tenants}::uuid[])`;
+      await sql`alter table q_runtime.daily_editions enable trigger daily_editions_guard`;
+      const issues = editions
+        .map((e) => e.cluster_issue_id)
+        .filter((id): id is string => id !== null);
+      // A cluster issue is shared by key and date; drop it only if no
+      // other edition points at it.
+      await sql`delete from q_runtime.daily_cluster_issues c
+        where c.id = any(${issues}::uuid[])
+          and not exists (select 1 from q_runtime.daily_editions e where e.cluster_issue_id = c.id)`;
+      await sql`delete from q_runtime.daily_preferences where tenant_id = any(${tenants}::uuid[])`;
+      await sql`delete from network.relationship_events where relationship_id in (select id from network.relationships where company_id = ${ids.company})`;
+      await sql`delete from network.relationships where company_id = ${ids.company}`;
+      await sql`delete from core.investor_mandate_constraints where mandate_id = ${ids.mandate}`;
+      await sql`delete from core.investor_mandates where id = ${ids.mandate}`;
+      await sql`delete from core.investor_organisations where id = ${ids.investor}`;
+      await sql`delete from core.capital_objectives where company_id = ${ids.company}`;
+      await sql`delete from taxonomy.entity_assignments where entity_id = ${ids.company}`;
+      await sql`delete from core.companies where id = ${ids.company}`;
+      await sql`delete from identity.organisation_memberships where tenant_id = any(${tenants}::uuid[])`;
+      await sql`delete from identity.tenant_organisations where tenant_id = any(${tenants}::uuid[])`;
+      await sql`delete from identity.organisations where tenant_id = any(${tenants}::uuid[])`;
+      const auth = await sql<{ auth_user_id: string }[]>`
+        select auth_user_id from identity.user_profiles where id = any(${users}::uuid[])`;
+      await sql`delete from identity.user_profiles where id = any(${users}::uuid[])`;
+      await sql`delete from auth.users where id = any(${auth.map((a) => a.auth_user_id)}::uuid[])`;
+      await sql`delete from identity.tenants where id = any(${tenants}::uuid[])`;
+    });
     await db.close();
   });
 

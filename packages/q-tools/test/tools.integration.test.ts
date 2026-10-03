@@ -429,10 +429,11 @@ describe("@capital-q/q-tools against local PostgreSQL", () => {
       ]);
       const ctx = context(w.founder, plan);
       const offered = await w.tools.offer(ctx);
+      // R33 order: fewer declared purposes first, then id.
       expect(offered.map((t) => t.definition.name)).toEqual([
-        "get_capital_objective",
         "get_company",
         "search_companies",
+        "get_capital_objective",
       ]);
 
       const company = await w.tools.execute(
@@ -503,10 +504,16 @@ describe("@capital-q/q-tools against local PostgreSQL", () => {
       ]);
       const ctx = context(w.apexAdmin, plan);
       const offered = await w.tools.offer(ctx);
+      // R35 (600c6e46): get_capital_objective is offered under the
+      // actor-wide network scope, exactly as get_company is, so an investor
+      // can read a raise a company shared with them. Being offered grants
+      // nothing: the tool authorises every call (company visibility, then
+      // the disclosure engine on the objective), asserted below.
       expect(offered.map((t) => t.definition.name)).toEqual([
+        "get_investor_mandate",
         "get_company",
         "search_companies",
-        "get_investor_mandate",
+        "get_capital_objective",
       ]);
 
       const company = await w.tools.execute(
@@ -539,8 +546,12 @@ describe("@capital-q/q-tools against local PostgreSQL", () => {
         },
         ctx,
       );
-      // Not even offered: no capital scope in an investor's own-organisation plan.
-      expect(objective.failureCode).toBe("TOOL_NOT_ELIGIBLE");
+      // Offered, but Alpha is neither bound in this plan nor visible to Apex:
+      // the answer is the same NOT_AVAILABLE as for a company that does not
+      // exist, so the private raise's existence never leaks.
+      expect(objective.status).toBe("DENIED");
+      expect(objective.failureCode).toBe("NOT_AVAILABLE");
+      expect(objective.result).toEqual(company.result);
 
       const text = JSON.stringify([company, hidden, objective]);
       expect(text).not.toContain(MARKERS.founder);

@@ -146,6 +146,10 @@ export function createEntitlementService(options: EntitlementServiceOptions) {
   const now = options.now ?? (() => new Date());
 
   async function planOf(accountKey: string, at: Date): Promise<PlanRow> {
+    // starts_at defaults to clock_timestamp() (microseconds) while `at` is
+    // a JS Date (milliseconds): untruncated, a plan assigned within the
+    // same millisecond as the check (…244185 vs …244) is not yet in force
+    // and the old plan answers.
     const assigned = await sql<PlanRow[]>`
       select p.id, p.key, p.version, p.name, p.description, p.audience,
              a.source, a.ends_at
@@ -153,7 +157,7 @@ export function createEntitlementService(options: EntitlementServiceOptions) {
         join billing.plans p on p.id = a.plan_id
        where a.account_key = ${accountKey}
          and a.superseded_at is null
-         and a.starts_at <= ${at}
+         and date_trunc('milliseconds', a.starts_at) <= ${at}
          and (a.ends_at is null or a.ends_at > ${at})`;
     const row = assigned[0];
     if (row !== undefined) return row;

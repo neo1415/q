@@ -647,8 +647,10 @@ export async function createQEvalWorld(
   const providers: ModelProvider[] = [];
   if (options.providerMode === "FAKE") {
     // The scripted model registers under the real catalogue codes so
-    // routing, eligibility, prices and the usage ledger all apply.
-    for (const code of ["google", "groq"] as const) {
+    // routing, eligibility, prices and the usage ledger all apply. OpenAI
+    // is every policy's primary since 20261008130000 (Groq left every
+    // policy in 20261008120000), so without it no INTERNAL route exists.
+    for (const code of ["google", "groq", "openai"] as const) {
       const provider = scriptedProvider(code);
       scripted.set(code, provider);
       providers.push(recordingProvider(provider, recorded));

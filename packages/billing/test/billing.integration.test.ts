@@ -227,6 +227,32 @@ describe("@capital-q/billing against local Postgres", () => {
     });
   });
 
+  it("a plan is in force from the millisecond it was assigned, though starts_at holds microseconds", async () => {
+    await scenario(async (w, tx) => {
+      const clock = { at: new Date() };
+      const { entitlements, accounts } = services(tx, clock);
+      await accounts.assignPlan({
+        organisationId: w.orgA,
+        planKey: "free",
+        endsAt: null,
+        byUserId: w.admin,
+        reason: "Fixture: free plan",
+      });
+      const [row] = await tx.sql<{ starts_at: Date }[]>`
+        select starts_at from billing.plan_assignments
+         where account_key = ${`o:${w.orgA}`} and superseded_at is null`;
+      if (row === undefined) throw new Error("assignment missing");
+      // The JS Date truncates starts_at to its millisecond: a check made in
+      // that same millisecond must already see the new plan.
+      clock.at = row.starts_at;
+      const summary = await entitlements.summary({
+        organisationId: w.orgA,
+        userId: w.member,
+      });
+      expect(summary.plan.key).toBe("free");
+    });
+  });
+
   it("consume is idempotent per key, refuses past the limit, and a void gives the unit back", async () => {
     await scenario(async (w, tx) => {
       const { entitlements, accounts } = services(tx);

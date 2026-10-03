@@ -61,16 +61,25 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     await db.close();
   });
 
-  it("loads the seeded catalog: two providers, five models, versioned prices, seven policies", async () => {
+  it("loads the seeded catalog: three providers, nine models, versioned prices, seven policies", async () => {
     const snapshot = await loadModelCatalogSnapshot(db.sql, new Date());
     const catalog = indexCatalog(snapshot);
     expect(snapshot.providers.map((p) => p.code).sort()).toEqual([
       "google",
       "groq",
+      // 20261006090000: added as a diagnostic provider; reviewed for
+      // dialogue in 20261006100000.
+      "openai",
     ]);
+    // gemini-3.5-flash (20261008120000) and the two image models
+    // (20261113010000) joined the original five.
     expect(snapshot.models.map((m) => m.modelCode).sort()).toEqual([
+      "gemini-2.5-flash-image",
+      "gemini-3.5-flash",
       "gemini-3.5-flash-lite",
       "gemini-3.8-flash",
+      "gpt-5.6-luna",
+      "gpt-image-1",
       "openai/gpt-oss-120b",
       "openai/gpt-oss-20b",
       "qwen/qwen3.8-27b",
@@ -118,9 +127,19 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
         },
       ],
     });
+    const openai = createFakeModelProvider({
+      code: "openai",
+      script: [
+        {
+          kind: "TEXT",
+          text: "synthetic openai answer",
+          usage: { inputTokens: 40, cachedInputTokens: 0, outputTokens: 12 },
+        },
+      ],
+    });
     const gateway = createModelGateway({
       catalog: createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 }),
-      registry: createModelProviderRegistry([google, groq]),
+      registry: createModelProviderRegistry([google, groq, openai]),
       usage: createPostgresModelUsageRepository({ sql: db.sql }),
     });
     const runId = randomUUID();
@@ -152,14 +171,16 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(light.routingPolicyCode).toBe("fast_classification.v1");
     expect(light.cost.basis).toBe("PRICE_SNAPSHOT");
 
-    // INTERNAL: unverified gemini is excluded before any call; groq serves.
+    // INTERNAL: unverified gemini is excluded before any call; the reviewed
+    // fallback serves. Since 20261008120000 Groq is in no routing policy and
+    // gpt-5.6-luna (reviewed, CONFIDENTIAL ceiling) is the fallback here.
     const internal = await gateway.execute({
       ...base,
       taskClass: "FAST_CLASSIFICATION",
       sensitivity: "INTERNAL",
     });
-    expect(internal.providerCode).toBe("groq");
-    expect(internal.modelCode).toBe("openai/gpt-oss-20b");
+    expect(internal.providerCode).toBe("openai");
+    expect(internal.modelCode).toBe("gpt-5.6-luna");
     // Not a fallback: nothing eligible was tried before it. The first
     // candidate was refused on privacy, not on availability.
     expect(internal.fallbackUsed).toBe(false);
@@ -171,7 +192,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(google.calls).toHaveLength(1);
 
     // CONFIDENTIAL now routes, and only to the provider whose reviewed
-    // terms justify it: Groq under zero data retention (CQ-C5-R2A). Gemini
+    // terms justify it: OpenAI under zero data retention (20261006100000). Gemini
     // stays unreviewed and public-only, so it must not be the one that
     // answers.
     await gateway.execute({
@@ -180,7 +201,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       sensitivity: "CONFIDENTIAL",
     });
     expect(google.calls).toHaveLength(1);
-    expect(groq.calls).toHaveLength(2);
+    expect(openai.calls).toHaveLength(2);
 
     // NETWORK_VISIBLE is above PUBLIC: the unreviewed provider is refused
     // before any call and the reviewed one serves, exactly as for INTERNAL.
@@ -189,13 +210,14 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       taskClass: "FAST_CLASSIFICATION",
       sensitivity: "NETWORK_VISIBLE",
     });
-    expect(network.providerCode).toBe("groq");
+    expect(network.providerCode).toBe("openai");
     expect(network.route.candidates[0]).toMatchObject({
       providerCode: "google",
       reason: "SENSITIVITY_EXCEEDS_CEILING",
     });
     expect(google.calls).toHaveLength(1);
-    expect(groq.calls).toHaveLength(3);
+    expect(openai.calls).toHaveLength(3);
+    expect(groq.calls).toHaveLength(0);
 
     // HIGHLY_CONFIDENTIAL: no reviewed class reaches it (CQ-C5-R2A), so the
     // request is refused before any provider attempt.
@@ -211,7 +233,8 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     }
     expect(above?.failureClass).toBe("POLICY_INELIGIBLE");
     expect(google.calls).toHaveLength(1);
-    expect(groq.calls).toHaveLength(3);
+    expect(openai.calls).toHaveLength(3);
+    expect(groq.calls).toHaveLength(0);
 
     // RESTRICTED: nothing seeded is cleared for it, and no token is sent
     // anywhere. Approving a vendor for confidential work is not approving
@@ -228,7 +251,8 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     }
     expect(denied?.failureClass).toBe("POLICY_INELIGIBLE");
     expect(google.calls).toHaveLength(1);
-    expect(groq.calls).toHaveLength(3);
+    expect(openai.calls).toHaveLength(3);
+    expect(groq.calls).toHaveLength(0);
 
     const rows = await db.sql<
       {
@@ -243,16 +267,16 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
         from ai_ops.model_usage u join ai_ops.models m on m.id = u.model_id
        where u.q_run_id = ${runId} order by u.id`;
     // Four ledger rows now: the public run, the INTERNAL run, the
-    // CONFIDENTIAL run that Groq's reviewed zero-retention terms admit, and
-    // the NETWORK_VISIBLE classification Groq carried because Gemini's
+    // CONFIDENTIAL run that OpenAI's reviewed zero-retention terms admit, and
+    // the NETWORK_VISIBLE classification OpenAI carried because Gemini's
     // reviewed ceiling stops at PUBLIC. The RESTRICTED and HIGHLY_CONFIDENTIAL
     // attempts are refused before a provider is contacted, so they leave no
     // row — a refusal costs nothing and is not an execution.
     expect(rows.map((r) => [r.model_code, r.success, r.cost_basis])).toEqual([
       ["gemini-3.5-flash-lite", true, "PRICE_SNAPSHOT"],
-      ["openai/gpt-oss-20b", true, "PRICE_SNAPSHOT"],
-      ["openai/gpt-oss-120b", true, "PRICE_SNAPSHOT"],
-      ["openai/gpt-oss-20b", true, "PRICE_SNAPSHOT"],
+      ["gpt-5.6-luna", true, "PRICE_SNAPSHOT"],
+      ["gpt-5.6-luna", true, "PRICE_SNAPSHOT"],
+      ["gpt-5.6-luna", true, "PRICE_SNAPSHOT"],
     ]);
     expect(Number(rows[0]?.cost_usd)).toBeGreaterThan(0);
     // 40 in × 0.30 + 10 out × 2.50, per million.

@@ -501,7 +501,8 @@ describe("@capital-q/taxonomy classification against local PostgreSQL", () => {
         classifierProvider: "capital_q",
         classifierModel: "deterministic_lexical",
         classifierVersion: "taxonomy-lexical-v1",
-        taxonomyVersion: { geography: 1, industry: 1, product_category: 1 },
+        // geography v2 since 20261008100000 (more of Africa).
+        taxonomyVersion: { geography: 2, industry: 1, product_category: 1 },
         status: "COMPLETED",
         costUsd: "0.000000",
       });

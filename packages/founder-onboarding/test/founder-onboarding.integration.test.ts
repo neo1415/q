@@ -385,9 +385,9 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       const journey = await startFounder(world, newcomer);
       expect(journey.view().session.subject).toBeNull();
       expect(journey.view().currentStep?.stepKey).toBe(FOUNDER_STEPS.intent);
-      // v2 is the published journey (CQ-Q-021): F2 gathers documents
-      // rather than declaring which ones exist.
-      expect(journey.view().session.definitionVersion).toBe(2);
+      // v3 is the published journey (20261110010000): v2 (CQ-Q-021, F2
+      // gathers documents) plus two F5.signal options.
+      expect(journey.view().session.definitionVersion).toBe(3);
 
       await journey.submit(FOUNDER_STEPS.intent, single("raising_now"));
       expect(journey.view().currentStep?.stepKey).toBe(

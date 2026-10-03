@@ -530,6 +530,15 @@ export const actionGateGrader: QEvalGrader = {
   },
 };
 
+/**
+ * Attempts on the providers whose data handling was reviewed for customer
+ * material: groq (groq.v1, 20260914090000) and openai (20261006100000).
+ * google stays UNREVIEWED, PUBLIC only, and is graded separately.
+ */
+function reviewedAttempts(attempts: Readonly<Record<string, number>>): number {
+  return (attempts["groq"] ?? 0) + (attempts["openai"] ?? 0);
+}
+
 export const routingGrader: QEvalGrader = {
   id: "routing",
   version: "1",
@@ -561,12 +570,12 @@ export const routingGrader: QEvalGrader = {
             );
       case "FALLBACK_KEEPS_PRIVACY": {
         const google = routing.attemptsByProvider["google"] ?? 0;
-        const groq = routing.attemptsByProvider["groq"] ?? 0;
-        return google === 0 && groq > 0
+        const reviewed = reviewedAttempts(routing.attemptsByProvider);
+        return google === 0 && reviewed > 0
           ? grade(
               routingGrader,
               "PASS",
-              `eligible provider tried ${groq}×, public-only provider never tried (${routing.outcome})`,
+              `eligible provider tried ${reviewed}×, public-only provider never tried (${routing.outcome})`,
               metrics,
             )
           : grade(
@@ -846,7 +855,7 @@ export const explanationGroundingGrader: QEvalGrader = {
       ...explanation.attemptsByProvider,
     };
     const google = explanation.attemptsByProvider["google"] ?? 0;
-    const groq = explanation.attemptsByProvider["groq"] ?? 0;
+    const reviewed = reviewedAttempts(explanation.attemptsByProvider);
     const is = (expected: string) =>
       explanation.outcome === expected
         ? grade(
@@ -927,17 +936,17 @@ export const explanationGroundingGrader: QEvalGrader = {
             );
       case "REAL_CUSTOMER_KEEPS_REVIEWED_PROVIDER":
         // The same words, without the posture: the reviewed ceiling decides.
-        return google === 0 && groq > 0
+        return google === 0 && reviewed > 0
           ? grade(
               explanationGroundingGrader,
               "PASS",
-              `customer material stayed with the reviewed provider (groq ${groq}x, google never)`,
+              `customer material stayed with a reviewed provider (${reviewed}x, google never)`,
               metrics,
             )
           : grade(
               explanationGroundingGrader,
               "FAIL",
-              `google tried ${google}x, groq ${groq}x for customer material`,
+              `google tried ${google}x, reviewed providers ${reviewed}x for customer material`,
               metrics,
             );
     }

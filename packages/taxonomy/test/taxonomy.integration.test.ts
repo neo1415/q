@@ -357,7 +357,8 @@ describe("@capital-q/taxonomy against local PostgreSQL", () => {
         business_model: 1,
         company_stage: 1,
         customer_type: 1,
-        geography: 1,
+        // 20261008100000 grew geography to v2 (more of Africa).
+        geography: 2,
         impact_theme: 1,
         industry: 1,
         product_category: 1,
