@@ -282,6 +282,49 @@ describe("RelationshipTimeline", () => {
     );
     expect(times).toEqual(milestones.map((milestone) => milestone.at));
   });
+
+  it("shows a same-day back-and-forth once, with how many times it happened", () => {
+    const messy: RelationshipStatusDto["milestones"] = [
+      { state: "CONNECTED", at: "2026-09-27T09:00:00.000Z" },
+      ...[1, 2, 3, 4].flatMap((n) => [
+        { state: "PASSED" as const, at: `2026-10-03T0${n}:00:00.000Z` },
+        { state: "CONNECTED" as const, at: `2026-10-03T0${n}:30:00.000Z` },
+      ]),
+    ];
+    render(
+      <RelationshipTimeline
+        milestones={messy}
+        side="INVESTOR"
+        counterpart="Harbour Labs"
+      />,
+    );
+    const entries = within(
+      screen.getByRole("list", { name: "What happened" }),
+    ).getAllByRole("listitem");
+    expect(entries).toHaveLength(2);
+    expect(entries[1]?.textContent).toContain(
+      "Then: Both sides agreed to connect.",
+    );
+    expect(entries[1]?.textContent).toContain("happened 4 times that day");
+  });
+
+  it("does not merge the same step on different days", () => {
+    render(
+      <RelationshipTimeline
+        milestones={[
+          { state: "CONNECTED", at: "2026-09-27T09:00:00.000Z" },
+          { state: "CONNECTED", at: "2026-09-29T09:00:00.000Z" },
+        ]}
+        side="INVESTOR"
+        counterpart="Harbour Labs"
+      />,
+    );
+    expect(
+      within(screen.getByRole("list", { name: "What happened" })).getAllByRole(
+        "listitem",
+      ),
+    ).toHaveLength(2);
+  });
 });
 
 describe("relationship actions", () => {

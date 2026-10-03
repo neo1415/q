@@ -4,7 +4,9 @@ import Link from "next/link";
 import {
   discoverInvestors,
   listConnectionRequests,
+  listInvestorRelationships,
 } from "@capital-q/api-client";
+import { isMatchedRelationshipState } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -35,7 +37,21 @@ export default async function InvestorsPage({
   const session = await apiSession();
 
   if (context.kind === "INVESTOR" && session !== null) {
-    const inbox = await listConnectionRequests(session).catch(() => null);
+    const [inbox, relationships] = await Promise.all([
+      listConnectionRequests(session).catch(() => null),
+      // Only used to tell a request already overtaken by a match; when it
+      // can't load, every pending request stays answerable, as before.
+      listInvestorRelationships(session).catch(() => null),
+    ]);
+    const matchedCompanyIds = new Set(
+      (relationships?.items ?? [])
+        .filter(
+          (item) =>
+            item.counterpart.kind === "COMPANY" &&
+            isMatchedRelationshipState(item.state),
+        )
+        .map((item) => item.counterpart.id),
+    );
     return (
       <PageContainer>
         <PageHeader
@@ -53,7 +69,10 @@ export default async function InvestorsPage({
             }
           />
         ) : (
-          <ConnectionRequestsInbox items={inbox.items} />
+          <ConnectionRequestsInbox
+            items={inbox.items}
+            matchedCompanyIds={matchedCompanyIds}
+          />
         )}
         <p className="cq-body-sm text-(--cq-text-secondary)">
           Who can send you a request follows the choice you set in{" "}
