@@ -9,6 +9,7 @@ import {
 import { EmptyState, ErrorState } from "@capital-q/ui/states";
 
 import { adminContext } from "@/features/admin/admin-context";
+import { QueueKeys } from "@/features/admin/queue-keys";
 import { ReviewQueue } from "@/features/admin/review-queue";
 import { VerificationQueue } from "@/features/admin/verification-queue";
 
@@ -106,10 +107,12 @@ export default async function AdminQueuePage({
         ) : verification.length === 0 ? (
           <EmptyState compact title="No requests waiting" />
         ) : (
-          <VerificationQueue
-            rows={verification}
-            canDecide={context.can("verification.decide")}
-          />
+          <QueueKeys hint="J / K move · V verify · D decline">
+            <VerificationQueue
+              rows={verification}
+              canDecide={context.can("verification.decide")}
+            />
+          </QueueKeys>
         )
       ) : (
         <div className="flex flex-col gap-3">
@@ -131,11 +134,13 @@ export default async function AdminQueuePage({
           ) : reviews.length === 0 ? (
             <EmptyState compact title="No reviews waiting" />
           ) : (
-            <ReviewQueue
-              rows={reviews}
-              canDecide={context.can("reviews.decide")}
-              viewerId={context.me.userId}
-            />
+            <QueueKeys hint="J / K move · V changed · M needs evidence · D upheld">
+              <ReviewQueue
+                rows={reviews}
+                canDecide={context.can("reviews.decide")}
+                viewerId={context.me.userId}
+              />
+            </QueueKeys>
           )}
         </div>
       )}

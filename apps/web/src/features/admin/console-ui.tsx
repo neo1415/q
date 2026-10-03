@@ -202,9 +202,15 @@ export function ReasonAction({
   minLength = 3,
   reasonLabel = "Reason",
   disabled = false,
+  shortcut,
+  wide = false,
   run,
 }: {
   readonly label: string;
+  /** One letter the queue's keyboard handler presses (design-48). */
+  readonly shortcut?: string | undefined;
+  /** Fills its share of a decision bar. */
+  readonly wide?: boolean | undefined;
   readonly title: string;
   readonly description?: string | undefined;
   readonly confirm: string;
@@ -220,11 +226,16 @@ export function ReasonAction({
   const fieldId = useId();
   const short = reason.trim().length < minLength;
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div
+      className={`flex flex-col gap-1 ${wide ? "min-w-0 flex-1 items-stretch" : "items-start"}`}
+    >
       <Button
         variant={variant}
         size="compact"
+        className={wide ? "w-full" : undefined}
         disabled={disabled || pending}
+        data-shortcut={shortcut}
+        aria-keyshortcuts={shortcut?.toUpperCase()}
         onClick={() => {
           setReason("");
           setOpen(true);

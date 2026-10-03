@@ -4,6 +4,7 @@ import type { AdminReviewRowDto } from "@capital-q/contracts";
 
 import { decideReviewAction } from "./console-actions";
 import { ReasonAction } from "./console-ui";
+import { DecisionBar, QUEUE_ITEM } from "./queue-keys";
 
 const SUBJECT_WORDS: Readonly<Record<string, string>> = {
   READINESS_ASSESSMENT: "Readiness reading",
@@ -17,6 +18,13 @@ const OUTCOME_WORDS = {
   UPHELD: "Upheld",
   CHANGED: "Changed",
   NEEDS_EVIDENCE: "Needs evidence",
+} as const;
+
+/** The queue's keys (design-48): V changes, M asks for more, D upholds. */
+export const REVIEW_KEYS = {
+  CHANGED: "v",
+  NEEDS_EVIDENCE: "m",
+  UPHELD: "d",
 } as const;
 
 /**
@@ -36,7 +44,11 @@ export function ReviewQueue({
   return (
     <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
       {rows.map((row) => (
-        <li key={row.reviewId} className="flex flex-col gap-2 py-4">
+        <li
+          key={row.reviewId}
+          {...QUEUE_ITEM}
+          className={`flex flex-col gap-2 py-4 ${QUEUE_ITEM.className}`}
+        >
           <div className="flex flex-col gap-1">
             <span className="cq-body font-medium text-(--cq-text-primary)">
               {SUBJECT_WORDS[row.subjectType] ?? row.subjectType} ·{" "}
@@ -68,12 +80,14 @@ export function ReviewQueue({
           {canDecide &&
           row.status === "OPEN" &&
           row.requesterUserId !== viewerId ? (
-            <div className="flex flex-wrap gap-2">
-              {(["UPHELD", "CHANGED", "NEEDS_EVIDENCE"] as const).map(
+            <DecisionBar>
+              {(["CHANGED", "NEEDS_EVIDENCE", "UPHELD"] as const).map(
                 (outcome) => (
                   <ReasonAction
                     key={outcome}
                     label={OUTCOME_WORDS[outcome]}
+                    shortcut={REVIEW_KEYS[outcome]}
+                    wide
                     title={`${OUTCOME_WORDS[outcome]}: tell them why`}
                     description={
                       outcome === "CHANGED"
@@ -81,7 +95,7 @@ export function ReviewQueue({
                         : "They'll see this reason in a notice and on their Reviews page."
                     }
                     confirm="Send decision"
-                    variant={outcome === "UPHELD" ? "secondary" : "primary"}
+                    variant={outcome === "CHANGED" ? "primary" : "secondary"}
                     reasonLabel="Reason"
                     run={(reason) =>
                       decideReviewAction({
@@ -93,7 +107,7 @@ export function ReviewQueue({
                   />
                 ),
               )}
-            </div>
+            </DecisionBar>
           ) : null}
         </li>
       ))}

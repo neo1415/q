@@ -10,6 +10,7 @@ import {
   verifyPairAction,
 } from "./console-actions";
 import { ReasonAction } from "./console-ui";
+import { DecisionBar, QUEUE_ITEM } from "./queue-keys";
 import { verificationGroups } from "./verification-groups";
 
 const CLAIM_WORDS: Readonly<Record<string, string>> = {
@@ -81,7 +82,11 @@ function VerificationRows({
               ? (row.subjectDomain ?? "Domain not stated")
               : row.organisationName;
         return (
-          <li key={row.claimId} className="flex flex-col gap-3">
+          <li
+            key={row.claimId}
+            {...QUEUE_ITEM}
+            className={`flex flex-col gap-3 ${QUEUE_ITEM.className}`}
+          >
             <div className="flex flex-col gap-1">
               <span className="cq-body font-medium text-(--cq-text-primary)">
                 {CLAIM_WORDS[row.claimType] ?? row.claimType}: {subject}
@@ -107,9 +112,11 @@ function VerificationRows({
               )}
             </div>
             {canDecide ? (
-              <div className="flex flex-wrap gap-2">
+              <DecisionBar>
                 <ReasonAction
                   label="Verify"
+                  shortcut="v"
+                  wide
                   title={`Verify ${subject}?`}
                   description="Capital Q will show this as verified by an operator. Say what you checked."
                   confirm="Verify"
@@ -125,10 +132,12 @@ function VerificationRows({
                 />
                 <ReasonAction
                   label="Decline"
+                  shortcut="d"
+                  wide
                   title={`Decline verification for ${subject}?`}
                   description="They can ask again. Say why, plainly; it is kept with the decision."
                   confirm="Decline"
-                  variant="danger"
+                  variant="secondary"
                   reasonLabel="Why it can't be verified"
                   run={(basis) =>
                     decideVerificationAction({
@@ -138,7 +147,7 @@ function VerificationRows({
                     })
                   }
                 />
-              </div>
+              </DecisionBar>
             ) : null}
           </li>
         );
