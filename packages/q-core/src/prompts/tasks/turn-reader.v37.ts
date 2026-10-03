@@ -30,7 +30,7 @@ export const TURN_READER_V37: PromptDefinition<
 > = {
   ...TURN_READER_V36,
   version: 37,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA run 3af14042 (v36): a deck, document or upload's audience is set_deck_audience and a pitch video's is set_pitch_sharing, never SET_VISIBILITY. Same schema and order as v36.",
   effectiveFrom: "2026-10-03",

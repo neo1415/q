@@ -29,7 +29,7 @@ export type QDelegationPort = {
       readonly includeNewCompanies: boolean;
       /**
        * What else they said about the grant (ask first, tone, topics,
-       * digest, how long), read against the tool's own schema; the
+       * digest, how long, their working hours), read against the tool's own schema; the
        * tool validates it.
        */
       readonly more?: Readonly<Record<string, unknown>> | undefined;
@@ -213,6 +213,7 @@ export function createToolDelegationPort(dependencies: {
         "expiresInDays",
         "digest",
         "askedTermsOrMoney",
+        "workingHours",
       ] as const;
       const extra = Object.fromEntries(
         known.filter((key) => key in more).map((key) => [key, more[key]]),

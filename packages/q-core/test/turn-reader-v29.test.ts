@@ -13,12 +13,16 @@ describe("TURN_READER v29", () => {
   it("is superseded by v30, which adds askedAction", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(37);
+    ).toBe(38);
   });
 
   it("names every contract destination exactly once, PASSED included", () => {
     expect(Q_NAVIGATE_DESTINATIONS).toContain("PASSED");
-    for (const destination of [...Q_NAVIGATE_DESTINATIONS, "RESULTS"]) {
+    // USAGE arrives with v38.
+    for (const destination of [
+      ...Q_NAVIGATE_DESTINATIONS.filter((name) => name !== "USAGE"),
+      "RESULTS",
+    ]) {
       expect(
         TURN_READER_V29.template.split(
           new RegExp(`(?<![A-Z_])${destination} \\(`),
