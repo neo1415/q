@@ -206,4 +206,32 @@ describe("propose_standing_instruction: prepare is not do (weekend test 6ea17898
       narrowed.find((entry) => entry.action === "schedule.meeting.book")?.mode,
     ).toBe("ASK");
   });
+
+  it("reads a model's own words for what not to do, and asks for everything when it cannot place one (QA 07a90dd8)", async () => {
+    const out = await world().propose({
+      goal: "Handle it for me. Do not book calls.",
+      handsOverDoing: true,
+      onItsOwnOnly: ["express interest", "first messages"],
+      neverDo: ["booking calls"],
+    });
+    expect(out.outcome.status).toBe("SUCCEEDED");
+    const actions = grantOf(out.prepared[0]).actions;
+    expect(
+      actions.find((entry) => entry.action === "schedule.meeting.book"),
+    ).toBeUndefined();
+    expect(
+      actions.filter((entry) => entry.mode === "AUTO").map((e) => e.action),
+    ).toEqual(["relationship.interest.express", "chat.message.send"]);
+
+    const unplaced = await world().propose({
+      goal: "Handle it, but never touch their pricing page",
+      handsOverDoing: true,
+      neverDo: ["edit pricing page"],
+    });
+    expect(
+      grantOf(unplaced.prepared[0]).actions.every(
+        (entry) => entry.mode === "ASK",
+      ),
+    ).toBe(true);
+  });
 });
