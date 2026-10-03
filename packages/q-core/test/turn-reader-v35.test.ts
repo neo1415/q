@@ -12,10 +12,10 @@ import {
  * one of their relationships names relationship_outcome; an opinion does not.
  */
 describe("TURN_READER v35", () => {
-  it("is the active reader and v34 is deprecated", () => {
+  it("is superseded by v36, and v34 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(35);
+    ).toBe(36);
     expect(TURN_READER_V34.status).toBe("DEPRECATED");
   });
 

@@ -332,9 +332,11 @@ export const OUTCOME_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof OutcomeTool>
 >({
   name: "relationship.outcome.change",
-  short: "record a relationship decision",
+  // The reader's list shows `short` (QA runs a6b19977 / 06289687: a label
+  // about meetings let "we've decided not to proceed" name no action).
+  short: "relationship decisions and meeting outcomes",
   area: "relationships",
-  does: "Records where a connected relationship goes after a meeting: the investor not proceeding for now, pausing or resuming, or a meeting's confirmed outcome, as the relationship page does.",
+  does: "Records a decision on a connected relationship: the investor not proceeding for now, pausing or resuming, or what a meeting led to (diligence, a follow-up, materials, introductions), as the relationship page does.",
   members: {
     NOT_PROCEED: PASS,
     PAUSE: pauseOrResume("PAUSE"),
