@@ -365,8 +365,12 @@ export const ProposeStandingInstructionInputSchema = z
     askFirst: z
       .boolean()
       .default(false)
+      .describe("True when they want Q to ask before every step."),
+    handsOverDoing: z
+      .boolean()
+      .default(false)
       .describe(
-        "True when they want Q to ask before every step; false keeps the default (Q expresses interest, chats and books times on its own).",
+        "True only when they hand Q the doing itself ('handle it', 'do it for me', 'just send them', 'reach out to them', 'take it over'): then Q expresses interest, chats and books times on its own. False when they ask Q to find, prepare, draft or line up things for them ('prepare intros', 'draft messages', 'line up meetings'): every step is then a card for their yes.",
       ),
     tone: z
       .string()
@@ -603,9 +607,13 @@ export function createQWorkTools(
               goal: input.goal,
               grant: {
                 ...base,
-                actions: input.askFirst
-                  ? base.actions.map((entry) => ({ ...entry, mode: "ASK" }))
-                  : base.actions,
+                // The default's AUTO set only when they handed over the
+                // doing (weekend test 6ea17898: "find new founders ... and
+                // prepare intros" became AUTO interest, chat and booking).
+                actions:
+                  input.askFirst || !input.handsOverDoing
+                    ? base.actions.map((entry) => ({ ...entry, mode: "ASK" }))
+                    : base.actions,
                 counterparts: {
                   ...(input.relationshipIds.length > 0
                     ? {

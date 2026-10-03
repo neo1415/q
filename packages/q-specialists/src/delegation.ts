@@ -207,6 +207,7 @@ export function createToolDelegationPort(dependencies: {
       // their words, and an unreadable extra is dropped, not guessed.
       const known = [
         "askFirst",
+        "handsOverDoing",
         "tone",
         "topics",
         "relationshipIds",

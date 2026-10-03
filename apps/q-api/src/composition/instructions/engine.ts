@@ -16,7 +16,7 @@ import {
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import type {
-  InstructionPlanResult,
+  InstructionPlanV2Result as InstructionPlanResult,
   InstructionThreadFacts,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -115,6 +115,7 @@ export const REFUSAL_WORDS: Readonly<
 /** Why a granted AUTO step is asked instead, in plain words. */
 export const ASK_WORDS: Readonly<Record<string, string>> = {
   NOT_DELEGABLE: "it needs your yes",
+  ASKED_TO_PREPARE: "you asked me to prepare it for you",
   TERMS_OR_MONEY: "it touches terms or money",
   OFF_TOPIC: "it goes beyond the topics you approved",
   OVER_MESSAGE_CAP: "I've sent them as many messages as you allowed",
@@ -212,6 +213,12 @@ export type ValidationContext = {
   readonly stepKey: string;
   /** S6: what the quarantined reader found in each thread. */
   readonly facts?: ReadonlyMap<string, InstructionThreadFacts> | undefined;
+  /**
+   * The plan's reading of the goal: PREPARE (find, prepare, draft, line
+   * up) asks for every step whatever the grant says (weekend test
+   * 6ea17898: "prepare intros" ran AUTO steps).
+   */
+  readonly request?: "PREPARE" | "EXECUTE" | undefined;
 };
 
 const Args = z.record(z.string(), z.unknown());
@@ -361,6 +368,7 @@ export function validateStep(
     };
   }
   // AUTO as granted -- but what Q may do alone is fixed in code.
+  if (context.request === "PREPARE") return ask("ASKED_TO_PREPARE");
   if (!delegableOnItsOwn(action)) return ask("NOT_DELEGABLE");
   if (step.touchesTermsOrMoney) return ask("TERMS_OR_MONEY");
   // Code, not the planner, reads the thread's facts: where they raised
@@ -789,6 +797,7 @@ export function createInstructionEngine(
             now: at,
             stepKey: keyOf(index),
             facts,
+            request: current.request,
           }),
         );
         const refused = verdicts

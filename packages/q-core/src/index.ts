@@ -896,6 +896,7 @@ export {
 // ADR 0043: standing instructions.
 export {
   INSTRUCTION_PLAN_V1,
+  INSTRUCTION_PLAN_V2,
   INSTRUCTION_THREAD_READER_V1,
 } from "./prompts/tasks/instructions.v1.js";
 export {
@@ -903,7 +904,10 @@ export {
   type InstructionThreadFacts,
   type InstructionThreadReaderVariables,
   InstructionPlanResultSchema,
+  InstructionPlanV2ResultSchema,
+  INSTRUCTION_PLAN_REQUESTS,
   type InstructionPlanResult,
+  type InstructionPlanV2Result,
   type InstructionPlanVariables,
 } from "./prompts/schemas/instructions.js";
 

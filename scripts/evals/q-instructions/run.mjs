@@ -112,6 +112,14 @@ const CASES = [
     mustSay: [/terms[^.]*stay with you/iu],
   },
   {
+    // Weekend test 6ea17898: asked to prepare, not to do -- every step a card.
+    id: "investor.prepare-intros",
+    account: "INVESTOR",
+    say: "Find new founders matching my mandate and prepare intros for me.",
+    card: true,
+    grant: (g) => g.actions.every((a) => a.mode === "ASK"),
+  },
+  {
     id: "investor.handle-all-work",
     account: "INVESTOR",
     say: "Handle all the work for me.",

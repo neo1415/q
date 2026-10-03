@@ -10,7 +10,10 @@ import {
   INSTRUCTION_PLAN_SCHEMA_NAME,
   INSTRUCTION_PLAN_SCHEMA_VERSION,
   INSTRUCTION_PLAN_UNTRUSTED,
+  INSTRUCTION_PLAN_V2_SCHEMA_VERSION,
   InstructionPlanResultSchema,
+  InstructionPlanV2ResultSchema,
+  type InstructionPlanV2Result,
   InstructionPlanVariablesSchema,
   type InstructionPlanResult,
   type InstructionPlanVariables,
@@ -62,7 +65,7 @@ export const INSTRUCTION_PLAN_V1: PromptDefinition<
   InstructionPlanVariables,
   InstructionPlanResult
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -82,6 +85,41 @@ export const INSTRUCTION_PLAN_V1: PromptDefinition<
     schema: InstructionPlanResultSchema,
   },
   template: PLAN,
+};
+
+const PLAN_V2 = PLAN.replace(
+  "- Nothing to do now: empty steps.",
+  `- request: how their goal reads. PREPARE when it asks you to find, prepare, draft or line up things for them ("prepare intros", "draft messages", "line up meetings"): every step then waits for their yes. EXECUTE only when it hands you the doing itself ("handle it", "do it for me", "just send them", "reach out to them"). When unsure, PREPARE.
+- Nothing to do now: empty steps.`,
+).replace(
+  "matching the InstructionPlanResult schema",
+  "matching the InstructionPlanResult schema (v2, with request)",
+);
+
+export const INSTRUCTION_PLAN_V2: PromptDefinition<
+  InstructionPlanVariables,
+  InstructionPlanV2Result
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-03",
+  id: "INSTRUCTION_PLAN",
+  version: 2,
+  changeDescription:
+    "Weekend test 6ea17898: the plan reads whether the goal asks Q to prepare (every step asked) or hands over the doing; code asks for every step of a PREPARE plan whatever the grant says.",
+  variables: {
+    schema: InstructionPlanVariablesSchema,
+    untrusted: [...INSTRUCTION_PLAN_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_PLAN_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_PLAN_V2_SCHEMA_VERSION,
+    schema: InstructionPlanV2ResultSchema,
+  },
+  template: PLAN_V2,
 };
 
 const THREAD_READER = `TASK: INSTRUCTION_THREAD_READER

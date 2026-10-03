@@ -77,6 +77,23 @@ export const InstructionPlanResultSchema = z
   .strict();
 export type InstructionPlanResult = z.infer<typeof InstructionPlanResultSchema>;
 
+/**
+ * v2 (weekend test 6ea17898): the plan's own reading of the goal. PREPARE
+ * when it asks Q to find, prepare, draft or line up things for them; then
+ * code asks for every step, whatever the grant says. EXECUTE only when it
+ * hands Q the doing itself.
+ */
+export const INSTRUCTION_PLAN_V2_SCHEMA_VERSION = 2;
+export const INSTRUCTION_PLAN_REQUESTS = ["PREPARE", "EXECUTE"] as const;
+export const InstructionPlanV2ResultSchema = InstructionPlanResultSchema.extend(
+  {
+    request: z.enum(INSTRUCTION_PLAN_REQUESTS),
+  },
+).strict();
+export type InstructionPlanV2Result = z.infer<
+  typeof InstructionPlanV2ResultSchema
+>;
+
 // ---------------------------------------------------------------------------
 // INSTRUCTION_THREAD_READER: the quarantined extractor (ADR 0043 §6)
 // ---------------------------------------------------------------------------

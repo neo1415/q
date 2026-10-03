@@ -141,3 +141,35 @@ describe("propose_standing_instruction: their working hours", () => {
     expect(unknown.prepared).toHaveLength(0);
   });
 });
+
+describe("propose_standing_instruction: prepare is not do (weekend test 6ea17898)", () => {
+  it("asked to prepare or line up: every step is a card; handed the doing: the default's own steps", async () => {
+    const prepare = await world().propose({
+      goal: "Find new founders matching my mandate and prepare intros",
+    });
+    const asked = grantOf(prepare.prepared[0]).actions;
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked.every((entry) => entry.mode === "ASK")).toBe(true);
+    const handed = await world().propose({
+      goal: "Handle all the work for me",
+      handsOverDoing: true,
+    });
+    expect(
+      grantOf(handed.prepared[0]).actions.some(
+        (entry) =>
+          entry.action === "relationship.interest.express" &&
+          entry.mode === "AUTO",
+      ),
+    ).toBe(true);
+    // Asked first, even when handed over.
+    const askFirst = await world().propose({
+      handsOverDoing: true,
+      askFirst: true,
+    });
+    expect(
+      grantOf(askFirst.prepared[0]).actions.every(
+        (entry) => entry.mode === "ASK",
+      ),
+    ).toBe(true);
+  });
+});
