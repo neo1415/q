@@ -271,7 +271,8 @@ export function ReasonAction({
 const SECTIONS: readonly {
   readonly href: string;
   readonly label: string;
-  readonly permission: string;
+  /** Shown to a role holding any of these. */
+  readonly permission: string | readonly string[];
 }[] = [
   { href: "/admin", label: "Overview", permission: "overview.read" },
   { href: "/admin/accounts", label: "Accounts", permission: "accounts.read" },
@@ -281,11 +282,10 @@ const SECTIONS: readonly {
     permission: "accounts.read",
   },
   {
-    href: "/admin/verification",
-    label: "Verification",
-    permission: "verification.read",
+    href: "/admin/queue",
+    label: "Queue",
+    permission: ["verification.read", "reviews.read"],
   },
-  { href: "/admin/reviews", label: "Reviews", permission: "reviews.read" },
   { href: "/admin/safety", label: "Safety", permission: "safety.read" },
   { href: "/admin/q", label: "Q monitor", permission: "q.monitor.read" },
   { href: "/admin/audit", label: "Audit", permission: "audit.read" },
@@ -303,7 +303,9 @@ export function ConsoleNav({
 }) {
   const pathname = usePathname();
   const allowed = SECTIONS.filter((section) =>
-    permissions.includes(section.permission),
+    typeof section.permission === "string"
+      ? permissions.includes(section.permission)
+      : section.permission.some((one) => permissions.includes(one)),
   );
   return (
     <nav

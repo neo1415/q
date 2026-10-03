@@ -110,10 +110,14 @@ export default async function AdminPage() {
     {
       term: "Verification waiting",
       value: verification,
-      href: "/admin/verification",
+      href: "/admin/queue?tab=verification",
     },
     { term: "Reports to review", value: safety, href: "/admin/safety" },
-    { term: "Reviews to answer", value: reviews, href: "/admin/reviews" },
+    {
+      term: "Reviews to answer",
+      value: reviews,
+      href: "/admin/queue?tab=reviews",
+    },
     {
       term: "Break-glass to decide",
       value: glass,
