@@ -88,7 +88,9 @@ export function grantCard(
   );
   lines.push(
     grant.counterparts.scope === "ALL_MY_RELATIONSHIPS"
-      ? "Who: everyone you're already in touch with."
+      ? grant.counterparts.includeNewCompanies
+        ? "Who: everyone you're already in touch with, and new companies from your feed and saved list (never ones you passed)."
+        : "Who: everyone you're already in touch with."
       : `Who: ${String(grant.counterparts.relationshipIds.length)} relationships you chose.`,
   );
   lines.push(

@@ -365,6 +365,12 @@ export const ProposeStandingInstructionInputSchema = z
       .describe(
         "Only these relationships, if they named some; empty means all of theirs.",
       ),
+    includeNewCompanies: z
+      .boolean()
+      .default(false)
+      .describe(
+        "True when the goal reaches companies they are not in touch with yet ('monitor new founders', 'find me companies'): Q may then also act on companies in their own feed and saved list (never ones they passed).",
+      ),
     expiresInDays: z.number().int().min(1).max(365).default(30),
   })
   .strict();
@@ -495,6 +501,7 @@ export function createQWorkTools(
           timeZone,
           tone: input.tone ?? undefined,
           topics: input.topics.length > 0 ? input.topics : undefined,
+          includeNewCompanies: input.includeNewCompanies,
         });
         const status = port.prepareForApproval({
           runId: context.runId,
@@ -515,6 +522,7 @@ export function createQWorkTools(
                     ? {
                         scope: "LISTED",
                         relationshipIds: input.relationshipIds,
+                        includeNewCompanies: false,
                       }
                     : base.counterparts,
                 expiresInDays: input.expiresInDays,

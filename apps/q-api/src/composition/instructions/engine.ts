@@ -220,7 +220,12 @@ export function inScope(
   grant: InstructionGrant,
   people: readonly InstructionPerson[],
 ): readonly InstructionPerson[] {
-  if (grant.counterparts.scope === "ALL_MY_RELATIONSHIPS") return people;
+  // A company they are not in touch with only when the grant says so.
+  if (grant.counterparts.scope === "ALL_MY_RELATIONSHIPS") {
+    return grant.counterparts.includeNewCompanies
+      ? people
+      : people.filter((person) => person.relationshipId !== null);
+  }
   const listed = new Set(grant.counterparts.relationshipIds);
   return people.filter(
     (person) =>
@@ -369,7 +374,12 @@ export function validateStep(
 
 export type InstructionFiringResult = {
   readonly outcome:
-    "RAN" | "NOT_ACTIVE" | "EXPIRED" | "NO_ACTOR" | "PLANNER_UNAVAILABLE";
+    | "RAN"
+    | "NOT_ACTIVE"
+    | "EXPIRED"
+    | "NO_ACTOR"
+    | "OUTSIDE_HOURS"
+    | "PLANNER_UNAVAILABLE";
   readonly done: number;
   readonly asked: number;
   readonly refused: number;
@@ -522,6 +532,10 @@ export function createInstructionEngine(
       }
       const grant = InstructionGrantSchema.safeParse(row.grant_payload);
       if (!grant.success) return empty("NOT_ACTIVE");
+      // Q works in their working hours: no planning (and no spend) outside.
+      if (!withinWorkingHours(at, grant.data.workingHours)) {
+        return empty("OUTSIDE_HOURS");
+      }
       const actor = await dependencies.actorFor(row);
       if (actor === null || actor.userId !== row.user_id) {
         return empty("NO_ACTOR");
@@ -756,3 +770,84 @@ export function createInstructionEngine(
 }
 
 export type InstructionEngine = ReturnType<typeof createInstructionEngine>;
+
+/**
+ * Who an instruction may concern (S4): their own relationships (declined
+ * ones left out), then -- as candidates with no relationship yet -- the
+ * companies in their own feed and the ones they saved. A company they
+ * passed is never a candidate; one already in a relationship appears once.
+ * Everything here is what the person may already see on their own pages.
+ */
+export async function instructionPeople(
+  actor: ActorContext,
+  reads: {
+    readonly relationships: (actor: ActorContext) => Promise<{
+      readonly items: readonly {
+        readonly relationshipId: string;
+        readonly counterpart: {
+          readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+          readonly id: string;
+          readonly name: string;
+        };
+        readonly state: string;
+      }[];
+    } | null>;
+    readonly feed: (
+      actor: ActorContext,
+    ) => Promise<
+      readonly { readonly companyId: string; readonly name: string }[]
+    >;
+    readonly decisions: (actor: ActorContext) => Promise<
+      readonly {
+        readonly companyId: string;
+        readonly name: string;
+        readonly decision: "SAVED" | "PASSED";
+      }[]
+    >;
+  },
+): Promise<readonly InstructionPerson[]> {
+  const [own, feed, decisions] = await Promise.all([
+    reads.relationships(actor).catch(() => null),
+    reads.feed(actor).catch(() => []),
+    reads.decisions(actor).catch(() => []),
+  ]);
+  const people: InstructionPerson[] = (own?.items ?? [])
+    .filter((item) => item.state !== "DECLINED")
+    .map((item) => ({
+      relationshipId: item.relationshipId,
+      counterpartKind: item.counterpart.kind,
+      counterpartId: item.counterpart.id,
+      name: item.counterpart.name,
+      state: item.state,
+    }));
+  const known = new Set(
+    (own?.items ?? [])
+      .filter((item) => item.counterpart.kind === "COMPANY")
+      .map((item) => item.counterpart.id),
+  );
+  const passed = new Set(
+    decisions
+      .filter((entry) => entry.decision === "PASSED")
+      .map((entry) => entry.companyId),
+  );
+  const candidate = (companyId: string, name: string, state: string) => {
+    if (known.has(companyId) || passed.has(companyId)) return;
+    known.add(companyId);
+    people.push({
+      relationshipId: null,
+      counterpartKind: "COMPANY",
+      counterpartId: companyId,
+      name,
+      state,
+    });
+  };
+  for (const entry of decisions) {
+    if (entry.decision === "SAVED") {
+      candidate(entry.companyId, entry.name, "SAVED_NOT_CONTACTED");
+    }
+  }
+  for (const item of feed) {
+    candidate(item.companyId, item.name, "IN_FEED_NOT_CONTACTED");
+  }
+  return people;
+}
