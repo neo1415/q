@@ -180,10 +180,11 @@ export async function MandateSummary({
         >
           Review my mandate
         </Link>
-        <Link href="/discover/saved" className={buttonClassName("secondary")}>
+        {/* One primary; the rest are quiet ways out, not equal choices. */}
+        <Link href="/discover/saved" className={buttonClassName("quiet")}>
           Saved companies
         </Link>
-        <Link href="/gateway" className={buttonClassName("secondary")}>
+        <Link href="/gateway" className={buttonClassName("quiet")}>
           Your gateway
         </Link>
       </div>

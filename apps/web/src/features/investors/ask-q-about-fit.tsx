@@ -3,7 +3,6 @@
 import { Button } from "@capital-q/ui/button";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
-import { QAperture } from "@/features/q-aperture";
 
 /**
  * "Ask Q about fit" on an investor (ux spec §9.6): opens the one Q with the
@@ -23,7 +22,7 @@ export function AskQAboutFit({ name }: { readonly name: string }) {
         )
       }
     >
-      <QAperture state="IDLE" size="chrome" />
+      {/* Words only: Q's mark on every card read as icon spam. */}
       Ask Q about fit
     </Button>
   );
