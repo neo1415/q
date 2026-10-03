@@ -62,6 +62,7 @@
     "q:eval:ci": "node scripts/q-eval.mjs run --profile CI_CORE",
     "q:eval:live": "node scripts/q-eval.mjs run --profile LIVE_MODEL",
     "q:eval:instructions": "node scripts/evals/q-instructions/run.mjs",
+    "q:eval:voice": "node scripts/evals/q-voice/run.mjs",
     "rag:extract-smoke": "node scripts/rag-extract-smoke.mjs",
     "rag:rebuild-chunks": "node scripts/rag-rebuild-chunks.mjs",
     "embedding:up": "docker compose -f infra/embeddings/docker-compose.yml up -d",
