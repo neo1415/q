@@ -5,6 +5,7 @@ import { useId, useRef, useState, useTransition } from "react";
 
 import type { KybDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
+import { ICON_SIZE, ShieldCheck } from "@capital-q/ui/icons";
 import { Input } from "@capital-q/ui/input";
 
 import {
@@ -37,6 +38,40 @@ function standingWords(
     case "NOT_REQUESTED":
       return "Not started";
   }
+}
+
+/**
+ * One standing, as a row: who, then the state in words with a mark beside
+ * it -- a shield once verified. The
+ * words always carry the meaning; the mark never stands alone (doc 18).
+ */
+function StandingRow({
+  who,
+  standing,
+  words,
+}: {
+  readonly who: string;
+  readonly standing: Standing;
+  readonly words: string;
+}) {
+  const verified = standing === "VERIFIED";
+  return (
+    <li className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+      <span className="cq-body font-medium text-(--cq-text-primary)">
+        {who}
+      </span>
+      <span className="cq-body-sm flex items-center gap-1.5 text-(--cq-text-primary)">
+        {!verified ? null : (
+          <ShieldCheck
+            size={ICON_SIZE.compact}
+            aria-hidden="true"
+            className="text-(--cq-text-secondary)"
+          />
+        )}
+        {words}
+      </span>
+    </li>
+  );
 }
 
 async function upload(
@@ -115,20 +150,22 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
   return (
     <div className="flex flex-col gap-4">
       <ul
-        className="flex flex-col gap-1"
+        className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
         aria-label="Where verification stands"
       >
-        <li className="cq-body-sm text-(--cq-text-primary)">
-          <span className="font-medium">You</span> ·{" "}
-          {standingWords(
+        <StandingRow
+          who="You"
+          standing={kyb.person.standing}
+          words={standingWords(
             kyb.person.standing,
             kyb.person.submission?.status === "SUBMITTED",
             kyb.person.declineReason,
           )}
-        </li>
-        <li className="cq-body-sm text-(--cq-text-primary)">
-          <span className="font-medium">{name}</span> ·{" "}
-          {standingWords(
+        />
+        <StandingRow
+          who={name}
+          standing={kyb.standing}
+          words={standingWords(
             kyb.standing,
             submission?.status === "SUBMITTED" &&
               submission.source === "PERSON",
@@ -136,7 +173,7 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
               ? submission.decisionReason
               : null,
           )}
-        </li>
+        />
       </ul>
       {!parts.organisation && !parts.person ? null : (
         <form

@@ -385,7 +385,9 @@ function FactRow({
         : "contradictory";
   return (
     <li
-      className="flex flex-col gap-2 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
+      // Tight rows: six facts ran ~1,000 px on a phone (re-capture
+      // 2026-10-03). The structure and every axis are unchanged.
+      className="flex flex-col gap-1 border-t border-(--cq-border-subtle) py-2 first:border-t-0"
       data-fact={fact.key}
       data-fact-state={state}
     >
@@ -393,6 +395,8 @@ function FactRow({
         <h3 className="cq-label text-(--cq-text-secondary)">{label}</h3>
         <Button
           variant="quiet"
+          size="compact"
+          className="min-h-11"
           onClick={onAsk}
           aria-label={`Ask Q about ${label.toLowerCase()}`}
         >

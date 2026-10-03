@@ -38,6 +38,18 @@ describe("fictional names (demo audit 2026-10-03)", () => {
     expect(document.querySelectorAll("[data-fictional-note]")).toHaveLength(1);
   });
 
+  it("works outside the app shell too (onboarding)", async () => {
+    render(
+      <div data-fictional-scope>
+        <p>Savanna Seed Partners (fictional)</p>
+        <FictionalNames />
+      </div>,
+    );
+    await act(async () => {});
+    expect(screen.getByText("Savanna Seed Partners")).toBeTruthy();
+    expect(document.querySelectorAll("[data-fictional-note]")).toHaveLength(1);
+  });
+
   it("says nothing on a page with no marked name", async () => {
     render(
       <main>

@@ -154,6 +154,8 @@ export function RelationshipChat({
   // 2026-10-03: at 390px the dock sat on Send).
   const composer = useRef<HTMLFormElement>(null);
   useDockAvoid(composer, status === "OPEN");
+  const header = useRef<HTMLDivElement>(null);
+  useDockAvoid(header);
 
   const markRead = useCallback(
     (list: readonly ChatMessageDto[]) => {
@@ -398,7 +400,10 @@ export function RelationshipChat({
     >
       {/* The header (founder direction 2026-09-29: "whatsapp for that
           page"): who, where things stand, and the few actions, in one row. */}
-      <div className="flex items-center gap-2 border-b border-(--cq-border-subtle) px-2 py-2">
+      <div
+        ref={header}
+        className="flex items-center gap-2 border-b border-(--cq-border-subtle) px-2 py-2"
+      >
         <h2 id="relationship-chat" className="sr-only">
           Messages with {counterpart}
         </h2>

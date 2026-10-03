@@ -174,11 +174,17 @@ export function RelationshipDetail({
           )}
         </div>
 
+        {/*
+          On a phone the aside's parts join the page's grid so the next
+          step can come straight after the hero, before the history
+          (re-capture 2026-10-03: Book a call sat below the whole timeline);
+          context and Ask Q follow the page.
+        */}
         <aside
-          className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start"
+          className="flex min-w-0 flex-col gap-6 max-lg:contents lg:sticky lg:top-6 lg:self-start"
           aria-label="Next"
         >
-          <Card title="Next" id="next">
+          <Card title="Next" id="next" className="max-lg:order-first">
             <DockAvoidZone className="flex flex-col items-stretch gap-2">
               {actions}
               {connected && relationship !== null ? (
@@ -259,6 +265,7 @@ export function RelationshipDetail({
           </Card>
 
           <Card
+            className="max-lg:order-last"
             title={side === "INVESTOR" ? "Company context" : "Investor context"}
             id="context"
           >
@@ -292,7 +299,7 @@ export function RelationshipDetail({
           {askQ ? (
             <section
               aria-label="Ask Q"
-              className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-5"
+              className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-5 max-lg:order-last"
             >
               <AskQAboutRelationship counterpart={counterpart} />
             </section>
@@ -470,17 +477,19 @@ function Card({
   title,
   id,
   action,
+  className,
   children,
 }: {
   readonly title: string;
   readonly id: string;
   readonly action?: ReactNode;
+  readonly className?: string | undefined;
   readonly children: ReactNode;
 }) {
   return (
     <section
       aria-labelledby={`relationship-${id}`}
-      className="flex scroll-mt-24 flex-col gap-4 border-t border-(--cq-border-subtle) pt-5"
+      className={`flex scroll-mt-24 flex-col gap-4 border-t border-(--cq-border-subtle) pt-5 ${className ?? ""}`}
     >
       <div className="flex items-center justify-between gap-3">
         <h2
