@@ -19,7 +19,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(33);
+select plan(35);
 
 -- Seed is present and shaped as the packet verified it -------------------------------
 select is((select count(*)::int from ai_ops.providers), 3, 'three providers are seeded (openai joined in 20261006090000)');
@@ -103,6 +103,13 @@ values
    0, 0, 0, 1200, null, 'UNPRICED', false, 'TIMEOUT', null);
 
 select is((select count(*)::int from ai_ops.model_usage), 2, 'success and failure attempts are both recorded');
+-- 20261126090000: what a call was for, a closed set; older writers read OTHER.
+select is((select count(*)::int from ai_ops.model_usage where purpose = 'OTHER'), 2,
+  'a row written without a purpose reads OTHER');
+select throws_ok(
+  $$ insert into ai_ops.model_usage (tenant_id, task_class, provider_id, model_id, attempt, latency_ms, cost_basis, success, purpose)
+     values (pg_temp.rls_id('tenant_a'), 'NORMAL_DIALOGUE', 'a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000004', 1, 10, 'UNPRICED', true, 'SHOPPING') $$,
+  '23514', null, 'a purpose outside the closed set is refused');
 select throws_ok(
   $$ insert into ai_ops.model_usage (tenant_id, task_class, provider_id, model_id, attempt, latency_ms, cost_basis, success, error_code)
      values (pg_temp.rls_id('tenant_a'), 'NORMAL_DIALOGUE', 'a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000004', 1, 10, 'UNPRICED', true, 'TIMEOUT') $$,

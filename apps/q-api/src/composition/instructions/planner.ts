@@ -84,6 +84,7 @@ export function createInstructionPlanner(dependencies: {
             messages: [...rendered.messages],
             output: rendered.output,
             attribution: {
+              purpose: "INSTRUCTION",
               tenantId: who.tenantId,
               userId: who.userId,
               // The instruction this spend belongs to, in the usage ledger.

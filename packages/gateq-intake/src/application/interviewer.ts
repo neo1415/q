@@ -321,7 +321,7 @@ export function createGateQInterviewer(
             budget: DIALOGUE_BUDGET,
             messages: [...rendered.messages],
             output: rendered.output,
-            attribution: input.attribution,
+            attribution: { ...input.attribution, purpose: "ONBOARDING" },
           },
           {
             schema: GateQInterviewerResultSchema,

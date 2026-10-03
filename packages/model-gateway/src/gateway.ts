@@ -6,6 +6,7 @@ import {
   messagesCarryImages,
   ModelGatewayRequestSchema,
   ModelGatewayResultMetadataSchema,
+  usagePurposeOf,
   type ModelAttemptRecord,
   type ModelCandidateDecision,
   type ModelCost,
@@ -496,6 +497,7 @@ export function createModelGateway(
         await recordUsage({
           tenantId: request.attribution.tenantId,
           userId: request.attribution.userId,
+          purpose: usagePurposeOf(request.attribution),
           qRunId: request.attribution.qRunId,
           taskClass: request.taskClass,
           providerId: candidate.provider.id,

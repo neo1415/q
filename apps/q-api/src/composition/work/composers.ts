@@ -130,6 +130,7 @@ export function createWorkComposers(dependencies: {
           messages: [...rendered.messages],
           output: rendered.output,
           attribution: {
+            purpose: "DELEGATED_WORK",
             tenantId: who.tenantId,
             userId: who.userId,
             correlationId: `cor_${randomUUID()}`,

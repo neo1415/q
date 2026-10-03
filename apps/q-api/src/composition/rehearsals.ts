@@ -2363,6 +2363,7 @@ export function createRehearsalComposer(dependencies: {
           output: rendered.output,
           ...(seeing ? { requiredCapabilities: ["VISION"] } : {}),
           attribution: {
+            purpose: "REHEARSAL",
             tenantId: actor.tenantId,
             userId: actor.userId,
             correlationId: `cor_${randomUUID()}`,

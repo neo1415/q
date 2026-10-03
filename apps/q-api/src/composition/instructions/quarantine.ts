@@ -123,6 +123,7 @@ export function createQuarantinedThreadReader(dependencies: {
             messages: [...rendered.messages],
             output: rendered.output,
             attribution: {
+              purpose: "INSTRUCTION",
               tenantId: input.actor.tenantId,
               userId: input.actor.userId,
               correlationId: `cor_instr_${input.instructionId}_${randomUUID().slice(0, 8)}`,

@@ -1187,6 +1187,7 @@ export function createInterviewAgent(
       sensitivity: decision.plan.maxSensitivity,
       budget: BUDGET,
       attribution: {
+        purpose: "ONBOARDING" as const,
         tenantId: actor.tenantId,
         userId: actor.userId,
         qRunId: runId,

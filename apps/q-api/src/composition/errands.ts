@@ -453,6 +453,7 @@ export function createErrandReplyComposer(dependencies: {
             messages: [...rendered.messages],
             output: rendered.output,
             attribution: {
+              purpose: "DELEGATED_WORK",
               tenantId: input.actor.tenantId,
               userId: input.actor.userId,
               correlationId: `cor_${randomUUID()}`,

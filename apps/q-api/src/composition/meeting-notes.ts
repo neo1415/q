@@ -62,6 +62,7 @@ export function createMeetingNotesComposer(dependencies: {
               messages: [...rendered.messages],
               output: rendered.output,
               attribution: {
+                purpose: "MEETING",
                 tenantId: input.tenantId,
                 userId: input.userId,
                 correlationId: `cor_${runId}`,

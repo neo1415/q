@@ -84,6 +84,7 @@ export function createProfileGapReader(dependencies: {
           messages: [...rendered.messages],
           output: rendered.output,
           attribution: {
+            purpose: "ONBOARDING",
             tenantId: request.actor.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,

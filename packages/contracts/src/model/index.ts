@@ -496,14 +496,51 @@ export const ModelBudgetSchema = z
 export type ModelBudget = z.infer<typeof ModelBudgetSchema>;
 
 /** Who is paying and which run is asking. Identifiers only. */
+/**
+ * What a model call was for, as the person's usage view groups it (lead
+ * 2026-10-03: "This month: Q used about $X for you", by task). A closed
+ * set; absent, the gateway derives it (a Q run is a conversation, an
+ * instruction's correlation id is that instruction) or leaves it OTHER.
+ */
+export const MODEL_USAGE_PURPOSES = [
+  "CONVERSATION",
+  "INSTRUCTION",
+  "DELEGATED_WORK",
+  "REHEARSAL",
+  "RESEARCH",
+  "ONBOARDING",
+  "MEETING",
+  "DOCUMENT",
+  "OTHER",
+] as const;
+export const ModelUsagePurposeSchema = z.enum(MODEL_USAGE_PURPOSES);
+export type ModelUsagePurpose = z.infer<typeof ModelUsagePurposeSchema>;
+
 export const ModelAttributionSchema = z
   .object({
     tenantId: UuidSchema,
     userId: UuidSchema.optional(),
     qRunId: UuidSchema.optional(),
     correlationId: z.string().min(1).max(128),
+    purpose: ModelUsagePurposeSchema.optional(),
   })
   .strict();
+
+/** The prefix an instruction's model calls carry in their correlation id. */
+export const INSTRUCTION_CORRELATION_PREFIX = "cor_instr_" as const;
+
+/** The purpose a call is recorded under: declared, else derived. */
+export function usagePurposeOf(attribution: {
+  readonly purpose?: ModelUsagePurpose | undefined;
+  readonly qRunId?: string | undefined;
+  readonly correlationId?: string | undefined;
+}): ModelUsagePurpose {
+  if (attribution.purpose !== undefined) return attribution.purpose;
+  if (attribution.correlationId?.startsWith(INSTRUCTION_CORRELATION_PREFIX)) {
+    return "INSTRUCTION";
+  }
+  return attribution.qRunId === undefined ? "OTHER" : "CONVERSATION";
+}
 export type ModelAttribution = z.infer<typeof ModelAttributionSchema>;
 
 /**

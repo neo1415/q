@@ -169,6 +169,8 @@ export function createImageGateway(options: {
           ?.record({
             tenantId: request.attribution.tenantId,
             userId: request.attribution.userId,
+            // Illustrations are for documents, whatever run asked.
+            purpose: "DOCUMENT",
             qRunId: request.attribution.qRunId,
             taskClass: IMAGE_GENERATION_TASK_CLASS,
             providerId: provider.providerId,

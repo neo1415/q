@@ -20,13 +20,14 @@ export function createPostgresModelUsageRepository(options: {
         insert into ai_ops.model_usage
           (tenant_id, user_id, q_run_id, task_class, provider_id, model_id, routing_policy_id, attempt,
            input_tokens, cached_input_tokens, output_tokens, latency_ms, cost_usd, cost_basis,
-           success, error_code, correlation_id)
+           success, error_code, correlation_id, purpose)
         values
           (${entry.tenantId}, ${entry.userId ?? null}, ${entry.qRunId ?? null}, ${entry.taskClass},
            ${entry.providerId}, ${entry.modelId}, ${entry.routingPolicyId ?? null}, ${entry.attempt},
            ${entry.inputTokens}, ${entry.cachedInputTokens}, ${entry.outputTokens}, ${entry.latencyMs},
            ${entry.costUsd === undefined ? null : entry.costUsd.toFixed(8)}::text::numeric, ${entry.costBasis},
-           ${entry.success}, ${entry.errorCode ?? null}, ${entry.correlationId ?? null})`;
+           ${entry.success}, ${entry.errorCode ?? null}, ${entry.correlationId ?? null},
+           ${entry.purpose ?? "OTHER"})`;
     },
   };
 }

@@ -813,6 +813,7 @@ export function createMeetingHostComposer(dependencies: {
             messages: [...rendered.messages],
             output: rendered.output,
             attribution: {
+              purpose: "MEETING",
               tenantId: who.tenantId,
               userId: who.userId,
               correlationId: `cor_${randomUUID()}`,

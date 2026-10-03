@@ -121,6 +121,7 @@ export function createInvestorResearchReader(dependencies: {
           messages: [...rendered.messages],
           output: rendered.output,
           attribution: {
+            purpose: "RESEARCH",
             tenantId: request.actor.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,
@@ -407,6 +408,7 @@ export function createFounderResearchReader(dependencies: {
           messages: [...rendered.messages],
           output: rendered.output,
           attribution: {
+            purpose: "RESEARCH",
             tenantId: request.actor.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,

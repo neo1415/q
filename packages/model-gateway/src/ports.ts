@@ -13,6 +13,7 @@ import type {
   ModelToolCall,
   ModelToolDefinition,
   ModelUsage,
+  ModelUsagePurpose,
   TenantModelPolicy,
 } from "@capital-q/contracts";
 
@@ -147,6 +148,8 @@ export type ModelUsageEntry = {
   readonly success: boolean;
   readonly errorCode: ModelFailureClass | undefined;
   readonly correlationId: string | undefined;
+  /** What it was for (usage view); absent from older callers: OTHER. */
+  readonly purpose?: ModelUsagePurpose | undefined;
 };
 
 export type ModelUsageRepository = {

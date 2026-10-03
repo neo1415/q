@@ -276,6 +276,26 @@ describe("privacy", () => {
     expect(usage.entries.every((e) => e.providerId === IDS.alpha)).toBe(true);
   });
 
+  it("records what each call was for: declared, an instruction's correlation id, a Q run, else OTHER", async () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ purpose: "REHEARSAL" }, "REHEARSAL"],
+      [{ correlationId: "cor_instr_abc_1234" }, "INSTRUCTION"],
+      [{ qRunId: "11111111-2222-4333-8444-555555555555" }, "CONVERSATION"],
+      [{}, "OTHER"],
+    ];
+    for (const [extra, purpose] of cases) {
+      const { gateway, usage } = build();
+      const base = request();
+      const { qRunId: _unused, ...withoutRun } = base.attribution;
+      void _unused;
+      await gateway.execute({
+        ...base,
+        attribution: { ...withoutRun, ...extra },
+      });
+      expect(usage.entries.at(-1)?.purpose).toBe(purpose);
+    }
+  });
+
   it("refuses a RESTRICTED request outright: no ceiling admits it", async () => {
     const { gateway, alpha, beta } = build();
     const error = await failure(
