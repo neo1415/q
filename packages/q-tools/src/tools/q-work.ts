@@ -353,6 +353,14 @@ const WorkingTime = z
   .regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/u)
   .describe('A time of day, 24-hour "HH:MM".');
 
+/** The standing-instruction proposal: as any proposal, and how many steps are Q's own. */
+export const StandingProposalOutputSchema = ProposalOutputSchema.extend({
+  onItsOwn: z.number().int().min(0),
+}).strict();
+export type StandingProposalOutput = z.infer<
+  typeof StandingProposalOutputSchema
+>;
+
 export const ProposeStandingInstructionInputSchema = z
   .object({
     goal: z
@@ -541,7 +549,7 @@ export function createQWorkTools(
       },
     }),
 
-    defineQTool<ProposeStandingInstructionInput, ProposalOutput, null>({
+    defineQTool<ProposeStandingInstructionInput, StandingProposalOutput, null>({
       ...OWN,
       id: PROPOSE_STANDING_INSTRUCTION,
       providerName: "propose_standing_instruction",
@@ -552,7 +560,7 @@ export function createQWorkTools(
       approval: "NONE",
       visibleStage: "WAITING_FOR_APPROVAL",
       input: ProposeStandingInstructionInputSchema,
-      output: ProposalOutputSchema,
+      output: StandingProposalOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
           ownConversation(actor, plan)
@@ -596,6 +604,13 @@ export function createQWorkTools(
           topics: input.topics.length > 0 ? input.topics : undefined,
           includeNewCompanies: input.includeNewCompanies,
         });
+        // The default's AUTO set only when they handed over the doing
+        // (weekend test 6ea17898: "find new founders ... and prepare
+        // intros" became AUTO interest, chat and booking).
+        const actions =
+          input.askFirst || !input.handsOverDoing
+            ? base.actions.map((entry) => ({ ...entry, mode: "ASK" as const }))
+            : base.actions;
         const status = port.prepareForApproval({
           runId: context.runId,
           tenantId: context.actor.tenantId,
@@ -607,13 +622,7 @@ export function createQWorkTools(
               goal: input.goal,
               grant: {
                 ...base,
-                // The default's AUTO set only when they handed over the
-                // doing (weekend test 6ea17898: "find new founders ... and
-                // prepare intros" became AUTO interest, chat and booking).
-                actions:
-                  input.askFirst || !input.handsOverDoing
-                    ? base.actions.map((entry) => ({ ...entry, mode: "ASK" }))
-                    : base.actions,
+                actions,
                 counterparts: {
                   ...(input.relationshipIds.length > 0
                     ? {
@@ -646,6 +655,9 @@ export function createQWorkTools(
         return {
           status,
           awaitingApprovalOf: "Q works on this for you, inside these limits",
+          // How many steps the card lets Q take on its own: the reply's
+          // words are drawn from this grant, never assumed.
+          onItsOwn: actions.filter((entry) => entry.mode === "AUTO").length,
         };
       },
     }),

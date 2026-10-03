@@ -147,6 +147,11 @@ describe("propose_standing_instruction: prepare is not do (weekend test 6ea17898
     const prepare = await world().propose({
       goal: "Find new founders matching my mandate and prepare intros",
     });
+    // The tool says how many steps are Q's own: none here.
+    expect(
+      prepare.outcome.result.ok &&
+        (prepare.outcome.result.data as { onItsOwn: number }).onItsOwn,
+    ).toBe(0);
     const asked = grantOf(prepare.prepared[0]).actions;
     expect(asked.length).toBeGreaterThan(0);
     expect(asked.every((entry) => entry.mode === "ASK")).toBe(true);
