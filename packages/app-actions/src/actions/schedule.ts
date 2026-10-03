@@ -73,6 +73,10 @@ const REFUSALS: Readonly<
     code: "VALIDATION_FAILED",
     detail: "Choose a time in the future.",
   },
+  KEY_REUSED: {
+    code: "RESOURCE_CONFLICT",
+    detail: "That request key was already used for something else. Try again.",
+  },
 };
 
 /** A schedule outcome as the problem the routes answer; null when it is OK. */

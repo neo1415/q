@@ -77,6 +77,7 @@ type Refusal =
   | "NOT_ORGANISER"
   | "CANCELLED"
   | "INVALID_TIME"
+  | "KEY_REUSED"
   | "UNAVAILABLE";
 
 /** The schedule as Q may see it, for the invoker only. */
