@@ -57,7 +57,7 @@ export default async function SettingsPage({
               <ThemeToggle />
             </SettingRow>
             <SettingRow term="Q motion">
-              <QMotionToggle />
+              <QMotionToggle size="touch" />
             </SettingRow>
           </dl>
         </PageSection>
