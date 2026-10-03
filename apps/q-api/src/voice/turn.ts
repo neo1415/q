@@ -70,6 +70,16 @@ import {
   speakable,
 } from "./speech.js";
 import { utteranceRefOf } from "./utterance.js";
+import { isEcho, isFragment } from "./approval-reply.js";
+import {
+  approvalCue,
+  declines,
+  isReplyToCard,
+  plainApproval,
+  plainRefusal,
+  statusLine,
+  type PendingTurnReading,
+} from "@capital-q/q-specialists";
 
 /**
  * One spoken turn (CQ-Q-VOICE-001 C §35-§40).
@@ -228,6 +238,11 @@ export function latestUtterance(
   const last = [...transcript].reverse().find((turn) => turn.role === "user");
   const text = withoutContinueSignal(last?.content ?? "").trim();
   return text.length === 0 ? null : text.slice(0, VOICE_TURN_MAX_CHARS);
+}
+
+/** A card's summary as a phrase: no trailing full stop. */
+function named(summary: string): string {
+  return summary.trim().replace(/[.\s]+$/u, "");
 }
 
 /** The conversation so far as the provider transcribed it, per binding. */
@@ -781,19 +796,32 @@ export function createVoiceTurnHandler(
           correlationId,
           signal,
         );
+        // Said by name, so they hear what was approved (lead 2026-10-03).
         line =
-          ended === "COMPLETED"
-            ? "Saved. What would you like to do next?"
-            : ended === "FAILED"
-              ? "Approved, but it didn't go through, so it's not saved. Ask me again in a moment, or change it from your company page."
-              : "Approved. It's being saved now.";
+          waiting.summary === null
+            ? ended === "COMPLETED"
+              ? "Saved. What would you like to do next?"
+              : ended === "FAILED"
+                ? "Approved, but it didn't go through, so it's not saved. Ask me again in a moment, or change it from your company page."
+                : "Approved. It's being saved now."
+            : statusLine(
+                ended === "COMPLETED"
+                  ? "SAVED"
+                  : ended === "FAILED"
+                    ? "NOT_SAVED"
+                    : "SAVING",
+                waiting.summary,
+              );
       } else {
         await approvals.reject({
           actor: binding.actor,
           approvalId,
           correlationId,
         });
-        line = "Alright, nothing changes.";
+        line =
+          waiting.summary === null
+            ? "Alright, nothing changes."
+            : statusLine("DECLINED", waiting.summary);
       }
     } catch (error: unknown) {
       logger.warn(
@@ -1611,6 +1639,46 @@ export function createVoiceTurnHandler(
     return { decision: "UNRELATED", remainder: null };
   };
 
+  /** The turn reader's reading of a reply to a waiting card; null unread. */
+  const readTurnForCard = async (
+    binding: VoiceSessionBinding,
+    text: string,
+    signal: AbortSignal,
+  ): Promise<PendingTurnReading | null> => {
+    const reader = dependencies.turns;
+    if (reader === undefined) return null;
+    const read = await reader
+      .read({
+        utterance: text,
+        recentTurns: transcriptOf(binding)
+          .slice(0, -1)
+          .slice(-6)
+          .map((turn) => ({
+            role: turn.role === "person" ? ("USER" as const) : ("Q" as const),
+            text: turn.text,
+          })),
+        modality: "VOICE",
+        attribution: {
+          tenantId: binding.actor.tenantId,
+          userId: binding.actor.userId,
+          correlationId: createCorrelationId(),
+        },
+        signal,
+      })
+      .catch(() => null);
+    if (read === null) return null;
+    return {
+      kind: read.kind,
+      // Words not meant for Q (the room, a call) decide nothing.
+      addressedToQ: read.addressedToQ ?? true,
+      namesAction:
+        (typeof read.askedAction === "string" && read.askedAction.length > 0) ||
+        (read.appAction ?? null) !== null ||
+        (read.tool ?? null) !== null ||
+        (read.handOver ?? null) !== null,
+    };
+  };
+
   const handle: VoiceTurnHandler = async (
     binding,
     transcript,
@@ -1690,30 +1758,96 @@ export function createVoiceTurnHandler(
       return handle(binding, rest, signal, speaker);
     };
     // A proposal Q made, waiting for yes or no (CQ-Q-008, ADR 0011).
+    // Only a spoken reply to it decides it (lead 2026-10-03): never a
+    // request or a statement, a fragment, or Q's own voice heard back.
     const approvalWaiting = pendingApproval.get(binding);
     if (approvalWaiting !== undefined && dependencies.approvals !== undefined) {
-      const read = await decide(
-        binding,
-        `${approvalWaiting.summary ?? "I've prepared something that needs your approval."} Shall I go ahead?`,
-        text,
-        signal,
-      );
-      if (read.decision !== "UNRELATED") {
+      const qLines = transcript
+        .slice(-6)
+        .filter((turn) => turn.role !== "user")
+        .map((turn) => turn.content);
+      if (isEcho(text, qLines)) {
+        // Q heard itself: not a turn, and the card still waits.
+        logger.info(
+          { qVoiceSessionId: binding.voiceSessionId },
+          "q's own words heard back while a card waits; ignored",
+        );
+        return { kind: "NOTHING" };
+      }
+      // A fragment ("go ahead with the") decides nothing; the card keeps
+      // waiting for the whole reply, and the fragment is answered as any.
+      const fragment = isFragment(text);
+      const summary =
+        approvalWaiting.summary ??
+        "I've prepared something that needs your approval.";
+      const plain = plainApproval(text) || plainRefusal(text);
+      const [read, reading] = fragment
+        ? [null, null]
+        : await Promise.all([
+            decide(binding, `${summary} Shall I go ahead?`, text, signal),
+            plain || dependencies.turns === undefined
+              ? Promise.resolve(null)
+              : readTurnForCard(binding, text, signal),
+          ]);
+      // Without a turn reader composed, the decision reading is all there
+      // is, as before; with one, an unread turn is no reply.
+      const reply =
+        read !== null &&
+        (plain ||
+          dependencies.turns === undefined ||
+          isReplyToCard(text, reading));
+      const decision =
+        read === null || !reply
+          ? "UNRELATED"
+          : read.decision === "YES"
+            ? approvalCue(text)
+              ? "APPROVE"
+              : "WAITING"
+            : read.decision === "NO"
+              ? declines(text, { summary })
+                ? "REJECT"
+                : "UNRELATED"
+              : "UNRELATED";
+      if (read !== null) {
+        logger.info(
+          {
+            qVoiceSessionId: binding.voiceSessionId,
+            read: read.decision,
+            reply,
+            decision,
+            turnKind: reading?.kind ?? null,
+          },
+          "a spoken reply to a waiting card was read",
+        );
+      }
+      if (decision === "APPROVE" || decision === "REJECT") {
         pendingApproval.delete(binding);
         return carryOn(
-          read,
+          read ?? { decision: "UNRELATED", remainder: null },
           await decideApproval(
             binding,
             approvalWaiting,
-            read.decision === "YES" ? "APPROVE" : "REJECT",
+            decision,
             signal,
             speaker,
           ),
         );
       }
+      if (decision === "WAITING") {
+        // A yes in meaning without an approving word: it stays waiting.
+        return (await speakLine(
+          speaker,
+          `That's ready: ${named(summary)}. It's waiting for your yes.`,
+          signal,
+          binding,
+        ))
+          ? { kind: "SPOKEN", path: "MOVE" }
+          : { kind: "INTERRUPTED", path: "MOVE" };
+      }
       // Anything else: the proposal stays on screen, where it can still
-      // be decided; the conversation moves on.
-      pendingApproval.delete(binding);
+      // be decided; the conversation moves on. A fragment keeps the
+      // question open for the whole reply.
+      if (!fragment) pendingApproval.delete(binding);
     }
     // "Is this you?", answered.
     if (awaitingRecognition.has(binding)) {

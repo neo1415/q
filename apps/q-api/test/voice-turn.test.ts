@@ -1544,7 +1544,10 @@ describe("a spoken question for Q", () => {
     expect(resumed).toHaveLength(1);
     // The fake run never reports its end, so Q says the yes is recorded
     // and under way rather than claiming it is done.
-    expect(yes.spoken.join(" ")).toMatch(/^(Saved|Approved)\./);
+    // Said by name (lead 2026-10-03): what was approved, not just "Saved".
+    expect(yes.spoken.join(" ")).toMatch(
+      /^(?:Done|Approved): Update your company profile\./,
+    );
     // A yes was the decision; no run was started for the word "yes".
     expect(runtime.calls.createRun).toHaveLength(1);
   });
@@ -1624,13 +1627,197 @@ describe("a spoken question for Q", () => {
       "Change what I call you to John. Shall I go ahead?",
     ]);
     expect(approvals.approve).toHaveLength(1);
-    expect(yes.spoken.join(" ")).toMatch(/^(Saved|Approved)\./);
+    expect(yes.spoken.join(" ")).toMatch(
+      /^(?:Done|Approved): Change what I call you to John/,
+    );
     // The remainder became the next turn: a run of its own, after the yes.
     expect(runtime.calls.createRun).toHaveLength(2);
     expect(
       (runtime.calls.createRun[1] as { input: { message: { text: string } } })
         .input.message.text,
     ).toBe("what's the weather like?");
+  });
+
+  /**
+   * Lead 2026-10-03 (after run ad0b0067 on the typed path): only a spoken
+   * reply to the card decides it. A request or a statement, a fragment the
+   * recogniser handed over early, Q's own voice heard back, or words not
+   * meant for Q never approve -- whatever DECISION_READER reads.
+   */
+  describe("only a spoken reply decides a waiting card", () => {
+    const SUMMARY = "Share your raise with Savanna Seed";
+    const setup = (
+      reading: Partial<QTurnReading> | null,
+      decision: "YES" | "NO" = "YES",
+    ) => {
+      const runtime = fakeRuntime();
+      const approvals = { approve: [] as unknown[], reject: [] as unknown[] };
+      const turnReads: string[] = [];
+      const handle = createVoiceTurnHandler({
+        qRuntime: runtime.service,
+        qStream: fakeStream([
+          event("q.action.proposed", {
+            proposal: { proposalId: "p1", summary: SUMMARY },
+          }),
+          event("q.approval.required", {
+            approvalId: "33333333-3333-4333-8333-333333333333",
+            proposalId: "p1",
+          }),
+        ]),
+        approvals: {
+          approve: (command: unknown) => {
+            approvals.approve.push(command);
+            return Promise.resolve({
+              decided: true,
+              action: { runId: RUN_ID },
+              view: {},
+            } as never);
+          },
+          reject: (command: unknown) => {
+            approvals.reject.push(command);
+            return Promise.resolve({} as never);
+          },
+        },
+        // The decision reader always hears a decision: the gate is the turn.
+        decisions: {
+          read: () => Promise.resolve({ decision, remainder: null }),
+        },
+        turns: {
+          read: (input) => {
+            turnReads.push(input.utterance);
+            return Promise.resolve(
+              reading === null
+                ? null
+                : {
+                    kind: "ANSWER",
+                    confidence: "HIGH",
+                    transcript: "CLEAR",
+                    question: null,
+                    aboutNamedOther: false,
+                    tool: null,
+                    ...reading,
+                  },
+            );
+          },
+        },
+        logger,
+      });
+      const bound = binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: undefined,
+      });
+      const say = async (words: string) => {
+        const speaker = fakeSpeaker();
+        await handle(
+          bound,
+          [
+            { role: "user", content: "Share my raise with Savanna Seed." },
+            { role: "agent", content: `${SUMMARY}. Shall I go ahead?` },
+            { role: "user", content: words },
+          ],
+          new AbortController().signal,
+          speaker,
+        );
+        return speaker.spoken.join(" ");
+      };
+      const prepare = () =>
+        handle(
+          bound,
+          [{ role: "user", content: "Share my raise with Savanna Seed." }],
+          new AbortController().signal,
+          fakeSpeaker(),
+        );
+      return { approvals, say, prepare, turnReads, runtime };
+    };
+
+    it.each([
+      [
+        "We've decided not to proceed with Ledgefold for now.",
+        { kind: "TOOL_REQUEST", askedAction: "relationship_outcome" },
+      ],
+      [
+        "Don't proceed.",
+        { kind: "TOOL_REQUEST", askedAction: "relationship_outcome" },
+      ],
+      [
+        "Let's proceed with the pass on Ledgerfold.",
+        { kind: "ANSWER", askedAction: "relationship_outcome" },
+      ],
+      ["Share my raise with Savanna Seed.", { kind: "TOOL_REQUEST" }],
+      // Overheard: the room, not Q.
+      ["Yeah, go ahead and take it, Tunde.", { addressedToQ: false }],
+      // Unread: no reading, no decision.
+      ["Okay, go ahead then, sounds right.", null],
+    ] as const)("%s: never approved or declined", async (words, reading) => {
+      for (const decision of ["YES", "NO"] as const) {
+        const run = setup(reading, decision);
+        await run.prepare();
+        await run.say(words);
+        expect(run.approvals.approve).toHaveLength(0);
+        expect(run.approvals.reject).toHaveLength(0);
+      }
+    });
+
+    it.each(["go ahead with the", "yes, go ahead and…", "approve it but-"])(
+      "a fragment (%s) never approves, and the card keeps waiting for the whole reply",
+      async (fragment) => {
+        const run = setup({ kind: "ANSWER" });
+        await run.prepare();
+        await run.say(fragment);
+        expect(run.approvals.approve).toHaveLength(0);
+        // The whole reply, once said, still decides it.
+        const spoken = await run.say("Yes, go ahead.");
+        expect(run.approvals.approve).toHaveLength(1);
+        expect(spoken).toMatch(
+          /^(?:Done|Approved): Share your raise with Savanna Seed/,
+        );
+      },
+    );
+
+    it.each([
+      "Shall I go ahead?",
+      "share your raise with Savanna Seed shall I go ahead",
+      "your raise with Savanna Seed",
+    ])(
+      "Q's own voice heard back (%s) is no turn and approves nothing",
+      async (echo) => {
+        const run = setup({ kind: "ANSWER" });
+        await run.prepare();
+        const created = run.runtime.calls.createRun.length;
+        const spoken = await run.say(echo);
+        expect(run.approvals.approve).toHaveLength(0);
+        expect(spoken).toBe("");
+        expect(run.runtime.calls.createRun).toHaveLength(created);
+      },
+    );
+
+    it.each([
+      ["Yes, go ahead.", { kind: "TOOL_REQUEST" }],
+      ["Approve it.", { kind: "TOOL_REQUEST" }],
+      ["Yes, please do.", { kind: "ANSWER" }],
+    ] as const)(
+      "%s approves, and says what by name",
+      async (words, reading) => {
+        const run = setup(reading);
+        await run.prepare();
+        const spoken = await run.say(words);
+        expect(run.approvals.approve).toHaveLength(1);
+        expect(spoken).toMatch(
+          /^(?:Done|Approved): Share your raise with Savanna Seed/,
+        );
+      },
+    );
+
+    it("a plain no declines it by name", async () => {
+      const run = setup({ kind: "ANSWER" }, "NO");
+      await run.prepare();
+      const spoken = await run.say("No, cancel that.");
+      expect(run.approvals.reject).toHaveLength(1);
+      expect(spoken).toBe(
+        "Declined: Share your raise with Savanna Seed. Nothing was changed.",
+      );
+    });
   });
 
   it("leaves a proposal on screen when the reply is about something else", async () => {

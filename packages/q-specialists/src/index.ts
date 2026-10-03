@@ -204,8 +204,14 @@ export {
   type IllustrationPort,
 } from "./company/deck-illustrations.js";
 export {
+  approvalCue,
   decidePending,
+  declines,
+  isReplyToCard,
+  plainApproval,
+  plainRefusal,
   statusLine,
+  type PendingTurnReading,
   type PendingDecisionContext,
   type PendingDecisionOutcome,
   type PendingDecisionPort,

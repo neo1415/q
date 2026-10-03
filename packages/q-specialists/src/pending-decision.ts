@@ -142,8 +142,22 @@ const REPLY_KINDS: ReadonlySet<string> = new Set([
  * go ahead", "approve it", "no thanks"), which hold no request of their
  * own, or a turn the reader read as a reply. An unread turn is not one.
  */
-function isReply(utterance: string, turn: PendingTurnReading | null): boolean {
+export function isReplyToCard(
+  utterance: string,
+  turn: PendingTurnReading | null,
+): boolean {
   if (plainApproval(utterance) || plainRefusal(utterance)) return true;
+  // "Approved. And what's the weather like?": a reply first, then more.
+  // Only a first sentence that is nothing but a yes or a no counts; "We've
+  // decided not to proceed…" is no such sentence.
+  const first = /^[^.!?]+[.!?]/u.exec(utterance.trim())?.[0];
+  if (
+    first !== undefined &&
+    first.trim().length < utterance.trim().length &&
+    (plainApproval(first) || plainRefusal(first))
+  ) {
+    return true;
+  }
   return (
     turn !== null &&
     turn.addressedToQ &&
@@ -240,7 +254,9 @@ export async function decidePending(
   // grants it. A request or a statement in its own right, even one that
   // restates the card, approves and declines nothing.
   const reply =
-    input.turn === undefined ? true : isReply(input.utterance, input.turn);
+    input.turn === undefined
+      ? true
+      : isReplyToCard(input.utterance, input.turn);
   // Approval binds to words that approve. Asking for the same thing again
   // is not a yes: with no approval word, a reading that it is about this
   // change says it is ready and waiting, and nothing is approved.
@@ -379,7 +395,7 @@ const REFUSAL_WORDS = [
  * "no thanks"), one that opens with "no,", one that points at it ("cancel
  * that", "don't do it"), or one that names its counterpart. A new request, even read NO, is none.
  */
-function declines(
+export function declines(
   utterance: string,
   card: { readonly summary: string },
 ): boolean {
@@ -410,8 +426,8 @@ export function plainRefusal(utterance: string): boolean {
 }
 
 /** Any word that can approve; without one, nothing is approved. */
-function approvalCue(utterance: string): boolean {
-  return /\b(?:yes|yeah|yep|yup|ok|okay|sure|approv\w*|go ahead|proceed|confirm\w*|do it|send it|agreed?)\b/iu.test(
+export function approvalCue(utterance: string): boolean {
+  return /\b(?:yes|yeah|yep|yup|ok|okay|sure|alright|all right|sounds good|please do|absolutely|definitely|approv\w*|go ahead|proceed|confirm\w*|do it|send it|agreed?)\b/iu.test(
     utterance,
   );
 }
@@ -547,7 +563,7 @@ async function answeredAlready(
   const latest = all.at(-1);
   if (latest === undefined) return { kind: "NONE" };
   // A request of its own is answered as one, never as "already done".
-  if (input.turn !== undefined && !isReply(input.utterance, input.turn)) {
+  if (input.turn !== undefined && !isReplyToCard(input.utterance, input.turn)) {
     return { kind: "NONE" };
   }
   // An explicit approval needs no reading; a bare "ok" or "yes" might
