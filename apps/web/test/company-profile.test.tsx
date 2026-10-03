@@ -240,6 +240,22 @@ describe("the profile, for an investor", () => {
     ).toBeTruthy();
   });
 
+  it("keeps Interest and Pass alone in the decision row and folds the details on a phone (design-48)", () => {
+    renderProfile(investorProfile());
+    const row = document.querySelector("[data-profile-actions]");
+    const buttons = [...(row?.querySelectorAll("button") ?? [])].map(
+      (button) => button.textContent,
+    );
+    expect(buttons.some((text) => /deck/i.test(text ?? ""))).toBe(false);
+    const fold = document.querySelector(
+      "details[data-phone-fold=company-details]",
+    );
+    expect(fold?.hasAttribute("open")).toBe(false);
+    expect(
+      screen.getByRole("heading", { name: "Company details" }),
+    ).toBeTruthy();
+  });
+
   it("ADR 0042: an unscanned deck says 'Not virus-scanned yet' beside its download; a scanned one does not", () => {
     const base = investorProfile();
     const overview = base.overview;

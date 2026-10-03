@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type {
   CompanyProfileDto,
@@ -6,8 +7,8 @@ import type {
   InterestDto,
   RelationshipStateV2,
 } from "@capital-q/contracts";
-import { buttonClassName } from "@capital-q/ui/button";
 import {
+  ChevronDown,
   ChevronRight,
   Globe,
   ICON_SIZE,
@@ -232,7 +233,7 @@ export function CompanyProfileView({
             {profile.canonicalName}
           </h1>
           {profile.shortDescription === null ? null : (
-            <p className="cq-body text-(--cq-text-primary)">
+            <p className="cq-body line-clamp-3 text-(--cq-text-primary) sm:line-clamp-none">
               {profile.shortDescription}
             </p>
           )}
@@ -266,16 +267,9 @@ export function CompanyProfileView({
             companyId={profile.companyId}
             companyName={profile.canonicalName}
           />
-          {overview?.deck == null ? null : (
-            <DeckDownload
-              companyId={profile.companyId}
-              title={overview.deck.title}
-              scanned={overview.deck.scanned}
-            />
-          )}
           <Link
             href={`/relationships/company/${encodeURIComponent(profile.companyId)}`}
-            className={buttonClassName("quiet")}
+            className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
           >
             Your relationship
             <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
@@ -433,18 +427,20 @@ export function CompanyProfileView({
                   : []),
               ]}
             />
+            {/* The deck is downloaded where it is named (design-48 v2: the
+                decision row keeps Interest and Pass only). */}
+            {!investor || overview.deck === null ? null : (
+              <div className="pt-2">
+                <DeckDownload
+                  companyId={profile.companyId}
+                  title={overview.deck.title}
+                  scanned={overview.deck.scanned}
+                />
+              </div>
+            )}
           </section>
 
-          <section
-            className="flex max-w-(--cq-layout-narrow) flex-col gap-1"
-            aria-labelledby="company-details"
-          >
-            <h2
-              id="company-details"
-              className="cq-title-sm text-(--cq-text-primary)"
-            >
-              Company details
-            </h2>
+          <PhoneFold id="company-details" title="Company details">
             <ProfileRows
               rows={[
                 [
@@ -482,7 +478,7 @@ export function CompanyProfileView({
                     ] as const)),
               ]}
             />
-          </section>
+          </PhoneFold>
 
           {/*
             What is known on the three evidence axes, and why it is in the
@@ -497,5 +493,39 @@ export function CompanyProfileView({
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * A section folded behind its heading on a phone and open on a large
+ * screen (design-48 v2), through ::details-content; folded, one tap away,
+ * where that is unsupported.
+ */
+function PhoneFold({
+  id,
+  title,
+  children,
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <details
+      className="group flex max-w-(--cq-layout-narrow) flex-col border-t border-(--cq-border-subtle) lg:border-t-0 lg:[&::details-content]:[content-visibility:visible]"
+      data-phone-fold={id}
+    >
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 lg:pointer-events-none lg:min-h-0 [&::-webkit-details-marker]:hidden">
+        <h2 id={id} className="cq-title-sm text-(--cq-text-primary)">
+          {title}
+        </h2>
+        <ChevronDown
+          size={ICON_SIZE.regular}
+          aria-hidden="true"
+          className="text-(--cq-text-tertiary) transition-transform group-open:rotate-180 lg:hidden"
+        />
+      </summary>
+      <div className="flex flex-col gap-1 pt-1">{children}</div>
+    </details>
   );
 }
