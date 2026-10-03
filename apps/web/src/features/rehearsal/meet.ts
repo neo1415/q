@@ -27,6 +27,27 @@ export function elapsedLabel(fromMs: number, nowMs: number): string {
     : `${String(minutes)}:${ss}`;
 }
 
+/**
+ * How long the rehearsal ran, for its review: seconds under a minute
+ * (QA 064ff78f: "Length 0 min" beside a 0:24 header), minutes after.
+ */
+export function lengthWords(
+  createdAt: string,
+  endedAt: string | null,
+  minutes: number,
+): string {
+  if (endedAt !== null) {
+    const seconds = Math.max(
+      0,
+      Math.round((Date.parse(endedAt) - Date.parse(createdAt)) / 1_000),
+    );
+    if (Number.isFinite(seconds) && seconds < 60) {
+      return `${String(seconds)} sec`;
+    }
+  }
+  return `${String(minutes)} min`;
+}
+
 export function initialsOf(name: string): string {
   const words = name
     .replace(/[^\p{L}\p{N}\s]/gu, " ")

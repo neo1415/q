@@ -78,7 +78,11 @@ export function questionOpenIn(
     readonly move?: string | undefined;
   }[],
 ): boolean {
-  const lastTheirs = [...turns].reverse().find((turn) => turn.from === "THEM");
+  // Code's own yield to a raised hand is not their question: look past it
+  // to the line before (QA rehearsal 064ff78f).
+  const lastTheirs = [...turns]
+    .reverse()
+    .find((turn) => turn.from === "THEM" && turn.move !== "YIELD");
   if (lastTheirs === undefined) return false;
   if (lastTheirs.move !== undefined) {
     return lastTheirs.move === "QUESTION" || lastTheirs.move === "FOLLOW_UP";

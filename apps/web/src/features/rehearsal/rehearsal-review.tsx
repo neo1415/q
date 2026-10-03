@@ -12,6 +12,7 @@ import {
   OUTCOME_WORDS,
   RATING_WORDS,
   elapsedLabel,
+  lengthWords,
 } from "./meet";
 import { ReviewRefresh } from "./review-refresh";
 
@@ -127,7 +128,14 @@ export function RehearsalReview({
                 `${String(rehearsal.metrics.longestAnswerWords)} words`,
               ],
               ["Your answers", String(rehearsal.metrics.exchanges)],
-              ["Length", `${String(rehearsal.metrics.minutes)} min`],
+              [
+                "Length",
+                lengthWords(
+                  rehearsal.createdAt,
+                  rehearsal.endedAt,
+                  rehearsal.metrics.minutes,
+                ),
+              ],
             ].map(([label, value]) => (
               <div key={label} className="flex flex-col">
                 <dt className="cq-caption text-(--cq-text-tertiary)">

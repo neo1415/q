@@ -109,6 +109,7 @@ import { MEETING_HOST_TURN_V1 } from "./tasks/meeting-host-turn.v1.js";
 import { MEETING_HOST_TURN_V2 } from "./tasks/meeting-host-turn.v2.js";
 import { REHEARSAL_SCORE_V3 } from "./tasks/rehearsal-score.v3.js";
 import { REHEARSAL_SCORE_V4 } from "./tasks/rehearsal-score.v4.js";
+import { REHEARSAL_SCORE_V5 } from "./tasks/rehearsal-score.v5.js";
 import { FOUNDER_RESEARCH_READER_V1 } from "./tasks/founder-research-reader.v1.js";
 import { PROFILE_GAP_READER_V1 } from "./tasks/profile-gap-reader.v1.js";
 import { APP_ACTION_ARGUMENTS_V1 } from "./tasks/app-action-arguments.v1.js";
@@ -400,6 +401,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     MEETING_HOST_TURN_V2,
     REHEARSAL_SCORE_V3,
     REHEARSAL_SCORE_V4,
+    REHEARSAL_SCORE_V5,
     FOUNDER_RESEARCH_READER_V1,
     PROFILE_GAP_READER_V1,
     APP_ACTION_ARGUMENTS_V1,

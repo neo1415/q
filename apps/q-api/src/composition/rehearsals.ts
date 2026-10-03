@@ -1676,9 +1676,13 @@ export function createRehearsalService(dependencies: {
       initialTemperament(row.difficulty, persona.temperament.baseline);
     // The register the machine left them in on their last line; before
     // any, where the persona and difficulty start them.
+    // Code's own lines (a yield to a raised hand, a holding line) carry no
+    // register: the machine's last one is before them (QA rehearsal
+    // 064ff78f: after a yield the register was re-derived from the numbers
+    // and a strong answer was met angry).
     const lastTheirs = [...turns]
       .reverse()
-      .find((turn) => turn.from === "THEM");
+      .find((turn) => turn.from === "THEM" && turn.register !== undefined);
     const registerBefore: Register = (REGISTERS as readonly string[]).includes(
       lastTheirs?.register ?? "",
     )
@@ -1687,7 +1691,7 @@ export function createRehearsalService(dependencies: {
     // Their dodges in a row, newest first, as code categorised them.
     let dodgeStreak = 0;
     for (const turn of [...turns].reverse()) {
-      if (turn.from !== "THEM") continue;
+      if (turn.from !== "THEM" || turn.move === "YIELD") continue;
       if (turn.category !== "DODGE") break;
       dodgeStreak += 1;
     }

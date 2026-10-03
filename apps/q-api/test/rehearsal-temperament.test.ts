@@ -237,6 +237,16 @@ describe("the question on the table", () => {
     expect(theyAskedIn([{ from: "YOU", text: "We grew 12% a month." }])).toBe(
       false,
     );
+    // Code's yield to a raised hand is not their question: their question
+    // before it is still open (QA 064ff78f: the strong answer after a
+    // raised hand was read with no question open).
+    expect(
+      questionOpenIn([
+        { from: "THEM", text: "What's your repayment rate?", move: "QUESTION" },
+        { from: "THEM", text: "Go ahead.", move: "YIELD" },
+        { from: "YOU", text: "Fifty-two thousand users, 1% per payout." },
+      ]),
+    ).toBe(true);
   });
 
   it("the whole note to the model stays within its bound", () => {
@@ -433,6 +443,15 @@ describe("the temperament machine", () => {
       "NONE",
     ],
     ["bad news: sad", { category: "HURTING", hurt: 50 }, "SAD", null, "NONE"],
+    // QA 064ff78f: after a raised hand, the strong answer met anger -- the
+    // previous register is the machine's last (impatient), not re-derived.
+    [
+      "a strong answer after a raised hand, from impatient: down a step",
+      { category: "STRONG", previous: "EXASPERATED" },
+      "EVEN",
+      null,
+      "NONE",
+    ],
   ] as const)("%s", (_label, input, register, warning, close) => {
     expect(step(input as Partial<TemperamentInput>)).toEqual({
       register,

@@ -10,6 +10,7 @@ import {
   greySignature,
   initialsOf,
   OUTCOME_WORDS,
+  lengthWords,
   screenChanged,
   moodWord,
   shouldNudgeSilence,
@@ -69,6 +70,16 @@ describe("rehearsal room helpers", () => {
     expect(OUTCOME_WORDS.STRONG_LATER).toBe("Strong chance later");
     expect(OUTCOME_WORDS.ADJOURNED).toContain("missing");
     expect(OUTCOME_WORDS.FOUNDER_ENDED).toBe("You ended the meeting");
+  });
+
+  it("says seconds under a minute, minutes after (QA 064ff78f)", () => {
+    expect(
+      lengthWords("2026-10-03T18:24:26.000Z", "2026-10-03T18:24:50.000Z", 0),
+    ).toBe("24 sec");
+    expect(
+      lengthWords("2026-10-03T18:24:26.000Z", "2026-10-03T18:31:26.000Z", 7),
+    ).toBe("7 min");
+    expect(lengthWords("2026-10-03T18:24:26.000Z", null, 3)).toBe("3 min");
   });
 });
 

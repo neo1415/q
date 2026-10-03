@@ -73,8 +73,16 @@ describe("lenient rehearsal readings", () => {
   it("is what the active persona and review prompts ask for", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(5);
-    expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(4);
+    expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(5);
     expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(9);
+  });
+
+  it("the review writes to them as you, never by their role (QA 064ff78f)", () => {
+    const template =
+      createDefaultPromptRegistry().getActive("REHEARSAL_SCORE").definition
+        .template;
+    expect(template).toContain('as "you" and "your"');
+    expect(template).toContain('Never call them "the founder"');
   });
 
   it("tells the played person who holds the leverage, and reads how forward they are", () => {

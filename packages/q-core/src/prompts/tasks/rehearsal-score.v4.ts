@@ -48,7 +48,7 @@ export const REHEARSAL_SCORE_V4: PromptDefinition<
 > = {
   ...REHEARSAL_SCORE_V3,
   version: 4,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-10-01: review only the person rehearsing, in their role (an investor graded on diligence, control, fairness, decision clarity, professionalism), quoting only their own lines.",
   effectiveFrom: "2026-10-01",

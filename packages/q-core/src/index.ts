@@ -392,6 +392,10 @@ export {
 export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
 export { REHEARSAL_SCORE_V4 } from "./prompts/tasks/rehearsal-score.v4.js";
 export {
+  REHEARSAL_SCORE_V5,
+  REHEARSAL_SCORE_V5_RULE,
+} from "./prompts/tasks/rehearsal-score.v5.js";
+export {
   REHEARSAL_CONCLUSIONS,
   REHEARSAL_CUES,
   REHEARSAL_CUES_V3,
