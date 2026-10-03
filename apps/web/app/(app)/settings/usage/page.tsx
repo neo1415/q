@@ -13,9 +13,9 @@ import {
 } from "@/components/app-shell/page-container";
 import { allowanceLine } from "@/features/billing/plan-words";
 import {
+  callsLine,
   dollars,
   headline,
-  monthName,
   taskName,
 } from "@/features/billing/usage-words";
 import { qApiSession } from "@/features/q/context";
@@ -63,11 +63,7 @@ function Usage({ usage }: { readonly usage: QUsageDto }) {
       <PageSection
         id="month"
         title={headline(usage)}
-        description={`${monthName(usage.month)}, ${String(usage.calls)} model ${usage.calls === 1 ? "call" : "calls"}${
-          usage.unpricedCalls > 0
-            ? `, ${String(usage.unpricedCalls)} without a price yet (counted at no cost)`
-            : ""
-        }.`}
+        description={callsLine(usage)}
       >
         {usage.byTask.length === 0 ? null : (
           <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">

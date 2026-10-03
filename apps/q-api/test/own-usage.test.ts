@@ -27,6 +27,7 @@ describe("the person's own usage", () => {
           totalUsd: "0.173000",
           calls: 5,
           unpricedCalls: 1,
+          failedCalls: 2,
           byPurpose: [
             { purpose: "REHEARSAL", usd: "0.120000", calls: 2 },
             { purpose: "INSTRUCTION", usd: "0.053000", calls: 3 },
@@ -87,6 +88,7 @@ describe("the person's own usage", () => {
       },
     ]);
     expect(dto.month).toBe("2026-10");
+    expect([dto.unpricedCalls, dto.failedCalls]).toEqual([1, 2]);
     expect(dto.instructions).toEqual([
       {
         instructionId: mine,
@@ -105,6 +107,7 @@ describe("the person's own usage", () => {
           totalUsd: "0",
           calls: 0,
           unpricedCalls: 0,
+          failedCalls: 0,
           byPurpose: [],
           byInstruction: [],
         }),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  callsLine,
   dollars,
   headline,
   monthName,
@@ -30,5 +31,18 @@ describe("Settings → Usage words", () => {
     );
     expect(monthName("2026-10")).toBe("October 2026");
     expect(taskName("INSTRUCTION")).toBe("Standing instructions");
+  });
+
+  it("says failed calls are not charged, never 'without a price'", () => {
+    const base = { month: "2026-10", calls: 620, unpricedCalls: 0 };
+    expect(callsLine({ ...base, failedCalls: 130 })).toBe(
+      "October 2026, 620 model calls, 130 failed calls, not charged.",
+    );
+    expect(callsLine({ ...base, failedCalls: 1, unpricedCalls: 2 })).toBe(
+      "October 2026, 620 model calls, 1 failed call, not charged, 2 without a price yet (counted at no cost).",
+    );
+    expect(callsLine({ ...base, calls: 1 })).toBe(
+      "October 2026, 1 model call.",
+    );
   });
 });

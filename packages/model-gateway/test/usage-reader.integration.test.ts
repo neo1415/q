@@ -111,6 +111,7 @@ describe("the usage read", () => {
         expect(own.totalUsd).toBe("0.173000");
         expect(own.calls).toBe(5);
         expect(own.unpricedCalls).toBe(1);
+        expect(own.failedCalls).toBe(0);
         expect(own.byPurpose).toEqual([
           { purpose: "REHEARSAL", usd: "0.120000", calls: 2 },
           { purpose: "CONVERSATION", usd: "0.050000", calls: 1 },

@@ -21,8 +21,10 @@ export const QUsageDtoSchema = z
     month: z.string().regex(/^\d{4}-\d{2}$/u),
     totalUsd: Usd,
     calls: z.number().int().min(0),
-    /** Calls whose cost is not known (no price); counted at no cost. */
+    /** Successful calls whose cost is not known (no price); counted at no cost. */
     unpricedCalls: z.number().int().min(0),
+    /** Calls that failed; never charged. Absent from an older server: 0. */
+    failedCalls: z.number().int().min(0).default(0),
     byTask: z
       .array(
         z

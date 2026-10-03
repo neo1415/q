@@ -20,9 +20,7 @@ export function createOwnUsage(dependencies: {
     at: Date,
   ) => Promise<OwnMonthUsage>;
   /** Their own instructions by id: goal and monthly budget. */
-  readonly instructions: (
-    actor: ActorContext,
-  ) => Promise<
+  readonly instructions: (actor: ActorContext) => Promise<
     readonly {
       readonly id: string;
       readonly goal: string;
@@ -54,6 +52,7 @@ export function createOwnUsage(dependencies: {
       totalUsd: month.totalUsd,
       calls: month.calls,
       unpricedCalls: month.unpricedCalls,
+      failedCalls: month.failedCalls,
       byTask: month.byPurpose.map((row) => ({ ...row })),
       // Only their own instructions are named; spend under an id that is not
       // theirs (never expected) is left in the INSTRUCTION total, unnamed.

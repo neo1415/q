@@ -46,3 +46,27 @@ export function monthName(month: string): string {
     { month: "long", year: "numeric", timeZone: "UTC" },
   );
 }
+
+/**
+ * The month's calls in a sentence. A failed call is never charged and is
+ * said so; "without a price yet" is kept for a call that worked but has no
+ * price (QA 2026-10-03: 130 failed calls read as unpriced).
+ */
+export function callsLine(
+  usage: Pick<QUsageDto, "month" | "calls" | "unpricedCalls"> & {
+    readonly failedCalls?: number | undefined;
+  },
+): string {
+  const plural = (n: number, one: string, many: string) =>
+    `${String(n)} ${n === 1 ? one : many}`;
+  const failed = usage.failedCalls ?? 0;
+  return `${monthName(usage.month)}, ${plural(usage.calls, "model call", "model calls")}${
+    failed > 0
+      ? `, ${plural(failed, "failed call", "failed calls")}, not charged`
+      : ""
+  }${
+    usage.unpricedCalls > 0
+      ? `, ${String(usage.unpricedCalls)} without a price yet (counted at no cost)`
+      : ""
+  }.`;
+}
