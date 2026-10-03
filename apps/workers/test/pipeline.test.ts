@@ -240,7 +240,7 @@ describe("document processing pipeline", () => {
     });
   });
 
-  it("refuses a job for another pipeline version", async () => {
+  it("leaves a job for another pipeline version to its own worker (deploy overlap)", async () => {
     const version = makeVersion();
     const evidence = createFakeEvidence({
       version,
@@ -258,8 +258,10 @@ describe("document processing pipeline", () => {
         pipelineVersion: "evidence-processing-v9",
       }),
     );
+    // Left for the worker of that version (deploy overlap), never
+    // dead-lettered on first sight; the attempt limit still ends it.
     expect(outcome).toEqual({
-      kind: "PERMANENT",
+      kind: "RETRY",
       errorCode: "PIPELINE_VERSION_MISMATCH",
     });
     expect(evidence.calls).toEqual([]);
