@@ -261,6 +261,28 @@ export async function decidePending(
     input.turn === undefined
       ? true
       : isReplyToCard(input.utterance, input.turn);
+  // A new request is never a reply to a card from another conversation
+  // (QA 2026-10-03, run 528f4c4e: "just handle it" in a fresh
+  // conversation was read as a yes to Express interest in Clinicrest,
+  // waiting in another, so it was answered "That's ready…" and the
+  // standing instruction it asked for was never set up). By the reader's
+  // reading, never by words: a request to act, a declared action, a
+  // hand-over, or a question is answered as itself; only the same request
+  // again, naming the card's counterpart, is told the card is ready. In
+  // this conversation a request already decides nothing (only a reply
+  // does) and the card's status follows the answer.
+  const reading = input.turn ?? null;
+  const newRequest =
+    elsewhere &&
+    reading !== null &&
+    !reply &&
+    (reading.namesAction ||
+      reading.kind === "TOOL_REQUEST" ||
+      reading.kind === "QUESTION_TO_Q" ||
+      reading.kind === "RESEARCH_REQUEST");
+  if (newRequest && namedIn(input.utterance, pending) === null) {
+    return { kind: "NONE" };
+  }
   // Approval binds to words that approve. Asking for the same thing again
   // is not a yes: with no approval word, a reading that it is about this
   // change says it is ready and waiting, and nothing is approved.
@@ -269,9 +291,11 @@ export async function decidePending(
   // named, or the first words of a conversation opened to answer it
   // (live 2026-10-01: "yes, go ahead" after a reload).
   let points = !elsewhere;
+  let namedElsewhere = false;
   if (elsewhere) {
     const chosen = namedIn(input.utterance, pending);
     if (chosen !== null) pending = [chosen];
+    namedElsewhere = chosen !== null;
     points = chosen !== null || input.recentTurns.length === 0;
   }
   // What may approve by words: an approval word, and elsewhere an explicit
@@ -320,6 +344,12 @@ export async function decidePending(
       kind: "REPLY",
       line: whichLine(pending.map((proposal) => proposal.summary)),
     };
+  }
+  // Elsewhere, "it's ready" is said only to the same request again, which
+  // names the card; words that neither approve it nor name it are
+  // answered as themselves (run 528f4c4e).
+  if (read.decision === "YES" && !mayApprove && elsewhere && !namedElsewhere) {
+    return { kind: "NONE" };
   }
   if (read.decision === "YES" && !mayApprove) {
     // The same request again, or a yes elsewhere that does not approve

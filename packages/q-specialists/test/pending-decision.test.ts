@@ -527,6 +527,46 @@ describe("a yes in a new conversation to a change asked for elsewhere (live 2026
     }
   });
 
+  it("QA run 528f4c4e: a new request in a fresh conversation is never a reply to a card from another", async () => {
+    const CLINICREST: Proposal = {
+      proposalId: "c1",
+      summary: "Express interest in Clinicrest",
+      status: "PENDING",
+    };
+    const reads: readonly PendingTurnReading[] = [
+      // "just handle it": a request to act, routed to delegation.
+      { kind: "TOOL_REQUEST", addressedToQ: true, namesAction: false },
+      // A hand-over or a declared action the reader named.
+      { kind: "TOOL_REQUEST", addressedToQ: true, namesAction: true },
+      // A question.
+      { kind: "QUESTION_TO_Q", addressedToQ: true, namesAction: false },
+      // Even read as a reply: words that neither approve nor name it.
+      { kind: "CONTROL", addressedToQ: true, namesAction: false },
+    ];
+    for (const reading of reads) {
+      const { value, calls } = withElsewhere([CLINICREST], {
+        decision: "YES",
+        remainder: null,
+      });
+      const outcome = await decidePending(value, {
+        ...turn("just handle it"),
+        turn: reading,
+      });
+      expect(outcome).toEqual({ kind: "NONE" });
+      expect(calls.approve).toEqual([]);
+    }
+    // A plain yes in a fresh conversation still resolves the one card.
+    const yes = withElsewhere([CLINICREST], {
+      decision: "YES",
+      remainder: null,
+    });
+    await decidePending(yes.value, {
+      ...turn("yes, go ahead"),
+      turn: { kind: "CONTROL", addressedToQ: true, namesAction: false },
+    });
+    expect(yes.calls.approve).toEqual(["c1"]);
+  });
+
   it("elsewhere, mid-conversation: a bare yes does not approve; an approval naming the card does", async () => {
     const bare = withElsewhere([SHARE], { decision: "YES", remainder: null });
     await decidePending(bare.value, midConversation("yes, go ahead"));
