@@ -158,7 +158,11 @@ export type AppActionPorts = {
   readonly schedule?:
     | Pick<
         ScheduleService,
-        "schedule" | "cancel" | "createReminder" | "dismissReminder"
+        | "schedule"
+        | "cancel"
+        | "createReminder"
+        | "dismissReminder"
+        | "confirmHeld"
       >
     | undefined;
   /** Interest and connection requests: the network services. */

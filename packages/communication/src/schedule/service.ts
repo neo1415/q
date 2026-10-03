@@ -260,6 +260,21 @@ export type ScheduleService = {
     readonly meetingId: string;
     readonly correlationId: string;
   }) => Promise<ScheduleOutcome<{ readonly alreadyDone: boolean }>>;
+  /**
+   * A party says the relationship's booked call took place (2026-10-03: a
+   * call without the meeting bot never reached MEETING_HELD). Only that
+   * relationship's own booked call, only after it ended, and only while the
+   * match is still CONNECTED -- the first meeting, exactly the projector's
+   * rule -- so it is recorded at most once and never counted twice. Asked
+   * for by the person's confirmed "How did the call go?" outcome; it adds
+   * no authority of its own.
+   */
+  readonly confirmHeld: (input: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+    readonly meetingId: string;
+    readonly correlationId: string;
+  }) => Promise<ScheduleOutcome<{ readonly alreadyDone: boolean }>>;
   /** The organiser's own meeting, for authorize steps; null otherwise. */
   readonly organisedMeeting: (
     actor: ActorContext,
@@ -935,6 +950,37 @@ export function createScheduleService(
     organisedMeeting: async (actor, meetingId) => {
       const record = await ownedMeeting(actor, meetingId);
       return record === null ? null : viewFor(record, actor.userId);
+    },
+
+    confirmHeld: async (input) => {
+      const party = await partyOf(input.actor, input.relationshipId);
+      if (party === null) return refusal("NOT_A_PARTY");
+      const record = await store.findMeeting(input.meetingId);
+      if (
+        record === null ||
+        record.relationshipId !== input.relationshipId ||
+        record.status !== "SCHEDULED"
+      ) {
+        return refusal("NOT_FOUND");
+      }
+      if (record.endsAt.getTime() > now().getTime()) {
+        return refusal("INVALID_TIME");
+      }
+      // Already past its first meeting (held, in diligence, paused...): a
+      // later call is activity the person has no need to mark.
+      if (party.state !== "CONNECTED") {
+        return { outcome: "OK", alreadyDone: true };
+      }
+      await transactions.run((tx) =>
+        activity.record(tx, {
+          relationshipId: record.relationshipId,
+          eventType: "meeting_held",
+          meetingId: record.id,
+          actorUserId: input.actor.userId,
+          correlationId: input.correlationId,
+        }),
+      );
+      return { outcome: "OK", alreadyDone: false };
     },
 
     listMeetings: async (actor, relationshipId) => {

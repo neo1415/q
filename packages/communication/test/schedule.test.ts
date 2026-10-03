@@ -45,7 +45,9 @@ const STRANGER = actor("00000000-0000-4000-8000-0000000000e9", INVESTOR_TENANT);
 // Monday 5 October 2026, 08:00 London (07:00 UTC).
 const NOW = new Date("2026-10-05T07:00:00Z");
 
-function world(options: { connected?: boolean; now?: Date } = {}) {
+function world(
+  options: { connected?: boolean; now?: Date; state?: string } = {},
+) {
   let clock = options.now ?? NOW;
   const store = createInMemoryScheduleStore({ now: () => clock });
   const activity = createRecordingMeetingActivity();
@@ -56,9 +58,17 @@ function world(options: { connected?: boolean; now?: Date } = {}) {
     if (relationshipId !== REL) return Promise.resolve(null);
     const party: ChatParty | null =
       a.userId === INVESTOR.userId
-        ? { side: "INVESTOR", connected: options.connected ?? true }
+        ? {
+            side: "INVESTOR",
+            connected: options.connected ?? true,
+            state: options.state,
+          }
         : a.userId === FOUNDER.userId
-          ? { side: "COMPANY", connected: options.connected ?? true }
+          ? {
+              side: "COMPANY",
+              connected: options.connected ?? true,
+              state: options.state,
+            }
           : null;
     return Promise.resolve(party);
   };
@@ -293,6 +303,57 @@ describe("schedule, reschedule, cancel", () => {
       code: "NOT_A_PARTY",
     });
     expect(w.investorCalendar.inserted).toHaveLength(0);
+  });
+
+  it("marks a booked call held once it has ended, for either side, only while still CONNECTED (no bot)", async () => {
+    const w = world({ state: "CONNECTED" });
+    const scheduled = await w.service.schedule(SCHEDULE);
+    if (scheduled.outcome !== "OK") throw new Error("not scheduled");
+    const id = scheduled.meeting.id;
+    const confirm = (who: ActorContext, meetingId = id) =>
+      w.service.confirmHeld({
+        actor: who,
+        relationshipId: REL,
+        meetingId,
+        correlationId: SCHEDULE.correlationId,
+      });
+    // Before it ends: not yet.
+    expect(await confirm(FOUNDER)).toEqual({
+      outcome: "REFUSED",
+      code: "INVALID_TIME",
+    });
+    w.advance(new Date("2026-10-06T10:00:00Z"));
+    // A stranger, or a call that is not this relationship's: nothing.
+    expect((await confirm(STRANGER)).outcome).toBe("REFUSED");
+    expect(
+      await confirm(FOUNDER, "00000000-0000-4000-8000-0000000fffff"),
+    ).toEqual({ outcome: "REFUSED", code: "NOT_FOUND" });
+    // The founder (not the organiser) may say it happened.
+    expect(await confirm(FOUNDER)).toEqual({
+      outcome: "OK",
+      alreadyDone: false,
+    });
+    expect(
+      w.activity.recorded.filter((r) => r.eventType === "meeting_held"),
+    ).toEqual([{ eventType: "meeting_held", meetingId: id }]);
+  });
+
+  it("does not record a second held call once the match has moved past CONNECTED", async () => {
+    const w = world({ state: "MEETING_HELD" });
+    const scheduled = await w.service.schedule(SCHEDULE);
+    if (scheduled.outcome !== "OK") throw new Error("not scheduled");
+    w.advance(new Date("2026-10-06T10:00:00Z"));
+    expect(
+      await w.service.confirmHeld({
+        actor: INVESTOR,
+        relationshipId: REL,
+        meetingId: scheduled.meeting.id,
+        correlationId: SCHEDULE.correlationId,
+      }),
+    ).toEqual({ outcome: "OK", alreadyDone: true });
+    expect(
+      w.activity.recorded.some((r) => r.eventType === "meeting_held"),
+    ).toBe(false);
   });
 
   it("lets only the organiser move or cancel; cancel deletes the event and records meeting_cancelled once", async () => {

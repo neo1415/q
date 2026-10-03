@@ -271,8 +271,26 @@ const MEETING_OUTCOME = defineAppAction<z.infer<typeof Outcome>, OutcomeResult>(
     input: Outcome,
     output: z.custom<OutcomeResult>(),
     authorize: servicesDecide,
-    run: (ports, context, input) =>
-      outcomes(ports).recordMeetingOutcome({
+    run: async (ports, context, input) => {
+      // An outcome that names the call says the call happened: the
+      // schedule service (the call's owner) marks it held first, so a call
+      // without the meeting bot still reaches MEETING_HELD (2026-10-03).
+      const meetingId = input.input.meetingId;
+      if (
+        meetingId !== undefined &&
+        ports.schedule?.confirmHeld !== undefined
+      ) {
+        const held = await ports.schedule.confirmHeld({
+          actor: context.actor,
+          relationshipId: input.relationshipId,
+          meetingId,
+          correlationId: context.correlationId,
+        });
+        if (held.outcome !== "OK") {
+          return { outcome: "REFUSED", code: "NOT_FOUND" } as const;
+        }
+      }
+      return outcomes(ports).recordMeetingOutcome({
         actor: context.actor,
         relationshipId: input.relationshipId,
         outcome:
@@ -281,7 +299,8 @@ const MEETING_OUTCOME = defineAppAction<z.infer<typeof Outcome>, OutcomeResult>(
             : { kind: "PROGRESSED", step: input.input.outcome },
         meetingId: input.input.meetingId,
         correlationId: context.correlationId,
-      }),
+      });
+    },
     targets: (input) => [
       { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
     ],
