@@ -14,9 +14,16 @@ vi.mock("next/navigation", () => ({ redirect }));
 
 /** Discover is home (founder directive, 2026-09-27); Q is one tap away. */
 describe("Discover is where the product starts", () => {
-  it("sends the root to arrival, which onboards first (founder direction 2026-09-30)", async () => {
+  it("the root is the signed-out landing; the proxy sends everyone else to arrival", async () => {
+    // Founder routing rule 2026-10-04: signed-in people and installed
+    // launches are redirected to /welcome by the proxy before the page
+    // renders (test/landing-proxy.test.ts); the page itself never redirects.
     const { default: RootPage } = await import("../app/page");
-    expect(() => RootPage()).toThrow("REDIRECT /welcome");
+    expect(() => RootPage()).not.toThrow();
+    const { landingRedirect } = await import("../src/auth/landing-route");
+    expect(
+      landingRedirect({ signedIn: true, searchParams: new URLSearchParams() }),
+    ).toBe("/welcome");
   });
 
   it("keeps Q reachable at /home, and /q redirects there with its query", async () => {
