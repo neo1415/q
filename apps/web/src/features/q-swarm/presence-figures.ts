@@ -745,16 +745,34 @@ function faceFigure(kind: FigureKind, voice: FaceVoice, count: number): Figure {
   };
 }
 
-/** The resting cloud: a mass carried on slow currents, never the same twice. */
+/**
+ * Depth, in frame units, of z = 1 (ADR 0049: the presence is 3D). Figures
+ * report z normalised to -1 (far) .. 1 (near); the renderer multiplies by
+ * this before turning and projecting, so the face's own z and the cloud's
+ * sphere share one scale.
+ */
+export const DEPTH_UNITS = 0.7;
+
+/** The cloud's radius in frame units: room for the voice to swell it and for perspective. */
+const CLOUD_RADIUS = 0.78;
+
+/**
+ * The resting cloud: a soft sphere of light, denser at its core, turning
+ * slowly on a current that shears it -- inner and outer shells turn at
+ * different rates and a lobe wanders round -- so it is never the same
+ * twice. Real depth (ADR 0049): z is the sphere's, not a shading trick.
+ */
 function cloudFigure(count: number): Figure {
   const random = seeded(113);
   const raw: RawPoint[] = Array.from({ length: count }, () => {
-    const r = Math.abs(gaussian(random)) * 0.3;
-    const a = random() * TAU;
+    const theta = random() * TAU;
+    const phi = Math.acos(2 * random() - 1);
+    // pow < 1 feathers the edge; the projection of a ball piles up its core.
+    const r = random() ** 0.55 * (0.75 + 0.25 * random()) * CLOUD_RADIUS;
     return {
-      x: Math.cos(a) * r,
-      y: Math.sin(a) * r * 0.85,
-      z: 0,
+      x: r * Math.sin(phi) * Math.cos(theta),
+      y: r * Math.cos(phi) * 0.92,
+      z: r * Math.sin(phi) * Math.sin(theta),
       part: P.FIELD,
       u: random(),
       b: 0.55 + random() * 0.3,
@@ -763,20 +781,26 @@ function cloudFigure(count: number): Figure {
   const set = toPointSet(raw, count);
   return {
     kind: "CLOUD",
-    flow: 0.16,
+    flow: 0.12,
     evaluate: ({ t, output, input }, out) => {
+      const swell = 1 + output * 0.16 + input * 0.1;
       for (let i = 0; i < count; i += 1) {
         const bx = set.x[i] ?? 0;
         const by = set.y[i] ?? 0;
-        const radius = Math.hypot(bx, by);
-        const angle =
-          Math.atan2(by, bx) + t * 0.16 + radius * Math.sin(t * 0.21) * 1.3;
+        const bz = set.z[i] ?? 0;
+        const ring = Math.hypot(bx, bz) / CLOUD_RADIUS;
+        // Turning about the vertical, the shells sheared against each other.
+        const a = t * 0.16 + ring * Math.sin(t * 0.21) * 1.1;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        const x = bx * ca + bz * sa;
+        const z = -bx * sa + bz * ca;
         // One slow lobe that wanders round: smoke, not a star.
-        const stretch = 1 + 0.24 * Math.sin(t * 0.29 + angle + radius * 3.1);
-        const swell = 1 + output * 0.25 + input * 0.15;
-        out.x[i] = Math.cos(angle) * radius * stretch * swell;
-        out.y[i] = Math.sin(angle) * radius * (2 - stretch) * swell;
-        out.z[i] = 0;
+        const stretch =
+          1 + 0.18 * Math.sin(t * 0.29 + Math.atan2(by, x) + ring * 3.1);
+        out.x[i] = x * stretch * swell;
+        out.y[i] = by * (2 - stretch) * swell;
+        out.z[i] = Math.max(-1, Math.min(1, (z * swell) / DEPTH_UNITS));
         // A spark now and then: never quite still.
         const spark =
           Math.max(0, Math.sin(t * 0.8 + (set.u[i] ?? 0) * 19)) ** 40;
@@ -791,26 +815,34 @@ function attentiveFigure(count: number): Figure {
   const base = cloudFigure(count);
   return {
     kind: "ATTENTIVE",
-    flow: 0.09,
+    flow: 0.07,
     evaluate: (input, out) => {
       base.evaluate({ ...input, output: 0, input: 0 }, out);
       const level = input.input;
       for (let i = 0; i < count; i += 1) {
         const x = (out.x[i] ?? 0) * 0.82;
         const y = (out.y[i] ?? 0) * 0.82;
-        const r = Math.hypot(x, y);
+        const z = (out.z[i] ?? 0) * 0.82;
+        const r = Math.hypot(x, y, z * DEPTH_UNITS);
         const ripple =
           1 + level * (0.28 + 0.08 * Math.sin(r * 14 - input.t * 9));
         out.x[i] = x * ripple;
         // Leaning in: forward and a little down, towards whoever speaks.
         out.y[i] = y * ripple + 0.1 + level * 0.04;
+        out.z[i] = Math.max(-1, Math.min(1, z * ripple + 0.12 + level * 0.1));
         out.b[i] = (out.b[i] ?? 0.6) * (0.85 + level * 0.5);
       }
     },
   };
 }
 
-/** Working: a slow orbit, the swarm busy on something. */
+/** Sine of the working ring's tilt towards the viewer. */
+const RING_TILT = 0.42;
+
+/**
+ * Working: the swarm gathers into a ring tilted towards the viewer and
+ * runs round it -- the near side larger and brighter, the far side behind.
+ */
 function orbitFigure(count: number): Figure {
   const random = seeded(71);
   const raw: RawPoint[] = Array.from({ length: count }, () => {
@@ -819,25 +851,28 @@ function orbitFigure(count: number): Figure {
     return {
       x: Math.cos(a) * r,
       y: Math.sin(a) * r,
-      z: 0,
+      z: gaussianSoft(random) * 0.03,
       part: P.FIELD,
       u: random(),
       b: 0.6,
     };
   });
   const set = toPointSet(raw, count);
+  const lift = Math.sqrt(1 - RING_TILT * RING_TILT);
   return {
     kind: "ORBIT",
-    flow: 0.05,
+    flow: 0.04,
     evaluate: ({ t }, out) => {
       for (let i = 0; i < count; i += 1) {
         const bx = set.x[i] ?? 0;
         const by = set.y[i] ?? 0;
         const r = Math.hypot(bx, by);
         const a = Math.atan2(by, bx) + t * (0.9 + (r - 0.5) * 2);
+        const depth = Math.sin(a) * r;
+        const thick = set.z[i] ?? 0;
         out.x[i] = Math.cos(a) * r;
-        out.y[i] = Math.sin(a) * r * 0.92;
-        out.z[i] = 0;
+        out.y[i] = depth * RING_TILT + thick;
+        out.z[i] = Math.max(-1, Math.min(1, (depth * lift) / DEPTH_UNITS));
         // A brighter arc travelling round.
         const head = Math.cos(a - t * 2.1);
         out.b[i] = 0.45 + Math.max(0, head) ** 6 * 0.55;
