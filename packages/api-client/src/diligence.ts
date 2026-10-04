@@ -117,13 +117,14 @@ export function diligenceDownload(
   session: ApiSession,
   relationshipId: string,
   documentId: string,
+  view = false,
 ) {
   return call(
     session,
     "GET",
     diligencePath(
       relationshipId,
-      `/documents/${encodeURIComponent(documentId)}/download`,
+      `/documents/${encodeURIComponent(documentId)}/download${view ? "?disposition=inline" : ""}`,
     ),
     DiligenceDownloadDtoSchema,
   );

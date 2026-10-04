@@ -10,6 +10,7 @@ import {
   requestDiligenceDocument,
   revokeDiligenceShare,
   shareDiligenceDocument,
+  uploadAndFulfilDiligenceRequest,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
@@ -128,9 +129,39 @@ export async function requestDiligenceAction(
   );
 }
 
+/**
+ * Upload and share in one step: the file is already in storage through the
+ * documents screen's own upload session; the API finishes it into their
+ * Documents and answers the request with it. One key per press.
+ */
+export async function uploadAndFulfilAction(
+  relationshipId: string,
+  requestId: string,
+  uploadSessionId: string,
+  idempotencyKey: string,
+): Promise<DiligenceResult<{ readonly policyId: string }>> {
+  const id = Id.safeParse(relationshipId);
+  const request = Id.safeParse(requestId);
+  const upload = Id.safeParse(uploadSessionId);
+  const key = Key.safeParse(idempotencyKey);
+  if (!id.success || !request.success || !upload.success || !key.success) {
+    return { ok: false, message: "Not found." };
+  }
+  return run((session) =>
+    uploadAndFulfilDiligenceRequest(
+      session,
+      id.data,
+      request.data,
+      upload.data,
+      key.data,
+    ),
+  );
+}
+
 export async function diligenceDownloadAction(
   relationshipId: string,
   documentId: string,
+  view = false,
 ): Promise<DiligenceResult<{ readonly url: string }>> {
   const id = Id.safeParse(relationshipId);
   const document = Id.safeParse(documentId);
@@ -138,7 +169,9 @@ export async function diligenceDownloadAction(
     return { ok: false, message: DOWNLOAD_UNAVAILABLE };
   return run(
     async (session) => ({
-      url: (await diligenceDownload(session, id.data, document.data)).url,
+      url: (
+        await diligenceDownload(session, id.data, document.data, view === true)
+      ).url,
     }),
     DOWNLOAD_UNAVAILABLE,
   );

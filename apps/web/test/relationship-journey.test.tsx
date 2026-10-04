@@ -90,7 +90,7 @@ describe("the relationship journey (design-48)", () => {
 });
 
 describe("phone folds (design-48 v2)", () => {
-  it("folds What happened and Diligence behind their headings, with the count", async () => {
+  it("folds What happened behind its heading; Diligence is its own tab (2026-10-04)", async () => {
     const { RelationshipDetail } =
       await import("../src/features/relationships/relationship-detail");
     const { container } = render(
@@ -113,15 +113,13 @@ describe("phone folds (design-48 v2)", () => {
     const history = container.querySelector(
       "details[data-collapsible=history]",
     );
-    const diligence = container.querySelector(
-      "details[data-collapsible=diligence]",
-    );
     expect(history?.hasAttribute("open")).toBe(false);
-    expect(diligence?.hasAttribute("open")).toBe(false);
     expect(history?.querySelector("summary")?.textContent).toContain(
       "What happened · 3",
     );
-    // A link to #diligence lands inside the fold, which opens it.
-    expect(diligence?.querySelector("#diligence")).not.toBeNull();
+    // The overview points to the Diligence tab rather than folding it in.
+    expect(
+      container.querySelector("[data-diligence-summary]")?.getAttribute("href"),
+    ).toBe("/relationships/investor/x/diligence");
   });
 });

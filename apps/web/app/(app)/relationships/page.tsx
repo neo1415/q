@@ -1,21 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { getChatUnread } from "@capital-q/api-client";
+import {
+  getChatUnread,
+  listNotifications,
+  listReminders,
+} from "@capital-q/api-client";
+import type { NotificationDto, ReminderDto } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
-import {
-  PageContainer,
-  PageHeader,
-} from "@/components/app-shell/page-container";
+import { PageContainer } from "@/components/app-shell/page-container";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import {
   ownRelationships,
   relationshipDigests,
 } from "@/features/relationships/relationship-data";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
-import { NoticesPanel } from "@/features/schedule/notices-panel";
+import {
+  listOrder,
+  pageAfter,
+} from "@/features/relationships/relationships-view";
 
 export const metadata: Metadata = { title: "Relationships" };
 
@@ -30,12 +35,20 @@ export const dynamic = "force-dynamic";
  */
 export default async function RelationshipsPage() {
   const context = await resolveOwnContext();
-  const [items, unread] = await Promise.all([
+  const [items, unread, needs] = await Promise.all([
     ownRelationships(context),
     unreadByRelationship(),
+    noticesAndReminders(),
   ]);
+  // The first page's cards are read in full; later pages by cursor.
   const digests =
-    items === undefined ? {} : await relationshipDigests(context, items);
+    items === undefined
+      ? {}
+      : await relationshipDigests(
+          context,
+          pageAfter(items.toSorted(listOrder), null).items,
+        );
+  const now = Date.now();
   const side =
     context.kind === "FOUNDER"
       ? "COMPANY"
@@ -44,43 +57,44 @@ export default async function RelationshipsPage() {
         : "NONE";
 
   return (
-    <PageContainer className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <PageHeader title="Relationships" />
-        </div>
+    <PageContainer className="flex flex-col gap-4">
+      {/* Search comes straight after the name (founder critique
+          2026-10-04); adding one is a small control beside the title. */}
+      <div className="flex items-center gap-2">
+        <h1 className="cq-title-lg min-w-0 flex-1 text-(--cq-text-primary)">
+          Relationships
+        </h1>
+        {side === "INVESTOR" ? (
+          // ADR 0023: founders' Connection Requests wait on the investor here.
+          <Link
+            href="/investors"
+            className={buttonClassName("quiet", "compact")}
+            data-founder-requests-link
+          >
+            Founder requests
+          </Link>
+        ) : null}
         {side === "NONE" ? null : (
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {side === "INVESTOR" ? (
-              // ADR 0023: founders' Connection Requests wait on the investor here.
-              <Link
-                href="/investors"
-                className={buttonClassName("secondary")}
-                data-founder-requests-link
-              >
-                Founder requests
-              </Link>
-            ) : null}
-            {/* A relationship starts where its first step is taken:
-                interest from Discover, or a request from Investors. */}
-            <Link
-              href={side === "INVESTOR" ? "/discover" : "/investors"}
-              className={buttonClassName("primary")}
-              data-add-relationship
-            >
-              <Plus size={ICON_SIZE.regular} aria-hidden="true" />
-              Add relationship
-            </Link>
-          </div>
+          // A relationship starts where its first step is taken: interest
+          // from Discover, or a request from Investors.
+          <Link
+            href={side === "INVESTOR" ? "/discover" : "/investors"}
+            className={buttonClassName("secondary", "compact")}
+            data-add-relationship
+          >
+            <Plus size={ICON_SIZE.compact} aria-hidden="true" />
+            Add
+          </Link>
         )}
       </div>
-      {/* BIZ-008: due reminders and notices, before the list. */}
-      <NoticesPanel />
       <RelationshipsIndex
         side={side}
         items={items}
         unread={unread}
         digests={digests}
+        notices={needs.notices}
+        reminders={needs.reminders}
+        now={now}
       />
     </PageContainer>
   );
@@ -96,4 +110,22 @@ async function unreadByRelationship(): Promise<ReadonlyMap<string, number>> {
   } catch {
     return new Map();
   }
+}
+
+/** BIZ-008: the person's own notices and reminders; unreadable is none. */
+async function noticesAndReminders(): Promise<{
+  readonly notices: readonly NotificationDto[];
+  readonly reminders: readonly ReminderDto[];
+}> {
+  const session = await apiSession();
+  if (session === null) return { notices: [], reminders: [] };
+  const [notices, reminders] = await Promise.all([
+    listNotifications(session)
+      .then((list) => list.items)
+      .catch(() => [] as const),
+    listReminders(session)
+      .then((list) => list.items)
+      .catch(() => [] as const),
+  ]);
+  return { notices, reminders };
 }

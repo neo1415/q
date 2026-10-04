@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   isMatchedRelationshipState,
   type ChatThreadDto,
+  type DiligenceDto,
   type MeetingDto,
   type RelationshipStatusDto,
 } from "@capital-q/contracts";
@@ -11,11 +12,14 @@ import { buttonClassName } from "@capital-q/ui/button";
 import {
   ArrowLeft,
   ArrowUpRight,
+  CalendarDays,
   ChevronDown,
+  FileText,
   Globe,
   ICON_SIZE,
   MapPin,
   MessageSquare,
+  Upload,
 } from "@capital-q/ui/icons";
 
 import { PageContainer } from "@/components/app-shell/page-container";
@@ -33,7 +37,7 @@ import type { CounterpartProfile } from "./relationship-page-data";
 import { RelationshipCommitment } from "./relationship-commitment";
 import { RelationshipErrands } from "./relationship-errands";
 import { RelationshipOutcome } from "./relationship-outcome";
-import { RelationshipDiligence } from "./relationship-diligence";
+import { nextStepFor, type NextStep } from "./relationships-view";
 import { RelationshipTimeline } from "./relationship-timeline";
 import { JOURNEY, journeyStep } from "./journey";
 import {
@@ -95,6 +99,7 @@ export function RelationshipDetail({
   readAt,
   basePath,
   media = null,
+  diligence = null,
 }: {
   readonly side: RelationshipSide;
   readonly counterpart: string;
@@ -116,6 +121,8 @@ export function RelationshipDetail({
   readonly basePath: string;
   /** The counterpart's pitch, when this side may play it. */
   readonly media?: ReactNode;
+  /** The diligence area once diligence started (its own tab). */
+  readonly diligence?: DiligenceDto | null | undefined;
 }) {
   // The match outlives CONNECTED (relationship-state.v2).
   const connected =
@@ -133,12 +140,22 @@ export function RelationshipDetail({
         relationship={relationship}
         profile={profile}
         note={relationship === null ? absentSentence : undefined}
+        step={heroStep({
+          side,
+          relationship,
+          diligence,
+          meetings,
+          readAt,
+          basePath,
+        })}
       />
 
       <RelationshipTabs
         basePath={basePath}
         current="OVERVIEW"
         messageCount={connected ? messageCount : null}
+        diligence={diligence}
+        calls={connected}
       />
 
       {relationship !== null &&
@@ -192,11 +209,21 @@ export function RelationshipDetail({
           !relationship.milestones.some(
             (milestone) => milestone.state === "IN_DILIGENCE",
           ) ? null : (
-            <Card title="Diligence" id="diligence" collapsible>
-              <RelationshipDiligence
-                relationshipId={relationship.relationshipId}
-                companyId={relationship.companyId}
-              />
+            <Card title="Diligence" id="diligence">
+              <Link
+                href={`${basePath}/diligence`}
+                className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3 hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                data-diligence-summary
+              >
+                <span className="cq-body text-(--cq-text-primary)">
+                  {diligenceLine(side, diligence)}
+                </span>
+                <ArrowUpRight
+                  size={ICON_SIZE.compact}
+                  aria-hidden="true"
+                  className="shrink-0 text-(--cq-text-tertiary)"
+                />
+              </Link>
             </Card>
           )}
 
@@ -369,6 +396,64 @@ export function RelationshipDetail({
 }
 
 /**
+ * A relationship's other tabs (Diligence, Calls): the same back link, hero
+ * and tabs as the overview, then the tab's own content.
+ */
+export function RelationshipSection({
+  side,
+  counterpart,
+  relationship,
+  profile,
+  basePath,
+  current,
+  messageCount,
+  diligence,
+  meetings,
+  readAt,
+  children,
+}: {
+  readonly side: RelationshipSide;
+  readonly counterpart: string;
+  readonly relationship: RelationshipStatusDto;
+  readonly profile: CounterpartProfile;
+  readonly basePath: string;
+  readonly current: "DILIGENCE" | "CALLS";
+  readonly messageCount: number;
+  readonly diligence: DiligenceDto | null;
+  readonly meetings: readonly MeetingDto[];
+  readonly readAt: number;
+  readonly children: ReactNode;
+}) {
+  const connected = isMatchedRelationshipState(relationship.state);
+  return (
+    <PageContainer className="flex flex-col gap-6">
+      <BackToRelationships />
+      <RelationshipHero
+        counterpart={counterpart}
+        relationship={relationship}
+        profile={profile}
+        step={heroStep({
+          side,
+          relationship,
+          diligence,
+          meetings,
+          readAt,
+          basePath,
+        })}
+      />
+      <RelationshipTabs
+        basePath={basePath}
+        current={current}
+        messageCount={connected ? messageCount : null}
+        diligence={diligence}
+        calls={connected}
+      />
+      {children}
+    </PageContainer>
+  );
+}
+
+/**
  * The top of both relationship pages: who, where, and where it stands
  * (design-48). No card around it: the name, then the state in words with
  * the step it reached, the bar repeating what the words say.
@@ -378,101 +463,211 @@ export function RelationshipHero({
   relationship,
   profile,
   note,
+  step: next = null,
 }: {
   readonly counterpart: string;
   readonly relationship: RelationshipStatusDto | null;
   readonly profile: CounterpartProfile;
   /** Said under the name when nothing is on record. */
   readonly note?: string | undefined;
+  /** The one next step (the list row's own), as the hero's button. */
+  readonly step?: NextStep | null | undefined;
 }) {
   const step = relationship === null ? null : journeyStep(relationship);
+  const action =
+    next === null || next.label === null || next.href === null ? null : next;
+  const ActionIcon =
+    action?.icon === "upload"
+      ? Upload
+      : action?.icon === "file"
+        ? FileText
+        : action?.icon === "reply"
+          ? MessageSquare
+          : action?.icon === "calendar"
+            ? CalendarDays
+            : null;
   return (
     <section
       aria-label={`${counterpart} at a glance`}
-      className="flex flex-col gap-4"
+      className="grid gap-4 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-xs) sm:p-5 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-center lg:gap-x-8"
       data-relationship-hero
     >
-      {typeof profile.coverUrl === "string" ? (
-        <EntityCover src={profile.coverUrl} className="rounded-xl" />
-      ) : null}
-      <div className="flex items-center gap-4">
-        <EntityAvatar
-          kind={profile.companyId === undefined ? "investor" : "company"}
-          name={counterpart}
-          src={profile.photoUrl}
-          companyId={profile.companyId}
-          size="lg"
-          decorative
-        />
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h1 className="cq-title-lg text-(--cq-text-primary)">
-            {counterpart}
-          </h1>
-          <div className="max-sm:hidden">
-            <ProfileChips profile={profile} />
-          </div>
-          {note === undefined ? null : (
-            <p className="cq-body-sm text-(--cq-text-secondary)">{note}</p>
-          )}
-        </div>
-      </div>
-      {relationship === null ? null : (
-        <div className="flex max-w-(--cq-layout-reading) flex-col gap-2">
-          {step === null ? null : (
-            <ol
-              className="grid grid-cols-5 gap-1"
-              aria-label="Progress"
-              data-journey-step={step}
-            >
-              {JOURNEY.map((entry, index) => (
-                <li
-                  key={entry.label}
-                  className="flex flex-col gap-1"
-                  aria-current={index + 1 === step ? "step" : undefined}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`h-1 rounded-full ${
-                      index + 1 < step
-                        ? "bg-(--cq-text-secondary)"
-                        : index + 1 === step
-                          ? "bg-(--cq-accent)"
-                          : "bg-(--cq-surface-strong)"
-                    }`}
-                  />
-                  <span
-                    className={`cq-caption max-sm:sr-only ${
-                      index + 1 === step
-                        ? "font-medium text-(--cq-text-primary)"
-                        : "text-(--cq-text-tertiary)"
-                    }`}
-                  >
-                    {entry.label}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
-          <p
-            className="cq-body-sm text-(--cq-text-secondary)"
-            data-relationship-state
-          >
-            <span className="font-medium text-(--cq-text-primary)">
-              {STATE_WORDS[relationship.state]}
-            </span>
-            {step === null ? null : (
-              <span className="cq-numeric">
-                {` · ${String(step)} of ${String(JOURNEY.length)}`}
-              </span>
+      <div className="flex min-w-0 flex-col gap-4">
+        {typeof profile.coverUrl === "string" ? (
+          <EntityCover src={profile.coverUrl} className="rounded-xl" />
+        ) : null}
+        <div className="flex items-center gap-4">
+          <EntityAvatar
+            kind={profile.companyId === undefined ? "investor" : "company"}
+            name={counterpart}
+            src={profile.photoUrl}
+            companyId={profile.companyId}
+            size="lg"
+            decorative
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <h1 className="cq-title-lg text-(--cq-text-primary)">
+              {counterpart}
+            </h1>
+            <div className="max-sm:hidden">
+              <ProfileChips profile={profile} />
+            </div>
+            {note === undefined ? null : (
+              <p className="cq-body-sm text-(--cq-text-secondary)">{note}</p>
             )}
-            <span className="max-sm:sr-only">
-              {` · Next: ${NEXT_STEP_WORDS[relationship.nextStep]}`}
-            </span>
-          </p>
+          </div>
+        </div>
+        {relationship === null ? null : (
+          <div className="flex max-w-(--cq-layout-reading) flex-col gap-2">
+            {step === null ? null : (
+              <ol
+                className="grid grid-cols-5 gap-1"
+                aria-label="Progress"
+                data-journey-step={step}
+              >
+                {JOURNEY.map((entry, index) => (
+                  <li
+                    key={entry.label}
+                    className="flex flex-col gap-1"
+                    aria-current={index + 1 === step ? "step" : undefined}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-1 rounded-full ${
+                        index + 1 < step
+                          ? "bg-(--cq-text-secondary)"
+                          : index + 1 === step
+                            ? "bg-(--cq-accent)"
+                            : "bg-(--cq-surface-strong)"
+                      }`}
+                    />
+                    <span
+                      className={`cq-caption max-sm:sr-only ${
+                        index + 1 === step
+                          ? "font-medium text-(--cq-text-primary)"
+                          : "text-(--cq-text-tertiary)"
+                      }`}
+                    >
+                      {entry.label}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <p
+              className="cq-body-sm text-(--cq-text-secondary)"
+              data-relationship-state
+            >
+              <span className="font-medium text-(--cq-text-primary)">
+                {STATE_WORDS[relationship.state]}
+              </span>
+              {step === null ? null : (
+                <span className="cq-numeric">
+                  {` · ${String(step)} of ${String(JOURNEY.length)}`}
+                </span>
+              )}
+              {action === null ? (
+                <span className="max-sm:sr-only">
+                  {` · Next: ${NEXT_STEP_WORDS[relationship.nextStep]}`}
+                </span>
+              ) : null}
+            </p>
+          </div>
+        )}
+      </div>
+      {action === null ? null : (
+        <div className="flex flex-col gap-1.5" data-hero-action>
+          <Link
+            href={action.href ?? "#"}
+            className={buttonClassName(
+              action.urgent ? "primary" : "secondary",
+              "regular",
+              "w-full",
+            )}
+          >
+            {ActionIcon === null ? null : (
+              <ActionIcon size={ICON_SIZE.regular} aria-hidden="true" />
+            )}
+            {action.label}
+          </Link>
+          {action.why === "" ? null : (
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {action.why}
+            </p>
+          )}
         </div>
       )}
     </section>
   );
+}
+
+/** The hero's step: the same words the list row says for it. */
+export function heroStep(input: {
+  readonly side: RelationshipSide;
+  readonly relationship: RelationshipStatusDto | null;
+  readonly diligence: DiligenceDto | null;
+  readonly meetings: readonly MeetingDto[];
+  readonly readAt: number;
+  readonly basePath: string;
+}): NextStep | null {
+  const { relationship, diligence } = input;
+  if (relationship === null) return null;
+  const open = (diligence?.requests ?? []).filter(
+    (request) => request.status === "OPEN",
+  );
+  const nextCall = input.meetings
+    .filter(
+      (meeting) =>
+        meeting.status !== "CANCELLED" &&
+        Date.parse(meeting.startsAt) > input.readAt,
+    )
+    .toSorted((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
+    .at(0);
+  const step = nextStepFor(
+    relationship,
+    {
+      unread: 0,
+      followUpDue: false,
+      nextCallAt: nextCall?.startsAt ?? null,
+      lastMessageAt: null,
+      diligence:
+        diligence === null || !diligence.open
+          ? null
+          : {
+              openRequests: open.length,
+              firstOpenTitle: open[0]?.title ?? null,
+              unopenedShares: diligence.shares.filter(
+                (share) => share.viewedAt === null,
+              ).length,
+            },
+    },
+    input.side,
+    input.readAt,
+    input.basePath,
+  );
+  // Answering interest stays the Next card's own server-confirmed control.
+  return step.icon === "answer" ? null : step;
+}
+
+/** The overview's one line about diligence, from the side reading it. */
+export function diligenceLine(
+  side: RelationshipSide,
+  diligence: DiligenceDto | null,
+): string {
+  if (diligence === null) return "Open diligence";
+  const open = diligence.requests.filter((r) => r.status === "OPEN").length;
+  const shared = diligence.shares.length;
+  const parts = [
+    open === 0
+      ? null
+      : side === "COMPANY"
+        ? `${String(open)} ${open === 1 ? "request" : "requests"} to answer`
+        : `${String(open)} waiting on them`,
+    shared === 0
+      ? null
+      : `${String(shared)} ${shared === 1 ? "document" : "documents"} shared`,
+  ].filter((part): part is string => part !== null);
+  return parts.length === 0 ? "Nothing requested yet" : parts.join(" · ");
 }
 
 /** The relationship's tabs: real pages and real sections, nothing else. */
@@ -480,12 +675,24 @@ export function RelationshipTabs({
   basePath,
   current,
   messageCount,
+  diligence = null,
+  calls = false,
 }: {
   readonly basePath: string;
-  readonly current: "OVERVIEW" | "MESSAGES";
+  readonly current: "OVERVIEW" | "DILIGENCE" | "MESSAGES" | "CALLS";
   /** Null when the chat isn't open: the tab is then not offered. */
   readonly messageCount: number | null;
+  /** Offered once diligence started; its count is what waits on this side. */
+  readonly diligence?: DiligenceDto | null | undefined;
+  /** Offered once connected. */
+  readonly calls?: boolean | undefined;
 }) {
+  const waiting =
+    diligence === null
+      ? 0
+      : diligence.side === "COMPANY"
+        ? diligence.requests.filter((r) => r.status === "OPEN").length
+        : diligence.shares.filter((share) => share.viewedAt === null).length;
   const tab = (active: boolean) =>
     `cq-body-sm inline-flex min-h-11 items-center gap-2 border-b-2 px-1 ${
       active
@@ -504,6 +711,20 @@ export function RelationshipTabs({
       >
         Overview
       </Link>
+      {diligence === null ? null : (
+        <Link
+          href={`${basePath}/diligence`}
+          aria-current={current === "DILIGENCE" ? "page" : undefined}
+          className={tab(current === "DILIGENCE")}
+        >
+          Diligence
+          {waiting > 0 ? (
+            <span className="cq-caption cq-numeric rounded-full bg-(--cq-accent) px-2 text-(--cq-text-inverse)">
+              {waiting}
+            </span>
+          ) : null}
+        </Link>
+      )}
       {messageCount === null ? null : (
         <Link
           href={`${basePath}/messages`}
@@ -518,6 +739,15 @@ export function RelationshipTabs({
           ) : null}
         </Link>
       )}
+      {calls ? (
+        <Link
+          href={`${basePath}/calls`}
+          aria-current={current === "CALLS" ? "page" : undefined}
+          className={tab(current === "CALLS")}
+        >
+          Calls
+        </Link>
+      ) : null}
     </nav>
   );
 }

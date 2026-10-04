@@ -57,7 +57,10 @@ export type DiligenceDocumentPort = {
   /** A document by id, permission-neutral, for a share already authorised. */
   readonly canonical: (documentId: string) => Promise<DiligenceDocument | null>;
   /** A short-lived signed download of an already-authorised version. */
-  readonly signedDownload: (document: DiligenceDocument) => Promise<{
+  readonly signedDownload: (
+    document: DiligenceDocument,
+    disposition?: "INLINE" | "ATTACHMENT",
+  ) => Promise<{
     readonly url: string;
     readonly expiresAt: string;
     /** False for a NOT_SCANNED file (ADR 0042). Absent: scanned. */
@@ -211,7 +214,7 @@ export function createDiligenceService(dependencies: {
   });
 
   /** The founder shares one of their documents, optionally answering a request. */
-const share = async (command: {
+  const share = async (command: {
     readonly actor: ActorContext;
     readonly relationshipId: string;
     readonly documentId: string;
@@ -488,6 +491,8 @@ const share = async (command: {
       readonly actor: ActorContext;
       readonly relationshipId: string;
       readonly documentId: string;
+      /** INLINE opens it in the browser (View); default saves it. */
+      readonly disposition?: "INLINE" | "ATTACHMENT" | undefined;
     }): Promise<{
       readonly url: string;
       readonly expiresAt: string;
@@ -508,7 +513,10 @@ const share = async (command: {
       if (document === null || document.companyId !== party.companyId) {
         return null;
       }
-      const link = await dependencies.documents.signedDownload(document);
+      const link = await dependencies.documents.signedDownload(
+        document,
+        query.disposition ?? "ATTACHMENT",
+      );
       // The requester's side opening it is what "Viewed" means; the
       // founder opening their own file is not. Best-effort: a lost write
       // never stops the download.

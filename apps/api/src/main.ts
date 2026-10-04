@@ -1225,7 +1225,7 @@ const diligence = createDiligenceService({
       });
       return { documentId: completed.document.id };
     },
-    signedDownload: async (document) => {
+    signedDownload: async (document, disposition = "ATTACHMENT") => {
       if (
         diligenceDocuments === undefined ||
         document.currentVersionId === null
@@ -1236,7 +1236,7 @@ const diligence = createDiligenceService({
         documentTenantId: document.tenantId,
         documentId: document.id,
         documentVersionId: document.currentVersionId,
-        disposition: "ATTACHMENT",
+        disposition,
       });
       return {
         url: link.url,

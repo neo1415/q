@@ -185,9 +185,7 @@ export function createPostgresDiligenceRequests() {
         select document_version_id, summary
           from network.diligence_document_summaries
          where document_version_id = any(${[...documentVersionIds]}::uuid[])`;
-      return new Map(
-        rows.map((row) => [row.document_version_id, row.summary]),
-      );
+      return new Map(rows.map((row) => [row.document_version_id, row.summary]));
     },
   };
 }

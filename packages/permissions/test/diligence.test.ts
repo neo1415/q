@@ -76,8 +76,7 @@ function world(options: { readonly diligence?: boolean } = {}) {
   const events: { eventType: string; payload: unknown }[] = [];
   const requestRows: DiligenceRequestRecord[] = [];
   const audits: unknown[] = [];
-  const notices: { title: string; priority: string; actingSide: string }[] =
-    [];
+  const notices: { title: string; priority: string; actingSide: string }[] = [];
   const viewRows: { relationshipId: string; documentId: string }[] = [];
   const summaryRows = new Map<string, string>();
   const completed: string[] = [];
@@ -525,7 +524,10 @@ describe("diligence: upload and share in one step (2026-10-04)", () => {
       priority: "NEEDS_YOU",
       actingSide: "COMPANY",
     });
-    const seen = await w.service.view({ actor: investorOne, relationshipId: R1 });
+    const seen = await w.service.view({
+      actor: investorOne,
+      relationshipId: R1,
+    });
     expect(seen?.requests).toMatchObject([
       {
         status: "FULFILLED",
@@ -570,12 +572,19 @@ describe("diligence: upload and share in one step (2026-10-04)", () => {
 
   it("the investor's open is 'Viewed'; the founder's own open is not; Q's summary rides only with a share", async () => {
     const w = world();
-    w.summaryRows.set(DOC_VERSION, "Monthly accounts · Jan–Sep 2026 · revenue self-reported");
+    w.summaryRows.set(
+      DOC_VERSION,
+      "Monthly accounts · Jan–Sep 2026 · revenue self-reported",
+    );
     expect(
       (await w.service.view({ actor: investorOne, relationshipId: R1 }))
         ?.shares,
     ).toEqual([]);
-    await w.service.share({ actor: founder, relationshipId: R1, documentId: DOC });
+    await w.service.share({
+      actor: founder,
+      relationshipId: R1,
+      documentId: DOC,
+    });
     await w.service.download({
       actor: founder,
       relationshipId: R1,
