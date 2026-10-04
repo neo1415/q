@@ -13,6 +13,7 @@ import {
 import type { ActorContext } from "@capital-q/security";
 
 import { notesQuestions } from "./outcome-proposal.js";
+import type { MeetingRecap } from "./recap-email.js";
 
 /**
  * Q in a meeting (founder direction 2026-09-29).
@@ -429,6 +430,11 @@ export function createMeetingAssistantService(dependencies: {
    * per meeting. Absent: the bot stays the passive note-taker of ADR 0027.
    */
   readonly hosting?: ((meetingId: string) => string | undefined) | undefined;
+  /**
+   * meet2-64: the recap email to each participant once the record exists
+   * (only what both sides read; see recap-email.ts). Absent: no email.
+   */
+  readonly recap?: ((recap: MeetingRecap) => Promise<void>) | undefined;
 }): MeetingAssistantService {
   const { sql, bots, composer, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
@@ -777,6 +783,44 @@ export function createMeetingAssistantService(dependencies: {
     }
   }
 
+  /**
+   * What Q heard live in the call (meet2-64): the host runtime saves the
+   * lines as they arrive, so a call that ends early, or whose provider
+   * transcript fails or never comes back, still keeps what was heard.
+   */
+  function liveLines(row: AssistantRow): MeetingTranscriptLine[] {
+    return asArray<{ speaker?: unknown; text?: unknown }>(row.transcript)
+      .filter(
+        (line): line is { speaker: unknown; text: string } =>
+          typeof line.text === "string" && line.text.trim().length > 0,
+      )
+      .map((line) => ({
+        speaker: typeof line.speaker === "string" ? line.speaker : null,
+        text: line.text,
+      }));
+  }
+
+  const heardSomeone = (lines: readonly MeetingTranscriptLine[]) =>
+    lines.some((line) => line.speaker !== "Q" && line.text.trim().length > 0);
+
+  /**
+   * The call ended without a usable provider transcript. When Q heard
+   * people live, that is the record (partial, and said so); only when it
+   * heard nobody is the call marked unrecorded.
+   */
+  async function endedWithout(
+    row: AssistantRow & MeetingRow,
+    failure: string,
+    why: string,
+  ): Promise<void> {
+    const live = liveLines(row);
+    if (heardSomeone(live)) {
+      await record(row, live, { failure, why });
+      return;
+    }
+    await failed(row, failure, why);
+  }
+
   async function settle(row: AssistantRow & MeetingRow): Promise<void> {
     if (bots === undefined || row.provider_bot_id === null) return;
     const current = now();
@@ -791,43 +835,68 @@ export function createMeetingAssistantService(dependencies: {
     }
     if (read.state === "ENDED" && read.ended !== undefined) {
       const end = MEETING_BOT_END[read.ended];
-      await failed(row, end.failure, end.unrecorded);
+      await endedWithout(row, end.failure, end.unrecorded);
       return;
     }
     if (read.state === "LOBBY") await inLobby(row);
     if (read.state !== "ENDED" || read.transcript === null) {
       if (current.getTime() > row.ends_at.getTime() + GIVE_UP_AFTER_END_MS) {
-        await failed(
-          row,
-          read.state === "ENDED"
-            ? "Q's transcript of the call never came back."
-            : "Q never got into the call.",
-          read.state === "ENDED"
-            ? "Q's transcript never came back"
-            : "Q never got into the call",
-        );
+        if (read.state === "ENDED") {
+          await endedWithout(
+            row,
+            "Q's transcript of the call never came back.",
+            "Q's transcript never came back",
+          );
+        } else {
+          await failed(
+            row,
+            "Q never got into the call.",
+            "Q never got into the call",
+          );
+        }
       } else if (read.state === "IN_CALL" && row.status !== "IN_CALL") {
         await update(row.id, { status: "IN_CALL" });
       }
       return;
     }
-    const transcript = transcriptText(read.transcript);
     // Only Q's own voice came back (live cfccb9a9: its greeting was the
-    // whole transcript): no person was heard, so there is nothing to note.
-    const heardPeople = read.transcript.some(
-      (line) => line.speaker !== "Q" && line.text.trim().length > 0,
-    );
-    if (transcript.length === 0 || !heardPeople) {
-      await failed(
+    // whole transcript): no person was heard in the provider's transcript.
+    if (!heardSomeone(read.transcript)) {
+      await endedWithout(
         row,
         "Nothing was said that Q could hear.",
         "Q heard nothing in the call",
       );
       return;
     }
+    await record(
+      row,
+      read.transcript,
+      read.cutShort === undefined
+        ? null
+        : {
+            failure: MEETING_BOT_END[read.cutShort].failure,
+            why: MEETING_BOT_END[read.cutShort].unrecorded,
+          },
+    );
+  }
+
+  /**
+   * The call's record from what was heard, then everything that follows
+   * from it. Live 2026-10-04: the record was written but the first notice
+   * failed a constraint, and everything after it (the other side's notice,
+   * any email) was skipped, so both sides saw nothing. Each step after the
+   * record now stands alone: one failing never stops the others.
+   */
+  async function record(
+    row: AssistantRow & MeetingRow,
+    transcriptLines: readonly MeetingTranscriptLine[],
+    partial: { readonly failure: string; readonly why: string } | null,
+  ): Promise<void> {
+    const transcript = transcriptText(transcriptLines);
     await update(row.id, {
       status: "COMPOSING",
-      transcript: read.transcript,
+      transcript: transcriptLines,
     });
     const notes = await composer.compose({
       tenantId: row.tenant_id,
@@ -853,19 +922,28 @@ export function createMeetingAssistantService(dependencies: {
       return;
     }
     await update(row.id, { status: "DONE", notes });
-    // Removed part-way: what Q heard is the record, and the rest is said
-    // to be unrecorded rather than left to look complete.
-    if (read.cutShort !== undefined) {
-      const end = MEETING_BOT_END[read.cutShort];
-      await unrecorded(row, `${end.unrecorded} before it ended`);
-      await tellBoth(row, {
-        key: "meeting-q-cut-short",
-        title: "Q's record of this call is partial",
-        body: `${end.failure} Q kept what it heard until then; the rest of the call is unrecorded.`,
+    const step = async (name: string, run: () => Promise<unknown>) => {
+      await run().catch((error: unknown) => {
+        logger?.warn(
+          { err: error, meetingId: row.meeting_id, step: name },
+          "a step after the meeting record failed",
+        );
+      });
+    };
+    // Part of the call is missing: what Q heard is the record, and the
+    // rest is said to be unrecorded rather than left to look complete.
+    if (partial !== null) {
+      await step("partial", async () => {
+        await unrecorded(row, `${partial.why} before it ended`);
+        await tellBoth(row, {
+          key: "meeting-q-cut-short",
+          title: "Q's record of this call is partial",
+          body: `${partial.failure} Q kept what it heard until then; the rest of the call is unrecorded.`,
+        });
       });
     }
-    await dependencies
-      .onHeld?.({
+    await step("held", async () =>
+      dependencies.onHeld?.({
         relationshipId: row.relationship_id,
         meetingId: row.meeting_id,
         organiserUserId: row.organiser_user_id,
@@ -875,13 +953,8 @@ export function createMeetingAssistantService(dependencies: {
         startsAt: row.starts_at,
         agreements: notes.agreements,
         nextSteps: notes.nextSteps ?? [],
-      })
-      .catch((error: unknown) => {
-        logger?.warn(
-          { err: error, meetingId: row.meeting_id },
-          "meeting held not recorded on the relationship",
-        );
-      });
+      }),
+    );
     // "How did it go?" (2026-10-02): Q proposes what the call led to from
     // its own notes, and offers its follow-ups and the proposals made to it
     // in the call; the person confirms on their relationship page or to Q.
@@ -896,7 +969,11 @@ export function createMeetingAssistantService(dependencies: {
       inCallProposals,
     });
     const ask = questions.organiser;
-    await sql`
+    // A notice's link is a plain path: the notifications check allows no
+    // fragment or query (an outcome fragment failed it live, 2026-10-04).
+    await step(
+      "organiser-notice",
+      async () => sql`
       insert into communication.notifications
         (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
       select ${row.tenant_id}, ${row.user_id}, 'MEETING_NOTES_READY',
@@ -907,21 +984,24 @@ export function createMeetingAssistantService(dependencies: {
                      where m.user_id = ${row.user_id}
                        and m.organisation_id = c.organisation_id
                        and m.membership_status = 'active')
-                  then '/relationships/investor/' || r.investor_organisation_id::text || '#outcome'
-                  else '/relationships/company/' || r.company_id::text || '#outcome'
+                  then '/relationships/investor/' || r.investor_organisation_id::text
+                  else '/relationships/company/' || r.company_id::text
              end,
              null, ${row.meeting_id}, ${`meeting-notes:${row.meeting_id}`}
         from network.relationships r
         join core.companies c on c.id = r.company_id
        where r.id = ${row.relationship_id}
-      on conflict (user_id, dedupe_key) do nothing`;
+      on conflict (user_id, dedupe_key) do nothing`,
+    );
     // The other side's debrief (2026-10-02; was organiser-only, ADR 0027):
     // each other participant hears the record is ready, on their own side's
     // page. Context Firewall: their question is built only from what both
     // sides read (the agreements), never from the organiser's private Q
     // analysis (summary, flags, follow-ups) or the proposals made to Q.
     const theirs = questions.others;
-    await sql`
+    await step(
+      "participant-notice",
+      async () => sql`
       insert into communication.notifications
         (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
       select p.participant_tenant_id, p.user_id, 'MEETING_NOTES_READY',
@@ -931,8 +1011,8 @@ export function createMeetingAssistantService(dependencies: {
                      where m.user_id = p.user_id
                        and m.organisation_id = c.organisation_id
                        and m.membership_status = 'active')
-                  then '/relationships/investor/' || r.investor_organisation_id::text || '#outcome'
-                  else '/relationships/company/' || r.company_id::text || '#outcome'
+                  then '/relationships/investor/' || r.investor_organisation_id::text
+                  else '/relationships/company/' || r.company_id::text
              end,
              null, ${row.meeting_id}, ${`meeting-notes:${row.meeting_id}`}
         from communication.meeting_participants p
@@ -941,11 +1021,55 @@ export function createMeetingAssistantService(dependencies: {
        where p.meeting_id = ${row.meeting_id}
          and p.user_id <> ${row.user_id}
        limit 20
-      on conflict (user_id, dedupe_key) do nothing`.catch((error: unknown) => {
-      logger?.warn(
-        { err: error, meetingId: row.meeting_id },
-        "the other side's notes notice was not written",
-      );
+      on conflict (user_id, dedupe_key) do nothing`,
+    );
+    const send = dependencies.recap;
+    if (send === undefined) return;
+    await step("recap-email", async () => {
+      // Claimed once per person on their own notice (emailed_at), so a
+      // second settle never sends a second recap.
+      const claimed = await sql<
+        {
+          user_id: string;
+          email: string | null;
+          display_name: string | null;
+          link_path: string | null;
+        }[]
+      >`
+        update communication.notifications n
+           set emailed_at = clock_timestamp()
+          from communication.meeting_participants p
+         where n.meeting_id = ${row.meeting_id}
+           and n.dedupe_key = ${`meeting-notes:${row.meeting_id}`}
+           and n.emailed_at is null
+           and p.meeting_id = n.meeting_id
+           and p.user_id = n.user_id
+        returning n.user_id, p.email, p.display_name, n.link_path`;
+      for (const person of claimed) {
+        if (person.email === null || person.email.length === 0) continue;
+        await send({
+          meetingId: row.meeting_id,
+          userId: person.user_id,
+          to: person.email,
+          name: person.display_name,
+          purpose: row.purpose,
+          startsAt: row.starts_at,
+          linkPath: person.link_path,
+          attendees: notes.attendees.map((a) => a.name).slice(0, 20),
+          agreements: notes.agreements,
+          money: notes.commitments.map((c) => ({
+            party: c.party,
+            amount: c.amount,
+            quote: c.quote,
+          })),
+          partial: partial !== null,
+        }).catch((error: unknown) => {
+          logger?.warn(
+            { err: error, meetingId: row.meeting_id },
+            "the recap email was not sent",
+          );
+        });
+      }
     });
   }
 

@@ -56,3 +56,36 @@ describe("money Q heard", () => {
     expect(sideOfParty("Someone else", attendees)).toBeNull();
   });
 });
+
+/**
+ * meet2-64 (live 2026-10-04): "I'm going to give you one million dollars"
+ * was written down by the notes as "a million dollars" and never filed.
+ */
+describe("money said in words", () => {
+  it.each([
+    ["a million dollars", "1000000", "USD"],
+    ["one million dollars", "1000000", "USD"],
+    ["$1 million", "1000000", "USD"],
+    ["two million naira", "2000000", "NGN"],
+    ["a hundred thousand pounds", "100000", "GBP"],
+    ["about 250k dollars", "250000", "USD"],
+    ["give you one million dollars", "1000000", "USD"],
+    ["$500,000 for the round", "500000", "USD"],
+    ["we'll commit to $500k", "500000", "USD"],
+  ])("reads %s", (text, amount, currencyCode) => {
+    expect(parseSpokenAmount(text)).toEqual({ amount, currencyCode });
+  });
+
+  it.each([
+    "half a million dollars",
+    "a few hundred thousand dollars",
+    "$500,000 for a million dollars",
+    "a million",
+    "one or two million dollars",
+    "1 to 2 million dollars",
+    "€5 million dollars",
+    "zero dollars",
+  ])("leaves %s unknown", (text) => {
+    expect(parseSpokenAmount(text)).toBeNull();
+  });
+});

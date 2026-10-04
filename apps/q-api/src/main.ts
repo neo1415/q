@@ -196,6 +196,7 @@ import {
   createCounterpartNotices,
   meetingIcs,
   createMeetingAssistantService,
+  meetingRecapEmail,
   createNetworkMeetingActivityWriter,
 } from "@capital-q/communication";
 import {
@@ -3106,6 +3107,23 @@ const meetingAssistant = createMeetingAssistantService({
   bots: recallBots,
   // MEET-HOST: the bot joins early, live, with a signed events endpoint.
   hosting: (meetingId) => meetingHost.urlFor(meetingId),
+  // meet2-64: each participant gets the recap by email once the record
+  // exists (only what both sides read), through the app's own sender.
+  recap: async (recap) => {
+    if (!inviteEmail.available) return;
+    const message = meetingRecapEmail(
+      recap,
+      process.env.RAILWAY_SERVICE__CAPITAL_Q_WEB_URL
+        ? `https://${process.env.RAILWAY_SERVICE__CAPITAL_Q_WEB_URL}`
+        : null,
+    );
+    await inviteEmail.send({
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+    });
+  },
   composer: createMeetingNotesComposer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,

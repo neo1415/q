@@ -422,7 +422,7 @@ export function createMeetingFollowUpCards(dependencies: {
                        where m.user_id = p.user_id
                          and m.organisation_id = c.organisation_id
                          and m.membership_status = 'active')
-                    then i.name else c.name end as counterpart
+                    then i.display_name else c.canonical_name end as counterpart
           from communication.meeting_participants p
           join identity.user_profiles u on u.id = p.user_id
           join network.relationships r on r.id = ${relationshipId}

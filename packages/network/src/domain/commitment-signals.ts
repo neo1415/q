@@ -71,6 +71,132 @@ function scale(figure: string, multiplier: bigint): string | null {
 }
 
 export function parseSpokenAmount(text: string): SpokenAmount | null {
+  return parseExactFigure(text) ?? parseSaidFigure(text);
+}
+
+/** "dollars", "naira": the currency as said, when no symbol or code is. */
+const CURRENCY_WORDS: Readonly<Record<string, string>> = {
+  dollar: "USD",
+  dollars: "USD",
+  usd: "USD",
+  euro: "EUR",
+  euros: "EUR",
+  eur: "EUR",
+  pound: "GBP",
+  pounds: "GBP",
+  gbp: "GBP",
+  naira: "NGN",
+  ngn: "NGN",
+  rand: "ZAR",
+  zar: "ZAR",
+  cedi: "GHS",
+  cedis: "GHS",
+  shillings: "KES",
+  kes: "KES",
+};
+
+const NUMBER_WORDS: Readonly<Record<string, string>> = {
+  a: "1",
+  an: "1",
+  one: "1",
+  two: "2",
+  three: "3",
+  four: "4",
+  five: "5",
+  six: "6",
+  seven: "7",
+  eight: "8",
+  nine: "9",
+  ten: "10",
+  eleven: "11",
+  twelve: "12",
+  fifteen: "15",
+  twenty: "20",
+  thirty: "30",
+  forty: "40",
+  fifty: "50",
+  sixty: "60",
+  seventy: "70",
+  eighty: "80",
+  ninety: "90",
+};
+
+/**
+ * Words before a figure that make it vague: "half a million" and "one or
+ * two million" stay unknown.
+ */
+const VAGUE_BEFORE =
+  /(?:\b(?:half|quarter|few|couple|several|some|tens|hundreds|thousands|millions)\s*(?:of\s*)?|(?:\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten))\s*(?:or|to)\s*)$/i;
+
+/**
+ * meet2-64 (live 2026-10-04): the notes wrote the amount as said, "a
+ * million dollars", which the exact reader above refused, so money said in
+ * the call was never filed. A figure said in words or inside a phrase is
+ * read when it is still exact: one number (digits or a plain number word),
+ * an optional scale, and a currency by symbol, code or name. Two different
+ * figures in one phrase, or a vague one, stay unknown.
+ */
+function parseSaidFigure(text: string): SpokenAmount | null {
+  const said = text.replace(/\s+/g, " ").trim();
+  const symbols = SYMBOLS.map(([symbol]) =>
+    symbol.replace(/[$.]/g, (c) => `\\${c}`),
+  ).join("|");
+  const numberWords = Object.keys(NUMBER_WORDS).join("|");
+  const pattern = new RegExp(
+    `(${symbols})?\\s*(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?|\\b(?:${numberWords})\\b)(?:[\\s-]*(hundred))?(?:[\\s-]*(k|thousand|mn|mm|m|million|bn|b|billion)\\b)?(?=(?:\\s*([A-Za-z]+)\\b)?)`,
+    "gi",
+  );
+  const found = new Map<string, SpokenAmount>();
+  for (const match of said.matchAll(pattern)) {
+    const [whole, symbol, figureRaw = "", hundred, unit = "", after] = match;
+    if (VAGUE_BEFORE.test(said.slice(0, match.index))) return null;
+    const afterWord = after?.toLowerCase();
+    const named =
+      afterWord === undefined ? undefined : CURRENCY_WORDS[afterWord];
+    // "$5 zillion": an unknown scale is not money we can read.
+    if (
+      afterWord !== undefined &&
+      /illion$/.test(afterWord) &&
+      named === undefined
+    ) {
+      return null;
+    }
+    const bySymbol =
+      symbol === undefined
+        ? undefined
+        : SYMBOLS.find(([s]) => s.toLowerCase() === symbol.toLowerCase())?.[1];
+    if (bySymbol !== undefined && named !== undefined && bySymbol !== named) {
+      return null;
+    }
+    const currency = bySymbol ?? named;
+    if (currency === undefined || whole.trim().length === 0) continue;
+    const isWord = /^[a-z]+$/i.test(figureRaw);
+    // A bare "a"/"one" with no scale or currency name is not a figure.
+    if (isWord && unit === "" && hundred === undefined && named === undefined) {
+      continue;
+    }
+    let figure = isWord
+      ? (NUMBER_WORDS[figureRaw.toLowerCase()] ?? "")
+      : figureRaw.replaceAll(",", "");
+    if (figure === "") continue;
+    if (hundred !== undefined) {
+      const scaled = scale(figure, 100n);
+      if (scaled === null) return null;
+      figure = scaled;
+    }
+    const multiplier = MULTIPLIERS[unit.toLowerCase()];
+    if (multiplier === undefined) return null;
+    const amount = scale(figure, multiplier);
+    if (amount === null) return null;
+    if (/^0+(?:\.0+)?$/.test(amount)) return null;
+    if ((amount.split(".")[0] ?? "").length > 13) return null;
+    found.set(`${amount} ${currency}`, { amount, currencyCode: currency });
+  }
+  if (found.size !== 1) return null;
+  return [...found.values()][0] ?? null;
+}
+
+function parseExactFigure(text: string): SpokenAmount | null {
   let rest = text.trim().replace(/\s+/g, " ");
   let currency: string | null = null;
   for (const [symbol, code] of SYMBOLS) {

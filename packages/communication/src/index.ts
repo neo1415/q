@@ -124,6 +124,11 @@ export {
   proposeMeetingOutcome,
   type ProposedMeetingOutcome,
 } from "./meeting-assistant/outcome-proposal.js";
+export {
+  meetingRecapEmail,
+  type MeetingRecap,
+  type MeetingRecapEmail,
+} from "./meeting-assistant/recap-email.js";
 
 // AUTO block: Web Push (VAPID) and notice delivery (ADR 0030).
 export {
