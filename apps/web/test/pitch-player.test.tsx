@@ -770,20 +770,46 @@ describe("R36 · one active player across a page", () => {
 describe("a pitch this browser cannot play (R30 #22, #23)", () => {
   it("says so when the element or the stream engine gives up, instead of a still poster", async () => {
     const authorize = vi.fn(() => Promise.resolve(authorization()));
+    const attachSource = vi.fn(() => () => undefined);
     const { container } = render(
       <PitchPlayer
         company={company(1)}
         policy="ACTIVE"
         authorize={authorize}
         reducedMotion={false}
-        attachSource={() => () => undefined}
+        attachSource={attachSource}
       />,
     );
     await waitFor(() => expect(videoIn(container).poster).not.toBe(""));
+    // The engine can only fail once a source is attached. Waiting for the
+    // poster alone raced the effects: the poster is in the DOM at commit,
+    // the listeners only after the passive effects, so under a loaded
+    // runner the event could fire into the gap (design-48 flake).
+    await waitFor(() => expect(attachSource).toHaveBeenCalled());
     act(() => {
       videoIn(container).dispatchEvent(new Event("cq-playback-failed"));
     });
-    // Under a loaded runner the status can land a tick later.
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain(
+        "can't play in this browser",
+      ),
+    );
+  });
+
+  it("hears a failure raised while the source is being attached", async () => {
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+        attachSource={(video) => {
+          video.dispatchEvent(new Event("cq-playback-failed"));
+          return () => undefined;
+        }}
+      />,
+    );
     await waitFor(() =>
       expect(screen.getByRole("status").textContent).toContain(
         "can't play in this browser",

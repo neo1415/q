@@ -12,6 +12,7 @@ import {
   rejectQApproval,
   createQRun,
   getCurrentOnboardingSession,
+  getQApproval,
   getQArtifact,
   getQArtifactVersion,
   getQConversation,
@@ -31,6 +32,7 @@ import {
   type ListQConversationsResponse,
   type QArtifactDetail,
   type QConversationDetail,
+  type QApprovalView,
   type QPendingApproval,
   type QRunSummary,
 } from "@capital-q/contracts";
@@ -400,6 +402,21 @@ export async function pendingQApprovalsAction(): Promise<
   return run(async (session) => (await listPendingQApprovals(session)).items);
 }
 
+/**
+ * One approval as its requested approver may read it: what Q would do, to
+ * whom, and the exact content the decision binds to (design-48: Q's work
+ * shows it before the person says yes).
+ */
+export async function readQApprovalAction(
+  rawApprovalId: string,
+): Promise<QActionResult<QApprovalView>> {
+  const approvalId = ApprovalIdSchema.safeParse(rawApprovalId);
+  if (!approvalId.success) {
+    return failure("That approval isn't available.");
+  }
+  return run((session) => getQApproval(session, approvalId.data));
+}
+
 export async function rejectQApprovalAction(
   rawApprovalId: string,
 ): Promise<QActionResult<null>> {
@@ -435,6 +452,28 @@ export async function readQRunAction(
  * conversation that is not theirs is not found. The browser never keeps
  * a copy: a refresh reads the list and the thread back from the server.
  */
+/**
+ * What the dock needs to resume on a fresh page, in one round trip
+ * (design-48): the approvals waiting on this person and their recent
+ * conversations, read in parallel on the server. Two client actions here
+ * queued behind each other, and behind the rest of the shell's, on every
+ * page load.
+ */
+export async function resumeQAction(): Promise<
+  QActionResult<{
+    readonly pending: readonly QPendingApproval[];
+    readonly conversations: ListQConversationsResponse["items"];
+  }>
+> {
+  return run(async (session) => {
+    const [pending, conversations] = await Promise.all([
+      listPendingQApprovals(session),
+      listQConversations(session, { limit: 30 }),
+    ]);
+    return { pending: pending.items, conversations: conversations.items };
+  });
+}
+
 export async function listQConversationsAction(
   before?: string,
 ): Promise<QActionResult<ListQConversationsResponse>> {

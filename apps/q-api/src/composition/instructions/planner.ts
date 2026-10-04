@@ -9,7 +9,7 @@ import {
   InstructionPlanV3ResultSchema,
   renderPrompt,
   type InstructionPlanV3Result,
-  type InstructionPlanVariables,
+  type InstructionPlanV4Variables,
 } from "@capital-q/q-core";
 
 /**
@@ -24,7 +24,7 @@ import {
 export const PLAN_MAX_COST_USD = 0.08;
 
 export type PlanVariables = Omit<
-  InstructionPlanVariables,
+  InstructionPlanV4Variables,
   | "operatingMode"
   | "communicationProfile"
   | "communicationGuidance"

@@ -1,7 +1,11 @@
 import type { EventRegistry } from "@capital-q/contracts";
 import type { CounterpartNotices } from "@capital-q/communication";
 import type { DatabaseExecutor } from "@capital-q/database";
-import { RelationshipInterestExpressedEvent } from "@capital-q/network/events";
+import {
+  RelationshipInterestDeclinedEvent,
+  RelationshipInterestExpressedEvent,
+  RelationshipMatchedEvent,
+} from "@capital-q/network/events";
 
 import type { RunnerLogger } from "../outbox-runner.js";
 import type { QueueMessage } from "../queue/pgmq.js";
@@ -13,7 +17,16 @@ import type { MessageOutcome } from "../queue/runner.js";
  * reaches the investor's, as a "Needs you" notice (and so a push). Whoever
  * expressed it -- in person or Q on their behalf -- is named. Once per
  * interest (dedupe), so redelivery tells nobody twice.
+ *
+ * Once it is answered (accepted, or declined), that notice is resolved --
+ * marked read, never deleted (QA run 8a1d57b9: "New: Savanna is
+ * interested... Open" stayed after the founder accepted). Idempotent.
  */
+
+const ANSWERED: ReadonlySet<string> = new Set([
+  RelationshipMatchedEvent.name,
+  RelationshipInterestDeclinedEvent.name,
+]);
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,6 +44,29 @@ export function withInterestNotices(
 ): (message: QueueMessage) => Promise<MessageOutcome> {
   return async (message) => {
     const parsed = options.registry.parse(message.message);
+    if (parsed.ok && ANSWERED.has(parsed.message.type)) {
+      const answered = parsed.message.data as { readonly interestId?: unknown };
+      if (
+        typeof answered.interestId === "string" &&
+        UUID.test(answered.interestId)
+      ) {
+        try {
+          await options.sql`
+            update communication.notifications
+               set read_at = clock_timestamp()
+             where read_at is null
+               and dedupe_key in (${`interest_received:${answered.interestId}`},
+                                  ${`connection_requested:${answered.interestId}`})`;
+        } catch (error: unknown) {
+          options.logger.warn(
+            { msgId: message.msgId, err: error },
+            "answered interest notice not resolved; retrying",
+          );
+          return { kind: "RETRY", errorCode: "INTEREST_NOTICE_FAILED" };
+        }
+      }
+      return inner(message);
+    }
     if (
       !parsed.ok ||
       parsed.message.type !== RelationshipInterestExpressedEvent.name

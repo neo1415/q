@@ -7,9 +7,10 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  InstructionThreadFactsSchema,
+  InstructionThreadFactsV2Schema,
   renderPrompt,
   type InstructionThreadFacts,
+  type InstructionThreadFactsV2,
   type InstructionThreadReaderVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -40,8 +41,15 @@ type Variables = Omit<
 >;
 
 export type ThreadRead = {
-  readonly facts: InstructionThreadFacts | null;
+  readonly facts: InstructionThreadFactsV2 | null;
   readonly costUsd: number;
+  /**
+   * QA run 8a1d57b9: their open question, verbatim, for CODE only -- quoted
+   * to the person in a NEEDS_YOU notice when Q may not answer it. Never
+   * given to the planner (it reads the typed facts alone).
+   */
+  readonly question?:
+    { readonly messageId: string; readonly text: string } | undefined;
 };
 
 export type QuarantinedThreadReader = (input: {
@@ -60,7 +68,10 @@ export function createQuarantinedThreadReader(dependencies: {
   readonly logger?: Logger | undefined;
 }): QuarantinedThreadReader {
   const registry = createDefaultPromptRegistry();
-  const cache = new Map<string, InstructionThreadFacts>();
+  const cache = new Map<
+    string,
+    { facts: InstructionThreadFactsV2; question: ThreadRead["question"] }
+  >();
 
   return async (input) => {
     const read = await dependencies.chat
@@ -75,7 +86,13 @@ export function createQuarantinedThreadReader(dependencies: {
     if (latest === undefined) return { facts: null, costUsd: 0 };
     const key = `${input.instructionId}:${input.relationshipId}:${latest.id}`;
     const cached = cache.get(key);
-    if (cached !== undefined) return { facts: cached, costUsd: 0 };
+    if (cached !== undefined) {
+      return {
+        facts: cached.facts,
+        costUsd: 0,
+        ...(cached.question === undefined ? {} : { question: cached.question }),
+      };
+    }
     if (input.maxCostUsd < THREAD_READ_MAX_COST_USD) {
       return { facts: null, costUsd: 0 };
     }
@@ -107,7 +124,7 @@ export function createQuarantinedThreadReader(dependencies: {
         },
       });
       const response =
-        await dependencies.gateway.execute<InstructionThreadFacts>(
+        await dependencies.gateway.execute<InstructionThreadFactsV2>(
           {
             taskClass: "STRUCTURED_EXTRACTION",
             sensitivity: "CONFIDENTIAL",
@@ -129,25 +146,39 @@ export function createQuarantinedThreadReader(dependencies: {
               correlationId: `cor_instr_${input.instructionId}_${randomUUID().slice(0, 8)}`,
             },
           },
-          { schema: InstructionThreadFactsSchema },
+          { schema: InstructionThreadFactsV2Schema },
         );
       const costUsd = response.cost.amount;
       if (response.output.kind !== "STRUCTURED")
         return { facts: null, costUsd };
-      const parsed = InstructionThreadFactsSchema.safeParse(
+      const parsed = InstructionThreadFactsV2Schema.safeParse(
         response.output.value,
       );
       if (!parsed.success) return { facts: null, costUsd };
       // Topic numbers outside the approved list are dropped, not trusted.
-      const facts: InstructionThreadFacts = {
+      const facts: InstructionThreadFactsV2 = {
         ...parsed.data,
         topicNumbers: parsed.data.topicNumbers.filter(
           (number) => number <= input.topics.length,
         ),
       };
+      // Their latest words, for code to quote to the person; read from the
+      // thread itself, never from the model.
+      const theirs =
+        facts.asksQuestion && latest.from === "OTHER_SIDE"
+          ? (latest.text ?? null)
+          : null;
+      const question =
+        theirs === null || theirs.trim() === ""
+          ? undefined
+          : { messageId: latest.id, text: theirs.trim().slice(0, 400) };
       if (cache.size >= CACHE_MAX) cache.clear();
-      cache.set(key, facts);
-      return { facts, costUsd };
+      cache.set(key, { facts, question });
+      return {
+        facts,
+        costUsd,
+        ...(question === undefined ? {} : { question }),
+      };
     } catch (error: unknown) {
       dependencies.logger?.warn(
         { err: error, instructionId: input.instructionId },
@@ -158,13 +189,33 @@ export function createQuarantinedThreadReader(dependencies: {
   };
 }
 
+const QUESTION_WORDS: Readonly<Record<string, string>> = {
+  CHEQUE_SIZE: "cheque size",
+  LEAD_OR_FOLLOW: "whether you lead",
+  SECTORS: "sectors",
+  STAGES: "stages",
+  GEOGRAPHIES: "geographies",
+  OTHER: "something else",
+};
+
 /** The facts as the planner sees them: fixed words, never theirs. */
 export function factsLine(
-  facts: InstructionThreadFacts,
+  facts: InstructionThreadFacts & {
+    readonly questionAbout?: readonly string[] | undefined;
+  },
   topics: readonly string[],
 ): string {
   const parts: string[] = [`last from ${facts.lastFrom}`];
-  if (facts.asksQuestion) parts.push("asks a question");
+  if (facts.asksQuestion) {
+    const about = (facts.questionAbout ?? [])
+      .map((kind) => QUESTION_WORDS[kind])
+      .filter((words): words is string => words !== undefined);
+    parts.push(
+      about.length === 0
+        ? "asks a question"
+        : `asks a question about ${about.join(", ")}`,
+    );
+  }
   if (facts.wantsToMeet) parts.push("wants to meet");
   if (facts.proposedTime !== null) {
     parts.push(`proposed ${facts.proposedTime}`);
@@ -199,7 +250,7 @@ export type QuarantinedEmailReader = (input: {
   };
   readonly topics: readonly string[];
   readonly now: Date;
-}) => Promise<InstructionThreadFacts | null>;
+}) => Promise<InstructionThreadFactsV2 | null>;
 
 export function createQuarantinedEmailReader(dependencies: {
   readonly gateway: ModelGateway;
@@ -207,7 +258,7 @@ export function createQuarantinedEmailReader(dependencies: {
   readonly logger?: Logger | undefined;
 }): QuarantinedEmailReader {
   const registry = createDefaultPromptRegistry();
-  const cache = new Map<string, InstructionThreadFacts>();
+  const cache = new Map<string, InstructionThreadFactsV2>();
 
   return async (input) => {
     const key = `${input.actor.userId}:${input.email.id}:${input.topics.join("\u0001")}`;
@@ -234,7 +285,7 @@ export function createQuarantinedEmailReader(dependencies: {
         },
       });
       const response =
-        await dependencies.gateway.execute<InstructionThreadFacts>(
+        await dependencies.gateway.execute<InstructionThreadFactsV2>(
           {
             taskClass: "STRUCTURED_EXTRACTION",
             sensitivity: "CONFIDENTIAL",
@@ -256,14 +307,14 @@ export function createQuarantinedEmailReader(dependencies: {
               correlationId: `cor_inbound_${randomUUID().slice(0, 8)}`,
             },
           },
-          { schema: InstructionThreadFactsSchema },
+          { schema: InstructionThreadFactsV2Schema },
         );
       if (response.output.kind !== "STRUCTURED") return null;
-      const parsed = InstructionThreadFactsSchema.safeParse(
+      const parsed = InstructionThreadFactsV2Schema.safeParse(
         response.output.value,
       );
       if (!parsed.success) return null;
-      const facts: InstructionThreadFacts = {
+      const facts: InstructionThreadFactsV2 = {
         ...parsed.data,
         topicNumbers: parsed.data.topicNumbers.filter(
           (number) => number <= input.topics.length,

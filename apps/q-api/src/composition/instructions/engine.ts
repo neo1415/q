@@ -18,12 +18,20 @@ import type { Logger } from "@capital-q/observability";
 import {
   ENGINE_ABILITIES,
   type InstructionPlanV3Result as InstructionPlanResult,
+  type InstructionQuestionKind,
   type InstructionThreadFacts,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
 import { PLAN_MAX_COST_USD, type InstructionPlanner } from "./planner.js";
 import { needsYouNotice } from "./digest.js";
+import {
+  checkMessage,
+  materialLine,
+  senderLines,
+  type InstructionMaterial,
+  type MaterialFact,
+} from "./material.js";
 import { factsLine, type QuarantinedThreadReader } from "./quarantine.js";
 import type { InstructionRow, InstructionStore } from "./store.js";
 
@@ -56,6 +64,11 @@ export type InstructionPerson = {
   readonly state: string | null;
 };
 
+/** The quarantined reader's facts; v2 also says what a question is about. */
+export type ThreadFacts = InstructionThreadFacts & {
+  readonly questionAbout?: readonly InstructionQuestionKind[] | undefined;
+};
+
 export type InstructionPlanStep = InstructionPlanResult["steps"][number];
 
 export type StepVerdict =
@@ -80,6 +93,13 @@ export const REFUSAL_CODES = [
   "OUT_OF_SCOPE",
   "EXCLUDED",
   "OUTSIDE_HOURS",
+  // QA run 8a1d57b9: what code finds wrong with a message Q wrote.
+  "UNGROUNDED_MESSAGE",
+  "FALSE_HISTORY",
+  "MEETING_NOT_ALLOWED",
+  "MESSAGE_TOO_LONG",
+  "UNGROUNDED_NUMBER",
+  "UNANSWERED_QUESTION",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -110,6 +130,33 @@ export const REFUSAL_WORDS: Readonly<
   OUTSIDE_HOURS: {
     reason: "it's outside the working hours you set",
     instead: "I'll pick it up in your working hours",
+  },
+  UNGROUNDED_MESSAGE: {
+    reason:
+      "the message didn't name anything specific from what they show on Capital Q",
+    instead:
+      "I'll write it again from their own profile, or you can write it yourself",
+  },
+  FALSE_HISTORY: {
+    reason: "the message claimed a history with them that you don't have",
+    instead: "I'll write it again without that",
+  },
+  MEETING_NOT_ALLOWED: {
+    reason: "the message proposed a call, and you haven't let me book calls",
+    instead: "I'll ask them a question instead, or you can let me book calls",
+  },
+  MESSAGE_TOO_LONG: {
+    reason: "the message was longer than a short note",
+    instead: "I'll write it shorter",
+  },
+  UNGROUNDED_NUMBER: {
+    reason:
+      "the message stated a number that isn't in their profile or your declared facts",
+    instead: "I'll leave numbers out unless they're on record",
+  },
+  UNANSWERED_QUESTION: {
+    reason: "the answer isn't among the facts you've declared",
+    instead: "I've put their question to you",
   },
 };
 
@@ -213,13 +260,20 @@ export type ValidationContext = {
   /** The idempotency key this step runs under. */
   readonly stepKey: string;
   /** S6: what the quarantined reader found in each thread. */
-  readonly facts?: ReadonlyMap<string, InstructionThreadFacts> | undefined;
+  readonly facts?: ReadonlyMap<string, ThreadFacts> | undefined;
   /**
    * The plan's reading of the goal: PREPARE (find, prepare, draft, line
    * up) asks for every step whatever the grant says (weekend test
    * 6ea17898: "prepare intros" ran AUTO steps).
    */
   readonly request?: "PREPARE" | "EXECUTE" | undefined;
+  /**
+   * QA run 8a1d57b9: what Q's messages may say -- the sender's approved
+   * facts and each counterpart's network-visible material. Present, every
+   * chat message is checked against it (null: nothing could be read, so a
+   * first message has nothing specific to say and is refused).
+   */
+  readonly material?: InstructionMaterial | null | undefined;
 };
 
 const Args = z.record(z.string(), z.unknown());
@@ -361,6 +415,15 @@ export function validateStep(
     )?.relationshipId ??
     null;
 
+  // What Q writes is checked before it is sent or asked (QA run 8a1d57b9):
+  // a card with a generic message is no better than sending one.
+  if (action.name === "chat.message.send" && context.material !== undefined) {
+    const problem = messageProblem(parsed.data, subject, context);
+    if (problem !== null) {
+      return { verdict: "REFUSED", code: problem, relationshipId: subject };
+    }
+  }
+
   const ask = (code: string): StepVerdict => ({
     verdict: "ASK",
     action,
@@ -434,6 +497,96 @@ export function validateStep(
   };
 }
 
+export type QuestionVerdict =
+  "ANSWERABLE" | "TERMS_OR_MONEY" | "NOT_DECLARED" | "MESSAGES_NOT_AUTO";
+
+/**
+ * QA run 8a1d57b9: whether Q may answer their open question itself. Only
+ * from the person's approved facts (declared mandate fields, or an
+ * approved topic), only when messages are AUTO, and never terms or money.
+ * Null: no open question from them.
+ */
+export function questionVerdict(
+  facts: ThreadFacts,
+  grant: InstructionGrant,
+  sender: readonly MaterialFact[] | null,
+): QuestionVerdict | null {
+  if (!facts.asksQuestion || facts.lastFrom !== "THEM") return null;
+  if (facts.mentionsTermsOrMoney) return "TERMS_OR_MONEY";
+  if (
+    !grant.actions.some(
+      (entry) => entry.action === "chat.message.send" && entry.mode === "AUTO",
+    )
+  ) {
+    return "MESSAGES_NOT_AUTO";
+  }
+  const kinds =
+    facts.questionAbout === undefined || facts.questionAbout.length === 0
+      ? ["OTHER" as const]
+      : facts.questionAbout;
+  const declared = kinds.every((kind) =>
+    kind === "OTHER"
+      ? facts.topicNumbers.length > 0
+      : (sender ?? []).some((fact) => fact.answers === kind),
+  );
+  return declared ? "ANSWERABLE" : "NOT_DECLARED";
+}
+
+/** Why their question went to the person, in plain words. */
+export const QUESTION_WORDS: Readonly<
+  Record<Exclude<QuestionVerdict, "ANSWERABLE">, string>
+> = {
+  TERMS_OR_MONEY:
+    "It's about terms or money, so the answer is yours. Reply in the chat when you're ready.",
+  NOT_DECLARED:
+    "The answer isn't among the facts you've declared, so I won't guess. Reply in the chat, or declare it and I can answer next time.",
+  MESSAGES_NOT_AUTO:
+    "You haven't let me send messages on my own under this instruction. Reply in the chat.",
+};
+
+/** Code's check of a message's words against the material it may use. */
+function messageProblem(
+  input: unknown,
+  subject: string | null,
+  context: ValidationContext,
+): RefusalCode | null {
+  const body = (input as { input?: { kind?: unknown; body?: unknown } }).input;
+  if (body?.kind !== "TEXT" || typeof body.body !== "string") return null;
+  const counterpartId =
+    subject === null
+      ? undefined
+      : context.people.find((person) => person.relationshipId === subject)
+          ?.counterpartId;
+  const thread = subject === null ? undefined : context.facts?.get(subject);
+  const sent = subject === null ? 0 : (context.sent.get(subject) ?? 0);
+  const material = context.material ?? null;
+  // Their question Q may not answer has gone to the person: no reply.
+  const open =
+    thread === undefined
+      ? null
+      : questionVerdict(thread, context.grant, material?.sender.facts ?? null);
+  if (open === "NOT_DECLARED" || open === "MESSAGES_NOT_AUTO") {
+    return "UNANSWERED_QUESTION";
+  }
+  return checkMessage({
+    body: body.body,
+    first: sent === 0 && (thread === undefined || thread.lastFrom === "NONE"),
+    counterpart:
+      counterpartId === undefined
+        ? []
+        : (material?.counterparts.get(counterpartId) ?? []),
+    sender: material?.sender.facts ?? [],
+    bookingAuto: context.grant.actions.some(
+      (entry) =>
+        entry.action === "schedule.meeting.book" && entry.mode === "AUTO",
+    ),
+    answering:
+      thread?.asksQuestion === true && thread.lastFrom === "THEM"
+        ? (thread.questionAbout ?? ["OTHER"])
+        : undefined,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // One firing
 // ---------------------------------------------------------------------------
@@ -485,6 +638,17 @@ export type InstructionEngineDependencies = {
   /** The planner: one structured call through the Q Model Gateway. */
   /** The planner: one structured call through the Q Model Gateway (S5: budgeted). */
   readonly plan: InstructionPlanner;
+  /**
+   * QA run 8a1d57b9: the sender's approved facts and each covered person's
+   * network-visible material, read as the person. Absent, messages are not
+   * checked against material (and the planner sees none).
+   */
+  readonly material?:
+    | ((
+        actor: ActorContext,
+        people: readonly InstructionPerson[],
+      ) => Promise<InstructionMaterial | null>)
+    | undefined;
   /** S6: the quarantined extractor; absent, the planner sees no thread facts. */
   readonly readThread?: QuarantinedThreadReader | undefined;
   /** An ASK step: the `app.<name>` card, as the person. */
@@ -542,8 +706,10 @@ function actionLines(
 function peopleLines(
   people: readonly InstructionPerson[],
   sent: ReadonlyMap<string, number>,
-  facts: ReadonlyMap<string, InstructionThreadFacts>,
+  facts: ReadonlyMap<string, ThreadFacts>,
   topics: readonly string[],
+  material: InstructionMaterial | null | undefined,
+  grant: InstructionGrant,
 ): string {
   if (people.length === 0) return "No one yet.";
   return people
@@ -565,6 +731,26 @@ function peopleLines(
               read === undefined ? null : `chat: ${factsLine(read, topics)}`)(
               facts.get(person.relationshipId),
             ),
+        // Their open question: answer it, or leave it to the person.
+        person.relationshipId === null
+          ? null
+          : ((read) => {
+              if (read === undefined || material === undefined) return null;
+              const verdict = questionVerdict(
+                read,
+                grant,
+                material?.sender.facts ?? null,
+              );
+              return verdict === null
+                ? null
+                : verdict === "ANSWERABLE"
+                  ? "their question: answer it from WHO YOU WRITE AS"
+                  : "their question has gone to the person: write no reply";
+            })(facts.get(person.relationshipId)),
+        // Their network-visible material, each fact with its source.
+        material === undefined
+          ? null
+          : materialLine(material?.counterparts.get(person.counterpartId)),
       ]
         .filter((part): part is string => part !== null)
         .join(" | "),
@@ -723,7 +909,11 @@ export function createInstructionEngine(
 
       // S6: their messages, read only through the quarantined extractor,
       // keeping one planning call in reserve.
-      const facts = new Map<string, InstructionThreadFacts>();
+      const facts = new Map<string, ThreadFacts>();
+      const questions = new Map<
+        string,
+        { readonly messageId: string; readonly text: string }
+      >();
       if (dependencies.readThread !== undefined) {
         const threads = inScope(grant.data, people)
           .map((person) => person.relationshipId)
@@ -744,7 +934,65 @@ export function createInstructionEngine(
             await store.addSpend(row.id, read.costUsd);
           }
           if (read.facts !== null) facts.set(relationshipId, read.facts);
+          if (read.question !== undefined) {
+            questions.set(relationshipId, read.question);
+          }
         }
+      }
+
+      // What messages may say: read once per firing, as the person.
+      const material =
+        dependencies.material === undefined
+          ? undefined
+          : await dependencies
+              .material(actor, inScope(grant.data, people))
+              .catch(() => null);
+
+      // QA run 8a1d57b9: their question Q may not answer goes to the
+      // person at once, quoted (their words reach the person, never the
+      // planner), and is noted on /work. Once per message.
+      for (const [relationshipId, read] of facts) {
+        const verdict = questionVerdict(
+          read,
+          grant.data,
+          material?.sender.facts ?? null,
+        );
+        const question = questions.get(relationshipId);
+        if (
+          verdict === null ||
+          verdict === "ANSWERABLE" ||
+          question === undefined
+        ) {
+          continue;
+        }
+        const name = (
+          people.find((person) => person.relationshipId === relationshipId)
+            ?.name ?? "They"
+        ).slice(0, 80);
+        await store
+          .notify({
+            instruction: row,
+            key: `question:${question.messageId}`,
+            priority: "NEEDS_YOU",
+            title: `${name} asked something only you can answer`,
+            body: `"${question.text}"\n${QUESTION_WORDS[verdict]}`,
+          })
+          .catch(() => false);
+        await store
+          .recordStep({
+            instruction: row,
+            runKey,
+            stepIndex: 150,
+            action: "q.note",
+            mode: "ASK",
+            status: "NOTED",
+            relationshipId,
+            words: `Passed ${name}'s question to you: ${QUESTION_WORDS[verdict]}`,
+            reasonCode: "QUESTION_FOR_YOU",
+            qActionId: null,
+            idempotencyKey: `instr:${row.id}:question:${question.messageId}`,
+          })
+          .catch(() => false);
       }
 
       // Plan; validate; re-plan with the reasons at most twice.
@@ -768,6 +1016,7 @@ export function createInstructionEngine(
               "the person",
             goal: row.goal_text,
             grant: grantLines(grant.data),
+            sender: senderLines(material?.sender ?? null),
             actions: actionLines(grant.data, dependencies.actions),
             now: `${at.toISOString()} (their zone ${grant.data.workingHours.timeZone})`,
             people: peopleLines(
@@ -775,6 +1024,8 @@ export function createInstructionEngine(
               sentBefore,
               facts,
               grant.data.topics,
+              material,
+              grant.data,
             ),
             history:
               history.length === 0
@@ -808,6 +1059,7 @@ export function createInstructionEngine(
             stepKey: keyOf(index),
             facts,
             request: current.request,
+            material,
           }),
         );
         const refused = verdicts
@@ -879,6 +1131,33 @@ export function createInstructionEngine(
           { instructionId: row.id, people: acting.length, deferred },
           "standing instruction fan-out capped; the rest waits for the next firing",
         );
+        // QA run 8a1d57b9: Tallyloom was skipped with no record. Who waits
+        // is said on their work page (a NOTED step, once per firing).
+        const nameOf = (who: string): string =>
+          (who.startsWith("company:")
+            ? people.find(
+                (person) =>
+                  person.counterpartKind === "COMPANY" &&
+                  person.counterpartId === who.slice("company:".length),
+              )?.name
+            : people.find((person) => person.relationshipId === who)?.name
+          )?.slice(0, 80) ?? "someone";
+        const waiting = acting.slice(FANOUT_MAX).map(nameOf);
+        await store
+          .recordStep({
+            instruction: row,
+            runKey,
+            stepIndex: 199,
+            action: "q.note",
+            mode: "ASK",
+            status: "NOTED",
+            relationshipId: null,
+            words: `Next firing: ${waiting.join(", ")}. I act for at most ${String(FANOUT_MAX)} people at a time.`,
+            reasonCode: "FANOUT_NEXT_FIRING",
+            qActionId: null,
+            idempotencyKey: keyOf(199),
+          })
+          .catch(() => false);
       }
       const runStep = async (index: number): Promise<void> => {
         const verdict = verdicts[index];

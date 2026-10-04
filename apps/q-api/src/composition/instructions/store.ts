@@ -193,17 +193,59 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
          order by i.created_at desc
          limit ${limit}`,
 
-    /** One sentence or one tap: stops the person's own live instruction. */
+    /**
+     * One sentence or one tap: stops the person's own live instruction.
+     * What it asked them is no longer waiting (QA run 8a1d57b9: "5 things
+     * need your yes" stayed after a stop): its NEEDS_YOU notices are
+     * resolved (marked read; never deleted).
+     */
     stop: async (owner: Owner, id: string): Promise<boolean> => {
       const rows = await sql<{ id: string }[]>`
         update q_runtime.standing_instructions
            set status = 'STOPPED', stopped_at = clock_timestamp(),
+               -- QA run 8a1d57b9: a stopped instruction is due never.
+               next_fire_at = null,
                updated_at = clock_timestamp()
          where id = ${id} and user_id = ${owner.userId}
            and tenant_id = ${owner.tenantId}
            and status in ('DRAFT', 'ACTIVE', 'PAUSED')
         returning id`;
-      return rows.length > 0;
+      if (rows.length === 0) return false;
+      await sql`
+        update communication.notifications
+           set read_at = clock_timestamp()
+         where user_id = ${owner.userId} and kind = 'Q_WORK'
+           and priority = 'NEEDS_YOU' and read_at is null
+           and dedupe_key like ${`instr:${id}:%`}`;
+      return true;
+    },
+
+    /**
+     * QA run 8a1d57b9: "N things need your yes" stayed after every card in
+     * it was answered. A run's NEEDS_YOU notice is resolved (marked read)
+     * once none of the cards it asked about still waits on the person --
+     * approved, rejected, withdrawn or expired alike. Recent notices only.
+     */
+    resolveAnswered: async (): Promise<number> => {
+      const rows = await sql<{ id: string }[]>`
+        update communication.notifications n
+           set read_at = clock_timestamp()
+         where n.kind = 'Q_WORK' and n.priority = 'NEEDS_YOU'
+           and n.read_at is null
+           and n.dedupe_key like 'instr:%:needs'
+           and n.created_at > clock_timestamp() - interval '30 days'
+           and exists (
+             select 1 from q_runtime.instruction_steps t
+              where t.user_id = n.user_id and t.status = 'ASKED'
+                and n.dedupe_key = 'instr:' || t.instruction_id::text || ':' || t.run_key || ':needs')
+           and not exists (
+             select 1 from q_runtime.instruction_steps t
+               join q_runtime.actions a on a.id = t.q_action_id
+              where t.user_id = n.user_id and t.status = 'ASKED'
+                and n.dedupe_key = 'instr:' || t.instruction_id::text || ':' || t.run_key || ':needs'
+                and a.status in ('PROPOSED', 'AWAITING_APPROVAL'))
+        returning n.id`;
+      return rows.length;
     },
 
     /** The platform's read, for the engine advancing this instruction. */
@@ -231,7 +273,8 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
     },
 
     /**
-     * S4: claims the instructions due now, moving each one's next firing
+     * S4: claims the instructions due now -- ACTIVE only: a STOPPED or
+     * PAUSED one is never claimed, whatever its next_fire_at -- moving each one's next firing
      * forward in the same statement (skip locked), so no two instances
      * fire the same one. Returns each with the instant it was claimed at.
      */
@@ -277,6 +320,56 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       return rows.length;
     },
 
+    /**
+     * QA run 8a1d57b9: a chat message landed on this relationship. Every
+     * ACTIVE instruction that covers it -- owned by someone on the side that
+     * did NOT write the latest message, with the relationship in its grant's
+     * scope and its counterpart not left out -- is due now. Idempotent: a
+     * second call finds them due already.
+     */
+    wakeForChat: async (relationshipId: string): Promise<number> => {
+      const rows = await sql<{ id: string }[]>`
+        with latest as (
+          select m.sender_side
+            from communication.conversations cv
+            join communication.messages m on m.conversation_id = cv.id
+           where cv.relationship_id = ${relationshipId}
+             and m.revises_message_id is null
+           order by m.created_at desc, m.id desc
+           limit 1
+        ), receiving as (
+          select r.id, r.company_id, r.investor_organisation_id,
+                 case when latest.sender_side = 'INVESTOR'
+                      then c.organisation_id else i.organisation_id end as organisation_id
+            from network.relationships r
+            join latest on true
+            join core.companies c on c.id = r.company_id
+            join core.investor_organisations i on i.id = r.investor_organisation_id
+           where r.id = ${relationshipId}
+        )
+        update q_runtime.standing_instructions s
+           set next_fire_at = clock_timestamp(), updated_at = clock_timestamp()
+          from receiving, q_runtime.instruction_grants g
+         where s.status = 'ACTIVE'
+           and g.instruction_id = s.id and g.version = s.grant_version
+           and exists (
+             select 1 from identity.organisation_memberships om
+              where om.user_id = s.user_id
+                and om.organisation_id = receiving.organisation_id
+                and om.membership_status = 'active')
+           and (g.grant_payload->'counterparts'->>'scope' = 'ALL_MY_RELATIONSHIPS'
+                or coalesce(g.grant_payload->'counterparts'->'relationshipIds', '[]'::jsonb)
+                     ? receiving.id::text)
+           and not exists (
+             select 1
+               from jsonb_array_elements(
+                      coalesce(g.grant_payload->'counterparts'->'exclude', '[]'::jsonb)) e
+              where e->>'counterpartId' in (receiving.company_id::text,
+                                            receiving.investor_organisation_id::text))
+        returning s.id`;
+      return rows.length;
+    },
+
     /** S5: model spend under this instruction; a new month starts at zero. */
     addSpend: async (id: string, amountUsd: number): Promise<void> => {
       if (!(amountUsd > 0)) return;
@@ -296,6 +389,7 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       const rows = await sql<{ id: string }[]>`
         update q_runtime.standing_instructions
            set status = 'PAUSED', pause_reason = ${reason},
+               next_fire_at = null,
                updated_at = clock_timestamp()
          where id = ${id} and status = 'ACTIVE'
         returning id`;

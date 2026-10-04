@@ -200,6 +200,26 @@ export const INSTRUCTION_ACTIONS_BY_SIDE: Readonly<
 };
 
 /**
+ * What a person can name when handing Q the doing, in their words, and the
+ * declared actions each covers: "express interest and send a first message"
+ * narrows what Q does alone; "do not book calls" takes booking out.
+ */
+export const INSTRUCTION_HAND_OVER_KINDS = [
+  "EXPRESS_INTEREST",
+  "MESSAGES",
+  "BOOK_CALLS",
+] as const;
+export type InstructionHandOverKind =
+  (typeof INSTRUCTION_HAND_OVER_KINDS)[number];
+export const INSTRUCTION_HAND_OVER_ACTIONS: Readonly<
+  Record<InstructionHandOverKind, readonly string[]>
+> = {
+  EXPRESS_INTEREST: ["relationship.interest.express"],
+  MESSAGES: ["chat.message.send"],
+  BOOK_CALLS: ["schedule.meeting.book"],
+};
+
+/**
  * Every action any default grant holds. q-api composes an `app.<name>`
  * approval card type for each, so an ASK step can always prepare its card.
  */

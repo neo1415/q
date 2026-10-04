@@ -6,8 +6,9 @@ import type { InstructionStore } from "./store.js";
 
 /**
  * When a standing instruction runs (ADR 0043 S4): on its cadence (every
- * four hours by default), as soon as it is approved, and when something
- * happens on a relationship Q has worked on for it. Each firing is claimed
+ * four hours by default), as soon as it is approved, when something
+ * happens on a relationship Q has worked on for it, and when a chat
+ * message lands on a relationship it covers (QA run 8a1d57b9). Each firing is claimed
  * in the database first, so instances never double-fire; outside the
  * person's working hours it is deferred, not planned.
  */
@@ -20,7 +21,12 @@ export function createInstructionTriggers(dependencies: {
     Partial<
       Pick<
         InstructionStore,
-        "claimDigestDue" | "stepsSince" | "instruction" | "notify"
+        | "claimDigestDue"
+        | "stepsSince"
+        | "instruction"
+        | "notify"
+        | "wakeForChat"
+        | "resolveAnswered"
       >
     >;
   readonly engine: () => InstructionEngine | undefined;
@@ -63,6 +69,11 @@ export function createInstructionTriggers(dependencies: {
     }
     await digests().catch((error: unknown) => {
       logger?.warn({ err: error }, "standing instruction digests failed");
+    });
+    // QA run 8a1d57b9: a "needs your yes" notice whose cards are all
+    // answered (or rejected) stops asking for attention.
+    await store.resolveAnswered?.().catch((error: unknown) => {
+      logger?.warn({ err: error }, "standing instruction notices not resolved");
     });
     return due.length;
   };
@@ -107,6 +118,16 @@ export function createInstructionTriggers(dependencies: {
     sweep,
     wake: async (relationshipId: string): Promise<number> => {
       const woken = await store.wakeFor(relationshipId);
+      if (woken > 0) void sweep().catch(() => undefined);
+      return woken;
+    },
+    /**
+     * QA run 8a1d57b9: a chat message on the relationship wakes the ACTIVE
+     * instructions covering it on the receiving side, at once.
+     */
+    wakeChat: async (relationshipId: string): Promise<number> => {
+      if (store.wakeForChat === undefined) return 0;
+      const woken = await store.wakeForChat(relationshipId);
       if (woken > 0) void sweep().catch(() => undefined);
       return woken;
     },

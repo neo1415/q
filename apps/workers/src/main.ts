@@ -43,6 +43,7 @@ import { loadWorkerConfig } from "@capital-q/config/workers";
 import {
   CONTRACTS_VERSION,
   CorrelationIdSchema,
+  Q_INSTRUCTION_WAKE_CHANNEL,
   Q_WORK_WAKE_CHANNEL,
   type ModelDataPosture,
 } from "@capital-q/contracts";
@@ -161,6 +162,7 @@ import { withRelationshipProjection } from "./network/relationship-projection-ha
 import { rebuildRelationshipStatesAtStart } from "./network/relationship-rebuild-at-start.js";
 import { redriveBlockedDocumentsAtStart } from "./documents/redrive.js";
 import { withQWorkWake } from "./network/q-work-wake-handler.js";
+import { withChatMessageEvents } from "./network/chat-message-handler.js";
 import { withInterestNotices } from "./network/interest-notice-handler.js";
 import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
@@ -173,6 +175,7 @@ import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeSchedule,
   // AUTO block (ADR 0030)
+  createChatMessageNotices,
   createCounterpartNotices,
   createMeetingMailer,
   createNotificationDelivery,
@@ -743,55 +746,67 @@ const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
   handle: withRelationshipProjection(
-    // AUTO block (founder direction 2026-10-01): acceptance wakes Q's
-    // waiting work at once, after the state above is projected.
-    withQWorkWake(
-      withOutcomeNotices(
-        withInterestNotices(
-          withReadinessAfterVerification(
-            withVerificationDecisions(
-              createDomainEventHandler({
-                registry,
-                queues,
-                pipelineVersion: config.documents.pipelineVersion,
-                mediaModeration: {
-                  onReady: (event) => {
-                    // The message names the asset; the decision re-reads it. An id that
-                    // is not one is archived by the handler's own outcome, not thrown.
-                    const mediaAssetId = MediaAssetIdSchema.safeParse(
-                      event.mediaAssetId,
-                    );
-                    if (!mediaAssetId.success) {
-                      return Promise.resolve({ kind: "SKIPPED" });
-                    }
-                    return mediaModeration({
-                      tenantId: event.tenantId,
-                      mediaAssetId: mediaAssetId.data,
-                      correlationId: CorrelationIdSchema.parse(
-                        event.correlationId ?? `cor_${randomUUID()}`,
-                      ),
-                    });
+    // QA run 8a1d57b9: a chat message wakes the standing instructions
+    // covering its relationship.
+    withChatMessageEvents(
+      // AUTO block (founder direction 2026-10-01): acceptance wakes Q's
+      // waiting work at once, after the state above is projected.
+      withQWorkWake(
+        withOutcomeNotices(
+          withInterestNotices(
+            withReadinessAfterVerification(
+              withVerificationDecisions(
+                createDomainEventHandler({
+                  registry,
+                  queues,
+                  pipelineVersion: config.documents.pipelineVersion,
+                  mediaModeration: {
+                    onReady: (event) => {
+                      // The message names the asset; the decision re-reads it. An id that
+                      // is not one is archived by the handler's own outcome, not thrown.
+                      const mediaAssetId = MediaAssetIdSchema.safeParse(
+                        event.mediaAssetId,
+                      );
+                      if (!mediaAssetId.success) {
+                        return Promise.resolve({ kind: "SKIPPED" });
+                      }
+                      return mediaModeration({
+                        tenantId: event.tenantId,
+                        mediaAssetId: mediaAssetId.data,
+                        correlationId: CorrelationIdSchema.parse(
+                          event.correlationId ?? `cor_${randomUUID()}`,
+                        ),
+                      });
+                    },
                   },
-                },
-                ...(founderReview === undefined ? {} : { founderReview }),
-                ...(mandateReview === undefined ? {} : { mandateReview }),
-                ...(presenceResearch === undefined ? {} : { presenceResearch }),
-                recommendations: {
-                  onEvent: (event) =>
-                    slateInvalidation.apply(refreshDirectiveFor(event), {
-                      correlationId: event.correlationId,
-                      causationId: `cau_${event.id}`,
-                    }),
-                },
+                  ...(founderReview === undefined ? {} : { founderReview }),
+                  ...(mandateReview === undefined ? {} : { mandateReview }),
+                  ...(presenceResearch === undefined
+                    ? {}
+                    : { presenceResearch }),
+                  recommendations: {
+                    onEvent: (event) =>
+                      slateInvalidation.apply(refreshDirectiveFor(event), {
+                        correlationId: event.correlationId,
+                        causationId: `cau_${event.id}`,
+                      }),
+                  },
+                  logger,
+                }),
+                { registry, decide: verificationDecider, logger },
+              ),
+              {
+                registry,
+                ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
+                reconcile:
+                  readinessCompanies.reconcileMarketplaceReadinessAsSystem,
                 logger,
-              }),
-              { registry, decide: verificationDecider, logger },
+              },
             ),
             {
               registry,
-              ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
-              reconcile:
-                readinessCompanies.reconcileMarketplaceReadinessAsSystem,
+              sql: database.sql,
+              notices: createCounterpartNotices(database.sql),
               logger,
             },
           ),
@@ -804,17 +819,21 @@ const documentEvents = createQueueRunner({
         ),
         {
           registry,
-          sql: database.sql,
-          notices: createCounterpartNotices(database.sql),
+          channel: Q_WORK_WAKE_CHANNEL,
+          notify: async (channel, payload) => {
+            await database.sql`select pg_notify(${channel}, ${payload})`;
+          },
           logger,
         },
       ),
       {
         registry,
-        channel: Q_WORK_WAKE_CHANNEL,
+        channel: Q_INSTRUCTION_WAKE_CHANNEL,
         notify: async (channel, payload) => {
           await database.sql`select pg_notify(${channel}, ${payload})`;
         },
+        // QA run 8a1d57b9: the recipient is told, one notice per conversation.
+        notices: createChatMessageNotices(database.sql),
         logger,
       },
     ),

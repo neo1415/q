@@ -19,7 +19,6 @@
   --radius-lg: 14px;
   --radius-xl: 18px;
 }
-
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;

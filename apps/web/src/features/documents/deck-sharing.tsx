@@ -36,9 +36,7 @@ export const DECK_AUDIENCE_OPTIONS: readonly {
 export function deckAudienceDescription(
   audience: DocumentDownloadAudience,
 ): string {
-  return audience === "INVESTORS"
-    ? "Investors who can find your company can download it from your profile."
-    : "Private: only people in your organisation can download it.";
+  return audience === "INVESTORS" ? "From your profile." : "Private.";
 }
 
 function DeckChoice({ deck }: { readonly deck: DeckRow }) {
@@ -97,7 +95,7 @@ function DeckChoice({ deck }: { readonly deck: DeckRow }) {
       )}
       <div>
         <Button
-          variant="primary"
+          variant="secondary"
           disabled={audience === record.downloadAudience || saving}
           onClick={() => void save()}
         >
@@ -113,7 +111,7 @@ export function DeckSharing({ decks }: { readonly decks: readonly DeckRow[] }) {
   return (
     <section className="flex flex-col gap-2" aria-labelledby="deck-sharing">
       <h2 id="deck-sharing" className="cq-title-sm text-(--cq-text-primary)">
-        Your pitch deck
+        Pitch deck
       </h2>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
         {decks.map((deck) => (

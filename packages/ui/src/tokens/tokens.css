@@ -49,9 +49,9 @@
   --cq-accent-soft: oklch(0.94 0.035 258);
 
   /* Semantic states. Never "green = good company"; meaning is always labelled. */
-  --cq-positive: oklch(0.55 0.13 151);
+  --cq-positive: oklch(0.5 0.13 151);
   --cq-positive-soft: oklch(0.95 0.035 151);
-  --cq-warning: oklch(0.67 0.14 78);
+  --cq-warning: oklch(0.53 0.12 70);
   --cq-warning-soft: oklch(0.96 0.045 78);
   --cq-danger: oklch(0.56 0.2 27);
   --cq-danger-soft: oklch(0.95 0.04 27);

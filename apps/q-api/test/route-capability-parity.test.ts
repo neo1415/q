@@ -650,6 +650,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/admin/accounts/[userId]": OPERATIONS_CONSOLE,
   "/admin/organisations": OPERATIONS_CONSOLE,
   "/admin/organisations/[organisationId]": OPERATIONS_CONSOLE,
+  "/admin/queue": OPERATIONS_CONSOLE,
   "/admin/verification": OPERATIONS_CONSOLE,
   "/admin/safety": OPERATIONS_CONSOLE,
   "/admin/safety/break-glass/[requestId]": OPERATIONS_CONSOLE,

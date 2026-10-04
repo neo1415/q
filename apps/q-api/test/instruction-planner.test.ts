@@ -17,6 +17,8 @@ const variables = {
   people: "No one yet.",
   history: "Nothing yet.",
   refusals: "None.",
+  sender:
+    "An investor writing to founders about their companies.\n- stages: Seed (source: your declared mandate)",
 };
 
 describe("the instruction planner", () => {
@@ -24,6 +26,7 @@ describe("the instruction planner", () => {
     const requests: {
       budget: { maxEstimatedCostUsd: number };
       attribution: { correlationId: string };
+      messages: { content: unknown }[];
     }[] = [];
     const gateway = {
       execute: (request: (typeof requests)[number]) => {
@@ -49,6 +52,13 @@ describe("the instruction planner", () => {
       costUsd: 0.012,
     });
     expect(requests[0]?.budget.maxEstimatedCostUsd).toBe(0.05);
+    // QA run 8a1d57b9 (v4): the planner reads who it writes as, and the
+    // rules code holds every message to.
+    const prompt = JSON.stringify(requests[0]?.messages);
+    expect(prompt).toContain("WHO YOU WRITE AS");
+    expect(prompt).toContain("stages: Seed (source: your declared mandate)");
+    expect(prompt).toContain("Never claim history you do not have");
+    expect(prompt).toContain("only when schedule.meeting.book is AUTO");
     expect(requests[0]?.attribution.correlationId).toContain(
       `cor_instr_${instructionId}_`,
     );

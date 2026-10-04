@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 import {
+  INSTRUCTION_HAND_OVER_ACTIONS,
+  INSTRUCTION_HAND_OVER_KINDS,
+  type InstructionHandOverKind,
   Q_INSTRUCTION_GRANT,
   Q_TASK_CLASSES,
   Q_WORK_OUTREACH_START,
@@ -361,6 +364,31 @@ export type StandingProposalOutput = z.infer<
   typeof StandingProposalOutputSchema
 >;
 
+/**
+ * A model's reading of "do not book calls" arrives in its own words
+ * (QA 07a90dd8, 4a2c9bc4: a strict enum failed the whole card as
+ * INVALID_ARGUMENTS). Read leniently, in execute: case and
+ * separators are ignored, plain synonyms map to their kind, and anything
+ * still unknown is read as UNKNOWN -- never dropped, since a dropped "don't"
+ * would leave Q doing what they forbade (execute makes every step ask then).
+ */
+function handOverKindOf(raw: string): InstructionHandOverKind | "UNKNOWN" {
+  const word = raw
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]+/gu, "_")
+    .replace(/^_+|_+$/gu, "");
+  if ((INSTRUCTION_HAND_OVER_KINDS as readonly string[]).includes(word)) {
+    return word as InstructionHandOverKind;
+  }
+  if (/INTEREST/u.test(word)) return "EXPRESS_INTEREST";
+  if (/BOOK|CALL|MEETING|SCHEDUL/u.test(word)) return "BOOK_CALLS";
+  if (/MESSAG|CHAT|REPL|WRITE|OUTREACH/u.test(word)) return "MESSAGES";
+  return "UNKNOWN";
+}
+
+const HandOverKinds = z.array(z.string().min(1).max(80)).max(10).default([]);
+
 export const ProposeStandingInstructionInputSchema = z
   .object({
     goal: z
@@ -380,6 +408,12 @@ export const ProposeStandingInstructionInputSchema = z
       .describe(
         "True only when they hand Q the doing itself ('handle it', 'do it for me', 'just send them', 'reach out to them', 'take it over'): then Q expresses interest, chats and books times on its own. False when they ask Q to find, prepare, draft or line up things for them ('prepare intros', 'draft messages', 'line up meetings'): every step is then a card for their yes.",
       ),
+    onItsOwnOnly: HandOverKinds.describe(
+      "When they handed over the doing AND named what Q may do on its own ('express interest and send a first message' -> ['EXPRESS_INTEREST', 'MESSAGES']): only those; empty when they named nothing specific ('handle it'). One of EXPRESS_INTEREST, MESSAGES, BOOK_CALLS each.",
+    ),
+    neverDo: HandOverKinds.describe(
+      "What they told Q not to do at all ('do not book calls' -> ['BOOK_CALLS']); empty when they said nothing like that. One of EXPRESS_INTEREST, MESSAGES, BOOK_CALLS each.",
+    ),
     tone: z
       .string()
       .min(1)
@@ -607,10 +641,31 @@ export function createQWorkTools(
         // The default's AUTO set only when they handed over the doing
         // (weekend test 6ea17898: "find new founders ... and prepare
         // intros" became AUTO interest, chat and booking).
+        // QA 2026-10-03 (runs 9a8e8d2a, b4e0db89): "express interest and
+        // send a first message ... do not book calls" still granted AUTO
+        // booking. What they said not to do leaves the grant (the engine
+        // refuses it as NOT_IN_GRANT); when they named what Q may do alone,
+        // only those stay AUTO and the rest ask.
+        const actionsOf = (kind: InstructionHandOverKind | "UNKNOWN") =>
+          kind === "UNKNOWN" ? [] : INSTRUCTION_HAND_OVER_ACTIONS[kind];
+        const neverKinds = input.neverDo.map(handOverKindOf);
+        const never = new Set(neverKinds.flatMap(actionsOf));
+        const named = new Set(
+          input.onItsOwnOnly.map(handOverKindOf).flatMap(actionsOf),
+        );
+        // A "don't" Q could not place: nothing is done alone.
+        const unplaced = neverKinds.includes("UNKNOWN");
+        const kept = base.actions.filter((entry) => !never.has(entry.action));
         const actions =
-          input.askFirst || !input.handsOverDoing
-            ? base.actions.map((entry) => ({ ...entry, mode: "ASK" as const }))
-            : base.actions;
+          input.askFirst || !input.handsOverDoing || unplaced
+            ? kept.map((entry) => ({ ...entry, mode: "ASK" as const }))
+            : kept.map((entry) =>
+                named.size > 0 &&
+                entry.mode === "AUTO" &&
+                !named.has(entry.action)
+                  ? { ...entry, mode: "ASK" as const }
+                  : entry,
+              );
         const status = port.prepareForApproval({
           runId: context.runId,
           tenantId: context.actor.tenantId,

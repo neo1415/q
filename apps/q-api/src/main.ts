@@ -120,6 +120,8 @@ import {
   createInboundReplyAction,
   createInboundReplyBoard,
 } from "./composition/inbound-email.js";
+import { createInstructionMaterialReader } from "./composition/instructions/material.js";
+import { MANDATE_LABELS } from "./composition/mandate-labels.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -220,6 +222,7 @@ import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
 import {
   QActionProposalIdSchema,
   Q_WORK_WAKE_CHANNEL,
+  Q_INSTRUCTION_WAKE_CHANNEL,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_THINK_PATH,
   Q_VOICE_WS_PATH,
@@ -1264,6 +1267,9 @@ const chat = composeChat({
         };
   },
   newCorrelationId: createCorrelationId,
+  // QA run 8a1d57b9: each new message is announced (the other side is
+  // told; a standing instruction wakes).
+  outbox: createOutboxWriter({ registry: createEventRegistry(NETWORK_EVENTS) }),
 });
 // Meetings and reminders (BIZ-008): the person's own Google Calendar
 // through the integrations context; approved actions execute here. App
@@ -3324,6 +3330,10 @@ const workRuntime = createWorkRuntime({
 // ADR 0043: the standing-instruction engine. Q plans through the gateway;
 // code validates every step against the approved grant; AUTO steps run the
 // declared command as the person, ASK steps become their cards.
+const instructionCards = createPostgresCompanyCardPort({ sql: database.sql });
+const instructionDiscovery = createPostgresDiscoveryRepository({
+  sql: database.sql,
+});
 instructionEngine.current = createInstructionEngine({
   store: instructionStore,
   autoEnabled: instructionsAuto,
@@ -3338,6 +3348,57 @@ instructionEngine.current = createInstructionEngine({
       )[0]?.auth_user_id ?? null,
   }),
   people: (actor) => instructionPeopleOf(actor),
+  // QA run 8a1d57b9: what Q's messages may say. The sender's own approved
+  // facts (declared mandate, or their own company's card) and each
+  // counterpart's network-visible material -- the feed's own cards behind
+  // its discoverability check, or an investor's network-visible profile.
+  // Never founder-private data.
+  material: createInstructionMaterialReader({
+    ownInvestor: (actor) =>
+      slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
+    ownMandate: async (actor) => {
+      const own =
+        await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+          actor,
+        );
+      if (own === null) return null;
+      const tenantId = TenantIdSchema.parse(actor.tenantId);
+      const organisationId = InvestorOrganisationIdSchema.parse(
+        own.investorOrganisationId,
+      );
+      const first = (
+        await mandates.listActiveMandates(tenantId, organisationId)
+      )[0];
+      return first === undefined
+        ? null
+        : mandates.getMandate(tenantId, organisationId, first.id);
+    },
+    ownCompanyCard: async (actor) => {
+      const companyId = await workOwnCompany(actor);
+      if (companyId === null) return null;
+      return (
+        (await instructionCards.cardsByIds([companyId])).get(companyId) ?? null
+      );
+    },
+    companyCards: async (actor, companyIds) => {
+      const [permitted, cards] = await Promise.all([
+        slateRead.eligibilityPorts.discoverability.permittedToView(
+          { kind: "ACTOR", actor },
+          companyIds,
+        ),
+        instructionCards.cardsByIds(companyIds),
+      ]);
+      return new Map(
+        [...cards].filter(([companyId]) => permitted.get(companyId) === true),
+      );
+    },
+    investorProfile: (actor, investorOrganisationId) =>
+      instructionDiscovery.discoverableInvestor(actor, investorOrganisationId),
+    labels: {
+      code: (code, vocabularyCode) => MANDATE_LABELS.code(code, vocabularyCode),
+      investorType: (code) => MANDATE_LABELS.investorType(code),
+    },
+  }),
   plan: createInstructionPlanner({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -3396,6 +3457,29 @@ void createWorkWakeListener({
   .catch((error: unknown) => {
     // The minute's tick still carries the work; only the instant wake is lost.
     logger.warn({ err: error }, "q work wake listener not started");
+  });
+// QA run 8a1d57b9: a chat message wakes the standing instructions covering
+// its relationship at once (the workers announce it from the outbox).
+void createWorkWakeListener({
+  listen: (channel, onNotify, onListen) =>
+    database.listen(channel, onNotify, onListen),
+  channel: Q_INSTRUCTION_WAKE_CHANNEL,
+  catchUp: () => {
+    void instructionTriggers.sweep().catch(() => undefined);
+  },
+  targets: [
+    {
+      name: "instructions-chat",
+      wake: (relationshipId) => instructionTriggers.wakeChat(relationshipId),
+    },
+  ],
+  logger,
+})
+  .start()
+  .then(() => logger.info({}, "instruction wake listener started"))
+  .catch((error: unknown) => {
+    // The sweep still fires each instruction on its cadence.
+    logger.warn({ err: error }, "instruction wake listener not started");
   });
 // end AUTO block
 

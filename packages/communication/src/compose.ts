@@ -3,7 +3,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { InterestService } from "@capital-q/network";
 import type { ActorContext } from "@capital-q/security";
 
-import { createPostgresChatStore } from "./postgres.js";
+import { createPostgresChatStore, type ChatOutbox } from "./postgres.js";
 import { createPostgresChatSafetyStore } from "./safety-postgres.js";
 import {
   createChatSafetyService,
@@ -94,11 +94,14 @@ export function composeChat(options: {
   readonly ownDocument: OwnDocumentLookup;
   readonly downloads?: ChatDownloadPort | undefined;
   readonly newCorrelationId: () => string;
+  /** Announces each new message (`network.relationship.message_sent`). */
+  readonly outbox?: ChatOutbox | undefined;
 }): ChatService {
   return createChatService({
     store: createPostgresChatStore({
       sql: options.sql,
       transactions: options.transactions,
+      outbox: options.outbox,
     }),
     parties: createNetworkChatParties(options.interests),
     documents: createChatDocuments(options.ownDocument),

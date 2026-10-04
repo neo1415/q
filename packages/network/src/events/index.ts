@@ -153,12 +153,71 @@ export const RelationshipOutcomeRecordedEvent = defineEvent({
     "A post-meeting outcome was recorded on a canonical relationship. Carries no reason and no note.",
 });
 
+/**
+ * A message on the relationship's chat thread (QA run 8a1d57b9: a founder's
+ * question sat unanswered for hours, and neither side was told of new
+ * messages). Announced in the same transaction as the message and its
+ * `message_sent` history row. Identifiers and the sending side only --
+ * never the words. Activity, not a state move: talking is not interest.
+ */
+export const RelationshipMessageSentEvent = defineEvent({
+  name: "network.relationship.message_sent",
+  version: 1,
+  owner: NETWORK_EVENT_OWNER,
+  producer: NETWORK_EVENT_PRODUCER,
+  consumers: ["@capital-q/q", "@capital-q/communication"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      relationshipId: UuidSchema,
+      conversationId: UuidSchema,
+      messageId: UuidSchema,
+      senderSide: z.enum(["INVESTOR", "COMPANY"]),
+    })
+    .strict(),
+  description:
+    "A person on one side (or Q for them) sent a message on the relationship's chat thread. Carries identifiers only.",
+});
+
+export function relationshipMessageSentEvent(input: {
+  readonly tenantId: string;
+  readonly senderUserId: string;
+  readonly correlationId: CorrelationId;
+  readonly relationshipId: string;
+  readonly conversationId: string;
+  readonly messageId: string;
+  readonly senderSide: "INVESTOR" | "COMPANY";
+}): CapitalQEvent<z.infer<typeof RelationshipMessageSentEvent.dataSchema>> {
+  return {
+    specVersion: "1.0",
+    id: EventIdSchema.parse(randomUUID()),
+    type: RelationshipMessageSentEvent.name,
+    source: RelationshipMessageSentEvent.producer,
+    time: UtcTimestampSchema.parse(new Date().toISOString()),
+    subject: `relationship/${input.relationshipId}`,
+    dataContentType: "application/json",
+    eventVersion: RelationshipMessageSentEvent.version,
+    tenantId: input.tenantId,
+    actor: { type: "HUMAN", id: input.senderUserId },
+    correlationId: input.correlationId,
+    aggregate: { type: "chat_message", id: input.messageId, version: 1 },
+    data: {
+      relationshipId: input.relationshipId,
+      conversationId: input.conversationId,
+      messageId: input.messageId,
+      senderSide: input.senderSide,
+    },
+  };
+}
+
 export const NETWORK_EVENTS: readonly EventDefinition[] = [
   RelationshipCreatedEvent,
   RelationshipInterestExpressedEvent,
   RelationshipMatchedEvent,
   RelationshipInterestDeclinedEvent,
   RelationshipOutcomeRecordedEvent,
+  RelationshipMessageSentEvent,
 ];
 
 export function relationshipOutcomeRecordedEvent(input: {

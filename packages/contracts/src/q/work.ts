@@ -40,6 +40,14 @@ export const qWorkLaneAnswerPath = (delegationId: string, laneId: string) =>
  */
 export const Q_WORK_WAKE_CHANNEL = "q_work_wake" as const;
 
+/**
+ * The channel that wakes standing instructions when a chat message lands
+ * on a relationship (QA run 8a1d57b9). Separate from Q_WORK_WAKE_CHANNEL:
+ * a message is not a relationship move, and errands and delegations must
+ * not continue on one. The payload is the relationship id only.
+ */
+export const Q_INSTRUCTION_WAKE_CHANNEL = "q_instruction_wake" as const;
+
 export const Q_WORK_KINDS = [
   "INVESTOR_OUTREACH",
   "FOUNDER_STAND_IN",

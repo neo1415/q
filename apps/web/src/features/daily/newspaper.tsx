@@ -101,7 +101,7 @@ function Sources({ story }: { readonly story: QDailyStory }) {
   );
 }
 
-function Body({ story }: { readonly story: QDailyStory }) {
+function Paragraphs({ story }: { readonly story: QDailyStory }) {
   return (
     <>
       {story.paragraphs.map((paragraph, index) => (
@@ -122,6 +122,41 @@ function Body({ story }: { readonly story: QDailyStory }) {
           )}
         </blockquote>
       ))}
+    </>
+  );
+}
+
+function Body({
+  story,
+  fold = false,
+}: {
+  readonly story: QDailyStory;
+  /**
+   * design-48 v2: on a phone a story below the lead is its headline,
+   * standfirst and sources; the body is one tap away. Open on a large
+   * screen through ::details-content (folded where that is unsupported).
+   */
+  readonly fold?: boolean;
+}) {
+  const hasBody = story.paragraphs.length > 0 || story.quotes.length > 0;
+  return (
+    <>
+      {!hasBody ? null : fold ? (
+        <details
+          className="group flex flex-col gap-3 lg:[&::details-content]:[content-visibility:visible]"
+          data-story-fold
+        >
+          <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center text-(--cq-text-primary) underline underline-offset-4 lg:hidden [&::-webkit-details-marker]:hidden">
+            Read
+            <span className="sr-only"> {story.headline}</span>
+          </summary>
+          <div className="flex flex-col gap-3">
+            <Paragraphs story={story} />
+          </div>
+        </details>
+      ) : (
+        <Paragraphs story={story} />
+      )}
       <Sources story={story} />
     </>
   );
@@ -183,7 +218,7 @@ function Story({ story }: { readonly story: QDailyStory }) {
           {story.standfirst}
         </p>
       )}
-      <Body story={story} />
+      <Body story={story} fold />
     </article>
   );
 }

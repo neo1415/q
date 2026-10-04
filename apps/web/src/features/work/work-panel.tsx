@@ -15,6 +15,7 @@ import {
   setAwayAction,
   stopWorkAction,
 } from "./work-actions";
+import { instructionWords } from "./instruction-words";
 
 /**
  * "Q is working on" (AUTO; spec auto.md §3.4): every outreach and stand-in
@@ -204,6 +205,10 @@ function WorkItem({
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const words =
+    work.kind === "STANDING_INSTRUCTION"
+      ? instructionWords(work.summary)
+      : null;
   const stop = () =>
     startTransition(async () => {
       const result = await stopWorkAction(work.id, null);
@@ -225,20 +230,31 @@ function WorkItem({
     });
   return (
     <article
-      className="flex flex-col gap-2 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+      className="flex flex-col gap-2 border-b border-(--cq-border-subtle) py-4 last:border-b-0"
       data-work={work.kind}
     >
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="cq-title-sm text-(--cq-text-primary)">
-          {WORK_KIND_LABELS[work.kind]}
+      <header className="flex flex-col gap-0.5">
+        <h3 className="cq-title-sm line-clamp-2 text-(--cq-text-primary)">
+          {words === null || words.goal === ""
+            ? WORK_KIND_LABELS[work.kind]
+            : words.goal}
         </h3>
-        <span className="cq-caption text-(--cq-text-secondary)">
-          {STATUS_WORDS[work.status]}
-        </span>
+        <p className="cq-caption cq-numeric text-(--cq-text-secondary)">
+          {[
+            words !== null && words.paused !== null
+              ? `Paused: ${words.paused}`
+              : STATUS_WORDS[work.status],
+            words?.spend ?? null,
+          ]
+            .filter((part) => part !== null)
+            .join(" · ")}
+        </p>
       </header>
-      {work.summary === null ? null : (
-        <p className="cq-body-sm text-(--cq-text-secondary)">{work.summary}</p>
-      )}
+      {words === null && work.summary !== null ? (
+        <p className="cq-body-sm line-clamp-2 text-(--cq-text-secondary)">
+          {work.summary}
+        </p>
+      ) : null}
       {work.lanes.length === 0 ? null : (
         <ul>
           {work.lanes.map((lane) => (
@@ -324,18 +340,25 @@ function WorkItem({
 export function WorkPanel({
   variant,
   initial = null,
+  initialFailed = false,
 }: {
   /** Home shows running work only, and nothing when there is none. */
   readonly variant: "home" | "page";
+  /** Read on the server for the page, so the first paint never waits. */
   readonly initial?: readonly QWorkDto[] | null;
+  readonly initialFailed?: boolean;
 }) {
   const [items, setItems] = useState<readonly QWorkDto[] | null>(initial);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState(initialFailed);
   const { askAbout } = useGlobalQ();
 
   const load = useCallback(async () => {
-    const result = await listWorkAction();
-    if (result.ok) {
+    // A thrown or dropped action (deploy skew, a signed-out tab, a request
+    // aborted behind the other actions on the page) is a failed load. It
+    // used to reject unhandled and leave the skeleton up for good
+    // (design-48, production /work).
+    const result = await listWorkAction().catch(() => null);
+    if (result?.ok === true) {
       setItems(result.value);
       setFailed(false);
     } else {
@@ -347,86 +370,106 @@ export function WorkPanel({
     const refresh = () => {
       if (document.visibilityState === "visible") void load();
     };
-    refresh();
+    // With a server-read first list the first poll waits its turn; without
+    // one it runs now.
+    if (initial === null && !initialFailed) refresh();
     const timer = window.setInterval(refresh, POLL_MS);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [load]);
+  }, [load, initial, initialFailed]);
 
-  // The full page lists stopped plans too, so it leads with what is still
-  // running and does not call a stopped plan "working on" (demo-44 pass).
-  const shown =
-    variant === "home"
-      ? (items ?? []).filter((item) => item.status === "ACTIVE")
-      : (items ?? []).toSorted(
-          (a, b) =>
-            Number(b.status === "ACTIVE") - Number(a.status === "ACTIVE"),
-        );
-  const heading =
-    variant === "home" || shown.every((item) => item.status === "ACTIVE")
-      ? "Q is working on"
-      : "Plans you approved";
+  const running = (items ?? []).filter((item) => item.status === "ACTIVE");
+  const finished = (items ?? []).filter((item) => item.status !== "ACTIVE");
 
-  if (variant === "home" && (items === null || shown.length === 0)) return null;
+  if (variant === "home" && running.length === 0) return null;
+
+  const list = (shown: readonly QWorkDto[]) => (
+    <div className="flex flex-col">
+      {shown.map((work) => (
+        <WorkItem
+          key={work.id}
+          work={work}
+          onChanged={() => void load()}
+          detailLink
+        />
+      ))}
+    </div>
+  );
+
+  const body =
+    items === null && !failed ? (
+      <Skeleton lines={3} />
+    ) : items === null ? (
+      <ErrorState
+        title="Q's work couldn't load"
+        description="Running work continues. Nothing is sent without your yes."
+        action={
+          <Button
+            variant="secondary"
+            size="compact"
+            onClick={() => {
+              setFailed(false);
+              void load();
+            }}
+          >
+            Try again
+          </Button>
+        }
+        compact
+      />
+    ) : running.length === 0 && finished.length === 0 ? (
+      <EmptyState
+        title="Nothing running"
+        description="Hand Q something that repeats, in your own words. You approve the plan first."
+        action={
+          <Button
+            variant="primary"
+            size="compact"
+            onClick={() => askAbout("Q, handle it for me: ")}
+          >
+            Ask Q to handle something
+          </Button>
+        }
+      />
+    ) : (
+      <>
+        {running.length === 0 ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Nothing is running now.
+          </p>
+        ) : (
+          list(running)
+        )}
+        {variant === "page" && finished.length > 0 ? (
+          <details
+            className="border-t border-(--cq-border-subtle) pt-2"
+            data-work-finished
+          >
+            <summary className="cq-body-sm flex min-h-11 cursor-pointer items-center font-medium text-(--cq-text-primary)">
+              Finished · {finished.length}
+            </summary>
+            {list(finished)}
+          </details>
+        ) : null}
+      </>
+    );
 
   return (
     <section
       aria-labelledby={`q-work-${variant}`}
-      className="flex max-w-(--cq-layout-reading) flex-col gap-3"
+      className="flex max-w-(--cq-layout-reading) flex-col gap-2"
       data-work-panel={variant}
     >
       <h2
         id={`q-work-${variant}`}
         className="cq-title-sm text-(--cq-text-primary)"
       >
-        {heading}
+        {variant === "home" ? "Q is working on" : "Running"}
       </h2>
-      {items === null && !failed ? (
-        <Skeleton lines={3} />
-      ) : failed && items === null ? (
-        <ErrorState
-          title="Q's work couldn't load"
-          description="Try again in a moment."
-          action={
-            <Button
-              variant="secondary"
-              size="compact"
-              onClick={() => void load()}
-            >
-              Try again
-            </Button>
-          }
-          compact
-        />
-      ) : shown.length === 0 ? (
-        <EmptyState
-          title="Nothing running"
-          description="Investors can hand Q their outreach: Q picks founders that fit, reaches out, interviews and books calls. Founders can have Q answer investors while they're away."
-          action={
-            <Button
-              variant="primary"
-              size="compact"
-              onClick={() => askAbout("Q, handle it for me: ")}
-            >
-              Ask Q
-            </Button>
-          }
-        />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {shown.map((work) => (
-            <WorkItem
-              key={work.id}
-              work={work}
-              onChanged={() => void load()}
-              detailLink
-            />
-          ))}
-        </div>
-      )}
+      {body}
     </section>
   );
 }

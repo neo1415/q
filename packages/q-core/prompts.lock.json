@@ -146,7 +146,9 @@
     "instruction-plan/v3": "0b7a9075969d331d0a2fee80ac69d66224e86b06c753cd8bf50f364b0ab8d279",
     "turn-reader/v39": "34f08890ae739dda08c68ff5cc1b6bf28f04f21ed2a8dad85b4f5c6ec1b95c93",
     "rehearsal-score/v5": "6986f28f771e849273f689d58d46531f546c3dba024292b31c1e10144e657831",
-    "investor-persona/v6": "efe30957f2ec84c227be1b7f760d98ccda254b8bcee0e9e8ccad37a6d108efc0"
+    "investor-persona/v6": "efe30957f2ec84c227be1b7f760d98ccda254b8bcee0e9e8ccad37a6d108efc0",
+    "instruction-plan/v4": "0e4096dd7ec13240897db0290a3ee46c9533ed0eee55ebe2f9bb81c25cce6109",
+    "instruction-thread-reader/v2": "9bd365b8d6a93d253a34e7df45285c87017c7963a4c2d99ad3eedddc27b5e7ce"
   },
   "generatedBy": "CQ-Q-006"
 }

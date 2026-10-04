@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-import type { NotificationDto } from "@capital-q/contracts";
-import { IconButton } from "@capital-q/ui/button";
+import { buttonClassName, IconButton } from "@capital-q/ui/button";
 import { Bell, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
 import { EmptyState, ErrorState, Skeleton } from "@capital-q/ui/states";
 
+import { groupNotices, type NoticeGroup } from "./notice-groups";
 import { PushSetting } from "./push-setting";
-import { listNoticesAction, markReadAction } from "./work-actions";
+import { markReadAction } from "./work-actions";
+import { noticesRead, refreshNotices, useNotices } from "./notice-store";
 
 /**
  * The notification centre (AUTO; spec auto.md §3.5): one bell with the
@@ -19,8 +20,6 @@ import { listNoticesAction, markReadAction } from "./work-actions";
  * where it is acted on. Opening marks what is shown as read. Refreshes
  * every minute while the page is visible, and on focus.
  */
-
-const POLL_MS = 60_000;
 
 function when(iso: string): string {
   const at = new Date(iso);
@@ -33,51 +32,73 @@ function when(iso: string): string {
 }
 
 function NoticeRow({
-  notice,
+  group,
   onOpen,
+  needsYou = false,
 }: {
-  readonly notice: NotificationDto;
+  readonly group: NoticeGroup;
   readonly onOpen: () => void;
+  readonly needsYou?: boolean;
 }) {
+  const { notice, count, unread } = group;
+  const linked = notice.linkPath !== null && /^\/(?!\/)/.test(notice.linkPath);
+  // One line per notice on a phone (design-48 v2): the title and its time.
+  // The body is on the page the row opens, never repeated here.
   const body = (
-    <span className="flex flex-col gap-0.5">
-      <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-        {notice.read ? null : <span className="sr-only">New: </span>}
+    <span className="flex min-w-0 flex-1 items-baseline gap-3">
+      <span
+        className={`cq-body-sm min-w-0 flex-1 line-clamp-2 text-(--cq-text-primary) ${unread ? "font-medium" : ""}`}
+      >
+        {unread ? <span className="sr-only">New: </span> : null}
         {notice.title}
       </span>
-      {notice.body === null ? null : (
-        <span className="cq-caption line-clamp-2 whitespace-pre-line text-(--cq-text-secondary)">
-          {notice.body}
-        </span>
-      )}
-      <time
-        dateTime={notice.createdAt}
-        className="cq-caption cq-numeric text-(--cq-text-tertiary)"
-        suppressHydrationWarning
-      >
-        {when(notice.createdAt)}
-      </time>
+      <span className="cq-caption cq-numeric shrink-0 text-(--cq-text-tertiary)">
+        <time dateTime={notice.createdAt} suppressHydrationWarning>
+          {when(notice.createdAt)}
+        </time>
+        {count > 1 ? (
+          <>
+            <span aria-hidden="true"> ×{count}</span>
+            <span className="sr-only">, latest of {count} like this</span>
+          </>
+        ) : null}
+      </span>
     </span>
   );
   return (
     <li
-      className="flex gap-3 border-b border-(--cq-border-subtle) py-3 last:border-b-0"
+      className="border-b border-(--cq-border-subtle) last:border-b-0"
       data-notice={notice.kind}
+      data-notice-count={count}
     >
-      <span
-        aria-hidden="true"
-        className={`mt-2 size-1.5 shrink-0 rounded-full ${notice.read ? "bg-transparent" : "bg-(--cq-accent)"}`}
-      />
-      {notice.linkPath === null || !/^\/(?!\/)/.test(notice.linkPath) ? (
-        body
-      ) : (
+      {linked ? (
         <Link
-          href={notice.linkPath}
+          href={notice.linkPath ?? "/"}
           onClick={onOpen}
-          className="min-h-11 flex-1 rounded-sm focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="flex min-h-12 items-center gap-3 rounded-sm py-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
+          <span
+            aria-hidden="true"
+            className={`size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
+          />
           {body}
+          {needsYou ? (
+            <span
+              aria-hidden="true"
+              className={buttonClassName("secondary", "compact")}
+            >
+              Open
+            </span>
+          ) : null}
         </Link>
+      ) : (
+        <div className="flex min-h-12 items-center gap-3 py-2">
+          <span
+            aria-hidden="true"
+            className={`size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
+          />
+          {body}
+        </div>
       )}
     </li>
   );
@@ -85,37 +106,9 @@ function NoticeRow({
 
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<readonly NotificationDto[] | null>(null);
-  const [unread, setUnread] = useState(0);
-  const [failed, setFailed] = useState(false);
-
-  const load = useCallback(async () => {
-    // A thrown action (deploy skew, signed-out tab) is a failed load,
-    // never an unhandled rejection.
-    const result = await listNoticesAction().catch(() => null);
-    if (result?.ok === true) {
-      setItems(result.value.items);
-      setUnread(result.value.unread);
-      setFailed(false);
-    } else {
-      setFailed(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    const refresh = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    refresh();
-    const timer = window.setInterval(refresh, POLL_MS);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [load]);
+  // Shared by both bells (phone header, desktop sidebar): one read.
+  const { items, unread, failed } = useNotices();
+  const load = () => refreshNotices(true);
 
   // Seen once shown: what the person opened the centre to read is read.
   useEffect(() => {
@@ -123,14 +116,11 @@ export function NotificationCenter() {
     const ids = items.filter((item) => !item.read).map((item) => item.id);
     if (ids.length === 0) return;
     void markReadAction(ids.slice(0, 50)).then((result) => {
-      if (result.ok) setUnread((count) => Math.max(0, count - ids.length));
+      if (result.ok) noticesRead(ids.length);
     });
   }, [open, items]);
 
-  const needsYou = (items ?? []).filter(
-    (item) => item.priority === "NEEDS_YOU",
-  );
-  const updates = (items ?? []).filter((item) => item.priority !== "NEEDS_YOU");
+  const { needsYou, days } = groupNotices(items ?? []);
   const close = () => setOpen(false);
 
   return (
@@ -168,7 +158,7 @@ export function NotificationCenter() {
           ) : failed && items === null ? (
             <ErrorState
               title="Notifications couldn't load"
-              description="Try again in a moment."
+              description="What needs you is also on Q's work."
               action={
                 <button
                   type="button"
@@ -182,8 +172,8 @@ export function NotificationCenter() {
             />
           ) : (items ?? []).length === 0 ? (
             <EmptyState
-              title="Nothing yet"
-              description="When Q does something for you or needs your word, it shows here."
+              title="You're up to date"
+              description="What needs you shows first."
               compact
             />
           ) : (
@@ -192,40 +182,38 @@ export function NotificationCenter() {
                 <section aria-labelledby="notices-needs-you">
                   <h3
                     id="notices-needs-you"
-                    className="cq-label text-(--cq-text-secondary)"
+                    className="cq-title-sm text-(--cq-text-primary)"
                   >
                     Needs you
                   </h3>
                   <ul>
-                    {needsYou.map((notice) => (
+                    {needsYou.map((group) => (
                       <NoticeRow
-                        key={notice.id}
-                        notice={notice}
+                        key={group.key}
+                        group={group}
                         onOpen={close}
+                        needsYou
                       />
                     ))}
                   </ul>
                 </section>
               )}
-              {updates.length === 0 ? null : (
-                <section aria-labelledby="notices-updates">
-                  <h3
-                    id="notices-updates"
-                    className="cq-label text-(--cq-text-secondary)"
-                  >
-                    Updates
+              {days.map((day) => (
+                <section
+                  key={day.label}
+                  aria-label={`Updates, ${day.label}`}
+                  data-notice-day={day.label}
+                >
+                  <h3 className="cq-label text-(--cq-text-secondary)">
+                    {day.label}
                   </h3>
                   <ul>
-                    {updates.map((notice) => (
-                      <NoticeRow
-                        key={notice.id}
-                        notice={notice}
-                        onOpen={close}
-                      />
+                    {day.groups.map((group) => (
+                      <NoticeRow key={group.key} group={group} onOpen={close} />
                     ))}
                   </ul>
                 </section>
-              )}
+              ))}
             </>
           )}
           <div className="border-t border-(--cq-border-subtle) pt-4">
