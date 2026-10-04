@@ -3371,12 +3371,21 @@ export function createModelGatewayQAnswer(
                 ...(approvalLine === null ? [] : [approvalLine]),
                 // Code's opening lines for this answer, before the model's.
                 ...(request.leadLines === undefined ? [] : [request.leadLines]),
-                request.leadLines === undefined
-                  ? (statusTalk?.text ?? guarded.text)
-                  : afterLeadLines(
-                      statusTalk?.text ?? guarded.text,
-                      request.leadLines,
-                    ),
+                // Nothing was done: a model line that says it was is
+                // false, and is not said beside the could-not line
+                // (follow-55, Zino run 50159909: "Your investment stages
+                // are now recorded…" then "I didn't prepare that").
+                ...(couldNot !== null &&
+                claimsDone(statusTalk?.text ?? guarded.text)
+                  ? []
+                  : [
+                      request.leadLines === undefined
+                        ? (statusTalk?.text ?? guarded.text)
+                        : afterLeadLines(
+                            statusTalk?.text ?? guarded.text,
+                            request.leadLines,
+                          ),
+                    ]),
                 ...(couldNot === null ? [] : [couldNot]),
                 ...actedLines,
                 // The status of earlier changes is not an answer to this
@@ -3689,6 +3698,17 @@ const NOTHING_DONE_EXPLAINED =
   /\b(?:already\b|(?:can(?:no|['’])t|couldn['’]t|could not|unable to|not able to|won['’]t be able to)\s+(?:\w+\s+){0,3}?(?:do|express|send|prepar|mak|chang|record|book|shar|request|ask|add|creat|sav|pass|mov|accept|declin|invit)\w*|nothing (?:was|has been|is) (?:done|prepared|changed|needed)|(?:isn['’]t|is not) (?:needed|necessary|possible|available)|no need to)/iu;
 export function explainsNothingDone(text: string): boolean {
   return NOTHING_DONE_EXPLAINED.test(text);
+}
+
+/**
+ * An answer that says a change WAS made: "are now recorded", "I've saved
+ * it", "has been updated". Only consulted when code knows nothing was
+ * done, so a match is a false claim and is not said.
+ */
+const DONE_CLAIMED =
+  /\b(?:(?:is|are) now (?:recorded|saved|set|updated|changed|live|in place)|(?:i|i['’]ve|i have|we['’]ve|we have) (?:just )?(?:saved|updated|changed|recorded|sent|booked|set|added|removed|made)|(?:has|have) (?:now )?been (?:saved|updated|changed|recorded|sent|booked|set|added|removed)|(?:it['’]s|that['’]s) (?:done|saved|updated))\b/iu;
+export function claimsDone(text: string): boolean {
+  return DONE_CLAIMED.test(text) && !NOTHING_DONE_EXPLAINED.test(text);
 }
 
 /** A reply that puts a question to the person: any sentence ending "?". */

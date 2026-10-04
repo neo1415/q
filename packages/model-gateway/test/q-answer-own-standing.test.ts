@@ -21,7 +21,7 @@ import {
   createModelProviderRegistry,
   createStaticModelCatalog,
 } from "../src/index.js";
-import { createModelGatewayQAnswer } from "../src/q/index.js";
+import { claimsDone, createModelGatewayQAnswer } from "../src/q/index.js";
 import { ownStandingFact } from "../src/q/own-standing.js";
 import { afterLeadLines, readinessLeadLines } from "../src/q/own-readiness.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
@@ -782,6 +782,41 @@ describe("what exists, and the parity gap", () => {
     expect(silent).toContain(
       "I couldn't do that from this conversation: that action isn't available to me here",
     );
+  });
+
+  it("never says a change was made beside the line that says nothing was (Zino run 50159909)", async () => {
+    const { seam, request, persisted } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {},
+      {
+        said: "Yeah. I approve. Go ahead and sync it.",
+        answer:
+          "Your investment stages are now recorded as pre-seed through Series A, including seed.",
+      },
+    );
+    await seam.answer({
+      ...request,
+      turnKind: "TOOL_REQUEST",
+      askedAction: "get_q_daily",
+    });
+    const said = persisted.join("\n");
+    expect(said).not.toContain("now recorded");
+    expect(said).toContain("I didn't prepare that, so nothing was changed.");
+    for (const claim of [
+      "I've saved your stages.",
+      "Your mandate has been updated.",
+      "That's done.",
+    ]) {
+      expect(claimsDone(claim)).toBe(true);
+    }
+    for (const plain of [
+      "Your mandate covers pre-seed.",
+      "I can update it once you approve.",
+      "Nothing has been changed.",
+    ]) {
+      expect(claimsDone(plain)).toBe(false);
+    }
   });
 
   it("does not log a gap for a question", async () => {
