@@ -8,46 +8,45 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { pendingQApprovalsAction } from "@/features/q/actions";
-import { ApprovalsPanel } from "@/features/work/approvals-panel";
-import { WorkPanel } from "@/features/work/work-panel";
 import { listWorkAction } from "@/features/work/work-actions";
+import {
+  listDoneAction,
+  listSuggestionsAction,
+} from "@/features/work/work-page-actions";
+import { WorkPage } from "@/features/work/work-page";
 
-export const metadata: Metadata = { title: "Q's work" };
+export const metadata: Metadata = { title: "Work" };
 
 /**
- * Q's work (AUTO, ADR 0030; design-48): what waits on the person first,
- * then every outreach, stand-in and standing instruction they approved.
+ * Work, Q's work page (WORK-58): give Q a task, what Q suggests from the
+ * person's own account, what needs their yes, what runs, what is done.
  *
- * Both lists are read on the server and streamed in. In production the
- * panel used to fetch them with a client server action queued behind the
- * shell's own actions (notifications, presence), which run one at a time;
- * the list arrived seconds late or, when its request was dropped, never,
- * and the skeleton stayed. The page header never waits on these reads.
+ * Every list is read on the server, in parallel, and streamed in; the
+ * header never waits on them (design-48: a client action queued behind
+ * the shell's own left the page on its skeleton).
  */
 async function WorkLists() {
-  const [work, approvals] = await Promise.all([
-    listWorkAction().catch(() => null),
+  const [suggestions, approvals, work, done] = await Promise.all([
+    listSuggestionsAction().catch(() => null),
     pendingQApprovalsAction().catch(() => null),
+    listWorkAction().catch(() => null),
+    listDoneAction().catch(() => null),
   ]);
   return (
-    <div className="flex flex-col gap-8">
-      <ApprovalsPanel
-        initial={approvals?.ok === true ? approvals.value : null}
-      />
-      <WorkPanel
-        variant="page"
-        initial={work?.ok === true ? work.value : null}
-        initialFailed={work?.ok !== true}
-      />
-    </div>
+    <WorkPage
+      suggestions={suggestions?.ok === true ? suggestions.value : null}
+      approvals={approvals?.ok === true ? approvals.value : null}
+      work={work?.ok === true ? work.value : null}
+      done={done?.ok === true ? done.value : null}
+    />
   );
 }
 
-export default function WorkPage() {
+export default function WorkRoute() {
   return (
-    <PageContainer width="reading">
-      <PageHeader title="Q's work" />
-      <Suspense fallback={<Skeleton lines={4} />}>
+    <PageContainer>
+      <PageHeader title="Work" />
+      <Suspense fallback={<Skeleton lines={6} />}>
         <WorkLists />
       </Suspense>
     </PageContainer>
