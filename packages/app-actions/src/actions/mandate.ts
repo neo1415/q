@@ -261,12 +261,28 @@ function transition(operation: "ACTIVATE" | "CLOSE"): AnyAppAction {
   });
 }
 
+/**
+ * Stage codes are reference data (taxonomy `stage`), never an enum here:
+ * the shape is checked, and the investors service checks the code against
+ * the taxonomy. The words name today's codes so a request in words ("pre-
+ * seed to Series A") is filled as codes (follow-55).
+ */
+const StageCode = z
+  .string()
+  .regex(/^[a-z][a-z0-9_]*$/, "a lower_snake_case stage code")
+  .max(64);
+const STAGE_WORDS = "pre_seed, seed, series_a, series_b, series_c_plus";
+
 const MandateTool = z
   .object({
+    // Optional (follow-55, Zino live 2026-10-04: "make sure I invest in
+    // pre-seed to Series A, save that" was refused as REQUIRED_INPUT_NOT_SAID
+    // because nobody says "update"): a change to fields is an UPDATE.
     operation: z
       .enum(["CREATE", "UPDATE", "ACTIVATE", "CLOSE"])
+      .optional()
       .describe(
-        "CREATE a new mandate (needs name); UPDATE fields; ACTIVATE it so their feed uses it; CLOSE it.",
+        "CREATE a new mandate (needs name); UPDATE fields (the default: leave it out for a change to fields); ACTIVATE it so their feed uses it; CLOSE it.",
       ),
     mandateId: z
       .string()
@@ -287,8 +303,12 @@ const MandateTool = z
       .strict()
       .optional()
       .describe("Cheque sizes as decimal strings in one ISO currency."),
-    minStageCode: z.string().max(64).optional(),
-    maxStageCode: z.string().max(64).optional(),
+    minStageCode: StageCode.optional().describe(
+      `The earliest stage they invest at, one of: ${STAGE_WORDS}. "Pre-seed to Series A" is pre_seed to series_a.`,
+    ),
+    maxStageCode: StageCode.optional().describe(
+      `The latest stage they invest at, one of: ${STAGE_WORDS}.`,
+    ),
     rawMandateText: z
       .string()
       .max(8000)
@@ -362,7 +382,8 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         .catch(() => null);
       if (own === null || own === undefined) return null;
       const investorOrganisationId = InvestorOrganisationIdSchema.parse(own);
-      const { operation, mandateId, ...fields } = tool;
+      const { operation: said, mandateId, ...fields } = tool;
+      const operation = said ?? "UPDATE";
       const filled = Object.fromEntries(
         Object.entries(fields).filter(([, value]) => value !== undefined),
       );
