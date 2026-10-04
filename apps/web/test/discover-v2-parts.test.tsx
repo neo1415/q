@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import {
-  act,
   cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DiscoveredCompanyDto, MediaAssetDto } from "@capital-q/contracts";
@@ -278,9 +280,7 @@ describe("the founder's download switch (ADR 0047)", () => {
     });
     expect(toggle.getAttribute("aria-checked")).toBe("false");
     expect(screen.getByText(/can't save a copy/)).toBeTruthy();
-    await act(async () => {
-      fireEvent.click(toggle);
-    });
+    fireEvent.click(toggle);
     expect(setPitchDetailsAction).toHaveBeenCalledWith(
       "00000001-0000-4000-8000-000000000000",
       pitch.mediaAssetId,
@@ -296,10 +296,8 @@ describe("the founder's download switch (ADR 0047)", () => {
 });
 
 describe("the caption scrim's contrast guard (ADR 0047)", () => {
-  it("never puts less than 62% stage canvas under text over the pitch", async () => {
-    const { readFile } = await import("node:fs/promises");
-    const { join } = await import("node:path");
-    const css = await readFile(
+  it("never puts less than 62% stage canvas under text over the pitch", () => {
+    const css = readFileSync(
       join(import.meta.dirname, "../app/globals.css"),
       "utf8",
     );

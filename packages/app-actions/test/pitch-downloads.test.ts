@@ -149,7 +149,7 @@ describe("pitch downloads through pitch.details.set (ADR 0047)", () => {
     const canonical = await SET_PITCH_SHARING.tool?.toCanonical(
       { pitch: "my pitch", downloadable: true },
       CONTEXT,
-      { ownCompanyId: () => Promise.resolve(COMPANY) } as never,
+      { ownCompanyId: () => Promise.resolve(COMPANY) },
     );
     expect(canonical).toEqual({
       companyId: COMPANY,

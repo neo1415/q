@@ -1411,15 +1411,11 @@ describe("downloads (ADR 0047)", () => {
     });
     expect(on.downloadable).toBe(true);
     expect(on.version).toBe(2);
-    expect(h.audits).toEqual([
-      expect.objectContaining({
-        actionType: "media.asset.downloadable_set",
-        metadata: expect.objectContaining({
-          previousDownloadable: false,
-          downloadable: true,
-        }),
-      }),
-    ]);
+    expect(h.audits).toHaveLength(1);
+    expect(h.audits[0]).toMatchObject({
+      actionType: "media.asset.downloadable_set",
+      metadata: { previousDownloadable: false, downloadable: true },
+    });
     await expect(
       h.service.setPitchDownloadable({
         actor: founder,

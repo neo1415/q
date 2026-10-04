@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 /**
  * The pitch's progress bar, on the seam between the video and what is
@@ -46,7 +52,20 @@ export function seekBy(
   const duration = durationOf(video, fallbackDuration);
   const target = video.currentTime + seconds;
   video.currentTime =
-    duration > 0 ? Math.min(Math.max(0, target), duration - 0.05) : Math.max(0, target);
+    duration > 0
+      ? Math.min(Math.max(0, target), duration - 0.05)
+      : Math.max(0, target);
+}
+
+/**
+ * Put the pitch at a time. A plain function on purpose: the element is the
+ * truth about the position, and moving it is an effect on the element, not
+ * a change to anything this component renders from.
+ */
+function jumpTo(video: HTMLVideoElement, seconds: number, fast = false): void {
+  // fastSeek lands on a keyframe: right for a moving finger.
+  if (fast && typeof video.fastSeek === "function") video.fastSeek(seconds);
+  else video.currentTime = seconds;
 }
 
 function bufferedEnd(video: HTMLVideoElement): number {
@@ -78,7 +97,24 @@ export function PitchScrubber({
   const bufferRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
   const readoutRef = useRef<HTMLSpanElement>(null);
-  const [paused, setPaused] = useState(true);
+  // Playing or paused is the element's own state, read from its events.
+  const subscribePaused = useCallback(
+    (onChange: () => void) => {
+      if (video === null) return () => undefined;
+      video.addEventListener("play", onChange);
+      video.addEventListener("pause", onChange);
+      return () => {
+        video.removeEventListener("play", onChange);
+        video.removeEventListener("pause", onChange);
+      };
+    },
+    [video],
+  );
+  const paused = useSyncExternalStore(
+    subscribePaused,
+    () => video?.paused ?? true,
+    () => true,
+  );
   const [dragging, setDragging] = useState(false);
   const draggingRef = useRef(false);
   const resumeAfter = useRef(false);
@@ -89,7 +125,10 @@ export function PitchScrubber({
   const paint = useCallback(
     (ratio: number, buffered: number) => {
       const clamped = Math.min(1, Math.max(0, ratio));
-      fillRef.current?.style.setProperty("transform", `scaleX(${String(clamped)})`);
+      fillRef.current?.style.setProperty(
+        "transform",
+        `scaleX(${String(clamped)})`,
+      );
       bufferRef.current?.style.setProperty(
         "transform",
         `scaleX(${String(Math.min(1, Math.max(clamped, buffered)))})`,
@@ -133,16 +172,13 @@ export function PitchScrubber({
       frame = window.requestAnimationFrame(loop);
     };
     const start = () => {
-      setPaused(false);
       if (frame === null) frame = window.requestAnimationFrame(loop);
     };
     const stop = () => {
-      setPaused(video.paused);
       if (frame !== null) window.cancelAnimationFrame(frame);
       frame = null;
       paintFromVideo();
     };
-    setPaused(video.paused);
     if (!video.paused) start();
     else paintFromVideo();
     video.addEventListener("play", start);
@@ -178,13 +214,11 @@ export function PitchScrubber({
       if (video === null || target === null) return;
       const duration = durationOf(video, durationSeconds);
       if (duration <= 0) return;
-      const time = Math.min(target * duration, duration - 0.05);
-      // fastSeek lands on a keyframe: right for a moving finger.
-      if (typeof video.fastSeek === "function" && draggingRef.current) {
-        video.fastSeek(time);
-      } else {
-        video.currentTime = time;
-      }
+      jumpTo(
+        video,
+        Math.min(target * duration, duration - 0.05),
+        draggingRef.current,
+      );
     });
   };
   useEffect(
@@ -236,7 +270,7 @@ export function PitchScrubber({
       const duration = durationOf(video, durationSeconds);
       if (duration > 0) {
         // The exact frame where the finger let go, not the keyframe.
-        video.currentTime = Math.min(ratio * duration, duration - 0.05);
+        jumpTo(video, Math.min(ratio * duration, duration - 0.05));
       }
       if (resumeAfter.current) void video.play().catch(() => undefined);
     }
@@ -256,9 +290,9 @@ export function PitchScrubber({
     } else if (event.key === "PageUp") {
       seekBy(video, duration / 10, durationSeconds);
     } else if (event.key === "Home") {
-      video.currentTime = 0;
+      jumpTo(video, 0);
     } else if (event.key === "End" && duration > 0) {
-      video.currentTime = duration - 0.05;
+      jumpTo(video, duration - 0.05);
     } else {
       handled = false;
     }
@@ -271,7 +305,10 @@ export function PitchScrubber({
   };
 
   const state = dragging ? "dragging" : paused ? "paused" : "playing";
-  const total = video === null ? (durationSeconds ?? 0) : durationOf(video, durationSeconds);
+  const total =
+    video === null
+      ? (durationSeconds ?? 0)
+      : durationOf(video, durationSeconds);
 
   return (
     <div
