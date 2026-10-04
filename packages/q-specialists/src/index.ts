@@ -254,3 +254,15 @@ export {
   type TurnAppAction,
 } from "./app-action-turn.js";
 export { createToolReadinessLead } from "./readiness-lead.js";
+
+export {
+  createToolOpenRecordPort,
+  openTarget,
+  referenceNote,
+  repeatedAction,
+  shownItems,
+  type LastAction,
+  type OpenTarget,
+  type QOpenRecordPort,
+  type ShownItem,
+} from "./references.js";

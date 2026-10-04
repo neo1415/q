@@ -51,6 +51,7 @@ import {
   createToolDelegationPort,
   createToolReadinessLead,
   createToolAppActionPort,
+  createToolOpenRecordPort,
   createToolProfileGapsPort,
   createToolOwnMandatePort,
   createToolOwnRecordsPort,
@@ -420,6 +421,12 @@ export function composeQIntelligence(
       // one with its own: left out, the router never saw it and "Express
       // interest in Clinicrest" was asked back (QA run 4e3b1903).
       names: appActionToolNames(APP_ACTIONS),
+      ...(logger === undefined ? {} : { logger }),
+    }),
+    // follow-55: the one record a turn names or points at, opened through
+    // open_page's own authorize step (their own records only).
+    openRecord: createToolOpenRecordPort({
+      tools,
       ...(logger === undefined ? {} : { logger }),
     }),
     // Lead 2026-10-03: "what should I do next?" opens with their readiness.

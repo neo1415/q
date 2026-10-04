@@ -8,10 +8,10 @@ import {
 
 /** TURN_READER v39 (QA run f99e507c): a reminder is a request to act. */
 describe("TURN_READER v39", () => {
-  it("is the active reader and v38 is deprecated", () => {
+  it("v38 is deprecated (v40 is active)", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(39);
+    ).toBeGreaterThanOrEqual(39);
     expect(TURN_READER_V38.status).toBe("DEPRECATED");
   });
 

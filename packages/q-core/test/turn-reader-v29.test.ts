@@ -13,7 +13,7 @@ describe("TURN_READER v29", () => {
   it("is superseded by v30, which adds askedAction", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(39);
+    ).toBe(40);
   });
 
   it("names every contract destination exactly once, PASSED included", () => {

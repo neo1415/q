@@ -585,3 +585,48 @@ export const TurnReaderV31ResultSchema = TurnReaderV30ResultSchema.extend({
   appAction: TurnAppActionSchema.nullable().default(null),
 }).strict();
 export type TurnReaderV31Result = z.infer<typeof TurnReaderV31ResultSchema>;
+
+/**
+ * v40 (follow-55, Zino live 2026-10-04): what the turn points back to. "Open
+ * the questions for…" and "open the first documents" opened the Documents
+ * list; "now try again" after a change Q could not prepare opened the
+ * profile page again. The reader now says, by meaning, which one record
+ * they ask to open (named, or pointed at among what Q just showed) and
+ * whether they ask Q to do its last action again (for someone else, when
+ * they say so). Code resolves the record among what is theirs and re-runs
+ * the action through its own authorize step and approval card; a phrase
+ * never decides it.
+ */
+export const TURN_READER_V40_SCHEMA_VERSION = 40;
+
+export const TURN_REFERENCE_OPEN_KINDS = [
+  "DOCUMENT",
+  "CHAT",
+  "RELATIONSHIP",
+  "COMPANY",
+  "INVESTOR",
+  "MEETING",
+  "PITCH",
+] as const;
+export type TurnReferenceOpenKind = (typeof TURN_REFERENCE_OPEN_KINDS)[number];
+
+export const TurnReferenceSchema = z
+  .object({
+    /** They ask Q to open one specific record of this kind; null otherwise. */
+    open: z.enum(TURN_REFERENCE_OPEN_KINDS).nullable().default(null),
+    /** The record as they named it, or as recent turns name what they point at. */
+    name: z.string().trim().min(1).max(160).nullable().default(null),
+    /** "The second one": its number in Q's SHOWN list; null when not pointed by number. */
+    shown: z.number().int().min(1).max(12).nullable().default(null),
+    /** "Try again", "do it again", "go ahead" after Q's last action was not done. */
+    retryLast: z.boolean().default(false),
+    /** "Same for Kazikit": the record the repeated action is for instead. */
+    sameFor: z.string().trim().min(1).max(120).nullable().default(null),
+  })
+  .strict();
+export type TurnReference = z.infer<typeof TurnReferenceSchema>;
+
+export const TurnReaderV40ResultSchema = TurnReaderV31ResultSchema.extend({
+  reference: TurnReferenceSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV40Result = z.infer<typeof TurnReaderV40ResultSchema>;

@@ -29,7 +29,7 @@ export const TURN_READER_V39: PromptDefinition<
 > = {
   ...TURN_READER_V38,
   version: 39,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA run f99e507c: setting a reminder is a TOOL_REQUEST for the reminder action, even when it names a company and a time of their day. Same schema and order as v38.",
   effectiveFrom: "2026-10-03",

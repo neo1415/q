@@ -109,6 +109,16 @@ import {
   type QDelegationPort,
 } from "./delegation.js";
 import type { QProfileGapsPort } from "./profile-gaps.js";
+import {
+  openingLine,
+  openTarget,
+  referenceNote,
+  repeatedAction,
+  shownItems,
+  type LastAction,
+  type QOpenRecordPort,
+} from "./references.js";
+import type { TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
   decidePending,
@@ -229,6 +239,11 @@ function turnReaderInput(
     readonly correlationId: string;
     readonly signal?: AbortSignal | undefined;
   },
+  /**
+   * Capital Q's own note of what was shown and the last action (follow-55),
+   * read as the last recent turn so "that one" and "try again" bind.
+   */
+  note: string | null = null,
 ) {
   // Spoken turns carry the recogniser's utterance; typed ones never do.
   // The reader needs to know which: only speech can be overheard.
@@ -236,13 +251,16 @@ function turnReaderInput(
   return {
     utterance: latest.content,
     actions,
-    recentTurns: history
-      .filter((m) => m.id !== latest.id)
-      .slice(-6)
-      .map((m) => ({
-        role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
-        text: m.content,
-      })),
+    recentTurns: [
+      ...history
+        .filter((m) => m.id !== latest.id)
+        .slice(note === null ? -6 : -5)
+        .map((m) => ({
+          role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
+          text: m.content,
+        })),
+      ...(note === null ? [] : [{ role: "Q" as const, text: note }]),
+    ],
     modality: spoken ? ("VOICE" as const) : ("TEXT" as const),
     attribution: {
       tenantId: context.tenantId,
@@ -377,6 +395,11 @@ export type SpecialistQAnswerDependencies = {
    * when the turn reader reads saveToOwnProfile (HARDEN P0, 2026-10-02).
    */
   readonly profileGaps?: QProfileGapsPort | undefined;
+  /**
+   * Opening the one record a turn names or points at (follow-55), through
+   * open_page's authorize step. Absent: such a turn is answered as before.
+   */
+  readonly openRecord?: QOpenRecordPort | undefined;
   /** Whether public research exists in this composition at all. */
   readonly researchAvailable?: boolean | undefined;
   /**
@@ -653,12 +676,55 @@ export function createSpecialistQAnswer(
   /** Declared actions waiting on the person's reply, per conversation. */
   const pendingActions = pendingAppActionStore(dependencies.pendingAppActions);
   /** A port result said as the answer: a line, a card, or a question that waits. */
+  /**
+   * The last action Q took or tried per conversation (follow-55), so "try
+   * again" and "same for X" bind to it. In memory and bounded like the
+   * rest of the core's state: a restart forgets it, never a fact.
+   */
+  const lastActed = new Map<string, LastAction>();
+  /** What each run's person said, for the action a run notes. */
+  const saidInRun = new Map<string, string>();
+  const noteAction = (
+    request: QAnswerRequest,
+    conversationId: string,
+    action: {
+      readonly tool: string;
+      readonly arguments: Readonly<Record<string, unknown>> | null;
+    },
+    outcome: LastAction["outcome"],
+    utterance?: string,
+  ): void => {
+    const said = utterance ?? saidInRun.get(request.runId);
+    if (said === undefined) return;
+    lastActed.delete(conversationId);
+    lastActed.set(conversationId, {
+      tool: action.tool,
+      arguments: action.arguments,
+      utterance: said,
+      outcome,
+    });
+    while (lastActed.size > MAX_CONVERSATIONS) {
+      const oldest = lastActed.keys().next().value;
+      if (oldest === undefined) break;
+      lastActed.delete(oldest);
+    }
+  };
   const saidByAction = async (
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
     action: TurnAppAction,
     said: string | QAppActionPrepared | QAppActionAsks,
   ): Promise<QAnswerOutcome> => {
+    noteAction(
+      request,
+      conversationId,
+      action,
+      typeof said === "string"
+        ? "SAID"
+        : "asks" in said
+          ? "WAITING"
+          : "PREPARED",
+    );
     if (typeof said === "string") {
       return recordAnswer(request, conversationId, said);
     }
@@ -1572,12 +1638,21 @@ export function createSpecialistQAnswer(
       const actions = JSON.parse(key) as ReaderAction[];
       const reading = turns
         .read(
-          turnReaderInput(history, latest, actions, {
-            tenantId: input.tenantId,
-            userId: input.actor.userId,
-            correlationId: input.correlationId,
-            signal: input.signal,
-          }),
+          turnReaderInput(
+            history,
+            latest,
+            actions,
+            {
+              tenantId: input.tenantId,
+              userId: input.actor.userId,
+              correlationId: input.correlationId,
+              signal: input.signal,
+            },
+            referenceNote(
+              shownItems(history),
+              lastActed.get(conversationId) ?? null,
+            ),
+          ),
         )
         .catch(() => null);
       return { messageId: latest.id, actionsKey: key, reading };
@@ -1620,6 +1695,101 @@ export function createSpecialistQAnswer(
         "lines not meant for Q were not marked",
       );
     }
+  };
+
+  /**
+   * Open the one record the turn names or points at (follow-55), through
+   * open_page's authorize step: their own documents, relationships and
+   * what the network shows them, nothing else. Null: nothing of theirs
+   * matched, and the turn is answered as before.
+   */
+  const openReferenced = async (
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    reference: TurnReference,
+    shown: ReturnType<typeof shownItems>,
+  ): Promise<QAnswerOutcome | null> => {
+    const port = dependencies.openRecord;
+    if (port === undefined) return null;
+    const side =
+      ownInvestorOrganisationIn(request.plan) !== null ? "INVESTOR" : "FOUNDER";
+    const target = openTarget(reference, shown, side);
+    if (target === null) return null;
+    for (const page of target.pages) {
+      const intent = await port
+        .open(request, { page, id: target.id, name: target.name })
+        .catch(() => null);
+      if (intent === null) continue;
+      logger?.info(
+        { qRunId: request.runId, page, byName: target.id === undefined },
+        "q opened the record the turn pointed at",
+      );
+      remember(
+        conversationId,
+        reduceConversation(
+          conversations.get(conversationId) ?? INITIAL_CONVERSATION_STATE,
+          { type: "SUCCEEDED", operation: "TOOL" },
+        ),
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        openingLine(page, target.name),
+        [{ kind: "UI_INTENT", intent }],
+      );
+    }
+    logger?.info(
+      { qRunId: request.runId, open: reference.open },
+      "the record the turn pointed at is not one of theirs; answered instead",
+    );
+    return null;
+  };
+
+  /**
+   * Q's last action again ("try again", "do it again", "same for X"):
+   * the same declared action with the same inputs -- read again from what
+   * they said then when they were never read -- through its own authorize
+   * step and approval card. Null: it still cannot be done; answered.
+   */
+  const repeatLastAction = async (
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    last: LastAction,
+    sameFor: string | null,
+  ): Promise<QAnswerOutcome | null> => {
+    const actions = dependencies.appActions;
+    if (actions === undefined) return null;
+    let action = repeatedAction(last, sameFor);
+    if (action === null && dependencies.appActionArguments !== undefined) {
+      const said =
+        sameFor === null
+          ? last.utterance
+          : `${last.utterance} (this time for ${sameFor})`;
+      const args = await dependencies
+        .appActionArguments(request, { tool: last.tool, utterance: said })
+        .catch(() => null);
+      action =
+        args === null || args === undefined
+          ? null
+          : { tool: last.tool, arguments: args };
+    }
+    logger?.info(
+      {
+        qRunId: request.runId,
+        tool: last.tool,
+        was: last.outcome,
+        sameFor: sameFor !== null,
+        filled: action !== null,
+      },
+      "q repeats its last action",
+    );
+    if (action === null) return null;
+    const said = await actions.run(request, action).catch(() => null);
+    if (said === null) {
+      noteAction(request, conversationId, action, "NOT_DONE", last.utterance);
+      return null;
+    }
+    return saidByAction(request, conversationId, action, said);
   };
 
   const answerTurn = async (
@@ -1817,14 +1987,29 @@ export function createSpecialistQAnswer(
     // Spoken turns carry the recogniser's utterance; typed ones never do.
     // The reader needs to know which: only speech can be overheard.
     const spoken = latest.utteranceRef !== undefined;
+    // What Q showed and last did, for "that one" and "try again".
+    const shown = shownItems(history);
+    const lastAction = lastActed.get(conversationId) ?? null;
+    saidInRun.set(request.runId, latest.content);
+    while (saidInRun.size > PREREADS_MAX) {
+      const oldest = saidInRun.keys().next().value;
+      if (oldest === undefined) break;
+      saidInRun.delete(oldest);
+    }
     const readTurn = () =>
       turns.read(
-        turnReaderInput(history, latest, actions, {
-          tenantId: request.tenantId,
-          userId: request.actor.userId,
-          correlationId: request.correlationId,
-          signal: request.signal,
-        }),
+        turnReaderInput(
+          history,
+          latest,
+          actions,
+          {
+            tenantId: request.tenantId,
+            userId: request.actor.userId,
+            correlationId: request.correlationId,
+            signal: request.signal,
+          },
+          referenceNote(shown, lastAction),
+        ),
       );
     // Read early, beside the firewall (ADR 0035), with the same words, the
     // same turns and the same actions as now: taken up only when all three
@@ -1965,6 +2150,39 @@ export function createSpecialistQAnswer(
           };
     }
     unclearInARow.delete(conversationId);
+    // What the turn points back at (TURN_READER v40, follow-55): one record
+    // to open, or Q's last action again. Bound here by code to a record of
+    // theirs or to that action, before any screen is opened for the turn
+    // (Zino live 2026-10-04: "open the questions for…" opened the
+    // Documents list; "now try again" opened the profile page again).
+    const reference =
+      read !== null && read.confidence !== "LOW"
+        ? (read.reference ?? null)
+        : null;
+    if (reference !== null && reference.open !== null) {
+      const opened = await openReferenced(
+        request,
+        conversationId,
+        reference,
+        shown,
+      );
+      if (opened !== null) return opened;
+    }
+    if (
+      reference !== null &&
+      reference.retryLast &&
+      lastAction !== null &&
+      dependencies.appActions !== undefined &&
+      dependencies.appActions.tools.has(lastAction.tool)
+    ) {
+      const again = await repeatLastAction(
+        request,
+        conversationId,
+        lastAction,
+        reference.sameFor,
+      );
+      if (again !== null) return again;
+    }
     // A LOW reading is a guess, and a guess never moves anybody's screen or
     // prepares a change: it is answered like any other turn. A document
     // asked for "from what you can find publicly" may be read as a
@@ -2254,9 +2472,17 @@ export function createSpecialistQAnswer(
               { qRunId: request.runId, tool, filled: args != null },
               "app action named without arguments; arguments read for it",
             );
-            return args === null || args === undefined
-              ? null
-              : { tool, arguments: args };
+            if (args === null || args === undefined) {
+              // Asked for and not prepared: "try again" binds to it.
+              noteAction(
+                request,
+                conversationId,
+                { tool, arguments: null },
+                "NOT_DONE",
+              );
+              return null;
+            }
+            return { tool, arguments: args };
           })()
         : null);
     if (
@@ -2313,6 +2539,8 @@ export function createSpecialistQAnswer(
           }
         }
       }
+      // Tried and not done: what "try again" will run, with its inputs.
+      noteAction(request, conversationId, appAction, "NOT_DONE");
     }
     // A hand-over (TURN_READER v22): "get me a meeting with this person",
     // "handle this for me", in any language. Code prepares Q's errand for
