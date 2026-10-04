@@ -340,7 +340,7 @@ export function RelationshipDiligence({
                     />
                   ) : null}
                   {founder && area.open && status.answerable && !mine ? (
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-2 gap-2 sm:flex">
                       <UploadButton
                         disabled={busy !== null || uploading !== null}
                         label={`Upload & share ${request.title}`}
@@ -348,7 +348,7 @@ export function RelationshipDiligence({
                       />
                       <Button
                         variant="secondary"
-                        className="flex-1 sm:flex-none"
+                        className="min-w-0 px-2.5 sm:px-4"
                         disabled={busy !== null || uploading !== null}
                         onClick={() =>
                           setPicking({ requestId: request.requestId })
@@ -529,7 +529,7 @@ function UploadButton({
     <>
       <Button
         variant="primary"
-        className="flex-1 sm:flex-none"
+        className="min-w-0 px-2.5 sm:px-4"
         disabled={disabled}
         aria-label={label}
         onClick={() => input.current?.click()}
@@ -775,5 +775,28 @@ function AskForm({
         </button>
       )}
     </form>
+  );
+}
+
+/** The tab could not be read: say so, and one way to try again. */
+export function DiligenceUnavailable({ href }: { readonly href: string }) {
+  return (
+    <section
+      role="alert"
+      className="flex items-center justify-between gap-3 rounded-xl border border-(--cq-border) bg-(--cq-surface-raised) p-4"
+      data-state="unavailable"
+    >
+      <span className="flex flex-col gap-0.5">
+        <span className="cq-body-sm font-semibold text-(--cq-text-primary)">
+          Diligence didn&apos;t load
+        </span>
+        <span className="cq-body-sm text-(--cq-text-secondary)">
+          Nothing changed. Try again in a moment.
+        </span>
+      </span>
+      <a href={href} className={buttonClassName("secondary")}>
+        Retry
+      </a>
+    </section>
   );
 }

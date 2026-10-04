@@ -223,7 +223,7 @@ describe("Needs you", () => {
     });
     expect(cards.map((c) => [c.title, c.count, c.action.label])).toEqual([
       ["Chase the term sheet", 1, "Done"],
-      ["Fund 1 asked for Cap table", 2, "Upload & share"],
+      ["Asked for Cap table", 2, "Upload & share"],
       ["Rehearse your call: intro", 2, "Rehearse"],
       ["New call: check something", 2, "Got it"],
     ]);

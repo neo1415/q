@@ -6,7 +6,10 @@ import {
   RelationshipSection,
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
-import { RelationshipDiligence } from "@/features/relationships/relationship-diligence";
+import {
+  DiligenceUnavailable,
+  RelationshipDiligence,
+} from "@/features/relationships/relationship-diligence";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
 
 export const metadata: Metadata = { title: "Diligence" };
@@ -28,10 +31,13 @@ export default async function CompanyDiligencePage({
   if (loaded.kind === "UNAVAILABLE") {
     return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
-  if (loaded.relationship === null || loaded.diligence === null) {
+  const { relationship, diligence } = loaded;
+  if (
+    relationship === null ||
+    !relationship.milestones.some((m) => m.state === "IN_DILIGENCE")
+  ) {
     redirect(basePath);
   }
-  const { relationship, diligence } = loaded;
   return (
     <>
       <QPageSubject
@@ -54,13 +60,17 @@ export default async function CompanyDiligencePage({
         meetings={loaded.meetings}
         readAt={loaded.readAt}
       >
-        <RelationshipDiligence
-          relationshipId={relationship.relationshipId}
-          companyId={relationship.companyId}
-          counterpart={loaded.counterpart}
-          initial={diligence}
-          now={loaded.readAt}
-        />
+        {diligence === null ? (
+          <DiligenceUnavailable href={`${basePath}/diligence`} />
+        ) : (
+          <RelationshipDiligence
+            relationshipId={relationship.relationshipId}
+            companyId={relationship.companyId}
+            counterpart={loaded.counterpart}
+            initial={diligence}
+            now={loaded.readAt}
+          />
+        )}
       </RelationshipSection>
     </>
   );

@@ -285,7 +285,9 @@ function actionFor(
         label:
           side === "COMPANY" && href?.endsWith("/diligence") === true
             ? "Upload & share"
-            : "Open",
+            : side === "INVESTOR"
+              ? "Review files"
+              : "Open",
         href,
       };
     case "INTEREST_RECEIVED":
@@ -309,6 +311,18 @@ function actionFor(
         ? { label: "Got it", href: null }
         : { label: "Open", href };
   }
+}
+
+/**
+ * The card already names who: "Savanna Seed Partners asked for Pitch deck"
+ * reads "Asked for Pitch deck" under their name.
+ */
+export function withoutName(title: string, name: string): string {
+  if (!title.toLowerCase().startsWith(`${name.toLowerCase()} `)) return title;
+  const rest = title.slice(name.length + 1).trim();
+  return rest.length === 0
+    ? title
+    : `${rest.charAt(0).toUpperCase()}${rest.slice(1)}`;
 }
 
 /**
@@ -355,7 +369,10 @@ export function needsYouCards(input: {
     }
     cards.set(key, {
       key,
-      title: notice.title,
+      title:
+        relationship === null
+          ? notice.title
+          : withoutName(notice.title, relationship.counterpart.name),
       relationship,
       latestAt: notice.createdAt,
       count: 1,
