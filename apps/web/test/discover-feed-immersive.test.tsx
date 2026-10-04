@@ -458,7 +458,14 @@ describe("playback", () => {
     reducedMotion = true;
     const { container } = await renderFeed();
 
-    const playButton = await screen.findByRole("button", { name: "Play" });
+    // A real button with words on it (ADR-001), and the sound stays off
+    // until the person turns it on.
+    const playButton = await screen.findByRole("button", {
+      name: "Play pitch",
+    });
+    expect(
+      screen.getByText("Sound stays off until you turn it on"),
+    ).toBeTruthy();
     await waitFor(() =>
       expect(
         container
@@ -617,7 +624,8 @@ describe("tap to pause (founder directive, 2026-09-27)", () => {
     });
     pause.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
-    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("button", { name: /^More about / }));
+    fireEvent.click(screen.getByRole("button", { name: "All details" }));
     expect(pause).not.toHaveBeenCalled();
   });
 });
@@ -633,7 +641,8 @@ describe("the details sheet over the feed", () => {
       configurable: true,
       get: () => false,
     });
-    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("button", { name: /^More about / }));
+    fireEvent.click(screen.getByRole("button", { name: "All details" }));
     const dialog = await screen.findByRole("dialog");
     pause.mockClear();
 

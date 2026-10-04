@@ -7,22 +7,23 @@ import type {
   DiscoveredCompanyDto,
   DiscoveryReasonDto,
 } from "@capital-q/contracts";
-import { Button } from "@capital-q/ui/button";
+import { Button, buttonClassName } from "@capital-q/ui/button";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import {
   ArrowDown,
   Bookmark,
   BookmarkCheck,
   ChevronRight,
-  ChevronUp,
   Globe,
   Handshake,
   ICON_SIZE,
   ICON_STROKE,
+  MoreHorizontal,
   Share2,
 } from "@capital-q/ui/icons";
 
-import { CompanyAvatarLink } from "../company/company-avatar";
+import { CompanyAvatar, CompanyAvatarLink } from "../company/company-avatar";
+import { moneyText } from "../company/money-text";
 import { countryLabel, stageLabel } from "../company/declared-labels";
 import { ExpressInterest } from "../network/express-interest";
 import { useDockAvoid } from "../q-dock";
@@ -163,6 +164,70 @@ function useDesktopPanel(): boolean {
   );
 }
 
+/** The few words a statement's axes earn on a card (ADR-001). */
+export function evidenceWords(
+  truthClass: string,
+  evidenceStatus: string,
+): string {
+  if (truthClass === "VERIFIED") return "verified";
+  if (evidenceStatus === "SELF_REPORTED" || truthClass === "USER_CLAIM") {
+    return "founder-stated";
+  }
+  return "not verified";
+}
+
+/**
+ * The card's declared facts beyond the name (Discover v2): sector and the
+ * raise, only as the server read them for this reader. Unknown is said as
+ * unknown ("Not shared with you"), never as zero or as nothing.
+ */
+function CardFacts({
+  company,
+  sectorLabels,
+}: {
+  readonly company: DiscoveredCompanyDto;
+  readonly sectorLabels: ReadonlyMap<string, string>;
+}) {
+  const summary = company.summary;
+  if (summary === undefined) return null;
+  const sectors = summary.sectorNodeIds
+    .map((id) => sectorLabels.get(id))
+    .filter((label): label is string => label !== undefined);
+  const stage = stageLabel(company.currentStageCode);
+  return (
+    <dl className="cq-feed-facts" data-feed-facts>
+      {sectors.length === 0 ? null : (
+        <>
+          <dt>Sector</dt>
+          <dd>{sectors.slice(0, 3).join(", ")}</dd>
+        </>
+      )}
+      {stage === null ? null : (
+        <>
+          <dt>Stage</dt>
+          <dd>{stage}</dd>
+        </>
+      )}
+      <dt>Raising</dt>
+      <dd className="cq-numeric">
+        {summary.raise === null ? (
+          <span className="cq-feed-fact-unknown">Not shared with you</span>
+        ) : (
+          <>
+            {moneyText(summary.raise.money)}{" "}
+            <span className="cq-feed-fact-axis">
+              {evidenceWords(
+                summary.raise.truthClass,
+                summary.raise.evidenceStatus,
+              )}
+            </span>
+          </>
+        )}
+      </dd>
+    </dl>
+  );
+}
+
 export function FeedCard({
   company,
   policy,
@@ -172,10 +237,12 @@ export function FeedCard({
   onSave,
   onPass,
   onAskQ,
+  onMore,
   showMedia = true,
   askQMark,
   feedNotes = null,
   videos,
+  sectorLabels = NO_LABELS,
 }: {
   readonly company: DiscoveredCompanyDto;
   readonly policy: FeedPreloadPolicy;
@@ -185,6 +252,8 @@ export function FeedCard({
   readonly onSave: () => void;
   readonly onPass: () => void;
   readonly onAskQ: () => void;
+  /** The pitch's options (speed, download, captions...): the rail's More. */
+  readonly onMore?: (() => void) | undefined;
   /**
    * False inside the immersive feed, whose stage owns the players (three
    * recycled elements, spec §9.5); the card is then the company and its
@@ -206,6 +275,8 @@ export function FeedCard({
         readonly onNext: () => void;
       }
     | undefined;
+  /** The industry vocabulary's names, for the card's sector. */
+  readonly sectorLabels?: ReadonlyMap<string, string> | undefined;
 }) {
   // Stage first, then where: "Seed · Nigeria".
   const place = [
@@ -220,6 +291,8 @@ export function FeedCard({
   const filterUnknown = company.filterUnknown ?? [];
   const sheetDrag = useRef<number | null>(null);
   const [expanded, setExpanded] = useState(false);
+  // The caption's "more": in place, over its own darker scrim (Discover v2).
+  const [captionOpen, setCaptionOpen] = useState(false);
   const wide = useDesktopPanel();
   const [confirming, setConfirming] = useState(false);
   const openDetails = (confirm: boolean) => {
@@ -227,12 +300,16 @@ export function FeedCard({
     setExpanded(true);
   };
   const [shared, setShared] = useState<ShareOutcome | null>(null);
+  const reasons =
+    company.reasons.length > 0 ? company.reasons : slateReasons(company);
+  const open = wide || captionOpen;
 
   return (
     <article
       className="cq-feed-card flex h-full w-full flex-col gap-5"
       aria-label={company.canonicalName}
       data-company-id={company.companyId}
+      data-caption-open={captionOpen ? "" : undefined}
     >
       {/*
         No pitch, and nothing pretending to be one: no frame is reserved
@@ -252,54 +329,54 @@ export function FeedCard({
       )}
 
       {/*
-        The summary over the pitch (founder feedback, 2026-09-27): the name,
-        one short line and stage · place. Everything else is behind More,
-        in a sheet with its own solid surface -- never bare text over video.
+        The caption over the pitch (Discover v2): the name with stage and
+        place, two lines, and "more" that opens it in place. The scrim sits
+        behind the words only, never a block over the picture.
       */}
-      <div className="cq-feed-info flex flex-col gap-1.5" data-feed-summary>
+      <div className="cq-feed-info flex flex-col gap-1" data-feed-summary>
         {company.sinceYouLastSaw === undefined ? null : (
           // Passed before, offered again because something is new (doc 19
           // §67). Words, not a colour or a badge.
-          <p
-            className="cq-caption text-(--cq-text-secondary)"
-            data-since-you-last-saw
-          >
+          <p className="cq-caption cq-feed-muted" data-since-you-last-saw>
             {sinceYouLastSawLine(company.sinceYouLastSaw.change)}
           </p>
         )}
-        <div className="flex items-center gap-3">
-          {/*
-            The company's photo, or a plain mark, opens its profile
-            (founder request 2026-10-02): over the stage on a phone and in
-            the panel on a desktop, since both are this card.
-          */}
-          <CompanyAvatarLink
-            companyId={company.companyId}
-            companyName={company.canonicalName}
-          />
-          <h2 className="cq-title-sm min-w-0 text-(--cq-text-primary)">
-            {/* The name opens the company, as it does in any feed. */}
-            <Link
-              href={`/company/${company.companyId}`}
-              className="underline-offset-4 hover:underline"
-              data-feed-company-link
-            >
-              {company.canonicalName}
-            </Link>
-          </h2>
+        <div className="cq-feed-company">
+          {/* On a desktop the panel names the company with its mark; the
+              rail's avatar is the way into the profile on both. */}
+          <span className="cq-feed-panel-mark">
+            <CompanyAvatar
+              companyId={company.companyId}
+              photoUrl={company.photoUrl}
+              size={52}
+            />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <h2 className="cq-title-sm min-w-0 text-(--cq-text-primary)">
+              {/* The name opens the company, as it does in any feed. */}
+              <Link
+                href={`/company/${company.companyId}`}
+                className="underline-offset-4 hover:underline"
+                data-feed-company-link
+              >
+                {company.canonicalName}
+              </Link>
+            </h2>
+            {place === "" ? null : (
+              <span className="cq-caption cq-feed-muted" data-feed-place>
+                {place}
+              </span>
+            )}
+          </span>
         </div>
 
         {company.shortDescription === null ? null : (
           <p
-            className="cq-body-sm line-clamp-2 max-w-(--cq-layout-narrow) text-(--cq-text-primary)"
+            className={`cq-body-sm max-w-(--cq-layout-narrow) text-(--cq-text-primary) ${open ? "" : "line-clamp-2"}`}
             data-feed-one-liner
           >
             {company.shortDescription}
           </p>
-        )}
-
-        {place === "" ? null : (
-          <p className="cq-caption text-(--cq-text-secondary)">{place}</p>
         )}
 
         {/*
@@ -308,43 +385,78 @@ export function FeedCard({
           in view and says which, in one short line (ux/discover-filters).
         */}
         {filterUnknown.length === 0 ? null : (
-          <p className="cq-caption text-(--cq-text-secondary)">
+          <p className="cq-caption cq-feed-muted">
             {filterUnknown
               .map((dimension) => FILTER_UNKNOWN_TEXT[dimension])
               .join(" · ")}
           </p>
         )}
 
-        <button
-          type="button"
-          className="cq-caption inline-flex min-h-11 items-center gap-1 self-start font-medium text-(--cq-text-primary)"
-          aria-haspopup="dialog"
-          aria-expanded={expanded}
-          onClick={() => openDetails(false)}
-          data-feed-details-toggle
-        >
-          More
-          <ChevronUp aria-hidden="true" size={ICON_SIZE.compact} />
-        </button>
+        {wide ? null : (
+          <button
+            type="button"
+            className="cq-feed-more"
+            aria-expanded={captionOpen}
+            aria-controls={`cq-feed-more-${company.companyId}`}
+            aria-label={
+              captionOpen
+                ? `Less about ${company.canonicalName}`
+                : `More about ${company.canonicalName}`
+            }
+            onClick={() => setCaptionOpen((value) => !value)}
+            data-feed-details-toggle
+          >
+            {captionOpen ? "less" : "more"}
+          </button>
+        )}
       </div>
 
       {/*
-        Why it is here, in the panel on a desktop (spec §9.2; demo audit
-        2026-10-03: the panel said nothing about fit). A phone keeps it
-        behind More, where there is room. Declared alignment only.
+        What "more" opens on a phone, and what the panel always shows on a
+        desktop (spec §9.2): the declared facts, why it is here, and the
+        way into the profile. Declared alignment only; never a score.
       */}
-      {wide ? (
-        <div className="cq-feed-why flex flex-col gap-1" data-feed-why>
-          <h3 className="cq-label text-(--cq-text-secondary)">
-            Why it&apos;s here
-          </h3>
-          <Reasons
-            reasons={
-              company.reasons.length > 0
-                ? company.reasons
-                : slateReasons(company)
-            }
-          />
+      {open ? (
+        <div
+          className="cq-feed-more-body flex flex-col gap-4"
+          id={`cq-feed-more-${company.companyId}`}
+          data-feed-more
+        >
+          <CardFacts company={company} sectorLabels={sectorLabels} />
+          <div className="cq-feed-why flex flex-col gap-1" data-feed-why>
+            <h3 className="cq-label text-(--cq-text-primary)">
+              Why it&apos;s here
+            </h3>
+            <Reasons reasons={reasons} />
+            {unverified.length === 0 ? null : (
+              <p className="cq-caption cq-feed-muted">
+                Your {ruleList(unverified)} exclusion
+                {unverified.length === 1 ? " wasn't" : "s weren't"} checked:
+                this company hasn&apos;t stated it yet.
+              </p>
+            )}
+          </div>
+          {feedNotes}
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/company/${company.companyId}`}
+              className={buttonClassName("primary")}
+              data-feed-open-profile
+            >
+              Open profile
+            </Link>
+            {/* Everything else, with Express interest at its first step:
+                the website, the notes, and the server-confirmed decision. */}
+            <Button
+              variant="secondary"
+              onClick={() => openDetails(false)}
+              aria-haspopup="dialog"
+              aria-expanded={expanded}
+              data-feed-all-details
+            >
+              All details
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -399,7 +511,7 @@ export function FeedCard({
               )}
               {company.pitch === null ? (
                 <p className="cq-caption text-(--cq-text-secondary)">
-                  No pitch video yet.
+                  No pitch to show yet.
                 </p>
               ) : null}
             </div>
@@ -408,13 +520,7 @@ export function FeedCard({
               <h3 className="cq-label text-(--cq-text-secondary)">
                 Why it&apos;s here
               </h3>
-              <Reasons
-                reasons={
-                  company.reasons.length > 0
-                    ? company.reasons
-                    : slateReasons(company)
-                }
-              />
+              <Reasons reasons={reasons} />
               {/*
                 Unknown never excludes (ADR 0020): a hard rule this
                 company's own facts could not answer is said, quietly,
@@ -460,11 +566,11 @@ export function FeedCard({
 
       {/*
         The action rail (spec §9.1; ADR 0017 C4; founder directive
-        2026-09-27): labelled, and no counters of any kind -- nothing here
-        counts views, saves or shares. On a phone it runs down the right of
-        the stage; on a desktop it is a row in the intelligence panel,
-        where Express Interest is already in view. The Q Dock never sits on
-        it (spec §6.2).
+        2026-09-27; Discover v2): the company's mark first -- the way into
+        its profile is always there -- then the decisions, labelled, with
+        no counters of any kind. A phone carries it down the right of the
+        pitch on one quiet capsule; a desktop beside the 9:16 stage. The Q
+        Dock never sits on it (spec §6.2).
       */}
       <div
         ref={decisions}
@@ -472,6 +578,30 @@ export function FeedCard({
         role="group"
         aria-label="Decide"
       >
+        <span className="cq-feed-rail-profile">
+          <CompanyAvatarLink
+            companyId={company.companyId}
+            companyName={company.canonicalName}
+            photoUrl={company.photoUrl}
+          />
+          <span className="cq-feed-rail-label" aria-hidden="true">
+            Profile
+          </span>
+        </span>
+        <Button
+          variant="quiet"
+          onClick={() => openDetails(true)}
+          className="cq-feed-rail-button"
+          aria-haspopup="dialog"
+          data-feed-interest
+        >
+          <Handshake
+            aria-hidden="true"
+            size={ICON_SIZE.prominent}
+            strokeWidth={ICON_STROKE}
+          />
+          <span className="cq-feed-rail-label">Interest</span>
+        </Button>
         {/* Unsaved reads as a quiet choice like Pass; saved is marked by
             the filled icon and the word (demo audit 2026-10-03: a filled
             Save read as already saved). */}
@@ -513,20 +643,6 @@ export function FeedCard({
         </Button>
         <Button
           variant="quiet"
-          onClick={() => openDetails(true)}
-          className="cq-feed-rail-button"
-          aria-haspopup="dialog"
-          data-feed-interest
-        >
-          <Handshake
-            aria-hidden="true"
-            size={ICON_SIZE.prominent}
-            strokeWidth={ICON_STROKE}
-          />
-          <span className="cq-feed-rail-label">Interest</span>
-        </Button>
-        <Button
-          variant="secondary"
           onClick={onAskQ}
           className="cq-feed-rail-button"
           data-feed-ask-q
@@ -569,6 +685,22 @@ export function FeedCard({
             <span className="cq-feed-rail-label">Next video</span>
           </Button>
         )}
+        {onMore === undefined ? null : (
+          <Button
+            variant="quiet"
+            onClick={onMore}
+            className="cq-feed-rail-button"
+            aria-haspopup="dialog"
+            data-feed-more-options
+          >
+            <MoreHorizontal
+              aria-hidden="true"
+              size={ICON_SIZE.prominent}
+              strokeWidth={ICON_STROKE}
+            />
+            <span className="cq-feed-rail-label">More</span>
+          </Button>
+        )}
         <span className="sr-only" role="status">
           {shared === "COPIED" ? "Link to the company copied." : ""}
         </span>
@@ -576,6 +708,8 @@ export function FeedCard({
     </article>
   );
 }
+
+const NO_LABELS: ReadonlyMap<string, string> = new Map();
 
 /** The line on a passed company offered again (doc 19 §67). */
 export function sinceYouLastSawLine(change: "NEW_PITCH" | null): string {

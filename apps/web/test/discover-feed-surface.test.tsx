@@ -7,6 +7,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -191,9 +192,14 @@ async function renderFeed() {
   return view;
 }
 
-/** Reasons, the website and Express Interest live in the details sheet. */
+/**
+ * Reasons, the website and Express Interest live in the details sheet,
+ * reached from the caption's "more" (Discover v2): "more" opens the caption
+ * in place, "All details" the sheet.
+ */
 function openDetails() {
-  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  fireEvent.click(screen.getByRole("button", { name: /^More about / }));
+  fireEvent.click(screen.getByRole("button", { name: "All details" }));
 }
 
 /** The feed owns its keys; they are not dispatched at the window. */
@@ -221,7 +227,9 @@ describe("a card", () => {
     expect(screen.getAllByText("What company 1 does.").length).toBeGreaterThan(
       0,
     );
-    expect(screen.getByText("Seed, as you declared")).toBeTruthy();
+    expect(
+      within(screen.getByRole("dialog")).getByText("Seed, as you declared"),
+    ).toBeTruthy();
 
     // No percentage, no "match", no score, anywhere in the rendered card.
     const text = container.textContent ?? "";
@@ -251,7 +259,9 @@ describe("a card", () => {
     );
     openDetails();
 
-    expect(screen.getByText("Pre-seed, in your range")).toBeTruthy();
+    expect(
+      within(screen.getByRole("dialog")).getByText("Pre-seed, in your range"),
+    ).toBeTruthy();
     expect(screen.getAllByText("Pre-seed · Nigeria").length).toBeGreaterThan(0);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/nothing declared in common/);
@@ -273,7 +283,9 @@ describe("a card", () => {
       />,
     );
     openDetails();
-    const note = screen.getByText(/stage exclusion\s+wasn't\s+checked/i);
+    const note = within(screen.getByRole("dialog")).getByText(
+      /stage exclusion\s+wasn't\s+checked/i,
+    );
     expect(note.className).toContain("cq-caption");
     expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
   });
@@ -309,7 +321,9 @@ describe("a card", () => {
     );
     openDetails();
 
-    expect(screen.getByText(/No pitch video yet/i)).toBeTruthy();
+    expect(
+      within(screen.getByRole("dialog")).getByText(/No pitch to show yet/i),
+    ).toBeTruthy();
     expect(container.querySelector("video")).toBeNull();
     // No empty frame held open for a video that does not exist: the
     // company leads (CQ-ACCEPT-001).
@@ -449,13 +463,35 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     );
   }
 
-  it("carries Save, Pass, Interest, Ask Q and Share, with no counts", () => {
-    renderCard();
+  it("carries the profile first, then Interest, Save, Pass, Ask Q, Share and More, with no counts (Discover v2)", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+        onMore={() => undefined}
+      />,
+    );
     const rail = screen.getByRole("group", { name: "Decide" });
+    // The way into the profile is always the rail's first control.
+    const first = rail.querySelector("a, button");
+    expect(first?.getAttribute("aria-label")).toBe("Open Company 1 profile");
     const labels = [...rail.querySelectorAll("button")].map((button) =>
       button.textContent?.trim(),
     );
-    expect(labels).toEqual(["Save", "Pass", "Interest", "Ask Q", "Share"]);
+    expect(labels).toEqual([
+      "Interest",
+      "Save",
+      "Pass",
+      "Ask Q",
+      "Share",
+      "More",
+    ]);
     // Nothing in the rail is a number: no vanity counts.
     expect(rail.textContent).not.toMatch(/\d/);
   });
@@ -500,16 +536,31 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     expect(document.querySelector("[data-feed-details]")).toBeNull();
   });
 
-  it("opens details in a closable dialog, not as bare text over the video", async () => {
+  it("opens the caption in place on 'more', then the details in a closable dialog (Discover v2)", async () => {
     renderCard();
-    const more = screen.getByRole("button", { name: "More" });
+    const more = screen.getByRole("button", {
+      name: `More about ${company(1).canonicalName}`,
+    });
+    expect(more.textContent).toBe("more");
     expect(more.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(more);
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect(more.textContent).toBe("less");
+    // In place: the declared facts, why it is here, and the profile.
+    expect(
+      document.querySelector("[data-feed-more] [data-feed-why]"),
+    ).not.toBeNull();
+    expect(
+      document.querySelector("[data-feed-open-profile]")?.getAttribute("href"),
+    ).toBe(`/company/${companyId(1)}`);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const all = screen.getByRole("button", { name: "All details" });
+    fireEvent.click(all);
     const dialog = await screen.findByRole("dialog", {
       name: company(1).canonicalName,
     });
     expect(dialog.querySelector("[data-feed-details]")).not.toBeNull();
-    expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect(all.getAttribute("aria-expanded")).toBe("true");
 
     fireEvent.keyDown(dialog, { key: "Escape" });
     await waitFor(() => {
@@ -519,7 +570,7 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
 
   it("closes the details on a swipe down", async () => {
     renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    openDetails();
     await screen.findByRole("dialog");
     const details = document.querySelector("[data-feed-details]");
     if (details === null) throw new Error("no details");

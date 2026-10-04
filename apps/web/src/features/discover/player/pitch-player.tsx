@@ -14,8 +14,11 @@ import {
   ICON_STROKE,
   Pause,
   Play,
+  RotateCw,
+  Signal,
   Volume2,
   VolumeX,
+  WifiOff,
 } from "@capital-q/ui/icons";
 
 import type { FeedPreloadPolicy } from "../feed/feed-state";
@@ -27,6 +30,7 @@ import {
   type PlaybackSource,
 } from "./pitch-playback";
 import { claimActivePlayer, releaseActivePlayer } from "./active-player";
+import { reportPlaybackStall } from "../feed/use-feed-budget";
 import { setStreamWarmth } from "./hls-source";
 import { usePitchPlayback } from "./use-pitch-playback";
 
@@ -119,7 +123,26 @@ type PitchPlayerProps = {
    * bytes move; pressing Play lifts the cap and starts it.
    */
   readonly startOnRequest?: boolean | undefined;
+  /** Stage only: the viewer's speed (client-only, Discover v2). */
+  readonly rate?: number | undefined;
+  /** Stage only: captions shown, when the pitch has them. */
+  readonly captionsOn?: boolean | undefined;
+  /**
+   * Stage only, the card in view: its element, for the feed's progress
+   * bar and speed. Called with null when it stops being that card.
+   */
+  readonly onElement?: ((video: HTMLVideoElement | null) => void) | undefined;
+  /** Stage only: the browser says there is no network at all. */
+  readonly offline?: boolean | undefined;
 };
+
+/**
+ * A stall shorter than this shows nothing: most recover before a person
+ * would notice, and a ring that flashes reads as a fault (Discover v2).
+ */
+export const BUFFERING_DELAY_MS = 400;
+/** A rendition whose short side is below this is "lower quality". */
+const LOW_QUALITY_SHORT_SIDE = 360;
 
 /**
  * The tier a request-to-play player is really in: the controller's, but
@@ -148,6 +171,10 @@ export function PitchPlayer({
   onMutedChange,
   initialAuthorization = null,
   startOnRequest = false,
+  rate = 1,
+  captionsOn: stageCaptionsOn = true,
+  onElement,
+  offline = false,
 }: PitchPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   // Sound on (ADR 0026), except under reduced motion, where audio stays
@@ -185,7 +212,7 @@ export function PitchPlayer({
   const pendingPlay = useRef(false);
   const [captionsOn, setCaptionsOn] = useState(true);
 
-  const { intent, posterUrl, playbackUrl, failed } = usePitchPlayback({
+  const { intent, posterUrl, playbackUrl, failed, retry } = usePitchPlayback({
     mediaAssetId: company.pitch?.mediaAssetId ?? null,
     policy: requestedPolicy(policy, requested),
     authorize,
@@ -340,6 +367,87 @@ export function PitchPlayer({
     showCaptions(videoRef.current, captionsOn);
   }, [captionsOn, playbackUrl]);
 
+  // The viewer's speed, on the element itself; the pitch's voice keeps its
+  // pitch at 0.5x and 2x rather than turning into a cartoon.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video === null) return;
+    video.playbackRate = rate;
+    video.defaultPlaybackRate = rate;
+    video.preservesPitch = true;
+  }, [rate, playbackUrl]);
+
+  // The stage's captions follow the feed's one choice.
+  useEffect(() => {
+    if (variant === "stage") showCaptions(videoRef.current, stageCaptionsOn);
+  }, [variant, stageCaptionsOn, playbackUrl]);
+
+  // The card in view hands its element to the feed's progress bar.
+  useEffect(() => {
+    if (onElement === undefined) return;
+    onElement(videoRef.current);
+    return () => onElement(null);
+  }, [onElement]);
+
+  /*
+   * Buffering, said quietly: a ring only after a stall has lasted
+   * BUFFERING_DELAY_MS, on the poster or the last frame (never a black
+   * box), and only for the card that is meant to be playing. Each stall is
+   * reported to the preload budget, which narrows the warm window on a
+   * link that keeps stalling (doc 20 §53).
+   */
+  const [buffering, setBuffering] = useState(false);
+  const [lowQuality, setLowQuality] = useState(false);
+  const meantToPlay = policy === "ACTIVE" && !hold && intent.autoplay;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video === null || playbackUrl === null) return;
+    let timer: number | undefined;
+    const clear = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = undefined;
+      setBuffering(false);
+    };
+    const stalled = () => {
+      if (timer !== undefined || video.paused) return;
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        setBuffering(true);
+        reportPlaybackStall();
+      }, BUFFERING_DELAY_MS);
+    };
+    const resized = () => {
+      const short = Math.min(video.videoWidth, video.videoHeight);
+      setLowQuality(short > 0 && short < LOW_QUALITY_SHORT_SIDE);
+    };
+    video.addEventListener("waiting", stalled);
+    video.addEventListener("playing", clear);
+    video.addEventListener("canplaythrough", clear);
+    video.addEventListener("pause", clear);
+    video.addEventListener("emptied", clear);
+    video.addEventListener("resize", resized);
+    return () => {
+      clear();
+      video.removeEventListener("waiting", stalled);
+      video.removeEventListener("playing", clear);
+      video.removeEventListener("canplaythrough", clear);
+      video.removeEventListener("pause", clear);
+      video.removeEventListener("emptied", clear);
+      video.removeEventListener("resize", resized);
+    };
+  }, [playbackUrl]);
+
+  /** Try again, on a press: re-ask for the grant and reload the source. */
+  const tryAgain = () => {
+    setUnplayable(null);
+    retry();
+    const video = videoRef.current;
+    if (video !== null && playbackUrl !== null && !failed) {
+      video.load();
+      if (meantToPlay) void video.play().catch(() => undefined);
+    }
+  };
+
   const startPlaying = () => {
     const video = videoRef.current;
     if (!requested) {
@@ -373,11 +481,25 @@ export function PitchPlayer({
   if (variant === "stage") {
     // The stage is portrait; a landscape pitch is letterboxed, not cropped.
     const [w = 9, h = 16] = frame.aspectRatio.split("/").map(Number);
+    const captions = pitch.captionState === "AVAILABLE";
+    const problem: "OFFLINE" | "FAILED" | "UNPLAYABLE" | null =
+      policy !== "ACTIVE"
+        ? null
+        : offline && !playing
+          ? "OFFLINE"
+          : failed
+            ? "FAILED"
+            : cannotPlay
+              ? "UNPLAYABLE"
+              : null;
+    const explicitPlay =
+      intent.requiresExplicitPlay && !playing && problem === null;
     return (
       <div
         className="cq-feed-player"
         data-pitch-frame
         data-orientation={w > h ? "landscape" : "portrait"}
+        data-problem={problem ?? undefined}
       >
         <video
           ref={videoRef}
@@ -399,58 +521,142 @@ export function PitchPlayer({
           data-playing={playing ? "true" : "false"}
           onPlay={onPlay}
           onPause={() => setPlaying(false)}
-        />
-        {intent.attach || failed || cannotPlay ? (
+        >
+          {/* Captions, same-origin (see the inline player), only once a
+              source is attached so a cold card fetches nothing. */}
+          {captions && playbackUrl !== null ? (
+            <track
+              kind="captions"
+              srcLang="en"
+              label="English (generated)"
+              src={`/api/pitch-captions/${company.companyId}/${pitch.mediaAssetId}`}
+              default={stageCaptionsOn}
+            />
+          ) : null}
+        </video>
+
+        {/* Sound belongs to the card on screen only: a preloaded card
+            offering its own Unmute read as "Unmute Unmute". */}
+        {intent.attach && policy === "ACTIVE" && problem === null ? (
           <div className="cq-feed-player-controls">
-            {intent.requiresExplicitPlay && !playing && !cannotPlay ? (
-              <button
-                type="button"
-                className="cq-stage-control"
-                onClick={() => {
-                  void videoRef.current?.play().catch(() => undefined);
-                }}
-                disabled={playbackUrl === null}
-              >
-                Play
-              </button>
-            ) : null}
-            {/* Sound belongs to the card on screen only: a preloaded card
-                offering its own Unmute read as "Unmute Unmute". */}
-            {intent.attach && policy === "ACTIVE" && !cannotPlay ? (
-              <button
-                type="button"
-                className="cq-stage-control"
-                aria-pressed={!silent}
-                aria-label={silent ? "Unmute" : "Mute"}
-                onClick={toggleSound}
-                data-sound-toggle
-              >
-                {silent ? (
-                  <VolumeX
-                    aria-hidden="true"
-                    size={ICON_SIZE.regular}
-                    strokeWidth={ICON_STROKE}
-                  />
-                ) : (
-                  <Volume2
-                    aria-hidden="true"
-                    size={ICON_SIZE.regular}
-                    strokeWidth={ICON_STROKE}
-                  />
-                )}
-              </button>
-            ) : null}
-            {failed ? (
-              <span className="cq-caption cq-feed-player-note">
-                This pitch couldn&apos;t load right now. Try again in a moment.
-              </span>
-            ) : cannotPlay ? (
-              <span className="cq-caption cq-feed-player-note" role="status">
-                {CANNOT_PLAY}
+            <button
+              type="button"
+              className="cq-feed-sound"
+              aria-pressed={!silent}
+              aria-label={silent ? "Unmute" : "Mute"}
+              onClick={toggleSound}
+              data-sound-toggle
+            >
+              {silent ? (
+                <VolumeX
+                  aria-hidden="true"
+                  size={ICON_SIZE.prominent}
+                  strokeWidth={ICON_STROKE}
+                />
+              ) : (
+                <Volume2
+                  aria-hidden="true"
+                  size={ICON_SIZE.prominent}
+                  strokeWidth={ICON_STROKE}
+                />
+              )}
+            </button>
+            {lowQuality && playing ? (
+              <span className="cq-feed-quality" data-low-quality>
+                <Signal
+                  aria-hidden="true"
+                  size={ICON_SIZE.compact}
+                  strokeWidth={ICON_STROKE}
+                />
+                Slow connection · lower quality
               </span>
             ) : null}
           </div>
         ) : null}
+
+        {buffering && meantToPlay && problem === null ? (
+          <span
+            className="cq-feed-buffering"
+            role="status"
+            aria-label="The pitch is loading"
+            data-buffering
+          >
+            <span className="cq-feed-ring" aria-hidden="true" />
+          </span>
+        ) : null}
+
+        {explicitPlay ? (
+          /*
+            Reduced motion keeps the video and removes the surprise: the
+            poster and an explicit Play with a word on it (ADR-001), sound
+            off until the person turns it on.
+          */
+          <div className="cq-feed-center" data-explicit-play>
+            <button
+              type="button"
+              className="cq-feed-play"
+              onClick={() => {
+                void videoRef.current?.play().catch(() => undefined);
+              }}
+              disabled={playbackUrl === null}
+            >
+              <Play
+                aria-hidden="true"
+                size={ICON_SIZE.regular}
+                strokeWidth={ICON_STROKE}
+                fill="currentColor"
+              />
+              Play pitch
+            </button>
+            {silent ? (
+              <span className="cq-feed-center-note">
+                Sound stays off until you turn it on
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {problem === null ? null : (
+          <div className="cq-feed-center cq-feed-problem" role="status">
+            {problem === "OFFLINE" ? (
+              <WifiOff
+                aria-hidden="true"
+                size={ICON_SIZE.prominent}
+                strokeWidth={ICON_STROKE}
+              />
+            ) : null}
+            <p className="cq-feed-problem-title">
+              {problem === "OFFLINE"
+                ? "No connection"
+                : problem === "FAILED"
+                  ? "This pitch couldn't load"
+                  : "This pitch can't play here"}
+            </p>
+            <p className="cq-feed-center-note">
+              {problem === "OFFLINE"
+                ? "The pitch picks up where it stopped once you're back online. Saves and passes are kept."
+                : problem === "FAILED"
+                  ? "Check your connection, then try again. The company's profile is still one tap away."
+                  : CANNOT_PLAY}
+            </p>
+            {problem === "UNPLAYABLE" ? null : (
+              <button
+                type="button"
+                className="cq-feed-play"
+                onClick={tryAgain}
+                disabled={offline}
+                data-pitch-retry
+              >
+                <RotateCw
+                  aria-hidden="true"
+                  size={ICON_SIZE.regular}
+                  strokeWidth={ICON_STROKE}
+                />
+                Try again
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   }

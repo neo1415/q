@@ -106,7 +106,7 @@ describe("Your companies feed", () => {
     expect(yourCompaniesPolicy(0, 1)).toBe("NONE");
   });
 
-  it("shows Nixo with its pitch and label, and a company that has not shared its pitch as 'Pitch not shared' with its profile", () => {
+  it("shows Nixo with its pitch and label, and a company without a pitch it can show as 'No pitch to show yet' with its profile (unknown stays unknown)", () => {
     act(() => setDiscoverTab("YOURS"));
     render(
       <YourCompaniesFeed
@@ -125,7 +125,9 @@ describe("Your companies feed", () => {
     );
     expect(screen.getByTestId(`player-${NIXO}`).dataset["hold"]).toBe("false");
     const kazikit = screen.getByRole("article", { name: "Kazikit" });
-    expect(kazikit.textContent).toContain("Pitch not shared");
+    expect(kazikit.textContent).toContain("No pitch to show yet");
+    // Never claimed as withheld: the API cannot say a pitch exists.
+    expect(kazikit.textContent).not.toContain("not shared");
     expect(kazikit.querySelector("[data-testid^='player-']")).toBeNull();
     expect(
       kazikit

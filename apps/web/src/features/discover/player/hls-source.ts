@@ -88,6 +88,29 @@ export function setStreamWarmth(
  * destroys it — which is what actually cancels the segment fetches it
  * started (doc 20 §236's preload abort).
  */
+/**
+ * The link's own estimate of its speed (Network Information API `downlink`,
+ * Mbit/s), discounted and bounded, as hls.js's starting bandwidth guess.
+ * Absent on Safari and Firefox, where hls.js keeps its own default; a hint
+ * only, never a decision (doc 20 §52).
+ */
+export function startingBandwidthEstimate(): number | null {
+  if (typeof navigator === "undefined") return null;
+  const link: unknown = Reflect.get(navigator, "connection");
+  if (typeof link !== "object" || link === null) return null;
+  const downlink: unknown = Reflect.get(link, "downlink");
+  if (
+    typeof downlink !== "number" ||
+    !Number.isFinite(downlink) ||
+    downlink <= 0
+  ) {
+    return null;
+  }
+  return Math.round(
+    Math.min(10_000_000, Math.max(300_000, downlink * 1_000_000 * 0.8)),
+  );
+}
+
 export const attachHlsOrNativeSource: AttachSource = (video, url) => {
   if (!looksLikeHls(url) || playsHlsNatively(video)) {
     video.src = url;
@@ -111,6 +134,7 @@ export const attachHlsOrNativeSource: AttachSource = (video, url) => {
         return;
       }
       const warmth = wanted.get(video) ?? "warm";
+      const estimate = startingBandwidthEstimate();
       const engine = new Hls({
         // A pitch is about 60 seconds and the preload budget is the
         // controller's: see BUFFER_SECONDS.
@@ -122,6 +146,9 @@ export const attachHlsOrNativeSource: AttachSource = (video, url) => {
         // The stage is the size of the viewport; a rendition larger than
         // the element is bytes nobody sees.
         capLevelToPlayerSize: true,
+        // The first rung is chosen from this estimate before a single
+        // segment has been measured; afterwards ABR measures for itself.
+        ...(estimate === null ? {} : { abrEwmaDefaultEstimate: estimate }),
       });
       engines.set(video, engine.config);
       // A fatal engine error (a codec this browser cannot decode, a

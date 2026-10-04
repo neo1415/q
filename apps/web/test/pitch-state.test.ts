@@ -39,6 +39,7 @@ function pitch(overrides: Partial<MediaAssetDto> = {}): MediaAssetDto {
     moderationStatus: "NOT_REVIEWED",
     title: null,
     audience: "INVESTORS",
+    downloadable: false,
     live: true,
     replacesMediaAssetId: null,
     createdAt: "2026-09-23T09:00:00.000Z",

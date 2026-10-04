@@ -84,6 +84,7 @@ export function PitchDetails({
     readonly text: string;
   } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [savingDownloads, setSavingDownloads] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const trimmed = title.trim();
@@ -108,6 +109,40 @@ export function PitchDetails({
       return;
     }
     setNotice({ tone: "info", text: "Saved." });
+    setSaved(result.value);
+    onSaved(result.value);
+  };
+
+  /*
+   * ADR 0047: the founder's own switch, saved the moment it is flipped, on
+   * the record as it stands (never the title or audience being edited
+   * above). Q can flip it too, from anywhere, as a card the founder
+   * approves.
+   */
+  const setDownloads = async (next: boolean) => {
+    setSavingDownloads(true);
+    setNotice(null);
+    const result = await setPitchDetailsAction(
+      companyId,
+      pitch.mediaAssetId,
+      {
+        title: record.title,
+        audience: record.audience,
+        downloadable: next,
+      },
+      record.version,
+    );
+    setSavingDownloads(false);
+    if (!result.ok) {
+      setNotice({ tone: "warning", text: result.message });
+      return;
+    }
+    setNotice({
+      tone: "info",
+      text: next
+        ? "Investors who can watch it can now download it."
+        : "Watch-only now: investors can watch it, not download it.",
+    });
     setSaved(result.value);
     onSaved(result.value);
   };
@@ -157,6 +192,42 @@ export function PitchDetails({
           )
         }
       />
+      <div className="flex items-center gap-4 border-t border-(--cq-border-subtle) pt-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span
+            className="cq-body font-medium text-(--cq-text-primary)"
+            id={`${id}-downloads`}
+          >
+            Let investors download my pitch
+          </span>
+          <span
+            className="cq-body-sm text-(--cq-text-secondary)"
+            id={`${id}-downloads-help`}
+          >
+            {record.downloadable
+              ? "On: investors who can watch it can save a copy from the video's options. Copies already saved can't be recalled."
+              : "Off: investors can watch it, but can't save a copy."}{" "}
+            You can change this any time, here or by asking Q.
+          </span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={record.downloadable}
+          aria-labelledby={`${id}-downloads`}
+          aria-describedby={`${id}-downloads-help`}
+          disabled={savingDownloads}
+          onClick={() => void setDownloads(!record.downloadable)}
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
+          data-pitch-downloadable
+        >
+          <span
+            aria-hidden="true"
+            className="cq-switch"
+            data-on={record.downloadable ? "" : undefined}
+          />
+        </button>
+      </div>
       {notice === null ? null : (
         <InlineNotice tone={notice.tone}>{notice.text}</InlineNotice>
       )}

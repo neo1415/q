@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -79,6 +80,12 @@ export type PitchPlayback = {
   readonly isAuthorizing: boolean;
   /** The authorization was refused or failed; the card shows a poster-less still. */
   readonly failed: boolean;
+  /**
+   * The person asked to try again (offline, a failed load): forget the
+   * refusal and the attempt budget for this asset and ask once more. Only
+   * ever on a press; there is still no silent retry loop.
+   */
+  readonly retry: () => void;
 };
 
 export function usePitchPlayback(
@@ -243,6 +250,12 @@ export function usePitchPlayback(
 
   const fresh = isPlaybackUsable(authorization, now());
 
+  const retry = useCallback(() => {
+    attemptsRef.current = { mediaAssetId, count: 0 };
+    setRefused(null);
+    setHeld(null);
+  }, [mediaAssetId]);
+
   return {
     intent,
     posterUrl: fresh ? (authorization?.posterUrl ?? null) : null,
@@ -250,6 +263,7 @@ export function usePitchPlayback(
       fresh && intent.attach ? (authorization?.playbackUrl ?? null) : null,
     isAuthorizing,
     failed,
+    retry,
   };
 }
 

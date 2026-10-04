@@ -34,6 +34,7 @@ function video(overrides: Partial<MediaAssetDto>): MediaAssetDto {
     moderationStatus: "ALLOWED",
     title: null,
     audience: "INVESTORS",
+    downloadable: false,
     live: true,
     replacesMediaAssetId: null,
     createdAt: "2026-09-20T09:00:00.000Z",
