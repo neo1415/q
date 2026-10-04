@@ -1,6 +1,7 @@
 -- 20261203090000 · DUPLEX: full-duplex voice usage in the Model Gateway
 -- ledger. VOICE_REALTIME joins the closed purpose set, the realtime model
--- is in the catalog (public-only, like its provider), and the daily cap's
+-- is in the catalog (CONFIDENTIAL since 20261203100000, the reviewed
+-- provider's standing), and the daily cap's
 -- sum has its own index. Nothing about who may read the ledger changes.
 --
 -- EXPECTED DB BEHAVIOUR: the privileged server role writes ledger rows.
@@ -17,8 +18,8 @@ select plan(9);
 
 select is((select model_type from ai_ops.models where model_code = 'gpt-realtime-mini'), 'REALTIME',
   'the realtime model is catalogued as REALTIME');
-select is((select sensitivity_ceiling from ai_ops.models where model_code = 'gpt-realtime-mini'), 'PUBLIC',
-  'the realtime model is public-only, like its unreviewed provider');
+select is((select sensitivity_ceiling from ai_ops.models where model_code = 'gpt-realtime-mini'), 'CONFIDENTIAL',
+  'the realtime model carries the reviewed provider''s ceiling (founder approval, 20261203100000)');
 select is((select output_per_million::text from ai_ops.model_prices where model_id = 'a2000000-0000-4000-8000-000000000022'), '2.400000',
   'the realtime model has a text price snapshot');
 
