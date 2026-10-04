@@ -24,4 +24,15 @@ describe("the line an app action tool returns", () => {
     expect(appActionLineOf({ saved: true })).toBeNull();
     expect(appActionLineOf(null)).toBeNull();
   });
+
+  it("says a call blocked on the organiser's calendar in Capital Q's words, so no generic could-not line follows (meetfix-57)", () => {
+    const says =
+      "Your Google Calendar connection expired, so I can't create the Meet link.";
+    expect(appActionLineOf({ status: "CALENDAR_REVOKED", says })).toBe(says);
+    expect(appActionLineOf({ status: "CALENDAR_NOT_CONNECTED", says })).toBe(
+      says,
+    );
+    expect(appActionLineOf({ status: "CALENDAR_REVOKED" })).toBeNull();
+    expect(appActionLineOf({ status: "NOT_CONNECTED", says })).toBeNull();
+  });
 });

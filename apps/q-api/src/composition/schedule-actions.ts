@@ -485,6 +485,8 @@ export function createScheduleIntelligencePort(
     timeZoneOf: (actor) => schedule.timeZoneOf(actor),
     canSchedule: (actor, relationshipId) =>
       schedule.canSchedule(actor, relationshipId),
+    counterpartCanHost: (actor, relationshipId) =>
+      schedule.counterpartCanHost(actor, relationshipId),
     brief: async (actor, meetingId) =>
       (await schedule.brief(actor, meetingId))?.body ?? null,
   };

@@ -36,6 +36,12 @@ export const GoogleConnectionStatusSchema = z.enum([
   "UNAVAILABLE",
   "NOT_CONNECTED",
   "CONNECTED",
+  /**
+   * meetfix-57: Google ended the grant (a revoked or expired refresh
+   * token -- testing-mode tokens lapse after 7 days). Not the same as never
+   * connected: the person reconnects, and Q says so.
+   */
+  "REVOKED",
 ]);
 export type GoogleConnectionStatus = z.infer<
   typeof GoogleConnectionStatusSchema
@@ -48,9 +54,58 @@ export const GoogleConnectionDtoSchema = z
     connectedAt: UtcTimestampSchema.optional(),
     /** Whether replies arrive by push; polling runs either way. */
     replyTracking: z.enum(["PUSH_AND_POLL", "POLL"]).optional(),
+    /** REVOKED only: when Google ended it. */
+    revokedAt: UtcTimestampSchema.optional(),
   })
   .strict();
 export type GoogleConnectionDto = z.infer<typeof GoogleConnectionDtoSchema>;
+
+/**
+ * meetfix-57: the one in-app link that reconnects Google. Settings opens
+ * on Connections and, when Google is not connected, starts the reconnect
+ * itself, so a notice or Q's answer is one tap from fixed.
+ */
+export const GOOGLE_RECONNECT_PATH =
+  "/settings?reconnect=google#connections" as const;
+
+/**
+ * Why a call can't be booked on the organiser's calendar, typed: never a
+ * generic "can't". REVOKED is a connection Google ended; NOT_CONNECTED is
+ * one that never existed (or lacks calendar access).
+ */
+export const CALENDAR_BLOCK_REASONS = [
+  "CALENDAR_NOT_CONNECTED",
+  "CALENDAR_REVOKED",
+] as const;
+export type CalendarBlockReason = (typeof CALENDAR_BLOCK_REASONS)[number];
+
+export function isCalendarBlock(code: unknown): code is CalendarBlockReason {
+  return code === "CALENDAR_NOT_CONNECTED" || code === "CALENDAR_REVOKED";
+}
+
+/**
+ * What Q says when a call can't be booked for that reason: the reason and
+ * the fix in one line, with the reconnect link, then the one alternative
+ * that works -- the other side hosts when their calendar is connected,
+ * otherwise a pasted Meet link Q sets up and joins. Every surface (Q's
+ * answer, the errand and work notices) says these same words.
+ */
+export function calendarBlockedLine(input: {
+  readonly reason: CalendarBlockReason;
+  /** The other side's name, when the alternative is theirs to host. */
+  readonly counterpartName?: string | undefined;
+  readonly counterpartCanHost: boolean;
+}): string {
+  const fix =
+    input.reason === "CALENDAR_REVOKED"
+      ? `Your Google Calendar connection expired, so I can't create the Meet link. [Reconnect it in Settings → Connections](${GOOGLE_RECONNECT_PATH}) (one tap) and I'll book it.`
+      : `Your Google Calendar isn't connected, so I can't create the Meet link. [Connect it in Settings → Connections](${GOOGLE_RECONNECT_PATH}) (one tap) and I'll book it.`;
+  const other =
+    input.counterpartCanHost && input.counterpartName !== undefined
+      ? `Or ${input.counterpartName} can host: their Google Calendar is connected, so I can ask them to send the invite.`
+      : "Or paste a Meet link and I'll set it up and join.";
+  return `${fix}\n${other}`;
+}
 
 /** `POST /v1/integrations/google/connect` body: where to come back to. */
 export const StartGoogleConnectRequestSchema = z

@@ -133,6 +133,8 @@ export function composeSchedule(options: {
   readonly transactions: TransactionManager;
   readonly interests: Pick<InterestService, "relationshipById">;
   readonly calendars: CalendarDirectory;
+  /** meetfix-57: why a calendar is missing (revoked vs never connected). */
+  readonly calendarState?: ScheduleServiceDependencies["calendarState"];
   readonly email: AppEmailPort;
   /** DOCS: the web origin, for links in reminder emails. */
   readonly appOrigin?: string | null | undefined;
@@ -149,6 +151,7 @@ export function composeSchedule(options: {
     parties: createNetworkChatParties(options.interests),
     directory: createPostgresMeetingDirectory({ sql: options.sql }),
     calendars: options.calendars,
+    calendarState: options.calendarState,
     activity: createNetworkMeetingActivityWriter(),
     email: options.email,
     appOrigin: options.appOrigin ?? null,

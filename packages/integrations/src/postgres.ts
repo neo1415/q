@@ -193,6 +193,21 @@ export function createPostgresIntegrationsStore(options: {
           from integrations.google_accounts
           where user_id = ${userId} and status = 'CONNECTED' limit 1`,
       )[0] ?? null,
+    latestStatus: async (userId) => {
+      const rows = await sql<
+        {
+          status: GoogleAccountRecord["status"];
+          disconnected_at: Date | null;
+        }[]
+      >`select status, disconnected_at from integrations.google_accounts
+          where user_id = ${userId}
+          order by (status = 'CONNECTED') desc, connected_at desc
+          limit 1`;
+      const row = rows[0];
+      return row === undefined
+        ? null
+        : { status: row.status, endedAt: row.disconnected_at };
+    },
     findConnectedById: async (accountId) =>
       accounts(
         await sql<AccountRow[]>`select ${sql([...ACCOUNT_COLUMNS])}

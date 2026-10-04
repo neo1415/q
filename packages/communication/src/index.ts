@@ -62,6 +62,7 @@ export {
   JOINED_CALL_MINUTES,
   type AppEmailPort,
   type CalendarDirectory,
+  type CalendarStateReader,
   type MeetingView,
   type OrganiserCalendar,
   type ReminderView,

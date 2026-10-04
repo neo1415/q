@@ -106,6 +106,14 @@ export type IntegrationsStore = {
   readonly findConnectedByUser: (
     userId: string,
   ) => Promise<GoogleAccountRecord | null>;
+  /**
+   * meetfix-57: the person's newest connection, live or ended, and when it
+   * ended -- so "Google ended it" reads apart from "never connected".
+   */
+  readonly latestStatus: (userId: string) => Promise<{
+    readonly status: GoogleAccountStatus;
+    readonly endedAt: Date | null;
+  } | null>;
   readonly findConnectedById: (
     accountId: string,
   ) => Promise<GoogleAccountRecord | null>;

@@ -6,6 +6,7 @@ import {
   parseMarkdown,
   plainFromMarkdown,
   QMarkdown,
+  inAppHref,
   safeHref,
 } from "../src/features/q/markdown";
 
@@ -46,6 +47,22 @@ describe("Q markdown safety", () => {
     expect(links[0]?.getAttribute("target")).toBe("_blank");
     expect(root.textContent).toContain("one two three four five");
     expect(root.innerHTML).not.toMatch(/javascript:|data:text/i);
+  });
+
+  it("keeps Capital Q's own reconnect link in the app, and no other relative path (meetfix-57)", () => {
+    const root = html(
+      "[Reconnect it in Settings → Connections](/settings?reconnect=google#connections) [nope](/settings?reconnect=evil) [admin](/admin)",
+    );
+    const links = [...root.querySelectorAll("a")];
+    expect(links).toHaveLength(1);
+    expect(links[0]?.getAttribute("href")).toBe(
+      "/settings?reconnect=google#connections",
+    );
+    expect(links[0]?.getAttribute("target")).toBeNull();
+    expect(inAppHref(" /settings?reconnect=google#connections ")).toBe(
+      "/settings?reconnect=google#connections",
+    );
+    expect(inAppHref("//evil.example")).toBeNull();
   });
 
   it("accepts only absolute http(s) URLs", () => {

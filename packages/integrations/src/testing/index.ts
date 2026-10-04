@@ -171,6 +171,7 @@ export function createInMemoryIntegrationsStore(): IntegrationsStore & {
     list[index] = next;
   };
   const live = (a: GoogleAccountRecord) => a.status === "CONNECTED";
+  const ended = new Map<string, Date>();
   return {
     accounts,
     emails,
@@ -218,6 +219,18 @@ export function createInMemoryIntegrationsStore(): IntegrationsStore & {
       Promise.resolve(
         accounts.find((a) => a.userId === userId && live(a)) ?? null,
       ),
+    latestStatus: (userId) => {
+      const mine = accounts.filter((a) => a.userId === userId);
+      const newest = mine.find(live) ?? mine.at(-1);
+      return Promise.resolve(
+        newest === undefined
+          ? null
+          : {
+              status: newest.status,
+              endedAt: live(newest) ? null : (ended.get(newest.id) ?? null),
+            },
+      );
+    },
     findConnectedById: (id) =>
       Promise.resolve(accounts.find((a) => a.id === id && live(a)) ?? null),
     findConnectedByEmail: (email) =>
@@ -233,6 +246,7 @@ export function createInMemoryIntegrationsStore(): IntegrationsStore & {
           refreshTokenCiphertext: null,
           watchExpiresAt: null,
         });
+        ended.set(a.id, new Date());
       }
       return Promise.resolve();
     },

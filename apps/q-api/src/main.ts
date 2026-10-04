@@ -1290,6 +1290,7 @@ const schedule = composeSchedule({
   transactions: database.transactions,
   interests: interestService,
   calendars: (userId) => integrations.calendarOf(userId),
+  calendarState: (userId) => integrations.calendarState(userId),
   email: unavailableAppEmailSender,
   logger,
   onJoinRequested: (meetingId) => {
