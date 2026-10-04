@@ -2016,6 +2016,25 @@ const qTools = createQTools({
           currentVersion: item.currentVersion,
           updatedAt: item.updatedAt,
         })),
+      // voiceq-63: what one of their documents says, read as the actor
+      // (the service refuses one that is not theirs).
+      read: async (actor, artifactId) => {
+        const detail = await qArtifacts.service
+          .read(actor, artifactId)
+          .catch(() => null);
+        const current = detail?.current;
+        if (detail === null || current === undefined) return null;
+        return {
+          title: current.title,
+          type: detail.artifact.type,
+          version: current.version,
+          sections: current.content.sections.map((section) => ({
+            heading: section.heading,
+            body: section.body,
+          })),
+          gaps: current.content.gaps,
+        };
+      },
     },
     // Revising one of their documents into a new version (founder
     // directive 2026-09-28). A closure: the artifact composition is built

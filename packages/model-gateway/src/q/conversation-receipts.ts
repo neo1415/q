@@ -194,6 +194,8 @@ const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
   VERIFICATION: "verification",
   ONBOARDING: "their setup",
   DAILY: "The Q Daily (today's edition)",
+  DOCUMENTS: "their documents",
+  WORK: "Q's work page (what Q is doing and what needs them)",
   OTHER: null,
 };
 
@@ -253,6 +255,11 @@ export function screenLines(
     ...(screen.documentId === undefined
       ? []
       : [`their document ${screen.documentId} open`]),
+    ...(screen.artifactId === undefined
+      ? []
+      : [
+          `the document Q made for them ${screen.artifactId}, open (its text is under ON THEIR SCREEN when it could be read; otherwise read it with read_my_document)`,
+        ]),
   ];
   return [
     `WHERE THEY ARE NOW (Capital Q, from their screen as they asked): ${

@@ -94,6 +94,7 @@ import { afterLeadLines, ownReadinessFact } from "./own-readiness.js";
 export type { QOwnIndex } from "./own-standing.js";
 export { readinessLeadLines } from "./own-readiness.js";
 import { onScreenCompanyFact } from "./company-fact.js";
+import { onScreenDocumentFact } from "./document-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
 import { companiesNamedIn, knownCompaniesOf } from "./named-companies.js";
@@ -1688,6 +1689,37 @@ export function createModelGatewayQAnswer(
       }
     })();
     /**
+     * The document Q made for them that is open on their screen, read for
+     * them (voiceq-63, founder live 2026-10-04: Q opened the prep PDF and
+     * could not read what it showed). Through read_my_document under the
+     * plan, as the asker; its words are their document's, data to read
+     * out or summarise, never instructions.
+     */
+    let onScreenDocument: AuthorisedFact | null = null;
+    let onScreenDocumentCall: QToolCallObservation | null = null;
+    const documentRead = (async (): Promise<void> => {
+      const artifactId = plan.screen?.artifactId;
+      if (artifactId === undefined || !prefetchTools.has("read_my_document")) {
+        return;
+      }
+      const call = {
+        callId: "q-on-screen-document",
+        name: "read_my_document",
+        arguments: { artifactId },
+      };
+      const outcome = await tools.execute(call, toolContext);
+      onScreenDocumentCall = {
+        toolName: outcome.toolName,
+        providerName: call.name,
+        status: outcome.status,
+        failureCode: outcome.failureCode,
+        latencyMs: outcome.latencyMs,
+      };
+      if (outcome.result.ok) {
+        onScreenDocument = onScreenDocumentFact(outcome.result.data);
+      }
+    })();
+    /**
      * Their day: now in their zone, calls and reminders for 7 days, what
      * waits for their approval, Q's work for them, their last rehearsals
      * (founder demo 2026-10-02). Own records only, through the tools the
@@ -1876,6 +1908,7 @@ export function createModelGatewayQAnswer(
       companyRead,
       namedRead,
       dailyRead,
+      documentRead,
       dayRead,
     ]);
     return {
@@ -1900,6 +1933,8 @@ export function createModelGatewayQAnswer(
       namedCompanyCalls,
       onScreenDaily,
       onScreenDailyCall,
+      onScreenDocument,
+      onScreenDocumentCall,
       ownDay,
       ownDayCalls,
       asked,
@@ -1990,6 +2025,8 @@ export function createModelGatewayQAnswer(
         namedCompanyCalls,
         onScreenDaily,
         onScreenDailyCall,
+        onScreenDocument,
+        onScreenDocumentCall,
         ownDay,
         ownDayCalls,
         ownStanding,
@@ -2108,6 +2145,7 @@ export function createModelGatewayQAnswer(
         ...(onScreenCompany === null ? [] : [onScreenCompany]),
         ...namedCompanies,
         ...(onScreenDaily === null ? [] : [onScreenDaily]),
+        ...(onScreenDocument === null ? [] : [onScreenDocument]),
         ...(ownDay === null ? [] : [ownDay]),
         ...(relationship === null ? [] : [relationship]),
         ...(ownStanding === null ? [] : [ownStanding]),
@@ -2630,6 +2668,9 @@ export function createModelGatewayQAnswer(
         toolCalls.push(onScreenCompanyCall);
       }
       toolCalls.push(...namedCompanyCalls);
+      if (onScreenDocumentCall !== null) {
+        toolCalls.push(onScreenDocumentCall);
+      }
       if (onScreenDailyCall !== null) {
         toolCalls.push(onScreenDailyCall);
       }

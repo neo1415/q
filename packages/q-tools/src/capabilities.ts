@@ -700,6 +700,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Lists the documents Q prepared for them (decks, briefs, one-pagers), newest first, with versions.",
   ),
   tool(
+    "read_my_document",
+    "DOCUMENT",
+    "Reads one of the documents Q prepared for them as its viewer shows it (title, version, the text), above all the one open on their screen.",
+  ),
+  tool(
     "revise_my_document",
     "DOCUMENT",
     "Edits a document Q prepared for them (a deck, brief, one-pager or mandate) with the changes they ask for, as a new version: the earlier version is kept and the new card has fresh PDF and PowerPoint downloads.",

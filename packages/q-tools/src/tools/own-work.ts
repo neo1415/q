@@ -32,6 +32,7 @@ import type {
 
 export const LIST_PENDING_APPROVALS = "approvals.pending.list" as const;
 export const LIST_MY_DOCUMENTS = "documents.own.list" as const;
+export const READ_MY_DOCUMENT = "documents.own.read" as const;
 export const REVISE_MY_DOCUMENT = "documents.own.revise" as const;
 
 /** A person, in their own Q conversation. */
@@ -198,6 +199,113 @@ export function createListMyDocumentsTool(
   });
 }
 
+// --- reading one of their documents (voiceq-63) ----------------------------
+
+/** What a turn can carry of one document: enough to read it out or summarise. */
+export const READ_MY_DOCUMENT_TEXT_MAX = 12_000;
+
+export const ReadMyDocumentInputSchema = z
+  .object({
+    artifactId: QArtifactIdSchema.describe(
+      "The document: the one open on their screen (named under WHERE THEY ARE NOW), on a document card in this conversation, or from list_my_documents.",
+    ),
+  })
+  .strict();
+export type ReadMyDocumentInput = z.infer<typeof ReadMyDocumentInputSchema>;
+
+export const ReadMyDocumentOutputSchema = z
+  .object({
+    status: z.enum(["FOUND", "NONE"]),
+    title: z.string().max(200).nullable(),
+    type: z.string().max(64).nullable(),
+    version: z.number().int().min(0).nullable(),
+    /** Its sections as written, headings first; cut at a sentence when long. */
+    text: z
+      .string()
+      .max(READ_MY_DOCUMENT_TEXT_MAX + 64)
+      .nullable(),
+    truncated: z.boolean(),
+    /** What Q could not establish when it wrote it: unknown stays unknown. */
+    gaps: z.array(z.string().max(300)).max(24),
+  })
+  .strict();
+export type ReadMyDocumentOutput = z.infer<typeof ReadMyDocumentOutputSchema>;
+
+/** A document's sections as one text a voice or a reader can follow. */
+export function documentText(
+  sections: readonly { readonly heading: string; readonly body: string }[],
+): { readonly text: string; readonly truncated: boolean } {
+  const whole = sections
+    .map((section) => `${section.heading}\n${section.body}`)
+    .join("\n\n");
+  if (whole.length <= READ_MY_DOCUMENT_TEXT_MAX) {
+    return { text: whole, truncated: false };
+  }
+  const cut = whole.slice(0, READ_MY_DOCUMENT_TEXT_MAX);
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("\n"));
+  return {
+    text: `${end > READ_MY_DOCUMENT_TEXT_MAX / 2 ? cut.slice(0, end + 1) : cut}…`,
+    truncated: true,
+  };
+}
+
+export function createReadMyDocumentTool(
+  documents: OwnDocumentsPort,
+): AnyQToolDefinition | null {
+  const read = documents.read;
+  if (read === undefined) return null;
+  return defineQTool<ReadMyDocumentInput, ReadMyDocumentOutput, null>({
+    ...OWN,
+    id: READ_MY_DOCUMENT,
+    supportedPurposes: [
+      "OWN_COMPANY_QUESTION",
+      "INVESTOR_QUESTION",
+      "ACTION_PREPARATION",
+      "GENERAL_QUESTION",
+    ],
+    providerName: "read_my_document",
+    description:
+      "Reads one of the documents Q prepared for them, as its viewer shows it: title, version and its sections' text. Call it when they ask what a document says, to read it out, or to summarise or check it, above all the one open on their screen. NONE: not one of theirs, or still being prepared.",
+    classification: "READ_ONLY",
+    riskClass: "SAFE_READ",
+    input: ReadMyDocumentInputSchema,
+    output: ReadMyDocumentOutputSchema,
+    authorize: (_input, { actor, plan }) =>
+      Promise.resolve(
+        ownConversation(actor, plan)
+          ? allow<null>("CONFIDENTIAL", null)
+          : deny<null>("NOT_AVAILABLE"),
+      ),
+    execute: async (input, context) => {
+      // Read as the actor: the artifact service refuses what is not theirs.
+      const found = await read(context.actor, input.artifactId).catch(
+        () => null,
+      );
+      if (found === null || found.sections.length === 0) {
+        return {
+          status: "NONE",
+          title: null,
+          type: null,
+          version: null,
+          text: null,
+          truncated: false,
+          gaps: [],
+        };
+      }
+      const { text, truncated } = documentText(found.sections);
+      return {
+        status: "FOUND",
+        title: found.title.slice(0, 200),
+        type: found.type.slice(0, 64),
+        version: found.version,
+        text,
+        truncated,
+        gaps: found.gaps.slice(0, 24).map((gap) => gap.slice(0, 300)),
+      };
+    },
+  });
+}
+
 // Save, Unsave, Pass and Undo pass are declared once in the app's action
 // registry (ADR 0040) and generated as Q tools (tools/app-actions.ts).
 
@@ -315,6 +423,11 @@ export function createOwnWorkTools(ports: {
     ...(ports.documents === undefined
       ? []
       : [createListMyDocumentsTool(ports.documents)]),
+    ...(ports.documents === undefined
+      ? []
+      : [createReadMyDocumentTool(ports.documents)].filter(
+          (tool): tool is AnyQToolDefinition => tool !== null,
+        )),
     ...(ports.documentRevision === undefined
       ? []
       : [createReviseMyDocumentTool(ports.documentRevision)]),

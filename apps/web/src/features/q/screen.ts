@@ -23,6 +23,9 @@ const EXACT: Readonly<Record<string, QScreenRoute>> = {
   "/pitch": "PITCH",
   "/verification": "VERIFICATION",
   "/daily": "DAILY",
+  // voiceq-63: their documents, and Q's work page.
+  "/documents": "DOCUMENTS",
+  "/work": "WORK",
 };
 
 const UUID =
@@ -63,6 +66,21 @@ export function setOpenDocument(documentId: string | null): void {
   openDocumentId =
     documentId !== null && UUID.test(documentId)
       ? documentId.toLowerCase()
+      : null;
+}
+
+/**
+ * The document open in the app's document viewer on this tab (the
+ * Documents page and the ready toast open it; voiceq-63: Q opened the prep
+ * PDF there and could not read it). This tab only: never another tab or
+ * app. Set by the viewer; Q's own viewer above wins while it is open.
+ */
+let viewerDocumentId: string | null = null;
+
+export function setViewerDocument(artifactId: string | null): void {
+  viewerDocumentId =
+    artifactId !== null && UUID.test(artifactId)
+      ? artifactId.toLowerCase()
       : null;
 }
 
@@ -111,9 +129,10 @@ export function currentScreen(
   }
   const zone = deviceTimeZone();
   if (zone !== undefined) screen = { ...screen, timeZone: zone };
-  return openDocumentId === null || screen.documentId !== undefined
-    ? screen
-    : { ...screen, documentId: openDocumentId };
+  // What Q's viewers show are documents Q made for them (artifacts): they
+  // ride as artifactId, read on the server through read_my_document.
+  const open = openDocumentId ?? viewerDocumentId;
+  return open === null ? screen : { ...screen, artifactId: open };
 }
 
 const ZONE = /^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/;

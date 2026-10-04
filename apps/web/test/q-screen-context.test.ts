@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   QScreenContextSchema,
@@ -9,7 +9,9 @@ import {
   currentScreen,
   currentViewing,
   screenOf,
+  setOpenDocument,
   setScreenFocusSource,
+  setViewerDocument,
 } from "../src/features/q/screen";
 
 /** The device's zone travels with every screen (live 2026-09-28 #2). */
@@ -129,5 +131,41 @@ describe("the card on screen in Discover", () => {
       setScreenFocusSource(null);
     }
     expect(currentScreen("/discover")).toEqual({ route: "DISCOVER", ...here });
+  });
+});
+
+/**
+ * voiceq-63 (founder, live 2026-10-04): Q opened the prep PDF in the
+ * document viewer, then could not say what it said. What a viewer on this
+ * tab shows is on screen: the Documents and Work pages by name, and the
+ * open document Q made for them as artifactId (read on the server, as the
+ * asker, through read_my_document).
+ */
+describe("the document open on this tab", () => {
+  const DOC = "e0000000-0000-4000-8000-000000000001";
+  afterEach(() => {
+    setViewerDocument(null);
+    setOpenDocument(null);
+  });
+
+  it("names the Documents and Work pages", () => {
+    expect(screenOf("/documents")).toEqual({ route: "DOCUMENTS" });
+    expect(screenOf("/work")).toEqual({ route: "WORK" });
+  });
+
+  it("carries the viewer's document as artifactId, within the contract", () => {
+    setViewerDocument(DOC);
+    const screen = currentScreen("/documents");
+    expect(screen).toMatchObject({ route: "DOCUMENTS", artifactId: DOC });
+    expect(QScreenContextSchema.safeParse(screen).success).toBe(true);
+    setViewerDocument(null);
+    expect(currentScreen("/documents").artifactId).toBeUndefined();
+  });
+
+  it("Q's own viewer wins while it is open", () => {
+    const Q_DOC = "e0000000-0000-4000-8000-000000000002";
+    setViewerDocument(DOC);
+    setOpenDocument(Q_DOC);
+    expect(currentScreen("/home").artifactId).toBe(Q_DOC);
   });
 });

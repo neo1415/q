@@ -583,7 +583,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/q-artifacts.ts GET Q_ARTIFACTS_PATH": cap(
     "tool.list_my_documents",
   ),
-  "q-api/http/q-artifacts.ts GET artifactPath": cap("tool.list_my_documents"),
+  // voiceq-63: one document as its viewer shows it.
+  "q-api/http/q-artifacts.ts GET artifactPath": cap("tool.read_my_document"),
   "q-api/http/q-artifacts.ts GET `${artifactPath}${Q_ARTIFACT_SLIDES_SUFFIX}`":
     DOWNLOAD,
   "q-api/http/q-artifacts.ts GET `${artifactPath}${Q_ARTIFACT_EXPORT_SUFFIX}/:format`":

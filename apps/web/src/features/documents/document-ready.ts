@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 
+import { setViewerDocument } from "../q/screen";
+
 /**
  * Documents that just became ready, for the one toast owner on every page
  * (DOCS spec §3 F2).
@@ -94,6 +96,8 @@ let viewing: string | null = null;
 /** Open a document in the one viewer the centre owns, from any page. */
 export function openDocumentViewer(artifactId: string | null): void {
   viewing = artifactId;
+  // What the viewer shows is on screen for Q too (voiceq-63).
+  setViewerDocument(artifactId);
   emit();
 }
 
@@ -111,6 +115,7 @@ export function resetReadyDocuments(): void {
   announced.clear();
   watchUntil = 0;
   viewing = null;
+  setViewerDocument(null);
   emit();
 }
 
