@@ -362,7 +362,10 @@ const JOIN = defineAppAction<
       'Use when the person asks Q to join a call that is happening now ("Q, join this call: https://meet.google.com/abc-defg-hij"). Sends Q into that Google Meet as "Q (Capital Q notes)" to keep the record for both sides, at once: their word is the click. Google Meet links only. Name who the call is with as they said it; if they did not say, ask.',
     input: JoinTool,
     references: { relationship: "RELATIONSHIP" },
-    purposes: ["ACTION_PREPARATION", "GENERAL_QUESTION"],
+    // The unfocused ACTION_PREPARATION offer is full (MODEL_TOOLS_MAX); the
+    // turn reader names it from its action list ("have Q join a call"),
+    // and a named declared tool is eligible on any purpose.
+    purposes: ["GENERAL_QUESTION"],
     eval: {
       say: [
         "Q, join my call with {name}: https://meet.google.com/abc-defg-hij",
