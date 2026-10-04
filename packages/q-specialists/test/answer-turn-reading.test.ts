@@ -843,6 +843,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
         visibilityChange: false,
         offers: [
           expect.objectContaining({ destination: "SETTINGS" }),
+          // Their Q email address: copy it, or get a new one (inbound email).
+          expect.objectContaining({ destination: "SETTINGS" }),
           // Profile photo and cover (cropped on the profile).
           expect.objectContaining({ destination: "PROFILE" }),
           expect.objectContaining({ destination: "HOME" }),
