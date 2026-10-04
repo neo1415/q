@@ -6,6 +6,7 @@ import {
   type SpeechReaction,
   type SpeechTone,
 } from "../speech-performance.js";
+import { withoutStageDirections } from "../speech.js";
 
 /**
  * What each voice can actually do with a delivery cue, and how it is asked
@@ -183,11 +184,26 @@ const BRACKET_TAG = /\s*\[[a-z]+(?: [a-z]+){0,2}\]\s*/g;
 const BREAK_TAG = /\s*<break\b[^>]*\/?>\s*/gi;
 
 export function withoutMarkup(text: string): string {
-  return text
+  return withoutStageDirections(text)
     .replace(BRACKET_TAG, " ")
     .replace(BREAK_TAG, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
+}
+
+/**
+ * A laugh written as a word at the start of a sentence ("Ha!", "Haha.",
+ * "Jajaja,"). voiceq-63 (founder, live 2026-10-04): "when I start to laugh
+ * it does something like 'ha'": the cue put `[laughs]` before the written
+ * "Ha!", so v3 laughed and then read "Ha" out, and a voice without
+ * reactions read it alone. The written laugh is never spoken: the reaction
+ * tag is the laugh, and a voice that cannot laugh does not.
+ */
+const WRITTEN_LAUGH_START =
+  /^\s*(?:hah?|(?:ha|he|hi|ja)(?:[\s-]?(?:ha|he|hi|ja))+|lol|lmao)\s*[!.,\u2026]+\s*/iu;
+
+export function withoutWrittenLaugh(text: string): string {
+  return text.replace(WRITTEN_LAUGH_START, "");
 }
 
 export type RenderedSpeech = {
@@ -220,7 +236,7 @@ export function renderSpeech(
   performances: readonly SentencePerformance[],
   markup: SpeechMarkup,
 ): RenderedSpeech {
-  const clean = withoutMarkup(text);
+  const clean = withoutWrittenLaugh(withoutMarkup(text));
   const can = markup.capabilities;
   const rendered = new Set<RenderedSpeech["rendered"][number]>();
   const insertions: Insertion[] = [];
@@ -229,14 +245,17 @@ export function renderSpeech(
   let stability: number | undefined;
 
   for (const p of performances) {
-    const at = body.indexOf(p.sentence);
-    const whole = at !== -1;
+    // Anchored on the words that are spoken: a written laugh at its start
+    // is not one of them.
+    const said = withoutWrittenLaugh(p.sentence);
+    const at = said.length === 0 ? -1 : body.indexOf(said);
+    const whole = at !== -1 || (said.length === 0 && body.length === 0);
     // A piece of a sentence: the reaction belongs to its start and the
     // pause to its end, so each goes only where this piece is that part.
     const pieceKey = sentenceKey(body);
-    const sentence = sentenceKey(p.sentence);
-    const start = whole ? at : 0;
-    const end = whole ? at + p.sentence.length : body.length;
+    const sentence = sentenceKey(said);
+    const start = at === -1 ? 0 : at;
+    const end = at === -1 ? body.length : at + said.length;
     const isStart = whole || sentence.startsWith(pieceKey);
     const isEnd = whole || sentence.endsWith(pieceKey);
 
@@ -302,8 +321,11 @@ export function renderSpeech(
       insertion.text +
       body.slice(insertion.at + (insertion.remove ?? 0));
   }
+  // Nothing left but the laugh: the tag alone where it renders, else a
+  // beat of silence, never the word.
+  const spoken = body.trim();
   return {
-    text: body.trim(),
+    text: spoken.length === 0 ? "\u2026" : spoken,
     speed,
     ...(stability === undefined ? {} : { stability }),
     rendered: [...rendered],

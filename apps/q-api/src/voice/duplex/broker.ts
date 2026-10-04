@@ -23,6 +23,8 @@ import type { ActorContext } from "@capital-q/security";
 
 import type { VoiceSessionBinding } from "../bindings.js";
 import type { VoiceSpeaker } from "../provider.js";
+import { withoutWrittenLaugh } from "../providers/speech-markup.js";
+import { sentences, withoutStageDirections } from "../speech.js";
 import { APPROVAL_QUESTION, type VoiceTurnHandler } from "../turn.js";
 import type { DuplexConfig } from "./config.js";
 import {
@@ -75,6 +77,29 @@ export const DUPLEX_CAP_NOTICE =
 /** How long past its limits a line may still report before it is gone. */
 const GRACE_MS = 60_000;
 const ASK_Q_MAX_CHARS = 2_000;
+
+/**
+ * voiceq-63 (founder, live 2026-10-04): "when I laugh it does something
+ * like 'ha', or it says 'chuckles'". The realtime model says the text it is
+ * given, so a laugh written into Q's answer ("Ha!") or a stage direction
+ * reached the person as a word. What it is told to say carries neither;
+ * the amusement travels as a delivery note it voices and never says.
+ */
+const AMUSED_DELIVERY =
+  "amused: let a light, natural laugh into your voice before the words; never say a laugh word or describe it";
+
+export function forRealtime(said: string): {
+  readonly say: string;
+  readonly amused: boolean;
+} {
+  let amused = false;
+  const parts = sentences(withoutStageDirections(said)).flatMap((sentence) => {
+    const rest = withoutWrittenLaugh(sentence);
+    if (rest !== sentence) amused = true;
+    return rest.length === 0 ? [] : [rest];
+  });
+  return { say: parts.join(" "), amused };
+}
 const SPOKEN_MAX = 6_000;
 
 export type DuplexFallbackReason =
@@ -338,6 +363,7 @@ export function createDuplexBroker(
         voice: binding.voice,
         maxOutputTokens: config.maxOutputTokens,
         secretTtlSeconds: config.secretTtlSeconds,
+        speechSpeed: config.speechSpeed,
         ...(listens
           ? {
               transcribeInput: true,
@@ -419,8 +445,11 @@ export function createDuplexBroker(
           if (outcome.kind === "INTERRUPTED" || abort.aborted) {
             return output({ ok: false, interrupted: true });
           }
+          const { say, amused } = forRealtime(said);
           return output(
-            { ok: true, say: said },
+            amused
+              ? { ok: true, say, delivery: AMUSED_DELIVERY }
+              : { ok: true, say },
             said.endsWith(APPROVAL_QUESTION),
           );
         } catch (error: unknown) {

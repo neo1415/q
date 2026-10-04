@@ -286,6 +286,37 @@ describe("openai realtime adapter", () => {
     // Without listening behaviour: the eager detector and no transcriber.
     expect(JSON.stringify(body.session)).toContain('"eagerness":"high"');
     expect(JSON.stringify(body.session)).not.toContain("transcription");
+    // No rate asked for: the provider's default.
+    expect(JSON.stringify(body.session)).not.toContain('"speed"');
+  });
+
+  it("asks for an unhurried speaking rate when given one (voiceq-63)", async () => {
+    const fetchFake = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ value: "ek_minted" }), { status: 200 }),
+      ),
+    );
+    const provider = createOpenAIRealtimeProvider({
+      apiKey: DISABLED_KEY,
+      fetch: fetchFake,
+    });
+    await provider.mint(
+      {
+        modelCode: provider.modelCode,
+        instructions: "You are Q.",
+        tools: [],
+        voice: "FEMALE",
+        maxOutputTokens: 800,
+        secretTtlSeconds: 60,
+        speechSpeed: 0.95,
+      },
+      { signal: new AbortController().signal },
+    );
+    const [, init] = fetchFake.mock.calls[0] ?? [];
+    const body = JSON.parse(
+      typeof init?.body === "string" ? init.body : "{}",
+    ) as { session: { audio: { output: { voice: string; speed: number } } } };
+    expect(body.session.audio.output).toEqual({ voice: "marin", speed: 0.95 });
   });
 
   it("asks for input transcription and a patient turn detector when the line listens", async () => {

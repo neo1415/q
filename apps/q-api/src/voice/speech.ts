@@ -248,10 +248,29 @@ function spokenDomain(address: string): string {
   }
 }
 
+/**
+ * Stage directions written as words: "(chuckles)", "*laughs softly*",
+ * "(sighs)", "[laughing]". voiceq-63 (founder, live 2026-10-04): Q said
+ * "chuckles" out loud. A voice is never handed the description of a sound;
+ * where a voice can make one, the delivery layer asks for it by its own
+ * tag. Only affect words in a bracket, parenthesis or asterisks match,
+ * never the reply's own words.
+ */
+const STAGE_DIRECTION =
+  /\s*(?:\(|\*{1,2}|\[)\s*(?:(?:soft|light|warm|quiet|gentl|brief)\w*\s+)?(?:laugh\w*|chuckl\w*|giggl\w*|sigh\w*|smil\w*|grin\w*|snicker\w*|snort\w*|chortl\w*|clears? (?:his |her |my |their )?throat|cough\w*|pause\w*|beat)(?:\s+[a-z]+){0,3}\s*(?:\)|\*{1,2}|\])/giu;
+
+export function withoutStageDirections(text: string): string {
+  return text
+    .replace(STAGE_DIRECTION, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ +([.,;:!?])/g, "$1")
+    .trim();
+}
+
 /** Markdown and machine punctuation → plain sentences. */
 export function speakable(text: string): string {
   return (
-    spokenFigures(text)
+    spokenFigures(withoutStageDirections(text))
       // Headings, list bullets, block quotes.
       .replace(/^\s{0,3}#{1,6}\s+/gm, "")
       .replace(/^\s*[-*+]\s+/gm, "")
