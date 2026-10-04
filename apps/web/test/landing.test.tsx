@@ -8,6 +8,7 @@ import { ALL_CRITERION_REASON_CODES } from "@capital-q/gateq/engine";
 import {
   PWA_STANDALONE_SCRIPT,
   PWA_START_URL,
+  isStandaloneLaunch,
   landingRedirect,
 } from "../src/auth/landing-route";
 import { splashSkippedFor } from "../src/features/splash/splash-policy";
@@ -357,14 +358,20 @@ describe("Watch Q work", () => {
     expect(shown()).toBe(0);
     // Every line is laid out from the start, so nothing reflows as it plays.
     expect(screen.getByText(COPY.WATCH.card.body)).toBeTruthy();
-    await act(async () => vi.advanceTimersByTime(300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     expect(shown()).toBe(1);
-    await act(async () => vi.advanceTimersByTime(1100 + 1500));
+    act(() => {
+      vi.advanceTimersByTime(1100 + 1500);
+    });
     expect(shown()).toBe(3);
     expect(screen.getByTestId("q-aperture").dataset["state"]).toBe(
       "NEEDS_APPROVAL",
     );
-    await act(async () => vi.advanceTimersByTime(2600));
+    act(() => {
+      vi.advanceTimersByTime(2600);
+    });
     expect(shown()).toBe(4);
     expect(screen.getByRole("button", { name: "Approved" })).toBeTruthy();
   });
@@ -374,10 +381,12 @@ describe("Watch Q work", () => {
     vi.useFakeTimers();
     const { WatchQWork } = await import("../src/features/landing/watch-q-work");
     render(<WatchQWork />);
-    await act(async () => vi.advanceTimersByTime(300 + 1100 + 1500));
-    await act(async () =>
-      screen.getByRole("button", { name: COPY.WATCH.card.approve }).click(),
-    );
+    act(() => {
+      vi.advanceTimersByTime(300 + 1100 + 1500);
+    });
+    act(() => {
+      screen.getByRole("button", { name: COPY.WATCH.card.approve }).click();
+    });
     expect(document.querySelectorAll(".cq-landing-step.is-shown")).toHaveLength(
       4,
     );
@@ -417,19 +426,23 @@ describe("routing: the installed app never shows the landing", () => {
     ).toBeNull();
   });
 
-  it("the standalone fallback hides the landing only in standalone display mode", () => {
-    const run = (standalone: boolean) => {
-      document.documentElement.removeAttribute("data-pwa");
-      vi.stubGlobal("matchMedia", (query: string) => ({
-        matches: standalone && query === "(display-mode: standalone)",
-      }));
-      // jsdom cannot navigate; the script's own try/catch keeps it silent.
-      new Function(PWA_STANDALONE_SCRIPT)();
-      return document.documentElement.hasAttribute("data-pwa");
-    };
-    expect(run(false)).toBe(false);
-    expect(run(true)).toBe(true);
-    document.documentElement.removeAttribute("data-pwa");
+  it("the standalone fallback catches an installed launch with no flag", () => {
+    const mm = (standalone: boolean) => (query: string) => ({
+      matches: standalone && query === "(display-mode: standalone)",
+    });
+    expect(isStandaloneLaunch({ matchMedia: mm(false), navigator: {} })).toBe(
+      false,
+    );
+    expect(isStandaloneLaunch({ matchMedia: mm(true), navigator: {} })).toBe(
+      true,
+    );
+    // iOS Home Screen web apps report it on navigator instead.
+    expect(isStandaloneLaunch({ navigator: { standalone: true } })).toBe(true);
+    // The inline script is the same rule: it hides the page, then leaves.
+    expect(PWA_STANDALONE_SCRIPT).toContain('"(display-mode: standalone)"');
+    expect(PWA_STANDALONE_SCRIPT).toContain("navigator.standalone===true");
+    expect(PWA_STANDALONE_SCRIPT).toContain('setAttribute("data-pwa","")');
+    expect(PWA_STANDALONE_SCRIPT).toContain('location.replace("/welcome")');
   });
 
   it("the splash still comes first on the landing, in a tab and installed", () => {

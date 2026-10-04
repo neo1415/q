@@ -24,9 +24,10 @@ vi.mock("../src/auth/cookie-options", () => ({
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
     auth: {
-      getClaims: async () => ({
-        data: signedIn ? { claims: { sub: "user-1" } } : null,
-      }),
+      getClaims: () =>
+        Promise.resolve({
+          data: signedIn ? { claims: { sub: "user-1" } } : null,
+        }),
     },
   }),
 }));

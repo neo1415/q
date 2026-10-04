@@ -41,7 +41,11 @@ const APERTURE: Readonly<Record<WatchStep, QApertureState>> = {
 export function WatchQWork() {
   const root = useRef<HTMLDivElement>(null);
   const visible = useInView(root, { rootMargin: "0px", threshold: 0.35 });
-  const [step, setStep] = useState<WatchStep>(0);
+  const [played, setStep] = useState<WatchStep>(0);
+  // Read once: this island never renders on the server.
+  const [reduced] = useState(prefersReducedMotion);
+  // Reduced motion shows the finished story; nothing is scheduled.
+  const step: WatchStep = reduced ? (visible ? 4 : 0) : played;
   const [run, setRun] = useState(0);
   const timers = useRef<number[]>([]);
 
@@ -51,12 +55,7 @@ export function WatchQWork() {
   };
 
   useEffect(() => {
-    if (!visible) return;
-    if (prefersReducedMotion()) {
-      setStep(4);
-      return;
-    }
-    setStep(0);
+    if (!visible || reduced) return;
     let elapsed = 0;
     for (const { to, after } of SCRIPT) {
       elapsed += after;
@@ -65,7 +64,7 @@ export function WatchQWork() {
       );
     }
     return clear;
-  }, [visible, run]);
+  }, [visible, reduced, run]);
 
   const approve = useCallback(() => {
     clear();
@@ -139,9 +138,10 @@ export function WatchQWork() {
 
       <button
         type="button"
-        className={cx(buttonClassName("quiet", "compact"), "mt-4")}
+        className={cx(buttonClassName("quiet", "compact"), "mt-4 self-start")}
         onClick={() => {
           clear();
+          setStep(0);
           setRun((r) => r + 1);
         }}
         disabled={step < 4}

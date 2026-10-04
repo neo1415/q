@@ -12,15 +12,17 @@ export function useInView(
   ref: RefObject<Element | null>,
   options: { readonly rootMargin?: string; readonly threshold?: number } = {},
 ): boolean {
-  const [seen, setSeen] = useState(false);
+  // No IntersectionObserver (old browsers, test DOMs): visible from the
+  // start. On the server it is always false, so the HTML holds the fallback.
+  const [seen, setSeen] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      typeof IntersectionObserver === "undefined",
+  );
   const { rootMargin = "200px 0px", threshold = 0 } = options;
   useEffect(() => {
     const element = ref.current;
     if (element === null || seen) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setSeen(true);
-      return;
-    }
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {

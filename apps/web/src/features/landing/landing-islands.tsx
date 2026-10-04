@@ -24,6 +24,14 @@ const GateQDemo = dynamic(
   { ssr: false },
 );
 
+const ThemeToggle = dynamic(
+  () => import("../appearance/theme-toggle").then((m) => m.ThemeToggle),
+  { ssr: false },
+);
+
+/** The demos fetch a screen or so ahead, so a fast scroll meets them ready. */
+const AHEAD = "1200px 0px";
+
 function Island({
   className,
   rootMargin,
@@ -64,7 +72,7 @@ export function WatchQWorkIsland({
   readonly fallback: ReactNode;
 }) {
   return (
-    <Island className="cq-landing-watch" fallback={fallback}>
+    <Island className="cq-landing-watch" rootMargin={AHEAD} fallback={fallback}>
       <WatchQWork />
     </Island>
   );
@@ -76,8 +84,20 @@ export function GateQDemoIsland({
   readonly fallback: ReactNode;
 }) {
   return (
-    <Island className="cq-landing-gateq" fallback={fallback}>
+    <Island className="cq-landing-gateq" rootMargin={AHEAD} fallback={fallback}>
       <GateQDemo />
+    </Island>
+  );
+}
+
+/**
+ * The visible theme choice (ADR 0017 F4), in the footer. Its tooltips
+ * bring a popover library, so it loads with the footer, not the hero.
+ */
+export function ThemeToggleIsland() {
+  return (
+    <Island className="cq-landing-theme">
+      <ThemeToggle display="icons" size="touch" />
     </Island>
   );
 }

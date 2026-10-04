@@ -2167,8 +2167,14 @@
   }
 
   /* Watch Q work. Every line is laid out from the start; only opacity moves. */
+  /* Reserved at the measured loaded height, so the island never shifts. */
   .cq-landing-watch {
-    min-height: 520px;
+    min-height: 800px;
+  }
+  @media (min-width: 768px) {
+    .cq-landing-watch {
+      min-height: 600px;
+    }
   }
   .cq-landing-watch-stage {
     display: flex;
@@ -2212,8 +2218,18 @@
 
   /* Try GateQ. */
   .cq-landing-gateq {
-    min-height: 560px;
+    min-height: 920px;
     margin-top: 40px;
+  }
+  @media (min-width: 768px) {
+    .cq-landing-gateq {
+      min-height: 840px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .cq-landing-gateq {
+      min-height: 560px;
+    }
   }
   .cq-landing-gateq-grid {
     display: grid;
@@ -2292,6 +2308,9 @@
   }
   .cq-landing-faq[open] > summary::after {
     transform: rotate(45deg);
+  }
+  .cq-landing-theme {
+    min-height: 50px;
   }
   .cq-landing-final {
     border-top: 1px solid var(--cq-border-subtle);

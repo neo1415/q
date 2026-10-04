@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { buttonClassName, cx } from "@capital-q/ui";
 
 import { PWA_STANDALONE_SCRIPT } from "@/auth/landing-route";
-import { ThemeToggle } from "@/features/appearance/theme-toggle";
 
 import {
   FAILURE,
@@ -27,6 +26,7 @@ import {
 import {
   GateQDemoIsland,
   HeroPresenceIsland,
+  ThemeToggleIsland,
   WatchQWorkIsland,
 } from "./landing-islands";
 
@@ -93,21 +93,21 @@ function Header() {
       <Container className="flex h-16 items-center justify-between gap-4">
         <Link
           href="/"
-          className="cq-title-md rounded-xs text-(--cq-text-primary)"
+          className="cq-title-md rounded-xs whitespace-nowrap text-(--cq-text-primary)"
           aria-label="Capital Q home"
         >
           Capital Q
         </Link>
         <nav aria-label="Primary" className="flex items-center gap-1 sm:gap-2">
-          <a
-            href={`#${GATEQ_ANCHOR}`}
-            className={cx(
-              buttonClassName("quiet", "compact"),
-              "hidden sm:inline-flex",
-            )}
-          >
-            {HERO.secondary}
-          </a>
+          {/* A wrapper, because the button's own inline-flex would win. */}
+          <span className="hidden sm:contents">
+            <a
+              href={`#${GATEQ_ANCHOR}`}
+              className={buttonClassName("quiet", "compact")}
+            >
+              {HERO.secondary}
+            </a>
+          </span>
           <Link
             href={SIGN_IN_HREF}
             className={buttonClassName("quiet", "compact")}
@@ -463,7 +463,7 @@ function Footer() {
               {HERO.primary}
             </Link>
           </nav>
-          <ThemeToggle display="icons" size="touch" />
+          <ThemeToggleIsland />
         </div>
       </Container>
     </footer>

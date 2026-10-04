@@ -43,3 +43,18 @@ export function landingRedirect(input: {
  * navigation. The proxy then routes `/welcome` as for any installed launch.
  */
 export const PWA_STANDALONE_SCRIPT = `try{if((window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true){document.documentElement.setAttribute("data-pwa","");location.replace(${JSON.stringify(APP_ENTRY)})}}catch(e){}`;
+
+/**
+ * The fallback's rule, as a function: the script above is this, inlined so
+ * it runs before any paint. Kept together so they cannot drift.
+ */
+export function isStandaloneLaunch(win: {
+  readonly matchMedia?: (query: string) => { readonly matches: boolean };
+  readonly navigator: { readonly standalone?: boolean };
+}): boolean {
+  return (
+    (typeof win.matchMedia === "function" &&
+      win.matchMedia("(display-mode: standalone)").matches) ||
+    win.navigator.standalone === true
+  );
+}
