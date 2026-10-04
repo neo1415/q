@@ -199,6 +199,7 @@ describe("the inbound email port and board", () => {
         mentionsTermsOrMoney: false,
         declined: false,
         tone: "NEUTRAL",
+        questionAbout: [],
       });
     };
     const board = createInboundReplyBoard();
