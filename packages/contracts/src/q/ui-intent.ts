@@ -251,6 +251,10 @@ export const Q_RECORD_PAGES = [
   "INVESTOR_REHEARSAL",
   // REHEARSE: an investor's rehearsal with a company they are connected to.
   "COMPANY_REHEARSAL",
+  // follow-55 (Zino, live 2026-10-04: "open the questions for…" opened the
+  // Documents list): one of their own documents, by its artifact id, in
+  // the shell's document viewer.
+  "DOCUMENT",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;

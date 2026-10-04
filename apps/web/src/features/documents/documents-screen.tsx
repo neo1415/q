@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import {
   qArtifactExportFormats,
@@ -98,15 +98,33 @@ export function DocumentsScreen({
   documents,
   brand,
   decks = null,
+  openOnArrival = null,
 }: {
   /** Null when the list could not be read. */
   readonly documents: readonly QArtifactSummary[] | null;
   readonly brand: QBrandKitState | null;
   /** Who may download the pitch deck, shown after the list. */
   readonly decks?: ReactNode;
+  /**
+   * A document Q was asked to open (`/documents?open=<id>`): opened in the
+   * viewer once, only when it is one of the person's own listed and ready
+   * documents. Anything else is ignored, never fetched.
+   */
+  readonly openOnArrival?: string | null;
 }) {
   const { askAbout } = useGlobalQ();
   const items = documents;
+  const arrival =
+    openOnArrival === null
+      ? null
+      : (items?.find(
+          (document) =>
+            document.artifactId.toLowerCase() === openOnArrival.toLowerCase() &&
+            document.status === "READY",
+        )?.artifactId ?? null);
+  useEffect(() => {
+    if (arrival !== null) openDocumentViewer(arrival);
+  }, [arrival]);
 
   return (
     <>

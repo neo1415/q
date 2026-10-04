@@ -329,14 +329,14 @@ export function createSignOutTool(): AnyQToolDefinition {
 export const OpenPageInputSchema = z
   .object({
     page: QRecordPageSchema.describe(
-      "COMPANY: a company's page. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation.",
+      "COMPANY: a company's page. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it.",
     ),
     id: z
       .string()
       .uuid()
       .optional()
       .describe(
-        "The company's or investor organisation's id, exactly as a tool or the screen gave it. Never guessed from a name.",
+        "The company's, investor organisation's or document's id, exactly as a tool or the screen gave it. Never guessed from a name.",
       ),
     name: z
       .string()
@@ -344,7 +344,7 @@ export const OpenPageInputSchema = z
       .max(200)
       .optional()
       .describe(
-        "Instead of id: the company's or investor's name as they said it, even misheard ('young field agro'). It is matched against the records they can already see.",
+        "Instead of id: the company's or investor's name, or the document's title, as they said it, even misheard or cut short ('young field agro', 'the questions for Priya'). It is matched against the records they can already see.",
       ),
   })
   .strict();
@@ -512,6 +512,38 @@ export async function findRecordByName(
 }
 
 /**
+ * One of the person's own ready documents (follow-55): by id, or by the
+ * title as they said it, matched like any spoken name. Only their own
+ * list (the artifact service, read as them) is searched, so a title can
+ * never open, or reveal, a document that is not theirs. A document with
+ * nothing to show yet is not opened.
+ */
+export async function ownDocumentId(
+  ports: Pick<QToolPorts, "documents">,
+  actor: ActorContext,
+  wanted: {
+    readonly id?: string | undefined;
+    readonly name?: string | undefined;
+  },
+): Promise<string | null> {
+  if (ports.documents === undefined) return null;
+  const listed = await ports.documents.list(actor, 20).catch(() => null);
+  const ready = (listed ?? []).filter((item) => item.status === "READY");
+  if (wanted.id !== undefined) {
+    const id = wanted.id.toLowerCase();
+    return ready.some((item) => item.artifactId.toLowerCase() === id)
+      ? id
+      : null;
+  }
+  if (wanted.name === undefined) return null;
+  const id = matchCounterpart(
+    wanted.name,
+    ready.map((item) => ({ id: item.artifactId, name: item.title })),
+  );
+  return id === null ? null : id.toLowerCase();
+}
+
+/**
  * Open one record's page (R33). The page authorises the read server-side,
  * as for a typed URL; this step only refuses what the person could not
  * open anyway -- a company not in their tenant, or a relationship they are
@@ -520,7 +552,12 @@ export async function findRecordByName(
 export function createOpenPageTool(
   ports: Pick<
     QToolPorts,
-    "companies" | "relationships" | "disclosure" | "discovery" | "investorFeed"
+    | "companies"
+    | "relationships"
+    | "disclosure"
+    | "discovery"
+    | "investorFeed"
+    | "documents"
   >,
 ): AnyQToolDefinition {
   const candidates = (
@@ -538,11 +575,17 @@ export function createOpenPageTool(
     id: OPEN_PAGE,
     providerName: "open_page",
     description:
-      "Opens any one record's own page on their screen, at once: a company's page, an investor organisation's page, their relationship with a company or investor, or the chat with them. Give the id a tool or the screen gave, or just the name they said -- misheard names are matched against the records they can already see (their relationships, Saves, the network). 'Open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES (X a company) or RELATIONSHIP_INVESTOR_MESSAGES (X an investor) with name X; 'show me X' is COMPANY or INVESTOR; 'rehearse / practise my meeting with X' is INVESTOR_REHEARSAL when X is an investor (they are a founder) and COMPANY_REHEARSAL when X is a company (they are an investor). Call it directly, never send them to a list instead. NOT_AVAILABLE means nothing they can see matches, or that page is not theirs to open.",
+      "Opens any one record's own page on their screen, at once: a company's page, an investor organisation's page, their relationship with a company or investor, or the chat with them. Give the id a tool or the screen gave, or just the name they said -- misheard names are matched against the records they can already see (their relationships, Saves, the network). 'Open the deck' or 'open the questions for Priya' is DOCUMENT with that title; 'open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES (X a company) or RELATIONSHIP_INVESTOR_MESSAGES (X an investor) with name X; 'show me X' is COMPANY or INVESTOR; 'rehearse / practise my meeting with X' is INVESTOR_REHEARSAL when X is an investor (they are a founder) and COMPANY_REHEARSAL when X is a company (they are an investor). Call it directly, never send them to a list instead. NOT_AVAILABLE means nothing they can see matches, or that page is not theirs to open.",
     input: OpenPageInputSchema,
     authorize: async (input, { actor, plan }) => {
       if (!ownConversation(actor, plan)) {
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
+      }
+      if (input.page === "DOCUMENT") {
+        const id = await ownDocumentId(ports, actor, input);
+        return id === null
+          ? deny<QClientActionToolResult>("NOT_AVAILABLE")
+          : allowed({ kind: "OPEN_RECORD_PAGE", page: "DOCUMENT", id });
       }
       const companySide =
         input.page === "COMPANY" ||
@@ -770,7 +813,12 @@ export function createSetDiscoverFiltersTool(): AnyQToolDefinition {
 export function createClientActionTools(
   ports: Pick<
     QToolPorts,
-    "companies" | "relationships" | "disclosure" | "discovery" | "investorFeed"
+    | "companies"
+    | "relationships"
+    | "disclosure"
+    | "discovery"
+    | "investorFeed"
+    | "documents"
   >,
 ): readonly AnyQToolDefinition[] {
   return [

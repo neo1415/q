@@ -24,7 +24,14 @@ export const dynamic = "force-dynamic";
  * person's own session from the Q API; the Q API lists only their own
  * organisation's documents and brand.
  */
-export default async function DocumentsPage() {
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // A deep link Q opens (`?open=<artifact id>`); the screen opens it only
+  // when it is one of the person's own listed documents.
+  const open = (await searchParams)["open"];
   const { qApiBaseUrl, apiBaseUrl } = loadWebServerConfig();
   const accessToken = await getSessionAccessToken();
   const session =
@@ -68,6 +75,7 @@ export default async function DocumentsPage() {
         documents={documents?.items ?? null}
         brand={brand}
         decks={<DeckSharing decks={decks} />}
+        openOnArrival={typeof open === "string" ? open.slice(0, 64) : null}
       />
     </PageContainer>
   );

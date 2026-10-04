@@ -33,8 +33,13 @@ const { BrandKitPanel } =
 const { DocumentsScreen } =
   await import("../src/features/documents/documents-screen");
 const { AnswerPdf } = await import("../src/features/documents/answer-pdf");
-const { resetReadyDocuments, useReadyDocuments } =
-  await import("../src/features/documents/document-ready");
+const {
+  openDocumentViewer,
+  resetReadyDocuments,
+  useReadyDocuments,
+  useViewingDocument,
+} = await import("../src/features/documents/document-ready");
+const { recordPagePath } = await import("../src/features/q/client-actions");
 const { ArtifactCard } = await import("../src/features/q/artifact-card");
 
 const NOW = "2026-10-01T10:00:00.000Z";
@@ -163,6 +168,65 @@ describe("the documents list", () => {
     expect(screen.getByText(/Version 3/)).toBeTruthy();
     expect(screen.getByText(/Q is writing this/)).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Open" })).toHaveLength(1);
+  });
+});
+
+describe("a document Q was asked to open (follow-55)", () => {
+  const READY = "a0000000-0000-4000-8000-000000000003";
+  const WRITING = "a0000000-0000-4000-8000-000000000004";
+  const docs = [
+    {
+      artifactId: QArtifactIdSchema.parse(READY),
+      type: "Q_REPORT" as const,
+      status: "READY" as const,
+      title: "Questions for Priya Khandelwal",
+      currentVersion: 1,
+      createdAt: NOW,
+      updatedAt: NOW,
+    },
+    {
+      artifactId: QArtifactIdSchema.parse(WRITING),
+      type: "Q_REPORT" as const,
+      status: "PREPARING" as const,
+      title: "Brief",
+      currentVersion: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    },
+  ];
+  function Viewing() {
+    return (
+      <output data-testid="viewing">{useViewingDocument() ?? "none"}</output>
+    );
+  }
+  afterEach(() => openDocumentViewer(null));
+
+  it("deep-links to the Documents page, which opens that document's viewer", async () => {
+    expect(recordPagePath("DOCUMENT", READY.toUpperCase())).toBe(
+      `/documents?open=${READY}`,
+    );
+    render(
+      <>
+        <DocumentsScreen documents={docs} brand={{}} openOnArrival={READY} />
+        <Viewing />
+      </>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("viewing").textContent).toBe(READY),
+    );
+  });
+
+  it("opens nothing for a document that is not theirs or not ready", () => {
+    for (const id of [WRITING, "a0000000-0000-4000-8000-0000000000ff"]) {
+      const { unmount } = render(
+        <>
+          <DocumentsScreen documents={docs} brand={{}} openOnArrival={id} />
+          <Viewing />
+        </>,
+      );
+      expect(screen.getByTestId("viewing").textContent).toBe("none");
+      unmount();
+    }
   });
 });
 

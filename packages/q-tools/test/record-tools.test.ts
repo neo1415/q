@@ -182,6 +182,103 @@ describe("opening a record's page", () => {
   });
 });
 
+describe("opening one of their documents by its title (follow-55, Zino live 2026-10-04)", () => {
+  const QUESTIONS = "8e4b6f4b-bd88-4ab1-8a4f-3d4e5f607182";
+  const DECK = "9f5c7a5c-ce99-4bc2-9b5a-4e5f60718293";
+  const DRAFT = "a06d8b6d-dfaa-4cd3-8c6b-5f6071829304";
+  const listed: { actor: string; limit: number }[] = [];
+  const documents = {
+    list: (actor: { userId: string }, limit: number) => {
+      listed.push({ actor: actor.userId, limit });
+      return Promise.resolve([
+        {
+          artifactId: QUESTIONS,
+          type: "Q_REPORT",
+          status: "READY",
+          title: "Questions for Priya Khandelwal",
+          currentVersion: 1,
+          updatedAt: "2026-10-03T10:00:00.000Z",
+        },
+        {
+          artifactId: DECK,
+          type: "PITCH_DECK",
+          status: "READY",
+          title: "Nixo pitch deck",
+          currentVersion: 2,
+          updatedAt: "2026-10-02T10:00:00.000Z",
+        },
+        {
+          artifactId: DRAFT,
+          type: "INVESTMENT_BRIEF",
+          status: "PREPARING",
+          title: "Brief on Clinicrest",
+          currentVersion: 0,
+          updatedAt: "2026-10-04T08:00:00.000Z",
+        },
+      ]);
+    },
+  };
+  const executor = createQToolExecutor({
+    registry: createQToolRegistry([
+      createOpenPageTool({ ...fakePorts(), documents }),
+    ]),
+  });
+
+  it("'open the questions for…' opens that document in the viewer, by its cut-short title", async () => {
+    for (const said of [
+      "the questions for",
+      "questions for Priya",
+      "Questions for Priya Khandelwal",
+    ]) {
+      const outcome = await executor.execute(
+        call("open_page", { page: "DOCUMENT", name: said }),
+        contextFor(actorA, ownPlan()),
+      );
+      expect(
+        QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+      ).toEqual({ kind: "OPEN_RECORD_PAGE", page: "DOCUMENT", id: QUESTIONS });
+    }
+    // Their own list, read as them.
+    expect(listed.every((entry) => entry.actor === actorA.userId)).toBe(true);
+  });
+
+  it("opens one of their own ready documents by id", async () => {
+    const outcome = await executor.execute(
+      call("open_page", { page: "DOCUMENT", id: DECK }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+    ).toEqual({ kind: "OPEN_RECORD_PAGE", page: "DOCUMENT", id: DECK });
+  });
+
+  it("never opens a document that is not on their list, or not ready", async () => {
+    for (const args of [
+      { page: "DOCUMENT", id: COMPANY_A },
+      { page: "DOCUMENT", id: DRAFT },
+      { page: "DOCUMENT", name: "brief on clinicrest" },
+      { page: "DOCUMENT", name: "board minutes" },
+    ]) {
+      const outcome = await executor.execute(
+        call("open_page", args),
+        contextFor(actorA, ownPlan()),
+      );
+      expect(outcome.status).not.toBe("SUCCEEDED");
+    }
+  });
+
+  it("without the documents port nothing opens as a document", async () => {
+    const bare = createQToolExecutor({
+      registry: createQToolRegistry([createOpenPageTool(fakePorts())]),
+    });
+    const outcome = await bare.execute(
+      call("open_page", { page: "DOCUMENT", id: DECK }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+});
+
 describe("opening a chat by a spoken name (founder report 2026-09-30)", () => {
   const YAMFIELD = "5b1f3c1e-8a55-4d8e-9d1c-0a1b2c3d4e5f";
   const KOLA = "6c2f4d2f-9b66-4e9f-8e2d-1b2c3d4e5f60";

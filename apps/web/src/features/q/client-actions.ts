@@ -67,6 +67,10 @@ export function recordPagePath(page: QRecordPage, id: string): string {
       return `/rehearsals/investor/${safe}`;
     case "COMPANY_REHEARSAL":
       return `/rehearsals/company/${safe}`;
+    // The Documents page opens its viewer on this one: a deep link that
+    // works from any page; the Q API authorises the read as the person.
+    case "DOCUMENT":
+      return `/documents?open=${safe}`;
   }
 }
 
