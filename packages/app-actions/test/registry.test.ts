@@ -98,6 +98,21 @@ describe("the action registry", () => {
       ["capital.objective.update", "via:change_my_raise", "CONSEQUENTIAL"],
       ["capital.objective.close", "via:change_my_raise", "CONSEQUENTIAL"],
       ["capital.objective.replace", "via:change_my_raise", "CONSEQUENTIAL"],
+      // 2026-10-04: rounds join the raise's tool; the money's steps are one family.
+      ["capital.round.open", "via:change_my_raise", "CONSEQUENTIAL"],
+      ["capital.round.close", "via:change_my_raise", "CONSEQUENTIAL"],
+      ["capital.commitment.step", "commitment_step", "CONSEQUENTIAL"],
+      [
+        "capital.commitment.confirm_amount",
+        "via:commitment_step",
+        "CONSEQUENTIAL",
+      ],
+      ["capital.commitment.mark_sent", "via:commitment_step", "CONSEQUENTIAL"],
+      [
+        "capital.commitment.confirm_received",
+        "via:commitment_step",
+        "CONSEQUENTIAL",
+      ],
       ["investor.mandate.change", "change_my_mandate", "CONSEQUENTIAL"],
       ["investor.mandate.create", "via:change_my_mandate", "CONSEQUENTIAL"],
       ["investor.mandate.update", "via:change_my_mandate", "CONSEQUENTIAL"],
@@ -420,6 +435,8 @@ describe("delegation: what Q may do on its own", () => {
 
   it.each([
     "capital.objective.change",
+    "capital.commitment.step",
+    "capital.commitment.confirm_received",
     "disclosure.raise.share",
     "relationship.outcome.change",
     "relationship.outcome.pass",

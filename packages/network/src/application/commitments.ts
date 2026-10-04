@@ -694,6 +694,8 @@ export function createCommitmentService(dependencies: {
     confirmReceived: async (
       actor: ActorContext,
       commitmentId: string,
+      /** The round it counts toward when it has none yet. */
+      roundId: string | null = null,
     ): Promise<
       CommitmentOutcome<NonNullable<Awaited<ReturnType<typeof view>>>>
     > => {
@@ -710,7 +712,8 @@ export function createCommitmentService(dependencies: {
         const updated = await tx.sql<{ id: string }[]>`
           update network.commitments
              set status = 'RECEIVED', received_by_user_id = ${actor.userId},
-                 received_at = clock_timestamp(), updated_at = clock_timestamp()
+                 received_at = clock_timestamp(), updated_at = clock_timestamp(),
+                 round_id = coalesce(round_id, ${roundId}::uuid)
            where id = ${commitmentId} and status in ('CONFIRMED', 'TRANSFER_SENT')
           returning id`;
         if (updated.length > 0) {

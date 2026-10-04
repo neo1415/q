@@ -63,6 +63,7 @@ import {
 } from "@capital-q/discovery";
 import {
   CapitalObjectiveNotFoundError,
+  createCapitalRoundService,
   createCapitalService,
   createPostgresCapitalObjectiveQueryPort,
   createPostgresCapitalObjectiveTimes,
@@ -918,6 +919,16 @@ const commitments = createCommitmentService({
     },
   }),
   newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
+  // 2026-10-04: each step is announced, so the other side is told.
+  outbox,
+});
+/** Capital rounds (2026-10-04): under the raise's own capabilities. */
+const capitalRounds = createCapitalRoundService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  audit,
 });
 /**
  * Post-meeting outcomes (2026-10-02): the investor's Pass, Pause and Resume
@@ -1755,6 +1766,7 @@ const { app, logger } = createApp(config, security, {
   interests,
   connections,
   commitments,
+  capitalRounds,
   outcomes,
   diligence,
   // BILLING block (ADR 0034)

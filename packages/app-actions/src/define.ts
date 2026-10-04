@@ -443,6 +443,8 @@ export function defineAppActionFamily<ToolIn>(definition: {
  */
 const FEATURES: Readonly<Partial<Record<keyof AppActionPorts, string>>> = {
   capital: "Your raise",
+  capitalRounds: "Rounds",
+  commitments: "Commitments",
   chat: "Chat",
   chatSafety: "Blocking and reporting in chat",
   companies: "Company profiles",

@@ -1,3 +1,4 @@
+import type { CapitalRoundService } from "@capital-q/capital";
 import { pitchSummary } from "@capital-q/media";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
@@ -239,6 +240,8 @@ export type ApiModules = {
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
     CommitmentRoutesDependencies["commitments"] | undefined;
+  /** Capital rounds (2026-10-04). Absent: the rounds and the book do not register. */
+  readonly capitalRounds?: CapitalRoundService | undefined;
   // BILLING block (ADR 0034): plans, usage, checkout, the Stripe webhook,
   // and the console's billing controls. Absent: none of it registers and
   // nothing is gated.
@@ -483,6 +486,12 @@ export function createApp(
         ? {}
         : { connections: modules.connections }),
       ...(modules.outcomes === undefined ? {} : { outcomes: modules.outcomes }),
+      ...(modules.commitments === undefined
+        ? {}
+        : { commitments: modules.commitments }),
+      ...(modules.capitalRounds === undefined
+        ? {}
+        : { capitalRounds: modules.capitalRounds }),
       ...(modules.diligence === undefined
         ? {}
         : { diligence: modules.diligence }),
@@ -607,6 +616,7 @@ export function createApp(
       resolver: security.resolver,
       commitments: modules.commitments,
       capital: modules.capital,
+      capitalRounds: modules.capitalRounds,
     });
   }
 

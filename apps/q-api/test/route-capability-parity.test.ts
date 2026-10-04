@@ -304,6 +304,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/commitments.ts POST NETWORK_COMMITMENT_WITHDRAW_PATH": exempt(
     "a party withdrawing its relationship's commitment is their own decision; never a Q action",
   ),
+  // 2026-10-04: the Capital page's book, read by read_my("capital").
+  "api/http/commitments.ts GET COMPANY_CAPITAL_LEDGER_PATH":
+    cap("tool.read_my"),
+  "api/http/commitments.ts GET NETWORK_MY_COMMITMENTS_PATH":
+    cap("tool.read_my"),
   "api/http/commitments.ts GET NETWORK_COMPANY_FUNDRAISING_PATH": exempt(
     "the founder's raise in money, shown on Capital; a Q read tool comes later",
   ),

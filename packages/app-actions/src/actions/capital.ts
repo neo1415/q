@@ -9,6 +9,7 @@ import {
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
   CAPITAL_OBJECTIVE_CLOSURE_REASONS,
+  CAPITAL_ROUND_INSTRUMENTS,
   CAPITAL_OBJECTIVES_SUFFIX,
   COMPANIES_PATH,
   CapitalObjectiveDtoSchema,
@@ -29,8 +30,10 @@ import {
   defineAppActionFamily,
   refusal,
   type AnyAppAction,
+  type AppActionContext,
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
+import { CLOSE_ROUND, OPEN_ROUND } from "./commitments.js";
 
 /**
  * Capital (ADR 0040 checklist): the Capital page's raise form -- create,
@@ -318,9 +321,16 @@ const REPLACE = defineAppAction<
 const RaiseTool = z
   .object({
     operation: z
-      .enum(["CREATE", "UPDATE", "CLOSE", "REPLACE"])
+      .enum([
+        "CREATE",
+        "UPDATE",
+        "CLOSE",
+        "REPLACE",
+        "OPEN_ROUND",
+        "CLOSE_ROUND",
+      ])
       .describe(
-        "CREATE a raise when they have none; UPDATE the current one's fields; CLOSE it (with closureReason); REPLACE it with a deliberately new raise.",
+        "CREATE a raise when they have none; UPDATE the current one's fields; CLOSE it (with closureReason); REPLACE it with a deliberately new raise. OPEN_ROUND: open (or plan) a funding round such as Pre-seed or Seed with its target; CLOSE_ROUND: close a round (the current one unless roundName says which).",
       ),
     target: z
       .object({
@@ -348,8 +358,119 @@ const RaiseTool = z
     targetCloseDate: z.string().max(10).optional().describe("YYYY-MM-DD"),
     useOfFundsSummary: z.string().max(2000).optional(),
     closureReason: z.enum(CAPITAL_OBJECTIVE_CLOSURE_REASONS).optional(),
+    roundName: z
+      .string()
+      .max(80)
+      .optional()
+      .describe(
+        "OPEN_ROUND / CLOSE_ROUND: the round's name, e.g. Seed, Pre-seed, Series A.",
+      ),
+    roundInstrument: z
+      .enum(CAPITAL_ROUND_INSTRUMENTS)
+      .optional()
+      .describe(
+        "OPEN_ROUND: SAFE, EQUITY, CONVERTIBLE or OTHER, only if they said it.",
+      ),
+    roundPlanned: z
+      .boolean()
+      .optional()
+      .describe(
+        "OPEN_ROUND: true only if they are planning it, not raising it now.",
+      ),
   })
   .strict();
+
+/** The raise's instrument code as a round's instrument, when it maps. */
+const ROUND_INSTRUMENT_OF: Readonly<
+  Record<string, (typeof CAPITAL_ROUND_INSTRUMENTS)[number]>
+> = {
+  safe: "SAFE",
+  equity: "EQUITY",
+  priced_equity: "EQUITY",
+  convertible: "CONVERTIBLE",
+  convertible_note: "CONVERTIBLE",
+};
+
+const titleCase = (value: string) =>
+  value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .replace(/\bPre Seed\b/, "Pre-seed");
+
+/** A round opened or closed through the raise's tool. */
+async function roundOperation(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  companyId: z.infer<typeof CompanyIdSchema>,
+  said: {
+    readonly operation: "OPEN_ROUND" | "CLOSE_ROUND";
+    readonly roundName: string | undefined;
+    readonly roundInstrument:
+      (typeof CAPITAL_ROUND_INSTRUMENTS)[number] | undefined;
+    readonly roundPlanned: boolean | undefined;
+    readonly target:
+      { readonly amount: string; readonly currency: string } | undefined;
+    readonly targetStage: string | undefined;
+  },
+) {
+  if (ports.capitalRounds === undefined) return null;
+  if (said.operation === "CLOSE_ROUND") {
+    const all = await ports.capitalRounds
+      .listRounds({ actor: context.actor, companyId })
+      .catch(() => []);
+    const wanted = said.roundName?.trim().toLowerCase();
+    const round =
+      wanted === undefined || wanted === ""
+        ? all.find((item) => item.isCurrent)
+        : all.find(
+            (item) =>
+              item.status !== "CLOSED" && item.name.toLowerCase() === wanted,
+          );
+    if (round === undefined) {
+      return refusal(
+        wanted === undefined
+          ? "You have no current round to close."
+          : `No open round is called ${said.roundName ?? ""}.`,
+      );
+    }
+    return {
+      operation: "CLOSE_ROUND",
+      input: { companyId, roundId: round.id, input: {} },
+    };
+  }
+  if (said.target === undefined) {
+    return refusal("What's the round's target, and in which currency?");
+  }
+  const name =
+    said.roundName?.trim() ||
+    (said.targetStage === undefined ? "" : titleCase(said.targetStage));
+  if (name === "")
+    return refusal("What's the round called (Pre-seed, Seed, …)?");
+  let instrument = said.roundInstrument;
+  if (instrument === undefined) {
+    const raise = await ports.capital
+      ?.getCurrentCapitalObjective({ actor: context.actor, companyId })
+      .catch(() => null);
+    const code = raise?.instrumentCode ?? null;
+    instrument = code === null ? undefined : ROUND_INSTRUMENT_OF[code];
+  }
+  if (instrument === undefined) {
+    return refusal("Is it a SAFE, equity or a convertible note?");
+  }
+  return {
+    operation: "OPEN_ROUND",
+    input: {
+      companyId,
+      idempotencyKey: context.idempotencyKey,
+      input: {
+        name: titleCase(name),
+        target: said.target,
+        instrument,
+        ...(said.roundPlanned === true ? { status: "PLANNED" as const } : {}),
+      },
+    },
+  };
+}
 
 export const CAPITAL_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof RaiseTool>
@@ -360,11 +481,11 @@ export const CAPITAL_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   short: "change their raise",
   area: "capital",
   does: "Sets up, changes, closes or replaces their company's raise, as the Capital page's form does.",
-  members: { CREATE, UPDATE, CLOSE, REPLACE },
+  members: { CREATE, UPDATE, CLOSE, REPLACE, OPEN_ROUND, CLOSE_ROUND },
   tool: {
     name: "change_my_raise",
     description:
-      "Prepares a change to their own company's raise (capital objective), exactly as the Capital page's form makes it: create one, update target (amount + currency), targetStage, instrumentCode, targetCloseDate or useOfFundsSummary, close it with a closureReason (ACHIEVED, CLOSED_BY_FOUNDER, DISCONTINUED), or replace it with a new raise. Nothing changes until they approve exactly it.",
+      "Prepares a change to their own company's raise (capital objective), exactly as the Capital page's form makes it: create one, update target (amount + currency), targetStage, instrumentCode, targetCloseDate or useOfFundsSummary, close it with a closureReason (ACHIEVED, CLOSED_BY_FOUNDER, DISCONTINUED), or replace it with a new raise. Also opens or closes a funding round ('open a seed round for $1.5M': OPEN_ROUND with roundName and target). Nothing changes until they approve exactly it.",
     input: RaiseTool,
     references: {},
     scopes: ["COMPANY_PROFILE"],
@@ -385,7 +506,24 @@ export const CAPITAL_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         return null;
       }
       const companyId = CompanyIdSchema.parse(own);
-      const { operation, closureReason, ...fields } = tool;
+      const {
+        operation,
+        closureReason,
+        roundName,
+        roundInstrument,
+        roundPlanned,
+        ...fields
+      } = tool;
+      if (operation === "OPEN_ROUND" || operation === "CLOSE_ROUND") {
+        return roundOperation(ports, context, companyId, {
+          operation,
+          roundName,
+          roundInstrument,
+          roundPlanned,
+          target: tool.target,
+          targetStage: tool.targetStage,
+        });
+      }
       const filled = Object.fromEntries(
         Object.entries(fields).filter(([, value]) => value !== undefined),
       );

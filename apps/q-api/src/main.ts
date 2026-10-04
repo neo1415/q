@@ -32,6 +32,7 @@ import {
 import { CAPITAL_EVENTS } from "@capital-q/capital/events";
 import {
   CapitalObjectiveNotFoundError,
+  createCapitalRoundService,
   createCapitalService,
   createPostgresCapitalObjectiveQueryPort,
   createPostgresCapitalObjectiveTimes,
@@ -1728,6 +1729,24 @@ const appActionPorts: OwnReadPorts = {
     replaceCapitalObjective: (command) =>
       capitalService.replaceCapitalObjective(command),
   },
+  // 2026-10-04: rounds and the money's steps (closures: composed below).
+  capitalRounds: {
+    listRounds: (query) => capitalRounds.listRounds(query),
+    currentRound: (query) => capitalRounds.currentRound(query),
+    openRound: (command) => capitalRounds.openRound(command),
+    closeRound: (command) => capitalRounds.closeRound(command),
+  },
+  commitments: {
+    confirmAmount: (actor, commitmentId, key, roundId) =>
+      meetingCommitments.confirmAmount(actor, commitmentId, key, roundId),
+    markSent: (actor, commitmentId, reference) =>
+      meetingCommitments.markSent(actor, commitmentId, reference),
+    confirmReceived: (actor, commitmentId, roundId) =>
+      meetingCommitments.confirmReceived(actor, commitmentId, roundId),
+    commitmentFor: (actor, commitmentId) =>
+      meetingCommitments.commitmentFor(actor, commitmentId),
+    ledger: (input) => meetingCommitments.ledger(input),
+  },
   people: {
     read: (userId) => people.read(userId),
     update: (input) => people.update(input),
@@ -2147,6 +2166,13 @@ const capitalService = createCapitalService({
   authorization,
   companies,
   outbox: createOutboxWriter({ registry: createEventRegistry(CAPITAL_EVENTS) }),
+  audit: createPostgresMaterialActionAuditWriter(),
+});
+const capitalRounds = createCapitalRoundService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  companies,
   audit: createPostgresMaterialActionAuditWriter(),
 });
 const verificationService = createCompanyVerificationService({
@@ -3031,6 +3057,8 @@ const meetingCommitments = createCommitmentService({
     },
   }),
   newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+  // 2026-10-04: a step a person approves is announced to the other side.
+  outbox: createOutboxWriter({ registry: createEventRegistry(NETWORK_EVENTS) }),
 });
 // MEET-HOST block (founder direction 2026-10-01; ADR 0037): Q as a live
 // participant in calls booked on Capital Q. Recall brings the call's events

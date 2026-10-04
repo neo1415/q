@@ -1,4 +1,4 @@
-import type { CapitalService } from "@capital-q/capital";
+import type { CapitalRoundService, CapitalService } from "@capital-q/capital";
 import type {
   ChatSafetyService,
   ChatService,
@@ -29,6 +29,7 @@ import type {
 } from "@capital-q/public-identity";
 import type { MediaService } from "@capital-q/media";
 import type {
+  CommitmentService,
   ConnectionService,
   InterestService,
   RelationshipOutcomeService,
@@ -216,6 +217,19 @@ export type AppActionPorts = {
         | "updateCapitalObjective"
         | "closeCapitalObjective"
         | "replaceCapitalObjective"
+      >
+    | undefined;
+  /** Capital rounds (2026-10-04): the Capital page's rounds. */
+  readonly capitalRounds?: CapitalRoundService | undefined;
+  /** Commitments' steps (2026-10-04): Network's commitment service. */
+  readonly commitments?:
+    | Pick<
+        CommitmentService,
+        | "confirmAmount"
+        | "markSent"
+        | "confirmReceived"
+        | "commitmentFor"
+        | "ledger"
       >
     | undefined;
   /** A company's publishable pitch, for the company route's answer. */
