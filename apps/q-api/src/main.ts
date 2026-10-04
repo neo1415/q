@@ -76,6 +76,11 @@ import {
 } from "@capital-q/model-gateway/images";
 import { createGoogleImageProvider } from "@capital-q/model-gateway/images/google";
 import { createOpenAIImageProvider } from "@capital-q/model-gateway/images/openai";
+import { createRealtimeVoiceGateway } from "@capital-q/model-gateway/realtime";
+import { createOpenAIRealtimeProvider } from "@capital-q/model-gateway/realtime/openai";
+import { createDuplexBroker } from "./voice/duplex/broker.js";
+import { duplexConfigFrom } from "./voice/duplex/config.js";
+import { createPostgresDuplexSpend } from "./voice/duplex/spend.js";
 import {
   createDocumentStudioPort,
   createDocumentsModule,
@@ -4369,6 +4374,48 @@ const rehearsalVoiceTurn = createRehearsalAwareTurn({
   // The played person's mood becomes the voice's delivery (REHEARSE).
   performance: speechPerformance,
 });
+/**
+ * DUPLEX: full-duplex voice (CQ_VOICE_REALTIME, off by default). Composed
+ * only when the flag is on and the OpenAI key exists; otherwise every
+ * voice session is the standard line, exactly as before. The broker plans
+ * each line with the same firewall, offers the same registry's tools and
+ * sends substantive turns to the same turn handler as the standard line.
+ */
+const duplexConfig = duplexConfigFrom(process.env);
+const duplexBroker =
+  duplexConfig.enabled && providerSecrets.openai !== undefined
+    ? createDuplexBroker({
+        config: duplexConfig,
+        gateway: createRealtimeVoiceGateway({
+          provider: createOpenAIRealtimeProvider({
+            apiKey: providerSecrets.openai.reveal(),
+          }),
+          enabled: true,
+          usage: createPostgresModelUsageRepository({ sql: database.sql }),
+          // ai_ops.providers: openai is UNREVIEWED, so PUBLIC unless this
+          // deployment is attested synthetic (as for text routing).
+          providerCeiling: "PUBLIC",
+          syntheticDemo,
+          onFailure: (failure) =>
+            logger.warn(failure, "duplex voice secret not minted"),
+        }),
+        firewall,
+        tools: qTools.port,
+        // Not the rehearsal-aware turn: a rehearsal line is never duplex.
+        turn: voiceTurn,
+        spend: createPostgresDuplexSpend(database.sql),
+        logger,
+      })
+    : undefined;
+logger.info(
+  {
+    enabled: duplexBroker !== undefined,
+    dailyCapUsd: duplexConfig.dailyCapUsd,
+    maxSessionSeconds: duplexConfig.maxSessionMs / 1000,
+    idleSeconds: duplexConfig.idleMs / 1000,
+  },
+  "duplex voice composed",
+);
 logger.info(
   {
     speech: speechProviderConfigStatus(
@@ -4467,6 +4514,7 @@ const { app, logger: appLogger } = createApp(
             board: voiceTurnBoard,
             welcome: welcomeHost,
             turn: rehearsalVoiceTurn,
+            duplex: duplexBroker,
             memory: { termsFor: memoryLearner.termsFor },
             openerFacts: createOpenerFacts({ sql: database.sql }),
             rehearsals: {

@@ -156,6 +156,13 @@ export type VoiceTurnOutcome =
   | { readonly kind: "INTERRUPTED"; readonly path: "INTERVIEW" | "Q" | "MOVE" }
   | { readonly kind: "NOTHING" };
 
+/**
+ * What Q asks, in code's words, when a spoken turn left a proposal waiting
+ * for the person (CQ-Q-008). Exported so the full-duplex line can tell the
+ * model a card is on screen without reading the model's own text.
+ */
+export const APPROVAL_QUESTION = "Shall I go ahead?";
+
 export type VoiceTurnHandler = (
   binding: VoiceSessionBinding,
   transcript: readonly VoiceTranscriptTurn[],
@@ -1113,8 +1120,8 @@ export function createVoiceTurnHandler(
               summary: proposedSummary,
             });
             yield proposedSummary === null
-              ? "I've prepared something that needs your approval. Shall I go ahead?"
-              : `${proposedSummary} Shall I go ahead?`;
+              ? `I've prepared something that needs your approval. ${APPROVAL_QUESTION}`
+              : `${proposedSummary} ${APPROVAL_QUESTION}`;
             // The run is paused for the person now; nothing more arrives
             // until they decide. Waiting here held the think request
             // open until its deadline, and the person read "Thinking"

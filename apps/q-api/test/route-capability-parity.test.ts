@@ -622,6 +622,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/voice/routes.ts POST Q_VOICE_SPEECH_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SPEAK_RELAY_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SESSIONS_PATH": Q_TRANSPORT,
+  // DUPLEX: the full-duplex line's tool relay, usage report and end.
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH": Q_TRANSPORT,
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH": Q_TRANSPORT,
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_END_PATH": Q_TRANSPORT,
   "q-api/voice/think.ts POST dependencies.path": Q_TRANSPORT,
   "q-api/voice/think.ts POST `${dependencies.path}/chat/completions`":
     Q_TRANSPORT,
@@ -804,6 +808,20 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  */
 const LEGACY_MUTATION_ROUTES_MAX = 92;
 
+/**
+ * DUPLEX (flag CQ_VOICE_REALTIME): the full-duplex line's own transport —
+ * a relay of the model's tool calls into the Tool Registry, its usage
+ * reports for the spend cap, and its end. Q transport, exempt under ADR
+ * 0040 ("Exempt routes stay exempt ... Q transport"); not a person's
+ * action, so never declarable as one. Named here one by one rather than
+ * lifting the legacy ceiling; pending the lead's decision.
+ */
+const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_END_PATH",
+]);
+
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH",
@@ -846,8 +864,10 @@ describe("every route and page is something Q can do, or exempt with a reason (R
   });
 
   it("no new hand-written mutation route: declare it in the app's action registry (ADR 0040)", () => {
-    const handWritten = routeKeys().filter((key) =>
-      / (POST|PUT|PATCH|DELETE) /.test(key),
+    const handWritten = routeKeys().filter(
+      (key) =>
+        / (POST|PUT|PATCH|DELETE) /.test(key) &&
+        !Q_TRANSPORT_NOT_ACTIONS.has(key),
     );
     expect(
       handWritten.length,

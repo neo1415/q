@@ -16,6 +16,7 @@ import {
   QVoiceScreenUpdateSchema,
   QVoiceTurnStateSchema,
   type QVoiceChoice,
+  type QVoiceDuplexCredential,
 } from "@capital-q/contracts";
 import { fetchMe } from "@capital-q/api-client";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
@@ -68,6 +69,8 @@ import {
 } from "./returning-opener.js";
 import type { ActorContext } from "@capital-q/security";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
+import type { DuplexBroker } from "./duplex/broker.js";
+import { registerDuplexVoiceRoutes } from "./duplex/routes.js";
 
 /**
  * `POST /v1/q/voice/sessions` (CQ-Q-VOICE-001 C §31, §34; doc 12 §7.2,
@@ -174,6 +177,12 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   /** What is theirs to deal with now, for a returning person's opener. */
   readonly openerFacts?:
     ((actor: ActorContext) => Promise<OpenerFacts>) | undefined;
+  /**
+   * DUPLEX: the full-duplex broker, when composed (CQ_VOICE_REALTIME).
+   * Tried after the standard line is bound; anything short of a minted
+   * line leaves the standard credential exactly as it was.
+   */
+  readonly duplex?: DuplexBroker | undefined;
 };
 
 export function registerQVoiceRoutes(
@@ -830,7 +839,7 @@ export function registerQVoiceRoutes(
       } else {
         throw new Error("unreachable: no voice transport");
       }
-      const accepted = dependencies.bindings.issue({
+      const binding: VoiceSessionBinding = {
         voiceSessionId,
         providerConversationId: credentials.providerConversationId,
         actor,
@@ -845,11 +854,37 @@ export function registerQVoiceRoutes(
           : { thinkToken: credentials.thinkToken }),
         ...(speakerVoiceId === undefined ? {} : { speakerVoiceId }),
         sessionToken: credentials.sessionToken,
-      });
+      };
+      const accepted = dependencies.bindings.issue(binding);
       if (!accepted) {
         throw new VoiceSessionLimitError();
       }
       started.add(1, { voice });
+
+      // DUPLEX: offered on top of the standard line, never instead of it.
+      // Any failure here is silent: the person gets the standard line.
+      let duplex: QVoiceDuplexCredential | undefined;
+      if (
+        dependencies.duplex?.enabled === true &&
+        input.duplex !== false &&
+        input.rehearsal === undefined
+      ) {
+        try {
+          const opened = await dependencies.duplex.open({
+            binding,
+            firstMessage,
+            locale: input.locale,
+          });
+          if (opened.kind === "DUPLEX") {
+            duplex = opened.credential;
+            // The line is in use from now: kept past the connect window,
+            // and the standard transport finds it connected on fallback.
+            dependencies.bindings.connect(binding.providerConversationId);
+          }
+        } catch (error: unknown) {
+          request.log.warn({ err: error }, "duplex voice unavailable");
+        }
+      }
 
       // Identifiers only: never the token, never the bearer.
       request.log.info(
@@ -858,6 +893,7 @@ export function registerQVoiceRoutes(
           voice,
           thread: input.onboarding === undefined ? "conversation" : "interview",
           resume,
+          duplex: duplex !== undefined,
         },
         "voice session issued",
       );
@@ -880,8 +916,16 @@ export function registerQVoiceRoutes(
             ...(credentials.settings === undefined
               ? {}
               : { deepgram: credentials.settings }),
+            ...(duplex === undefined ? {} : { duplex }),
           }),
         );
     },
   );
+
+  if (dependencies.duplex !== undefined) {
+    registerDuplexVoiceRoutes(app, {
+      broker: dependencies.duplex,
+      withContext,
+    });
+  }
 }
