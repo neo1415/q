@@ -160,6 +160,47 @@ describe("authorised retrieval service", () => {
     expect(result.hits.map((h) => h.chunkId)).toEqual([chunkId(1)]);
   });
 
+  it("an unconfigured runtime is lexical-only, logged once as a warning, never as an error (run 13955ca2)", async () => {
+    const logger = {
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    };
+    const embeddings = {
+      describe: () => {
+        throw new Error("unused");
+      },
+      embedDocuments: () => Promise.reject(new Error("unused")),
+      embedQuery: vi
+        .fn()
+        .mockRejectedValue(
+          new Error("the embedding runtime is not configured"),
+        ),
+      health: () => Promise.reject(new Error("unused")),
+    };
+    const service = createAuthorisedRetrievalService({
+      sql,
+      lexical: {
+        search: () =>
+          Promise.resolve([
+            { chunkId: chunkId(1), rank: 1, lexicalScore: 0.5 },
+          ]),
+      },
+      semantic: noSemantic,
+      hydration: fakeHydration([hydrated(chunkId(1))]),
+      embeddings,
+      logger: logger as never,
+    });
+    for (const query of ["runway", "burn", "payroll"]) {
+      const result = await service.retrieve({ query, envelope: envelope() });
+      expect(result.executedStrategy).toBe("LEXICAL_ONLY");
+      expect(result.hits.map((h) => h.chunkId)).toEqual([chunkId(1)]);
+    }
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+
   it("never reaches for an external provider when the local one is down", async () => {
     const embeddings = {
       describe: () => {

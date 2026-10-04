@@ -8,7 +8,7 @@ import {
   type BrandLogoBytes,
 } from "@capital-q/q-artifacts";
 import type { QBrandPalette } from "@capital-q/contracts";
-import { judgePublicUrl } from "@capital-q/q-research";
+import { normaliseWebAddress } from "@capital-q/q-research";
 
 import { createVettedHttp, type VettedHttp } from "./vetted-http.js";
 
@@ -73,14 +73,17 @@ export async function suggestBrandFromWebsite(input: {
   readonly http?: VettedHttp | undefined;
 }): Promise<WebsiteBrandSuggestion | null> {
   const client = input.http ?? createVettedHttp();
-  const withScheme = /^https?:\/\//i.test(input.websiteUrl)
-    ? input.websiteUrl
-    : `https://${input.websiteUrl}`;
-  const first = judgePublicUrl(withScheme);
-  if (!first.ok) return null;
-  const site = siteOf(new URL(first.url).host);
+  // The record holds what the person typed ("zinoaviation.com",
+  // "WWW.X.COM/", "http://x.com"): https first, then http once (lead
+  // 2026-10-04). A private or non-web address is refused as before.
+  const address = normaliseWebAddress(input.websiteUrl);
+  if (address === null) return null;
+  const site = siteOf(new URL(address.url).host);
 
-  const page = await fetchOnSite(client, first.url, site, HTML_MAX);
+  let page = await fetchOnSite(client, address.url, site, HTML_MAX);
+  if (page === null || !page.type.includes("html")) {
+    page = await fetchOnSite(client, address.fallback, site, HTML_MAX);
+  }
   if (page === null || !page.type.includes("html")) return null;
   const html = new TextDecoder().decode(page.body);
   const shallow = readWebsiteBrand({ pageUrl: page.url, html });

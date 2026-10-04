@@ -2647,6 +2647,8 @@ export function createSpecialistQAnswer(
               namedTools: named,
               hand: read.tool?.kind ?? null,
               handOver: (read.handOver ?? null) !== null,
+              research: (await research).mode,
+              text: latest.content,
             },
       subjectKinds: request.subjects.map((subject) => subject.kind),
       counterparty: await aboutCounterparty(request, latest.content, read),

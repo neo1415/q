@@ -171,6 +171,8 @@ export function createAuthorisedRetrievalService(
     }
   }
 
+  let warnedUnconfigured = false;
+
   async function runSemantic(
     envelope: RetrievalPermissionEnvelope,
     text: string,
@@ -215,7 +217,22 @@ export function createAuthorisedRetrievalService(
       // The local runtime is unavailable. There is no fallback: sending a
       // private evidence query to an external embedding API to keep search
       // working would trade a privacy guarantee for an availability one.
-      logger?.error({ err: error }, "query embedding failed");
+      // A runtime that is not configured at all (no Q_EMBEDDING_BASE_URL on
+      // this deployment) is a standing state, not an incident: lexical
+      // retrieval answers, the degradation travels with the result, and it
+      // is logged once rather than as an error on every turn (lead
+      // 2026-10-04, run 13955ca2).
+      const unconfigured =
+        error instanceof Error && /not configured/u.test(error.message);
+      if (!unconfigured) {
+        logger?.error({ err: error }, "query embedding failed");
+      } else if (!warnedUnconfigured) {
+        warnedUnconfigured = true;
+        logger?.warn(
+          { reason: "EMBEDDING_UNAVAILABLE" },
+          "no embedding runtime configured; retrieval is lexical only",
+        );
+      }
       return {
         candidates: [],
         state: "UNAVAILABLE",

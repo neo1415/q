@@ -356,4 +356,44 @@ describe("tools offered by what the turn is about", () => {
     );
     expect(afterTotal).toBeLessThan(beforeTotal);
   });
+
+  it("run 13955ca2: a research turn on an own-company plan keeps every research tool within the bound", () => {
+    const research = [
+      "extract_public_web",
+      "lookup_public_profile",
+      "research_public_web",
+    ];
+    // Their own records and research: 81 tools rank before the bound, and
+    // without the guarantee the three sit at 42-44, past it.
+    const areas = [
+      "Documents",
+      "Pitch",
+      "Profile",
+      "Records",
+      "Relationships",
+      "Research",
+    ];
+    expect(
+      names(
+        registry.eligible(
+          worstCase("OWN_COMPANY_QUESTION", { areas, tools: [] }),
+        ),
+      ),
+    ).not.toContain("research_public_web");
+    const focus = { areas, tools: research };
+    for (const purpose of [
+      "OWN_COMPANY_QUESTION",
+      "COUNTERPARTY_COMPANY_QUESTION",
+      "INVESTOR_QUESTION",
+      "GENERAL_QUESTION",
+    ] as const) {
+      const context = worstCase(purpose, focus);
+      const offered = names(registry.eligible(context));
+      expect(offered.length).toBeLessThanOrEqual(Q_TURN_TOOLS_MAX);
+      for (const tool of research) {
+        expect(offered, `${purpose}: ${tool}`).toContain(tool);
+        expect(registry.offeredByProviderName(context, tool)).toBeDefined();
+      }
+    }
+  });
 });

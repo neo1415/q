@@ -29,7 +29,44 @@ export type FocusReading = {
   /** The reader's hand, when it read one (NAVIGATE, SET_VISIBILITY, ...). */
   readonly hand: string | null;
   readonly handOver: boolean;
+  /**
+   * The reader's research decision for the turn (QResearchDirective mode:
+   * EXPLICIT, OFFERED, NONE...). Absent: not read.
+   */
+  readonly research?: string | null | undefined;
+  /** The person's words this turn, for a URL or a domain they named. */
+  readonly text?: string | undefined;
 };
+
+/**
+ * The public-web tools a research turn needs (lead 2026-10-04, run
+ * 13955ca2: a RESEARCH_REQUEST read with research EXPLICIT, on an
+ * OWN_COMPANY_QUESTION plan of 85 eligible tools, lost all three to the
+ * 40-tool bound, and Q said it had no public-web result). Kept the way a
+ * named action is kept: they lead the offer, so no bound can cut them.
+ * Offering is not authority: the plan's purpose and scopes still decide
+ * whether they may execute.
+ */
+export const RESEARCH_TOOLS: readonly string[] = [
+  "extract_public_web",
+  "lookup_public_profile",
+  "research_public_web",
+];
+
+const RESEARCH_MODES = new Set(["EXPLICIT", "OFFERED"]);
+
+/**
+ * A web address in what they wrote: a scheme, "www.", or a bare domain
+ * on a common or country TLD ("zinoaviation.com", "acme.co.uk"). A file
+ * name ("deck.pdf") or a version ("v1.5") is not one.
+ */
+const WEB_ADDRESS =
+  /(?:\bhttps?:\/\/|\bwww\.)\S|\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:com|net|org|io|ai|co|app|dev|xyz|tech|vc|capital|ventures|fund|finance|africa|biz|info|uk|ng|za|ke|gh|rw|eg|ma|de|fr|nl|us|ca|in|sg|ae|eu|me|ly|so|to|ie|es|it|au|nz|br|mx)\b(?![.-][a-z0-9])/iu;
+
+/** The turn names a web address. */
+export function namesWebAddress(text: string): boolean {
+  return WEB_ADDRESS.test(text);
+}
 
 const QUESTION_AREAS: Readonly<Record<string, readonly string[]>> = {
   ADVICE: ["Research"],
@@ -97,7 +134,14 @@ export function toolFocusOf(input: {
   for (const area of QUESTION_AREAS[reading.questionKind ?? ""] ?? []) {
     areas.add(area);
   }
-  if (reading.kind === "RESEARCH_REQUEST") areas.add("Research");
+  if (
+    reading.kind === "RESEARCH_REQUEST" ||
+    RESEARCH_MODES.has(reading.research ?? "") ||
+    namesWebAddress(reading.text ?? "")
+  ) {
+    areas.add("Research");
+    for (const tool of RESEARCH_TOOLS) tools.add(tool);
+  }
   const handArea = reading.hand === null ? undefined : HAND_AREAS[reading.hand];
   if (handArea !== undefined) areas.add(handArea);
   if (reading.handOver) areas.add("Relationships");

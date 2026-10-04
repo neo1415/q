@@ -19,7 +19,12 @@ import {
   type InstructionRiskCategory,
 } from "../domain/excerpt.js";
 import { mentionedCountries } from "../domain/geography.js";
-import { judgePublicUrl, publicDomainOf } from "../domain/url-safety.js";
+import {
+  judgePublicUrl,
+  normaliseWebAddress,
+  publicDomainOf,
+  webAddressesIn,
+} from "../domain/url-safety.js";
 import {
   isResearchProviderFailure,
   type PublicWebResearchProvider,
@@ -124,6 +129,13 @@ export type ExtractCommand = {
   readonly runId: string;
   readonly correlationId: CorrelationId;
   readonly urls: readonly string[];
+  /**
+   * The web addresses the person wrote in their own message this turn,
+   * as written (lead 2026-10-04: "read zinoaviation.com" was refused as
+   * not from a search). A URL they named may be read like one a search
+   * surfaced (ADR 0048); every URL is still judged public first.
+   */
+  readonly personNamed?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -715,13 +727,30 @@ export function createPublicWebResearchService(
     extract: async (command) => {
       metrics.requested.add(1, { operation: "extract" });
       const seen = new Set(allowlist.get(command.runId)?.urls ?? []);
+      // What the person named, normalised: https, with http as the one
+      // fallback for a site that only serves plain http.
+      const named = new Map<string, string>();
+      for (const written of webAddressesIn(
+        (command.personNamed ?? []).join(" "),
+        RESEARCH_BOUNDS.maxExtractCount,
+      )) {
+        named.set(written.url, written.fallback);
+      }
       const accepted: string[] = [];
       const rejectedUrls: { url: string; reason: string }[] = [];
       for (const candidate of command.urls.slice(
         0,
         RESEARCH_BOUNDS.maxExtractCount,
       )) {
-        const verdict = judgePublicUrl(candidate);
+        // "zinoaviation.com" from the model is the same address as
+        // "https://zinoaviation.com/"; a non-web scheme stays refused.
+        const written = /^[a-z][a-z0-9+.-]*:/iu.test(candidate.trim())
+          ? null
+          : normaliseWebAddress(candidate);
+        const verdict =
+          written === null
+            ? judgePublicUrl(candidate)
+            : judgePublicUrl(written.url);
         if (!verdict.ok) {
           rejectedUrls.push({
             url: candidate.slice(0, 200),
@@ -729,7 +758,7 @@ export function createPublicWebResearchService(
           });
           continue;
         }
-        if (!seen.has(verdict.url)) {
+        if (!seen.has(verdict.url) && !named.has(verdict.url)) {
           rejectedUrls.push({
             url: verdict.url,
             reason: "NOT_FROM_THIS_CONVERSATIONS_SEARCH",
@@ -759,6 +788,35 @@ export function createPublicWebResearchService(
           };
         }
         throw error;
+      }
+      // A site the person named that https could not read: once over
+      // plain http (its own, already-judged fallback form).
+      const retry = extracted.failedUrls.flatMap((url) => {
+        const fallback = named.get(url);
+        return fallback === undefined ? [] : [fallback];
+      });
+      if (retry.length > 0) {
+        try {
+          const again = await provider.extract(
+            { urls: retry },
+            { signal: command.signal },
+          );
+          const recovered = new Set(
+            retry
+              .filter((url) => !again.failedUrls.includes(url))
+              .map((url) => url.replace(/^http:/u, "https:")),
+          );
+          extracted = {
+            ...extracted,
+            pages: [...extracted.pages, ...again.pages],
+            failedUrls: [
+              ...extracted.failedUrls.filter((url) => !recovered.has(url)),
+              ...again.failedUrls,
+            ],
+          };
+        } catch (error: unknown) {
+          if (!isResearchProviderFailure(error)) throw error;
+        }
       }
       metrics.extractLatency.record(extracted.latencyMs, {
         provider: provider.code,
