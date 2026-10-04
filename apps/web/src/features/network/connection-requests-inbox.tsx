@@ -11,6 +11,7 @@ import { Button } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
 import { formatDay } from "@/components/date-format";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import {
   answerConnectionRequestAction,
@@ -211,16 +212,25 @@ function Row({
       className="flex flex-col gap-2 py-4"
       data-connection-request-id={current.interestId}
     >
-      <div className="flex flex-col gap-0.5">
-        <Link
-          href={`/company/${current.companyId}`}
-          className="cq-title-sm text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-        >
-          {name}
-        </Link>
-        <p className="cq-caption text-(--cq-text-tertiary)">
-          Asked to connect {formatDay(current.requestedAt)}
-        </p>
+      <div className="flex items-start gap-3">
+        <EntityAvatar
+          kind="company"
+          name={name}
+          companyId={current.companyId}
+          size="md"
+          decorative
+        />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Link
+            href={`/company/${current.companyId}`}
+            className="cq-title-sm text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          >
+            {name}
+          </Link>
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            Asked to connect {formatDay(current.requestedAt)}
+          </p>
+        </div>
       </div>
       {outcome}
     </li>

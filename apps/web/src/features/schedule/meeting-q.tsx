@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition, type ReactNode } from "react";
 import type { QMeetingAssistantDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import {
@@ -321,15 +322,26 @@ function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
         )}
         {record.attendees.length === 0 ? null : (
           <RecordSection label="Who was there">
-            <p className="cq-body-sm text-(--cq-text-primary)">
-              {record.attendees
-                .map((person) =>
-                  person.side === null
+            <ul className="flex flex-wrap gap-x-4 gap-y-2">
+              {record.attendees.map((person, index) => (
+                <li
+                  // Names can repeat across sides; the call's order is stable.
+                  key={`${person.name}-${String(index)}`}
+                  className="cq-body-sm flex items-center gap-1.5 text-(--cq-text-primary)"
+                >
+                  {/* A person's photo is theirs alone today: initials. */}
+                  <EntityAvatar
+                    kind="person"
+                    name={person.name}
+                    size="xs"
+                    decorative
+                  />
+                  {person.side === null
                     ? person.name
-                    : `${person.name} (${SIDE_WORDS[person.side] ?? person.side})`,
-                )
-                .join(", ")}
-            </p>
+                    : `${person.name} (${SIDE_WORDS[person.side] ?? person.side})`}
+                </li>
+              ))}
+            </ul>
           </RecordSection>
         )}
         {record.transcript.length === 0 ? null : (

@@ -9,6 +9,7 @@ import {
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
+import { CompanyAvatar } from "../company/company-avatar";
 import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
 import { ComparisonCards } from "./comparison-cards";
@@ -309,7 +310,11 @@ export function QResultBlocks({
                     </button>
                   )
                 }
-              />
+              >
+                {/* The company's picture through its gated photo route;
+                    the block names no one, so the frame stays unlabelled. */}
+                <CompanyAvatar companyId={block.companyId} size={40} />
+              </QResultCard>
             );
 
           case "INVESTOR_REFERENCE":
