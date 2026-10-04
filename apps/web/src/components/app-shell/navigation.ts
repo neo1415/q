@@ -5,7 +5,9 @@ import {
   CircleUser,
   FileText,
   Compass,
+  Gauge,
   Handshake,
+  ListChecks,
   Search,
   Landmark,
   Newspaper,
@@ -13,6 +15,7 @@ import {
   Presentation,
   Settings,
   Users,
+  Wrench,
 } from "@capital-q/ui/icons";
 
 import type { ContextScope } from "@capital-q/ui/tokens";
@@ -42,7 +45,10 @@ export type NavigationItem = {
     | "/results"
     | "/daily"
     | "/settings"
-    | "/documents";
+    | "/settings/usage"
+    | "/documents"
+    | "/work"
+    | "/admin";
   readonly label: string;
   readonly icon: ComponentType<{
     readonly size?: number;
@@ -141,6 +147,34 @@ export const DAILY_NAVIGATION: NavigationItem = {
   icon: Newspaper,
 };
 
+/**
+ * Q's work (WORK-58): what Q suggests, what waits for their yes, what it
+ * runs and what it finished. Reached from the bell before; now a section.
+ */
+export const WORK_NAVIGATION: NavigationItem = {
+  href: "/work",
+  label: "Work",
+  icon: ListChecks,
+};
+
+/** What Q used for them this month (lead 2026-10-03), under You. */
+export const USAGE_NAVIGATION: NavigationItem = {
+  href: "/settings/usage",
+  label: "Usage",
+  icon: Gauge,
+};
+
+/**
+ * Capital Q's operations console (ADR 0033), shown only to platform
+ * admins. The flag comes from the server; the console's own route still
+ * refuses everyone else whatever the navigation shows.
+ */
+export const ADMIN_NAVIGATION: NavigationItem = {
+  href: "/admin",
+  label: "Admin console",
+  icon: Wrench,
+};
+
 /** Search people by @handle and founders' videos (founder design 2026-09-29). */
 export const FIND_NAVIGATION: NavigationItem = {
   href: "/search",
@@ -170,36 +204,98 @@ export const ACCOUNT_NAVIGATION: readonly NavigationItem[] = [
 ];
 
 /**
- * Every section a person in this context can reach, in the sidebar's
- * order. The one source both the desktop sidebar and the phone's More
- * sheet read, so the two never drift. Showing a link is not access: each
- * route's server decides what this person may see.
+ * The sidebar's groups (WORK-58, founder-approved 2026-10-04): the main
+ * areas with no label, then Workspace, You, and Admin for platform admins
+ * only. Few short labels, never a heading per item. The one source both
+ * the desktop sidebar and the phone's More sheet read, so the two never
+ * drift. Showing a link is not access: each route's server decides.
  */
-export function sectionsFor(scope: ContextScope): readonly NavigationItem[] {
+export type NavigationGroup = {
+  /** Null for the main areas, which need no label. */
+  readonly label: "Workspace" | "You" | "Admin" | null;
+  readonly items: readonly NavigationItem[];
+};
+
+export function navigationGroupsFor(
+  scope: ContextScope,
+  options: { readonly admin?: boolean | undefined } = {},
+): readonly NavigationGroup[] {
   const founder = scope === "founder_private";
   const investor = scope === "investor_private";
   return [
-    ...PRIMARY_NAVIGATION,
-    // Founder Discover's Investors tab is the investor list; a second
-    // "Investors" entry showed the same list (demo audit 2026-10-03).
-    ...(founder ? [FOUNDER_MEDIA_NAVIGATION] : []),
-    ...(investor ? [FOUNDER_REQUESTS_NAVIGATION] : []),
-    ...(founder || investor ? [REHEARSALS_NAVIGATION, RESULTS_NAVIGATION] : []),
-    DOCUMENTS_NAVIGATION,
-    DAILY_NAVIGATION,
+    { label: null, items: PRIMARY_NAVIGATION },
+    {
+      label: "Workspace",
+      items: [
+        WORK_NAVIGATION,
+        ...(founder ? [FOUNDER_MEDIA_NAVIGATION] : []),
+        ...(investor ? [FOUNDER_REQUESTS_NAVIGATION] : []),
+        DOCUMENTS_NAVIGATION,
+        ...(founder || investor ? [REHEARSALS_NAVIGATION] : []),
+        DAILY_NAVIGATION,
+      ],
+    },
+    {
+      label: "You",
+      items: [
+        PROFILE_NAVIGATION,
+        ...(founder || investor ? [RESULTS_NAVIGATION] : []),
+        USAGE_NAVIGATION,
+        SETTINGS_NAVIGATION,
+      ],
+    },
+    ...(options.admin === true
+      ? [{ label: "Admin" as const, items: [ADMIN_NAVIGATION] }]
+      : []),
+  ];
+}
+
+/**
+ * Every section a person in this context can reach, in the sidebar's
+ * order, Profile and Settings aside (ACCOUNT_NAVIGATION). Search is the
+ * sidebar's search field and the More sheet's, so it is listed here too.
+ */
+export function sectionsFor(
+  scope: ContextScope,
+  options: { readonly admin?: boolean | undefined } = {},
+): readonly NavigationItem[] {
+  const account = new Set(ACCOUNT_NAVIGATION.map((item) => item.href));
+  return [
+    ...navigationGroupsFor(scope, options)
+      .flatMap((group) => group.items)
+      .filter((item) => !account.has(item.href)),
     FIND_NAVIGATION,
   ];
 }
 
-/** What the More sheet lists: Profile first, then everything not on a tab. */
+/**
+ * What the More sheet lists, in groups: everything not on a tab. Profile
+ * heads the sheet; Search is its field.
+ */
+export function moreGroupsFor(
+  scope: ContextScope,
+  options: { readonly admin?: boolean | undefined } = {},
+): readonly NavigationGroup[] {
+  const onTabs = new Set(MOBILE_NAVIGATION.map((item) => item.href));
+  return navigationGroupsFor(scope, options)
+    .map((group) => ({
+      label: group.label,
+      items: group.items.filter(
+        (item) => !onTabs.has(item.href) && item.href !== "/profile",
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+/** What the More sheet lists, flat: Profile, Search, then every group's. */
 export function moreSectionsFor(
   scope: ContextScope,
+  options: { readonly admin?: boolean | undefined } = {},
 ): readonly NavigationItem[] {
-  const onTabs = new Set(MOBILE_NAVIGATION.map((item) => item.href));
   return [
     PROFILE_NAVIGATION,
-    ...sectionsFor(scope).filter((item) => !onTabs.has(item.href)),
-    SETTINGS_NAVIGATION,
+    FIND_NAVIGATION,
+    ...moreGroupsFor(scope, options).flatMap((group) => group.items),
   ];
 }
 

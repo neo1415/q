@@ -27,8 +27,14 @@ export function QNavIcon({
       aria-hidden={ariaHidden}
       className={className}
     >
-      <circle cx="11.5" cy="11.5" r="7.5" />
-      <path d="M15.5 15.5 20 20" />
+      {/*
+       * WORK-58: distinct from Search's magnifier beside it. The tail
+       * crosses the ring, as a Q's does, and the core is lit: the mark's
+       * near-white centre, drawn as a dot (no glow in the chrome).
+       */}
+      <circle cx="12" cy="11.5" r="7.5" />
+      <path d="M13.6 13.4 19 19.5" />
+      <circle cx="12" cy="11.5" r="1.75" fill="currentColor" stroke="none" />
     </svg>
   );
 }

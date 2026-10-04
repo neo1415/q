@@ -15,6 +15,7 @@ import {
 import type { QSubject } from "@/features/q/q-subject";
 import { QSwarmPointer } from "@/features/q-swarm/q-swarm-pointer";
 import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
+import { adminContext } from "@/features/admin/admin-context";
 import { InstallPrompt } from "@/pwa/install-prompt";
 
 // Session-bound HTML is rendered per request and never prerendered or
@@ -76,13 +77,19 @@ export default async function ApplicationLayout({
   // ADMIN-4 block: "Verify you and <organisation>" stays in the shell until
   // both the person and the organisation are verified. A read that fails
   // shows nothing rather than a wrong state.
-  const verifyNudgeState =
+  // WORK-58: the Admin group shows only to a platform admin, decided by
+  // the API (the console's own route refuses anyone else regardless).
+  const [verifyNudgeState, admin] = await Promise.all([
     unfinished === null && context.kind !== "NONE"
-      ? await loadVerifyNudge()
-      : null;
+      ? loadVerifyNudge()
+      : Promise.resolve(null),
+    adminContext()
+      .then((found) => found !== null)
+      .catch(() => false),
+  ]);
   return (
     <AppShell
-      context={shell}
+      context={{ ...shell, admin }}
       subject={subject}
       qConnected={qConnected}
       onboarding={unfinished}

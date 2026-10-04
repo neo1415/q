@@ -27,6 +27,8 @@ import { NetworkStatus } from "./network-status";
 export type ShellContext = {
   readonly scope: ContextScope;
   readonly label?: string | undefined;
+  /** A platform admin (WORK-58): the sidebar adds the Admin group. */
+  readonly admin?: boolean | undefined;
 };
 
 const UNSET: ShellContext = { scope: "unset" };
@@ -101,7 +103,11 @@ export function AppShell({
             {children}
             <FictionalNames />
           </main>
-          <MobileNavigation scope={context.scope} verifyNudge={verifyNudge} />
+          <MobileNavigation
+            scope={context.scope}
+            admin={context.admin === true}
+            verifyNudge={verifyNudge}
+          />
         </div>
       </div>
       {/* DOCS: the one owner of document-ready cards, on every page. */}

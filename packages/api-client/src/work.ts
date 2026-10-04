@@ -20,6 +20,13 @@ import {
   type NotificationSettingsRequest,
   type PushSubscriptionRequest,
   type QWorkLaneAnswerRequest,
+  Q_WORK_DONE_PATH,
+  Q_WORK_SUGGESTION_DISMISSALS_PATH,
+  Q_WORK_SUGGESTIONS_PATH,
+  QWorkDonePageDtoSchema,
+  QWorkSuggestionListDtoSchema,
+  qWorkPausePath,
+  qWorkResumePath,
 } from "@capital-q/contracts";
 
 import { readProblemResponse } from "./problem.js";
@@ -180,5 +187,60 @@ export function saveNotificationSettings(
     NOTIFICATION_SETTINGS_PATH,
     NotificationSettingsDtoSchema,
     { body: settings },
+  );
+}
+
+// --- WORK-58: Q's work page -------------------------------------------------
+
+/** `GET /v1/q/work/suggestions` (Q API): up to five, read by code. */
+export function listQWorkSuggestions(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    Q_WORK_SUGGESTIONS_PATH,
+    QWorkSuggestionListDtoSchema,
+  );
+}
+
+/** `GET /v1/q/work/done` (Q API): what Q finished, a page at a time. */
+export function listQWorkDone(
+  session: ApiSession,
+  page: { readonly cursor?: string | undefined; readonly limit?: number } = {},
+) {
+  const query = new URLSearchParams();
+  if (page.cursor !== undefined) query.set("cursor", page.cursor);
+  if (page.limit !== undefined) query.set("limit", String(page.limit));
+  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+  return call(
+    session,
+    "GET",
+    `${Q_WORK_DONE_PATH}${suffix}`,
+    QWorkDonePageDtoSchema,
+  );
+}
+
+/** `POST /v1/q/work/suggestions/dismissals` (API, ADR 0040): "Not now". */
+export function dismissQWorkSuggestion(session: ApiSession, key: string) {
+  return call(
+    session,
+    "POST",
+    Q_WORK_SUGGESTION_DISMISSALS_PATH,
+    QWorkAcceptedDtoSchema,
+    { body: { key } },
+  );
+}
+
+/** `POST /v1/q/work/:id/pause` or `/resume` (API, ADR 0040). */
+export function setQWorkPaused(
+  session: ApiSession,
+  delegationId: string,
+  paused: boolean,
+) {
+  return call(
+    session,
+    "POST",
+    paused ? qWorkPausePath(delegationId) : qWorkResumePath(delegationId),
+    QWorkAcceptedDtoSchema,
+    { body: {} },
   );
 }
