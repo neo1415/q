@@ -120,6 +120,8 @@ export type QActionRepository = {
       readonly actionType: string;
       readonly actionVersion: number;
       readonly now: Date;
+      /** Only cards for exactly these targets; absent: any target. */
+      readonly targets?: readonly QSubjectRef[] | undefined;
     },
   ) => Promise<
     readonly {
@@ -143,6 +145,8 @@ export type QActionRepository = {
           readonly actionType: string;
           readonly actionVersion: number;
           readonly since: Date;
+          /** Only changes to exactly these targets; absent: any target. */
+          readonly targets?: readonly QSubjectRef[] | undefined;
         },
       ) => Promise<
         readonly {

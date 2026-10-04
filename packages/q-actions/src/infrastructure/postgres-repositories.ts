@@ -205,6 +205,20 @@ export function createPostgresQActionRepositories(): QActionRepositories {
     return rows.length === 0 ? null : toApproval(rows[0]);
   };
 
+  /**
+   * Only cards for these exact targets (voiceq-63: each candidate is read
+   * back with two queries, inside the propose transaction; unfiltered, a
+   * person with many waiting cards paid for all of them before a new card
+   * appeared). jsonb equality: the same refs, whatever their key order.
+   */
+  const sameTargets = (
+    executor: DatabaseExecutor,
+    targets: readonly unknown[] | undefined,
+  ) =>
+    targets === undefined
+      ? executor``
+      : executor`and a.target_refs = ${JSON.stringify(targets)}::text::jsonb`;
+
   return {
     actions: {
       insert: async (tx, input) => {
@@ -244,6 +258,7 @@ export function createPostgresQActionRepositories(): QActionRepositories {
              and a.action_type = ${input.actionType}
              and a.action_version = ${input.actionVersion}
              and a.status = 'AWAITING_APPROVAL'
+             ${sameTargets(executor, input.targets)}
              and p.requested_from_user_id = ${input.userId}
              and p.status = 'PENDING'
              and p.expires_at > ${input.now.toISOString()}::text::timestamptz
@@ -283,6 +298,7 @@ export function createPostgresQActionRepositories(): QActionRepositories {
              and a.action_type = ${input.actionType}
              and a.action_version = ${input.actionVersion}
              and a.status = 'EXECUTED'
+             ${sameTargets(executor, input.targets)}
              and p.status = 'APPROVED'
              and a.executed_at >= ${input.since.toISOString()}::text::timestamptz
            order by a.executed_at desc, a.id desc

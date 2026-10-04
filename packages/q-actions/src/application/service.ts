@@ -1071,6 +1071,7 @@ export function createQActionService(
                 actionType: definition.actionType,
                 actionVersion: definition.version,
                 now,
+                targets,
               },
             );
             const same = waiting.find(
@@ -1124,6 +1125,7 @@ export function createQActionService(
                   actionType: definition.actionType,
                   actionVersion: definition.version,
                   since: new Date(now.getTime() - ALREADY_DONE_LOOKBACK_MS),
+                  targets,
                 });
               const done = findSameIntent(
                 definition,

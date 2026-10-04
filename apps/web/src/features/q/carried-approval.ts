@@ -23,6 +23,36 @@ export type CarriedApproval = {
   readonly runId: string;
 };
 
+/**
+ * The conversation has moved on from a card (founder, voiceq-63): Q has
+ * since answered something else, in another run, without naming the card.
+ * The card leaves the screen on its own; the approval itself still waits,
+ * is listed under Needs you on Work, and "go ahead" or "cancel that" still
+ * decides it on the server.
+ */
+export function movedOn(
+  history: readonly QMessage[],
+  runId: string,
+  proposal: Pick<QActionProposal, "summary">,
+): boolean {
+  const at = history.findLastIndex(
+    (message) => message.role === "Q" && message.runId === runId,
+  );
+  if (at < 0) return false;
+  const summary = proposal.summary
+    .trim()
+    .replace(/[.\s]+$/u, "")
+    .toLowerCase();
+  return history
+    .slice(at + 1)
+    .some(
+      (message) =>
+        message.role === "Q" &&
+        message.runId !== runId &&
+        !(message.text ?? "").toLowerCase().includes(summary),
+    );
+}
+
 export function carriedApproval(
   conversationId: string | null,
   history: readonly QMessage[],
@@ -42,7 +72,7 @@ export function carriedApproval(
         ),
       )
       .at(0);
-    if (proposal !== undefined) {
+    if (proposal !== undefined && !movedOn(history, item.runId, proposal)) {
       return {
         approval: {
           approvalId: item.approvalId,
