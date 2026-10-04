@@ -105,6 +105,13 @@ export type VoiceSessionEvents = {
     ((reason: "ended" | "error" | "dropped") => void) | undefined;
   /** A plain sentence for the person; never a provider error string. */
   readonly onError?: ((message: string) => void) | undefined;
+  /**
+   * DUPLEX: the full-duplex line ended after it came up (the cap, its
+   * maximum length, the network) and the standard voice should take over
+   * on the same thread; with one sentence for the person, or silently.
+   * Absent: the line is reported as dropped.
+   */
+  readonly onFallback?: ((notice: string | null) => void) | undefined;
 };
 
 export type VoiceSessionStart = {

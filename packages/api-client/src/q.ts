@@ -9,6 +9,14 @@ import {
   QVoiceTurnStateSchema,
   qVoiceTurnPath,
   qVoiceScreenPath,
+  qVoiceDuplexEndPath,
+  qVoiceDuplexToolPath,
+  qVoiceDuplexUsagePath,
+  QVoiceDuplexToolResultSchema,
+  QVoiceDuplexUsageResultSchema,
+  type QVoiceDuplexEnd,
+  type QVoiceDuplexToolCall,
+  type QVoiceDuplexUsageReport,
   type QVoiceScreenUpdate,
   Q_VOICE_SESSIONS_PATH,
   IDEMPOTENCY_KEY_HEADER,
@@ -227,6 +235,61 @@ export function createQVoiceSession(
     CreateQVoiceSessionResponseSchema,
     { body: input },
   );
+}
+
+/** DUPLEX: one function call the duplex model proposed, for the server to run. */
+export function relayQVoiceDuplexTool(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexToolCall,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexToolPath(voiceSessionId),
+    QVoiceDuplexToolResultSchema,
+    { body: input },
+  );
+}
+
+/** DUPLEX: one response's usage, for the spend cap. */
+export function reportQVoiceDuplexUsage(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexUsageReport,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexUsagePath(voiceSessionId),
+    QVoiceDuplexUsageResultSchema,
+    { body: input },
+  );
+}
+
+/** DUPLEX: the line ended. */
+export async function endQVoiceDuplex(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexEnd,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${qVoiceDuplexEndPath(voiceSessionId)}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
 }
 
 const conversationPath = (conversationId: string) =>

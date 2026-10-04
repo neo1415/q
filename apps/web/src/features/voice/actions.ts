@@ -74,6 +74,12 @@ function translate(error: unknown): VoiceActionResult<never> {
 
 const InputSchema = CreateQVoiceSessionRequestSchema;
 
+/** CQ_VOICE_REALTIME on the web service; read on the server only. */
+function duplexVoiceAllowed(): boolean {
+  const flag = process.env.CQ_VOICE_REALTIME?.trim().toLowerCase();
+  return flag === "on" || flag === "true" || flag === "1";
+}
+
 /** Ask the Q API for a voice session bound to the thread the person is in. */
 export async function startVoiceSessionAction(
   rawInput: unknown,
@@ -82,7 +88,11 @@ export async function startVoiceSessionAction(
   if (!parsed.success) {
     return failure("I couldn't start voice for this conversation.");
   }
-  const input: CreateQVoiceSessionRequest = parsed.data;
+  // DUPLEX: both services must have the flag on. Off here, the Q API is
+  // asked for the standard line whatever it would offer.
+  const input: CreateQVoiceSessionRequest = duplexVoiceAllowed()
+    ? parsed.data
+    : { ...parsed.data, duplex: false };
   const { qApiBaseUrl } = loadWebServerConfig();
   if (qApiBaseUrl === undefined) {
     return failure("Q isn't available right now. Try again later.");

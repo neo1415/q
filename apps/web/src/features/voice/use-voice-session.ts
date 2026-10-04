@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDeepgramVoiceSession } from "./provider/deepgram-session";
+import { useDuplexVoiceSession } from "./provider/duplex-session";
 import { useElevenLabsVoiceSession } from "./provider/elevenlabs-session";
 import type {
   VoiceSessionClient,
@@ -34,18 +35,33 @@ export function useVoiceSession(
 ): VoiceSessionClient {
   const elevenLabs = useElevenLabsVoiceSession(events);
   const deepgram = useDeepgramVoiceSession(events);
-  const [active, setActive] = useState<"elevenlabs" | "deepgram">("elevenlabs");
-  const client = active === "deepgram" ? deepgram : elevenLabs;
+  const duplex = useDuplexVoiceSession(events);
+  const [active, setActive] = useState<"elevenlabs" | "deepgram" | "duplex">(
+    "elevenlabs",
+  );
+  const client =
+    active === "duplex"
+      ? duplex
+      : active === "deepgram"
+        ? deepgram
+        : elevenLabs;
   const [pausedAway, setPausedAway] = useState(false);
 
   const start = useCallback(
     async (input: VoiceSessionStart) => {
       const provider = input.credential.provider ?? "elevenlabs";
-      setActive(provider);
       setPausedAway(false);
+      // DUPLEX: the full-duplex line first when the server brokered one;
+      // if it does not come up, the standard line on the same credential,
+      // at once and without a word to the person.
+      if (input.credential.duplex !== undefined) {
+        setActive("duplex");
+        if (await duplex.start(input)) return;
+      }
+      setActive(provider);
       await (provider === "deepgram" ? deepgram : elevenLabs).start(input);
     },
-    [deepgram, elevenLabs],
+    [deepgram, duplex, elevenLabs],
   );
 
   const transportSetMuted = client.setMuted;

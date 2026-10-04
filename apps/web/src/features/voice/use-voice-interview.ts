@@ -60,6 +60,8 @@ export type VoiceInterview = {
      * says `firstMessage` (a line already on screen), or nothing.
      */
     readonly resume?: boolean | undefined;
+    /** DUPLEX: the standard line, even where full duplex is offered. */
+    readonly duplex?: false | undefined;
   }) => Promise<void>;
   readonly end: () => Promise<void>;
   readonly chooseVoice: (voice: QVoiceChoice) => Promise<void>;
@@ -205,6 +207,11 @@ export function useVoiceInterview(
   });
   /** Q's latest spoken line, to time its gestures by sentence. */
   const lastQLine = useRef("");
+  /**
+   * DUPLEX: a full-duplex line ended into the standard voice. Until the
+   * person ends voice, every line (a reconnect too) is the standard one.
+   */
+  const duplexOff = useRef(false);
   const client = useVoiceSession({
     ...events,
     onLine: (line) => {
@@ -212,6 +219,26 @@ export function useVoiceInterview(
       events.onLine?.(line);
     },
     onEnded: ended,
+    // DUPLEX: the same thread carries on, on the standard voice, at once.
+    // Resumed: Q does not greet again. The cap's one sentence, if any, is
+    // shown once the standard line is up (talk clears the notice first).
+    onFallback: (notice) => {
+      duplexOff.current = true;
+      const last = lastStart.current;
+      const again = talkRef.current;
+      if (last === null || again === null) {
+        ended("dropped");
+        return;
+      }
+      void again({
+        thread: last.thread,
+        firstMessage: undefined,
+        resume: true,
+        duplex: false,
+      }).then(() => {
+        if (notice !== null) setNotice(notice);
+      });
+    },
     onError: (message) => {
       setNotice(message);
       events.onError?.(message);
@@ -223,12 +250,19 @@ export function useVoiceInterview(
   });
 
   const talk = useCallback<VoiceInterview["talk"]>(
-    async ({ thread, firstMessage, voice: requested, resume = false }) => {
+    async ({
+      thread,
+      firstMessage,
+      voice: requested,
+      resume = false,
+      duplex,
+    }) => {
       const chosen = requested ?? voice;
       setNotice(null);
       lastStart.current = { thread, firstMessage };
       const started = await startVoiceSessionAction({
         ...(resume ? { resume: true } : {}),
+        ...(duplex === false || duplexOff.current ? { duplex: false } : {}),
         ...(thread.welcome === true ? { welcome: true } : {}),
         ...(thread.onboarding === undefined
           ? {}
@@ -285,6 +319,7 @@ export function useVoiceInterview(
     lastStart.current = null;
     reconnectAttempts.current = 0;
     upSince.current = null;
+    duplexOff.current = false;
     await client.end();
   }, [client]);
 
