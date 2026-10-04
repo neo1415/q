@@ -120,6 +120,21 @@ const CASES = [
     grant: (g) => g.actions.every((a) => a.mode === "ASK"),
   },
   {
+    // Live QA (instruction 76d6f281, runs 01a6124a / 9f948ed2): any hour
+    // is every day 00:00-23:59, read by code; a first message only allows
+    // no follow-ups; "do not book calls" leaves booking out.
+    id: "investor.first-message-any-hour",
+    account: "INVESTOR",
+    say: "Starting right now at any hour, send a short first message to founders I'm connected with who haven't heard from me yet. Do not book calls.",
+    card: true,
+    grant: (g) =>
+      g.workingHours.days.length === 7 &&
+      g.workingHours.start === "00:00" &&
+      g.workingHours.end === "23:59" &&
+      g.followUps === false &&
+      !g.actions.some((a) => a.action === "schedule.meeting.book"),
+  },
+  {
     id: "investor.handle-all-work",
     account: "INVESTOR",
     say: "Handle all the work for me.",

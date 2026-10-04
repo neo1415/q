@@ -6,9 +6,9 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  InstructionPlanV3ResultSchema,
+  InstructionPlanV5ResultSchema,
   renderPrompt,
-  type InstructionPlanV3Result,
+  type InstructionPlanV5Result,
   type InstructionPlanV4Variables,
 } from "@capital-q/q-core";
 
@@ -31,9 +31,21 @@ export type PlanVariables = Omit<
   | "environmentNotes"
 >;
 
+type PlanStepV5 = InstructionPlanV5Result["steps"][number];
+/**
+ * A planned step. `message` is v5's typed reading of a chat message (its
+ * kind and final ask); a step without it is judged by code alone.
+ */
+export type InstructionPlanStep = Omit<PlanStepV5, "message"> & {
+  readonly message?: PlanStepV5["message"] | undefined;
+};
+export type InstructionPlan = Omit<InstructionPlanV5Result, "steps"> & {
+  readonly steps: readonly InstructionPlanStep[];
+};
+
 export type PlanOutcome = {
   /** Null: refused, failed or unreadable; the firing plans nothing. */
-  readonly plan: InstructionPlanV3Result | null;
+  readonly plan: InstructionPlan | null;
   /** What it cost, USD (0 when nothing was spent or it was unpriced). */
   readonly costUsd: number;
 };
@@ -65,7 +77,7 @@ export function createInstructionPlanner(dependencies: {
         variables,
       });
       const response =
-        await dependencies.gateway.execute<InstructionPlanV3Result>(
+        await dependencies.gateway.execute<InstructionPlanV5Result>(
           {
             taskClass: "STRUCTURED_EXTRACTION",
             sensitivity: "CONFIDENTIAL",
@@ -91,11 +103,11 @@ export function createInstructionPlanner(dependencies: {
               correlationId: `cor_instr_${who.instructionId}_${randomUUID().slice(0, 8)}`,
             },
           },
-          { schema: InstructionPlanV3ResultSchema },
+          { schema: InstructionPlanV5ResultSchema },
         );
       const costUsd = response.cost.amount;
       if (response.output.kind !== "STRUCTURED") return { plan: null, costUsd };
-      const parsed = InstructionPlanV3ResultSchema.safeParse(
+      const parsed = InstructionPlanV5ResultSchema.safeParse(
         response.output.value,
       );
       return { plan: parsed.success ? parsed.data : null, costUsd };

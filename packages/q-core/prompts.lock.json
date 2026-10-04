@@ -149,7 +149,8 @@
     "investor-persona/v6": "efe30957f2ec84c227be1b7f760d98ccda254b8bcee0e9e8ccad37a6d108efc0",
     "instruction-plan/v4": "0e4096dd7ec13240897db0290a3ee46c9533ed0eee55ebe2f9bb81c25cce6109",
     "instruction-thread-reader/v2": "9bd365b8d6a93d253a34e7df45285c87017c7963a4c2d99ad3eedddc27b5e7ce",
-    "meeting-notes/v3": "e127c908de22a739712e81298f15a8277ce76ae5cb554edf86b896181f627106"
+    "meeting-notes/v3": "e127c908de22a739712e81298f15a8277ce76ae5cb554edf86b896181f627106",
+    "instruction-plan/v5": "c048351f251be9b557a7cf5ad825cb91c36254452603f692f3311fc0df8b5289"
   },
   "generatedBy": "CQ-Q-006"
 }

@@ -235,3 +235,67 @@ describe("propose_standing_instruction: prepare is not do (weekend test 6ea17898
     ).toBe(true);
   });
 });
+
+describe("propose_standing_instruction: clear hours are read by code (live QA 01a6124a / 9f948ed2)", () => {
+  const ALL_DAY = {
+    timeZone: "Africa/Lagos",
+    days: [1, 2, 3, 4, 5, 6, 7],
+    start: "00:00",
+    end: "23:59",
+  };
+
+  it("'at any hour', '24/7', 'anytime', 'round the clock', 'weekends too', 'every day': every day, all day -- whatever the model left out", async () => {
+    for (const goal of [
+      "Send a first message to my founders, starting right now at any hour",
+      "Handle my investors 24/7",
+      "Reply to founders anytime",
+      "Work round the clock on my outreach",
+      "Keep my investor conversations going, weekends too",
+      "Message new founders every day",
+    ]) {
+      const { prepared } = await world().propose({ goal });
+      expect(grantOf(prepared[0]).workingHours, goal).toEqual(ALL_DAY);
+    }
+  });
+
+  it("overrides a default reading (the flaky Mon-Fri 09:00-17:00), never an explicit one", async () => {
+    const flaky = await world().propose({
+      goal: "Starting right now at any hour, message my founders",
+      workingHours: { days: [1, 2, 3, 4, 5], start: "09:00", end: "17:00" },
+    });
+    expect(grantOf(flaky.prepared[0]).workingHours).toEqual(ALL_DAY);
+    const explicit = await world().propose({
+      goal: "Weekends too, 8am to 10pm",
+      workingHours: {
+        days: [1, 2, 3, 4, 5, 6, 7],
+        start: "08:00",
+        end: "22:00",
+      },
+    });
+    expect(grantOf(explicit.prepared[0]).workingHours).toEqual({
+      ...ALL_DAY,
+      start: "08:00",
+      end: "22:00",
+    });
+  });
+});
+
+describe("propose_standing_instruction: a first message only (live QA, instruction 76d6f281)", () => {
+  it("'a first message to founders who haven't heard from me' allows no follow-ups; other goals leave them as they were", async () => {
+    const first = await world().propose({
+      goal: "Send a short first message to founders I'm connected with who haven't heard from me yet",
+    });
+    expect(grantOf(first.prepared[0]).followUps).toBe(false);
+    const read = await world().propose({
+      goal: "Say hello to my new connections",
+      firstMessagesOnly: true,
+    });
+    expect(grantOf(read.prepared[0]).followUps).toBe(false);
+    const both = await world().propose({
+      goal: "Send a first message and follow up a week later",
+    });
+    expect(grantOf(both.prepared[0]).followUps).toBeUndefined();
+    const all = await world().propose({ goal: "Handle all the work for me" });
+    expect(grantOf(all.prepared[0]).followUps).toBeUndefined();
+  });
+});

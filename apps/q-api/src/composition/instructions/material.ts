@@ -1,4 +1,8 @@
-import type { InstructionQuestionKind } from "@capital-q/q-core";
+import { STAGE_LADDER, stageInRange } from "@capital-q/discovery";
+import type {
+  InstructionMessageAsk,
+  InstructionQuestionKind,
+} from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
 /**
@@ -37,11 +41,38 @@ export type MaterialFact = {
   readonly kind: "LABEL" | "DESCRIPTION";
   /** The question this fact answers, when it is one of the sender's own. */
   readonly answers?: InstructionQuestionKind | undefined;
+  /** The declared code behind a label fact (stage, country), when there is one. */
+  readonly code?: string | undefined;
+  /**
+   * Live QA (ASK card f3e411b7): the sentence that answers `answers`,
+   * composed by code from the declared fields alone. A reply uses it word
+   * for word; nothing about the sender is generated freely.
+   */
+  readonly answer?: string | undefined;
+  /** investment_role codes, for the role-in-a-round fact. */
+  readonly roles?: readonly string[] | undefined;
+};
+
+/**
+ * The sender's declared hard criteria a first message must sit inside
+ * (live QA: Tallyloom, Series B, was told it "fits" a Seed-only mandate).
+ * Undeclared is open; a counterpart's unknown stage or country is unknown,
+ * never outside.
+ */
+export type SenderCriteria = {
+  readonly minStageCode: string | null;
+  readonly maxStageCode: string | null;
+  /** Declared countries (geography.country, including), upper case; empty: open. */
+  readonly countries: readonly string[];
+  /** Hard-excluded countries, upper case. */
+  readonly excludedCountries: readonly string[];
 };
 
 export type SenderMaterial = {
   readonly side: "INVESTOR" | "COMPANY";
   readonly facts: readonly MaterialFact[];
+  /** An investor's declared criteria; absent for a founder. */
+  readonly criteria?: SenderCriteria | undefined;
 };
 
 export type InstructionMaterial = {
@@ -82,6 +113,7 @@ function label(
   text: string,
   source: string,
   answers?: InstructionQuestionKind,
+  code?: string,
 ): MaterialFact {
   return {
     label: name,
@@ -90,6 +122,7 @@ function label(
     anchors: [text.toLowerCase()],
     kind: "LABEL",
     ...(answers === undefined ? {} : { answers }),
+    ...(code === undefined ? {} : { code }),
   };
 }
 
@@ -119,24 +152,24 @@ export function companyCardFacts(
 ): readonly MaterialFact[] {
   const facts: MaterialFact[] = [];
   if (card.currentStageCode !== null) {
-    facts.push(
-      label(
-        "stage",
-        humanCode(card.currentStageCode, labels),
-        source,
-        "STAGES",
-      ),
-    );
+    const stage = humanCode(card.currentStageCode, labels);
+    facts.push({
+      ...label("stage", stage, source, "STAGES", card.currentStageCode),
+      answer: `We're at ${stage}.`,
+    });
   }
   if (card.headquartersCountry !== null) {
-    facts.push(
-      label(
+    const place = humanCode(card.headquartersCountry, labels);
+    facts.push({
+      ...label(
         "based in",
-        humanCode(card.headquartersCountry, labels),
+        place,
         source,
         "GEOGRAPHIES",
+        card.headquartersCountry,
       ),
-    );
+      answer: `We're based in ${place}.`,
+    });
   }
   if (card.shortDescription !== null && card.shortDescription.trim() !== "") {
     facts.push(described("what they do", card.shortDescription, source));
@@ -236,6 +269,10 @@ export function mandateFacts(
         : (low ?? high ?? "");
     facts.push({
       ...label("stages", text, source, "STAGES"),
+      answer:
+        low !== null && high !== null && low !== high
+          ? `We invest from ${low} to ${high}.`
+          : `We invest at ${text}.`,
       anchors: [low, high]
         .filter((part): part is string => part !== null)
         .map((part) => part.toLowerCase()),
@@ -281,6 +318,7 @@ export function mandateFacts(
     const list = unique(sectors);
     facts.push({
       ...label("sectors", list.join(", "), source, "SECTORS"),
+      answer: `We focus on ${list.join(", ")}.`,
       anchors: list.map((entry) => entry.toLowerCase()),
     });
   }
@@ -288,6 +326,7 @@ export function mandateFacts(
     const list = unique(places);
     facts.push({
       ...label("geographies", list.join(", "), source, "GEOGRAPHIES"),
+      answer: `We invest in ${list.join(", ")}.`,
       anchors: list.map((entry) => entry.toLowerCase()),
     });
   }
@@ -312,9 +351,23 @@ export function mandateFacts(
             ? `up to ${money(cheque.max)}`
             : null,
     ].filter((part): part is string => part !== null);
+    // A declared range is a declared fact, not a commitment: said exactly.
+    const range =
+      cheque.min !== undefined && cheque.max !== undefined
+        ? `from ${money(cheque.min)} to ${money(cheque.max)}`
+        : cheque.min !== undefined
+          ? `from ${money(cheque.min)}`
+          : cheque.max !== undefined
+            ? `of up to ${money(cheque.max)}`
+            : null;
+    const answer =
+      cheque.typical !== undefined
+        ? `Our typical cheque is ${money(cheque.typical)}${range === null ? "" : `, within a range ${range}`}.`
+        : `We write cheques ${range ?? ""}.`;
     facts.push({
       label: "cheque size",
       text: parts.join(", "),
+      answer,
       source,
       // Grounded by the amounts themselves (numbersIn reads "250k" too).
       anchors: [cheque.typical, cheque.min, cheque.max]
@@ -324,13 +377,14 @@ export function mandateFacts(
       answers: "CHEQUE_SIZE",
     });
   }
-  const roles = codesOf("investment_role").map((code) =>
-    humanCode(code, labels),
-  );
+  const roleCodes = [...new Set(codesOf("investment_role"))];
+  const roles = roleCodes.map((code) => humanCode(code, labels));
   if (roles.length > 0) {
     const list = unique(roles);
     facts.push({
       ...label("role in a round", list.join("; "), source, "LEAD_OR_FOLLOW"),
+      roles: roleCodes,
+      answer: roleAnswer(roleCodes, list),
       anchors: list.flatMap((entry) =>
         distinctiveWords(entry, 3).length > 0
           ? distinctiveWords(entry, 3)
@@ -339,6 +393,100 @@ export function mandateFacts(
     });
   }
   return facts;
+}
+
+const ROLE_WORDS: Readonly<Record<string, string>> = {
+  lead: "lead rounds",
+  co_invest: "co-invest alongside a lead",
+  follow: "follow in later rounds",
+};
+
+/** "We lead rounds." / "We lead rounds and co-invest alongside a lead." */
+function roleAnswer(codes: readonly string[], labelled: readonly string[]) {
+  const words = codes.map((code) => ROLE_WORDS[code]);
+  if (words.every((entry): entry is string => entry !== undefined)) {
+    return `We ${words.join(" and ")}.`;
+  }
+  return `On rounds: ${labelled.join("; ")}.`;
+}
+
+/** The investor's declared hard criteria for a first message. */
+export function mandateCriteria(mandate: MandateLike): SenderCriteria {
+  const countries = (hard: boolean) =>
+    mandate.constraints
+      .filter(
+        (constraint) =>
+          constraint.dimension === "geography.country" &&
+          constraint.isHardExclusion === hard &&
+          (hard
+            ? constraint.operator === "NOT_IN" || constraint.operator === "NEQ"
+            : INCLUDING.has(constraint.operator)) &&
+          constraint.value.kind === "codes",
+      )
+      .flatMap((constraint) =>
+        "values" in constraint.value ? [...constraint.value.values] : [],
+      )
+      .map((code) => code.toUpperCase());
+  return {
+    minStageCode: mandate.stage.minStageCode,
+    maxStageCode: mandate.stage.maxStageCode,
+    countries: countries(false),
+    excludedCountries: countries(true),
+  };
+}
+
+export type OutsideCriterion = "STAGE" | "GEOGRAPHY";
+
+/**
+ * Where a counterpart is outside the sender's declared hard criteria; null
+ * when inside, undeclared, or unknown. (Sector: a card carries no declared
+ * sector code, so it is never judged outside on sector -- unknown is not a
+ * no.)
+ */
+export function outsideCriteria(
+  criteria: SenderCriteria | undefined,
+  counterpart: readonly MaterialFact[],
+): OutsideCriterion | null {
+  if (criteria === undefined) return null;
+  const stage = counterpart.find((fact) => fact.label === "stage")?.code;
+  if (
+    stage !== undefined &&
+    (criteria.minStageCode !== null || criteria.maxStageCode !== null) &&
+    (STAGE_LADDER as readonly string[]).includes(stage) &&
+    !stageInRange(stage, criteria.minStageCode, criteria.maxStageCode)
+  ) {
+    return "STAGE";
+  }
+  const country = counterpart
+    .find((fact) => fact.label === "based in")
+    ?.code?.toUpperCase();
+  if (
+    country !== undefined &&
+    (criteria.excludedCountries.includes(country) ||
+      (criteria.countries.length > 0 && !criteria.countries.includes(country)))
+  ) {
+    return "GEOGRAPHY";
+  }
+  return null;
+}
+
+/**
+ * The reply to their question about the sender's declared fields, composed
+ * by code (deterministic templating); null when any part is not declared or
+ * the question is about something else.
+ */
+export function factAnswer(
+  kinds: readonly InstructionQuestionKind[],
+  sender: readonly MaterialFact[],
+): string | null {
+  if (kinds.length === 0 || kinds.includes("OTHER")) return null;
+  const parts: string[] = [];
+  for (const kind of [...new Set(kinds)]) {
+    const answer = sender.find((fact) => fact.answers === kind)?.answer;
+    if (answer === undefined) return null;
+    parts.push(answer);
+  }
+  return parts.join(" ");
 }
 
 // ---------------------------------------------------------------------------
@@ -388,6 +536,8 @@ export const MESSAGE_PROBLEMS = [
   "MESSAGE_TOO_LONG",
   "UNGROUNDED_NUMBER",
   "UNANSWERED_QUESTION",
+  "UNSUPPORTED_FIT",
+  "UNGROUNDED_CLAIM",
 ] as const;
 export type MessageProblem = (typeof MESSAGE_PROBLEMS)[number];
 
@@ -398,6 +548,70 @@ const FALSE_HISTORY =
 /** A call or a meeting proposed. */
 const MEETING =
   /\b(?:meet|meeting|meet up|catch up|catch-up|a call|quick call|short call|intro call|hop on|jump on|zoom|google meet|teams call|coffee|find (?:a )?time|book (?:a |some )?time|grab (?:some )?time|schedule (?:a|some)|calendar|calendly|\d+\s?(?:-|to)?\s?min(?:ute)?s?\b)/iu;
+
+/**
+ * Live QA (instruction 76d6f281): "are there times that suit you for a
+ * conversation?" and "What times work well to connect?" passed MEETING.
+ * The planner now says what its last sentence asks (a typed field, the
+ * primary rule); this is code's own reading of that last sentence, so a
+ * mislabelled ask is caught too. Common scheduling forms only -- time and
+ * times, call, meet, chat, connect, schedule, availability, calendar,
+ * slot, "find a time" -- each in its scheduling sense, not "how do you
+ * meet demand?".
+ */
+const MEETING_ASK = new RegExp(
+  [
+    String.raw`\btimes?\b[^?]{0,40}\b(?:work|works|suit|suits|convenient|free|good|best|available|open)\b`,
+    String.raw`\b(?:good|convenient|best|free|a) times?\b(?: (?:to|for|that|this|next))`,
+    String.raw`\btime to (?:talk|chat|connect|meet|speak|catch up)\b`,
+    String.raw`\bfind (?:a |some )?time\b`,
+    String.raw`\bavailability\b`,
+    String.raw`\b(?:are you|you're|you are|be) (?:\w+ )?(?:available|free)\b`,
+    String.raw`\b(?:my|your|our) calendars?\b`,
+    String.raw`\bcalendar (?:invite|link)\b`,
+    String.raw`\b(?:my|your|our) diary\b`,
+    String.raw`\bschedule (?:a|an|some|time|something)\b`,
+    String.raw`\bscheduling (?:a|an|some) (?:call|meeting|chat|time)\b`,
+    String.raw`\b(?:a|time|your) slots?\b`,
+    String.raw`\bslots? (?:next|this|that|open|free|available)\b`,
+    String.raw`\b(?:a|quick|short|brief|intro|video|phone|zoom) (?:call|chat|catch[- ]up|conversation)\b`,
+    String.raw`\b(?:call|chat|talk|speak|connect|meet)(?: (?:next|this|soon|sometime|later|over|on|by)\b|\s*[?.!]*$)`,
+    String.raw`\bmeet(?:ing)?\b(?! (?:demand|the (?:needs?|demand)|needs?|requirements?|targets?|regulat\w*|compliance))`,
+  ].join("|"),
+  "iu",
+);
+
+/** The last sentence of a message, where its ask is. */
+export function finalSentence(body: string): string {
+  const sentences = body
+    .replace(/\s+/gu, " ")
+    .trim()
+    .split(/(?<=[.!?])\s+/u)
+    .filter((sentence) => sentence.trim() !== "");
+  return sentences[sentences.length - 1] ?? "";
+}
+
+/** Whether a sentence asks for a call, a meeting or a time. */
+export function asksForMeeting(sentence: string): boolean {
+  return MEETING_ASK.test(sentence);
+}
+
+/** A claim that the counterpart fits or matches the sender's focus. */
+const FIT_CLAIM =
+  /\bfits?\b|\bfitting\b|\b(?:good|great|strong|close|natural|clear) (?:fit|match)\b|\bmatch(?:es|ed)? (?:our|my|what (?:we|i))\b|\baligns? (?:well )?with (?:our|my)\b|\bin line with (?:our|my)\b|\bsweet spot\b|\bwheelhouse\b/iu;
+
+/** Claims about the sender's role in a round, by investment_role code. */
+const ROLE_CLAIMS: readonly (readonly [string, RegExp])[] = [
+  [
+    "lead",
+    /\b(?:we|i)(?: \w+){0,2} lead\b|\blead(?:ing)? (?:the |a )?rounds?\b|\b(?:as|take) (?:the |a )?lead\b/iu,
+  ],
+  ["co_invest", /\bco-?invest\w*|\balongside (?:a |the |another )?lead\b/iu],
+  [
+    "follow",
+    /\bfollow(?:ing)? (?:in|on) (?:later )?rounds?\b|\bfollow-?on\b/iu,
+  ],
+];
 
 /** Where a fact comes from, said in the message. */
 const SOURCE_CUE =
@@ -445,7 +659,16 @@ export type MessageCheckInput = {
   readonly bookingAuto: boolean;
   /** What their open question is about, when this answers one. */
   readonly answering?: readonly InstructionQuestionKind[] | undefined;
+  /** The planner's own reading of what the last sentence asks. */
+  readonly asks?: InstructionMessageAsk | null | undefined;
+  /** Who writes: role claims are checked for an investor. */
+  readonly side?: "INVESTOR" | "COMPANY" | undefined;
+  /** The investor's declared criteria, for a claim of fit. */
+  readonly criteria?: SenderCriteria | undefined;
 };
+
+const normal = (text: string) =>
+  text.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
 
 const hits = (text: string, fact: MaterialFact): number =>
   fact.anchors.filter((anchor) => anchor !== "" && text.includes(anchor))
@@ -458,11 +681,26 @@ export function checkMessage(input: MessageCheckInput): MessageProblem | null {
   const words = body === "" ? 0 : body.split(" ").length;
   if (words > MESSAGE_WORDS_MAX) return "MESSAGE_TOO_LONG";
   if (FALSE_HISTORY.test(body)) return "FALSE_HISTORY";
-  if (!input.bookingAuto && MEETING.test(body)) return "MEETING_NOT_ALLOWED";
+  if (
+    !input.bookingAuto &&
+    (input.asks === "MEETING" ||
+      MEETING.test(body) ||
+      asksForMeeting(finalSentence(body)))
+  ) {
+    return "MEETING_NOT_ALLOWED";
+  }
 
-  // Every number stated must be one the material holds.
+  const declaredKinds = (input.answering ?? []).filter(
+    (kind) => kind !== "OTHER",
+  );
+  // Every number stated must be one the material holds; answering their
+  // question about the sender, only the sender's own declared facts (ASK
+  // card f3e411b7: a "typical USD 600,000" no field declares).
   const known = new Set(
-    [...input.counterpart, ...input.sender].flatMap((fact) => [
+    [
+      ...(declaredKinds.length > 0 ? [] : input.counterpart),
+      ...input.sender,
+    ].flatMap((fact) => [
       ...numbersIn(fact.text),
       ...fact.anchors.flatMap((anchor) => numbersIn(anchor)),
     ]),
@@ -479,20 +717,47 @@ export function checkMessage(input: MessageCheckInput): MessageProblem | null {
     return "UNGROUNDED_NUMBER";
   }
 
-  // A reply answers only from the sender's own facts.
-  if (input.answering !== undefined && input.answering.length > 0) {
-    for (const kind of input.answering) {
-      if (kind === "OTHER") continue;
-      const fact = input.sender.find((entry) => entry.answers === kind);
-      if (fact === undefined) return "UNANSWERED_QUESTION";
-      const grounded =
-        kind === "CHEQUE_SIZE"
-          ? numbersIn(body).some((value) =>
-              fact.anchors.some((anchor) => Number(anchor) === value),
-            )
-          : hits(text, fact) > 0;
-      if (!grounded) return "UNANSWERED_QUESTION";
+  // A claim about the investor's role in a round matches the declared
+  // field ("we can lead or co-invest" where only leading is declared: no).
+  if (input.side === "INVESTOR") {
+    const declared = new Set(
+      input.sender.flatMap((fact) => [...(fact.roles ?? [])]),
+    );
+    if (
+      ROLE_CLAIMS.some(
+        ([code, claim]) => claim.test(body) && !declared.has(code),
+      )
+    ) {
+      return "UNGROUNDED_CLAIM";
     }
+  }
+
+  // "Fits" or "matches" only where the company's stage is inside the
+  // declared stages (when both ends are declared); unknown is not inside.
+  const criteria = input.criteria;
+  if (
+    FIT_CLAIM.test(body) &&
+    criteria !== undefined &&
+    criteria.minStageCode !== null &&
+    criteria.maxStageCode !== null
+  ) {
+    const stage = input.counterpart.find(
+      (fact) => fact.label === "stage",
+    )?.code;
+    if (
+      stage === undefined ||
+      !stageInRange(stage, criteria.minStageCode, criteria.maxStageCode)
+    ) {
+      return "UNSUPPORTED_FIT";
+    }
+  }
+
+  // A reply answers only from the sender's own facts: their declared
+  // fields in code's own words, word for word.
+  if (declaredKinds.length > 0) {
+    const answer = factAnswer(declaredKinds, input.sender);
+    if (answer === null) return "UNANSWERED_QUESTION";
+    if (!normal(body).includes(normal(answer))) return "UNANSWERED_QUESTION";
   }
 
   if (!input.first) return null;
@@ -571,6 +836,7 @@ export function createInstructionMaterialReader(
       sender = {
         side: "INVESTOR",
         facts: mandate === null ? [] : mandateFacts(mandate, reads.labels.code),
+        ...(mandate === null ? {} : { criteria: mandateCriteria(mandate) }),
       };
     } else {
       const card = await reads.ownCompanyCard(actor).catch(() => null);

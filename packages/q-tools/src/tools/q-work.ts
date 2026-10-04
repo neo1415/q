@@ -365,6 +365,77 @@ export type StandingProposalOutput = z.infer<
 >;
 
 /**
+ * Live QA (runs 01a6124a, 9f948ed2): "starting right now at any hour" was
+ * read once as Mon-Fri 09:00-17:00 and once correctly. Clear round-the-clock
+ * wording ("any hour", "24/7", "anytime", "weekends too", "every day") is
+ * read by code: every day, 00:00-23:59. It overrides an absent
+ * reading or the default; explicit hours the model read still win.
+ */
+const ALL_HOURS =
+  /\b(?:any|all) hours?\b|\bat any time\b|\banytime\b|\bany time of (?:the )?(?:day|night)\b|\b24\s*\/\s*7\b|\b24-7\b|\b24 hours a day\b|\bround[- ]the[- ]clock\b|\baround the clock\b|\bday (?:and|or) night\b|\bweekends? (?:too|as well)\b|\bincluding weekends?\b|\bevery day\b|\b(?:seven|7) days a week\b/iu;
+
+export type ClearHours = {
+  readonly days: readonly number[];
+  readonly start: string;
+  readonly end: string;
+};
+
+/** Code's own reading of clear working-hours words in the goal; else null. */
+export function clearHoursOf(goal: string): ClearHours | null {
+  if (ALL_HOURS.test(goal)) {
+    return { days: [1, 2, 3, 4, 5, 6, 7], start: "00:00", end: "23:59" };
+  }
+  return null;
+}
+
+const DEFAULT_DAYS = [1, 2, 3, 4, 5];
+
+/**
+ * The hours a grant carries: the model's explicit reading when it differs
+ * from the default; otherwise code's reading of clear words; otherwise the
+ * default.
+ */
+export function workingHoursFor(
+  goal: string,
+  read: ClearHours | null,
+  base: { readonly timeZone: string } & ClearHours,
+): { timeZone: string; days: number[]; start: string; end: string } {
+  const isDefault =
+    read === null ||
+    (read.start === base.start &&
+      read.end === base.end &&
+      [...new Set(read.days)].sort((a, b) => a - b).join(",") ===
+        DEFAULT_DAYS.join(","));
+  const clear = clearHoursOf(goal);
+  const chosen = isDefault ? (clear ?? read) : read;
+  if (chosen === null) {
+    return { ...base, days: [...base.days] };
+  }
+  return {
+    timeZone: base.timeZone,
+    days: [...new Set(chosen.days)].sort((a, b) => a - b),
+    start: chosen.start,
+    end: chosen.end,
+  };
+}
+
+/**
+ * Live QA (instruction 76d6f281): "a short first message to founders ...
+ * who haven't heard from me yet" is a first message only -- the grant then
+ * allows no follow-ups. Read by code from the goal, or from the model.
+ */
+const FIRST_ONLY =
+  /\b(?:first|opening|intro(?:ductory)?) (?:message|note|hello)s?\b|\bhaven'?t (?:yet )?heard from (?:me|us)\b|\bhave not (?:yet )?heard from (?:me|us)\b|\bnot (?:yet )?heard from (?:me|us)\b|\bhaven'?t (?:yet )?(?:messaged|contacted|written to)\b/iu;
+
+const FOLLOW_UPS =
+  /\bfollow[- ]?ups?\b|\bfollow(?:ing)? up\b|\bkeep (?:the )?\w+ (?:going|moving)\b/iu;
+
+export function firstMessagesOnly(goal: string, read: boolean): boolean {
+  if (FOLLOW_UPS.test(goal)) return false;
+  return read || FIRST_ONLY.test(goal);
+}
+
+/**
  * A model's reading of "do not book calls" arrives in its own words
  * (QA 07a90dd8, 4a2c9bc4: a strict enum failed the whole card as
  * INVALID_ARGUMENTS). Read leniently, in execute: case and
@@ -458,6 +529,12 @@ export const ProposeStandingInstructionInputSchema = z
       .default([])
       .describe(
         "Companies or investors they said to leave out, as they named them ('except Nixo' -> ['Nixo']); empty when they named none.",
+      ),
+    firstMessagesOnly: z
+      .boolean()
+      .default(false)
+      .describe(
+        "True when the goal is a first message only ('send a first message to founders who haven't heard from me'): Q then sends no follow-ups.",
       ),
     workingHours: z
       .object({
@@ -691,18 +768,16 @@ export function createQWorkTools(
                 expiresInDays: input.expiresInDays,
                 digest: input.digest,
                 // Their own hours when they gave them, in their own zone;
-                // the card says them in plain words before they approve.
-                workingHours:
-                  input.workingHours === null
-                    ? base.workingHours
-                    : {
-                        timeZone: base.workingHours.timeZone,
-                        days: [...new Set(input.workingHours.days)].sort(
-                          (a, b) => a - b,
-                        ),
-                        start: input.workingHours.start,
-                        end: input.workingHours.end,
-                      },
+                // clear words ("any hour", "24/7") read by code; the card
+                // says them in plain words before they approve.
+                workingHours: workingHoursFor(
+                  input.goal,
+                  input.workingHours,
+                  base.workingHours,
+                ),
+                ...(firstMessagesOnly(input.goal, input.firstMessagesOnly)
+                  ? { followUps: false }
+                  : {}),
               },
             },
           },

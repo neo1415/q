@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  asksForMeeting,
   checkMessage,
   companyCardFacts,
   createInstructionMaterialReader,
+  factAnswer,
+  finalSentence,
+  mandateCriteria,
   mandateFacts,
+  outsideCriteria,
   materialLine,
   numbersIn,
   senderLines,
@@ -22,6 +27,7 @@ const LABELS: Record<string, string> = {
   seed: "Seed",
   pre_seed: "Pre-seed",
   series_a: "Series A",
+  series_b: "Series B",
   ke: "Kenya",
   ng: "Nigeria",
   healthtech: "Health tech",
@@ -195,9 +201,15 @@ describe("the message check", () => {
       });
     expect(
       reply(
-        "Our typical cheque is $250k, and yes, we lead rounds. What are you raising for?",
+        "Our typical cheque is USD 250,000, within a range from USD 100,000 to USD 500,000. We lead rounds. What are you raising for?",
       ),
     ).toBeNull();
+    // Right numbers in the model's own words: not code's answer.
+    expect(
+      reply(
+        "Our typical cheque is $250k, and yes, we lead rounds. What are you raising for?",
+      ),
+    ).toBe("UNANSWERED_QUESTION");
     expect(
       reply("Our typical cheque is $300k and we lead rounds. Does that fit?"),
     ).toBe("UNGROUNDED_NUMBER");
@@ -274,5 +286,139 @@ describe("reading the material as the person", () => {
     expect(
       material.counterparts.get("savanna")?.map((fact) => fact.label),
     ).toEqual(["investor type", "based in", "their focus"]);
+  });
+});
+
+describe("live QA (instruction 76d6f281)", () => {
+  // Savanna Seed Partners: Seed only, USD 250,000 to 1,000,000, leads.
+  const SAVANNA: MandateLike = {
+    cheque: { currency: "USD", min: "250000", max: "1000000" },
+    stage: { minStageCode: "seed", maxStageCode: "seed" },
+    constraints: [
+      {
+        dimension: "investment_role",
+        operator: "IN",
+        value: { kind: "codes", values: ["lead"] },
+        isHardExclusion: false,
+      },
+    ],
+    taxonomyPreferences: [],
+  };
+  const sender = mandateFacts(SAVANNA, labels);
+  const criteria = mandateCriteria(SAVANNA);
+  const TALLYLOOM = companyCardFacts(
+    {
+      currentStageCode: "series_b",
+      headquartersCountry: "NG",
+      shortDescription:
+        "Tallyloom builds inventory and invoicing software for African distributors.",
+    },
+    labels,
+    "their Capital Q profile",
+  );
+
+  it("refuses a meeting ask however it is worded, from the planner's own reading or code's", () => {
+    for (const ending of [
+      "Are there times that suit you for a conversation?",
+      "What times work well to connect?",
+      "Could we find a time next week?",
+      "Would you be free for a quick call?",
+      "Happy to share my calendar link.",
+      "Any availability on Thursday?",
+      "Shall we connect?",
+    ]) {
+      expect(asksForMeeting(ending), ending).toBe(true);
+      expect(first(`${GROUNDED.replace(/ How are .*$/u, "")} ${ending}`)).toBe(
+        "MEETING_NOT_ALLOWED",
+      );
+    }
+    // The planner said MEETING: refused, whatever the words.
+    expect(
+      checkMessage({
+        body: GROUNDED,
+        first: true,
+        counterpart: TARMACLY,
+        sender: INVESTOR,
+        bookingAuto: false,
+        asks: "MEETING",
+      }),
+    ).toBe("MEETING_NOT_ALLOWED");
+    // A substantive question about the company is not a meeting.
+    for (const question of [
+      "How are operators finding you today?",
+      "Is your product available in Uganda yet?",
+      "How do you meet demand at peak season?",
+      "How much time do dispatchers save per load?",
+    ]) {
+      expect(asksForMeeting(question), question).toBe(false);
+    }
+    expect(finalSentence("One. Two? Three.")).toBe("Three.");
+  });
+
+  it("a company outside the declared stages is outside the mandate; a claim of fit needs the stage inside", () => {
+    expect(outsideCriteria(criteria, TALLYLOOM)).toBe("STAGE");
+    expect(outsideCriteria(criteria, TARMACLY)).toBeNull();
+    // Unknown stage is unknown, never outside.
+    expect(
+      outsideCriteria(
+        criteria,
+        TALLYLOOM.filter((fact) => fact.label !== "stage"),
+      ),
+    ).toBeNull();
+    const fits =
+      "Tallyloom's profile describes inventory and invoicing software for African distributors, which fits our interest in African enterprise software. How are distributors adopting it?";
+    expect(
+      checkMessage({
+        body: fits,
+        first: false,
+        counterpart: TALLYLOOM,
+        sender,
+        bookingAuto: false,
+        side: "INVESTOR",
+        criteria,
+      }),
+    ).toBe("UNSUPPORTED_FIT");
+    expect(
+      checkMessage({
+        body: fits.replace("Tallyloom", "Tarmacly"),
+        first: false,
+        counterpart: TARMACLY,
+        sender,
+        bookingAuto: false,
+        side: "INVESTOR",
+        criteria,
+      }),
+    ).toBeNull();
+  });
+
+  it("answers Clinicrest's cheque question in code's words from the declared fields only", () => {
+    const answer = factAnswer(["CHEQUE_SIZE", "LEAD_OR_FOLLOW"], sender);
+    expect(answer).toBe(
+      "We write cheques from USD 250,000 to USD 1,000,000. We lead rounds.",
+    );
+    const reply = (body: string) =>
+      checkMessage({
+        body,
+        first: false,
+        counterpart: [],
+        sender,
+        bookingAuto: false,
+        side: "INVESTOR",
+        criteria,
+        answering: ["CHEQUE_SIZE", "LEAD_OR_FOLLOW"],
+      });
+    // ASK card f3e411b7, word for word: an invented typical cheque.
+    expect(
+      reply(
+        "We typically invest USD 600,000, with a usual range of USD 250,000 to USD 1,000,000. We can lead rounds or co-invest alongside a lead.",
+      ),
+    ).toBe("UNGROUNDED_NUMBER");
+    // Right numbers, but co-investing is not declared.
+    expect(
+      reply(`${answer ?? ""} We can also co-invest alongside a lead.`),
+    ).toBe("UNGROUNDED_CLAIM");
+    expect(reply(`${answer ?? ""} What are you raising for?`)).toBeNull();
+    // Nothing declared about it: no answer.
+    expect(factAnswer(["CHEQUE_SIZE", "OTHER"], sender)).toBeNull();
   });
 });

@@ -17,8 +17,10 @@ import { noticesRead, refreshNotices, useNotices } from "./notice-store";
  * The notification centre (AUTO; spec auto.md §3.5): one bell with the
  * unread count in words for assistive tech and as a number on screen
  * (never colour alone). "Needs you" first, then updates, each a tap to
- * where it is acted on. Opening marks what is shown as read. Refreshes
- * every minute while the page is visible, and on focus.
+ * where it is acted on. Opening marks the updates shown as read; a "Needs
+ * you" notice is read only when it is resolved or opened from its row, so
+ * it leaves "Needs you" once dealt with, never merely by being seen.
+ * Refreshes every minute while the page is visible, and on focus.
  */
 
 function when(iso: string): string {
@@ -110,10 +112,12 @@ export function NotificationCenter() {
   const { items, unread, failed } = useNotices();
   const load = () => refreshNotices(true);
 
-  // Seen once shown: what the person opened the centre to read is read.
+  // Updates are seen once shown; what needs them waits until dealt with.
   useEffect(() => {
     if (!open || items === null) return;
-    const ids = items.filter((item) => !item.read).map((item) => item.id);
+    const ids = items
+      .filter((item) => !item.read && item.priority !== "NEEDS_YOU")
+      .map((item) => item.id);
     if (ids.length === 0) return;
     void markReadAction(ids.slice(0, 50)).then((result) => {
       if (result.ok) noticesRead(ids.length);
@@ -122,6 +126,15 @@ export function NotificationCenter() {
 
   const { needsYou, days } = groupNotices(items ?? []);
   const close = () => setOpen(false);
+  // Opening a "Needs you" row is dealing with it: it is read, and leaves.
+  const openNeed = (ids: readonly string[]) => () => {
+    close();
+    void markReadAction(ids.slice(0, 50)).then((result) => {
+      if (!result.ok) return;
+      noticesRead(ids.length);
+      void refreshNotices(true);
+    });
+  };
 
   return (
     <SheetRoot open={open} onOpenChange={setOpen}>
@@ -191,7 +204,7 @@ export function NotificationCenter() {
                       <NoticeRow
                         key={group.key}
                         group={group}
-                        onOpen={close}
+                        onOpen={openNeed(group.ids)}
                         needsYou
                       />
                     ))}

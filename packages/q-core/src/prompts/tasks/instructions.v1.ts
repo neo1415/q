@@ -13,6 +13,9 @@ import {
   INSTRUCTION_PLAN_V2_SCHEMA_VERSION,
   INSTRUCTION_PLAN_V3_SCHEMA_VERSION,
   INSTRUCTION_THREAD_READER_V2_SCHEMA_VERSION,
+  INSTRUCTION_PLAN_V5_SCHEMA_VERSION,
+  InstructionPlanV5ResultSchema,
+  type InstructionPlanV5Result,
   InstructionPlanV4VariablesSchema,
   InstructionThreadFactsV2Schema,
   type InstructionPlanV4Variables,
@@ -182,7 +185,7 @@ export const INSTRUCTION_PLAN_V4: PromptDefinition<
   InstructionPlanV4Variables,
   InstructionPlanV3Result
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -202,6 +205,53 @@ export const INSTRUCTION_PLAN_V4: PromptDefinition<
     schema: InstructionPlanV3ResultSchema,
   },
   template: PLAN_V4,
+};
+
+const PLAN_V5 = PLAN_V4.replace(
+  `  - A first message (nothing sent in that thread yet) is specific and human. Say what in the other side's own material (under THEIR PEOPLE) fits WHO YOU WRITE AS -- sector, stage, geography -- and name one concrete fact from that material with where it comes from ("your profile says...", "in your pitch..."). Write in the register of the sender's side: an investor writing to a founder about their company, or a founder writing to an investor about their focus.`,
+  `  - message: for every chat message, its kind and what its final sentence asks; null for any other action.
+    - kind: code reads each conversation and says under THEIR PEOPLE whether their side has heard from you. FIRST only where it says "no message from your side yet". Where your side has already written -- by them or by you, under any instruction -- never write a first message: write a FOLLOW_UP only when what they allowed has follow-ups, or a REPLY to what they wrote last; otherwise nothing.
+    - asks: QUESTION when the last sentence asks something substantive about them or their company, MEETING when it asks for a call, a meeting, a chat, a time, a slot or their availability (however it is worded: "what times work to connect?" is MEETING), NONE otherwise. Be honest: code checks it.
+  - A first message is specific and human. Lead with the specific thing itself -- what they do, who for, where -- and vary how each one opens; never open with a fixed formula such as "Your profile says". Mention in passing where the fact comes from (their profile, their pitch, their Capital Q page). Write in the register of the sender's side: an investor writing to a founder about their company, or a founder writing to an investor about their focus.
+  - Where THEIR PEOPLE says a company is outside your declared mandate, write no first message to it. Say a company fits or matches only where its stage is within your declared stages; otherwise say nothing about fit.`,
+)
+  .replace(
+    "  - Propose a call or a meeting only when schedule.meeting.book is AUTO in what they allowed. Otherwise end with a question instead.",
+    "  - Propose a call or a meeting (asks MEETING) only when schedule.meeting.book is AUTO in what they allowed. Otherwise end with a substantive question about their company -- their customers, product, traction or plans -- never a request for time.",
+  )
+  .replace(
+    "  - A reply to their question answers only from WHO YOU WRITE AS and the approved topics. When the answer is not there, or it is about terms or money, write no reply: code takes that question to them.",
+    "  - A reply to their question answers only from WHO YOU WRITE AS and the approved topics. Where THEIR PEOPLE gives the answer to use, write it word for word and add nothing else about yourself (no other amount, no other role in a round); you may then ask one question. When the answer is not there, or it is about terms or money, write no reply: code takes that question to them.",
+  )
+  .replace(
+    "(v3, with request and each cannot's needs)",
+    "(v5, with request, each cannot's needs and each step's message)",
+  );
+
+export const INSTRUCTION_PLAN_V5: PromptDefinition<
+  InstructionPlanV4Variables,
+  InstructionPlanV5Result
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-04",
+  id: "INSTRUCTION_PLAN",
+  version: 5,
+  changeDescription:
+    "Live QA (instruction 76d6f281): second 'first messages' to founders already written to, meeting asks despite no booking, a fit claimed outside the mandate's stages, and an invented typical cheque. Each message now carries its kind and final ask as typed fields; code decides first messages from the conversation, refuses MEETING without AUTO booking, keeps first messages inside the declared mandate, and has replies use code's templated answer. First messages lead with the specific thing and vary their opening.",
+  variables: {
+    schema: InstructionPlanV4VariablesSchema,
+    untrusted: [...INSTRUCTION_PLAN_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_PLAN_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_PLAN_V5_SCHEMA_VERSION,
+    schema: InstructionPlanV5ResultSchema,
+  },
+  template: PLAN_V5,
 };
 
 const THREAD_READER = `TASK: INSTRUCTION_THREAD_READER

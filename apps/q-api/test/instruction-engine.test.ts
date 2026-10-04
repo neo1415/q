@@ -29,6 +29,7 @@ import {
   mandateFacts,
   type InstructionMaterial,
 } from "../src/composition/instructions/material.js";
+import { createIntroducedReader } from "../src/composition/instructions/introduced.js";
 import type { ThreadRead } from "../src/composition/instructions/quarantine.js";
 import type {
   InstructionRow,
@@ -1108,7 +1109,7 @@ describe("their question gets an answer or goes to the person (QA run 8a1d57b9)"
       (code) => (code === "lead" ? "Lead rounds" : undefined),
     );
   const reply = chat(
-    "Our typical cheque is $250k, and yes, we lead rounds. What are you raising for?",
+    "Our typical cheque is USD 250,000. We lead rounds. What are you raising for?",
   );
 
   it("answers from the declared mandate, within MESSAGES AUTO", async () => {
@@ -1220,4 +1221,279 @@ describe("a stopped or paused instruction never fires (QA run 8a1d57b9)", () => 
       expect(ran).toHaveLength(0);
     },
   );
+});
+
+describe("live QA (instruction 76d6f281): code decides from the conversation", () => {
+  const SEED_ONLY: InstructionMaterial = {
+    sender: {
+      side: "INVESTOR",
+      facts: mandateFacts(
+        {
+          cheque: { currency: "USD", min: "250000", max: "1000000" },
+          stage: { minStageCode: "seed", maxStageCode: "seed" },
+          constraints: [
+            {
+              dimension: "investment_role",
+              operator: "IN",
+              value: { kind: "codes", values: ["lead"] },
+              isHardExclusion: false,
+            },
+          ],
+          taxonomyPreferences: [],
+        },
+        (code) =>
+          ({ seed: "Seed", series_b: "Series B", lead: "Lead rounds" })[code],
+      ),
+      criteria: {
+        minStageCode: "seed",
+        maxStageCode: "seed",
+        countries: [],
+        excludedCountries: [],
+      },
+    },
+    counterparts: new Map([
+      [
+        COMPANY,
+        companyCardFacts(
+          {
+            currentStageCode: "series_b",
+            headquartersCountry: null,
+            shortDescription:
+              "Acme Robotics builds warehouse picking robots for grocery retailers.",
+          },
+          (code) => ({ series_b: "Series B" })[code],
+          "their Capital Q profile",
+        ),
+      ],
+    ]),
+  };
+  const firstMessage = chat(
+    "Warehouse picking robots for grocery retailers, as your profile puts it -- which retailers are you piloting with?",
+    { message: { kind: "FIRST", asks: "QUESTION" } },
+  );
+  const check = (
+    step: InstructionPlanStep,
+    options: {
+      grant?: InstructionGrant;
+      introduced?: ReadonlySet<string>;
+      material?: InstructionMaterial;
+      facts?: ReadonlyMap<
+        string,
+        InstructionThreadFacts & {
+          questionAbout?: readonly ("CHEQUE_SIZE" | "LEAD_OR_FOLLOW")[];
+        }
+      >;
+    } = {},
+  ) =>
+    validateStep(step, {
+      grant: options.grant ?? grant(),
+      actions: ACTIONS,
+      people: PEOPLE,
+      sent: new Map(),
+      now: IN_HOURS,
+      stepKey: "instr:test:run:0",
+      ...(options.introduced === undefined
+        ? {}
+        : { introduced: options.introduced }),
+      ...(options.material === undefined ? {} : { material: options.material }),
+      ...(options.facts === undefined ? {} : { facts: options.facts }),
+    });
+
+  it("a first message where their side already wrote (another instruction, the night before) is refused; a follow-up only where the grant allows", () => {
+    const written = new Set([REL]);
+    expect(
+      check(firstMessage, {
+        introduced: written,
+        grant: grant({ followUps: false }),
+      }),
+    ).toMatchObject({ verdict: "REFUSED", code: "ALREADY_INTRODUCED" });
+    // A follow-up under a first-message-only grant: refused too.
+    expect(
+      check(
+        chat("Any news on the pilots?", {
+          message: { kind: "FOLLOW_UP", asks: "QUESTION" },
+        }),
+        {
+          introduced: written,
+          grant: grant({ followUps: false }),
+        },
+      ),
+    ).toMatchObject({ verdict: "REFUSED", code: "ALREADY_INTRODUCED" });
+    // Follow-ups allowed: it is sent as one.
+    expect(check(firstMessage, { introduced: written })).toMatchObject({
+      verdict: "AUTO",
+    });
+    // Nothing from their side yet: a first message.
+    expect(
+      check(firstMessage, {
+        introduced: new Set(),
+        grant: grant({ followUps: false }),
+      }),
+    ).toMatchObject({ verdict: "AUTO" });
+  });
+
+  it("no first message to a company outside the declared stages; no claim of fit either", () => {
+    expect(
+      check(firstMessage, { introduced: new Set(), material: SEED_ONLY }),
+    ).toMatchObject({ verdict: "REFUSED", code: "OUTSIDE_MANDATE" });
+  });
+
+  it("a message the planner says asks for a meeting is refused without AUTO booking", () => {
+    const noBooking = grant({
+      actions: grant().actions.filter(
+        (entry) => entry.action !== "schedule.meeting.book",
+      ),
+    });
+    expect(
+      check(
+        chat("Thanks for the update on the pilots. Would next week suit?", {
+          message: { kind: "FOLLOW_UP", asks: "MEETING" },
+        }),
+        {
+          grant: noBooking,
+          material: {
+            sender: { side: "INVESTOR", facts: [] },
+            counterparts: new Map(),
+          },
+        },
+      ),
+    ).toMatchObject({ verdict: "REFUSED", code: "MEETING_NOT_ALLOWED" });
+  });
+
+  it("a declared cheque range, in code's words, answering their question, runs AUTO even when the planner flags money", () => {
+    const facts = new Map([
+      [
+        REL,
+        {
+          lastFrom: "THEM" as const,
+          asksQuestion: true,
+          wantsToMeet: false,
+          proposedTime: null,
+          topicNumbers: [],
+          mentionsTermsOrMoney: false,
+          declined: false,
+          tone: "POSITIVE" as const,
+          questionAbout: ["CHEQUE_SIZE" as const, "LEAD_OR_FOLLOW" as const],
+        },
+      ],
+    ]);
+    const answer = chat(
+      "We write cheques from USD 250,000 to USD 1,000,000. We lead rounds. What are you raising for?",
+      {
+        touchesTermsOrMoney: true,
+        message: { kind: "REPLY", asks: "QUESTION" },
+      },
+    );
+    expect(
+      check(answer, { material: SEED_ONLY, facts, introduced: new Set([REL]) }),
+    ).toMatchObject({ verdict: "AUTO" });
+    // ASK card f3e411b7's words: refused, AUTO or not.
+    expect(
+      check(
+        chat(
+          "We typically invest USD 600,000, with a usual range of USD 250,000 to USD 1,000,000. We can lead rounds or co-invest alongside a lead.",
+          { touchesTermsOrMoney: true },
+        ),
+        { material: SEED_ONLY, facts, introduced: new Set([REL]) },
+      ),
+    ).toMatchObject({ verdict: "REFUSED", code: "UNGROUNDED_NUMBER" });
+  });
+
+  it("a firing reads each conversation and tells the planner who has heard from them; a failed read counts as written", async () => {
+    const reads: string[][] = [];
+    const { row } = world([{ steps: [], cannot: [] }]);
+    const seen: string[] = [];
+    const wired = createInstructionEngine({
+      store: {
+        instruction: () => Promise.resolve({ ...row, grant_payload: grant() }),
+        expire: () => Promise.resolve(),
+        recordStep: () => Promise.resolve(true),
+        stepDone: () => Promise.resolve(false),
+        messagesSent: () => Promise.resolve(new Map<string, number>()),
+        history: () => Promise.resolve([]),
+        addSpend: () => Promise.resolve(),
+        pause: () => Promise.resolve(true),
+        notify: () => Promise.resolve(true),
+      },
+      actions: ACTIONS,
+      ports: {},
+      actorFor: () => Promise.resolve(actor),
+      people: () => Promise.resolve(PEOPLE),
+      introduced: (_actor, ids) => {
+        reads.push([...ids]);
+        return Promise.resolve(new Set([REL]));
+      },
+      plan: (_who, variables) => {
+        seen.push(variables.people);
+        return Promise.resolve({
+          plan: { request: "EXECUTE", steps: [], cannot: [] },
+          costUsd: 0,
+        });
+      },
+      ask: () => Promise.resolve(null),
+      now: () => IN_HOURS,
+      autoEnabled: true,
+    });
+    await wired.fire(row.id, "run-0401");
+    expect(reads).toEqual([[REL, OTHER_REL]]);
+    expect(seen[0]).toContain(
+      "your side has already written here: no first message",
+    );
+    expect(seen[0]).toContain("no message from your side yet");
+
+    // The reader: any message from their side counts, by them or by Q;
+    // a failed read, or a window full of the other side's, counts too.
+    const message = (from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE") => ({
+      id: randomUUID(),
+      viaQ: false,
+      envelope: null,
+      from,
+      senderName: "x",
+      kind: "TEXT" as const,
+      text: "hello",
+      attachmentTitle: null,
+      sentAt: IN_HOURS.toISOString(),
+    });
+    const threads: Record<string, ReturnType<typeof message>[] | null> = {
+      a: [message("OTHER_SIDE"), message("YOUR_SIDE")],
+      b: [message("OTHER_SIDE")],
+      c: [],
+      d: null,
+      e: Array.from({ length: 30 }, () => message("OTHER_SIDE")),
+    };
+    const written = await createIntroducedReader({
+      chat: {
+        readForQ: ({ relationshipId }) => {
+          const messages = threads[relationshipId];
+          return messages === null || messages === undefined
+            ? Promise.reject(new Error("unavailable"))
+            : Promise.resolve({
+                side: "INVESTOR",
+                connected: true,
+                blocked: false,
+                messages,
+              } as never);
+        },
+      },
+    })(actor, ["a", "b", "c", "d", "e"]);
+    expect([...written].sort()).toEqual(["a", "d", "e"]);
+  });
+});
+
+describe("any hour (live QA 01a6124a)", () => {
+  it("every day 00:00-23:59 is in hours at any minute, the last one too", () => {
+    const always = {
+      timeZone: "UTC",
+      days: [1, 2, 3, 4, 5, 6, 7],
+      start: "00:00",
+      end: "23:59",
+    };
+    for (const at of [
+      "2026-10-04T00:00:00Z",
+      "2026-10-04T03:17:00Z",
+      "2026-10-03T23:59:30Z",
+    ]) {
+      expect(withinWorkingHours(new Date(at), always), at).toBe(true);
+    }
+  });
 });

@@ -114,6 +114,60 @@ describe("the notification centre", () => {
     });
     expect(screen.getAllByText(ASK)).toHaveLength(1);
     expect(screen.getByText(/latest of 3 like this/u)).toBeTruthy();
-    expect(markRead).toHaveBeenCalledWith(repeats.map((item) => item.id));
+    // Seen is not dealt with: "Needs you" is not marked read on opening.
+    expect(markRead).not.toHaveBeenCalled();
+    // Opening the row is: every folded notice is marked read.
+    fireEvent.click(
+      screen.getByRole("link", { name: /5 things need your yes/u }),
+    );
+    expect(markRead).toHaveBeenCalledWith(
+      repeats.map((item) => item.id).toReversed(),
+    );
+  });
+
+  it("marks the updates shown read on opening, and leaves what needs you alone", async () => {
+    // A fresh store: the shell's one read is shared, and was made above.
+    vi.resetModules();
+    const { NotificationCenter } =
+      await import("../src/features/work/notification-center");
+    const need = notice({ title: ASK, priority: "NEEDS_YOU" });
+    const update = notice({ title: "Voltron is interested" });
+    list.mockResolvedValue({
+      ok: true,
+      value: { items: [need, update], unread: 2 },
+    });
+    markRead.mockResolvedValue({ ok: true, value: null });
+    render(<NotificationCenter />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Notifications, 2 new" }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(markRead).toHaveBeenCalledWith([update.id]);
+  });
+});
+
+describe("a resolved notice leaves Needs you (live QA: Brightkloof)", () => {
+  it("an answered interest notice -- read on the server -- moves to its day, with no Open", () => {
+    const resolved = notice({
+      kind: "INTEREST_RECEIVED",
+      title: "Savanna Seed Partners is interested in Brightkloof",
+      priority: "NEEDS_YOU",
+      read: true,
+      createdAt: "2026-10-03T08:00:00Z",
+    });
+    const open = notice({ title: ASK, priority: "NEEDS_YOU" });
+    const { needsYou, days } = groupNotices([resolved, open], NOW);
+    expect(needsYou.map((group) => group.notice.id)).toEqual([open.id]);
+    expect(days).toEqual([
+      expect.objectContaining({
+        label: "Today",
+        groups: [expect.objectContaining({ ids: [resolved.id] })],
+      }),
+    ]);
   });
 });
