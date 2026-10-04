@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
 
 import {
-  createDefaultPromptRegistry,
   TURN_READER_V40,
   TURN_READER_V40_DESTINATIONS,
   TURN_READER_V41,

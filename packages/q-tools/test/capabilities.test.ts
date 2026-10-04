@@ -54,7 +54,7 @@ const EVERY_PORT: QToolPorts = {
   approvalInbox: STUB,
   results: STUB,
   humanReviews: STUB,
-  documents: { list: STUB, read: STUB } as never,
+  documents: { list: STUB, read: STUB },
   documentRevision: STUB,
   // DOCS block.
   documentStudio: STUB,

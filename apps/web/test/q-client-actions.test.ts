@@ -227,7 +227,10 @@ describe("the screen includes the document open in Q's viewer (R21)", () => {
   it("adds the open document to the route's context, and drops it when closed", () => {
     setOpenDocument(DOC);
     const { timeZone: _withDoc, ...withDoc } = currentScreen("/home") ?? {};
-    expect(withDoc).toEqual({ route: "HOME", documentId: DOC });
+    // voiceq-63: Q's viewer shows a document Q made (an artifact): it rides
+    // as artifactId, which the server reads through read_my_document. As
+    // documentId it was dropped by the firewall (canonical documents only).
+    expect(withDoc).toEqual({ route: "HOME", artifactId: DOC });
     setOpenDocument(null);
     const { timeZone: _closed, ...closed } = currentScreen("/home") ?? {};
     expect(closed).toEqual({ route: "HOME" });
