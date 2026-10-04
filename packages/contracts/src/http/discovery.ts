@@ -692,11 +692,13 @@ export const NetworkPitchPageDtoSchema = z
 export type NetworkPitchPageDto = z.infer<typeof NetworkPitchPageDtoSchema>;
 
 /**
- * "Your companies" (founder decision 2026-10-02): pitches from companies
- * the investor's organisation is connected with, has expressed interest
- * in, or saved. A separate row beside the recommended feed: it never
- * touches ranking and is never paid for. Newest pitch first, keyset
- * cursor. The label says why it is there; nothing else.
+ * "Your companies" (founder decisions 2026-10-02 and 2026-10-04): every
+ * company the investor's organisation is connected with (and later
+ * states), has expressed interest in, or saved -- Discover's second tab,
+ * beside "For you", which never lists them. It never touches ranking and
+ * is never paid for. Most recent activity first, keyset cursor. A pitch
+ * is carried only when the company makes it available to this investor;
+ * the label says why the company is there; nothing else.
  */
 export const DISCOVERY_YOUR_COMPANIES_PATH =
   "/v1/discovery/your-companies" as const;
@@ -716,9 +718,19 @@ export const YourCompanyPitchItemDtoSchema = z
     headquartersCountry: z.string().nullable(),
     currentStageCode: z.string().nullable(),
     label: YourCompanyLabelSchema,
-    pitch: PitchSummaryDtoSchema,
-    /** When the pitch became playable: the row's order. */
-    readyAt: UtcTimestampSchema,
+    /**
+     * Their pitch, only when the company makes it available to this
+     * investor (the media service's own playback rule). Null: "Pitch not
+     * shared" -- the company is still theirs to open (follow-55).
+     */
+    pitch: PitchSummaryDtoSchema.nullable(),
+    /** When the pitch became playable; null without a playable pitch. */
+    readyAt: UtcTimestampSchema.nullable(),
+    /**
+     * The most recent activity between them (the relationship's latest
+     * state, a save, an interaction): the feed's order, newest first.
+     */
+    activityAt: UtcTimestampSchema,
   })
   .strict();
 export type YourCompanyPitchItemDto = z.infer<

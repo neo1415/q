@@ -109,6 +109,8 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
         readonly {
           readonly companyId: string;
           readonly label: YourCompanyLabel;
+          /** Their latest activity together; null when none is known. */
+          readonly activityAt?: string | null | undefined;
         }[]
       >)
     | undefined;
@@ -381,11 +383,12 @@ export function registerDiscoveryRoutes(
     },
   );
 
-  // "Your companies" (founder decision 2026-10-02): a row beside the
-  // recommended feed, never part of it. Their own connected, interested and
-  // saved companies' publishable pitches, newest first. Each company passes
-  // the same disclosure read the network preview uses; each play is still
-  // authorised per viewer by the media service.
+  // "Your companies" (founder decisions 2026-10-02, 2026-10-04): Discover's
+  // second tab, never part of the recommended feed. Every company they are
+  // connected with (and later), interested in or saved, most recent
+  // activity first. Each company passes the same disclosure read the
+  // network preview uses; a pitch is carried only when the media service
+  // would sign it for this viewer, and each play is authorised again.
   app.get(
     DISCOVERY_YOUR_COMPANIES_PATH,
     { onRequest: withContext },
@@ -426,18 +429,25 @@ export function registerDiscoveryRoutes(
           Promise.resolve(new Map<string, string>()),
       ]);
       const after = decodeNetworkCursor(page.cursor);
+      // Every company of theirs, most recent activity first (follow-55):
+      // one without a pitch they may play is still theirs, shown as
+      // "Pitch not shared". Ties by company id, so the cursor is total.
+      const EPOCH = new Date(0).toISOString();
       const ordered = own
-        .flatMap((entry) => {
-          const set = sets.get(entry.companyId);
-          const at = readyAt.get(entry.companyId);
-          return set === undefined || at === undefined
-            ? []
-            : [{ ...entry, set, at: new Date(at).toISOString() }];
+        .map((entry) => {
+          const ready = readyAt.get(entry.companyId);
+          const at =
+            entry.activityAt ?? (ready === undefined ? null : ready) ?? null;
+          return {
+            ...entry,
+            set: sets.get(entry.companyId),
+            ready: ready === undefined ? null : new Date(ready).toISOString(),
+            at: at === null ? EPOCH : new Date(at).toISOString(),
+          };
         })
-        // Newest pitch first; ties by video id, so the cursor is total.
         .sort((a, b) =>
           a.at === b.at
-            ? b.set.mediaAssetId.localeCompare(a.set.mediaAssetId)
+            ? b.companyId.localeCompare(a.companyId)
             : b.at.localeCompare(a.at),
         )
         .filter(
@@ -445,26 +455,27 @@ export function registerDiscoveryRoutes(
             after === null ||
             entry.at < after.createdAt ||
             (entry.at === after.createdAt &&
-              entry.set.mediaAssetId < after.mediaAssetId),
+              entry.companyId < after.mediaAssetId),
         );
       const items: YourCompanyPitchItemDto[] = [];
       let last: (typeof ordered)[number] | undefined;
       for (const entry of ordered) {
         if (items.length >= limit) break;
         last = entry;
+        // The same disclosure read the network preview uses: a company no
+        // longer visible to them is not listed at all.
         const company = await networkCompany(actor, entry.companyId).catch(
           () => null,
         );
         if (company === null || company.companyStatus !== "active") continue;
-        // One predicate with the player: only what the playback rule will
-        // sign for this viewer is listed.
-        if (
-          !(await mayPlay(actor, entry.companyId, entry.set.mediaAssetId).catch(
+        // One predicate with the player: a pitch is carried only when the
+        // playback rule will sign it for this viewer (purpose VIEW; ADR
+        // 0041). Otherwise the card says the pitch is not shared.
+        const playable =
+          entry.set !== undefined &&
+          (await mayPlay(actor, entry.companyId, entry.set.mediaAssetId).catch(
             () => false,
-          ))
-        ) {
-          continue;
-        }
+          ));
         items.push({
           companyId: entry.companyId,
           canonicalName: company.canonicalName,
@@ -472,8 +483,12 @@ export function registerDiscoveryRoutes(
           headquartersCountry: company.headquartersCountry,
           currentStageCode: company.currentStageCode,
           label: entry.label,
-          pitch: pitchSummary(entry.set),
-          readyAt: entry.at,
+          pitch:
+            playable && entry.set !== undefined
+              ? pitchSummary(entry.set)
+              : null,
+          readyAt: playable ? entry.ready : null,
+          activityAt: entry.at,
         });
       }
       const more =
@@ -482,7 +497,7 @@ export function registerDiscoveryRoutes(
         items,
         nextCursor:
           more && last !== undefined
-            ? encodeNetworkCursor(last.at, last.set.mediaAssetId)
+            ? encodeNetworkCursor(last.at, last.companyId)
             : null,
       });
     },

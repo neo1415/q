@@ -1469,19 +1469,47 @@ const { app, logger } = createApp(config, security, {
           .catch(() => [] as readonly string[]),
       ]);
       const labelled = new Map<string, YourCompanyLabel>();
+      const latest = new Map<string, string>();
+      const touch = (companyId: string, at: string | null | undefined) => {
+        if (at === null || at === undefined) return;
+        const known = latest.get(companyId);
+        if (known === undefined || known < at) latest.set(companyId, at);
+      };
       for (const listing of relationships) {
         const state = listing.projection.state;
         const companyId = listing.relationship.companyId;
         if (isMatchedRelationshipState(state)) {
           labelled.set(companyId, "CONNECTED");
+          touch(companyId, listing.projection.stateSince);
         } else if (state === "INTEREST_EXPRESSED" && !labelled.has(companyId)) {
           labelled.set(companyId, "INTERESTED");
+          touch(companyId, listing.projection.stateSince);
         }
       }
       for (const companyId of saved) {
         if (!labelled.has(companyId)) labelled.set(companyId, "SAVED");
       }
-      return [...labelled].map(([companyId, label]) => ({ companyId, label }));
+      // Their latest save or interaction with each, for the tab's order
+      // (follow-55: most recent activity first). Failing keeps the
+      // relationship's own time.
+      const states: ReadonlyMap<
+        string,
+        {
+          readonly savedAt: string | null;
+          readonly lastInteractionAt: string | null;
+        }
+      > = await interactions
+        .stateForCompanies({ actor, companyIds: [...labelled.keys()] })
+        .catch(() => new Map());
+      for (const [companyId, state] of states) {
+        touch(companyId, state.savedAt);
+        touch(companyId, state.lastInteractionAt);
+      }
+      return [...labelled].map(([companyId, label]) => ({
+        companyId,
+        label,
+        activityAt: latest.get(companyId) ?? null,
+      }));
     },
     // The row lists only what the player will sign: the media service's
     // own playback rule, as a yes or no (live 2026-10-02).

@@ -657,7 +657,7 @@ describe("GET /v1/discovery/network-pitches (ADR 0021)", () => {
   });
 });
 
-describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () => {
+describe("GET /v1/discovery/your-companies (founder decisions 2026-10-02, 2026-10-04)", () => {
   const NIXO = "c2000000-0000-4000-8000-000000000001";
   const SAVED = "c2000000-0000-4000-8000-000000000002";
   const HIDDEN = "c2000000-0000-4000-8000-000000000003";
@@ -696,7 +696,7 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
       ),
   };
 
-  it("their connected, interested and saved companies' pitches, newest first, labelled, disclosure re-checked, only what will play, cursor-paged", async () => {
+  it("every company of theirs, most recent activity first, labelled, disclosure re-checked; a pitch only when it will play, else 'not shared'; cursor-paged (follow-55)", async () => {
     const { app } = buildApp({
       principal: PRINCIPAL,
       page: new Error("not used"),
@@ -704,11 +704,32 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
       network: {
         yourCompanies: () =>
           Promise.resolve([
-            { companyId: SAVED, label: "SAVED" as const },
-            { companyId: NIXO, label: "CONNECTED" as const },
-            { companyId: HIDDEN, label: "INTERESTED" as const },
-            { companyId: NO_PITCH, label: "CONNECTED" as const },
-            { companyId: REFUSED, label: "INTERESTED" as const },
+            {
+              companyId: SAVED,
+              label: "SAVED" as const,
+              activityAt: "2026-09-20T10:00:00.000Z",
+            },
+            // Connected, a meeting held yesterday: the latest activity.
+            {
+              companyId: NIXO,
+              label: "CONNECTED" as const,
+              activityAt: "2026-10-03T09:48:33.414Z",
+            },
+            {
+              companyId: HIDDEN,
+              label: "INTERESTED" as const,
+              activityAt: "2026-10-02T10:00:00.000Z",
+            },
+            {
+              companyId: NO_PITCH,
+              label: "CONNECTED" as const,
+              activityAt: "2026-10-01T10:00:00.000Z",
+            },
+            {
+              companyId: REFUSED,
+              label: "INTERESTED" as const,
+              activityAt: "2026-09-30T10:00:00.000Z",
+            },
           ]),
         // The player's own rule: REFUSED's pitch would not be signed.
         mayPlay: (_actor, companyId) => Promise.resolve(companyId !== REFUSED),
@@ -717,7 +738,7 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
             companyId === HIDDEN
               ? null
               : {
-                  canonicalName: companyId === NIXO ? "Nixo" : "Saved Co",
+                  canonicalName: companyId === NIXO ? "Nixo" : "Other Co",
                   shortDescription: null,
                   headquartersCountry: "NG",
                   currentStageCode: "seed",
@@ -732,11 +753,23 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
     });
     expect(first.statusCode).toBe(200);
     const page1 = first.json<{
-      items: { companyId: string; label: string; canonicalName: string }[];
+      items: {
+        companyId: string;
+        label: string;
+        canonicalName: string;
+        pitch: unknown;
+        activityAt: string;
+      }[];
       nextCursor: string | null;
     }>();
     expect(page1.items).toMatchObject([
-      { companyId: NIXO, label: "CONNECTED", canonicalName: "Nixo" },
+      {
+        companyId: NIXO,
+        label: "CONNECTED",
+        canonicalName: "Nixo",
+        activityAt: "2026-10-03T09:48:33.414Z",
+        pitch: { mediaAssetId: "f0000000-0000-4000-8000-000000000201" },
+      },
     ]);
     expect(page1.nextCursor).not.toBeNull();
     const rest = await app.inject({
@@ -744,12 +777,21 @@ describe("GET /v1/discovery/your-companies (founder decision 2026-10-02)", () =>
       url: `/v1/discovery/your-companies?limit=5&cursor=${page1.nextCursor ?? ""}`,
     });
     const page2 = rest.json<{
-      items: { companyId: string; label: string }[];
+      items: { companyId: string; label: string; pitch: unknown }[];
       nextCursor: string | null;
     }>();
-    // The hidden company drops out; the one without a pitch never appears.
-    expect(page2.items.map((item) => [item.companyId, item.label])).toEqual([
-      [SAVED, "SAVED"],
+    // The hidden company drops out. The one without a pitch, and the one
+    // whose pitch would not be signed for them, stay: "Pitch not shared".
+    expect(
+      page2.items.map((item) => [
+        item.companyId,
+        item.label,
+        item.pitch === null,
+      ]),
+    ).toEqual([
+      [NO_PITCH, "CONNECTED", true],
+      [REFUSED, "INTERESTED", true],
+      [SAVED, "SAVED", false],
     ]);
     expect(page2.nextCursor).toBeNull();
     await app.close();
