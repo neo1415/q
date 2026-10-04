@@ -838,6 +838,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "DAILY",
           "RESULTS",
           "PASSED",
+          // WORK-58: Q's work page.
+          "WORK",
         ],
         documents: [],
         visibilityChange: false,

@@ -253,6 +253,10 @@ export {
   TURN_READER_V40_REFERENCES,
 } from "./prompts/tasks/turn-reader.v40.js";
 export {
+  TURN_READER_V41,
+  TURN_READER_V41_DESTINATIONS,
+} from "./prompts/tasks/turn-reader.v41.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,

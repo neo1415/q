@@ -138,6 +138,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "PASSED",
   // follow-55: Discover's "Your companies" tab (/discover?tab=yours).
   "YOUR_COMPANIES",
+  // WORK-58: Q's work page (what Q suggests, runs, needs and finished).
+  "WORK",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

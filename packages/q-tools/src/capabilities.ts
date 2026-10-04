@@ -270,6 +270,8 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
     "Opens The Q Daily: their latest edition (news about their sectors, markets, deals and people they know, every story with its source, Q's take labelled), its archive and the PDF edition.",
   YOUR_COMPANIES:
     "Opens Your companies, Discover's second tab: every company they are connected with, expressed interest in or saved, most recent first, each with its pitch when the company shares it with them.",
+  WORK:
+    "Opens Work, Q's work page: what Q suggests from their own account, what needs their yes, what Q is running for them (goal, status, spend) and what it finished. For 'show my work' or 'what is Q doing'.",
   RESULTS:
     "Opens Results: what their activity on Capital Q produced (introductions, conversations, meetings and where each stands), with reports to download.",
 };
