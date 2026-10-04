@@ -22,6 +22,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { QAperture } from "@/features/q-aperture";
 import {
   materialUploadCompleteAction,
@@ -459,6 +460,27 @@ export function RelationshipChat({
             className={`group flex max-w-[80%] min-w-0 flex-col gap-0.5 ${message.mine ? "items-end self-end" : "items-start self-start"}`}
             data-chat-message={message.mine ? "mine" : "theirs"}
           >
+            {!message.mine &&
+            (index === 0 ||
+              messages[index - 1]?.mine === true ||
+              messages[index - 1]?.senderName !== message.senderName) ? (
+              // Who is speaking, once per run of their messages. A
+              // person's photo is theirs alone today: initials here.
+              <span
+                className="flex items-center gap-1.5"
+                data-chat-sender
+              >
+                <EntityAvatar
+                  kind="person"
+                  name={message.senderName}
+                  size="xs"
+                  decorative
+                />
+                <span className="cq-caption text-(--cq-text-secondary)">
+                  {message.senderName}
+                </span>
+              </span>
+            ) : null}
             <div
               className={`max-w-full min-w-0 rounded-2xl px-3 py-2 ${
                 message.mine

@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { RelationshipSummaryDto } from "@capital-q/contracts";
 import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
 import {
   formatRelationshipDate,
   NEXT_STEP_WORDS,
@@ -71,6 +73,23 @@ function RelationshipRow({
       href={relationshipHref(item)}
       className="flex min-h-11 items-center gap-3 py-3 outline-offset-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
     >
+      {item.counterpart.kind === "COMPANY" ? (
+        <EntityAvatar
+          kind="company"
+          name={item.counterpart.name}
+          companyId={item.counterpart.id}
+          size="sm"
+          decorative
+        />
+      ) : (
+        // The list carries no investor image; the detail page reads it.
+        <EntityAvatar
+          kind="investor"
+          name={item.counterpart.name}
+          size="sm"
+          decorative
+        />
+      )}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="cq-body text-(--cq-text-primary)">
           {item.counterpart.name}

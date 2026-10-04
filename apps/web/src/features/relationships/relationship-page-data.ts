@@ -40,6 +40,16 @@ import { absentSentence } from "./relationship-words";
 
 export type CounterpartProfile = {
   readonly photoUrl: string | null;
+  /**
+   * The counterpart's cover, for the detail hero only, from the same read
+   * as the photo (and under the same rule). Absent: none to show.
+   */
+  readonly coverUrl?: string | null | undefined;
+  /**
+   * Set when the counterpart is a company, so its avatar can fall back to
+   * the gated company photo route. Absent: an investor organisation.
+   */
+  readonly companyId?: string | undefined;
   readonly about: string | null;
   readonly location: string | null;
   readonly websiteUrl: string | null;
@@ -180,6 +190,10 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
     readAt: Date.now(),
     profile: {
       ...NO_PROFILE,
+      // The profile read's own card-scoped images; nothing new is asked.
+      photoUrl: profile?.photoUrl ?? null,
+      coverUrl: profile?.coverUrl ?? null,
+      companyId: company.companyId,
       about: company.shortDescription ?? company.primaryDescription,
       location: location.length === 0 ? null : location,
       websiteUrl: company.websiteUrl,
@@ -260,6 +274,7 @@ export async function loadCompanySideRelationship(
         ? NO_PROFILE
         : {
             photoUrl: investor.photoUrl ?? null,
+            coverUrl: investor.coverUrl ?? null,
             about: investor.publicDescription,
             location: countryLabel(investor.hqCountry),
             websiteUrl: investor.websiteUrl,
