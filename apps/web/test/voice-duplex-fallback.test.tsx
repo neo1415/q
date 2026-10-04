@@ -2,6 +2,8 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { QConversationIdSchema } from "@capital-q/contracts";
+
 import type { VoiceSessionEvents } from "../src/features/voice/session";
 
 /**
@@ -43,7 +45,9 @@ vi.mock("../src/features/voice/use-voice-session", () => ({
 const { useVoiceInterview } =
   await import("../src/features/voice/use-voice-interview");
 
-const CONVERSATION = "7f000000-0000-4000-8000-000000000001";
+const CONVERSATION = QConversationIdSchema.parse(
+  "7f000000-0000-4000-8000-000000000001",
+);
 
 beforeEach(() => {
   startVoiceSessionAction.mockReset();

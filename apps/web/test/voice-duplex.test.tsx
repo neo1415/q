@@ -30,7 +30,10 @@ class FakeChannel {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
-  constructor(readonly label: string) {}
+  readonly label: string;
+  constructor(label: string) {
+    this.label = label;
+  }
   send(data: string) {
     this.sent.push(JSON.parse(data) as Record<string, unknown>);
   }

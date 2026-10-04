@@ -22,7 +22,9 @@ import type {
   ContextFirewallRequest,
 } from "@capital-q/q-runtime";
 import {
+  allow,
   createQToolExecutor,
+  deny,
   createQToolRegistry,
   defineQTool,
   type AnyQToolDefinition,
@@ -98,11 +100,10 @@ function planFor(
   });
 }
 
-function tool(
+function readTool(
   providerName: string,
-  classification: "READ_ONLY" | "PREPARE",
   authorizeCalls: string[],
-  allow = true,
+  permitted = true,
 ): AnyQToolDefinition {
   return defineQTool<{ readonly q: string }, { readonly echo: string }, null>({
     id: `test.${providerName}`,
@@ -110,12 +111,12 @@ function tool(
     status: "ACTIVE",
     providerName,
     description: "Echoes.",
-    classification,
-    riskClass: classification === "READ_ONLY" ? "SAFE_READ" : "PREPARE_ONLY",
+    classification: "READ_ONLY",
+    riskClass: "SAFE_READ",
     requiredCapabilities: [],
     supportedPurposes: ["GENERAL_QUESTION"],
     requiredScopeKinds: [],
-    approval: classification === "READ_ONLY" ? "NONE" : "REQUIRED",
+    approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "test",
     visibleStage: null,
@@ -124,13 +125,9 @@ function tool(
     authorize: () => {
       authorizeCalls.push(providerName);
       return Promise.resolve(
-        allow
-          ? { outcome: "ALLOW", sensitivity: "PUBLIC", grant: null }
-          : {
-              outcome: "DENY",
-              code: "NOT_PERMITTED",
-              safeMessage: "Not for you.",
-            },
+        permitted
+          ? allow<null>("PUBLIC", null)
+          : deny<null>("NOT_AVAILABLE", "Not for you."),
       );
     },
     execute: (input) => Promise.resolve({ echo: input.q }),
@@ -212,7 +209,7 @@ function harness(
         options.deny === true
           ? {
               outcome: "DENIED",
-              reason: "ACTOR_NOT_AUTHORISED",
+              reason: "NO_AUTHORISED_CONTEXT",
               denied: [],
             }
           : {
@@ -223,7 +220,7 @@ function harness(
     },
   };
   const registry = createQToolRegistry([
-    tool("get_thing", "READ_ONLY", authorizeCalls, options.allowDirect ?? true),
+    readTool("get_thing", authorizeCalls, options.allowDirect ?? true),
   ]);
   const executor = createQToolExecutor({ registry });
   const execute = vi.fn(executor.execute);
