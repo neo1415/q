@@ -108,6 +108,8 @@ type World = {
   readonly port: ReturnType<typeof createQActionPort>;
 };
 
+let nextMeetingDay = 0;
+
 describe("approve → continue → execute, per action type (local PostgreSQL)", () => {
   let db: RequestDatabase;
   let world: World;
@@ -378,7 +380,11 @@ describe("approve → continue → execute, per action type (local PostgreSQL)",
         relationshipId: RELATIONSHIP,
         counterpartName: "Acme",
         purpose: "Intro call",
-        startsAt: "2030-10-06T13:00:00.000Z",
+        // A day apart per case: one booking per counterpart per 30-minute
+        // window (voiceq-63) would rightly refuse a second identical one.
+        startsAt: new Date(
+          Date.UTC(2030, 9, 6, 13) + nextMeetingDay++ * 86_400_000,
+        ).toISOString(),
         durationMinutes: 30,
         timeZone: "Europe/London",
       }),
