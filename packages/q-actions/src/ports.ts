@@ -127,6 +127,30 @@ export type QActionRepository = {
       readonly approval: QApprovalRecord;
     }[]
   >;
+  /**
+   * The proposals of this person, of one action type and version, carried
+   * out since `since`, with their approval: what a restated request is
+   * matched with by intent so it is answered "already done" instead of
+   * acting twice (voiceq-63). Newest first, bounded. Absent: never matched.
+   */
+  readonly listExecutedForProposer?:
+    | ((
+        executor: DatabaseExecutor,
+        input: {
+          readonly tenantId: TenantId;
+          readonly userId: UserId;
+          readonly organisationId: OrganisationId;
+          readonly actionType: string;
+          readonly actionVersion: number;
+          readonly since: Date;
+        },
+      ) => Promise<
+        readonly {
+          readonly action: QActionRecord;
+          readonly approval: QApprovalRecord;
+        }[]
+      >)
+    | undefined;
 };
 
 export type QApprovalRecord = {

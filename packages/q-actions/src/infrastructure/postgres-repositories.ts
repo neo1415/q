@@ -271,6 +271,44 @@ export function createPostgresQActionRepositories(): QActionRepositories {
         }
         return found;
       },
+      listExecutedForProposer: async (executor, input) => {
+        const rows = await executor`
+          select a.id as action_id, p.id as approval_id
+            from q_runtime.actions a
+            join q_runtime.approvals p
+              on p.action_id = a.id and p.tenant_id = a.tenant_id
+           where a.tenant_id = ${input.tenantId}
+             and a.proposed_by_user_id = ${input.userId}
+             and a.organisation_id = ${input.organisationId}
+             and a.action_type = ${input.actionType}
+             and a.action_version = ${input.actionVersion}
+             and a.status = 'EXECUTED'
+             and p.status = 'APPROVED'
+             and a.executed_at >= ${input.since.toISOString()}::text::timestamptz
+           order by a.executed_at desc, a.id desc
+           limit 20`;
+        const found: {
+          readonly action: QActionRecord;
+          readonly approval: QApprovalRecord;
+        }[] = [];
+        for (const row of rows) {
+          const ids = AwaitingRow.parse(row);
+          const action = await findAction(
+            executor,
+            input.tenantId,
+            ids.action_id,
+          );
+          const approval = await findApproval(
+            executor,
+            input.tenantId,
+            ids.approval_id,
+          );
+          if (action !== null && approval !== null) {
+            found.push({ action, approval });
+          }
+        }
+        return found;
+      },
       listForRun: async (executor, tenantId, runId) => {
         const rows = await executor`
           ${selectAction(executor)}

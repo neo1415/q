@@ -145,8 +145,10 @@ const REPLY_KINDS: ReadonlySet<string> = new Set([
 export function isReplyToCard(
   utterance: string,
   turn: PendingTurnReading | null,
+  cards: readonly { readonly summary: string }[] = [],
 ): boolean {
   if (plainApproval(utterance) || plainRefusal(utterance)) return true;
+  if (pointedRefusal(utterance) || restatesCard(utterance, cards)) return true;
   // "Approved. And what's the weather like?": a reply first, then more.
   // Only a first sentence that is nothing but a yes or a no counts; "We've
   // decided not to proceed…" is no such sentence.
@@ -260,7 +262,10 @@ export async function decidePending(
   const reply =
     input.turn === undefined
       ? true
-      : isReplyToCard(input.utterance, input.turn);
+      : isReplyToCard(input.utterance, input.turn, pending);
+  // A decision that restates the card carries nothing more to answer: the
+  // restatement is the card itself, never a second request.
+  const restated = restatesCard(input.utterance, pending);
   // A new request is never a reply to a card from another conversation
   // (QA 2026-10-03, run 528f4c4e: "just handle it" in a fresh
   // conversation was read as a yes to Express interest in Clinicrest,
@@ -327,13 +332,15 @@ export async function decidePending(
         // "Shall I go ahead?", "yes, go ahead" came back with a remainder
         // and could not be told apart from a change).
         `${named(only.summary)}. Shall I go ahead with exactly this, unchanged?`;
-  const read = await port.read({
+  const heard = await port.read({
     question,
     utterance: input.utterance,
     recentTurns: input.recentTurns,
     context: input.context,
     ...(input.signal === undefined ? {} : { signal: input.signal }),
   });
+  const read =
+    heard !== null && restated ? { ...heard, remainder: null } : heard;
   if (read === null || read.decision === "UNRELATED") {
     return { kind: "NONE" };
   }
@@ -387,6 +394,61 @@ export async function decidePending(
     : { kind: "ANSWER_THEN", before: line, after: null };
 }
 
+/** Words that open by deciding: an approval or a refusal, before anything else. */
+const OPENS_DECIDING =
+  /^\s*(?:(?:yes|yeah|yep|ok(?:ay)?|sure|no|nope|please)[\s,.!]+)*(?:approve|confirm|go ahead(?: with)?|proceed with|cancel|decline|reject|scrap|drop)\b/iu;
+/** Words that ask for something new or different, not this card again. */
+const ASKS_ANEW =
+  /\b(?:another|new|second|again|one more|instead|but|change|move|different|also|and then|as well)\b/iu;
+
+/**
+ * An explicit decision that restates the card it decides (voiceq-63, live
+ * 2026-10-04): "Yes, approve the meeting with Nixo for the next five
+ * minutes" opened with "approve", named the card's counterpart and asked
+ * for nothing new, yet the reader read it as a request; it was answered as
+ * one and prepared a second card, then a third for "Yes, confirm…". Words
+ * that open by deciding and point to one waiting card by its counterpart
+ * are a reply to it, unless they ask for something new or different.
+ */
+export function restatesCard(
+  utterance: string,
+  cards: readonly { readonly summary: string }[],
+): boolean {
+  if (cards.length === 0) return false;
+  if (!OPENS_DECIDING.test(utterance) || ASKS_ANEW.test(utterance)) {
+    return false;
+  }
+  return namedIn(utterance, cards) !== null;
+}
+
+/**
+ * A refusal that is all pointing at the card ("cancel that", "scrap it",
+ * "cancel the meeting"): a reply however the reader read it (voiceq-63:
+ * "cancel that" must decline the waiting card by voice).
+ */
+export function pointedRefusal(utterance: string): boolean {
+  if (!POINTED.test(utterance)) return false;
+  const words = utterance
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}'\s]/gu, " ")
+    .split(/\s+/u)
+    .filter((word) => word.length > 0);
+  return words.every(
+    (word) =>
+      REFUSAL_WORDS.includes(word) || FILLER.has(word) || CARD_WORDS.has(word),
+  );
+}
+const CARD_WORDS: ReadonlySet<string> = new Set([
+  "meeting",
+  "call",
+  "booking",
+  "request",
+  "email",
+  "message",
+  "reminder",
+  "please",
+]);
+
 /** Said when the same change is asked for again: ready, waiting for a yes. */
 export function readyLine(summary: string): string {
   return `That's ready: ${named(summary)}. It's waiting for your yes. Tap Approve on the card, or tell me to go ahead.`;
@@ -397,7 +459,7 @@ const REFUSAL =
   /\b(?:no|nope|nah|don'?t|do not|cancel\w*|declin\w*|reject\w*|scrap|stop|never ?mind|forget (?:it|that)|not (?:that|this|it|now))\b/iu;
 /** Words that point to the card in front of them. */
 const POINTED =
-  /\b(?:cancel|decline|scrap|drop|forget|reject|stop|don'?t do|do not do|not)\s+(?:that|this|it|the (?:card|change|proposal|one)|that one)\b/iu;
+  /\b(?:cancel|decline|scrap|drop|forget|reject|stop|don'?t do|do not do|not)\s+(?:that|this|it|the (?:card|change|proposal|one|meeting|call|booking|request|email|message|reminder)|that one)\b/iu;
 /** "No," or "Nope." opening what they say: an explicit no. */
 const OPENING_NO = /^\s*(?:no|nope|nah)\b[\s,.!;:-]/iu;
 const REFUSAL_WORDS = [

@@ -155,6 +155,33 @@ const when = (iso: string, timeZone?: string) => {
   return new Date(iso).toUTCString().replace(":00 GMT", " UTC");
 };
 
+/** "Tue 6 Oct, 10:00": a booked time as said back, in its zone when known. */
+const shortWhen = (iso: string, timeZone?: string) => {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      ...(timeZone === undefined ? { timeZone: "UTC" } : { timeZone }),
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .format(new Date(iso))
+      .replace(/^(\w{3}),/u, "$1");
+  } catch {
+    return when(iso);
+  }
+};
+
+/**
+ * One booking per counterpart per intended time (voiceq-63): two requests
+ * for a call on one relationship starting within this window are the same
+ * call, however the time was worded ("in the next five minutes", said at
+ * 18:24 and again at 18:25, is not two calls).
+ */
+export const SAME_MEETING_WINDOW_MS = 30 * 60_000;
+
 /** A schedule outcome as an action result; refusals are final. */
 function asExecution<T, R>(
   outcome: ScheduleOutcome<T>,
@@ -329,9 +356,15 @@ export function createMeetingScheduleAction(dependencies: {
       summary: `Call with ${payload.counterpartName}`,
       preview: `${payload.purpose}\n${when(payload.startsAt, payload.timeZone)}, ${String(payload.durationMinutes)} minutes\nGoogle Meet invite to ${payload.counterpartName}'s people`,
     }),
+    sameIntent: (previous, next) =>
+      previous.relationshipId === next.relationshipId &&
+      Math.abs(Date.parse(previous.startsAt) - Date.parse(next.startsAt)) <
+        SAME_MEETING_WINDOW_MS,
+    alreadyDone: (payload, result) =>
+      `Already booked with ${payload.counterpartName} for ${shortWhen(payload.startsAt, payload.timeZone)}${result.meetLink === null ? "" : ` — link: ${result.meetLink}`}.`,
     confirm: (payload, result) =>
       result.alreadyDone
-        ? `That call with ${payload.counterpartName} was already booked; nobody was invited twice.`
+        ? `Already booked with ${payload.counterpartName} for ${shortWhen(payload.startsAt, payload.timeZone)}${result.meetLink === null ? "" : ` — link: ${result.meetLink}`}. Nobody was invited twice.`
         : `Booked. ${payload.counterpartName} has the invite${result.meetLink === null ? "" : ` and the Meet link: ${result.meetLink}`}.`,
     authorize: async (payload, actor) => {
       const check = await schedule.canSchedule(actor, payload.relationshipId);

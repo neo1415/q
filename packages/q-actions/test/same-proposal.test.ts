@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
-import { proposalContent } from "../src/domain/same-proposal.js";
+import {
+  findSameIntent,
+  proposalContent,
+} from "../src/domain/same-proposal.js";
 
 /**
  * Lead 2026-10-03: a restated request made a second identical card, and
@@ -89,5 +93,71 @@ describe("two waiting cards for one deck, opposite audiences", () => {
 
   it("a request for INVESTORS is the INVESTORS card", () => {
     expect(match("INVESTORS")).toBe("30784a17");
+  });
+});
+
+/**
+ * voiceq-63, live 2026-10-04: "book a call with Nixo in the next five
+ * minutes", said and restated, minted starts seconds apart; content never
+ * matched, five cards waited and two were booked.
+ */
+describe("the same change, by intent", () => {
+  const Meeting = z.object({
+    relationshipId: z.string(),
+    startsAt: z.string(),
+  });
+  type Meeting = z.infer<typeof Meeting>;
+  const definition = {
+    payload: Meeting,
+    sameIntent: (a: Meeting, b: Meeting) =>
+      a.relationshipId === b.relationshipId &&
+      Math.abs(Date.parse(a.startsAt) - Date.parse(b.startsAt)) < 30 * 60_000,
+  };
+  const targets = [{ kind: "RELATIONSHIP", relationshipId: "r1" }];
+  const card = (id: string, startsAt: string, relationshipId = "r1") => ({
+    id,
+    targets: [{ kind: "RELATIONSHIP", relationshipId }],
+    payload: { relationshipId, startsAt },
+  });
+  const read = (c: ReturnType<typeof card>) => c;
+
+  it("a restated booking seconds later is the waiting card", () => {
+    const waiting = [card("a", "2026-10-04T18:29:42.892Z")];
+    expect(
+      findSameIntent(definition, waiting, read, {
+        targets,
+        payload: { relationshipId: "r1", startsAt: "2026-10-04T18:30:08.879Z" },
+      })?.id,
+    ).toBe("a");
+  });
+
+  it("another hour, or another counterpart, is another call", () => {
+    const waiting = [
+      card("a", "2026-10-04T18:29:42.892Z"),
+      card("b", "2026-10-04T18:30:00.000Z", "r2"),
+    ];
+    expect(
+      findSameIntent(definition, waiting, read, {
+        targets,
+        payload: { relationshipId: "r1", startsAt: "2026-10-04T20:00:00.000Z" },
+      }),
+    ).toBeUndefined();
+  });
+
+  it("without a sameIntent rule nothing matches by intent", () => {
+    expect(
+      findSameIntent(
+        { payload: Meeting },
+        [card("a", "2026-10-04T18:29:42.892Z")],
+        read,
+        {
+          targets,
+          payload: {
+            relationshipId: "r1",
+            startsAt: "2026-10-04T18:29:42.892Z",
+          },
+        },
+      ),
+    ).toBeUndefined();
   });
 });

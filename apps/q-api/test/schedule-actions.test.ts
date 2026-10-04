@@ -126,6 +126,35 @@ const meetingPayload = {
 };
 
 describe("meeting.schedule", () => {
+  it("is one booking per counterpart per intended time, said back from the record (voiceq-63)", () => {
+    const { schedule } = world();
+    const action = createMeetingScheduleAction({ schedule });
+    const same = action.sameIntent;
+    const done = action.alreadyDone;
+    if (same === undefined || done === undefined) throw new Error("absent");
+    const at = (startsAt: string) =>
+      action.payload.parse({ ...meetingPayload, startsAt });
+    // "In the next five minutes", said at 18:24 and again at 18:25.
+    expect(
+      same(at("2026-10-06T09:00:00.000Z"), at("2026-10-06T09:00:26.000Z")),
+    ).toBe(true);
+    expect(
+      same(at("2026-10-06T09:00:00.000Z"), at("2026-10-06T11:00:00.000Z")),
+    ).toBe(false);
+    expect(
+      done(
+        action.payload.parse({ ...meetingPayload, timeZone: "Africa/Lagos" }),
+        action.result.parse({
+          meetingId: "00000000-0000-4000-8000-0000000000c1",
+          meetLink: "https://meet.google.com/abc-defg-hij",
+          alreadyDone: false,
+        }),
+      ),
+    ).toBe(
+      "Already booked with Acme for Tue 6 Oct, 10:00 — link: https://meet.google.com/abc-defg-hij.",
+    );
+  });
+
   it("authorises a connected party with Calendar, and nobody else", async () => {
     const { schedule } = world();
     const action = createMeetingScheduleAction({ schedule });

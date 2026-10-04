@@ -75,6 +75,7 @@ import {
   approvalCue,
   declines,
   isReplyToCard,
+  restatesCard,
   plainApproval,
   plainRefusal,
   statusLine,
@@ -1830,7 +1831,7 @@ export function createVoiceTurnHandler(
         approvalWaiting.summary ??
         "I've prepared something that needs your approval.";
       const plain = plainApproval(text) || plainRefusal(text);
-      const [read, reading] = fragment
+      let [read, reading] = fragment
         ? [null, null]
         : await Promise.all([
             decide(binding, `${summary} Shall I go ahead?`, text, signal),
@@ -1840,11 +1841,17 @@ export function createVoiceTurnHandler(
           ]);
       // Without a turn reader composed, the decision reading is all there
       // is, as before; with one, an unread turn is no reply.
+      const card = [{ summary }];
       const reply =
         read !== null &&
         (plain ||
           dependencies.turns === undefined ||
-          isReplyToCard(text, reading));
+          isReplyToCard(text, reading, card));
+      // "Yes, approve the meeting with Nixo for the next five minutes":
+      // the rest restates the card, so there is no rest to answer.
+      if (read !== null && restatesCard(text, card)) {
+        read = { ...read, remainder: null };
+      }
       const decision =
         read === null || !reply
           ? "UNRELATED"

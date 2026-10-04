@@ -190,7 +190,7 @@ export function createQActionPort(options: {
         return { kind: "NONE" };
       }
       try {
-        const { action, approval, existing, superseded } =
+        const { action, approval, existing, superseded, alreadyDone } =
           await options.service.propose({
             actor: context.actor,
             runId: context.runId,
@@ -201,6 +201,16 @@ export function createQActionPort(options: {
         // What this result covers: the card it is, and the cards it replaced.
         covered.add(action.id);
         for (const older of superseded ?? []) covered.add(older.id);
+        if (alreadyDone !== undefined) {
+          // Carried out already (voiceq-63): where it stands, from its
+          // record, and nothing new to approve.
+          if (options.narrator?.note !== undefined) {
+            await options.narrator.note(run, alreadyDone);
+          } else {
+            await narrator.refused(run, alreadyDone);
+          }
+          return { kind: "NONE" };
+        }
         if (existing === true) {
           // The same change already waits for them (lead 2026-10-03): its
           // card is shown here again, in focus, and nothing new is made.

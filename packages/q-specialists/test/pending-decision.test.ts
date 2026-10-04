@@ -683,3 +683,70 @@ describe("the founder's lines, live 2026-10-02 (Zino)", () => {
     expect(JSON.stringify(outcome)).not.toMatch(/waiting for your approval/);
   });
 });
+
+describe("an explicit decision that restates its card (voiceq-63, live 2026-10-04)", () => {
+  const CALL: Proposal = {
+    proposalId: "daeef460",
+    summary: "Call with Nixo",
+    status: "PENDING",
+  };
+  const asRequest = {
+    kind: "TOOL_REQUEST",
+    addressedToQ: true,
+    namesAction: true,
+  } as const;
+  const said = (utterance: string) => ({
+    context,
+    utterance,
+    recentTurns: [],
+    turn: asRequest,
+  });
+
+  it.each([
+    "Yes, approve the meeting with Nixo for the next five minutes.",
+    "Yes, confirm the meeting with Nixo in the next five minutes.",
+  ])("%s approves the waiting card, with nothing left over", async (words) => {
+    const { value, calls } = port({
+      proposals: [CALL],
+      // The reader heard "for the next five minutes" as more to do.
+      reading: { decision: "YES", remainder: "for the next five minutes" },
+    });
+    const outcome = await decidePending(value, said(words));
+    expect(calls.approve).toEqual(["daeef460"]);
+    expect(outcome).toEqual({ kind: "REPLY", line: "Done: Call with Nixo." });
+  });
+
+  it("cancel the call with Nixo declines it", async () => {
+    const { value, calls } = port({
+      proposals: [CALL],
+      reading: { decision: "NO", remainder: null },
+    });
+    await decidePending(value, said("Cancel the call with Nixo."));
+    expect(calls.decline).toEqual(["daeef460"]);
+  });
+
+  it.each(["cancel that", "Cancel that.", "scrap it", "cancel the meeting"])(
+    "%s declines the waiting card, read as a request or not",
+    async (words) => {
+      const { value, calls } = port({
+        proposals: [CALL],
+        reading: { decision: "NO", remainder: null },
+      });
+      await decidePending(value, said(words));
+      expect(calls.decline).toEqual(["daeef460"]);
+    },
+  );
+
+  it.each([
+    "Book another one with Nixo for the next five minutes.",
+    "Yes, approve the meeting with Nixo but move it to three.",
+    "Book a meeting with Nixo in the next five minutes.",
+  ])("%s is its own request: nothing approved", async (words) => {
+    const { value, calls } = port({
+      proposals: [CALL],
+      reading: { decision: "YES", remainder: null },
+    });
+    await decidePending(value, said(words));
+    expect(calls.approve).toEqual([]);
+  });
+});
