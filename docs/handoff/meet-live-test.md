@@ -64,3 +64,46 @@ Nothing should fail silently. Each failure appears both on the meeting record an
 When a call is still running, **Send Q in again** on the record retries.
 
 If none of these appear and Q never arrives, check the q-api logs for `meeting bot not created`. Bot status can be read-only checked with `GET /api/v1/bot/<id>/`.
+
+## meet2-64: what the 2026-10-04 call showed, and what to check next time
+
+What happened (Recall bot `6cf27e41`, meeting `21d82131`): Q was admitted at 18:36:31, greeted, then said nothing until 18:40:06, when it said a greeting and three answers in one go. The call ended at 18:41:46. The record was written at 18:42:58 (polling worked; the webhook is not set up), but nobody was told: the "notes are ready" notice failed the link check, and that failure skipped everything after it.
+
+- **The delay.** Recall's participant events show Meet's "speaking" flag on for 130 s from one open microphone, then switching between the two laptops every 0.3–3 s. Q waited for nobody to be speaking. Answers were composed 1.6–2.3 s after each question; captions arrived 1–3 s after the words.
+- **Echo.** Two laptops in one room, both mics open: every line was captioned twice, once under each name. For the demo, use one laptop per room, or headphones.
+- **Two calls.** Q's voice "repeats its last action" made two bookings 4 s apart. The second bot sat in the lobby, and its "Q has no record of this call" was the only after-call notice anyone got. This is voice-side; the voice owner should fix it.
+
+Check next time (deploy `build/meet2-64`; no migration):
+
+| When                                  | Look for                                                                                                                                                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| You ask "Q, …?" or "Um, hello, Q?"    | The answer starts within about 2 s of you stopping, even if the other laptop's mic is open. In the q-api logs, `meeting host composed` shows `composeMs` and `meeting host spoke` shows `ttsMs`/`playMs`. |
+| You ask three questions quickly       | One answer, to the last one, starting "Taking the latest question:". Never a pile of answers.                                                                                                             |
+| You start talking while Q speaks      | Q stops (your words, or a fresh voice in a quiet room). Two open mics flipping on their own don't stop it.                                                                                                |
+| Mid-call                              | The meeting record already shows the transcript so far (saved every 10 s).                                                                                                                                |
+| Within about 1 min of the call ending | Both sides get "Q's notes are ready" / "The call's record is ready". Each gets the recap email (Brevo). Work has the follow-up cards. Money is shown as **DETECTED** ("a million dollars" is now read).   |
+| End the call early                    | The record still appears, built from what Q heard; if the provider's transcript failed, it is marked partial.                                                                                             |
+
+Logs to grep (they never contain the call's words): `meeting host composed`, `meeting host spoke`, `a step after the meeting record failed`, `the live record was not saved`, `meeting follow-up cards prepared`.
+
+### Backfill for today's call (proposed, not run)
+
+Recall keeps the bot's transcript (retention: forever). After `build/meet2-64` is deployed (which marks `meeting_held` once per meeting), let the collector settle the call again:
+
+```sql
+update communication.meeting_assistants
+   set status = 'IN_CALL', updated_at = clock_timestamp()
+ where id = '80b4e357-6731-473d-ac2f-e1df64b84245' and status = 'DONE';
+```
+
+Within a minute the collector reads bot `6cf27e41` and rewrites the notes (one MEETING_NOTES model call). It then sends both notices and both recap emails, prepares the follow-up cards, and files "a million dollars" as DETECTED (key `meeting:21d82131…:<n>`, idempotent). Notices dedupe on `meeting-notes:<id>`. Cost: one notes model call plus two emails.
+
+### Sharing the deck on screen in a call (plan, after the demo)
+
+Recall Output Media can show a web page as the bot's camera or screen share (`POST /bot/{id}/output_media/`, kind `webpage`). This was not built for the demo: it needs more than the 2-hour budget and needs a security review.
+
+1. "Q, share my deck" in a call makes the founder's existing **Share your deck** card. Nothing is shown before approval.
+2. On approval, the server mints a short-lived deck-view token. The token is scoped to the meeting, the deck document and the approving founder. It expires at the call's end, and it is checked server-side on every page and image request.
+3. A read-only deck viewer route is reachable only with that token, and serves no other document.
+4. The server then calls `output_media` with that URL, and `DELETE` stops it. Both happen only from the founder's approval or their "stop sharing", never from the model.
+5. Tests: the token is refused for another meeting, another deck, after expiry and after the founder revokes it.

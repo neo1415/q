@@ -3169,16 +3169,26 @@ const meetingAssistant = createMeetingAssistantService({
         );
       });
     void instructionTriggers.wake(held.relationshipId).catch(() => undefined);
-    const writer = createNetworkMeetingActivityWriter();
-    await database.transactions.run((tx) =>
-      writer.record(tx, {
-        relationshipId: held.relationshipId,
-        eventType: "meeting_held",
-        meetingId: held.meetingId,
-        actorUserId: held.organiserUserId,
-        correlationId: `cor_${randomUUID()}`,
-      }),
-    );
+    // meet2-64: a call's record may be settled again (a backfill, a retry
+    // after a failed step); the history marks the call held once.
+    const alreadyHeld = await database.sql<{ one: number }[]>`
+      select 1 as one from network.relationship_events
+       where relationship_id = ${held.relationshipId}
+         and event_type = 'meeting_held'
+         and source_id = ${held.meetingId}
+       limit 1`;
+    if (alreadyHeld.length === 0) {
+      const writer = createNetworkMeetingActivityWriter();
+      await database.transactions.run((tx) =>
+        writer.record(tx, {
+          relationshipId: held.relationshipId,
+          eventType: "meeting_held",
+          meetingId: held.meetingId,
+          actorUserId: held.organiserUserId,
+          correlationId: `cor_${randomUUID()}`,
+        }),
+      );
+    }
     // Founder direction 2026-09-30: money said in the call is filed by Q
     // for both sides to adopt or dispute; it never counts until confirmed.
     for (const [index, signal] of held.commitments.entries()) {
