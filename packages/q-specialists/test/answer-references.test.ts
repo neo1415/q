@@ -349,6 +349,22 @@ describe("the conversation reference resolver", () => {
     ).toBeNull();
   });
 
+  it("'show me Nixo's pitch' is that company's item in Your companies", () => {
+    expect(
+      openTarget(
+        {
+          open: "PITCH",
+          name: "Nixo",
+          shown: null,
+          retryLast: false,
+          sameFor: null,
+        },
+        [],
+        "INVESTOR",
+      ),
+    ).toEqual({ pages: ["COMPANY_PITCH"], name: "Nixo" });
+  });
+
   it("'same for Kazikit' repeats the action for the record they named instead", () => {
     const last = {
       tool: "propose_express_interest",

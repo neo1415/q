@@ -173,6 +173,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   REHEARSALS: "Rehearsals",
   DOCUMENTS: "their documents and brand kit",
   DAILY: "The Q Daily",
+  YOUR_COMPANIES: "Your companies on Discover",
   RESULTS: "Results",
 };
 

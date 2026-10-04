@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
+
 import {
   createDefaultPromptRegistry,
   TURN_READER_V39,
+  TURN_READER_V38_DESTINATIONS,
   TURN_READER_V40,
+  TURN_READER_V40_DESTINATIONS,
   TURN_READER_V40_REFERENCES,
   TurnReaderV40ResultSchema,
 } from "../src/index.js";
@@ -20,10 +24,26 @@ describe("TURN_READER v40", () => {
     expect(TURN_READER_V39.status).toBe("DEPRECATED");
   });
 
-  it("adds only the REFERENCE words, in the static prefix before every per-turn value", () => {
+  it("names every contract destination exactly once, YOUR_COMPANIES included", () => {
+    for (const destination of [...Q_NAVIGATE_DESTINATIONS, "RESULTS"]) {
+      expect(
+        TURN_READER_V40.template.split(
+          new RegExp(`(?<![A-Z_])${destination} \\(`),
+        ).length - 1,
+        destination,
+      ).toBe(1);
+    }
+  });
+
+  it("adds only the REFERENCE words and the YOUR_COMPANIES screen, in the static prefix before every per-turn value", () => {
     expect(
-      TURN_READER_V40.template.replace(TURN_READER_V40_REFERENCES, ""),
+      TURN_READER_V40.template
+        .replace(TURN_READER_V40_REFERENCES, "")
+        .replace(TURN_READER_V40_DESTINATIONS, TURN_READER_V38_DESTINATIONS),
     ).toBe(TURN_READER_V39.template);
+    expect(TURN_READER_V40.template.indexOf("YOUR_COMPANIES (")).toBeLessThan(
+      TURN_READER_V40.template.indexOf("{{"),
+    );
     expect(TURN_READER_V40.template.indexOf("REFERENCE (")).toBeLessThan(
       TURN_READER_V40.template.indexOf("{{"),
     );

@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   discoverCompanies,
   listNetworkPitches,
+  listYourCompanies,
   passCompany,
   saveCompany,
   unpassCompany,
@@ -17,6 +18,7 @@ import {
   type DiscoveryCompanySlateDto,
   type InteractionRecordedDto,
   type NetworkPitchPageDto,
+  type YourCompaniesPageDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -221,6 +223,36 @@ export async function loadNetworkPitchesAction(
     return {
       ok: false,
       message: "Founders' videos couldn't load just now. Try again.",
+    };
+  }
+}
+
+/**
+ * `GET /v1/discovery/your-companies` -- one page of Discover's "Your
+ * companies" tab, by cursor (follow-55). The API re-checks disclosure for
+ * each company and carries a pitch only when it would sign it for them.
+ */
+export async function loadYourCompaniesAction(
+  rawCursor: string | null,
+): Promise<FeedActionResult<YourCompaniesPageDto>> {
+  const current = await session();
+  if (current === null) return { ok: false, message: NO_SESSION };
+  const cursor = rawCursor === null ? null : CursorInput.safeParse(rawCursor);
+  if (cursor !== null && !cursor.success) {
+    return { ok: false, message: "That page isn't available." };
+  }
+  try {
+    return {
+      ok: true,
+      value: await listYourCompanies(current, {
+        limit: 10,
+        ...(cursor === null ? {} : { cursor: cursor.data }),
+      }),
+    };
+  } catch {
+    return {
+      ok: false,
+      message: "Your companies couldn't load just now. Try again.",
     };
   }
 }

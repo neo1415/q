@@ -20,7 +20,9 @@ describe("TURN_READER v29", () => {
     expect(Q_NAVIGATE_DESTINATIONS).toContain("PASSED");
     // USAGE arrives with v38.
     for (const destination of [
-      ...Q_NAVIGATE_DESTINATIONS.filter((name) => name !== "USAGE"),
+      ...Q_NAVIGATE_DESTINATIONS.filter(
+        (name) => name !== "USAGE" && name !== "YOUR_COMPANIES",
+      ),
       "RESULTS",
     ]) {
       expect(

@@ -329,7 +329,7 @@ export function createSignOutTool(): AnyQToolDefinition {
 export const OpenPageInputSchema = z
   .object({
     page: QRecordPageSchema.describe(
-      "COMPANY: a company's page. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it.",
+      "COMPANY: a company's page. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it. COMPANY_PITCH: for an investor, a company of theirs (connected, interested or saved) in Discover's Your companies tab, with its pitch when the company shares it ('show me Nixo's pitch').",
     ),
     id: z
       .string()
@@ -589,6 +589,7 @@ export function createOpenPageTool(
       }
       const companySide =
         input.page === "COMPANY" ||
+        input.page === "COMPANY_PITCH" ||
         input.page === "COMPANY_REHEARSAL" ||
         input.page === "RELATIONSHIP_COMPANY" ||
         input.page === "RELATIONSHIP_COMPANY_MESSAGES";
@@ -621,6 +622,26 @@ export function createOpenPageTool(
           actor.organisationId === id ||
           (await candidates(actor, kind, null)).some(
             (candidate) => candidate.id.toLowerCase() === id,
+          );
+      } else if (input.page === "COMPANY_PITCH") {
+        // follow-55: a company in their own "Your companies" -- one they
+        // have a relationship with or saved. The tab plays the pitch only
+        // when the company shares it with them; this opens nothing else.
+        const id = recordId;
+        const related =
+          ports.relationships !== undefined &&
+          (await ports.relationships
+            .withCompany(actor, id)
+            .catch(() => null)) !== null;
+        openable =
+          related ||
+          (
+            (await ports.investorFeed?.decisions(actor, 100).catch(() => [])) ??
+            []
+          ).some(
+            (entry) =>
+              entry.companyId.toLowerCase() === id &&
+              entry.decision === "SAVED",
           );
       } else if (input.page === "COMPANY_REHEARSAL") {
         // REHEARSE: an investor rehearses only with a company they have a

@@ -300,6 +300,8 @@ export const Q_VOICE_DESTINATIONS = [
   "RESULTS",
   // The Passed list (/discover/passed).
   "PASSED",
+  // follow-55: Discover's "Your companies" tab (an investor's own companies).
+  "YOUR_COMPANIES",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

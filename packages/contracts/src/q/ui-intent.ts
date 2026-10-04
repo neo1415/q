@@ -136,6 +136,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "RESULTS",
   // QA 2026-10-02: the Passed list (/discover/passed).
   "PASSED",
+  // follow-55: Discover's "Your companies" tab (/discover?tab=yours).
+  "YOUR_COMPANIES",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
@@ -255,6 +257,9 @@ export const Q_RECORD_PAGES = [
   // Documents list): one of their own documents, by its artifact id, in
   // the shell's document viewer.
   "DOCUMENT",
+  // follow-55: one company's item in Discover's "Your companies" tab, its
+  // pitch when the company shares it with them.
+  "COMPANY_PITCH",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;

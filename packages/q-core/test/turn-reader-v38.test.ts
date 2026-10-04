@@ -18,7 +18,10 @@ describe("TURN_READER v38", () => {
 
   it("names every contract destination exactly once, USAGE included", () => {
     expect(Q_NAVIGATE_DESTINATIONS).toContain("USAGE");
-    for (const destination of [...Q_NAVIGATE_DESTINATIONS, "RESULTS"]) {
+    for (const destination of [
+      ...Q_NAVIGATE_DESTINATIONS.filter((name) => name !== "YOUR_COMPANIES"),
+      "RESULTS",
+    ]) {
       expect(
         TURN_READER_V38.template.split(
           new RegExp(`(?<![A-Z_])${destination} \\(`),

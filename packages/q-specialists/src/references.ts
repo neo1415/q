@@ -197,7 +197,7 @@ export function openTarget(
       case "INVESTOR":
         return ["INVESTOR"];
       case "PITCH":
-        return ["COMPANY"];
+        return ["COMPANY_PITCH"];
     }
   })();
   // An id shown on a document card opens only as a document.
@@ -320,6 +320,10 @@ export function openingLine(
       return what === null
         ? "Opening the chat."
         : `Opening your chat with ${what}.`;
+    case "COMPANY_PITCH":
+      return what === null
+        ? "Opening the pitch in Your companies."
+        : `Opening ${what} in Your companies.`;
     case "COMPANY":
     case "INVESTOR":
     case "RELATIONSHIP_COMPANY":

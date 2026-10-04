@@ -1182,6 +1182,143 @@
     right: -4px;
   }
 
+  /*
+   * Discover's two tabs (follow-55; founder decision 2026-10-04): "For
+   * you" and "Your companies", like TikTok's For You and Following. In
+   * the page's flow by default; over the stage, top left, clear of the
+   * filter and up/down controls, whenever the tab showing is immersive.
+   * The tab showing is underlined as well as brighter: never colour alone.
+   */
+  .cq-discover {
+    position: relative;
+  }
+  .cq-discover-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px 0;
+  }
+  .cq-discover-tab {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 0 10px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--cq-text-secondary);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cq-discover-tab[aria-pressed="true"] {
+    border-bottom-color: currentColor;
+    color: var(--cq-text-primary);
+  }
+  .cq-discover:has(> div:not([hidden]) [data-feed-immersive]) .cq-discover-tabs,
+  .cq-discover:has(> div[data-feed-immersive]:not([hidden])) .cq-discover-tabs {
+    position: absolute;
+    top: calc(8px + var(--cq-safe-top));
+    left: 4px;
+    z-index: var(--cq-z-sticky);
+    padding: 0;
+  }
+  .cq-discover:has(> div:not([hidden]) [data-feed-immersive]) .cq-discover-tab,
+  .cq-discover:has(> div[data-feed-immersive]:not([hidden])) .cq-discover-tab {
+    color: var(--cq-stage-text-muted);
+    text-shadow:
+      0 0 2px var(--cq-stage-canvas),
+      0 1px 3px var(--cq-stage-canvas),
+      0 0 8px var(--cq-stage-canvas);
+  }
+  .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
+    .cq-discover-tab[aria-pressed="true"],
+  .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
+    .cq-discover-tab[aria-pressed="true"] {
+    color: var(--cq-stage-text);
+  }
+
+  /*
+   * Your companies (follow-55): one company per screen, snapping like the
+   * feed, on the stage tokens in either theme. The pitch fills the card on
+   * a phone with the company over a scrim; on a desktop the 9:16 stage and
+   * the panel sit side by side, as on For you.
+   */
+  .cq-yours-feed {
+    --cq-text-primary: var(--cq-stage-text);
+    --cq-text-secondary: var(--cq-stage-text-muted);
+    --cq-text-tertiary: var(--cq-stage-text-muted);
+    --cq-surface: var(--cq-stage-canvas);
+    --cq-border-subtle: var(--cq-stage-border);
+    color-scheme: dark;
+    height: calc(100svh - var(--cq-bottom-nav-height) - var(--cq-safe-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: y mandatory;
+    background: var(--cq-stage-canvas);
+    color: var(--cq-stage-text);
+  }
+  .cq-yours-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 72px 16px;
+  }
+  .cq-yours-card {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  .cq-yours-media {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: var(--cq-stage-canvas);
+  }
+  .cq-yours-info {
+    position: absolute;
+    inset: auto 0 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 48px 16px 16px;
+    background: linear-gradient(
+      to top,
+      var(--cq-stage-canvas) 0%,
+      color-mix(in oklch, var(--cq-stage-canvas) 92%, transparent)
+        calc(100% - 48px),
+      transparent 100%
+    );
+  }
+  @media (min-width: 1024px) {
+    .cq-yours-feed {
+      height: 100dvh;
+    }
+    .cq-yours-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 440px;
+      gap: 24px;
+      padding: 24px;
+    }
+    .cq-yours-media {
+      position: relative;
+      inset: auto;
+      justify-self: center;
+      height: calc(100dvh - 48px);
+      aspect-ratio: 9 / 16;
+      border: 1px solid var(--cq-stage-border);
+      border-radius: var(--cq-radius-lg);
+    }
+    .cq-yours-info {
+      position: static;
+      align-self: center;
+      padding: 0;
+      background: none;
+    }
+  }
+
   @media (min-width: 1024px) {
     .cq-feed {
       height: 100dvh;

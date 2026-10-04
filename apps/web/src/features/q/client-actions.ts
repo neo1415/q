@@ -71,6 +71,9 @@ export function recordPagePath(page: QRecordPage, id: string): string {
     // works from any page; the Q API authorises the read as the person.
     case "DOCUMENT":
       return `/documents?open=${safe}`;
+    // Discover's "Your companies" tab, on that company's item.
+    case "COMPANY_PITCH":
+      return `/discover?tab=yours&company=${safe}`;
   }
 }
 

@@ -152,16 +152,18 @@ function intentLabel(intent: QUiIntent): string {
     case "OPEN_RECORD_PAGE":
       return intent.page === "DOCUMENT"
         ? "Open the document"
-        : intent.page === "COMPANY"
-          ? "Open the company"
-          : intent.page === "INVESTOR"
-            ? "Open the investor"
-            : intent.page === "INVESTOR_REHEARSAL" ||
-                intent.page === "COMPANY_REHEARSAL"
-              ? "Rehearse the meeting"
-              : intent.page.endsWith("_MESSAGES")
-                ? "Open the chat"
-                : "Open the relationship";
+        : intent.page === "COMPANY_PITCH"
+          ? "Watch the pitch"
+          : intent.page === "COMPANY"
+            ? "Open the company"
+            : intent.page === "INVESTOR"
+              ? "Open the investor"
+              : intent.page === "INVESTOR_REHEARSAL" ||
+                  intent.page === "COMPANY_REHEARSAL"
+                ? "Rehearse the meeting"
+                : intent.page.endsWith("_MESSAGES")
+                  ? "Open the chat"
+                  : "Open the relationship";
     case "SCREEN_ACT":
       return "On this page";
     case "OPEN_SETUP":
@@ -198,6 +200,7 @@ const DESTINATION_LABELS: Readonly<
   DOCUMENTS: "Open Documents",
   DAILY: "Open The Q Daily",
   RESULTS: "Open Results",
+  YOUR_COMPANIES: "Open Your companies",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

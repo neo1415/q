@@ -257,6 +257,16 @@ describe("a run's capabilities come from composed facts, never words", () => {
     ).toContain("document.OWN_MANDATE");
   });
 
+  it("Your companies is a screen only for an investor's own organisation (follow-55)", () => {
+    expect(ids(facts({}))).not.toContain("navigate.YOUR_COMPANIES");
+    expect(ids(facts({ company: true }))).not.toContain(
+      "navigate.YOUR_COMPANIES",
+    );
+    expect(ids(facts({ ownInvestorOrganisation: true }))).toContain(
+      "navigate.YOUR_COMPANIES",
+    );
+  });
+
   it("the onboarding loop has its own hands and none of Home Q's", () => {
     const loop = ids(
       facts({

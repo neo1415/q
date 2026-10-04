@@ -249,6 +249,7 @@ export {
 } from "./prompts/tasks/turn-reader.v39.js";
 export {
   TURN_READER_V40,
+  TURN_READER_V40_DESTINATIONS,
   TURN_READER_V40_REFERENCES,
 } from "./prompts/tasks/turn-reader.v40.js";
 export {

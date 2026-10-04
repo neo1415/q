@@ -11,7 +11,7 @@ import {
 // PASSED arrives with v29.
 const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
   // USAGE arrives with v38.
-  (name) => name !== "PASSED" && name !== "USAGE",
+  (name) => name !== "PASSED" && name !== "USAGE" && name !== "YOUR_COMPANIES",
 );
 
 /** TURN_READER v20 (DOCS, on REHEARSE's v19): Documents is a destination. */

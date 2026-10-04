@@ -485,6 +485,7 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   DOCUMENTS: "Opening your documents.",
   DAILY: "Opening The Q Daily.",
   RESULTS: "Opening Results.",
+  YOUR_COMPANIES: "Opening Your companies.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -511,6 +512,7 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   DOCUMENTS: "Documents",
   DAILY: "The Q Daily",
   RESULTS: "Results",
+  YOUR_COMPANIES: "Your companies",
 };
 
 /**

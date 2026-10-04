@@ -268,6 +268,8 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // DAILY block.
   DAILY:
     "Opens The Q Daily: their latest edition (news about their sectors, markets, deals and people they know, every story with its source, Q's take labelled), its archive and the PDF edition.",
+  YOUR_COMPANIES:
+    "Opens Your companies, Discover's second tab: every company they are connected with, expressed interest in or saved, most recent first, each with its pitch when the company shares it with them.",
   RESULTS:
     "Opens Results: what their activity on Capital Q produced (introductions, conversations, meetings and where each stands), with reports to download.",
 };
@@ -279,6 +281,11 @@ const COMPANY_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
   "PITCH",
   "COMPANY_INTEREST",
   "NEW_PITCH",
+]);
+
+/** Screens that belong to an investor organisation's own people. */
+const INVESTOR_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
+  "YOUR_COMPANIES",
 ]);
 
 const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(
@@ -293,10 +300,13 @@ const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(
     executes: [],
     eligibility: COMPANY_SCREENS.has(destination)
       ? "a company is a subject of the run"
-      : "always, on Home Q",
+      : INVESTOR_SCREENS.has(destination)
+        ? "their own investor organisation is in the plan"
+        : "always, on Home Q",
     eligible: (facts) =>
       facts.surface === "HOME_Q" &&
-      (!COMPANY_SCREENS.has(destination) || facts.company),
+      (!COMPANY_SCREENS.has(destination) || facts.company) &&
+      (!INVESTOR_SCREENS.has(destination) || facts.ownInvestorOrganisation),
   }),
 );
 

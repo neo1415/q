@@ -18,6 +18,8 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { DiscoverInvestors } from "@/features/discover/discover-screen";
+import { tabFromQuery } from "@/features/discover/discover-tab";
+import { DiscoverTabs } from "@/features/discover/discover-tabs";
 import { InvestorFeedScreen } from "@/features/discover/investor-feed-screen";
 import { NetworkVideos } from "@/features/discover/network/network-videos";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
@@ -37,7 +39,10 @@ export const dynamic = "force-dynamic";
 export default async function DiscoverPage({
   searchParams,
 }: {
-  readonly searchParams?: Promise<{ readonly tab?: string | string[] }>;
+  readonly searchParams?: Promise<{
+    readonly tab?: string | string[];
+    readonly company?: string | string[];
+  }>;
 } = {}) {
   const context = await resolveOwnContext();
   const session = await apiSession();
@@ -82,6 +87,16 @@ export default async function DiscoverPage({
   }
 
   if (context.kind === "INVESTOR") {
+    // Discover's two tabs (follow-55): For you, and Your companies.
+    const params = await searchParams;
+    const initialTab = tabFromQuery(
+      typeof params?.tab === "string" ? params.tab : undefined,
+    );
+    const focus =
+      typeof params?.company === "string" &&
+      /^[0-9a-f-]{36}$/iu.test(params.company)
+        ? params.company.toLowerCase()
+        : null;
     /*
       An investor gets the feed: one card at a time, one player, position
       kept across a visit to a company. The first page is read here, under
@@ -105,11 +120,11 @@ export default async function DiscoverPage({
           })),
         )
         .catch(() => []),
-      // "Your companies" (2026-10-02): names and labels for the row beside
-      // the feed; failing leaves the row out, nothing more.
-      listYourCompanies(session, { limit: 4 })
-        .then((page) => page.items)
-        .catch(() => []),
+      // Your companies' first page, only when that tab is the one linked
+      // (follow-55); otherwise it is read when the tab is first opened.
+      initialTab === "YOURS"
+        ? listYourCompanies(session, { limit: 10 }).catch(() => null)
+        : Promise.resolve(null),
     ]);
     /*
      * The cards the preload window can reach first (spec §9.5: active, the
@@ -145,7 +160,7 @@ export default async function DiscoverPage({
         ? null
         : (warm.find((grant) => grant.companyId === first.companyId)
             ?.authorization ?? null);
-    if (authorization?.posterUrl != null) {
+    if (authorization?.posterUrl != null && initialTab === "FOR_YOU") {
       // The poster is on the CDN; the browser should ask for it before it
       // has parsed the rest of the page.
       preload(authorization.posterUrl, { as: "image", fetchPriority: "high" });
@@ -156,16 +171,24 @@ export default async function DiscoverPage({
     return (
       <>
         <h1 className="sr-only">Discover</h1>
-        <InvestorFeedScreen
-          initial={slate === null ? null : { slate, authorization, warm }}
-          sectors={sectors}
-          yours={yours}
+        <DiscoverTabs
+          initialTab={initialTab}
+          yoursInitial={yours}
+          focusCompanyId={focus}
+          forYou={
+            <InvestorFeedScreen
+              initial={slate === null ? null : { slate, authorization, warm }}
+              sectors={sectors}
+            />
+          }
         />
       </>
     );
   }
 
   // Founders' videos (ADR 0021) sit beside the investors, one tab each.
+  // (A founder has no "Your companies": the investors they talk to are on
+  // Relationships; no equivalent tab is invented here.)
   const tab = (await searchParams)?.tab;
   const founders = tab === "founders";
   const tabClass = (active: boolean) =>

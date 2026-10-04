@@ -16,7 +16,6 @@ import type {
   DiscoveryCompanySlateDto,
   DiscoveryNoteDto,
   PlaybackAuthorizationDto,
-  YourCompanyPitchItemDto,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import {
@@ -25,7 +24,6 @@ import {
   ICON_SIZE,
   ICON_STROKE,
   Play,
-  Users,
 } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -36,7 +34,7 @@ import { useQSessionOptional } from "@/features/q/q-session";
 import { QPageSubject } from "@/features/q/q-subject";
 
 import { FeedCard } from "./feed-card";
-import { YourCompaniesRow } from "./your-companies";
+import { useDiscoverTab } from "./discover-tab";
 import { ruleList } from "./mandate-rules";
 import {
   actionFeedTransport,
@@ -323,13 +321,10 @@ export type InvestorFeedInitial = {
 export function InvestorFeedScreen({
   initial = null,
   sectors = [],
-  yours = [],
 }: {
   readonly initial?: InvestorFeedInitial | null;
   /** The industry vocabulary, for the sector filter. */
   readonly sectors?: readonly SectorOption[];
-  /** "Your companies" (2026-10-02): a row beside the feed, never in it. */
-  readonly yours?: readonly YourCompanyPitchItemDto[];
 } = {}) {
   const discoverFilters = useDiscoverFilters(sectors);
   const { filters, setFilters, clear, notice } = discoverFilters;
@@ -350,10 +345,6 @@ export function InvestorFeedScreen({
       />
     ),
     clear,
-    yours: (className: string) => (
-      <YourCompaniesRow items={yours} className={className} />
-    ),
-    hasYours: yours.length > 0,
   };
   return (
     <>
@@ -382,10 +373,6 @@ type FeedFilterControls = {
   /** The row, with the classes that decide where it shows. */
   readonly row: (className: string) => React.ReactNode;
   readonly clear: () => void;
-  /** "Your companies", with the classes that decide where it shows. */
-  readonly yours: (className: string) => React.ReactNode;
-  /** Whether there is a "Your companies" row to reach (the phone's entry). */
-  readonly hasYours: boolean;
 };
 
 function InvestorFeed({
@@ -542,7 +529,11 @@ function InvestorFeed({
     splashShowing,
     () => false,
   );
-  const hold = settledAt !== index || tabHidden || tapPaused || splashUp;
+  // The "Your companies" tab is showing: this feed waits where it is
+  // (follow-55; one active player per page).
+  const offTab = useDiscoverTab() !== "FOR_YOU";
+  const hold =
+    settledAt !== index || tabHidden || tapPaused || splashUp || offTab;
   // While the voice line is open the pitch stays muted, not only while Q
   // speaks: the microphone heard the video's words as the person's and cut
   // Q off (live 2026-09-30: runs cancelled mid-"I'm interested").
@@ -1037,7 +1028,6 @@ function InvestorFeed({
                 Ask Q
               </Button>
               <SavedAndPassedLinks className="flex" />
-              {controls.yours("flex")}
             </div>
           }
         />
@@ -1054,14 +1044,16 @@ function InvestorFeed({
         Q looks at the card the person is looking at. Declaring it grants
         nothing — the Q API resolves and authorises the subject again.
       */}
-      <QPageSubject
-        subject={{
-          kind: "COMPANY",
-          companyId: card.companyId,
-          label: card.canonicalName,
-          scope: "network_visible",
-        }}
-      />
+      {offTab ? null : (
+        <QPageSubject
+          subject={{
+            kind: "COMPANY",
+            companyId: card.companyId,
+            label: card.canonicalName,
+            scope: "network_visible",
+          }}
+        />
+      )}
 
       <div
         ref={stageRef}
@@ -1100,18 +1092,8 @@ function InvestorFeed({
         </span>
 
         {/* One compact control over the pitch; the row is the desktop's. */}
+        {/* Your companies is Discover's own tab now (follow-55). */}
         <div className="cq-feed-filter flex gap-2 lg:hidden">
-          {/* Your companies, one tap from the stage on a phone (2026-10-02). */}
-          {controls.hasYours ? (
-            <Link
-              href="/discover/yours"
-              aria-label="Your companies"
-              className="cq-feed-filter-button"
-              data-your-companies-entry
-            >
-              <Users size={ICON_SIZE.regular} aria-hidden="true" />
-            </Link>
-          ) : null}
           {controls.button}
         </div>
 
@@ -1126,7 +1108,6 @@ function InvestorFeed({
         <div className="cq-feed-overlay bg-[linear-gradient(to_top,var(--cq-stage-canvas)_0%,color-mix(in_oklch,var(--cq-stage-canvas)_92%,transparent)_calc(100%-48px),transparent_100%)] lg:bg-none">
           {controls.row("hidden lg:flex")}
           <SavedAndPassedLinks className="hidden lg:flex" />
-          {controls.yours("hidden lg:flex")}
           <FeedCard
             key={card.companyId}
             company={withVideo(card)}

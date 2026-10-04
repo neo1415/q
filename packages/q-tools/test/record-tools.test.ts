@@ -348,6 +348,25 @@ describe("opening a chat by a spoken name (founder report 2026-09-30)", () => {
     }
   });
 
+  it("'show me Yamfield's pitch' opens that company in Your companies; a company not theirs never does (follow-55)", async () => {
+    const outcome = await executor.execute(
+      call("open_page", { page: "COMPANY_PITCH", name: "yamfield" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY_PITCH",
+      id: YAMFIELD,
+    });
+    const stranger = await executor.execute(
+      call("open_page", { page: "COMPANY_PITCH", id: COMPANY_A }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(stranger.status).not.toBe("SUCCEEDED");
+  });
+
   it("an investor organisation is never matched for a company page", () => {
     expect(
       matchCounterpart("agro fund", [
