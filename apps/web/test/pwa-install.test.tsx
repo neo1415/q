@@ -42,12 +42,12 @@ function publicFile(path: string): string {
 describe("web app manifest", () => {
   const m = manifest();
 
-  it("is installable: name, short name, standalone, scope and start at arrival (onboarding first)", () => {
+  it("is installable: name, short name, standalone, scope and start flagged as an installed launch (never the landing)", () => {
     expect(m.name).toBe("Capital Q");
     expect(m.short_name).toBe("Capital Q");
     expect(m.display).toBe("standalone");
     expect(m.scope).toBe("/");
-    expect(m.start_url).toBe("/welcome");
+    expect(m.start_url).toBe("/?source=pwa");
   });
 
   it("takes its theme colour from the tokens and launches on the splash's navy", () => {

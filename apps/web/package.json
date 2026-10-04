@@ -17,6 +17,7 @@
     "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/founder-onboarding": "workspace:*",
+    "@capital-q/gateq": "workspace:*",
     "@capital-q/investor-onboarding": "workspace:*",
     "@capital-q/onboarding": "workspace:*",
     "@capital-q/ui": "workspace:*",
