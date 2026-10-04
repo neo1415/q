@@ -56,9 +56,15 @@ vi.mock("../src/features/discover/feed/feed-actions", () => ({
 vi.mock("../src/features/network/interest-actions", () => ({
   expressInterestAction: vi.fn(),
 }));
+const authoriseDownloadAction =
+  vi.fn<
+    (companyId: string, mediaAssetId: string) => Promise<ActionResult<unknown>>
+  >();
 vi.mock("../src/features/discover/feed/playback-source", () => ({
   authorisePlaybackAction: (companyId: string, mediaAssetId: string) =>
     authorisePlaybackAction(companyId, mediaAssetId),
+  authoriseDownloadAction: (companyId: string, mediaAssetId: string) =>
+    authoriseDownloadAction(companyId, mediaAssetId),
 }));
 const globalQ: {
   open: boolean;
@@ -76,6 +82,8 @@ vi.mock("@/features/q/q-subject", () => ({
 
 const { InvestorFeedScreen } =
   await import("../src/features/discover/investor-feed-screen");
+const { resetPlaybackRateForTests } =
+  await import("../src/features/discover/stage/playback-rate");
 
 // A shared machine can be slow to commit; the expectations are unchanged.
 configure({ asyncUtilTimeout: 8000 });
@@ -655,5 +663,263 @@ describe("the details sheet over the feed", () => {
 
     expect(pause).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
+  });
+});
+
+describe("Discover v2: options, long press, Clear display, keys", () => {
+  function activeVideo(container: HTMLElement): HTMLVideoElement {
+    const video = container.querySelector<HTMLVideoElement>(
+      "[data-slot-active] video",
+    );
+    if (video === null) throw new Error("no active video");
+    return video;
+  }
+
+  beforeEach(() => {
+    authoriseDownloadAction.mockReset();
+    window.localStorage.removeItem("cq.discover.rate");
+    resetPlaybackRateForTests();
+  });
+
+  it("a long press on the pitch opens its options, and the release does not pause it", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { container } = await renderFeed();
+      const video = activeVideo(container);
+      fireEvent.pointerDown(video, {
+        pointerType: "touch",
+        isPrimary: true,
+        clientX: 100,
+        clientY: 200,
+      });
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+      expect(await screen.findByRole("dialog")).toBeTruthy();
+      expect(document.querySelector("[data-pitch-options]")).not.toBeNull();
+      pause.mockClear();
+      fireEvent.pointerUp(video, { pointerType: "touch" });
+      fireEvent.click(video);
+      expect(pause).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a short press is still a tap, not a long press", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { container } = await renderFeed();
+      const video = activeVideo(container);
+      fireEvent.pointerDown(video, { pointerType: "touch", isPrimary: true });
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      fireEvent.pointerUp(video, { pointerType: "touch" });
+      expect(document.querySelector("[data-pitch-options]")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("More and a right-click open the same options; speed is the viewer's own and stays on this device", async () => {
+    const { container } = await renderFeed();
+    fireEvent.contextMenu(activeVideo(container));
+    await screen.findByRole("dialog");
+    const speeds = screen.getByRole("radiogroup", { name: "Playback speed" });
+    const labels = [...speeds.querySelectorAll("[role='radio']")].map(
+      (radio) => radio.textContent,
+    );
+    expect(labels).toEqual(["0.5×", "0.75×", "1×", "1.25×", "1.5×", "2×"]);
+    fireEvent.click(screen.getByRole("radio", { name: "1.5×" }));
+    await waitFor(() => expect(activeVideo(container).playbackRate).toBe(1.5));
+    expect(window.localStorage.getItem("cq.discover.rate")).toBe("1.5");
+    // Never sent anywhere: no request is made for a speed change.
+    expect(loadSlatePageAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Download only when the founder allows it, and never Report without a contract", async () => {
+    await renderFeed();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    await screen.findByRole("dialog");
+    expect(screen.queryByRole("button", { name: /Download pitch/ })).toBeNull();
+    expect(
+      screen.getByText("Download not allowed by the company"),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Report/)).toBeNull();
+  });
+
+  it("downloads through the server's short-lived link when allowed", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        ...slate([1, 2]).value,
+        items: [
+          {
+            ...company(1),
+            pitch: { ...company(1).pitch, downloadAllowed: true },
+          },
+          company(2),
+        ],
+      },
+    });
+    authoriseDownloadAction.mockResolvedValue({
+      ok: true,
+      value: {
+        status: "READY",
+        mediaAssetId: assetId(1),
+        downloadUrl: "https://cdn.test/token/downloads/default.mp4",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+    const clicks: string[] = [];
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        clicks.push(this.href);
+      });
+    try {
+      await renderFeed();
+      fireEvent.click(screen.getByRole("button", { name: "More" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: /Download pitch/ }),
+      );
+      await screen.findAllByText("Download started.");
+      expect(authoriseDownloadAction).toHaveBeenCalledWith(
+        companyId(1),
+        assetId(1),
+      );
+      expect(clicks).toEqual(["https://cdn.test/token/downloads/default.mp4"]);
+    } finally {
+      click.mockRestore();
+    }
+  });
+
+  it("Not interested is Pass: it records the pass and moves on", async () => {
+    await renderFeed();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Not interested/ }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Company 2" }),
+    ).toBeTruthy();
+  });
+
+  it("Clear display hides everything over the pitch until a tap, and that tap does nothing else", async () => {
+    const { container } = await renderFeed();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Clear display/ }),
+    );
+    const feed = container.querySelector("[data-feed-immersive]");
+    expect(feed?.hasAttribute("data-clear-display")).toBe(true);
+    const video = activeVideo(container);
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      get: () => false,
+    });
+    pause.mockClear();
+    fireEvent.click(video);
+    expect(feed?.hasAttribute("data-clear-display")).toBe(false);
+    expect(pause).not.toHaveBeenCalled();
+  });
+
+  it("left and right move through the pitch; j and k still move through the feed; < and > change speed", async () => {
+    const { container } = await renderFeed();
+    const video = activeVideo(container);
+    // The card in view hands its element to the feed once it is mounted.
+    await waitFor(() =>
+      expect(screen.getByRole("slider").getAttribute("aria-disabled")).toBe(
+        "false",
+      ),
+    );
+    video.currentTime = 20;
+    fireEvent.keyDown(feedRegion(), { key: "ArrowRight" });
+    expect(video.currentTime).toBe(25);
+    fireEvent.keyDown(feedRegion(), { key: "ArrowLeft" });
+    fireEvent.keyDown(feedRegion(), { key: "ArrowLeft" });
+    expect(video.currentTime).toBe(15);
+    fireEvent.keyDown(feedRegion(), { key: ">" });
+    await waitFor(() => expect(video.playbackRate).toBe(1.25));
+    expect(screen.getByText("Speed 1.25×")).toBeTruthy();
+    fireEvent.keyDown(feedRegion(), { key: "j" });
+    expect(
+      await screen.findByRole("heading", { name: "Company 2" }),
+    ).toBeTruthy();
+  });
+
+  it("carries a progress bar for the pitch in view: a slider with its time in words", async () => {
+    await renderFeed();
+    const slider = screen.getByRole("slider", {
+      name: "Position in Company 1's pitch",
+    });
+    expect(slider.getAttribute("aria-valuemin")).toBe("0");
+    expect(slider.getAttribute("aria-valuetext")).toMatch(/of 1:00$/);
+  });
+});
+
+describe("Discover v2: loading, buffering and a bad network", () => {
+  it("loads as the feed's own shape, never a sentence", () => {
+    loadSlatePageAction.mockReturnValue(new Promise(() => undefined));
+    const { container } = render(<InvestorFeedScreen />);
+    expect(container.querySelector("[data-feed-loading]")).not.toBeNull();
+    expect(container.textContent).not.toMatch(/Loading your recommendations…/);
+    expect(screen.getByRole("status").textContent).toBe(
+      "Loading your recommendations",
+    );
+  });
+
+  it("shows a ring only after a stall has lasted 400 ms, and never for a quick one", async () => {
+    const { container } = await renderFeed();
+    const video = container.querySelector<HTMLVideoElement>(
+      "[data-slot-active] video",
+    );
+    if (video === null) throw new Error("no video");
+    await waitFor(() => expect(video.getAttribute("src")).not.toBeNull());
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      get: () => false,
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fireEvent(video, new Event("waiting"));
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      fireEvent(video, new Event("playing"));
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(container.querySelector("[data-buffering]")).toBeNull();
+      fireEvent(video, new Event("waiting"));
+      act(() => {
+        vi.advanceTimersByTime(450);
+      });
+      expect(container.querySelector("[data-buffering]")).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("offline, says so over the poster with Try again, and keeps the profile on the rail", async () => {
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      await renderFeed();
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+      expect(await screen.findByText("No connection")).toBeTruthy();
+      expect(
+        screen
+          .getByRole("button", { name: "Try again" })
+          .hasAttribute("disabled"),
+      ).toBe(true);
+      expect(
+        screen.getByRole("link", { name: "Open Company 1 profile" }),
+      ).toBeTruthy();
+    } finally {
+      online.mockRestore();
+    }
   });
 });

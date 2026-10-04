@@ -981,6 +981,24 @@
     --cq-accent: var(--cq-stage-accent);
     background-color: var(--cq-stage-canvas);
   }
+  /* The app's connection notice floats over the stage on Discover as a
+     small pill under the tabs, instead of pushing the pitch down and
+     clipping its caption off the screen. Its words stay the same. */
+  body:has([data-feed-immersive]) [data-network]:not([data-network="online"]) {
+    position: fixed;
+    top: calc(56px + var(--cq-safe-top));
+    left: 50%;
+    z-index: var(--cq-z-sticky);
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    border: none;
+    border-radius: var(--cq-radius-full);
+    box-shadow: var(--cq-shadow-overlay);
+    transform: translateX(-50%);
+  }
+  .cq-feed-skeleton .cq-feed-stage::before {
+    display: none;
+  }
   .cq-feed {
     /* Text over video, guarded (ADR 0047). */
     --cq-feed-scrim-floor: color-mix(
@@ -1596,7 +1614,7 @@
     background: linear-gradient(
       100deg,
       transparent 35%,
-      color-mix(in oklch, var(--cq-stage-text) 6%, transparent) 50%,
+      color-mix(in oklch, var(--cq-stage-text) 4%, transparent) 50%,
       transparent 65%
     );
     transform: translateX(-100%);
@@ -1828,12 +1846,6 @@
     font-weight: 600;
     text-shadow: none;
   }
-  /* On a phone the rail carries the profile and the relationship. */
-  @media (max-width: 1023px) {
-    .cq-yours-actions {
-      display: none;
-    }
-  }
   .cq-yours-card[data-clear-display]
     :is(.cq-yours-info, .cq-feed-rail, .cq-feed-player-controls, .cq-scrubber),
   .cq-yours-card[data-clear-display]::before,
@@ -1884,11 +1896,30 @@
       border-left: 1px solid var(--cq-app-border-subtle);
       color: var(--cq-app-text-primary);
       text-shadow: none;
+      --cq-canvas: var(--cq-app-canvas);
+      --cq-surface: var(--cq-app-surface);
+      --cq-surface-raised: var(--cq-app-surface-raised);
+      --cq-surface-subtle: var(--cq-app-surface-subtle);
+      --cq-surface-strong: var(--cq-app-surface-strong);
+      --cq-border: var(--cq-app-border);
+      --cq-border-subtle: var(--cq-app-border-subtle);
+      --cq-border-strong: var(--cq-app-border-strong);
       --cq-text-primary: var(--cq-app-text-primary);
       --cq-text-secondary: var(--cq-app-text-secondary);
-      --cq-surface: var(--cq-app-surface);
-      --cq-border-subtle: var(--cq-app-border-subtle);
+      --cq-text-tertiary: var(--cq-app-text-tertiary);
+      --cq-text-inverse: var(--cq-app-text-inverse);
+      --cq-accent: var(--cq-app-accent);
+      --cq-accent-hover: var(--cq-app-accent-hover);
+      --cq-accent-soft: var(--cq-app-accent-soft);
       color-scheme: light dark;
+    }
+    /* The rail beside the pitch keeps the stage's own tokens. */
+    .cq-yours-info .cq-feed-rail {
+      --cq-text-primary: var(--cq-stage-text);
+      --cq-text-secondary: var(--cq-stage-text-muted);
+      --cq-surface-subtle: var(--cq-stage-surface-strong);
+      --cq-surface-strong: var(--cq-stage-surface-strong);
+      --cq-accent: var(--cq-stage-accent);
     }
     .cq-yours-info .cq-feed-muted {
       color: var(--cq-app-text-secondary);
@@ -2053,8 +2084,12 @@
     .cq-feed-rail-button:hover > svg {
       background: color-mix(in oklch, var(--cq-stage-text) 20%, transparent);
     }
+    /* Previous and Next at the top of the stage's column, clear of the
+       rail beside the pitch. */
     .cq-feed-nav {
-      right: calc(440px + 24px);
+      top: 24px;
+      right: calc(440px + 16px);
+      transform: none;
     }
     .cq-feed-keys {
       display: flex;

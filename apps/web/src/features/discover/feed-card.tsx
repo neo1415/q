@@ -306,7 +306,7 @@ export function FeedCard({
 
   return (
     <article
-      className="cq-feed-card flex h-full w-full flex-col gap-5"
+      className="cq-feed-card flex w-full flex-col gap-5"
       aria-label={company.canonicalName}
       data-company-id={company.companyId}
       data-caption-open={captionOpen ? "" : undefined}

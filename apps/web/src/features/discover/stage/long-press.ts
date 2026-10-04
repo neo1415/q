@@ -70,12 +70,23 @@ export function useLongPress(onLongPress: () => void, enabled = true) {
     return true;
   }, []);
 
+  /*
+   * The finger lifting after a long press would become a click on the
+   * sheet's backdrop and close the sheet it just opened. Cancelling the
+   * touchend cancels that click. Capture phase, so the surface's own touch
+   * handlers (the swipe) are untouched.
+   */
+  const onTouchEndCapture = useCallback((event: React.TouchEvent) => {
+    if (fired.current && event.cancelable) event.preventDefault();
+  }, []);
+
   return {
     handlers: {
       onPointerDown,
       onPointerMove,
       onPointerUp: cancel,
       onPointerCancel: cancel,
+      onTouchEndCapture,
     },
     consumed,
   } as const;

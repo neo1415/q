@@ -269,9 +269,15 @@ export function PitchOptionsSheet({
             </button>
 
             {onNotInterested === undefined ? null : (
+              <div
+                aria-hidden="true"
+                className="mx-2 my-1 h-px bg-(--cq-border-subtle)"
+              />
+            )}
+            {onNotInterested === undefined ? null : (
               <button
                 type="button"
-                className={`${optionRow} border-t border-(--cq-border-subtle)`}
+                className={optionRow}
                 onClick={() => {
                   onOpenChange(false);
                   onNotInterested();

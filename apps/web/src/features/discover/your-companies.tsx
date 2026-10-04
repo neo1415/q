@@ -253,7 +253,7 @@ function YourCompanyCard({
             {item.shortDescription}
           </p>
         )}
-        <div className="cq-yours-actions flex flex-wrap gap-2 pt-1">
+        <div className="cq-yours-actions flex flex-wrap gap-2 pt-1 max-lg:hidden">
           <Link
             href={`/company/${item.companyId}`}
             className={buttonClassName("primary")}
