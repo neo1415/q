@@ -352,6 +352,20 @@ const UNFINISHED_HOLD_MS = 1_500;
 /** Transcripts built here from a reply already acted on (never held). */
 const settledTranscripts = new WeakSet<readonly VoiceTranscriptTurn[]>();
 
+/**
+ * A transcript whose turn has already ended, by a judge other than its
+ * punctuation (voiceq-63): on the duplex line the realtime model's own
+ * turn detector ended the person's turn before it called ask_q, so holding
+ * an unpunctuated request "in case they carry on" only added 1.5 s to
+ * every such answer.
+ */
+export function settledTurn(
+  transcript: readonly VoiceTranscriptTurn[],
+): readonly VoiceTranscriptTurn[] {
+  settledTranscripts.add(transcript);
+  return transcript;
+}
+
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
 
 /**

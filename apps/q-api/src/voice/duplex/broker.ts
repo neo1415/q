@@ -25,7 +25,11 @@ import type { VoiceSessionBinding } from "../bindings.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
 import { withoutWrittenLaugh } from "../providers/speech-markup.js";
 import { sentences, withoutStageDirections } from "../speech.js";
-import { APPROVAL_QUESTION, type VoiceTurnHandler } from "../turn.js";
+import {
+  APPROVAL_QUESTION,
+  settledTurn,
+  type VoiceTurnHandler,
+} from "../turn.js";
 import type { DuplexConfig } from "./config.js";
 import {
   ASK_Q_TOOL_NAME,
@@ -455,7 +459,9 @@ export function createDuplexBroker(
           };
           const outcome = await turn(
             line.binding,
-            [...line.history, asked],
+            // The realtime turn detector already ended their turn: never
+            // held for sounding unfinished.
+            settledTurn([...line.history, asked]),
             abort,
             speaker,
           );
