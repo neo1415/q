@@ -8,6 +8,12 @@ import {
   reportDuplexUsageAction,
 } from "../duplex-actions";
 import {
+  onListeningPreferenceChange,
+  readListeningPreference,
+  storeListeningPreference,
+} from "../listening-preference";
+import { resolveListeningLevel } from "./backchannel";
+import {
   transcriptLineFor,
   type VoiceSessionClient,
   type VoiceSessionEvents,
@@ -86,6 +92,16 @@ export function useDuplexVoiceSession(
     [],
   );
 
+  // BACKCHANNEL: the Settings toggle reaches an open line at once.
+  useEffect(
+    () =>
+      onListeningPreferenceChange(() => {
+        const device = readListeningPreference();
+        if (device !== null) lineRef.current?.setListening(device.level);
+      }),
+    [],
+  );
+
   const start = useCallback(
     async ({ credential }: VoiceSessionStart): Promise<boolean> => {
       const duplex = credential.duplex;
@@ -103,12 +119,25 @@ export function useDuplexVoiceSession(
       };
       const line = new DuplexLine({
         credential: duplex,
+        // BACKCHANNEL: this device's toggle or the person's remembered
+        // level, whichever they set last.
+        listening:
+          duplex.listening === undefined
+            ? undefined
+            : resolveListeningLevel(
+                duplex.listening,
+                readListeningPreference(),
+              ),
         relays,
         environment:
           optionsRef.current.environment ?? browserDuplexEnvironment(),
         events: {
           onState: setState,
           onLine: addLine,
+          // Changed by voice: this device's toggle shows it too.
+          onListening: (level) => {
+            storeListeningPreference(level);
+          },
           onInterrupted: () => eventsRef.current.onInterrupted?.(),
           onFallback: ({ notice, connected: wasUp }) => {
             if (lineRef.current === line) lineRef.current = null;

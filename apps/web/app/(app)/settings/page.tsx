@@ -17,7 +17,10 @@ import { QMotionToggle } from "@/features/q-aperture";
 import { DailySetting } from "@/features/daily/daily-setting";
 import { qApiSession, resolveQStanding } from "@/features/q/context";
 import { PersonalitySetting } from "@/features/settings/personality-setting";
-import { VoiceSetting } from "@/features/settings/voice-setting";
+import {
+  ListeningSetting,
+  VoiceSetting,
+} from "@/features/settings/voice-setting";
 import { PushSetting } from "@/features/work/push-setting";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -26,7 +29,7 @@ export const metadata: Metadata = { title: "Settings" };
  * Settings (R28): how Capital Q looks and how Q behaves on this device.
  *
  * Every choice here is a per-device preference the browser keeps (theme,
- * Q motion, Q's voice). Connections (BIZ-007: Google) read their own status after
+ * Q motion, Q's voice, its listening sounds). Connections (BIZ-007: Google) read their own status after
  * the page opens; Q's personality and The Q Daily are kept by Capital Q
  * and read in parallel as the page renders. Notifications (AUTO): a push on this device and email
  * for what needs them; in-app notices always show. The page offers no
@@ -68,6 +71,9 @@ export default async function SettingsPage({
           <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             <SettingRow term="Voice">
               <VoiceSetting />
+            </SettingRow>
+            <SettingRow term="Listening sounds">
+              <ListeningSetting />
             </SettingRow>
             <SettingRow term="Personality">
               <PersonalitySetting initial={standing?.personality ?? "AUTO"} />
