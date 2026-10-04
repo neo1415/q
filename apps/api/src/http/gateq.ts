@@ -409,9 +409,7 @@ export function registerGateQRoutes(
     const images =
       dependencies.publicImages === undefined
         ? null
-        : await dependencies
-            .publicImages(publicId.data)
-            .catch(() => null);
+        : await dependencies.publicImages(publicId.data).catch(() => null);
     // Briefly cacheable, well inside the signed URLs' own lifetime.
     void reply.header("Cache-Control", "public, max-age=60");
     return PublicGatewayDtoSchema.parse({

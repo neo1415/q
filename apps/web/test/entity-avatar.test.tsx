@@ -65,7 +65,9 @@ describe("EntityAvatar (founder ask 2026-10-04)", () => {
     );
     expect(screen.queryByRole("img")).toBeNull();
     expect(
-      container.querySelector("[data-entity-avatar]")?.getAttribute("aria-hidden"),
+      container
+        .querySelector("[data-entity-avatar]")
+        ?.getAttribute("aria-hidden"),
     ).toBe("true");
   });
 
@@ -123,7 +125,11 @@ describe("EntityAvatar visibility", () => {
     expect(entityImageSource({ kind: "investor" })).toBeNull();
     // An investor id is not a way to ask for its image.
     const { container } = render(
-      <EntityAvatar kind="investor" name="Rift Valley" companyId={COMPANY_ID} />,
+      <EntityAvatar
+        kind="investor"
+        name="Rift Valley"
+        companyId={COMPANY_ID}
+      />,
     );
     expect(container.querySelector("img")).toBeNull();
   });
@@ -134,9 +140,9 @@ describe("EntityCover", () => {
     const { container } = render(<EntityCover src={null} />);
     expect(container.querySelector("img")).toBeNull();
     expect(
-      container.querySelector("[data-entity-cover]")?.getAttribute(
-        "data-entity-cover",
-      ),
+      container
+        .querySelector("[data-entity-cover]")
+        ?.getAttribute("data-entity-cover"),
     ).toBe("none");
   });
 

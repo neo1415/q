@@ -149,7 +149,10 @@ export type PublicIdentityService = {
   readonly cardImagesFor: (input: {
     readonly subject: QCardSubject;
     readonly audience: CardAudience;
-  }) => Promise<{ readonly photo: string | null; readonly cover: string | null }>;
+  }) => Promise<{
+    readonly photo: string | null;
+    readonly cover: string | null;
+  }>;
 };
 
 function dayOf(date: Date): string {

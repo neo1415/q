@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { Building2 } from "@capital-q/ui/icons";
 
-
 /**
  * The one picture for anyone or anything named on screen (founder ask
  * 2026-10-04): a person, a company or an investor organisation.
@@ -104,8 +103,7 @@ export function EntityAvatar({
     readonly source: string | null;
     readonly status: "loading" | "loaded" | "failed";
   }>({ source, status: "loading" });
-  const current =
-    state.source === source ? state.status : ("loading" as const);
+  const current = state.source === source ? state.status : ("loading" as const);
   const showImage = source !== null && current !== "failed";
   // People are round; organisations are a rounded square, as on their
   // profile. A company keeps the round frame Discover already uses.

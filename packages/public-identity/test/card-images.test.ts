@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { MaterialActionAuditWriter } from "@capital-q/audit";
-import type {
-  DatabaseExecutor,
-  TransactionManager,
-} from "@capital-q/database";
+import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { AuthorizationService } from "@capital-q/security";
 
 import {
@@ -82,7 +79,10 @@ describe("cardImagesFor", () => {
     });
     await expect(
       service.cardImagesFor({ subject: SUBJECT, audience: "PUBLIC" }),
-    ).resolves.toEqual({ photo: "https://storage.test/photo?sig=1", cover: null });
+    ).resolves.toEqual({
+      photo: "https://storage.test/photo?sig=1",
+      cover: null,
+    });
   });
 
   it("signs nothing when the card shows neither image", async () => {

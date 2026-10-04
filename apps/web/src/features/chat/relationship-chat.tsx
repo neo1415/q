@@ -466,10 +466,7 @@ export function RelationshipChat({
               messages[index - 1]?.senderName !== message.senderName) ? (
               // Who is speaking, once per run of their messages. A
               // person's photo is theirs alone today: initials here.
-              <span
-                className="flex items-center gap-1.5"
-                data-chat-sender
-              >
+              <span className="flex items-center gap-1.5" data-chat-sender>
                 <EntityAvatar
                   kind="person"
                   name={message.senderName}
