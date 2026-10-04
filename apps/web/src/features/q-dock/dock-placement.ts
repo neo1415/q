@@ -178,6 +178,16 @@ export type Rect = {
   readonly bottom: number;
 };
 
+/**
+ * Something the dock must not cover. `text` marks a heading or a section
+ * label: when nothing is free, covering one costs more than covering the
+ * edge of a control, because it hides what the page or section is.
+ */
+export type Obstacle = Rect & { readonly text?: boolean | undefined };
+
+/** How much worse covering a heading or label is, when something must be. */
+const TEXT_WEIGHT = 8;
+
 export function overlaps(a: Rect, b: Rect): boolean {
   return (
     a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
@@ -220,6 +230,20 @@ function overlapArea(a: Rect, b: Rect): number {
   return width > 0 && height > 0 ? width * height : 0;
 }
 
+function covered(rect: Rect, obstacles: readonly Obstacle[]): number {
+  return obstacles.reduce(
+    (sum, obstacle) =>
+      sum + overlapArea(rect, obstacle) * (obstacle.text ? TEXT_WEIGHT : 1),
+    0,
+  );
+}
+
+function coversText(rect: Rect, obstacles: readonly Obstacle[]): boolean {
+  return obstacles.some(
+    (obstacle) => obstacle.text === true && overlaps(rect, obstacle),
+  );
+}
+
 /**
  * Where to show the dock so that it covers no obstacle: an interactive
  * element or a heading on screen, or a registered control (spec §6.2 a;
@@ -230,14 +254,17 @@ function overlapArea(a: Rect, b: Rect): number {
  * 2. the same anchors with the dock shrunk to its minimal 44 px button;
  * 3. last resort: the minimal button at the bottom of whichever side
  *    covers less, a safe gap above the bottom navigation. The insets keep
- *    it off the navigation itself.
+ *    it off the navigation itself. Covering a heading or section label
+ *    weighs more than covering a control, and when both bottoms would
+ *    cover one, any anchor that covers only controls is taken instead
+ *    (QA 390 px: the dock sat on Settings' "Notifications").
  *
  * The person's choice is not rewritten: the dock goes back when the
  * obstacle goes away. A stash is an explicit choice and stays put.
  */
 export function placeDock(
   chosen: DockPlacement,
-  obstacles: readonly Rect[],
+  obstacles: readonly Obstacle[],
   viewport: DockViewport,
   size: DockSize,
   dockClass: DockClass,
@@ -295,14 +322,18 @@ export function placeDock(
   for (const side of [chosen.side, other] as const) {
     const placement: DockPlacement = { side, slot: "bottom", stashed: false };
     const { x } = anchorPoint(placement, viewport, MINIMAL_SIZE);
-    const rect = rectAt({ x, y }, MINIMAL_SIZE);
-    const covered = obstacles.reduce(
-      (sum, obstacle) => sum + overlapArea(rect, obstacle),
-      0,
-    );
-    if (covered < bestCovered) {
+    const area = covered(rectAt({ x, y }, MINIMAL_SIZE), obstacles);
+    if (area < bestCovered) {
       best = { placement, x, y, minimal: true, lastResort: true };
-      bestCovered = covered;
+      bestCovered = area;
+    }
+  }
+  if (best !== null && coversText(rectAt(best, MINIMAL_SIZE), obstacles)) {
+    for (const placement of candidates) {
+      const point = anchorPoint(placement, viewport, MINIMAL_SIZE);
+      if (!coversText(rectAt(point, MINIMAL_SIZE), obstacles)) {
+        return { placement, ...point, minimal: true, lastResort: true };
+      }
     }
   }
   return (
@@ -318,7 +349,7 @@ export function placeDock(
 /** The anchor {@link placeDock} picks, without its form. */
 export function placementAvoiding(
   chosen: DockPlacement,
-  avoid: readonly Rect[],
+  avoid: readonly Obstacle[],
   viewport: DockViewport,
   size: DockSize,
   dockClass: DockClass,

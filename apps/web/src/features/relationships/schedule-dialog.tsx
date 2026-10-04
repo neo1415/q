@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot, DialogTrigger } from "@capital-q/ui/dialog";
-import { Bell, CalendarDays, ICON_SIZE } from "@capital-q/ui/icons";
+import { Bell, CalendarDays, ICON_SIZE, Video } from "@capital-q/ui/icons";
 
 function subscribeHash(onChange: () => void): () => void {
   window.addEventListener("hashchange", onChange);
@@ -14,6 +14,8 @@ function subscribeHash(onChange: () => void): () => void {
 const KINDS = {
   call: { hash: "#calls", title: "Book a call", Icon: CalendarDays },
   reminder: { hash: "#reminders", title: "Set a reminder", Icon: Bell },
+  // QA 390 px: only reachable behind Book a call, so nobody found it.
+  join: { hash: "#join-call", title: "Have Q join a call", Icon: Video },
 } as const;
 
 /**

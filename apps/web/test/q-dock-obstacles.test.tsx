@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { obstacleRects } from "@/features/q-dock/dock-avoid";
+import { obstacleRects, watchLayout } from "@/features/q-dock/dock-avoid";
 import {
   DEFAULT_PLACEMENT,
   overlaps,
@@ -156,5 +156,132 @@ describe("dock obstacles from the page (jsdom)", () => {
         obstacles[0] ?? { left: 0, top: 0, right: 0, bottom: 0 },
       ),
     ).toBe(false);
+  });
+});
+
+/**
+ * Settings at 390 x 844 (QA, both accounts): the dock sat on the
+ * "Notifications" heading. Every row is full width (term above its
+ * control), so on a scrolled settings page each anchor touches a control,
+ * and the old last resort chose whichever bottom covered the least area,
+ * treating a heading like the edge of a button. Section titles that are
+ * not h1-h6 and list terms were not obstacles at all.
+ */
+describe("the settings layout (QA 390 px)", () => {
+  function settingsPage(): { notifications: Element; voice: Element } {
+    const main = add(document.body, document.createElement("main"));
+    // Appearance → Theme: a full-width segmented control under the header.
+    const theme = add(main, document.createElement("div"));
+    theme.setAttribute("role", "radiogroup");
+    at(add(theme, document.createElement("button")), 16, 62, 358, 48);
+    // Q's voice: titled by a styled paragraph, not an h2.
+    const voiceSection = add(main, document.createElement("section"));
+    voiceSection.setAttribute("aria-labelledby", "voice-heading");
+    const voice = at(
+      add(voiceSection, document.createElement("p")),
+      16,
+      300,
+      96,
+      28,
+    );
+    voice.id = "voice-heading";
+    voice.textContent = "Q's voice";
+    const list = add(voiceSection, document.createElement("dl"));
+    at(add(list, document.createElement("dt")), 16, 340, 40, 18).textContent =
+      "Voice";
+    at(add(list, document.createElement("button")), 16, 372, 358, 48);
+    // Notifications: its heading at the bottom left, the email switch row
+    // spanning the width just above the bottom navigation.
+    const section = add(main, document.createElement("section"));
+    section.setAttribute("aria-labelledby", "notifications-heading");
+    const notifications = at(
+      add(section, document.createElement("h2")),
+      16,
+      700,
+      118,
+      28,
+    );
+    notifications.id = "notifications-heading";
+    notifications.textContent = "Notifications";
+    at(add(section, document.createElement("input")), 330, 724, 44, 44);
+    at(
+      add(section, document.createElement("a")),
+      16,
+      746,
+      120,
+      44,
+    ).setAttribute("href", "/work");
+    return { notifications, voice };
+  }
+
+  it("a section label, a list term and a legend are obstacles, as text", () => {
+    const { voice } = settingsPage();
+    const fieldset = add(document.body, document.createElement("fieldset"));
+    at(add(fieldset, document.createElement("legend")), 16, 460, 80, 20);
+    const obstacles = obstacleRects();
+    expect(obstacles).toContainEqual({
+      left: 16,
+      top: 300,
+      right: 112,
+      bottom: 328,
+      text: true,
+    });
+    expect(obstacles.filter((o) => o.text === true)).toHaveLength(4);
+    expect(voice.id).toBe("voice-heading");
+  });
+
+  it("the dock never sits on Notifications, from either side", () => {
+    const { notifications } = settingsPage();
+    const obstacles = obstacleRects();
+    const box = notifications.getBoundingClientRect();
+    for (const side of ["left", "right"] as const) {
+      const spot = placeDock(
+        { side, slot: "bottom", stashed: false },
+        obstacles,
+        phone,
+        size,
+        "mobile",
+      );
+      const rect = {
+        left: spot.x,
+        top: spot.y,
+        right: spot.x + 44,
+        bottom: spot.y + 44,
+      };
+      expect(
+        overlaps(rect, {
+          left: box.left,
+          top: box.top,
+          right: box.right,
+          bottom: box.bottom,
+        }),
+      ).toBe(false);
+      for (const obstacle of obstacles.filter((o) => o.text === true)) {
+        expect(overlaps(rect, obstacle)).toBe(false);
+      }
+    }
+  });
+
+  it("re-measures when a setting's text loads in without a new node", async () => {
+    vi.useFakeTimers();
+    try {
+      const line = add(document.body, document.createElement("p"));
+      line.textContent = "Checking this device.";
+      let calls = 0;
+      const stop = watchLayout(() => {
+        calls += 1;
+      });
+      await vi.advanceTimersByTimeAsync(250);
+      const before = calls;
+      const text = line.firstChild;
+      if (text === null) throw new Error("no text node");
+      text.nodeValue =
+        "To get pushes on iPhone, add Capital Q to your Home Screen.";
+      await vi.advanceTimersByTimeAsync(250);
+      expect(calls).toBeGreaterThan(before);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

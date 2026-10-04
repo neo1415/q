@@ -28,7 +28,7 @@ import {
 } from "@/features/q-aperture";
 import { useQSessionOptional } from "@/features/q/q-session";
 
-import { obstacleRects, subscribeAvoid } from "./dock-avoid";
+import { obstacleRects, subscribeAvoid, watchLayout } from "./dock-avoid";
 import { useDockClass, useDockMenu } from "./use-dock-menu";
 import {
   applyMove,
@@ -210,17 +210,10 @@ export function QDock() {
     const observer = new ResizeObserver(bump);
     if (box !== null) observer.observe(box);
     // Controls that arrive without a scroll (data loading in, a section
-    // opening) are obstacles too. Settled first: a streaming answer would
-    // otherwise re-measure the page on every token.
-    let settle = 0;
-    const mutations = new MutationObserver(() => {
-      window.clearTimeout(settle);
-      settle = window.setTimeout(bump, 200);
-    });
-    mutations.observe(document.body, { childList: true, subtree: true });
+    // opening, a font swapping) move obstacles too.
+    const unwatch = watchLayout(bump);
     return () => {
-      window.clearTimeout(settle);
-      mutations.disconnect();
+      unwatch();
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", bump);
       window.removeEventListener("scroll", bump, { capture: true });
