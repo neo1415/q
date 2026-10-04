@@ -146,6 +146,8 @@ grant select on integrations.inbound_emails to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- communication.notifications: "New email from X: subject"
+-- The set equals 20261201090000 (chat notices), which hosted applies first:
+-- CHAT_MESSAGE stays in so running this one afterwards never narrows it.
 -- ---------------------------------------------------------------------------
 
 alter table communication.notifications
@@ -156,4 +158,4 @@ alter table communication.notifications
                     'COMMITMENT_DETECTED', 'ACCOUNT_PAUSED', 'Q_WORK', 'Q_STAND_IN',
                     'INTEREST_RECEIVED', 'CONNECTION_REQUESTED', 'Q_MESSAGE', 'TIME_PROPOSED',
                     'HUMAN_REVIEW', 'VERIFICATION_DECIDED', 'VERIFICATION_REQUESTED',
-                    'RELATIONSHIP_OUTCOME', 'DILIGENCE', 'EMAIL_RECEIVED'));
+                    'RELATIONSHIP_OUTCOME', 'DILIGENCE', 'EMAIL_RECEIVED', 'CHAT_MESSAGE'));
