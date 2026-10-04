@@ -5,6 +5,8 @@ import type {
   MeetingBotState,
   MeetingTranscriptLine,
 } from "@capital-q/communication";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { z } from "zod";
 
 /**
@@ -328,7 +330,13 @@ export function createRecallBots(options: {
         const text = part.words.map((word) => word.text).join(" ");
         return { speaker: speakerOf(part.participant?.name, text), text };
       });
-      return { state, transcript };
+      // Removed part-way (meet-47): the record is what Q heard until then.
+      const end = endOf(
+        bot.status_changes.map((change) => change.sub_code ?? null),
+      );
+      return end === "REMOVED"
+        ? { state, transcript, cutShort: end }
+        : { state, transcript };
     },
     // A scheduled bot is deleted; one already in the call is asked to
     // leave (ADR 0027: any participant may remove Q at any time).
@@ -339,6 +347,123 @@ export function createRecallBots(options: {
       } catch {
         await request(`${path}leave_call/`, { method: "POST" });
       }
+    },
+  };
+}
+
+/**
+ * Recall's status webhook (meet-47: a late transcript is read the moment
+ * Recall says it is ready, with the collector's poll as the fallback).
+ * Recall signs deliveries the Svix way: HMAC-SHA256 over
+ * "<id>.<timestamp>.<raw body>" with the endpoint's whsec_ secret. Anything
+ * unsigned, mis-signed or older than five minutes is refused unread. The
+ * body only names a bot; Q then reads that bot through the API as usual,
+ * so nothing in the delivery is trusted beyond "look at this bot".
+ */
+export type RecallStatusWebhook = {
+  readonly verify: (
+    headers: Readonly<Record<string, string | string[] | undefined>>,
+    rawBody: Buffer,
+  ) => boolean;
+  readonly receive: (body: unknown) => Promise<void>;
+};
+
+const WEBHOOK_TOLERANCE_MS = 5 * 60_000;
+
+const RecallEventSchema = z
+  .object({
+    event: z.string().max(80),
+    data: z
+      .object({
+        bot_id: z.string().max(80).optional(),
+        bot: z
+          .object({ id: z.string().max(80) })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+/** The events after which a bot's record may have changed. */
+const SETTLE_EVENTS =
+  /^(bot\.(status_change|done|fatal|call_ended|in_waiting_room|in_call_recording)|transcript\.(done|failed)|recording\.(done|failed))$/;
+
+export function recallEventBotId(body: unknown): string | null {
+  const parsed = RecallEventSchema.safeParse(body);
+  if (!parsed.success || !SETTLE_EVENTS.test(parsed.data.event)) return null;
+  return parsed.data.data.bot?.id ?? parsed.data.data.bot_id ?? null;
+}
+
+function header(
+  headers: Readonly<Record<string, string | string[] | undefined>>,
+  ...names: string[]
+): string | null {
+  for (const name of names) {
+    const value = headers[name];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return null;
+}
+
+export function verifySvixSignature(input: {
+  readonly secret: string;
+  readonly headers: Readonly<Record<string, string | string[] | undefined>>;
+  readonly rawBody: Buffer;
+  readonly now: Date;
+}): boolean {
+  const id = header(input.headers, "svix-id", "webhook-id");
+  const timestamp = header(
+    input.headers,
+    "svix-timestamp",
+    "webhook-timestamp",
+  );
+  const signatures = header(
+    input.headers,
+    "svix-signature",
+    "webhook-signature",
+  );
+  if (id === null || timestamp === null || signatures === null) return false;
+  if (!/^\d{1,12}$/.test(timestamp)) return false;
+  const sentAt = Number(timestamp) * 1_000;
+  if (Math.abs(input.now.getTime() - sentAt) > WEBHOOK_TOLERANCE_MS) {
+    return false;
+  }
+  const key = Buffer.from(input.secret.replace(/^whsec_/, ""), "base64");
+  if (key.length === 0) return false;
+  const expected = createHmac("sha256", key)
+    .update(`${id}.${timestamp}.`)
+    .update(input.rawBody)
+    .digest();
+  return signatures.split(" ").some((entry) => {
+    const [version, value] = entry.split(",", 2);
+    if (version !== "v1" || value === undefined) return false;
+    const given = Buffer.from(value, "base64");
+    return given.length === expected.length && timingSafeEqual(given, expected);
+  });
+}
+
+export function createRecallStatusWebhook(options: {
+  readonly secret: string | undefined;
+  readonly settleBot: (botId: string) => Promise<unknown>;
+  readonly now?: () => Date;
+}): RecallStatusWebhook | undefined {
+  const secret = options.secret;
+  if (
+    secret === undefined ||
+    !secret.startsWith("whsec_") ||
+    secret.length < 20
+  ) {
+    return undefined;
+  }
+  const now = options.now ?? (() => new Date());
+  return {
+    verify: (headers, rawBody) =>
+      verifySvixSignature({ secret, headers, rawBody, now: now() }),
+    receive: async (body) => {
+      const botId = recallEventBotId(body);
+      if (botId === null) return;
+      await options.settleBot(botId);
     },
   };
 }

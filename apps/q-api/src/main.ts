@@ -82,7 +82,11 @@ import {
   ownCompanyOf,
 } from "./composition/documents.js";
 import { createMeetingFollowUpCards } from "./composition/meeting-follow-up-cards.js";
-import { createRecallBots, transcriberOf } from "./composition/recall-bots.js";
+import {
+  createRecallBots,
+  createRecallStatusWebhook,
+  transcriberOf,
+} from "./composition/recall-bots.js";
 import {
   createMeetingHostComposer,
   createMeetingHostRuntime,
@@ -3100,7 +3104,9 @@ setInterval(
         logger.warn({ err: error }, "meeting assistant collection failed");
       });
   },
-  2 * 60 * 1000,
+  // meet-47: every minute, so a call booked or joined inside the window,
+  // a lobby and a retry are each seen within a minute.
+  60 * 1000,
 ).unref();
 
 // AUTO block (founder direction 2026-10-01): one gentle reminder to a
@@ -4239,6 +4245,10 @@ const { app, logger: appLogger } = createApp(
     meetingAssistant,
     // MEET-HOST block (ADR 0037)
     meetingHost,
+    recallStatus: createRecallStatusWebhook({
+      secret: process.env.RECALL_WEBHOOK_SECRET,
+      settleBot: (botId) => meetingAssistant.settleBot(botId),
+    }),
     errands,
     // AUTO block (ADR 0030)
     work: workPort,

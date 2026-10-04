@@ -110,6 +110,8 @@ export {
   type MeetingBotState,
   type MeetingBotEnd,
   MEETING_BOT_END,
+  BOT_CREATE_MAX_ATTEMPTS,
+  botRetryDelayMs,
   type MeetingNotes,
   type MeetingNextStepNote,
   type MeetingNotesComposer,
