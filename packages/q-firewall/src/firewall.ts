@@ -185,11 +185,22 @@ function screenWithin(
         scope.subject !== undefined &&
         JSON.stringify(scope.subject) === JSON.stringify(ref),
     );
-  const { companyId, investorOrganisationId, documentId, timeZone } = screen;
+  const {
+    companyId,
+    investorOrganisationId,
+    documentId,
+    timeZone,
+    artifactId,
+  } = screen;
   return {
     route: screen.route,
     // The person's own clock, not data about anyone.
     ...(timeZone === undefined ? {} : { timeZone }),
+    // voiceq-63: the document Q made for them that is open on this tab, as
+    // an id only. It grants nothing: its words are read solely through
+    // read_my_document, which reads it as the asker through the documents'
+    // own service and refuses one that is not theirs.
+    ...(artifactId === undefined ? {} : { artifactId }),
     ...(companyId !== undefined && bound({ kind: "COMPANY", companyId })
       ? { companyId }
       : {}),

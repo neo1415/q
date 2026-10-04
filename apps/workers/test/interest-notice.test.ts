@@ -10,7 +10,10 @@ import {
   relationshipInterestExpressedEvent,
 } from "@capital-q/network/events";
 
-import { withInterestNotices } from "../src/network/interest-notice-handler.js";
+import {
+  BENCH_ACCOUNT_PATTERN,
+  withInterestNotices,
+} from "../src/network/interest-notice-handler.js";
 import type { QueueMessage } from "../src/queue/pgmq.js";
 import type { MessageOutcome } from "../src/queue/runner.js";
 import { createRecordingLogger, TENANT_A } from "./support/fakes.js";
@@ -174,5 +177,69 @@ describe("withInterestNotices", () => {
       kind: "RETRY",
       errorCode: "INTEREST_NOTICE_FAILED",
     });
+  });
+});
+
+/**
+ * voiceq-63: QA bench accounts playing real investors expressed interest in
+ * real founders' companies on 2026-10-03 ("Ventures Platform is interested
+ * in Nixo"). A bench account's interest never notifies anyone; a lookup
+ * that fails never stops a real notice.
+ */
+describe("a bench account's interest", () => {
+  const run = async (bench: boolean | "fails") => {
+    const told: string[] = [];
+    const sql = ((strings: TemplateStringsArray) => {
+      const text = strings.join("?");
+      if (text.includes("auth.users")) {
+        return bench === "fails"
+          ? Promise.reject(new Error("permission denied"))
+          : Promise.resolve([{ bench }]);
+      }
+      return Promise.resolve([
+        { party: "INVESTOR", company: "Nixo", investor: "Ventures Platform" },
+      ]);
+    }) as unknown;
+    const handle = withInterestNotices(
+      () => Promise.resolve({ kind: "DONE" }),
+      {
+        registry,
+        sql: sql as DatabaseExecutor,
+        notices: {
+          notify: (input) => {
+            told.push(input.title);
+            return Promise.resolve(1);
+          },
+        },
+        logger: createRecordingLogger(),
+      },
+    );
+    const outcome = await handle(message(expressed()));
+    return { told, outcome };
+  };
+
+  it("notifies nobody", async () => {
+    const { told, outcome } = await run(true);
+    expect(told).toEqual([]);
+    expect(outcome).toEqual({ kind: "DONE" });
+  });
+
+  it("a real investor's interest is still told, even if the check fails", async () => {
+    expect((await run(false)).told).toEqual([
+      "Ventures Platform is interested in Nixo",
+    ]);
+    expect((await run("fails")).told).toEqual([
+      "Ventures Platform is interested in Nixo",
+    ]);
+  });
+
+  it("matches the bench families only, never the fictional seed world", () => {
+    const bench = new RegExp(BENCH_ACCOUNT_PATTERN);
+    expect(bench.test("bench.soyombo3@fictional.capitalq.local")).toBe(true);
+    expect(bench.test("bench.venturesplatform3@fictional.capitalq.local")).toBe(
+      true,
+    );
+    expect(bench.test("investor.savanna@fictional.capitalq.local")).toBe(false);
+    expect(bench.test("adedaniel502@gmail.com")).toBe(false);
   });
 });

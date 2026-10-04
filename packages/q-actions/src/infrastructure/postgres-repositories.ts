@@ -205,6 +205,20 @@ export function createPostgresQActionRepositories(): QActionRepositories {
     return rows.length === 0 ? null : toApproval(rows[0]);
   };
 
+  /**
+   * Only cards for these exact targets (voiceq-63: each candidate is read
+   * back with two queries, inside the propose transaction; unfiltered, a
+   * person with many waiting cards paid for all of them before a new card
+   * appeared). jsonb equality: the same refs, whatever their key order.
+   */
+  const sameTargets = (
+    executor: DatabaseExecutor,
+    targets: readonly unknown[] | undefined,
+  ) =>
+    targets === undefined
+      ? executor``
+      : executor`and a.target_refs = ${JSON.stringify(targets)}::text::jsonb`;
+
   return {
     actions: {
       insert: async (tx, input) => {
@@ -244,10 +258,50 @@ export function createPostgresQActionRepositories(): QActionRepositories {
              and a.action_type = ${input.actionType}
              and a.action_version = ${input.actionVersion}
              and a.status = 'AWAITING_APPROVAL'
+             ${sameTargets(executor, input.targets)}
              and p.requested_from_user_id = ${input.userId}
              and p.status = 'PENDING'
              and p.expires_at > ${input.now.toISOString()}::text::timestamptz
            order by p.requested_at desc, p.id desc
+           limit 20`;
+        const found: {
+          readonly action: QActionRecord;
+          readonly approval: QApprovalRecord;
+        }[] = [];
+        for (const row of rows) {
+          const ids = AwaitingRow.parse(row);
+          const action = await findAction(
+            executor,
+            input.tenantId,
+            ids.action_id,
+          );
+          const approval = await findApproval(
+            executor,
+            input.tenantId,
+            ids.approval_id,
+          );
+          if (action !== null && approval !== null) {
+            found.push({ action, approval });
+          }
+        }
+        return found;
+      },
+      listExecutedForProposer: async (executor, input) => {
+        const rows = await executor`
+          select a.id as action_id, p.id as approval_id
+            from q_runtime.actions a
+            join q_runtime.approvals p
+              on p.action_id = a.id and p.tenant_id = a.tenant_id
+           where a.tenant_id = ${input.tenantId}
+             and a.proposed_by_user_id = ${input.userId}
+             and a.organisation_id = ${input.organisationId}
+             and a.action_type = ${input.actionType}
+             and a.action_version = ${input.actionVersion}
+             and a.status = 'EXECUTED'
+             ${sameTargets(executor, input.targets)}
+             and p.status = 'APPROVED'
+             and a.executed_at >= ${input.since.toISOString()}::text::timestamptz
+           order by a.executed_at desc, a.id desc
            limit 20`;
         const found: {
           readonly action: QActionRecord;

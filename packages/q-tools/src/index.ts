@@ -150,6 +150,9 @@ export {
 } from "./tools/pending-proposal.js";
 export {
   createListMyDocumentsTool,
+  createReadMyDocumentTool,
+  documentText,
+  READ_MY_DOCUMENT,
   createListPendingApprovalsTool,
   createOwnWorkTools,
   createReviseMyDocumentTool,

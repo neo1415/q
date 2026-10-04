@@ -194,6 +194,8 @@ const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
   VERIFICATION: "verification",
   ONBOARDING: "their setup",
   DAILY: "The Q Daily (today's edition)",
+  DOCUMENTS: "their documents",
+  WORK: "Q's work page (what Q is doing and what needs them)",
   OTHER: null,
 };
 
@@ -237,6 +239,14 @@ export const PLAIN_KNOWING_LINE =
 export const CHECK_BEFORE_CANT_LINE =
   "CHECK BEFORE NO OR CAN'T: before saying something of theirs does not exist, look at WHAT EXISTS in the facts and read it with read_my or a list or read tool you hold; before saying you can't do something, look for the tool that does it in the list below. Say you can't only when no tool here does it, plainly in one sentence, and never claim a record is missing that WHAT EXISTS counts. A company, person or record that is not in these facts is unknown here, never \"not there\": call the tool with the name as they said it and let the tool resolve it.";
 
+/**
+ * voiceq-63 (founder 2026-10-04: "understand badly-phrased requests like
+ * ChatGPT"): the answer reads loose words the way the turn reader now does
+ * (TURN_READER v42 MESSY WORDS), and asks at most one short question.
+ */
+export const MESSY_WORDS_LINE =
+  "THEIR WORDS MAY BE MESSY (typed fast, misheard by speech recognition, fragments, pidgin or mixed languages): answer what they most plausibly mean, using this conversation and their screen; a name that sounds like one in this conversation is that one. Ask one short question only when two readings would lead to different actions and nothing here decides; never ask them to rephrase or repeat. Answer in the language they used.";
+
 export function screenLines(
   screen: QScreenContext | undefined,
   now: Date = new Date(),
@@ -253,6 +263,11 @@ export function screenLines(
     ...(screen.documentId === undefined
       ? []
       : [`their document ${screen.documentId} open`]),
+    ...(screen.artifactId === undefined
+      ? []
+      : [
+          `the document Q made for them ${screen.artifactId}, open (its text is under ON THEIR SCREEN when it could be read; otherwise read it with read_my_document)`,
+        ]),
   ];
   return [
     `WHERE THEY ARE NOW (Capital Q, from their screen as they asked): ${
@@ -318,6 +333,7 @@ export function capabilityNote(
 ): ModelMessage {
   const lines: string[] = [
     ...screenLines(screen),
+    MESSY_WORDS_LINE,
     PLAIN_KNOWING_LINE,
     CHECK_BEFORE_CANT_LINE,
     "WHAT YOU CAN DO IN THIS CONVERSATION (Capital Q, authoritative; you can do nothing else):",

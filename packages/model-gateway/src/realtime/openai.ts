@@ -119,7 +119,17 @@ export function createOpenAIRealtimeProvider(options: {
                       }
                     : {}),
                 },
-                output: { voice: VOICES[request.voice] },
+                output: {
+                  voice: VOICES[request.voice],
+                  ...(request.speechSpeed === undefined
+                    ? {}
+                    : {
+                        speed: Math.min(
+                          1.5,
+                          Math.max(0.25, request.speechSpeed),
+                        ),
+                      }),
+                },
               },
             },
           }),

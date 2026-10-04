@@ -68,6 +68,9 @@ export const Q_SCREEN_ROUTES = [
   // The Q Daily (founder live 2026-10-01): "summarize everything here" on
   // the Daily was answered from older conversation text.
   "DAILY",
+  // voiceq-63: their documents, and Q's work page ("Needs you").
+  "DOCUMENTS",
+  "WORK",
   "OTHER",
 ] as const;
 export const QScreenRouteSchema = z.enum(Q_SCREEN_ROUTES);
@@ -87,6 +90,14 @@ export const QScreenContextSchema = z
     companyId: UuidSchema.optional(),
     investorOrganisationId: UuidSchema.optional(),
     documentId: UuidSchema.optional(),
+    /**
+     * voiceq-63: a document Q prepared for them, open in a viewer on this
+     * Capital Q tab (founder, live 2026-10-04: Q opened the prep PDF and
+     * could not read what it showed). An id, never authority: its words
+     * are read only through read_my_document, which reads it as the asker
+     * through the documents' own service and refuses anything not theirs.
+     */
+    artifactId: UuidSchema.optional(),
     /**
      * The device's IANA time zone as the person asks (live test 2026-09-28
      * #2): "tomorrow at 2 PM" is resolved by code in this zone, never in

@@ -886,6 +886,28 @@ export type OwnDocumentsPort = {
       readonly updatedAt: string;
     }[]
   >;
+  /**
+   * voiceq-63: one of their documents as its viewer shows it (title and
+   * the current version's sections), read as the actor through the
+   * artifact service, which refuses one that is not theirs; null for
+   * absent, not theirs, or still preparing alike. Absent: no
+   * read_my_document tool.
+   */
+  readonly read?:
+    | ((
+        actor: ActorContext,
+        artifactId: string,
+      ) => Promise<{
+        readonly title: string;
+        readonly type: string;
+        readonly version: number;
+        readonly sections: readonly {
+          readonly heading: string;
+          readonly body: string;
+        }[];
+        readonly gaps: readonly string[];
+      } | null>)
+    | undefined;
 };
 
 /**

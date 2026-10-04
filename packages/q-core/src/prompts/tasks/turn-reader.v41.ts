@@ -30,7 +30,7 @@ export const TURN_READER_V41: PromptDefinition<
 > = {
   ...TURN_READER_V40,
   version: 41,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "WORK-58 (founder 2026-10-04): WORK, Q's work page, is a NAVIGATE destination for 'show my work' / 'what's Q doing'; a task is still the delegation tool.",
   effectiveFrom: "2026-10-04",

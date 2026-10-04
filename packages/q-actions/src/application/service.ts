@@ -91,7 +91,7 @@ import {
   type QPendingApprovalRow,
 } from "../ports.js";
 import type { QActionRegistry } from "../registry.js";
-import { proposalContent } from "../domain/same-proposal.js";
+import { findSameIntent, proposalContent } from "../domain/same-proposal.js";
 
 /**
  * The Approval Engine (doc 12 §29-§32; doc 15 §50-§53; CQ-Q-008).
@@ -148,6 +148,12 @@ export type ProposeQActionResult = {
    * they can no longer be approved (lead 2026-10-03).
    */
   readonly superseded?: readonly QActionRecord[] | undefined;
+  /**
+   * The same change by intent was already carried out (voiceq-63): nothing
+   * new was prepared, `action` is the executed one, and this is what Q says
+   * about it, from its record ("Already booked for Tue 10:00 — link: …").
+   */
+  readonly alreadyDone?: string | undefined;
 };
 
 export type QApprovalQuery = {
@@ -268,6 +274,23 @@ const AUDIT = {
 
 function iso(date: Date): UtcTimestamp {
   return date.toISOString();
+}
+
+/** How far back a restated request is matched with one already carried out. */
+const ALREADY_DONE_LOOKBACK_MS = 24 * 60 * 60_000;
+
+/** What Q says about a change already carried out, from its own record. */
+export function alreadyDoneLine(
+  definition: AnyQActionDefinition,
+  action: QActionRecord,
+): string {
+  const fallback = `Already done: ${action.summary.trim().replace(/[.\s]+$/u, "")}.`;
+  if (definition.alreadyDone === undefined) return fallback;
+  const payload = definition.payload.safeParse(action.payload);
+  const result = definition.result.safeParse(action.executionResult);
+  return payload.success && result.success
+    ? definition.alreadyDone(payload.data, result.data)
+    : fallback;
 }
 
 export function idempotencyKeyFor(
@@ -1048,6 +1071,7 @@ export function createQActionService(
                 actionType: definition.actionType,
                 actionVersion: definition.version,
                 now,
+                targets,
               },
             );
             const same = waiting.find(
@@ -1059,18 +1083,75 @@ export function createQActionService(
                   payload: action.payload,
                 }) === content,
             );
-            if (same !== undefined) {
+            // The same change by intent (voiceq-63): a restated "book Nixo
+            // in five minutes" whose start differs by seconds is this card.
+            const restated =
+              same ??
+              findSameIntent(
+                definition,
+                waiting,
+                ({ action }) => ({
+                  targets: action.targets,
+                  payload: action.payload,
+                }),
+                { targets, payload: payload.data },
+              );
+            if (restated !== undefined) {
               logger?.info(
                 {
                   qRunId: run.id,
-                  actionId: same.action.id,
-                  approvalId: same.approval.id,
+                  actionId: restated.action.id,
+                  approvalId: restated.approval.id,
                   actionType: definition.actionType,
+                  byIntent: same === undefined,
                   correlationId,
                 },
                 "q action already waiting for approval; no second card",
               );
-              return { ...same, existing: true };
+              return { ...restated, existing: true };
+            }
+            // Already carried out, recently, by intent: say so from its
+            // record and act on nothing (one booking per counterpart per
+            // intended time).
+            if (
+              definition.sameIntent !== undefined &&
+              repositories.actions.listExecutedForProposer !== undefined
+            ) {
+              const executed =
+                await repositories.actions.listExecutedForProposer(tx.sql, {
+                  tenantId: actor.tenantId,
+                  userId: actor.userId,
+                  organisationId,
+                  actionType: definition.actionType,
+                  actionVersion: definition.version,
+                  since: new Date(now.getTime() - ALREADY_DONE_LOOKBACK_MS),
+                  targets,
+                });
+              const done = findSameIntent(
+                definition,
+                executed,
+                ({ action }) => ({
+                  targets: action.targets,
+                  payload: action.payload,
+                }),
+                { targets, payload: payload.data },
+              );
+              if (done !== undefined) {
+                logger?.info(
+                  {
+                    qRunId: run.id,
+                    actionId: done.action.id,
+                    actionType: definition.actionType,
+                    correlationId,
+                  },
+                  "q action already carried out; nothing new prepared",
+                );
+                return {
+                  ...done,
+                  existing: true,
+                  alreadyDone: alreadyDoneLine(definition, done.action),
+                };
+              }
             }
             if (!canTransition(run.status, "AWAITING_APPROVAL")) {
               throw new QActionVersionConflictError();

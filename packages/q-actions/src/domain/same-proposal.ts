@@ -1,4 +1,5 @@
 import { canonicalJsonStringify } from "@capital-q/contracts";
+import type { z } from "zod";
 
 /**
  * What makes two proposals the same card (lead 2026-10-03): the action
@@ -39,4 +40,35 @@ function withoutIdempotencyKeys(value: unknown): unknown {
     out[key] = withoutIdempotencyKeys(nested);
   }
   return out;
+}
+
+/**
+ * The earlier proposal that a new one restates by intent: the same targets,
+ * and the definition's `sameIntent` says the values mean the same change
+ * (voiceq-63). Stored payloads are read back through the definition's own
+ * schema; one that no longer parses never matches.
+ */
+export function findSameIntent<P, T>(
+  definition: {
+    readonly payload: z.ZodType<P>;
+    readonly sameIntent?: ((previous: P, next: P) => boolean) | undefined;
+  },
+  candidates: readonly T[],
+  read: (candidate: T) => {
+    readonly targets: readonly unknown[];
+    readonly payload: unknown;
+  },
+  next: { readonly targets: readonly unknown[]; readonly payload: P },
+): T | undefined {
+  const same = definition.sameIntent;
+  if (same === undefined) return undefined;
+  const key = (targets: readonly unknown[]) =>
+    canonicalJsonStringify(JSON.parse(JSON.stringify(targets)) as unknown);
+  const targetKey = key(next.targets);
+  return candidates.find((candidate) => {
+    const stored = read(candidate);
+    if (key(stored.targets) !== targetKey) return false;
+    const parsed = definition.payload.safeParse(stored.payload);
+    return parsed.success && same(parsed.data, next.payload);
+  });
 }

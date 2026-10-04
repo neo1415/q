@@ -208,6 +208,8 @@ export {
   decidePending,
   declines,
   isReplyToCard,
+  pointedRefusal,
+  restatesCard,
   plainApproval,
   plainRefusal,
   statusLine,

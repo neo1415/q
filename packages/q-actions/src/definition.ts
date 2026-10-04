@@ -154,6 +154,22 @@ export type QActionDefinition<P, R> = {
    */
   readonly supersedes?: boolean | undefined;
   /**
+   * Whether two proposals for the same targets would do the same thing in
+   * the world although their values differ in detail (voiceq-63, live
+   * 2026-10-04: "book a call with Nixo in the next five minutes", said and
+   * restated, gave five starts seconds apart, five cards and two invites).
+   * A match with a waiting card returns that card; a match with one
+   * already carried out returns its result, said as `alreadyDone`. Absent:
+   * only identical content is the same card.
+   */
+  readonly sameIntent?: ((previous: P, next: P) => boolean) | undefined;
+  /**
+   * What Q says when a request matches a change already carried out, from
+   * that change's payload and validated result: "Already booked for Tue
+   * 10:00 — link: …". Absent: "Already done: <summary>."
+   */
+  readonly alreadyDone?: ((payload: P, result: R) => string) | undefined;
+  /**
    * What Q tells the person once the gate has persisted EXECUTED, from the
    * approved payload and the executor's validated result — never from a
    * model. Absent: the approval summary, prefixed "Done".

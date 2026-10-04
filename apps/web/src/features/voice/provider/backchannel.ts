@@ -41,11 +41,14 @@ export type BackchannelLevelRules = {
 export const BACKCHANNEL_RULES: Readonly<
   Record<Exclude<QVoiceListeningLevel, "OFF">, BackchannelLevelRules>
 > = {
+  // voiceq-63 (founder: "it was always talking"): Subtle is rarer -- one
+  // reaction in a turn, only after a real stretch of speech and a clear
+  // pause, and long gaps between them.
   SUBTLE: {
-    minTurnSpeechMs: 4_000,
+    minTurnSpeechMs: 5_000,
     minSpeechSinceMs: 5_000,
-    minGapMs: 9_000,
-    maxPerTurn: 2,
+    minGapMs: 15_000,
+    maxPerTurn: 1,
     triggerMs: 450,
   },
   NATURAL: {

@@ -306,11 +306,24 @@ describe("schedule, reschedule, cancel", () => {
       w.store.notifications
         .filter((n) => n.kind === "MEETING_SCHEDULED")
         .map((n) => [n.userId, n.kind]),
-    ).toEqual([[FOUNDER.userId, "MEETING_SCHEDULED"]]);
+    ).toEqual([
+      [FOUNDER.userId, "MEETING_SCHEDULED"],
+      [INVESTOR.userId, "MEETING_SCHEDULED"],
+    ]);
     // The "New call" notice carries the Meet link itself.
     expect(
-      w.store.notifications.find((n) => n.kind === "MEETING_SCHEDULED")?.body,
+      w.store.notifications.find(
+        (n) => n.kind === "MEETING_SCHEDULED" && n.userId === FOUNDER.userId,
+      )?.body,
     ).toBe("Meet link: https://meet.google.com/abc-defg-hij");
+    // voiceq-63: the organiser is told in the app that it is booked.
+    const booked = w.store.notifications.find(
+      (n) => n.kind === "MEETING_SCHEDULED" && n.userId === INVESTOR.userId,
+    );
+    expect(booked?.title).toMatch(/^Booked: /u);
+    expect(booked?.body).toContain(
+      "Meet link: https://meet.google.com/abc-defg-hij",
+    );
     // REHEARSE: everyone on the call is offered a rehearsal of it.
     const rehearse = w.store.notifications.filter(
       (n) => n.kind === "MEETING_PREP_READY",
@@ -329,6 +342,31 @@ describe("schedule, reschedule, cancel", () => {
     expect(again.outcome === "OK" && again.alreadyScheduled).toBe(true);
     expect(w.investorCalendar.inserted).toHaveLength(1);
     expect(w.activity.recorded).toHaveLength(1);
+  });
+
+  it("books once per counterpart per time window, whatever card asked (voiceq-63)", async () => {
+    const w = world();
+    const first = await w.service.schedule(SCHEDULE);
+    if (first.outcome !== "OK") throw new Error("first booking refused");
+    // A restated request seconds later: another card, another key, a start
+    // a few minutes off. Live 2026-10-04 this invited Nixo twice.
+    const again = await w.service.schedule({
+      ...SCHEDULE,
+      idempotencyKey: "q-action:0002-schedule",
+      startsAt: new Date("2026-10-06T09:05:00Z"),
+    });
+    if (again.outcome !== "OK") throw new Error("restated booking refused");
+    expect(again.alreadyScheduled).toBe(true);
+    expect(again.meeting.id).toBe(first.meeting.id);
+    expect(w.investorCalendar.inserted).toHaveLength(1);
+    // Another hour is another call.
+    const later = await w.service.schedule({
+      ...SCHEDULE,
+      idempotencyKey: "q-action:0003-schedule",
+      startsAt: new Date("2026-10-06T11:00:00Z"),
+    });
+    expect(later.outcome === "OK" && later.alreadyScheduled).toBe(false);
+    expect(w.investorCalendar.inserted).toHaveLength(2);
   });
 
   it("retries a failed insert with the same event id", async () => {

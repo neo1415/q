@@ -140,6 +140,8 @@
     "turn-reader/v39": "34f08890ae739dda08c68ff5cc1b6bf28f04f21ed2a8dad85b4f5c6ec1b95c93",
     "turn-reader/v4": "b028c2844b8800c3e70d8e7a4110e2365db1f341feb9483e0e1fe5bc547984ee",
     "turn-reader/v40": "dc7c25fff0d6804962cdb4c850c2400287e447243856057d9041c652ed31615f",
+    "turn-reader/v41": "961764b5009c021dbac25a0371c23a84df92ca9e6ca5c3b1fbeff8e1ac7b367d",
+    "turn-reader/v42": "05edace18a07de73c16c2e0c002c593d39e7d49e2c81fe643e7a1004b5a9373e",
     "turn-reader/v5": "d16225398ce01cbfbcc959f1aad18a762ac269a3c851986bb1ae967a033158d3",
     "turn-reader/v6": "628316302e0c9194a0d7b8f0043307551a07e69d8ceebd295318e6cac4934c9f",
     "turn-reader/v7": "35c13812e361ec18765a34dcdb4a3aabd1138bab96d2175667e8959bed7e4fc5",
@@ -151,8 +153,7 @@
     "work-interview-turn/v1": "7366247a58e5db9f03d2d5c0e68c8b3e538fdfcc894ea19a9c0bc9337ab8d60b",
     "work-shortlist/v1": "901f1389ffedbd8c702574097b87e51f926cc594305d8d43c8b3b4c65c2d10e3",
     "work-slot-reader/v1": "9cc7753d25abaeab63e9a2082567b701e9d370fdcf1583447030b6453f14b3fc",
-    "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0",
-    "turn-reader/v41": "961764b5009c021dbac25a0371c23a84df92ca9e6ca5c3b1fbeff8e1ac7b367d"
+    "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0"
   },
   "generatedBy": "CQ-Q-006"
 }

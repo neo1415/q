@@ -68,8 +68,15 @@ export type LevelMeter = {
   readonly close: () => void;
 };
 
-/** A slow answer gets a bridging line after this long. */
-export const BRIDGE_AFTER_MS = 700;
+/**
+ * A slow answer gets a bridging line after this long (SUBTLE). voiceq-63
+ * (founder, live 2026-10-04: "it was always talking"): at 700 ms nearly
+ * every answer (3-8 s on the line) was preceded by a bridge, so Q spoke
+ * before every reply. A bridge is for a pause the person has noticed.
+ */
+export const BRIDGE_AFTER_MS = 2_500;
+/** NATURAL listening bridges a little sooner. */
+export const BRIDGE_AFTER_NATURAL_MS = 1_600;
 /** Reactions play quieter than Q's turns. */
 export const BACKCHANNEL_GAIN = 0.6;
 /** Output caps: a reaction is under a second, a bridge a short clause. */
@@ -657,9 +664,14 @@ export class DuplexLine {
           this.#events.onLine("user", words);
           // A slow answer gets a bridging line; a fast one gets silence.
           if (this.#bridgesAllowed()) {
-            bridge = this.#env.setTimeout(() => {
-              if (generation === this.#generation) this.#fireBridge(words);
-            }, BRIDGE_AFTER_MS);
+            bridge = this.#env.setTimeout(
+              () => {
+                if (generation === this.#generation) this.#fireBridge(words);
+              },
+              this.#policy.level === "NATURAL"
+                ? BRIDGE_AFTER_NATURAL_MS
+                : BRIDGE_AFTER_MS,
+            );
           }
         }
       } catch {

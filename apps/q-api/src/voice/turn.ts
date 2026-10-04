@@ -75,6 +75,7 @@ import {
   approvalCue,
   declines,
   isReplyToCard,
+  restatesCard,
   plainApproval,
   plainRefusal,
   statusLine,
@@ -350,6 +351,20 @@ const stopping = new WeakSet<LiveRun>();
 const UNFINISHED_HOLD_MS = 1_500;
 /** Transcripts built here from a reply already acted on (never held). */
 const settledTranscripts = new WeakSet<readonly VoiceTranscriptTurn[]>();
+
+/**
+ * A transcript whose turn has already ended, by a judge other than its
+ * punctuation (voiceq-63): on the duplex line the realtime model's own
+ * turn detector ended the person's turn before it called ask_q, so holding
+ * an unpunctuated request "in case they carry on" only added 1.5 s to
+ * every such answer.
+ */
+export function settledTurn(
+  transcript: readonly VoiceTranscriptTurn[],
+): readonly VoiceTranscriptTurn[] {
+  settledTranscripts.add(transcript);
+  return transcript;
+}
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
 
@@ -1830,7 +1845,7 @@ export function createVoiceTurnHandler(
         approvalWaiting.summary ??
         "I've prepared something that needs your approval.";
       const plain = plainApproval(text) || plainRefusal(text);
-      const [read, reading] = fragment
+      const [heard, reading] = fragment
         ? [null, null]
         : await Promise.all([
             decide(binding, `${summary} Shall I go ahead?`, text, signal),
@@ -1840,11 +1855,18 @@ export function createVoiceTurnHandler(
           ]);
       // Without a turn reader composed, the decision reading is all there
       // is, as before; with one, an unread turn is no reply.
+      const card = [{ summary }];
+      // "Yes, approve the meeting with Nixo for the next five minutes":
+      // the rest restates the card, so there is no rest to answer.
+      const read =
+        heard !== null && restatesCard(text, card)
+          ? { ...heard, remainder: null }
+          : heard;
       const reply =
         read !== null &&
         (plain ||
           dependencies.turns === undefined ||
-          isReplyToCard(text, reading));
+          isReplyToCard(text, reading, card));
       const decision =
         read === null || !reply
           ? "UNRELATED"

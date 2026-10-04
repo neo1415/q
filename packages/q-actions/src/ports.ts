@@ -120,6 +120,8 @@ export type QActionRepository = {
       readonly actionType: string;
       readonly actionVersion: number;
       readonly now: Date;
+      /** Only cards for exactly these targets; absent: any target. */
+      readonly targets?: readonly QSubjectRef[] | undefined;
     },
   ) => Promise<
     readonly {
@@ -127,6 +129,32 @@ export type QActionRepository = {
       readonly approval: QApprovalRecord;
     }[]
   >;
+  /**
+   * The proposals of this person, of one action type and version, carried
+   * out since `since`, with their approval: what a restated request is
+   * matched with by intent so it is answered "already done" instead of
+   * acting twice (voiceq-63). Newest first, bounded. Absent: never matched.
+   */
+  readonly listExecutedForProposer?:
+    | ((
+        executor: DatabaseExecutor,
+        input: {
+          readonly tenantId: TenantId;
+          readonly userId: UserId;
+          readonly organisationId: OrganisationId;
+          readonly actionType: string;
+          readonly actionVersion: number;
+          readonly since: Date;
+          /** Only changes to exactly these targets; absent: any target. */
+          readonly targets?: readonly QSubjectRef[] | undefined;
+        },
+      ) => Promise<
+        readonly {
+          readonly action: QActionRecord;
+          readonly approval: QApprovalRecord;
+        }[]
+      >)
+    | undefined;
 };
 
 export type QApprovalRecord = {

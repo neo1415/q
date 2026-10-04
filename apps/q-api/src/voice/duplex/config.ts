@@ -28,6 +28,12 @@ export type DuplexConfig = {
    * "off": the kill switch that leaves duplex exactly as before.
    */
   readonly backchannel: boolean;
+  /**
+   * voiceq-63: the realtime voice's speaking rate. The founder heard
+   * "rapid-fire" speech; 0.95 is unhurried without sounding slow.
+   * CQ_VOICE_REALTIME_SPEED, bounded 0.8-1.2.
+   */
+  readonly speechSpeed: number;
 };
 
 export const DUPLEX_DEFAULTS: DuplexConfig = {
@@ -40,6 +46,7 @@ export const DUPLEX_DEFAULTS: DuplexConfig = {
   maxDirectTools: 6,
   secretTtlSeconds: 60,
   backchannel: true,
+  speechSpeed: 0.95,
 };
 
 function bounded(
@@ -105,6 +112,12 @@ export function duplexConfigFrom(
       ),
     ),
     secretTtlSeconds: DUPLEX_DEFAULTS.secretTtlSeconds,
+    speechSpeed: bounded(
+      env.CQ_VOICE_REALTIME_SPEED,
+      DUPLEX_DEFAULTS.speechSpeed,
+      0.8,
+      1.2,
+    ),
     backchannel: !(
       backchannel === "off" ||
       backchannel === "false" ||

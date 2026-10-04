@@ -121,6 +121,18 @@ export function createQToolExecutor(
         failureCode: outcome.failureCode,
         sensitivity: outcome.sensitivity,
         latencyMs: outcome.latencyMs,
+        // Which argument fields a reader got wrong (paths only, never
+        // values): voiceq-63, a reader's propose_meeting arguments failed
+        // and cost a second model call before the card, with no trace of why.
+        ...(outcome.failureCode === "INVALID_ARGUMENTS" &&
+        outcome.result.ok === false
+          ? {
+              invalidAt:
+                /invalid at: ([^.]*)\./u.exec(
+                  outcome.result.error.safeMessage,
+                )?.[1] ?? null,
+            }
+          : {}),
       },
       "q tool call finished",
     );

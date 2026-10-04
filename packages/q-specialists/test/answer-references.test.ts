@@ -18,6 +18,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import { createSpecialistQAnswer } from "../src/answer.js";
 import type { QAppActionPort, TurnAppAction } from "../src/app-action-turn.js";
 import {
+  spokenRecordName,
   openTarget,
   referenceNote,
   repeatedAction,
@@ -644,5 +645,23 @@ describe("'try again' re-runs the last action (Zino live 2026-10-04)", () => {
     });
     expect(ran).toHaveLength(0);
     expect(chat.delegated()).toBe(1);
+  });
+});
+
+/**
+ * voiceq-63 (live 2026-10-04): "open the relationship between Nixon and I"
+ * was answered `Opening "Nixon and I".` The words around a name are not
+ * the name.
+ */
+describe("a record's name as said", () => {
+  it.each([
+    ["Nixon and I", "Nixon"],
+    ["the relationship between Nixon and I", "Nixon"],
+    ["my chat with Kazikit", "Kazikit"],
+    ["me and Nixo", "Nixo"],
+    ["Yamfield Agro", "Yamfield Agro"],
+    ["Savanna Seed Partners", "Savanna Seed Partners"],
+  ])("%s -> %s", (said, name) => {
+    expect(spokenRecordName(said)).toBe(name);
   });
 });

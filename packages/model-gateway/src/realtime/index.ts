@@ -77,6 +77,12 @@ export type RealtimeSessionRequest = {
   readonly turnEagerness?: "HIGH" | "AUTO" | undefined;
   /** BACKCHANNEL: transcribe the person's speech (for context and quotes). */
   readonly transcribeInput?: boolean | undefined;
+  /**
+   * voiceq-63: the voice's speaking rate (1 is the provider's default).
+   * The founder heard "rapid-fire" speech; a touch under 1 is unhurried,
+   * not slow. Absent: the provider's default.
+   */
+  readonly speechSpeed?: number | undefined;
 };
 
 /** What produced a usage report; all of it is VOICE_REALTIME spend. */
@@ -126,6 +132,7 @@ export type RealtimeMintRequest = {
   readonly secretTtlSeconds: number;
   readonly turnEagerness?: "HIGH" | "AUTO" | undefined;
   readonly transcribeInput?: boolean | undefined;
+  readonly speechSpeed?: number | undefined;
   /** The plan's ceiling: the most sensitive thing the line may carry. */
   readonly sensitivity: ModelSensitivity;
   readonly attribution: RealtimeAttribution;
@@ -246,6 +253,9 @@ export function createRealtimeVoiceGateway(options: {
             ...(request.transcribeInput === undefined
               ? {}
               : { transcribeInput: request.transcribeInput }),
+            ...(request.speechSpeed === undefined
+              ? {}
+              : { speechSpeed: request.speechSpeed }),
           },
           { signal },
         );

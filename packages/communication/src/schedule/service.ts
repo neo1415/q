@@ -415,6 +415,32 @@ export type ScheduleService = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_WINDOW_DAYS = 7;
 const MEETING_REMINDER_MINUTES = 15;
+/**
+ * One booking per counterpart per intended time (voiceq-63). Live
+ * 2026-10-04: "book a call with Nixo in the next five minutes", said and
+ * restated, became five cards whose times differed by seconds; two were
+ * approved four seconds apart and Nixo got two invites. A call the same
+ * organiser already has on the same relationship within this window is
+ * that booking, whatever card or idempotency key asked for it.
+ */
+const SAME_BOOKING_WINDOW_MS = 30 * 60_000;
+
+/** The organiser's own wording of a call's time, in its zone. */
+function bookedAt(startsAt: Date, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(startsAt);
+  } catch {
+    return startsAt.toUTCString().replace(":00 GMT", " UTC");
+  }
+}
 const BRIEF_LEAD_MS = 24 * 3_600_000;
 /** Re-read a missing Meet link on every tick this long after booking. */
 const MEET_LINK_EAGER_MS = 30 * 60_000;
@@ -785,6 +811,28 @@ export function createScheduleService(
             email: person.email.toLowerCase(),
           })),
       ];
+      const near = (
+        await store.listMeetingsForRelationship(input.relationshipId, 50)
+      ).find(
+        (meeting) =>
+          meeting.organiserUserId === actor.userId &&
+          meeting.idempotencyKey !== input.idempotencyKey &&
+          (meeting.origin ?? "BOOKED") === "BOOKED" &&
+          (meeting.status === "SCHEDULED" || meeting.status === "SCHEDULING") &&
+          Math.abs(meeting.startsAt.getTime() - input.startsAt.getTime()) <
+            SAME_BOOKING_WINDOW_MS,
+      );
+      if (near !== undefined) {
+        logger?.info(
+          { meetingId: near.id, relationshipId: input.relationshipId },
+          "meeting already booked in this window; no second invite",
+        );
+        return {
+          outcome: "OK",
+          meeting: viewFor(near, actor.userId),
+          alreadyScheduled: true,
+        };
+      }
       const meetingId = newId();
       const claim = await store.claimMeeting({
         id: meetingId,
@@ -849,6 +897,25 @@ export function createScheduleService(
         "calendar event created",
       );
       await finalise(record, meetLink, actor, input.correlationId);
+      // The organiser is told too, in the app, wherever they are when the
+      // approved booking lands (voiceq-63): Q's line reaches only the
+      // conversation it was asked in.
+      await transactions.run(async (tx) => {
+        await store.notify(tx, {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          kind: "MEETING_SCHEDULED",
+          title: `Booked: ${record.purpose}`.slice(0, 200),
+          body: `${bookedAt(record.startsAt, record.timeZone)}${meetLink === null ? "" : ` · Meet link: ${meetLink}`}`.slice(
+            0,
+            1000,
+          ),
+          linkPath: null,
+          reminderId: null,
+          meetingId: record.id,
+          dedupeKey: `meeting-booked:${record.id}`,
+        });
+      });
       logger?.info({ meetingId: record.id }, "meeting scheduled");
       const fresh = (await store.findMeeting(record.id)) ?? record;
       return {

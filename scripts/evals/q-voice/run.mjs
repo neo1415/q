@@ -47,7 +47,8 @@ const CALLS_PER_CASE = 3;
 const COMPANY = process.env.EVAL_COMPANY_NAME ?? "Clinicrest";
 
 /**
- * `expect`: NAVIGATE <destination> | CARD <action type> | ANSWER.
+ * `expect`: NAVIGATE <destination> | CARD <action type> | ANSWER | ASKS
+ * (one short question back, and nothing acted on).
  * `workingHours`: the card's payload must carry working hours.
  */
 const CASES = [
@@ -89,6 +90,64 @@ const CASES = [
     // Express interest is still prepared by its hand-written proposer,
     // under its own type.
     expect: "CARD app.|relationship.interest.express",
+  },
+  // voiceq-63 (founder 2026-10-04: "understand badly-phrased requests like
+  // ChatGPT"): typos, speech slips, fragments, run-ons and pidgin are read
+  // for their most plausible meaning (TURN_READER v42); only a real
+  // ambiguity gets one short question back.
+  {
+    id: "messy-typos",
+    as: "INVESTOR",
+    text: "pls show me d companys i pasd on",
+    expect: "NAVIGATE PASSED",
+  },
+  {
+    id: "messy-fragment",
+    as: "FOUNDER",
+    text: "the usage thing. take me",
+    expect: "NAVIGATE USAGE",
+  },
+  {
+    id: "messy-pidgin-nav",
+    as: "FOUNDER",
+    text: "Abeg carry me go my documents",
+    expect: "NAVIGATE DOCUMENTS",
+  },
+  {
+    id: "messy-pidgin-question",
+    as: "FOUNDER",
+    text: "Wetin dey my calendar tmrw?",
+    expect: "ANSWER",
+  },
+  {
+    id: "messy-asr-action",
+    as: "INVESTOR",
+    text: `Express in dressed in ${COMPANY}.`,
+    expect: "CARD app.|relationship.interest.express",
+  },
+  {
+    id: "messy-run-on",
+    as: "FOUNDER",
+    text: "so yeah um I was thinking like what should I even like do next with the raise and stuff you know what I mean",
+    expect: "ANSWER",
+  },
+  {
+    id: "messy-self-correct",
+    as: "FOUNDER",
+    text: "Take me to Discover, no wait, my documents.",
+    expect: "NAVIGATE DOCUMENTS",
+  },
+  {
+    id: "messy-mixed-language",
+    as: "FOUNDER",
+    text: "Muéstrame my documents por favor",
+    expect: "NAVIGATE DOCUMENTS",
+  },
+  {
+    id: "messy-ambiguous",
+    as: "FOUNDER",
+    text: "do the thing for him",
+    expect: "ASKS",
   },
 ];
 
@@ -335,6 +394,23 @@ async function outcomeProblems(testCase, runId, message) {
     if (testCase.workingHours === true && !/"workingHours"/u.test(card.payload))
       return ["card has no working hours"];
     return [];
+  }
+  if (kind === "ASKS") {
+    const actions = await proposedOf(runId);
+    const said = message?.text ?? "";
+    const questions = (said.match(/\?/gu) ?? []).length;
+    return [
+      ...(actions.length > 0
+        ? [
+            `acted instead of asking: ${actions.map((a) => a.action_type).join(", ")}`,
+          ]
+        : []),
+      ...(questions === 1 && said.length <= 240
+        ? []
+        : [
+            `wanted one short question, got ${String(questions)} in ${String(said.length)} chars`,
+          ]),
+    ];
   }
   return message === null ? ["no answer"] : [];
 }
