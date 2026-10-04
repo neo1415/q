@@ -40,7 +40,10 @@ import {
   DUPLEX_CAP_NOTICE,
   type DuplexBrokerDependencies,
 } from "../src/voice/duplex/broker.js";
-import { DUPLEX_DEFAULTS, duplexConfigFrom } from "../src/voice/duplex/config.js";
+import {
+  DUPLEX_DEFAULTS,
+  duplexConfigFrom,
+} from "../src/voice/duplex/config.js";
 import { DUPLEX_INSTRUCTIONS_PREFIX } from "../src/voice/duplex/instructions.js";
 import { utcDayStart } from "../src/voice/duplex/spend.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
@@ -245,7 +248,7 @@ function harness(
   };
   const turn: VoiceTurnHandler =
     options.turn ??
-    vi.fn(async (_binding, transcript, _signal, speaker) => {
+    vi.fn<VoiceTurnHandler>(async (_binding, transcript, _signal, speaker) => {
       await speaker.speak(`Heard: ${transcript.at(-1)?.content ?? ""}`);
       return { kind: "SPOKEN", path: "Q" } as const;
     });
@@ -260,7 +263,7 @@ function harness(
       },
     },
     firewall,
-    tools: tools as unknown as DuplexBrokerDependencies["tools"],
+    tools,
     turn,
     spend: {
       spentTodayUsd: () => {
@@ -325,9 +328,9 @@ describe("duplex config", () => {
   });
 
   it("counts the day from midnight UTC", () => {
-    expect(utcDayStart(new Date("2026-10-04T23:59:00+05:00")).toISOString()).toBe(
-      "2026-10-04T00:00:00.000Z",
-    );
+    expect(
+      utcDayStart(new Date("2026-10-04T23:59:00+05:00")).toISOString(),
+    ).toBe("2026-10-04T00:00:00.000Z");
   });
 });
 
@@ -361,7 +364,9 @@ describe("opening a duplex line", () => {
     expect(mint?.sensitivity).toBe("PUBLIC");
     // ask_q and the read-only tool; never the PREPARE one.
     expect(mint?.tools.map((t) => t.name)).toEqual(["ask_q", "get_thing"]);
-    expect(mint?.instructions.startsWith(DUPLEX_INSTRUCTIONS_PREFIX)).toBe(true);
+    expect(mint?.instructions.startsWith(DUPLEX_INSTRUCTIONS_PREFIX)).toBe(
+      true,
+    );
     expect(mint?.instructions).toContain("Hi Ada. I'm listening.");
     expect(mint?.instructions).toContain("fr-FR");
     expect(mint?.instructions).not.toContain("eyPRIVATE");
@@ -408,12 +413,19 @@ describe("opening a duplex line", () => {
     const h = harness({ spent: 0.4 });
     expect((await h.broker.open({ binding: binding() })).kind).toBe("DUPLEX");
     // A second person's line: 0.40 spent + 0.25 held + 0.25 asked ≤ 1.00.
-    const other = { ...binding(), voiceSessionId: "5f000000-0000-4000-8000-000000000002", actor: STRANGER };
+    const other = {
+      ...binding(),
+      voiceSessionId: "5f000000-0000-4000-8000-000000000002",
+      actor: STRANGER,
+    };
     expect((await h.broker.open({ binding: other })).kind).toBe("DUPLEX");
     const third = {
       ...binding(),
       voiceSessionId: "5f000000-0000-4000-8000-000000000003",
-      actor: { ...ACTOR, userId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000003") },
+      actor: {
+        ...ACTOR,
+        userId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000003"),
+      },
     };
     expect(await h.broker.open({ binding: third })).toEqual({
       kind: "FALLBACK",
@@ -469,7 +481,9 @@ describe("relaying the model's tool calls", () => {
   it("says a proposal is waiting when the turn left one for approval", async () => {
     const h = await opened({
       turn: async (_b, _t, _s, speaker) => {
-        await speaker.speak("Update your round size to two million. Shall I go ahead?");
+        await speaker.speak(
+          "Update your round size to two million. Shall I go ahead?",
+        );
         return { kind: "SPOKEN", path: "Q" };
       },
     });
@@ -479,7 +493,9 @@ describe("relaying the model's tool calls", () => {
       call: {
         callId: "call_2",
         name: "ask_q",
-        arguments: JSON.stringify({ request: "Change my round to two million" }),
+        arguments: JSON.stringify({
+          request: "Change my round to two million",
+        }),
       },
     });
     expect(result?.approvalPending).toBe(true);
@@ -543,8 +559,16 @@ describe("usage and the caps", () => {
   it("records each response once under VOICE_REALTIME and carries on under the cap", async () => {
     const h = harness();
     await h.broker.open({ binding: binding() });
-    const first = await h.broker.usage({ actor: ACTOR, voiceSessionId: id, report: REPORT });
-    const again = await h.broker.usage({ actor: ACTOR, voiceSessionId: id, report: REPORT });
+    const first = await h.broker.usage({
+      actor: ACTOR,
+      voiceSessionId: id,
+      report: REPORT,
+    });
+    const again = await h.broker.usage({
+      actor: ACTOR,
+      voiceSessionId: id,
+      report: REPORT,
+    });
     expect(first).toEqual({ continue: true });
     expect(again).toEqual({ continue: true });
     expect(h.usage.entries).toHaveLength(1);
@@ -563,7 +587,11 @@ describe("usage and the caps", () => {
     await h.broker.open({ binding: binding() });
     spent = 1.0;
     expect(
-      await h.broker.usage({ actor: ACTOR, voiceSessionId: id, report: REPORT }),
+      await h.broker.usage({
+        actor: ACTOR,
+        voiceSessionId: id,
+        report: REPORT,
+      }),
     ).toEqual({ continue: false, notice: DUPLEX_CAP_NOTICE });
     // The line is gone: the browser carries on on the standard voice.
     expect(
@@ -603,15 +631,23 @@ describe("usage and the caps", () => {
     const h = harness({ recordThrows: true });
     await h.broker.open({ binding: binding() });
     expect(
-      await h.broker.usage({ actor: ACTOR, voiceSessionId: id, report: REPORT }),
+      await h.broker.usage({
+        actor: ACTOR,
+        voiceSessionId: id,
+        report: REPORT,
+      }),
     ).toEqual({ continue: false });
   });
 
   it("releases the line's reservation when it ends", async () => {
     const h = harness({ spent: 0.5 });
     await h.broker.open({ binding: binding() });
-    expect(h.broker.end({ actor: ACTOR, voiceSessionId: id, reason: "ENDED" })).toBe(true);
+    expect(
+      h.broker.end({ actor: ACTOR, voiceSessionId: id, reason: "ENDED" }),
+    ).toBe(true);
     expect(h.broker.size()).toBe(0);
-    expect(h.broker.end({ actor: ACTOR, voiceSessionId: id, reason: "ENDED" })).toBe(false);
+    expect(
+      h.broker.end({ actor: ACTOR, voiceSessionId: id, reason: "ENDED" }),
+    ).toBe(false);
   });
 });

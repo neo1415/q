@@ -176,8 +176,7 @@ export function createRealtimeVoiceGateway(options: {
   readonly syntheticDemo?: SyntheticDemoRoutingAllowance | null | undefined;
   readonly mintTimeoutMs?: number | undefined;
   readonly onFailure?:
-    | ((failure: { readonly failureClass: string }) => void)
-    | undefined;
+    ((failure: { readonly failureClass: string }) => void) | undefined;
 }): RealtimeVoiceGateway {
   const provider = options.provider;
   const enabled = options.enabled && provider !== undefined;

@@ -22,8 +22,10 @@ import type {
  * and tools keep the registry's order, so the prefix repeats.
  */
 export const OPENAI_REALTIME_MODEL = "gpt-realtime-mini";
-const CLIENT_SECRETS_ENDPOINT = "https://api.openai.com/v1/realtime/client_secrets";
-export const OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+const CLIENT_SECRETS_ENDPOINT =
+  "https://api.openai.com/v1/realtime/client_secrets";
+export const OPENAI_REALTIME_CALLS_URL =
+  "https://api.openai.com/v1/realtime/calls";
 
 /** USD per million tokens (developers.openai.com/api/docs/pricing, 2026-10-04). */
 export const OPENAI_REALTIME_MINI_PRICES: RealtimePrices = {
@@ -97,11 +99,14 @@ export function createOpenAIRealtimeProvider(options: {
           signal: context.signal,
         });
       } catch (error) {
-        throw new ModelProviderFailure("openai realtime secret request failed", {
-          failureClass: "TRANSIENT",
-          providerCode: "openai",
-          cause: error,
-        });
+        throw new ModelProviderFailure(
+          "openai realtime secret request failed",
+          {
+            failureClass: "TRANSIENT",
+            providerCode: "openai",
+            cause: error,
+          },
+        );
       }
       if (!response.ok) {
         throw new ModelProviderFailure("openai realtime secret refused", {

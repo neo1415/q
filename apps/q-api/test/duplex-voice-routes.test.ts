@@ -126,7 +126,9 @@ describe("the voice session route with duplex", () => {
 
   it("is the standard line, unchanged, when the broker falls back", async () => {
     const server = await app(
-      fakeBroker(() => Promise.resolve({ kind: "FALLBACK", reason: "CAP_REACHED" })),
+      fakeBroker(() =>
+        Promise.resolve({ kind: "FALLBACK", reason: "CAP_REACHED" }),
+      ),
     );
     const response = await open(server);
     expect(response.statusCode).toBe(201);

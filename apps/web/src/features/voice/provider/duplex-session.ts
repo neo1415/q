@@ -148,14 +148,11 @@ export function useDuplexVoiceSession(
     await Promise.resolve();
   }, []);
 
-  const sendText = useCallback(
-    (text: string) => {
-      const line = lineRef.current;
-      if (line === null) return;
-      line.sendText(text);
-    },
-    [],
-  );
+  const sendText = useCallback((text: string) => {
+    const line = lineRef.current;
+    if (line === null) return;
+    line.sendText(text);
+  }, []);
 
   const setMuted = useCallback((next: boolean) => {
     setMutedState(next);

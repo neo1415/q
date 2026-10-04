@@ -201,7 +201,9 @@ describe("openai realtime adapter", () => {
     expect(JSON.stringify(grant)).not.toContain(DISABLED_KEY);
     const [url, init] = fetchFake.mock.calls[0] ?? [];
     expect(url).toBe("https://api.openai.com/v1/realtime/client_secrets");
-    const body = JSON.parse(String(init?.body)) as {
+    const body = JSON.parse(
+      typeof init?.body === "string" ? init.body : "{}",
+    ) as {
       session: {
         model: string;
         max_output_tokens: number;

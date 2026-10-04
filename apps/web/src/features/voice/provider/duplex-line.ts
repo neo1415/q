@@ -31,11 +31,7 @@ import type { VoiceState } from "../session";
  */
 
 export type DuplexFallbackCause =
-  | "CONNECT"
-  | "NETWORK"
-  | "RELAY"
-  | "CAP"
-  | "MAX_LENGTH";
+  "CONNECT" | "NETWORK" | "RELAY" | "CAP" | "MAX_LENGTH";
 
 export type DuplexLineEvents = {
   readonly onState: (state: VoiceState) => void;
@@ -283,7 +279,6 @@ export class DuplexLine {
     this.#touch();
   }
 
-
   #channelOpen(channel: RTCDataChannel): Promise<void> {
     if (channel.readyState === "open") return Promise.resolve();
     return new Promise((resolve, reject) => {
@@ -381,6 +376,7 @@ export class DuplexLine {
       return;
     }
     const type = text(event, "type");
+    if (type === undefined) return;
     switch (type) {
       case "input_audio_buffer.speech_started":
         this.#touch();
@@ -474,7 +470,11 @@ export class DuplexLine {
     }
     this.#send({
       type: "conversation.item.create",
-      item: { type: "function_call_output", call_id: callId, output: result.output },
+      item: {
+        type: "function_call_output",
+        call_id: callId,
+        output: result.output,
+      },
     });
     // Talked over while it worked: the result is kept, but not said.
     if (generation !== this.#generation) return;

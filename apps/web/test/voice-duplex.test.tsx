@@ -113,7 +113,15 @@ function harness(
     createPeer: () => peer as unknown as RTCPeerConnection,
     getMicrophone: options.microphone ?? (() => Promise.resolve(stream)),
     fetch: (input, init) => {
-      fetchCalls.push({ url: String(input), init });
+      fetchCalls.push({
+        url:
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url,
+        init,
+      });
       return (
         options.answer?.() ??
         Promise.resolve(new Response("v=0 answer", { status: 201 }))
@@ -131,7 +139,10 @@ function harness(
       options.tool ??
         (() =>
           Promise.resolve({
-            output: JSON.stringify({ ok: true, say: "Your raise is on track." }),
+            output: JSON.stringify({
+              ok: true,
+              say: "Your raise is on track.",
+            }),
             approvalPending: false,
           })),
     ),
@@ -278,7 +289,10 @@ describe("tool calls and usage", () => {
       name: "ask_q",
       arguments: JSON.stringify({ request: "How is my raise going?" }),
     });
-    expect(h.events.onLine).toHaveBeenCalledWith("user", "How is my raise going?");
+    expect(h.events.onLine).toHaveBeenCalledWith(
+      "user",
+      "How is my raise going?",
+    );
     expect(h.channel().types()).toEqual([
       "conversation.item.create",
       "response.create",
@@ -367,7 +381,9 @@ describe("tool calls and usage", () => {
   });
 
   it("maps an empty or hostile usage block to zero counts", () => {
-    expect(usageReportOf("r", { input_token_details: { text_tokens: -3 } })).toEqual({
+    expect(
+      usageReportOf("r", { input_token_details: { text_tokens: -3 } }),
+    ).toEqual({
       responseId: "r",
       inputTextTokens: 0,
       inputAudioTokens: 0,
@@ -451,9 +467,8 @@ vi.mock("../src/features/voice/provider/duplex-session", () => ({
   useDuplexVoiceSession: () => fake(duplexStart),
 }));
 
-const { useVoiceSession } = await import(
-  "../src/features/voice/use-voice-session"
-);
+const { useVoiceSession } =
+  await import("../src/features/voice/use-voice-session");
 
 const STANDARD: CreateQVoiceSessionResponse = {
   voiceSessionId: "5f000000-0000-4000-8000-000000000001",

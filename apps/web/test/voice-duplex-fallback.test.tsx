@@ -40,9 +40,8 @@ vi.mock("../src/features/voice/use-voice-session", () => ({
   },
 }));
 
-const { useVoiceInterview } = await import(
-  "../src/features/voice/use-voice-interview"
-);
+const { useVoiceInterview } =
+  await import("../src/features/voice/use-voice-interview");
 
 const CONVERSATION = "7f000000-0000-4000-8000-000000000001";
 

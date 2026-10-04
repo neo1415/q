@@ -77,5 +77,8 @@ export function duplexInstructions(input: {
 export function duplexTools(
   direct: readonly ModelToolDefinition[],
 ): readonly ModelToolDefinition[] {
-  return [ASK_Q_TOOL, ...direct.filter((tool) => tool.name !== ASK_Q_TOOL_NAME)];
+  return [
+    ASK_Q_TOOL,
+    ...direct.filter((tool) => tool.name !== ASK_Q_TOOL_NAME),
+  ];
 }
