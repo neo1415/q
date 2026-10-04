@@ -288,6 +288,12 @@ export function createRecallBots(options: {
         body: { kind: "mp3", b64_data: mp3Base64 },
       });
     },
+    // meet-47: someone talked over Q; its line stops at once.
+    stopSpeaking: async (botId) => {
+      await request(`/bot/${encodeURIComponent(botId)}/output_audio/`, {
+        method: "DELETE",
+      });
+    },
     leave: async (botId) => {
       await request(`/bot/${encodeURIComponent(botId)}/leave_call/`, {
         method: "POST",

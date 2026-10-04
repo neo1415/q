@@ -6,6 +6,7 @@ import {
   DEFAULT_HOST_LIMITS,
   DEFAULT_HOST_POLICY,
   HOST_REFUSAL,
+  hostCarded,
   hostProposed,
   type CallParticipant,
   type HostAction,
@@ -116,6 +117,8 @@ export type MeetingHostVoice = {
   /** The bot plays it into the call. */
   readonly play: (botId: string, mp3Base64: string) => Promise<void>;
   readonly leave: (botId: string) => Promise<void>;
+  /** Stops Q's line now: someone talked over it (meet-47). */
+  readonly stop?: ((botId: string) => Promise<void>) | undefined;
 };
 
 export type MeetingHostComposer = {
@@ -291,6 +294,17 @@ export function createMeetingHostRuntime(dependencies: {
   readonly voice: MeetingHostVoice;
   readonly composer: MeetingHostComposer;
   readonly followThrough?: MeetingHostFollowThrough;
+  /**
+   * meet-47: a request made to Q in the call, by someone on the booking,
+   * becomes a card in their own Capital Q (true when one was prepared).
+   */
+  readonly askerCard?:
+    | ((request: {
+        readonly meetingId: string;
+        readonly askerUserId: string;
+        readonly text: string;
+      }) => Promise<boolean>)
+    | undefined;
   readonly limits?: HostLimits;
   /** Code's capped waiting policy; never anything said in the call. */
   readonly policy?: Partial<HostPolicy>;
@@ -371,6 +385,7 @@ export function createMeetingHostRuntime(dependencies: {
     userId: session.organiserUserId,
   });
 
+  const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] ?? "there";
   const organiserName = (session: Session) => {
     const organiser = session.context.parties.find(
       (party) => party.userId === session.organiserUserId,
@@ -436,6 +451,9 @@ export function createMeetingHostRuntime(dependencies: {
         session.lines.push(`Q: ${action.text}`);
         return;
       }
+      case "STOP_SPEAKING":
+        await voice.stop?.(session.botId);
+        return;
       case "LEAVE_REQUESTED":
         await noteSafely(session, {
           kind: "LEAVE_REQUESTED",
@@ -526,21 +544,49 @@ export function createMeetingHostRuntime(dependencies: {
         } else if (result?.kind === "QUIET") {
           session.host.quiet();
         } else if (result?.kind === "PROPOSE" && result.proposal !== null) {
-          session.proposals += 1;
+          // meet-47: the asker's own card, in their own Capital Q; never
+          // an action for anyone else. Someone not on the booking is put
+          // to the organiser as before.
+          const askerUserId = session.host.userIdOf(action.speaker);
+          const carded =
+            askerUserId !== null && dependencies.askerCard !== undefined
+              ? await dependencies
+                  .askerCard({
+                    meetingId: session.meetingId,
+                    askerUserId,
+                    text: `${result.proposal} (${action.utterance})`.slice(
+                      0,
+                      1_000,
+                    ),
+                  })
+                  .catch((error: unknown) => {
+                    logger?.warn(
+                      { err: error, meetingId: session.meetingId },
+                      "the asker's card was not prepared",
+                    );
+                    return false;
+                  })
+              : false;
+          if (!carded) session.proposals += 1;
           await noteSafely(session, {
             kind: "PROPOSAL",
             body: result.proposal.slice(0, 500),
             requestedByName: action.speaker.slice(0, 200),
             absentSide: null,
           });
-          session.host.reply(hostProposed(organiserName(session)), "PROPOSED");
+          session.host.reply(
+            carded
+              ? hostCarded(firstNameOf(action.speaker))
+              : hostProposed(organiserName(session)),
+            "PROPOSED",
+          );
         } else {
           session.host.reply(
             result === null
               ? "Sorry, I couldn't get to that just now."
               : result.kind === "DECLINE" || result.kind === "PROPOSE"
                 ? HOST_REFUSAL
-                : result.line,
+                : spokenLine(result.line),
           );
         }
         // Inside the chain already: run what is released now, in place
@@ -606,6 +652,27 @@ export function createMeetingHostRuntime(dependencies: {
     },
     sessions: () => sessions.size,
   };
+}
+
+/**
+ * meet-47: in a call Q says one or two natural sentences, whatever the
+ * model wrote; code holds the length, not the prompt alone.
+ */
+export function spokenLine(line: string, maxChars = 280): string {
+  const text = line.replace(/\s+/g, " ").trim();
+  const sentences = text.match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g) ?? [
+    text,
+  ];
+  let out = "";
+  for (const sentence of sentences.slice(0, 2)) {
+    const next = `${out}${out === "" ? "" : " "}${sentence.trim()}`;
+    if (next.length > maxChars) break;
+    out = next;
+  }
+  if (out !== "") return out;
+  const cut = text.slice(0, maxChars);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > 40 ? cut.slice(0, space) : cut).replace(/[,;:]$/, "")}.`;
 }
 
 // ---------------------------------------------------------------------------

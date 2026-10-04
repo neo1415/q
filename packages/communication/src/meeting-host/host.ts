@@ -110,6 +110,8 @@ export type SayReason =
 
 export type HostAction =
   | { readonly kind: "SAY"; readonly text: string; readonly why: SayReason }
+  /** A person started talking over Q: its line stops, and what was queued goes. */
+  | { readonly kind: "STOP_SPEAKING" }
   | {
       readonly kind: "COMPOSE";
       readonly speaker: string;
@@ -255,6 +257,27 @@ export const HOST_UNAVAILABLE =
 const BOT_NAME = /^q\b.*capital q/i;
 /** Q's own words heard back within this long are its echo, not a person. */
 export const ECHO_WINDOW_MS = 45_000;
+
+/**
+ * Talking over Q this long after its line began stops it. Earlier is its
+ * own voice returning through a participant's microphone, not a person.
+ */
+export const INTERRUPT_GRACE_MS = 1_500;
+
+/** Words too common to tell Q's echo from a person (and Q's own name). */
+const ECHO_IGNORED: ReadonlySet<string> = new Set(
+  "q cue queue kew a an the and or but so of to for in on at by with from about this that these those it its is are was be do does did can could will would i im ill me my we our us you your youre he she they them their what whats who how when where why if just s ll m re t ve d".split(
+    " ",
+  ),
+);
+
+/**
+ * meet-47: a request made to Q in the call becomes a card in the asker's
+ * own Capital Q, for them to approve -- never an action for anyone else.
+ */
+export function hostCarded(askerFirstName: string): string {
+  return `I've put that in your Capital Q to approve, ${askerFirstName}.`;
+}
 
 /** Lowercase letters and spaces, for comparing names said by the call. */
 function plain(text: string): string {
@@ -404,6 +427,8 @@ export function createMeetingHost(
   let lastSpeechAt = 0;
   /** Q's own line is still playing until this time. */
   let busyUntil = 0;
+  /** When Q's current line started playing. */
+  let sayingSince = 0;
   let spoken = 0;
   let calls = 0;
   let introduced = false;
@@ -442,6 +467,7 @@ export function createMeetingHost(
     if (next === undefined) return [];
     spoken += next.text.length;
     remember(next.text, at);
+    sayingSince = at;
     // About fifteen characters a second when spoken.
     busyUntil = at + Math.ceil((next.text.length / 15) * 1_000);
     return [{ kind: "SAY", text: next.text, why: next.why }];
@@ -473,9 +499,12 @@ export function createMeetingHost(
     ) {
       recentlySaid.shift();
     }
+    // Content words only (meet-47): "Q, what's this call about?" right
+    // after Q's introduction shared "q", "this" and "about" with it and
+    // was dropped as Q's own echo; a person's short question is not.
     const words = plain(text)
       .split(" ")
-      .filter((w) => w.length > 0);
+      .filter((w) => w.length > 0 && !ECHO_IGNORED.has(w));
     if (words.length === 0) return false;
     return recentlySaid.some((line) => {
       const shared = words.filter((w) => line.words.has(w)).length;
@@ -489,7 +518,7 @@ export function createMeetingHost(
       words: new Set(
         plain(text)
           .split(" ")
-          .filter((w) => w.length > 0),
+          .filter((w) => w.length > 0 && !ECHO_IGNORED.has(w)),
       ),
       at,
     });
@@ -621,6 +650,20 @@ export function createMeetingHost(
       }
       case "SPEECH_ON":
         speaking.add(event.participantId);
+        // meet-47: someone in the call talks over Q -- it stops at once and
+        // drops what it had queued (they can ask again). Only a person who
+        // joined counts, and not in Q's first moment on a line, when its
+        // own voice coming back through someone's microphone starts.
+        if (
+          present.has(event.participantId) &&
+          event.at < busyUntil &&
+          event.at - sayingSince >= INTERRUPT_GRACE_MS
+        ) {
+          busyUntil = event.at;
+          const keep = outbox.filter((line) => line.why === "LEAVING");
+          outbox.splice(0, outbox.length, ...keep);
+          out.push({ kind: "STOP_SPEAKING" });
+        }
         break;
       case "SPEECH_OFF":
         speaking.delete(event.participantId);

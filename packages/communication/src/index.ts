@@ -171,6 +171,8 @@ export {
   HOST_AT_TIME,
   HOST_POLICY_BOUNDS,
   hostProposed,
+  hostCarded,
+  INTERRUPT_GRACE_MS,
   saysNeverMind,
   type HostOutcome,
   type HostPolicy,

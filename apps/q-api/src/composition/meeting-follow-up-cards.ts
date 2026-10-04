@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { APP_ACTIONS } from "@capital-q/app-actions";
 import type { MeetingNextStepNote } from "@capital-q/communication";
@@ -256,6 +256,51 @@ export function followUpCards(input: {
     .slice(0, FOLLOW_UP_CARDS_MAX);
 }
 
+/**
+ * A request made to Q in the call (meet-47), as the asker's own next step.
+ * Code reads the kind, never the model, and only ever as something the
+ * asker does: a founder's "send them the deck" shares their own deck; an
+ * investor's "send me the deck" asks for it. Nobody's words make a card
+ * for the other side.
+ */
+export function callRequestStep(input: {
+  readonly request: string;
+  readonly side: "FOUNDER" | "INVESTOR";
+  readonly askerName: string;
+}): MeetingNextStepNote {
+  const text = input.request.toLowerCase();
+  const said = (pattern: RegExp) => pattern.test(text);
+  const document =
+    /\b(pitch deck|deck|slides|financials|financial model|model|cap table|data ?room|metrics|accounts|term sheet|documents?)\b/.exec(
+      text,
+    )?.[1] ?? null;
+  const base = {
+    what: clip(input.request.trim(), 300),
+    owner: input.askerName,
+    ownerSide: input.side,
+    dueDate: null,
+    callAt: null,
+    document: null,
+  } as const;
+  if (
+    said(
+      /\b(book|schedule|set up|arrange)\b.*\b(call|meeting|catch[- ]?up)\b/,
+    ) ||
+    said(/\b(next|follow[- ]up) (call|meeting)\b/)
+  ) {
+    return { ...base, kind: "NEXT_CALL" };
+  }
+  if (document !== null && input.side === "FOUNDER") {
+    return /deck|slides/.test(document)
+      ? { ...base, kind: "SHARE_DECK" }
+      : { ...base, kind: "REMINDER" };
+  }
+  if (document !== null && input.side === "INVESTOR") {
+    return { ...base, kind: "DOCUMENT_REQUEST", document };
+  }
+  return { ...base, kind: "REMINDER" };
+}
+
 type Person = {
   readonly user_id: string;
   readonly auth_user_id: string | null;
@@ -354,18 +399,12 @@ export function createMeetingFollowUpCards(dependencies: {
     return created.conversation.id;
   }
 
-  return {
-    /** Returns how many cards were proposed, per user id. */
-    prepare: async (held: {
-      readonly meetingId: string;
-      readonly relationshipId: string;
-      readonly purpose: string;
-      readonly startsAt: Date;
-      readonly agreements: readonly string[];
-      readonly nextSteps: readonly MeetingNextStepNote[];
-    }): Promise<Map<string, number>> => {
-      const people = await sql<Person[]>`
-        select p.user_id, u.auth_user_id,
+  async function peopleOf(
+    meetingId: string,
+    relationshipId: string,
+  ): Promise<readonly (Person & { readonly name: string })[]> {
+    return sql<(Person & { readonly name: string })[]>`
+        select p.user_id, u.auth_user_id, p.display_name as name,
                case when exists (
                       select 1 from identity.organisation_memberships m
                        where m.user_id = p.user_id
@@ -386,17 +425,90 @@ export function createMeetingFollowUpCards(dependencies: {
                     then i.name else c.name end as counterpart
           from communication.meeting_participants p
           join identity.user_profiles u on u.id = p.user_id
-          join network.relationships r on r.id = ${held.relationshipId}
+          join network.relationships r on r.id = ${relationshipId}
           join core.companies c on c.id = r.company_id
           join core.investor_organisations i on i.id = r.investor_organisation_id
-         where p.meeting_id = ${held.meetingId}
+         where p.meeting_id = ${meetingId}
          limit 20`;
-      const deck = await sql<{ id: string }[]>`
+  }
+
+  async function deckOf(relationshipId: string): Promise<string | null> {
+    const deck = await sql<{ id: string }[]>`
         select d.id from evidence.documents d
           join network.relationships r on r.company_id = d.company_id
-         where r.id = ${held.relationshipId}
+         where r.id = ${relationshipId}
            and d.document_type = 'PITCH_DECK' and d.status = 'ACTIVE'
          order by d.created_at desc limit 1`;
+    return deck[0]?.id ?? null;
+  }
+
+  return {
+    /**
+     * meet-47: a request made to Q in the call becomes one card in the
+     * asker's own Capital Q, as their own action for them to approve. An
+     * asker who is not on the booking gets nothing (false): nobody in the
+     * call can make Q act for someone else.
+     */
+    cardFromCall: async (request: {
+      readonly meetingId: string;
+      readonly askerUserId: string;
+      readonly text: string;
+    }): Promise<boolean> => {
+      const meeting = (
+        await sql<
+          { relationship_id: string; purpose: string; starts_at: Date }[]
+        >`
+          select relationship_id, purpose, starts_at
+            from communication.meetings where id = ${request.meetingId} limit 1`
+      )[0];
+      if (meeting === undefined) return false;
+      const person = (
+        await peopleOf(request.meetingId, meeting.relationship_id)
+      ).find((candidate) => candidate.user_id === request.askerUserId);
+      if (person === undefined || person.side === null) return false;
+      const step = callRequestStep({
+        request: request.text,
+        side: person.side,
+        askerName: person.name,
+      });
+      const said = createHash("sha256")
+        .update(request.text.trim().toLowerCase())
+        .digest("hex")
+        .slice(0, 12);
+      const [card] = followUpCards({
+        // Never the organiser's recap: just this one request.
+        person: { userId: person.user_id, side: person.side, organiser: false },
+        meetingId: `${request.meetingId}:call-${said}`,
+        relationshipId: meeting.relationship_id,
+        purpose: meeting.purpose,
+        startsAt: new Date(meeting.starts_at),
+        counterpartName: person.counterpart,
+        agreements: [],
+        nextSteps: [step],
+        deckDocumentId:
+          step.kind === "SHARE_DECK"
+            ? await deckOf(meeting.relationship_id)
+            : null,
+        now: now(),
+      });
+      if (card === undefined) return false;
+      const actor = await actorOf(person);
+      if (actor === null) return false;
+      await propose(actor, card, null);
+      return true;
+    },
+
+    /** Returns how many cards were proposed, per user id. */
+    prepare: async (held: {
+      readonly meetingId: string;
+      readonly relationshipId: string;
+      readonly purpose: string;
+      readonly startsAt: Date;
+      readonly agreements: readonly string[];
+      readonly nextSteps: readonly MeetingNextStepNote[];
+    }): Promise<Map<string, number>> => {
+      const people = await peopleOf(held.meetingId, held.relationshipId);
+      const deckId = await deckOf(held.relationshipId);
       const proposed = new Map<string, number>();
       for (const person of people) {
         if (person.side === null) continue;
@@ -413,7 +525,7 @@ export function createMeetingFollowUpCards(dependencies: {
           counterpartName: person.counterpart,
           agreements: held.agreements,
           nextSteps: held.nextSteps,
-          deckDocumentId: deck[0]?.id ?? null,
+          deckDocumentId: deckId,
           now: now(),
         });
         if (cards.length === 0) continue;

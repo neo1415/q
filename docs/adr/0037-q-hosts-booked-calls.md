@@ -20,3 +20,8 @@ In a call booked on Capital Q, Q joins three minutes early, greets each person b
 - Recall bots run a few minutes longer per call; minutes are capped per call.
 - One q-api instance holds a call's live session in memory; a restart mid-call loses Q's place (it stays silent; the passive record still completes).
 - Live in-call vision (Recall video frames) is not used; the rehearsal camera work could be reused later.
+
+## Amendment (meet-47, founder direction 2026-10-03; for the lead's review)
+
+- §1 "an action asked for is noted as a proposal for the organiser": a request made by someone on the booking now becomes one approval card in **the asker's own** Capital Q, as their own declared action (a founder's "send them the deck" shares their deck; an investor's "send me the deck" asks for it). Q says "I've put that in your Capital Q to approve, <name>." Code, not the model, reads the kind; no card is ever made for the other side. A request from someone not on the booking stays a proposal for the organiser. Q still has no tools in the call; nothing is done before the asker approves.
+- "Never speaks over anyone": Q also stops its line when a person who joined talks over it (Recall output audio stopped), except in its first 1.5 s, when its own voice returning through a microphone starts. Spoken answers are held by code to two sentences.

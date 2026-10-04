@@ -2922,6 +2922,14 @@ const recallBots = createRecallBots({
   region: process.env.RECALL_REGION ?? "eu-central-1",
   transcriber: transcriberOf(process.env.RECALL_TRANSCRIBER),
 });
+const meetingFollowUpCards = createMeetingFollowUpCards({
+  sql: database.sql,
+  resolver: actorContextResolver,
+  runtime: qRuntime,
+  orchestration: orchestrationRuntime,
+  actions: qActions,
+  logger,
+});
 const meetingHost = createMeetingHostRuntime({
   enabled:
     process.env.CQ_MEETING_HOST !== "off" &&
@@ -2945,7 +2953,12 @@ const meetingHost = createMeetingHostRuntime({
     leave: async (botId) => {
       await recallBots?.leave?.(botId);
     },
+    stop: async (botId) => {
+      await recallBots?.stopSpeaking?.(botId);
+    },
   },
+  // meet-47: a request to Q in the call is a card in the asker's own app.
+  askerCard: (request) => meetingFollowUpCards.cardFromCall(request),
   composer: createMeetingHostComposer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -2986,14 +2999,6 @@ const meetingHost = createMeetingHostRuntime({
   logger,
 });
 // end MEET-HOST block
-const meetingFollowUpCards = createMeetingFollowUpCards({
-  sql: database.sql,
-  resolver: actorContextResolver,
-  runtime: qRuntime,
-  orchestration: orchestrationRuntime,
-  actions: qActions,
-  logger,
-});
 const meetingAssistant = createMeetingAssistantService({
   sql: database.sql,
   bots: recallBots,

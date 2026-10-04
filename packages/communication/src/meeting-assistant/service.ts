@@ -114,6 +114,8 @@ export type MeetingBotProvider = {
   }) => Promise<{ readonly botId: string }>;
   /** Plays a short spoken line (mp3) into the call. */
   readonly say?: (botId: string, mp3Base64: string) => Promise<void>;
+  /** Stops the line Q is playing (someone talked over it). */
+  readonly stopSpeaking?: (botId: string) => Promise<void>;
   /** Leaves the call now (a participant asked Q to go). */
   readonly leave?: (botId: string) => Promise<void>;
   readonly read: (botId: string) => Promise<{

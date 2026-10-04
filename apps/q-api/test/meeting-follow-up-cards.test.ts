@@ -6,6 +6,7 @@ import {
   FOLLOW_UP_CARDS_MAX,
   followUpCards,
   recapMessage,
+  callRequestStep,
 } from "../src/composition/meeting-follow-up-cards.js";
 
 /**
@@ -171,5 +172,71 @@ describe("cards after a call", () => {
     ).toBe(
       "Thanks for the call today. A quick recap:\n\nWhat we agreed:\n- Second call next Tuesday\n\nNext steps:\n- Ada shares the deck",
     );
+  });
+});
+
+describe("a request made to Q in the call (meet-47)", () => {
+  it("is always the asker's own step, never the other side's action", () => {
+    expect(
+      callRequestStep({
+        request: "Q, send them the deck",
+        side: "FOUNDER",
+        askerName: "Adaeze",
+      }),
+    ).toMatchObject({
+      kind: "SHARE_DECK",
+      ownerSide: "FOUNDER",
+      owner: "Adaeze",
+    });
+    // The investor asking for the deck asks; it never shares the founder's.
+    expect(
+      callRequestStep({
+        request: "Q, send me their deck",
+        side: "INVESTOR",
+        askerName: "Tunde",
+      }),
+    ).toMatchObject({
+      kind: "DOCUMENT_REQUEST",
+      document: "deck",
+      ownerSide: "INVESTOR",
+    });
+    // A founder can't make Q ask the investor for anything: a reminder.
+    expect(
+      callRequestStep({
+        request: "Q, get their term sheet over to me",
+        side: "FOUNDER",
+        askerName: "Adaeze",
+      }),
+    ).toMatchObject({ kind: "REMINDER", ownerSide: "FOUNDER" });
+    expect(
+      callRequestStep({
+        request: "Q, book a follow-up call for next week",
+        side: "INVESTOR",
+        askerName: "Tunde",
+      }),
+    ).toMatchObject({ kind: "NEXT_CALL", callAt: null });
+  });
+
+  it("becomes one card for the asker only", () => {
+    const step = callRequestStep({
+      request: "Q, send me the financial model",
+      side: "INVESTOR",
+      askerName: "Tunde",
+    });
+    const cards = followUpCards({
+      person: { userId: "u-investor", side: "INVESTOR", organiser: false },
+      meetingId: "00000000-0000-4000-8000-0000000000b1:call-abc",
+      relationshipId: "00000000-0000-4000-8000-0000000000e1",
+      purpose: "Intro call",
+      startsAt: new Date("2026-10-05T10:00:00Z"),
+      counterpartName: "Nixo",
+      agreements: [],
+      nextSteps: [step],
+      deckDocumentId: null,
+      now: new Date("2026-10-05T10:20:00Z"),
+    });
+    expect(cards.map((card) => card.actionType)).toEqual([
+      "app.diligence.document.request",
+    ]);
   });
 });
