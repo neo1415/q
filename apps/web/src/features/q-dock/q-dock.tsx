@@ -28,13 +28,12 @@ import {
 } from "@/features/q-aperture";
 import { useQSessionOptional } from "@/features/q/q-session";
 
-import { avoidRects, subscribeAvoid } from "./dock-avoid";
+import { obstacleRects, subscribeAvoid } from "./dock-avoid";
 import { useDockClass, useDockMenu } from "./use-dock-menu";
 import {
-  anchorPoint,
   applyMove,
   DEFAULT_PLACEMENT,
-  placementAvoiding,
+  placeDock,
   placementForRelease,
   readHidden,
   readPlacement,
@@ -42,6 +41,7 @@ import {
   subscribePlacement,
   type DockClass,
   type DockMove,
+  type DockSize,
   type DockViewport,
 } from "./dock-placement";
 
@@ -63,6 +63,10 @@ import {
  * control would be covered (it glides to the nearest free anchor), or the
  * menu moves it -- right click, long press, or Shift+F10 -- which is the
  * non-drag way to do everything a drag does (WCAG 2.5.7).
+ *
+ * It never covers a control or a heading (`placeDock`): every interactive
+ * element and heading on screen is an obstacle, on every page. Where the
+ * pill fits nowhere it shows as the minimal button instead.
  */
 
 const Q_PAGE = "/home";
@@ -147,6 +151,10 @@ export function QDock() {
   /** A drag just ended: the anchor is flown to even if it is the same one. */
   const released = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** The pill fits nowhere free: shown as the minimal button meanwhile. */
+  const [shrunk, setShrunk] = useState(false);
+  /** The pill's own size, kept while it is shrunk, to test it again. */
+  const fullSize = useRef<DockSize | null>(null);
   // Drag arrives with Motion's features, after the dock has painted; the
   // attribute says when (and the menu moves it before then).
   const [draggable, setDraggable] = useState(false);
@@ -168,10 +176,11 @@ export function QDock() {
   const q = session?.q;
   const voice = session?.voice;
   const approval = q?.state.approval ?? null;
-  const compact =
+  const wantsCompact =
     q !== undefined &&
     voice !== undefined &&
     (q.working || approval !== null || voice.active);
+  const compact = wantsCompact && !shrunk;
   const stashed = chosen.stashed && !compact;
   // Where the investor feed is on screen the dock merges into its action
   // rail (spec §6.2): hidden in CSS while `[data-feed-immersive]` exists.
@@ -200,7 +209,18 @@ export function QDock() {
     const box = boxRef.current;
     const observer = new ResizeObserver(bump);
     if (box !== null) observer.observe(box);
+    // Controls that arrive without a scroll (data loading in, a section
+    // opening) are obstacles too. Settled first: a streaming answer would
+    // otherwise re-measure the page on every token.
+    let settle = 0;
+    const mutations = new MutationObserver(() => {
+      window.clearTimeout(settle);
+      settle = window.setTimeout(bump, 200);
+    });
+    mutations.observe(document.body, { childList: true, subtree: true });
     return () => {
+      window.clearTimeout(settle);
+      mutations.disconnect();
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", bump);
       window.removeEventListener("scroll", bump, { capture: true });
@@ -213,20 +233,25 @@ export function QDock() {
   useLayoutEffect(() => {
     const box = boxRef.current;
     if (!rendered || box === null || dragging.current) return;
-    const size = { width: box.offsetWidth, height: box.offsetHeight };
+    const measured = { width: box.offsetWidth, height: box.offsetHeight };
+    const showingShrunk = shrunk && wantsCompact;
+    if (!showingShrunk) fullSize.current = measured;
+    const size =
+      showingShrunk && fullSize.current !== null ? fullSize.current : measured;
     const viewport = measureViewport(dockClass);
-    const shown = placementAvoiding(
-      chosen,
-      avoidRects(),
-      viewport,
-      size,
-      dockClass,
-    );
-    const target = anchorPoint(shown, viewport, size);
+    const spot = placeDock(chosen, obstacleRects(), viewport, size, dockClass);
+    const shouldShrink = wantsCompact && spot.minimal;
+    if (shouldShrink !== shrunk) {
+      // Layout-driven, before paint: the next pass places the new form.
+      setShrunk(shouldShrink);
+      return;
+    }
+    const shown = spot.placement;
+    const target = { x: spot.x, y: spot.y };
     // Only a new anchor is flown to. The same anchor moving because the
     // window, the chrome or the dock's own size changed is simply where
     // the dock now is: a resize is not a throw.
-    const shownKey = `${shown.side}-${shown.slot}-${String(shown.stashed)}`;
+    const shownKey = `${shown.side}-${shown.slot}-${String(shown.stashed)}-${String(spot.lastResort)}`;
     const sameAnchor = shownAnchor.current === shownKey && !released.current;
     shownAnchor.current = shownKey;
     released.current = false;
@@ -268,6 +293,8 @@ export function QDock() {
     dockClass,
     still,
     compact,
+    wantsCompact,
+    shrunk,
     stashed,
     x,
     y,
@@ -457,6 +484,7 @@ export function QDock() {
               data-q-dock-placement={`${chosen.side}-${chosen.slot}${chosen.stashed ? "-stashed" : ""}`}
               data-q-dock-state={presence.state}
               data-q-dock-draggable={draggable ? "" : undefined}
+              data-q-dock-minimal={shrunk && wantsCompact ? "" : undefined}
             >
               {body}
             </m.div>

@@ -4,11 +4,16 @@ import {
   anchorPoint,
   applyMove,
   DEFAULT_PLACEMENT,
+  LAST_RESORT_GAP,
+  MINIMAL_SIZE,
   normalise,
+  overlaps,
+  placeDock,
   placementAvoiding,
   placementForRelease,
   STASH_SIZE,
   type DockViewport,
+  type Rect,
 } from "../src/features/q-dock/dock-placement";
 
 /**
@@ -198,5 +203,149 @@ describe("dock avoid zones", () => {
           at.y + size.height > zone.top,
       ).toBe(false);
     }
+  });
+});
+
+/**
+ * QA phone pass (390x844, investor): the dock sat on a relationship
+ * page's pitch card and its "Not proceeding for now" control, and on
+ * Settings → Usage over the "Plan allowances" heading. Fictional rects
+ * reproducing those layouts; every interactive element and heading on
+ * screen is an obstacle.
+ */
+describe("dock obstacles (QA phone pass)", () => {
+  const navTop = phone.height - phone.insetBottom;
+  const coversNone = (
+    spot: { x: number; y: number },
+    box: typeof size,
+    obstacles: readonly Rect[],
+  ) =>
+    !obstacles.some((obstacle) =>
+      overlaps(
+        {
+          left: spot.x,
+          top: spot.y,
+          right: spot.x + box.width,
+          bottom: spot.y + box.height,
+        },
+        obstacle,
+      ),
+    );
+
+  // A relationship page, scrolled to the pitch: the company heading at
+  // the top left, the pitch card across the middle, the decision control
+  // across the bottom (it sat under the default bottom-right anchor).
+  const heading = { left: 16, top: 64, right: 140, bottom: 96 };
+  const pitchCard = { left: 16, top: 140, right: 374, bottom: 540 };
+  const notProceeding = { left: 16, top: 716, right: 374, bottom: 764 };
+  const relationship = [heading, pitchCard, notProceeding];
+
+  it("relationship page: finds the free corner, off the pitch card and the decision", () => {
+    const spot = placeDock(
+      DEFAULT_PLACEMENT,
+      relationship,
+      phone,
+      size,
+      "mobile",
+    );
+    expect(spot.placement).toEqual({
+      side: "right",
+      slot: "top",
+      stashed: false,
+    });
+    expect(spot.minimal).toBe(false);
+    expect(spot.lastResort).toBe(false);
+    expect(coversNone(spot, size, relationship)).toBe(true);
+    expect(spot.y + size.height).toBeLessThanOrEqual(navTop);
+  });
+
+  it("relationship page: a pill that fits nowhere shrinks to the 44 px button", () => {
+    const pill = { width: 200, height: 44 };
+    const status = { left: 230, top: 66, right: 300, bottom: 96 };
+    const obstacles = [...relationship, status];
+    const spot = placeDock(DEFAULT_PLACEMENT, obstacles, phone, pill, "mobile");
+    expect(spot.minimal).toBe(true);
+    expect(spot.lastResort).toBe(false);
+    expect(spot.placement.slot).toBe("top");
+    expect(coversNone(spot, MINIMAL_SIZE, obstacles)).toBe(true);
+    expect(MINIMAL_SIZE.width).toBeGreaterThanOrEqual(44);
+    expect(MINIMAL_SIZE.height).toBeGreaterThanOrEqual(44);
+  });
+
+  it("with nothing free, waits small above the bottom nav with a safe gap", () => {
+    const share = { left: 330, top: 64, right: 374, bottom: 104 };
+    const spot = placeDock(
+      DEFAULT_PLACEMENT,
+      [...relationship, share],
+      phone,
+      { width: 200, height: 44 },
+      "mobile",
+    );
+    expect(spot.lastResort).toBe(true);
+    expect(spot.minimal).toBe(true);
+    expect(spot.placement.side).toBe("right");
+    expect(spot.y + MINIMAL_SIZE.height).toBe(navTop - LAST_RESORT_GAP);
+    expect(spot.x + MINIMAL_SIZE.width).toBeLessThanOrEqual(
+      phone.width - phone.gutter,
+    );
+  });
+
+  it("last resort takes the side that covers less", () => {
+    const rightOnly = { left: 300, top: 60, right: 390, bottom: navTop };
+    const everywhere = [
+      rightOnly,
+      { left: 0, top: 60, right: 300, bottom: 700 },
+      { left: 0, top: 700, right: 60, bottom: 730 },
+    ];
+    const spot = placeDock(
+      DEFAULT_PLACEMENT,
+      everywhere,
+      phone,
+      size,
+      "mobile",
+    );
+    expect(spot.lastResort).toBe(true);
+    expect(spot.placement.side).toBe("left");
+  });
+
+  it("Settings → Usage: keeps off the Plan allowances heading", () => {
+    const usage = [
+      { left: 16, top: 64, right: 100, bottom: 96 }, // h1 Usage
+      { left: 290, top: 64, right: 374, bottom: 100 }, // Upgrade link
+      { left: 16, top: 712, right: 374, bottom: 740 }, // h2 Plan allowances
+    ];
+    const spot = placeDock(DEFAULT_PLACEMENT, usage, phone, size, "mobile");
+    expect(spot.placement).toEqual({
+      side: "right",
+      slot: "middle",
+      stashed: false,
+    });
+    expect(coversNone(spot, size, usage)).toBe(true);
+    expect(spot.y + size.height).toBeLessThanOrEqual(navTop);
+  });
+
+  it("is the same rule on a desktop, and a stash stays where it was put", () => {
+    const spot = placeDock(
+      DEFAULT_PLACEMENT,
+      [{ left: 1100, top: 780, right: 1440, bottom: 900 }],
+      desktop,
+      size,
+      "desktop",
+    );
+    expect(spot.placement).toEqual({
+      side: "right",
+      slot: "middle",
+      stashed: false,
+    });
+    const stash = { side: "left", slot: "top", stashed: true } as const;
+    expect(
+      placeDock(
+        stash,
+        [{ left: 0, top: 0, right: 1440, bottom: 900 }],
+        desktop,
+        size,
+        "desktop",
+      ).placement,
+    ).toEqual(stash);
   });
 });

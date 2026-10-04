@@ -184,12 +184,138 @@ export function overlaps(a: Rect, b: Rect): boolean {
   );
 }
 
+/** The dock at its smallest: the bare 44 px button, still a full target. */
+export const MINIMAL_SIZE: DockSize = { width: 44, height: 44 };
+
+/** Clear space kept above the bottom navigation when nowhere is free. */
+export const LAST_RESORT_GAP = 16;
+
+/** Where the dock is shown, and in what form. */
+export type DockSpot = {
+  readonly placement: DockPlacement;
+  /** The dock's top-left corner, in viewport pixels. */
+  readonly x: number;
+  readonly y: number;
+  /** Shown as the minimal button whatever Q is doing (the pill did not fit). */
+  readonly minimal: boolean;
+  /** Nothing was free: the dock waits small, just above the bottom nav. */
+  readonly lastResort: boolean;
+};
+
+function rectAt(
+  point: { readonly x: number; readonly y: number },
+  size: DockSize,
+): Rect {
+  return {
+    left: point.x,
+    top: point.y,
+    right: point.x + size.width,
+    bottom: point.y + size.height,
+  };
+}
+
+function overlapArea(a: Rect, b: Rect): number {
+  const width = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+  const height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return width > 0 && height > 0 ? width * height : 0;
+}
+
 /**
- * The placement to show: the chosen one, unless it would cover a
- * registered control, then the nearest that covers none (spec §6.2 a).
+ * Where to show the dock so that it covers no obstacle: an interactive
+ * element or a heading on screen, or a registered control (spec §6.2 a;
+ * WCAG 2.4.11). One rule for every page, in order:
+ *
+ * 1. the chosen anchor, then the others nearest it first, then (on a
+ *    phone, which has no middle anchor) the middle of either side;
+ * 2. the same anchors with the dock shrunk to its minimal 44 px button;
+ * 3. last resort: the minimal button at the bottom of whichever side
+ *    covers less, a safe gap above the bottom navigation. The insets keep
+ *    it off the navigation itself.
+ *
  * The person's choice is not rewritten: the dock goes back when the
- * control goes away.
+ * obstacle goes away. A stash is an explicit choice and stays put.
  */
+export function placeDock(
+  chosen: DockPlacement,
+  obstacles: readonly Rect[],
+  viewport: DockViewport,
+  size: DockSize,
+  dockClass: DockClass,
+): DockSpot {
+  if (chosen.stashed) {
+    return {
+      placement: chosen,
+      ...anchorPoint(chosen, viewport, size),
+      minimal: false,
+      lastResort: false,
+    };
+  }
+  const other = chosen.side === "left" ? "right" : "left";
+  const candidates: DockPlacement[] = [
+    ...placementsByDistance(chosen, viewport, size, dockClass),
+  ];
+  if (dockClass !== "desktop") {
+    // Every corner taken (a phone chat: header on top, composer below —
+    // demo-44 pass): the middle of a side often covers only prose.
+    for (const side of [chosen.side, other] as const) {
+      candidates.push({ side, slot: "middle", stashed: false });
+    }
+  }
+  const fitsMinimal =
+    size.width <= MINIMAL_SIZE.width && size.height <= MINIMAL_SIZE.height;
+  const sizes: readonly DockSize[] = fitsMinimal
+    ? [size]
+    : [size, MINIMAL_SIZE];
+  for (const box of sizes) {
+    for (const placement of candidates) {
+      const point = anchorPoint(placement, viewport, box);
+      const rect = rectAt(point, box);
+      if (!obstacles.some((obstacle) => overlaps(rect, obstacle))) {
+        return {
+          placement,
+          ...point,
+          minimal: box !== size,
+          lastResort: false,
+        };
+      }
+    }
+  }
+  const lowest = viewport.insetTop + viewport.gutter;
+  const y = Math.round(
+    Math.max(
+      lowest,
+      viewport.height -
+        viewport.insetBottom -
+        MINIMAL_SIZE.height -
+        LAST_RESORT_GAP,
+    ),
+  );
+  let best: DockSpot | null = null;
+  let bestCovered = Number.POSITIVE_INFINITY;
+  for (const side of [chosen.side, other] as const) {
+    const placement: DockPlacement = { side, slot: "bottom", stashed: false };
+    const { x } = anchorPoint(placement, viewport, MINIMAL_SIZE);
+    const rect = rectAt({ x, y }, MINIMAL_SIZE);
+    const covered = obstacles.reduce(
+      (sum, obstacle) => sum + overlapArea(rect, obstacle),
+      0,
+    );
+    if (covered < bestCovered) {
+      best = { placement, x, y, minimal: true, lastResort: true };
+      bestCovered = covered;
+    }
+  }
+  return (
+    best ?? {
+      placement: chosen,
+      ...anchorPoint(chosen, viewport, MINIMAL_SIZE),
+      minimal: true,
+      lastResort: true,
+    }
+  );
+}
+
+/** The anchor {@link placeDock} picks, without its form. */
 export function placementAvoiding(
   chosen: DockPlacement,
   avoid: readonly Rect[],
@@ -197,39 +323,7 @@ export function placementAvoiding(
   size: DockSize,
   dockClass: DockClass,
 ): DockPlacement {
-  if (chosen.stashed || avoid.length === 0) return chosen;
-  const rectOf = (placement: DockPlacement): Rect => {
-    const point = anchorPoint(placement, viewport, size);
-    return {
-      left: point.x,
-      top: point.y,
-      right: point.x + size.width,
-      bottom: point.y + size.height,
-    };
-  };
-  for (const candidate of placementsByDistance(
-    chosen,
-    viewport,
-    size,
-    dockClass,
-  )) {
-    const rect = rectOf(candidate);
-    if (!avoid.some((zone) => overlaps(rect, zone))) return candidate;
-  }
-  // Every corner is taken (a phone chat: header on top, composer below —
-  // demo-44 pass, the dock sat on Send). The middle of a side covers only
-  // scrolling content, so it is the last resort before covering a control.
-  if (dockClass !== "desktop") {
-    for (const side of [
-      chosen.side,
-      chosen.side === "left" ? "right" : "left",
-    ] as const) {
-      const middle: DockPlacement = { side, slot: "middle", stashed: false };
-      if (!avoid.some((zone) => overlaps(rectOf(middle), zone))) return middle;
-    }
-  }
-  // Nowhere is free: stay where the person put it.
-  return chosen;
+  return placeDock(chosen, avoid, viewport, size, dockClass).placement;
 }
 
 // ---- The remembered choice ------------------------------------------------
