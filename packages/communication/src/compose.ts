@@ -134,6 +134,8 @@ export function composeSchedule(options: {
   /** DOCS: the web origin, for links in reminder emails. */
   readonly appOrigin?: string | null | undefined;
   readonly logger?: ScheduleServiceDependencies["logger"];
+  /** meet-47: book Q's bot at once when someone asks Q to join a call. */
+  readonly onJoinRequested?: ScheduleServiceDependencies["onJoinRequested"];
 }): ScheduleService {
   return createScheduleService({
     store: createPostgresScheduleStore({
@@ -148,5 +150,6 @@ export function composeSchedule(options: {
     email: options.email,
     appOrigin: options.appOrigin ?? null,
     logger: options.logger,
+    onJoinRequested: options.onJoinRequested,
   });
 }

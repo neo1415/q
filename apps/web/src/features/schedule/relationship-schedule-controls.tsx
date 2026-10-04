@@ -16,6 +16,7 @@ import {
   createReminderAction,
   dismissReminderAction,
   findSlotsAction,
+  joinCallAction,
 } from "./schedule-actions";
 import { MeetingQ } from "./meeting-q";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
@@ -111,6 +112,8 @@ export function RelationshipScheduleControls({
   const [byEmail, setByEmail] = useState(true);
   const [reminderKey, setReminderKey] = useState(newKey);
   const [message, setMessage] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [joinLink, setJoinLink] = useState("");
   const [pending, startTransition] = useTransition();
   // When the page was opened: whether a call is over is read once, not
   // on every render.
@@ -169,6 +172,29 @@ export function RelationshipScheduleControls({
       setChosen(null);
       setBookKey(newKey());
       setMessage(`Invite sent to ${counterpart}.`);
+    });
+
+  // meet-47: "Have Q join a call" -- a Google Meet already running.
+  const joinCall = () =>
+    startTransition(async () => {
+      setMessage(null);
+      const joined = await joinCallAction({
+        relationshipId,
+        meetLink: joinLink,
+      });
+      if (!joined.ok) {
+        setMessage(joined.message);
+        return;
+      }
+      setMeetings((current) => [
+        joined.value,
+        ...current.filter((meeting) => meeting.id !== joined.value.id),
+      ]);
+      setJoining(false);
+      setJoinLink("");
+      setMessage(
+        'Q is on its way into the call. Admit "Q (Capital Q notes)" from the lobby.',
+      );
     });
 
   const cancel = (meetingId: string) =>
@@ -293,6 +319,59 @@ export function RelationshipScheduleControls({
                 </li>
               ))}
             </ul>
+          )}
+
+          {!connected ? null : joining ? (
+            <form
+              className="flex flex-col gap-2"
+              data-join-call
+              onSubmit={(event) => {
+                event.preventDefault();
+                joinCall();
+              }}
+            >
+              <Input
+                id="join-call-link"
+                label="Google Meet link"
+                type="url"
+                inputMode="url"
+                autoComplete="off"
+                placeholder="https://meet.google.com/abc-defg-hij"
+                value={joinLink}
+                onChange={(event) => setJoinLink(event.target.value)}
+              />
+              <p className="cq-caption text-(--cq-text-secondary)">
+                Q joins as &quot;Q (Capital Q notes)&quot; to keep the record of
+                this call for both sides, and says so when it joins.{" "}
+                {counterpart} is told.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  disabled={pending || joinLink.trim() === ""}
+                >
+                  Send Q in
+                </Button>
+                <Button
+                  type="button"
+                  variant="quiet"
+                  disabled={pending}
+                  onClick={() => setJoining(false)}
+                >
+                  Not now
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <Button
+              variant="quiet"
+              disabled={pending}
+              onClick={() => setJoining(true)}
+              className="self-start"
+            >
+              Have Q join a call
+            </Button>
           )}
 
           {!connected ? (

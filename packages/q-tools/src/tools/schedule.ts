@@ -79,6 +79,7 @@ type Refusal =
   | "CANCELLED"
   | "INVALID_TIME"
   | "KEY_REUSED"
+  | "NOT_A_MEET_LINK"
   | "UNAVAILABLE";
 
 /** The schedule as Q may see it, for the invoker only. */

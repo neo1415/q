@@ -58,6 +58,8 @@ export {
 export {
   createScheduleService,
   googleEventIdFor,
+  JOINED_CALL_CONSENT,
+  JOINED_CALL_MINUTES,
   type AppEmailPort,
   type CalendarDirectory,
   type MeetingView,

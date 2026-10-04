@@ -163,6 +163,7 @@ export type AppActionPorts = {
         | "createReminder"
         | "dismissReminder"
         | "confirmHeld"
+        | "joinCall"
       >
     | undefined;
   /** Interest and connection requests: the network services. */

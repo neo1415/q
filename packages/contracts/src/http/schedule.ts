@@ -9,6 +9,7 @@ import { UtcTimestampSchema } from "../common/time.js";
  *   GET  /v1/relationships/:relationshipId/meetings        the relationship's calls
  *   POST /v1/relationships/:relationshipId/meeting-slots   three free slots
  *   POST /v1/relationships/:relationshipId/meetings        invite (idempotent)
+ *   POST /v1/relationships/:relationshipId/meetings/join   Q joins a running Meet (idempotent)
  *   POST /v1/meetings/:meetingId/cancel                    organiser only
  *   GET  /v1/meetings/:meetingId/brief                     own prep brief
  *   GET  /v1/reminders                                     own reminders
@@ -23,6 +24,9 @@ import { UtcTimestampSchema } from "../common/time.js";
 
 export const RELATIONSHIP_MEETINGS_PATH =
   "/v1/relationships/:relationshipId/meetings" as const;
+/** meet-47: Q asked to join a Google Meet already running, on demand. */
+export const RELATIONSHIP_MEETING_JOIN_PATH =
+  "/v1/relationships/:relationshipId/meetings/join" as const;
 export const RELATIONSHIP_MEETING_SLOTS_PATH =
   "/v1/relationships/:relationshipId/meeting-slots" as const;
 export const MEETING_CANCEL_PATH = "/v1/meetings/:meetingId/cancel" as const;
@@ -110,6 +114,51 @@ export const ScheduleMeetingRequestSchema = z
 export type ScheduleMeetingRequest = z.infer<
   typeof ScheduleMeetingRequestSchema
 >;
+
+const MEET_CODE = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+
+/**
+ * A Google Meet link in its one canonical form
+ * (https://meet.google.com/abc-defg-hij), or null. Only meet.google.com is
+ * accepted: Q joins Google Meet calls and nothing else, and a link is never
+ * a way to send Q's bot to an arbitrary host.
+ */
+export function googleMeetLink(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0 || trimmed.length > 300) return null;
+  let url: URL;
+  try {
+    url = new URL(
+      /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`,
+    );
+  } catch {
+    return null;
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.hostname.toLowerCase() !== "meet.google.com" ||
+    url.port !== "" ||
+    url.username !== "" ||
+    url.password !== ""
+  ) {
+    return null;
+  }
+  const code = url.pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
+  return MEET_CODE.test(code) ? `https://meet.google.com/${code}` : null;
+}
+
+export const JoinMeetingRequestSchema = z
+  .object({
+    meetLink: z
+      .string()
+      .max(300)
+      .refine((value) => googleMeetLink(value) !== null, {
+        message: "a Google Meet link (https://meet.google.com/...)",
+      }),
+    purpose: MeetingPurposeSchema.optional(),
+  })
+  .strict();
+export type JoinMeetingRequest = z.infer<typeof JoinMeetingRequestSchema>;
 
 export const MeetingBriefDtoSchema = z
   .object({

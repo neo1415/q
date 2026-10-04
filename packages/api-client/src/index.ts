@@ -272,6 +272,7 @@ export {
   listReminders,
   markNotificationsRead,
   scheduleMeeting,
+  joinMeetingCall,
 } from "./schedule.js";
 
 export { forgetQMemory, listQMemory } from "./memory.js";

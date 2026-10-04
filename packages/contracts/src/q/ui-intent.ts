@@ -417,6 +417,9 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "dismiss_reminder",
   "set_notification_settings",
   "set_q_personality",
+  // meet-47: "Q, join this call" -- their word is the click; Q joins as
+  // the same note-taker, with the same consent line, for both sides.
+  "join_call",
 ] as const;
 
 /**

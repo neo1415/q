@@ -9,8 +9,11 @@ import {
   CreateReminderRequestSchema,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
+  googleMeetLink,
+  JoinMeetingRequestSchema,
   MEETING_CANCEL_PATH,
   MeetingDtoSchema,
+  RELATIONSHIP_MEETING_JOIN_PATH,
   RELATIONSHIP_MEETINGS_PATH,
   REMINDER_DISMISS_PATH,
   REMINDERS_PATH,
@@ -22,6 +25,7 @@ import {
 import {
   defineAppAction,
   portMissing,
+  refusal,
   relationshipTarget,
   type AnyAppAction,
 } from "../define.js";
@@ -81,6 +85,11 @@ const REFUSALS: Readonly<
   KEY_REUSED: {
     code: "RESOURCE_CONFLICT",
     detail: "That request key was already used for something else. Try again.",
+  },
+  NOT_A_MEET_LINK: {
+    code: "VALIDATION_FAILED",
+    detail:
+      "Q joins Google Meet calls: paste a link like https://meet.google.com/abc-defg-hij.",
   },
 };
 
@@ -272,8 +281,109 @@ const DISMISS = defineAppAction<z.infer<typeof Dismiss>, boolean>({
   legacyTool: "dismiss_reminder",
 });
 
+const Join = z
+  .object({
+    relationshipId: z.string().max(64),
+    input: JoinMeetingRequestSchema,
+  })
+  .strict();
+
+const JoinTool = z
+  .object({
+    relationship: z
+      .string()
+      .min(1)
+      .max(200)
+      .describe(
+        "Who the call is with: the company or investor as the person named it.",
+      ),
+    meetLink: z
+      .string()
+      .min(1)
+      .max(300)
+      .describe(
+        "The Google Meet link exactly as they gave it (https://meet.google.com/abc-defg-hij).",
+      ),
+  })
+  .strict();
+
+/**
+ * meet-47 (founder direction 2026-10-03): "Have Q join a call", on demand,
+ * for either side. INSTANT: the person's own word -- the button, or "Q,
+ * join this call: <link>" -- is the click, and it acts only as them, on a
+ * relationship they are a party to. Q joins Google Meet links only, as the
+ * same note-taker with the same consent line and record as a booked call.
+ */
+const JOIN = defineAppAction<
+  z.infer<typeof Join>,
+  Awaited<ReturnType<ScheduleService["joinCall"]>>,
+  z.infer<typeof JoinTool>
+>({
+  name: "schedule.meeting.join",
+  short: "have Q join a call",
+  area: "schedule",
+  classification: "INSTANT",
+  does: "Sends Q into a Google Meet call already running with the other side of a connected relationship, to keep the record for both sides, as the meeting record's button does.",
+  input: Join,
+  output: serviceResult(),
+  authorize: servicesDecide,
+  run: (ports, context, input) =>
+    schedule(ports).joinCall({
+      actor: context.actor,
+      relationshipId: input.relationshipId,
+      meetLink: input.input.meetLink,
+      purpose: input.input.purpose,
+      correlationId: context.correlationId,
+    }),
+  targets: (input) => relationshipTarget(input.relationshipId),
+  card: () => ({ summary: "Have Q join this call", preview: "" }),
+  succeeded: (out) => out.outcome === "OK",
+  done: (out) =>
+    out.outcome !== "OK"
+      ? (scheduleProblem(out)?.detail ?? "Q couldn't join that call.")
+      : out.alreadyJoined
+        ? 'I\'m already on my way into that call. Admit "Q (Capital Q notes)" from the lobby when I knock.'
+        : 'On my way into the call now. Admit "Q (Capital Q notes)" from the lobby when I knock; I\'ll keep the record for both sides.',
+  http: {
+    method: "POST",
+    path: RELATIONSHIP_MEETING_JOIN_PATH,
+    fromRequest: (params, body) => ({
+      relationshipId: params["relationshipId"],
+      input: body,
+    }),
+    problem: scheduleProblem,
+    status: (out) => (out.outcome === "OK" && out.alreadyJoined ? 200 : 201),
+    respond: (out) =>
+      out.outcome === "OK" ? MeetingDtoSchema.parse(out.meeting) : undefined,
+  },
+  tool: {
+    name: "join_call",
+    description:
+      'Use when the person asks Q to join a call that is happening now ("Q, join this call: https://meet.google.com/abc-defg-hij"). Sends Q into that Google Meet as "Q (Capital Q notes)" to keep the record for both sides, at once: their word is the click. Google Meet links only. Name who the call is with as they said it; if they did not say, ask.',
+    input: JoinTool,
+    references: { relationship: "RELATIONSHIP" },
+    purposes: ["ACTION_PREPARATION", "GENERAL_QUESTION"],
+    eval: {
+      say: [
+        "Q, join my call with {name}: https://meet.google.com/abc-defg-hij",
+        "Can you sit in on the call with {name}? It's https://meet.google.com/abc-defg-hij",
+      ],
+      names: "RELATIONSHIP",
+    },
+    toCanonical: (tool) => {
+      const link = googleMeetLink(tool.meetLink);
+      return Promise.resolve(
+        link === null
+          ? refusal(REFUSALS.NOT_A_MEET_LINK.detail)
+          : { relationshipId: tool.relationship, input: { meetLink: link } },
+      );
+    },
+  },
+});
+
 export const SCHEDULE_ACTIONS: readonly AnyAppAction[] = [
   BOOK,
+  JOIN,
   CANCEL,
   REMIND,
   DISMISS,

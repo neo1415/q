@@ -1225,6 +1225,11 @@ const chat = composeChat({
 // Meetings and reminders (BIZ-008): the person's own Google Calendar
 // through the integrations context; approved actions execute here. App
 // email (reminders) is the workers' job, so q-api composes none.
+// meet-47: "Have Q join a call" books the bot at once; bound once the
+// meeting assistant is composed below (until then the collector's tick does).
+const joinCallNow: { book: (meetingId: string) => void } = {
+  book: () => undefined,
+};
 const schedule = composeSchedule({
   sql: database.sql,
   transactions: database.transactions,
@@ -1232,6 +1237,9 @@ const schedule = composeSchedule({
   calendars: (userId) => integrations.calendarOf(userId),
   email: unavailableAppEmailSender,
   logger,
+  onJoinRequested: (meetingId) => {
+    joinCallNow.book(meetingId);
+  },
 });
 // Handles and the Q Card (BIZ-004), composed as the application API
 // composes them: the same service, the same allowlisted subject facts.
@@ -3077,6 +3085,11 @@ const meetingAssistant = createMeetingAssistantService({
     ),
   logger,
 });
+joinCallNow.book = (meetingId) => {
+  void meetingAssistant.enlist().catch((error: unknown) => {
+    logger.warn({ err: error, meetingId }, "joined call not booked at once");
+  });
+};
 setInterval(
   () => {
     // ADR 0027: every booked call gets Q, enlisted shortly before it starts.

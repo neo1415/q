@@ -143,6 +143,7 @@ describe("the action registry", () => {
       ["chat.unblock", "offer.chat_unblock", "INSTANT"],
       ["chat.report", "offer.chat_report", "INSTANT"],
       ["schedule.meeting.book", "legacy:propose_meeting", "CONSEQUENTIAL"],
+      ["schedule.meeting.join", "join_call", "INSTANT"],
       [
         "schedule.meeting.cancel",
         "legacy:propose_meeting_change",
