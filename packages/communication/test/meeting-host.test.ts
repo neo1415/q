@@ -172,17 +172,48 @@ describe("meeting host: turn-taking and when Q speaks", () => {
       at: T0 + 100,
     });
     expect(said(during)).toEqual([]);
-    expect(said(host.handle({ kind: "TICK", at: T0 + 5_000 }))).toEqual([]);
-    host.handle({ kind: "SPEECH_OFF", participantId: "7", at: T0 + 6_000 });
-    expect(said(host.handle({ kind: "TICK", at: T0 + 6_500 }))).toEqual([]);
+    expect(said(host.handle({ kind: "TICK", at: T0 + 3_000 }))).toEqual([]);
+    host.handle({ kind: "SPEECH_OFF", participantId: "7", at: T0 + 3_500 });
+    expect(said(host.handle({ kind: "TICK", at: T0 + 4_000 }))).toEqual([]);
     expect(
       said(
         host.handle({
           kind: "TICK",
-          at: T0 + 6_000 + DEFAULT_HOST_LIMITS.quietMs,
+          at: T0 + 3_500 + DEFAULT_HOST_LIMITS.quietMs,
         }),
       ),
     ).toHaveLength(1);
+  });
+
+  it("does not wait forever on Meet's speaking flag: past the hold, the words stopping ends the turn (live 2026-10-04)", () => {
+    const host = createMeetingHost(CONTEXT);
+    host.handle({ kind: "JOIN", participant: ADAEZE, at: T0 });
+    host.handle({ kind: "TICK", at: T0 + 10_000 });
+    // Adaeze's open microphone keeps Meet's flag on; she is still talking.
+    host.handle({
+      kind: "SPEECH_ON",
+      participantId: ADAEZE.id,
+      at: T0 + 20_000,
+    });
+    const asked = host.handle({
+      kind: "UTTERANCE",
+      participant: ADAEZE,
+      text: "Q, what's this call about?",
+      at: T0 + 21_000,
+    });
+    expect(asked.filter((a) => a.kind === "COMPOSE")).toHaveLength(1);
+    host.reply("It's about the seed round.");
+    // Words still arriving: held.
+    host.handle({
+      kind: "UTTERANCE",
+      participant: ADAEZE,
+      text: "and the timing",
+      at: T0 + 22_000,
+    });
+    expect(said(host.handle({ kind: "TICK", at: T0 + 22_300 }))).toEqual([]);
+    // The flag never drops, but the words stopped: Q answers within the hold.
+    const spoken = said(host.handle({ kind: "TICK", at: T0 + 23_300 }));
+    expect(spoken.map((a) => a.text)).toEqual(["It's about the seed round."]);
   });
 
   it("stays silent unless addressed; composes once per addressed line, not per fragment", () => {

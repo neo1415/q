@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@capital-q/database";
+import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
@@ -75,6 +75,16 @@ export type MeetingHostStore = {
   ) => Promise<void>;
   /** A participant Capital Q knows removed Q: recorded as their decline. */
   readonly removedBy: (meetingId: string, userId: string) => Promise<void>;
+  /**
+   * meet2-64: what Q has heard so far, saved as the call goes, so a call
+   * ended early or whose provider transcript fails still has its record.
+   * Replaced by the provider's transcript once that arrives.
+   */
+  readonly heard?: (
+    meetingId: string,
+    botId: string,
+    lines: readonly HeardLine[],
+  ) => Promise<void>;
   /** Append-only notes: proposals for the organiser, and outcomes. */
   readonly note: (
     meetingId: string,
@@ -256,8 +266,19 @@ export function sharedMeetingText(context: HostContext): string {
   ].join("\n");
 }
 
+export type HeardLine = {
+  readonly speaker: string | null;
+  readonly text: string;
+};
+
 type Session = {
   readonly meetingId: string;
+  /** Every line heard and said, for the live record (bounded). */
+  readonly heard: HeardLine[];
+  heardDirty: boolean;
+  heardSavedAt: number;
+  /** Raised when Q is cut off: pieces of a line not yet played are dropped. */
+  epoch: number;
   readonly botId: string;
   readonly tenantId: string;
   readonly organiserUserId: string;
@@ -271,6 +292,42 @@ type Session = {
 };
 
 const LINES_KEPT = 200;
+/** The bot's own name in the call (its captions are its echo). */
+const Q_BOT_CALL_NAME = /^q\b.*capital q/i;
+const HEARD_KEPT = 2_000;
+/** The live record is saved at most this often while words arrive. */
+const HEARD_SAVE_EVERY_MS = 10_000;
+/** Q's mp3 (ElevenLabs mp3_44100_128): bytes to milliseconds of audio. */
+const MP3_BYTES_PER_MS = 128_000 / 8 / 1_000;
+
+/**
+ * A line in pieces, so the first sentence plays while the next is still
+ * being synthesised (meet2-64: time to first audio is one sentence's TTS).
+ * Very short pieces ride with the next one.
+ */
+export function speechPieces(text: string): string[] {
+  const sentences = text
+    .split(/(?<=[.!?;])\s+/)
+    .map((piece) => piece.trim())
+    .filter((piece) => piece.length > 0);
+  const pieces: string[] = [];
+  let carry = "";
+  for (const sentence of sentences) {
+    const joined = carry.length === 0 ? sentence : `${carry} ${sentence}`;
+    if (joined.length < 25) {
+      carry = joined;
+      continue;
+    }
+    pieces.push(joined);
+    carry = "";
+  }
+  if (carry.length > 0) {
+    if (pieces.length === 0) pieces.push(carry);
+    else
+      pieces[pieces.length - 1] = `${pieces[pieces.length - 1] ?? ""} ${carry}`;
+  }
+  return pieces;
+}
 const IDLE_END_MS = 3 * 3_600_000;
 
 export type MeetingHostRuntime = {
@@ -281,6 +338,8 @@ export type MeetingHostRuntime = {
   readonly receive: (meetingId: string, body: unknown) => Promise<void>;
   /** One clock tick for a call (the ticker does this; tests call it). */
   readonly tick: (meetingId: string) => Promise<void>;
+  /** Saves what Q heard of a call now (tests; the ticker does it too). */
+  readonly flush: (meetingId: string) => Promise<void>;
   /** Live sessions, for tests and status. */
   readonly sessions: () => number;
 };
@@ -314,6 +373,8 @@ export function createMeetingHostRuntime(dependencies: {
   readonly tickEveryMs?: number | null;
   /** Before leaving, let the goodbye play (tests: 0). */
   readonly leaveDelayMs?: number;
+  /** A line spoken a sentence at a time (default); false: whole lines. */
+  readonly speakInPieces?: boolean;
 }): MeetingHostRuntime {
   const sessions = new Map<string, Session>();
   const opening = new Map<string, Promise<Session | null>>();
@@ -335,6 +396,10 @@ export function createMeetingHostRuntime(dependencies: {
         if (context === null || context.declined) return null;
         const session: Session = {
           meetingId,
+          heard: [],
+          heardDirty: false,
+          heardSavedAt: now(),
+          epoch: 0,
           botId: context.botId,
           tenantId: context.tenantId,
           organiserUserId: context.organiserUserId,
@@ -361,6 +426,7 @@ export function createMeetingHostRuntime(dependencies: {
               close(session);
               return;
             }
+            void saveHeard(session, false);
             void carryOut(
               session,
               session.host.handle({ kind: "TICK", at: now() }),
@@ -378,6 +444,84 @@ export function createMeetingHostRuntime(dependencies: {
   function close(session: Session): void {
     if (session.ticker !== null) clearInterval(session.ticker);
     sessions.delete(session.meetingId);
+    void saveHeard(session, true);
+  }
+
+  /** The live record, saved now and then (and at the end); never throws. */
+  async function saveHeard(session: Session, force: boolean): Promise<void> {
+    if (!session.heardDirty || store.heard === undefined) return;
+    if (!force && now() - session.heardSavedAt < HEARD_SAVE_EVERY_MS) return;
+    session.heardDirty = false;
+    session.heardSavedAt = now();
+    await store
+      .heard(session.meetingId, session.botId, [...session.heard])
+      .catch((error: unknown) => {
+        session.heardDirty = true;
+        logger?.warn(
+          { err: error, meetingId: session.meetingId },
+          "the live record was not saved",
+        );
+      });
+  }
+
+  function hear(session: Session, line: HeardLine): void {
+    session.heard.push(line);
+    if (session.heard.length > HEARD_KEPT) session.heard.shift();
+    session.heardDirty = true;
+  }
+
+  const wait = (ms: number) =>
+    ms <= 0
+      ? Promise.resolve()
+      : new Promise<void>((done) => setTimeout(done, ms).unref());
+
+  /**
+   * Q's line, a sentence at a time: the first piece is synthesised and
+   * played at once; each next piece is synthesised while the one before
+   * plays, and played when it ends -- unless Q was cut off meanwhile.
+   */
+  async function speak(
+    session: Session,
+    text: string,
+    why: string,
+  ): Promise<void> {
+    const epoch = session.epoch;
+    const [first, ...rest] =
+      dependencies.speakInPieces === false ? [text] : speechPieces(text);
+    if (first === undefined) return;
+    const started = now();
+    const audio = await voice.speak(first);
+    const synthesised = now();
+    if (session.epoch !== epoch) return;
+    await voice.play(session.botId, Buffer.from(audio).toString("base64"));
+    logger?.info?.(
+      {
+        meetingId: session.meetingId,
+        why,
+        ttsMs: synthesised - started,
+        playMs: now() - synthesised,
+        pieces: rest.length + 1,
+      },
+      "meeting host spoke",
+    );
+    if (rest.length === 0) return;
+    let endsAt = now() + audio.byteLength / MP3_BYTES_PER_MS;
+    // The rest plays outside the call's action chain, so someone cutting
+    // in is heard at once rather than after Q's whole line.
+    void (async () => {
+      for (const piece of rest) {
+        const next = await voice.speak(piece);
+        await wait(endsAt - now());
+        if (session.epoch !== epoch) return;
+        await voice.play(session.botId, Buffer.from(next).toString("base64"));
+        endsAt = now() + next.byteLength / MP3_BYTES_PER_MS;
+      }
+    })().catch((error: unknown) => {
+      logger?.warn(
+        { err: error, meetingId: session.meetingId },
+        "the rest of Q's line was not played",
+      );
+    });
   }
 
   const attribution = (session: Session) => ({
@@ -398,8 +542,24 @@ export function createMeetingHostRuntime(dependencies: {
   /** Actions run in order per call, so lines never overlap or reorder. */
   function carryOut(
     session: Session,
-    actions: readonly HostAction[],
+    actionsIn: readonly HostAction[],
   ): Promise<void> {
+    // Someone talked over Q: it stops now, not after whatever the call's
+    // chain is waiting on (a model call, a line being synthesised).
+    if (actionsIn.some((action) => action.kind === "STOP_SPEAKING")) {
+      session.epoch += 1;
+      void Promise.resolve(voice.stop?.(session.botId)).catch(
+        (error: unknown) => {
+          logger?.warn(
+            { err: error, meetingId: session.meetingId },
+            "Q's line was not stopped",
+          );
+        },
+      );
+    }
+    const actions = actionsIn.filter(
+      (action) => action.kind !== "STOP_SPEAKING",
+    );
     if (actions.length === 0) return session.chain;
     session.chain = session.chain
       .then(async () => {
@@ -446,13 +606,13 @@ export function createMeetingHostRuntime(dependencies: {
     }
     switch (action.kind) {
       case "SAY": {
-        const audio = await voice.speak(action.text);
-        await voice.play(session.botId, Buffer.from(audio).toString("base64"));
         session.lines.push(`Q: ${action.text}`);
+        hear(session, { speaker: "Q", text: action.text });
+        await speak(session, action.text, action.why);
         return;
       }
       case "STOP_SPEAKING":
-        await voice.stop?.(session.botId);
+        // Done at once in carryOut; never queued behind the chain.
         return;
       case "LEAVE_REQUESTED":
         await noteSafely(session, {
@@ -515,6 +675,7 @@ export function createMeetingHostRuntime(dependencies: {
         close(session);
         return;
       case "COMPOSE": {
+        const askedAt = now();
         const result = await composer.turn(attribution(session), {
           mode: "ANSWER",
           meeting: sharedMeetingText(session.context),
@@ -589,6 +750,14 @@ export function createMeetingHostRuntime(dependencies: {
                 : spokenLine(result.line),
           );
         }
+        logger?.info?.(
+          {
+            meetingId: session.meetingId,
+            composeMs: now() - askedAt,
+            kind: result?.kind ?? null,
+          },
+          "meeting host composed",
+        );
         // Inside the chain already: run what is released now, in place
         // (queueing onto the chain from inside it would wait on itself).
         for (const next of session.host.handle({ kind: "TICK", at: now() })) {
@@ -642,13 +811,23 @@ export function createMeetingHostRuntime(dependencies: {
       if (event.kind === "UTTERANCE") {
         session.lines.push(`${event.participant.name}: ${event.text}`);
         if (session.lines.length > LINES_KEPT) session.lines.shift();
+        // Q's own voice is recorded from what it said, not the captions.
+        if (!Q_BOT_CALL_NAME.test(event.participant.name.trim())) {
+          hear(session, { speaker: event.participant.name, text: event.text });
+          void saveHeard(session, false);
+        }
       }
       await carryOut(session, session.host.handle(event));
     },
     tick: async (meetingId) => {
       const session = sessions.get(meetingId);
       if (session === undefined) return;
+      await saveHeard(session, false);
       await carryOut(session, session.host.handle({ kind: "TICK", at: now() }));
+    },
+    flush: async (meetingId) => {
+      const session = sessions.get(meetingId);
+      if (session !== undefined) await saveHeard(session, true);
     },
     sessions: () => sessions.size,
   };
@@ -774,6 +953,23 @@ export function createPostgresMeetingHostStore(sql: Sql): MeetingHostStore {
         values (${meetingId}, ${tenantId}, ${note.kind}, ${note.body},
                 ${note.requestedByName}, ${note.absentSide})`;
     },
+    // Only while the call is live: the provider's transcript, once read,
+    // replaces this and is never overwritten by it.
+    heard: async (meetingId, botId, lines) => {
+      await sql`
+        update communication.meeting_assistants
+           set transcript = ${jsonbParam(
+             sql,
+             lines.map((line) => ({
+               speaker: line.speaker?.slice(0, 120) ?? null,
+               text: line.text.slice(0, 8_000),
+             })),
+           )}::jsonb,
+               updated_at = clock_timestamp()
+         where meeting_id = ${meetingId}
+           and provider_bot_id = ${botId}
+           and status in ('SCHEDULED', 'IN_CALL')`;
+    },
     removedBy: async (meetingId, userId) => {
       await sql`
         update communication.meeting_assistants
@@ -843,11 +1039,13 @@ export function readHostResult(raw: unknown): MeetingHostResult | null {
 }
 
 /** One short spoken answer: small, quick, cheap. */
+// meet2-64: an answer in a call is worth little after a few seconds; two
+// short attempts, not two of eight seconds each.
 const HOST_BUDGET = {
   maxAttempts: 2,
   maxEstimatedCostUsd: 0.02,
   maxOutputTokens: 400,
-  attemptTimeoutMs: 8_000,
+  attemptTimeoutMs: 4_000,
 } as const;
 
 export function createMeetingHostComposer(dependencies: {

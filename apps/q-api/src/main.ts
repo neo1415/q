@@ -3033,6 +3033,8 @@ const meetingFollowUpCards = createMeetingFollowUpCards({
   actions: qActions,
   logger,
 });
+let meetingSpeech:
+  ReturnType<typeof createElevenLabsSpeechSynthesis> | undefined;
 const meetingHost = createMeetingHostRuntime({
   enabled:
     process.env.CQ_MEETING_HOST !== "off" &&
@@ -3042,9 +3044,16 @@ const meetingHost = createMeetingHostRuntime({
   secret: recallKey,
   store: createPostgresMeetingHostStore(database.sql),
   voice: {
+    // meet2-64: in a call, the fast engine (turbo) speaks each sentence as
+    // soon as it is ready; the expressive v3 voice stays for Q in the app.
     speak: async (text) => {
-      if (elevenLabsSpeech === undefined) throw new Error("no speech");
-      const spoken = await elevenLabsSpeech.oneWay.synthesise({
+      const key = config.secrets.speechProviders.elevenLabs;
+      if (key === undefined) throw new Error("no speech");
+      meetingSpeech ??= createElevenLabsSpeechSynthesis({
+        apiKey: key.reveal(),
+        model: "eleven_turbo_v2_5",
+      });
+      const spoken = await meetingSpeech.synthesise({
         text,
         voice: "FEMALE",
       });

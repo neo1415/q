@@ -217,6 +217,22 @@ export type HostLimits = {
   readonly quietMs: number;
   /** Before the scheduled end, Q offers a recap once. */
   readonly offerRecapBeforeEndMs: number;
+  /**
+   * meet2-64: the longest an answer waits for Meet's "nobody is speaking"
+   * before Q says it anyway, once no words have arrived for wordsGapMs.
+   * Live 2026-10-04, Meet's speaking flag stayed on for 130 s on an open
+   * microphone and then flipped between two laptops in one room: there was
+   * no gap for three minutes, and Q held every answer until one came.
+   */
+  readonly replyHoldMs?: number;
+  /** The same for Q's own lines (greeting, introductions, recap offer). */
+  readonly lineHoldMs?: number;
+  /** No caption words for this long counts as the end of a turn. */
+  readonly wordsGapMs?: number;
+  /** An answer not said within this long of being ready is dropped. */
+  readonly replyStaleMs?: number;
+  /** A greeting or introduction not said within this long is dropped. */
+  readonly lineStaleMs?: number;
 };
 
 export const DEFAULT_HOST_LIMITS: HostLimits = {
@@ -224,7 +240,22 @@ export const DEFAULT_HOST_LIMITS: HostLimits = {
   maxModelCalls: 16,
   quietMs: 1_200,
   offerRecapBeforeEndMs: 3 * 60_000,
+  replyHoldMs: 1_200,
+  lineHoldMs: 4_000,
+  wordsGapMs: 700,
+  replyStaleMs: 15_000,
+  lineStaleMs: 30_000,
 };
+
+/** Several questions came while Q was answering: it answers the latest. */
+export const HOST_TAKING_LATEST = "Taking the latest question:";
+
+/**
+ * Talking over Q stops it when the person starts in a quiet room: Meet's
+ * speaking flag flipping between microphones (two laptops in one room) is
+ * not someone cutting in. Words heard over Q always stop it.
+ */
+export const FRESH_SPEECH_MS = 1_500;
 
 /** The polite, fixed refusal: nothing said in the call gives Q authority. */
 export const HOST_REFUSAL =
@@ -332,6 +363,11 @@ export function addressedToQ(text: string): boolean {
       `^(?:(?:hey|hi|ok|okay|so|um|and)[,\\s]+)?${name}(?:[,.:!?]|\\s|$)`,
     ).test(t) ||
     new RegExp(`[,]\\s*${name}[.?!]*$`).test(t) ||
+    // meet2-64 (live 2026-10-04): "Um, hello, Q? Can you hear me?" -- the
+    // name as a vocative mid-line, after a greeting or a pause.
+    /(?:^|[,.!?]\s*|\b(?:hey|hi|hello|ok|okay|so|um)[,\s]+)(?:q|cue|kew)\s*[,?!]/.test(
+      t,
+    ) ||
     /\bcapital q\b/.test(t)
   );
 }
@@ -423,8 +459,26 @@ export function createMeetingHost(
   let oneSide: { present: HostSide; absent: HostSide } | null = null;
   const present = new Map<string, Present>();
   const speaking = new Set<string>();
-  const outbox: { text: string; why: SayReason }[] = [];
+  const outbox: { text: string; why: SayReason; readyAt: number }[] = [];
+  const replyHoldMs =
+    limits.replyHoldMs ?? DEFAULT_HOST_LIMITS.replyHoldMs ?? 1_200;
+  const lineHoldMs =
+    limits.lineHoldMs ?? DEFAULT_HOST_LIMITS.lineHoldMs ?? 4_000;
+  const wordsGapMs = limits.wordsGapMs ?? DEFAULT_HOST_LIMITS.wordsGapMs ?? 700;
+  const replyStaleMs =
+    limits.replyStaleMs ?? DEFAULT_HOST_LIMITS.replyStaleMs ?? 15_000;
+  const lineStaleMs =
+    limits.lineStaleMs ?? DEFAULT_HOST_LIMITS.lineStaleMs ?? 30_000;
   let lastSpeechAt = 0;
+  /** When a person's words last arrived (caption lines, not Meet's flag). */
+  let lastWordsAt = 0;
+  /** The clock as last seen, for lines queued between events. */
+  let clock = 0;
+  /** The latest question asked while Q was composing an answer. */
+  let pending: { speaker: string; utterance: string } | null = null;
+  /** Questions passed over for a later one since the last answer. */
+  let skipped = 0;
+  let ackLatest = false;
   /** Q's own line is still playing until this time. */
   let busyUntil = 0;
   /** When Q's current line started playing. */
@@ -457,12 +511,43 @@ export function createMeetingHost(
     const waiting = outbox.reduce((sum, line) => sum + line.text.length, 0);
     const overBudget = spoken + waiting + text.length > limits.maxSpokenChars;
     if (overBudget && why !== "LEAVING" && why !== "REFUSE") return;
-    outbox.push({ text, why });
+    outbox.push({ text, why, readyAt: clock });
+  }
+
+  const answers = (why: SayReason) =>
+    why === "REPLY" || why === "REFUSE" || why === "PROPOSED";
+
+  /**
+   * A line that waited too long is no longer worth saying (meet2-64: a
+   * greeting and three answers were said together, minutes late). What Q
+   * says when leaving, or to one side about the other, is never dropped.
+   */
+  function dropStale(at: number): void {
+    for (let i = outbox.length - 1; i >= 0; i -= 1) {
+      const line = outbox[i];
+      if (line === undefined) continue;
+      if (line.why === "LEAVING" || line.why === "ONE_SIDED") continue;
+      const limit = answers(line.why)
+        ? replyStaleMs
+        : line.why === "OFFER_RECAP"
+          ? 2 * lineStaleMs
+          : lineStaleMs;
+      if (at - line.readyAt > limit) outbox.splice(i, 1);
+    }
   }
 
   function release(at: number): HostAction[] {
-    if (outbox.length === 0 || speaking.size > 0) return [];
-    if (at - lastSpeechAt < limits.quietMs || at < busyUntil) return [];
+    dropStale(at);
+    const head = outbox[0];
+    if (head === undefined || at < busyUntil) return [];
+    const roomQuiet =
+      speaking.size === 0 && at - lastSpeechAt >= limits.quietMs;
+    // Meet's speaking flag is a hint, not the truth: past the hold, the
+    // end of a turn is the words stopping.
+    const heldLongEnough =
+      at - head.readyAt >= (answers(head.why) ? replyHoldMs : lineHoldMs) &&
+      at - lastWordsAt >= wordsGapMs;
+    if (!roomQuiet && !heldLongEnough) return [];
     const next = outbox.shift();
     if (next === undefined) return [];
     spoken += next.text.length;
@@ -470,6 +555,12 @@ export function createMeetingHost(
     sayingSince = at;
     // About fifteen characters a second when spoken.
     busyUntil = at + Math.ceil((next.text.length / 15) * 1_000);
+    // Time Q spends on its own line is not time the others waited: lines
+    // queued behind it age (and are held) from when it finishes.
+    const waitBehind = busyUntil - Math.max(at, 0);
+    for (const line of outbox) {
+      line.readyAt = Math.max(line.readyAt, at) + waitBehind;
+    }
     return [{ kind: "SAY", text: next.text, why: next.why }];
   }
 
@@ -610,8 +701,31 @@ export function createMeetingHost(
     };
   }
 
+  /** Someone talks over Q's line: it stops, and what was queued goes. */
+  function interrupt(at: number): HostAction[] {
+    if (at >= busyUntil || at - sayingSince < INTERRUPT_GRACE_MS) return [];
+    busyUntil = at;
+    const keep = outbox.filter((line) => line.why === "LEAVING");
+    outbox.splice(0, outbox.length, ...keep);
+    return [{ kind: "STOP_SPEAKING" }];
+  }
+
+  /** One question to Q, composed now (one at a time, latest first). */
+  function compose(speaker: string, utterance: string): HostAction[] {
+    if (calls >= limits.maxModelCalls) {
+      queue(HOST_UNAVAILABLE, "REPLY");
+      return [];
+    }
+    calls += 1;
+    composing = true;
+    ackLatest = skipped > 0;
+    skipped = 0;
+    return [{ kind: "COMPOSE", speaker, utterance }];
+  }
+
   function handle(event: HostEvent): HostAction[] {
     if (left) return [];
+    clock = Math.max(clock, event.at);
     const out: HostAction[] = [];
     switch (event.kind) {
       case "JOIN": {
@@ -648,23 +762,21 @@ export function createMeetingHost(
         out.push({ kind: "ROSTER", entry: rosterOf(entry, "LEFT") });
         break;
       }
-      case "SPEECH_ON":
-        speaking.add(event.participantId);
+      case "SPEECH_ON": {
         // meet-47: someone in the call talks over Q -- it stops at once and
         // drops what it had queued (they can ask again). Only a person who
         // joined counts, and not in Q's first moment on a line, when its
         // own voice coming back through someone's microphone starts.
-        if (
-          present.has(event.participantId) &&
-          event.at < busyUntil &&
-          event.at - sayingSince >= INTERRUPT_GRACE_MS
-        ) {
-          busyUntil = event.at;
-          const keep = outbox.filter((line) => line.why === "LEAVING");
-          outbox.splice(0, outbox.length, ...keep);
-          out.push({ kind: "STOP_SPEAKING" });
+        // meet2-64: and only a fresh start in a quiet room; Meet's flag
+        // flipping between open microphones is not someone cutting in.
+        const fresh =
+          speaking.size === 0 && event.at - lastSpeechAt >= FRESH_SPEECH_MS;
+        speaking.add(event.participantId);
+        if (present.has(event.participantId) && fresh) {
+          out.push(...interrupt(event.at));
         }
         break;
+      }
       case "SPEECH_OFF":
         speaking.delete(event.participantId);
         lastSpeechAt = Math.max(lastSpeechAt, event.at);
@@ -680,6 +792,9 @@ export function createMeetingHost(
         // Only people who joined are heard, and nothing that repeats what
         // Q just said (its voice echoed through someone's microphone).
         if (entry === undefined || echoesQ(text, event.at)) break;
+        lastWordsAt = Math.max(lastWordsAt, event.at);
+        // Words from a person over Q's line stop it (meet2-64).
+        out.push(...interrupt(event.at));
         if (askedAt !== null && oneSide !== null) {
           out.push(...settleOneSided(!saysNeverMind(text)));
           return out;
@@ -706,23 +821,34 @@ export function createMeetingHost(
           queue(HOST_REFUSAL, "REFUSE");
           break;
         }
-        if (composing) break;
-        if (calls >= limits.maxModelCalls) {
-          queue(HOST_UNAVAILABLE, "REPLY");
+        const speaker =
+          entry.party?.name ??
+          (entry.introducedAs ? entry.introducedAs : event.participant.name);
+        // meet2-64: one answer at a time, and only to the latest question.
+        // Asked again while Q is composing: the newer question waits and
+        // the older answer is dropped when it comes back.
+        if (composing) {
+          pending = { speaker, utterance: text };
+          skipped += 1;
           break;
         }
-        calls += 1;
-        composing = true;
-        out.push({
-          kind: "COMPOSE",
-          speaker:
-            entry?.party?.name ??
-            (entry?.introducedAs ? entry.introducedAs : event.participant.name),
-          utterance: text,
-        });
+        // An answer still waiting to be said is overtaken by a new question.
+        for (let i = outbox.length - 1; i >= 0; i -= 1) {
+          if (outbox[i]?.why === "REPLY") {
+            outbox.splice(i, 1);
+            skipped += 1;
+          }
+        }
+        out.push(...compose(speaker, text));
         break;
       }
       case "TICK": {
+        // The latest question asked while Q was answering, now.
+        if (!composing && pending !== null) {
+          const next = pending;
+          pending = null;
+          out.push(...compose(next.speaker, next.utterance));
+        }
         // The hard cap: whatever was said, Q goes.
         if (event.at >= start + policy.hardCapAfterStartMs) {
           outbox.length = 0;
@@ -805,8 +931,17 @@ export function createMeetingHost(
     handle,
     reply: (text, why = "REPLY") => {
       composing = false;
+      // A newer question came while this was composed: this answer is
+      // stale and goes unsaid; the newer one is composed on the next tick.
+      if (pending !== null && why === "REPLY") {
+        skipped += 1;
+        return;
+      }
       const line = text.trim();
-      if (line.length > 0) queue(line.slice(0, 600), why);
+      if (line.length === 0) return;
+      const said = ackLatest ? `${HOST_TAKING_LATEST} ${line}` : line;
+      ackLatest = false;
+      queue(said.slice(0, 600), why);
     },
     guestIntroduced: (participantId, intro) => {
       const entry = present.get(participantId);

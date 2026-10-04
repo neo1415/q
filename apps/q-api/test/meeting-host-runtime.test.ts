@@ -85,6 +85,8 @@ function setup(
     reply?: Partial<MeetingHostResult> | null;
     /** meet-47: the asker's own card; absent, the organiser's proposal. */
     askerCard?: boolean;
+    /** meet2-64: lines spoken a sentence at a time. */
+    pieces?: boolean;
   } = {},
 ) {
   const cards: { askerUserId: string; text: string }[] = [];
@@ -186,6 +188,7 @@ function setup(
     now: () => clock.at,
     tickEveryMs: null,
     leaveDelayMs: 0,
+    speakInPieces: options.pieces ?? false,
   });
   /** Events in, then the room goes quiet so queued lines come out. */
   const send = async (...bodies: unknown[]) => {
@@ -436,6 +439,12 @@ describe("meeting host in a call", () => {
         event("participant_events.join", 1, "Adaeze Okafor"),
         event("participant_events.join", 2, "Tunde Bello"),
       );
+      // Let the greetings and introduction finish first: words said over
+      // them would (rightly) stop them too.
+      for (let i = 0; i < 40; i += 1) {
+        t.clock.at += 1_500;
+        await t.runtime.tick(MEETING);
+      }
       await t.runtime.receive(
         MEETING,
         event(
