@@ -139,6 +139,11 @@ export type QApiModules = {
   readonly work?: WorkRoutesDependencies["work"] | undefined;
   /** WORK-58: Q's work page reads (suggestions, Not now, done). */
   readonly workPage?: WorkRoutesDependencies["page"] | undefined;
+  /**
+   * Pictures of who work and approvals name (founder decision
+   * 2026-10-04). Absent: those rows read as initials.
+   */
+  readonly namedPhotos?: WorkRoutesDependencies["namedPhotos"] | undefined;
   /** The person's own usage this month (lead 2026-10-03). */
   readonly usage?: OwnUsage | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
@@ -435,6 +440,7 @@ export function createApp(
       resolver: security.resolver,
       work: modules.work,
       page: modules.workPage,
+      namedPhotos: modules.namedPhotos,
     });
   }
 
@@ -517,6 +523,7 @@ export function createApp(
       qActions: modules.qActions,
       orchestrator: modules.orchestration?.orchestrator,
       continueApproved: modules.continueApproved,
+      namedPhotos: modules.namedPhotos,
     });
   }
 

@@ -78,14 +78,16 @@ function RelationshipRow({
           kind="company"
           name={item.counterpart.name}
           companyId={item.counterpart.id}
+          src={item.counterpart.photoUrl}
           size="sm"
           decorative
         />
       ) : (
-        // The list carries no investor image; the detail page reads it.
+        // The list names them, so it carries their logo (the name's scope).
         <EntityAvatar
           kind="investor"
           name={item.counterpart.name}
+          src={item.counterpart.photoUrl ?? null}
           size="sm"
           decorative
         />

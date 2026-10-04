@@ -356,6 +356,17 @@ function laneDto(lane: LaneRow): QWorkDto["lanes"][number] {
   return {
     id: lane.id,
     counterpartName: lane.counterpart_name,
+    // The id only: the route signs the picture for the person reading.
+    counterpart:
+      lane.company_id !== null
+        ? { kind: "COMPANY", id: lane.company_id, photoUrl: null }
+        : lane.investor_organisation_id !== null
+          ? {
+              kind: "INVESTOR_ORGANISATION",
+              id: lane.investor_organisation_id,
+              photoUrl: null,
+            }
+          : null,
     stage: lane.stage,
     lastStep: lane.last_step,
     reasons: (Array.isArray(lane.match_reasons)

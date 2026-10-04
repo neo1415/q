@@ -355,6 +355,12 @@ export const RelationshipSummaryDtoSchema = z
         kind: z.enum(["COMPANY", "INVESTOR_ORGANISATION"]),
         id: UuidSchema,
         name: z.string().min(1).max(200),
+        /**
+         * Their logo, a short-lived signed URL minted for this reader
+         * because the row names them (founder decision 2026-10-04: the
+         * picture has the name's scope). Null or absent: initials.
+         */
+        photoUrl: z.string().url().nullable().optional(),
       })
       .strict(),
     state: RelationshipStateV2Schema,
@@ -419,6 +425,8 @@ export const IncomingInterestDtoSchema = z
     interestId: UuidSchema,
     investorOrganisationId: UuidSchema,
     investorName: z.string().min(1).max(200),
+    /** The named investor's logo, under the name's scope; absent: initials. */
+    investorPhotoUrl: z.string().url().nullable().optional(),
     investorType: z.string().min(1).max(64),
     expressedAt: UtcTimestampSchema,
     response: InterestResponseStatusSchema,

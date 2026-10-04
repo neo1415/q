@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { NamedPictureSchema } from "../common/named-picture.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { StandingInstructionDtoSchema } from "./instructions.js";
 
@@ -86,6 +87,12 @@ export const QWorkLaneDtoSchema = z
   .object({
     id: UuidSchema,
     counterpartName: z.string().max(200),
+    /**
+     * The counterpart, so a list can show their logo: the id only (the
+     * work read), the URL signed by the route for the person whose work it
+     * is, under the name's scope. Absent: initials.
+     */
+    counterpart: NamedPictureSchema.nullable().optional(),
     stage: z.enum(Q_WORK_LANE_STAGES),
     lastStep: z.string().max(300).nullable(),
     /** Why Q picked them, each with the words it rests on. */

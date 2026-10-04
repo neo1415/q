@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import type {
+  NamedPicture,
   QApprovalView,
   QPendingApproval,
   QWorkDonePageDto,
@@ -48,6 +49,7 @@ import {
   readQApprovalAction,
   rejectQApprovalAction,
 } from "@/features/q/actions";
+import { EntityAvatar, type EntityKind } from "@/features/entity/entity-avatar";
 import { EmailDraftEditor } from "@/features/integrations/email-draft-editor";
 import { useQSessionOptional } from "@/features/q/q-session";
 
@@ -736,8 +738,11 @@ function SuggestionCard({
           </span>
         </span>
         <span className="min-w-0">
-          <span className="block truncate cq-body font-medium text-(--cq-text-primary)">
-            {item.subject}
+          <span className="flex min-w-0 items-center gap-2">
+            <NamedMark named={item.named} size={20} />
+            <span className="block truncate cq-body font-medium text-(--cq-text-primary)">
+              {item.subject}
+            </span>
           </span>
           <span className="block truncate cq-body-sm text-(--cq-text-secondary)">
             {item.question}
@@ -834,6 +839,47 @@ function SuggestionPlan({
 // Needs you
 // ---------------------------------------------------------------------------
 
+const NAMED_KIND: Readonly<Record<NamedPicture["kind"], EntityKind>> = {
+  PERSON: "person",
+  COMPANY: "company",
+  INVESTOR_ORGANISATION: "investor",
+};
+
+/**
+ * The picture of who a row names, as the server signed it for this reader
+ * (the name's scope). Without a name to draw initials from, a row with no
+ * picture keeps its icon: `null` here.
+ */
+export function namedMarkShown(
+  named: NamedPicture | null | undefined,
+  name: string | undefined,
+): named is NamedPicture {
+  if (named === null || named === undefined) return false;
+  return name !== undefined || named.photoUrl !== null;
+}
+
+function NamedMark({
+  named,
+  name,
+  size,
+}: {
+  readonly named: NamedPicture | null | undefined;
+  /** The name the row prints; absent, only a real picture is drawn. */
+  readonly name?: string | undefined;
+  readonly size: number;
+}) {
+  if (!namedMarkShown(named, name)) return null;
+  return (
+    <EntityAvatar
+      kind={NAMED_KIND[named.kind]}
+      name={name ?? ""}
+      src={named.photoUrl}
+      size={size}
+      decorative
+    />
+  );
+}
+
 type TimeLane = {
   readonly work: QWorkDto;
   readonly lane: QWorkDto["lanes"][number];
@@ -864,6 +910,7 @@ function NeedsYou({
           >
             <NeedRow
               Icon={MessageSquare}
+              named={item.named}
               title={item.summary}
               meta={`Asked ${shortAge(item.requestedAt)}`}
               open={open === item.approvalId}
@@ -898,6 +945,8 @@ function NeedsYou({
           <li key={lane.id} className="border-b border-(--cq-border-subtle)">
             <NeedRow
               Icon={CalendarDays}
+              named={lane.counterpart}
+              namedName={lane.counterpartName}
               title={`Pick a time with ${lane.counterpartName}`}
               meta={`${String(lane.offered.length)} ${lane.offered.length === 1 ? "time" : "times"} offered`}
               open={open === lane.id}
@@ -924,6 +973,8 @@ function NeedsYou({
 
 function NeedRow({
   Icon,
+  named,
+  namedName,
   title,
   meta,
   open,
@@ -934,6 +985,9 @@ function NeedRow({
     readonly strokeWidth?: number;
     readonly "aria-hidden"?: boolean | "true";
   }>;
+  /** Who the row names: their picture (or initials, given the name). */
+  readonly named?: NamedPicture | null | undefined;
+  readonly namedName?: string | undefined;
   readonly title: string;
   readonly meta: string;
   readonly open: boolean;
@@ -941,9 +995,13 @@ function NeedRow({
 }) {
   return (
     <div className="flex min-h-16 items-center gap-3 py-2.5">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
-        <Icon aria-hidden="true" size={16} strokeWidth={ICON_STROKE} />
-      </span>
+      {namedMarkShown(named, namedName) ? (
+        <NamedMark named={named} name={namedName} size={32} />
+      ) : (
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+          <Icon aria-hidden="true" size={16} strokeWidth={ICON_STROKE} />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate cq-body-sm font-medium text-(--cq-text-primary)">
           {title}
@@ -1376,12 +1434,16 @@ function Done({ initial }: { readonly initial: QWorkDonePageDto | null }) {
                   key={item.id}
                   className="flex min-h-12 items-center gap-3 border-b border-(--cq-border-subtle) py-2"
                 >
-                  <Check
-                    aria-hidden="true"
-                    size={16}
-                    strokeWidth={ICON_STROKE}
-                    className="shrink-0 text-(--cq-text-tertiary)"
-                  />
+                  {namedMarkShown(item.named, undefined) ? (
+                    <NamedMark named={item.named} size={24} />
+                  ) : (
+                    <Check
+                      aria-hidden="true"
+                      size={16}
+                      strokeWidth={ICON_STROKE}
+                      className="shrink-0 text-(--cq-text-tertiary)"
+                    />
+                  )}
                   <span className="min-w-0 flex-1 truncate cq-body-sm text-(--cq-text-primary)">
                     {item.words}
                   </span>

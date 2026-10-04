@@ -5,6 +5,7 @@ import type {
   StoredObjectRef,
   StoredObjectStream,
   DirectDownloadAuthorization,
+  PrivateBatchDownloadAuthorizer,
   PrivateDocumentDownloadAuthorizer,
 } from "../application/storage-port.js";
 import { DocumentStorageUnavailableError } from "../domain/errors.js";
@@ -76,7 +77,9 @@ function providerExpiryFromToken(token: string): string {
 
 export function createSupabaseDocumentStorageProvider(
   options: SupabaseStorageProviderOptions,
-): PrivateDocumentStorageProvider & PrivateDocumentDownloadAuthorizer {
+): PrivateDocumentStorageProvider &
+  PrivateDocumentDownloadAuthorizer &
+  PrivateBatchDownloadAuthorizer {
   const base = `${options.supabaseUrl.replace(/\/+$/, "")}/storage/v1`;
   const call = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -172,6 +175,42 @@ export function createSupabaseDocumentStorageProvider(
           Date.now() + input.expiresInSeconds * 1000,
         ).toISOString(),
       };
+    },
+
+    // Many objects of one bucket in one call (a list's pictures). An entry
+    // the provider could not sign is null; nothing here decides who reads.
+    createDownloadAuthorizations: async (input) => {
+      if (input.keys.length === 0) return [];
+      const response = await request(
+        `/object/sign/${encodeURIComponent(input.bucket)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            expiresIn: input.expiresInSeconds,
+            paths: input.keys,
+          }),
+        },
+      );
+      if (!response.ok) throw new DocumentStorageUnavailableError();
+      const body: unknown = await response.json().catch(() => null);
+      if (!Array.isArray(body)) throw new DocumentStorageUnavailableError();
+      const byPath = new Map<string, string>();
+      for (const entry of body as readonly unknown[]) {
+        if (typeof entry !== "object" || entry === null) continue;
+        const { path, signedURL } = entry as {
+          readonly path?: unknown;
+          readonly signedURL?: unknown;
+        };
+        if (
+          typeof path === "string" &&
+          typeof signedURL === "string" &&
+          signedURL.startsWith("/object/sign/")
+        ) {
+          byPath.set(path, `${base}${signedURL}`);
+        }
+      }
+      return input.keys.map((key) => byPath.get(key) ?? null);
     },
 
     statObject: async (object): Promise<StoredObjectMetadata | null> => {

@@ -172,12 +172,15 @@ import {
 } from "@capital-q/billing";
 // end BILLING block
 import {
+  createNamedImageReader,
+  createPostgresNamedImageStore,
   createPostgresProfileImageRepository,
   createPostgresPublicIdentityRepository,
   createProfileImageService,
   createPublicIdentityService,
   createSharpImageProcessor,
   createSubjectDirectory,
+  namedImageKey,
 } from "@capital-q/public-identity";
 import {
   createCompanyVerificationService,
@@ -1326,6 +1329,15 @@ const profileImages = createProfileImageService({
   processor: storage === undefined ? undefined : createSharpImageProcessor(),
 });
 
+// The pictures of who a list names (founder decision 2026-10-04): a photo
+// or logo has its name's scope, so a route that names someone signs their
+// picture with the name, one batch per response.
+const namedPhotos = createNamedImageReader({
+  sql: database.sql,
+  store: createPostgresNamedImageStore(),
+  storage,
+});
+
 const publicIdentity = createPublicIdentityService({
   sql: database.sql,
   transactions: database.transactions,
@@ -1556,18 +1568,32 @@ const { app, logger } = createApp(config, security, {
         ? media.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
         : false;
     },
-    // The Q Card's own `photo` scope, for a signed-in participant.
-    photo: (company) =>
-      publicIdentity.cardPhotoFor({
-        subject: { subjectType: "COMPANY", subjectId: company.id },
-        audience: "PARTICIPANT",
-      }),
-    // The header's photo and cover, each under its own card scope.
-    images: (company) =>
-      publicIdentity.cardImagesFor({
-        subject: { subjectType: "COMPANY", subjectId: company.id },
-        audience: "PARTICIPANT",
-      }),
+    // The route already decided this reader may see the company, and so
+    // its name: the logo has the name's scope (founder decision
+    // 2026-10-04), with or without a Q Card.
+    photo: async (company) => {
+      const subject = {
+        subjectType: "COMPANY",
+        subjectId: company.id,
+      } as const;
+      return (
+        (await namedPhotos.photos([subject])).get(namedImageKey(subject)) ??
+        null
+      );
+    },
+    // The header's logo (the name's scope) and cover (the card's own
+    // `cover` scope for a signed-in participant).
+    images: async (company) => {
+      const subject = {
+        subjectType: "COMPANY",
+        subjectId: company.id,
+      } as const;
+      return (
+        (await namedPhotos.images([subject], "PARTICIPANT")).get(
+          namedImageKey(subject),
+        ) ?? { photo: null, cover: null }
+      );
+    },
     disclosedRaise: async (actor, companyId) =>
       (
         await discoverFilterFacts.disclosedRaises?.({
@@ -1812,6 +1838,7 @@ const { app, logger } = createApp(config, security, {
   visibility,
   publicIdentity,
   profileImages,
+  namedPhotos,
   // WORK-58: the Work page's own writes (pause, resume, Not now).
   qWork: createQWorkPagePort(database.sql),
   inboundEmail: {

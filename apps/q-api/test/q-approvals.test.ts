@@ -219,6 +219,74 @@ describe("GET /v1/q/approvals (R35)", () => {
     );
     await app.close();
   });
+
+  it("names the action's person or organisation with their picture, signed in one batch", async () => {
+    const LOGO = "https://storage.test/object/sign/cq-profile-images/l?t=1";
+    const PERSON_ID = "b1000000-0000-4000-8000-000000000009";
+    const asked: unknown[] = [];
+    const row = {
+      approvalId: APPROVAL_ID as never,
+      runId: VIEW.runId,
+      conversationId: null,
+      summary: "Send the deck",
+      requestedAt: VIEW.requestedAt,
+      expiresAt: VIEW.expiresAt,
+    };
+    const { service } = fakeEngine({
+      listPendingApprovals: () =>
+        Promise.resolve([
+          {
+            ...row,
+            targets: [
+              { kind: "DOCUMENT", documentId: COMPANY_ID },
+              { kind: "COMPANY", companyId: COMPANY_ID },
+            ],
+          },
+          { ...row, targets: [{ kind: "USER", userId: PERSON_ID }] },
+          { ...row, targets: [] },
+        ] as never),
+    });
+    const app = createApp(
+      parseQApiConfig({ NODE_ENV: "test" }),
+      {
+        authenticator: { authenticate: () => Promise.resolve(PRINCIPAL) },
+        resolver: {
+          resolveHumanContext: () =>
+            Promise.resolve({ status: "RESOLVED", context: CONTEXT }),
+        },
+      },
+      {
+        qActions: service,
+        namedPhotos: {
+          photos: (subjects) => {
+            asked.push(subjects);
+            // Only the company has a picture; the person has none.
+            return Promise.resolve(new Map([[`COMPANY:${COMPANY_ID}`, LOGO]]));
+          },
+        },
+      },
+    ).app;
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/q/approvals",
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: Record<string, unknown>[] }>();
+    expect(body.items.map((item) => item["named"])).toEqual([
+      { kind: "COMPANY", id: COMPANY_ID, photoUrl: LOGO },
+      { kind: "PERSON", id: PERSON_ID, photoUrl: null },
+      null,
+    ]);
+    // The targets themselves never leave in the list.
+    expect(body.items.every((item) => !("targets" in item))).toBe(true);
+    expect(asked).toEqual([
+      [
+        { subjectType: "COMPANY", subjectId: COMPANY_ID },
+        { subjectType: "PERSON", subjectId: PERSON_ID },
+      ],
+    ]);
+    await app.close();
+  });
 });
 
 describe("GET /v1/q/approvals/:approvalId", () => {

@@ -67,3 +67,5 @@ export {
 } from "./validation.js";
 
 export { CountryCodeSchema, type CountryCode } from "./geography.js";
+
+export { NamedPictureSchema, type NamedPicture } from "./named-picture.js";

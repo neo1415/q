@@ -120,7 +120,31 @@ describe("the card projection", () => {
       }),
     ).toEqual({
       ok: true,
-      scopes: { displayName: "public_external", hqCountry: "public_external" },
+      scopes: {
+        displayName: "public_external",
+        photo: "public_external",
+        hqCountry: "public_external",
+      },
+    });
+  });
+
+  it("gives the photo the name's scope, whatever was asked (founder decision 2026-10-04)", () => {
+    expect(
+      fitFieldScopes("COMPANY", {
+        photo: "network_visible",
+        cover: "network_visible",
+      }),
+    ).toEqual({
+      ok: true,
+      scopes: {
+        canonicalName: "public_external",
+        photo: "public_external",
+        cover: "network_visible",
+      },
+    });
+    expect(readStoredScopes("INVESTOR_ORGANISATION", {})).toEqual({
+      displayName: "public_external",
+      photo: "public_external",
     });
   });
 
@@ -131,7 +155,7 @@ describe("the card projection", () => {
         websiteUrl: "public_external",
         runwayMonths: "public_external",
       }),
-    ).toEqual({ canonicalName: "public_external" });
+    ).toEqual({ canonicalName: "public_external", photo: "public_external" });
     expect(
       readStoredScopes("COMPANY", {
         websiteUrl: "public_external",
@@ -141,9 +165,11 @@ describe("the card projection", () => {
       websiteUrl: "public_external",
       foundedDate: "network_visible",
       canonicalName: "public_external",
+      photo: "public_external",
     });
     expect(readStoredScopes("COMPANY", "garbage")).toEqual({
       canonicalName: "public_external",
+      photo: "public_external",
     });
   });
 });

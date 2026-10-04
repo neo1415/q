@@ -8,14 +8,15 @@ import { Building2 } from "@capital-q/ui/icons";
  * The one picture for anyone or anything named on screen (founder ask
  * 2026-10-04): a person, a company or an investor organisation.
  *
- * Visibility is never decided here. The picture is either a URL a server
- * read already minted for this viewer (and only where that read's own rule
- * lets the viewer see the entity's image), or, for a company, the company
- * photo route, which asks the API under the same Q Card scope as the
- * profile and answers "no" with a 404. Anything else gets the fallback: so
- * a viewer without access sees initials (or a company's plain mark), never
- * a URL. A person's photo is visible only to that person today, so other
- * people always read as initials until a rule says otherwise.
+ * Visibility is never decided here. The rule (founder decision
+ * 2026-10-04) is that a person's photo, or an organisation's logo, has the
+ * scope of their name: whoever may see the name on a surface may see the
+ * picture beside it. The server applies it: the picture is either a URL
+ * the read that returned the name minted for this viewer, or, for a
+ * company or an investor organisation known only by id, its photo route,
+ * which asks the API whether this viewer may see that name and answers
+ * "no" with a 404. Anything else gets the fallback: so a viewer without
+ * access sees initials (or a company's plain mark), never a URL.
  *
  * The frame has fixed dimensions and the fallback is always drawn under
  * the image, so nothing shifts while the image loads or when it fails; a
@@ -31,6 +32,14 @@ export type EntityKind = "person" | "company" | "investor";
  */
 export function companyPhotoPath(companyId: string): string {
   return `/api/company-photo/${encodeURIComponent(companyId)}`;
+}
+
+/**
+ * The investor photo route: a redirect the API answers only where this
+ * reader may see the investor organisation's name (see the route).
+ */
+export function investorPhotoPath(investorOrganisationId: string): string {
+  return `/api/investor-photo/${encodeURIComponent(investorOrganisationId)}`;
 }
 
 export const ENTITY_AVATAR_SIZES = {
@@ -62,16 +71,21 @@ export function entityInitials(name: string): string {
 /**
  * Where the picture comes from. A string: a URL a server read minted for
  * this viewer. Null: the server said there is nothing to show. Undefined:
- * not known; a company then asks its photo route, anyone else falls back.
+ * not known; a company or an investor organisation given by id then asks
+ * its photo route, anyone else falls back.
  */
 export function entityImageSource(input: {
   readonly kind: EntityKind;
   readonly src?: string | null | undefined;
   readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
 }): string | null {
   if (input.src !== undefined) return input.src;
   if (input.kind === "company" && input.companyId !== undefined) {
     return companyPhotoPath(input.companyId);
+  }
+  if (input.kind === "investor" && input.investorOrganisationId !== undefined) {
+    return investorPhotoPath(input.investorOrganisationId);
   }
   return null;
 }
@@ -81,6 +95,7 @@ export function EntityAvatar({
   name,
   src,
   companyId,
+  investorOrganisationId,
   size = "md",
   decorative = false,
   className,
@@ -90,6 +105,8 @@ export function EntityAvatar({
   readonly src?: string | null | undefined;
   /** A company's id, so an unknown `src` can ask the company photo route. */
   readonly companyId?: string | undefined;
+  /** An investor organisation's id, for its photo route likewise. */
+  readonly investorOrganisationId?: string | undefined;
   /** A named size, or exact pixels for a stage that needs its own. */
   readonly size?: EntityAvatarSize | number | undefined;
   /** True when the name is printed right beside it: not announced twice. */
@@ -97,7 +114,12 @@ export function EntityAvatar({
   readonly className?: string | undefined;
 }) {
   const px = typeof size === "number" ? size : ENTITY_AVATAR_SIZES[size];
-  const source = entityImageSource({ kind, src, companyId });
+  const source = entityImageSource({
+    kind,
+    src,
+    companyId,
+    investorOrganisationId,
+  });
   // Keyed by source, so a new URL gets a fresh load and a fresh failure.
   const [state, setState] = useState<{
     readonly source: string | null;
@@ -163,7 +185,8 @@ export function EntityAvatar({
 /**
  * A cover band for profile and hero surfaces only: a fixed aspect so it
  * never shifts, a quiet surface when there is no cover, and never a
- * placeholder picture. Covers are never shown in lists.
+ * placeholder picture. Covers are never shown in list rows; a stage card
+ * (Your companies) may show one in place of a pitch it cannot play.
  */
 export function EntityCover({
   src,

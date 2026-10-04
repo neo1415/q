@@ -64,6 +64,7 @@ export type {
 } from "./application/dependencies.js";
 export type {
   DirectDownloadAuthorization,
+  PrivateBatchDownloadAuthorizer,
   PrivateDocumentDownloadAuthorizer,
   DirectUploadAuthorization,
   PrivateDocumentStorageProvider,

@@ -9,6 +9,8 @@ import {
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
 import { CompanyAvatar } from "../company/company-avatar";
 import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
@@ -336,7 +338,17 @@ export function QResultBlocks({
                     </button>
                   )
                 }
-              />
+              >
+                {/* The investor's logo through its gated photo route, which
+                    answers only where this reader may see their name. */}
+                <EntityAvatar
+                  kind="investor"
+                  name="Investor"
+                  investorOrganisationId={block.investorOrganisationId}
+                  size={40}
+                  decorative
+                />
+              </QResultCard>
             );
 
           case "COMPARISON_CARDS":

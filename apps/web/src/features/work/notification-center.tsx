@@ -8,6 +8,8 @@ import { Bell, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
 import { EmptyState, ErrorState, Skeleton } from "@capital-q/ui/states";
 
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
 import { groupNotices, type NoticeGroup } from "./notice-groups";
 import { PushSetting } from "./push-setting";
 import { markReadAction } from "./work-actions";
@@ -46,8 +48,27 @@ function NoticeRow({
   const linked = notice.linkPath !== null && /^\/(?!\/)/.test(notice.linkPath);
   // One line per notice on a phone (design-48 v2): the title and its time.
   // The body is on the page the row opens, never repeated here.
+  const named = notice.named ?? null;
   const body = (
     <span className="flex min-w-0 flex-1 items-baseline gap-3">
+      {named === null || named.photoUrl === null ? null : (
+        // Who the notice names, as the server signed it for this reader
+        // (the name's scope). No picture: the row stays text only.
+        <EntityAvatar
+          kind={
+            named.kind === "COMPANY"
+              ? "company"
+              : named.kind === "PERSON"
+                ? "person"
+                : "investor"
+          }
+          name=""
+          src={named.photoUrl}
+          size="xs"
+          decorative
+          className="self-center"
+        />
+      )}
       <span
         className={`cq-body-sm min-w-0 flex-1 line-clamp-2 text-(--cq-text-primary) ${unread ? "font-medium" : ""}`}
       >
