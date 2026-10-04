@@ -1479,3 +1479,21 @@ describe("live QA (instruction 76d6f281): code decides from the conversation", (
     expect([...written].sort()).toEqual(["a", "d", "e"]);
   });
 });
+
+describe("any hour (live QA 01a6124a)", () => {
+  it("every day 00:00-23:59 is in hours at any minute, the last one too", () => {
+    const always = {
+      timeZone: "UTC",
+      days: [1, 2, 3, 4, 5, 6, 7],
+      start: "00:00",
+      end: "23:59",
+    };
+    for (const at of [
+      "2026-10-04T00:00:00Z",
+      "2026-10-04T03:17:00Z",
+      "2026-10-03T23:59:30Z",
+    ]) {
+      expect(withinWorkingHours(new Date(at), always), at).toBe(true);
+    }
+  });
+});

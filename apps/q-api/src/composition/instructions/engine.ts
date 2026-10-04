@@ -250,10 +250,11 @@ export function withinWorkingHours(
 ): boolean {
   try {
     const here = local(at, hours.timeZone);
+    // "23:59" is the end of the day ("any hour"): its last minute is in.
     return (
       hours.days.includes(here.day) &&
       here.hm >= hours.start &&
-      here.hm < hours.end
+      (here.hm < hours.end || hours.end === "23:59")
     );
   } catch {
     // An unknown zone: never "inside" -- AUTO waits, nothing runs blind.
