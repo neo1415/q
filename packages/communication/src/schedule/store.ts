@@ -107,7 +107,8 @@ export type NotificationKind =
   | "INTEREST_RECEIVED"
   | "CONNECTION_REQUESTED"
   | "Q_MESSAGE"
-  | "TIME_PROPOSED";
+  | "TIME_PROPOSED"
+  | "COMMITMENT";
 
 export type NewNotification = {
   readonly tenantId: string;

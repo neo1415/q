@@ -18,7 +18,9 @@ export type CounterpartNoticeKind =
   /** A pass, pause or resume on the relationship (2026-10-02). */
   | "RELATIONSHIP_OUTCOME"
   /** A diligence request or a shared document (2026-10-02). */
-  | "DILIGENCE";
+  | "DILIGENCE"
+  /** A commitment moved a step: amount, sent, received (2026-10-04). */
+  | "COMMITMENT";
 
 export function createCounterpartNotices(sql: DatabaseExecutor) {
   return {
@@ -30,7 +32,7 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
       readonly title: string;
       readonly body: string | null;
       /** Where they act: their inbox, their chat, or the relationship page. */
-      readonly target: "INBOX" | "CHAT" | "RELATIONSHIP";
+      readonly target: "INBOX" | "CHAT" | "RELATIONSHIP" | "CAPITAL";
       readonly key: string;
       readonly priority: "NEEDS_YOU" | "UPDATE";
     }): Promise<number> => {
@@ -40,6 +42,7 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
         select m.tenant_id, m.user_id, ${input.kind}, ${input.title.slice(0, 200)},
                ${input.body === null ? null : input.body.slice(0, 1000)},
                case
+                 when ${input.target} = 'CAPITAL' then '/capital'
                  when ${input.target} = 'INBOX' and ${input.actingSide} = 'INVESTOR' then '/company/interest'
                  when ${input.target} = 'INBOX' then '/investors'
                  when ${input.target} = 'RELATIONSHIP' and ${input.actingSide} = 'INVESTOR'

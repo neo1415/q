@@ -8,6 +8,8 @@ import {
   RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED,
   RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
   RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
+  RELATIONSHIP_EVENT_COMMITMENT_RECEIVED,
+  RELATIONSHIP_EVENT_COMMITMENT_TRANSFER_SENT,
   RELATIONSHIP_EVENT_COMMITMENT_STATED,
   RELATIONSHIP_EVENT_COMMITMENT_WITHDRAWN,
   RELATIONSHIP_EVENT_CONNECTION_ACCEPTED,
@@ -132,6 +134,9 @@ const ACTIVITY_TYPES: ReadonlySet<string> = new Set([
   RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
   RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
   RELATIONSHIP_EVENT_MEETING_NO_SHOW,
+  // 2026-10-04: activity in v1; v2 reads a receipt as INVESTED.
+  RELATIONSHIP_EVENT_COMMITMENT_TRANSFER_SENT,
+  RELATIONSHIP_EVENT_COMMITMENT_RECEIVED,
 ]);
 
 export type RelationshipProjection = {
@@ -250,6 +255,8 @@ export function projectRelationshipStateV1(
  *   CONNECTED | MEETING_HELD | IN_DILIGENCE | PAUSED
  *     --commitment_confirmed (level INVESTED)--> INVESTED
  *   INVESTED --commitment_withdrawn (that commitment)--> the state before
+ *   CONNECTED | MEETING_HELD | IN_DILIGENCE | PAUSED
+ *     --commitment_received (any level; 2026-10-04)--> INVESTED
  *
  * A meeting held after the first, a SOFT or FIRM confirmation, mail and
  * chat stay activity: they never move state and are never anomalies. A
@@ -393,6 +400,16 @@ export function projectRelationshipStateV2(
     if (event.eventType === RELATIONSHIP_EVENT_MEETING_HELD) {
       // The first meeting of a match moves it; every other is activity.
       if (at.state === "CONNECTED") move("MEETING_HELD", event);
+      continue;
+    }
+    if (event.eventType === RELATIONSHIP_EVENT_COMMITMENT_RECEIVED) {
+      // The company's side confirmed the money arrived: invested, whatever
+      // level was said. A receipt is never withdrawn.
+      const commitmentId = payloadString(event, "commitmentId");
+      if (commitmentId !== undefined && INVESTABLE.has(at.state)) {
+        at.investedBy = { commitmentId, from: at.state };
+        move("INVESTED", event);
+      }
       continue;
     }
     if (event.eventType === RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED) {

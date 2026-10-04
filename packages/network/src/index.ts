@@ -248,10 +248,15 @@ export {
 // Spec 6.6.14-6.6.15: commitments and the fundraising view.
 export {
   commitmentBucket,
+  commitmentNextStep,
   createCommitmentService,
+  type CommitmentLedger,
   type CommitmentOutcome,
   type CommitmentService,
+  type LedgerCommitment,
+  type LedgerSum,
 } from "./application/commitments.js";
+export { COMMITMENT_STEPS, type CommitmentStep } from "./events/index.js";
 export {
   reapproachAfterPass,
   type PassStanding,
@@ -273,11 +278,15 @@ export {
   CommitmentConfirmedRelationshipEvent,
   CommitmentDetectedRelationshipEvent,
   CommitmentDisputedRelationshipEvent,
+  CommitmentReceivedRelationshipEvent,
+  CommitmentTransferSentRelationshipEvent,
   MeetingRecordingDeclinedRelationshipEvent,
   MeetingNoShowRelationshipEvent,
   RELATIONSHIP_EVENT_MEETING_NO_SHOW,
   RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
   RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
+  RELATIONSHIP_EVENT_COMMITMENT_RECEIVED,
+  RELATIONSHIP_EVENT_COMMITMENT_TRANSFER_SENT,
   RELATIONSHIP_EVENT_MEETING_RECORDING_DECLINED,
   CommitmentStatedRelationshipEvent,
   CommitmentWithdrawnRelationshipEvent,

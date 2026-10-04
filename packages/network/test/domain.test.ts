@@ -139,6 +139,8 @@ describe("relationship event registry", () => {
       "meeting_recording_declined",
       "commitment_detected",
       "commitment_disputed",
+      "commitment_transfer_sent",
+      "commitment_received",
       "meeting_no_show",
       "relationship_passed",
       "relationship_paused",

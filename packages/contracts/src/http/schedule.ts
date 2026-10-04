@@ -244,6 +244,8 @@ export const NotificationKindSchema = z.enum([
   "EMAIL_RECEIVED",
   // QA run 8a1d57b9: a new chat message, one notice per conversation.
   "CHAT_MESSAGE",
+  // 2026-10-04: a commitment moved a step (amount, sent, received).
+  "COMMITMENT",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

@@ -293,6 +293,48 @@ describe("relationship-state.v2 transitions", () => {
     ).toBe("MEETING_HELD");
   });
 
+  it("money received is INVESTED at any level; marking it sent moves nothing (2026-10-04)", () => {
+    const firm = [
+      ...connected(),
+      event(4, "meeting_held"),
+      event(5, "commitment_confirmed", {
+        commitmentId: COMMITMENT,
+        level: "FIRM",
+      }),
+      event(6, "commitment_transfer_sent", {
+        commitmentId: COMMITMENT,
+        level: "FIRM",
+      }),
+    ];
+    expect(stateOf(firm)).toBe("MEETING_HELD");
+    const received = [
+      ...firm,
+      event(7, "commitment_received", {
+        commitmentId: COMMITMENT,
+        level: "FIRM",
+      }),
+    ];
+    expect(stateOf(received)).toBe("INVESTED");
+    const projection = projectRelationshipStateV2(received);
+    expect(projection?.anomalies).toEqual([]);
+    expect(projection?.unrecognised).toBe(0);
+    // Already invested by a confirmed INVESTED commitment: the receipt is
+    // not a second move.
+    expect(
+      projectRelationshipStateV2([
+        ...connected(),
+        event(4, "commitment_confirmed", {
+          commitmentId: COMMITMENT,
+          level: "INVESTED",
+        }),
+        event(5, "commitment_received", {
+          commitmentId: COMMITMENT,
+          level: "INVESTED",
+        }),
+      ])?.milestones.filter((m) => m.state === "INVESTED"),
+    ).toHaveLength(1);
+  });
+
   it("an outcome that is not a legal move is an anomaly and changes nothing", () => {
     const early = projectRelationshipStateV2([
       event(1, "discovered", {}, "investor_private"),
