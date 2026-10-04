@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
 import type { GoogleConnectionDto } from "@capital-q/contracts";
@@ -12,16 +12,23 @@ import {
 } from "./integration-actions";
 
 /**
- * Gmail on the Settings page (BIZ-007): connect, see which address, and
- * disconnect. Connecting lets Q draft emails to people on your
- * relationships for your approval, and notice their replies; nothing is
- * ever sent without your approval of the exact email.
+ * Google on Settings → Connections (BIZ-007): connect, see which address,
+ * and disconnect. Connecting lets Q draft emails to people on your
+ * relationships for your approval, notice their replies, and book calls
+ * with a Meet link; nothing is ever sent without your approval.
+ *
+ * meetfix-57: a connection Google ended (REVOKED) says so plainly with a
+ * Reconnect button, and the reconnect link from Q or a notice
+ * (`reconnect`) starts the reconnect itself -- one tap from the notice.
  */
 export function GmailConnection({
   outcome,
+  reconnect = false,
 }: {
   /** `?google=` from the OAuth return, if any. */
   readonly outcome?: string | undefined;
+  /** `?reconnect=google`: start reconnecting when Google isn't connected. */
+  readonly reconnect?: boolean | undefined;
 }) {
   const [connection, setConnection] = useState<GoogleConnectionDto | null>(
     null,
@@ -48,6 +55,25 @@ export function GmailConnection({
       if (result.ok) window.location.assign(result.value);
       else setMessage(result.message);
     });
+
+  // The reconnect link: once, and only when there is something to fix and
+  // the person did not just come back from Google declining it.
+  const started = useRef(false);
+  useEffect(() => {
+    if (
+      !reconnect ||
+      started.current ||
+      outcome !== undefined ||
+      connection === null ||
+      (connection.status !== "REVOKED" && connection.status !== "NOT_CONNECTED")
+    ) {
+      return;
+    }
+    started.current = true;
+    connect();
+    // `connect` is stable in effect: it only starts a transition.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reconnect, outcome, connection]);
   const disconnect = () =>
     startTransition(async () => {
       const result = await disconnectGmail();
@@ -86,10 +112,29 @@ export function GmailConnection({
             Disconnect
           </button>
         </div>
+      ) : connection.status === "REVOKED" ? (
+        <div className="flex flex-col items-start gap-2">
+          <p className="cq-body-sm text-(--cq-text-primary)">
+            Disconnected by Google
+            {connection.revokedAt === undefined
+              ? ""
+              : ` on ${new Date(connection.revokedAt).toLocaleDateString()}`}
+            . Calendar, email and Meet links are paused until you reconnect.
+          </p>
+          <button
+            type="button"
+            className={buttonClassName("primary", "compact")}
+            disabled={pending}
+            onClick={connect}
+          >
+            Reconnect Google
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col items-start gap-2">
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Q drafts emails you approve, and tells you when they reply.
+            Q drafts emails you approve, tells you when they reply, and books
+            calls with a Meet link.
           </p>
           <button
             type="button"
@@ -97,7 +142,7 @@ export function GmailConnection({
             disabled={pending}
             onClick={connect}
           >
-            Connect Gmail
+            Connect Google
           </button>
         </div>
       )}

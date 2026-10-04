@@ -61,11 +61,14 @@ export const GoogleConnectionDtoSchema = z
 export type GoogleConnectionDto = z.infer<typeof GoogleConnectionDtoSchema>;
 
 /**
- * meetfix-57: the one in-app link that reconnects Google. Settings opens
- * on Connections and, when Google is not connected, starts the reconnect
- * itself, so a notice or Q's answer is one tap from fixed.
+ * meetfix-57: the one in-app link that reconnects Google. It opens
+ * Settings on Connections and, when Google is not connected, starts the
+ * reconnect itself, so a notice or Q's answer is one tap from fixed. A
+ * plain path: notification links allow no query or fragment.
  */
-export const GOOGLE_RECONNECT_PATH =
+export const GOOGLE_RECONNECT_PATH = "/settings/reconnect/google" as const;
+/** Where that link lands: Settings, Connections, reconnect requested. */
+export const GOOGLE_RECONNECT_TARGET =
   "/settings?reconnect=google#connections" as const;
 
 /**

@@ -247,13 +247,26 @@ export function createIntegrationsService(
         error instanceof GoogleProviderError &&
         error.code === "INVALID_GRANT"
       ) {
-        // The person revoked us at Google: the credential is dead weight.
-        await store.endConnection(account.id, "REVOKED_BY_PROVIDER");
+        // The person revoked us at Google (or a testing-mode token lapsed
+        // after 7 days): the credential is dead weight.
+        const ended = await store.endConnection(
+          account.id,
+          "REVOKED_BY_PROVIDER",
+        );
         accessCache.delete(account.id);
         logger?.warn(
           { googleAccountId: account.id },
           "google grant revoked by provider; connection ended",
         );
+        if (ended) {
+          // meetfix-57: told once, by whichever sync saw it first.
+          await store.noticeRevoked(account).catch((noticeError: unknown) => {
+            logger?.warn(
+              { googleAccountId: account.id, err: noticeError },
+              "google revocation notice not recorded",
+            );
+          });
+        }
       }
       throw error;
     }

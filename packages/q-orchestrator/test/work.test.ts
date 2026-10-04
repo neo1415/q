@@ -566,7 +566,7 @@ describe("lane: accept → chat → interview → report → times → book", ()
       notice.key.startsWith("calendar-blocked:"),
     );
     expect(held).toHaveLength(1);
-    expect(held[0]?.link).toBe("/settings?reconnect=google#connections");
+    expect(held[0]?.link).toBe("/settings/reconnect/google");
     expect(held[0]?.title).toBe(
       "Reconnect Google to book your call with Femi Co",
     );

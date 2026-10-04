@@ -124,11 +124,19 @@ export type IntegrationsStore = {
   readonly listConnected: (
     limit: number,
   ) => Promise<readonly GoogleAccountRecord[]>;
-  /** Drops the credential; the row stays as history. */
+  /**
+   * Drops the credential; the row stays as history. True only for the call
+   * that ended a live connection, so what follows an ending happens once.
+   */
   readonly endConnection: (
     accountId: string,
     status: "DISCONNECTED" | "REVOKED_BY_PROVIDER",
-  ) => Promise<void>;
+  ) => Promise<boolean>;
+  /**
+   * meetfix-57: the person's one notice that Google ended this connection,
+   * with the reconnect link; idempotent per connection.
+   */
+  readonly noticeRevoked: (account: GoogleAccountRecord) => Promise<void>;
   readonly saveCursor: (
     accountId: string,
     cursor: {
