@@ -148,6 +148,26 @@ export function referenceNote(
   return parts.join(" ").slice(0, NOTE_CHARS);
 }
 
+/**
+ * The record's name as said, without the words around it that are not the
+ * name (voiceq-63, live 2026-10-04: "open the relationship between Nixon
+ * and I" was answered `Opening "Nixon and I".`). Speech only frames the
+ * name; the record is still resolved by the open tool among their own.
+ */
+export function spokenRecordName(name: string): string {
+  const bare = name
+    .trim()
+    .replace(
+      /^(?:(?:the|my|our)\s+)?(?:relationship|chat|conversation|call|meeting|page|profile)?\s*(?:between|with|of|for)\s+/iu,
+      "",
+    )
+    .replace(/^(?:me|myself|us|i)\s+and\s+/iu, "")
+    .replace(/\s+(?:and|&)\s+(?:i|me|myself|us|we)$/iu, "")
+    .replace(/[\s.,;:!?]+$/u, "")
+    .trim();
+  return bare.length === 0 ? name.trim() : bare;
+}
+
 /** Which record a reading points at: its name or id, and the pages to try. */
 export type OpenTarget = {
   readonly pages: readonly QRecordPage[];
@@ -169,12 +189,13 @@ export function openTarget(
   if (reference.open === null) return null;
   const pointed =
     reference.shown === null ? undefined : shown[reference.shown - 1];
-  const name = reference.name ?? pointed?.name ?? null;
+  const said =
+    reference.name === null ? null : spokenRecordName(reference.name);
+  const name = said ?? pointed?.name ?? null;
   const id =
     pointed !== undefined &&
     pointed.id !== null &&
-    (reference.name === null ||
-      reference.name.toLowerCase() === pointed.name.toLowerCase())
+    (said === null || said.toLowerCase() === pointed.name.toLowerCase())
       ? pointed.id
       : null;
   if (name === null && id === null) return null;

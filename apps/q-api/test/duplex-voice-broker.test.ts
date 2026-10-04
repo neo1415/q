@@ -59,6 +59,7 @@ import {
   nextListeningLevel,
   type DuplexListeningStore,
 } from "../src/voice/duplex/listening.js";
+import { utteranceRefOf } from "../src/voice/utterance.js";
 import { utcDayStart } from "../src/voice/duplex/spend.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
 
@@ -498,6 +499,34 @@ describe("relaying the model's tool calls", () => {
       say: "Heard: How is my raise going?",
     });
     expect(result?.approvalPending).toBe(false);
+  });
+
+  it("each ask_q is its own utterance, after what Q said on the line (voiceq-63)", async () => {
+    const h = await opened();
+    const ask = (request: string, callId: string) =>
+      h.broker.tool({
+        actor: ACTOR,
+        voiceSessionId: id,
+        call: { callId, name: "ask_q", arguments: JSON.stringify({ request }) },
+      });
+    await ask("Book a meeting with Nixo in the next five minutes.", "c1");
+    await ask("Yes, approve the meeting with Nixo.", "c2");
+    const calls = vi.mocked(h.turn).mock.calls;
+    const first = calls[0]?.[1] ?? [];
+    const second = calls[1]?.[1] ?? [];
+    expect(second).toEqual([
+      {
+        role: "user",
+        content: "Book a meeting with Nixo in the next five minutes.",
+      },
+      {
+        role: "agent",
+        content: "Heard: Book a meeting with Nixo in the next five minutes.",
+      },
+      { role: "user", content: "Yes, approve the meeting with Nixo." },
+    ]);
+    // Live 2026-10-04 both had one ref, and the second hid the first.
+    expect(utteranceRefOf(id, second)).not.toBe(utteranceRefOf(id, first));
   });
 
   it("says a proposal is waiting when the turn left one for approval", async () => {

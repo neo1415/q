@@ -3514,11 +3514,21 @@ export function createModelGatewayQAnswer(
         // An answer that was nothing but talk about acting leaves Capital
         // Q's own lines — the revision below, the action's own narration —
         // to say what happened. Alone, it is acknowledged and no more.
+        // voiceq-63 (live 2026-10-04, run 87391453): "open the PDF…"
+        // opened it, the claim was removed from the words, and the person
+        // heard only "Understood.". A screen move that went through says so.
+        const openedOnScreen = (analystBlocks ?? []).some(
+          (block) =>
+            block.kind === "UI_INTENT" &&
+            block.intent.kind === "OPEN_RECORD_PAGE",
+        );
         const reply =
           revisedArtifact === null
             ? content.length > 0
               ? content
-              : "Understood."
+              : openedOnScreen
+                ? CLIENT_ACTION_DONE_LINE
+                : "Understood."
             : `${content}
 
 I've updated **${revisedArtifact.title}** — that's version ${String(revisedArtifact.currentVersion)}. The previous version is still there, and nothing has been shared or sent.`.trim();

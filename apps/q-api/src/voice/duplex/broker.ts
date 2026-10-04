@@ -22,7 +22,7 @@ import type {
 import type { ActorContext } from "@capital-q/security";
 
 import type { VoiceSessionBinding } from "../bindings.js";
-import type { VoiceSpeaker } from "../provider.js";
+import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
 import { withoutWrittenLaugh } from "../providers/speech-markup.js";
 import { sentences, withoutStageDirections } from "../speech.js";
 import { APPROVAL_QUESTION, type VoiceTurnHandler } from "../turn.js";
@@ -129,7 +129,20 @@ type DuplexLine = {
   readonly listening: boolean;
   /** Reports by kind, for the end-of-line log. */
   readonly kinds: Record<string, number>;
+  /**
+   * What was asked of Q and said back on this line, oldest first, bounded
+   * (voiceq-63). Each ask_q is a new utterance after Q's last reply: live
+   * 2026-10-04 every request went to the turn as a one-line transcript, so
+   * all of them had one utterance ref, and each new request marked every
+   * earlier one on the line, with its answer, as superseded: Q lost what
+   * it had just said and prepared, and spoken replies were read without
+   * their context.
+   */
+  readonly history: VoiceTranscriptTurn[];
 };
+
+/** The turns of a line the next ask_q carries. */
+const LINE_HISTORY_MAX = 12;
 
 export type DuplexBroker = {
   readonly enabled: boolean;
@@ -395,6 +408,7 @@ export function createDuplexBroker(
         seen: new Set(),
         listening: listens,
         kinds: {},
+        history: [],
       });
       logger.info(
         {
@@ -435,13 +449,27 @@ export function createDuplexBroker(
         // same Q run, the same tools, approvals and conduct.
         const speaker = collectingSpeaker(`rt_${voiceSessionId}`);
         try {
+          const asked: VoiceTranscriptTurn = {
+            role: "user",
+            content: request.slice(0, ASK_Q_MAX_CHARS),
+          };
           const outcome = await turn(
             line.binding,
-            [{ role: "user", content: request.slice(0, ASK_Q_MAX_CHARS) }],
+            [...line.history, asked],
             abort,
             speaker,
           );
           const said = speaker.said();
+          // What was asked stays on the line's record either way; what Q
+          // said, only when it was said.
+          line.history.push(asked);
+          if (outcome.kind !== "INTERRUPTED" && !abort.aborted && said !== "") {
+            line.history.push({ role: "agent", content: said });
+          }
+          line.history.splice(
+            0,
+            Math.max(0, line.history.length - LINE_HISTORY_MAX),
+          );
           if (outcome.kind === "INTERRUPTED" || abort.aborted) {
             return output({ ok: false, interrupted: true });
           }
