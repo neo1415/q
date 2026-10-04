@@ -136,6 +136,11 @@ export const CompanyProfileDtoSchema = z
      * shows the photo to signed-in participants. Null: none, or not shown.
      */
     photoUrl: z.string().url().nullable(),
+    /**
+     * The company's cover, under its Q Card's own `cover` scope, the same
+     * way (founder ask 2026-10-04). Absent from older servers.
+     */
+    coverUrl: z.string().url().nullable().optional(),
     /** Null for a FOUNDER viewer, by design. */
     overview: CompanyProfileOverviewSchema.nullable(),
     /** Every video this reader may play, newest first. */

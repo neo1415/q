@@ -1561,6 +1561,12 @@ const { app, logger } = createApp(config, security, {
         subject: { subjectType: "COMPANY", subjectId: company.id },
         audience: "PARTICIPANT",
       }),
+    // The header's photo and cover, each under its own card scope.
+    images: (company) =>
+      publicIdentity.cardImagesFor({
+        subject: { subjectType: "COMPANY", subjectId: company.id },
+        audience: "PARTICIPANT",
+      }),
     disclosedRaise: async (actor, companyId) =>
       (
         await discoverFilterFacts.disclosedRaises?.({

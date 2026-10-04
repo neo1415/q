@@ -141,6 +141,15 @@ export type PublicIdentityService = {
     readonly subject: QCardSubject;
     readonly audience: CardAudience;
   }) => Promise<string | null>;
+  /**
+   * The photo and the cover for one audience, each under its own card
+   * scope (founder ask 2026-10-04: the cover on profile headers). Signed
+   * in one read; a field the scope hides comes back null.
+   */
+  readonly cardImagesFor: (input: {
+    readonly subject: QCardSubject;
+    readonly audience: CardAudience;
+  }) => Promise<{ readonly photo: string | null; readonly cover: string | null }>;
 };
 
 function dayOf(date: Date): string {
@@ -472,6 +481,29 @@ export function createPublicIdentityService(
       return { handle: active.handle };
     },
 
+    cardImagesFor: async ({ subject, audience }) => {
+      const none = { photo: null, cover: null };
+      if (dependencies.cardImages === undefined) return none;
+      const card = await repository.findCard(sql, subject);
+      if (card === null || card.status !== "ACTIVE") return none;
+      const scopes = readStoredScopes(subject.subjectType, card.fieldScopes);
+      // The card's own projection decides, with stand-in values, before
+      // anything is signed: when the scopes hide both, nothing is minted.
+      const shown = new Set(
+        projectCardFields(
+          subject.subjectType,
+          scopes,
+          { photo: "shown", cover: "shown" },
+          audience,
+        ).map((field) => field.key),
+      );
+      if (!shown.has("photo") && !shown.has("cover")) return none;
+      const images = await dependencies.cardImages(subject).catch(() => null);
+      return {
+        photo: shown.has("photo") ? (images?.photo ?? null) : null,
+        cover: shown.has("cover") ? (images?.cover ?? null) : null,
+      };
+    },
     cardPhotoFor: async ({ subject, audience }) => {
       if (dependencies.cardImages === undefined) return null;
       const card = await repository.findCard(sql, subject);
