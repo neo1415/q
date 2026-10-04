@@ -47,7 +47,7 @@ const stranger = {
   organisationId: "00000000-0000-4000-8000-0000000000b8",
 } as unknown as ActorContext;
 
-function world(options: { calendar?: boolean } = {}) {
+function world(options: { calendar?: boolean; revoked?: boolean } = {}) {
   const store = createInMemoryScheduleStore();
   const calendar = createFakeCalendar("ben@vc.example.invalid");
   const schedule = createScheduleService({
@@ -83,6 +83,16 @@ function world(options: { calendar?: boolean } = {}) {
     calendars: (userId) =>
       Promise.resolve(
         options.calendar !== false && userId === actor.userId ? calendar : null,
+      ),
+    calendarState: (userId) =>
+      Promise.resolve(
+        userId !== actor.userId
+          ? "NOT_CONNECTED"
+          : options.calendar === false
+            ? options.revoked === true
+              ? "REVOKED"
+              : "NOT_CONNECTED"
+            : "CONNECTED",
       ),
     activity: createRecordingMeetingActivity(),
     email: createFakeAppEmail(),
@@ -129,10 +139,38 @@ describe("meeting.schedule", () => {
     const noCalendar = createMeetingScheduleAction({
       schedule: world({ calendar: false }).schedule,
     });
+    // meetfix-57: a missing calendar is not a want of authority; the
+    // executor meets it once and the action ends with the reason.
     expect(await noCalendar.authorize(meetingPayload, actor)).toEqual({
-      outcome: "DENY",
-      code: "CALENDAR_NOT_CONNECTED",
+      outcome: "ALLOW",
     });
+  });
+
+  it("ends an approved call on a revoked calendar once, with the reason and one notice (meetfix-57)", async () => {
+    const { schedule } = world({ calendar: false, revoked: true });
+    const told: { reason: string; actionId: string }[] = [];
+    const book = createMeetingScheduleAction({
+      schedule,
+      tellCalendarBlocked: (notice) => {
+        told.push({ reason: notice.reason, actionId: notice.actionId });
+        return Promise.resolve();
+      },
+    });
+    const outcome = await book.executor.execute(
+      approved(MEETING_SCHEDULE, meetingPayload, "q_action:m:revoked"),
+      context,
+    );
+    expect(outcome).toEqual({
+      outcome: "FAILED",
+      failureCode: "CALENDAR_REVOKED",
+      retryable: false,
+    });
+    expect(told).toEqual([
+      {
+        reason: "CALENDAR_REVOKED",
+        actionId: "00000000-0000-4000-8000-0000000000e1",
+      },
+    ]);
   });
 
   it("books once per execution identity and cancels only as the organiser", async () => {

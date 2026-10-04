@@ -528,6 +528,64 @@ describe("lane: accept → chat → interview → report → times → book", ()
     expect(rec.posts.map((post) => post.key)).toEqual(["open", "booked:auto"]);
   });
 
+  it("parks a call on a revoked calendar: one attempt, one notice, then books once reconnected (meetfix-57)", async () => {
+    const grant = OutreachGrantSchema.parse({
+      ...GRANT,
+      topics: [],
+      brief: null,
+      interview: null,
+      call: { ...GRANT.call, mayBookInWindows: true },
+    });
+    const { ports, rec } = fakePorts();
+    let connected = false;
+    let attempts = 0;
+    const okSlots = ports.slots;
+    const engine = createQWorkEngine({
+      checkpoints: createInMemoryQCheckpointStore(),
+      ports: {
+        ...ports,
+        calendarReady: () => Promise.resolve(connected),
+        slots: (ref, relationshipId, call) => {
+          attempts += 1;
+          return connected
+            ? okSlots(ref, relationshipId, call)
+            : Promise.resolve({ outcome: "REFUSED", code: "CALENDAR_REVOKED" });
+        },
+      },
+    });
+    await engine.advanceLane(
+      LANE("lane-3", grant),
+      observe({ connected: false }),
+    );
+    for (let minute = 0; minute < 10; minute += 1) {
+      await engine.advanceLane(LANE("lane-3", grant), observe());
+    }
+    expect(attempts).toBe(1);
+    expect(rec.booked).toEqual([]);
+    const held = rec.notices.filter((notice) =>
+      notice.key.startsWith("calendar-blocked:"),
+    );
+    expect(held).toHaveLength(1);
+    expect(held[0]?.link).toBe("/settings?reconnect=google#connections");
+    expect(held[0]?.title).toBe(
+      "Reconnect Google to book your call with Femi Co",
+    );
+    expect(
+      rec.lanes
+        .get("lane-3")
+        ?.some((patch) =>
+          patch.lastStep?.startsWith(
+            "Call on hold: your Google Calendar connection expired",
+          ),
+        ),
+    ).toBe(true);
+
+    connected = true;
+    await engine.advanceLane(LANE("lane-3", grant), observe());
+    expect(attempts).toBe(2);
+    expect(rec.booked).toEqual(["2026-10-06T10:00:00.000Z"]);
+  });
+
   it("ends a declined lane with a notice", async () => {
     const { ports, rec } = fakePorts();
     const engine = createQWorkEngine({
