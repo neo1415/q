@@ -13,10 +13,7 @@ import {
 
 /** TURN_READER v41 (WORK-58): "show my work" opens Q's work page. */
 describe("TURN_READER v41", () => {
-  it("is the active reader and v40 is deprecated", () => {
-    expect(
-      createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(41);
+  it("v40 is deprecated (v42 is the active reader since voiceq-63)", () => {
     expect(TURN_READER_V40.status).toBe("DEPRECATED");
   });
 
