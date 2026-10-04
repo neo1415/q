@@ -19,7 +19,7 @@ import {
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { useDockAvoid } from "@/features/q-dock";
-import { initials } from "@/features/investors/investor-labels";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import type { RelationshipDigest } from "./relationship-data";
 import { StatusPill, type StatusTone } from "./status-pill";
@@ -306,22 +306,23 @@ function RelationshipCard({
       data-relationship-card={item.state}
     >
       <div className="flex min-w-0 items-start gap-4">
-        {digest?.photoUrl === null || digest?.photoUrl === undefined ? (
-          <span
-            aria-hidden="true"
-            className="inline-flex size-12 shrink-0 items-center justify-center rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) font-semibold text-(--cq-text-secondary)"
-          >
-            {initials(name)}
-          </span>
+        {item.counterpart.kind === "COMPANY" ? (
+          // A company's photo through its gated route, lazily, per card.
+          <EntityAvatar
+            kind="company"
+            name={name}
+            companyId={item.counterpart.id}
+            src={digest?.photoUrl ?? undefined}
+            size={48}
+            decorative
+          />
         ) : (
-          // A short-lived signed URL; next/image would cache it past expiry.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={digest.photoUrl}
-            alt=""
-            width={48}
-            height={48}
-            className="size-12 shrink-0 rounded-xl object-cover"
+          <EntityAvatar
+            kind="investor"
+            name={name}
+            src={digest?.photoUrl ?? null}
+            size={48}
+            decorative
           />
         )}
         <div className="flex min-w-0 flex-1 flex-col gap-1">

@@ -320,6 +320,41 @@ describe("GET /v1/companies/:id/profile", () => {
     await app.close();
   });
 
+  it("carries the card's cover beside the photo when the images port answers (founder ask 2026-10-04)", async () => {
+    const { profile } = ports({ investor: true });
+    const app = buildApp({
+      profile: {
+        ...profile,
+        images: () =>
+          Promise.resolve({
+            photo: "https://storage.example/photo.webp?sig=1",
+            cover: "https://storage.example/cover.webp?sig=1",
+          }),
+      },
+    });
+    const response = await app.inject({ method: "GET", url: PROFILE_URL });
+    const body = response.json<ProfileBody & { coverUrl?: string | null }>();
+    expect(body.photoUrl).toContain("photo.webp");
+    expect(body.coverUrl).toContain("cover.webp");
+    await app.close();
+  });
+
+  it("a reader the card's scopes do not reach gets no image URL at all", async () => {
+    const { profile } = ports({ investor: false });
+    const app = buildApp({
+      profile: {
+        ...profile,
+        images: () => Promise.resolve({ photo: null, cover: null }),
+      },
+    });
+    const response = await app.inject({ method: "GET", url: PROFILE_URL });
+    const body = response.json<ProfileBody & { coverUrl?: string | null }>();
+    expect(body.photoUrl).toBeNull();
+    expect(body.coverUrl).toBeNull();
+    expect(response.body).not.toContain("storage.example");
+    await app.close();
+  });
+
   it("carries nothing founder-private, whatever the company read returned", async () => {
     const { profile } = ports({ investor: true });
     const app = buildApp({ profile });

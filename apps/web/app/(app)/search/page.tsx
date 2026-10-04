@@ -9,8 +9,11 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { NetworkVideos } from "@/features/discover/network/network-videos";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 import {
   cardDescriptor,
+  cardImage,
+  fieldsForAudience,
   publicExternalFields,
 } from "@/features/q-card/card-content";
 import { loadPublicCard } from "@/features/q-card/public-card-data";
@@ -142,13 +145,23 @@ export default async function SearchPage({
                 <li key={match.href}>
                   <Link
                     href={match.href}
-                    className="flex min-h-14 flex-col justify-center px-1 py-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                    className="flex min-h-14 items-center gap-3 px-1 py-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                   >
-                    <span className="cq-body text-(--cq-text-primary)">
-                      {match.name}
-                    </span>
-                    <span className="cq-caption text-(--cq-text-secondary)">
-                      {match.detail}
+                    <EntityAvatar
+                      kind={match.kind}
+                      name={match.name}
+                      companyId={match.companyId}
+                      src={match.photoUrl}
+                      size="sm"
+                      decorative
+                    />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="cq-body text-(--cq-text-primary)">
+                        {match.name}
+                      </span>
+                      <span className="cq-caption text-(--cq-text-secondary)">
+                        {match.detail}
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -169,12 +182,13 @@ export default async function SearchPage({
           data-find-result={card.handle}
           className="flex min-h-14 items-center gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3 hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
-          <span
-            aria-hidden="true"
-            className="cq-label flex size-10 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-primary)"
-          >
-            {card.name.trim().slice(0, 1).toUpperCase()}
-          </span>
+          {/* The card's own photo field, only as its scope shows it. */}
+          <EntityAvatar
+            kind={card.subjectType === "COMPANY" ? "company" : "investor"}
+            name={card.name}
+            src={cardImage(fieldsForAudience(card), "photo")}
+            decorative
+          />
           <span className="flex min-w-0 flex-col">
             <span className="cq-body truncate font-medium text-(--cq-text-primary)">
               {card.name}

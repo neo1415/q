@@ -18,6 +18,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { RelationshipChat } from "@/features/chat/relationship-chat";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { apiSession } from "@/features/q/context";
 
 import { InfoDialog } from "./info-dialog";
@@ -95,7 +96,13 @@ export async function RelationshipConversation({
             </Link>
             {/* On a phone the name needs the room more than the avatar. */}
             <span className="max-sm:hidden">
-              <ChatAvatar name={counterpart} photoUrl={profile.photoUrl} />
+              <EntityAvatar
+                kind={profile.companyId === undefined ? "investor" : "company"}
+                name={counterpart}
+                src={profile.photoUrl}
+                companyId={profile.companyId}
+                decorative
+              />
             </span>
             <span className="flex min-w-0 flex-col">
               <span className="cq-body line-clamp-2 leading-tight font-semibold text-(--cq-text-primary)">
@@ -186,34 +193,6 @@ export async function RelationshipConversation({
         }
       />
     </div>
-  );
-}
-
-/** The counterpart's picture or initial, chat-sized. */
-function ChatAvatar({
-  name,
-  photoUrl,
-}: {
-  readonly name: string;
-  readonly photoUrl: string | null;
-}) {
-  return photoUrl === null ? (
-    <span
-      aria-hidden="true"
-      className="cq-label inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
-    >
-      {name.trim().slice(0, 1).toUpperCase()}
-    </span>
-  ) : (
-    // A short-lived signed URL; next/image would cache it past expiry.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={photoUrl}
-      alt=""
-      width={40}
-      height={40}
-      className="size-10 shrink-0 rounded-full object-cover"
-    />
   );
 }
 

@@ -21,7 +21,7 @@ import {
 import { PageContainer } from "@/components/app-shell/page-container";
 import { RelationshipMail } from "@/features/integrations/relationship-mail";
 import { DockAvoidZone } from "@/features/q-dock";
-import { initials } from "@/features/investors/investor-labels";
+import { EntityAvatar, EntityCover } from "@/features/entity/entity-avatar";
 import { JoinCallForm } from "@/features/schedule/join-call-form";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
@@ -392,8 +392,18 @@ export function RelationshipHero({
       className="flex flex-col gap-4"
       data-relationship-hero
     >
+      {typeof profile.coverUrl === "string" ? (
+        <EntityCover src={profile.coverUrl} className="rounded-xl" />
+      ) : null}
       <div className="flex items-center gap-4">
-        <Avatar name={counterpart} photoUrl={profile.photoUrl} />
+        <EntityAvatar
+          kind={profile.companyId === undefined ? "investor" : "company"}
+          name={counterpart}
+          src={profile.photoUrl}
+          companyId={profile.companyId}
+          size="lg"
+          decorative
+        />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <h1 className="cq-title-lg text-(--cq-text-primary)">
             {counterpart}
@@ -548,33 +558,6 @@ function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
         </span>
       ))}
     </div>
-  );
-}
-
-function Avatar({
-  name,
-  photoUrl,
-}: {
-  readonly name: string;
-  readonly photoUrl: string | null;
-}) {
-  return photoUrl === null ? (
-    <span
-      aria-hidden="true"
-      className="inline-flex size-14 shrink-0 items-center justify-center rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) text-lg font-semibold text-(--cq-text-secondary)"
-    >
-      {initials(name)}
-    </span>
-  ) : (
-    // A short-lived signed URL; next/image would cache it past expiry.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={photoUrl}
-      alt=""
-      width={56}
-      height={56}
-      className="size-14 shrink-0 rounded-xl object-cover"
-    />
   );
 }
 

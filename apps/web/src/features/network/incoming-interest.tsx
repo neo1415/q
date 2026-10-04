@@ -16,6 +16,7 @@ import {
   type AnswerActionResult,
 } from "./interest-actions";
 import { formatDay } from "@/components/date-format";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { STATE_WORDS } from "@/features/relationships/relationship-words";
 
 /**
@@ -230,17 +231,21 @@ function Row({
       className="flex flex-col gap-2 py-4"
       data-interest-id={current.interestId}
     >
-      <div className="flex flex-col gap-0.5">
-        <Link
-          href={`/relationships/investor/${current.investorOrganisationId}`}
-          className="cq-title-sm text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-        >
-          {name}
-        </Link>
-        <p className="cq-caption text-(--cq-text-tertiary)">
-          {TYPE_LABELS[current.investorType] ?? current.investorType} ·
-          expressed interest {when(current.expressedAt)}
-        </p>
+      <div className="flex items-start gap-3">
+        {/* The interest carries no image: initials, never a guessed URL. */}
+        <EntityAvatar kind="investor" name={name} size="md" decorative />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Link
+            href={`/relationships/investor/${current.investorOrganisationId}`}
+            className="cq-title-sm text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          >
+            {name}
+          </Link>
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            {TYPE_LABELS[current.investorType] ?? current.investorType} ·
+            expressed interest {when(current.expressedAt)}
+          </p>
+        </div>
       </div>
       {outcome}
     </li>

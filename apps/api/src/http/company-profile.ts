@@ -103,6 +103,16 @@ export type CompanyProfilePorts = {
   ) => Promise<boolean>;
   /** The Q Card photo for signed-in participants, or null. */
   readonly photo: (company: CompanyProfileFacts) => Promise<string | null>;
+  /**
+   * The Q Card photo and cover for signed-in participants, each under its
+   * own scope, signed in one read. Absent: the profile asks `photo` alone.
+   */
+  readonly images?:
+    | ((company: CompanyProfileFacts) => Promise<{
+        readonly photo: string | null;
+        readonly cover: string | null;
+      }>)
+    | undefined;
   /** The current raise, only where disclosure lets this actor view it. */
   readonly disclosedRaise: (
     actor: ActorContext,
@@ -271,9 +281,14 @@ export function registerCompanyProfileRoutes(
         viewer === "INVESTOR" &&
         (await quietly(profile.investorMayFind(actor, company.id), false));
 
-      const [photoUrl, videos, raise, verified, sectors, deck, team] =
+      const [images, videos, raise, verified, sectors, deck, team] =
         await Promise.all([
-          quietly(profile.photo(company), null),
+          profile.images === undefined
+            ? quietly(profile.photo(company), null).then((photo) => ({
+                photo,
+                cover: null,
+              }))
+            : quietly(profile.images(company), { photo: null, cover: null }),
           videosFor(actor, company.id, viewer),
           // Not computed at all for a founder viewer: not hidden, absent.
           full
@@ -302,7 +317,8 @@ export function registerCompanyProfileRoutes(
         currentStageCode: projection.currentStageCode,
         headquartersCountry: projection.headquartersCountry,
         headquartersCity: projection.headquartersCity,
-        photoUrl,
+        photoUrl: images.photo,
+        coverUrl: images.cover,
         overview: full
           ? {
               legalName: projection.legalName,

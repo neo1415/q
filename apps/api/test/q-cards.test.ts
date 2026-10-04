@@ -93,6 +93,7 @@ function service(overrides: Partial<PublicIdentityService> = {}) {
     resolveCode: (code) =>
       Promise.resolve(code === "abcdefgh23" ? { handle: "kivu" } : null),
     cardPhotoFor: () => Promise.resolve(null),
+    cardImagesFor: () => Promise.resolve({ photo: null, cover: null }),
     ...overrides,
   };
   return { fake, calls };

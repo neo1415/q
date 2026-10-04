@@ -245,6 +245,13 @@ export const PublicGatewayDtoSchema = z
       )
       .max(64),
     publishedAt: z.string(),
+    /**
+     * The organisation's photo and cover, short-lived signed URLs, only
+     * where its own Q Card shows them to the public (founder ask
+     * 2026-10-04). Absent or null: nothing to show.
+     */
+    organisationPhotoUrl: z.string().url().nullable().optional(),
+    organisationCoverUrl: z.string().url().nullable().optional(),
   })
   .strict();
 export type PublicGatewayDto = z.infer<typeof PublicGatewayDtoSchema>;

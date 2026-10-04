@@ -1,30 +1,21 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
 
-import { Building2 } from "@capital-q/ui/icons";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
+export { companyPhotoPath } from "@/features/entity/entity-avatar";
 
 /**
  * A company's photo, or a plain building mark when it has none (founder
- * request 2026-10-02). Never initials on a gradient: a company without a
- * photo is not decorated into having one.
- *
- * The frame is fixed-size and the mark is always drawn, so nothing shifts
- * when the photo arrives or fails; the photo fades in over it only once it
- * has loaded. The image is the browser's own request, straight to storage
- * (through a redirect that carries no bytes), lazily, and only for the card
- * on screen: it is not part of the feed's preload or swipe path.
+ * request 2026-10-02): the shared EntityAvatar, company-shaped. The image
+ * is the browser's own lazy request, straight to storage through the
+ * gated photo route, only for the card on screen: never part of the
+ * feed's preload or swipe path.
  */
-
-export function companyPhotoPath(companyId: string): string {
-  return `/api/company-photo/${encodeURIComponent(companyId)}`;
-}
-
 export function CompanyAvatar({
   companyId,
   photoUrl,
   size = 44,
+  name,
 }: {
   readonly companyId: string;
   /**
@@ -33,42 +24,18 @@ export function CompanyAvatar({
    */
   readonly photoUrl?: string | null | undefined;
   readonly size?: number | undefined;
+  /** Announced when given; otherwise the name beside it speaks. */
+  readonly name?: string | undefined;
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const src = photoUrl === undefined ? companyPhotoPath(companyId) : photoUrl;
-  // Semantic tokens only: on the Discover stage `.cq-stage` remaps them to
-  // the always-dark stage palette (ADR 0017), so one frame serves both.
   return (
-    <span
-      className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
-      style={{ width: size, height: size }}
-      data-company-avatar={loaded && !failed ? "photo" : "mark"}
-    >
-      <Building2
-        aria-hidden="true"
-        size={Math.round(size * 0.45)}
-        strokeWidth={1.75}
-      />
-      {src === null || failed ? null : (
-        // A plain <img> on purpose: next/image would route the bytes of a
-        // private, signed photo through the app's optimiser.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt=""
-          width={size}
-          height={size}
-          loading="lazy"
-          decoding="async"
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-          className={`absolute inset-0 size-full object-cover transition-opacity duration-200 motion-reduce:transition-none ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-        />
-      )}
-    </span>
+    <EntityAvatar
+      kind="company"
+      name={name ?? ""}
+      companyId={companyId}
+      src={photoUrl}
+      size={size}
+      decorative={name === undefined}
+    />
   );
 }
 
