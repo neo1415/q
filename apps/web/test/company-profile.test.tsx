@@ -182,8 +182,9 @@ describe("the avatar over a Discover pitch", () => {
     expect(link.getAttribute("href")).toBe(`/company/${COMPANY_ID}`);
     expect(link.className).toContain("min-h-11");
     expect(link.className).toContain("min-w-11");
-    const avatar = container.querySelector("[data-company-avatar]");
-    expect(avatar?.getAttribute("data-company-avatar")).toBe("mark");
+    // The shared EntityAvatar, company-shaped: its plain mark until loaded.
+    const avatar = container.querySelector('[data-entity-avatar="company"]');
+    expect(avatar?.getAttribute("data-entity-avatar-state")).toBe("fallback");
     // No initials, no generated decoration: the only text is the name.
     expect(link.textContent).toBe("");
     // The photo is asked for lazily, through the redirect route.
@@ -202,9 +203,9 @@ describe("the avatar over a Discover pitch", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(
       container
-        .querySelector("[data-company-avatar]")
-        ?.getAttribute("data-company-avatar"),
-    ).toBe("mark");
+        .querySelector('[data-entity-avatar="company"]')
+        ?.getAttribute("data-entity-avatar-state"),
+    ).toBe("fallback");
   });
 });
 

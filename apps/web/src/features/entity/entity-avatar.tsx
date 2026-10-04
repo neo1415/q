@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { Building2 } from "@capital-q/ui/icons";
 
-import { companyPhotoPath } from "@/features/company/company-avatar";
 
 /**
  * The one picture for anyone or anything named on screen (founder ask
@@ -26,6 +25,14 @@ import { companyPhotoPath } from "@/features/company/company-avatar";
  */
 
 export type EntityKind = "person" | "company" | "investor";
+
+/**
+ * The company photo route: a redirect the API answers only where the
+ * company's Q Card shows its photo to this reader (see the route).
+ */
+export function companyPhotoPath(companyId: string): string {
+  return `/api/company-photo/${encodeURIComponent(companyId)}`;
+}
 
 export const ENTITY_AVATAR_SIZES = {
   /** Dense rows: chat bubbles, attendee chips, notices. */
@@ -84,12 +91,13 @@ export function EntityAvatar({
   readonly src?: string | null | undefined;
   /** A company's id, so an unknown `src` can ask the company photo route. */
   readonly companyId?: string | undefined;
-  readonly size?: EntityAvatarSize | undefined;
+  /** A named size, or exact pixels for a stage that needs its own. */
+  readonly size?: EntityAvatarSize | number | undefined;
   /** True when the name is printed right beside it: not announced twice. */
   readonly decorative?: boolean | undefined;
   readonly className?: string | undefined;
 }) {
-  const px = ENTITY_AVATAR_SIZES[size];
+  const px = typeof size === "number" ? size : ENTITY_AVATAR_SIZES[size];
   const source = entityImageSource({ kind, src, companyId });
   // Keyed by source, so a new URL gets a fresh load and a fresh failure.
   const [state, setState] = useState<{

@@ -5,8 +5,10 @@ import type { DiscoveredInvestorDto } from "@capital-q/contracts";
 import { ICON_SIZE, MapPin } from "@capital-q/ui/icons";
 
 import { countryLabel } from "../company/declared-labels";
+import { EntityAvatar } from "../entity/entity-avatar";
+
 import { AskQAboutFit } from "./ask-q-about-fit";
-import { inboundLabel, initials, investorTypeLabel } from "./investor-labels";
+import { inboundLabel, investorTypeLabel } from "./investor-labels";
 
 /**
  * Investors a founder may look at (ADR 0023), as cards: cover (only when
@@ -72,25 +74,15 @@ function InvestorCard({
           className={`flex flex-1 flex-col gap-2 px-4 pb-2 ${cover === null ? "pt-4" : ""}`}
         >
           <div
-            className={`relative size-14 overflow-hidden rounded-xl border-2 border-(--cq-surface) bg-(--cq-surface-subtle) ${cover === null ? "" : "-mt-7"}`}
+            className={`w-fit rounded-lg bg-(--cq-surface) p-0.5 ${cover === null ? "" : "-mt-7"}`}
           >
-            {photo === null ? (
-              <span
-                aria-hidden="true"
-                className="cq-title-sm flex size-full items-center justify-center text-(--cq-text-secondary)"
-              >
-                {initials(item.displayName)}
-              </span>
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
-              <img
-                src={photo}
-                alt=""
-                className="size-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            )}
+            <EntityAvatar
+              kind="investor"
+              name={item.displayName}
+              src={photo}
+              size="lg"
+              decorative
+            />
           </div>
           <div className="flex flex-col gap-0.5">
             <h3 className="cq-title-sm text-(--cq-text-primary) group-hover:underline group-hover:underline-offset-4">

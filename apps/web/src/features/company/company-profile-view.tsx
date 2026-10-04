@@ -19,6 +19,8 @@ import { formatLongDay } from "@/components/date-format";
 
 import { ExpressInterest } from "../network/express-interest";
 
+import { EntityAvatar, EntityCover } from "../entity/entity-avatar";
+
 import { CompanyAvatar } from "./company-avatar";
 import { CompanyDeeperView } from "./company-deeper-view";
 import {
@@ -96,19 +98,23 @@ function TeamList({
         {team.map((member, index) => (
           <li
             key={`${member.name}-${String(index)}`}
-            className="flex flex-col gap-1 py-3"
+            className="flex items-start gap-3 py-3"
           >
-            <p className="cq-body font-medium text-(--cq-text-primary)">
-              {member.name}
-            </p>
-            <p className="cq-caption text-(--cq-text-secondary)">
-              {teamRoleLine(member)}
-            </p>
-            {member.shortBio === null ? null : (
-              <p className="cq-body-sm text-(--cq-text-primary)">
-                {member.shortBio}
+            {/* A person's photo is theirs alone today: initials here. */}
+            <EntityAvatar kind="person" name={member.name} decorative />
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="cq-body font-medium text-(--cq-text-primary)">
+                {member.name}
               </p>
-            )}
+              <p className="cq-caption text-(--cq-text-secondary)">
+                {teamRoleLine(member)}
+              </p>
+              {member.shortBio === null ? null : (
+                <p className="cq-body-sm text-(--cq-text-primary)">
+                  {member.shortBio}
+                </p>
+              )}
+            </div>
           </li>
         ))}
       </ul>
@@ -219,6 +225,10 @@ export function CompanyProfileView({
       aria-labelledby="company-name"
       data-company-profile={profile.viewer}
     >
+      {typeof profile.coverUrl === "string" ? (
+        // Only a cover the card's own scope shows this reader.
+        <EntityCover src={profile.coverUrl} className="rounded-xl" />
+      ) : null}
       <header className="flex items-start gap-4">
         <CompanyAvatar
           companyId={profile.companyId}
