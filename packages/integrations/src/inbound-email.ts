@@ -2,10 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { z } from "zod";
 
-import type {
-  CapitalQEvent,
-  CorrelationId,
-} from "@capital-q/contracts";
+import type { CapitalQEvent, CorrelationId } from "@capital-q/contracts";
 import type {
   DatabaseExecutor,
   TransactionContext,
@@ -114,12 +111,17 @@ const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const NUL = /\u0000/g;
 
 function oneLine(value: string | undefined, max: number): string {
-  return (value ?? "").replace(CONTROL, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  return (value ?? "")
+    .replace(CONTROL, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
 }
 
 function addressOnly(value: string | undefined): string | null {
   const line = oneLine(value, 400);
-  const match = /<([^<>\s]+@[^<>\s]+)>/.exec(line) ?? /([^<>\s]+@[^<>\s]+)/.exec(line);
+  const match =
+    /<([^<>\s]+@[^<>\s]+)>/.exec(line) ?? /([^<>\s]+@[^<>\s]+)/.exec(line);
   const address = match?.[1]?.toLowerCase();
   return address !== undefined && address.length >= 3 && address.length <= 320
     ? address
@@ -146,9 +148,11 @@ function plainFromHtml(html: string): string {
 function mailboxHashOf(payload: PostmarkInbound): string | null {
   const candidates = [
     payload.MailboxHash,
-    ...[...(payload.ToFull ?? []), ...(payload.CcFull ?? []), ...(payload.BccFull ?? [])].map(
-      (recipient) => recipient.MailboxHash,
-    ),
+    ...[
+      ...(payload.ToFull ?? []),
+      ...(payload.CcFull ?? []),
+      ...(payload.BccFull ?? []),
+    ].map((recipient) => recipient.MailboxHash),
   ];
   for (const candidate of candidates) {
     const token = candidate?.trim().toLowerCase();
@@ -193,7 +197,8 @@ export function readPostmarkInbound(
       .slice(0, MAX_ATTACHMENTS)
       .map((attachment) => ({
         name: oneLine(attachment.Name, 200) || "attachment",
-        contentType: oneLine(attachment.ContentType, 200) || "application/octet-stream",
+        contentType:
+          oneLine(attachment.ContentType, 200) || "application/octet-stream",
         size: attachment.ContentLength ?? 0,
       })),
   };
@@ -324,8 +329,7 @@ export function createInboundEmailService(dependencies: {
   readonly transactions: TransactionManager;
   /** The deployment's inbound address; absent: the feature is off. */
   readonly baseAddress:
-    | { readonly local: string; readonly domain: string }
-    | undefined;
+    { readonly local: string; readonly domain: string } | undefined;
   /** Required to receive; reads and addresses work without it. */
   readonly outbox?: InboundEmailOutbox | undefined;
   readonly newToken?: (() => string) | undefined;
@@ -341,7 +345,9 @@ export function createInboundEmailService(dependencies: {
     executor: DatabaseExecutor | TransactionContext["sql"],
     actor: InboundEmailActor,
   ): Promise<{ id: string; token: string; tenant_id: string } | null> => {
-    const rows = await executor<{ id: string; token: string; tenant_id: string }[]>`
+    const rows = await executor<
+      { id: string; token: string; tenant_id: string }[]
+    >`
       select id, token, tenant_id from integrations.inbound_addresses
        where user_id = ${actor.userId} and status = 'ACTIVE'`;
     return rows[0] ?? null;
@@ -430,7 +436,8 @@ export function createInboundEmailService(dependencies: {
         const stored = inserted[0];
         if (stored === undefined) return { outcome: "DUPLICATE" };
         const who = email.fromName ?? email.fromAddress;
-        const subject = email.subject.length === 0 ? "(no subject)" : email.subject;
+        const subject =
+          email.subject.length === 0 ? "(no subject)" : email.subject;
         // The person's own notice: who and what, never a link out. The
         // body is a short excerpt for them; no model reads notice bodies of
         // this kind.

@@ -99,7 +99,8 @@ describe("inbound email against local PostgreSQL", () => {
         await sql`insert into auth.users (id, email) values (${auth[name]}, ${`${name}-${auth[name].slice(0, 6)}@example.invalid`})`;
         const [profile] = await sql<{ id: string }[]>`
           select id from identity.user_profiles where auth_user_id = ${auth[name]}`;
-        if (profile === undefined) throw new Error("profile trigger did not run");
+        if (profile === undefined)
+          throw new Error("profile trigger did not run");
         users[name] = profile.id;
         await sql`insert into identity.organisation_memberships (tenant_id, organisation_id, user_id, membership_status)
           values (${tenant}, ${org}, ${profile.id}, 'active')`;
@@ -145,15 +146,24 @@ describe("inbound email against local PostgreSQL", () => {
     const token = tokenOf(address ?? "");
 
     const messageId = randomUUID();
-    const first = await service.receive(delivery(token, messageId), correlation());
+    const first = await service.receive(
+      delivery(token, messageId),
+      correlation(),
+    );
     expect(first.outcome).toBe("STORED");
-    const again = await service.receive(delivery(token, messageId), correlation());
+    const again = await service.receive(
+      delivery(token, messageId),
+      correlation(),
+    );
     expect(again).toEqual({ outcome: "DUPLICATE" });
 
     const notices = await db.sql<{ title: string; kind: string }[]>`
       select title, kind from communication.notifications where user_id = ${users.ada}`;
     expect(notices).toEqual([
-      { kind: "EMAIL_RECEIVED", title: "New email from Sam Sender: Intro: a seed round" },
+      {
+        kind: "EMAIL_RECEIVED",
+        title: "New email from Sam Sender: Intro: a seed round",
+      },
     ]);
     const events = await db.sql<{ event_type: string; payload: string }[]>`
       select event_type, payload::text as payload from events.outbox where tenant_id = ${tenant}`;

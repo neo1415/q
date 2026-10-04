@@ -57,7 +57,9 @@ describe("Brevo API email sender", () => {
     const body = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(body).toMatchObject({
       sender: { email: "q@example.test", name: "Ada via Capital Q" },
-      replyTo: { email: "hash+abcdefghijklmnopqrstuvwxyz@inbound.example.test" },
+      replyTo: {
+        email: "hash+abcdefghijklmnopqrstuvwxyz@inbound.example.test",
+      },
     });
     await expect(
       sender.send({
@@ -68,7 +70,12 @@ describe("Brevo API email sender", () => {
       }),
     ).rejects.toThrow("header injection refused");
     await expect(
-      sender.send({ to: "sam@example.test", subject: "x", text: "x", replyTo: "a@b.test, c@d.test" }),
+      sender.send({
+        to: "sam@example.test",
+        subject: "x",
+        text: "x",
+        replyTo: "a@b.test, c@d.test",
+      }),
     ).rejects.toThrow("header injection refused");
     expect(fetch).toHaveBeenCalledTimes(1);
   });

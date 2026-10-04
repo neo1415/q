@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { Q_TASK_CLASSES, type PermittedContextPlan } from "@capital-q/contracts";
+import {
+  Q_TASK_CLASSES,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -77,7 +80,9 @@ const EmailSummarySchema = z
   })
   .strict();
 
-function summary(email: InboundEmailSummary): z.infer<typeof EmailSummarySchema> {
+function summary(
+  email: InboundEmailSummary,
+): z.infer<typeof EmailSummarySchema> {
   return {
     inboundEmailId: email.id,
     from: email.fromAddress.slice(0, 320),
@@ -171,7 +176,7 @@ export const ReadMyInboundEmailInputSchema = z
       .max(6)
       .optional()
       .describe(
-        "Topics the person cares about here, in their words (\"our seed round\"), to check the email against.",
+        'Topics the person cares about here, in their words ("our seed round"), to check the email against.',
       ),
   })
   .strict();

@@ -67,8 +67,7 @@ const ON_BEHALF =
 export function createInboundReplyAction(dependencies: {
   /** Absent when this deployment receives no email: every reply is refused. */
   readonly inbound:
-    | Pick<InboundEmailService, "read" | "currentAddress">
-    | undefined;
+    Pick<InboundEmailService, "read" | "currentAddress"> | undefined;
   readonly sender: AppEmailSender;
   readonly logger?: Logger | undefined;
 }): AnyQActionDefinition {

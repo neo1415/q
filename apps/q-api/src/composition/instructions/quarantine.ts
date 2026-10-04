@@ -226,10 +226,11 @@ export function createQuarantinedEmailReader(dependencies: {
               .map((topic, index) => `${String(index + 1)}. ${topic}`)
               .join("\n") || "None.",
           now: input.now.toISOString(),
-          thread: `[THEM ${input.email.receivedAt}] Subject: ${input.email.subject}\n${input.email.text}`.slice(
-            0,
-            EMAIL_TEXT_MAX_CHARS,
-          ),
+          thread:
+            `[THEM ${input.email.receivedAt}] Subject: ${input.email.subject}\n${input.email.text}`.slice(
+              0,
+              EMAIL_TEXT_MAX_CHARS,
+            ),
         },
       });
       const response =

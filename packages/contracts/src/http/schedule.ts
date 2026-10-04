@@ -190,7 +190,7 @@ export const NotificationKindSchema = z.enum([
   // 2026-10-02: a pass, pause or resume, told to the other side.
   "RELATIONSHIP_OUTCOME",
   "DILIGENCE",
-  // Inbound email: "New email from X: subject", to the person it came for.
+  // Inbound email (20261130090000); 20261201090000 keeps it in the check.
   "EMAIL_RECEIVED",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

@@ -14,13 +14,20 @@ describe("readPostmarkInbound", () => {
       MessageID: "0f1e2d3c-aaaa-bbbb-cccc-000000000001",
       From: "Sam <sam@example.invalid>",
       FromFull: { Email: "Sam@Example.invalid", Name: "Sam\r\nBcc: x" },
-      ToFull: [{ Email: `hash+${TOKEN}@inbound.example.invalid`, MailboxHash: TOKEN }],
+      ToFull: [
+        { Email: `hash+${TOKEN}@inbound.example.invalid`, MailboxHash: TOKEN },
+      ],
       CcFull: [{ Email: "cc@example.invalid" }],
       MailboxHash: TOKEN.toUpperCase(),
       Subject: "Hello\r\nBcc: victim@example.invalid",
       TextBody: "Line one\r\nLine two\u0000",
       Attachments: [
-        { Name: "a.pdf", ContentType: "application/pdf", ContentLength: 10, Content: "QUJD" },
+        {
+          Name: "a.pdf",
+          ContentType: "application/pdf",
+          ContentLength: 10,
+          Content: "QUJD",
+        },
       ],
       Headers: [{ Name: "X-Anything", Value: "ignored" }],
     });
@@ -34,7 +41,9 @@ describe("readPostmarkInbound", () => {
       subject: "Hello Bcc: victim@example.invalid",
       textBody: "Line one\nLine two",
       textTruncated: false,
-      attachments: [{ name: "a.pdf", contentType: "application/pdf", size: 10 }],
+      attachments: [
+        { name: "a.pdf", contentType: "application/pdf", size: 10 },
+      ],
     });
     expect(JSON.stringify(email)).not.toContain("QUJD");
   });
@@ -79,7 +88,9 @@ describe("readPostmarkInbound", () => {
 
 describe("newInboundToken", () => {
   it("is 26 lowercase base32 characters and does not repeat", () => {
-    const tokens = new Set(Array.from({ length: 200 }, () => newInboundToken()));
+    const tokens = new Set(
+      Array.from({ length: 200 }, () => newInboundToken()),
+    );
     expect(tokens.size).toBe(200);
     for (const token of tokens) expect(token).toMatch(/^[a-z2-7]{26}$/);
   });

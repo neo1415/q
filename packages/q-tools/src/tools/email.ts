@@ -142,7 +142,7 @@ type Grant =
 export function createProposeEmailTool(
   email: EmailIntelligencePort | undefined,
   relationships: RelationshipIntelligencePort | undefined,
-  inbound?: InboundEmailPort | undefined,
+  inbound?: InboundEmailPort,
 ): AnyQToolDefinition {
   return defineQTool<ProposeEmailInput, ProposeEmailOutput, Grant>({
     id: PROPOSE_EMAIL,

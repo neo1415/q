@@ -17,7 +17,8 @@ import {
  */
 
 export const INTEGRATIONS_EVENT_OWNER = "@capital-q/integrations" as const;
-export const INTEGRATIONS_EVENT_PRODUCER = "capitalq://api/integrations" as const;
+export const INTEGRATIONS_EVENT_PRODUCER =
+  "capitalq://api/integrations" as const;
 
 export const InboundEmailReceivedEvent = defineEvent({
   name: "integrations.inbound_email.received",

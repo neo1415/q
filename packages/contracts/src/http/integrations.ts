@@ -147,8 +147,7 @@ export const INBOUND_EMAIL_POSTMARK_PATH =
 /** `GET` the person's own Q email address (issued on first read). */
 export const INBOUND_EMAIL_ADDRESS_PATH = "/v1/me/inbound-email" as const;
 /** `POST` a new Q email address: the old one stops receiving at once. */
-export const INBOUND_EMAIL_ROTATE_PATH =
-  "/v1/me/inbound-email/rotate" as const;
+export const INBOUND_EMAIL_ROTATE_PATH = "/v1/me/inbound-email/rotate" as const;
 
 export const InboundEmailAddressDtoSchema = z.discriminatedUnion("status", [
   /** Inbound email is not configured on this deployment. */

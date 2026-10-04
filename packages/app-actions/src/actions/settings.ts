@@ -228,7 +228,8 @@ const INBOUND_EMAIL_ROTATE = defineAppAction<
   }),
   targets: () => [],
   card: () => ({ summary: "New Q email address", preview: "" }),
-  done: () => "Your new Q email address is ready; the old one no longer receives.",
+  done: () =>
+    "Your new Q email address is ready; the old one no longer receives.",
   http: {
     method: "POST",
     path: INBOUND_EMAIL_ROTATE_PATH,

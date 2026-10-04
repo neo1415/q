@@ -46,7 +46,9 @@ function world(options: { readonly canReply?: boolean } = {}) {
     fromName: "Sam Sender",
     subject: "Seed round intro",
     receivedAt: "2026-10-03T10:00:00.000Z",
-    attachments: [{ name: "deck.pdf", contentType: "application/pdf", size: 9 }],
+    attachments: [
+      { name: "deck.pdf", contentType: "application/pdf", size: 9 },
+    ],
   };
   const inboundEmail: InboundEmailPort = {
     address: (actor) => Promise.resolve(own(actor.userId) ? ADDRESS : ADDRESS),
