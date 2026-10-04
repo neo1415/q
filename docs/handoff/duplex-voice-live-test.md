@@ -52,6 +52,30 @@ Realtime only opens on a deployment whose context can go to OpenAI. OpenAI is re
 | 4:15 | Start voice again. Turn Wi-Fi off for 5 seconds, then on.                                    | The voice carries on, on the standard line, in the same conversation, with no greeting. This is the silent fallback.                     |
 | 5:00 | End voice.                                                                                   | —                                                                                                                                        |
 
+## Backchannels: a 3-minute live check (backchannel-61)
+
+Run it on the same setup. `CQ_VOICE_REALTIME_BACKCHANNEL` is on by default; set it to `off` on q-api to disable this. Use a headset. Leave Settings → Q's voice → Listening sounds on **Subtle**.
+
+Expected cost: **about $0.40** for the 3 minutes. Reactions, bridges and transcription add only about **$0.02**. All of it is in the same "Live voice" total and counts under the daily cap.
+
+| Min  | Say                                                                                                               | Listen for                                                                                                                                                                                      |
+| ---- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0:00 | "Open my pipeline." (a quick command)                                                                             | **No** reaction while you speak. If the answer takes more than about 0.7 s, you hear one short, specific line first (for example "Let me pull up your pipeline"), never "hmm". Then the answer. |
+| 0:30 | Tell a 30-second story with natural pauses. Make part of it bad news ("…and then our lead investor pulled out…"). | One to three quiet, short reactions, only at your pauses, never over a word. They fit what you said: "mm-hm" while you narrate, "oh no" for the bad news. No sentence, no fact, no repeats.     |
+| 1:15 | Start talking again the instant you hear a reaction begin.                                                        | The reaction stops **at once**, and Q does not take the turn.                                                                                                                                   |
+| 1:40 | "Stop doing that."                                                                                                | Q confirms once, in a few words. The q-api log shows `duplex listening level changed` with `level: "OFF"` and `remembered: true`.                                                               |
+| 2:00 | Tell another 20-second story.                                                                                     | Silence while you talk. Settings → Listening sounds now shows **Off**.                                                                                                                          |
+| 2:30 | "Actually, you can react more."                                                                                   | A one-line confirmation. The level steps up to Subtle. A short story now gets reactions again.                                                                                                  |
+| 3:00 | End voice.                                                                                                        | The log line `duplex voice line ended` shows `reports` broken down by kind (`RESPONSE`, `BACKCHANNEL`, `BRIDGE`, `TRANSCRIPTION`).                                                              |
+
+What would make it fail, and what to report:
+
+- a reaction in the middle of a word, or two reactions close together;
+- a reaction that is a sentence, a fact or a number;
+- a reaction that does not stop when you resume;
+- a story that loses its turn after a reaction (Q answers before you finish);
+- "stop" not sticking on the next call (check the memory page for "Voice preference: no listening sounds…").
+
 ## After the test
 
 - Spend: in Settings → Usage, "Live voice" shows about $0.50. Or query it directly:
