@@ -22,6 +22,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { RelationshipMail } from "@/features/integrations/relationship-mail";
 import { DockAvoidZone } from "@/features/q-dock";
 import { initials } from "@/features/investors/investor-labels";
+import { JoinCallForm } from "@/features/schedule/join-call-form";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
 import { ScheduleDialog } from "./schedule-dialog";
@@ -289,6 +290,14 @@ export function RelationshipDetail({
                         counterpart={counterpart}
                         connected={connected}
                       />
+                      {connected ? (
+                        <ScheduleDialog kind="join">
+                          <JoinCallForm
+                            relationshipId={relationship.relationshipId}
+                            counterpart={counterpart}
+                          />
+                        </ScheduleDialog>
+                      ) : null}
                       <ScheduleDialog kind="reminder">
                         <RelationshipSchedule
                           relationshipId={relationship.relationshipId}
