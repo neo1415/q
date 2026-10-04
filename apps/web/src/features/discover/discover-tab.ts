@@ -7,7 +7,10 @@ import { useSyncExternalStore } from "react";
  * keeps its place; the one not showing holds its player (one active
  * player per page) and stops declaring Q's subject.
  */
-export type DiscoverTab = "FOR_YOU" | "YOURS";
+import type { DiscoverTab } from "./discover-tab-query";
+
+export type { DiscoverTab } from "./discover-tab-query";
+export { tabFromQuery } from "./discover-tab-query";
 
 let current: DiscoverTab = "FOR_YOU";
 const listeners = new Set<() => void>();
@@ -38,6 +41,3 @@ export function useDiscoverTab(
 }
 
 /** The query value each tab is linked by: `/discover?tab=yours`. */
-export function tabFromQuery(raw: string | undefined): DiscoverTab {
-  return raw === "yours" ? "YOURS" : "FOR_YOU";
-}

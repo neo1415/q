@@ -18,7 +18,7 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { DiscoverInvestors } from "@/features/discover/discover-screen";
-import { tabFromQuery } from "@/features/discover/discover-tab";
+import { tabFromQuery } from "@/features/discover/discover-tab-query";
 import { DiscoverTabs } from "@/features/discover/discover-tabs";
 import { InvestorFeedScreen } from "@/features/discover/investor-feed-screen";
 import { NetworkVideos } from "@/features/discover/network/network-videos";
