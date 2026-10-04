@@ -76,6 +76,7 @@ const ASSET = {
   moderationStatus: "NOT_REVIEWED",
   title: null,
   audience: "INVESTORS",
+  downloadable: false,
   replacesMediaAssetId: null,
   supersededAt: null,
   createdByUserId: USER,

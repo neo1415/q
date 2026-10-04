@@ -103,6 +103,11 @@ export const MediaAssetDtoSchema = z
     /** The owner's name for the video; null when they gave none. */
     title: z.string().max(PITCH_TITLE_MAX).nullable(),
     audience: PitchAudienceSchema,
+    /**
+     * ADR 0047: investors who may watch it may also save a copy. False
+     * unless the owner turned it on (doc 20 §219); absent from older APIs.
+     */
+    downloadable: z.boolean().default(false),
     /** False once replaced by a re-upload, or deleted. */
     live: z.boolean(),
     replacesMediaAssetId: UuidSchema.nullable(),
@@ -164,6 +169,12 @@ export type CreateCompanyPitchResponse = z.infer<
 export const MEDIA_UPLOAD_SESSION_SUFFIX = "/upload-session" as const;
 export const MEDIA_SYNC_SUFFIX = "/sync" as const;
 export const MEDIA_PLAYBACK_SUFFIX = "/playback" as const;
+/**
+ * `GET .../pitch/:mediaAssetId/download` (ADR 0047): a short-lived link to
+ * the pitch as a file, decided per viewer on every request. The browser
+ * fetches the file from the CDN; no byte passes through Capital Q.
+ */
+export const MEDIA_DOWNLOAD_SUFFIX = "/download" as const;
 
 export const UPLOAD_MODES = ["DIRECT", "RESUMABLE"] as const;
 export const UploadModeSchema = z.enum(UPLOAD_MODES);
@@ -281,6 +292,12 @@ export const PitchSummaryDtoSchema = z
     captionState: DerivedTextStateSchema,
     /** The owner's name for the video (ADR 0022); absent from older APIs. */
     title: z.string().max(PITCH_TITLE_MAX).nullable().optional(),
+    /**
+     * ADR 0047: the owner lets viewers save a copy, so the player's menu
+     * offers Download. A hint for the menu only: the download route decides
+     * again on every request. Absent from older APIs (treated as false).
+     */
+    downloadAllowed: z.boolean().optional(),
   })
   .strict();
 export type PitchSummaryDto = z.infer<typeof PitchSummaryDtoSchema>;
@@ -335,12 +352,41 @@ export const SetPitchDetailsRequestSchema = z
      * "only my organisation". Absent: unchanged.
      */
     playbackPolicy: OwnerPlaybackPolicySchema.optional(),
+    /**
+     * ADR 0047: whether investors who may watch it may also save a copy.
+     * Absent: unchanged. Off by default (doc 20 §219).
+     */
+    downloadable: z.boolean().optional(),
     expectedVersion: ResourceVersionSchema,
   })
   .strict();
 export type SetPitchDetailsRequest = z.infer<
   typeof SetPitchDetailsRequestSchema
 >;
+
+/**
+ * READY: the link, until `expiresAt` (a secret for this viewer: open it,
+ * never store or share it). PREPARING: the file is still being made; ask
+ * again shortly.
+ */
+export const PitchDownloadDtoSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("READY"),
+      mediaAssetId: UuidSchema,
+      downloadUrl: z.string().url(),
+      expiresAt: UtcTimestampSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("PREPARING"),
+      mediaAssetId: UuidSchema,
+      percentComplete: z.number().min(0).max(100).nullable(),
+    })
+    .strict(),
+]);
+export type PitchDownloadDto = z.infer<typeof PitchDownloadDtoSchema>;
 
 export const SetPitchDetailsResponseSchema = z
   .object({ pitch: MediaAssetDtoSchema })

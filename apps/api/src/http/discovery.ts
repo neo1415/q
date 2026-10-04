@@ -23,6 +23,7 @@ import {
   DiscoveredInvestorPhotoDtoSchema,
   type YourCompanyLabel,
   type YourCompanyPitchItemDto,
+  type FeedCompanySummaryDto,
 } from "@capital-q/contracts";
 import type {
   DiscoveryService,
@@ -78,6 +79,18 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
    * — a feed without video is still a feed (doc 20 §137).
    */
   readonly pitches?: DiscoverablePitchQueryPort | undefined;
+  /**
+   * Discover v2: each card's declared facts for THIS reader (sector, and
+   * the raise only where disclosure lets them view it), one batch per
+   * page, asked only for companies the slate reader already allowed.
+   * Absent or failing: cards carry no summary, never a guessed one.
+   */
+  readonly feedSummaries?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, FeedCompanySummaryDto>>)
+    | undefined;
   /**
    * The viewer's own saved state for a page's companies (the interaction
    * projection), so a save survives a reload. Absent, or failing, the
@@ -249,6 +262,27 @@ export function registerDiscoveryRoutes(
                 companyIds: served.items.map((item) => item.companyId),
               })
               .catch(() => null);
+      const companyIds = served.items.map((item) => item.companyId);
+      const [summaries, photos] = await Promise.all([
+        dependencies.feedSummaries === undefined || companyIds.length === 0
+          ? null
+          : dependencies
+              .feedSummaries(getActorContext(request), companyIds)
+              .catch(() => null),
+        // The card's avatar opens the profile; its photo is the company's
+        // Q Card `photo` scope, for signed-in participants, one batch.
+        dependencies.namedPhotos === undefined || companyIds.length === 0
+          ? null
+          : dependencies.namedPhotos
+              .images(
+                companyIds.map((companyId) => ({
+                  subjectType: "COMPANY" as const,
+                  subjectId: companyId,
+                })),
+                "PARTICIPANT",
+              )
+              .catch(() => null),
+      ]);
       void reply.header("Cache-Control", "no-store");
       return DiscoveryCompanySlateDtoSchema.parse({
         slateId: served.slateId,
@@ -281,6 +315,20 @@ export function registerDiscoveryRoutes(
             ...(states === null
               ? {}
               : { viewerSaved: states.get(item.companyId)?.saved === true }),
+            ...(photos === null
+              ? {}
+              : {
+                  photoUrl:
+                    photos.get(
+                      namedImageKey({
+                        subjectType: "COMPANY",
+                        subjectId: item.companyId,
+                      }),
+                    )?.photo ?? null,
+                }),
+            ...(summaries?.get(item.companyId) === undefined
+              ? {}
+              : { summary: summaries.get(item.companyId) }),
             pitch: pitch === undefined ? null : pitchSummary(pitch),
             ...(pitch === undefined || pitch.more.length === 0
               ? {}

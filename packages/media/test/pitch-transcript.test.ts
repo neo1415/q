@@ -109,6 +109,7 @@ function asset(overrides: Partial<MediaAsset> = {}): MediaAsset {
     moderationStatus: "ALLOWED",
     title: null,
     audience: "INVESTORS",
+    downloadable: false,
     replacesMediaAssetId: null,
     supersededAt: null,
     createdByUserId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000001"),

@@ -60,7 +60,11 @@ export type AppActionPorts = {
   /** ADR 0041: who may download a pitch deck (the Evidence service). */
   readonly deckAudience?: DeckAudiencePort | undefined;
   readonly media?:
-    Pick<MediaService, "listCompanyMedia" | "setPitchDetails"> | undefined;
+    | Pick<
+        MediaService,
+        "listCompanyMedia" | "setPitchDetails" | "setPitchDownloadable"
+      >
+    | undefined;
   readonly interactions?: Pick<InteractionSignalService, "decide"> | undefined;
   /** Profile and records (ADR 0040 checklist): the owning services. */
   readonly companies?:

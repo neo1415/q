@@ -71,6 +71,7 @@ const ACTION = {
   ),
   moderated: AuditActionTypeSchema.parse("media.asset.moderated"),
   detailsSet: AuditActionTypeSchema.parse("media.asset.details_set"),
+  downloadableSet: AuditActionTypeSchema.parse("media.asset.downloadable_set"),
 };
 const PITCH = "FOUNDER_PITCH" as const;
 
@@ -375,6 +376,96 @@ export function createSetPitchDetails(dependencies: MediaServiceDependencies) {
           previousAudience: asset.audience,
           audience: details.audience,
           titleChanged: asset.title !== details.title,
+        },
+        correlationId: command.correlationId,
+      });
+      return updated;
+    });
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Downloads (ADR 0047)
+// ---------------------------------------------------------------------------
+
+export type SetPitchDownloadableCommand = {
+  readonly actor: ActorContext;
+  readonly companyId: string;
+  readonly mediaAssetId: MediaAssetId;
+  readonly downloadable: boolean;
+  /** The version the owner saw. A stale screen does not decide. */
+  readonly expectedVersion: number;
+  readonly correlationId: CorrelationId;
+};
+
+/**
+ * Whether viewers the playback rule admits may also save a copy of one of
+ * the owner's pitches. The owner's decision only, under the same capability
+ * as the pitch's other details; recorded in the audit trail (who decided),
+ * never as an analytics or ranking signal.
+ */
+export function createSetPitchDownloadable(
+  dependencies: MediaServiceDependencies,
+) {
+  const { repositories, transactions, audit } = dependencies;
+
+  return async (command: SetPitchDownloadableCommand): Promise<MediaAsset> => {
+    const { actor } = command;
+    const owner = await ownedResource(
+      dependencies,
+      actor,
+      companyRef(command.companyId),
+    );
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: MEDIA_MANAGE,
+      resource: ownerScope(actor, owner),
+    });
+
+    return transactions.run(async (tx: TransactionContext) => {
+      const asset = await repositories.mediaAssets.lockById(
+        tx,
+        owner.tenantId,
+        command.mediaAssetId,
+      );
+      if (
+        asset === null ||
+        asset.ownerType !== owner.ownerType ||
+        asset.ownerId !== owner.ownerId ||
+        asset.purpose !== PITCH
+      ) {
+        throw new MediaAssetNotFoundError();
+      }
+      if (asset.version !== command.expectedVersion) {
+        throw new MediaAssetConflictError();
+      }
+      if (asset.status === "DELETED") {
+        throw new MediaRuleError("A deleted video can't be changed.");
+      }
+      if (asset.downloadable === command.downloadable) return asset;
+      const updated = await repositories.mediaAssets.setDownloadable(tx, {
+        tenantId: owner.tenantId,
+        mediaAssetId: asset.id,
+        expectedVersion: asset.version,
+        downloadable: command.downloadable,
+      });
+      if (updated === null) {
+        throw new MediaAssetConflictError();
+      }
+      await audit.record(tx, {
+        ...auditActorFromContext(actor),
+        auditEventId: createAuditEventId(),
+        actionType: ACTION.downloadableSet,
+        resourceType: RESOURCE_MEDIA,
+        resourceId: asset.id,
+        occurredAt: occurredNow(),
+        outcome: "SUCCEEDED",
+        metadata: {
+          ownerType: asset.ownerType,
+          ownerId: asset.ownerId,
+          purpose: asset.purpose,
+          previousDownloadable: asset.downloadable,
+          downloadable: command.downloadable,
         },
         correlationId: command.correlationId,
       });

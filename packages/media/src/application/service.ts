@@ -20,6 +20,7 @@ import { createApplyProviderStatusReport } from "./provider-status-use-cases.js"
 import {
   createApplyAutomatedModeration,
   createSetPitchDetails,
+  createSetPitchDownloadable,
   createSetPitchPlaybackPolicy,
 } from "./publish-use-cases.js";
 import {
@@ -29,6 +30,7 @@ import {
   createSyncPitchTranscript,
 } from "./transcript-use-cases.js";
 import {
+  createAuthoriseDownload,
   createAuthorisePlayback,
   createCancelUpload,
   createCreateUploadSession,
@@ -61,6 +63,7 @@ export type MediaService = {
   readonly cancelUpload: ReturnType<typeof createCancelUpload>;
   readonly syncMediaAsset: ReturnType<typeof createSyncMediaAsset>;
   readonly authorisePlayback: ReturnType<typeof createAuthorisePlayback>;
+  readonly authoriseDownload: ReturnType<typeof createAuthoriseDownload>;
   /**
    * The pitch's transcript (R18), read under exactly the playback rule;
    * by company and pitch for the player, by pitch alone for Q.
@@ -83,6 +86,7 @@ export type MediaService = {
   >;
   /** The publish path (CQ-MEDIA-013): the owner's decision, and the platform's. */
   readonly setPitchDetails: ReturnType<typeof createSetPitchDetails>;
+  readonly setPitchDownloadable: ReturnType<typeof createSetPitchDownloadable>;
   readonly setPitchPlaybackPolicy: ReturnType<
     typeof createSetPitchPlaybackPolicy
   >;
@@ -145,12 +149,14 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     cancelUpload: createCancelUpload(dependencies),
     syncMediaAsset: createSyncMediaAsset(dependencies),
     authorisePlayback: createAuthorisePlayback(dependencies),
+    authoriseDownload: createAuthoriseDownload(dependencies),
     getPitchTranscript: createGetPitchTranscript(dependencies),
     getPitchTranscriptByPitch: createGetPitchTranscriptByPitch(dependencies),
     syncPitchTranscript: createSyncPitchTranscript(dependencies),
     mayPlayPitch: createMayPlayPitch(dependencies),
     applyProviderStatusReport: createApplyProviderStatusReport(dependencies),
     setPitchDetails: createSetPitchDetails(dependencies),
+    setPitchDownloadable: createSetPitchDownloadable(dependencies),
     setPitchPlaybackPolicy: createSetPitchPlaybackPolicy(dependencies),
     applyAutomatedModeration: createApplyAutomatedModeration(dependencies),
   };

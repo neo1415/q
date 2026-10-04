@@ -1167,6 +1167,7 @@ describe("@capital-q/media against local PostgreSQL", () => {
         captionState: "NOT_REQUESTED",
         title: null,
         audience: "INVESTORS",
+        downloadable: false,
         more: [],
       });
       expect(JSON.stringify([...pitches.values()])).not.toContain(

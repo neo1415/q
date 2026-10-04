@@ -775,3 +775,86 @@ describe("resumable (tus) upload", () => {
     expect(provider(double).capabilities.resumableUpload).toBe(true);
   });
 });
+
+describe("createDownloadAuthorization (ADR 0047)", () => {
+  const request = {
+    mediaAssetId: MEDIA_ASSET_ID,
+    providerAssetId: UID,
+    accessMode: "AUTHORISED" as const,
+    ttlSeconds: 300,
+    fileName: "Seed-pitch.mp4",
+  };
+
+  it("answers PREPARING while the vendor makes the file, and mints nothing", async () => {
+    const double = httpDouble(() => ({
+      status: 200,
+      body: envelope({
+        default: { status: "inprogress", percentComplete: 40 },
+      }),
+    }));
+    const answer =
+      await provider(double).createDownloadAuthorization?.(request);
+    expect(answer).toEqual({
+      status: "PREPARING",
+      mediaAssetId: MEDIA_ASSET_ID,
+      percentComplete: 40,
+    });
+    expect(double.calls.map((call) => `${call.method} ${call.url}`)).toEqual([
+      `POST https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/stream/${UID}/downloads`,
+    ]);
+  });
+
+  it("once ready, links the CDN file under a token that says downloadable", async () => {
+    const double = httpDouble((call) =>
+      call.url.endsWith("/downloads")
+        ? { status: 200, body: envelope({ default: { status: "ready" } }) }
+        : { status: 200, body: envelope({ token: "eyJ.dl.token" }) },
+    );
+    const answer =
+      await provider(double).createDownloadAuthorization?.(request);
+    expect(answer).toEqual({
+      status: "READY",
+      mediaAssetId: MEDIA_ASSET_ID,
+      downloadUrl: `https://${SUBDOMAIN}/eyJ.dl.token/downloads/default.mp4?filename=Seed-pitch.mp4`,
+      expiresAt: "2026-09-23T12:05:00.000Z",
+    });
+    expect(double.calls[1]?.body).toEqual({
+      exp: 1_790_165_100,
+      downloadable: true,
+    });
+  });
+
+  it("a locally signed download token carries the claim; a playback token never does", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+    const double = httpDouble((call) =>
+      call.url.endsWith("/downloads")
+        ? { status: 200, body: envelope({ default: { status: "ready" } }) }
+        : new Error("must not mint"),
+    );
+    const p = provider(double, {
+      signingKey: {
+        keyId: "keyid0000000000001",
+        pem: Buffer.from(pem).toString("base64"),
+      },
+    });
+    const claims = (url: string) => {
+      const token = new URL(url).pathname.split("/")[1] ?? "";
+      return JSON.parse(
+        Buffer.from(token.split(".")[1] ?? "", "base64url").toString(),
+      ) as Record<string, unknown>;
+    };
+    const download = await p.createDownloadAuthorization?.(request);
+    expect(download?.status).toBe("READY");
+    expect(
+      claims(download?.status === "READY" ? download.downloadUrl : ""),
+    ).toMatchObject({ downloadable: true });
+    const playback = await p.createPlaybackAuthorization({
+      mediaAssetId: MEDIA_ASSET_ID,
+      providerAssetId: UID,
+      accessMode: "AUTHORISED",
+      ttlSeconds: 600,
+    });
+    expect(claims(playback.playbackUrl)).not.toHaveProperty("downloadable");
+  });
+});

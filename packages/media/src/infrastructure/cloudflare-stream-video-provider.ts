@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ProviderAssetIdSchema, type MediaStatus } from "../contracts/index.js";
 import {
   CreateVideoUploadSessionSchema,
+  DownloadAuthorizationRequestSchema,
   PlaybackAuthorizationRequestSchema,
   ResumeVideoUploadSessionSchema,
   VideoAssetStatusSchema,
@@ -13,6 +14,8 @@ import {
   type GeneratedCaptions,
   type GeneratedCaptionsStatus,
   type PlaybackAuthorization,
+  type DownloadAuthorization,
+  type DownloadAuthorizationRequest,
   type PlaybackAuthorizationRequest,
   type ResumeVideoUploadSession,
   type VideoAssetStatus,
@@ -318,6 +321,26 @@ function manifestUrl(subdomain: string, tokenOrUid: string): string {
 function posterUrl(subdomain: string, tokenOrUid: string): string {
   return `https://${subdomain}/${tokenOrUid}/thumbnails/thumbnail.jpg`;
 }
+function downloadUrl(
+  subdomain: string,
+  tokenOrUid: string,
+  fileName: string,
+): string {
+  return `https://${subdomain}/${tokenOrUid}/downloads/default.mp4?filename=${encodeURIComponent(fileName)}`;
+}
+
+/**
+ * `POST /stream/<uid>/downloads` (Cloudflare, "Download videos"): creates
+ * the default MP4 once and reports its state; asking again is idempotent.
+ */
+const DownloadsResultSchema = z.object({
+  default: z
+    .object({
+      status: z.string(),
+      percentComplete: z.number().nullable().optional(),
+    })
+    .passthrough(),
+});
 
 const base64url = (value: string | Buffer): string =>
   Buffer.from(value).toString("base64url");
@@ -678,6 +701,7 @@ export function createCloudflareStreamVideoProvider(
     key: CloudflareStreamSigningKey,
     uid: string,
     expiresAtSeconds: number,
+    downloadable = false,
   ): string {
     const header = base64url(JSON.stringify({ alg: "RS256", kid: key.keyId }));
     const payload = base64url(
@@ -686,6 +710,9 @@ export function createCloudflareStreamVideoProvider(
         kid: key.keyId,
         exp: expiresAtSeconds,
         nbf: Math.floor(now().getTime() / 1_000) - NOT_BEFORE_SKEW_SECONDS,
+        // A playback token never carries this claim, so a playback token
+        // can never be used to fetch the file (ADR 0047).
+        ...(downloadable ? { downloadable: true } : {}),
       }),
     );
     try {
@@ -807,6 +834,76 @@ export function createCloudflareStreamVideoProvider(
     };
   }
 
+  /**
+   * ADR 0047. The file is made on first request (the MP4 is billed as
+   * delivered minutes, so it is never made for a pitch nobody downloads)
+   * and fetched by the browser from the CDN; no byte passes through
+   * Capital Q. Signed media gets a token with `downloadable: true`, minted
+   * per request and never cached: unlike playback it is rare.
+   */
+  async function createDownloadAuthorization(
+    raw: DownloadAuthorizationRequest,
+  ): Promise<DownloadAuthorization> {
+    const authorization = DownloadAuthorizationRequestSchema.parse(raw);
+    const subdomain = options.customerSubdomain;
+    if (subdomain === undefined) {
+      throw new MediaProviderNotConfiguredError("download", [
+        "CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN",
+      ]);
+    }
+    const uid = authorization.providerAssetId;
+    const made = await request(
+      "download",
+      "POST",
+      `/${encodeURIComponent(uid)}/downloads`,
+      DownloadsResultSchema,
+      {},
+    );
+    if (made.kind === "NOT_FOUND") {
+      throw fail("download", "REJECTED", 404, "ASSET_NOT_FOUND");
+    }
+    if (made.result.default.status !== "ready") {
+      return {
+        status: "PREPARING",
+        mediaAssetId: authorization.mediaAssetId,
+        percentComplete: made.result.default.percentComplete ?? null,
+      };
+    }
+    const expiresAtSeconds =
+      Math.floor(now().getTime() / 1_000) + authorization.ttlSeconds;
+    const expiresAt = new Date(expiresAtSeconds * 1_000).toISOString();
+    if (authorization.accessMode === "PUBLIC") {
+      return {
+        status: "READY",
+        mediaAssetId: authorization.mediaAssetId,
+        downloadUrl: downloadUrl(subdomain, uid, authorization.fileName),
+        expiresAt,
+      };
+    }
+    let token: string;
+    if (options.signingKey !== undefined) {
+      token = signLocally(options.signingKey, uid, expiresAtSeconds, true);
+    } else {
+      const minted = await request(
+        "download",
+        "POST",
+        `/${encodeURIComponent(uid)}/token`,
+        TokenResultSchema,
+        { exp: expiresAtSeconds, downloadable: true },
+      );
+      if (minted.kind === "NOT_FOUND") {
+        throw fail("download", "REJECTED", 404, "ASSET_NOT_FOUND");
+      }
+      token = minted.result.token;
+    }
+    return {
+      status: "READY",
+      mediaAssetId: authorization.mediaAssetId,
+      downloadUrl: downloadUrl(subdomain, token, authorization.fileName),
+      expiresAt,
+    };
+  }
+
   async function deleteAsset(providerAssetId: string): Promise<void> {
     const uid = ProviderAssetIdSchema.parse(providerAssetId);
     // A deleted asset's token must not outlive it in this process.
@@ -921,6 +1018,7 @@ export function createCloudflareStreamVideoProvider(
     resumeUploadSession,
     getAsset,
     createPlaybackAuthorization,
+    createDownloadAuthorization,
     deleteAsset,
     requestGeneratedCaptions,
     getGeneratedCaptions,

@@ -7,12 +7,14 @@ import {
   CreateCompanyPitchResponseSchema,
   IDEMPOTENCY_KEY_HEADER,
   MEDIA_DETAILS_SUFFIX,
+  MEDIA_DOWNLOAD_SUFFIX,
   MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_SYNC_SUFFIX,
   MEDIA_UPLOAD_CANCEL_SUFFIX,
   MEDIA_UPLOAD_SESSION_SUFFIX,
   MediaUploadSessionDtoSchema,
+  PitchDownloadDtoSchema,
   PlaybackAuthorizationDtoSchema,
   SetPitchDetailsResponseSchema,
   SetPitchPlaybackPolicyResponseSchema,
@@ -226,5 +228,24 @@ export function authorisePitchPlayback(
     `${assetPath(companyId, mediaAssetId)}${MEDIA_PLAYBACK_SUFFIX}`,
     PlaybackAuthorizationDtoSchema,
     { body: {} },
+  );
+}
+
+/**
+ * `GET …/pitch/:mediaAssetId/download` (ADR 0047) — a short-lived link to
+ * the pitch as a file, or PREPARING while the file is made. Refused as
+ * not-found for a watch-only pitch exactly as for one the viewer may not
+ * play. The browser opens the link; the bytes come from the CDN.
+ */
+export function authorisePitchDownload(
+  session: ApiSession,
+  companyId: string,
+  mediaAssetId: string,
+) {
+  return call(
+    session,
+    "GET",
+    `${assetPath(companyId, mediaAssetId)}${MEDIA_DOWNLOAD_SUFFIX}`,
+    PitchDownloadDtoSchema,
   );
 }

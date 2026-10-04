@@ -92,6 +92,16 @@ export type MediaAssetRepository = {
       readonly audience: PitchAudience;
     },
   ) => Promise<MediaAsset | null>;
+  /** ADR 0047: whether viewers may save a copy of one founder pitch. */
+  readonly setDownloadable: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly mediaAssetId: MediaAssetId;
+      readonly expectedVersion: number;
+      readonly downloadable: boolean;
+    },
+  ) => Promise<MediaAsset | null>;
   /** Newest first, including superseded and deleted assets: this is history. */
   readonly listForOwner: (
     executor: DatabaseExecutor,

@@ -89,11 +89,13 @@ export {
   createApplyAutomatedModeration,
   createPostgresAutomatedModeration,
   createSetPitchDetails,
+  createSetPitchDownloadable,
   createSetPitchPlaybackPolicy,
   OwnerPlaybackPolicySchema,
   PitchDetailsSchema,
   type PitchDetails,
   type SetPitchDetailsCommand,
+  type SetPitchDownloadableCommand,
   type ApplyAutomatedModerationCommand,
   type AutomatedModerationDependencies,
   type AutomatedModerationResult,
@@ -127,6 +129,8 @@ export {
   type TimedCue,
 } from "./domain/web-vtt.js";
 export {
+  downloadFileName,
+  type AuthoriseDownloadQuery,
   type AuthorisePlaybackQuery,
   type CancelUploadCommand,
   type CancelUploadResult,

@@ -17,6 +17,7 @@ import {
   type MediaOwnerRef,
 } from "../contracts/index.js";
 import type {
+  DownloadAuthorization,
   PlaybackAuthorization,
   VideoUploadSession,
 } from "../contracts/provider.js";
@@ -24,6 +25,7 @@ import {
   MediaAssetConflictError,
   MediaAssetNotFoundError,
   MediaOwnerNotFoundError,
+  MediaProviderNotConfiguredError,
   MediaRuleError,
 } from "../domain/errors.js";
 import type { ResolvedMediaOwner } from "../domain/owners.js";
@@ -82,6 +84,8 @@ const ACTION = {
 const PITCH = "FOUNDER_PITCH" as const;
 /** A viewer's grant outlives a pitch by a comfortable margin, and no more. */
 const PLAYBACK_TTL_SECONDS = 15 * 60;
+/** ADR 0047: long enough to start the download, short enough not to share. */
+const DOWNLOAD_TTL_SECONDS = 5 * 60;
 
 function companyRef(companyId: string): MediaOwnerRef {
   return { ownerType: "COMPANY", ownerId: companyId };
@@ -758,5 +762,60 @@ export function createAuthorisePlayback(
       ttlSeconds: PLAYBACK_TTL_SECONDS,
     });
     return { asset, authorization };
+  };
+}
+
+export type AuthoriseDownloadQuery = AuthorisePlaybackQuery;
+
+/** A file name made of safe characters, from display text. */
+export function downloadFileName(label: string | null): string {
+  const stem = (label ?? "")
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, 60);
+  return `${stem === "" ? "pitch" : `${stem}-pitch`}.mp4`;
+}
+
+/**
+ * ADR 0047. Decided on every request, in this order: the one playback rule
+ * (owner, or a viewer the feed would show it to), then the owner's
+ * download permission for a viewer. Every refusal is "not found", exactly
+ * as for a pitch the viewer may not watch: a watch-only pitch and a pitch
+ * that does not exist look the same from outside. The owner may always
+ * save their own pitch.
+ */
+export function createAuthoriseDownload(
+  dependencies: MediaServiceDependencies,
+) {
+  const { videoProvider } = dependencies;
+  const playable = createResolvePlayableAsset(dependencies);
+  return async (
+    query: AuthoriseDownloadQuery,
+  ): Promise<DownloadAuthorization> => {
+    const asset = await playable(query);
+    // The owner's own organisation; anyone else is a viewer. Decided from
+    // the actor's server-resolved context, never from anything sent.
+    const isOwner =
+      query.actor.organisationId !== undefined &&
+      asset.ownerOrganisationId === query.actor.organisationId;
+    if (
+      asset.providerAssetId === null ||
+      asset.purpose !== "FOUNDER_PITCH" ||
+      (!isOwner && !asset.downloadable)
+    ) {
+      throw new MediaAssetNotFoundError();
+    }
+    if (videoProvider.createDownloadAuthorization === undefined) {
+      throw new MediaProviderNotConfiguredError("download", []);
+    }
+    return videoProvider.createDownloadAuthorization({
+      mediaAssetId: asset.id,
+      providerAssetId: asset.providerAssetId,
+      accessMode: asset.playbackPolicy,
+      ttlSeconds: DOWNLOAD_TTL_SECONDS,
+      // The owner's own title for the video, reduced to safe characters.
+      fileName: downloadFileName(asset.title),
+    });
   };
 }

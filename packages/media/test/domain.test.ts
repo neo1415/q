@@ -55,6 +55,7 @@ const asset = (overrides: Partial<MediaAsset> = {}): MediaAsset =>
     moderationStatus: "NOT_REVIEWED",
     title: null,
     audience: "INVESTORS",
+    downloadable: false,
     replacesMediaAssetId: null,
     supersededAt: null,
     createdByUserId: "55555555-5555-4555-8555-555555555555",
@@ -188,6 +189,7 @@ describe("the client-facing DTO", () => {
       "audience",
       "captionState",
       "createdAt",
+      "downloadable",
       "durationSeconds",
       "live",
       "mediaAssetId",
@@ -326,6 +328,7 @@ describe("toDiscoverablePitch", () => {
       captionState: "AVAILABLE",
       title: null,
       audience: "INVESTORS",
+      downloadable: false,
     });
     expect(JSON.stringify(pitch)).not.toContain("cf-uid-private");
   });

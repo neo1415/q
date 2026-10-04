@@ -77,6 +77,7 @@ const MediaAssetRow = z.object({
   moderation_status: ModerationStatusSchema,
   title: z.string().nullable(),
   audience: PitchAudienceSchema,
+  downloadable: z.boolean(),
   replaces_media_asset_id: MediaAssetIdSchema.nullable(),
   superseded_at: Timestamp.nullable(),
   created_by_user_id: UserIdSchema,
@@ -109,6 +110,7 @@ function toAsset(row: unknown): MediaAsset {
     moderationStatus: r.moderation_status,
     title: r.title,
     audience: r.audience,
+    downloadable: r.downloadable,
     replacesMediaAssetId: r.replaces_media_asset_id,
     supersededAt: r.superseded_at,
     createdByUserId: r.created_by_user_id,
@@ -126,7 +128,7 @@ function select(executor: DatabaseExecutor) {
            m.purpose, m.provider, m.provider_asset_id, m.status, m.duration_seconds,
            m.width, m.height, m.aspect_ratio, m.playback_policy, m.thumbnail_reference,
            m.caption_state, m.transcript_state, m.moderation_status,
-           m.title, m.audience, m.replaces_media_asset_id, m.superseded_at, m.created_by_user_id,
+           m.title, m.audience, m.downloadable, m.replaces_media_asset_id, m.superseded_at, m.created_by_user_id,
            m.created_at, m.ready_at, m.deleted_at, m.version
       from media.media_assets m`;
 }
@@ -226,6 +228,21 @@ export function createPostgresMediaAssetRepository(): MediaAssetRepository {
          where m.id = ${input.mediaAssetId}
            and m.tenant_id = ${input.tenantId}
            and m.version = ${input.expectedVersion}
+        returning m.id`;
+      return rows.length === 0
+        ? null
+        : reread(tx, input.tenantId, input.mediaAssetId);
+    },
+
+    setDownloadable: async (tx, input) => {
+      const rows = await tx.sql`
+        update media.media_assets m
+           set downloadable = ${input.downloadable},
+               version = m.version + 1
+         where m.id = ${input.mediaAssetId}
+           and m.tenant_id = ${input.tenantId}
+           and m.version = ${input.expectedVersion}
+           and m.purpose = 'FOUNDER_PITCH'
         returning m.id`;
       return rows.length === 0
         ? null

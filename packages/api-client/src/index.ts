@@ -129,6 +129,7 @@ export {
 } from "./documents.js";
 
 export {
+  authorisePitchDownload,
   authorisePitchPlayback,
   cancelPitchUpload,
   createPitchMediaAsset,
