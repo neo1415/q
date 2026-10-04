@@ -123,13 +123,27 @@ export function MeetingQ({
   }
 
   if (status === "FAILED" && state.failure !== null) {
+    // meet-47: never silent -- why Q has no record, and, while the call
+    // is still on, a way to send it in again.
     return (
-      <p
-        className="cq-caption text-(--cq-text-secondary)"
+      <div
+        className="flex flex-wrap items-center gap-2"
         data-meeting-q="FAILED"
       >
-        {state.failure}
-      </p>
+        <span className="cq-caption text-(--cq-text-secondary)">
+          {state.failure}
+        </span>
+        {ended ? null : (
+          <Button
+            variant="quiet"
+            size="compact"
+            disabled={pending}
+            onClick={() => act(() => bringMeetingQAction(meetingId, newKey()))}
+          >
+            Send Q in again
+          </Button>
+        )}
+      </div>
     );
   }
 
@@ -139,6 +153,12 @@ export function MeetingQ({
   // Declining is each person's right, and it is recorded, never silent.
   return (
     <div className="flex flex-col items-start gap-1" data-meeting-q={status}>
+      {state.failure === null ? null : (
+        // A retry in progress (meet-47): said, not hidden.
+        <span className="cq-caption text-(--cq-text-secondary)">
+          {state.failure}
+        </span>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <span className="cq-caption text-(--cq-text-secondary)">
           Q joins and keeps the record for both sides.

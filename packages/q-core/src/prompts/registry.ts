@@ -81,6 +81,7 @@ import { TURN_READER_V39 } from "./tasks/turn-reader.v39.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
 import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
+import { MEETING_NOTES_V3 } from "./tasks/meeting-notes.v3.js";
 import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
 // AUTO block (ADR 0030)
 import {
@@ -383,6 +384,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     MEMORY_EXTRACTOR_V1,
     MEETING_NOTES_V1,
     MEETING_NOTES_V2,
+    MEETING_NOTES_V3,
     ERRAND_REPLY_V1,
     INVESTOR_PERSONA_V1,
     INVESTOR_TWIN_TURN_V1,

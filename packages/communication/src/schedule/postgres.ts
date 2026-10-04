@@ -45,6 +45,7 @@ type MeetingRow = {
   q_action_id: string | null;
   idempotency_key: string;
   prep_brief_at: Date | null;
+  origin?: MeetingRecord["origin"];
   participants:
     | {
         participant_tenant_id: string;
@@ -74,6 +75,7 @@ function toMeeting(row: MeetingRow): MeetingRecord {
     idempotencyKey: row.idempotency_key,
     prepBriefAt:
       row.prep_brief_at === null ? null : new Date(row.prep_brief_at),
+    origin: row.origin ?? "BOOKED",
     participants: (row.participants ?? []).map((p) => ({
       participantTenantId: p.participant_tenant_id,
       userId: p.user_id,
@@ -143,7 +145,7 @@ export function createPostgresScheduleStore(options: {
   >`
     select m.id, m.tenant_id, m.relationship_id, m.organiser_user_id, m.organiser_tenant_id,
            m.purpose, m.starts_at, m.ends_at, m.time_zone, m.status, m.google_event_id,
-           m.meet_link, m.q_action_id, m.idempotency_key, m.prep_brief_at,
+           m.meet_link, m.q_action_id, m.idempotency_key, m.prep_brief_at, m.origin,
            (select json_agg(json_build_object(
                      'participant_tenant_id', p.participant_tenant_id, 'user_id', p.user_id,
                      'role', p.role, 'display_name', p.display_name, 'email', p.email)
@@ -163,10 +165,11 @@ export function createPostgresScheduleStore(options: {
           const inserted = await tx.sql<{ id: string }[]>`
           insert into communication.meetings
             (id, tenant_id, relationship_id, organiser_user_id, organiser_tenant_id, purpose,
-             starts_at, ends_at, time_zone, google_event_id, q_action_id, idempotency_key)
+             starts_at, ends_at, time_zone, google_event_id, q_action_id, idempotency_key, origin)
           values (${input.id}, ${input.tenantId}, ${input.relationshipId}, ${input.organiserUserId},
                   ${input.organiserTenantId}, ${input.purpose}, ${input.startsAt}, ${input.endsAt},
-                  ${input.timeZone}, ${input.googleEventId}, ${input.qActionId}, ${input.idempotencyKey})
+                  ${input.timeZone}, ${input.googleEventId}, ${input.qActionId}, ${input.idempotencyKey},
+                  ${input.origin ?? "BOOKED"})
           on conflict do nothing
           returning id`;
           if (inserted.length === 1) {
@@ -217,6 +220,28 @@ export function createPostgresScheduleStore(options: {
         update communication.meetings
            set status = 'SCHEDULED', meet_link = ${meetLink}
          where id = ${meetingId} and status in ('SCHEDULING', 'FAILED')`;
+    },
+
+    liveMeetingOnLink: async (relationshipId, meetLink, at) =>
+      (
+        await selectMeetings(
+          sql`where m.relationship_id = ${relationshipId}
+                and m.meet_link = ${meetLink}
+                and m.status = 'SCHEDULED'
+                and m.starts_at - interval '30 minutes' <= ${at}
+                and m.ends_at > ${at}
+              order by m.starts_at desc limit 1`,
+        )
+      ).map(toMeeting)[0] ?? null,
+
+    askQToJoin: async (meetingId) => {
+      await sql`
+        update communication.meeting_assistants
+           set status = 'REQUESTED', failure = null, provider_bot_id = null,
+               attempts = 0, next_attempt_at = clock_timestamp(),
+               booked_starts_at = null, booked_meet_link = null,
+               updated_at = clock_timestamp()
+         where meeting_id = ${meetingId} and status in ('FAILED', 'CANCELLED')`;
     },
 
     markMeetingFailed: async (meetingId) => {

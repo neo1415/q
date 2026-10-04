@@ -8,11 +8,13 @@ import {
   createReminder,
   dismissReminder,
   findMeetingSlots,
+  joinMeetingCall,
   markNotificationsRead,
   scheduleMeeting,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
+  googleMeetLink,
   MeetingDurationMinutesSchema,
   MeetingPurposeSchema,
   ReminderNoteSchema,
@@ -116,6 +118,26 @@ export async function bookMeetingAction(input: {
   const { relationshipId, idempotencyKey, ...request } = parsed.data;
   return run((session) =>
     scheduleMeeting(session, relationshipId, request, idempotencyKey),
+  );
+}
+
+/** meet-47: "Have Q join a call" -- a Google Meet already running. */
+export async function joinCallAction(input: {
+  readonly relationshipId: string;
+  readonly meetLink: string;
+}): Promise<ScheduleActionResult<MeetingDto>> {
+  const id = Id.safeParse(input.relationshipId);
+  const link = googleMeetLink(input.meetLink);
+  if (!id.success) return invalid;
+  if (link === null) {
+    return {
+      ok: false,
+      message:
+        "Q joins Google Meet calls: paste a link like https://meet.google.com/abc-defg-hij.",
+    };
+  }
+  return run((session) =>
+    joinMeetingCall(session, id.data, { meetLink: link }),
   );
 }
 

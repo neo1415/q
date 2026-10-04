@@ -1,6 +1,7 @@
 import type { OwnUsage } from "./composition/usage.js";
 import { registerUsageRoutes } from "./http/usage.js";
 import type { MeetingHostRuntime } from "./composition/meeting-host-runtime.js";
+import type { RecallStatusWebhook } from "./composition/recall-bots.js";
 import { registerMeetingHostRoutes } from "./http/meeting-host.js";
 import { randomUUID } from "node:crypto";
 
@@ -156,6 +157,8 @@ export type QApiModules = {
     MeetingAssistantRoutesDependencies["assistant"] | undefined;
   // MEET-HOST block (ADR 0037): Recall's live events for calls Q hosts.
   readonly meetingHost?: MeetingHostRuntime | undefined;
+  /** meet-47: Recall's status webhook (a late transcript settles at once). */
+  readonly recallStatus?: RecallStatusWebhook | undefined;
   /** What Q found about the actor's own profile subject (BIZ-002). */
   readonly profileFindings?:
     ProfileFindingsRoutesDependencies["findings"] | undefined;
@@ -473,9 +476,13 @@ export function createApp(
     });
   }
 
-  // MEET-HOST block: signed per meeting, no session.
-  if (modules.meetingHost !== undefined) {
-    registerMeetingHostRoutes(app, { host: modules.meetingHost });
+  // MEET-HOST block: signed per meeting, no session; meet-47: Recall's
+  // signed status webhook on the same path.
+  if (modules.meetingHost !== undefined || modules.recallStatus !== undefined) {
+    registerMeetingHostRoutes(app, {
+      host: modules.meetingHost,
+      status: modules.recallStatus,
+    });
   }
 
   // What Q found about the actor's own profile subject (BIZ-002).

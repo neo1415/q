@@ -33,7 +33,14 @@ export type MeetingRecord = {
   readonly idempotencyKey: string;
   readonly prepBriefAt: Date | null;
   readonly participants: readonly MeetingParticipant[];
+  /**
+   * meet-47: BOOKED on Capital Q with a calendar event, or JOINED (Q asked
+   * to join a running Google Meet; no calendar event exists). Absent: BOOKED.
+   */
+  readonly origin?: MeetingOrigin | undefined;
 };
+
+export type MeetingOrigin = "BOOKED" | "JOINED";
 
 export type NewMeeting = {
   readonly id: string;
@@ -49,6 +56,7 @@ export type NewMeeting = {
   readonly qActionId: string | null;
   readonly idempotencyKey: string;
   readonly participants: readonly MeetingParticipant[];
+  readonly origin?: MeetingOrigin | undefined;
 };
 
 export type ReminderChannel = "IN_APP" | "EMAIL";
@@ -147,6 +155,21 @@ export type ScheduleStore = {
     meetLink: string | null,
   ) => Promise<void>;
   readonly markMeetingFailed: (meetingId: string) => Promise<void>;
+  /**
+   * meet-47: the relationship's live call on this Meet link -- SCHEDULED,
+   * and `at` inside its window (from 30 minutes before its start to its
+   * end) -- or null. "Join this call" twice is one call.
+   */
+  readonly liveMeetingOnLink: (
+    relationshipId: string,
+    meetLink: string,
+    at: Date,
+  ) => Promise<MeetingRecord | null>;
+  /**
+   * meet-47: Q asked again after it failed or was stood down: its record
+   * goes back to REQUESTED for the collector to book now. A decline stands.
+   */
+  readonly askQToJoin: (meetingId: string) => Promise<void>;
   /**
    * AUTO (2026-10-02): scheduled meetings still without a Meet link, not
    * yet started, booked within the last day, oldest first.

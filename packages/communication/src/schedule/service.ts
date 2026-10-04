@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { googleMeetLink } from "@capital-q/contracts";
 import type { TransactionManager } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
@@ -132,7 +133,20 @@ export type ScheduleServiceDependencies = {
     | undefined;
   readonly now?: (() => Date) | undefined;
   readonly newId?: (() => string) | undefined;
+  /**
+   * meet-47: someone asked Q to join a call now; the composition books the
+   * bot at once rather than on the collector's next tick. Absent (a service
+   * without the bot provider): the collector books it within its tick.
+   */
+  readonly onJoinRequested?: ((meetingId: string) => void) | undefined;
 };
+
+/** meet-47: what a joined call's other side reads, and the record's consent line. */
+export const JOINED_CALL_CONSENT =
+  'Q from Capital Q joins as "Q (Capital Q notes)" to keep the record of this call for both sides. It says so when it joins, and the organiser can end recording from Capital Q.';
+
+/** How long a joined call is held open when nobody said; the bot leaves when the call ends. */
+export const JOINED_CALL_MINUTES = 60;
 
 export type ScheduleRefusal =
   | "NOT_A_PARTY"
@@ -144,7 +158,9 @@ export type ScheduleRefusal =
   | "CANCELLED"
   | "INVALID_TIME"
   /** An idempotency key already used for a different request. */
-  | "KEY_REUSED";
+  | "KEY_REUSED"
+  /** meet-47: Q joins Google Meet links only. */
+  | "NOT_A_MEET_LINK";
 
 export type ScheduleOutcome<T> =
   | ({ readonly outcome: "OK" } & T)
@@ -243,6 +259,24 @@ export type ScheduleService = {
         readonly name: string;
         readonly email: string;
       }[];
+    }>
+  >;
+  /**
+   * meet-47: "Have Q join a call" -- a Google Meet already running, on a
+   * relationship the person is a party to, either side. Recorded as a
+   * JOINED meeting (no calendar event) that Q's collector books the bot
+   * for at once; the same link at the same time is the same call.
+   */
+  readonly joinCall: (input: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+    readonly meetLink: string;
+    readonly purpose?: string | undefined;
+    readonly correlationId: string;
+  }) => Promise<
+    ScheduleOutcome<{
+      readonly meeting: MeetingView;
+      readonly alreadyJoined: boolean;
     }>
   >;
   readonly reschedule: (input: {
@@ -830,9 +864,131 @@ export function createScheduleService(
       };
     },
 
+    joinCall: async (input) => {
+      const { actor } = input;
+      if (actor.actorType !== "HUMAN") return refusal("NOT_A_PARTY");
+      const link = googleMeetLink(input.meetLink);
+      if (link === null) return refusal("NOT_A_MEET_LINK");
+      const resolved = await counterpartOf(actor, input.relationshipId);
+      if (resolved === null) return refusal("NOT_A_PARTY");
+      if (!resolved.party.connected) return refusal("NOT_CONNECTED");
+      const current = now();
+      // Idempotent per link and time: the call already on this link now
+      // (booked or joined) is the one Q joins.
+      const live = await store.liveMeetingOnLink(
+        input.relationshipId,
+        link,
+        current,
+      );
+      if (live !== null) {
+        await store.askQToJoin(live.id);
+        dependencies.onJoinRequested?.(live.id);
+        return {
+          outcome: "OK",
+          meeting: viewFor(live, actor.userId),
+          alreadyJoined: true,
+        };
+      }
+      const tenantId = await directory.relationshipTenant(input.relationshipId);
+      if (tenantId === null) return refusal("NOT_A_PARTY");
+      const people = await directory.counterpartPeople({
+        relationshipId: input.relationshipId,
+        counterpart: resolved.counterpart,
+      });
+      const self = await directory.person(actor.userId);
+      if (self === null) return refusal("NO_RECIPIENTS");
+      const counterpartName =
+        (await directory.counterpartName({
+          relationshipId: input.relationshipId,
+          organiserTenantId: actor.tenantId,
+        })) ?? null;
+      const meetingId = newId();
+      const code = link.slice("https://meet.google.com/".length);
+      // A double click lands in the same ten minutes: one row.
+      const bucket = Math.floor(current.getTime() / 600_000);
+      const claim = await store.claimMeeting({
+        id: meetingId,
+        tenantId,
+        relationshipId: input.relationshipId,
+        organiserUserId: actor.userId,
+        organiserTenantId: actor.tenantId,
+        purpose: (
+          input.purpose ??
+          (counterpartName === null ? "Call" : `Call with ${counterpartName}`)
+        ).slice(0, 500),
+        startsAt: current,
+        endsAt: new Date(current.getTime() + JOINED_CALL_MINUTES * 60_000),
+        timeZone: "UTC",
+        // Never sent to Google: the row's own stable handle.
+        googleEventId: googleEventIdFor(meetingId),
+        qActionId: null,
+        idempotencyKey: `join:${input.relationshipId}:${code}:${String(bucket)}`,
+        origin: "JOINED",
+        participants: [
+          {
+            participantTenantId: actor.tenantId,
+            userId: actor.userId,
+            role: "ORGANISER",
+            displayName: self.name,
+            email: self.email,
+          },
+          ...people
+            .filter((person) => person.userId !== actor.userId)
+            .slice(0, 10)
+            .map((person) => ({
+              participantTenantId: person.tenantId,
+              userId: person.userId,
+              role: "ATTENDEE" as const,
+              displayName: person.name.slice(0, 200),
+              email: person.email.toLowerCase(),
+            })),
+        ],
+      });
+      const record = claim.record;
+      if (record.status === "SCHEDULING") {
+        await transactions.run(async (tx) => {
+          await store.markMeetingScheduled(tx, record.id, link);
+          await activity.record(tx, {
+            relationshipId: record.relationshipId,
+            eventType: "meeting_scheduled",
+            meetingId: record.id,
+            actorUserId: actor.userId,
+            correlationId: input.correlationId,
+          });
+          // The other side hears it, with the same consent line the
+          // calendar invite of a booked call carries (ADR 0027, 0039).
+          for (const participant of record.participants) {
+            if (participant.role !== "ATTENDEE") continue;
+            await store.notify(tx, {
+              tenantId: participant.participantTenantId,
+              userId: participant.userId,
+              kind: "MEETING_SCHEDULED",
+              title: `${self.name} asked Q to join your call`.slice(0, 200),
+              body: `${JOINED_CALL_CONSENT} Meet link: ${link}`.slice(0, 1000),
+              linkPath: null,
+              reminderId: null,
+              meetingId: record.id,
+              dedupeKey: `meeting-joined:${record.id}`,
+            });
+          }
+        });
+      } else {
+        await store.askQToJoin(record.id);
+      }
+      dependencies.onJoinRequested?.(record.id);
+      const fresh = (await store.findMeeting(record.id)) ?? record;
+      return {
+        outcome: "OK",
+        meeting: viewFor(fresh, actor.userId),
+        alreadyJoined: !claim.created,
+      };
+    },
+
     reschedule: async (input) => {
       const record = await ownedMeeting(input.actor, input.meetingId);
       if (record === null) return refusal("NOT_FOUND");
+      // A joined call is happening now and has no calendar event to move.
+      if (record.origin === "JOINED") return refusal("NOT_FOUND");
       if (record.status === "CANCELLED") return refusal("CANCELLED");
       if (record.status !== "SCHEDULED") return refusal("NOT_FOUND");
       if (input.startsAt.getTime() < now().getTime()) {
@@ -910,7 +1066,11 @@ export function createScheduleService(
       if (record.status === "CANCELLED") {
         return { outcome: "OK", alreadyDone: true };
       }
-      if (record.status === "SCHEDULED" || record.status === "SCHEDULING") {
+      // A joined call has no calendar event (meet-47): nothing at Google.
+      if (
+        record.origin !== "JOINED" &&
+        (record.status === "SCHEDULED" || record.status === "SCHEDULING")
+      ) {
         const calendar = await calendars(input.actor.userId).catch(() => null);
         if (calendar === null) return refusal("CALENDAR_NOT_CONNECTED");
         try {

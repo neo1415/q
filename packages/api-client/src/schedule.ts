@@ -10,6 +10,7 @@ import {
   NOTIFICATIONS_PATH,
   NOTIFICATIONS_READ_PATH,
   NotificationListSchema,
+  RELATIONSHIP_MEETING_JOIN_PATH,
   RELATIONSHIP_MEETING_SLOTS_PATH,
   RELATIONSHIP_MEETINGS_PATH,
   REMINDER_DISMISS_PATH,
@@ -17,6 +18,7 @@ import {
   ReminderDtoSchema,
   ReminderListSchema,
   type CreateReminderRequest,
+  type JoinMeetingRequest,
   type MeetingSlotsRequest,
   type ScheduleMeetingRequest,
 } from "@capital-q/contracts";
@@ -92,6 +94,21 @@ export function scheduleMeeting(
     withId(RELATIONSHIP_MEETINGS_PATH, "relationshipId", relationshipId),
     MeetingDtoSchema,
     { body: request, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** meet-47: Q joins a Google Meet already running; the same link now is one call. */
+export function joinMeetingCall(
+  session: ApiSession,
+  relationshipId: string,
+  request: JoinMeetingRequest,
+) {
+  return call(
+    session,
+    "POST",
+    withId(RELATIONSHIP_MEETING_JOIN_PATH, "relationshipId", relationshipId),
+    MeetingDtoSchema,
+    { body: request },
   );
 }
 

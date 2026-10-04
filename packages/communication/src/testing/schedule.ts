@@ -80,6 +80,18 @@ export function createInMemoryScheduleStore(
       created.set(record.id, options.now?.() ?? new Date());
       return Promise.resolve({ record: copy(record), created: true });
     },
+    liveMeetingOnLink: (relationshipId, meetLink, at) => {
+      const found = meetings.find(
+        (m) =>
+          m.relationshipId === relationshipId &&
+          m.meetLink === meetLink &&
+          m.status === "SCHEDULED" &&
+          m.startsAt.getTime() - 30 * 60_000 <= at.getTime() &&
+          m.endsAt.getTime() > at.getTime(),
+      );
+      return Promise.resolve(found === undefined ? null : copy(found));
+    },
+    askQToJoin: () => Promise.resolve(),
     findMeeting: (id) => {
       const found = meetings.find((m) => m.id === id);
       return Promise.resolve(found === undefined ? null : copy(found));

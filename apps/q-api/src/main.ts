@@ -81,7 +81,12 @@ import {
   createDocumentsModule,
   ownCompanyOf,
 } from "./composition/documents.js";
-import { createRecallBots } from "./composition/recall-bots.js";
+import { createMeetingFollowUpCards } from "./composition/meeting-follow-up-cards.js";
+import {
+  createRecallBots,
+  createRecallStatusWebhook,
+  transcriberOf,
+} from "./composition/recall-bots.js";
 import {
   createMeetingHostComposer,
   createMeetingHostRuntime,
@@ -1274,6 +1279,11 @@ const chat = composeChat({
 // Meetings and reminders (BIZ-008): the person's own Google Calendar
 // through the integrations context; approved actions execute here. App
 // email (reminders) is the workers' job, so q-api composes none.
+// meet-47: "Have Q join a call" books the bot at once; bound once the
+// meeting assistant is composed below (until then the collector's tick does).
+const joinCallNow: { book: (meetingId: string) => void } = {
+  book: () => undefined,
+};
 const schedule = composeSchedule({
   sql: database.sql,
   transactions: database.transactions,
@@ -1281,6 +1291,9 @@ const schedule = composeSchedule({
   calendars: (userId) => integrations.calendarOf(userId),
   email: unavailableAppEmailSender,
   logger,
+  onJoinRequested: (meetingId) => {
+    joinCallNow.book(meetingId);
+  },
 });
 // Handles and the Q Card (BIZ-004), composed as the application API
 // composes them: the same service, the same allowlisted subject facts.
@@ -2978,6 +2991,15 @@ const recallKey = process.env.RECALL_API_KEY ?? process.env.RECALL_API;
 const recallBots = createRecallBots({
   apiKey: recallKey,
   region: process.env.RECALL_REGION ?? "eu-central-1",
+  transcriber: transcriberOf(process.env.RECALL_TRANSCRIBER),
+});
+const meetingFollowUpCards = createMeetingFollowUpCards({
+  sql: database.sql,
+  resolver: actorContextResolver,
+  runtime: qRuntime,
+  orchestration: orchestrationRuntime,
+  actions: qActions,
+  logger,
 });
 const meetingHost = createMeetingHostRuntime({
   enabled:
@@ -3002,7 +3024,12 @@ const meetingHost = createMeetingHostRuntime({
     leave: async (botId) => {
       await recallBots?.leave?.(botId);
     },
+    stop: async (botId) => {
+      await recallBots?.stopSpeaking?.(botId);
+    },
   },
+  // meet-47: a request to Q in the call is a card in the asker's own app.
+  askerCard: (request) => meetingFollowUpCards.cardFromCall(request),
   composer: createMeetingHostComposer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -3056,6 +3083,34 @@ const meetingAssistant = createMeetingAssistantService({
   // ADR 0027: the call is marked on the relationship's history once its
   // record exists, through Network's own appender.
   onHeld: async (held) => {
+    // meet-47: after the call Q works in the app -- each person's own
+    // approval cards from what was agreed, and any standing instruction or
+    // errand waiting on this relationship continues now.
+    void meetingFollowUpCards
+      .prepare({
+        meetingId: held.meetingId,
+        relationshipId: held.relationshipId,
+        purpose: held.purpose,
+        startsAt: held.startsAt,
+        agreements: held.agreements,
+        nextSteps: held.nextSteps,
+      })
+      .then((proposed) => {
+        logger.info(
+          {
+            meetingId: held.meetingId,
+            cards: [...proposed.values()].reduce((a, b) => a + b, 0),
+          },
+          "meeting follow-up cards prepared",
+        );
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          { err: error, meetingId: held.meetingId },
+          "meeting follow-up cards not prepared",
+        );
+      });
+    void instructionTriggers.wake(held.relationshipId).catch(() => undefined);
     const writer = createNetworkMeetingActivityWriter();
     await database.transactions.run((tx) =>
       writer.record(tx, {
@@ -3110,6 +3165,11 @@ const meetingAssistant = createMeetingAssistantService({
     ),
   logger,
 });
+joinCallNow.book = (meetingId) => {
+  void meetingAssistant.enlist().catch((error: unknown) => {
+    logger.warn({ err: error, meetingId }, "joined call not booked at once");
+  });
+};
 setInterval(
   () => {
     // ADR 0027: every booked call gets Q, enlisted shortly before it starts.
@@ -3120,7 +3180,9 @@ setInterval(
         logger.warn({ err: error }, "meeting assistant collection failed");
       });
   },
-  2 * 60 * 1000,
+  // meet-47: every minute, so a call booked or joined inside the window,
+  // a lobby and a retry are each seen within a minute.
+  60 * 1000,
 ).unref();
 
 // AUTO block (founder direction 2026-10-01): one gentle reminder to a
@@ -4337,6 +4399,10 @@ const { app, logger: appLogger } = createApp(
     meetingAssistant,
     // MEET-HOST block (ADR 0037)
     meetingHost,
+    recallStatus: createRecallStatusWebhook({
+      secret: process.env.RECALL_WEBHOOK_SECRET,
+      settleBot: (botId) => meetingAssistant.settleBot(botId),
+    }),
     errands,
     // AUTO block (ADR 0030)
     work: workPort,

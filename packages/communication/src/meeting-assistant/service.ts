@@ -36,7 +36,55 @@ type Logger = {
   ) => void;
 };
 
-export type MeetingBotState = "WAITING" | "IN_CALL" | "ENDED" | "FAILED";
+export type MeetingBotState =
+  | "WAITING"
+  /** Held in the call's lobby until someone admits Q. */
+  | "LOBBY"
+  | "IN_CALL"
+  | "ENDED"
+  | "FAILED";
+
+/** Why a call ended with nothing recorded (the provider's own reason). */
+export type MeetingBotEnd =
+  | "NOT_ADMITTED"
+  | "REMOVED"
+  | "NOBODY_CAME"
+  | "NOT_RECORDED"
+  | "TRANSCRIPT_FAILED"
+  | "NO_RECORDING";
+
+/** What each end means, said plainly on the assistant row and the record. */
+export const MEETING_BOT_END: Readonly<
+  Record<
+    MeetingBotEnd,
+    { readonly failure: string; readonly unrecorded: string }
+  >
+> = {
+  NOT_ADMITTED: {
+    failure: "Nobody let Q in from the call's lobby, so it heard nothing.",
+    unrecorded: "Q was not admitted from the lobby",
+  },
+  REMOVED: {
+    failure: "Q was removed from the call.",
+    unrecorded: "Q was removed from the call",
+  },
+  NOBODY_CAME: {
+    failure: "Nobody joined the call while Q was there.",
+    unrecorded: "Nobody joined while Q was there",
+  },
+  NOT_RECORDED: {
+    failure: "The call didn't let Q record.",
+    unrecorded: "The call did not permit recording",
+  },
+  TRANSCRIPT_FAILED: {
+    failure: "Q was in the call but its transcript failed.",
+    unrecorded: "Q's transcript of the call failed",
+  },
+  NO_RECORDING: {
+    failure: "The call ended before Q could record anything.",
+    unrecorded: "The call ended before Q recorded anything",
+  },
+};
 
 export type MeetingTranscriptLine = {
   readonly speaker: string | null;
@@ -66,14 +114,44 @@ export type MeetingBotProvider = {
   }) => Promise<{ readonly botId: string }>;
   /** Plays a short spoken line (mp3) into the call. */
   readonly say?: (botId: string, mp3Base64: string) => Promise<void>;
+  /** Stops the line Q is playing (someone talked over it). */
+  readonly stopSpeaking?: (botId: string) => Promise<void>;
   /** Leaves the call now (a participant asked Q to go). */
   readonly leave?: (botId: string) => Promise<void>;
   readonly read: (botId: string) => Promise<{
     readonly state: MeetingBotState;
-    /** Present once the call has ended and its captions are ready. */
+    /** Present once the call has ended and its transcript is ready. */
     readonly transcript: readonly MeetingTranscriptLine[] | null;
+    /** Ended with nothing to read, and why (absent while still processing). */
+    readonly ended?: MeetingBotEnd;
+    /**
+     * A transcript came back but Q did not stay to the end (removed from
+     * the call): the rest of the call is unrecorded, and said so.
+     */
+    readonly cutShort?: MeetingBotEnd;
   }>;
   readonly cancel: (botId: string) => Promise<void>;
+};
+
+/**
+ * An agreed next step as Q read it from the call (MEETING_NOTES v3): what
+ * kind of thing it is, whose, and dates only when they were said. Code
+ * turns it into an approval card; nothing here acts.
+ */
+export type MeetingNextStepNote = {
+  readonly kind:
+    | "MESSAGE"
+    | "REMINDER"
+    | "NEXT_CALL"
+    | "DOCUMENT_REQUEST"
+    | "SHARE_DECK"
+    | "OTHER";
+  readonly what: string;
+  readonly owner: string | null;
+  readonly ownerSide: "FOUNDER" | "INVESTOR" | null;
+  readonly dueDate: string | null;
+  readonly callAt: string | null;
+  readonly document: string | null;
 };
 
 export type MeetingNotes = {
@@ -83,6 +161,8 @@ export type MeetingNotes = {
   readonly attendees: QMeetingAssistantDto["attendees"];
   readonly agreements: readonly string[];
   readonly commitments: readonly QMeetingCommitmentSignal[];
+  /** Absent from composers before MEETING_NOTES v3. */
+  readonly nextSteps?: readonly MeetingNextStepNote[] | undefined;
   readonly composerVersion: string;
 };
 
@@ -93,6 +173,8 @@ export type MeetingNotesComposer = {
     readonly purpose: string;
     readonly organiserName: string;
     readonly transcript: string;
+    /** The call's date, YYYY-MM-DD (UTC), for days said in the call. */
+    readonly callDate: string;
   }) => Promise<MeetingNotes | null>;
 };
 
@@ -155,6 +237,11 @@ export type MeetingAssistantService = {
   readonly collect: (limit?: number) => Promise<number>;
   /** Collector tick: bring Q to every booked call about to start (ADR 0027). */
   readonly enlist: (limit?: number) => Promise<number>;
+  /**
+   * The provider said a bot changed (its status webhook): settle that one
+   * call now rather than on the next tick. Unknown bots are ignored.
+   */
+  readonly settleBot: (botId: string) => Promise<boolean>;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -168,6 +255,23 @@ export const Q_MEETING_BOT_NAME = "Q (Capital Q notes)";
 const OPEN = ["REQUESTED", "SCHEDULED", "IN_CALL", "COMPOSING"] as const;
 /** How far ahead of a call Q is enlisted: close enough not to waste a bot. */
 const ENLIST_AHEAD_MS = 30 * 60_000;
+/**
+ * meet-47: creating the bot is retried with backoff, never final on the
+ * first provider error: 1, 2, 4, 8, 15 minutes, then Q says it couldn't.
+ */
+export const BOT_CREATE_MAX_ATTEMPTS = 6;
+export function botRetryDelayMs(attempts: number): number {
+  return Math.min(15, 2 ** Math.max(0, attempts - 1)) * 60_000;
+}
+/** A claimed attempt is held this long; a crash mid-attempt retries after it. */
+const ATTEMPT_LEASE_MS = 3 * 60_000;
+/** A REQUESTED row from before retries existed, idle this long, is picked up. */
+const STALE_REQUEST_MS = 2 * 60_000;
+/**
+ * Bots are read from a little before the start: a hosted bot joins three
+ * minutes early, and a lobby is worth telling people about at once.
+ */
+const READ_AHEAD_MS = 5 * 60_000;
 /** The transcript kept, in lines; a long call is still bounded. */
 const TRANSCRIPT_MAX_LINES = 2_000;
 
@@ -303,6 +407,11 @@ export function createMeetingAssistantService(dependencies: {
         /** Who was there and the money said, from Q's record. */
         readonly attendees: MeetingNotes["attendees"];
         readonly commitments: MeetingNotes["commitments"];
+        /** For the follow-through cards (meet-47). */
+        readonly purpose: string;
+        readonly startsAt: Date;
+        readonly agreements: MeetingNotes["agreements"];
+        readonly nextSteps: readonly MeetingNextStepNote[];
       }) => Promise<void>)
     | undefined;
   /** A participant declined recording: marked on the relationship's history. */
@@ -428,7 +537,10 @@ export function createMeetingAssistantService(dependencies: {
    * read (ADR 0039): nobody can later claim it happened unwitnessed.
    */
   async function unrecorded(
-    row: AssistantRow & MeetingRow,
+    row: Pick<
+      MeetingRow & AssistantRow,
+      "meeting_id" | "organiser_tenant_id" | "starts_at" | "ends_at"
+    >,
     why: string,
   ): Promise<void> {
     const hhmm = (at: Date) => `${at.toISOString().slice(11, 16)} UTC`;
@@ -446,36 +558,271 @@ export function createMeetingAssistantService(dependencies: {
     );
   }
 
+  /**
+   * A notice to everyone on the call, once per kind (meet-47: whatever
+   * happens to Q in a call, both sides hear it in the app; nothing about
+   * Q's presence fails silently). Each lands on their own side's page.
+   */
+  async function tellBoth(
+    row: Pick<MeetingRow, "relationship_id" | "purpose"> & {
+      readonly meeting_id: string;
+    },
+    notice: {
+      readonly key: string;
+      readonly title: string;
+      readonly body: string;
+    },
+  ): Promise<void> {
+    await sql`
+      insert into communication.notifications
+        (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
+      select p.participant_tenant_id, p.user_id, 'Q_MESSAGE',
+             ${`${notice.title}: ${row.purpose}`.slice(0, 200)},
+             ${notice.body.slice(0, 1000)},
+             case when exists (
+                    select 1 from identity.organisation_memberships m
+                     where m.user_id = p.user_id
+                       and m.organisation_id = c.organisation_id
+                       and m.membership_status = 'active')
+                  then '/relationships/investor/' || r.investor_organisation_id::text
+                  else '/relationships/company/' || r.company_id::text
+             end,
+             null, ${row.meeting_id}, ${`${notice.key}:${row.meeting_id}`}
+        from communication.meeting_participants p
+        join network.relationships r on r.id = ${row.relationship_id}
+        join core.companies c on c.id = r.company_id
+       where p.meeting_id = ${row.meeting_id}
+       limit 20
+      on conflict (user_id, dedupe_key) do nothing`.catch((error: unknown) => {
+      logger?.warn(
+        { err: error, meetingId: row.meeting_id, notice: notice.key },
+        "the meeting notice was not written",
+      );
+    });
+  }
+
+  /**
+   * Q is held in the call's lobby: everyone on the booking hears it once,
+   * in the app, so someone admits it (Google Meet asks the organiser of the
+   * Meet to let an unsigned-in guest in; nobody saw that live).
+   */
+  async function inLobby(row: AssistantRow & MeetingRow): Promise<void> {
+    await tellBoth(row, {
+      key: "meeting-lobby",
+      title: "Q is waiting to be let in",
+      body: `Q is in the call's lobby as "${Q_MEETING_BOT_NAME}". Admit it in the call so it can keep the record for both sides; until then it hears nothing.`,
+    });
+  }
+
+  /**
+   * Q has no record of the call (or of part of it): the assistant row says
+   * why, the record both sides read says "Unrecorded" (ADR 0039), and both
+   * sides hear it.
+   */
+  async function failed(
+    row: Pick<
+      MeetingRow & AssistantRow,
+      | "meeting_id"
+      | "relationship_id"
+      | "purpose"
+      | "organiser_tenant_id"
+      | "starts_at"
+      | "ends_at"
+    > & { readonly id: string },
+    failure: string,
+    why: string,
+  ): Promise<void> {
+    await update(row.id, { status: "FAILED", failure });
+    await unrecorded(row, why);
+    await tellBoth(row, {
+      key: "meeting-q-failed",
+      title: "Q has no record of this call",
+      body: `${failure} The meeting record says so for both sides.`,
+    });
+  }
+
+  /**
+   * One try at creating the bot for a call (meet-47). A provider error is
+   * retried with backoff while the call can still be joined; only the last
+   * try fails the record, and both sides are told either way.
+   */
+  async function book(
+    assistantId: string,
+    call: MeetingRow,
+    attempts: number,
+    current: Date,
+  ): Promise<boolean> {
+    if (bots === undefined || call.meet_link === null) return false;
+    const startsIn = call.starts_at.getTime() - current.getTime();
+    try {
+      const created = await bots.create(
+        botFor(call.id, call.meet_link, call, current, startsIn),
+      );
+      await sql`
+        update communication.meeting_assistants
+           set status = 'SCHEDULED', provider_bot_id = ${created.botId},
+               failure = null, next_attempt_at = null,
+               booked_starts_at = ${call.starts_at}, booked_meet_link = ${call.meet_link},
+               updated_at = clock_timestamp()
+         where id = ${assistantId}`;
+      return true;
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, meetingId: call.id, attempts },
+        "meeting bot not created",
+      );
+      const next = new Date(current.getTime() + botRetryDelayMs(attempts));
+      const row = { ...call, id: assistantId, meeting_id: call.id };
+      if (
+        attempts >= BOT_CREATE_MAX_ATTEMPTS ||
+        next.getTime() >= call.ends_at.getTime()
+      ) {
+        await failed(
+          row,
+          `Q couldn't be booked into this call (${String(attempts)} tries).`,
+          "Q could not be booked into the call",
+        );
+        return false;
+      }
+      const hhmm = `${next.toISOString().slice(11, 16)} UTC`;
+      await sql`
+        update communication.meeting_assistants
+           set status = 'REQUESTED', provider_bot_id = null,
+               failure = ${`Q couldn't be booked into the call yet; trying again at ${hhmm}.`},
+               next_attempt_at = ${next}, updated_at = clock_timestamp()
+         where id = ${assistantId}`;
+      await tellBoth(row, {
+        key: "meeting-q-retrying",
+        title: "Q is having trouble joining",
+        body: "Q couldn't be booked into the call on its first try. It keeps trying, and the meeting record will say if it can't get in.",
+      });
+      return false;
+    }
+  }
+
+  /**
+   * The sweep before bots are booked (meet-47): a cancelled call stands Q
+   * down; a call moved, or given a new link, after Q was booked gets a
+   * fresh bot at its new time; a request whose call ended unbooked fails
+   * visibly.
+   */
+  async function reconcile(current: Date, limit: number): Promise<void> {
+    const cancelled = await sql<
+      { id: string; provider_bot_id: string | null }[]
+    >`
+      select a.id, a.provider_bot_id
+        from communication.meeting_assistants a
+        join communication.meetings m on m.id = a.meeting_id
+       where a.status in ('REQUESTED', 'SCHEDULED')
+         and m.status = 'CANCELLED'
+       limit ${limit}`;
+    for (const row of cancelled) {
+      if (bots !== undefined && row.provider_bot_id !== null) {
+        await bots.cancel(row.provider_bot_id).catch((error: unknown) => {
+          logger?.warn({ err: error }, "meeting bot not cancelled");
+        });
+      }
+      await sql`
+        update communication.meeting_assistants
+           set status = 'CANCELLED', next_attempt_at = null, updated_at = clock_timestamp()
+         where id = ${row.id} and status in ('REQUESTED', 'SCHEDULED')`;
+    }
+    const moved = await sql<
+      { id: string; provider_bot_id: string | null; starts_at: Date }[]
+    >`
+      select a.id, a.provider_bot_id, m.starts_at
+        from communication.meeting_assistants a
+        join communication.meetings m on m.id = a.meeting_id
+       where a.status = 'SCHEDULED'
+         and m.status = 'SCHEDULED'
+         and m.starts_at > ${current}
+         and ((a.booked_starts_at is not null and a.booked_starts_at <> m.starts_at)
+              or (a.booked_meet_link is not null and a.booked_meet_link is distinct from m.meet_link))
+       limit ${limit}`;
+    for (const row of moved) {
+      if (bots !== undefined && row.provider_bot_id !== null) {
+        await bots.cancel(row.provider_bot_id).catch((error: unknown) => {
+          logger?.warn({ err: error }, "moved call's old bot not cancelled");
+        });
+      }
+      const due = Math.max(
+        current.getTime(),
+        row.starts_at.getTime() - ENLIST_AHEAD_MS,
+      );
+      await sql`
+        update communication.meeting_assistants
+           set status = 'REQUESTED', provider_bot_id = null, failure = null,
+               attempts = 0, next_attempt_at = ${new Date(due)},
+               booked_starts_at = null, booked_meet_link = null,
+               updated_at = clock_timestamp()
+         where id = ${row.id} and status = 'SCHEDULED'`;
+    }
+    const unbooked = await sql<(MeetingRow & { assistant_id: string })[]>`
+      select a.id as assistant_id, m.id, m.relationship_id, m.organiser_user_id,
+             m.organiser_tenant_id, m.purpose, m.starts_at, m.ends_at, m.status, m.meet_link
+        from communication.meeting_assistants a
+        join communication.meetings m on m.id = a.meeting_id
+       where a.status = 'REQUESTED'
+         and m.status = 'SCHEDULED'
+         and m.ends_at <= ${current}
+       limit ${limit}`;
+    for (const call of unbooked) {
+      await failed(
+        { ...call, id: call.assistant_id, meeting_id: call.id },
+        call.meet_link === null
+          ? "The call never had a link, so Q couldn't join it."
+          : "Q never got into the call.",
+        "Q was never booked into the call",
+      );
+    }
+  }
+
   async function settle(row: AssistantRow & MeetingRow): Promise<void> {
     if (bots === undefined || row.provider_bot_id === null) return;
     const current = now();
     const read = await bots.read(row.provider_bot_id);
     if (read.state === "FAILED") {
-      await update(row.id, {
-        status: "FAILED",
-        failure: "Q couldn't get into the call.",
-      });
-      await unrecorded(row, "Q was not admitted to the call");
+      await failed(
+        row,
+        "Q couldn't get into the call.",
+        "Q was not admitted to the call",
+      );
       return;
     }
+    if (read.state === "ENDED" && read.ended !== undefined) {
+      const end = MEETING_BOT_END[read.ended];
+      await failed(row, end.failure, end.unrecorded);
+      return;
+    }
+    if (read.state === "LOBBY") await inLobby(row);
     if (read.state !== "ENDED" || read.transcript === null) {
       if (current.getTime() > row.ends_at.getTime() + GIVE_UP_AFTER_END_MS) {
-        await update(row.id, {
-          status: "FAILED",
-          failure: "The call's captions never came back.",
-        });
+        await failed(
+          row,
+          read.state === "ENDED"
+            ? "Q's transcript of the call never came back."
+            : "Q never got into the call.",
+          read.state === "ENDED"
+            ? "Q's transcript never came back"
+            : "Q never got into the call",
+        );
       } else if (read.state === "IN_CALL" && row.status !== "IN_CALL") {
         await update(row.id, { status: "IN_CALL" });
       }
       return;
     }
     const transcript = transcriptText(read.transcript);
-    if (transcript.length === 0) {
-      await update(row.id, {
-        status: "FAILED",
-        failure: "Nothing was said that Q could hear.",
-      });
-      await unrecorded(row, "Q heard nothing in the call");
+    // Only Q's own voice came back (live cfccb9a9: its greeting was the
+    // whole transcript): no person was heard, so there is nothing to note.
+    const heardPeople = read.transcript.some(
+      (line) => line.speaker !== "Q" && line.text.trim().length > 0,
+    );
+    if (transcript.length === 0 || !heardPeople) {
+      await failed(
+        row,
+        "Nothing was said that Q could hear.",
+        "Q heard nothing in the call",
+      );
       return;
     }
     await update(row.id, {
@@ -489,15 +836,34 @@ export function createMeetingAssistantService(dependencies: {
       organiserName:
         (await dependencies.nameOf(row.user_id)) ?? "the organiser",
       transcript,
+      callDate: row.starts_at.toISOString().slice(0, 10),
     });
     if (notes === null) {
+      // The transcript is kept and both sides still read it; only Q's
+      // notes are missing, so this is said, not marked unrecorded.
       await update(row.id, {
         status: "FAILED",
         failure: "Q couldn't write the notes. Ask it about the call instead.",
       });
+      await tellBoth(row, {
+        key: "meeting-q-failed",
+        title: "Q couldn't write the notes",
+        body: "Q kept the call's transcript, but couldn't write its notes. The transcript is on the meeting record; ask Q about the call instead.",
+      });
       return;
     }
     await update(row.id, { status: "DONE", notes });
+    // Removed part-way: what Q heard is the record, and the rest is said
+    // to be unrecorded rather than left to look complete.
+    if (read.cutShort !== undefined) {
+      const end = MEETING_BOT_END[read.cutShort];
+      await unrecorded(row, `${end.unrecorded} before it ended`);
+      await tellBoth(row, {
+        key: "meeting-q-cut-short",
+        title: "Q's record of this call is partial",
+        body: `${end.failure} Q kept what it heard until then; the rest of the call is unrecorded.`,
+      });
+    }
     await dependencies
       .onHeld?.({
         relationshipId: row.relationship_id,
@@ -505,6 +871,10 @@ export function createMeetingAssistantService(dependencies: {
         organiserUserId: row.organiser_user_id,
         attendees: notes.attendees,
         commitments: notes.commitments,
+        purpose: row.purpose,
+        startsAt: row.starts_at,
+        agreements: notes.agreements,
+        nextSteps: notes.nextSteps ?? [],
       })
       .catch((error: unknown) => {
         logger?.warn(
@@ -620,29 +990,21 @@ export function createMeetingAssistantService(dependencies: {
       // reuses it rather than adding a second.
       const rows = await sql<{ id: string }[]>`
         insert into communication.meeting_assistants
-          (meeting_id, tenant_id, user_id, provider, status, idempotency_key)
+          (meeting_id, tenant_id, user_id, provider, status, idempotency_key,
+           attempts, next_attempt_at)
         values (${meeting.id}, ${meeting.organiser_tenant_id}, ${meeting.organiser_user_id}, 'recall',
-                'REQUESTED', ${idempotencyKey})
+                'REQUESTED', ${idempotencyKey}, 1, ${new Date(current.getTime() + ATTEMPT_LEASE_MS)})
         on conflict (meeting_id) do update
           set status = 'REQUESTED', failure = null, provider_bot_id = null,
               declined_by_user_id = null, declined_at = null,
+              attempts = 1, next_attempt_at = excluded.next_attempt_at,
+              booked_starts_at = null, booked_meet_link = null,
               idempotency_key = excluded.idempotency_key, updated_at = clock_timestamp()
         returning id`;
       const id = rows[0]?.id;
       if (id === undefined) return { outcome: "REFUSED", code: "UNAVAILABLE" };
-      const startsIn = meeting.starts_at.getTime() - current.getTime();
-      try {
-        const created = await bots.create(
-          botFor(meeting.id, meeting.meet_link, meeting, current, startsIn),
-        );
-        await update(id, { status: "SCHEDULED", botId: created.botId });
-      } catch (error: unknown) {
-        logger?.warn({ err: error, meetingId }, "meeting bot not created");
-        await update(id, {
-          status: "FAILED",
-          failure: "Q couldn't be booked into this call just now.",
-        });
-      }
+      // A provider error is retried by the collector, and said on the record.
+      await book(id, meeting, 1, current);
       return {
         outcome: "OK",
         assistant: meetingAssistantView(
@@ -770,7 +1132,8 @@ export function createMeetingAssistantService(dependencies: {
           from communication.meeting_assistants a
           join communication.meetings m on m.id = a.meeting_id
          where a.status in ('SCHEDULED', 'IN_CALL', 'COMPOSING')
-           and m.starts_at <= ${current}
+           and m.status <> 'CANCELLED'
+           and m.starts_at <= ${new Date(current.getTime() + READ_AHEAD_MS)}
          order by m.starts_at
          limit ${limit}`;
       let settled = 0;
@@ -791,9 +1154,16 @@ export function createMeetingAssistantService(dependencies: {
     enlist: async (limit = 10) => {
       if (bots === undefined) return 0;
       const current = now();
-      const calls = await sql<MeetingRow[]>`
-        select m.id, m.relationship_id, m.organiser_user_id, m.organiser_tenant_id,
-               m.purpose, m.starts_at, m.ends_at, m.status, m.meet_link
+      await reconcile(current, limit);
+      // Every booked (or joined) call about to start with a link and no
+      // record yet: a call booked inside the window, or given its link
+      // late, is picked up on the next tick like any other.
+      await sql`
+        insert into communication.meeting_assistants
+          (meeting_id, tenant_id, user_id, provider, status, idempotency_key,
+           attempts, next_attempt_at)
+        select m.id, m.organiser_tenant_id, m.organiser_user_id, 'recall', 'REQUESTED',
+               'enlist:' || m.id::text, 0, ${current}
           from communication.meetings m
          where m.status = 'SCHEDULED'
            and m.meet_link is not null
@@ -802,37 +1172,68 @@ export function createMeetingAssistantService(dependencies: {
            and not exists (select 1 from communication.meeting_assistants a
                             where a.meeting_id = m.id)
          order by m.starts_at
-         limit ${limit}`;
+         limit ${limit}
+        on conflict (meeting_id) do nothing`;
+      // Claim each due try atomically (a lease), so two ticks never book
+      // two bots for one call.
+      const due = await sql<
+        (MeetingRow & { assistant_id: string; attempts: number })[]
+      >`
+        update communication.meeting_assistants a
+           set attempts = a.attempts + 1,
+               next_attempt_at = ${new Date(current.getTime() + ATTEMPT_LEASE_MS)},
+               updated_at = clock_timestamp()
+          from communication.meetings m
+         where m.id = a.meeting_id
+           and a.id in (
+             select a2.id
+               from communication.meeting_assistants a2
+               join communication.meetings m2 on m2.id = a2.meeting_id
+              where a2.status = 'REQUESTED'
+                and a2.attempts < ${BOT_CREATE_MAX_ATTEMPTS}
+                and (a2.next_attempt_at <= ${current}
+                     or (a2.next_attempt_at is null
+                         and a2.updated_at <= ${new Date(current.getTime() - STALE_REQUEST_MS)}))
+                and m2.status = 'SCHEDULED'
+                and m2.meet_link is not null
+                and m2.starts_at <= ${new Date(current.getTime() + ENLIST_AHEAD_MS)}
+                and m2.ends_at > ${current}
+              order by m2.starts_at
+              limit ${limit}
+              for update of a2 skip locked)
+        returning a.id as assistant_id, a.attempts, m.id, m.relationship_id,
+                  m.organiser_user_id, m.organiser_tenant_id, m.purpose,
+                  m.starts_at, m.ends_at, m.status, m.meet_link`;
       let enlisted = 0;
-      for (const call of calls) {
-        const rows = await sql<{ id: string }[]>`
-          insert into communication.meeting_assistants
-            (meeting_id, tenant_id, user_id, provider, status, idempotency_key)
-          values (${call.id}, ${call.organiser_tenant_id}, ${call.organiser_user_id},
-                  'recall', 'REQUESTED', ${`enlist:${call.id}`})
-          on conflict (meeting_id) do nothing
-          returning id`;
-        const id = rows[0]?.id;
-        if (id === undefined || call.meet_link === null) continue;
-        const startsIn = call.starts_at.getTime() - current.getTime();
-        try {
-          const created = await bots.create(
-            botFor(call.id, call.meet_link, call, current, startsIn),
-          );
-          await update(id, { status: "SCHEDULED", botId: created.botId });
+      for (const call of due) {
+        if (await book(call.assistant_id, call, call.attempts, current)) {
           enlisted += 1;
-        } catch (error: unknown) {
-          logger?.warn(
-            { err: error, meetingId: call.id },
-            "meeting bot not created",
-          );
-          await update(id, {
-            status: "FAILED",
-            failure: "Q couldn't be booked into this call.",
-          });
         }
       }
       return enlisted;
+    },
+
+    settleBot: async (botId) => {
+      if (bots === undefined || !/^[A-Za-z0-9-]{8,80}$/.test(botId)) {
+        return false;
+      }
+      const rows = await sql<(AssistantRow & MeetingRow)[]>`
+        select a.id, a.meeting_id, a.tenant_id, a.user_id, a.provider_bot_id, a.status,
+               a.failure, a.summary, a.flags, a.follow_ups, a.transcript, a.attendees,
+               a.agreements, a.commitments, a.declined_by_user_id,
+               null::text as declined_by_name, a.declined_at, a.updated_at,
+               m.relationship_id, m.organiser_user_id,
+               m.organiser_tenant_id, m.purpose, m.starts_at, m.ends_at,
+               m.status as meeting_status, m.meet_link
+          from communication.meeting_assistants a
+          join communication.meetings m on m.id = a.meeting_id
+         where a.provider_bot_id = ${botId}
+           and a.status in ('SCHEDULED', 'IN_CALL')
+         limit 1`;
+      const row = rows[0];
+      if (row === undefined) return false;
+      await settle(row);
+      return true;
     },
   };
 }

@@ -7,15 +7,15 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  MeetingNotesV2ResultSchema,
+  MeetingNotesV3ResultSchema,
   renderPrompt,
-  type MeetingNotesV2Result,
-  type MeetingNotesVariables,
+  type MeetingNotesV3Result,
+  type MeetingNotesV3Variables,
 } from "@capital-q/q-core";
 
 /**
  * The meeting record (ADR 0027), written through the model gateway by task
- * class like every other model call (MEETING_NOTES v2). The transcript goes
+ * class like every other model call (MEETING_NOTES v3). The transcript goes
  * to the provider the gateway picks for CONFIDENTIAL work; the meeting
  * assistant service keeps it with the record.
  */
@@ -26,7 +26,7 @@ const NOTES_BUDGET = {
   attemptTimeoutMs: 60_000,
 } as const;
 
-export const MEETING_NOTES_COMPOSER_VERSION = "meeting-notes.v2";
+export const MEETING_NOTES_COMPOSER_VERSION = "meeting-notes.v3";
 
 export function createMeetingNotesComposer(dependencies: {
   readonly gateway: ModelGateway;
@@ -36,7 +36,7 @@ export function createMeetingNotesComposer(dependencies: {
   const registry = createDefaultPromptRegistry();
   return {
     compose: async (input) => {
-      const rendered = renderPrompt<MeetingNotesVariables>(registry, {
+      const rendered = renderPrompt<MeetingNotesV3Variables>(registry, {
         task: "MEETING_NOTES",
         operatingMode: "ASSESSMENT",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
@@ -46,12 +46,13 @@ export function createMeetingNotesComposer(dependencies: {
           purpose: input.purpose,
           organiserName: input.organiserName,
           transcript: input.transcript,
+          callDate: input.callDate,
         },
       });
       const runId = randomUUID();
       try {
         const response =
-          await dependencies.gateway.execute<MeetingNotesV2Result>(
+          await dependencies.gateway.execute<MeetingNotesV3Result>(
             {
               taskClass: "STRUCTURED_EXTRACTION",
               sensitivity: "CONFIDENTIAL",
@@ -68,10 +69,10 @@ export function createMeetingNotesComposer(dependencies: {
                 correlationId: `cor_${runId}`,
               },
             },
-            { schema: MeetingNotesV2ResultSchema },
+            { schema: MeetingNotesV3ResultSchema },
           );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = MeetingNotesV2ResultSchema.safeParse(
+        const parsed = MeetingNotesV3ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;
@@ -82,6 +83,7 @@ export function createMeetingNotesComposer(dependencies: {
           attendees: parsed.data.attendees,
           agreements: parsed.data.agreements,
           commitments: parsed.data.commitments,
+          nextSteps: parsed.data.nextSteps,
           composerVersion: MEETING_NOTES_COMPOSER_VERSION,
         };
       } catch (error: unknown) {

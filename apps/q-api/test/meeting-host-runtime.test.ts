@@ -16,6 +16,7 @@ import {
   meetingHostUrl,
   readHostResult,
   sharedMeetingText,
+  spokenLine,
   verifyMeetingHostToken,
   type MeetingHostComposer,
   type MeetingHostFollowThrough,
@@ -82,8 +83,12 @@ function setup(
   options: {
     declined?: boolean;
     reply?: Partial<MeetingHostResult> | null;
+    /** meet-47: the asker's own card; absent, the organiser's proposal. */
+    askerCard?: boolean;
   } = {},
 ) {
+  const cards: { askerUserId: string; text: string }[] = [];
+  const stops: string[] = [];
   const clock = { at: START - 3 * 60_000 };
   const said: string[] = [];
   const left: string[] = [];
@@ -162,7 +167,22 @@ function setup(
         left.push(botId);
         return Promise.resolve();
       },
+      stop: (botId) => {
+        stops.push(botId);
+        return Promise.resolve();
+      },
     },
+    ...(options.askerCard === undefined
+      ? {}
+      : {
+          askerCard: (request: { askerUserId: string; text: string }) => {
+            cards.push({
+              askerUserId: request.askerUserId,
+              text: request.text,
+            });
+            return Promise.resolve(options.askerCard === true);
+          },
+        }),
     now: () => clock.at,
     tickEveryMs: null,
     leaveDelayMs: 0,
@@ -189,6 +209,8 @@ function setup(
     asked,
     outcomes,
     send,
+    cards,
+    stops,
   };
 }
 
@@ -337,6 +359,108 @@ describe("meeting host in a call", () => {
     clock.at = START + DEFAULT_HOST_POLICY.hardCapAfterStartMs;
     await runtime.tick(MEETING);
     expect(outcomes).toContain("PROPOSALS:1");
+  });
+
+  it("meet-47: a request becomes a card in the asker's own app, and Q says so by name", async () => {
+    const { said, notes, outcomes, cards, send, clock, runtime } = setup({
+      askerCard: true,
+      reply: {
+        kind: "PROPOSE",
+        line: "Sent!",
+        proposal: "Send the deck to Zino Aviation (asked by Adaeze)",
+      },
+    });
+    await send(
+      event("participant_events.join", 1, "Adaeze Okafor"),
+      event("participant_events.join", 2, "Tunde Bello"),
+    );
+    await send(
+      event("transcript.data", 1, "Adaeze Okafor", "Q, send them the deck."),
+    );
+    // Adaeze's own card, never Tunde's (the organiser) and never done.
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.askerUserId).toBe("u-founder");
+    expect(said.at(-1)).toBe(
+      "I've put that in your Capital Q to approve, Adaeze.",
+    );
+    expect(said).not.toContain("Sent!");
+    expect(notes.map((n) => n.kind)).toContain("PROPOSAL");
+    clock.at = START + DEFAULT_HOST_POLICY.hardCapAfterStartMs;
+    await runtime.tick(MEETING);
+    // Not also put to the organiser.
+    expect(outcomes).not.toContain("PROPOSALS:1");
+  });
+
+  it("meet-47: a short question to Q right after its introduction is heard, not taken for its echo", async () => {
+    const { asked, send } = setup();
+    await send(
+      event("participant_events.join", 1, "Adaeze Okafor"),
+      event("participant_events.join", 2, "Tunde Bello"),
+    );
+    await send(
+      event("transcript.data", 2, "Tunde Bello", "Q, what's this call about?"),
+    );
+    expect(asked.map((a) => a.utterance)).toEqual([
+      "Q, what's this call about?",
+    ]);
+  });
+
+  it("meet-47: with no card for the asker, it goes to the organiser as before", async () => {
+    const { said, cards, send } = setup({
+      askerCard: false,
+      reply: {
+        kind: "PROPOSE",
+        line: "Sure.",
+        proposal: "Send the deck",
+      },
+    });
+    await send(
+      event("participant_events.join", 1, "Adaeze Okafor"),
+      event("participant_events.join", 2, "Tunde Bello"),
+    );
+    await send(
+      event("transcript.data", 2, "Tunde Bello", "Q, send me the deck."),
+    );
+    expect(cards.map((c) => c.askerUserId)).toEqual(["u-investor"]);
+    expect(said.at(-1)).toBe(
+      "I can't do that from the call, but I've noted it for Tunde to approve afterwards.",
+    );
+  });
+
+  it("meet-47: Q stops its line when a person talks over it, not at its own echo", async () => {
+    const answer =
+      "Nixo is raising a seed round to build its aviation software, and this call is the first conversation about it.";
+    const talkOver = async (afterMs: number) => {
+      const t = setup({ reply: { line: answer } });
+      await t.send(
+        event("participant_events.join", 1, "Adaeze Okafor"),
+        event("participant_events.join", 2, "Tunde Bello"),
+      );
+      await t.runtime.receive(
+        MEETING,
+        event(
+          "transcript.data",
+          2,
+          "Tunde Bello",
+          "Q, can you share the agenda?",
+        ),
+      );
+      // Tick until the answer starts playing, then talk over it.
+      for (let i = 0; i < 120 && t.said.at(-1) !== answer; i += 1) {
+        t.clock.at += 500;
+        await t.runtime.tick(MEETING);
+      }
+      expect(t.said.at(-1)).toBe(answer);
+      t.clock.at += afterMs;
+      await t.runtime.receive(
+        MEETING,
+        event("participant_events.speech_on", 1, "Adaeze Okafor"),
+      );
+      return t.stops;
+    };
+    expect(await talkOver(2_000)).toEqual(["bot-1"]);
+    // Within the first moment of the line: Q's own voice coming back.
+    expect(await talkOver(500)).toEqual([]);
   });
 
   it("a model DECLINE is spoken as the fixed refusal, never the model's words", async () => {
@@ -546,5 +670,21 @@ describe("the bot Q books for a hosted call", () => {
       bot_name: "Q",
       recording_config: { transcript: { provider: { meeting_captions: {} } } },
     });
+  });
+});
+
+describe("what Q says aloud (meet-47)", () => {
+  it("is one or two sentences, whatever the model wrote", () => {
+    expect(
+      spokenLine(
+        "Nixo is raising a seed round. Tunde leads Zino Aviation's early-stage deals. Also, here is a third sentence nobody needs.",
+      ),
+    ).toBe(
+      "Nixo is raising a seed round. Tunde leads Zino Aviation's early-stage deals.",
+    );
+    expect(spokenLine("Sure, Adaeze")).toBe("Sure, Adaeze");
+    expect(spokenLine(`${"word ".repeat(100)}end.`).length).toBeLessThanOrEqual(
+      281,
+    );
   });
 });
