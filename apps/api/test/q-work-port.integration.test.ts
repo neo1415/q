@@ -60,8 +60,14 @@ describe("the Work page's writes (WORK-58)", () => {
           users.push(profile?.id ?? "");
         }
         const [ada = "", ben = ""] = users;
-        const actor = { tenantId: tenant, userId: ada } as unknown as ActorContext;
-        const other = { tenantId: tenant, userId: ben } as unknown as ActorContext;
+        const actor = {
+          tenantId: tenant,
+          userId: ada,
+        } as unknown as ActorContext;
+        const other = {
+          tenantId: tenant,
+          userId: ben,
+        } as unknown as ActorContext;
         const id = randomUUID();
         await tx`
           insert into q_runtime.standing_instructions (id, tenant_id, user_id, goal_text, status, grant_version, next_fire_at)
@@ -70,7 +76,9 @@ describe("the Work page's writes (WORK-58)", () => {
 
         expect(await port.pause(other, id)).toBe(false);
         expect(await port.pause(actor, id)).toBe(true);
-        const [paused] = await tx<{ status: string; next_fire_at: Date | null }[]>`
+        const [paused] = await tx<
+          { status: string; next_fire_at: Date | null }[]
+        >`
           select status, next_fire_at from q_runtime.standing_instructions where id = ${id}`;
         expect(paused).toEqual({ status: "PAUSED", next_fire_at: null });
         expect(await port.resume(other, id)).toBe(false);

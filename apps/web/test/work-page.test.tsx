@@ -47,9 +47,7 @@ vi.mock("../src/features/work/work-actions", () => ({
   stopWorkAction: () => Promise.resolve({ ok: true, value: null }),
 }));
 
-const { WorkPage, readPlan } = await import(
-  "../src/features/work/work-page"
-);
+const { WorkPage, readPlan } = await import("../src/features/work/work-page");
 
 afterEach(() => {
   cleanup();
@@ -232,9 +230,7 @@ describe("Work (WORK-58)", () => {
         done={{ items: [], thisWeek: 9, nextCursor: null }}
       />,
     );
-    expect(
-      screen.getByRole("heading", { name: "Running, 1" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Running, 1" })).toBeTruthy();
     expect(screen.getByText("Working")).toBeTruthy();
     expect(screen.getByText("$1.84")).toBeTruthy();
     expect(screen.getByText("$1.84 this month")).toBeTruthy();

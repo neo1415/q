@@ -26,10 +26,7 @@ export const Q_WORK_DONE_PATH = "/v1/q/work/done" as const;
 export const qWorkPausePath = (delegationId: string) =>
   Q_WORK_PAUSE_PATH.replace(":delegationId", encodeURIComponent(delegationId));
 export const qWorkResumePath = (delegationId: string) =>
-  Q_WORK_RESUME_PATH.replace(
-    ":delegationId",
-    encodeURIComponent(delegationId),
-  );
+  Q_WORK_RESUME_PATH.replace(":delegationId", encodeURIComponent(delegationId));
 
 /** At most this many suggestions are shown; the page never becomes a feed. */
 export const Q_WORK_SUGGESTIONS_MAX = 5;

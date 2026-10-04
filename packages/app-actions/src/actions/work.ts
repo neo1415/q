@@ -40,10 +40,7 @@ const ownRows = () => Promise.resolve({ ok: true as const });
 const ById = z.object({ delegationId: UuidSchema }).strict();
 const Acted = z.object({ acted: z.boolean() }).strict();
 
-const PAUSE = defineAppAction<
-  z.infer<typeof ById>,
-  z.infer<typeof Acted>
->({
+const PAUSE = defineAppAction<z.infer<typeof ById>, z.infer<typeof Acted>>({
   name: "q.work.pause",
   short: "pause a standing instruction",
   area: "work",
@@ -69,10 +66,7 @@ const PAUSE = defineAppAction<
   legacyTool: "stop_q_work",
 });
 
-const RESUME = defineAppAction<
-  z.infer<typeof ById>,
-  z.infer<typeof Acted>
->({
+const RESUME = defineAppAction<z.infer<typeof ById>, z.infer<typeof Acted>>({
   name: "q.work.resume",
   short: "resume a standing instruction",
   area: "work",

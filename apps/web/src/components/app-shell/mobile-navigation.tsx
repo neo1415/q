@@ -306,9 +306,7 @@ function MoreLink({
         aria-hidden="true"
         size={ICON_SIZE.prominent}
         strokeWidth={active ? 2 : ICON_STROKE}
-        className={
-          active ? "text-(--cq-accent)" : "text-(--cq-text-secondary)"
-        }
+        className={active ? "text-(--cq-accent)" : "text-(--cq-text-secondary)"}
       />
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
       {waiting === null ? null : (

@@ -146,10 +146,11 @@ export function composeSuggestions(
       kind: "CALL_RECAP",
       lead: 1,
       unit: "call",
-      subject: `${item.name} call ended ${age === 0 ? "today" : age === 1 ? "yesterday" : `${String(age)} days ago`}`.slice(
-        0,
-        120,
-      ),
+      subject:
+        `${item.name} call ended ${age === 0 ? "today" : age === 1 ? "yesterday" : `${String(age)} days ago`}`.slice(
+          0,
+          120,
+        ),
       question: "Send the recap?",
       prompt:
         `Prepare a short recap of my call with ${item.name}, from the call's notes, as a message to them for me to approve.`.slice(
@@ -186,16 +187,15 @@ export function composeSuggestions(
       unit: "saved",
       subject: "Saved, no interest sent",
       question: "Express interest?",
-      prompt:
-        `I saved ${saved
-          .slice(0, 5)
-          .map((entry) => entry.name)
-          .join(
-            ", ",
-          )} but haven't contacted them. Prepare expressing interest in them for me to approve.`.slice(
-          0,
-          400,
-        ),
+      prompt: `I saved ${saved
+        .slice(0, 5)
+        .map((entry) => entry.name)
+        .join(
+          ", ",
+        )} but haven't contacted them. Prepare expressing interest in them for me to approve.`.slice(
+        0,
+        400,
+      ),
       linkPath: "/discover/saved",
       age: 0,
     });
@@ -278,7 +278,10 @@ export type WorkPageReads = {
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
 };
 
-const quiet = <T>(fallback: T) => (): T => fallback;
+const quiet =
+  <T>(fallback: T) =>
+  (): T =>
+    fallback;
 
 export function createWorkPage(dependencies: {
   readonly sql: DatabaseExecutor;
@@ -505,9 +508,7 @@ export function createWorkPage(dependencies: {
 export type WorkPage = ReturnType<typeof createWorkPage>;
 
 export function encodeCursor(at: Date, id: string): string {
-  return Buffer.from(`${at.toISOString()}|${id}`, "utf8").toString(
-    "base64url",
-  );
+  return Buffer.from(`${at.toISOString()}|${id}`, "utf8").toString("base64url");
 }
 
 /** A cursor is input: anything malformed starts from the first page. */
@@ -515,9 +516,7 @@ export function decodeCursor(
   cursor: string | undefined,
 ): { readonly at: Date; readonly id: string } | null {
   if (cursor === undefined) return null;
-  const [at, id] = Buffer.from(cursor, "base64url")
-    .toString("utf8")
-    .split("|");
+  const [at, id] = Buffer.from(cursor, "base64url").toString("utf8").split("|");
   if (at === undefined || id === undefined) return null;
   const time = Date.parse(at);
   if (

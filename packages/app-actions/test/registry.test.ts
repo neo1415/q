@@ -229,11 +229,7 @@ describe("the action registry", () => {
       // WORK-58: Q's work page.
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
       ["q.work.resume", "legacy:stop_q_work", "INSTANT"],
-      [
-        "q.work.suggestion.dismiss",
-        "offer.work_suggestions",
-        "INSTANT",
-      ],
+      ["q.work.suggestion.dismiss", "offer.work_suggestions", "INSTANT"],
     ]);
   });
 });

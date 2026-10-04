@@ -18,9 +18,7 @@ import {
  */
 export const TURN_READER_V41_DESTINATIONS = `${TURN_READER_V40_DESTINATIONS.replace(/\.$/u, "")}, WORK (Work, Q's work page: what Q suggests for them, what waits for their yes, what Q is running for them and what it finished; "show my work", "what's Q doing", "what are you working on for me". Giving Q a task is never WORK: that is the delegation tool).`;
 
-if (
-  TURN_READER_V40.template.split(TURN_READER_V40_DESTINATIONS).length !== 2
-) {
+if (TURN_READER_V40.template.split(TURN_READER_V40_DESTINATIONS).length !== 2) {
   throw new Error(
     "TURN_READER v41 extends v40's destinations once, which changed",
   );

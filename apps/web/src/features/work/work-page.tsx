@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -391,22 +392,21 @@ function ApprovalPlan({
   const approve = () =>
     startTransition(async () => {
       setMessage(null);
-      const result = await approveQApprovalAction(approvalId).catch(
-        () => null,
-      );
+      const result = await approveQApprovalAction(approvalId).catch(() => null);
       if (result?.ok === true) {
         setMessage("Approved. Q is doing it now.");
         onDone(true);
       } else {
-        setMessage(result?.message ?? "That didn't go through. Nothing was sent.");
+        setMessage(
+          result?.message ?? "That didn't go through. Nothing was sent.",
+        );
       }
     });
 
   if (failed) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-        This couldn&rsquo;t load. Nothing was sent; it still waits for your
-        yes.
+        This couldn&rsquo;t load. Nothing was sent; it still waits for your yes.
       </p>
     );
   }
@@ -969,9 +969,11 @@ function TimePicker({
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const answer = (
-    choice: { readonly kind: "BOOK_AT"; readonly at: string } | {
-      readonly kind: "PASS";
-    },
+    choice:
+      | { readonly kind: "BOOK_AT"; readonly at: string }
+      | {
+          readonly kind: "PASS";
+        },
   ) =>
     startTransition(async () => {
       setMessage(null);
@@ -1051,7 +1053,8 @@ function Running({
   }
   if (rows.length === 0) return null;
   const month = rows.reduce(
-    (sum, item) => sum + (item.spend === null ? 0 : cents(item.spend.spentUsdMonth)),
+    (sum, item) =>
+      sum + (item.spend === null ? 0 : cents(item.spend.spentUsdMonth)),
     0,
   );
   const anySpend = rows.some((item) => item.spend !== null);
@@ -1098,6 +1101,7 @@ function RunningRow({
   readonly onChanged: (next: QWorkDto | null) => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const state = item.run?.state ?? "WORKING";
@@ -1204,7 +1208,7 @@ function RunningRow({
             ) : null}
             <MenuItem
               onClick={() => {
-                window.location.assign(`/work/${item.id}`);
+                router.push(`/work/${item.id}`);
               }}
             >
               What Q did
@@ -1270,8 +1274,7 @@ function StateMark({
           state === "WORKING" && "size-[7px] rounded-full bg-current",
           state === "WAITING" &&
             "size-[7px] rounded-full border-[1.5px] border-current",
-          state === "PAUSED" &&
-            "h-2 w-[7px] border-x-2 border-current",
+          state === "PAUSED" && "h-2 w-[7px] border-x-2 border-current",
         )}
       />
       {STATE_WORDS[state]}

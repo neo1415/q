@@ -6,12 +6,7 @@ import { useState } from "react";
 
 import { cx } from "@capital-q/ui";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
-import {
-  ICON_SIZE,
-  ICON_STROKE,
-  PanelLeft,
-  Search,
-} from "@capital-q/ui/icons";
+import { ICON_SIZE, ICON_STROKE, PanelLeft, Search } from "@capital-q/ui/icons";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { ThemeMenu } from "@/features/appearance/theme-menu";
@@ -245,7 +240,9 @@ function SidebarLink({
         size={ICON_SIZE.regular}
         strokeWidth={ICON_STROKE}
       />
-      {compact ? null : <span className="min-w-0 flex-1 truncate">{label}</span>}
+      {compact ? null : (
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+      )}
       {compact || waiting === null ? null : (
         <span
           aria-hidden="true"

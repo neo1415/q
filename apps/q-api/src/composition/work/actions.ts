@@ -408,7 +408,10 @@ function instructionWorkDto(row: InstructionRow): QWorkDto | null {
     run: !live
       ? null
       : row.status === "PAUSED"
-        ? { state: "PAUSED", pauseReason: row.pause_reason ?? "WAITING_FOR_YOU" }
+        ? {
+            state: "PAUSED",
+            pauseReason: row.pause_reason ?? "WAITING_FOR_YOU",
+          }
         : { state: "WORKING", pauseReason: null },
     lastStep:
       row.last_step_words === undefined ||

@@ -88,11 +88,9 @@ export type QWorkIntelligencePort = {
    * paused themselves; false: not theirs, or not in that state.
    */
   readonly pause?:
-    | ((actor: ActorContext, id: string) => Promise<boolean>)
-    | undefined;
+    ((actor: ActorContext, id: string) => Promise<boolean>) | undefined;
   readonly resume?:
-    | ((actor: ActorContext, id: string) => Promise<boolean>)
-    | undefined;
+    ((actor: ActorContext, id: string) => Promise<boolean>) | undefined;
   /** Their own delegation (or one lane of it); false: not theirs / not active. */
   readonly stop: (
     actor: ActorContext,
