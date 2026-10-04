@@ -31,6 +31,7 @@ import {
 import { needsYouNotice } from "./digest.js";
 import {
   checkMessage,
+  factAnswer,
   materialLine,
   outsideCriteria,
   senderLines,
@@ -110,6 +111,7 @@ export const REFUSAL_CODES = [
   "ALREADY_INTRODUCED",
   "OUTSIDE_MANDATE",
   "UNSUPPORTED_FIT",
+  "UNGROUNDED_CLAIM",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -182,6 +184,11 @@ export const REFUSAL_WORDS: Readonly<
     reason:
       "the message said they fit your mandate, but their stage isn't one you declare",
     instead: "I'll write it again without claiming a fit",
+  },
+  UNGROUNDED_CLAIM: {
+    reason:
+      "the message said how you take part in a round in a way your mandate doesn't declare",
+    instead: "I'll say only what your mandate declares",
   },
 };
 
@@ -449,11 +456,17 @@ export function validateStep(
 
   // What Q writes is checked before it is sent or asked (QA run 8a1d57b9):
   // a card with a generic message is no better than sending one.
+  let factReply = false;
   if (action.name === "chat.message.send") {
-    const problem = messageProblem(parsed.data, subject, context, step);
-    if (problem !== null) {
-      return { verdict: "REFUSED", code: problem, relationshipId: subject };
+    const checked = messageProblem(parsed.data, subject, context, step);
+    if (checked.problem !== null) {
+      return {
+        verdict: "REFUSED",
+        code: checked.problem,
+        relationshipId: subject,
+      };
     }
+    factReply = checked.factReply;
   }
 
   const ask = (code: string): StepVerdict => ({
@@ -475,7 +488,10 @@ export function validateStep(
   // AUTO as granted -- but what Q may do alone is fixed in code.
   if (context.request === "PREPARE") return ask("ASKED_TO_PREPARE");
   if (!delegableOnItsOwn(action)) return ask("NOT_DELEGABLE");
-  if (step.touchesTermsOrMoney) return ask("TERMS_OR_MONEY");
+  // A declared cheque range or role, in code's own words, answering their
+  // question about it, is a declared fact, not terms or a commitment (live
+  // QA, ASK card f3e411b7): the planner's flag does not make it a card.
+  if (step.touchesTermsOrMoney && !factReply) return ask("TERMS_OR_MONEY");
   // Code, not the planner, reads the thread's facts: where they raised
   // terms or money, or said no, Q does not act alone.
   const thread = subject === null ? undefined : context.facts?.get(subject);
@@ -590,6 +606,19 @@ function sidesWritten(
   );
 }
 
+/** The reply code composes to their question, when it is one it may answer. */
+function templatedAnswer(
+  thread: ThreadFacts | undefined,
+  context: ValidationContext,
+): string | null {
+  if (thread === undefined || context.material === undefined) return null;
+  const facts = context.material?.sender.facts ?? null;
+  if (questionVerdict(thread, context.grant, facts) !== "ANSWERABLE") {
+    return null;
+  }
+  return factAnswer(thread.questionAbout ?? [], facts ?? []);
+}
+
 /**
  * Code's check of a message: whether it may be written at all in this
  * conversation, then its words against the material it may use.
@@ -599,9 +628,11 @@ function messageProblem(
   subject: string | null,
   context: ValidationContext,
   step: InstructionPlanStep,
-): RefusalCode | null {
+): { readonly problem: RefusalCode | null; readonly factReply: boolean } {
+  const pass = { problem: null, factReply: false } as const;
+  const refuse = (problem: RefusalCode) => ({ problem, factReply: false });
   const body = (input as { input?: { kind?: unknown; body?: unknown } }).input;
-  if (body?.kind !== "TEXT" || typeof body.body !== "string") return null;
+  if (body?.kind !== "TEXT" || typeof body.body !== "string") return pass;
   const thread = subject === null ? undefined : context.facts?.get(subject);
   // Live QA (instruction 76d6f281): "first" is the conversation's, never
   // the planner's. Where their side has heard from the sender already, a
@@ -610,9 +641,9 @@ function messageProblem(
   const written = sidesWritten(subject, context);
   const replying = thread?.lastFrom === "THEM";
   if (written && !replying && context.grant.followUps === false) {
-    return "ALREADY_INTRODUCED";
+    return refuse("ALREADY_INTRODUCED");
   }
-  if (context.material === undefined) return null;
+  if (context.material === undefined) return pass;
   const counterpartId =
     subject === null
       ? undefined
@@ -629,7 +660,7 @@ function messageProblem(
     first &&
     outsideCriteria(material?.sender.criteria, counterpart) !== null
   ) {
-    return "OUTSIDE_MANDATE";
+    return refuse("OUTSIDE_MANDATE");
   }
   // Their question Q may not answer has gone to the person: no reply.
   const open =
@@ -637,13 +668,13 @@ function messageProblem(
       ? null
       : questionVerdict(thread, context.grant, material?.sender.facts ?? null);
   if (open === "NOT_DECLARED" || open === "MESSAGES_NOT_AUTO") {
-    return "UNANSWERED_QUESTION";
+    return refuse("UNANSWERED_QUESTION");
   }
   const answering =
     thread?.asksQuestion === true && thread.lastFrom === "THEM"
       ? (thread.questionAbout ?? ["OTHER" as const])
       : undefined;
-  return checkMessage({
+  const problem = checkMessage({
     body: body.body,
     first,
     counterpart,
@@ -654,8 +685,17 @@ function messageProblem(
     ),
     answering,
     asks: step.message?.asks,
+    side: material?.sender.side,
     criteria: material?.sender.criteria,
   });
+  if (problem !== null) return refuse(problem);
+  return {
+    problem: null,
+    factReply:
+      open === "ANSWERABLE" &&
+      thread?.mentionsTermsOrMoney !== true &&
+      templatedAnswer(thread, context) !== null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -845,11 +885,18 @@ function peopleLines(
                 grant,
                 material?.sender.facts ?? null,
               );
-              return verdict === null
-                ? null
-                : verdict === "ANSWERABLE"
-                  ? "their question: answer it from WHO YOU WRITE AS"
-                  : "their question has gone to the person: write no reply";
+              if (verdict === null) return null;
+              if (verdict !== "ANSWERABLE") {
+                return "their question has gone to the person: write no reply";
+              }
+              // Code's own words for a declared fact: used word for word.
+              const answer = factAnswer(
+                read.questionAbout ?? [],
+                material?.sender.facts ?? [],
+              );
+              return answer === null
+                ? "their question: answer it from WHO YOU WRITE AS"
+                : `their question: answer with exactly "${answer}"`;
             })(facts.get(person.relationshipId)),
         // Their network-visible material, each fact with its source.
         material === undefined

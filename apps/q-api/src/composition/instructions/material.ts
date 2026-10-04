@@ -43,6 +43,14 @@ export type MaterialFact = {
   readonly answers?: InstructionQuestionKind | undefined;
   /** The declared code behind a label fact (stage, country), when there is one. */
   readonly code?: string | undefined;
+  /**
+   * Live QA (ASK card f3e411b7): the sentence that answers `answers`,
+   * composed by code from the declared fields alone. A reply uses it word
+   * for word; nothing about the sender is generated freely.
+   */
+  readonly answer?: string | undefined;
+  /** investment_role codes, for the role-in-a-round fact. */
+  readonly roles?: readonly string[] | undefined;
 };
 
 /**
@@ -145,13 +153,23 @@ export function companyCardFacts(
   const facts: MaterialFact[] = [];
   if (card.currentStageCode !== null) {
     const stage = humanCode(card.currentStageCode, labels);
-    facts.push(label("stage", stage, source, "STAGES", card.currentStageCode));
+    facts.push({
+      ...label("stage", stage, source, "STAGES", card.currentStageCode),
+      answer: `We're at ${stage}.`,
+    });
   }
   if (card.headquartersCountry !== null) {
     const place = humanCode(card.headquartersCountry, labels);
-    facts.push(
-      label("based in", place, source, "GEOGRAPHIES", card.headquartersCountry),
-    );
+    facts.push({
+      ...label(
+        "based in",
+        place,
+        source,
+        "GEOGRAPHIES",
+        card.headquartersCountry,
+      ),
+      answer: `We're based in ${place}.`,
+    });
   }
   if (card.shortDescription !== null && card.shortDescription.trim() !== "") {
     facts.push(described("what they do", card.shortDescription, source));
@@ -251,6 +269,10 @@ export function mandateFacts(
         : (low ?? high ?? "");
     facts.push({
       ...label("stages", text, source, "STAGES"),
+      answer:
+        low !== null && high !== null && low !== high
+          ? `We invest from ${low} to ${high}.`
+          : `We invest at ${text}.`,
       anchors: [low, high]
         .filter((part): part is string => part !== null)
         .map((part) => part.toLowerCase()),
@@ -296,6 +318,7 @@ export function mandateFacts(
     const list = unique(sectors);
     facts.push({
       ...label("sectors", list.join(", "), source, "SECTORS"),
+      answer: `We focus on ${list.join(", ")}.`,
       anchors: list.map((entry) => entry.toLowerCase()),
     });
   }
@@ -303,6 +326,7 @@ export function mandateFacts(
     const list = unique(places);
     facts.push({
       ...label("geographies", list.join(", "), source, "GEOGRAPHIES"),
+      answer: `We invest in ${list.join(", ")}.`,
       anchors: list.map((entry) => entry.toLowerCase()),
     });
   }
@@ -327,9 +351,23 @@ export function mandateFacts(
             ? `up to ${money(cheque.max)}`
             : null,
     ].filter((part): part is string => part !== null);
+    // A declared range is a declared fact, not a commitment: said exactly.
+    const range =
+      cheque.min !== undefined && cheque.max !== undefined
+        ? `from ${money(cheque.min)} to ${money(cheque.max)}`
+        : cheque.min !== undefined
+          ? `from ${money(cheque.min)}`
+          : cheque.max !== undefined
+            ? `of up to ${money(cheque.max)}`
+            : null;
+    const answer =
+      cheque.typical !== undefined
+        ? `Our typical cheque is ${money(cheque.typical)}${range === null ? "" : `, within a range ${range}`}.`
+        : `We write cheques ${range ?? ""}.`;
     facts.push({
       label: "cheque size",
       text: parts.join(", "),
+      answer,
       source,
       // Grounded by the amounts themselves (numbersIn reads "250k" too).
       anchors: [cheque.typical, cheque.min, cheque.max]
@@ -339,13 +377,14 @@ export function mandateFacts(
       answers: "CHEQUE_SIZE",
     });
   }
-  const roles = codesOf("investment_role").map((code) =>
-    humanCode(code, labels),
-  );
+  const roleCodes = [...new Set(codesOf("investment_role"))];
+  const roles = roleCodes.map((code) => humanCode(code, labels));
   if (roles.length > 0) {
     const list = unique(roles);
     facts.push({
       ...label("role in a round", list.join("; "), source, "LEAD_OR_FOLLOW"),
+      roles: roleCodes,
+      answer: roleAnswer(roleCodes, list),
       anchors: list.flatMap((entry) =>
         distinctiveWords(entry, 3).length > 0
           ? distinctiveWords(entry, 3)
@@ -354,6 +393,21 @@ export function mandateFacts(
     });
   }
   return facts;
+}
+
+const ROLE_WORDS: Readonly<Record<string, string>> = {
+  lead: "lead rounds",
+  co_invest: "co-invest alongside a lead",
+  follow: "follow in later rounds",
+};
+
+/** "We lead rounds." / "We lead rounds and co-invest alongside a lead." */
+function roleAnswer(codes: readonly string[], labelled: readonly string[]) {
+  const words = codes.map((code) => ROLE_WORDS[code]);
+  if (words.every((entry): entry is string => entry !== undefined)) {
+    return `We ${words.join(" and ")}.`;
+  }
+  return `On rounds: ${labelled.join("; ")}.`;
 }
 
 /** The investor's declared hard criteria for a first message. */
@@ -416,6 +470,25 @@ export function outsideCriteria(
   return null;
 }
 
+/**
+ * The reply to their question about the sender's declared fields, composed
+ * by code (deterministic templating); null when any part is not declared or
+ * the question is about something else.
+ */
+export function factAnswer(
+  kinds: readonly InstructionQuestionKind[],
+  sender: readonly MaterialFact[],
+): string | null {
+  if (kinds.length === 0 || kinds.includes("OTHER")) return null;
+  const parts: string[] = [];
+  for (const kind of [...new Set(kinds)]) {
+    const answer = sender.find((fact) => fact.answers === kind)?.answer;
+    if (answer === undefined) return null;
+    parts.push(answer);
+  }
+  return parts.join(" ");
+}
+
 // ---------------------------------------------------------------------------
 // What the planner reads
 // ---------------------------------------------------------------------------
@@ -464,6 +537,7 @@ export const MESSAGE_PROBLEMS = [
   "UNGROUNDED_NUMBER",
   "UNANSWERED_QUESTION",
   "UNSUPPORTED_FIT",
+  "UNGROUNDED_CLAIM",
 ] as const;
 export type MessageProblem = (typeof MESSAGE_PROBLEMS)[number];
 
@@ -526,6 +600,19 @@ export function asksForMeeting(sentence: string): boolean {
 const FIT_CLAIM =
   /\bfits?\b|\bfitting\b|\b(?:good|great|strong|close|natural|clear) (?:fit|match)\b|\bmatch(?:es|ed)? (?:our|my|what (?:we|i))\b|\baligns? (?:well )?with (?:our|my)\b|\bin line with (?:our|my)\b|\bsweet spot\b|\bwheelhouse\b/iu;
 
+/** Claims about the sender's role in a round, by investment_role code. */
+const ROLE_CLAIMS: readonly (readonly [string, RegExp])[] = [
+  [
+    "lead",
+    /\b(?:we|i)(?: \w+){0,2} lead\b|\blead(?:ing)? (?:the |a )?rounds?\b|\b(?:as|take) (?:the |a )?lead\b/iu,
+  ],
+  ["co_invest", /\bco-?invest\w*|\balongside (?:a |the |another )?lead\b/iu],
+  [
+    "follow",
+    /\bfollow(?:ing)? (?:in|on) (?:later )?rounds?\b|\bfollow-?on\b/iu,
+  ],
+];
+
 /** Where a fact comes from, said in the message. */
 const SOURCE_CUE =
   /\b(?:profile|pitch|deck|website|site|listing|page|description|mandate|thesis|focus)\b/iu;
@@ -574,9 +661,14 @@ export type MessageCheckInput = {
   readonly answering?: readonly InstructionQuestionKind[] | undefined;
   /** The planner's own reading of what the last sentence asks. */
   readonly asks?: InstructionMessageAsk | null | undefined;
+  /** Who writes: role claims are checked for an investor. */
+  readonly side?: "INVESTOR" | "COMPANY" | undefined;
   /** The investor's declared criteria, for a claim of fit. */
   readonly criteria?: SenderCriteria | undefined;
 };
+
+const normal = (text: string) =>
+  text.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
 
 const hits = (text: string, fact: MaterialFact): number =>
   fact.anchors.filter((anchor) => anchor !== "" && text.includes(anchor))
@@ -598,9 +690,17 @@ export function checkMessage(input: MessageCheckInput): MessageProblem | null {
     return "MEETING_NOT_ALLOWED";
   }
 
-  // Every number stated must be one the material holds.
+  const declaredKinds = (input.answering ?? []).filter(
+    (kind) => kind !== "OTHER",
+  );
+  // Every number stated must be one the material holds; answering their
+  // question about the sender, only the sender's own declared facts (ASK
+  // card f3e411b7: a "typical USD 600,000" no field declares).
   const known = new Set(
-    [...input.counterpart, ...input.sender].flatMap((fact) => [
+    [
+      ...(declaredKinds.length > 0 ? [] : input.counterpart),
+      ...input.sender,
+    ].flatMap((fact) => [
       ...numbersIn(fact.text),
       ...fact.anchors.flatMap((anchor) => numbersIn(anchor)),
     ]),
@@ -615,6 +715,21 @@ export function checkMessage(input: MessageCheckInput): MessageProblem | null {
   );
   if (stated.some((value) => !known.has(value))) {
     return "UNGROUNDED_NUMBER";
+  }
+
+  // A claim about the investor's role in a round matches the declared
+  // field ("we can lead or co-invest" where only leading is declared: no).
+  if (input.side === "INVESTOR") {
+    const declared = new Set(
+      input.sender.flatMap((fact) => [...(fact.roles ?? [])]),
+    );
+    if (
+      ROLE_CLAIMS.some(
+        ([code, claim]) => claim.test(body) && !declared.has(code),
+      )
+    ) {
+      return "UNGROUNDED_CLAIM";
+    }
   }
 
   // "Fits" or "matches" only where the company's stage is inside the
@@ -637,20 +752,12 @@ export function checkMessage(input: MessageCheckInput): MessageProblem | null {
     }
   }
 
-  // A reply answers only from the sender's own facts.
-  if (input.answering !== undefined && input.answering.length > 0) {
-    for (const kind of input.answering) {
-      if (kind === "OTHER") continue;
-      const fact = input.sender.find((entry) => entry.answers === kind);
-      if (fact === undefined) return "UNANSWERED_QUESTION";
-      const grounded =
-        kind === "CHEQUE_SIZE"
-          ? numbersIn(body).some((value) =>
-              fact.anchors.some((anchor) => Number(anchor) === value),
-            )
-          : hits(text, fact) > 0;
-      if (!grounded) return "UNANSWERED_QUESTION";
-    }
+  // A reply answers only from the sender's own facts: their declared
+  // fields in code's own words, word for word.
+  if (declaredKinds.length > 0) {
+    const answer = factAnswer(declaredKinds, input.sender);
+    if (answer === null) return "UNANSWERED_QUESTION";
+    if (!normal(body).includes(normal(answer))) return "UNANSWERED_QUESTION";
   }
 
   if (!input.first) return null;

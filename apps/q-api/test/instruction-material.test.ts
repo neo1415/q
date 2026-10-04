@@ -5,6 +5,7 @@ import {
   checkMessage,
   companyCardFacts,
   createInstructionMaterialReader,
+  factAnswer,
   finalSentence,
   mandateCriteria,
   mandateFacts,
@@ -200,9 +201,15 @@ describe("the message check", () => {
       });
     expect(
       reply(
-        "Our typical cheque is $250k, and yes, we lead rounds. What are you raising for?",
+        "Our typical cheque is USD 250,000, within a range from USD 100,000 to USD 500,000. We lead rounds. What are you raising for?",
       ),
     ).toBeNull();
+    // Right numbers in the model's own words: not code's answer.
+    expect(
+      reply(
+        "Our typical cheque is $250k, and yes, we lead rounds. What are you raising for?",
+      ),
+    ).toBe("UNANSWERED_QUESTION");
     expect(
       reply("Our typical cheque is $300k and we lead rounds. Does that fit?"),
     ).toBe("UNGROUNDED_NUMBER");
@@ -367,6 +374,7 @@ describe("live QA (instruction 76d6f281)", () => {
         counterpart: TALLYLOOM,
         sender,
         bookingAuto: false,
+        side: "INVESTOR",
         criteria,
       }),
     ).toBe("UNSUPPORTED_FIT");
@@ -377,8 +385,40 @@ describe("live QA (instruction 76d6f281)", () => {
         counterpart: TARMACLY,
         sender,
         bookingAuto: false,
+        side: "INVESTOR",
         criteria,
       }),
     ).toBeNull();
+  });
+
+  it("answers Clinicrest's cheque question in code's words from the declared fields only", () => {
+    const answer = factAnswer(["CHEQUE_SIZE", "LEAD_OR_FOLLOW"], sender);
+    expect(answer).toBe(
+      "We write cheques from USD 250,000 to USD 1,000,000. We lead rounds.",
+    );
+    const reply = (body: string) =>
+      checkMessage({
+        body,
+        first: false,
+        counterpart: [],
+        sender,
+        bookingAuto: false,
+        side: "INVESTOR",
+        criteria,
+        answering: ["CHEQUE_SIZE", "LEAD_OR_FOLLOW"],
+      });
+    // ASK card f3e411b7, word for word: an invented typical cheque.
+    expect(
+      reply(
+        "We typically invest USD 600,000, with a usual range of USD 250,000 to USD 1,000,000. We can lead rounds or co-invest alongside a lead.",
+      ),
+    ).toBe("UNGROUNDED_NUMBER");
+    // Right numbers, but co-investing is not declared.
+    expect(
+      reply(`${answer ?? ""} We can also co-invest alongside a lead.`),
+    ).toBe("UNGROUNDED_CLAIM");
+    expect(reply(`${answer ?? ""} What are you raising for?`)).toBeNull();
+    // Nothing declared about it: no answer.
+    expect(factAnswer(["CHEQUE_SIZE", "OTHER"], sender)).toBeNull();
   });
 });

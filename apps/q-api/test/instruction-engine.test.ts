@@ -1109,7 +1109,7 @@ describe("their question gets an answer or goes to the person (QA run 8a1d57b9)"
       (code) => (code === "lead" ? "Lead rounds" : undefined),
     );
   const reply = chat(
-    "Our typical cheque is $250k, and yes, we lead rounds. What are you raising for?",
+    "Our typical cheque is USD 250,000. We lead rounds. What are you raising for?",
   );
 
   it("answers from the declared mandate, within MESSAGES AUTO", async () => {
@@ -1358,6 +1358,45 @@ describe("live QA (instruction 76d6f281): code decides from the conversation", (
         },
       ),
     ).toMatchObject({ verdict: "REFUSED", code: "MEETING_NOT_ALLOWED" });
+  });
+
+  it("a declared cheque range, in code's words, answering their question, runs AUTO even when the planner flags money", () => {
+    const facts = new Map([
+      [
+        REL,
+        {
+          lastFrom: "THEM" as const,
+          asksQuestion: true,
+          wantsToMeet: false,
+          proposedTime: null,
+          topicNumbers: [],
+          mentionsTermsOrMoney: false,
+          declined: false,
+          tone: "POSITIVE" as const,
+          questionAbout: ["CHEQUE_SIZE" as const, "LEAD_OR_FOLLOW" as const],
+        },
+      ],
+    ]);
+    const answer = chat(
+      "We write cheques from USD 250,000 to USD 1,000,000. We lead rounds. What are you raising for?",
+      {
+        touchesTermsOrMoney: true,
+        message: { kind: "REPLY", asks: "QUESTION" },
+      },
+    );
+    expect(
+      check(answer, { material: SEED_ONLY, facts, introduced: new Set([REL]) }),
+    ).toMatchObject({ verdict: "AUTO" });
+    // ASK card f3e411b7's words: refused, AUTO or not.
+    expect(
+      check(
+        chat(
+          "We typically invest USD 600,000, with a usual range of USD 250,000 to USD 1,000,000. We can lead rounds or co-invest alongside a lead.",
+          { touchesTermsOrMoney: true },
+        ),
+        { material: SEED_ONLY, facts, introduced: new Set([REL]) },
+      ),
+    ).toMatchObject({ verdict: "REFUSED", code: "UNGROUNDED_NUMBER" });
   });
 
   it("a firing reads each conversation and tells the planner who has heard from them; a failed read counts as written", async () => {
