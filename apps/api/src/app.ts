@@ -44,6 +44,8 @@ import {
   registerDocumentRoutes,
   type DocumentRoutesDependencies,
 } from "./http/documents.js";
+import type { QWorkPagePort } from "@capital-q/app-actions";
+
 import { deckAudiencePort } from "./deck-audience-port.js";
 import {
   registerAppActionRoutes,
@@ -287,6 +289,8 @@ export type ApiModules = {
   /** Profile photos and covers. Absent: no image routes register. */
   readonly profileImages?:
     ProfileImageRoutesDependencies["profileImages"] | undefined;
+  /** WORK-58: pause/resume their own instruction, set a suggestion aside. */
+  readonly qWork?: QWorkPagePort | undefined;
 };
 
 /**
@@ -513,6 +517,7 @@ export function createApp(
       ...(modules.evidence === undefined
         ? {}
         : { deckAudience: deckAudiencePort(modules.evidence) }),
+      ...(modules.qWork === undefined ? {} : { qWork: modules.qWork }),
     },
   });
   // ADR 0040: person-scoped routes (onboarding), under the onboarding actor.

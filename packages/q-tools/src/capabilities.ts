@@ -357,6 +357,13 @@ const OFFERS: readonly QCapability[] = [
     "A new address cuts off everyone who has the old one at once; the person does that themselves in Settings, where they copy the new one.",
   ),
   offer(
+    "work_suggestions",
+    "RELATIONSHIP",
+    "Set aside one of Q's suggestions on Work so it does not come back",
+    "WORK",
+    "A card set aside is the page's own preference: the person taps Not now on it; Q prepares what a card suggests through its propose tools.",
+  ),
+  offer(
     "pitch_video_upload",
     "MEDIA",
     "Upload several pitch videos, name, replace or remove each, and choose who can watch each one (investors only, or everyone on Capital Q)",
@@ -489,6 +496,8 @@ export const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   onboarding: "ONBOARDING",
   settings: "SETTINGS",
   integrations: "SETTINGS",
+  // WORK-58: Q's work page (pause, resume, set a suggestion aside).
+  work: "RELATIONSHIP",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
@@ -889,7 +898,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "stop_q_work",
     "RELATIONSHIP",
-    "Stops Q's work at once, all of it or one founder; no approval needed.",
+    "Stops Q's work at once, all of it or one founder, or pauses and resumes a standing instruction; no approval needed.",
     { acts: true },
   ),
   tool(

@@ -137,6 +137,8 @@ export type QApiModules = {
   readonly errands?: ErrandRoutesDependencies["errands"] | undefined;
   /** AUTO: Q's delegated work, the person's own, read, answered, stopped. */
   readonly work?: WorkRoutesDependencies["work"] | undefined;
+  /** WORK-58: Q's work page reads (suggestions, Not now, done). */
+  readonly workPage?: WorkRoutesDependencies["page"] | undefined;
   /** The person's own usage this month (lead 2026-10-03). */
   readonly usage?: OwnUsage | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
@@ -432,6 +434,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       work: modules.work,
+      page: modules.workPage,
     });
   }
 

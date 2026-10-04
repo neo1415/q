@@ -485,6 +485,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/work.ts POST Q_WORK_LANE_ANSWER_PATH": cap("tool.answer_q_work"),
   "q-api/http/work.ts GET Q_WORK_LANE_REPORT_PATH": DOWNLOAD,
   "q-api/http/work.ts PUT Q_PRESENCE_PATH": cap("tool.set_away"),
+  // WORK-58: Q's work page.
+  "q-api/http/work.ts GET Q_WORK_SUGGESTIONS_PATH": cap("navigate.WORK"),
+  "q-api/http/work.ts GET Q_WORK_DONE_PATH": cap("tool.list_q_work"),
   "q-api/http/errands.ts DELETE Q_ERRAND_PATH": cap("tool.stop_q_work"),
   // DAILY block: The Q Daily.
   "q-api/http/daily.ts GET Q_DAILY_PATH": cap("tool.get_q_daily"),
@@ -701,7 +704,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/settings": cap("navigate.SETTINGS"),
   "/settings/plan": cap("tool.get_my_plan"),
   // AUTO (ADR 0030): Q's work; Q reads the same with list_q_work.
-  "/work": cap("tool.list_q_work"),
+  "/work": cap("navigate.WORK"),
   "/work/[delegationId]": cap("tool.list_q_work"),
   "/work/[delegationId]/report/[laneId]": DOWNLOAD,
   // DOCS: their documents and brand kit.

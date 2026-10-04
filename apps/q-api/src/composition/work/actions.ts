@@ -395,6 +395,7 @@ function instructionWorkDto(row: InstructionRow): QWorkDto | null {
     row.status === "PAUSED"
       ? `Paused (${row.pause_reason ?? "waiting for you"}): ${row.goal_text}`
       : `${row.goal_text} -- ${String(auto)} things on my own, the rest I ask; $${row.spent_this_month.replace(/(\.\d{2})\d*$/u, "$1")} of $${row.budget_usd_month} this month.`;
+  const live = row.status === "ACTIVE" || row.status === "PAUSED";
   return {
     id: row.id,
     kind: "STANDING_INSTRUCTION",
@@ -403,7 +404,71 @@ function instructionWorkDto(row: InstructionRow): QWorkDto | null {
     createdAt: row.created_at.toISOString(),
     expiresAt: (row.expires_at ?? row.created_at).toISOString(),
     lanes: [],
+    goal: row.goal_text.slice(0, 300),
+    run: !live
+      ? null
+      : row.status === "PAUSED"
+        ? { state: "PAUSED", pauseReason: row.pause_reason ?? "WAITING_FOR_YOU" }
+        : { state: "WORKING", pauseReason: null },
+    lastStep:
+      row.last_step_words === undefined ||
+      row.last_step_words === null ||
+      row.last_step_at === undefined ||
+      row.last_step_at === null
+        ? null
+        : {
+            words: row.last_step_words.slice(0, 500),
+            at: row.last_step_at.toISOString(),
+          },
+    // Money stays a decimal string end to end (never a float on the wire).
+    spend: {
+      spentUsdMonth: cents(row.spent_this_month),
+      budgetUsdMonth: cents(row.budget_usd_month),
+    },
   };
+}
+
+/** "1.843210" -> "1.84": truncated, never rounded up past what was spent. */
+function cents(amount: string): string {
+  const [whole = "0", fraction = ""] = amount.split(".");
+  return `${whole}.${fraction.padEnd(2, "0").slice(0, 2)}`;
+}
+
+/**
+ * WORK-58: where delegated work stands. WAITING while every open founder
+ * waits on the other side (or on the person's choice of time); WORKING
+ * while Q has something to do itself. Null once it has ended.
+ */
+export function delegationRun(
+  status: QWorkDto["status"],
+  lanes: readonly QWorkDto["lanes"][number][],
+): QWorkDto["run"] {
+  if (status !== "ACTIVE") return null;
+  const open = lanes.filter((lane) => !TERMINAL_STAGES.includes(lane.stage));
+  const waiting =
+    open.length > 0 &&
+    open.every(
+      (lane) =>
+        lane.stage === "WAITING_ACCEPTANCE" || lane.stage === "NEEDS_TIMES",
+    );
+  return { state: waiting ? "WAITING" : "WORKING", pauseReason: null };
+}
+
+/** The most recent lane step, as the row's "last thing done". */
+export function latestLaneStep(
+  lanes: readonly QWorkDto["lanes"][number][],
+): QWorkDto["lastStep"] {
+  let latest: QWorkDto["lastStep"] = null;
+  for (const lane of lanes) {
+    if (lane.lastStep === null) continue;
+    if (latest === null || lane.updatedAt > latest.at) {
+      latest = {
+        words: `${lane.counterpartName}: ${lane.lastStep}`.slice(0, 500),
+        at: lane.updatedAt,
+      };
+    }
+  }
+  return latest;
 }
 
 export function createWorkPort(dependencies: {
@@ -456,17 +521,29 @@ export function createWorkPort(dependencies: {
     laneId: string,
   ) => Promise<unknown>;
   readonly seen: (actor: ActorContext) => Promise<void>;
+  /** WORK-58: the person pauses or resumes their own standing instruction. */
+  readonly pause: (actor: ActorContext, id: string) => Promise<boolean>;
+  readonly resume: (actor: ActorContext, id: string) => Promise<boolean>;
 } {
   const { store } = dependencies;
-  const toDto = async (row: Awaited<ReturnType<WorkStore["own"]>>[number]) => ({
-    id: row.id,
-    kind: row.kind,
-    status: row.status,
-    summary: row.summary,
-    createdAt: row.created_at.toISOString(),
-    expiresAt: row.expires_at.toISOString(),
-    lanes: (await store.lanes(row.id)).slice(0, 30).map(laneDto),
-  });
+  const toDto = async (
+    row: Awaited<ReturnType<WorkStore["own"]>>[number],
+  ): Promise<QWorkDto> => {
+    const lanes = (await store.lanes(row.id)).slice(0, 30).map(laneDto);
+    return {
+      id: row.id,
+      kind: row.kind,
+      status: row.status,
+      summary: row.summary,
+      createdAt: row.created_at.toISOString(),
+      expiresAt: row.expires_at.toISOString(),
+      lanes,
+      goal: null,
+      run: delegationRun(row.status, lanes),
+      lastStep: latestLaneStep(lanes),
+      spend: null,
+    };
+  };
   return {
     isInvestor: dependencies.isInvestor,
     hasCompany: async (actor) =>
@@ -534,6 +611,10 @@ export function createWorkPort(dependencies: {
     setAway: (actor, away) => store.setAway(actor, away),
     prepareForApproval: dependencies.board.prepareForApproval,
     seen: (actor) => store.seen(actor),
+    pause: async (actor, id) =>
+      (await dependencies.instructions?.pauseByOwner(actor, id)) ?? false,
+    resume: async (actor, id) =>
+      (await dependencies.instructions?.resumeByOwner(actor, id)) ?? false,
     detail: async (actor, delegationId) => {
       const row = await store.ownDelegation(actor, delegationId);
       if (row === null) {

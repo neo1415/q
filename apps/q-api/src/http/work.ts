@@ -16,10 +16,16 @@ import {
   QWorkLaneAnswerRequestSchema,
   QWorkListDtoSchema,
   QWorkReportDtoSchema,
+  Q_WORK_DONE_PATH,
+  Q_WORK_SUGGESTIONS_PATH,
+  QWorkDonePageDtoSchema,
+  QWorkDoneQuerySchema,
+  QWorkSuggestionListDtoSchema,
 } from "@capital-q/contracts";
 import { documentToPdf, type ArtifactDocument } from "@capital-q/deck-render";
 
 import type { WorkPort } from "../composition/work/actions.js";
+import type { WorkPage } from "../composition/work/page.js";
 import {
   getActorContext,
   requireActorContextHook,
@@ -37,6 +43,8 @@ import {
 
 export type WorkRoutesDependencies = ActorContextDependencies & {
   readonly work: WorkPort;
+  /** WORK-58: suggestions and the done page; absent, not routed. */
+  readonly page?: WorkPage | undefined;
 };
 
 const Id = z.string().uuid();
@@ -145,6 +153,37 @@ export function registerWorkRoutes(
     void reply.header("Cache-Control", "no-store");
     return QWorkListDtoSchema.parse({ items: items.slice(0, 20) });
   });
+
+  const { page } = dependencies;
+  if (page !== undefined) {
+    // WORK-58: read by code from the person's own signals; no model runs.
+    app.get(
+      Q_WORK_SUGGESTIONS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const items = await page.suggestions(getActorContext(request));
+        void reply.header("Cache-Control", "no-store");
+        return QWorkSuggestionListDtoSchema.parse({ items });
+      },
+    );
+
+    app.get(
+      Q_WORK_DONE_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const query = QWorkDoneQuerySchema.safeParse(request.query ?? {});
+        if (!query.success) return invalid(request, reply);
+        const done = await page.done(getActorContext(request), {
+          cursor: query.data.cursor,
+          ...(query.data.limit === undefined
+            ? {}
+            : { limit: query.data.limit }),
+        });
+        void reply.header("Cache-Control", "no-store");
+        return QWorkDonePageDtoSchema.parse(done);
+      },
+    );
+  }
 
   app.get(
     Q_WORK_ITEM_PATH,
