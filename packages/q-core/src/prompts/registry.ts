@@ -87,6 +87,7 @@ import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
 import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
 import { MEETING_NOTES_V3 } from "./tasks/meeting-notes.v3.js";
 import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
+import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
 // AUTO block (ADR 0030)
 import {
   WORK_CONVERSE_V1,
@@ -440,6 +441,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // DAILY block
     DAILY_STORY_WRITER_V1,
     DAILY_Q_TAKE_V1,
+    DILIGENCE_DOCUMENT_SUMMARY_V1,
   ];
 
 /** The production registry: the source-controlled definitions above. */

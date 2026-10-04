@@ -83,6 +83,8 @@ export const PROMPT_IDS = [
   "APP_ACTION_ARGUMENTS",
   /** HARDEN 2026-10-03: which one declared app action a request asks for. */
   "APP_ACTION_ROUTER",
+  /** 2026-10-04: Q's one line on a document shared in diligence. */
+  "DILIGENCE_DOCUMENT_SUMMARY",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -111,6 +113,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   DELEGATION_READER: "delegation-reader",
   INVESTOR_RESEARCH_READER: "investor-research-reader",
   ERRAND_REPLY: "errand-reply",
+  DILIGENCE_DOCUMENT_SUMMARY: "diligence-document-summary",
   INVESTOR_PERSONA: "investor-persona",
   INVESTOR_TWIN_TURN: "investor-twin-turn",
   REHEARSAL_SCORE: "rehearsal-score",

@@ -122,6 +122,13 @@ export {
   type AnalystResultLike,
 } from "./result-blocks.js";
 export {
+  createDiligenceDocumentSummariser,
+  DILIGENCE_SUMMARY_TEXT_MAX,
+  summaryLine,
+  summaryText,
+  type DiligenceDocumentSummariser,
+} from "./diligence-summary.js";
+export {
   createQTurnReader,
   readerActions,
   TURN_READER_ACTIONS_MAX,

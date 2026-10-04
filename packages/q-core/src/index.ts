@@ -377,6 +377,7 @@ export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
 export { MEETING_NOTES_V2 } from "./prompts/tasks/meeting-notes.v2.js";
 export { MEETING_NOTES_V3 } from "./prompts/tasks/meeting-notes.v3.js";
 export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
+export { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./prompts/tasks/diligence-document-summary.v1.js";
 export { INVESTOR_PERSONA_V1 } from "./prompts/tasks/investor-persona.v1.js";
 export { INVESTOR_TWIN_TURN_V1 } from "./prompts/tasks/investor-twin-turn.v1.js";
 export { REHEARSAL_SCORE_V1 } from "./prompts/tasks/rehearsal-score.v1.js";
@@ -539,6 +540,15 @@ export {
   type ErrandReplyResult,
   type ErrandReplyVariables,
 } from "./prompts/schemas/errand-reply.js";
+export {
+  DILIGENCE_DOCUMENT_SUMMARY_SCHEMA_NAME,
+  DILIGENCE_DOCUMENT_SUMMARY_SCHEMA_VERSION,
+  DILIGENCE_DOCUMENT_SUMMARY_UNTRUSTED,
+  DiligenceDocumentSummaryResultSchema,
+  DiligenceDocumentSummaryVariablesSchema,
+  type DiligenceDocumentSummaryResult,
+  type DiligenceDocumentSummaryVariables,
+} from "./prompts/schemas/diligence-document-summary.js";
 export {
   MEETING_NOTES_SCHEMA_NAME,
   MEETING_NOTES_SCHEMA_VERSION,
