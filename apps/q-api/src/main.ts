@@ -80,6 +80,7 @@ import { createRealtimeVoiceGateway } from "@capital-q/model-gateway/realtime";
 import { createOpenAIRealtimeProvider } from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
 import { duplexConfigFrom } from "./voice/duplex/config.js";
+import { createMemoryListeningStore } from "./voice/duplex/listening.js";
 import { createPostgresDuplexSpend } from "./voice/duplex/spend.js";
 import {
   createDocumentStudioPort,
@@ -4411,6 +4412,8 @@ const duplexBroker =
         // Not the rehearsal-aware turn: a rehearsal line is never duplex.
         turn: voiceTurn,
         spend: createPostgresDuplexSpend(database.sql),
+        // BACKCHANNEL: the person's listening level, through the Write Gate.
+        listening: createMemoryListeningStore(memoryService),
         logger,
       })
     : undefined;
@@ -4418,6 +4421,7 @@ logger.info(
   {
     enabled: duplexBroker !== undefined,
     dailyCapUsd: duplexConfig.dailyCapUsd,
+    backchannel: duplexConfig.backchannel,
     maxSessionSeconds: duplexConfig.maxSessionMs / 1000,
     idleSeconds: duplexConfig.idleMs / 1000,
   },

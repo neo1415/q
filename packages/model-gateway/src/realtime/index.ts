@@ -81,10 +81,7 @@ export type RealtimeSessionRequest = {
 
 /** What produced a usage report; all of it is VOICE_REALTIME spend. */
 export type RealtimeUsageKind =
-  | "RESPONSE"
-  | "BACKCHANNEL"
-  | "BRIDGE"
-  | "TRANSCRIPTION";
+  "RESPONSE" | "BACKCHANNEL" | "BRIDGE" | "TRANSCRIPTION";
 
 export type RealtimeSessionGrant = {
   readonly clientSecret: string;
@@ -107,8 +104,7 @@ export type RealtimeSessionProvider = {
    * Absent: the session asks for no transcription.
    */
   readonly transcription?:
-    | { readonly modelCode: string; readonly prices: RealtimePrices }
-    | undefined;
+    { readonly modelCode: string; readonly prices: RealtimePrices } | undefined;
   /** Rejects with ModelProviderFailure; never with a vendor exception. */
   readonly mint: (
     request: RealtimeSessionRequest,

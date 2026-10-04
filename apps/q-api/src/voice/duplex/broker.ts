@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import {
   CorrelationIdSchema,
+  Q_VOICE_LISTENING_DEFAULT,
   QRunIdSchema,
+  type QVoiceDuplexListening,
   type QVoiceDuplexCredential,
   type QVoiceDuplexToolCall,
   type QVoiceDuplexToolResult,
@@ -25,9 +27,17 @@ import { APPROVAL_QUESTION, type VoiceTurnHandler } from "../turn.js";
 import type { DuplexConfig } from "./config.js";
 import {
   ASK_Q_TOOL_NAME,
+  BACKCHANNEL_INSTRUCTIONS,
+  BRIDGE_INSTRUCTIONS,
   duplexInstructions,
   duplexTools,
+  SET_LISTENING_TOOL_NAME,
 } from "./instructions.js";
+import {
+  isListeningChange,
+  nextListeningLevel,
+  type DuplexListeningStore,
+} from "./listening.js";
 import type { DuplexSpendLedger } from "./spend.js";
 
 /**
@@ -90,6 +100,10 @@ type DuplexLine = {
   lastActivityAt: number;
   spentUsd: number;
   readonly seen: Set<string>;
+  /** BACKCHANNEL: whether this line listens like a person. */
+  readonly listening: boolean;
+  /** Reports by kind, for the end-of-line log. */
+  readonly kinds: Record<string, number>;
 };
 
 export type DuplexBroker = {
@@ -128,6 +142,8 @@ export type DuplexBrokerDependencies = {
   readonly turn: VoiceTurnHandler;
   readonly spend: DuplexSpendLedger;
   readonly logger: Logger;
+  /** BACKCHANNEL: the person's remembered listening level. */
+  readonly listening?: DuplexListeningStore | undefined;
   readonly now?: (() => number) | undefined;
 };
 
@@ -173,6 +189,8 @@ const output = (value: unknown, approvalPending = false) => ({
   output: JSON.stringify(value),
   approvalPending,
 });
+
+const QUOTE_MAX = 400;
 
 export function createDuplexBroker(
   dependencies: DuplexBrokerDependencies,
@@ -285,12 +303,50 @@ export function createDuplexBroker(
         .filter((tool) => tool.classification === "READ_ONLY")
         .slice(0, config.maxDirectTools);
 
+      // BACKCHANNEL: the person's remembered level. A read that fails
+      // costs the line its memory, never the line: the default applies.
+      const listens = config.backchannel;
+      let listening: QVoiceDuplexListening | undefined;
+      if (listens) {
+        let remembered = null;
+        try {
+          remembered = (await dependencies.listening?.read(actor)) ?? null;
+        } catch (error: unknown) {
+          logger.warn({ err: error }, "duplex listening level unreadable");
+        }
+        listening = {
+          level: remembered?.level ?? Q_VOICE_LISTENING_DEFAULT,
+          setAt:
+            remembered === null
+              ? null
+              : new Date(remembered.setAt).toISOString(),
+          backchannelInstructions: BACKCHANNEL_INSTRUCTIONS,
+          bridgeInstructions: BRIDGE_INSTRUCTIONS,
+        };
+      }
+
       const minted = await gateway.mint({
-        instructions: duplexInstructions({ firstMessage, locale }),
-        tools: duplexTools(direct.map((tool) => tool.definition)),
+        instructions: duplexInstructions({
+          firstMessage,
+          locale,
+          listening: listens,
+        }),
+        tools: duplexTools(
+          direct.map((tool) => tool.definition),
+          { listening: listens },
+        ),
         voice: binding.voice,
         maxOutputTokens: config.maxOutputTokens,
         secretTtlSeconds: config.secretTtlSeconds,
+        ...(listens
+          ? {
+              transcribeInput: true,
+              turnEagerness:
+                listening?.level === "OFF"
+                  ? ("HIGH" as const)
+                  : ("AUTO" as const),
+            }
+          : {}),
         sensitivity: decision.plan.maxSensitivity,
         attribution: {
           tenantId: actor.tenantId,
@@ -311,6 +367,8 @@ export function createDuplexBroker(
         lastActivityAt: at,
         spentUsd: 0,
         seen: new Set(),
+        listening: listens,
+        kinds: {},
       });
       logger.info(
         {
@@ -327,6 +385,7 @@ export function createDuplexBroker(
           expiresAt: minted.grant.expiresAt.toISOString(),
           maxSessionMs: config.maxSessionMs,
           idleMs: config.idleMs,
+          ...(listening === undefined ? {} : { listening }),
         },
       };
     },
@@ -376,6 +435,49 @@ export function createDuplexBroker(
         }
       }
 
+      if (call.name === SET_LISTENING_TOOL_NAME && line.listening) {
+        // BACKCHANNEL: the level is resolved here, deterministically, and
+        // applied on the line at once; it is remembered only through the
+        // memory Write Gate, whose quote check reads the provider's
+        // transcript of the person, not the model's words.
+        const change = args.change;
+        if (!isListeningChange(change)) {
+          return output({ ok: false, error: "That is not a change I know." });
+        }
+        const current = call.listening ?? Q_VOICE_LISTENING_DEFAULT;
+        const level = nextListeningLevel(current, change);
+        const quote =
+          typeof args.quote === "string"
+            ? args.quote.trim().slice(0, QUOTE_MAX)
+            : "";
+        let remembered = false;
+        if (dependencies.listening !== undefined && quote.length >= 3) {
+          try {
+            remembered = await dependencies.listening.remember({
+              actor,
+              level,
+              quote,
+              heard: call.heard ?? [],
+            });
+          } catch (error: unknown) {
+            logger.warn({ err: error }, "duplex listening level not kept");
+          }
+        }
+        logger.info(
+          { qVoiceSessionId: voiceSessionId, level, remembered },
+          "duplex listening level changed",
+        );
+        return {
+          ...output({
+            ok: true,
+            level,
+            remembered,
+            say: "Acknowledge it once, in a few words, then carry on.",
+          }),
+          listening: level,
+        };
+      }
+
       // Anything else must be a tool this line was offered, and runs only
       // through the registry's pipeline (validate, authorise, bound).
       if (!line.direct.has(call.name)) {
@@ -402,10 +504,13 @@ export function createDuplexBroker(
       line.lastActivityAt = at;
       if (!line.seen.has(report.responseId)) {
         line.seen.add(report.responseId);
-        const { responseId: _responseId, ...usage } = report;
+        const { responseId: _responseId, kind, ...usage } = report;
+        const counted = kind ?? "RESPONSE";
+        line.kinds[counted] = (line.kinds[counted] ?? 0) + 1;
         try {
           line.spentUsd += await gateway.record({
             usage,
+            kind: counted,
             attribution: {
               tenantId: actor.tenantId,
               userId: actor.userId,
@@ -447,6 +552,7 @@ export function createDuplexBroker(
           qVoiceSessionId: voiceSessionId,
           reason,
           spentUsd: Math.round(line.spentUsd * 1e6) / 1e6,
+          reports: line.kinds,
           seconds: Math.round((now() - line.openedAt) / 1000),
         },
         "duplex voice line ended",

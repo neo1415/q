@@ -17,6 +17,12 @@ import {
 } from "@capital-q/model-gateway/realtime";
 import { OPENAI_REALTIME_MINI_PRICES } from "@capital-q/model-gateway/realtime/openai";
 import { createLogger } from "@capital-q/observability";
+import {
+  quoteOccursIn,
+  type MemoryItem,
+  type MemoryService,
+  type RememberCommand,
+} from "@capital-q/q-knowledge";
 import type {
   ContextFirewallPort,
   ContextFirewallRequest,
@@ -47,6 +53,12 @@ import {
   duplexConfigFrom,
 } from "../src/voice/duplex/config.js";
 import { DUPLEX_INSTRUCTIONS_PREFIX } from "../src/voice/duplex/instructions.js";
+import {
+  createMemoryListeningStore,
+  LISTENING_MEMORY_KEY,
+  nextListeningLevel,
+  type DuplexListeningStore,
+} from "../src/voice/duplex/listening.js";
 import { utcDayStart } from "../src/voice/duplex/spend.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
 
@@ -169,6 +181,8 @@ function harness(
     readonly turn?: VoiceTurnHandler;
     readonly allowDirect?: boolean;
     readonly recordThrows?: boolean;
+    readonly backchannel?: boolean;
+    readonly listening?: DuplexListeningStore;
   } = {},
 ) {
   const order: string[] = [];
@@ -251,7 +265,14 @@ function harness(
     });
   const spent = options.spent ?? 0;
   const dependencies: DuplexBrokerDependencies = {
-    config: { ...DUPLEX_DEFAULTS, enabled: options.enabled ?? true },
+    config: {
+      ...DUPLEX_DEFAULTS,
+      enabled: options.enabled ?? true,
+      backchannel: options.backchannel ?? true,
+    },
+    ...(options.listening === undefined
+      ? {}
+      : { listening: options.listening }),
     gateway: {
       ...gateway,
       mint: (request) => {
@@ -359,8 +380,12 @@ describe("opening a duplex line", () => {
     });
     const mint = h.mints[0];
     expect(mint?.sensitivity).toBe("PUBLIC");
-    // ask_q and the read-only tool; never the PREPARE one.
-    expect(mint?.tools.map((t) => t.name)).toEqual(["ask_q", "get_thing"]);
+    // ask_q, set_listening and the read-only tool; never the PREPARE one.
+    expect(mint?.tools.map((t) => t.name)).toEqual([
+      "ask_q",
+      "set_listening",
+      "get_thing",
+    ]);
     expect(mint?.instructions.startsWith(DUPLEX_INSTRUCTIONS_PREFIX)).toBe(
       true,
     );
@@ -646,5 +671,242 @@ describe("usage and the caps", () => {
     expect(
       h.broker.end({ actor: ACTOR, voiceSessionId: id, reason: "ENDED" }),
     ).toBe(false);
+  });
+});
+
+describe("listening like a person (BACKCHANNEL)", () => {
+  const id = binding().voiceSessionId;
+  /** A memory fake: keeps items, and refuses a quote nobody said, as the gate does. */
+  function memoryFake() {
+    const items: MemoryItem[] = [];
+    const commands: RememberCommand[] = [];
+    let tick = 0;
+    const memory: Pick<MemoryService, "list" | "remember"> = {
+      list: () =>
+        Promise.resolve(items.filter((item) => item.validTo === null)),
+      remember: (command) => {
+        commands.push(command);
+        const quote = command.candidate.quote ?? "";
+        if (!command.userTurns.some((turn) => quoteOccursIn(quote, turn))) {
+          return Promise.resolve({
+            outcome: "REFUSED",
+            reason: "QUOTE_NOT_IN_TURNS",
+          });
+        }
+        for (const item of items) {
+          if (item.memoryKey === command.candidate.memoryKey) {
+            Object.assign(item, { validTo: "2026-10-04T00:00:00.000Z" });
+          }
+        }
+        tick += 1;
+        const item = {
+          id: randomUUID(),
+          memoryType: command.candidate.memoryType,
+          memoryKey: command.candidate.memoryKey,
+          structuredValue: command.candidate.structuredValue,
+          validFrom: `2026-10-04T10:00:0${String(tick)}.000Z`,
+          validTo: null,
+          status: "active",
+        } as unknown as MemoryItem;
+        items.push(item);
+        return Promise.resolve({
+          outcome: "REMEMBERED",
+          reason: "RECORDED",
+          item,
+        });
+      },
+    };
+    return { memory, items, commands };
+  }
+
+  const setListening = (
+    change: string,
+    quote: string,
+    heard: string[],
+    listening: "OFF" | "SUBTLE" | "NATURAL" = "SUBTLE",
+  ) => ({
+    callId: "call_listen",
+    name: "set_listening",
+    arguments: JSON.stringify({ change, quote }),
+    heard,
+    listening,
+  });
+
+  it("offers set_listening, the patient detector and the transcriber, with the default level", async () => {
+    const h = harness({
+      listening: createMemoryListeningStore(memoryFake().memory),
+    });
+    const opened = await h.broker.open({ binding: binding() });
+    if (opened.kind !== "DUPLEX") throw new Error("expected a duplex line");
+    expect(opened.credential.listening).toMatchObject({
+      level: "SUBTLE",
+      setAt: null,
+    });
+    expect(opened.credential.listening?.backchannelInstructions).toContain(
+      "never call a tool",
+    );
+    expect(h.mints[0]).toMatchObject({
+      transcribeInput: true,
+      turnEagerness: "AUTO",
+    });
+    expect(h.mints[0]?.instructions).toContain("set_listening");
+  });
+
+  it("leaves the line exactly as before when switched off", async () => {
+    const h = harness({ backchannel: false });
+    const opened = await h.broker.open({ binding: binding() });
+    if (opened.kind !== "DUPLEX") throw new Error("expected a duplex line");
+    expect(opened.credential.listening).toBeUndefined();
+    expect(h.mints[0]?.tools.map((t) => t.name)).toEqual([
+      "ask_q",
+      "get_thing",
+    ]);
+    expect(h.mints[0]?.transcribeInput).toBeUndefined();
+    expect(h.mints[0]?.instructions).not.toContain("set_listening");
+    // And the tool is not there to call.
+    const result = await h.broker.tool({
+      actor: ACTOR,
+      voiceSessionId: id,
+      call: setListening("OFF", "stop doing that", ["stop doing that"]),
+    });
+    expect(result?.listening).toBeUndefined();
+  });
+
+  it("'stop doing that' turns them off at once, persists through the Write Gate, and the next line opens off", async () => {
+    const fake = memoryFake();
+    const store = createMemoryListeningStore(fake.memory);
+    const h = harness({ listening: store });
+    await h.broker.open({ binding: binding() });
+    const result = await h.broker.tool({
+      actor: ACTOR,
+      voiceSessionId: id,
+      call: setListening("OFF", "stop doing that", [
+        "okay so the round is going well",
+        "Q, stop doing that.",
+      ]),
+    });
+    expect(result?.listening).toBe("OFF");
+    expect(JSON.parse(result?.output ?? "{}")).toMatchObject({
+      ok: true,
+      level: "OFF",
+      remembered: true,
+    });
+    // Written by code: fixed key, deterministic words, Q_PROPOSED with the
+    // provider's transcripts as the person's turns.
+    expect(fake.commands[0]).toMatchObject({
+      writeMode: "Q_PROPOSED",
+      candidate: {
+        memoryType: "preference",
+        memoryKey: LISTENING_MEMORY_KEY,
+        structuredValue: { listening: "OFF" },
+      },
+    });
+    expect(fake.commands[0]?.userTurns).toContain("Q, stop doing that.");
+    // The next line remembers.
+    const again = await h.broker.open({ binding: binding() });
+    if (again.kind !== "DUPLEX") throw new Error("expected a duplex line");
+    expect(again.credential.listening?.level).toBe("OFF");
+    expect(again.credential.listening?.setAt).not.toBeNull();
+    expect(h.mints[1]?.turnEagerness).toBe("HIGH");
+  });
+
+  it("applies the change on the line but remembers nothing the person did not say", async () => {
+    const fake = memoryFake();
+    const h = harness({ listening: createMemoryListeningStore(fake.memory) });
+    await h.broker.open({ binding: binding() });
+    const result = await h.broker.tool({
+      actor: ACTOR,
+      voiceSessionId: id,
+      call: setListening("OFF", "stop doing that", ["tell me about Kazikit"]),
+    });
+    expect(result?.listening).toBe("OFF");
+    expect(JSON.parse(result?.output ?? "{}")).toMatchObject({
+      remembered: false,
+    });
+    expect(fake.items).toHaveLength(0);
+  });
+
+  it("steps LESS and MORE one level from where the line is, and stops at the ends", async () => {
+    const h = harness({
+      listening: createMemoryListeningStore(memoryFake().memory),
+    });
+    await h.broker.open({ binding: binding() });
+    const level = async (change: string, from: "OFF" | "SUBTLE" | "NATURAL") =>
+      (
+        await h.broker.tool({
+          actor: ACTOR,
+          voiceSessionId: id,
+          call: setListening(change, "less of that", ["less of that"], from),
+        })
+      )?.listening;
+    expect(await level("LESS", "NATURAL")).toBe("SUBTLE");
+    expect(await level("LESS", "SUBTLE")).toBe("OFF");
+    expect(await level("LESS", "OFF")).toBe("OFF");
+    expect(await level("MORE", "SUBTLE")).toBe("NATURAL");
+    expect(await level("MORE", "NATURAL")).toBe("NATURAL");
+    expect(nextListeningLevel("OFF", "MORE")).toBe("SUBTLE");
+    // An unknown change is refused, and changes nothing.
+    const refused = await h.broker.tool({
+      actor: ACTOR,
+      voiceSessionId: id,
+      call: setListening("LOUDER", "louder", ["louder"]),
+    });
+    expect(refused?.listening).toBeUndefined();
+  });
+
+  it("opens with the default when the remembered level cannot be read", async () => {
+    const h = harness({
+      listening: {
+        read: () => Promise.reject(new Error("db down")),
+        remember: () => Promise.resolve(false),
+      },
+    });
+    const opened = await h.broker.open({ binding: binding() });
+    if (opened.kind !== "DUPLEX") throw new Error("expected a duplex line");
+    expect(opened.credential.listening?.level).toBe("SUBTLE");
+  });
+
+  it("counts backchannels, bridges and transcription in the same VOICE_REALTIME ledger, under the cap", async () => {
+    let spent = 0;
+    const h = harness({ spent: () => spent });
+    await h.broker.open({ binding: binding() });
+    for (const [responseId, kind] of [
+      ["bc_1", "BACKCHANNEL"],
+      ["br_1", "BRIDGE"],
+      ["tx_item_1", "TRANSCRIPTION"],
+    ] as const) {
+      await h.broker.usage({
+        actor: ACTOR,
+        voiceSessionId: id,
+        report: {
+          responseId,
+          kind,
+          inputTextTokens: 400,
+          inputAudioTokens: 100,
+          cachedTextTokens: 380,
+          cachedAudioTokens: 0,
+          outputTextTokens: 4,
+          outputAudioTokens: kind === "TRANSCRIPTION" ? 0 : 15,
+        },
+      });
+    }
+    expect(h.usage.entries).toHaveLength(3);
+    expect(
+      h.usage.entries.every((entry) => entry.purpose === "VOICE_REALTIME"),
+    ).toBe(true);
+    // Small: about a tenth of a cent each, even with transcription priced
+    // at the session's (higher) rates as this fake provider does.
+    const total = h.usage.entries.reduce((sum, e) => sum + e.costUsd, 0);
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBeLessThan(0.005);
+    // And the cap still governs them.
+    spent = 1;
+    expect(
+      await h.broker.usage({
+        actor: ACTOR,
+        voiceSessionId: id,
+        report: { ...REPORT, responseId: "bc_2", kind: "BACKCHANNEL" },
+      }),
+    ).toEqual({ continue: false, notice: DUPLEX_CAP_NOTICE });
   });
 });

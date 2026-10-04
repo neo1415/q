@@ -22,6 +22,12 @@ export type DuplexConfig = {
   readonly maxDirectTools: number;
   /** The client secret is only for opening the line. */
   readonly secretTtlSeconds: number;
+  /**
+   * BACKCHANNEL: the line listens like a person (reactions, bridges,
+   * input transcription). On unless CQ_VOICE_REALTIME_BACKCHANNEL is
+   * "off": the kill switch that leaves duplex exactly as before.
+   */
+  readonly backchannel: boolean;
 };
 
 export const DUPLEX_DEFAULTS: DuplexConfig = {
@@ -33,6 +39,7 @@ export const DUPLEX_DEFAULTS: DuplexConfig = {
   maxOutputTokens: 800,
   maxDirectTools: 6,
   secretTtlSeconds: 60,
+  backchannel: true,
 };
 
 function bounded(
@@ -52,6 +59,7 @@ export function duplexConfigFrom(
   env: Readonly<Record<string, string | undefined>>,
 ): DuplexConfig {
   const flag = env.CQ_VOICE_REALTIME?.trim().toLowerCase();
+  const backchannel = env.CQ_VOICE_REALTIME_BACKCHANNEL?.trim().toLowerCase();
   return {
     enabled: flag === "on" || flag === "true" || flag === "1",
     maxSessionMs:
@@ -97,5 +105,10 @@ export function duplexConfigFrom(
       ),
     ),
     secretTtlSeconds: DUPLEX_DEFAULTS.secretTtlSeconds,
+    backchannel: !(
+      backchannel === "off" ||
+      backchannel === "false" ||
+      backchannel === "0"
+    ),
   };
 }
