@@ -20,6 +20,36 @@
   --radius-xl: 18px;
 }
 @layer base {
+  /*
+   * The app's theme, as computed at the root (Discover v2, ADR 0047). A
+   * custom property is computed where it is declared, so these keep the
+   * theme's values even inside a stage that re-points --cq-* at the stage
+   * tokens: the desktop intelligence panel beside the pitch reads in the
+   * app's own theme while the cinema stays dark.
+   */
+  :root {
+    --cq-app-canvas: var(--cq-canvas);
+    --cq-app-surface: var(--cq-surface);
+    --cq-app-surface-raised: var(--cq-surface-raised);
+    --cq-app-surface-subtle: var(--cq-surface-subtle);
+    --cq-app-surface-strong: var(--cq-surface-strong);
+    --cq-app-surface-sunken: var(--cq-surface-sunken);
+    --cq-app-border: var(--cq-border);
+    --cq-app-border-subtle: var(--cq-border-subtle);
+    --cq-app-border-strong: var(--cq-border-strong);
+    --cq-app-text-primary: var(--cq-text-primary);
+    --cq-app-text-secondary: var(--cq-text-secondary);
+    --cq-app-text-tertiary: var(--cq-text-tertiary);
+    --cq-app-text-inverse: var(--cq-text-inverse);
+    --cq-app-accent: var(--cq-accent);
+    --cq-app-accent-hover: var(--cq-accent-hover);
+    --cq-app-accent-soft: var(--cq-accent-soft);
+    --cq-app-q-light: var(--cq-q-light);
+    --cq-app-q-core: var(--cq-q-core);
+    --cq-app-q-bloom: var(--cq-q-bloom);
+    --cq-app-q-ember: var(--cq-q-ember);
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     /* Keep focused content clear of the fixed header and bottom navigation. */
@@ -919,16 +949,18 @@
   }
 
   /*
-   * Discover, immersive (spec §9; ADR 0017 C4/C5). One stage on the stage
-   * tokens in either theme -- the video carries the cinema, the chrome
-   * stays out of its way.
+   * Discover, immersive (spec §9; ADR 0017 C4/C5; Discover v2, ADR 0047).
+   * The pitch is the page: on a phone it fills everything between the top
+   * of the screen and the app's own bottom navigation, which stays solid
+   * on the stage tokens, so the video ends above it and nothing covers the
+   * bottom of the frame but the 2 px progress bar on the seam. The chrome
+   * hugs the edges: tabs and sound at the top, the company's caption
+   * bottom-left, the rail down the right. A scrim sits only behind words,
+   * never under 62% stage canvas beneath any line of text: white stays at
+   * 5.2:1 on a pure white frame (secondary text is 90% white, 4.7:1).
    *
-   * Phone: the pitch fills the screen between the top and the bottom
-   * navigation (the header hides; the bottom navigation stays), the
-   * company and its decisions float over it on a scrim, the action rail
-   * runs down the right. Desktop: a 9:16 stage at the full height of the
-   * workspace, never stretched, with the company and the decisions in an
-   * intelligence panel beside it.
+   * Desktop: the 9:16 stage, the rail beside it, and an intelligence
+   * panel in the app's own theme (a reading surface, not the cinema).
    */
   /* The dock is a sibling of the shell, so the page is asked from the body. */
   body:has([data-feed-immersive]) [data-q-dock] {
@@ -939,8 +971,8 @@
       display: none;
     }
   }
-  /* The bottom navigation stays on Discover, on stage tokens (ADR 0017 C5),
-     so a light theme does not put a white bar under the pitch. */
+  /* The bottom navigation stays on Discover, solid, on stage tokens (ADR
+     0017 C5), so a light theme does not put a white bar under the pitch. */
   body:has([data-feed-immersive]) .cq-bottom-nav {
     color-scheme: dark;
     --cq-surface: var(--cq-stage-canvas);
@@ -949,15 +981,67 @@
     --cq-accent: var(--cq-stage-accent);
     background-color: var(--cq-stage-canvas);
   }
+  /* The app's connection notice floats over the stage on Discover as a
+     small pill under the tabs, instead of pushing the pitch down and
+     clipping its caption off the screen. Its words stay the same. */
+  body:has([data-feed-immersive]) [data-network]:not([data-network="online"]) {
+    position: fixed;
+    top: calc(56px + var(--cq-safe-top));
+    left: 50%;
+    z-index: var(--cq-z-sticky);
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    border: none;
+    border-radius: var(--cq-radius-full);
+    box-shadow: var(--cq-shadow-overlay);
+    transform: translateX(-50%);
+  }
+  .cq-feed-skeleton .cq-feed-stage::before {
+    display: none;
+  }
   .cq-feed {
+    /* Text over video, guarded (ADR 0047). */
+    --cq-feed-scrim-floor: color-mix(
+      in oklch,
+      var(--cq-stage-canvas) 62%,
+      transparent
+    );
+    --cq-feed-scrim-deep: color-mix(
+      in oklch,
+      var(--cq-stage-canvas) 76%,
+      transparent
+    );
+    --cq-feed-halo:
+      0 0 2px color-mix(in oklch, var(--cq-stage-canvas) 70%, transparent),
+      0 1px 3px color-mix(in oklch, var(--cq-stage-canvas) 60%, transparent);
     height: calc(100svh - var(--cq-bottom-nav-height) - var(--cq-safe-bottom));
     overflow: hidden;
+    /* A long press opens the options, not the browser's own menu. */
+    -webkit-touch-callout: none;
   }
   .cq-feed-stage {
     position: relative;
     height: 100%;
     overflow: hidden;
     touch-action: none;
+    user-select: none;
+  }
+  /* Behind the tabs and the sound control only: the floor under their
+     words, fading out well before the picture's middle. */
+  .cq-feed-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 1;
+    height: calc(112px + var(--cq-safe-top));
+    background: linear-gradient(
+      to bottom,
+      var(--cq-feed-scrim-floor) 0,
+      var(--cq-feed-scrim-floor) calc(52px + var(--cq-safe-top)),
+      transparent 100%
+    );
+    pointer-events: none;
+    transition: opacity var(--cq-motion-base) var(--cq-ease);
   }
   .cq-feed-media {
     position: absolute;
@@ -989,7 +1073,7 @@
     padding: 0.4rem 1rem;
     border: 2px solid currentColor;
     border-radius: 0.75rem;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.04em;
     pointer-events: none;
   }
@@ -1016,25 +1100,54 @@
     object-fit: cover;
     background: var(--cq-stage-canvas);
   }
+  /* A landscape pitch is shown whole on the portrait stage, never cropped
+     to a sliver of its middle. */
+  .cq-feed-player[data-orientation="landscape"] .cq-feed-video {
+    object-fit: contain;
+  }
+  /* Something went wrong: the frame stays (never a black box), dimmed so
+     the words over it read. */
+  .cq-feed-player[data-problem] .cq-feed-video {
+    filter: brightness(0.4);
+  }
   .cq-feed-player-controls {
     position: absolute;
-    /* Below the stage's top row (people, filters, up) and clear of its
-       right column (down): at 390px a long note ran under the filter
-       buttons (demo audit 2026-10-03; demo-44 phone pass). */
-    top: calc(64px + var(--cq-safe-top));
-    left: 12px;
-    right: 72px;
+    top: calc(4px + var(--cq-safe-top));
+    left: 4px;
+    z-index: 2;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
-  .cq-feed-player-note {
-    max-width: 32ch;
-    border-radius: 8px;
-    padding: 6px 10px;
-    background: var(--cq-stage-surface-strong);
+  .cq-feed-sound {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--cq-radius-full);
+    background: transparent;
     color: var(--cq-stage-text);
+    cursor: pointer;
+    filter: drop-shadow(0 0 2px var(--cq-stage-canvas));
+  }
+  .cq-feed-sound:active {
+    transform: scale(0.94);
+  }
+  .cq-feed-quality {
+    display: inline-flex;
+    min-height: 28px;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+    padding: 0 10px;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-feed-scrim-deep);
+    color: var(--cq-stage-text);
+    font-size: 12px;
+    font-weight: 500;
   }
   .cq-feed-still {
     position: absolute;
@@ -1047,98 +1160,369 @@
     padding: 24px;
     text-align: center;
   }
+  /* Centred over the pitch: the explicit Play, a problem, a pause. Clear
+     of the rail on a phone. */
+  .cq-feed-center {
+    position: absolute;
+    top: 45%;
+    left: calc(50% - 32px);
+    z-index: 2;
+    display: flex;
+    width: min(280px, calc(100% - 120px));
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+    color: var(--cq-stage-text);
+    text-shadow: var(--cq-feed-halo);
+    transform: translate(-50%, -50%);
+  }
+  .cq-feed-center-note {
+    font-size: 13px;
+    line-height: 1.45;
+    color: color-mix(in oklch, var(--cq-stage-text) 90%, transparent);
+  }
+  .cq-feed-problem-title {
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .cq-feed-play {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 22px;
+    border: none;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-stage-text);
+    color: var(--cq-stage-canvas);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    text-shadow: none;
+    cursor: pointer;
+    transition: transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-feed-play:active {
+    transform: scale(0.97);
+  }
+  .cq-feed-play:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .cq-feed-paused,
+  .cq-feed-buffering {
+    position: absolute;
+    top: 45%;
+    left: calc(50% - 32px);
+    z-index: 2;
+    display: flex;
+    width: 64px;
+    height: 64px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--cq-radius-full);
+    background: color-mix(in oklch, var(--cq-stage-canvas) 55%, transparent);
+    color: var(--cq-stage-text);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+  }
+  .cq-feed-paused > svg {
+    margin-left: 4px;
+  }
+  .cq-feed-ring {
+    width: 30px;
+    height: 30px;
+    border: 3px solid color-mix(in oklch, var(--cq-stage-text) 28%, transparent);
+    border-top-color: var(--cq-stage-text);
+    border-radius: var(--cq-radius-full);
+    animation: cq-feed-spin 0.8s linear infinite;
+  }
+  @keyframes cq-feed-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   /*
-   * Over the pitch on a phone: a scrim only where the words are. Not a
-   * scroll container: the rail is positioned against it and is taller
-   * than a short card, and a clipping overlay cut the top of the rail
-   * off. The description is clamped instead, so the words stay short.
+   * The caption: the words bottom-left, over the guarded scrim (ADR 0047).
+   * Not a scroll container: the rail is positioned against it.
    */
   .cq-feed-overlay {
     position: absolute;
     inset: auto 0 0 0;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 48px 16px 16px;
+    padding: 40px 84px 20px 16px;
     background: linear-gradient(
       to top,
-      var(--cq-stage-canvas) 0%,
+      var(--cq-feed-scrim-deep) 0%,
+      var(--cq-feed-scrim-floor) calc(100% - 40px),
+      transparent 100%
+    );
+    transition: opacity var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-feed-overlay:has([data-caption-open]) {
+    background: linear-gradient(
+      to top,
+      color-mix(in oklch, var(--cq-stage-canvas) 88%, transparent) 0%,
+      var(--cq-feed-scrim-deep) calc(100% - 40px),
       transparent 100%
     );
   }
   .cq-feed-card {
     gap: 12px;
   }
-  .cq-feed-card .cq-feed-info {
-    padding-right: 84px;
+  .cq-feed-info,
+  .cq-feed-more-body {
+    text-shadow: var(--cq-feed-halo);
   }
-  .cq-feed-info .cq-body {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
+  .cq-feed-muted {
+    color: color-mix(in oklch, var(--cq-stage-text) 90%, transparent);
   }
+  .cq-feed-company {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 12px;
+  }
+  .cq-feed-panel-mark {
+    display: none;
+  }
+  .cq-feed-more {
+    display: inline-flex;
+    min-height: 44px;
+    margin: -10px 0 -12px;
+    align-items: center;
+    align-self: flex-start;
+    padding: 0 8px 0 0;
+    border: none;
+    background: none;
+    color: var(--cq-stage-text);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cq-feed-facts {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    row-gap: 6px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .cq-feed-facts dt {
+    color: color-mix(in oklch, var(--cq-text-primary) 90%, transparent);
+  }
+  .cq-feed-fact-axis,
+  .cq-feed-fact-unknown {
+    font-size: 12.5px;
+    color: color-mix(in oklch, var(--cq-text-primary) 90%, transparent);
+  }
+
+  /*
+   * The rail: one quiet capsule down the right on a phone, the company's
+   * mark on top. The capsule is the floor under every label (≥ 62%).
+   */
   .cq-feed-rail {
     position: absolute;
-    right: 8px;
+    right: 6px;
     bottom: 16px;
     display: flex;
+    width: 64px;
     flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 0 6px;
+    border-radius: 32px;
+    background: var(--cq-feed-scrim-floor);
+    transition: opacity var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-feed-rail-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding-bottom: 4px;
+    color: var(--cq-stage-text);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .cq-feed-rail-profile img,
+  .cq-feed-rail-profile [data-entity-avatar] {
+    box-shadow: 0 0 0 2px var(--cq-stage-text);
   }
   .cq-feed-rail-button {
     display: inline-flex;
-    width: 72px;
+    width: 64px;
     min-height: 56px;
     height: auto;
     flex-direction: column;
     gap: 2px;
-    padding: 6px 4px;
-    font-size: 12px;
+    padding: 6px 2px;
+    border-radius: 16px;
+    background: transparent;
+    color: var(--cq-stage-text);
+    font-size: 11px;
     text-align: center;
   }
-  /* The label wraps inside the 72 px column (the button itself is nowrap). */
+  /* The label wraps inside the 64 px column (the button itself is nowrap). */
   .cq-feed-rail-label {
     white-space: normal;
     line-height: 1.2;
   }
-  /* Legible over any frame of a pitch, without a box around each control.
-     A dark halo in the stage's own colour (not light, so not a glow): a
-     white title slide swallowed the 1-2 px shadow (playback check
-     2026-10-03). */
-  /* The scrim is for video (ADR 0017): each control carries a small dark
-     one, so a bright frame never swallows it. */
-  @media (max-width: 1023px) {
-    .cq-feed-rail .cq-feed-rail-button {
-      border-radius: 14px;
-      background: color-mix(in oklch, var(--cq-stage-canvas) 55%, transparent);
-    }
-  }
-  .cq-feed-rail .cq-feed-rail-label {
-    text-shadow:
-      0 0 2px var(--cq-stage-canvas),
-      0 1px 3px var(--cq-stage-canvas),
-      0 0 8px var(--cq-stage-canvas);
-  }
   .cq-feed-rail-button > svg {
     flex: none;
-    filter: drop-shadow(0 0 1px var(--cq-stage-canvas))
-      drop-shadow(0 1px 3px var(--cq-stage-canvas));
   }
-  /* A landscape pitch is shown whole on the portrait stage, never cropped
-     to a sliver of its middle. */
-  .cq-feed-player[data-orientation="landscape"] .cq-feed-video {
-    object-fit: contain;
+
+  /* The progress bar, on the seam (Discover v2). */
+  .cq-scrubber {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 3;
+    height: 28px;
+    cursor: pointer;
+    touch-action: none;
+    outline: none;
   }
+  .cq-scrubber-track {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: color-mix(in oklch, var(--cq-stage-text) 24%, transparent);
+    transition: height var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-scrubber[data-state="paused"] .cq-scrubber-track,
+  .cq-scrubber:hover .cq-scrubber-track,
+  .cq-scrubber:focus-visible .cq-scrubber-track {
+    height: 4px;
+  }
+  .cq-scrubber[data-state="dragging"] .cq-scrubber-track {
+    height: 6px;
+  }
+  .cq-scrubber:focus-visible .cq-scrubber-track {
+    outline: 2px solid var(--cq-stage-accent);
+    outline-offset: 4px;
+  }
+  .cq-scrubber-buffered,
+  .cq-scrubber-fill {
+    position: absolute;
+    inset: 0;
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+  .cq-scrubber-buffered {
+    background: color-mix(in oklch, var(--cq-stage-text) 45%, transparent);
+  }
+  .cq-scrubber-fill {
+    background: var(--cq-stage-text);
+  }
+  .cq-scrubber-thumb {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-stage-text);
+    box-shadow: 0 1px 4px
+      color-mix(in oklch, var(--cq-stage-canvas) 60%, transparent);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+    transition:
+      opacity var(--cq-motion-fast) var(--cq-ease),
+      transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-scrubber[data-state="paused"] .cq-scrubber-thumb {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  .cq-scrubber[data-state="dragging"] .cq-scrubber-thumb {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+  .cq-scrubber-readout {
+    position: absolute;
+    bottom: 120px;
+    left: 50%;
+    color: var(--cq-stage-text);
+    font-variant-numeric: tabular-nums;
+    text-shadow: var(--cq-feed-halo);
+    white-space: nowrap;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .cq-scrubber-now {
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .cq-scrubber-total {
+    font-size: 20px;
+    font-weight: 500;
+    color: color-mix(in oklch, var(--cq-stage-text) 90%, transparent);
+  }
+
+  /* Clear display hides everything over the pitch until a tap; dragging
+     the progress bar hides the rest so the frame shows. */
+  .cq-feed[data-clear-display]
+    :is(
+      .cq-feed-overlay,
+      .cq-feed-player-controls,
+      .cq-feed-filter,
+      .cq-feed-nav,
+      .cq-scrubber
+    ),
+  .cq-feed[data-clear-display] .cq-feed-stage::before,
+  .cq-feed[data-scrubbing]
+    :is(
+      .cq-feed-overlay,
+      .cq-feed-player-controls,
+      .cq-feed-filter,
+      .cq-feed-nav
+    ),
+  .cq-feed[data-scrubbing] .cq-feed-stage::before,
+  .cq-discover:has([data-clear-display], [data-scrubbing]) .cq-discover-tabs {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .cq-discover-tabs,
+  .cq-feed-filter,
+  .cq-feed-nav,
+  .cq-feed-player-controls {
+    transition: opacity var(--cq-motion-base) var(--cq-ease);
+  }
+
   .cq-feed-nav {
     position: absolute;
-    top: calc(12px + var(--cq-safe-top));
+    top: 50%;
     right: 12px;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
+    transform: translateY(-50%);
+  }
+  /* On a phone the swipe is the move; the explicit Previous and Next stay
+     reachable by keyboard and switch access, shown when focused. */
+  @media (max-width: 1023px) {
+    .cq-feed-nav:not(:focus-within) {
+      clip-path: inset(50%);
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
+    .cq-feed-nav {
+      top: calc(56px + var(--cq-safe-top));
+      transform: none;
+    }
   }
   .cq-feed-nav-button {
     display: inline-flex;
@@ -1148,7 +1532,7 @@
     justify-content: center;
     border: 1px solid var(--cq-stage-border);
     border-radius: var(--cq-radius-full);
-    background: var(--cq-stage-surface);
+    background: var(--cq-stage-surface-strong);
     color: var(--cq-stage-text);
     cursor: pointer;
   }
@@ -1156,12 +1540,12 @@
     opacity: 0.4;
     cursor: default;
   }
-  /* Discover filters on a phone: one control beside the feed nav, on
-     stage tokens, so the pitch keeps its clean overlay. */
+  /* Discover filters on a phone: one control top right, on stage tokens. */
   .cq-feed-filter {
     position: absolute;
-    top: calc(12px + var(--cq-safe-top));
-    right: 64px;
+    top: calc(4px + var(--cq-safe-top));
+    right: 4px;
+    z-index: 2;
   }
   .cq-feed-filter-button {
     position: relative;
@@ -1170,23 +1554,149 @@
     height: 44px;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--cq-stage-border);
+    border: none;
     border-radius: var(--cq-radius-full);
-    background: var(--cq-stage-surface);
+    background: transparent;
     color: var(--cq-stage-text);
     cursor: pointer;
+    filter: drop-shadow(0 0 2px var(--cq-stage-canvas));
   }
   .cq-feed-filter-button > span {
     position: absolute;
     top: -4px;
     right: -4px;
   }
+  .cq-feed-keys {
+    display: none;
+  }
+
+  /* The options sheet's switch: the state is also the word (aria-checked). */
+  .cq-switch {
+    position: relative;
+    width: 44px;
+    height: 26px;
+    flex: none;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-strong);
+    transition: background-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-raised);
+    box-shadow: 0 1px 2px
+      color-mix(in oklch, var(--cq-text-primary) 30%, transparent);
+    transition: transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-switch[data-on] {
+    background: var(--cq-accent);
+  }
+  .cq-switch[data-on]::after {
+    transform: translateX(18px);
+  }
+
+  /* Loading: the feed's own shape (Discover v2), never a sentence. */
+  .cq-skeleton {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    background: var(--cq-stage-surface);
+  }
+  .cq-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 35%,
+      color-mix(in oklch, var(--cq-stage-text) 4%, transparent) 50%,
+      transparent 65%
+    );
+    transform: translateX(-100%);
+    animation: cq-skeleton-sweep 1.6s var(--cq-ease) infinite;
+  }
+  @keyframes cq-skeleton-sweep {
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-skeleton::after {
+      animation: none;
+      opacity: 0;
+    }
+    .cq-feed-ring {
+      animation-duration: 2.4s;
+    }
+  }
+  .cq-skeleton-poster {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in oklch, var(--cq-stage-text) 4%, transparent);
+  }
+  .cq-skeleton-rail {
+    position: absolute;
+    right: 6px;
+    bottom: 16px;
+    z-index: 2;
+    display: flex;
+    width: 64px;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 0;
+  }
+  .cq-skeleton-rail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .cq-skeleton-dot {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--cq-radius-full);
+  }
+  .cq-skeleton-dot-lg {
+    width: 44px;
+    height: 44px;
+  }
+  .cq-skeleton-bar {
+    height: 12px;
+    border-radius: 6px;
+  }
+  .cq-skeleton-bar-xs {
+    width: 32px;
+    height: 8px;
+  }
+  .cq-skeleton-bar-title {
+    width: 150px;
+    height: 18px;
+  }
+  .cq-skeleton-bar-line {
+    width: min(260px, 100%);
+  }
+  .cq-skeleton-bar-short {
+    width: min(200px, 80%);
+  }
+  .cq-skeleton-caption {
+    gap: 10px;
+    background: none;
+  }
+  .cq-skeleton-panel-only {
+    display: none;
+  }
 
   /*
    * Discover's two tabs (follow-55; founder decision 2026-10-04): "For
    * you" and "Your companies", like TikTok's For You and Following. In
-   * the page's flow by default; over the stage, top left, clear of the
-   * filter and up/down controls, whenever the tab showing is immersive.
+   * the page's flow by default; centred over the stage on a phone whenever
+   * the tab showing is immersive, beside the panel's top on a desktop.
    * The tab showing is underlined as well as brighter: never colour alone.
    */
   .cq-discover {
@@ -1218,18 +1728,21 @@
   .cq-discover:has(> div:not([hidden]) [data-feed-immersive]) .cq-discover-tabs,
   .cq-discover:has(> div[data-feed-immersive]:not([hidden])) .cq-discover-tabs {
     position: absolute;
-    top: calc(8px + var(--cq-safe-top));
-    left: 4px;
+    top: calc(4px + var(--cq-safe-top));
+    left: 50%;
     z-index: var(--cq-z-sticky);
     padding: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
   }
   .cq-discover:has(> div:not([hidden]) [data-feed-immersive]) .cq-discover-tab,
   .cq-discover:has(> div[data-feed-immersive]:not([hidden])) .cq-discover-tab {
-    color: var(--cq-stage-text-muted);
-    text-shadow:
+    color: color-mix(in oklch, var(--cq-stage-text) 90%, transparent);
+    text-shadow: var(
+      --cq-feed-halo-tabs,
       0 0 2px var(--cq-stage-canvas),
-      0 1px 3px var(--cq-stage-canvas),
-      0 0 8px var(--cq-stage-canvas);
+      0 1px 3px var(--cq-stage-canvas)
+    );
   }
   .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
     .cq-discover-tab[aria-pressed="true"],
@@ -1239,10 +1752,8 @@
   }
 
   /*
-   * Your companies (follow-55): one company per screen, snapping like the
-   * feed, on the stage tokens in either theme. The pitch fills the card on
-   * a phone with the company over a scrim; on a desktop the 9:16 stage and
-   * the panel sit side by side, as on For you.
+   * Your companies (follow-55; Discover v2): one company per screen,
+   * snapping like the feed, with the same caption, rail and progress bar.
    */
   .cq-yours-feed {
     --cq-text-primary: var(--cq-stage-text);
@@ -1250,6 +1761,19 @@
     --cq-text-tertiary: var(--cq-stage-text-muted);
     --cq-surface: var(--cq-stage-canvas);
     --cq-border-subtle: var(--cq-stage-border);
+    --cq-feed-scrim-floor: color-mix(
+      in oklch,
+      var(--cq-stage-canvas) 62%,
+      transparent
+    );
+    --cq-feed-scrim-deep: color-mix(
+      in oklch,
+      var(--cq-stage-canvas) 76%,
+      transparent
+    );
+    --cq-feed-halo:
+      0 0 2px color-mix(in oklch, var(--cq-stage-canvas) 70%, transparent),
+      0 1px 3px color-mix(in oklch, var(--cq-stage-canvas) 60%, transparent);
     color-scheme: dark;
     height: calc(100svh - var(--cq-bottom-nav-height) - var(--cq-safe-bottom));
     overflow-y: auto;
@@ -1257,6 +1781,7 @@
     scroll-snap-type: y mandatory;
     background: var(--cq-stage-canvas);
     color: var(--cq-stage-text);
+    -webkit-touch-callout: none;
   }
   .cq-yours-empty {
     display: flex;
@@ -1271,6 +1796,20 @@
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }
+  .cq-yours-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 1;
+    height: calc(112px + var(--cq-safe-top));
+    background: linear-gradient(
+      to bottom,
+      var(--cq-feed-scrim-floor) 0,
+      var(--cq-feed-scrim-floor) calc(52px + var(--cq-safe-top)),
+      transparent 100%
+    );
+    pointer-events: none;
+  }
   .cq-yours-media {
     position: absolute;
     inset: 0;
@@ -1280,18 +1819,47 @@
   .cq-yours-info {
     position: absolute;
     inset: auto 0 0 0;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: 48px 16px 16px;
+    padding: 40px 84px 20px 16px;
     background: linear-gradient(
       to top,
-      var(--cq-stage-canvas) 0%,
-      color-mix(in oklch, var(--cq-stage-canvas) 92%, transparent)
-        calc(100% - 48px),
+      var(--cq-feed-scrim-deep) 0%,
+      var(--cq-feed-scrim-floor) calc(100% - 40px),
       transparent 100%
     );
+    text-shadow: var(--cq-feed-halo);
   }
+  .cq-yours-chip {
+    display: inline-flex;
+    min-height: 26px;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 0 10px;
+    border: 1px solid var(--cq-stage-border);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-stage-surface-strong);
+    font-size: 12px;
+    font-weight: 600;
+    text-shadow: none;
+  }
+  .cq-yours-card[data-clear-display]
+    :is(.cq-yours-info, .cq-feed-rail, .cq-feed-player-controls, .cq-scrubber),
+  .cq-yours-card[data-clear-display]::before,
+  .cq-yours-card[data-scrubbing]
+    :is(.cq-yours-info, .cq-feed-rail, .cq-feed-player-controls),
+  .cq-discover:has(
+      .cq-yours-card[data-clear-display],
+      .cq-yours-card[data-scrubbing]
+    )
+    .cq-discover-tabs {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   @media (min-width: 1024px) {
     .cq-yours-feed {
       height: 100dvh;
@@ -1299,23 +1867,67 @@
     .cq-yours-card {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 440px;
-      gap: 24px;
-      padding: 24px;
+      container-type: size;
+      --cq-feed-video-h: min(
+        calc(100cqh - 48px),
+        calc((100cqw - 440px - 232px) * 16 / 9)
+      );
+    }
+    .cq-yours-card::before {
+      display: none;
     }
     .cq-yours-media {
       position: relative;
       inset: auto;
+      align-self: center;
       justify-self: center;
-      height: calc(100dvh - 48px);
+      height: var(--cq-feed-video-h);
       aspect-ratio: 9 / 16;
       border: 1px solid var(--cq-stage-border);
       border-radius: var(--cq-radius-lg);
     }
     .cq-yours-info {
       position: static;
-      align-self: center;
-      padding: 0;
-      background: none;
+      align-self: stretch;
+      justify-content: center;
+      gap: 10px;
+      padding: 72px 28px 28px;
+      background: var(--cq-app-canvas);
+      border-left: 1px solid var(--cq-app-border-subtle);
+      color: var(--cq-app-text-primary);
+      text-shadow: none;
+      --cq-canvas: var(--cq-app-canvas);
+      --cq-surface: var(--cq-app-surface);
+      --cq-surface-raised: var(--cq-app-surface-raised);
+      --cq-surface-subtle: var(--cq-app-surface-subtle);
+      --cq-surface-strong: var(--cq-app-surface-strong);
+      --cq-border: var(--cq-app-border);
+      --cq-border-subtle: var(--cq-app-border-subtle);
+      --cq-border-strong: var(--cq-app-border-strong);
+      --cq-text-primary: var(--cq-app-text-primary);
+      --cq-text-secondary: var(--cq-app-text-secondary);
+      --cq-text-tertiary: var(--cq-app-text-tertiary);
+      --cq-text-inverse: var(--cq-app-text-inverse);
+      --cq-accent: var(--cq-app-accent);
+      --cq-accent-hover: var(--cq-app-accent-hover);
+      --cq-accent-soft: var(--cq-app-accent-soft);
+      color-scheme: light dark;
+    }
+    /* The rail beside the pitch keeps the stage's own tokens. */
+    .cq-yours-info .cq-feed-rail {
+      --cq-text-primary: var(--cq-stage-text);
+      --cq-text-secondary: var(--cq-stage-text-muted);
+      --cq-surface-subtle: var(--cq-stage-surface-strong);
+      --cq-surface-strong: var(--cq-stage-surface-strong);
+      --cq-accent: var(--cq-stage-accent);
+    }
+    .cq-yours-info .cq-feed-muted {
+      color: var(--cq-app-text-secondary);
+    }
+    .cq-yours-chip {
+      border-color: var(--cq-app-border);
+      background: var(--cq-app-surface-subtle);
+      color: var(--cq-app-text-primary);
     }
   }
 
@@ -1323,59 +1935,242 @@
     .cq-feed {
       height: 100dvh;
     }
-    /* The stage and the panel side by side; the stage is the pitch's own
-       9:16, the full height of the workspace less the gutters. */
     .cq-feed-stage {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 440px;
-      gap: 24px;
-      padding: 24px;
+      container-type: size;
+      user-select: auto;
+      /* The 9:16 stage's height: the workspace less its gutters, narrowed
+         when the column is too slim to leave room for the rail beside it. */
+      --cq-feed-video-h: min(
+        calc(100cqh - 48px),
+        calc((100cqw - 440px - 232px) * 16 / 9)
+      );
+    }
+    .cq-feed-stage::before {
+      display: none;
     }
     .cq-feed-media {
       position: relative;
       inset: auto;
+      align-self: center;
       justify-self: center;
-      height: calc(100dvh - 48px);
+      height: var(--cq-feed-video-h);
       aspect-ratio: 9 / 16;
       border: 1px solid var(--cq-stage-border);
       border-radius: var(--cq-radius-lg);
     }
+    .cq-scrubber {
+      right: 12px;
+      bottom: 6px;
+      left: 12px;
+    }
+    .cq-scrubber-track {
+      border-radius: 2px;
+      overflow: visible;
+    }
+    .cq-scrubber-readout {
+      bottom: 40px;
+    }
+    .cq-feed-center,
+    .cq-feed-paused,
+    .cq-feed-buffering {
+      left: 50%;
+    }
+    .cq-feed-center {
+      width: min(300px, calc(100% - 48px));
+    }
+    /* The intelligence panel: the app's own theme, a reading surface. */
     .cq-feed-overlay {
       position: static;
-      align-self: center;
-      max-height: calc(100dvh - 48px);
+      align-self: stretch;
+      overflow-y: auto;
+      gap: 16px;
+      padding: 72px 28px 20px;
+      border-left: 1px solid var(--cq-app-border-subtle);
+      background: var(--cq-app-canvas);
+      color: var(--cq-app-text-primary);
+      color-scheme: light dark;
+      --cq-canvas: var(--cq-app-canvas);
+      --cq-surface: var(--cq-app-surface);
+      --cq-surface-raised: var(--cq-app-surface-raised);
+      --cq-surface-subtle: var(--cq-app-surface-subtle);
+      --cq-surface-strong: var(--cq-app-surface-strong);
+      --cq-surface-sunken: var(--cq-app-surface-sunken);
+      --cq-border: var(--cq-app-border);
+      --cq-border-subtle: var(--cq-app-border-subtle);
+      --cq-border-strong: var(--cq-app-border-strong);
+      --cq-text-primary: var(--cq-app-text-primary);
+      --cq-text-secondary: var(--cq-app-text-secondary);
+      --cq-text-tertiary: var(--cq-app-text-tertiary);
+      --cq-text-inverse: var(--cq-app-text-inverse);
+      --cq-accent: var(--cq-app-accent);
+      --cq-accent-hover: var(--cq-app-accent-hover);
+      --cq-accent-soft: var(--cq-app-accent-soft);
+      --cq-q-light: var(--cq-app-q-light);
+      --cq-q-core: var(--cq-app-q-core);
+      --cq-q-bloom: var(--cq-app-q-bloom);
+      --cq-q-ember: var(--cq-app-q-ember);
+    }
+    .cq-feed-overlay:has([data-caption-open]) {
+      background: var(--cq-app-canvas);
+    }
+    .cq-feed-info,
+    .cq-feed-more-body {
+      text-shadow: none;
+    }
+    .cq-feed-muted,
+    .cq-feed-facts dt,
+    .cq-feed-fact-axis,
+    .cq-feed-fact-unknown {
+      color: var(--cq-text-secondary);
+    }
+    .cq-feed-card {
+      height: auto;
+      flex: 1 0 auto;
+    }
+    .cq-feed-panel-mark {
+      display: inline-flex;
+    }
+    .cq-feed-company h2 {
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+    .cq-feed-facts {
+      grid-template-columns: 110px minmax(0, 1fr);
+      row-gap: 0;
+      border-top: 1px solid var(--cq-border-subtle);
+    }
+    .cq-feed-facts dt,
+    .cq-feed-facts dd {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--cq-border-subtle);
+    }
+    /* The rail beside the 9:16 stage, on the stage's own tokens. */
+    .cq-feed-rail {
+      bottom: calc((100cqh - var(--cq-feed-video-h)) / 2 + 4px);
+      left: calc((100cqw - 440px) / 2 + var(--cq-feed-video-h) * 9 / 32 + 14px);
+      right: auto;
+      width: 72px;
+      gap: 6px;
       padding: 0;
       background: none;
-      overflow-y: auto;
-    }
-    .cq-feed-rail .cq-feed-rail-label,
-    .cq-feed-rail-button > svg {
-      text-shadow: none;
-      filter: none;
-    }
-    .cq-feed-card .cq-feed-info {
-      padding-right: 0;
-    }
-    .cq-feed-info .cq-body {
-      display: block;
-    }
-    .cq-feed-rail {
-      position: static;
-      flex-direction: row;
-      flex-wrap: wrap;
+      color: var(--cq-stage-text);
+      --cq-text-primary: var(--cq-stage-text);
+      --cq-text-secondary: var(--cq-stage-text-muted);
+      --cq-surface: var(--cq-stage-surface);
+      --cq-surface-subtle: var(--cq-stage-surface-strong);
+      --cq-surface-strong: var(--cq-stage-surface-strong);
+      --cq-border: var(--cq-stage-border);
+      --cq-accent: var(--cq-stage-accent);
     }
     .cq-feed-rail-button {
-      width: auto;
-      min-height: 44px;
-      flex-direction: row;
-      gap: 8px;
-      padding: 0 14px;
-      font-size: 14px;
+      width: 72px;
+      min-height: 64px;
+      padding: 2px;
+      background: transparent;
+      color: var(--cq-stage-text);
     }
+    .cq-feed-rail-button:hover {
+      background: transparent;
+    }
+    .cq-feed-rail-button > svg {
+      box-sizing: content-box;
+      padding: 12px;
+      border-radius: var(--cq-radius-full);
+      background: var(--cq-stage-surface-strong);
+      transition: background-color var(--cq-motion-fast) var(--cq-ease);
+    }
+    .cq-feed-rail-button:hover > svg {
+      background: color-mix(in oklch, var(--cq-stage-text) 20%, transparent);
+    }
+    /* Previous and Next at the top of the stage's column, clear of the
+       rail beside the pitch. */
     .cq-feed-nav {
-      top: 50%;
-      right: calc(440px + 48px);
-      transform: translateY(-50%);
+      top: 24px;
+      right: calc(440px + 16px);
+      transform: none;
+    }
+    .cq-feed-keys {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--cq-border-subtle);
+      color: var(--cq-text-secondary);
+      font-size: 12.5px;
+      list-style: none;
+    }
+    .cq-feed-keys kbd {
+      display: inline-grid;
+      min-width: 22px;
+      height: 22px;
+      margin-right: 3px;
+      place-items: center;
+      padding: 0 5px;
+      border: 1px solid var(--cq-border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--cq-surface);
+      color: var(--cq-text-primary);
+      font: inherit;
+      font-size: 11.5px;
+    }
+    .cq-skeleton-rail {
+      bottom: calc((100cqh - var(--cq-feed-video-h)) / 2 + 4px);
+      left: calc((100cqw - 440px) / 2 + var(--cq-feed-video-h) * 9 / 32 + 14px);
+      right: auto;
+      width: 72px;
+    }
+    .cq-skeleton-dot {
+      width: 48px;
+      height: 48px;
+    }
+    .cq-skeleton-caption {
+      --cq-stage-surface: var(--cq-app-surface-strong);
+      --cq-stage-text: var(--cq-app-text-primary);
+    }
+    .cq-skeleton-panel-only {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .cq-skeleton-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .cq-skeleton-pill {
+      width: 140px;
+      height: 44px;
+      border-radius: var(--cq-radius-full);
+    }
+    .cq-skeleton-pill-sm {
+      width: 100px;
+    }
+    /* The tabs sit at the top of the panel on a desktop, in its theme. */
+    .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
+      .cq-discover-tabs,
+    .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
+      .cq-discover-tabs {
+      top: 16px;
+      left: calc(100% - 440px + 22px);
+      transform: none;
+    }
+    .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
+      .cq-discover-tab,
+    .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
+      .cq-discover-tab {
+      color: var(--cq-app-text-secondary);
+      text-shadow: none;
+    }
+    .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
+      .cq-discover-tab[aria-pressed="true"],
+    .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
+      .cq-discover-tab[aria-pressed="true"] {
+      color: var(--cq-app-text-primary);
     }
   }
 
@@ -1635,8 +2430,7 @@
    * 2026-10-03: a light rail beside the dark stage read as two apps).
    */
   .cq-stage,
-  .cq-shell:has(.cq-q-home) .cq-shell-sidebar,
-  .cq-shell:has([data-feed-immersive]) .cq-shell-sidebar {
+  .cq-shell:has(.cq-q-home) .cq-shell-sidebar {
     background: var(--cq-stage-canvas);
     color: var(--cq-stage-text);
     color-scheme: dark;

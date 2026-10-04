@@ -50,7 +50,7 @@ const PUBLIC = exempt(
   "public or anonymous surface (Q Card by handle/code, GateQ applicant): no signed-in Q session",
 );
 const PLAYER = exempt(
-  "the video player's own signed playback and captions: bytes go browser <-> CDN; Q reads transcripts with get_pitch_moment",
+  "the video player's own signed playback, captions and (ADR 0047) signed download link: bytes go browser <-> CDN; Q reads transcripts with get_pitch_moment and sets downloads with set_pitch_sharing",
 );
 const DOWNLOAD = exempt(
   "a document's render or file download (PDF/PPTX, slides, a version), linked from its card; Q lists documents (list_my_documents) and the card carries the downloads",
@@ -354,6 +354,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_SYNC_SUFFIX}`": PLAYER,
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_SUFFIX}`":
+    PLAYER,
+  "api/http/media.ts GET `${pitch}/:mediaAssetId${MEDIA_DOWNLOAD_SUFFIX}`":
     PLAYER,
   "api/http/media.ts GET `${pitch}/:mediaAssetId${MEDIA_TRANSCRIPT_SUFFIX}`":
     cap("tool.get_pitch_moment"),

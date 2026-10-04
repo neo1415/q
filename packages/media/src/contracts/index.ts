@@ -256,6 +256,11 @@ export type MediaAsset = {
   readonly title: string | null;
   /** Who beyond the owner may watch it once publishable (ADR 0021). */
   readonly audience: PitchAudience;
+  /**
+   * Whether viewers the playback rule admits may also save a copy (ADR
+   * 0047). False unless the owner turned it on (doc 20 §219).
+   */
+  readonly downloadable: boolean;
   /** Lineage: the asset this one replaced. Replacement never overwrites. */
   readonly replacesMediaAssetId: MediaAssetId | null;
   /** Set when a successor replaced this asset. Superseded is not deleted. */
@@ -299,6 +304,8 @@ export type MediaAssetDto = {
   readonly moderationStatus: ModerationStatus;
   readonly title: string | null;
   readonly audience: PitchAudience;
+  /** ADR 0047: investors who may watch it may also save a copy. */
+  readonly downloadable: boolean;
   /** False once another video replaced it, or it was deleted. */
   readonly live: boolean;
   readonly replacesMediaAssetId: string | null;
@@ -320,6 +327,7 @@ export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
     moderationStatus: asset.moderationStatus,
     title: asset.title,
     audience: asset.audience,
+    downloadable: asset.downloadable,
     live: asset.deletedAt === null && asset.supersededAt === null,
     replacesMediaAssetId: asset.replacesMediaAssetId,
     createdAt: asset.createdAt,
@@ -392,6 +400,8 @@ export type DiscoverablePitch = {
   readonly captionState: CaptionState;
   readonly title: string | null;
   readonly audience: PitchAudience;
+  /** ADR 0047: the owner lets viewers save a copy. */
+  readonly downloadable: boolean;
 };
 
 /**
@@ -430,6 +440,7 @@ export function toDiscoverablePitch(
     captionState: asset.captionState,
     title: asset.title,
     audience: asset.audience,
+    downloadable: asset.downloadable,
   };
 }
 
@@ -444,6 +455,7 @@ export function pitchSummary(pitch: DiscoverablePitch): {
   readonly durationSeconds: number | null;
   readonly captionState: CaptionState;
   readonly title: string | null;
+  readonly downloadAllowed: boolean;
 } {
   return {
     mediaAssetId: pitch.mediaAssetId,
@@ -451,6 +463,9 @@ export function pitchSummary(pitch: DiscoverablePitch): {
     durationSeconds: pitch.durationSeconds,
     captionState: pitch.captionState,
     title: pitch.title,
+    // Whether the menu offers Download. A hint for the menu only: the
+    // download endpoint decides again on every request.
+    downloadAllowed: pitch.downloadable,
   };
 }
 

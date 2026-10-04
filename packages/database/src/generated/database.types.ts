@@ -3257,6 +3257,7 @@ export type Database = {
           created_at: string
           created_by_user_id: string
           deleted_at: string | null
+          downloadable: boolean
           duration_seconds: number | null
           height: number | null
           id: string
@@ -3286,6 +3287,7 @@ export type Database = {
           created_at?: string
           created_by_user_id: string
           deleted_at?: string | null
+          downloadable?: boolean
           duration_seconds?: number | null
           height?: number | null
           id?: string
@@ -3315,6 +3317,7 @@ export type Database = {
           created_at?: string
           created_by_user_id?: string
           deleted_at?: string | null
+          downloadable?: boolean
           duration_seconds?: number | null
           height?: number | null
           id?: string

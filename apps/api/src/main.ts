@@ -1461,6 +1461,40 @@ const { app, logger } = createApp(config, security, {
     // The feed's one batched pitch read per page (CQ-MEDIA-012), through
     // the Media context's port: discovery never touches media tables.
     pitches: discoverablePitches,
+    // Discover v2: each card's sector and, only where disclosure lets this
+    // reader view it, the raise (the same reads the profile and the raise
+    // filter use). A raise is the founder's statement and says so; there
+    // is no traction figure because nothing declared and network-visible
+    // carries one, and unknown stays unknown.
+    feedSummaries: async (actor, companyIds) => {
+      const [raises, sectors] = await Promise.all([
+        discoverFilterFacts.disclosedRaises === undefined
+          ? new Map<string, { amount: string; currency: string }>()
+          : discoverFilterFacts.disclosedRaises({ actor, companyIds }),
+        companySectors.sectors === undefined
+          ? new Map<string, readonly string[]>()
+          : companySectors.sectors(companyIds),
+      ]);
+      return new Map(
+        companyIds.map((companyId) => {
+          const raise = raises.get(companyId);
+          return [
+            companyId,
+            {
+              sectorNodeIds: [...(sectors.get(companyId) ?? [])].slice(0, 8),
+              raise:
+                raise === undefined
+                  ? null
+                  : {
+                      money: { amount: raise.amount, currency: raise.currency },
+                      truthClass: "USER_CLAIM" as const,
+                      evidenceStatus: "SELF_REPORTED" as const,
+                    },
+            },
+          ] as const;
+        }),
+      );
+    },
     // Founders' network videos (ADR 0021): the media read, then the same
     // disclosure-checked company read the network preview uses.
     networkPitches: createPostgresNetworkPitchQueryPort({ sql: database.sql }),

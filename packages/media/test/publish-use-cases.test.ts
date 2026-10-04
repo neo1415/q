@@ -86,6 +86,7 @@ function ready(overrides: Partial<MediaAsset> = {}): MediaAsset {
     moderationStatus: "NOT_REVIEWED",
     title: null,
     audience: "INVESTORS",
+    downloadable: false,
     replacesMediaAssetId: null,
     supersededAt: null,
     createdByUserId: FOUNDER,

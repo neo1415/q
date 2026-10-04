@@ -108,6 +108,7 @@ function asset(overrides: Partial<MediaAsset> = {}): MediaAsset {
     moderationStatus: "NOT_REVIEWED",
     title: null,
     audience: "INVESTORS",
+    downloadable: false,
     replacesMediaAssetId: null,
     supersededAt: null,
     createdByUserId: FOUNDER,
@@ -146,6 +147,10 @@ function memoryRepository(initial: MediaAsset) {
     findCurrentForOwner: () => Promise.resolve(row),
     countLiveForOwner: () => Promise.resolve(1),
     setDetails: () => Promise.resolve(row),
+    setDownloadable: (_tx, input) =>
+      Promise.resolve(
+        bump({ downloadable: input.downloadable }, input.expectedVersion),
+      ),
     listForOwner: () => Promise.resolve(row === null ? [] : [row]),
     transitionStatus: (_tx, input) =>
       Promise.resolve(
@@ -246,6 +251,15 @@ function scriptedProvider(script: {
         posterUrl:
           "https://edge.provider.example/signed-token/thumbnails/thumbnail.jpg",
         expiresAt: "2026-09-23T09:15:00.000Z",
+      });
+    },
+    createDownloadAuthorization: (input) => {
+      calls.push({ method: "createDownloadAuthorization", input });
+      return Promise.resolve({
+        status: "READY",
+        mediaAssetId: input.mediaAssetId,
+        downloadUrl: `https://edge.provider.example/dl-token/downloads/default.mp4?filename=${input.fileName}`,
+        expiresAt: "2026-09-23T09:05:00.000Z",
       });
     },
     deleteAsset: (providerAssetId) => {
@@ -1311,5 +1325,129 @@ describe("applyProviderStatusReport (verified webhook, CQ-MEDIA-012)", () => {
     });
     expect(synced.status).toBe("READY");
     expect(h.events).toHaveLength(events);
+  });
+});
+
+describe("downloads (ADR 0047)", () => {
+  const ready = (overrides: Partial<MediaAsset> = {}) =>
+    asset({
+      status: "READY",
+      provider: "CLOUDFLARE_STREAM",
+      providerAssetId: UID,
+      readyAt: "2026-09-23T09:05:00.000Z",
+      moderationStatus: "ALLOWED",
+      playbackPolicy: "AUTHORISED",
+      title: "Seed pitch / v2",
+      ...overrides,
+    });
+  const query = { companyId: COMPANY, mediaAssetId: ASSET_ID };
+
+  it("gives a viewer the playback rule admits a short-lived CDN link once the owner allows downloads", async () => {
+    const { provider, calls } = scriptedProvider({});
+    const h = harness({
+      asset: ready({ downloadable: true }),
+      provider,
+      viewable: true,
+    });
+    const answer = await h.service.authoriseDownload({
+      ...query,
+      actor: investor,
+    });
+    expect(answer.status).toBe("READY");
+    expect(calls).toEqual([
+      {
+        method: "createDownloadAuthorization",
+        input: {
+          mediaAssetId: ASSET_ID,
+          providerAssetId: UID,
+          accessMode: "AUTHORISED",
+          ttlSeconds: 300,
+          fileName: "Seed-pitch-v2-pitch.mp4",
+        },
+      },
+    ]);
+  });
+
+  it("refuses a watch-only pitch exactly as a pitch the viewer may not see (not found)", async () => {
+    const { provider, calls } = scriptedProvider({});
+    const h = harness({ asset: ready(), provider, viewable: true });
+    await expect(
+      h.service.authoriseDownload({ ...query, actor: investor }),
+    ).rejects.toBeInstanceOf(MediaAssetNotFoundError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses a downloadable pitch to a viewer the playback rule does not admit (another tenant)", async () => {
+    const { provider, calls } = scriptedProvider({});
+    const h = harness({
+      asset: ready({ downloadable: true }),
+      provider,
+      viewable: false,
+    });
+    await expect(
+      h.service.authoriseDownload({ ...query, actor: investor }),
+    ).rejects.toBeInstanceOf(MediaAssetNotFoundError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("lets the owner save their own pitch whatever the switch says", async () => {
+    const { provider } = scriptedProvider({});
+    const h = harness({ asset: ready(), provider });
+    const answer = await h.service.authoriseDownload({
+      ...query,
+      actor: founder,
+    });
+    expect(answer.status).toBe("READY");
+  });
+
+  it("the owner turns downloads on and off, versioned and audited", async () => {
+    const h = harness({ asset: ready() });
+    const on = await h.service.setPitchDownloadable({
+      actor: founder,
+      ...query,
+      downloadable: true,
+      expectedVersion: 1,
+      correlationId: CORRELATION,
+    });
+    expect(on.downloadable).toBe(true);
+    expect(on.version).toBe(2);
+    expect(h.audits).toHaveLength(1);
+    expect(h.audits[0]).toMatchObject({
+      actionType: "media.asset.downloadable_set",
+      metadata: { previousDownloadable: false, downloadable: true },
+    });
+    await expect(
+      h.service.setPitchDownloadable({
+        actor: founder,
+        ...query,
+        downloadable: false,
+        expectedVersion: 1,
+        correlationId: CORRELATION,
+      }),
+    ).rejects.toBeInstanceOf(MediaAssetConflictError);
+  });
+
+  it("refuses a member without media.manage, and anyone outside the owner's tenant", async () => {
+    const denied = harness({ asset: ready(), deny: ["media.manage"] });
+    await expect(
+      denied.service.setPitchDownloadable({
+        actor: founder,
+        ...query,
+        downloadable: true,
+        expectedVersion: 1,
+        correlationId: CORRELATION,
+      }),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
+    const stranger = harness({ asset: ready() });
+    await expect(
+      stranger.service.setPitchDownloadable({
+        actor: investor,
+        ...query,
+        downloadable: true,
+        expectedVersion: 1,
+        correlationId: CORRELATION,
+      }),
+    ).rejects.toThrow();
+    expect(stranger.repository.current()?.downloadable).toBe(false);
   });
 });

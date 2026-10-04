@@ -5,10 +5,12 @@ import {
   CorrelationIdSchema,
   createProblemDetails,
   MEDIA_CAPTIONS_VTT_SUFFIX,
+  MEDIA_DOWNLOAD_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_TRANSCRIPT_SUFFIX,
   MEDIA_SYNC_SUFFIX,
   parseContract,
+  PitchDownloadDtoSchema,
   PitchTranscriptDtoSchema,
   PlaybackAuthorizationDtoSchema,
   PROBLEM_CONTENT_TYPE,
@@ -235,6 +237,26 @@ function registerPitchRoutes(
           expiresAt: grant.authorization.expiresAt,
         }),
       );
+    },
+  );
+
+  // ADR 0047: a short-lived link to the pitch as a file. The playback
+  // rule, then the owner's download permission, decided here on every
+  // request; every refusal is the same not-found as playback's. The link
+  // is the CDN's: the browser fetches the bytes from it, never from us.
+  app.get(
+    `${pitch}/:mediaAssetId${MEDIA_DOWNLOAD_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const answer = await service.authoriseDownload({
+        actor,
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+      });
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(PitchDownloadDtoSchema.parse(answer));
     },
   );
 

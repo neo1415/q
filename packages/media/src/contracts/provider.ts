@@ -193,6 +193,45 @@ export const PlaybackAuthorizationSchema = z
   .strict();
 export type PlaybackAuthorization = z.infer<typeof PlaybackAuthorizationSchema>;
 
+/**
+ * Permission to save one pitch as a file (ADR 0047). Reaching this point
+ * means Capital Q has already decided this viewer may watch it AND that its
+ * owner allows downloads; the provider only turns that into a short-lived
+ * link that the browser fetches from the CDN directly.
+ */
+export const DownloadAuthorizationRequestSchema = z
+  .object({
+    mediaAssetId: MediaAssetIdSchema,
+    providerAssetId: ProviderAssetIdSchema,
+    accessMode: PlaybackPolicySchema,
+    ttlSeconds: z.number().int().min(30).max(3_600),
+    /** The saved file's name, already reduced to safe characters. */
+    fileName: z.string().regex(/^[A-Za-z0-9._-]{1,80}$/u),
+  })
+  .strict();
+export type DownloadAuthorizationRequest = z.infer<
+  typeof DownloadAuthorizationRequestSchema
+>;
+
+/**
+ * READY: a link to the file, valid until `expiresAt`. PREPARING: the
+ * provider is still making the file (first request for this pitch).
+ * The link is a short-lived secret, like a playback token: never logged,
+ * stored, or put in an event or audit record.
+ */
+export type DownloadAuthorization =
+  | {
+      readonly status: "READY";
+      readonly mediaAssetId: MediaAssetId;
+      readonly downloadUrl: string;
+      readonly expiresAt: string;
+    }
+  | {
+      readonly status: "PREPARING";
+      readonly mediaAssetId: MediaAssetId;
+      readonly percentComplete: number | null;
+    };
+
 // ---------------------------------------------------------------------------
 // The port
 // ---------------------------------------------------------------------------
@@ -211,6 +250,14 @@ export type VideoProvider = {
   readonly createPlaybackAuthorization: (
     input: PlaybackAuthorizationRequest,
   ) => Promise<PlaybackAuthorization>;
+  /**
+   * ADR 0047: a short-lived link to the pitch as a file. Idempotent: asking
+   * again while the file is being made answers PREPARING. Absent when the
+   * provider cannot serve downloads.
+   */
+  readonly createDownloadAuthorization?:
+    | ((input: DownloadAuthorizationRequest) => Promise<DownloadAuthorization>)
+    | undefined;
   /** Idempotent: deleting an asset the provider no longer has is success. */
   readonly deleteAsset: (providerAssetId: string) => Promise<void>;
   /**

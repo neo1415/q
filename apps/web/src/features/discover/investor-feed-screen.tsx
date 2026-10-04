@@ -61,6 +61,16 @@ import { useInvestorFeed } from "./feed/use-investor-feed";
 import type { PlaybackSource } from "./player/pitch-playback";
 import { attachHlsOrNativeSource } from "./player/hls-source";
 import { PitchPlayer } from "./player/pitch-player";
+import { FeedSkeleton } from "./stage/feed-skeleton";
+import { useLongPress } from "./stage/long-press";
+import { useOnline } from "./stage/online";
+import { PitchOptionsSheet } from "./stage/pitch-options";
+import {
+  rateLabel,
+  stepPlaybackRate,
+  usePlaybackRate,
+} from "./stage/playback-rate";
+import { PitchScrubber, SEEK_STEP_SECONDS, seekBy } from "./stage/scrubber";
 import {
   SPLASH_DONE_EVENT,
   splashShowing,
@@ -74,6 +84,8 @@ import {
   usePitchPlayback,
   useReducedMotionPreference,
 } from "./player/use-pitch-playback";
+
+const useRate = usePlaybackRate;
 
 /** One swipe's settle (spec §9.3); instant under reduced motion. */
 const SETTLE_MS = 280;
@@ -153,9 +165,22 @@ function FeedMedia({
   initialAuthorization,
   mediaRef,
   paused,
+  rate,
+  captionsOn,
+  offline,
+  onActiveElement,
+  scrubber,
 }: {
   /** The person paused the card in view with a tap. */
   readonly paused: boolean;
+  /** The viewer's speed and captions, for every player (client-only). */
+  readonly rate: number;
+  readonly captionsOn: boolean;
+  readonly offline: boolean;
+  /** The card in view's element, for the progress bar and the keys. */
+  readonly onActiveElement: (video: HTMLVideoElement | null) => void;
+  /** The progress bar, on the media layer's bottom edge. */
+  readonly scrubber: React.ReactNode;
   readonly initialAuthorization: PlaybackAuthorizationDto | null;
   readonly items: readonly DiscoveredCompanyDto[];
   readonly index: number;
@@ -206,7 +231,7 @@ function FeedMedia({
                 {item.canonicalName}
               </span>
               <span className="cq-caption text-(--cq-text-secondary)">
-                No pitch video yet
+                No pitch to show yet
               </span>
             </div>
           ) : (
@@ -225,6 +250,10 @@ function FeedMedia({
                   ? initialAuthorization
                   : null
               }
+              rate={rate}
+              captionsOn={captionsOn}
+              offline={offline}
+              {...(offset === 0 ? { onElement: onActiveElement } : {})}
             />
           )}
         </div>
@@ -232,14 +261,11 @@ function FeedMedia({
       {paused ? (
         // Where the tap was answered. The tap region itself is the control,
         // so this is a picture of the state, not a second button.
-        <span
-          aria-hidden="true"
-          data-feed-paused
-          className="pointer-events-none absolute top-1/2 left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-(--cq-stage-surface) text-(--cq-stage-text)"
-        >
-          <Play size={28} strokeWidth={ICON_STROKE} />
+        <span aria-hidden="true" data-feed-paused className="cq-feed-paused">
+          <Play size={30} strokeWidth={ICON_STROKE} fill="currentColor" />
         </span>
       ) : null}
+      {scrubber}
       {warm.map((item) => (
         <PosterWarmer
           key={item.companyId}
@@ -327,6 +353,10 @@ export function InvestorFeedScreen({
   readonly sectors?: readonly SectorOption[];
 } = {}) {
   const discoverFilters = useDiscoverFilters(sectors);
+  const sectorLabels = useMemo(
+    () => new Map(sectors.map((sector) => [sector.nodeId, sector.label])),
+    [sectors],
+  );
   const { filters, setFilters, clear, notice } = discoverFilters;
   const [sheetOpen, setSheetOpen] = useState(false);
   const unfiltered = isEmptyDiscoverFilters(filters);
@@ -353,6 +383,7 @@ export function InvestorFeedScreen({
         initial={unfiltered ? initial : null}
         filters={unfiltered ? null : filters}
         controls={controls}
+        sectorLabels={sectorLabels}
       />
       <DiscoverFilterSheet
         filters={filters}
@@ -379,10 +410,12 @@ function InvestorFeed({
   initial,
   filters,
   controls,
+  sectorLabels,
 }: {
   readonly initial: InvestorFeedInitial | null;
   readonly filters: DiscoverFilters | null;
   readonly controls: FeedFilterControls;
+  readonly sectorLabels: ReadonlyMap<string, string>;
 }) {
   const transport = useMemo(() => actionFeedTransport(filters), [filters]);
   const reducedMotion = useReducedMotionPreference();
@@ -540,6 +573,23 @@ function InvestorFeed({
   const voiceOpen = session?.voice.active === true;
   const effectiveMuted = muted || qOpen || qSpeaking || voiceOpen;
 
+  /*
+   * Discover v2, all client-only and never sent anywhere: the element of
+   * the card in view (for the progress bar, speed and the seek keys), the
+   * viewer's speed, captions, the options sheet, Clear display, and
+   * whether the browser has any network at all.
+   */
+  const [activeVideo, setActiveVideo] = useState<HTMLVideoElement | null>(null);
+  const [rate, setRate] = useRate();
+  const [captionsOn, setCaptionsOn] = useState(true);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [clearDisplay, setClearDisplay] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
+  const online = useOnline();
+  const openOptions = useCallback(() => setOptionsOpen(true), []);
+  const longPress = useLongPress(openOptions);
+  const [rateNote, setRateNote] = useState<string | null>(null);
+
   /** Space plays or pauses the pitch in view; the element is the truth. */
   const togglePlay = useCallback(() => {
     const video = stageRef.current?.querySelector<HTMLVideoElement>(
@@ -557,6 +607,9 @@ function InvestorFeed({
    */
   const onStageClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
+      // The click that ends a long press opened the options; it is not
+      // also a pause.
+      if (longPress.consumed()) return;
       const target = event.target;
       if (
         !(target instanceof Element) ||
@@ -564,9 +617,14 @@ function InvestorFeed({
         // reach this handler through React but are not on the pitch.
         !event.currentTarget.contains(target) ||
         target.closest(
-          "button, a, input, textarea, select, [role='button'], .cq-feed-overlay, .cq-feed-nav, .cq-feed-player-controls",
+          "button, a, input, textarea, select, [role='button'], [role='slider'], .cq-feed-overlay, .cq-feed-nav, .cq-feed-player-controls",
         ) !== null
       ) {
+        return;
+      }
+      // With the display cleared, a tap brings it back and does nothing else.
+      if (clearDisplay) {
+        setClearDisplay(false);
         return;
       }
       const video = stageRef.current?.querySelector<HTMLVideoElement>(
@@ -581,7 +639,7 @@ function InvestorFeed({
         setPausedAt(index);
       }
     },
-    [index],
+    [index, clearDisplay, longPress],
   );
 
   // Wheel and trackpad: one item per gesture (spec §9.3).
@@ -658,9 +716,28 @@ function InvestorFeed({
       } else if (event.key === "m") {
         event.preventDefault();
         setMuted((current) => !(current ?? reducedMotion));
+      } else if (
+        (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+        activeVideo !== null
+      ) {
+        // Back or forward through the pitch; j and k stay next/previous
+        // (spec §9.3), so seeking is on the arrows beside them.
+        event.preventDefault();
+        seekBy(
+          activeVideo,
+          event.key === "ArrowLeft" ? -SEEK_STEP_SECONDS : SEEK_STEP_SECONDS,
+        );
+      } else if (event.key === "<" || event.key === ">") {
+        event.preventDefault();
+        const nextRate = stepPlaybackRate(rate, event.key === "<" ? -1 : 1);
+        setRate(nextRate);
+        setRateNote(`Speed ${rateLabel(nextRate)}`);
+      } else if (event.key === "c") {
+        event.preventDefault();
+        setCaptionsOn((on) => !on);
       }
     },
-    [next, previous, togglePlay, reducedMotion],
+    [next, previous, togglePlay, reducedMotion, activeVideo, rate, setRate],
   );
 
   // Q's moves on the feed (founder report 2026-09-30: "say next and it
@@ -884,7 +961,7 @@ function InvestorFeed({
     );
 
   if (feed.state.status === "LOADING_FIRST") {
-    return <p className="cq-status-line">Loading your recommendations…</p>;
+    return <FeedSkeleton label="Loading your recommendations" />;
   }
 
   if (
@@ -1036,10 +1113,16 @@ function InvestorFeed({
   }
 
   const decision = feed.decisionFor(card.companyId);
+  const shownPitch = withVideo(card).pitch;
   const policyByCompanyId = feed.prefetch.policyByCompanyId;
 
   return (
-    <div className="cq-stage cq-feed" data-feed-immersive>
+    <div
+      className="cq-stage cq-feed"
+      data-feed-immersive
+      data-clear-display={clearDisplay ? "" : undefined}
+      data-scrubbing={scrubbing ? "" : undefined}
+    >
       {/*
         Q looks at the card the person is looking at. Declaring it grants
         nothing — the Q API resolves and authorises the subject again.
@@ -1064,6 +1147,19 @@ function InvestorFeed({
         onKeyDown={onKeyDown}
         onWheel={onWheel}
         onClick={onStageClick}
+        {...longPress.handlers}
+        // A right-click on the pitch is the desktop's long press.
+        onContextMenu={(event) => {
+          const target = event.target;
+          if (
+            target instanceof Element &&
+            target.closest("a, button, input, .cq-feed-overlay") !== null
+          ) {
+            return;
+          }
+          event.preventDefault();
+          openOptions();
+        }}
         // Programmatically focusable, not a tab stop: the controls inside
         // are the tab stops, and the region only needs focus so its keys
         // work from the moment the feed appears.
@@ -1085,10 +1181,25 @@ function InvestorFeed({
           initialAuthorization={initialAuthorization}
           mediaRef={mediaRef}
           paused={tapPaused}
+          rate={rate}
+          captionsOn={captionsOn}
+          offline={!online}
+          onActiveElement={setActiveVideo}
+          scrubber={
+            card.pitch === null ? null : (
+              <PitchScrubber
+                key={`${card.companyId}:${card.pitch.mediaAssetId}`}
+                video={activeVideo}
+                durationSeconds={shownPitch?.durationSeconds}
+                companyName={card.canonicalName}
+                onScrubbingChange={setScrubbing}
+              />
+            )
+          }
         />
 
         <span className="sr-only" role="status">
-          {tapPaused ? "Paused" : ""}
+          {tapPaused ? "Paused" : (rateNote ?? "")}
         </span>
 
         {/* One compact control over the pitch; the row is the desktop's. */}
@@ -1098,14 +1209,14 @@ function InvestorFeed({
         </div>
 
         {/*
-          The scrim is always there on a phone (founder feedback,
-          2026-09-27): stage canvas, solid at the bottom and at least 92%
-          under every line of text, fading out only in the overlay's top
-          padding, so the words keep ≥4.5:1 whatever frame is behind them.
-          The stage is dark in both themes (ADR 0017), so the scrim is too.
-          On a desktop the panel sits beside the pitch, on the canvas.
+          The caption's scrim (ADR 0047, superseding the 92% block of
+          2026-09-27): stage canvas behind the words only, never under 62%
+          beneath any line of text, which keeps white text at 5.2:1 even on
+          a pure white frame, plus a text halo; the picture stays visible
+          everywhere else. Owned by .cq-feed-overlay in globals.css.
+          On a desktop the panel sits beside the pitch, in the app's theme.
         */}
-        <div className="cq-feed-overlay bg-[linear-gradient(to_top,var(--cq-stage-canvas)_0%,color-mix(in_oklch,var(--cq-stage-canvas)_92%,transparent)_calc(100%-48px),transparent_100%)] lg:bg-none">
+        <div className="cq-feed-overlay">
           {controls.row("hidden lg:flex")}
           <SavedAndPassedLinks className="hidden lg:flex" />
           <FeedCard
@@ -1146,6 +1257,8 @@ function InvestorFeed({
               next();
             }}
             onAskQ={() => setOpen(true)}
+            onMore={openOptions}
+            sectorLabels={sectorLabels}
             feedNotes={
               notes.length === 0 &&
               unverifiableLine === null &&
@@ -1170,6 +1283,7 @@ function InvestorFeed({
               )
             }
           />
+          <KeyHints />
         </div>
 
         {/*
@@ -1206,7 +1320,58 @@ function InvestorFeed({
           </button>
         </nav>
       </div>
+
+      {shownPitch === null ? null : (
+        <PitchOptionsSheet
+          open={optionsOpen}
+          onOpenChange={setOptionsOpen}
+          companyId={card.companyId}
+          companyName={card.canonicalName}
+          pitch={shownPitch}
+          rate={rate}
+          onRate={setRate}
+          captionsOn={captionsOn}
+          onCaptionsChange={setCaptionsOn}
+          onClearDisplay={() => setClearDisplay(true)}
+          onNotInterested={() => {
+            feed.pass(card.companyId);
+            next();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * The keys, said once beside the pitch on a desktop (Discover v2). Active
+ * only while the feed has focus (spec §9.3; WCAG 2.1.4).
+ */
+function KeyHints() {
+  return (
+    <ul className="cq-feed-keys" aria-label="Keyboard shortcuts">
+      <li>
+        <kbd>↑</kbd>
+        <kbd>↓</kbd> Previous, next
+      </li>
+      <li>
+        <kbd>Space</kbd> Pause
+      </li>
+      <li>
+        <kbd>←</kbd>
+        <kbd>→</kbd> Back, forward 5 s
+      </li>
+      <li>
+        <kbd>M</kbd> Sound
+      </li>
+      <li>
+        <kbd>&lt;</kbd>
+        <kbd>&gt;</kbd> Speed
+      </li>
+      <li>
+        <kbd>C</kbd> Captions
+      </li>
+    </ul>
   );
 }
 

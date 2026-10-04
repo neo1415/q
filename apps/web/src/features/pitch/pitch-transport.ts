@@ -107,6 +107,8 @@ export type PitchTransport = {
       readonly title: string | null;
       readonly audience: PitchAudience;
       readonly playbackPolicy?: "AUTHORISED" | "PRIVATE" | undefined;
+      /** ADR 0047: investors may also save a copy. Absent: unchanged. */
+      readonly downloadable?: boolean | undefined;
     },
     expectedVersion: number,
   ) => Promise<MediaAssetDto>;
@@ -198,6 +200,9 @@ export function apiPitchTransport(session: ApiSession): PitchTransport {
           ...(details.playbackPolicy === undefined
             ? {}
             : { playbackPolicy: details.playbackPolicy }),
+          ...(details.downloadable === undefined
+            ? {}
+            : { downloadable: details.downloadable }),
           expectedVersion,
         })
       ).pitch,

@@ -74,6 +74,11 @@ function buildApp(options: {
         "networkPitches" | "networkCompany" | "yourCompanies" | "mayPlay"
       >
     | undefined;
+  readonly feedSummaries?:
+    | NonNullable<
+        NonNullable<Parameters<typeof createApp>[2]>["discovery"]
+      >["feedSummaries"]
+    | undefined;
 }): { readonly app: FastifyInstance; readonly queries: PageCompaniesQuery[] } {
   const queries: PageCompaniesQuery[] = [];
   const slates: SlateReadService = {
@@ -101,6 +106,9 @@ function buildApp(options: {
         ? {}
         : { interactions: fakeInteractions(options.saved) }),
       ...(options.network ?? {}),
+      ...(options.feedSummaries === undefined
+        ? {}
+        : { feedSummaries: options.feedSummaries }),
     },
   });
   return { app, queries };
@@ -426,6 +434,7 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
             captionState: "NOT_REQUESTED",
             title: null,
             audience: "INVESTORS",
+            downloadable: false,
             more: [],
           },
         ],
@@ -442,6 +451,7 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
             captionState: "NOT_REQUESTED",
             title: null,
             audience: "INVESTORS",
+            downloadable: false,
             more: [],
           },
         ],
@@ -470,9 +480,70 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
       durationSeconds: 87,
       captionState: "NOT_REQUESTED",
       title: null,
+      downloadAllowed: false,
     });
     expect(body.items[1]?.pitch).toBeNull();
     expect(response.payload).not.toContain(FOREIGN);
+    await app.close();
+  });
+
+  it("places each card's summary as the composed read answered it, and an unknown raise stays null (Discover v2)", async () => {
+    const asked: string[][] = [];
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: twoItemPage,
+      feedSummaries: (_actor, companyIds) => {
+        asked.push([...companyIds]);
+        return Promise.resolve(
+          new Map([
+            [
+              COMPANY,
+              {
+                sectorNodeIds: ["a0000000-0000-4000-8000-000000000001"],
+                raise: {
+                  money: { amount: "1500000", currency: "USD" },
+                  truthClass: "USER_CLAIM" as const,
+                  evidenceStatus: "SELF_REPORTED" as const,
+                },
+              },
+            ],
+            // Not shared with this reader: unknown, never zero.
+            [OTHER, { sectorNodeIds: [], raise: null }],
+          ]),
+        );
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(asked).toEqual([[COMPANY, OTHER]]);
+    const body = response.json<{
+      items: { summary?: { raise: unknown; sectorNodeIds: string[] } }[];
+    }>();
+    expect(body.items[0]?.summary?.raise).toEqual({
+      money: { amount: "1500000", currency: "USD" },
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+    });
+    expect(body.items[1]?.summary).toEqual({ sectorNodeIds: [], raise: null });
+    await app.close();
+  });
+
+  it("a failing summary read leaves cards without a summary, never a guessed one", async () => {
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: twoItemPage,
+      feedSummaries: () => Promise.reject(new Error("disclosure down")),
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: { summary?: unknown }[] }>();
+    expect(body.items.every((item) => item.summary === undefined)).toBe(true);
     await app.close();
   });
 
@@ -672,6 +743,7 @@ describe("GET /v1/discovery/your-companies (founder decisions 2026-10-02, 2026-1
     captionState: "NOT_REQUESTED",
     title: null,
     audience: "INVESTORS",
+    downloadable: false,
     more: [],
   });
   const pitches: DiscoverablePitchQueryPort = {

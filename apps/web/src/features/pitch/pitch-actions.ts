@@ -145,6 +145,7 @@ export async function setPitchDetailsAction(
     readonly title: string | null;
     readonly audience: string;
     readonly playbackPolicy?: string | undefined;
+    readonly downloadable?: boolean | undefined;
   },
   rawExpectedVersion: number,
 ): Promise<PitchActionResult<MediaAssetDto>> {
@@ -156,6 +157,7 @@ export async function setPitchDetailsAction(
       title: z.string().trim().max(PITCH_TITLE_MAX).nullable(),
       audience: PitchAudienceSchema,
       playbackPolicy: OwnerPolicyInput.optional(),
+      downloadable: z.boolean().optional(),
     })
     .safeParse(rawDetails);
   if (!companyId.success || !mediaAssetId.success) {

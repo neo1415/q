@@ -197,6 +197,9 @@ export type ApiModules = {
           | undefined;
         /** CQ-MEDIA-012. Absent: every feed item's pitch is null. */
         readonly pitches?: DiscoveryRoutesDependencies["pitches"] | undefined;
+        /** Discover v2. Absent: cards carry no summary. */
+        readonly feedSummaries?:
+          DiscoveryRoutesDependencies["feedSummaries"] | undefined;
         /** ADR 0021. Absent: the founders' network feed is empty. */
         readonly networkPitches?:
           DiscoveryRoutesDependencies["networkPitches"] | undefined;
@@ -417,6 +420,7 @@ export function createApp(
       discovery: modules.discovery.discovery,
       slates: modules.discovery.slates,
       pitches: modules.discovery.pitches,
+      feedSummaries: modules.discovery.feedSummaries,
       interactions: modules.discovery.interactions,
       networkPitches: modules.discovery.networkPitches,
       networkCompany: modules.discovery.networkCompany,

@@ -5,6 +5,41 @@ import { UuidSchema } from "../common/ids.js";
 import { CurrencyCodeSchema } from "../common/money.js";
 import { StageCodeSchema } from "./companies.js";
 import { PitchSummaryDtoSchema } from "./media.js";
+import { MoneySchema } from "../common/money.js";
+import {
+  EvidenceStatusSchema,
+  TruthClassSchema,
+} from "../evidence/vocabulary.js";
+
+/**
+ * A feed card's few declared facts beyond the name (Discover v2), each read
+ * through the rule that already governs it, for THIS reader, server-side:
+ *
+ *   sectorNodeIds  the company's declared industry classification
+ *                  (reference-data node ids; the client names them);
+ *   raise          the current raise only where disclosure lets this reader
+ *                  view it (founder_private until shared). null means not
+ *                  shared with this reader or not stated: unknown, never
+ *                  zero. It carries its own truth and evidence axes: a
+ *                  raise is the founder's statement.
+ *
+ * There is no traction figure: no declared, network-visible metric exists
+ * yet, and the card says nothing rather than guessing.
+ */
+export const FeedCompanySummaryDtoSchema = z
+  .object({
+    sectorNodeIds: z.array(UuidSchema).max(8),
+    raise: z
+      .object({
+        money: MoneySchema,
+        truthClass: TruthClassSchema,
+        evidenceStatus: EvidenceStatusSchema,
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+export type FeedCompanySummaryDto = z.infer<typeof FeedCompanySummaryDtoSchema>;
 
 /**
  * `GET /v1/discovery/companies` and `/v1/discovery/investors` (doc 19).
@@ -359,6 +394,14 @@ export const DiscoveredCompanyDtoSchema = z
      * read: the client then shows the card as not saved yet.
      */
     viewerSaved: z.boolean().optional(),
+    /**
+     * The company's photo or logo for signed-in participants (its Q Card
+     * `photo` scope), a short-lived signed URL; null when it has none.
+     * Absent from older APIs.
+     */
+    photoUrl: z.string().url().nullable().optional(),
+    /** Discover v2: the card's declared facts for this reader. */
+    summary: FeedCompanySummaryDtoSchema.optional(),
     /**
      * Filters the reader applied that this company's shared facts could
      * not answer (its sector or stage is not stated, or its raise is not

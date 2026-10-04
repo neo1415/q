@@ -45,17 +45,63 @@ export function budgetFor(link: Connection | undefined): FeedPrefetchBudget {
     : DEFAULT_PREFETCH_BUDGET;
 }
 
+/**
+ * What the link actually did (doc 20 §53: "current rebuffer rate"). Two
+ * stalls of the playing pitch within half a minute mean the link cannot
+ * afford a warm next pitch whatever the browser claims, so the window
+ * drops to the constrained one until the stalls age out. Nothing here
+ * leaves the browser; it is a playback decision, not a signal.
+ */
+const STALL_WINDOW_MS = 30_000;
+const STALLS_TO_CONSTRAIN = 2;
+let stalls: number[] = [];
+const stallListeners = new Set<() => void>();
+let stallTimer: ReturnType<typeof setTimeout> | null = null;
+
+function recentStalls(now: number): number {
+  stalls = stalls.filter((at) => now - at < STALL_WINDOW_MS);
+  return stalls.length;
+}
+
+/** The player reports a stall of the playing pitch (buffer ran dry). */
+export function reportPlaybackStall(now = Date.now()): void {
+  stalls.push(now);
+  recentStalls(now);
+  for (const listener of stallListeners) listener();
+  // When the oldest stall ages out, the window may widen again.
+  if (stallTimer !== null) clearTimeout(stallTimer);
+  stallTimer = setTimeout(() => {
+    stallTimer = null;
+    for (const listener of stallListeners) listener();
+  }, STALL_WINDOW_MS);
+}
+
+export function linkIsStalling(now = Date.now()): boolean {
+  return recentStalls(now) >= STALLS_TO_CONSTRAIN;
+}
+
+/** For tests. */
+export function resetPlaybackStallsForTests(): void {
+  stalls = [];
+  if (stallTimer !== null) clearTimeout(stallTimer);
+  stallTimer = null;
+}
+
 function subscribe(onChange: () => void): () => void {
   const link = connection();
   link?.addEventListener?.("change", onChange);
-  return () => link?.removeEventListener?.("change", onChange);
+  stallListeners.add(onChange);
+  return () => {
+    link?.removeEventListener?.("change", onChange);
+    stallListeners.delete(onChange);
+  };
 }
 
 export function useFeedBudget(): FeedPrefetchBudget {
   return useSyncExternalStore(
     subscribe,
-    () => budgetFor(connection()),
-    // The server cannot know the link; the client's first render decides.
+    () =>
+      linkIsStalling() ? CONSTRAINED_PREFETCH_BUDGET : budgetFor(connection()),
     () => DEFAULT_PREFETCH_BUDGET,
   );
 }

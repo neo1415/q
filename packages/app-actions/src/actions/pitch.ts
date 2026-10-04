@@ -38,6 +38,11 @@ export const PitchDetailsInputSchema = z
     title: z.string().max(PITCH_TITLE_MAX).nullable().optional(),
     audience: PitchAudienceSchema.optional(),
     playbackPolicy: OwnerPlaybackPolicySchema.optional(),
+    /**
+     * ADR 0047: whether investors who may watch it may also save a copy.
+     * Undefined keeps it. Off by default (doc 20 §219).
+     */
+    downloadable: z.boolean().optional(),
     /** The version the screen saw; Q acts on the current one. */
     expectedVersion: ResourceVersionSchema.optional(),
   })
@@ -103,11 +108,24 @@ const ToolInputSchema = z
       .max(PITCH_TITLE_MAX)
       .optional()
       .describe("A new title, only when they asked to rename it."),
+    downloadable: z
+      .boolean()
+      .optional()
+      .describe(
+        "Only when they asked about downloads: true lets investors who can watch it also download a copy ('make my pitch downloadable'); false makes it watch-only.",
+      ),
   })
   .strict()
-  .refine((input) => input.sharing !== undefined || input.title !== undefined, {
-    message: "say who can watch it, or a new title",
-  });
+  .refine(
+    (input) =>
+      input.sharing !== undefined ||
+      input.title !== undefined ||
+      input.downloadable !== undefined,
+    {
+      message:
+        "say who can watch it, a new title, or whether it can be downloaded",
+    },
+  );
 
 export const SET_PITCH_SHARING = defineAppAction<
   PitchDetailsInput,
@@ -119,7 +137,7 @@ export const SET_PITCH_SHARING = defineAppAction<
   short: "set who sees a pitch",
   area: "pitch",
   classification: "CONSEQUENTIAL",
-  does: "Sets a pitch video's title and who can watch it (only their organisation, investors, or everyone on Capital Q), audience and playback together.",
+  does: "Sets a pitch video's title, who can watch it (only their organisation, investors, or everyone on Capital Q), and whether investors may download it.",
   input: PitchDetailsInputSchema,
   output: z.custom<MediaAsset>(),
   authorize: async (ports, context, input) =>
@@ -138,26 +156,61 @@ export const SET_PITCH_SHARING = defineAppAction<
     if (media === undefined || asset === null) {
       throw new Error("PITCH_NOT_AVAILABLE");
     }
-    return media.setPitchDetails({
+    const mediaAssetId = MediaAssetIdSchema.parse(input.mediaAssetId);
+    // The screen decides on the version it saw; Q on the current one,
+    // read inside the same authorization.
+    const expectedVersion = input.expectedVersion ?? asset.version;
+    const detailsAsked =
+      input.title !== undefined ||
+      input.audience !== undefined ||
+      input.playbackPolicy !== undefined;
+    const detailed = !detailsAsked
+      ? asset
+      : await media.setPitchDetails({
+          actor: context.actor,
+          companyId: input.companyId,
+          mediaAssetId,
+          details: {
+            title: input.title === undefined ? asset.title : input.title,
+            audience: input.audience ?? asset.audience,
+            ...(input.playbackPolicy === undefined
+              ? {}
+              : { playbackPolicy: input.playbackPolicy }),
+          },
+          expectedVersion,
+          correlationId: context.correlationId,
+        });
+    if (input.downloadable === undefined) return detailed;
+    // ADR 0047: its own audited decision, on the version the details left.
+    return media.setPitchDownloadable({
       actor: context.actor,
       companyId: input.companyId,
-      mediaAssetId: MediaAssetIdSchema.parse(input.mediaAssetId),
-      details: {
-        title: input.title === undefined ? asset.title : input.title,
-        audience: input.audience ?? asset.audience,
-        ...(input.playbackPolicy === undefined
-          ? {}
-          : { playbackPolicy: input.playbackPolicy }),
-      },
-      // The screen decides on the version it saw; Q on the current one,
-      // read inside the same authorization.
-      expectedVersion: input.expectedVersion ?? asset.version,
+      mediaAssetId,
+      downloadable: input.downloadable,
+      expectedVersion: detailsAsked ? detailed.version : expectedVersion,
       correlationId: context.correlationId,
     });
   },
   targets: (input) => [{ kind: "COMPANY", companyId: input.companyId }],
   card: (input) => {
     const sharing = sharingOfInput(input);
+    if (
+      input.downloadable !== undefined &&
+      sharing === null &&
+      input.title === undefined
+    ) {
+      return input.downloadable
+        ? {
+            summary: "Let investors download your pitch video",
+            preview:
+              "Investors who can watch it will be able to save a copy. Copies already saved can't be recalled. You can turn this off again at any time.",
+          }
+        : {
+            summary: "Make your pitch video watch-only",
+            preview:
+              "Investors will still be able to watch it, but no longer download it.",
+          };
+    }
     const what =
       sharing === null
         ? input.title === undefined || input.title === null
@@ -176,7 +229,7 @@ export const SET_PITCH_SHARING = defineAppAction<
   },
   done: (out) => {
     const sharing = sharingOf(out);
-    return `Done. Your pitch video "${out.title ?? "Pitch"}" can now be watched by ${SHARING_WORDS[sharing]}.`;
+    return `Done. Your pitch video "${out.title ?? "Pitch"}" can now be watched by ${SHARING_WORDS[sharing]}${out.downloadable ? ", who can also download it" : ""}.`;
   },
   http: {
     method: "POST",
@@ -192,7 +245,7 @@ export const SET_PITCH_SHARING = defineAppAction<
   tool: {
     name: "set_pitch_sharing",
     description:
-      "Sets who can watch one of the person's own pitch videos -- only their organisation, investors who can find their company, or everyone on Capital Q -- and/or renames it, exactly as the pitch page's choice does. Prepared for their approval: nothing changes until they approve exactly it.",
+      "Sets who can watch one of the person's own pitch videos -- only their organisation, investors who can find their company, or everyone on Capital Q -- whether investors may download it, and/or renames it, exactly as the pitch page's choices do. Prepared for their approval: nothing changes until they approve exactly it.",
     input: ToolInputSchema,
     references: { pitch: "MEDIA" },
     eval: {
@@ -209,6 +262,9 @@ export const SET_PITCH_SHARING = defineAppAction<
         companyId,
         mediaAssetId: input.pitch,
         ...(input.title === undefined ? {} : { title: input.title }),
+        ...(input.downloadable === undefined
+          ? {}
+          : { downloadable: input.downloadable }),
         ...(input.sharing === undefined
           ? {}
           : input.sharing === "ORGANISATION"
