@@ -40,6 +40,14 @@
     "./images/google": {
       "types": "./dist/images/google.d.ts",
       "default": "./dist/images/google.js"
+    },
+    "./realtime": {
+      "types": "./dist/realtime/index.d.ts",
+      "default": "./dist/realtime/index.js"
+    },
+    "./realtime/openai": {
+      "types": "./dist/realtime/openai.d.ts",
+      "default": "./dist/realtime/openai.js"
     }
   },
   "main": "./dist/index.js",
