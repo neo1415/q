@@ -252,6 +252,8 @@ export type ApiModules = {
   readonly gateqInbox?: GateQRoutesDependencies["inbox"] | undefined;
   /** CQ-GATE-001: the investor organisation's inbound gateway. */
   readonly gateq?: GateQRoutesDependencies["gateq"] | undefined;
+  /** The public gateway page's card-scoped organisation images. */
+  readonly gateqPublicImages?: GateQRoutesDependencies["publicImages"];
   /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
   readonly gateqApply?: GateQApplyRoutesDependencies | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
@@ -643,6 +645,7 @@ export function createApp(
       gateq: modules.gateq,
       inbox: modules.gateqInbox,
       entitlements: modules.billing?.entitlements,
+      publicImages: modules.gateqPublicImages,
     });
   }
 

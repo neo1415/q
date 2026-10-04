@@ -1780,6 +1780,20 @@ const { app, logger } = createApp(config, security, {
     publicKey: loadWebPushConfig(process.env).publicKey ?? null,
   },
   gateq,
+  // The public gateway page's header (founder ask 2026-10-04): the owning
+  // organisation's photo and cover exactly as its Q Card shows them to
+  // the public. Only a published, active gateway reaches here.
+  gateqPublicImages: async (publicId) => {
+    const gateway = await gateqGateways.findByPublicId(publicId);
+    if (gateway === null) return { photo: null, cover: null };
+    return publicIdentity.cardImagesFor({
+      subject: {
+        subjectType: "INVESTOR_ORGANISATION",
+        subjectId: gateway.investorOrganisationId,
+      },
+      audience: "PUBLIC",
+    });
+  },
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
   capital,

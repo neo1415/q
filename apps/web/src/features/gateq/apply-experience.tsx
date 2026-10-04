@@ -8,6 +8,7 @@ import type {
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
+import { EntityAvatar, EntityCover } from "@/features/entity/entity-avatar";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import {
@@ -107,8 +108,22 @@ export function ApplyExperience({
       aria-label={gateway.title}
     >
       {compact ? null : (
-        <header className="flex flex-col gap-1">
-          <p className="cq-caption text-(--cq-text-secondary)">
+        <header className="flex flex-col gap-2">
+          {/* Only images the organisation's card shows the public. */}
+          {typeof gateway.organisationCoverUrl === "string" ? (
+            <EntityCover
+              src={gateway.organisationCoverUrl}
+              className="rounded-xl"
+            />
+          ) : null}
+          <p className="cq-caption flex items-center gap-2 text-(--cq-text-secondary)">
+            <EntityAvatar
+              kind="investor"
+              name={gateway.organisationDisplayName}
+              src={gateway.organisationPhotoUrl ?? null}
+              size="md"
+              decorative
+            />
             {gateway.organisationDisplayName}
           </p>
           <h1 className="cq-title-lg text-(--cq-text-primary)">

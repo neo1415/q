@@ -80,10 +80,13 @@ function buildApp(options: {
   readonly principal: AuthenticatedPrincipal | null;
   readonly publicGateway?: PublicGateway | null;
   readonly created?: Gateway | Error;
+  readonly images?: { photo: string | null; cover: string | null };
 }): {
   readonly app: FastifyInstance;
   readonly publicLookups: string[];
+  readonly imageLookups: string[];
 } {
+  const imageLookups: string[] = [];
   const publicLookups: string[] = [];
   const gateq: GateQService = {
     createGateway: () =>
@@ -110,10 +113,19 @@ function buildApp(options: {
     },
     identities: { lookup: () => Promise.resolve(null) },
   };
+  const images = options.images;
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     gateq,
+    ...(images === undefined
+      ? {}
+      : {
+          gateqPublicImages: (publicId: string) => {
+            imageLookups.push(publicId);
+            return Promise.resolve(images);
+          },
+        }),
   });
-  return { app, publicLookups };
+  return { app, publicLookups, imageLookups };
 }
 
 describe("the configuration routes", () => {
@@ -210,6 +222,37 @@ describe("the public route", () => {
     const response = await app.inject({ method: "GET", url: url("gateway-1") });
     expect(response.statusCode).toBe(404);
     expect(publicLookups).toEqual([]);
+  });
+
+  it("carries the organisation's card-scoped photo and cover (founder ask 2026-10-04)", async () => {
+    const { app } = buildApp({
+      principal: null,
+      publicGateway: PUBLIC_PROJECTION,
+      images: {
+        photo: "https://storage.example/photo.webp?sig=1",
+        cover: null,
+      },
+    });
+    const body = (
+      await app.inject({ method: "GET", url: url(PUBLIC_ID) })
+    ).json<Record<string, unknown>>();
+    expect(body["organisationPhotoUrl"]).toBe(
+      "https://storage.example/photo.webp?sig=1",
+    );
+    // A cover the card keeps from the public is null, not a URL.
+    expect(body["organisationCoverUrl"]).toBeNull();
+  });
+
+  it("never asks for images for an unpublished or unknown gateway", async () => {
+    const { app, imageLookups } = buildApp({
+      principal: null,
+      publicGateway: null,
+      images: { photo: "https://storage.example/p?sig=1", cover: null },
+    });
+    const response = await app.inject({ method: "GET", url: url(PUBLIC_ID) });
+    expect(response.statusCode).toBe(404);
+    expect(imageLookups).toEqual([]);
+    expect(response.body).not.toContain("storage.example");
   });
 
   it("10: an authenticated caller sees exactly the same public answer", async () => {

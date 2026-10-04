@@ -24,6 +24,7 @@ import {
 } from "@capital-q/contracts";
 import {
   GatewayPublicIdSchema,
+  type GatewayPublicId,
   type Gateway,
   type GatewayId,
   type GatewayPolicy,
@@ -76,6 +77,17 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
   // Absent: no plan control (tests of the GateQ domain alone).
   readonly entitlements?: Pick<EntitlementService, "check"> | undefined;
   // end BILLING block
+  /**
+   * The organisation's card images for the public page, each under its
+   * card's PUBLIC scope. Asked only once the gateway is published.
+   * Absent: the page shows none.
+   */
+  readonly publicImages?:
+    | ((publicId: GatewayPublicId) => Promise<{
+        readonly photo: string | null;
+        readonly cover: string | null;
+      }>)
+    | undefined;
 };
 
 const gatewayIdOf = (request: FastifyRequest): GatewayId =>
@@ -394,7 +406,22 @@ export function registerGateQRoutes(
       reply.callNotFound();
       return undefined;
     }
+    const images =
+      dependencies.publicImages === undefined
+        ? null
+        : await dependencies
+            .publicImages(publicId.data)
+            .catch(() => null);
+    // Briefly cacheable, well inside the signed URLs' own lifetime.
     void reply.header("Cache-Control", "public, max-age=60");
-    return PublicGatewayDtoSchema.parse(projection);
+    return PublicGatewayDtoSchema.parse({
+      ...projection,
+      ...(images === null
+        ? {}
+        : {
+            organisationPhotoUrl: images.photo,
+            organisationCoverUrl: images.cover,
+          }),
+    });
   });
 }

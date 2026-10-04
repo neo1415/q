@@ -19,6 +19,14 @@ export type NameMatch = {
   readonly name: string;
   readonly detail: string;
   readonly href: string;
+  readonly kind: "company" | "investor";
+  /** A company's id, for its gated photo route. */
+  readonly companyId?: string | undefined;
+  /**
+   * An investor's photo only as the founder's own Discover read returned
+   * it (ADR 0023); null otherwise. Never fetched for a search.
+   */
+  readonly photoUrl?: string | null | undefined;
 };
 
 const MAX = 12;
@@ -45,6 +53,12 @@ export async function nameMatches(
   ]);
   const seen = new Set<string>();
   const out: NameMatch[] = [];
+  const discovered = new Map(
+    investors.map((investor) => [
+      investor.investorOrganisationId,
+      investor.photoUrl ?? null,
+    ]),
+  );
   for (const item of relationships ?? []) {
     if (!matchesName(item.counterpart.name, query)) continue;
     seen.add(item.counterpart.id);
@@ -52,6 +66,12 @@ export async function nameMatches(
       name: item.counterpart.name,
       detail: "Your relationship",
       href: relationshipHref(item),
+      ...(item.counterpart.kind === "COMPANY"
+        ? { kind: "company" as const, companyId: item.counterpart.id }
+        : {
+            kind: "investor" as const,
+            photoUrl: discovered.get(item.counterpart.id) ?? null,
+          }),
     });
   }
   for (const investor of investors) {
@@ -61,6 +81,8 @@ export async function nameMatches(
       name: investor.displayName,
       detail: "In your Discover",
       href: `/investors/${investor.investorOrganisationId}`,
+      kind: "investor",
+      photoUrl: investor.photoUrl ?? null,
     });
   }
   return out.slice(0, MAX);

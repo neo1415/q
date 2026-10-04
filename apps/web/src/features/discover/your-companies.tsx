@@ -17,6 +17,7 @@ import type {
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
+import { CompanyAvatarLink } from "@/features/company/company-avatar";
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { QPageSubject } from "@/features/q/q-subject";
 
@@ -136,14 +137,20 @@ function YourCompanyCard({
         >
           {YOUR_COMPANY_LABEL_WORDS[item.label]}
         </p>
-        <h2 className="cq-title-sm text-(--cq-stage-text)">
-          <Link
-            href={`/company/${item.companyId}`}
-            className="underline-offset-4 hover:underline"
-          >
-            {item.canonicalName}
-          </Link>
-        </h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <CompanyAvatarLink
+            companyId={item.companyId}
+            companyName={item.canonicalName}
+          />
+          <h2 className="cq-title-sm min-w-0 text-(--cq-stage-text)">
+            <Link
+              href={`/company/${item.companyId}`}
+              className="underline-offset-4 hover:underline"
+            >
+              {item.canonicalName}
+            </Link>
+          </h2>
+        </div>
         {item.shortDescription === null ? null : (
           <p className="cq-body-sm line-clamp-2 text-(--cq-stage-text)">
             {item.shortDescription}
