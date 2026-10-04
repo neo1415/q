@@ -13,7 +13,11 @@ import {
 // PASSED arrives with v29.
 const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
   // USAGE arrives with v38.
-  (name) => name !== "PASSED" && name !== "USAGE" && name !== "YOUR_COMPANIES",
+  (name) =>
+    name !== "PASSED" &&
+    name !== "USAGE" &&
+    name !== "YOUR_COMPANIES" &&
+    name !== "WORK",
 );
 
 /**
@@ -23,7 +27,7 @@ const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
 describe("TURN_READER v14", () => {
   it("is the active reader and v13 is deprecated", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(40);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(41);
     expect(TURN_READER_V13.status).toBe("DEPRECATED");
     expect(TURN_READER_V14.template).toContain("SEQUENCE (null unless");
     expect(TURN_READER_V14.template).toContain("unknownScreen is set");

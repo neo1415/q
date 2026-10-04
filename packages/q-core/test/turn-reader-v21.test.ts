@@ -11,14 +11,18 @@ import {
 // PASSED arrives with v29.
 const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
   // USAGE arrives with v38.
-  (name) => name !== "PASSED" && name !== "USAGE" && name !== "YOUR_COMPANIES",
+  (name) =>
+    name !== "PASSED" &&
+    name !== "USAGE" &&
+    name !== "YOUR_COMPANIES" &&
+    name !== "WORK",
 );
 
 /** TURN_READER v21 (DAILY, on DOCS's v20): The Q Daily is a destination. */
 describe("TURN_READER v21", () => {
   it("is the active reader", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(40);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(41);
   });
 
   it("names every contract destination exactly once", () => {

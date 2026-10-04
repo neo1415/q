@@ -11,7 +11,11 @@ import {
 // PASSED arrives with v29.
 const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
   // USAGE arrives with v38.
-  (name) => name !== "PASSED" && name !== "USAGE" && name !== "YOUR_COMPANIES",
+  (name) =>
+    name !== "PASSED" &&
+    name !== "USAGE" &&
+    name !== "YOUR_COMPANIES" &&
+    name !== "WORK",
 );
 
 /**
@@ -22,7 +26,7 @@ const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
 describe("TURN_READER v17", () => {
   it("is superseded by v18, which only adds a screen", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(40);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(41);
   });
 
   it("names every contract destination exactly once", () => {

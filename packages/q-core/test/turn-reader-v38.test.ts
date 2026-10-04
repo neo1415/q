@@ -13,13 +13,15 @@ describe("TURN_READER v38", () => {
   it("is followed by v39", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(40);
+    ).toBe(41);
   });
 
   it("names every contract destination exactly once, USAGE included", () => {
     expect(Q_NAVIGATE_DESTINATIONS).toContain("USAGE");
     for (const destination of [
-      ...Q_NAVIGATE_DESTINATIONS.filter((name) => name !== "YOUR_COMPANIES"),
+      ...Q_NAVIGATE_DESTINATIONS.filter(
+        (name) => name !== "YOUR_COMPANIES" && name !== "WORK",
+      ),
       "RESULTS",
     ]) {
       expect(

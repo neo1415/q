@@ -12,7 +12,11 @@ import {
 // PASSED arrives with v29.
 const DESTINATIONS_BEFORE_V29 = Q_NAVIGATE_DESTINATIONS.filter(
   // USAGE arrives with v38.
-  (name) => name !== "PASSED" && name !== "USAGE" && name !== "YOUR_COMPANIES",
+  (name) =>
+    name !== "PASSED" &&
+    name !== "USAGE" &&
+    name !== "YOUR_COMPANIES" &&
+    name !== "WORK",
 );
 
 /**
@@ -24,7 +28,7 @@ describe("TURN_READER v24", () => {
   it("is the active reader and v23 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(40);
+    ).toBe(41);
     expect(TURN_READER_V23.status).toBe("DEPRECATED");
     expect(TURN_READER_V24.status).toBe("DEPRECATED");
   });
