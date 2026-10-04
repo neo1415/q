@@ -1,3 +1,4 @@
+import { STAGE_LADDER, stageInRange } from "@capital-q/discovery";
 import type {
   InstructionMessageAsk,
   InstructionQuestionKind,
@@ -40,11 +41,30 @@ export type MaterialFact = {
   readonly kind: "LABEL" | "DESCRIPTION";
   /** The question this fact answers, when it is one of the sender's own. */
   readonly answers?: InstructionQuestionKind | undefined;
+  /** The declared code behind a label fact (stage, country), when there is one. */
+  readonly code?: string | undefined;
+};
+
+/**
+ * The sender's declared hard criteria a first message must sit inside
+ * (live QA: Tallyloom, Series B, was told it "fits" a Seed-only mandate).
+ * Undeclared is open; a counterpart's unknown stage or country is unknown,
+ * never outside.
+ */
+export type SenderCriteria = {
+  readonly minStageCode: string | null;
+  readonly maxStageCode: string | null;
+  /** Declared countries (geography.country, including), upper case; empty: open. */
+  readonly countries: readonly string[];
+  /** Hard-excluded countries, upper case. */
+  readonly excludedCountries: readonly string[];
 };
 
 export type SenderMaterial = {
   readonly side: "INVESTOR" | "COMPANY";
   readonly facts: readonly MaterialFact[];
+  /** An investor's declared criteria; absent for a founder. */
+  readonly criteria?: SenderCriteria | undefined;
 };
 
 export type InstructionMaterial = {
@@ -85,6 +105,7 @@ function label(
   text: string,
   source: string,
   answers?: InstructionQuestionKind,
+  code?: string,
 ): MaterialFact {
   return {
     label: name,
@@ -93,6 +114,7 @@ function label(
     anchors: [text.toLowerCase()],
     kind: "LABEL",
     ...(answers === undefined ? {} : { answers }),
+    ...(code === undefined ? {} : { code }),
   };
 }
 
@@ -122,23 +144,13 @@ export function companyCardFacts(
 ): readonly MaterialFact[] {
   const facts: MaterialFact[] = [];
   if (card.currentStageCode !== null) {
-    facts.push(
-      label(
-        "stage",
-        humanCode(card.currentStageCode, labels),
-        source,
-        "STAGES",
-      ),
-    );
+    const stage = humanCode(card.currentStageCode, labels);
+    facts.push(label("stage", stage, source, "STAGES", card.currentStageCode));
   }
   if (card.headquartersCountry !== null) {
+    const place = humanCode(card.headquartersCountry, labels);
     facts.push(
-      label(
-        "based in",
-        humanCode(card.headquartersCountry, labels),
-        source,
-        "GEOGRAPHIES",
-      ),
+      label("based in", place, source, "GEOGRAPHIES", card.headquartersCountry),
     );
   }
   if (card.shortDescription !== null && card.shortDescription.trim() !== "") {
@@ -344,6 +356,66 @@ export function mandateFacts(
   return facts;
 }
 
+/** The investor's declared hard criteria for a first message. */
+export function mandateCriteria(mandate: MandateLike): SenderCriteria {
+  const countries = (hard: boolean) =>
+    mandate.constraints
+      .filter(
+        (constraint) =>
+          constraint.dimension === "geography.country" &&
+          constraint.isHardExclusion === hard &&
+          (hard
+            ? constraint.operator === "NOT_IN" || constraint.operator === "NEQ"
+            : INCLUDING.has(constraint.operator)) &&
+          constraint.value.kind === "codes",
+      )
+      .flatMap((constraint) =>
+        "values" in constraint.value ? [...constraint.value.values] : [],
+      )
+      .map((code) => code.toUpperCase());
+  return {
+    minStageCode: mandate.stage.minStageCode,
+    maxStageCode: mandate.stage.maxStageCode,
+    countries: countries(false),
+    excludedCountries: countries(true),
+  };
+}
+
+export type OutsideCriterion = "STAGE" | "GEOGRAPHY";
+
+/**
+ * Where a counterpart is outside the sender's declared hard criteria; null
+ * when inside, undeclared, or unknown. (Sector: a card carries no declared
+ * sector code, so it is never judged outside on sector -- unknown is not a
+ * no.)
+ */
+export function outsideCriteria(
+  criteria: SenderCriteria | undefined,
+  counterpart: readonly MaterialFact[],
+): OutsideCriterion | null {
+  if (criteria === undefined) return null;
+  const stage = counterpart.find((fact) => fact.label === "stage")?.code;
+  if (
+    stage !== undefined &&
+    (criteria.minStageCode !== null || criteria.maxStageCode !== null) &&
+    (STAGE_LADDER as readonly string[]).includes(stage) &&
+    !stageInRange(stage, criteria.minStageCode, criteria.maxStageCode)
+  ) {
+    return "STAGE";
+  }
+  const country = counterpart
+    .find((fact) => fact.label === "based in")
+    ?.code?.toUpperCase();
+  if (
+    country !== undefined &&
+    (criteria.excludedCountries.includes(country) ||
+      (criteria.countries.length > 0 && !criteria.countries.includes(country)))
+  ) {
+    return "GEOGRAPHY";
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // What the planner reads
 // ---------------------------------------------------------------------------
@@ -391,6 +463,7 @@ export const MESSAGE_PROBLEMS = [
   "MESSAGE_TOO_LONG",
   "UNGROUNDED_NUMBER",
   "UNANSWERED_QUESTION",
+  "UNSUPPORTED_FIT",
 ] as const;
 export type MessageProblem = (typeof MESSAGE_PROBLEMS)[number];
 
@@ -449,6 +522,10 @@ export function asksForMeeting(sentence: string): boolean {
   return MEETING_ASK.test(sentence);
 }
 
+/** A claim that the counterpart fits or matches the sender's focus. */
+const FIT_CLAIM =
+  /\bfits?\b|\bfitting\b|\b(?:good|great|strong|close|natural|clear) (?:fit|match)\b|\bmatch(?:es|ed)? (?:our|my|what (?:we|i))\b|\baligns? (?:well )?with (?:our|my)\b|\bin line with (?:our|my)\b|\bsweet spot\b|\bwheelhouse\b/iu;
+
 /** Where a fact comes from, said in the message. */
 const SOURCE_CUE =
   /\b(?:profile|pitch|deck|website|site|listing|page|description|mandate|thesis|focus)\b/iu;
@@ -497,6 +574,8 @@ export type MessageCheckInput = {
   readonly answering?: readonly InstructionQuestionKind[] | undefined;
   /** The planner's own reading of what the last sentence asks. */
   readonly asks?: InstructionMessageAsk | null | undefined;
+  /** The investor's declared criteria, for a claim of fit. */
+  readonly criteria?: SenderCriteria | undefined;
 };
 
 const hits = (text: string, fact: MaterialFact): number =>
@@ -536,6 +615,26 @@ export function checkMessage(input: MessageCheckInput): MessageProblem | null {
   );
   if (stated.some((value) => !known.has(value))) {
     return "UNGROUNDED_NUMBER";
+  }
+
+  // "Fits" or "matches" only where the company's stage is inside the
+  // declared stages (when both ends are declared); unknown is not inside.
+  const criteria = input.criteria;
+  if (
+    FIT_CLAIM.test(body) &&
+    criteria !== undefined &&
+    criteria.minStageCode !== null &&
+    criteria.maxStageCode !== null
+  ) {
+    const stage = input.counterpart.find(
+      (fact) => fact.label === "stage",
+    )?.code;
+    if (
+      stage === undefined ||
+      !stageInRange(stage, criteria.minStageCode, criteria.maxStageCode)
+    ) {
+      return "UNSUPPORTED_FIT";
+    }
   }
 
   // A reply answers only from the sender's own facts.
@@ -630,6 +729,7 @@ export function createInstructionMaterialReader(
       sender = {
         side: "INVESTOR",
         facts: mandate === null ? [] : mandateFacts(mandate, reads.labels.code),
+        ...(mandate === null ? {} : { criteria: mandateCriteria(mandate) }),
       };
     } else {
       const card = await reads.ownCompanyCard(actor).catch(() => null);

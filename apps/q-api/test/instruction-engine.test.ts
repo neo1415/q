@@ -1224,6 +1224,49 @@ describe("a stopped or paused instruction never fires (QA run 8a1d57b9)", () => 
 });
 
 describe("live QA (instruction 76d6f281): code decides from the conversation", () => {
+  const SEED_ONLY: InstructionMaterial = {
+    sender: {
+      side: "INVESTOR",
+      facts: mandateFacts(
+        {
+          cheque: { currency: "USD", min: "250000", max: "1000000" },
+          stage: { minStageCode: "seed", maxStageCode: "seed" },
+          constraints: [
+            {
+              dimension: "investment_role",
+              operator: "IN",
+              value: { kind: "codes", values: ["lead"] },
+              isHardExclusion: false,
+            },
+          ],
+          taxonomyPreferences: [],
+        },
+        (code) =>
+          ({ seed: "Seed", series_b: "Series B", lead: "Lead rounds" })[code],
+      ),
+      criteria: {
+        minStageCode: "seed",
+        maxStageCode: "seed",
+        countries: [],
+        excludedCountries: [],
+      },
+    },
+    counterparts: new Map([
+      [
+        COMPANY,
+        companyCardFacts(
+          {
+            currentStageCode: "series_b",
+            headquartersCountry: null,
+            shortDescription:
+              "Acme Robotics builds warehouse picking robots for grocery retailers.",
+          },
+          (code) => ({ series_b: "Series B" })[code],
+          "their Capital Q profile",
+        ),
+      ],
+    ]),
+  };
   const firstMessage = chat(
     "Warehouse picking robots for grocery retailers, as your profile puts it -- which retailers are you piloting with?",
     { message: { kind: "FIRST", asks: "QUESTION" } },
@@ -1287,6 +1330,12 @@ describe("live QA (instruction 76d6f281): code decides from the conversation", (
         grant: grant({ followUps: false }),
       }),
     ).toMatchObject({ verdict: "AUTO" });
+  });
+
+  it("no first message to a company outside the declared stages; no claim of fit either", () => {
+    expect(
+      check(firstMessage, { introduced: new Set(), material: SEED_ONLY }),
+    ).toMatchObject({ verdict: "REFUSED", code: "OUTSIDE_MANDATE" });
   });
 
   it("a message the planner says asks for a meeting is refused without AUTO booking", () => {

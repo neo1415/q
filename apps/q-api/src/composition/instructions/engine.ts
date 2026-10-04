@@ -32,6 +32,7 @@ import { needsYouNotice } from "./digest.js";
 import {
   checkMessage,
   materialLine,
+  outsideCriteria,
   senderLines,
   type InstructionMaterial,
   type MaterialFact,
@@ -107,6 +108,8 @@ export const REFUSAL_CODES = [
   "UNANSWERED_QUESTION",
   // Live QA (instruction 76d6f281).
   "ALREADY_INTRODUCED",
+  "OUTSIDE_MANDATE",
+  "UNSUPPORTED_FIT",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -170,6 +173,15 @@ export const REFUSAL_WORDS: Readonly<
       "your side has already written to them, so a first message isn't one",
     instead:
       "I'll leave the conversation to you, or say so and I'll prepare follow-ups for your approval",
+  },
+  OUTSIDE_MANDATE: {
+    reason: "they're outside the stage or geography your mandate declares",
+    instead: "I'll write only to companies inside your mandate",
+  },
+  UNSUPPORTED_FIT: {
+    reason:
+      "the message said they fit your mandate, but their stage isn't one you declare",
+    instead: "I'll write it again without claiming a fit",
   },
 };
 
@@ -612,6 +624,13 @@ function messageProblem(
       ? []
       : (material?.counterparts.get(counterpartId) ?? []);
   const first = !written && !replying;
+  // A first message only inside the sender's declared hard criteria.
+  if (
+    first &&
+    outsideCriteria(material?.sender.criteria, counterpart) !== null
+  ) {
+    return "OUTSIDE_MANDATE";
+  }
   // Their question Q may not answer has gone to the person: no reply.
   const open =
     thread === undefined
@@ -635,6 +654,7 @@ function messageProblem(
     ),
     answering,
     asks: step.message?.asks,
+    criteria: material?.sender.criteria,
   });
 }
 
@@ -798,6 +818,16 @@ function peopleLines(
               (sent.get(person.relationshipId) ?? 0) > 0
             ? "your side has already written here: no first message"
             : "no message from your side yet",
+        // A first message only inside their declared criteria.
+        ((outside) =>
+          outside === null
+            ? null
+            : `outside your declared mandate (${outside.toLowerCase()}): write no first message`)(
+          outsideCriteria(
+            material?.sender.criteria,
+            material?.counterparts.get(person.counterpartId) ?? [],
+          ),
+        ),
         // Their messages only as typed facts from the quarantined reader.
         person.relationshipId === null
           ? null

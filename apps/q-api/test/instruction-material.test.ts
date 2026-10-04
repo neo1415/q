@@ -6,7 +6,9 @@ import {
   companyCardFacts,
   createInstructionMaterialReader,
   finalSentence,
+  mandateCriteria,
   mandateFacts,
+  outsideCriteria,
   materialLine,
   numbersIn,
   senderLines,
@@ -24,6 +26,7 @@ const LABELS: Record<string, string> = {
   seed: "Seed",
   pre_seed: "Pre-seed",
   series_a: "Series A",
+  series_b: "Series B",
   ke: "Kenya",
   ng: "Nigeria",
   healthtech: "Health tech",
@@ -280,6 +283,33 @@ describe("reading the material as the person", () => {
 });
 
 describe("live QA (instruction 76d6f281)", () => {
+  // Savanna Seed Partners: Seed only, USD 250,000 to 1,000,000, leads.
+  const SAVANNA: MandateLike = {
+    cheque: { currency: "USD", min: "250000", max: "1000000" },
+    stage: { minStageCode: "seed", maxStageCode: "seed" },
+    constraints: [
+      {
+        dimension: "investment_role",
+        operator: "IN",
+        value: { kind: "codes", values: ["lead"] },
+        isHardExclusion: false,
+      },
+    ],
+    taxonomyPreferences: [],
+  };
+  const sender = mandateFacts(SAVANNA, labels);
+  const criteria = mandateCriteria(SAVANNA);
+  const TALLYLOOM = companyCardFacts(
+    {
+      currentStageCode: "series_b",
+      headquartersCountry: "NG",
+      shortDescription:
+        "Tallyloom builds inventory and invoicing software for African distributors.",
+    },
+    labels,
+    "their Capital Q profile",
+  );
+
   it("refuses a meeting ask however it is worded, from the planner's own reading or code's", () => {
     for (const ending of [
       "Are there times that suit you for a conversation?",
@@ -316,5 +346,39 @@ describe("live QA (instruction 76d6f281)", () => {
       expect(asksForMeeting(question), question).toBe(false);
     }
     expect(finalSentence("One. Two? Three.")).toBe("Three.");
+  });
+
+  it("a company outside the declared stages is outside the mandate; a claim of fit needs the stage inside", () => {
+    expect(outsideCriteria(criteria, TALLYLOOM)).toBe("STAGE");
+    expect(outsideCriteria(criteria, TARMACLY)).toBeNull();
+    // Unknown stage is unknown, never outside.
+    expect(
+      outsideCriteria(
+        criteria,
+        TALLYLOOM.filter((fact) => fact.label !== "stage"),
+      ),
+    ).toBeNull();
+    const fits =
+      "Tallyloom's profile describes inventory and invoicing software for African distributors, which fits our interest in African enterprise software. How are distributors adopting it?";
+    expect(
+      checkMessage({
+        body: fits,
+        first: false,
+        counterpart: TALLYLOOM,
+        sender,
+        bookingAuto: false,
+        criteria,
+      }),
+    ).toBe("UNSUPPORTED_FIT");
+    expect(
+      checkMessage({
+        body: fits.replace("Tallyloom", "Tarmacly"),
+        first: false,
+        counterpart: TARMACLY,
+        sender,
+        bookingAuto: false,
+        criteria,
+      }),
+    ).toBeNull();
   });
 });
