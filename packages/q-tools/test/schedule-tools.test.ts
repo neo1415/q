@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { PermittedContextPlan } from "@capital-q/contracts";
+import {
+  GOOGLE_RECONNECT_PATH,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
 
 import {
   createDefaultQTools,
@@ -66,6 +69,8 @@ function world(
   options: {
     calendarZone?: string | null;
     calendarConnected?: boolean;
+    calendarRevoked?: boolean;
+    counterpartCanHost?: boolean;
     profileZone?: string | null;
   } = {},
 ) {
@@ -129,8 +134,14 @@ function world(
     profileTimeZoneOf: () => Promise.resolve(options.profileZone ?? null),
     canSchedule: () =>
       Promise.resolve(
-        options.calendarConnected === false ? "CALENDAR_NOT_CONNECTED" : "OK",
+        options.calendarRevoked === true
+          ? "CALENDAR_REVOKED"
+          : options.calendarConnected === false
+            ? "CALENDAR_NOT_CONNECTED"
+            : "OK",
       ),
+    counterpartCanHost: () =>
+      Promise.resolve(options.counterpartCanHost === true),
   };
   const executor = createQToolExecutor({
     registry: createQToolRegistry(
@@ -355,6 +366,54 @@ describe("schedule tools", () => {
         ok: true,
         data: { status: "CALENDAR_NOT_CONNECTED" },
       });
+    });
+
+    it("says a revoked calendar plainly, with the reconnect link and the paste-a-link alternative (meetfix-57)", async () => {
+      const { executor, prepared } = world({ calendarRevoked: true });
+      const outcome = await executor.execute(
+        meetingAt({ day: "tomorrow", time: "14:00" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Europe/London",
+          ),
+        ),
+      );
+      expect(prepared).toEqual([]);
+      const data = (
+        outcome.result as { data: { status: string; says: string } }
+      ).data;
+      expect(data.status).toBe("CALENDAR_REVOKED");
+      const [first, second] = data.says.split("\n");
+      expect(first).toContain(
+        "Your Google Calendar connection expired, so I can't create the Meet link.",
+      );
+      expect(first).toContain(`(${GOOGLE_RECONNECT_PATH})`);
+      expect(second).toBe("Or paste a Meet link and I'll set it up and join.");
+    });
+
+    it("offers that the other side host when their calendar is connected (meetfix-57)", async () => {
+      const { executor } = world({
+        calendarConnected: false,
+        counterpartCanHost: true,
+      });
+      const outcome = await executor.execute(
+        meetingAt({ day: "tomorrow", time: "14:00" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Europe/London",
+          ),
+        ),
+      );
+      const data = (
+        outcome.result as { data: { status: string; says: string } }
+      ).data;
+      expect(data.status).toBe("CALENDAR_NOT_CONNECTED");
+      expect(data.says).toContain("Your Google Calendar isn't connected");
+      expect(data.says).toContain("Or Apex can host");
     });
 
     it("sets a reminder for Friday 9 AM in their zone", async () => {

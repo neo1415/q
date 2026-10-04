@@ -421,6 +421,37 @@ describe("reply tracking (push and poll share one idempotent sync)", () => {
     expect(w.store.accounts[0]?.status).toBe("REVOKED_BY_PROVIDER");
     expect(w.store.accounts[0]?.refreshTokenCiphertext).toBeNull();
   });
+
+  it("tells the person once when Google ends the connection, and Settings shows it (meetfix-57)", async () => {
+    const w = world();
+    await connected(w);
+    const fresh = () =>
+      createIntegrationsService({
+        store: w.store,
+        transactions: inlineTransactions,
+        activity: w.activity,
+        google: {
+          oauth: w.oauth,
+          cipher: createTokenCipher(KEY),
+          email: w.mailbox,
+        },
+      });
+    w.oauth.failRefresh = true;
+    // Two processes, each syncing more than once, all see the revocation.
+    await fresh().pollAll(CORRELATION);
+    await fresh().pollAll(CORRELATION);
+    const account = w.store.accounts[0];
+    expect(w.store.revokedNotices).toEqual([account?.id]);
+    expect(await w.service.status(INVESTOR)).toMatchObject({
+      status: "REVOKED",
+    });
+    // Reconnecting is a new connection: Settings is connected again.
+    w.oauth.failRefresh = false;
+    await connected(w);
+    expect(await w.service.status(INVESTOR)).toMatchObject({
+      status: "CONNECTED",
+    });
+  });
 });
 
 describe("Pub/Sub push OIDC verification", () => {

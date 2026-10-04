@@ -45,9 +45,19 @@ const STRANGER = actor("00000000-0000-4000-8000-0000000000e9", INVESTOR_TENANT);
 // Monday 5 October 2026, 08:00 London (07:00 UTC).
 const NOW = new Date("2026-10-05T07:00:00Z");
 
+type CalendarFixture = "CONNECTED" | "NOT_CONNECTED" | "REVOKED";
+
 function world(
-  options: { connected?: boolean; now?: Date; state?: string } = {},
+  options: {
+    connected?: boolean;
+    now?: Date;
+    state?: string;
+    /** meetfix-57: each side's calendar as stored; default connected. */
+    calendarsOf?: Partial<Record<string, CalendarFixture>>;
+  } = {},
 ) {
+  const stateOf = (userId: string): CalendarFixture =>
+    options.calendarsOf?.[userId] ?? "CONNECTED";
   let clock = options.now ?? NOW;
   const store = createInMemoryScheduleStore({ now: () => clock });
   const activity = createRecordingMeetingActivity();
@@ -104,12 +114,15 @@ function world(
     }),
     calendars: (userId) =>
       Promise.resolve(
-        userId === INVESTOR.userId
-          ? investorCalendar
-          : userId === FOUNDER.userId
-            ? founderCalendar
-            : null,
+        stateOf(userId) !== "CONNECTED"
+          ? null
+          : userId === INVESTOR.userId
+            ? investorCalendar
+            : userId === FOUNDER.userId
+              ? founderCalendar
+              : null,
       ),
+    calendarState: (userId) => Promise.resolve(stateOf(userId)),
     activity,
     email,
     now: () => clock,
@@ -216,6 +229,53 @@ describe("slot proposal", () => {
       durationMinutes: 30,
     });
     expect(unconnected).toEqual({ outcome: "REFUSED", code: "NOT_CONNECTED" });
+  });
+});
+
+describe("a missing organiser calendar, typed (meetfix-57)", () => {
+  it("says REVOKED apart from never connected, on every path", async () => {
+    const revoked = world({ calendarsOf: { [INVESTOR.userId]: "REVOKED" } });
+    expect(await revoked.service.canSchedule(INVESTOR, REL)).toBe(
+      "CALENDAR_REVOKED",
+    );
+    expect(await revoked.service.schedule(SCHEDULE)).toEqual({
+      outcome: "REFUSED",
+      code: "CALENDAR_REVOKED",
+    });
+    expect(
+      await revoked.service.findSlots({
+        actor: INVESTOR,
+        relationshipId: REL,
+        durationMinutes: 30,
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "CALENDAR_REVOKED" });
+    expect(await revoked.service.calendarStatus(INVESTOR.userId)).toBe(
+      "CALENDAR_REVOKED",
+    );
+
+    const never = world({
+      calendarsOf: { [INVESTOR.userId]: "NOT_CONNECTED" },
+    });
+    expect(await never.service.canSchedule(INVESTOR, REL)).toBe(
+      "CALENDAR_NOT_CONNECTED",
+    );
+    expect(await never.service.calendarStatus(INVESTOR.userId)).toBe(
+      "CALENDAR_NOT_CONNECTED",
+    );
+  });
+
+  it("knows whether the other side could host, without reading their calendar", async () => {
+    const hostable = world({ calendarsOf: { [INVESTOR.userId]: "REVOKED" } });
+    expect(await hostable.service.counterpartCanHost(INVESTOR, REL)).toBe(true);
+    expect(hostable.founderCalendar.busyQueries).toBe(0);
+    const neither = world({
+      calendarsOf: {
+        [INVESTOR.userId]: "REVOKED",
+        [FOUNDER.userId]: "NOT_CONNECTED",
+      },
+    });
+    expect(await neither.service.counterpartCanHost(INVESTOR, REL)).toBe(false);
+    expect(await world().service.counterpartCanHost(STRANGER, REL)).toBe(false);
   });
 });
 

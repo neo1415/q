@@ -7,6 +7,8 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 
+import { GOOGLE_RECONNECT_PATH, isCalendarBlock } from "@capital-q/contracts";
+
 import {
   Q2Q_DAILY_CAP,
   WAIT_NUDGE_AFTER_DAYS,
@@ -66,6 +68,12 @@ export type LaneState = {
   bookings: number;
   /** When Q started waiting for them to accept. */
   waitingSince: string | null;
+  /**
+   * meetfix-57: the call is parked because the person's Google Calendar is
+   * missing or revoked (the typed reason); nothing is attempted until
+   * `calendarReady` says it is back.
+   */
+  calendarBlocked: string | null;
 };
 
 const replace = <T>(initial: () => T) =>
@@ -96,6 +104,7 @@ export const LaneAnnotation = Annotation.Root({
   answersHandled: replace<readonly string[]>(() => []),
   bookings: replace<number>(() => 0),
   waitingSince: replace<string | null>(() => null),
+  calendarBlocked: replace<string | null>(() => null),
 });
 
 /** Replies Q sends to one founder before handing the thread back. */
@@ -575,6 +584,31 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
   };
 
   // --- TIMES -------------------------------------------------------------------
+  /**
+   * meetfix-57: a call can't be booked on a missing or revoked calendar.
+   * The lane says why, the person is told once with the reconnect link,
+   * and nothing more is attempted until the calendar is back.
+   */
+  const parkOnCalendar = async (
+    state: LaneState,
+    code: string,
+  ): Promise<Update> => {
+    const revoked = code === "CALENDAR_REVOKED";
+    await ports.updateLane(state.laneId, {
+      lastStep: revoked
+        ? "Call on hold: your Google Calendar connection expired. Reconnect Google to book it."
+        : "Call on hold: your Google Calendar isn't connected. Connect Google to book it.",
+    });
+    await ports.notify(state.ref, {
+      key: `calendar-blocked:${state.laneId}:${code}`,
+      title: `${revoked ? "Reconnect" : "Connect"} Google to book your call with ${state.counterpartName}`,
+      body: `${revoked ? "Your Google Calendar connection expired" : "Your Google Calendar isn't connected"}, so Q can't create the Meet link. ${revoked ? "Reconnect" : "Connect"} it in Settings → Connections (one tap) and Q will book it.`,
+      link: GOOGLE_RECONNECT_PATH,
+      priority: "NEEDS_YOU",
+    });
+    return { phase: "TIMES", waiting: true, calendarBlocked: code };
+  };
+
   const book = async (
     state: LaneState,
     key: string,
@@ -590,6 +624,9 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
       purpose: call.purpose,
       durationMinutes: call.durationMinutes,
     });
+    if (booked.outcome === "REFUSED" && isCalendarBlock(booked.code)) {
+      return parkOnCalendar(state, booked.code);
+    }
     if (booked.outcome !== "OK") {
       await ports.notify(state.ref, {
         key: `book-refused:${key}`,
@@ -639,7 +676,21 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
     if (call === null || state.relationshipId === null) {
       return end(state, "DONE", "Done.");
     }
+    if (state.calendarBlocked !== null) {
+      // Parked: a cheap check of stored state, never a booking attempt.
+      const ready =
+        (await ports.calendarReady?.(state.ref).catch(() => false)) ?? false;
+      if (!ready) return { waiting: true };
+      // Reconnected: the hold is over, and the times step runs again now.
+      await ports.updateLane(state.laneId, {
+        lastStep: "Google reconnected; Q is booking the call.",
+      });
+      return { calendarBlocked: null, waiting: false };
+    }
     const found = await ports.slots(state.ref, state.relationshipId, call);
+    if (found.outcome === "REFUSED" && isCalendarBlock(found.code)) {
+      return parkOnCalendar(state, found.code);
+    }
     if (found.outcome !== "OK") {
       await ports.notify(state.ref, {
         key: `slots-refused:${state.laneId}:${found.code}`,

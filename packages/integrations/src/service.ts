@@ -128,6 +128,12 @@ export type IntegrationsService = {
    * have not connected, or their grant lacks `calendar.events`.
    */
   readonly calendarOf: (userId: string) => Promise<ConnectedCalendar | null>;
+  /**
+   * meetfix-57: why there is no calendar, from the rows alone (no Google
+   * call, nothing logged), so a booking that can't happen says the real
+   * reason and a parked one can check for a reconnect cheaply.
+   */
+  readonly calendarState: (userId: string) => Promise<CalendarState>;
   readonly sendApprovedEmail: (
     command: SendApprovedEmailCommand,
   ) => Promise<SendApprovedEmailOutcome>;
@@ -186,6 +192,9 @@ export type ConnectedCalendar = {
   readonly announceLink: (eventId: string, meetLink: string) => Promise<void>;
 };
 
+/** A person's Google Calendar, as booking sees it. */
+export type CalendarState = "CONNECTED" | "NOT_CONNECTED" | "REVOKED";
+
 export const CALENDAR_EVENTS_SCOPE =
   "https://www.googleapis.com/auth/calendar.events";
 
@@ -238,13 +247,26 @@ export function createIntegrationsService(
         error instanceof GoogleProviderError &&
         error.code === "INVALID_GRANT"
       ) {
-        // The person revoked us at Google: the credential is dead weight.
-        await store.endConnection(account.id, "REVOKED_BY_PROVIDER");
+        // The person revoked us at Google (or a testing-mode token lapsed
+        // after 7 days): the credential is dead weight.
+        const ended = await store.endConnection(
+          account.id,
+          "REVOKED_BY_PROVIDER",
+        );
         accessCache.delete(account.id);
         logger?.warn(
           { googleAccountId: account.id },
           "google grant revoked by provider; connection ended",
         );
+        if (ended) {
+          // meetfix-57: told once, by whichever sync saw it first.
+          await store.noticeRevoked(account).catch((noticeError: unknown) => {
+            logger?.warn(
+              { googleAccountId: account.id, err: noticeError },
+              "google revocation notice not recorded",
+            );
+          });
+        }
       }
       throw error;
     }
@@ -375,7 +397,19 @@ export function createIntegrationsService(
     status: async (userId) => {
       if (google === undefined) return { status: "UNAVAILABLE" };
       const account = await store.findConnectedByUser(userId);
-      if (account === null) return { status: "NOT_CONNECTED" };
+      if (account === null) {
+        // Google ended the newest connection: say so, so Settings offers
+        // Reconnect rather than a first-time Connect.
+        const latest = await store.latestStatus(userId);
+        return latest?.status === "REVOKED_BY_PROVIDER"
+          ? {
+              status: "REVOKED",
+              ...(latest.endedAt === null
+                ? {}
+                : { revokedAt: latest.endedAt.toISOString() }),
+            }
+          : { status: "NOT_CONNECTED" };
+      }
       return {
         status: "CONNECTED",
         email: account.email,
@@ -550,6 +584,20 @@ export function createIntegrationsService(
         announceLink: async (eventId, meetLink) =>
           calendar.announceLink(await accessFor(account), eventId, meetLink),
       };
+    },
+
+    calendarState: async (userId) => {
+      if (google?.calendar === undefined) return "NOT_CONNECTED";
+      const account = await store.findConnectedByUser(userId);
+      if (account !== null) {
+        return account.scopes.includes(CALENDAR_EVENTS_SCOPE)
+          ? "CONNECTED"
+          : "NOT_CONNECTED";
+      }
+      const latest = await store.latestStatus(userId);
+      return latest?.status === "REVOKED_BY_PROVIDER"
+        ? "REVOKED"
+        : "NOT_CONNECTED";
     },
 
     sendApprovedEmail: async (command) => {

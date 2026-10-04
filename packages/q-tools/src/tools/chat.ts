@@ -382,6 +382,7 @@ export const ChatProposalOutputSchema = z
      * NOT_CONNECTED: messages open once both sides are connected.
      * BLOCKED: messaging is blocked on this relationship; nothing is sent.
      * CALENDAR_NOT_CONNECTED: a call needs their Google Calendar connected.
+     * CALENDAR_REVOKED: Google ended their calendar connection; reconnect.
      */
     status: z.enum([
       "PREPARED",
@@ -389,6 +390,7 @@ export const ChatProposalOutputSchema = z
       "NOT_CONNECTED",
       "BLOCKED",
       "CALENDAR_NOT_CONNECTED",
+      "CALENDAR_REVOKED",
       /** Q already runs an errand for this subject: nothing new prepared. */
       "ALREADY_ACTIVE",
       /**
@@ -398,8 +400,11 @@ export const ChatProposalOutputSchema = z
       "NEEDS_TIME_ZONE",
     ]),
     awaitingApprovalOf: z.string(),
-    /** The one short question to put to them (NEEDS_TIME_ZONE). */
-    says: z.string().max(300).optional(),
+    /**
+     * The one short question to put to them (NEEDS_TIME_ZONE), or Capital
+     * Q's own words for why nothing was prepared and the fix (CALENDAR_*).
+     */
+    says: z.string().max(600).optional(),
     /** For Q: what to do with their answer (NEEDS_TIME_ZONE). */
     guidance: z.string().max(600).optional(),
   })

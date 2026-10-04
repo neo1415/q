@@ -511,6 +511,7 @@ import {
 import {
   createMeetingCancelAction,
   createMeetingRescheduleAction,
+  createCalendarBlockedNotice,
   createMeetingScheduleAction,
   createReminderCreateAction,
   createScheduleIntelligencePort,
@@ -1295,6 +1296,7 @@ const schedule = composeSchedule({
   transactions: database.transactions,
   interests: interestService,
   calendars: (userId) => integrations.calendarOf(userId),
+  calendarState: (userId) => integrations.calendarState(userId),
   email: unavailableAppEmailSender,
   logger,
   onJoinRequested: (meetingId) => {
@@ -2347,7 +2349,11 @@ const qActionRegistry = createQActionRegistry([
   createChatMessageSendAction({ chat, logger }),
   // BIZ-008: reminders and calls (Google Calendar + Meet).
   createReminderCreateAction({ schedule, logger }),
-  createMeetingScheduleAction({ schedule, logger }),
+  createMeetingScheduleAction({
+    schedule,
+    logger,
+    tellCalendarBlocked: createCalendarBlockedNotice(database.sql),
+  }),
   createMeetingRescheduleAction({ schedule }),
   createMeetingCancelAction({ schedule }),
   // BILLING block (ADR 0034): an errand, outreach or a stand-in each draw

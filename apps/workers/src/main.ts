@@ -961,6 +961,7 @@ const schedule = composeSchedule({
   // person's authorised request created. No party check can pass here.
   interests: { relationshipById: () => Promise.resolve(null) },
   calendars: (userId) => gmailIntegrations.calendarOf(userId),
+  calendarState: (userId) => gmailIntegrations.calendarState(userId),
   // HTTPS first: the deployment's network blocks outbound SMTP.
   // ADMIN block: each send's outcome feeds the console's Email panel.
   email:

@@ -87,7 +87,8 @@ export type WorkRuntimeDependencies = {
       input: Parameters<ChatService["send"]>[0],
     ) => Promise<unknown>;
   };
-  readonly schedule: Pick<ScheduleService, "findSlots" | "schedule">;
+  readonly schedule: Pick<ScheduleService, "findSlots" | "schedule"> &
+    Partial<Pick<ScheduleService, "calendarStatus">>;
   readonly interests: Pick<InterestService, "expressInterest">;
   readonly relationships: Pick<RelationshipIntelligencePort, "byRelationship">;
   /** The investor's own Discover feed, as the page shows it. */
@@ -458,6 +459,13 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
       };
     },
 
+    // meetfix-57: a parked call checks stored state only, never Google.
+    calendarReady: async (ref) =>
+      dependencies.schedule.calendarStatus === undefined
+        ? false
+        : (await dependencies.schedule
+            .calendarStatus(ref.userId)
+            .catch(() => null)) === "CONNECTED",
     slots: async (ref, relationshipId, call) => {
       const actor = await actorFor(ref);
       if (actor === null) return { outcome: "REFUSED", code: "ACCESS_LOST" };

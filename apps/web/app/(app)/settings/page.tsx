@@ -26,7 +26,7 @@ export const metadata: Metadata = { title: "Settings" };
  * Settings (R28): how Capital Q looks and how Q behaves on this device.
  *
  * Every choice here is a per-device preference the browser keeps (theme,
- * Q motion, Q's voice). Connected accounts (BIZ-007: Gmail) read their own status after
+ * Q motion, Q's voice). Connections (BIZ-007: Google) read their own status after
  * the page opens; Q's personality and The Q Daily are kept by Capital Q
  * and read in parallel as the page renders. Notifications (AUTO): a push on this device and email
  * for what needs them; in-app notices always show. The page offers no
@@ -37,7 +37,8 @@ export default async function SettingsPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const google = (await searchParams)["google"];
+  const params = await searchParams;
+  const google = params["google"];
   // Who Q is with them is kept by Capital Q, so it follows them to every
   // device (founder direction 2026-09-30).
   const session = await qApiSession();
@@ -140,11 +141,13 @@ export default async function SettingsPage({
           </dl>
         </PageSection>
 
-        <PageSection id="connected-accounts" title="Connected accounts">
+        {/* meetfix-57: "Settings → Connections", where Q's reconnect link lands. */}
+        <PageSection id="connections" title="Connections">
           <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            <SettingRow term="Gmail">
+            <SettingRow term="Google (Gmail, Calendar, Meet)">
               <GmailConnection
                 outcome={typeof google === "string" ? google : undefined}
+                reconnect={params["reconnect"] === "google"}
               />
             </SettingRow>
             <SettingRow term="Your Q email address">

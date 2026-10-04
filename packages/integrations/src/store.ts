@@ -106,6 +106,14 @@ export type IntegrationsStore = {
   readonly findConnectedByUser: (
     userId: string,
   ) => Promise<GoogleAccountRecord | null>;
+  /**
+   * meetfix-57: the person's newest connection, live or ended, and when it
+   * ended -- so "Google ended it" reads apart from "never connected".
+   */
+  readonly latestStatus: (userId: string) => Promise<{
+    readonly status: GoogleAccountStatus;
+    readonly endedAt: Date | null;
+  } | null>;
   readonly findConnectedById: (
     accountId: string,
   ) => Promise<GoogleAccountRecord | null>;
@@ -116,11 +124,19 @@ export type IntegrationsStore = {
   readonly listConnected: (
     limit: number,
   ) => Promise<readonly GoogleAccountRecord[]>;
-  /** Drops the credential; the row stays as history. */
+  /**
+   * Drops the credential; the row stays as history. True only for the call
+   * that ended a live connection, so what follows an ending happens once.
+   */
   readonly endConnection: (
     accountId: string,
     status: "DISCONNECTED" | "REVOKED_BY_PROVIDER",
-  ) => Promise<void>;
+  ) => Promise<boolean>;
+  /**
+   * meetfix-57: the person's one notice that Google ended this connection,
+   * with the reconnect link; idempotent per connection.
+   */
+  readonly noticeRevoked: (account: GoogleAccountRecord) => Promise<void>;
   readonly saveCursor: (
     accountId: string,
     cursor: {

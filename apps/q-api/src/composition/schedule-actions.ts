@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import {
+  GOOGLE_RECONNECT_PATH,
+  isCalendarBlock,
   MeetingDurationMinutesSchema,
   MeetingPurposeSchema,
   QActionTypeSchema,
@@ -10,12 +12,14 @@ import {
   TimeZoneSchema,
   UtcTimestampSchema,
   UuidSchema,
+  type CalendarBlockReason,
   type QSubjectRef,
 } from "@capital-q/contracts";
 import type {
   ScheduleOutcome,
   ScheduleService,
 } from "@capital-q/communication";
+import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 import {
@@ -266,9 +270,46 @@ export function createReminderCreateAction(dependencies: {
   });
 }
 
+/**
+ * meetfix-57: the approver's one notice that an approved call needs their
+ * Google Calendar back, deduplicated per action, with the reconnect link.
+ */
+export function createCalendarBlockedNotice(
+  sql: DatabaseExecutor,
+): NonNullable<
+  Parameters<typeof createMeetingScheduleAction>[0]["tellCalendarBlocked"]
+> {
+  return async (notice) => {
+    const revoked = notice.reason === "CALENDAR_REVOKED";
+    const verb = revoked ? "Reconnect" : "Connect";
+    await sql`
+      insert into communication.notifications
+        (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
+      values (${notice.tenantId}, ${notice.userId}, 'Q_WORK',
+              ${`${verb} Google to book your call with ${notice.counterpartName}`.slice(0, 200)},
+              ${`${revoked ? "Your Google Calendar connection expired" : "Your Google Calendar isn't connected"}, so Q couldn't create the Meet link and nothing was sent. ${verb} it in Settings → Connections (one tap), then ask Q to book it again.`},
+              ${GOOGLE_RECONNECT_PATH}, null, null,
+              ${`meeting-calendar:${notice.actionId}`})
+      on conflict (user_id, dedupe_key) do nothing`;
+  };
+}
+
 export function createMeetingScheduleAction(dependencies: {
   readonly schedule: ScheduleService;
   readonly logger?: Logger | undefined;
+  /**
+   * meetfix-57: tells the approver, once per action, that the call needs
+   * their Google Calendar reconnected. Absent: the failure code alone.
+   */
+  readonly tellCalendarBlocked?:
+    | ((notice: {
+        readonly tenantId: string;
+        readonly userId: string;
+        readonly actionId: string;
+        readonly reason: CalendarBlockReason;
+        readonly counterpartName: string;
+      }) => Promise<void>)
+    | undefined;
 }): AnyQActionDefinition {
   const { schedule, logger } = dependencies;
   return defineQAction<
@@ -294,7 +335,11 @@ export function createMeetingScheduleAction(dependencies: {
         : `Booked. ${payload.counterpartName} has the invite${result.meetLink === null ? "" : ` and the Meet link: ${result.meetLink}`}.`,
     authorize: async (payload, actor) => {
       const check = await schedule.canSchedule(actor, payload.relationshipId);
-      return check === "OK"
+      // meetfix-57: a missing calendar is not a want of authority. Denied
+      // here, an approved meeting stayed APPROVED and the sweep re-ran it
+      // every two minutes for a week; allowed, the executor meets the
+      // typed refusal once and the action ends FAILED with that reason.
+      return check === "OK" || isCalendarBlock(check)
         ? { outcome: "ALLOW" }
         : { outcome: "DENY", code: check };
     },
@@ -333,6 +378,26 @@ export function createMeetingScheduleAction(dependencies: {
             },
             "approved meeting not booked",
           );
+        }
+        if (
+          outcome.outcome === "REFUSED" &&
+          isCalendarBlock(outcome.code) &&
+          dependencies.tellCalendarBlocked !== undefined
+        ) {
+          await dependencies
+            .tellCalendarBlocked({
+              tenantId: context.approver.tenantId,
+              userId: context.approver.userId,
+              actionId: action.actionId,
+              reason: outcome.code,
+              counterpartName: action.payload.counterpartName,
+            })
+            .catch((error: unknown) => {
+              logger?.warn(
+                { err: error, actionId: action.actionId },
+                "calendar notice not recorded",
+              );
+            });
         }
         return asExecution(outcome, (ok) => ({
           meetingId: ok.meeting.id,
@@ -485,6 +550,8 @@ export function createScheduleIntelligencePort(
     timeZoneOf: (actor) => schedule.timeZoneOf(actor),
     canSchedule: (actor, relationshipId) =>
       schedule.canSchedule(actor, relationshipId),
+    counterpartCanHost: (actor, relationshipId) =>
+      schedule.counterpartCanHost(actor, relationshipId),
     brief: async (actor, meetingId) =>
       (await schedule.brief(actor, meetingId))?.body ?? null,
   };

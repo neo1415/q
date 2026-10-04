@@ -1,4 +1,7 @@
-import { CorrelationIdSchema } from "@capital-q/contracts";
+import {
+  CorrelationIdSchema,
+  GOOGLE_RECONNECT_PATH,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import {
   createPostgresRelationshipEventRepository,
@@ -193,6 +196,21 @@ export function createPostgresIntegrationsStore(options: {
           from integrations.google_accounts
           where user_id = ${userId} and status = 'CONNECTED' limit 1`,
       )[0] ?? null,
+    latestStatus: async (userId) => {
+      const rows = await sql<
+        {
+          status: GoogleAccountRecord["status"];
+          disconnected_at: Date | null;
+        }[]
+      >`select status, disconnected_at from integrations.google_accounts
+          where user_id = ${userId}
+          order by (status = 'CONNECTED') desc, connected_at desc
+          limit 1`;
+      const row = rows[0];
+      return row === undefined
+        ? null
+        : { status: row.status, endedAt: row.disconnected_at };
+    },
     findConnectedById: async (accountId) =>
       accounts(
         await sql<AccountRow[]>`select ${sql([...ACCOUNT_COLUMNS])}
@@ -214,10 +232,26 @@ export function createPostgresIntegrationsStore(options: {
           limit ${limit}`,
       ),
     endConnection: async (accountId, status) => {
-      await sql`update integrations.google_accounts
+      const ended = await sql<
+        { id: string }[]
+      >`update integrations.google_accounts
           set status = ${status}, refresh_token_ciphertext = null,
               disconnected_at = clock_timestamp(), watch_expires_at = null
-        where id = ${accountId} and status = 'CONNECTED'`;
+        where id = ${accountId} and status = 'CONNECTED'
+        returning id`;
+      return ended.length > 0;
+    },
+    noticeRevoked: async (account) => {
+      // The person's own notice, like the inbound-email one: no address,
+      // no provider detail, and once per connection whatever retries.
+      await sql`
+        insert into communication.notifications
+          (tenant_id, user_id, kind, title, body, link_path, dedupe_key, priority)
+        values (${account.tenantId}, ${account.userId}, 'Q_WORK',
+                'Google disconnected: reconnect to keep calendar, email and Meet working',
+                'Google ended Capital Q''s access to your account, so Q can''t book calls with a Meet link, send email you approve, or notice replies. Reconnect in Settings → Connections (one tap).',
+                ${GOOGLE_RECONNECT_PATH}, ${`google-revoked:${account.id}`}, 'NEEDS_YOU')
+        on conflict (user_id, dedupe_key) do nothing`;
     },
     saveCursor: async (accountId, cursor) => {
       await sql`update integrations.google_accounts

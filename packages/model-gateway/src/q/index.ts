@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import {
+  isCalendarBlock,
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
   QDocumentToolResultSchema,
@@ -3719,7 +3720,12 @@ export function asksThePerson(text: string): boolean {
 export function appActionLineOf(data: unknown): string | null {
   if (typeof data !== "object" || data === null) return null;
   const record = data as { readonly status?: unknown; readonly says?: unknown };
-  return (record.status === "DONE" || record.status === "NOT_DONE") &&
+  // meetfix-57: a call blocked on the organiser's calendar is said in
+  // Capital Q's words too -- the typed reason and its fix, never the
+  // generic could-not line.
+  return (record.status === "DONE" ||
+    record.status === "NOT_DONE" ||
+    isCalendarBlock(record.status)) &&
     typeof record.says === "string" &&
     record.says.trim().length > 0
     ? record.says.trim()

@@ -94,6 +94,7 @@ export {
   CALENDAR_EVENTS_SCOPE,
   createIntegrationsService,
   IntegrationUnavailableError,
+  type CalendarState,
   type ConnectedCalendar,
   OAUTH_STATE_TTL_MS,
   type CompleteConnectOutcome,

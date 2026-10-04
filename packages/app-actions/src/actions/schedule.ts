@@ -71,7 +71,13 @@ const REFUSALS: Readonly<
   },
   CALENDAR_NOT_CONNECTED: {
     code: "RESOURCE_CONFLICT",
-    detail: "Connect Google in Settings to use your calendar.",
+    detail:
+      "Your Google Calendar isn't connected. Connect it in Settings → Connections to book calls.",
+  },
+  CALENDAR_REVOKED: {
+    code: "RESOURCE_CONFLICT",
+    detail:
+      "Your Google Calendar connection expired. Reconnect it in Settings → Connections to book calls.",
   },
   NO_RECIPIENTS: {
     code: "RESOURCE_CONFLICT",

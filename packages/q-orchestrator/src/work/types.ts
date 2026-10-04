@@ -310,6 +310,13 @@ export type QWorkPorts = {
     | { readonly outcome: "OK"; readonly slots: readonly Slot[] }
     | { readonly outcome: "REFUSED"; readonly code: string }
   >;
+  /**
+   * meetfix-57: whether the person's Google Calendar is connected again,
+   * from stored state only (no provider call). Absent: a parked call stays
+   * parked.
+   */
+  readonly calendarReady?:
+    ((ref: DelegationRef) => Promise<boolean>) | undefined;
   readonly book: (
     ref: DelegationRef,
     relationshipId: string,

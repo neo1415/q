@@ -124,6 +124,7 @@ describe("@capital-q/integrations against local PostgreSQL", () => {
       const sql = tx.sql;
       await sql`delete from integrations.email_messages where relationship_id = ${ids.relationship} and direction = 'INBOUND'`;
       await sql`delete from integrations.email_messages where relationship_id = ${ids.relationship}`;
+      await sql`delete from communication.notifications where tenant_id = ${ids.tenantInv}`;
       await sql`delete from integrations.google_accounts where tenant_id = ${ids.tenantInv}`;
       await sql`delete from integrations.oauth_states where tenant_id = ${ids.tenantInv}`;
       await sql`delete from network.relationship_events where relationship_id = ${ids.relationship}`;
@@ -261,5 +262,48 @@ describe("@capital-q/integrations against local PostgreSQL", () => {
 
     await service.disconnect(investorUserId);
     expect(await store.findConnectedByUser(investorUserId)).toBeNull();
+  });
+
+  it("ends a revoked connection once and tells the person once (meetfix-57)", async () => {
+    const store = createPostgresIntegrationsStore({
+      sql: db.sql,
+      transactions: db.transactions,
+    });
+    const account = await store.connectAccount({
+      tenantId: ids.tenantInv,
+      userId: investorUserId,
+      googleSubject: "meetfix-57",
+      email: `ben-${ids.investorAuth.slice(0, 6)}@fund.example.invalid`,
+      scopes: ["openid"],
+      refreshTokenCiphertext: randomBytes(64),
+      keyVersion: 1,
+      historyId: null,
+    });
+    expect(await store.latestStatus(investorUserId)).toEqual({
+      status: "CONNECTED",
+      endedAt: null,
+    });
+    expect(await store.endConnection(account.id, "REVOKED_BY_PROVIDER")).toBe(
+      true,
+    );
+    expect(await store.endConnection(account.id, "REVOKED_BY_PROVIDER")).toBe(
+      false,
+    );
+    expect((await store.latestStatus(investorUserId))?.status).toBe(
+      "REVOKED_BY_PROVIDER",
+    );
+    await store.noticeRevoked(account);
+    await store.noticeRevoked(account);
+    const notices = await db.sql<{ title: string; link_path: string }[]>`
+      select title, link_path from communication.notifications
+       where user_id = ${investorUserId}
+         and dedupe_key = ${`google-revoked:${account.id}`}`;
+    expect(notices).toEqual([
+      {
+        title:
+          "Google disconnected: reconnect to keep calendar, email and Meet working",
+        link_path: "/settings/reconnect/google",
+      },
+    ]);
   });
 });

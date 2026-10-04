@@ -306,7 +306,7 @@ describe("calendarOf", () => {
         calendar: createGoogleCalendarProvider(http),
       },
     });
-    return { service, http };
+    return { service, http, store };
   }
 
   it("binds the person's own connection and mints access from the sealed token", async () => {
@@ -323,5 +323,22 @@ describe("calendarOf", () => {
     expect(
       await w.service.calendarOf("00000000-0000-4000-8000-0000000000b2"),
     ).toBeNull();
+  });
+
+  it("types a missing calendar from the rows alone: revoked apart from never connected (meetfix-57)", async () => {
+    const w = await world(["openid", CALENDAR_EVENTS_SCOPE]);
+    expect(await w.service.calendarState(USER)).toBe("CONNECTED");
+    const account = w.store.accounts[0];
+    if (account === undefined) throw new Error("no account");
+    await w.store.endConnection(account.id, "REVOKED_BY_PROVIDER");
+    expect(await w.service.calendarState(USER)).toBe("REVOKED");
+    expect(await w.service.status(USER)).toMatchObject({ status: "REVOKED" });
+    expect(
+      await w.service.calendarState("00000000-0000-4000-8000-0000000000b2"),
+    ).toBe("NOT_CONNECTED");
+    // Nothing reached Google for any of it.
+    expect(w.http.calls).toHaveLength(0);
+    const narrow = await world(["openid"]);
+    expect(await narrow.service.calendarState(USER)).toBe("NOT_CONNECTED");
   });
 });

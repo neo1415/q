@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 
+import { GOOGLE_RECONNECT_PATH } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import {
   AlertTriangle,
@@ -347,6 +348,18 @@ function parseList(
   return index;
 }
 
+/**
+ * meetfix-57: the few in-app links Capital Q itself puts in an answer
+ * (the Google reconnect). Exact matches only: any other relative path still
+ * loses its link, so a model can never point the person somewhere new.
+ */
+const IN_APP_LINKS: ReadonlySet<string> = new Set([GOOGLE_RECONNECT_PATH]);
+
+export function inAppHref(target: string): string | null {
+  const trimmed = target.trim();
+  return IN_APP_LINKS.has(trimmed) ? trimmed : null;
+}
+
 /** An absolute http(s) URL, or nothing: the only links an answer may carry. */
 export function safeHref(target: string): string | null {
   const trimmed = target.trim();
@@ -477,10 +490,15 @@ export function renderInline(
       if (link !== null) {
         flush();
         const label = link[1] ?? "";
+        const inApp = inAppHref(link[2] ?? "");
         const href = safeHref(link[2] ?? "");
         const id = next();
         out.push(
-          href === null ? (
+          inApp !== null ? (
+            <a key={id} href={inApp} className="underline underline-offset-2">
+              {renderInline(label, streaming, id)}
+            </a>
+          ) : href === null ? (
             <Fragment key={id}>{renderInline(label, streaming, id)}</Fragment>
           ) : (
             <a

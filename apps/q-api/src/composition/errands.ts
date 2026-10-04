@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import {
   ChatMessageBodySchema,
+  GOOGLE_RECONNECT_PATH,
+  isCalendarBlock,
   QActionTypeSchema,
   UtcTimestampSchema,
   UuidSchema,
@@ -529,6 +531,13 @@ export type ErrandStore = {
     relationshipId: string,
   ) => Promise<readonly ErrandListRow[]>;
   readonly stop: (actor: ActorContext, errandId: string) => Promise<boolean>;
+  /**
+   * meetfix-57: whether this errand's notice for `step` was already given.
+   * A call parked on a missing calendar stays parked while it was told and
+   * the calendar is still missing; absent, a parked call is never assumed.
+   */
+  readonly told?:
+    ((row: ErrandRow, step: string) => Promise<boolean>) | undefined;
   /** The person's own ACTIVE errand for a relationship or company, if any. */
   readonly activeFor?:
     | ((
@@ -602,6 +611,14 @@ export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
                 ${`errand:${row.id}:${step}`.slice(0, 200)})
         on conflict (user_id, dedupe_key) do nothing`;
     },
+    told: async (row, step) =>
+      (
+        await sql<{ found: number }[]>`
+          select 1 as found from communication.notifications
+           where user_id = ${row.user_id}
+             and dedupe_key = ${`errand:${row.id}:${step}`.slice(0, 200)}
+           limit 1`
+      ).length > 0,
     list: async (actor, relationshipId) =>
       sql<ErrandListRow[]>`
         select id, counterpart_name, status, last_step, failure, created_at
@@ -660,7 +677,8 @@ export function createErrandRunner(dependencies: {
       input: Parameters<ChatService["send"]>[0],
     ) => Promise<unknown>;
   };
-  readonly schedule: Pick<ScheduleService, "findSlots" | "schedule">;
+  readonly schedule: Pick<ScheduleService, "findSlots" | "schedule"> &
+    Partial<Pick<ScheduleService, "calendarStatus" | "counterpartCanHost">>;
   readonly relationships: Pick<RelationshipIntelligencePort, "byRelationship">;
   readonly composer: ErrandReplyComposer;
   readonly nameOf: (userId: string) => Promise<string | null>;
@@ -993,6 +1011,55 @@ export function createErrandRunner(dependencies: {
     return true;
   }
 
+  /** A call parked on a missing calendar: told, and still missing. */
+  async function parkedOnCalendar(row: ErrandRow): Promise<boolean> {
+    if (schedule.calendarStatus === undefined || store.told === undefined) {
+      return false;
+    }
+    const status = await schedule
+      .calendarStatus(row.user_id)
+      .catch(() => "CONNECTED" as const);
+    if (status === "CONNECTED") return false;
+    return store.told(row, `call-blocked:${status}`).catch(() => false);
+  }
+
+  /**
+   * meetfix-57: the call can't be booked on a missing or revoked calendar.
+   * Marked with the reason, the organiser told once with the reconnect
+   * link, and nothing more is attempted until the calendar is back.
+   */
+  async function parkOnCalendar(
+    actor: ActorContext,
+    row: ErrandRow,
+    reason: "CALENDAR_NOT_CONNECTED" | "CALENDAR_REVOKED",
+  ): Promise<void> {
+    const canHost =
+      (await schedule
+        .counterpartCanHost?.(actor, row.relationship_id)
+        .catch(() => false)) ?? false;
+    const revoked = reason === "CALENDAR_REVOKED";
+    await update(row.id, {
+      lastStep: revoked
+        ? "Call on hold: your Google Calendar connection expired. Reconnect Google to book it."
+        : "Call on hold: your Google Calendar isn't connected. Connect Google to book it.",
+    });
+    await tell(
+      row,
+      GOOGLE_RECONNECT_PATH,
+      `call-blocked:${reason}`,
+      `${revoked ? "Reconnect" : "Connect"} Google to book your call with ${row.counterpart_name}`,
+      [
+        revoked
+          ? "Your Google Calendar connection expired, so Q can't create the Meet link."
+          : "Your Google Calendar isn't connected, so Q can't create the Meet link.",
+        `${revoked ? "Reconnect" : "Connect"} it in Settings → Connections (one tap) and Q will book it.`,
+        canHost
+          ? `Or ${row.counterpart_name} can host: their Google Calendar is connected.`
+          : "Or paste a Meet link in the chat and Q will set it up and join.",
+      ].join("\n"),
+    );
+  }
+
   async function bookCall(
     actor: ActorContext,
     row: ErrandRow,
@@ -1001,6 +1068,16 @@ export function createErrandRunner(dependencies: {
   ): Promise<void> {
     const call = plan.bookCall;
     if (call === null || row.meeting_id !== null) return;
+    // meetfix-57: parked on a missing calendar -- told once, and the
+    // calendar still missing (stored state, no Google call): nothing is
+    // attempted until it is reconnected, which this check sees next tick.
+    if (await parkedOnCalendar(row)) return;
+    // Already arranging the time in the chat (no calendar): the calendar
+    // is not asked again every minute.
+    if (dependencies.negotiation !== undefined && offeredOf(row).length > 0) {
+      await offerTimes(actor, row, call, link, dependencies.negotiation);
+      return;
+    }
     const current = now();
     const found = await schedule.findSlots({
       actor,
@@ -1016,6 +1093,10 @@ export function createErrandRunner(dependencies: {
       await offerTimes(actor, row, call, link, dependencies.negotiation);
       return;
     }
+    if (found.outcome === "REFUSED" && isCalendarBlock(found.code)) {
+      await parkOnCalendar(actor, row, found.code);
+      return;
+    }
     if (found.outcome !== "OK") {
       const code = found.outcome === "REFUSED" ? found.code : "UNAVAILABLE";
       await tell(
@@ -1023,9 +1104,7 @@ export function createErrandRunner(dependencies: {
         link,
         `call-blocked:${code}`,
         `Q couldn't book the call with ${row.counterpart_name}`,
-        code === "CALENDAR_NOT_CONNECTED"
-          ? "Connect Google Calendar in Settings and Q will book it."
-          : "Q will try again shortly.",
+        "Q will try again shortly.",
       );
       await update(row.id, { lastStep: "Waiting to book the call." });
       return;

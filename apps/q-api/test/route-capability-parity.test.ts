@@ -711,6 +711,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/daily/[editionId]": cap("tool.get_q_daily"),
   "/settings/memory": cap("navigate.MEMORY"),
   "/settings/usage": cap("navigate.USAGE"),
+  // meetfix-57: the reconnect link in Q's answers and notices; it only
+  // redirects to Settings (navigate.SETTINGS), where Q already takes them.
+  "/settings/reconnect/google": cap("navigate.SETTINGS"),
   "/verification": cap("navigate.VERIFICATION"),
   "/pitch": cap("navigate.PITCH"),
   // One video's page and a new video's, both opened from Pitch & media (ADR 0022).

@@ -1412,6 +1412,7 @@ const schedule = composeSchedule({
   transactions: database.transactions,
   interests,
   calendars: (userId) => integrations.calendarOf(userId),
+  calendarState: (userId) => integrations.calendarState(userId),
   email: unavailableAppEmailSender,
 });
 

@@ -1,9 +1,12 @@
 import { z } from "zod";
 
 import {
+  calendarBlockedLine,
+  isCalendarBlock,
   Q_TASK_CLASSES,
   UtcTimestampSchema,
   UuidSchema,
+  type CalendarBlockReason,
   type PermittedContextPlan,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
@@ -73,6 +76,7 @@ type Refusal =
   | "NOT_A_PARTY"
   | "NOT_CONNECTED"
   | "CALENDAR_NOT_CONNECTED"
+  | "CALENDAR_REVOKED"
   | "NO_RECIPIENTS"
   | "NOT_FOUND"
   | "NOT_ORGANISER"
@@ -159,7 +163,32 @@ export type ScheduleIntelligencePort = {
     actor: ActorContext,
     relationshipId: string,
   ) => Promise<"OK" | Refusal>;
+  /**
+   * meetfix-57: with the organiser's calendar missing, whether the other
+   * side could host the call from their own connected calendar.
+   */
+  readonly counterpartCanHost?:
+    | ((actor: ActorContext, relationshipId: string) => Promise<boolean>)
+    | undefined;
 };
+
+/** Capital Q's words for a call blocked on the organiser's calendar. */
+async function blockedSays(
+  schedule: ScheduleIntelligencePort,
+  actor: ActorContext,
+  reason: CalendarBlockReason,
+  grant: { readonly relationshipId: string; readonly counterpartName: string },
+): Promise<string> {
+  const counterpartCanHost =
+    (await schedule
+      .counterpartCanHost?.(actor, grant.relationshipId)
+      .catch(() => false)) ?? false;
+  return calendarBlockedLine({
+    reason,
+    counterpartName: grant.counterpartName,
+    counterpartCanHost,
+  });
+}
 
 // An IANA zone, or the place they named for it ("Lagos", "Port
 // Harcourt"): resolved to a zone by code before it is used.
@@ -225,6 +254,7 @@ export const FindMeetingTimesOutputSchema = z
       "OK",
       "NOT_CONNECTED",
       "CALENDAR_NOT_CONNECTED",
+      "CALENDAR_REVOKED",
       "UNAVAILABLE",
     ]),
     counterpartName: z.string(),
@@ -241,6 +271,8 @@ export const FindMeetingTimesOutputSchema = z
       )
       .max(3),
     guidance: z.string(),
+    /** CALENDAR_*: Capital Q's own words, said as they are. */
+    says: z.string().max(600).optional(),
   })
   .strict();
 export type FindMeetingTimesOutput = z.infer<
@@ -300,7 +332,9 @@ const GUIDANCE: Readonly<Record<string, string>> = {
   NOT_CONNECTED:
     "Calls open once they are connected with them: interest expressed and accepted.",
   CALENDAR_NOT_CONNECTED:
-    "Their Google account is not connected with Calendar. Offer to take them to Settings to connect Google.",
+    "Their Google Calendar is not connected. Capital Q says why and how to fix it (`says`); add nothing about booking, and do not promise a time.",
+  CALENDAR_REVOKED:
+    "Their Google Calendar connection expired. Capital Q says why and how to fix it (`says`); add nothing about booking, and do not promise a time.",
   UNAVAILABLE: "Their calendar could not be read just now; try again shortly.",
 };
 
@@ -357,8 +391,7 @@ function createFindMeetingTimesTool(
       });
       if (found.status !== "OK") {
         const status =
-          found.status === "NOT_CONNECTED" ||
-          found.status === "CALENDAR_NOT_CONNECTED"
+          found.status === "NOT_CONNECTED" || isCalendarBlock(found.status)
             ? found.status
             : "UNAVAILABLE";
         return {
@@ -367,6 +400,11 @@ function createFindMeetingTimesTool(
           timeZone: null,
           slots: [],
           guidance: GUIDANCE[status] ?? "",
+          ...(isCalendarBlock(status)
+            ? {
+                says: await blockedSays(schedule, context.actor, status, grant),
+              }
+            : {}),
         };
       }
       return {
@@ -702,11 +740,14 @@ export function createScheduleTools(
             : await schedule
                 .canSchedule(context.actor, grant.relationshipId)
                 .catch(() => "OK" as const);
-        if (bookable === "CALENDAR_NOT_CONNECTED") {
+        if (isCalendarBlock(bookable)) {
+          // meetfix-57: the real reason and the fix, typed, in Capital Q's
+          // words -- never a generic "couldn't".
           return {
-            status: "CALENDAR_NOT_CONNECTED" as const,
+            status: bookable,
             awaitingApprovalOf:
-              "Nothing prepared: their Google account is not connected with Calendar, so no invite can be sent. Offer to take them to Settings to connect Google, then prepare it again.",
+              "Nothing prepared: their Google Calendar is not available, so no invite can be sent. Capital Q says why and how to fix it.",
+            says: await blockedSays(schedule, context.actor, bookable, grant),
           };
         }
         const at = await instantOf(input, context);

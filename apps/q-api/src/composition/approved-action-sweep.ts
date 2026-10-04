@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   CorrelationIdSchema,
+  isCalendarBlock,
   QActionProposalIdSchema,
   QRunIdSchema,
 } from "@capital-q/contracts";
@@ -184,6 +185,15 @@ export function createApprovedActionSweep(dependencies: {
             },
             "approved action not carried out by the sweep",
           );
+          // meetfix-57: a call refused for a missing calendar already told
+          // the approver how to fix it, once; a second, vaguer notice
+          // would contradict it.
+          if (
+            outcome.kind === "FAILED" &&
+            isCalendarBlock(outcome.failureCode)
+          ) {
+            continue;
+          }
           await notify(row, outcome.kind).catch((error: unknown) => {
             logger?.warn(
               { err: error, actionId: row.action_id },

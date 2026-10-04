@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { googleMeetLink } from "@capital-q/contracts";
+import { googleMeetLink, type CalendarBlockReason } from "@capital-q/contracts";
 import type { TransactionManager } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
@@ -91,6 +91,14 @@ export type CalendarDirectory = (
   userId: string,
 ) => Promise<OrganiserCalendar | null>;
 
+/**
+ * meetfix-57: why a person has no calendar, from stored state only (no
+ * provider call): Google ended the grant, or there never was one.
+ */
+export type CalendarStateReader = (
+  userId: string,
+) => Promise<"CONNECTED" | "NOT_CONNECTED" | "REVOKED">;
+
 export type AppEmailPort = {
   readonly available: boolean;
   readonly send: (message: {
@@ -115,6 +123,8 @@ export type ScheduleServiceDependencies = {
   readonly parties: ChatPartyResolver;
   readonly directory: MeetingDirectory;
   readonly calendars: CalendarDirectory;
+  /** Absent: a missing calendar reads as never connected. */
+  readonly calendarState?: CalendarStateReader | undefined;
   readonly activity: MeetingActivityWriter;
   readonly email: AppEmailPort;
   /** DOCS: the web origin, for links in emails; null leaves them out. */
@@ -152,6 +162,8 @@ export type ScheduleRefusal =
   | "NOT_A_PARTY"
   | "NOT_CONNECTED"
   | "CALENDAR_NOT_CONNECTED"
+  /** meetfix-57: Google ended the organiser's grant; reconnecting fixes it. */
+  | "CALENDAR_REVOKED"
   | "NO_RECIPIENTS"
   | "NOT_FOUND"
   | "NOT_ORGANISER"
@@ -213,6 +225,23 @@ export type ScheduleService = {
   >;
   /** The person's own Google Calendar zone, or null when unknown. */
   readonly timeZoneOf: (actor: ActorContext) => Promise<string | null>;
+  /**
+   * meetfix-57: the person's own calendar, typed, from stored state only:
+   * no provider call and nothing logged, so a booking parked on a missing
+   * calendar can check for the reconnect on every tick.
+   */
+  readonly calendarStatus: (
+    userId: string,
+  ) => Promise<"CONNECTED" | CalendarBlockReason>;
+  /**
+   * meetfix-57: when the organiser's calendar is missing, whether the
+   * other side could host instead (one of their people has a connected
+   * calendar). Never their busy times: only that a calendar is there.
+   */
+  readonly counterpartCanHost: (
+    actor: ActorContext,
+    relationshipId: string,
+  ) => Promise<boolean>;
   /** Precondition check for authorize steps: party, connection, calendar. */
   readonly canSchedule: (
     actor: ActorContext,
@@ -585,13 +614,39 @@ export function createScheduleService(
     if (calendar === null) {
       // No Google connection with calendar.events for this person, or no
       // Google configuration on this service at all (logged at startup).
+      // Typed: a connection Google ended reads apart from none at all.
+      const reason = await missingCalendar(actor.userId);
       logger?.warn(
-        { relationshipId },
-        "meeting refused: google calendar not connected for the organiser",
+        { relationshipId, reason },
+        reason === "CALENDAR_REVOKED"
+          ? "meeting refused: google calendar connection revoked for the organiser"
+          : "meeting refused: google calendar not connected for the organiser",
       );
-      return "CALENDAR_NOT_CONNECTED";
+      return reason;
     }
     return calendar;
+  }
+
+  async function missingCalendar(userId: string): Promise<CalendarBlockReason> {
+    const state = await dependencies.calendarState?.(userId).catch(() => null);
+    return state === "REVOKED" ? "CALENDAR_REVOKED" : "CALENDAR_NOT_CONNECTED";
+  }
+
+  async function calendarStatusOf(
+    userId: string,
+  ): Promise<"CONNECTED" | CalendarBlockReason> {
+    if (dependencies.calendarState !== undefined) {
+      const state = await dependencies
+        .calendarState(userId)
+        .catch(() => "NOT_CONNECTED" as const);
+      return state === "CONNECTED"
+        ? "CONNECTED"
+        : state === "REVOKED"
+          ? "CALENDAR_REVOKED"
+          : "CALENDAR_NOT_CONNECTED";
+    }
+    const calendar = await calendars(userId).catch(() => null);
+    return calendar === null ? "CALENDAR_NOT_CONNECTED" : "CONNECTED";
   }
 
   /** A calendar failure, logged with its cause: "didn't answer" alone hid a revoked scope. */
@@ -631,6 +686,25 @@ export function createScheduleService(
       if (calendar === null) return null;
       const zone = await calendar.timeZone().catch(() => null);
       return zone !== null && isKnownTimeZone(zone) ? zone : null;
+    },
+
+    calendarStatus: (userId) => calendarStatusOf(userId),
+
+    counterpartCanHost: async (actor, relationshipId) => {
+      const resolved = await counterpartOf(actor, relationshipId);
+      if (resolved === null || !resolved.party.connected) return false;
+      const people = await directory
+        .counterpartPeople({
+          relationshipId,
+          counterpart: resolved.counterpart,
+        })
+        .catch(() => []);
+      for (const person of people.slice(0, 12)) {
+        if ((await calendarStatusOf(person.userId)) === "CONNECTED") {
+          return true;
+        }
+      }
+      return false;
     },
 
     canSchedule: async (actor, relationshipId) => {
@@ -1011,7 +1085,9 @@ export function createScheduleService(
         };
       }
       const calendar = await calendars(input.actor.userId).catch(() => null);
-      if (calendar === null) return refusal("CALENDAR_NOT_CONNECTED");
+      if (calendar === null) {
+        return refusal(await missingCalendar(input.actor.userId));
+      }
       try {
         await calendar.move(record.googleEventId, {
           start: input.startsAt,
@@ -1072,7 +1148,9 @@ export function createScheduleService(
         (record.status === "SCHEDULED" || record.status === "SCHEDULING")
       ) {
         const calendar = await calendars(input.actor.userId).catch(() => null);
-        if (calendar === null) return refusal("CALENDAR_NOT_CONNECTED");
+        if (calendar === null) {
+          return refusal(await missingCalendar(input.actor.userId));
+        }
         try {
           await calendar.cancel(record.googleEventId);
         } catch (error: unknown) {
