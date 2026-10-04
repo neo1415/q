@@ -47,7 +47,7 @@ export const TURN_READER_V40: PromptDefinition<
 > = {
   ...TURN_READER_V39,
   version: 40,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "follow-55 (Zino live 2026-10-04): reference -- the one record a turn asks to open (named or pointed at among what Q showed) and a request to repeat Q's last action, so code opens the record and re-runs the action instead of opening a screen; YOUR_COMPANIES (Discover's second tab) is a NAVIGATE destination.",
   effectiveFrom: "2026-10-04",

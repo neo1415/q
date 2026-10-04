@@ -17,15 +17,19 @@ import {
  * asks to open, and a request to repeat Q's last action.
  */
 describe("TURN_READER v40", () => {
-  it("is the active reader and v39 is deprecated", () => {
+  it("v39 is deprecated (v41 is active)", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(40);
+    ).toBeGreaterThanOrEqual(40);
     expect(TURN_READER_V39.status).toBe("DEPRECATED");
   });
 
   it("names every contract destination exactly once, YOUR_COMPANIES included", () => {
-    for (const destination of [...Q_NAVIGATE_DESTINATIONS, "RESULTS"]) {
+    // WORK arrived with v41.
+    for (const destination of [
+      ...Q_NAVIGATE_DESTINATIONS.filter((name) => name !== "WORK"),
+      "RESULTS",
+    ]) {
       expect(
         TURN_READER_V40.template.split(
           new RegExp(`(?<![A-Z_])${destination} \\(`),

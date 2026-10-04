@@ -241,6 +241,7 @@ import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supa
 import { apiServiceIdentity, createApp } from "./app.js";
 import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
+import { createQWorkPagePort } from "./q-work-port.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createInvestorCardFacts } from "./investor-card-facts.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
@@ -1791,6 +1792,8 @@ const { app, logger } = createApp(config, security, {
   visibility,
   publicIdentity,
   profileImages,
+  // WORK-58: the Work page's own writes (pause, resume, Not now).
+  qWork: createQWorkPagePort(database.sql),
   inboundEmail: {
     inboundEmail,
     webhookSecret: inboundEmailConfig.inbound?.webhookSecret.reveal(),

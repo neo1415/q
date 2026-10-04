@@ -42,6 +42,10 @@ function work(
     createdAt: "2026-10-03T10:00:00Z",
     expiresAt: "2026-11-03T10:00:00Z",
     lanes: [],
+    goal: null,
+    run: null,
+    lastStep: null,
+    spend: null,
   } satisfies QWorkDto;
 }
 

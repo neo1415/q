@@ -270,6 +270,7 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
     "Opens The Q Daily: their latest edition (news about their sectors, markets, deals and people they know, every story with its source, Q's take labelled), its archive and the PDF edition.",
   YOUR_COMPANIES:
     "Opens Your companies, Discover's second tab: every company they are connected with, expressed interest in or saved, most recent first, each with its pitch when the company shares it with them.",
+  WORK: "Opens Work, Q's work page: what Q suggests from their own account, what needs their yes, what Q is running for them (goal, status, spend) and what it finished. For 'show my work' or 'what is Q doing'.",
   RESULTS:
     "Opens Results: what their activity on Capital Q produced (introductions, conversations, meetings and where each stands), with reports to download.",
 };
@@ -353,6 +354,13 @@ const OFFERS: readonly QCapability[] = [
     "Copy their Q email address, or get a new one so the old one stops receiving",
     "SETTINGS",
     "A new address cuts off everyone who has the old one at once; the person does that themselves in Settings, where they copy the new one.",
+  ),
+  offer(
+    "work_suggestions",
+    "RELATIONSHIP",
+    "Set aside one of Q's suggestions on Work so it does not come back",
+    "WORK",
+    "A card set aside is the page's own preference: the person taps Not now on it; Q prepares what a card suggests through its propose tools.",
   ),
   offer(
     "pitch_video_upload",
@@ -487,6 +495,8 @@ export const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   onboarding: "ONBOARDING",
   settings: "SETTINGS",
   integrations: "SETTINGS",
+  // WORK-58: Q's work page (pause, resume, set a suggestion aside).
+  work: "RELATIONSHIP",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
@@ -887,7 +897,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "stop_q_work",
     "RELATIONSHIP",
-    "Stops Q's work at once, all of it or one founder; no approval needed.",
+    "Stops Q's work at once, all of it or one founder, or pauses and resumes a standing instruction; no approval needed.",
     { acts: true },
   ),
   tool(

@@ -5,20 +5,32 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { cx } from "@capital-q/ui";
-import { ICON_SIZE, ICON_STROKE, MoreHorizontal } from "@capital-q/ui/icons";
+import {
+  ChevronRight,
+  ICON_SIZE,
+  ICON_STROKE,
+  MoreHorizontal,
+  Search,
+} from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { useHomeHref } from "@/features/q/active-conversation";
+import { useNotices } from "@/features/work/notice-store";
 import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
 import type { VerifyNudge } from "@/features/verification/verify-state";
 
 import {
+  FIND_NAVIGATION,
   isActiveRoute,
   MOBILE_CENTRE_HREF,
   MOBILE_NAVIGATION,
+  moreGroupsFor,
   moreSectionsFor,
+  PROFILE_NAVIGATION,
+  WORK_NAVIGATION,
+  type NavigationItem,
 } from "./navigation";
 
 const TAB_CLASS =
@@ -35,9 +47,12 @@ const TAB_CLASS =
  */
 export function MobileNavigation({
   scope = "unset",
+  admin = false,
   verifyNudge = null,
 }: {
   readonly scope?: ContextScope | undefined;
+  /** A platform admin: the More sheet adds the Admin group. */
+  readonly admin?: boolean | undefined;
   readonly verifyNudge?: VerifyNudge | null | undefined;
 }) {
   const pathname = usePathname();
@@ -98,6 +113,7 @@ export function MobileNavigation({
         <li className="min-w-0">
           <MoreSheet
             scope={scope}
+            admin={admin}
             pathname={pathname}
             verifyNudge={verifyNudge}
           />
@@ -115,16 +131,27 @@ export function MobileNavigation({
  */
 function MoreSheet({
   scope,
+  admin,
   pathname,
   verifyNudge,
 }: {
   readonly scope: ContextScope;
+  readonly admin: boolean;
   readonly pathname: string;
   readonly verifyNudge: VerifyNudge | null;
 }) {
   const [open, setOpen] = useState(false);
-  const items = moreSectionsFor(scope);
+  const items = moreSectionsFor(scope, { admin });
+  const groups = moreGroupsFor(scope, { admin });
   const inside = items.some((item) => isActiveRoute(pathname, item.href));
+  const notices = useNotices();
+  const needsYou = (notices.items ?? []).filter(
+    (item) => item.priority === "NEEDS_YOU" && !item.read,
+  ).length;
+  const close = () => {
+    setOpen(false);
+  };
+  const profileActive = isActiveRoute(pathname, PROFILE_NAVIGATION.href);
   return (
     <SheetRoot open={open} onOpenChange={setOpen}>
       <SheetTrigger>
@@ -157,57 +184,81 @@ function MoreSheet({
       </SheetTrigger>
       <SheetContent title="More">
         <nav aria-label="More sections">
-          <ul className="flex flex-col">
-            {items.map((item) => {
-              const active = isActiveRoute(pathname, item.href);
-              const Icon = item.icon;
-              return (
-                <li key={item.label}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => {
-                      setOpen(false);
-                    }}
-                    className={cx(
-                      "flex min-h-12 items-center gap-3 rounded-md px-3 cq-body transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
-                      active
-                        ? "bg-(--cq-accent-soft) font-semibold text-(--cq-text-primary)"
-                        : "text-(--cq-text-primary)",
-                    )}
-                  >
-                    <Icon
-                      aria-hidden="true"
-                      size={ICON_SIZE.prominent}
-                      strokeWidth={active ? 2 : ICON_STROKE}
-                      className={
-                        active
-                          ? "text-(--cq-accent)"
-                          : "text-(--cq-text-secondary)"
+          {/* Profile heads the sheet; Search is its field (WORK-58). */}
+          <Link
+            href={PROFILE_NAVIGATION.href}
+            aria-current={profileActive ? "page" : undefined}
+            onClick={close}
+            className="flex min-h-14 items-center gap-3 rounded-md px-3 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)"
+          >
+            <PROFILE_NAVIGATION.icon
+              aria-hidden="true"
+              size={ICON_SIZE.prominent + 4}
+              strokeWidth={ICON_STROKE}
+              className="text-(--cq-text-secondary)"
+            />
+            <span className="min-w-0 flex-1 truncate cq-body font-medium text-(--cq-text-primary)">
+              {PROFILE_NAVIGATION.label}
+            </span>
+            <ChevronRight
+              aria-hidden="true"
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+              className="text-(--cq-text-tertiary)"
+            />
+          </Link>
+          <Link
+            href={FIND_NAVIGATION.href}
+            aria-current={
+              isActiveRoute(pathname, FIND_NAVIGATION.href) ? "page" : undefined
+            }
+            onClick={close}
+            className="mt-2 flex min-h-11 items-center gap-3 rounded-md bg-(--cq-surface-subtle) px-3 cq-body text-(--cq-text-tertiary)"
+          >
+            <Search
+              aria-hidden="true"
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+            />
+            <span>{FIND_NAVIGATION.label}</span>
+          </Link>
+          {groups.map((group) => (
+            <div
+              key={group.label ?? "main"}
+              role="group"
+              aria-label={group.label ?? "Sections"}
+              className="mt-3"
+            >
+              {group.label === null ? null : (
+                <p
+                  aria-hidden="true"
+                  className="px-3 pb-1 cq-caption font-medium text-(--cq-text-tertiary)"
+                >
+                  {group.label}
+                </p>
+              )}
+              <ul className="flex flex-col">
+                {group.items.map((item) => (
+                  <li key={item.href}>
+                    <MoreLink
+                      item={item}
+                      active={isActiveRoute(pathname, item.href)}
+                      count={
+                        item.href === WORK_NAVIGATION.href
+                          ? needsYou
+                          : undefined
                       }
+                      onNavigate={close}
                     />
-                    <span className="min-w-0 flex-1 truncate">
-                      {item.label}
-                    </span>
-                    {active ? (
-                      <span className="cq-caption text-(--cq-text-secondary)">
-                        Current
-                      </span>
-                    ) : null}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
         {verifyNudge === null ? null : (
           <div className="mt-3 border-t border-(--cq-border-subtle) pt-3">
-            <VerifyNudgeLink
-              nudge={verifyNudge}
-              onNavigate={() => {
-                setOpen(false);
-              }}
-            />
+            <VerifyNudgeLink nudge={verifyNudge} onNavigate={close} />
           </div>
         )}
         <div className="mt-3 flex flex-col gap-2 border-t border-(--cq-border-subtle) px-3 pt-4">
@@ -218,5 +269,57 @@ function MoreSheet({
         </div>
       </SheetContent>
     </SheetRoot>
+  );
+}
+
+function MoreLink({
+  item,
+  active,
+  count,
+  onNavigate,
+}: {
+  readonly item: NavigationItem;
+  readonly active: boolean;
+  readonly count?: number | undefined;
+  readonly onNavigate: () => void;
+}) {
+  const Icon = item.icon;
+  const waiting = count !== undefined && count > 0 ? count : null;
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      aria-label={
+        waiting === null
+          ? undefined
+          : `${item.label}, ${String(waiting)} waiting for you`
+      }
+      onClick={onNavigate}
+      className={cx(
+        "flex min-h-12 items-center gap-3 rounded-md px-3 cq-body transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+        active
+          ? "bg-(--cq-accent-soft) font-semibold text-(--cq-text-primary)"
+          : "text-(--cq-text-primary)",
+      )}
+    >
+      <Icon
+        aria-hidden="true"
+        size={ICON_SIZE.prominent}
+        strokeWidth={active ? 2 : ICON_STROKE}
+        className={active ? "text-(--cq-accent)" : "text-(--cq-text-secondary)"}
+      />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {waiting === null ? null : (
+        <span
+          aria-hidden="true"
+          className="cq-label cq-numeric font-semibold text-(--cq-accent)"
+        >
+          {waiting}
+        </span>
+      )}
+      {active ? (
+        <span className="cq-caption text-(--cq-text-secondary)">Current</span>
+      ) : null}
+    </Link>
   );
 }

@@ -226,6 +226,10 @@ describe("the action registry", () => {
       ],
       ["review.request", "legacy:propose_human_review", "CONSEQUENTIAL"],
       ["verification.kyb.submit", "offer.kyb_submission", "CONSEQUENTIAL"],
+      // WORK-58: Q's work page.
+      ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
+      ["q.work.resume", "legacy:stop_q_work", "INSTANT"],
+      ["q.work.suggestion.dismiss", "offer.work_suggestions", "INSTANT"],
     ]);
   });
 });

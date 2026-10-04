@@ -201,6 +201,7 @@ const DESTINATION_LABELS: Readonly<
   DAILY: "Open The Q Daily",
   RESULTS: "Open Results",
   YOUR_COMPANIES: "Open Your companies",
+  WORK: "Open Work",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

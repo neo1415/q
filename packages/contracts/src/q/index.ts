@@ -846,7 +846,39 @@ export {
   type QWorkListDto,
   type QWorkSlot,
   type QWorkStepDto,
+  Q_WORK_RUN_STATES,
+  Q_WORK_PAUSED_BY_YOU,
+  QWorkRunStateSchema,
+  QWorkSpendSchema,
+  type QWorkRunState,
+  type QWorkSpend,
 } from "./work.js";
+// WORK-58: Q's work page (suggestions, pause/resume, done).
+export {
+  Q_WORK_DONE_PAGE_MAX,
+  Q_WORK_DONE_PATH,
+  Q_WORK_PAUSE_PATH,
+  Q_WORK_RESUME_PATH,
+  Q_WORK_SUGGESTION_DISMISSALS_PATH,
+  Q_WORK_SUGGESTION_KINDS,
+  Q_WORK_SUGGESTIONS_MAX,
+  Q_WORK_SUGGESTIONS_PATH,
+  QWorkDoneItemDtoSchema,
+  QWorkDonePageDtoSchema,
+  QWorkDoneQuerySchema,
+  qWorkPausePath,
+  qWorkResumePath,
+  QWorkSuggestionDismissRequestSchema,
+  QWorkSuggestionDtoSchema,
+  QWorkSuggestionKeySchema,
+  QWorkSuggestionListDtoSchema,
+  type QWorkDoneItemDto,
+  type QWorkDonePageDto,
+  type QWorkSuggestionDismissRequest,
+  type QWorkSuggestionDto,
+  type QWorkSuggestionKind,
+  type QWorkSuggestionListDto,
+} from "./work-page.js";
 export { Q_USAGE_PATH, QUsageDtoSchema, type QUsageDto } from "./usage.js";
 // end AUTO block
 

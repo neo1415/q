@@ -17,6 +17,7 @@ import { PROFILE_AND_RECORDS } from "./actions/records.js";
 import { SCHEDULE_ACTIONS } from "./actions/schedule.js";
 import { SETTINGS_ACTIONS } from "./actions/settings.js";
 import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
+import { WORK_ACTIONS } from "./actions/work.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -40,6 +41,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...DOCUMENT_ACTIONS,
   ...PROFILE_IMAGE_ACTIONS,
   ...SETTINGS_ACTIONS,
+  ...WORK_ACTIONS,
 ]);
 
 /**

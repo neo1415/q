@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
+import { StandingInstructionDtoSchema } from "./instructions.js";
 
 /**
  * Q's delegated work (AUTO, ADR 0030): an investor's outreach and a
@@ -123,6 +124,33 @@ export const QWorkStepDtoSchema = z
   .strict();
 export type QWorkStepDto = z.infer<typeof QWorkStepDtoSchema>;
 
+/**
+ * WORK-58: live work is WORKING (Q acts when due), WAITING (on the other
+ * side) or PAUSED, with why. PAUSED_BY_YOU is the person's own pause and
+ * the only one they resume with a tap; any other reason (the month's
+ * budget) resumes through its own approval card.
+ */
+export const Q_WORK_RUN_STATES = ["WORKING", "WAITING", "PAUSED"] as const;
+export const Q_WORK_PAUSED_BY_YOU = "PAUSED_BY_YOU" as const;
+export const QWorkRunStateSchema = z
+  .object({
+    state: z.enum(Q_WORK_RUN_STATES),
+    /** A reason code (`BUDGET_EXHAUSTED`, `PAUSED_BY_YOU`); null unless PAUSED. */
+    pauseReason: z
+      .string()
+      .regex(/^[A-Z][A-Z0-9_]{0,63}$/u)
+      .nullable(),
+  })
+  .strict();
+export type QWorkRunState = z.infer<typeof QWorkRunStateSchema>;
+
+/** The standing instruction's own money fields (ADR 0043), reused as is. */
+export const QWorkSpendSchema = StandingInstructionDtoSchema.pick({
+  budgetUsdMonth: true,
+  spentUsdMonth: true,
+});
+export type QWorkSpend = z.infer<typeof QWorkSpendSchema>;
+
 export const QWorkDtoSchema = z
   .object({
     id: UuidSchema,
@@ -133,6 +161,18 @@ export const QWorkDtoSchema = z
     createdAt: UtcTimestampSchema,
     expiresAt: UtcTimestampSchema,
     lanes: z.array(QWorkLaneDtoSchema).max(30),
+    /*
+     * WORK-58: the Running row's own fields, so the page shows numbers
+     * rather than parsing `summary`. Defaulted for an older server.
+     */
+    /** The goal in the person's own words (the kind's label when it has none). */
+    goal: z.string().max(300).nullable().default(null),
+    /** Where live work stands; null once it has ended. */
+    run: QWorkRunStateSchema.nullable().default(null),
+    /** The last thing Q did on it, with when. */
+    lastStep: QWorkStepDtoSchema.nullable().default(null),
+    /** This month's spend against its budget (standing instructions only). */
+    spend: QWorkSpendSchema.nullable().default(null),
   })
   .strict();
 export type QWorkDto = z.infer<typeof QWorkDtoSchema>;

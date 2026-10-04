@@ -350,6 +350,10 @@ export {
   saveNotificationSettings,
   setQPresence,
   stopQWork,
+  listQWorkSuggestions,
+  listQWorkDone,
+  dismissQWorkSuggestion,
+  setQWorkPaused,
   subscribePush,
   unsubscribePush,
 } from "./work.js";

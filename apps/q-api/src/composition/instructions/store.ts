@@ -39,6 +39,9 @@ export type InstructionRow = {
   last_digest_at?: Date | null;
   last_fired_at?: Date | null;
   cadence_minutes?: number;
+  /** WORK-58: the last thing Q did on it (list reads only). */
+  last_step_words?: string | null;
+  last_step_at?: Date | null;
   created_at: Date;
   updated_at: Date;
   grant_payload: unknown;
@@ -185,13 +188,55 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       sql<InstructionRow[]>`
         select i.*, g.grant_payload,
              (case when i.budget_month < date_trunc('month', now())::date
-                   then 0 else i.spent_usd_month end)::text as spent_this_month
+                   then 0 else i.spent_usd_month end)::text as spent_this_month,
+             last.words as last_step_words, last.created_at as last_step_at
           from q_runtime.standing_instructions i
           left join q_runtime.instruction_grants g
             on g.instruction_id = i.id and g.version = i.grant_version
+          left join lateral (
+            select s.words, s.created_at
+              from q_runtime.instruction_steps s
+             where s.instruction_id = i.id and s.user_id = i.user_id
+             order by s.created_at desc, s.step_index desc
+             limit 1) last on true
          where i.user_id = ${owner.userId} and i.tenant_id = ${owner.tenantId}
          order by i.created_at desc
          limit ${limit}`,
+
+    /**
+     * WORK-58: the person pauses their own live instruction. Like stop, it
+     * is due never while paused; unlike stop, they can resume it. Only an
+     * ACTIVE one pauses: a budget pause stays the engine's, resumed through
+     * its own approval card.
+     */
+    pauseByOwner: async (owner: Owner, id: string): Promise<boolean> =>
+      (
+        await sql<{ id: string }[]>`
+          update q_runtime.standing_instructions
+             set status = 'PAUSED', pause_reason = 'PAUSED_BY_YOU',
+                 next_fire_at = null, updated_at = clock_timestamp()
+           where id = ${id} and user_id = ${owner.userId}
+             and tenant_id = ${owner.tenantId} and status = 'ACTIVE'
+          returning id`
+      ).length > 0,
+
+    /**
+     * WORK-58: resumes only what the person paused themselves, and only
+     * while its grant has not expired. It is due at once; the claim then
+     * restores its cadence (claimDue sets the next firing).
+     */
+    resumeByOwner: async (owner: Owner, id: string): Promise<boolean> =>
+      (
+        await sql<{ id: string }[]>`
+          update q_runtime.standing_instructions
+             set status = 'ACTIVE', pause_reason = null,
+                 next_fire_at = clock_timestamp(), updated_at = clock_timestamp()
+           where id = ${id} and user_id = ${owner.userId}
+             and tenant_id = ${owner.tenantId} and status = 'PAUSED'
+             and pause_reason = 'PAUSED_BY_YOU'
+             and (expires_at is null or expires_at > clock_timestamp())
+          returning id`
+      ).length > 0,
 
     /**
      * One sentence or one tap: stops the person's own live instruction.

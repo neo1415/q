@@ -107,6 +107,7 @@ import {
   createWorkStartActions,
 } from "./composition/work/actions.js";
 import { createWorkComposers } from "./composition/work/composers.js";
+import { createWorkPage } from "./composition/work/page.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import {
@@ -4463,6 +4464,32 @@ const { app, logger: appLogger } = createApp(
     errands,
     // AUTO block (ADR 0030)
     work: workPort,
+    // WORK-58: Q's work page, read by code from the person's own signals.
+    workPage: createWorkPage({
+      sql: database.sql,
+      reads: {
+        relationships: async (actor) =>
+          (
+            (await errandRelationships.ownRelationships?.(actor))?.items ?? []
+          ).map((item) => ({
+            relationshipId: item.relationshipId,
+            counterpartKind: item.counterpart.kind,
+            counterpartId: item.counterpart.id,
+            name: item.counterpart.name,
+            nextStep: item.nextStep,
+            stateSince: item.stateSince,
+          })),
+        feed: async (actor) => (await workFeed.page(actor, 15))?.items ?? null,
+        decisions: (actor) => workFeed.decisions(actor, 30),
+        investorOrganisation: async (actor) =>
+          (
+            await slateRead.eligibilityPorts.investorSubject
+              .investorOrganisationFor(actor)
+              .catch(() => null)
+          )?.investorOrganisationId ?? null,
+        ownCompany: workOwnCompany,
+      },
+    }),
     // Lead 2026-10-03: the person's own usage this month.
     usage: createOwnUsage({
       ownMonth: createPostgresUsageReader(database.sql).ownMonth,

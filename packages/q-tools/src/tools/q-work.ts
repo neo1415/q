@@ -83,6 +83,14 @@ export type QWorkIntelligencePort = {
         }[]
       >)
     | undefined;
+  /**
+   * WORK-58: pause their own live standing instruction, or resume one they
+   * paused themselves; false: not theirs, or not in that state.
+   */
+  readonly pause?:
+    ((actor: ActorContext, id: string) => Promise<boolean>) | undefined;
+  readonly resume?:
+    ((actor: ActorContext, id: string) => Promise<boolean>) | undefined;
   /** Their own delegation (or one lane of it); false: not theirs / not active. */
   readonly stop: (
     actor: ActorContext,
@@ -309,6 +317,13 @@ const StopInputSchema = z
     laneId: Uuid.nullable()
       .default(null)
       .describe("One founder only; null stops the whole job."),
+    // WORK-58: a standing instruction can also be paused and resumed.
+    mode: z
+      .enum(["STOP", "PAUSE", "RESUME"])
+      .default("STOP")
+      .describe(
+        "PAUSE: hold a standing instruction until they resume it; RESUME: one they paused themselves.",
+      ),
   })
   .strict();
 type StopInput = z.output<typeof StopInputSchema>;
@@ -844,7 +859,7 @@ export function createQWorkTools(
       core: true,
       providerName: "stop_q_work",
       description:
-        "Stops Q's work for them at once: a whole outreach or stand-in, one founder in it (laneId), or an errand (its errandId as delegationId). Stopping is always theirs and needs no approval; nothing further is sent. Use the ids from list_q_work.",
+        "Stops Q's work for them at once: a whole outreach or stand-in, one founder in it (laneId), or an errand (its errandId as delegationId). mode PAUSE holds a standing instruction until they resume it; RESUME restarts one they paused (a budget pause is resumed by approving its card). Always theirs, no approval needed; nothing further is sent. Use the ids from list_q_work.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       approval: "NONE",
@@ -858,6 +873,25 @@ export function createQWorkTools(
             : deny<null>("NOT_AVAILABLE"),
         ),
       execute: async (input, context) => {
+        if (input.mode !== "STOP") {
+          const resume = input.mode === "RESUME";
+          const acted =
+            input.laneId === null &&
+            ((resume
+              ? await port.resume?.(context.actor, input.delegationId)
+              : await port.pause?.(context.actor, input.delegationId)) ??
+              false);
+          return {
+            done: acted,
+            note: acted
+              ? resume
+                ? "Resumed."
+                : "Paused."
+              : resume
+                ? "Nothing you paused there to resume."
+                : "Nothing running there to pause.",
+          };
+        }
         const stopped = await port.stop(
           context.actor,
           input.delegationId,

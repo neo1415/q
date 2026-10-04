@@ -423,6 +423,8 @@ export const Q_VOICE_DESTINATIONS = [
   "PASSED",
   // follow-55: Discover's "Your companies" tab (an investor's own companies).
   "YOUR_COMPANIES",
+  // WORK-58: Q's work page ("show my work", "what's Q doing").
+  "WORK",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

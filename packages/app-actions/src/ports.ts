@@ -40,6 +40,7 @@ import type {
 import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 
 import type { DeckAudiencePort } from "./actions/deck.js";
+import type { QWorkPagePort } from "./actions/work.js";
 
 /**
  * The services the declared actions call (ADR 0040). Each composition (the
@@ -54,6 +55,8 @@ export type DocumentUploadLimits = {
 };
 
 export type AppActionPorts = {
+  /** WORK-58: pause/resume their own standing instruction, set a card aside. */
+  readonly qWork?: QWorkPagePort | undefined;
   /** ADR 0041: who may download a pitch deck (the Evidence service). */
   readonly deckAudience?: DeckAudiencePort | undefined;
   readonly media?:
