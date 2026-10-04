@@ -79,9 +79,21 @@ type Props = {
   readonly approvals: readonly QPendingApproval[] | null;
   readonly work: readonly QWorkDto[] | null;
   readonly done: QWorkDonePageDto | null;
+  /**
+   * A suggestion whose card Q already prepared, shown open with its exact
+   * approval (the design review page renders it this way).
+   */
+  readonly prepared?:
+    { readonly key: string; readonly view: QApprovalView } | undefined;
 };
 
-export function WorkPage({ suggestions, approvals, work, done }: Props) {
+export function WorkPage({
+  suggestions,
+  approvals,
+  work,
+  done,
+  prepared,
+}: Props) {
   const running = (work ?? []).filter((item) => item.status === "ACTIVE");
   const timeLanes = running.flatMap((item) =>
     item.lanes
@@ -109,6 +121,7 @@ export function WorkPage({ suggestions, approvals, work, done }: Props) {
           <div className="order-1 empty:hidden lg:order-none">
             <Suggestions
               items={cards}
+              prepared={prepared}
               failed={suggestions === null}
               onGone={(key) => {
                 setCards((now) => now.filter((card) => card.key !== key));
@@ -357,18 +370,21 @@ function PreparedPlan({
  */
 function ApprovalPlan({
   approvalId,
+  initialView,
   editHref,
   onDone,
   onNotNow,
   notNowLabel = "Not now",
 }: {
   readonly approvalId: string;
+  /** Already read on the server: shown at once, read again on a revision. */
+  readonly initialView?: QApprovalView | undefined;
   readonly editHref?: string | undefined;
   readonly onDone: (approved: boolean) => void;
   readonly onNotNow: () => void;
   readonly notNowLabel?: string | undefined;
 }) {
-  const [view, setView] = useState<QApprovalView | null>(null);
+  const [view, setView] = useState<QApprovalView | null>(initialView ?? null);
   const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -376,6 +392,7 @@ function ApprovalPlan({
 
   const [version, setVersion] = useState(0);
   useEffect(() => {
+    if (initialView !== undefined && version === 0) return;
     let live = true;
     void readQApprovalAction(approvalId)
       .catch(() => null)
@@ -387,7 +404,7 @@ function ApprovalPlan({
     return () => {
       live = false;
     };
-  }, [approvalId, version]);
+  }, [approvalId, version, initialView]);
 
   const approve = () =>
     startTransition(async () => {
@@ -594,14 +611,17 @@ function SectionHead({
 
 function Suggestions({
   items,
+  prepared,
   failed,
   onGone,
 }: {
   readonly items: readonly QWorkSuggestionDto[];
+  readonly prepared?:
+    { readonly key: string; readonly view: QApprovalView } | undefined;
   readonly failed: boolean;
   readonly onGone: (key: string) => void;
 }) {
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(prepared?.key ?? null);
   if (items.length === 0 && !failed) return null;
   return (
     <section aria-labelledby="work-suggests" data-work-suggests>
@@ -624,6 +644,9 @@ function Suggestions({
               <SuggestionCard
                 item={item}
                 open={open === item.key}
+                preparedView={
+                  prepared?.key === item.key ? prepared.view : undefined
+                }
                 onToggle={() =>
                   setOpen((now) => (now === item.key ? null : item.key))
                 }
@@ -643,11 +666,14 @@ function Suggestions({
 function SuggestionCard({
   item,
   open,
+  preparedView,
   onToggle,
   onGone,
 }: {
   readonly item: QWorkSuggestionDto;
   readonly open: boolean;
+  /** Already prepared: shown at once, and Q is not asked again. */
+  readonly preparedView?: QApprovalView | undefined;
   readonly onToggle: () => void;
   readonly onGone: () => void;
 }) {
@@ -660,6 +686,7 @@ function SuggestionCard({
   const toggle = () => {
     onToggle();
     if (open || asked !== null || starting.current) return;
+    if (preparedView !== undefined) return;
     starting.current = true;
     void askQAction(item.prompt)
       .catch(() => null)
@@ -734,7 +761,16 @@ function SuggestionCard({
           id={panel}
           className="pr-4 pb-4 pl-[4.75rem] motion-safe:transition-[opacity,transform] motion-safe:duration-(--cq-motion-base) motion-safe:ease-(--cq-ease) starting:opacity-0 motion-safe:starting:-translate-y-1"
         >
-          {notice !== null ? (
+          {preparedView !== undefined ? (
+            <ApprovalPlan
+              approvalId={preparedView.approvalId}
+              initialView={preparedView}
+              onDone={(approved) => {
+                if (approved) onGone();
+              }}
+              onNotNow={() => void notNow(preparedView.approvalId)}
+            />
+          ) : notice !== null ? (
             <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
               {notice}
             </p>

@@ -130,7 +130,7 @@ export function DesktopSidebar({
       <nav
         aria-label="Primary"
         className={cx(
-          "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-3",
+          "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-3",
           collapsed ? "px-2" : "px-3",
         )}
       >
@@ -222,7 +222,7 @@ function SidebarLink({
       aria-current={active ? "page" : undefined}
       aria-label={compact || waiting !== null ? name : undefined}
       className={cx(
-        "relative flex min-h-11 items-center rounded-md cq-body-sm transition-colors duration-(--cq-motion-fast)",
+        "relative flex min-h-11 items-center rounded-md cq-body-sm pointer-fine:min-h-9 transition-colors duration-(--cq-motion-fast)",
         compact ? "w-11 justify-center" : "gap-3 px-3",
         active
           ? "bg-(--cq-accent-soft) font-medium text-(--cq-text-primary)"

@@ -30,6 +30,9 @@ vi.mock("../src/features/q/actions", () => ({
 vi.mock("../src/features/q/q-session", () => ({
   useQSessionOptional: () => null,
 }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 vi.mock("../src/features/integrations/email-draft-editor", () => ({
   EmailDraftEditor: () => null,
 }));
