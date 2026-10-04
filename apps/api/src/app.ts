@@ -112,6 +112,7 @@ import {
   registerProfileImageRoutes,
   type ProfileImageRoutesDependencies,
 } from "./http/profile-images.js";
+import type { NamedPhotos } from "./http/named-photos.js";
 import {
   registerQCardRoutes,
   type QCardRoutesDependencies,
@@ -293,6 +294,11 @@ export type ApiModules = {
     ProfileImageRoutesDependencies["profileImages"] | undefined;
   /** WORK-58: pause/resume their own instruction, set a suggestion aside. */
   readonly qWork?: QWorkPagePort | undefined;
+  /**
+   * Pictures of the people and organisations a list names (founder
+   * decision 2026-10-04). Absent: those lists read as initials.
+   */
+  readonly namedPhotos?: NamedPhotos | undefined;
 };
 
 /**
@@ -417,6 +423,7 @@ export function createApp(
       investorImages: modules.discovery.investorImages,
       yourCompanies: modules.discovery.yourCompanies,
       mayPlay: modules.discovery.mayPlay,
+      namedPhotos: modules.namedPhotos,
     });
     if (modules.discovery.interactions !== undefined) {
       registerRecommendationInteractionRoutes(app, {
@@ -609,6 +616,7 @@ export function createApp(
       connections: modules.connections,
       outcomes: modules.outcomes,
       diligence: modules.diligence,
+      namedPhotos: modules.namedPhotos,
     });
   }
 
@@ -628,6 +636,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       schedule: modules.schedule,
+      namedPhotos: modules.namedPhotos,
     });
   }
 

@@ -151,6 +151,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/discovery.ts GET DISCOVERY_INVESTOR_PATH": cap(
     "offer.connection_request",
   ),
+  "api/http/discovery.ts GET DISCOVERY_INVESTOR_PHOTO_PATH": exempt(
+    "the avatar's image on a Q investor reference: a redirect to a short-lived signed logo URL, bytes browser <-> storage; Q names the investor instead",
+  ),
   // The Discover row of their own companies' pitches (2026-10-02).
   "api/http/discovery.ts GET DISCOVERY_YOUR_COMPANIES_PATH":
     cap("navigate.DISCOVER"),

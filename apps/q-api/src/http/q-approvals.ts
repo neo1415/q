@@ -16,6 +16,7 @@ import {
   RejectQApprovalRequestSchema,
   type CorrelationId,
   type QApprovalId,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 import {
   createCorrelationId,
@@ -25,6 +26,11 @@ import {
   QApprovalNotFoundError,
   type QActionService,
 } from "@capital-q/q-actions";
+import {
+  photoLookup,
+  type NamedImageReader,
+  type NamedImageSubject,
+} from "@capital-q/public-identity";
 import type { QOrchestrator } from "@capital-q/q-runtime";
 
 import type { ApprovedContinuation } from "../composition/approved-continuation.js";
@@ -67,7 +73,40 @@ export type QApprovalRoutesDependencies = ActorContextDependencies & {
    * (approved-continuation.ts). Preferred over `orchestrator` when set.
    */
   readonly continueApproved?: ApprovedContinuation | undefined;
+  /** Pictures of who an approval names. Absent: none are carried. */
+  readonly namedPhotos?: Pick<NamedImageReader, "photos"> | undefined;
 };
+
+/**
+ * The person or organisation an action is aimed at: its first such
+ * target. The approver may open the approval, which names its targets, so
+ * the picture shows with them (founder decision 2026-10-04).
+ */
+export function namedTarget(
+  targets: readonly QSubjectRef[] | undefined,
+): NamedImageSubject | null {
+  for (const target of targets ?? []) {
+    switch (target.kind) {
+      case "COMPANY":
+        return { subjectType: "COMPANY", subjectId: target.companyId };
+      case "INVESTOR_ORGANISATION":
+        return {
+          subjectType: "INVESTOR_ORGANISATION",
+          subjectId: target.investorOrganisationId,
+        };
+      case "USER":
+        return { subjectType: "PERSON", subjectId: target.userId };
+      // A relationship, objective, document or organisation has no
+      // picture of its own; the next target may.
+      case "RELATIONSHIP":
+      case "CAPITAL_OBJECTIVE":
+      case "DOCUMENT":
+      case "ORGANISATION":
+        break;
+    }
+  }
+  return null;
+}
 
 function correlation(): CorrelationId {
   return CorrelationIdSchema.parse(createCorrelationId());
@@ -99,13 +138,31 @@ export function registerQApprovalRoutes(
     Q_APPROVALS_PATH,
     { onRequest: withContext },
     async (request, reply) => {
-      const items = await service.listPendingApprovals({
+      const rows = await service.listPendingApprovals({
         actor: getActorContext(request),
       });
+      const named = rows.map((row) => namedTarget(row.targets));
+      const photo = await photoLookup(
+        dependencies.namedPhotos,
+        named.filter((subject) => subject !== null),
+      );
       return reply.header("Cache-Control", "no-store").send(
         QPendingApprovalListSchema.parse({
           contractVersion: Q_CONTRACT_VERSION,
-          items,
+          items: rows.map(({ targets: _targets, ...row }, index) => {
+            const subject = named[index] ?? null;
+            return {
+              ...row,
+              named:
+                subject === null
+                  ? null
+                  : {
+                      kind: subject.subjectType,
+                      id: subject.subjectId,
+                      photoUrl: photo(subject),
+                    },
+            };
+          }),
         }),
       );
     },

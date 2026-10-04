@@ -242,6 +242,8 @@ export type QPendingApprovalRow = {
   readonly summary: string;
   readonly requestedAt: UtcTimestamp;
   readonly expiresAt: UtcTimestamp;
+  /** Who or what the action is aimed at, as the approver may open it. */
+  readonly targets?: readonly QSubjectRef[] | undefined;
 };
 
 export type QActionRepositories = {

@@ -6,6 +6,10 @@ import {
 } from "@capital-q/contracts";
 
 import type {
+  NamedImageStore,
+  NamedImageSubject,
+} from "../application/named-images.js";
+import type {
   ProfileImageRepository,
   ProfileImageRow,
 } from "../application/profile-images.js";
@@ -139,6 +143,76 @@ export function createPostgresProfileImageRepository(): ProfileImageRepository {
          where id = ${id} and status = 'PENDING'
      returning *`;
       return row === undefined ? null : toRow(row);
+    },
+  };
+}
+
+const ReadyImageSchema = z.object({
+  subject_type: ProfileImageSubjectTypeSchema,
+  subject_id: z.string().uuid(),
+  kind: ProfileImageKindSchema,
+  object_key: z.string().min(1),
+});
+
+/**
+ * The named-images read (named-images.ts): every current image of a list's
+ * subjects in one query on the one-READY index, and the organisations'
+ * active card scopes in another.
+ */
+export function createPostgresNamedImageStore(): NamedImageStore {
+  const columns = (subjects: readonly NamedImageSubject[]) => ({
+    types: subjects.map((subject) => subject.subjectType),
+    ids: subjects.map((subject) => subject.subjectId),
+  });
+  return {
+    readyImages: async (sql, subjects) => {
+      if (subjects.length === 0) return [];
+      const { types, ids } = columns(subjects);
+      const rows = await sql`
+        select i.subject_type, i.subject_id, i.kind, i.object_key
+          from core.profile_images i
+          join unnest(${types}::text[], ${ids}::uuid[]) as s (subject_type, subject_id)
+            on s.subject_type = i.subject_type and s.subject_id = i.subject_id
+         where i.status = 'READY' and i.object_key is not null`;
+      return rows.map((row) => {
+        const parsed = ReadyImageSchema.parse(row);
+        return {
+          subject: {
+            subjectType: parsed.subject_type,
+            subjectId: parsed.subject_id,
+          },
+          kind: parsed.kind,
+          objectKey: parsed.object_key,
+        };
+      });
+    },
+
+    activeCardScopes: async (sql, subjects) => {
+      const organisations = subjects.filter(
+        (subject) => subject.subjectType !== "PERSON",
+      );
+      if (organisations.length === 0) return new Map();
+      const { types, ids } = columns(organisations);
+      const rows = await sql`
+        select c.subject_type, c.subject_id, c.field_scopes
+          from core.shareable_identities c
+          join unnest(${types}::text[], ${ids}::uuid[]) as s (subject_type, subject_id)
+            on s.subject_type = c.subject_type and s.subject_id = c.subject_id
+         where c.status = 'ACTIVE'`;
+      const out = new Map<string, unknown>();
+      for (const row of rows as readonly {
+        subject_type?: unknown;
+        subject_id?: unknown;
+        field_scopes?: unknown;
+      }[]) {
+        if (
+          typeof row.subject_type === "string" &&
+          typeof row.subject_id === "string"
+        ) {
+          out.set(`${row.subject_type}:${row.subject_id}`, row.field_scopes);
+        }
+      }
+      return out;
     },
   };
 }

@@ -232,8 +232,15 @@ function Row({
       data-interest-id={current.interestId}
     >
       <div className="flex items-start gap-3">
-        {/* The interest carries no image: initials, never a guessed URL. */}
-        <EntityAvatar kind="investor" name={name} size="md" decorative />
+        {/* The inbox names them, so it carries their logo (the name's
+            scope); an answer's echo carries none, so the listed one stays. */}
+        <EntityAvatar
+          kind="investor"
+          name={name}
+          src={current.investorPhotoUrl ?? item.investorPhotoUrl ?? null}
+          size="md"
+          decorative
+        />
         <div className="flex min-w-0 flex-col gap-0.5">
           <Link
             href={`/relationships/investor/${current.investorOrganisationId}`}

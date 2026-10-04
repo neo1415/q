@@ -216,6 +216,33 @@ describe("RelationshipList", () => {
     expect(list.querySelector("[data-badge], .cq-badge")).toBeNull();
   });
 
+  it("shows a named investor's logo the list carries, and initials without one", () => {
+    const LOGO = "https://storage.test/object/sign/cq-profile-images/l?t=1";
+    const investor = (id: string, photoUrl: string | null) =>
+      summary({
+        nextStep: "AWAIT_ANSWER",
+        counterpart: {
+          kind: "INVESTOR_ORGANISATION",
+          id,
+          name: "Beacon Ventures",
+          photoUrl,
+        },
+      });
+    const { container } = render(
+      <RelationshipList
+        items={[
+          investor("33333333-0000-4000-8000-000000000001", LOGO),
+          investor("33333333-0000-4000-8000-000000000002", null),
+        ]}
+        emptySentence="None yet."
+      />,
+    );
+    const images = [...container.querySelectorAll("img")];
+    expect(images.map((img) => img.getAttribute("src"))).toEqual([LOGO]);
+    // The other row is initials, never a guessed route.
+    expect(container.innerHTML).not.toContain("/api/");
+  });
+
   it("says one sentence when there are none", () => {
     render(<RelationshipList items={[]} emptySentence="None yet." />);
     expect(screen.getByText("None yet.")).toBeTruthy();

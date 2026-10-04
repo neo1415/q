@@ -89,3 +89,16 @@ export type PrivateDocumentDownloadAuthorizer = {
     readonly downloadFilename?: string | undefined;
   }) => Promise<DirectDownloadAuthorization>;
 };
+
+/**
+ * Many short-lived reads of one bucket in one provider call, for a list's
+ * pictures. Issued only for objects the caller already authorised; each
+ * entry is the URL or null, in the order asked.
+ */
+export type PrivateBatchDownloadAuthorizer = {
+  readonly createDownloadAuthorizations: (input: {
+    readonly bucket: string;
+    readonly keys: readonly string[];
+    readonly expiresInSeconds: number;
+  }) => Promise<readonly (string | null)[]>;
+};

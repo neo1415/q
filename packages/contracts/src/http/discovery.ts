@@ -407,6 +407,20 @@ export type DiscoveredInvestorDto = z.infer<typeof DiscoveredInvestorDtoSchema>;
  */
 export const DISCOVERY_INVESTOR_PATH =
   "/v1/discovery/investors/:investorOrganisationId" as const;
+/**
+ * `GET` — an investor organisation's logo alone, for a Q investor
+ * reference: answered only where this reader may see the investor's name
+ * (the same read as the profile above, or their own organisation);
+ * every other case is the same 404.
+ */
+export const DISCOVERY_INVESTOR_PHOTO_PATH =
+  "/v1/discovery/investors/:investorOrganisationId/photo" as const;
+export const DiscoveredInvestorPhotoDtoSchema = z
+  .object({ photoUrl: z.string().url().nullable() })
+  .strict();
+export type DiscoveredInvestorPhotoDto = z.infer<
+  typeof DiscoveredInvestorPhotoDtoSchema
+>;
 export const DiscoveredInvestorProfileDtoSchema =
   DiscoveredInvestorDtoSchema.omit({ reasons: true });
 export type DiscoveredInvestorProfileDto = z.infer<
@@ -718,6 +732,13 @@ export const YourCompanyPitchItemDtoSchema = z
     headquartersCountry: z.string().nullable(),
     currentStageCode: z.string().nullable(),
     label: YourCompanyLabelSchema,
+    /**
+     * The company's logo (the name's scope) and cover (its Q Card's
+     * `cover` scope for a participant), signed for this reader in one
+     * batch. Null or absent: none to show.
+     */
+    photoUrl: z.string().url().nullable().optional(),
+    coverUrl: z.string().url().nullable().optional(),
     /**
      * Their pitch, only when the company makes it available to this
      * investor (the media service's own playback rule). Null: "Pitch not

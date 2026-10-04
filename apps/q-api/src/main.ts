@@ -199,6 +199,7 @@ import {
 } from "@capital-q/communication";
 import {
   createPostgresDocumentQueryPort,
+  createSupabaseDocumentStorageProvider,
   DocumentIdSchema,
   findActiveDocumentById,
 } from "@capital-q/evidence";
@@ -473,6 +474,8 @@ import {
 } from "./composition/approved-action-sweep.js";
 import { createApprovedContinuation } from "./composition/approved-continuation.js";
 import {
+  createNamedImageReader,
+  createPostgresNamedImageStore,
   createPostgresPublicIdentityRepository,
   createPublicIdentityService,
   createSubjectDirectory,
@@ -1341,6 +1344,20 @@ const publicIdentity = createPublicIdentityService({
   audit: createPostgresMaterialActionAuditWriter(),
   repository: createPostgresPublicIdentityRepository(),
   subjects: cardSubjects,
+});
+// The pictures of who work and approvals name (founder decision
+// 2026-10-04: a photo or logo has its name's scope). Signed by the server
+// storage key, never handed to a model; without the key, initials.
+const namedPhotos = createNamedImageReader({
+  sql: database.sql,
+  store: createPostgresNamedImageStore(),
+  storage:
+    config.secrets.supabaseSecretKey === undefined
+      ? undefined
+      : createSupabaseDocumentStorageProvider({
+          supabaseUrl: supabaseAuth.url,
+          secretKey: config.secrets.supabaseSecretKey,
+        }),
 });
 // ADMIN-3 block: appeals Stage 4 -- Q prepares, the person approves.
 const humanReviewBoard = createHumanReviewBoard();
@@ -4464,6 +4481,7 @@ const { app, logger: appLogger } = createApp(
     errands,
     // AUTO block (ADR 0030)
     work: workPort,
+    namedPhotos,
     // WORK-58: Q's work page, read by code from the person's own signals.
     workPage: createWorkPage({
       sql: database.sql,

@@ -31,6 +31,11 @@ import {
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import {
+  namedByRelationshipLink,
+  photoLookup,
+  type NamedPhotos,
+} from "./named-photos.js";
 
 /**
  * Meetings, reminders and notifications (BIZ-008) — the person's own page
@@ -46,6 +51,8 @@ import {
 
 export type ScheduleRoutesDependencies = ActorContextDependencies & {
   readonly schedule: ScheduleService;
+  /** Pictures of who a notice names. Absent: notices carry none. */
+  readonly namedPhotos?: NamedPhotos | undefined;
 };
 
 function param(request: FastifyRequest, name: string): string {
@@ -174,7 +181,20 @@ export function registerScheduleRoutes(
       // A row the contract can't describe (a kind the table accepts before the
       // contract learns it) is skipped and logged, never allowed to fail the
       // whole list.
+      // A notice about the person's own relationship names its other side
+      // (its link is that relationship's page): that side's logo shows with
+      // it, signed in one batch for the page of notices.
+      const namedBy = new Map(
+        own.items.flatMap((item) => {
+          const named = namedByRelationshipLink(item.linkPath);
+          return named === null ? [] : [[item.id, named] as const];
+        }),
+      );
+      const photo = await photoLookup(dependencies.namedPhotos, [
+        ...namedBy.values(),
+      ]);
       const items = own.items.flatMap((item) => {
+        const named = namedBy.get(item.id);
         const parsed = NotificationDtoSchema.safeParse({
           id: item.id,
           kind: item.kind,
@@ -184,6 +204,14 @@ export function registerScheduleRoutes(
           read: item.readAt !== null,
           createdAt: item.createdAt.toISOString(),
           priority: item.priority ?? "UPDATE",
+          named:
+            named === undefined
+              ? null
+              : {
+                  kind: named.subjectType,
+                  id: named.subjectId,
+                  photoUrl: photo(named),
+                },
         });
         if (parsed.success) return [parsed.data];
         request.log.warn(

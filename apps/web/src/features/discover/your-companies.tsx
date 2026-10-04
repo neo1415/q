@@ -18,6 +18,7 @@ import { Button, buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
 import { CompanyAvatarLink } from "@/features/company/company-avatar";
+import { EntityCover } from "@/features/entity/entity-avatar";
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { QPageSubject } from "@/features/q/q-subject";
 
@@ -110,6 +111,15 @@ function YourCompanyCard({
       <div className="cq-yours-media">
         {pitch === null ? (
           <div className="cq-feed-still" data-pitch-not-shared>
+            {/* Without a pitch, the company's own cover stands in, under
+                its card's cover scope (the server signed it or sent null). */}
+            {typeof item.coverUrl === "string" ? (
+              <EntityCover
+                src={item.coverUrl}
+                aspect="band"
+                className="max-w-[48ch] rounded-md"
+              />
+            ) : null}
             <p className="cq-body font-medium text-(--cq-stage-text)">
               Pitch not shared
             </p>
@@ -141,6 +151,7 @@ function YourCompanyCard({
           <CompanyAvatarLink
             companyId={item.companyId}
             companyName={item.canonicalName}
+            photoUrl={item.photoUrl}
           />
           <h2 className="cq-title-sm min-w-0 text-(--cq-stage-text)">
             <Link

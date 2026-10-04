@@ -21,8 +21,16 @@ import {
   QWorkDonePageDtoSchema,
   QWorkDoneQuerySchema,
   QWorkSuggestionListDtoSchema,
+  type QWorkDto,
+  type QWorkLaneDto,
 } from "@capital-q/contracts";
 import { documentToPdf, type ArtifactDocument } from "@capital-q/deck-render";
+import {
+  namedByRelationshipLink,
+  photoLookup,
+  type NamedImageReader,
+  type NamedImageSubject,
+} from "@capital-q/public-identity";
 
 import type { WorkPort } from "../composition/work/actions.js";
 import type { WorkPage } from "../composition/work/page.js";
@@ -45,7 +53,77 @@ export type WorkRoutesDependencies = ActorContextDependencies & {
   readonly work: WorkPort;
   /** WORK-58: suggestions and the done page; absent, not routed. */
   readonly page?: WorkPage | undefined;
+  /** Pictures of who the work names. Absent: initials. */
+  readonly namedPhotos?: Pick<NamedImageReader, "photos"> | undefined;
 };
+
+type Named = NonNullable<QWorkLaneDto["counterpart"]>;
+
+function subjectOf(named: Named): NamedImageSubject {
+  return { subjectType: named.kind, subjectId: named.id };
+}
+
+function namedOf(subject: NamedImageSubject | null): Named | null {
+  return subject === null
+    ? null
+    : { kind: subject.subjectType, id: subject.subjectId, photoUrl: null };
+}
+
+/**
+ * Every lane names its counterpart to the person whose work it is, so
+ * the counterpart's logo is signed with the name (founder decision
+ * 2026-10-04), in one batch for the response.
+ */
+async function withLanePhotos(
+  reader: WorkRoutesDependencies["namedPhotos"],
+  items: readonly QWorkDto[],
+): Promise<QWorkDto[]> {
+  const named = items.flatMap((item) =>
+    item.lanes.flatMap((lane) => {
+      const counterpart = lane.counterpart ?? null;
+      return counterpart === null ? [] : [subjectOf(counterpart)];
+    }),
+  );
+  const photo = await photoLookup(reader, named);
+  return items.map((item) => ({
+    ...item,
+    lanes: item.lanes.map((lane) => {
+      const counterpart = lane.counterpart ?? null;
+      return counterpart === null
+        ? lane
+        : {
+            ...lane,
+            counterpart: {
+              ...counterpart,
+              photoUrl: photo(subjectOf(counterpart)),
+            },
+          };
+    }),
+  }));
+}
+
+/** A row whose link is the person's own relationship names that side. */
+async function withLinkPhotos<T extends { readonly linkPath: string | null }>(
+  reader: WorkRoutesDependencies["namedPhotos"],
+  items: readonly T[],
+): Promise<(T & { named: Named | null })[]> {
+  const subjects = items.map((item) => namedByRelationshipLink(item.linkPath));
+  const photo = await photoLookup(
+    reader,
+    subjects.filter((subject) => subject !== null),
+  );
+  return items.map((item, index) => {
+    const subject = subjects[index] ?? null;
+    const named = namedOf(subject);
+    return {
+      ...item,
+      named:
+        named === null || subject === null
+          ? null
+          : { ...named, photoUrl: photo(subject) },
+    };
+  });
+}
 
 const Id = z.string().uuid();
 const ItemParams = z.object({ delegationId: Id }).strict();
@@ -151,7 +229,9 @@ export function registerWorkRoutes(
     await work.seen(actor).catch(() => undefined);
     const items = await work.list(actor);
     void reply.header("Cache-Control", "no-store");
-    return QWorkListDtoSchema.parse({ items: items.slice(0, 20) });
+    return QWorkListDtoSchema.parse({
+      items: await withLanePhotos(dependencies.namedPhotos, items.slice(0, 20)),
+    });
   });
 
   const { page } = dependencies;
@@ -163,7 +243,9 @@ export function registerWorkRoutes(
       async (request, reply) => {
         const items = await page.suggestions(getActorContext(request));
         void reply.header("Cache-Control", "no-store");
-        return QWorkSuggestionListDtoSchema.parse({ items });
+        return QWorkSuggestionListDtoSchema.parse({
+          items: await withLinkPhotos(dependencies.namedPhotos, items),
+        });
       },
     );
 
@@ -180,7 +262,10 @@ export function registerWorkRoutes(
             : { limit: query.data.limit }),
         });
         void reply.header("Cache-Control", "no-store");
-        return QWorkDonePageDtoSchema.parse(done);
+        return QWorkDonePageDtoSchema.parse({
+          ...done,
+          items: await withLinkPhotos(dependencies.namedPhotos, done.items),
+        });
       },
     );
   }
@@ -197,7 +282,13 @@ export function registerWorkRoutes(
       );
       if (detail === null) return notFound(request, reply);
       void reply.header("Cache-Control", "no-store");
-      return QWorkDetailDtoSchema.parse(detail);
+      const [withPhotos] = await withLanePhotos(dependencies.namedPhotos, [
+        detail.work,
+      ]);
+      return QWorkDetailDtoSchema.parse({
+        ...detail,
+        work: withPhotos ?? detail.work,
+      });
     },
   );
 

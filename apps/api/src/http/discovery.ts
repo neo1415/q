@@ -19,6 +19,8 @@ import {
   type DiscoverFilters,
   DISCOVERY_YOUR_COMPANIES_PATH,
   YourCompaniesPageDtoSchema,
+  DISCOVERY_INVESTOR_PHOTO_PATH,
+  DiscoveredInvestorPhotoDtoSchema,
   type YourCompanyLabel,
   type YourCompanyPitchItemDto,
 } from "@capital-q/contracts";
@@ -34,6 +36,7 @@ import {
   type DiscoverablePitchSet,
   type NetworkPitchQueryPort,
 } from "@capital-q/media";
+import { namedImageKey, type NamedImages } from "@capital-q/public-identity";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -41,6 +44,7 @@ import {
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import { photoLookup, type NamedPhotos } from "./named-photos.js";
 
 /**
  * `/v1/discovery` — the slate (doc 19).
@@ -116,6 +120,8 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
     | undefined;
   /** The playback rule; absent, the row is empty rather than unplayable. */
   readonly mayPlay?: YourCompaniesMayPlay | undefined;
+  /** Pictures of who a response names. Absent: initials everywhere. */
+  readonly namedPhotos?: NamedPhotos | undefined;
 };
 
 /**
@@ -493,8 +499,35 @@ export function registerDiscoveryRoutes(
       }
       const more =
         last !== undefined && ordered.indexOf(last) < ordered.length - 1;
+      // Each card names its company, so the logo shows with the name; the
+      // cover keeps the company's own card scope for a participant. One
+      // batch for the page.
+      const images =
+        dependencies.namedPhotos === undefined || items.length === 0
+          ? new Map<string, NamedImages>()
+          : await dependencies.namedPhotos
+              .images(
+                items.map((item) => ({
+                  subjectType: "COMPANY" as const,
+                  subjectId: item.companyId,
+                })),
+                "PARTICIPANT",
+              )
+              .catch(() => new Map<string, NamedImages>());
       return YourCompaniesPageDtoSchema.parse({
-        items,
+        items: items.map((item) => {
+          const image = images.get(
+            namedImageKey({
+              subjectType: "COMPANY",
+              subjectId: item.companyId,
+            }),
+          );
+          return {
+            ...item,
+            photoUrl: image?.photo ?? null,
+            coverUrl: image?.cover ?? null,
+          };
+        }),
         nextCursor:
           more && last !== undefined
             ? encodeNetworkCursor(last.at, last.companyId)
@@ -567,6 +600,45 @@ export function registerDiscoveryRoutes(
       return DiscoveredInvestorProfileDtoSchema.parse({
         ...investor,
         ...(await imagesOf(investor.investorOrganisationId)),
+      });
+    },
+  );
+
+  // An investor's logo alone, for a Q investor reference: only where this
+  // reader may see the investor's name (the profile read above, or their
+  // own organisation). Every "no" is the same 404.
+  app.get(
+    DISCOVERY_INVESTOR_PHOTO_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const raw = (request.params as { investorOrganisationId?: unknown })
+        .investorOrganisationId;
+      const id = typeof raw === "string" ? raw : "";
+      void reply.header("Cache-Control", "no-store");
+      const named =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(
+          id,
+        ) &&
+        (actor.organisationId === id ||
+          (await service.findInvestor(actor, id).catch(() => null)) !== null);
+      if (!named) {
+        const problem = createProblemDetails({
+          code: "RESOURCE_NOT_FOUND",
+          requestId: request.id,
+        });
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
+      const subject = {
+        subjectType: "INVESTOR_ORGANISATION" as const,
+        subjectId: id,
+      };
+      const photo = await photoLookup(dependencies.namedPhotos, [subject]);
+      return DiscoveredInvestorPhotoDtoSchema.parse({
+        photoUrl: photo(subject),
       });
     },
   );

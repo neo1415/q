@@ -85,15 +85,18 @@ describe("cardImagesFor", () => {
     });
   });
 
-  it("signs nothing when the card shows neither image", async () => {
-    const { service, signedCount } = serviceWith({
-      status: "ACTIVE",
-      fieldScopes: {},
-    });
-    await expect(
-      service.cardImagesFor({ subject: SUBJECT, audience: "PARTICIPANT" }),
-    ).resolves.toEqual({ photo: null, cover: null });
-    expect(signedCount()).toBe(0);
+  it("shows the photo wherever the card shows the name, whatever scope was stored for it", async () => {
+    // Founder decision 2026-10-04: the photo has the name's scope. A stored
+    // narrower photo scope (or none) no longer hides it from the public.
+    for (const fieldScopes of [{}, { photo: "network_visible" }]) {
+      const { service } = serviceWith({ status: "ACTIVE", fieldScopes });
+      await expect(
+        service.cardImagesFor({ subject: SUBJECT, audience: "PUBLIC" }),
+      ).resolves.toEqual({
+        photo: "https://storage.test/photo?sig=1",
+        cover: null,
+      });
+    }
   });
 
   it("signs nothing for a revoked card", async () => {

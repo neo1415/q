@@ -8,6 +8,7 @@ import { Button } from "@capital-q/ui/button";
 import { EmptyState, ErrorState, Skeleton } from "@capital-q/ui/states";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import {
   answerWorkAction,
@@ -101,7 +102,20 @@ function LaneRow({
       data-work-lane={lane.stage}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="cq-body font-medium text-(--cq-text-primary)">
+        <span className="flex min-w-0 items-center gap-2 cq-body font-medium text-(--cq-text-primary)">
+          {lane.counterpart === null ||
+          lane.counterpart === undefined ? null : (
+            // Their logo, signed with the name for this reader.
+            <EntityAvatar
+              kind={
+                lane.counterpart.kind === "COMPANY" ? "company" : "investor"
+              }
+              name={lane.counterpartName}
+              src={lane.counterpart.photoUrl}
+              size="xs"
+              decorative
+            />
+          )}
           {lane.counterpartName}
         </span>
         <span className="cq-caption text-(--cq-text-secondary)">

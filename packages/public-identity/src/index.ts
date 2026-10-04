@@ -69,7 +69,20 @@ export {
   type ProfileImageStorage,
   type ProfileImageSubject,
 } from "./application/profile-images.js";
-export { createPostgresProfileImageRepository } from "./infrastructure/postgres-profile-images.js";
+export {
+  createNamedImageReader,
+  namedByRelationshipLink,
+  namedImageKey,
+  photoLookup,
+  type NamedImageReader,
+  type NamedImages,
+  type NamedImageStore,
+  type NamedImageSubject,
+} from "./application/named-images.js";
+export {
+  createPostgresNamedImageStore,
+  createPostgresProfileImageRepository,
+} from "./infrastructure/postgres-profile-images.js";
 export { createSharpImageProcessor } from "./infrastructure/sharp-image-processor.js";
 export { createPostgresPublicIdentityRepository } from "./infrastructure/postgres-repository.js";
 export {

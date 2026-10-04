@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { NamedPictureSchema } from "../common/named-picture.js";
 import { UtcTimestampSchema } from "../common/time.js";
 
 /**
@@ -80,6 +81,11 @@ export const QWorkSuggestionDtoSchema = z
       .string()
       .regex(/^\/[A-Za-z0-9/_?=&-]{0,200}$/u)
       .nullable(),
+    /**
+     * Who the row's link names (their side of the person's own
+     * relationship), with their logo under the name's scope. Absent: none.
+     */
+    named: NamedPictureSchema.nullable().optional(),
   })
   .strict();
 export type QWorkSuggestionDto = z.infer<typeof QWorkSuggestionDtoSchema>;
@@ -111,6 +117,11 @@ export const QWorkDoneItemDtoSchema = z
       .string()
       .regex(/^\/[A-Za-z0-9/_?=&-]{0,200}$/u)
       .nullable(),
+    /**
+     * Who the row's link names (their side of the person's own
+     * relationship), with their logo under the name's scope. Absent: none.
+     */
+    named: NamedPictureSchema.nullable().optional(),
   })
   .strict();
 export type QWorkDoneItemDto = z.infer<typeof QWorkDoneItemDtoSchema>;

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { NamedPictureSchema } from "../common/named-picture.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import {
   Q_ACTION_PREVIEW_MAX_LENGTH,
@@ -117,6 +118,11 @@ export const QPendingApprovalSchema = z
     summary: z.string().trim().min(1).max(Q_ACTION_SUMMARY_MAX_LENGTH),
     requestedAt: UtcTimestampSchema,
     expiresAt: UtcTimestampSchema,
+    /**
+     * The person or organisation the action is aimed at (its first such
+     * target), with their picture under the name's scope. Absent: none.
+     */
+    named: NamedPictureSchema.nullable().optional(),
   })
   .strict();
 export type QPendingApproval = z.infer<typeof QPendingApprovalSchema>;

@@ -312,7 +312,7 @@ function RelationshipCard({
             kind="company"
             name={name}
             companyId={item.counterpart.id}
-            src={digest?.photoUrl ?? undefined}
+            src={item.counterpart.photoUrl ?? digest?.photoUrl ?? undefined}
             size={48}
             decorative
           />
@@ -320,7 +320,7 @@ function RelationshipCard({
           <EntityAvatar
             kind="investor"
             name={name}
-            src={digest?.photoUrl ?? null}
+            src={item.counterpart.photoUrl ?? digest?.photoUrl ?? null}
             size={48}
             decorative
           />

@@ -23,6 +23,10 @@ import {
 import { CompanyIdSchema } from "@capital-q/companies";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
 import {
+  namedImageKey,
+  type NamedImageSubject,
+} from "@capital-q/public-identity";
+import {
   AuthUserIdSchema,
   AuthorizationDeniedError,
   MembershipIdSchema,
@@ -151,13 +155,37 @@ function buildApp(
     readonly failWith?: Error | undefined;
     readonly deduplicated?: boolean | undefined;
     readonly noRelationship?: boolean | undefined;
+    /** Signed pictures by "TYPE:id"; set, the photo reader is composed. */
+    readonly photos?: Readonly<Record<string, string>> | undefined;
   } = {},
 ): {
   readonly app: FastifyInstance;
   readonly calls: ExpressInterestCommand[];
   readonly answers: RespondToInterestCommand[];
   readonly reads: Record<string, unknown>[];
+  readonly asked: NamedImageSubject[][];
 } {
+  const asked: NamedImageSubject[][] = [];
+  const photos = options.photos;
+  const namedPhotos =
+    photos === undefined
+      ? undefined
+      : {
+          photos: (subjects: readonly NamedImageSubject[]) => {
+            asked.push([...subjects]);
+            return Promise.resolve(
+              new Map(
+                subjects.flatMap((subject) => {
+                  const url = photos[namedImageKey(subject)];
+                  return url === undefined
+                    ? []
+                    : [[namedImageKey(subject), url] as const];
+                }),
+              ),
+            );
+          },
+          images: () => Promise.reject(new Error("not under test")),
+        };
   const calls: ExpressInterestCommand[] = [];
   const answers: RespondToInterestCommand[] = [];
   const reads: Record<string, unknown>[] = [];
@@ -227,8 +255,9 @@ function buildApp(
   };
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     interests,
+    namedPhotos,
   });
-  return { app, calls, answers, reads };
+  return { app, calls, answers, reads, asked };
 }
 
 const post = (
@@ -362,6 +391,7 @@ describe("the company's side (CQ-NET-011)", () => {
         interestId: INTEREST_ID,
         investorOrganisationId: INVESTOR.id,
         investorName: "Apex Ventures",
+        investorPhotoUrl: null,
         investorType: "VC",
         expressedAt: INTEREST.createdAt,
         response: "PENDING",
@@ -543,7 +573,12 @@ describe("each side's own relationships (CQ-WEB-030)", () => {
       items: [
         {
           relationshipId: RELATIONSHIP.id,
-          counterpart: { kind: "COMPANY", id: COMPANY, name: "Kora" },
+          counterpart: {
+            kind: "COMPANY",
+            id: COMPANY,
+            name: "Kora",
+            photoUrl: null,
+          },
           state: "CONNECTED",
           stateSince: "2026-09-25T11:00:00.000Z",
           nextStep: "SCHEDULE_MEETING",
@@ -584,5 +619,54 @@ describe("each side's own relationships (CQ-WEB-030)", () => {
       url: `/v1/network/companies/${COMPANY}/relationships`,
     });
     expect(response.statusCode).toBe(404);
+  });
+});
+
+describe("pictures have the name's scope (founder decision 2026-10-04)", () => {
+  const LOGO =
+    "https://storage.test/object/sign/cq-profile-images/logo?token=t";
+
+  it("a row that names the counterpart carries their logo, from one batch", async () => {
+    const { app, asked } = buildApp({
+      photos: { [`COMPANY:${COMPANY}`]: LOGO },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships",
+    });
+    expect(response.json()).toMatchObject({
+      items: [{ counterpart: { id: COMPANY, name: "Kora", photoUrl: LOGO } }],
+    });
+    expect(asked).toEqual([[{ subjectType: "COMPANY", subjectId: COMPANY }]]);
+  });
+
+  it("the company's inbox carries each named investor's logo", async () => {
+    const { app, asked } = buildApp({
+      photos: { [`INVESTOR_ORGANISATION:${INVESTOR.id}`]: LOGO },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY}/incoming-interest`,
+    });
+    expect(response.json()).toMatchObject({
+      items: [{ investorName: "Apex Ventures", investorPhotoUrl: LOGO }],
+    });
+    expect(asked).toHaveLength(1);
+  });
+
+  it("a reader who may not see the names gets no picture: nothing is even signed", async () => {
+    const { app, asked } = buildApp({
+      failWith: new InterestCompanyNotFoundError(),
+      photos: { [`INVESTOR_ORGANISATION:${INVESTOR.id}`]: LOGO },
+    });
+    for (const url of [
+      `/v1/network/companies/${COMPANY}/relationships`,
+      `/v1/network/companies/${COMPANY}/incoming-interest`,
+    ]) {
+      const response = await app.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(404);
+      expect(response.body).not.toContain("storage.test");
+    }
+    expect(asked).toEqual([]);
   });
 });

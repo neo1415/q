@@ -33,6 +33,18 @@ export const NAME_FIELD: Readonly<Record<QCardSubjectType, QCardField>> = {
 };
 
 /**
+ * The logo or photo has the name's scope, always (founder decision
+ * 2026-10-04: "they're literally profile pictures"): whoever may see the
+ * name may see the picture beside it. Only the cover keeps its own scope.
+ */
+function PINNED_TO_NAME(subjectType: QCardSubjectType): QCardFieldScopes {
+  return {
+    [NAME_FIELD[subjectType]]: "public_external",
+    photo: "public_external",
+  };
+}
+
+/**
  * A new card's defaults: identity-level facts public, the rest to the
  * network. The owner sees and changes every one before sharing.
  */
@@ -68,7 +80,8 @@ export type CardScopesReading =
 
 /**
  * Fit requested scopes to the subject type: every key must be one of its
- * card fields, and the name stays public whatever was asked.
+ * card fields, and the name (and the photo with it) stays public
+ * whatever was asked.
  */
 export function fitFieldScopes(
   subjectType: QCardSubjectType,
@@ -79,7 +92,7 @@ export function fitFieldScopes(
   if (misplaced.length > 0) return { ok: false, fields: misplaced };
   return {
     ok: true,
-    scopes: { ...requested, [NAME_FIELD[subjectType]]: "public_external" },
+    scopes: { ...requested, ...PINNED_TO_NAME(subjectType) },
   };
 }
 
@@ -89,7 +102,7 @@ export function readStoredScopes(
   stored: unknown,
 ): QCardFieldScopes {
   const parsed = QCardFieldScopesSchema.safeParse(stored);
-  if (!parsed.success) return { [NAME_FIELD[subjectType]]: "public_external" };
+  if (!parsed.success) return { ...PINNED_TO_NAME(subjectType) };
   const allowed = new Set<string>(CARD_FIELDS[subjectType]);
   const scopes: Partial<Record<QCardField, QCardScope>> = {};
   for (const [key, scope] of Object.entries(parsed.data)) {
@@ -97,8 +110,7 @@ export function readStoredScopes(
       scopes[key as QCardField] = scope;
     }
   }
-  scopes[NAME_FIELD[subjectType]] = "public_external";
-  return scopes;
+  return { ...scopes, ...PINNED_TO_NAME(subjectType) };
 }
 
 export type CardAudience = "PUBLIC" | "PARTICIPANT";

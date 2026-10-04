@@ -51,8 +51,10 @@ import type { SubjectDirectory } from "./ports.js";
  * Who may change an image: the person themselves (PERSON), or a member of
  * the organisation holding the profile-edit capability (COMPANY,
  * INVESTOR_ORGANISATION). Who may see it: the person; the organisation's
- * members; and, for an organisation, the Q Card's audiences through the
- * card's own `photo`/`cover` scopes -- never a public bucket.
+ * members; whoever may see the subject's name on a surface, for the photo
+ * (named-images.ts, founder decision 2026-10-04); and, for an
+ * organisation's cover, the Q Card's audiences through the card's own
+ * `cover` scope -- never a public bucket.
  */
 
 export const PROFILE_IMAGE_BUCKET = "cq-profile-images" as const;
@@ -109,6 +111,18 @@ export type ProfileImageStorage = {
     readonly object: StoredImageObject;
     readonly expiresInSeconds: number;
   }) => Promise<{ readonly url: string }>;
+  /**
+   * Many reads of one bucket signed in one provider call (a list's
+   * pictures). Each entry is the URL or null, in the order asked. Absent:
+   * the reader signs one by one.
+   */
+  readonly createDownloadAuthorizations?:
+    | ((input: {
+        readonly bucket: string;
+        readonly keys: readonly string[];
+        readonly expiresInSeconds: number;
+      }) => Promise<readonly (string | null)[]>)
+    | undefined;
   readonly statObject: (
     object: StoredImageObject,
   ) => Promise<{ readonly sizeBytes: number } | null>;

@@ -223,6 +223,59 @@ describe("Work (WORK-58)", () => {
     expect(screen.getByText("Hi Ngozi")).toBeTruthy();
   });
 
+  it("shows the picture of who an approval names, and the icon when there is none", () => {
+    const LOGO = "https://storage.test/object/sign/cq-profile-images/l?t=1";
+    const pending = (named: unknown) =>
+      QPendingApprovalSchema.parse({
+        approvalId: APPROVAL,
+        runId: RUN,
+        conversationId: null,
+        summary: "Reply to Clinicrest",
+        requestedAt: "2026-10-04T09:00:00Z",
+        expiresAt: "2026-10-05T09:00:00Z",
+        named,
+      });
+    const { container, unmount } = render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[
+          pending({
+            kind: "COMPANY",
+            id: "22222222-0000-4000-8000-000000000002",
+            photoUrl: LOGO,
+          }),
+        ]}
+        work={[]}
+        done={null}
+      />,
+    );
+    const section = container.querySelector("[data-work-needs-you]");
+    expect(section?.querySelector("img")?.getAttribute("src")).toBe(LOGO);
+    unmount();
+    const without = render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[
+          pending({
+            kind: "COMPANY",
+            id: "22222222-0000-4000-8000-000000000002",
+            photoUrl: null,
+          }),
+        ]}
+        work={[]}
+        done={null}
+      />,
+    );
+    expect(
+      without.container.querySelector("[data-work-needs-you] img"),
+    ).toBeNull();
+    expect(
+      without.container.querySelector(
+        "[data-work-needs-you] [data-entity-avatar]",
+      ),
+    ).toBeNull();
+  });
+
   it("shows running work in one line with its spend, and pauses it behind a tap", async () => {
     paused.mockResolvedValue({ ok: true, value: null });
     render(

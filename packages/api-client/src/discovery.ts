@@ -7,7 +7,9 @@ import {
   DISCOVERY_PASSED_PATH,
   DISCOVERY_EXPLANATION_PATH,
   DISCOVERY_INVESTOR_PATH,
+  DISCOVERY_INVESTOR_PHOTO_PATH,
   DISCOVERY_INVESTORS_PATH,
+  DiscoveredInvestorPhotoDtoSchema,
   DiscoveredInvestorProfileDtoSchema,
   DISCOVERY_NETWORK_PITCHES_PATH,
   DISCOVERY_SAVED_PATH,
@@ -83,6 +85,22 @@ export function getDiscoveredInvestor(
       encodeURIComponent(investorOrganisationId),
     ),
     DiscoveredInvestorProfileDtoSchema,
+  );
+}
+
+/** `GET /v1/discovery/investors/:investorOrganisationId/photo` — the logo's signed URL, or null. */
+export function getDiscoveredInvestorPhoto(
+  session: ApiSession,
+  investorOrganisationId: string,
+) {
+  return call(
+    session,
+    "GET",
+    DISCOVERY_INVESTOR_PHOTO_PATH.replace(
+      ":investorOrganisationId",
+      encodeURIComponent(investorOrganisationId),
+    ),
+    DiscoveredInvestorPhotoDtoSchema,
   );
 }
 

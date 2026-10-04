@@ -23,6 +23,7 @@ import {
   RelationshipListDtoSchema,
   RelationshipPassResponseDtoSchema,
   RelationshipStatusResponseDtoSchema,
+  type RelationshipSummaryDto,
 } from "@capital-q/contracts";
 import {
   InterestNotFoundError,
@@ -37,6 +38,8 @@ import {
   type RelationshipOutcomeService,
 } from "@capital-q/network";
 import type { DiligenceService } from "@capital-q/permissions";
+
+import { photoLookup, type NamedPhotos } from "./named-photos.js";
 
 import {
   getActorContext,
@@ -75,6 +78,8 @@ export type NetworkInterestRoutesDependencies = ActorContextDependencies & {
   readonly outcomes?: RelationshipOutcomeService | undefined;
   /** Diligence reads: the area and a shared document's signed download. */
   readonly diligence?: DiligenceService | undefined;
+  /** The named counterparts' pictures. Absent: every row reads as initials. */
+  readonly namedPhotos?: NamedPhotos | undefined;
 };
 
 function investorIdOf(request: FastifyRequest): string {
@@ -96,6 +101,25 @@ export function registerNetworkInterestRoutes(
 ): void {
   const withContext = requireActorContextHook(dependencies);
   const service = dependencies.interests;
+
+  // Each row names its counterpart to this party, so the counterpart's
+  // logo is signed with it, in one batch for the whole list.
+  const withCounterpartPhotos = async (
+    items: readonly RelationshipSummaryDto[],
+  ): Promise<RelationshipSummaryDto[]> => {
+    const subjectOf = (item: RelationshipSummaryDto) => ({
+      subjectType: item.counterpart.kind,
+      subjectId: item.counterpart.id,
+    });
+    const photo = await photoLookup(
+      dependencies.namedPhotos,
+      items.map(subjectOf),
+    );
+    return items.map((item) => ({
+      ...item,
+      counterpart: { ...item.counterpart, photoUrl: photo(subjectOf(item)) },
+    }));
+  };
 
   app.get(
     NETWORK_COMPANY_INTEREST_PATH,
@@ -231,8 +255,10 @@ export function registerNetworkInterestRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return RelationshipListDtoSchema.parse({
-        items: listings.map((listing) =>
-          toRelationshipSummaryDto(listing, "INVESTOR"),
+        items: await withCounterpartPhotos(
+          listings.map((listing) =>
+            toRelationshipSummaryDto(listing, "INVESTOR"),
+          ),
         ),
       });
     },
@@ -247,8 +273,10 @@ export function registerNetworkInterestRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return RelationshipListDtoSchema.parse({
-        items: listings.map((listing) =>
-          toRelationshipSummaryDto(listing, "COMPANY"),
+        items: await withCounterpartPhotos(
+          listings.map((listing) =>
+            toRelationshipSummaryDto(listing, "COMPANY"),
+          ),
         ),
       });
     },
@@ -264,10 +292,22 @@ export function registerNetworkInterestRoutes(
         companyId: companyIdOf(request),
       });
       void reply.header("Cache-Control", "no-store");
+      // The inbox names each investor, so their logo shows with the name.
+      const photo = await photoLookup(
+        dependencies.namedPhotos,
+        incoming.map(({ interest }) => ({
+          subjectType: "INVESTOR_ORGANISATION" as const,
+          subjectId: interest.investorOrganisationId,
+        })),
+      );
       return IncomingInterestListDtoSchema.parse({
-        items: incoming.map(({ interest, investor }) =>
-          toIncomingInterestDto(interest, investor),
-        ),
+        items: incoming.map(({ interest, investor }) => ({
+          ...toIncomingInterestDto(interest, investor),
+          investorPhotoUrl: photo({
+            subjectType: "INVESTOR_ORGANISATION",
+            subjectId: interest.investorOrganisationId,
+          }),
+        })),
       });
     },
   );

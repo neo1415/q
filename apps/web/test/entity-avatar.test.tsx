@@ -120,10 +120,28 @@ describe("EntityAvatar visibility", () => {
     );
   });
 
+  it("an investor known only by id asks its gated photo route only", () => {
+    // The route answers only where the reader may see the investor's name
+    // (founder decision 2026-10-04); a no is a 404 and the initials stay.
+    expect(
+      entityImageSource({
+        kind: "investor",
+        investorOrganisationId: COMPANY_ID,
+      }),
+    ).toBe(`/api/investor-photo/${COMPANY_ID}`);
+    expect(
+      entityImageSource({
+        kind: "investor",
+        investorOrganisationId: COMPANY_ID,
+        src: null,
+      }),
+    ).toBeNull();
+  });
+
   it("never invents a URL for a person or investor it was not handed", () => {
     expect(entityImageSource({ kind: "person" })).toBeNull();
     expect(entityImageSource({ kind: "investor" })).toBeNull();
-    // An investor id is not a way to ask for its image.
+    // A company id is not a way to ask for an investor's image.
     const { container } = render(
       <EntityAvatar
         kind="investor"

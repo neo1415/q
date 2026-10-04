@@ -129,6 +129,17 @@ describe("an accepted interest, later", () => {
 });
 
 describe("the founder's inbox", () => {
+  it("shows the named investor's logo the inbox carries", () => {
+    const LOGO = "https://storage.test/object/sign/cq-profile-images/l?t=1";
+    const { container } = render(
+      <IncomingInterest
+        items={[{ ...PENDING, investorPhotoUrl: LOGO }]}
+        answer={vi.fn()}
+      />,
+    );
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(LOGO);
+  });
+
   it("says so plainly when there is no interest", () => {
     render(<IncomingInterest items={[]} answer={vi.fn()} />);
     expect(screen.getByText("No investor interest yet.")).toBeTruthy();

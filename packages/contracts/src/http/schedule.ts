@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { NamedPictureSchema } from "../common/named-picture.js";
 import { UtcTimestampSchema } from "../common/time.js";
 
 /**
@@ -257,6 +258,12 @@ export const NotificationDtoSchema = z
     createdAt: UtcTimestampSchema,
     /** AUTO: what needs the person vs an update. */
     priority: z.enum(["NEEDS_YOU", "UPDATE"]).default("UPDATE"),
+    /**
+     * The organisation the notice is about (its link names their side of
+     * the person's own relationship), with its logo signed for this reader
+     * under the name's scope. Absent: the notice names no one.
+     */
+    named: NamedPictureSchema.nullable().optional(),
   })
   .strict();
 export type NotificationDto = z.infer<typeof NotificationDtoSchema>;

@@ -130,6 +130,9 @@ const PendingRow = z.object({
   summary: z.string().min(1),
   requested_at: Timestamp,
   expires_at: Timestamp,
+  // A stored target the contract no longer reads is no target, never a
+  // failed list.
+  target_refs: z.unknown(),
 });
 
 function toApproval(row: unknown): QApprovalRecord {
@@ -339,7 +342,7 @@ export function createPostgresQActionRepositories(): QActionRepositories {
       listPendingForApprover: async (executor, input) => {
         const rows = await executor`
           select p.id, a.run_id, r.conversation_id, a.summary,
-                 p.requested_at, p.expires_at
+                 p.requested_at, p.expires_at, a.target_refs
             from q_runtime.approvals p
             join q_runtime.actions a
               on a.id = p.action_id and a.tenant_id = p.tenant_id
@@ -361,6 +364,7 @@ export function createPostgresQActionRepositories(): QActionRepositories {
             summary: r.summary,
             requestedAt: r.requested_at,
             expiresAt: r.expires_at,
+            targets: QSubjectRefsSchema.safeParse(r.target_refs).data ?? [],
           };
         });
       },
