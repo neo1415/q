@@ -8,8 +8,15 @@ import type { NotificationDto } from "@capital-q/contracts";
  * near-identical rows. Notices with the same kind, title and destination
  * fold into their newest one, which carries how many it stands for.
  * "Needs you" comes first; updates follow under their day. Nothing is
- * dropped: every folded notice's id stays on its group, so opening the
- * centre still marks all of them read.
+ * dropped: every folded notice's id stays on its group, so marking a group
+ * read marks all of them.
+ *
+ * A NEEDS_YOU notice stays under "Needs you" only while it is unread. For
+ * one, read means dealt with -- resolved on the server once answered (an
+ * interest accepted or declined), or opened from its row -- never merely
+ * shown (live QA: Brightkloof's "Savanna Seed Partners is interested..."
+ * was resolved on accept and still sat under "Needs you" with Open). A
+ * resolved one moves to its day, as history.
  */
 export type NoticeGroup = {
   readonly key: string;
@@ -75,8 +82,10 @@ export function groupNotices(
   readonly needsYou: readonly NoticeGroup[];
   readonly days: readonly NoticeDay[];
 } {
-  const needsYou = fold(items.filter((item) => item.priority === "NEEDS_YOU"));
-  const updates = fold(items.filter((item) => item.priority !== "NEEDS_YOU"));
+  const waiting = (item: NotificationDto) =>
+    item.priority === "NEEDS_YOU" && !item.read;
+  const needsYou = fold(items.filter(waiting));
+  const updates = fold(items.filter((item) => !waiting(item)));
   const days: { label: string; groups: NoticeGroup[] }[] = [];
   for (const group of updates) {
     const label = dayLabel(group.notice.createdAt, now);
