@@ -37,12 +37,3 @@ export function useInView(
   }, [ref, seen, rootMargin, threshold]);
   return seen;
 }
-
-/** The person's reduced-motion preference, read after mount. */
-export function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
