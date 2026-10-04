@@ -71,8 +71,6 @@ export function GmailConnection({
     }
     started.current = true;
     connect();
-    // `connect` is stable in effect: it only starts a transition.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reconnect, outcome, connection]);
   const disconnect = () =>
     startTransition(async () => {
