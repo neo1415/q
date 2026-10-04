@@ -293,6 +293,34 @@ export type CreateQVoiceSessionResponse = z.infer<
 // reported here for the daily cap. None of these shapes names a vendor.
 // ---------------------------------------------------------------------------
 
+/**
+ * BACKCHANNEL (duplex only): how much Q reacts while the person is still
+ * talking ("mm", "oh no", "right") and whether it bridges a slow answer
+ * with a short line. OFF is silence until Q answers; SUBTLE (the default)
+ * is sparse; NATURAL reacts about as often as an attentive person. The
+ * words are always the model's; the level only bounds when and how often.
+ * Reference data, persisted as a per-person memory preference.
+ */
+export const Q_VOICE_LISTENING_LEVELS = ["OFF", "SUBTLE", "NATURAL"] as const;
+export const QVoiceListeningLevelSchema = z.enum(Q_VOICE_LISTENING_LEVELS);
+export type QVoiceListeningLevel = z.infer<typeof QVoiceListeningLevelSchema>;
+export const Q_VOICE_LISTENING_DEFAULT: QVoiceListeningLevel = "SUBTLE";
+
+/** What the line needs to listen like a person, composed on the server. */
+export const QVoiceDuplexListeningSchema = z
+  .object({
+    /** The person's remembered level, or the default. */
+    level: QVoiceListeningLevelSchema,
+    /** When they last set it by voice; null when never (the default). */
+    setAt: UtcTimestampSchema.nullable(),
+    /** The rules for a reaction while they talk (server-owned prompt). */
+    backchannelInstructions: z.string().min(1).max(4_000),
+    /** The rules for a short bridging line while an answer is slow. */
+    bridgeInstructions: z.string().min(1).max(4_000),
+  })
+  .strict();
+export type QVoiceDuplexListening = z.infer<typeof QVoiceDuplexListeningSchema>;
+
 export const QVoiceDuplexCredentialSchema = z
   .object({
     /** Ephemeral, minted server-side for this one line. Never an API key. */
@@ -305,6 +333,8 @@ export const QVoiceDuplexCredentialSchema = z
     maxSessionMs: z.number().int().min(10_000).max(3_600_000),
     /** Silence for this long ends the line. */
     idleMs: z.number().int().min(5_000).max(600_000),
+    /** BACKCHANNEL: absent when the server has them switched off. */
+    listening: QVoiceDuplexListeningSchema.optional(),
   })
   .strict();
 export type QVoiceDuplexCredential = z.infer<
@@ -338,6 +368,14 @@ export const QVoiceDuplexToolCallSchema = z
       .regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/),
     /** The arguments as the model wrote them (JSON text). */
     arguments: z.string().max(8_000),
+    /**
+     * BACKCHANNEL, set_listening only: the provider's transcripts of the
+     * person's latest turns (not the model's words), so the memory Write
+     * Gate can check the quote against what was actually said.
+     */
+    heard: z.array(z.string().max(600)).max(4).optional(),
+    /** BACKCHANNEL, set_listening only: the level the line is using now. */
+    listening: QVoiceListeningLevelSchema.optional(),
   })
   .strict();
 export type QVoiceDuplexToolCall = z.infer<typeof QVoiceDuplexToolCallSchema>;
@@ -348,6 +386,8 @@ export const QVoiceDuplexToolResultSchema = z
     output: z.string().max(16_000),
     /** Something now waits on screen for the person's approval. */
     approvalPending: z.boolean(),
+    /** BACKCHANNEL: the line's new listening level, applied at once. */
+    listening: QVoiceListeningLevelSchema.optional(),
   })
   .strict();
 export type QVoiceDuplexToolResult = z.infer<
@@ -361,6 +401,15 @@ export const QVoiceDuplexUsageReportSchema = z
   .object({
     /** The model's id for the response: one report per response is counted. */
     responseId: z.string().min(1).max(128),
+    /**
+     * What produced it. RESPONSE (default): a turn. BACKCHANNEL and
+     * BRIDGE: Q's out-of-band reactions. TRANSCRIPTION: the input
+     * transcription model, priced at its own rates. All count toward the
+     * same VOICE_REALTIME ledger and daily cap.
+     */
+    kind: z
+      .enum(["RESPONSE", "BACKCHANNEL", "BRIDGE", "TRANSCRIPTION"])
+      .optional(),
     inputTextTokens: TokenCountSchema,
     inputAudioTokens: TokenCountSchema,
     cachedTextTokens: TokenCountSchema,

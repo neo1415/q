@@ -13,9 +13,11 @@ import type {
  * the Tool Registry offered for this plan, the voice, turn detection that
  * interrupts Q when the person speaks, and a per-response output cap. The
  * browser opens WebRTC with that secret against `/v1/realtime/calls` and
- * never sees the API key. No input transcription is requested: it is a
- * second model billed per minute, and the words the person says reach Q
- * through the tool call's own argument.
+ * never sees the API key. Input transcription (a small second model) is
+ * requested only when the line listens like a person (BACKCHANNEL): the
+ * transcripts give Q's reactions their context and give the memory Write
+ * Gate the person's own words to check a spoken preference against. Its
+ * usage is reported per item and priced at its own rates.
  *
  * Prompt caching is the provider's automatic prefix cache: the
  * instructions put the stable charter first and the per-line context last,
@@ -37,6 +39,17 @@ export const OPENAI_REALTIME_MINI_PRICES: RealtimePrices = {
   audioOutput: 20,
 };
 
+/** The input transcription model (BACKCHANNEL), and its prices (2026-10-04). */
+export const OPENAI_REALTIME_TRANSCRIBE_MODEL = "gpt-4o-mini-transcribe";
+export const OPENAI_TRANSCRIBE_MINI_PRICES: RealtimePrices = {
+  textInput: 1.25,
+  cachedTextInput: 1.25,
+  textOutput: 5,
+  audioInput: 3,
+  cachedAudioInput: 3,
+  audioOutput: 0,
+};
+
 /** Q's two voices, in the provider's catalogue. */
 const VOICES = { FEMALE: "marin", MALE: "cedar" } as const;
 
@@ -54,6 +67,10 @@ export function createOpenAIRealtimeProvider(options: {
     // 20261203090000_model_usage_voice_realtime.sql
     modelId: "a2000000-0000-4000-8000-000000000022",
     prices: options.prices ?? OPENAI_REALTIME_MINI_PRICES,
+    transcription: {
+      modelCode: OPENAI_REALTIME_TRANSCRIBE_MODEL,
+      prices: OPENAI_TRANSCRIBE_MINI_PRICES,
+    },
     mint: async (request, context): Promise<RealtimeSessionGrant> => {
       let response: Response;
       try {
@@ -85,12 +102,22 @@ export function createOpenAIRealtimeProvider(options: {
                 input: {
                   // The person speaking cancels Q's response at once; the
                   // browser also stops playback and truncates (barge-in).
+                  // AUTO waits a little longer on a turn that sounds
+                  // unfinished, which is where Q's reactions go.
                   turn_detection: {
                     type: "semantic_vad",
-                    eagerness: "high",
+                    eagerness:
+                      request.turnEagerness === "AUTO" ? "auto" : "high",
                     create_response: true,
                     interrupt_response: true,
                   },
+                  ...(request.transcribeInput === true
+                    ? {
+                        transcription: {
+                          model: OPENAI_REALTIME_TRANSCRIBE_MODEL,
+                        },
+                      }
+                    : {}),
                 },
                 output: { voice: VOICES[request.voice] },
               },

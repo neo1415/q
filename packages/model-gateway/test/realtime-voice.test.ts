@@ -9,6 +9,7 @@ import {
 import {
   createOpenAIRealtimeProvider,
   OPENAI_REALTIME_MINI_PRICES,
+  OPENAI_TRANSCRIBE_MINI_PRICES,
 } from "../src/realtime/openai.js";
 import type { SyntheticDemoRoutingAllowance } from "../src/policy/synthetic-demo.js";
 
@@ -164,6 +165,64 @@ describe("realtime voice gateway", () => {
       success: true,
     });
   });
+
+  it("prices backchannels at the session rates and transcription at its own, in the same ledger", async () => {
+    const usage = createInMemoryModelUsageRepository();
+    const gateway = createRealtimeVoiceGateway({
+      provider: {
+        ...fakeProvider(),
+        transcription: {
+          modelCode: "fake-transcribe",
+          prices: OPENAI_TRANSCRIBE_MINI_PRICES,
+        },
+      },
+      enabled: true,
+      providerCeiling: "PUBLIC",
+      usage,
+    });
+    // A typical backchannel: ~400 cached instruction tokens, ~120 tokens
+    // of the person's in-progress audio, ~15 audio tokens out.
+    const backchannel = {
+      inputTextTokens: 420,
+      inputAudioTokens: 120,
+      cachedTextTokens: 384,
+      cachedAudioTokens: 0,
+      outputTextTokens: 4,
+      outputAudioTokens: 15,
+    };
+    const bc = await gateway.record({
+      usage: backchannel,
+      attribution: ATTRIBUTION,
+      kind: "BACKCHANNEL",
+    });
+    expect(bc).toBeCloseTo(
+      realtimeCostUsd(backchannel, OPENAI_REALTIME_MINI_PRICES),
+      8,
+    );
+    expect(bc).toBeLessThan(0.002);
+    // One minute of the person's speech through the transcriber.
+    const minute = {
+      inputTextTokens: 0,
+      inputAudioTokens: 600,
+      cachedTextTokens: 0,
+      cachedAudioTokens: 0,
+      outputTextTokens: 150,
+      outputAudioTokens: 0,
+    };
+    const tx = await gateway.record({
+      usage: minute,
+      attribution: ATTRIBUTION,
+      kind: "TRANSCRIPTION",
+    });
+    expect(tx).toBeCloseTo(0.00255, 6);
+    expect(gateway.price(minute, "TRANSCRIPTION")).toBeLessThan(
+      gateway.price(minute),
+    );
+    expect(usage.entries.map((entry) => entry.purpose)).toEqual([
+      "VOICE_REALTIME",
+      "VOICE_REALTIME",
+    ]);
+  });
 });
 
 describe("openai realtime adapter", () => {
@@ -224,6 +283,51 @@ describe("openai realtime adapter", () => {
       true,
     );
     expect(body.session.audio.output.voice).toBe("cedar");
+    // Without listening behaviour: the eager detector and no transcriber.
+    expect(JSON.stringify(body.session)).toContain('"eagerness":"high"');
+    expect(JSON.stringify(body.session)).not.toContain("transcription");
+  });
+
+  it("asks for input transcription and a patient turn detector when the line listens", async () => {
+    const fetchFake = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ value: "ek_minted" }), { status: 200 }),
+      ),
+    );
+    const provider = createOpenAIRealtimeProvider({
+      apiKey: DISABLED_KEY,
+      fetch: fetchFake,
+    });
+    await provider.mint(
+      {
+        modelCode: provider.modelCode,
+        instructions: "You are Q.",
+        tools: [],
+        voice: "FEMALE",
+        maxOutputTokens: 800,
+        secretTtlSeconds: 60,
+        turnEagerness: "AUTO",
+        transcribeInput: true,
+      },
+      { signal: new AbortController().signal },
+    );
+    const [, init] = fetchFake.mock.calls[0] ?? [];
+    const body = JSON.parse(
+      typeof init?.body === "string" ? init.body : "{}",
+    ) as {
+      session: {
+        audio: {
+          input: {
+            turn_detection: { eagerness: string };
+            transcription?: { model: string };
+          };
+        };
+      };
+    };
+    expect(body.session.audio.input.turn_detection.eagerness).toBe("auto");
+    expect(body.session.audio.input.transcription?.model).toBe(
+      "gpt-4o-mini-transcribe",
+    );
   });
 
   it("maps a refusal to a coded failure, never a vendor message", async () => {

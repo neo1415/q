@@ -69,7 +69,22 @@ export type RealtimeSessionRequest = {
   readonly maxOutputTokens: number;
   /** How long the client secret may be used to open the line. */
   readonly secretTtlSeconds: number;
+  /**
+   * BACKCHANNEL: how readily the turn detector ends the person's turn.
+   * HIGH answers soonest; AUTO leaves room for mid-turn pauses, where Q's
+   * reactions go. Default HIGH.
+   */
+  readonly turnEagerness?: "HIGH" | "AUTO" | undefined;
+  /** BACKCHANNEL: transcribe the person's speech (for context and quotes). */
+  readonly transcribeInput?: boolean | undefined;
 };
+
+/** What produced a usage report; all of it is VOICE_REALTIME spend. */
+export type RealtimeUsageKind =
+  | "RESPONSE"
+  | "BACKCHANNEL"
+  | "BRIDGE"
+  | "TRANSCRIPTION";
 
 export type RealtimeSessionGrant = {
   readonly clientSecret: string;
@@ -86,6 +101,14 @@ export type RealtimeSessionProvider = {
   readonly providerId: string;
   readonly modelId: string;
   readonly prices: RealtimePrices;
+  /**
+   * BACKCHANNEL: the session's input transcription model, billed at its
+   * own rates (text-token columns carry its text, audio its audio).
+   * Absent: the session asks for no transcription.
+   */
+  readonly transcription?:
+    | { readonly modelCode: string; readonly prices: RealtimePrices }
+    | undefined;
   /** Rejects with ModelProviderFailure; never with a vendor exception. */
   readonly mint: (
     request: RealtimeSessionRequest,
@@ -105,6 +128,8 @@ export type RealtimeMintRequest = {
   readonly voice: RealtimeVoice;
   readonly maxOutputTokens: number;
   readonly secretTtlSeconds: number;
+  readonly turnEagerness?: "HIGH" | "AUTO" | undefined;
+  readonly transcribeInput?: boolean | undefined;
   /** The plan's ceiling: the most sensitive thing the line may carry. */
   readonly sensitivity: ModelSensitivity;
   readonly attribution: RealtimeAttribution;
@@ -122,11 +147,12 @@ export type RealtimeVoiceGateway = {
   readonly enabled: boolean;
   readonly mint: (request: RealtimeMintRequest) => Promise<RealtimeMintResult>;
   /** Estimated USD for one response's usage at the provider's prices. */
-  readonly price: (usage: RealtimeUsage) => number;
+  readonly price: (usage: RealtimeUsage, kind?: RealtimeUsageKind) => number;
   /** Prices one response and writes its ledger row; returns the cost. */
   readonly record: (input: {
     readonly usage: RealtimeUsage;
     readonly attribution: RealtimeAttribution;
+    readonly kind?: RealtimeUsageKind | undefined;
   }) => Promise<number>;
 };
 
@@ -181,8 +207,16 @@ export function createRealtimeVoiceGateway(options: {
   const provider = options.provider;
   const enabled = options.enabled && provider !== undefined;
   const timeoutMs = options.mintTimeoutMs ?? 8_000;
-  const price = (usage: RealtimeUsage) =>
-    provider === undefined ? 0 : realtimeCostUsd(usage, provider.prices);
+  const price = (usage: RealtimeUsage, kind?: RealtimeUsageKind) => {
+    if (provider === undefined) return 0;
+    // Transcription is its own model's rates; with none configured it is
+    // priced at the session's (higher) rates rather than as free.
+    const prices =
+      kind === "TRANSCRIPTION"
+        ? (provider.transcription?.prices ?? provider.prices)
+        : provider.prices;
+    return realtimeCostUsd(usage, prices);
+  };
   return {
     enabled,
     price,
@@ -210,6 +244,12 @@ export function createRealtimeVoiceGateway(options: {
             voice: request.voice,
             maxOutputTokens: request.maxOutputTokens,
             secretTtlSeconds: request.secretTtlSeconds,
+            ...(request.turnEagerness === undefined
+              ? {}
+              : { turnEagerness: request.turnEagerness }),
+            ...(request.transcribeInput === undefined
+              ? {}
+              : { transcribeInput: request.transcribeInput }),
           },
           { signal },
         );
@@ -219,8 +259,8 @@ export function createRealtimeVoiceGateway(options: {
         return { status: "FAILED" };
       }
     },
-    record: async ({ usage, attribution }) => {
-      const costUsd = price(usage);
+    record: async ({ usage, attribution, kind }) => {
+      const costUsd = price(usage, kind);
       if (provider === undefined) return costUsd;
       await options.usage?.record({
         tenantId: attribution.tenantId,
