@@ -216,6 +216,12 @@ export const CreateQVoiceSessionRequestSchema = z
      * direction 2026-10-01). A preference, never authority.
      */
     locale: QLocaleSchema.optional(),
+    /**
+     * DUPLEX: the browser could not hold a full-duplex line (or one just
+     * ended), so the standard line is wanted. A downgrade only: nothing a
+     * client sends can turn full duplex on; the server decides that.
+     */
+    duplex: z.literal(false).optional(),
   })
   .strict();
 
@@ -264,12 +270,127 @@ export const CreateQVoiceSessionResponseSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * DUPLEX: present when the server brokered a full-duplex line for this
+     * session. The browser tries it first; the rest of this credential is
+     * the standard line, used as it is the moment the duplex one fails.
+     */
+    duplex: z.lazy(() => QVoiceDuplexCredentialSchema).optional(),
   })
   .strict();
 
 export type CreateQVoiceSessionResponse = z.infer<
   typeof CreateQVoiceSessionResponseSchema
 >;
+
+// ---------------------------------------------------------------------------
+// DUPLEX: full-duplex voice (flag CQ_VOICE_REALTIME, off by default).
+//
+// The server authorises the person, computes the Context Firewall plan and
+// checks the spend caps, then mints a short-lived client secret through the
+// Model Gateway. The browser opens the audio line with that secret only;
+// every tool the model calls comes back here, and every response's usage is
+// reported here for the daily cap. None of these shapes names a vendor.
+// ---------------------------------------------------------------------------
+
+export const QVoiceDuplexCredentialSchema = z
+  .object({
+    /** Ephemeral, minted server-side for this one line. Never an API key. */
+    clientSecret: z.string().min(1).max(8192),
+    /** Where the browser sends its session offer, with the secret. */
+    callsUrl: z.string().url().max(500),
+    /** The secret's own expiry: the line must be opened before this. */
+    expiresAt: UtcTimestampSchema,
+    /** The line ends (and the standard one takes over) after this long. */
+    maxSessionMs: z.number().int().min(10_000).max(3_600_000),
+    /** Silence for this long ends the line. */
+    idleMs: z.number().int().min(5_000).max(600_000),
+  })
+  .strict();
+export type QVoiceDuplexCredential = z.infer<
+  typeof QVoiceDuplexCredentialSchema
+>;
+
+/** POST: one function call the duplex model proposed, relayed for execution. */
+export const Q_VOICE_DUPLEX_TOOL_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/tool" as const;
+export const qVoiceDuplexToolPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/tool`;
+/** POST: one response's token usage, for the spend cap. */
+export const Q_VOICE_DUPLEX_USAGE_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/usage" as const;
+export const qVoiceDuplexUsagePath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/usage`;
+/** POST: the duplex line ended; its reservation is released. */
+export const Q_VOICE_DUPLEX_END_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/end" as const;
+export const qVoiceDuplexEndPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/end`;
+
+/** A model's proposal: untrusted input, validated again by the tool pipeline. */
+export const QVoiceDuplexToolCallSchema = z
+  .object({
+    callId: z.string().min(1).max(128),
+    name: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/),
+    /** The arguments as the model wrote them (JSON text). */
+    arguments: z.string().max(8_000),
+  })
+  .strict();
+export type QVoiceDuplexToolCall = z.infer<typeof QVoiceDuplexToolCallSchema>;
+
+export const QVoiceDuplexToolResultSchema = z
+  .object({
+    /** What goes back to the model as the call's output (JSON text). */
+    output: z.string().max(16_000),
+    /** Something now waits on screen for the person's approval. */
+    approvalPending: z.boolean(),
+  })
+  .strict();
+export type QVoiceDuplexToolResult = z.infer<
+  typeof QVoiceDuplexToolResultSchema
+>;
+
+const TokenCountSchema = z.number().int().min(0).max(2_000_000);
+
+/** One response's usage, as the model reported it, by modality. */
+export const QVoiceDuplexUsageReportSchema = z
+  .object({
+    /** The model's id for the response: one report per response is counted. */
+    responseId: z.string().min(1).max(128),
+    inputTextTokens: TokenCountSchema,
+    inputAudioTokens: TokenCountSchema,
+    cachedTextTokens: TokenCountSchema,
+    cachedAudioTokens: TokenCountSchema,
+    outputTextTokens: TokenCountSchema,
+    outputAudioTokens: TokenCountSchema,
+  })
+  .strict();
+export type QVoiceDuplexUsageReport = z.infer<
+  typeof QVoiceDuplexUsageReportSchema
+>;
+
+export const QVoiceDuplexUsageResultSchema = z
+  .object({
+    /** False: end the duplex line now and carry on on the standard one. */
+    continue: z.boolean(),
+    /** One line for the person, when they should know why. */
+    notice: z.string().min(1).max(300).optional(),
+  })
+  .strict();
+export type QVoiceDuplexUsageResult = z.infer<
+  typeof QVoiceDuplexUsageResultSchema
+>;
+
+export const QVoiceDuplexEndSchema = z
+  .object({
+    reason: z.enum(["ENDED", "IDLE", "MAX_LENGTH", "FALLBACK"]),
+  })
+  .strict();
+export type QVoiceDuplexEnd = z.infer<typeof QVoiceDuplexEndSchema>;
 
 /** Where Q may take the person on a spoken request; the browser maps each to a route. */
 export const Q_VOICE_DESTINATIONS = [

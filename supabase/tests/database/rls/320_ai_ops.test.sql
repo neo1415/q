@@ -39,9 +39,9 @@ select ok((select supports_zero_retention from ai_ops.providers where code = 'gr
 select results_eq(
   $$ select model_code from ai_ops.models order by model_code $$,
   $$ values ('gemini-2.5-flash-image'), ('gemini-3.5-flash'), ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'),
-            ('gpt-5.6-luna'), ('gpt-image-1'),
+            ('gpt-5.6-luna'), ('gpt-image-1'), ('gpt-realtime-mini'),
             ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b'), ('qwen/qwen3.8-27b') $$,
-  'the nine model ids are seeded, exactly (image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
+  'the ten model ids are seeded, exactly (gpt-realtime-mini for full-duplex voice in 20261203090000, image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
 select is((select count(*)::int from ai_ops.models where sensitivity_ceiling in ('HIGHLY_CONFIDENTIAL', 'RESTRICTED')), 0,
   'no model is cleared above CONFIDENTIAL: the strongest material never leaves through a vendor');
 select is(
@@ -57,7 +57,7 @@ select is((select sensitivity_ceiling from ai_ops.models where model_code = 'gem
   'unverified gemini is public-only');
 select is((select sensitivity_ceiling from ai_ops.models where model_code = 'openai/gpt-oss-120b'), 'CONFIDENTIAL',
   'groq carries confidential work under its reviewed zero-retention terms');
-select is((select count(*)::int from ai_ops.model_prices), 8, 'eight price snapshots are seeded (one per model, plus the closed introductory gemini-3.8-flash price)');
+select is((select count(*)::int from ai_ops.model_prices), 9, 'nine price snapshots are seeded (one per priced model, plus the closed introductory gemini-3.8-flash price; gpt-realtime-mini joined in 20261203090000)');
 select is(
   (select effective_to from ai_ops.model_prices where id = 'a3000000-0000-4000-8000-000000000002'),
   '2027-01-01T00:00:00Z'::timestamptz,

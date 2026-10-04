@@ -511,6 +511,8 @@ export const MODEL_USAGE_PURPOSES = [
   "ONBOARDING",
   "MEETING",
   "DOCUMENT",
+  // DUPLEX: full-duplex voice lines; the daily spend cap sums these rows.
+  "VOICE_REALTIME",
   "OTHER",
 ] as const;
 export const ModelUsagePurposeSchema = z.enum(MODEL_USAGE_PURPOSES);

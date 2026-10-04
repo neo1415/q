@@ -16,6 +16,7 @@ const TASK_NAMES: Readonly<
   ONBOARDING: "Setting up",
   MEETING: "Meetings",
   DOCUMENT: "Documents",
+  VOICE_REALTIME: "Live voice",
   OTHER: "Other",
 };
 
