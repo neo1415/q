@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  asksForMeeting,
   checkMessage,
   companyCardFacts,
   createInstructionMaterialReader,
+  finalSentence,
   mandateFacts,
   materialLine,
   numbersIn,
@@ -274,5 +276,45 @@ describe("reading the material as the person", () => {
     expect(
       material.counterparts.get("savanna")?.map((fact) => fact.label),
     ).toEqual(["investor type", "based in", "their focus"]);
+  });
+});
+
+describe("live QA (instruction 76d6f281)", () => {
+  it("refuses a meeting ask however it is worded, from the planner's own reading or code's", () => {
+    for (const ending of [
+      "Are there times that suit you for a conversation?",
+      "What times work well to connect?",
+      "Could we find a time next week?",
+      "Would you be free for a quick call?",
+      "Happy to share my calendar link.",
+      "Any availability on Thursday?",
+      "Shall we connect?",
+    ]) {
+      expect(asksForMeeting(ending), ending).toBe(true);
+      expect(first(`${GROUNDED.replace(/ How are .*$/u, "")} ${ending}`)).toBe(
+        "MEETING_NOT_ALLOWED",
+      );
+    }
+    // The planner said MEETING: refused, whatever the words.
+    expect(
+      checkMessage({
+        body: GROUNDED,
+        first: true,
+        counterpart: TARMACLY,
+        sender: INVESTOR,
+        bookingAuto: false,
+        asks: "MEETING",
+      }),
+    ).toBe("MEETING_NOT_ALLOWED");
+    // A substantive question about the company is not a meeting.
+    for (const question of [
+      "How are operators finding you today?",
+      "Is your product available in Uganda yet?",
+      "How do you meet demand at peak season?",
+      "How much time do dispatchers save per load?",
+    ]) {
+      expect(asksForMeeting(question), question).toBe(false);
+    }
+    expect(finalSentence("One. Two? Three.")).toBe("Three.");
   });
 });

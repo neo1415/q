@@ -438,7 +438,7 @@ export function validateStep(
   // What Q writes is checked before it is sent or asked (QA run 8a1d57b9):
   // a card with a generic message is no better than sending one.
   if (action.name === "chat.message.send") {
-    const problem = messageProblem(parsed.data, subject, context);
+    const problem = messageProblem(parsed.data, subject, context, step);
     if (problem !== null) {
       return { verdict: "REFUSED", code: problem, relationshipId: subject };
     }
@@ -586,6 +586,7 @@ function messageProblem(
   input: unknown,
   subject: string | null,
   context: ValidationContext,
+  step: InstructionPlanStep,
 ): RefusalCode | null {
   const body = (input as { input?: { kind?: unknown; body?: unknown } }).input;
   if (body?.kind !== "TEXT" || typeof body.body !== "string") return null;
@@ -633,6 +634,7 @@ function messageProblem(
         entry.action === "schedule.meeting.book" && entry.mode === "AUTO",
     ),
     answering,
+    asks: step.message?.asks,
   });
 }
 

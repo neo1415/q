@@ -1289,6 +1289,28 @@ describe("live QA (instruction 76d6f281): code decides from the conversation", (
     ).toMatchObject({ verdict: "AUTO" });
   });
 
+  it("a message the planner says asks for a meeting is refused without AUTO booking", () => {
+    const noBooking = grant({
+      actions: grant().actions.filter(
+        (entry) => entry.action !== "schedule.meeting.book",
+      ),
+    });
+    expect(
+      check(
+        chat("Thanks for the update on the pilots. Would next week suit?", {
+          message: { kind: "FOLLOW_UP", asks: "MEETING" },
+        }),
+        {
+          grant: noBooking,
+          material: {
+            sender: { side: "INVESTOR", facts: [] },
+            counterparts: new Map(),
+          },
+        },
+      ),
+    ).toMatchObject({ verdict: "REFUSED", code: "MEETING_NOT_ALLOWED" });
+  });
+
   it("a firing reads each conversation and tells the planner who has heard from them; a failed read counts as written", async () => {
     const reads: string[][] = [];
     const { row } = world([{ steps: [], cannot: [] }]);

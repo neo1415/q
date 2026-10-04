@@ -1,4 +1,7 @@
-import type { InstructionQuestionKind } from "@capital-q/q-core";
+import type {
+  InstructionMessageAsk,
+  InstructionQuestionKind,
+} from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
 /**
@@ -399,6 +402,53 @@ const FALSE_HISTORY =
 const MEETING =
   /\b(?:meet|meeting|meet up|catch up|catch-up|a call|quick call|short call|intro call|hop on|jump on|zoom|google meet|teams call|coffee|find (?:a )?time|book (?:a |some )?time|grab (?:some )?time|schedule (?:a|some)|calendar|calendly|\d+\s?(?:-|to)?\s?min(?:ute)?s?\b)/iu;
 
+/**
+ * Live QA (instruction 76d6f281): "are there times that suit you for a
+ * conversation?" and "What times work well to connect?" passed MEETING.
+ * The planner now says what its last sentence asks (a typed field, the
+ * primary rule); this is code's own reading of that last sentence, so a
+ * mislabelled ask is caught too. Common scheduling forms only -- time and
+ * times, call, meet, chat, connect, schedule, availability, calendar,
+ * slot, "find a time" -- each in its scheduling sense, not "how do you
+ * meet demand?".
+ */
+const MEETING_ASK = new RegExp(
+  [
+    String.raw`\btimes?\b[^?]{0,40}\b(?:work|works|suit|suits|convenient|free|good|best|available|open)\b`,
+    String.raw`\b(?:good|convenient|best|free|a) times?\b(?: (?:to|for|that|this|next))`,
+    String.raw`\btime to (?:talk|chat|connect|meet|speak|catch up)\b`,
+    String.raw`\bfind (?:a |some )?time\b`,
+    String.raw`\bavailability\b`,
+    String.raw`\b(?:are you|you're|you are|be) (?:\w+ )?(?:available|free)\b`,
+    String.raw`\b(?:my|your|our) calendars?\b`,
+    String.raw`\bcalendar (?:invite|link)\b`,
+    String.raw`\b(?:my|your|our) diary\b`,
+    String.raw`\bschedule (?:a|an|some|time|something)\b`,
+    String.raw`\bscheduling (?:a|an|some) (?:call|meeting|chat|time)\b`,
+    String.raw`\b(?:a|time|your) slots?\b`,
+    String.raw`\bslots? (?:next|this|that|open|free|available)\b`,
+    String.raw`\b(?:a|quick|short|brief|intro|video|phone|zoom) (?:call|chat|catch[- ]up|conversation)\b`,
+    String.raw`\b(?:call|chat|talk|speak|connect|meet)(?: (?:next|this|soon|sometime|later|over|on|by)\b|\s*[?.!]*$)`,
+    String.raw`\bmeet(?:ing)?\b(?! (?:demand|the (?:needs?|demand)|needs?|requirements?|targets?|regulat\w*|compliance))`,
+  ].join("|"),
+  "iu",
+);
+
+/** The last sentence of a message, where its ask is. */
+export function finalSentence(body: string): string {
+  const sentences = body
+    .replace(/\s+/gu, " ")
+    .trim()
+    .split(/(?<=[.!?])\s+/u)
+    .filter((sentence) => sentence.trim() !== "");
+  return sentences[sentences.length - 1] ?? "";
+}
+
+/** Whether a sentence asks for a call, a meeting or a time. */
+export function asksForMeeting(sentence: string): boolean {
+  return MEETING_ASK.test(sentence);
+}
+
 /** Where a fact comes from, said in the message. */
 const SOURCE_CUE =
   /\b(?:profile|pitch|deck|website|site|listing|page|description|mandate|thesis|focus)\b/iu;
@@ -445,6 +495,8 @@ export type MessageCheckInput = {
   readonly bookingAuto: boolean;
   /** What their open question is about, when this answers one. */
   readonly answering?: readonly InstructionQuestionKind[] | undefined;
+  /** The planner's own reading of what the last sentence asks. */
+  readonly asks?: InstructionMessageAsk | null | undefined;
 };
 
 const hits = (text: string, fact: MaterialFact): number =>
@@ -458,7 +510,14 @@ export function checkMessage(input: MessageCheckInput): MessageProblem | null {
   const words = body === "" ? 0 : body.split(" ").length;
   if (words > MESSAGE_WORDS_MAX) return "MESSAGE_TOO_LONG";
   if (FALSE_HISTORY.test(body)) return "FALSE_HISTORY";
-  if (!input.bookingAuto && MEETING.test(body)) return "MEETING_NOT_ALLOWED";
+  if (
+    !input.bookingAuto &&
+    (input.asks === "MEETING" ||
+      MEETING.test(body) ||
+      asksForMeeting(finalSentence(body)))
+  ) {
+    return "MEETING_NOT_ALLOWED";
+  }
 
   // Every number stated must be one the material holds.
   const known = new Set(
