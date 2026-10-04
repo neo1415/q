@@ -896,7 +896,7 @@ describe("listening like a person (BACKCHANNEL)", () => {
     ).toBe(true);
     // Small: about a tenth of a cent each, even with transcription priced
     // at the session's (higher) rates as this fake provider does.
-    const total = h.usage.entries.reduce((sum, e) => sum + e.costUsd, 0);
+    const total = h.usage.entries.reduce((sum, e) => sum + (e.costUsd ?? 0), 0);
     expect(total).toBeGreaterThan(0);
     expect(total).toBeLessThan(0.005);
     // And the cap still governs them.
