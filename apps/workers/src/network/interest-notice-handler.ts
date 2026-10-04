@@ -31,6 +31,19 @@ const ANSWERED: ReadonlySet<string> = new Set([
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/**
+ * The QA bench families (scripts/handoff/live/cleanup-bench.mjs BENCH): test
+ * accounts on the reserved fictional domain that play real, named investors
+ * and companies (HANDOVER §5). voiceq-63: two of them ("Kola Aina" of
+ * Ventures Platform, "Olumide Soyombo" of Voltron Capital) expressed
+ * interest in real founders' companies on 2026-10-03, and Nixo's founder
+ * was told "Ventures Platform is interested in Nixo". A bench account's
+ * interest never notifies anyone. The fictional seed world (founder./
+ * investor.<key>@, names marked "(fictional)") is not a bench family.
+ */
+export const BENCH_ACCOUNT_PATTERN =
+  "^(bench\\.|founder\\.onboard|investor\\.onboard|smoke\\.)[a-z0-9._-]*@fictional\\.capitalq\\.local$";
+
 export type InterestNoticeOptions = {
   readonly registry: EventRegistry;
   readonly sql: DatabaseExecutor;
@@ -97,7 +110,27 @@ export function withInterestNotices(
           join core.investor_organisations i on i.id = r.investor_organisation_id
          where n.id = ${data.interestId} and r.id = ${data.relationshipId}`;
       const row = rows[0];
-      if (row !== undefined) {
+      // Fail open: a lookup that cannot run never stops a real notice.
+      const bench =
+        row === undefined
+          ? false
+          : await options.sql<{ bench: boolean }[]>`
+              select exists (
+                select 1
+                  from network.interests n
+                  join identity.user_profiles p on p.id = n.expressed_by_user_id
+                  join auth.users a on a.id = p.auth_user_id
+                 where n.id = ${data.interestId}
+                   and lower(a.email) ~ ${BENCH_ACCOUNT_PATTERN}) as bench`
+              .then((found) => found[0]?.bench === true)
+              .catch(() => false);
+      if (bench) {
+        options.logger.info(
+          { msgId: message.msgId, interestId: data.interestId },
+          "a bench account's interest kept out of notifications",
+        );
+      }
+      if (row !== undefined && !bench) {
         const investorActed = row.party === "INVESTOR";
         await options.notices.notify({
           relationshipId: data.relationshipId,
