@@ -246,6 +246,8 @@ export {
   disconnectGoogle,
   getEmailDraft,
   getGoogleConnection,
+  getInboundEmailAddress,
+  rotateInboundEmailAddress,
   listRelationshipMail,
   reviseEmailDraft,
   startGoogleConnect,

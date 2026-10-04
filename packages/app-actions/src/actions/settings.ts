@@ -9,6 +9,8 @@ import {
   GOOGLE_INTEGRATION_PATH,
   HumanReviewDtoSchema,
   HumanReviewRequestSchema,
+  INBOUND_EMAIL_ROTATE_PATH,
+  InboundEmailAddressDtoSchema,
   KYB_PATH,
   KybDtoSchema,
   KybRequestSchema,
@@ -19,6 +21,7 @@ import {
   NotificationSettingsRequestSchema,
   RequestCompanyVerificationRequestSchema,
   REVIEWS_PATH,
+  RotateInboundEmailRequestSchema,
   StartGoogleConnectRequestSchema,
   StartGoogleConnectResponseSchema,
   UuidSchema,
@@ -59,6 +62,8 @@ const keyOf = (headers: Readonly<Record<string, unknown>>) =>
 const notifications = (ports: AppActionPorts) =>
   ports.notificationSettings ?? missing("notificationSettings");
 const google = (ports: AppActionPorts) => ports.google ?? missing("google");
+const inboundEmail = (ports: AppActionPorts) =>
+  ports.inboundEmail ?? missing("inboundEmail");
 
 // --- notification settings ----------------------------------------------
 
@@ -189,6 +194,54 @@ const GOOGLE_DISCONNECT = defineAppAction<
     respond: () => undefined,
   },
   qCapability: "offer.gmail_connect",
+});
+
+// --- their Q email address (inbound email) ----------------------------------
+
+const INBOUND_UNAVAILABLE = {
+  code: "PROVIDER_UNAVAILABLE" as KnownErrorCode,
+  detail: "Receiving email isn't set up on this deployment yet.",
+};
+
+const RotateInbound = z
+  .object({ input: RotateInboundEmailRequestSchema })
+  .strict();
+
+const INBOUND_EMAIL_ROTATE = defineAppAction<
+  z.infer<typeof RotateInbound>,
+  { readonly address: string | null }
+>({
+  name: "integrations.inbound_email.rotate",
+  short: "new Q email address",
+  area: "integrations",
+  classification: "CONSEQUENTIAL",
+  does: "Gives them a new Q email address; the old one stops receiving at once, as Settings does.",
+  input: RotateInbound,
+  output: serviceResult(),
+  // Their own address only: the service binds every change to the actor.
+  authorize: servicesDecide,
+  run: async (ports, context, input) => ({
+    address: await inboundEmail(ports).rotate(
+      context.actor,
+      input.input.currentAddress,
+    ),
+  }),
+  targets: () => [],
+  card: () => ({ summary: "New Q email address", preview: "" }),
+  done: () =>
+    "Your new Q email address is ready; the old one no longer receives.",
+  http: {
+    method: "POST",
+    path: INBOUND_EMAIL_ROTATE_PATH,
+    fromRequest: (_params, body) => ({ input: body }),
+    problem: (out) => (out.address === null ? INBOUND_UNAVAILABLE : null),
+    respond: (out) =>
+      InboundEmailAddressDtoSchema.parse({
+        status: "ACTIVE",
+        address: out.address,
+      }),
+  },
+  qCapability: "offer.q_email_address",
 });
 
 // --- verification and reviews ---------------------------------------------
@@ -413,6 +466,7 @@ export const SETTINGS_ACTIONS: readonly AnyAppAction[] = [
   NOTIFICATION_SETTINGS,
   GOOGLE_CONNECT,
   GOOGLE_DISCONNECT,
+  INBOUND_EMAIL_ROTATE,
   VERIFY,
   REVIEW,
   KYB,

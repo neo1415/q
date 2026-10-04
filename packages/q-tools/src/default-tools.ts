@@ -37,6 +37,7 @@ import { createOwnRecordTools } from "./tools/own-records.js";
 import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createFillProfileGapsTool } from "./tools/profile-gaps.js";
 import { createProposeEmailTool } from "./tools/email.js";
+import { createInboundEmailTools } from "./tools/inbound-email.js";
 import { createChatTools } from "./tools/chat.js";
 import { createErrandTools, PROPOSE_ERRAND } from "./tools/errands.js";
 // AUTO block (ADR 0030)
@@ -124,9 +125,18 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
       ? []
       : createRelationshipTools(ports, ports.relationships)),
     // BIZ-007: "email the founder", drafted for the person's approval.
-    ...(ports.email === undefined
+    // Inbound email: a reply is a propose_email card too.
+    ...(ports.email === undefined && ports.inboundEmail === undefined
       ? []
-      : [createProposeEmailTool(ports.email, ports.relationships)]),
+      : [
+          createProposeEmailTool(
+            ports.email,
+            ports.relationships,
+            ports.inboundEmail,
+          ),
+        ]),
+    // Inbound email: what arrived at their own Q address, read as fields.
+    ...createInboundEmailTools(ports.inboundEmail),
     // R34: the relationship chat, read and prepared for approval.
     ...(ports.chat === undefined || ports.relationships === undefined
       ? []

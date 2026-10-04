@@ -1098,6 +1098,9 @@ importers:
       '@capital-q/config':
         specifier: workspace:*
         version: link:../config
+      '@capital-q/eventing':
+        specifier: workspace:*
+        version: link:../eventing
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

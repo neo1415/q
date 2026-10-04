@@ -37,6 +37,10 @@
       "types": "./dist/app-email.d.ts",
       "default": "./dist/app-email.js"
     },
+    "./inbound-email": {
+      "types": "./dist/inbound-email.d.ts",
+      "default": "./dist/inbound-email.js"
+    },
     "./web-push": {
       "types": "./dist/web-push.d.ts",
       "default": "./dist/web-push.js"

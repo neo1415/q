@@ -7,12 +7,18 @@ import {
   disconnectGoogle,
   getEmailDraft,
   getGoogleConnection,
+  getInboundEmailAddress,
   reviseEmailDraft,
+  rotateInboundEmailAddress,
   startGoogleConnect,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
-import type { EmailDraftDto, GoogleConnectionDto } from "@capital-q/contracts";
+import type {
+  EmailDraftDto,
+  GoogleConnectionDto,
+  InboundEmailAddressDto,
+} from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
 
@@ -45,6 +51,7 @@ async function session(which: "api" | "q"): Promise<ApiSession | null> {
 async function run<T>(
   which: "api" | "q",
   work: (s: ApiSession) => Promise<T>,
+  unreachable = "Gmail couldn't be reached. Try again.",
 ): Promise<IntegrationResult<T>> {
   const s = await session(which);
   if (s === null)
@@ -61,10 +68,7 @@ async function run<T>(
         message: error.problem?.detail ?? "That didn't work. Try again.",
       };
     }
-    return {
-      ok: false,
-      message: "Gmail couldn't be reached. Try again.",
-    };
+    return { ok: false, message: unreachable };
   }
 }
 
@@ -114,4 +118,32 @@ export async function reviseEmailDraftAction(
     await reviseEmailDraft(s, approvalId.data, draft.data);
     return null;
   });
+}
+
+const Address = z.email().max(320);
+
+/** Their Q email address: people who write to it reach Q for them. */
+export async function readQEmailAddress(): Promise<
+  IntegrationResult<InboundEmailAddressDto>
+> {
+  return run(
+    "api",
+    (s) => getInboundEmailAddress(s),
+    "Your Q email address couldn't load. Try again.",
+  );
+}
+
+/** A new Q email address; the one they were shown stops receiving at once. */
+export async function rotateQEmailAddress(
+  rawCurrentAddress: string,
+): Promise<IntegrationResult<InboundEmailAddressDto>> {
+  const current = Address.safeParse(rawCurrentAddress);
+  if (!current.success) {
+    return { ok: false, message: "Reload Settings and try again." };
+  }
+  return run(
+    "api",
+    (s) => rotateInboundEmailAddress(s, current.data),
+    "A new address couldn't be made. Try again.",
+  );
 }

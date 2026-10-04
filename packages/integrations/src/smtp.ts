@@ -21,6 +21,16 @@ export type AppEmail = {
    * instead of the branded frame. The plain text is always sent beside it.
    */
   readonly html?: string | undefined;
+  /**
+   * Where the recipient's reply goes (inbound email: the person's own Q
+   * address, so an answer to a reply Q sent for them comes back to Q).
+   */
+  readonly replyTo?: string | undefined;
+  /**
+   * The display name on Capital Q's own address ("Ada Lovelace via Capital
+   * Q"). The address itself is always Capital Q's sender: never a person's.
+   */
+  readonly fromName?: string | undefined;
   /** Small text files sent with it (a calendar invite, AUTO 2026-10-02). */
   readonly attachments?:
     | readonly {
@@ -43,6 +53,20 @@ export const unavailableAppEmailSender: AppEmailSender = {
 };
 
 const LINE_BREAK = /[\r\n]/;
+
+/** Every header a caller supplies is one line; anything else is refused. */
+function refuseInjection(message: AppEmail): void {
+  if (
+    LINE_BREAK.test(message.subject) ||
+    LINE_BREAK.test(message.to) ||
+    LINE_BREAK.test(message.replyTo ?? "") ||
+    LINE_BREAK.test(message.fromName ?? "") ||
+    (message.replyTo !== undefined &&
+      !/^[^@\s<>,;"]+@[^@\s<>,;"]+$/.test(message.replyTo))
+  ) {
+    throw new Error("header injection refused");
+  }
+}
 
 /** Who Capital Q's own emails come from, by name, when none is configured. */
 export const APP_EMAIL_SENDER_NAME = "Capital Q";
@@ -99,12 +123,11 @@ export function createSmtpAppEmailSender(config: {
   return {
     available: true,
     send: async (message) => {
-      if (LINE_BREAK.test(message.subject) || LINE_BREAK.test(message.to)) {
-        throw new Error("header injection refused");
-      }
+      refuseInjection(message);
       const from = namedSender(config.sender);
       await transport.sendMail({
-        from: { name: from.name, address: from.email },
+        from: { name: message.fromName ?? from.name, address: from.email },
+        ...(message.replyTo === undefined ? {} : { replyTo: message.replyTo }),
         to: message.to,
         subject: message.subject,
         text: message.text,
@@ -140,9 +163,7 @@ export function createBrevoApiEmailSender(config: {
   return {
     available: true,
     send: async (message) => {
-      if (LINE_BREAK.test(message.subject) || LINE_BREAK.test(message.to)) {
-        throw new Error("header injection refused");
-      }
+      refuseInjection(message);
       const response = await doFetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
@@ -151,7 +172,13 @@ export function createBrevoApiEmailSender(config: {
           accept: "application/json",
         },
         body: JSON.stringify({
-          sender: { email: sender.email, name: sender.name },
+          sender: {
+            email: sender.email,
+            name: message.fromName ?? sender.name,
+          },
+          ...(message.replyTo === undefined
+            ? {}
+            : { replyTo: { email: message.replyTo } }),
           to: [{ email: message.to }],
           subject: message.subject,
           textContent: message.text,

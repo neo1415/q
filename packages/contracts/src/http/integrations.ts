@@ -134,3 +134,43 @@ export const RelationshipMailListSchema = z
   .object({ items: z.array(RelationshipMailItemSchema).max(100) })
   .strict();
 export type RelationshipMailList = z.infer<typeof RelationshipMailListSchema>;
+
+// --- inbound email (Postmark Inbound) ---------------------------------------
+
+/**
+ * Postmark's inbound webhook. Vendor-facing: its authority is the basic
+ * auth in the hook URL, and its body is Postmark's own JSON, validated at
+ * the route. Never a person's action.
+ */
+export const INBOUND_EMAIL_POSTMARK_PATH =
+  "/v1/inbound/email/postmark" as const;
+/** `GET` the person's own Q email address (issued on first read). */
+export const INBOUND_EMAIL_ADDRESS_PATH = "/v1/me/inbound-email" as const;
+/** `POST` a new Q email address: the old one stops receiving at once. */
+export const INBOUND_EMAIL_ROTATE_PATH = "/v1/me/inbound-email/rotate" as const;
+
+export const InboundEmailAddressDtoSchema = z.discriminatedUnion("status", [
+  /** Inbound email is not configured on this deployment. */
+  z.object({ status: z.literal("UNAVAILABLE") }).strict(),
+  z
+    .object({
+      status: z.literal("ACTIVE"),
+      address: z.email().max(320),
+    })
+    .strict(),
+]);
+export type InboundEmailAddressDto = z.infer<
+  typeof InboundEmailAddressDtoSchema
+>;
+
+/**
+ * Rotation names the address being replaced, so a retried request finds
+ * it already replaced and answers with the current one instead of
+ * rotating twice.
+ */
+export const RotateInboundEmailRequestSchema = z
+  .object({ currentAddress: z.email().max(320) })
+  .strict();
+export type RotateInboundEmailRequest = z.infer<
+  typeof RotateInboundEmailRequestSchema
+>;

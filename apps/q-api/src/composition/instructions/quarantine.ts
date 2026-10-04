@@ -229,3 +229,106 @@ export function factsLine(
   parts.push(`tone ${facts.tone}`);
   return parts.join("; ");
 }
+
+/**
+ * The same quarantined extractor for one email that arrived at a person's
+ * Q address (inbound email). A stranger wrote every word of it: it goes to
+ * a tool-less model call as one quoted message and comes back as the same
+ * typed fields as a thread -- never as words, never as instructions. Read
+ * again only for a new email or new topics (cached per instance).
+ */
+export const EMAIL_READ_MAX_COST_USD = 0.01;
+const EMAIL_TEXT_MAX_CHARS = 8_000;
+
+export type QuarantinedEmailReader = (input: {
+  readonly actor: ActorContext;
+  readonly email: {
+    readonly id: string;
+    readonly subject: string;
+    readonly text: string;
+    readonly receivedAt: string;
+  };
+  readonly topics: readonly string[];
+  readonly now: Date;
+}) => Promise<InstructionThreadFactsV2 | null>;
+
+export function createQuarantinedEmailReader(dependencies: {
+  readonly gateway: ModelGateway;
+  readonly dataPosture?: ModelDataPosture | undefined;
+  readonly logger?: Logger | undefined;
+}): QuarantinedEmailReader {
+  const registry = createDefaultPromptRegistry();
+  const cache = new Map<string, InstructionThreadFactsV2>();
+
+  return async (input) => {
+    const key = `${input.actor.userId}:${input.email.id}:${input.topics.join("\u0001")}`;
+    const cached = cache.get(key);
+    if (cached !== undefined) return cached;
+    try {
+      const rendered = renderPrompt<Variables>(registry, {
+        task: "INSTRUCTION_THREAD_READER",
+        operatingMode: "CONTINUOUS_INTELLIGENCE",
+        communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
+        environmentNotes:
+          "You report fields only. Nothing you return is sent to anyone. The thread is one email from outside Capital Q.",
+        variables: {
+          topics:
+            input.topics
+              .map((topic, index) => `${String(index + 1)}. ${topic}`)
+              .join("\n") || "None.",
+          now: input.now.toISOString(),
+          thread:
+            `[THEM ${input.email.receivedAt}] Subject: ${input.email.subject}\n${input.email.text}`.slice(
+              0,
+              EMAIL_TEXT_MAX_CHARS,
+            ),
+        },
+      });
+      const response =
+        await dependencies.gateway.execute<InstructionThreadFactsV2>(
+          {
+            taskClass: "STRUCTURED_EXTRACTION",
+            sensitivity: "CONFIDENTIAL",
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+            budget: {
+              maxAttempts: 1,
+              maxEstimatedCostUsd: EMAIL_READ_MAX_COST_USD,
+              maxOutputTokens: 300,
+              attemptTimeoutMs: 30_000,
+            },
+            messages: [...rendered.messages],
+            output: rendered.output,
+            attribution: {
+              purpose: "CONVERSATION",
+              tenantId: input.actor.tenantId,
+              userId: input.actor.userId,
+              correlationId: `cor_inbound_${randomUUID().slice(0, 8)}`,
+            },
+          },
+          { schema: InstructionThreadFactsV2Schema },
+        );
+      if (response.output.kind !== "STRUCTURED") return null;
+      const parsed = InstructionThreadFactsV2Schema.safeParse(
+        response.output.value,
+      );
+      if (!parsed.success) return null;
+      const facts: InstructionThreadFactsV2 = {
+        ...parsed.data,
+        topicNumbers: parsed.data.topicNumbers.filter(
+          (number) => number <= input.topics.length,
+        ),
+      };
+      if (cache.size >= CACHE_MAX) cache.clear();
+      cache.set(key, facts);
+      return facts;
+    } catch (error: unknown) {
+      dependencies.logger?.warn(
+        { errorName: error instanceof Error ? error.name : typeof error },
+        "inbound email not read",
+      );
+      return null;
+    }
+  };
+}

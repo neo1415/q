@@ -4,6 +4,9 @@ import {
   GOOGLE_INTEGRATION_PATH,
   GOOGLE_RELATIONSHIP_MAIL_PATH,
   GoogleConnectionDtoSchema,
+  INBOUND_EMAIL_ADDRESS_PATH,
+  INBOUND_EMAIL_ROTATE_PATH,
+  InboundEmailAddressDtoSchema,
   Q_APPROVAL_EMAIL_DRAFT_SUFFIX,
   Q_APPROVALS_PATH,
   QApprovalViewSchema,
@@ -89,4 +92,31 @@ export function reviseEmailDraft(
   return call(session, "POST", draftPath(approvalId), QApprovalViewSchema, {
     body: input,
   });
+}
+
+/** The person's own Q email address (inbound email), issued on first read. */
+export function getInboundEmailAddress(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    INBOUND_EMAIL_ADDRESS_PATH,
+    InboundEmailAddressDtoSchema,
+  );
+}
+
+/**
+ * A new Q email address. Names the address being replaced, so a retried
+ * request answers with the new one instead of rotating twice.
+ */
+export function rotateInboundEmailAddress(
+  session: ApiSession,
+  currentAddress: string,
+) {
+  return call(
+    session,
+    "POST",
+    INBOUND_EMAIL_ROTATE_PATH,
+    InboundEmailAddressDtoSchema,
+    { body: { currentAddress } },
+  );
 }

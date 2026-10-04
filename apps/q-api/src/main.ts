@@ -111,7 +111,15 @@ import {
 import { createInstructionTriggers } from "./composition/instructions/triggers.js";
 import { createOwnUsage } from "./composition/usage.js";
 import { createInstructionPlanner } from "./composition/instructions/planner.js";
-import { createQuarantinedThreadReader } from "./composition/instructions/quarantine.js";
+import {
+  createQuarantinedEmailReader,
+  createQuarantinedThreadReader,
+} from "./composition/instructions/quarantine.js";
+import {
+  createInboundEmailPort,
+  createInboundReplyAction,
+  createInboundReplyBoard,
+} from "./composition/inbound-email.js";
 import { createInstructionMaterialReader } from "./composition/instructions/material.js";
 import { MANDATE_LABELS } from "./composition/mandate-labels.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
@@ -130,6 +138,7 @@ import {
   createPostgresErrandStore,
 } from "./composition/errands.js";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
+import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import {
   createDailyReaderService,
   createPostgresDailyReaderStore,
@@ -472,6 +481,7 @@ import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeGoogleIntegrations,
   createPostgresCounterpartDirectory,
+  createInboundEmailService,
   createBrevoApiEmailSender,
   createSmtpAppEmailSender,
   unavailableAppEmailSender,
@@ -1177,6 +1187,40 @@ const integrations = composeGoogleIntegrations({
   logger,
 });
 const emailBoard = createEmailActionBoard();
+// Inbound email: what arrived at a person's Q address, read by Q only
+// through the quarantined reader; a reply is a card they approve, sent by
+// Capital Q's own sender on their behalf with Reply-To their Q address.
+const inboundEmailConfig = loadInboundEmailConfig(process.env);
+const inboundEmailService =
+  inboundEmailConfig.inbound === undefined
+    ? undefined
+    : createInboundEmailService({
+        sql: database.sql,
+        transactions: database.transactions,
+        baseAddress: inboundEmailConfig.inbound.address,
+      });
+const inboundReplyBoard = createInboundReplyBoard();
+const inboundReplyEmailConfig = loadAppEmailConfig(process.env);
+const inboundReplySender =
+  inboundReplyEmailConfig.brevoApi !== undefined
+    ? recordingEmailSender(
+        createBrevoApiEmailSender(inboundReplyEmailConfig.brevoApi),
+        {
+          sql: database.sql,
+          source: "q_api.inbound_reply",
+          provider: "BREVO_API",
+        },
+      )
+    : inboundReplyEmailConfig.smtp === undefined
+      ? unavailableAppEmailSender
+      : recordingEmailSender(
+          createSmtpAppEmailSender(inboundReplyEmailConfig.smtp),
+          {
+            sql: database.sql,
+            source: "q_api.inbound_reply",
+            provider: "SMTP",
+          },
+        );
 const emailInvestorNames = createPostgresInvestorProfileQueryPort({
   sql: database.sql,
 });
@@ -1966,6 +2010,20 @@ const qTools = createQTools({
       researchComposition.evidence,
     ),
     relationshipMail: createRelationshipMailPort(integrations),
+    ...(inboundEmailService === undefined
+      ? {}
+      : {
+          inboundEmail: createInboundEmailPort({
+            inbound: inboundEmailService,
+            reader: createQuarantinedEmailReader({
+              gateway: modelGateway,
+              dataPosture: demoDataPosture,
+              logger,
+            }),
+            board: inboundReplyBoard,
+            sender: inboundReplySender,
+          }),
+        }),
     // ADR 0040: the app's declared actions and read_my, through the same
     // services the screens use, as the person; CONSEQUENTIAL ones on the
     // approval board.
@@ -2260,6 +2318,12 @@ const qActionRegistry = createQActionRegistry([
     counterparts: relationshipCounterparts,
     logger,
   }),
+  // Inbound email: a reply to an email at their Q address, approved.
+  createInboundReplyAction({
+    inbound: inboundEmailService,
+    sender: inboundReplySender,
+    logger,
+  }),
   // R34: chat message from the relationship chat.
   createChatMessageSendAction({ chat, logger }),
   // BIZ-008: reminders and calls (Google Calendar + Meet).
@@ -2344,6 +2408,7 @@ const qActionPort = createQActionPort({
     // ADR 0040: a declared app action Q prepared.
     appActionBoard.proposer,
     emailBoard.proposer,
+    inboundReplyBoard.proposer,
     chatBoard.proposer,
     // AUTO block (ADR 0030)
     workBoard.proposer,

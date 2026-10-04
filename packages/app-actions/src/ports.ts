@@ -5,7 +5,10 @@ import type {
   PushSubscriptionStore,
   ScheduleService,
 } from "@capital-q/communication";
-import type { IntegrationsService } from "@capital-q/integrations";
+import type {
+  InboundEmailService,
+  IntegrationsService,
+} from "@capital-q/integrations";
 import type { PlatformAdmin } from "@capital-q/platform-admin";
 import type {
   CompanyVerificationService,
@@ -132,6 +135,8 @@ export type AppActionPorts = {
   readonly google?:
     | Pick<IntegrationsService, "available" | "startConnect" | "disconnect">
     | undefined;
+  /** Their Q email address: a new one replaces the old (inbound email). */
+  readonly inboundEmail?: Pick<InboundEmailService, "rotate"> | undefined;
   /** Their company's verification request. */
   readonly verification?:
     Pick<CompanyVerificationService, "requestCompanyVerification"> | undefined;
