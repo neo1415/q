@@ -157,4 +157,25 @@ describe("toolFocusOf", () => {
       ).toEqual({ areas: ["Screens"], tools: [] });
     });
   });
+
+  it("'try again' keeps the last turn's tools, whatever kind it is read as", () => {
+    const previous = { areas: ["Relationships"], tools: ["propose_meeting"] };
+    for (const text of [
+      "try again",
+      "Okay, try that again",
+      "retry",
+      "do it again please",
+    ]) {
+      expect(
+        focus(reading({ kind: "CONTROL", text }), [], previous),
+        text,
+      ).toEqual({
+        areas: ["Relationships", "Screens"],
+        tools: ["propose_meeting"],
+      });
+    }
+    expect(
+      focus(reading({ kind: "CONTROL", text: "stop" }), [], previous),
+    ).toEqual({ areas: ["Screens"], tools: [] });
+  });
 });

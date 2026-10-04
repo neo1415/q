@@ -59,6 +59,7 @@ import {
   createSetOnboardingRemindersTool,
 } from "./tools/onboarding-reminders.js";
 import { createGetQCardTool } from "./tools/q-card.js";
+import { createUseCapabilityTool } from "./tools/use-capability.js";
 
 /**
  * The catalogue: four SAFE_READ tools over public query ports, plus the two
@@ -225,6 +226,8 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
       ? []
       : [createProposeHumanReviewTool(ports.humanReviews)]),
     // end ADMIN block
+    // Lead 2026-10-04: any tool this run may use, loaded mid-turn.
+    createUseCapabilityTool(),
   ];
 }
 

@@ -53,7 +53,13 @@ export const RESEARCH_TOOLS: readonly string[] = [
   "research_public_web",
 ];
 
-const RESEARCH_MODES = new Set(["EXPLICIT", "OFFERED"]);
+/**
+ * EXPLICIT asks for research: the Research area and its tools. OFFERED
+ * (most turns) only keeps the tools within reach: they join whatever the
+ * turn is focused on, and an unfocused turn already holds them.
+ */
+const RESEARCH_ASKED = "EXPLICIT";
+const RESEARCH_OFFERED = "OFFERED";
 
 /**
  * A web address in what they wrote: a scheme, "www.", or a bare domain
@@ -62,6 +68,10 @@ const RESEARCH_MODES = new Set(["EXPLICIT", "OFFERED"]);
  */
 const WEB_ADDRESS =
   /(?:\bhttps?:\/\/|\bwww\.)\S|\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:com|net|org|io|ai|co|app|dev|xyz|tech|vc|capital|ventures|fund|finance|africa|biz|info|uk|ng|za|ke|gh|rw|eg|ma|de|fr|nl|us|ca|in|sg|ae|eu|me|ly|so|to|ie|es|it|au|nz|br|mx)\b(?![.-][a-z0-9])/iu;
+
+/** A request to repeat the last attempt. */
+const RETRY =
+  /^\s*(?:(?:ok(?:ay)?|please|pls|q)[,\s]+)*(?:try (?:it |that )?again|retry|redo (?:it|that)|do (?:it|that) again|one more time|again)\b/iu;
 
 /** The turn names a web address. */
 export function namesWebAddress(text: string): boolean {
@@ -123,6 +133,14 @@ export function toolFocusOf(input: {
 }): QToolFocus | null {
   const { reading } = input;
   if (reading === null) return null;
+  // "Try again" is the last turn's request once more, whatever kind it
+  // was read as (lead 2026-10-04): its tools are kept.
+  if (input.previous !== null && RETRY.test(reading.text ?? "")) {
+    return {
+      areas: [...new Set(["Screens", ...input.previous.areas])].sort(),
+      tools: [...input.previous.tools].sort(),
+    };
+  }
   if (CORE_ONLY.has(reading.kind)) return { areas: ["Screens"], tools: [] };
   const areas = new Set<string>();
   const tools = new Set<string>();
@@ -136,7 +154,7 @@ export function toolFocusOf(input: {
   }
   if (
     reading.kind === "RESEARCH_REQUEST" ||
-    RESEARCH_MODES.has(reading.research ?? "") ||
+    reading.research === RESEARCH_ASKED ||
     namesWebAddress(reading.text ?? "")
   ) {
     areas.add("Research");
@@ -165,8 +183,15 @@ export function toolFocusOf(input: {
     if (reading.kind !== "TOOL_REQUEST" || subjectAreas.length === 0) {
       return null;
     }
-    return { areas: [...new Set(subjectAreas)].sort(), tools: [], widen: true };
+    return {
+      areas: [...new Set(subjectAreas)].sort(),
+      tools: reading.research === RESEARCH_OFFERED ? [...RESEARCH_TOOLS] : [],
+      widen: true,
+    };
   }
   for (const area of subjectAreas) areas.add(area);
+  if (reading.research === RESEARCH_OFFERED) {
+    for (const tool of RESEARCH_TOOLS) tools.add(tool);
+  }
   return { areas: [...areas].sort(), tools: [...tools].sort() };
 }

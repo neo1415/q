@@ -29,3 +29,24 @@ and a bare domain did not parse.
    punctuation removed, host lower-cased, no scheme or `http://` read as
    `https://` first with the `http://` form as the single fallback. The brand
    reader applies the same normalisation to the website on record.
+
+## Addendum (same day): the tool limit is the provider's, and nothing is unreachable
+
+Founder: "increase the tool limit... make sure that Q is able to get all its tools
+whenever it needs them". Decision:
+
+4. `MODEL_TOOLS_MAX` is 128, the documented per-request function limit of OpenAI
+   and Gemini. The per-turn bound (`Q_TURN_TOOLS_MAX`, 40 since 2026-10-02) is
+   127: staging logs on gpt-5.6-luna showed no latency cost from 40 to 80 tools
+   (median round 2.9-4.2 s at 40, 2.4-3.1 s at 78-80); the 93-tool catalogue's
+   schemas are about 97k characters in all. The focus still narrows by
+   relevance, for cost.
+5. `use_capability` (core, SAFE_READ) loads any tool the run's `available` list
+   holds (purpose, plan scopes and actor; the same list that decides what may
+   execute) by name or need. The gateway adds what it returned to the offer and
+   to the focus's named tools for the next step of the same turn (one extra
+   round, once), and logs `q.capability_loaded`. A tool the plan does not
+   allow is never returned and never offered.
+6. Guaranteed in focus: named actions, research (EXPLICIT, a research request,
+   a URL; OFFERED keeps the three tools without adding the area), navigation
+   (core), and the previous turn's tools on "try again".
