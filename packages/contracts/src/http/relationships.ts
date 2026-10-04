@@ -684,6 +684,12 @@ export const NETWORK_DILIGENCE_REQUESTS_PATH =
   "/v1/network/relationships/:relationshipId/diligence/requests" as const;
 export const NETWORK_DILIGENCE_REQUEST_FULFIL_PATH =
   "/v1/network/relationships/:relationshipId/diligence/requests/:requestId/fulfil" as const;
+/**
+ * Upload and share in one step (2026-10-04): the founder's new file, already
+ * in storage through a document upload session, answers this request.
+ */
+export const NETWORK_DILIGENCE_REQUEST_UPLOAD_PATH =
+  "/v1/network/relationships/:relationshipId/diligence/requests/:requestId/upload" as const;
 export const NETWORK_DILIGENCE_DOWNLOAD_PATH =
   "/v1/network/relationships/:relationshipId/diligence/documents/:documentId/download" as const;
 
@@ -706,6 +712,13 @@ export const DiligenceDtoSchema = z
             sharedAt: UtcTimestampSchema,
             /** ADR 0042: false shows "Not virus-scanned yet". */
             scanned: z.boolean().default(true),
+            /** When the investor's side first opened it; null: not yet. */
+            viewedAt: UtcTimestampSchema.nullable().default(null),
+            /**
+             * Q's one-line summary of the shared version, from its own text
+             * only; null until Q has read it. Shown labelled as Q's.
+             */
+            qSummary: z.string().max(240).nullable().default(null),
           })
           .strict(),
       )
@@ -718,6 +731,8 @@ export const DiligenceDtoSchema = z
             title: z.string().max(200),
             note: z.string().max(1000).nullable(),
             requestedAt: UtcTimestampSchema,
+            /** Who asked; null when their profile names nobody. */
+            requestedByName: z.string().max(200).nullable().default(null),
             status: z.enum(["OPEN", "FULFILLED"]),
             fulfilledBy: z
               .object({
@@ -737,6 +752,12 @@ export type DiligenceDto = z.infer<typeof DiligenceDtoSchema>;
 export const ShareDiligenceDocumentRequestSchema = z
   .object({ documentId: UuidSchema })
   .strict();
+export const UploadDiligenceDocumentRequestSchema = z
+  .object({ uploadSessionId: UuidSchema })
+  .strict();
+export type UploadDiligenceDocumentRequest = z.infer<
+  typeof UploadDiligenceDocumentRequestSchema
+>;
 export const RequestDiligenceDocumentRequestSchema = z
   .object({
     title: z.string().trim().min(1).max(200),

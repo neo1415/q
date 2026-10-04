@@ -86,6 +86,32 @@ export function fulfilDiligenceRequest(
   );
 }
 
+/**
+ * Upload and share in one step: the founder's file, already in storage
+ * through a document upload session, answers this request. One key per press.
+ */
+export function uploadAndFulfilDiligenceRequest(
+  session: ApiSession,
+  relationshipId: string,
+  requestId: string,
+  uploadSessionId: string,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    diligencePath(
+      relationshipId,
+      `/requests/${encodeURIComponent(requestId)}/upload`,
+    ),
+    DiligenceShareResultDtoSchema,
+    {
+      body: { uploadSessionId },
+      headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+    },
+  );
+}
+
 /** A short-lived signed download of a shared document, decided server-side. */
 export function diligenceDownload(
   session: ApiSession,

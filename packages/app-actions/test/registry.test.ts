@@ -188,6 +188,11 @@ describe("the action registry", () => {
         "CONSEQUENTIAL",
       ],
       ["diligence.request.fulfil", "via:diligence_documents", "CONSEQUENTIAL"],
+      [
+        "diligence.request.upload_fulfil",
+        "offer.document_upload",
+        "CONSEQUENTIAL",
+      ],
       ["document.deck_audience.set", "set_deck_audience", "CONSEQUENTIAL"],
       ["document.upload.start", "offer.document_upload", "CONSEQUENTIAL"],
       ["document.upload.complete", "offer.document_upload", "CONSEQUENTIAL"],

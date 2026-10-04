@@ -195,7 +195,11 @@ export type AppActionPorts = {
     | undefined;
   /** Diligence documents and requests (2026-10-02): the diligence service. */
   readonly diligence?:
-    Pick<DiligenceService, "view" | "share" | "revoke" | "request"> | undefined;
+    | Pick<
+        DiligenceService,
+        "view" | "share" | "revoke" | "request" | "uploadAndFulfil"
+      >
+    | undefined;
   /** Post-meeting outcomes (2026-10-02): Network's outcome service. */
   readonly outcomes?:
     | Pick<

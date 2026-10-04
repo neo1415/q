@@ -63,6 +63,19 @@ export type DiligenceDocumentPort = {
     /** False for a NOT_SCANNED file (ADR 0042). Absent: scanned. */
     readonly scanned?: boolean | undefined;
   }>;
+  /**
+   * Finishes the founder's own upload through Evidence (the documents
+   * screen's own step), returning the new document's id. Absent: upload
+   * and share in one step is not offered.
+   */
+  readonly completeUpload?:
+    | ((command: {
+        readonly actor: ActorContext;
+        readonly uploadSessionId: string;
+        readonly idempotencyKey: string;
+        readonly correlationId: CorrelationId;
+      }) => Promise<{ readonly documentId: string }>)
+    | undefined;
 };
 
 export type DiligenceDocument = {
@@ -89,12 +102,21 @@ export type DiligenceView = {
     readonly sharedAt: string;
     /** False: "Not virus-scanned yet" beside it (ADR 0042). */
     readonly scanned: boolean;
+    /** When someone on the investor's side first opened it; null: not yet. */
+    readonly viewedAt: string | null;
+    /**
+     * Q's one-line summary of the shared version, from its own text; null
+     * until the worker has read it. Shown labelled as Q's, never as fact.
+     */
+    readonly qSummary: string | null;
   }[];
   readonly requests: readonly {
     readonly requestId: string;
     readonly title: string;
     readonly note: string | null;
     readonly requestedAt: string;
+    /** Who asked (their profile's name); null when it names nobody. */
+    readonly requestedByName: string | null;
     readonly status: "OPEN" | "FULFILLED";
     readonly fulfilledBy: {
       readonly documentId: string;
@@ -129,13 +151,18 @@ export function createDiligenceService(dependencies: {
   readonly requests: DiligenceRequestRepository;
   readonly appender: RelationshipEventAppender;
   readonly audit: MaterialActionAuditWriter;
-  /** The other side is told (best-effort, after the change committed). */
+  /**
+   * The other side is told (best-effort, after the change committed).
+   * `{actor}` in the title is the acting side's own name, filled in by the
+   * notice writer from the relationship ("Ajopot shared Pitch deck v3").
+   */
   readonly notify?:
     | ((input: {
         readonly relationshipId: string;
         readonly actingSide: "INVESTOR" | "COMPANY";
         readonly title: string;
         readonly key: string;
+        readonly priority: "NEEDS_YOU" | "UPDATE";
       }) => Promise<unknown>)
     | undefined;
   readonly newCorrelationId: () => CorrelationId;
@@ -183,16 +210,108 @@ export function createDiligenceService(dependencies: {
     code,
   });
 
-  return {
+  /** The founder shares one of their documents, optionally answering a request. */
+const share = async (command: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+    readonly documentId: string;
+    readonly requestId?: string | undefined;
+    readonly correlationId?: CorrelationId | undefined;
+  }): Promise<DiligenceOutcome<{ readonly policyId: string }>> => {
+    const party = await partyOf(command.actor, command.relationshipId);
+    if (party === null) return refused("NOT_FOUND");
+    if (party.side !== "COMPANY") return refused("COMPANY_ONLY");
+    if (!party.open) return refused("NOT_OPEN");
+    const document = await dependencies.documents
+      .ownDocument(command.actor, command.documentId)
+      .catch(() => null);
+    // Their own document, of this relationship's company, with a version.
+    if (
+      document === null ||
+      document.companyId !== party.companyId ||
+      document.currentVersionId === null
+    ) {
+      return refused("NOT_SHAREABLE");
+    }
+    const request =
+      command.requestId === undefined
+        ? null
+        : await requests.find(sql, command.requestId);
+    if (
+      command.requestId !== undefined &&
+      (request === null || request.relationshipId !== party.relationshipId)
+    ) {
+      return refused("NOT_FOUND");
+    }
+    const correlationId =
+      command.correlationId ?? dependencies.newCorrelationId();
+    // The existing disclosure rule: owner authority, audit, announcement.
+    const granted = await dependencies.policies.grant({
+      actor: command.actor,
+      resource: { type: "document", id: document.id },
+      scopeType: "relationship_shared",
+      recipient: { type: "RELATIONSHIP", id: party.relationshipId },
+      accessLevel: "view",
+      correlationId,
+    });
+    if (granted.outcome === "REDUNDANT") return refused("NOT_SHAREABLE");
+    const policyId = granted.policy.id;
+    const recorded = await transactions.run(async (tx) => {
+      const fulfilled =
+        request === null
+          ? false
+          : await requests.fulfil(tx, {
+              requestId: request.id,
+              tenantId: party.tenantId,
+              disclosurePolicyId: policyId,
+              documentId: document.id,
+              userId: command.actor.userId,
+            });
+      if (granted.outcome === "CREATED" || fulfilled) {
+        await appender.append(tx, {
+          relationshipId: party.relationshipId,
+          eventType: RELATIONSHIP_EVENT_DOCUMENT_SHARED,
+          actor: { type: "HUMAN", id: command.actor.userId },
+          source: { type: "MANUAL", id: policyId },
+          visibilityScope: "relationship_shared",
+          payload: {
+            documentId: document.id,
+            disclosurePolicyId: policyId,
+            ...(request === null ? {} : { requestId: request.id }),
+          },
+          correlationId,
+        });
+        return true;
+      }
+      return false;
+    });
+    if (recorded) {
+      await notifyQuietly({
+        relationshipId: party.relationshipId,
+        actingSide: "COMPANY",
+        title: (request === null
+          ? `{actor} shared ${document.title}`
+          : `{actor} shared ${document.title} for your request`
+        ).slice(0, 200),
+        key: policyId,
+        // An answer to their own request is theirs to open next.
+        priority: request === null ? "UPDATE" : "NEEDS_YOU",
+      });
+    }
+    return { outcome: "OK", value: { policyId } };
+  };
+
+  const service = {
     view: async (query: {
       readonly actor: ActorContext;
       readonly relationshipId: string;
     }): Promise<DiligenceView | null> => {
       const party = await partyOf(query.actor, query.relationshipId);
       if (party === null) return null;
-      const [policies, rows] = await Promise.all([
+      const [policies, rows, views] = await Promise.all([
         sharesOf(party),
         requests.listForRelationship(sql, party.relationshipId),
+        requests.viewsFor(sql, party.relationshipId),
       ]);
       const titles = new Map<string, DiligenceDocument>();
       await Promise.all(
@@ -213,6 +332,15 @@ export function createDiligenceService(dependencies: {
           }
         }),
       );
+      // Q's summary of exactly the version being shared, only beside a
+      // share this reader can already open.
+      const summaries = await requests.summariesFor(
+        sql,
+        policies.flatMap((policy) => {
+          const version = titles.get(policy.resource.id)?.currentVersionId;
+          return version === undefined || version === null ? [] : [version];
+        }),
+      );
       return {
         relationshipId: party.relationshipId,
         side: party.side,
@@ -229,6 +357,11 @@ export function createDiligenceService(dependencies: {
                   documentType: document.documentType,
                   sharedAt: policy.createdAt,
                   scanned: document.scanned !== false,
+                  viewedAt: views.get(document.id) ?? null,
+                  qSummary:
+                    document.currentVersionId === null
+                      ? null
+                      : (summaries.get(document.currentVersionId) ?? null),
                 },
               ];
         }),
@@ -237,6 +370,7 @@ export function createDiligenceService(dependencies: {
           title: row.title,
           note: row.note,
           requestedAt: row.createdAt,
+          requestedByName: row.requestedByName,
           status: row.fulfilment === null ? "OPEN" : "FULFILLED",
           fulfilledBy:
             row.fulfilment === null
@@ -250,93 +384,7 @@ export function createDiligenceService(dependencies: {
     },
 
     /** The founder shares one of their documents, optionally answering a request. */
-    share: async (command: {
-      readonly actor: ActorContext;
-      readonly relationshipId: string;
-      readonly documentId: string;
-      readonly requestId?: string | undefined;
-      readonly correlationId?: CorrelationId | undefined;
-    }): Promise<DiligenceOutcome<{ readonly policyId: string }>> => {
-      const party = await partyOf(command.actor, command.relationshipId);
-      if (party === null) return refused("NOT_FOUND");
-      if (party.side !== "COMPANY") return refused("COMPANY_ONLY");
-      if (!party.open) return refused("NOT_OPEN");
-      const document = await dependencies.documents
-        .ownDocument(command.actor, command.documentId)
-        .catch(() => null);
-      // Their own document, of this relationship's company, with a version.
-      if (
-        document === null ||
-        document.companyId !== party.companyId ||
-        document.currentVersionId === null
-      ) {
-        return refused("NOT_SHAREABLE");
-      }
-      const request =
-        command.requestId === undefined
-          ? null
-          : await requests.find(sql, command.requestId);
-      if (
-        command.requestId !== undefined &&
-        (request === null || request.relationshipId !== party.relationshipId)
-      ) {
-        return refused("NOT_FOUND");
-      }
-      const correlationId =
-        command.correlationId ?? dependencies.newCorrelationId();
-      // The existing disclosure rule: owner authority, audit, announcement.
-      const granted = await dependencies.policies.grant({
-        actor: command.actor,
-        resource: { type: "document", id: document.id },
-        scopeType: "relationship_shared",
-        recipient: { type: "RELATIONSHIP", id: party.relationshipId },
-        accessLevel: "view",
-        correlationId,
-      });
-      if (granted.outcome === "REDUNDANT") return refused("NOT_SHAREABLE");
-      const policyId = granted.policy.id;
-      const recorded = await transactions.run(async (tx) => {
-        const fulfilled =
-          request === null
-            ? false
-            : await requests.fulfil(tx, {
-                requestId: request.id,
-                tenantId: party.tenantId,
-                disclosurePolicyId: policyId,
-                documentId: document.id,
-                userId: command.actor.userId,
-              });
-        if (granted.outcome === "CREATED" || fulfilled) {
-          await appender.append(tx, {
-            relationshipId: party.relationshipId,
-            eventType: RELATIONSHIP_EVENT_DOCUMENT_SHARED,
-            actor: { type: "HUMAN", id: command.actor.userId },
-            source: { type: "MANUAL", id: policyId },
-            visibilityScope: "relationship_shared",
-            payload: {
-              documentId: document.id,
-              disclosurePolicyId: policyId,
-              ...(request === null ? {} : { requestId: request.id }),
-            },
-            correlationId,
-          });
-          return true;
-        }
-        return false;
-      });
-      if (recorded) {
-        await notifyQuietly({
-          relationshipId: party.relationshipId,
-          actingSide: "COMPANY",
-          title: `A document was shared with you: ${document.title}`.slice(
-            0,
-            200,
-          ),
-          key: policyId,
-        });
-      }
-      return { outcome: "OK", value: { policyId } };
-    },
+    share,
 
     /** The founder takes a share back: the investor loses access at once. */
     revoke: async (command: {
@@ -423,8 +471,9 @@ export function createDiligenceService(dependencies: {
         await notifyQuietly({
           relationshipId: party.relationshipId,
           actingSide: "INVESTOR",
-          title: `Document requested: ${title}`.slice(0, 200),
+          title: `{actor} asked for ${title}`.slice(0, 200),
           key: made.id,
+          priority: "NEEDS_YOU",
         });
       }
       return { outcome: "OK", value: { requestId: made.id } };
@@ -459,9 +508,67 @@ export function createDiligenceService(dependencies: {
       if (document === null || document.companyId !== party.companyId) {
         return null;
       }
-      return dependencies.documents.signedDownload(document);
+      const link = await dependencies.documents.signedDownload(document);
+      // The requester's side opening it is what "Viewed" means; the
+      // founder opening their own file is not. Best-effort: a lost write
+      // never stops the download.
+      if (party.side === "INVESTOR") {
+        await requests
+          .recordView(sql, {
+            relationshipId: party.relationshipId,
+            tenantId: party.tenantId,
+            documentId: document.id,
+            userId: query.actor.userId,
+          })
+          .catch(() => undefined);
+      }
+      return link;
+    },
+
+    /**
+     * Upload and share in one step (founder critique 2026-10-04): the
+     * founder's file, already in storage through the documents screen's
+     * own upload session, is finished through Evidence and answers this
+     * request through the same share as above. Checked before the upload
+     * is finished, so a refused request leaves an ordinary document in
+     * their Documents and shares nothing.
+     */
+    uploadAndFulfil: async (command: {
+      readonly actor: ActorContext;
+      readonly relationshipId: string;
+      readonly requestId: string;
+      readonly uploadSessionId: string;
+      readonly idempotencyKey: string;
+      readonly correlationId?: CorrelationId | undefined;
+    }): Promise<DiligenceOutcome<{ readonly policyId: string }>> => {
+      const complete = dependencies.documents.completeUpload;
+      if (complete === undefined) return refused("NOT_SHAREABLE");
+      const party = await partyOf(command.actor, command.relationshipId);
+      if (party === null) return refused("NOT_FOUND");
+      if (party.side !== "COMPANY") return refused("COMPANY_ONLY");
+      if (!party.open) return refused("NOT_OPEN");
+      const request = await requests.find(sql, command.requestId);
+      if (request === null || request.relationshipId !== party.relationshipId) {
+        return refused("NOT_FOUND");
+      }
+      const correlationId =
+        command.correlationId ?? dependencies.newCorrelationId();
+      const uploaded = await complete({
+        actor: command.actor,
+        uploadSessionId: command.uploadSessionId,
+        idempotencyKey: command.idempotencyKey,
+        correlationId,
+      });
+      return share({
+        actor: command.actor,
+        relationshipId: party.relationshipId,
+        documentId: uploaded.documentId,
+        requestId: request.id,
+        correlationId,
+      });
     },
   };
+  return service;
 }
 
 export type DiligenceService = ReturnType<typeof createDiligenceService>;
