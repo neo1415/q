@@ -116,6 +116,14 @@ export const InstructionGrantSchema = z
     tone: z.string().min(1).max(300),
     /** What Q may talk about; anything else comes back to them. */
     topics: z.array(z.string().min(1).max(120)).max(12),
+    /**
+     * Live QA (instruction 76d6f281): false when the goal is a first
+     * message only ("a first message to founders who haven't heard from
+     * me"): Q then writes nothing more where their side has already
+     * written. Absent (every grant approved before it) allows follow-ups.
+     * Optional, never defaulted: an approved payload is not reshaped.
+     */
+    followUps: z.boolean().optional(),
     maxMessagesPerCounterpart: z
       .number()
       .int()

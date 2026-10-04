@@ -17,13 +17,17 @@ import {
 import type { Logger } from "@capital-q/observability";
 import {
   ENGINE_ABILITIES,
-  type InstructionPlanV3Result as InstructionPlanResult,
   type InstructionQuestionKind,
   type InstructionThreadFacts,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
-import { PLAN_MAX_COST_USD, type InstructionPlanner } from "./planner.js";
+import {
+  PLAN_MAX_COST_USD,
+  type InstructionPlan,
+  type InstructionPlanStep,
+  type InstructionPlanner,
+} from "./planner.js";
 import { needsYouNotice } from "./digest.js";
 import {
   checkMessage,
@@ -69,7 +73,8 @@ export type ThreadFacts = InstructionThreadFacts & {
   readonly questionAbout?: readonly InstructionQuestionKind[] | undefined;
 };
 
-export type InstructionPlanStep = InstructionPlanResult["steps"][number];
+export type { InstructionPlanStep };
+type InstructionPlanResult = InstructionPlan;
 
 export type StepVerdict =
   | {
@@ -100,6 +105,8 @@ export const REFUSAL_CODES = [
   "MESSAGE_TOO_LONG",
   "UNGROUNDED_NUMBER",
   "UNANSWERED_QUESTION",
+  // Live QA (instruction 76d6f281).
+  "ALREADY_INTRODUCED",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -157,6 +164,12 @@ export const REFUSAL_WORDS: Readonly<
   UNANSWERED_QUESTION: {
     reason: "the answer isn't among the facts you've declared",
     instead: "I've put their question to you",
+  },
+  ALREADY_INTRODUCED: {
+    reason:
+      "your side has already written to them, so a first message isn't one",
+    instead:
+      "I'll leave the conversation to you, or say so and I'll prepare follow-ups for your approval",
   },
 };
 
@@ -274,6 +287,13 @@ export type ValidationContext = {
    * first message has nothing specific to say and is refused).
    */
   readonly material?: InstructionMaterial | null | undefined;
+  /**
+   * Live QA (instruction 76d6f281): the relationships where the sender's
+   * side has ever sent a message -- by a person or by Q, under any
+   * instruction -- read by code from the conversations themselves. Absent,
+   * code falls back to this instruction's own count and the thread facts.
+   */
+  readonly introduced?: ReadonlySet<string> | undefined;
 };
 
 const Args = z.record(z.string(), z.unknown());
@@ -417,7 +437,7 @@ export function validateStep(
 
   // What Q writes is checked before it is sent or asked (QA run 8a1d57b9):
   // a card with a generic message is no better than sending one.
-  if (action.name === "chat.message.send" && context.material !== undefined) {
+  if (action.name === "chat.message.send") {
     const problem = messageProblem(parsed.data, subject, context);
     if (problem !== null) {
       return { verdict: "REFUSED", code: problem, relationshipId: subject };
@@ -544,7 +564,24 @@ export const QUESTION_WORDS: Readonly<
     "You haven't let me send messages on my own under this instruction. Reply in the chat.",
 };
 
-/** Code's check of a message's words against the material it may use. */
+/** Whether the sender's side has written in this conversation, by code. */
+function sidesWritten(
+  subject: string | null,
+  context: ValidationContext,
+): boolean {
+  if (subject === null) return false;
+  const thread = context.facts?.get(subject);
+  return (
+    context.introduced?.has(subject) === true ||
+    (context.sent.get(subject) ?? 0) > 0 ||
+    thread?.lastFrom === "US"
+  );
+}
+
+/**
+ * Code's check of a message: whether it may be written at all in this
+ * conversation, then its words against the material it may use.
+ */
 function messageProblem(
   input: unknown,
   subject: string | null,
@@ -552,14 +589,28 @@ function messageProblem(
 ): RefusalCode | null {
   const body = (input as { input?: { kind?: unknown; body?: unknown } }).input;
   if (body?.kind !== "TEXT" || typeof body.body !== "string") return null;
+  const thread = subject === null ? undefined : context.facts?.get(subject);
+  // Live QA (instruction 76d6f281): "first" is the conversation's, never
+  // the planner's. Where their side has heard from the sender already, a
+  // first message is not one: it is a follow-up only where the grant allows
+  // follow-ups, and a reply only when they wrote last.
+  const written = sidesWritten(subject, context);
+  const replying = thread?.lastFrom === "THEM";
+  if (written && !replying && context.grant.followUps === false) {
+    return "ALREADY_INTRODUCED";
+  }
+  if (context.material === undefined) return null;
   const counterpartId =
     subject === null
       ? undefined
       : context.people.find((person) => person.relationshipId === subject)
           ?.counterpartId;
-  const thread = subject === null ? undefined : context.facts?.get(subject);
-  const sent = subject === null ? 0 : (context.sent.get(subject) ?? 0);
   const material = context.material ?? null;
+  const counterpart =
+    counterpartId === undefined
+      ? []
+      : (material?.counterparts.get(counterpartId) ?? []);
+  const first = !written && !replying;
   // Their question Q may not answer has gone to the person: no reply.
   const open =
     thread === undefined
@@ -568,22 +619,20 @@ function messageProblem(
   if (open === "NOT_DECLARED" || open === "MESSAGES_NOT_AUTO") {
     return "UNANSWERED_QUESTION";
   }
+  const answering =
+    thread?.asksQuestion === true && thread.lastFrom === "THEM"
+      ? (thread.questionAbout ?? ["OTHER" as const])
+      : undefined;
   return checkMessage({
     body: body.body,
-    first: sent === 0 && (thread === undefined || thread.lastFrom === "NONE"),
-    counterpart:
-      counterpartId === undefined
-        ? []
-        : (material?.counterparts.get(counterpartId) ?? []),
+    first,
+    counterpart,
     sender: material?.sender.facts ?? [],
     bookingAuto: context.grant.actions.some(
       (entry) =>
         entry.action === "schedule.meeting.book" && entry.mode === "AUTO",
     ),
-    answering:
-      thread?.asksQuestion === true && thread.lastFrom === "THEM"
-        ? (thread.questionAbout ?? ["OTHER"])
-        : undefined,
+    answering,
   });
 }
 
@@ -651,6 +700,18 @@ export type InstructionEngineDependencies = {
     | undefined;
   /** S6: the quarantined extractor; absent, the planner sees no thread facts. */
   readonly readThread?: QuarantinedThreadReader | undefined;
+  /**
+   * Live QA (instruction 76d6f281): which of these relationships' chats
+   * already hold a message from the person's side (by them or by Q, under
+   * any instruction). A failed read must count as written: unknown never
+   * licenses a first message.
+   */
+  readonly introduced?:
+    | ((
+        actor: ActorContext,
+        relationshipIds: readonly string[],
+      ) => Promise<ReadonlySet<string>>)
+    | undefined;
   /** An ASK step: the `app.<name>` card, as the person. */
   readonly ask: (
     actor: ActorContext,
@@ -678,6 +739,9 @@ function grantLines(grant: InstructionGrant): string {
     `Tone: ${grant.tone}`,
     `Topics: ${grant.topics.join("; ") || "none"}`,
     `At most ${String(grant.maxMessagesPerCounterpart)} messages per person, then ask.`,
+    grant.followUps === false
+      ? "Follow-ups: none. A first message only where their side has not heard from them; replies only to what they write."
+      : "Follow-ups: allowed where their side has already written.",
     `At most ${String(FANOUT_MAX)} people per run; the rest wait for the next run.`,
     "Terms, money and commitments: always theirs to approve.",
   ].join("\n");
@@ -710,6 +774,7 @@ function peopleLines(
   topics: readonly string[],
   material: InstructionMaterial | null | undefined,
   grant: InstructionGrant,
+  introduced?: ReadonlySet<string>,
 ): string {
   if (people.length === 0) return "No one yet.";
   return people
@@ -724,6 +789,13 @@ function peopleLines(
         person.relationshipId === null
           ? null
           : `Q messages sent ${String(sent.get(person.relationshipId) ?? 0)}`,
+        // Code's reading of the conversation itself: first message or not.
+        person.relationshipId === null || introduced === undefined
+          ? null
+          : introduced.has(person.relationshipId) ||
+              (sent.get(person.relationshipId) ?? 0) > 0
+            ? "your side has already written here: no first message"
+            : "no message from your side yet",
         // Their messages only as typed facts from the quarantined reader.
         person.relationshipId === null
           ? null
@@ -940,6 +1012,18 @@ export function createInstructionEngine(
         }
       }
 
+      // Live QA (instruction 76d6f281): whether each conversation already
+      // holds the person's side's message, read from the chats themselves.
+      const covered = inScope(grant.data, people)
+        .map((person) => person.relationshipId)
+        .filter((id): id is string => id !== null);
+      const introduced =
+        dependencies.introduced === undefined
+          ? undefined
+          : await dependencies
+              .introduced(actor, covered)
+              .catch(() => new Set(covered));
+
       // What messages may say: read once per firing, as the person.
       const material =
         dependencies.material === undefined
@@ -1026,6 +1110,7 @@ export function createInstructionEngine(
               grant.data.topics,
               material,
               grant.data,
+              introduced,
             ),
             history:
               history.length === 0
@@ -1060,6 +1145,7 @@ export function createInstructionEngine(
             facts,
             request: current.request,
             material,
+            introduced,
           }),
         );
         const refused = verdicts

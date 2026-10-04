@@ -365,6 +365,22 @@ export type StandingProposalOutput = z.infer<
 >;
 
 /**
+ * Live QA (instruction 76d6f281): "a short first message to founders ...
+ * who haven't heard from me yet" is a first message only -- the grant then
+ * allows no follow-ups. Read by code from the goal, or from the model.
+ */
+const FIRST_ONLY =
+  /\b(?:first|opening|intro(?:ductory)?) (?:message|note|hello)s?\b|\bhaven'?t (?:yet )?heard from (?:me|us)\b|\bhave not (?:yet )?heard from (?:me|us)\b|\bnot (?:yet )?heard from (?:me|us)\b|\bhaven'?t (?:yet )?(?:messaged|contacted|written to)\b/iu;
+
+const FOLLOW_UPS =
+  /\bfollow[- ]?ups?\b|\bfollow(?:ing)? up\b|\bkeep (?:the )?\w+ (?:going|moving)\b/iu;
+
+export function firstMessagesOnly(goal: string, read: boolean): boolean {
+  if (FOLLOW_UPS.test(goal)) return false;
+  return read || FIRST_ONLY.test(goal);
+}
+
+/**
  * A model's reading of "do not book calls" arrives in its own words
  * (QA 07a90dd8, 4a2c9bc4: a strict enum failed the whole card as
  * INVALID_ARGUMENTS). Read leniently, in execute: case and
@@ -458,6 +474,12 @@ export const ProposeStandingInstructionInputSchema = z
       .default([])
       .describe(
         "Companies or investors they said to leave out, as they named them ('except Nixo' -> ['Nixo']); empty when they named none.",
+      ),
+    firstMessagesOnly: z
+      .boolean()
+      .default(false)
+      .describe(
+        "True when the goal is a first message only ('send a first message to founders who haven't heard from me'): Q then sends no follow-ups.",
       ),
     workingHours: z
       .object({
@@ -703,6 +725,9 @@ export function createQWorkTools(
                         start: input.workingHours.start,
                         end: input.workingHours.end,
                       },
+                ...(firstMessagesOnly(input.goal, input.firstMessagesOnly)
+                  ? { followUps: false }
+                  : {}),
               },
             },
           },

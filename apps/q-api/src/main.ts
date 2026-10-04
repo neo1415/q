@@ -126,6 +126,7 @@ import {
   createInboundReplyBoard,
 } from "./composition/inbound-email.js";
 import { createInstructionMaterialReader } from "./composition/instructions/material.js";
+import { createIntroducedReader } from "./composition/instructions/introduced.js";
 import { MANDATE_LABELS } from "./composition/mandate-labels.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
@@ -3472,6 +3473,9 @@ instructionEngine.current = createInstructionEngine({
     dataPosture: demoDataPosture,
     logger,
   }),
+  // Live QA (instruction 76d6f281): a first message is decided from the
+  // conversation itself, never from the planner's memory.
+  introduced: createIntroducedReader({ chat }),
   ask: createInstructionAsk({
     runtime: qRuntime,
     orchestration: orchestrationRuntime,

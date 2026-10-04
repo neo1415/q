@@ -29,6 +29,7 @@ import {
   mandateFacts,
   type InstructionMaterial,
 } from "../src/composition/instructions/material.js";
+import { createIntroducedReader } from "../src/composition/instructions/introduced.js";
 import type { ThreadRead } from "../src/composition/instructions/quarantine.js";
 import type {
   InstructionRow,
@@ -1220,4 +1221,151 @@ describe("a stopped or paused instruction never fires (QA run 8a1d57b9)", () => 
       expect(ran).toHaveLength(0);
     },
   );
+});
+
+describe("live QA (instruction 76d6f281): code decides from the conversation", () => {
+  const firstMessage = chat(
+    "Warehouse picking robots for grocery retailers, as your profile puts it -- which retailers are you piloting with?",
+    { message: { kind: "FIRST", asks: "QUESTION" } },
+  );
+  const check = (
+    step: InstructionPlanStep,
+    options: {
+      grant?: InstructionGrant;
+      introduced?: ReadonlySet<string>;
+      material?: InstructionMaterial;
+      facts?: ReadonlyMap<
+        string,
+        InstructionThreadFacts & {
+          questionAbout?: readonly ("CHEQUE_SIZE" | "LEAD_OR_FOLLOW")[];
+        }
+      >;
+    } = {},
+  ) =>
+    validateStep(step, {
+      grant: options.grant ?? grant(),
+      actions: ACTIONS,
+      people: PEOPLE,
+      sent: new Map(),
+      now: IN_HOURS,
+      stepKey: "instr:test:run:0",
+      ...(options.introduced === undefined
+        ? {}
+        : { introduced: options.introduced }),
+      ...(options.material === undefined ? {} : { material: options.material }),
+      ...(options.facts === undefined ? {} : { facts: options.facts }),
+    });
+
+  it("a first message where their side already wrote (another instruction, the night before) is refused; a follow-up only where the grant allows", () => {
+    const written = new Set([REL]);
+    expect(
+      check(firstMessage, {
+        introduced: written,
+        grant: grant({ followUps: false }),
+      }),
+    ).toMatchObject({ verdict: "REFUSED", code: "ALREADY_INTRODUCED" });
+    // A follow-up under a first-message-only grant: refused too.
+    expect(
+      check(
+        chat("Any news on the pilots?", {
+          message: { kind: "FOLLOW_UP", asks: "QUESTION" },
+        }),
+        {
+          introduced: written,
+          grant: grant({ followUps: false }),
+        },
+      ),
+    ).toMatchObject({ verdict: "REFUSED", code: "ALREADY_INTRODUCED" });
+    // Follow-ups allowed: it is sent as one.
+    expect(check(firstMessage, { introduced: written })).toMatchObject({
+      verdict: "AUTO",
+    });
+    // Nothing from their side yet: a first message.
+    expect(
+      check(firstMessage, {
+        introduced: new Set(),
+        grant: grant({ followUps: false }),
+      }),
+    ).toMatchObject({ verdict: "AUTO" });
+  });
+
+  it("a firing reads each conversation and tells the planner who has heard from them; a failed read counts as written", async () => {
+    const reads: string[][] = [];
+    const { row } = world([{ steps: [], cannot: [] }]);
+    const seen: string[] = [];
+    const wired = createInstructionEngine({
+      store: {
+        instruction: () => Promise.resolve({ ...row, grant_payload: grant() }),
+        expire: () => Promise.resolve(),
+        recordStep: () => Promise.resolve(true),
+        stepDone: () => Promise.resolve(false),
+        messagesSent: () => Promise.resolve(new Map<string, number>()),
+        history: () => Promise.resolve([]),
+        addSpend: () => Promise.resolve(),
+        pause: () => Promise.resolve(true),
+        notify: () => Promise.resolve(true),
+      },
+      actions: ACTIONS,
+      ports: {},
+      actorFor: () => Promise.resolve(actor),
+      people: () => Promise.resolve(PEOPLE),
+      introduced: (_actor, ids) => {
+        reads.push([...ids]);
+        return Promise.resolve(new Set([REL]));
+      },
+      plan: (_who, variables) => {
+        seen.push(variables.people);
+        return Promise.resolve({
+          plan: { request: "EXECUTE", steps: [], cannot: [] },
+          costUsd: 0,
+        });
+      },
+      ask: () => Promise.resolve(null),
+      now: () => IN_HOURS,
+      autoEnabled: true,
+    });
+    await wired.fire(row.id, "run-0401");
+    expect(reads).toEqual([[REL, OTHER_REL]]);
+    expect(seen[0]).toContain(
+      "your side has already written here: no first message",
+    );
+    expect(seen[0]).toContain("no message from your side yet");
+
+    // The reader: any message from their side counts, by them or by Q;
+    // a failed read, or a window full of the other side's, counts too.
+    const message = (from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE") => ({
+      id: randomUUID(),
+      viaQ: false,
+      envelope: null,
+      from,
+      senderName: "x",
+      kind: "TEXT" as const,
+      text: "hello",
+      attachmentTitle: null,
+      sentAt: IN_HOURS.toISOString(),
+    });
+    const threads: Record<string, ReturnType<typeof message>[] | null> = {
+      a: [message("OTHER_SIDE"), message("YOUR_SIDE")],
+      b: [message("OTHER_SIDE")],
+      c: [],
+      d: null,
+      e: Array.from({ length: 30 }, () => message("OTHER_SIDE")),
+    };
+    const written = await createIntroducedReader({
+      chat: {
+        readForQ: ({ relationshipId }) => {
+          const messages = threads[relationshipId];
+          return messages === null || messages === undefined
+            ? Promise.reject(new Error("unavailable"))
+            : Promise.resolve({
+                side: "INVESTOR",
+                connected: true,
+                blocked: false,
+                messages,
+              } as never);
+        },
+      },
+    })(actor, ["a", "b", "c", "d", "e"]);
+    expect([...written].sort()).toEqual(["a", "d", "e"]);
+  });
 });

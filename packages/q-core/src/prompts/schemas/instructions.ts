@@ -153,6 +153,54 @@ export type InstructionPlanV4Variables = z.infer<
   typeof InstructionPlanV4VariablesSchema
 >;
 
+/**
+ * v5 (live QA, instruction 76d6f281): each chat message says, as typed
+ * fields, what kind of message it is and what its final sentence asks. Code
+ * decides from the conversation itself whether a first message is still
+ * possible (the planner's FIRST on a thread the sender's side already wrote
+ * in is refused), and refuses MEETING unless booking is AUTO -- the model's
+ * own reading of its last sentence, beside code's deterministic check, so
+ * "What times work well to connect?" cannot slip past a phrase list.
+ */
+export const INSTRUCTION_PLAN_V5_SCHEMA_VERSION = 5;
+export const INSTRUCTION_MESSAGE_KINDS = [
+  /** Nothing from the sender's side in this conversation yet. */
+  "FIRST",
+  /** The sender's side has written before; nothing new from them to answer. */
+  "FOLLOW_UP",
+  /** Answers what they wrote last. */
+  "REPLY",
+] as const;
+export const INSTRUCTION_MESSAGE_ASKS = [
+  /** A substantive question about them or their company. */
+  "QUESTION",
+  /** A call, meeting, chat, time, slot or availability. */
+  "MEETING",
+  "NONE",
+] as const;
+const InstructionPlanStepV5Schema =
+  InstructionPlanResultSchema.shape.steps.element
+    .extend({
+      /** For chat.message.send: the message's kind and final ask; else null. */
+      message: z
+        .object({
+          kind: z.enum(INSTRUCTION_MESSAGE_KINDS),
+          asks: z.enum(INSTRUCTION_MESSAGE_ASKS),
+        })
+        .strict()
+        .nullable(),
+    })
+    .strict();
+export const InstructionPlanV5ResultSchema =
+  InstructionPlanV3ResultSchema.extend({
+    steps: z.array(InstructionPlanStepV5Schema).max(10),
+  }).strict();
+export type InstructionPlanV5Result = z.infer<
+  typeof InstructionPlanV5ResultSchema
+>;
+export type InstructionMessageKind = (typeof INSTRUCTION_MESSAGE_KINDS)[number];
+export type InstructionMessageAsk = (typeof INSTRUCTION_MESSAGE_ASKS)[number];
+
 // ---------------------------------------------------------------------------
 // INSTRUCTION_THREAD_READER: the quarantined extractor (ADR 0043 §6)
 // ---------------------------------------------------------------------------

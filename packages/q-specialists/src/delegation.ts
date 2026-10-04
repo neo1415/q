@@ -254,6 +254,7 @@ export function createToolDelegationPort(dependencies: {
         "excludeNames",
         "onItsOwnOnly",
         "neverDo",
+        "firstMessagesOnly",
       ] as const;
       const extra = Object.fromEntries(
         known.filter((key) => key in more).map((key) => [key, more[key]]),

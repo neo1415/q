@@ -98,6 +98,11 @@ export function grantCard(
       `Never: ${grant.counterparts.exclude.map((entry) => entry.name).join(", ")}.`,
     );
   }
+  if (grant.followUps === false) {
+    lines.push(
+      "Messages: a first message only to people who haven't heard from you; no follow-ups.",
+    );
+  }
   lines.push(
     `Budget: $${grant.budgetUsdMonth} a month of Q's work; then I pause and ask.`,
   );
