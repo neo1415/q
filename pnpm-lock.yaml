@@ -325,6 +325,9 @@ importers:
       '@capital-q/founder-onboarding':
         specifier: workspace:*
         version: link:../../packages/founder-onboarding
+      '@capital-q/gateq':
+        specifier: workspace:*
+        version: link:../../packages/gateq
       '@capital-q/investor-onboarding':
         specifier: workspace:*
         version: link:../../packages/investor-onboarding

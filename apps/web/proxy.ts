@@ -13,6 +13,8 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // Exactly the root: who sees the landing (src/auth/landing-route.ts).
+    "/",
     "/home/:path*",
     "/welcome/:path*",
     "/discover/:path*",

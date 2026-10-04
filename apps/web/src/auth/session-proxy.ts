@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { sessionCookieOptions } from "./cookie-options";
+import { landingRedirect } from "./landing-route";
 import { resolveSafeReturnPath, signInPath } from "./redirect-safety";
 import { classifyRoute } from "./route-policy";
 
@@ -62,6 +63,16 @@ export async function handleSessionProxy(
   const user = typeof data?.claims.sub === "string" ? data.claims.sub : null;
 
   const { pathname, search, searchParams } = request.nextUrl;
+
+  if (pathname === "/") {
+    // The landing is prerendered and public; only who sees it is decided
+    // here (signed-in people and installed launches go into the app).
+    const target = landingRedirect({ signedIn: user !== null, searchParams });
+    return target === null
+      ? response
+      : redirectWithSession(request, target, response);
+  }
+
   const access = classifyRoute(pathname);
 
   if (access === "protected" && user === null) {
