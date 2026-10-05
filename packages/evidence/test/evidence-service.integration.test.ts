@@ -1324,4 +1324,156 @@ describe("@capital-q/evidence against local PostgreSQL", () => {
       ).rejects.toBeInstanceOf(EvidenceRuleError);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // P3 documents page: rename, delete (archive) and restore; keyset pages
+  // -------------------------------------------------------------------------
+
+  it("the owner renames, deletes and restores a document, audited without its title; a deleted deck stops being downloadable; nobody else can", async () => {
+    await withWorld(async (world) => {
+      const { tx, service } = world;
+      const deck = await service.createDocument({
+        actor: world.adminA,
+        input: {
+          title: "Seed deck",
+          documentType: "PITCH_DECK",
+          companyId: world.companyA,
+        },
+        correlationId: CORRELATION(),
+      });
+      const shared = await service.setDocumentDownloadAudience({
+        actor: world.adminA,
+        documentId: deck.id,
+        audience: "INVESTORS",
+        expectedVersion: deck.version,
+        correlationId: CORRELATION(),
+      });
+      // Another tenant's admin by a guessed id, and a member without
+      // document.manage, change nothing.
+      await expect(
+        service.changeDocument({
+          actor: world.adminB,
+          documentId: deck.id,
+          change: { kind: "ARCHIVE" },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(DocumentNotFoundError);
+      await expect(
+        service.changeDocument({
+          actor: world.memberA,
+          documentId: deck.id,
+          change: { kind: "RENAME", title: "Mine now" },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toMatchObject({ name: "AuthorizationDeniedError" });
+      await expect(
+        service.changeDocument({
+          actor: world.adminA,
+          documentId: deck.id,
+          change: { kind: "RENAME", title: "   " },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(EvidenceRuleError);
+
+      const renamed = await service.changeDocument({
+        actor: world.adminA,
+        documentId: deck.id,
+        change: { kind: "RENAME", title: "Seed deck, final" },
+        expectedVersion: shared.version,
+        correlationId: CORRELATION(),
+      });
+      expect(renamed.title).toBe("Seed deck, final");
+      // A stale screen cannot overwrite it.
+      await expect(
+        service.changeDocument({
+          actor: world.adminA,
+          documentId: deck.id,
+          change: { kind: "RENAME", title: "Older" },
+          expectedVersion: shared.version,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(DocumentVersionConflictError);
+
+      const deleted = await service.changeDocument({
+        actor: world.adminA,
+        documentId: deck.id,
+        change: { kind: "ARCHIVE" },
+        correlationId: CORRELATION(),
+      });
+      expect(deleted.status).toBe("ARCHIVED");
+      expect(deleted.downloadAudience).toBe("ORGANISATION");
+      const page = await service.listDocumentsWithVersions({
+        actor: world.adminA,
+        page: { limit: 50 },
+      });
+      expect(page.map((entry) => entry.document.id)).not.toContain(deck.id);
+
+      const restored = await service.changeDocument({
+        actor: world.adminA,
+        documentId: deck.id,
+        change: { kind: "RESTORE" },
+        correlationId: CORRELATION(),
+      });
+      expect(restored.status).toBe("ACTIVE");
+      // Restoring never reopens it to investors.
+      expect(restored.downloadAudience).toBe("ORGANISATION");
+
+      const audits = await tx.sql`
+        select metadata from audit.material_actions
+         where tenant_id = ${world.tenantA}
+           and action_type = 'document.details_changed'`;
+      expect(audits).toHaveLength(3);
+      const events = await tx.sql`
+        select * from events.outbox
+         where tenant_id = ${world.tenantA}
+           and event_type = 'evidence.document.details_changed'`;
+      expect(events).toHaveLength(3);
+      expect(JSON.stringify([audits, events])).not.toContain("Seed deck");
+    });
+  });
+
+  it("pages of documents follow the cursor without skipping or repeating, in the owner's organisation only", async () => {
+    await withWorld(async (world) => {
+      const { service } = world;
+      const made: string[] = [];
+      for (let n = 0; n < 5; n += 1) {
+        const document = await service.createDocument({
+          actor: world.adminA,
+          input: {
+            title: `Board pack ${String(n)}`,
+            documentType: "OTHER",
+            companyId: world.companyA,
+          },
+          correlationId: CORRELATION(),
+        });
+        made.push(document.id);
+      }
+      const seen: string[] = [];
+      let after: { updatedAt: string; id: string } | undefined;
+      for (let guard = 0; guard < 10; guard += 1) {
+        const page = await service.listDocumentsWithVersions({
+          actor: world.adminA,
+          page: { limit: 2, ...(after === undefined ? {} : { after }) },
+        });
+        if (page.length === 0) break;
+        expect(page.length).toBeLessThanOrEqual(2);
+        for (const entry of page) seen.push(entry.document.id);
+        const last = page.at(-1);
+        if (last === undefined) break;
+        after = {
+          updatedAt: new Date(last.document.updatedAt).toISOString(),
+          id: last.document.id,
+        };
+      }
+      expect(new Set(seen).size).toBe(seen.length);
+      expect(seen).toEqual(expect.arrayContaining(made));
+      const other = await service.listDocumentsWithVersions({
+        actor: world.adminB,
+        page: { limit: 100 },
+      });
+      for (const id of made) {
+        expect(other.map((entry) => entry.document.id)).not.toContain(id);
+      }
+    });
+  });
 });

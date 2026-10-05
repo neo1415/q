@@ -692,6 +692,15 @@ export {
   type DocumentUploadSessionResponse,
   type DocumentUploadSessionStatus,
   type DocumentVersionDto,
+  ArchiveDocumentRequestSchema,
+  DOCUMENT_ARCHIVE_SEGMENT,
+  DOCUMENT_FILE_SEGMENT,
+  DOCUMENT_PAGE_MAX,
+  DocumentFileLinkSchema,
+  RenameDocumentRequestSchema,
+  type ArchiveDocumentRequest,
+  type DocumentFileLink,
+  type RenameDocumentRequest,
 } from "./documents.js";
 
 export {

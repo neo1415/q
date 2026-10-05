@@ -56,7 +56,9 @@ export {
 } from "./ports.js";
 export {
   judgePublicUrl,
+  normaliseWebAddress,
   publicDomainOf,
+  webAddressesIn,
   URL_REJECTION_REASONS,
   type UrlRejectionReason,
   type UrlSafetyVerdict,

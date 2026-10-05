@@ -321,6 +321,52 @@ export const DocumentResponseSchema = z
 export type DocumentResponse = z.infer<typeof DocumentResponseSchema>;
 
 export const DocumentListResponseSchema = z
-  .object({ documents: z.array(DocumentDtoSchema) })
+  .object({
+    documents: z.array(DocumentDtoSchema),
+    /**
+     * P3: the next page's cursor when `limit` was asked and more remain.
+     * Opaque; never an offset (the list changes under the reader).
+     */
+    nextCursor: z.string().max(200).optional(),
+  })
   .strict();
+
+/** P3: a page of at most this many documents. */
+export const DOCUMENT_PAGE_MAX = 100;
+
+/** P3 documents page: rename one of the organisation's own documents. */
+export const RenameDocumentRequestSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    expectedVersion: ResourceVersionSchema.optional(),
+  })
+  .strict();
+export type RenameDocumentRequest = z.infer<typeof RenameDocumentRequestSchema>;
+
+/** P3: delete (archive) or restore it; deleting can be undone. */
+export const ArchiveDocumentRequestSchema = z
+  .object({
+    archived: z.boolean(),
+    expectedVersion: ResourceVersionSchema.optional(),
+  })
+  .strict();
+export type ArchiveDocumentRequest = z.infer<
+  typeof ArchiveDocumentRequestSchema
+>;
+export const DOCUMENT_ARCHIVE_SEGMENT = "/archive" as const;
+
+/**
+ * P3: a short-lived link to the owner's own file. The URL is the storage
+ * provider's signed read, never a key or a bucket, and it expires.
+ */
+export const DocumentFileLinkSchema = z
+  .object({
+    url: z.string().url(),
+    expiresAt: UtcTimestampSchema,
+    /** False for a version no scanner has checked (ADR 0042). */
+    scanned: z.boolean(),
+  })
+  .strict();
+export type DocumentFileLink = z.infer<typeof DocumentFileLinkSchema>;
+export const DOCUMENT_FILE_SEGMENT = "/file" as const;
 export type DocumentListResponse = z.infer<typeof DocumentListResponseSchema>;

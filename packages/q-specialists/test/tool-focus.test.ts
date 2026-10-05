@@ -94,4 +94,88 @@ describe("toolFocusOf", () => {
     // A question that names nothing is unchanged.
     expect(focus(reading({}), ["INVESTOR_ORGANISATION"])).toBeNull();
   });
+
+  describe("research and web reading are guaranteed (run 13955ca2)", () => {
+    const RESEARCH = [
+      "extract_public_web",
+      "lookup_public_profile",
+      "research_public_web",
+    ];
+
+    it("the exact reading of run 13955ca2: RESEARCH_REQUEST, research EXPLICIT, on their own company", () => {
+      const got = focus(
+        reading({
+          kind: "RESEARCH_REQUEST",
+          questionKind: null,
+          research: "EXPLICIT",
+          text: "read my website zinoaviation.com and tell me what's missing from my profile",
+        }),
+        ["COMPANY"],
+      );
+      expect(got?.areas).toEqual(["Records", "Research"]);
+      expect(got?.tools).toEqual(RESEARCH);
+    });
+
+    it("research EXPLICIT or OFFERED on any kind of turn", () => {
+      for (const research of ["EXPLICIT", "OFFERED"]) {
+        expect(
+          focus(reading({ questionKind: "THEIR_OWN_RECORDS", research }))
+            ?.tools,
+        ).toEqual(RESEARCH);
+      }
+      for (const research of ["NEVER", "ONLY_IF_EMPTY", null]) {
+        expect(
+          focus(reading({ questionKind: "THEIR_OWN_RECORDS", research }))
+            ?.tools,
+        ).toEqual([]);
+      }
+    });
+
+    it("a URL or a bare domain in their words, whatever the reading", () => {
+      for (const text of [
+        "can you read https://zinoaviation.com/about",
+        "read my website: zinoaviation.com",
+        "check WWW.Example.org please",
+        "our site is acme.co.uk",
+        "look at http://10.0.0.1",
+      ]) {
+        expect(focus(reading({ text }))?.tools, text).toEqual(RESEARCH);
+      }
+      for (const text of [
+        "summarise deck.pdf for me",
+        "we moved to v1.5 last week",
+        "what is my runway?",
+        "e.g. the board pack",
+      ]) {
+        expect(focus(reading({ text }))?.tools ?? [], text).toEqual([]);
+      }
+    });
+
+    it("small talk stays the core even with a domain in it", () => {
+      expect(
+        focus(reading({ kind: "SMALL_TALK", text: "thanks, see acme.com" })),
+      ).toEqual({ areas: ["Screens"], tools: [] });
+    });
+  });
+
+  it("'try again' keeps the last turn's tools, whatever kind it is read as", () => {
+    const previous = { areas: ["Relationships"], tools: ["propose_meeting"] };
+    for (const text of [
+      "try again",
+      "Okay, try that again",
+      "retry",
+      "do it again please",
+    ]) {
+      expect(
+        focus(reading({ kind: "CONTROL", text }), [], previous),
+        text,
+      ).toEqual({
+        areas: ["Relationships", "Screens"],
+        tools: ["propose_meeting"],
+      });
+    }
+    expect(
+      focus(reading({ kind: "CONTROL", text: "stop" }), [], previous),
+    ).toEqual({ areas: ["Screens"], tools: [] });
+  });
 });

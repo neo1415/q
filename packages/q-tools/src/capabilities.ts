@@ -711,6 +711,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     { acts: true },
   ),
   tool(
+    "use_capability",
+    "NAVIGATION",
+    "Loads any other Capital Q tool Q was not given for this turn, by name or need, for the next step of the same turn.",
+    { short: "loads a tool mid-turn" },
+  ),
+  tool(
     "open_page",
     "NAVIGATION",
     "Opens one company's page, their relationship with a company or an investor, the chat with them, or a rehearsal of their meeting with them (Q plays that person), by id or by the name they said.",

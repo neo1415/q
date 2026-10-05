@@ -448,6 +448,53 @@ describe("reading a brand from the company's own website", () => {
     expect(suggestion?.pairingFromSite).toBe(false);
   });
 
+  it("reads the website as the person typed it: bare, uppercase, www, a path, http only (lead 2026-10-04)", async () => {
+    const site = {
+      "https://www.northstar.example.com/about": {
+        type: "text/html",
+        body: page,
+      },
+    };
+    for (const written of [
+      "WWW.Northstar.Example.com/about",
+      " https://www.northstar.example.com/about ",
+      "HTTP://www.northstar.example.com/about",
+    ]) {
+      const read = await suggestBrandFromWebsite({
+        websiteUrl: written,
+        sectorCodes: [],
+        http: httpFrom(site),
+      });
+      expect(read?.palette.primary, written).toBe("#0b6e4f");
+    }
+    // A site that serves plain http only: https fails, http is tried once.
+    const plain = await suggestBrandFromWebsite({
+      websiteUrl: "northstar.example.com",
+      sectorCodes: [],
+      http: httpFrom({
+        "http://northstar.example.com/": { type: "text/html", body: page },
+      }),
+    });
+    expect(plain?.sourceUrl).toBe("http://northstar.example.com/");
+    for (const refused of [
+      "javascript:alert(1)",
+      "file:///etc/passwd",
+      "10.0.0.4",
+    ]) {
+      expect(
+        await suggestBrandFromWebsite({
+          websiteUrl: refused,
+          sectorCodes: [],
+          http: createVettedHttp({
+            resolve: () => Promise.reject(new Error("must not be called")),
+            transport: () => Promise.reject(new Error("must not be called")),
+          }),
+        }),
+        refused,
+      ).toBeNull();
+    }
+  });
+
   it("never follows a redirect off the site or to a private address", async () => {
     const offSite = await suggestBrandFromWebsite({
       websiteUrl: "https://northstar.example.com",

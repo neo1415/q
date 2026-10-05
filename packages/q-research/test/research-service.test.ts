@@ -351,6 +351,63 @@ describe("public web research service", () => {
     }
   });
 
+  it("reads a website the person wrote, however written; https first, then http; unsafe still refused (lead 2026-10-04)", async () => {
+    const page = (url: string) => ({
+      url,
+      title: "Site",
+      snippet: "A site.",
+      text: "A public site.",
+      publishedAt: null,
+      relevance: 0.5,
+    });
+    const provider = createFakeResearchProvider({
+      pages: [
+        page("https://zinoaviation.com/"),
+        page("http://plainsite.com/about"),
+      ],
+    });
+    const service = createPublicWebResearchService({
+      provider,
+      clock: () => NOW,
+    });
+    const outcome = await service.extract({
+      actor,
+      runId: "run-named",
+      correlationId: CORRELATION,
+      urls: [
+        "zinoaviation.com",
+        "PLAINSITE.COM/about",
+        "https://elsewhere.com/never-named",
+      ],
+      personNamed: [
+        "can you read my website Zinoaviation.com? also plainsite.com/about, and http://10.0.0.1",
+      ],
+    });
+    expect(outcome.status).toBe("OK");
+    if (outcome.status !== "OK") return;
+    expect(outcome.sources.map((s) => s.url).sort()).toEqual([
+      "http://plainsite.com/about",
+      "https://zinoaviation.com/",
+    ]);
+    expect(outcome.rejectedUrls).toEqual([
+      {
+        url: "https://elsewhere.com/never-named",
+        reason: "NOT_FROM_THIS_CONVERSATIONS_SEARCH",
+      },
+    ]);
+    // A private address the person wrote is not a site to read.
+    const local = await service.extract({
+      actor,
+      runId: "run-named",
+      correlationId: CORRELATION,
+      urls: ["http://10.0.0.1/", "javascript:alert(1)"],
+      personNamed: ["read http://10.0.0.1/ please"],
+    });
+    expect(
+      local.status === "OK" ? local.rejectedUrls.map((r) => r.reason) : null,
+    ).toEqual(["PRIVATE_OR_LINK_LOCAL", "SCHEME_NOT_ALLOWED"]);
+  });
+
   it("extracts only URLs a search in the same run surfaced, and rejects unsafe or foreign ones", async () => {
     const provider = createFakeResearchProvider({ pages: PAGES });
     const service = createPublicWebResearchService({

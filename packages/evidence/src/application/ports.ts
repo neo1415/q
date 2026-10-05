@@ -132,7 +132,21 @@ export type DocumentRepository = {
     executor: DatabaseExecutor,
     tenantId: TenantId,
     ownerOrganisationId: OrganisationId,
-    filter: { readonly companyId?: string | undefined },
+    filter: {
+      readonly companyId?: string | undefined;
+      /**
+       * One page, newest change first (P3 documents page): active
+       * documents only, keyset after (updatedAt, id). Absent: every
+       * document, by creation, as before.
+       */
+      readonly page?:
+        | {
+            readonly limit: number;
+            readonly after?:
+              { readonly updatedAt: string; readonly id: string } | undefined;
+          }
+        | undefined;
+    },
   ) => Promise<readonly Document[]>;
   /** False when `expectedVersion` no longer matches. */
   readonly setCurrentVersion: (
@@ -220,6 +234,8 @@ export type DocumentVersionRepository = {
     executor: DatabaseExecutor,
     tenantId: TenantId,
     ownerOrganisationId: OrganisationId,
+    /** Only these documents' current versions (one page). Absent: all. */
+    documentIds?: readonly string[],
   ) => Promise<readonly DocumentVersion[]>;
   /**
    * Byte-level duplicate detection inside one organisation only. A hash is

@@ -33,7 +33,7 @@ export const ExtractPublicWebInputSchema = z
       .min(1)
       .max(3)
       .describe(
-        "Public URLs that appeared in this conversation's research results. Others are refused.",
+        "Public URLs that appeared in this conversation's research results, or a website the person wrote in their message (a bare domain is fine). Others are refused.",
       ),
   })
   .strict();
@@ -114,6 +114,11 @@ export function createExtractPublicWebTool(
         runId: context.runId,
         correlationId: context.correlationId,
         urls: input.urls,
+        // Only the person's own words name a site to read; a model's
+        // argument alone still needs a search to have surfaced it.
+        ...(context.conversation === undefined
+          ? {}
+          : { personNamed: [context.conversation.latestUserText] }),
         signal: context.signal,
       });
       if (outcome.status !== "OK") {

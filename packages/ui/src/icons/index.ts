@@ -45,6 +45,7 @@ export {
   Keyboard,
   Landmark,
   LayoutGrid,
+  List,
   ListChecks,
   Lightbulb,
   Lock,

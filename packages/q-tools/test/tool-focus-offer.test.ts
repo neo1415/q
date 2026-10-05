@@ -356,4 +356,119 @@ describe("tools offered by what the turn is about", () => {
     );
     expect(afterTotal).toBeLessThan(beforeTotal);
   });
+
+  it("run 13955ca2: a research turn on an own-company plan keeps every research tool within the bound", () => {
+    const research = [
+      "extract_public_web",
+      "lookup_public_profile",
+      "research_public_web",
+    ];
+    // Their own records and research: 81 tools rank, and without the
+    // guarantee the three sat at 42-44, past the 40 bound of 2026-10-02.
+    const areas = [
+      "Documents",
+      "Pitch",
+      "Profile",
+      "Records",
+      "Relationships",
+      "Research",
+    ];
+    const unguarded = names(
+      registry.ranked(worstCase("OWN_COMPANY_QUESTION", { areas, tools: [] })),
+    );
+    expect(unguarded.indexOf("research_public_web")).toBeGreaterThanOrEqual(40);
+    const focus = { areas, tools: research };
+    for (const purpose of [
+      "OWN_COMPANY_QUESTION",
+      "COUNTERPARTY_COMPANY_QUESTION",
+      "INVESTOR_QUESTION",
+      "GENERAL_QUESTION",
+    ] as const) {
+      const context = worstCase(purpose, focus);
+      const offered = names(registry.eligible(context));
+      expect(offered.length).toBeLessThanOrEqual(Q_TURN_TOOLS_MAX);
+      for (const tool of research) {
+        expect(offered, `${purpose}: ${tool}`).toContain(tool);
+        // Named, so they lead right after the core: no bound reaches them.
+        expect(offered.indexOf(tool), `${purpose}: ${tool}`).toBeLessThan(40);
+        expect(registry.offeredByProviderName(context, tool)).toBeDefined();
+      }
+    }
+  });
+
+  describe("use_capability: anything this run may use, loaded mid-turn (lead 2026-10-04)", () => {
+    const load = async (
+      context: ReturnType<typeof worstCase>,
+      need: string,
+    ): Promise<readonly string[]> => {
+      const outcome = await createQToolExecutor({ registry }).execute(
+        { callId: "load", name: "use_capability", arguments: { need } },
+        context,
+      );
+      expect(outcome.status).toBe("SUCCEEDED");
+      if (!outcome.result.ok) return [];
+      return (outcome.result.data as { loaded: { name: string }[] }).loaded.map(
+        (tool) => tool.name,
+      );
+    };
+
+    it("is offered on every purpose and focus", () => {
+      for (const purpose of Q_TASK_CLASSES) {
+        for (const focus of [undefined, ...TURN_FOCUSES.slice(0, 5)]) {
+          expect(names(registry.eligible(worstCase(purpose, focus)))).toContain(
+            "use_capability",
+          );
+        }
+      }
+    });
+
+    it("loads a tool outside the turn's focus, which then executes in the same turn", async () => {
+      const focus = { areas: ["Screens"], tools: [] as string[] };
+      const context = worstCase("OWN_COMPANY_QUESTION", focus);
+      expect(names(registry.eligible(context))).not.toContain(
+        "propose_meeting",
+      );
+      const loaded = await load(context, "propose_meeting");
+      expect(loaded).toEqual(["propose_meeting"]);
+      // The gateway adds what was loaded to the focus's tools.
+      const next = worstCase("OWN_COMPANY_QUESTION", {
+        ...focus,
+        tools: [...focus.tools, ...loaded],
+      });
+      expect(names(registry.eligible(next))).toContain("propose_meeting");
+      expect(
+        registry.offeredByProviderName(next, "propose_meeting"),
+      ).toBeDefined();
+      // By need, not only by name.
+      expect(await load(context, "research the public web")).toContain(
+        "research_public_web",
+      );
+    });
+
+    it("never loads a tool the plan does not allow", async () => {
+      // No scopes: nothing but scope-free tools may run.
+      const bare = contextFor(actorA, planFor(actorA, "GENERAL_QUESTION", []));
+      for (const need of [
+        "propose_meeting",
+        "research_public_web",
+        "get_company",
+        "read the public web",
+      ]) {
+        const loaded = await load(bare, need);
+        for (const name of loaded) {
+          const record = registry
+            .list()
+            .find((r) => r.definition.providerName === name);
+          expect(record?.definition.requiredScopeKinds ?? [], name).toEqual([]);
+        }
+        expect(loaded).not.toContain(need);
+      }
+      // Not offered to an actor the registry does not serve, so not loaded.
+      const system = {
+        ...worstCase("GENERAL_QUESTION"),
+        actor: { ...actorA, actorType: "SYSTEM" as const },
+      };
+      expect(registry.available(system)).toEqual([]);
+    });
+  });
 });

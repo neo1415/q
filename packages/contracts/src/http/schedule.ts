@@ -274,6 +274,8 @@ export const NotificationListSchema = z
   .object({
     items: z.array(NotificationDtoSchema).max(50),
     unread: z.number().int().min(0),
+    /** P3: the next (older) page's cursor; absent at the end. */
+    nextBefore: z.string().max(200).optional(),
   })
   .strict();
 export type NotificationList = z.infer<typeof NotificationListSchema>;

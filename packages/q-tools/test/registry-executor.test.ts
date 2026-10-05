@@ -9,6 +9,7 @@ import {
   GET_CAPITAL_OBJECTIVE,
   GET_COMPANY,
   GET_INVESTOR_MANDATE,
+  USE_CAPABILITY,
   SEARCH_COMPANIES,
   type AnyQToolDefinition,
 } from "../src/index.js";
@@ -77,6 +78,8 @@ describe("tool registry", () => {
       `${GET_COMPANY}/v1`,
       `${SEARCH_COMPANIES}/v1`,
       `${GET_INVESTOR_MANDATE}/v1`,
+      // Lead 2026-10-04: every catalogue can load what a turn was not given.
+      `${USE_CAPABILITY}/v1`,
     ]);
     for (const record of registry.list()) {
       expect(record.definition.riskClass).toBe("SAFE_READ");
@@ -115,7 +118,9 @@ describe("tool registry", () => {
     const names = (plan: ReturnType<typeof planFor>, actor = actorA) =>
       registry
         .eligible(contextFor(actor, plan))
-        .map((r) => r.definition.providerName);
+        .map((r) => r.definition.providerName)
+        // The always-on loader is checked on its own below.
+        .filter((name) => name !== "use_capability");
 
     expect(
       names(

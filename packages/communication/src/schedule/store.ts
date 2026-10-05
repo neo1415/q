@@ -269,6 +269,8 @@ export type ScheduleStore = {
   readonly listNotifications: (
     userId: string,
     limit: number,
+    /** P3: older than this (createdAt, id); absent, the newest. */
+    before?: { readonly createdAt: Date; readonly id: string },
   ) => Promise<{
     readonly items: readonly NotificationRecord[];
     readonly unread: number;

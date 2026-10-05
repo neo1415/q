@@ -27,11 +27,31 @@ vi.mock("../src/features/q/actions", () => ({
   readQArtifactVersionAction: () => Promise.resolve({ ok: false, message: "" }),
 }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/documents" }));
+const library = {
+  loadLibraryPageAction: vi.fn<(input: unknown) => Promise<unknown>>(),
+  renameDocumentAction: vi.fn<(input: unknown) => Promise<unknown>>(),
+  archiveDocumentAction: vi.fn<(input: unknown) => Promise<unknown>>(),
+  documentFileAction: vi.fn<(id: string) => Promise<unknown>>(),
+};
+vi.mock("../src/features/documents/library-actions", () => library);
+vi.mock("../src/features/documents/deck-sharing-actions", () => ({
+  setDeckAudienceAction: vi.fn(),
+}));
+vi.mock("../src/features/onboarding-kit/material-actions", () => ({
+  materialUploadTargetAction: vi.fn(),
+  materialUploadCompleteAction: vi.fn(),
+}));
 
 const { BrandKitPanel } =
   await import("../src/features/documents/brand-kit-panel");
 const { DocumentsScreen } =
   await import("../src/features/documents/documents-screen");
+const { fromArtifact } =
+  await import("../src/features/documents/library-model");
+const pageOf = (artifacts: readonly Parameters<typeof fromArtifact>[0][]) => ({
+  items: artifacts.map(fromArtifact),
+  cursors: { q: null, uploads: null },
+});
 const { AnswerPdf } = await import("../src/features/documents/answer-pdf");
 const {
   openDocumentViewer,
@@ -128,7 +148,9 @@ describe("the brand kit", () => {
 
 describe("the documents list", () => {
   it("offers to ask Q for a deck when there are none", () => {
-    render(<DocumentsScreen documents={[]} brand={{}} />);
+    render(
+      <DocumentsScreen initial={pageOf([])} companyId={null} brand={{}} />,
+    );
     expect(screen.getByText(/No documents yet/)).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Ask Q for a deck" }),
@@ -139,7 +161,8 @@ describe("the documents list", () => {
     render(
       <DocumentsScreen
         brand={{}}
-        documents={[
+        companyId={null}
+        initial={pageOf([
           {
             artifactId: QArtifactIdSchema.parse(
               "a0000000-0000-4000-8000-000000000001",
@@ -162,12 +185,21 @@ describe("the documents list", () => {
             createdAt: NOW,
             updatedAt: NOW,
           },
-        ]}
+        ])}
       />,
     );
-    expect(screen.getByText(/Version 3/)).toBeTruthy();
+    expect(screen.getByText(/Made by Q, version 3/)).toBeTruthy();
     expect(screen.getByText(/Q is writing this/)).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Open" })).toHaveLength(1);
+    expect(
+      screen.getByRole("button", {
+        name: "Open Northstar — investor deck",
+      }),
+    ).toHaveProperty("disabled", false);
+    expect(
+      screen.getByRole("button", {
+        name: "Open Call notes",
+      }),
+    ).toHaveProperty("disabled", true);
   });
 });
 
@@ -207,7 +239,12 @@ describe("a document Q was asked to open (follow-55)", () => {
     );
     render(
       <>
-        <DocumentsScreen documents={docs} brand={{}} openOnArrival={READY} />
+        <DocumentsScreen
+          initial={pageOf(docs)}
+          companyId={null}
+          brand={{}}
+          openOnArrival={READY}
+        />
         <Viewing />
       </>,
     );
@@ -220,7 +257,12 @@ describe("a document Q was asked to open (follow-55)", () => {
     for (const id of [WRITING, "a0000000-0000-4000-8000-0000000000ff"]) {
       const { unmount } = render(
         <>
-          <DocumentsScreen documents={docs} brand={{}} openOnArrival={id} />
+          <DocumentsScreen
+            initial={pageOf(docs)}
+            companyId={null}
+            brand={{}}
+            openOnArrival={id}
+          />
           <Viewing />
         </>,
       );

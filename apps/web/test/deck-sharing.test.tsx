@@ -107,22 +107,28 @@ describe("deck sharing", () => {
   });
 });
 
-describe("Documents page order (design-48 v2)", () => {
-  it("lists documents first, then the deck, with the brand folded", async () => {
+describe("Documents page order (design-48 v2; P3)", () => {
+  it("shows the library first, with the brand folded after it", async () => {
     vi.doMock("../src/components/app-shell/global-q", () => ({
       useGlobalQ: () => ({ askAbout: vi.fn() }),
     }));
     vi.doMock("../src/features/documents/brand-kit-panel", () => ({
       BrandKitPanel: () => <p>brand panel</p>,
     }));
+    vi.doMock("../src/features/documents/library-actions", () => ({}));
+    vi.doMock("../src/features/onboarding-kit/material-actions", () => ({}));
     const { DocumentsScreen } =
       await import("../src/features/documents/documents-screen");
     const { container } = render(
-      <DocumentsScreen documents={[]} brand={null} decks={<p>deck rows</p>} />,
+      <DocumentsScreen
+        initial={{ items: [], cursors: { q: null, uploads: null } }}
+        companyId={null}
+        brand={null}
+      />,
     );
     const text = container.textContent ?? "";
-    expect(text.indexOf("No documents yet.")).toBeLessThan(
-      text.indexOf("deck rows"),
+    expect(text.indexOf("No documents yet")).toBeLessThan(
+      text.indexOf("brand panel"),
     );
     const brand = container.querySelector("details[data-brand-fold]");
     expect(brand?.hasAttribute("open")).toBe(false);

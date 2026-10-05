@@ -310,8 +310,10 @@ export function createInMemoryScheduleStore(
       }
       return Promise.resolve();
     },
-    listNotifications: (userId) => {
-      const mine = notifications.filter((n) => n.userId === userId);
+    listNotifications: (userId, limit) => {
+      const mine = notifications
+        .filter((n) => n.userId === userId)
+        .slice(0, limit);
       const items: NotificationRecord[] = mine.map((n) => ({
         id: n.id,
         kind: n.kind,

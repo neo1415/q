@@ -1892,6 +1892,30 @@ const { app, logger } = createApp(config, security, {
   // 2026-09-27): the versioned policy decides, the table remembers.
   onboardingNudges: createOnboardingNudges({ sql: database.sql }),
   evidence,
+  // P3: the owner's own file from the documents page. The route has
+  // already authorised the owner; Evidence checks the object (active, the
+  // version belongs, scan state under ADR 0042) and signs a 60 s read.
+  ...(diligenceDocuments === undefined
+    ? {}
+    : {
+        documentFileLink: async (file: {
+          readonly tenantId: string;
+          readonly documentId: string;
+          readonly versionId: string;
+        }) => {
+          const link = await diligenceDocuments.authorizeSharedVersion({
+            documentTenantId: file.tenantId,
+            documentId: file.documentId,
+            documentVersionId: file.versionId,
+            disposition: "ATTACHMENT",
+          });
+          return {
+            url: link.url,
+            expiresAt: link.expiresAt,
+            scanned: link.scanned,
+          };
+        },
+      }),
   media,
   verification,
   visibility,

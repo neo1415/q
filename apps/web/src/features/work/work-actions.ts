@@ -155,12 +155,14 @@ export async function setAwayAction(away: boolean): Promise<WorkResult<null>> {
 
 // --- notices and pushes --------------------------------------------------------
 
-export async function listNoticesAction(): Promise<
-  WorkResult<NotificationList>
-> {
+export async function listNoticesAction(
+  before?: string,
+): Promise<WorkResult<NotificationList>> {
+  const cursor =
+    typeof before === "string" && before.length <= 200 ? before : undefined;
   return run(
     await apiSession(),
-    (session) => listNotifications(session),
+    (session) => listNotifications(session, { before: cursor }),
     "Notifications couldn't load. Try again in a moment.",
   );
 }

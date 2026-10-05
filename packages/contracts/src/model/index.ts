@@ -330,12 +330,14 @@ export const ModelToolNameSchema = z.string().regex(/^[a-z][a-z0-9_]{1,63}$/);
 export type ModelToolName = z.infer<typeof ModelToolNameSchema>;
 
 /**
- * Tools on one attempt. R33 (Q can do everything the app can) put 30+
- * eligible tools in a Home Q run; at 16 the gateway refused the whole
- * request. Every provider routed to accepts 128; 80 (R33 + work, results, documents tools, 2026-10-01) leaves headroom while
- * keeping a bound on the prompt the tool list costs.
+ * Tools on one attempt: the providers' own documented limit (lead
+ * 2026-10-04, "increase the tool limit"). OpenAI and Gemini both accept at
+ * most 128 function declarations per request; Groq follows OpenAI. Staging
+ * logs (2026-10-04, gpt-5.6-luna) showed no latency cost from 40 to 80
+ * tools offered (median round 2.9-4.2 s at 40, 2.4-3.1 s at 78-80), so no
+ * lower bound is kept here; what a turn is offered is decided by its focus.
  */
-export const MODEL_TOOLS_MAX = 80;
+export const MODEL_TOOLS_MAX = 128;
 export const MODEL_TOOL_DESCRIPTION_MAX_CHARS = 1_000;
 /** Bounded tool result text handed back to a model (JSON). */
 export const MODEL_TOOL_RESULT_MAX_CHARS = 32_000;

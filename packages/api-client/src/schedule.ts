@@ -150,8 +150,20 @@ export function dismissReminder(session: ApiSession, reminderId: string) {
   );
 }
 
-export function listNotifications(session: ApiSession) {
-  return call(session, "GET", NOTIFICATIONS_PATH, NotificationListSchema);
+export function listNotifications(
+  session: ApiSession,
+  page: { readonly before?: string | undefined } = {},
+) {
+  const query =
+    page.before === undefined
+      ? ""
+      : `?before=${encodeURIComponent(page.before)}`;
+  return call(
+    session,
+    "GET",
+    `${NOTIFICATIONS_PATH}${query}`,
+    NotificationListSchema,
+  );
 }
 
 export function markNotificationsRead(

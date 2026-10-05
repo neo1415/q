@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import {
+  MODEL_TOOLS_MAX,
   isCalendarBlock,
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
@@ -276,6 +277,29 @@ const ANSWER_LIMIT_CHARS = 32_000;
  * more rounds when this constant is raised.
  */
 export const Q_TOOL_LOOP_MAX_ROUNDS = 1;
+
+/**
+ * The on-demand loader (q-tools `use_capability`, lead 2026-10-04). Its
+ * result names tools; only those in the run's own available list (what its
+ * purpose, plan scopes and actor allow) and not yet offered are loaded.
+ */
+const USE_CAPABILITY_TOOL = "use_capability";
+
+function loadCapabilities(
+  data: unknown,
+  available: readonly QOfferedTool[],
+  offered: ReadonlyMap<string, QOfferedTool>,
+): readonly QOfferedTool[] {
+  const parsed = z
+    .object({ loaded: z.array(z.object({ name: z.string() })).max(8) })
+    .safeParse(data);
+  if (!parsed.success) return [];
+  const names = new Set(parsed.data.loaded.map((tool) => tool.name));
+  return available.filter(
+    (tool) =>
+      names.has(tool.definition.name) && !offered.has(tool.definition.name),
+  );
+}
 export const Q_TOOL_LOOP_MAX_CALLS = 6;
 
 export function taskClassForCapability(
@@ -1928,6 +1952,7 @@ export function createModelGatewayQAnswer(
       assembled,
       profile,
       offeredForRun,
+      availableForRun,
       memory,
       ownProfile,
       ownProfileCall,
@@ -2017,10 +2042,11 @@ export function createModelGatewayQAnswer(
         openDocumentTitle,
         latest,
         earlier,
-        toolContext,
+        toolContext: preparedToolContext,
         assembled,
         profile,
         offeredForRun,
+        availableForRun,
         memory,
         ownProfile,
         ownProfileCall,
@@ -2043,6 +2069,8 @@ export function createModelGatewayQAnswer(
         onboardingFacts,
         counterparty,
       } = prepared;
+      // Grows only by what use_capability loads (lead 2026-10-04).
+      let toolContext = preparedToolContext;
       took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
       /**
        * Whether this turn may reach the public web (CQ-QX-005), decided by
@@ -2056,7 +2084,7 @@ export function createModelGatewayQAnswer(
       const research =
         request.research === undefined ? undefined : await request.research;
       took("reading");
-      const offered =
+      let offered =
         research?.mode === "NEVER"
           ? offeredForRun.filter(
               (tool) => tool.definition.name !== "research_public_web",
@@ -2713,13 +2741,17 @@ export function createModelGatewayQAnswer(
           // One more round, once, after fill_profile_gaps searched: the
           // second call carries the values the sources support.
           let gapsRounds = 0;
+          // One more round, once, after use_capability loaded a tool: the
+          // model calls it in the next step of the same turn.
+          let loadRounds = 0;
           let textRound = false;
           while (
             rounds <
               Q_TOOL_LOOP_MAX_ROUNDS +
                 recoveryRounds +
                 sayDoRounds +
-                gapsRounds &&
+                gapsRounds +
+                loadRounds &&
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
@@ -2982,6 +3014,47 @@ export function createModelGatewayQAnswer(
               }
               if (call.name === FILL_PROFILE_GAPS_TOOL && outcome.result.ok) {
                 gaps = gapsLineOf(outcome.result.data) ?? gaps;
+              }
+              if (call.name === USE_CAPABILITY_TOOL && outcome.result.ok) {
+                const loaded = loadCapabilities(
+                  outcome.result.data,
+                  availableForRun ?? [],
+                  offeredByName,
+                );
+                if (loaded.length > 0) {
+                  offered = [...offered, ...loaded].slice(0, MODEL_TOOLS_MAX);
+                  for (const tool of loaded) {
+                    offeredByName.set(tool.definition.name, tool);
+                  }
+                  // What was loaded may execute this turn exactly as a
+                  // tool the turn named (the registry's own rule).
+                  const focus = toolContext.focus ?? { areas: [], tools: [] };
+                  toolContext = {
+                    ...toolContext,
+                    focus: {
+                      ...focus,
+                      tools: [
+                        ...focus.tools,
+                        ...loaded.map((tool) => tool.definition.name),
+                      ],
+                    },
+                  };
+                  if (loadRounds === 0) loadRounds = 1;
+                }
+                logger?.info(
+                  {
+                    key: "q.capability_loaded",
+                    qRunId: request.runId,
+                    need: ((need: unknown) =>
+                      typeof need === "string" ? need.slice(0, 120) : "")(
+                      (call.arguments as { need?: unknown } | null)?.need,
+                    ),
+                    loaded: loaded.map((tool) => tool.definition.name),
+                    offered: offered.length,
+                    round: rounds,
+                  },
+                  "q loaded a tool on demand",
+                );
               }
               // ADR 0040: an app action that ran (or could not) says so in
               // Capital Q's own words, from the tool -- the model's talk

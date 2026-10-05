@@ -14,14 +14,22 @@ import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
 import { capabilityArea, Q_CAPABILITIES } from "./capabilities.js";
 import type { AnyQToolDefinition } from "./definition.js";
 import { planScopeKinds } from "./plan.js";
+import {
+  BIND_CATALOGUE,
+  type CapabilityCatalogue,
+} from "./tools/use-capability.js";
 
 /**
- * The most tools one turn is offered (lead 2026-10-02). Every turn pays for
- * every offered tool's schema, so the offer follows what the turn is about
- * (its focus) rather than a static list per purpose; the provider's own
- * bound (MODEL_TOOLS_MAX) stays the hard ceiling above this.
+ * The most tools one turn is offered: everything one request carries,
+ * less the one slot `use_capability` keeps (lead 2026-10-04: "increase the
+ * tool limit... make sure Q is able to get all its tools whenever it needs
+ * them"). The 40 of 2026-10-02 cut research from a research turn (run
+ * 13955ca2) and get_company from investor questions; staging logs showed
+ * no latency gain from it. The focus still decides what is relevant (cost),
+ * and anything relevant but not offered is one `use_capability` call away
+ * in the same turn.
  */
-export const Q_TURN_TOOLS_MAX = 40;
+export const Q_TURN_TOOLS_MAX = MODEL_TOOLS_MAX - 1;
 
 /** Each tool's capability area, by provider name (the reader's areas). */
 const TOOL_AREAS: ReadonlyMap<string, string> = new Map(
@@ -335,6 +343,21 @@ export function createQToolRegistry(
       ),
     ];
   };
+
+  // use_capability reads what this run may use from here, never more.
+  for (const record of records) {
+    const bind = (
+      record.definition as {
+        readonly [BIND_CATALOGUE]?: (catalogue: CapabilityCatalogue) => void;
+      }
+    )[BIND_CATALOGUE];
+    bind?.((context) =>
+      available(context).map(({ definition }) => ({
+        providerName: definition.providerName,
+        description: definition.description,
+      })),
+    );
+  }
 
   return {
     get: (id, version) => byVersion.get(versionIdOf(id, version)),

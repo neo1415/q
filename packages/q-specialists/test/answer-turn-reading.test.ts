@@ -3153,7 +3153,13 @@ describe("the tool offer follows the turn (tool focus)", () => {
     await run.answer.answer(request());
     expect(run.focuses[0]).toEqual({
       areas: ["Relationships"],
-      tools: ["propose_meeting"],
+      // Research OFFERED (this harness's default): its tools stay in reach.
+      tools: [
+        "extract_public_web",
+        "lookup_public_profile",
+        "propose_meeting",
+        "research_public_web",
+      ],
     });
   });
 });
@@ -3284,7 +3290,12 @@ describe("a request naming a counterparty brings Relationships into the offer", 
     });
     expect(run.focuses.at(-1)).toEqual({
       areas: ["Records", "Relationships"],
-      tools: [],
+      // Research OFFERED (this harness's default): its tools stay in reach.
+      tools: [
+        "extract_public_web",
+        "lookup_public_profile",
+        "research_public_web",
+      ],
       widen: true,
     });
   });
@@ -3299,7 +3310,12 @@ describe("a request naming a counterparty brings Relationships into the offer", 
     await run.answer.answer(request());
     expect(run.focuses.at(-1)).toEqual({
       areas: ["Relationships"],
-      tools: [],
+      // Research OFFERED (this harness's default): its tools stay in reach.
+      tools: [
+        "extract_public_web",
+        "lookup_public_profile",
+        "research_public_web",
+      ],
       widen: true,
     });
   });

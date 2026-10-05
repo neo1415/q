@@ -194,3 +194,66 @@ export function publicDomainOf(
   const verdict = judgePublicUrl(candidate);
   return verdict.ok ? verdict.domain : null;
 }
+
+/**
+ * A web address as a person writes it, as the URLs to try (lead
+ * 2026-10-04: "zinoaviation.com", "www.x.com", "HTTP://X.COM/About/",
+ * "<x.com>," all name a site). No scheme: https first, then http. A
+ * written http:// is upgraded to https with http as its fallback. Any
+ * other scheme ("javascript:", "file:", "ftp://") is refused, and both
+ * forms still pass judgePublicUrl, so a private, local or metadata host
+ * is refused exactly as before (ADR 0009 rule 4).
+ */
+export function normaliseWebAddress(
+  candidate: string,
+): {
+  readonly url: string;
+  readonly fallback: string;
+  readonly domain: string;
+} | null {
+  let text = candidate
+    .trim()
+    .replace(/^[<("'“‘[]+/u, "")
+    .replace(/[>)"'”’\],.;:!?]+$/u, "");
+  if (text.length === 0 || /\s/u.test(text)) return null;
+  const scheme = /^([a-z][a-z0-9+.-]*):\/\//iu.exec(text);
+  if (scheme !== null) {
+    const name = (scheme[1] ?? "").toLowerCase();
+    if (name !== "http" && name !== "https") return null;
+    text = text.slice(scheme[0].length);
+  } else if (text.startsWith("//")) {
+    text = text.slice(2);
+  } else if (
+    /^(?:mailto|javascript|data|file|ftp|tel|blob|about|vbscript|chrome|view-source):/iu.test(
+      text,
+    )
+  ) {
+    return null;
+  }
+  const https = judgePublicUrl(`https://${text}`);
+  const http = judgePublicUrl(`http://${text}`);
+  if (!https.ok || !http.ok) return null;
+  return { url: https.url, fallback: http.url, domain: https.domain };
+}
+
+/**
+ * The web addresses a person wrote in a message, normalised, at most
+ * `max`. A file name ("deck.pdf") or a version ("v1.5") is not one: a
+ * bare domain must end on a common or country TLD.
+ */
+export function webAddressesIn(
+  text: string,
+  max = 3,
+): readonly { readonly url: string; readonly fallback: string }[] {
+  const found: { url: string; fallback: string }[] = [];
+  for (const match of text.matchAll(WEB_ADDRESS_IN_TEXT)) {
+    const address = normaliseWebAddress(match[0]);
+    if (address === null || found.some((f) => f.url === address.url)) continue;
+    found.push({ url: address.url, fallback: address.fallback });
+    if (found.length >= max) break;
+  }
+  return found;
+}
+
+const WEB_ADDRESS_IN_TEXT =
+  /\bhttps?:\/\/[^\s<>"']+|\b(?:www\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:com|net|org|io|ai|co|app|dev|xyz|tech|vc|capital|ventures|fund|finance|africa|biz|info|uk|ng|za|ke|gh|rw|eg|ma|de|fr|nl|us|ca|in|sg|ae|eu|me|ly|so|to|ie|es|it|au|nz|br|mx)\b(?![.-][a-z0-9])(?:\/[^\s<>"']*)?/giu;

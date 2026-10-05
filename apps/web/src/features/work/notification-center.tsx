@@ -13,7 +13,12 @@ import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { groupNotices, type NoticeGroup } from "./notice-groups";
 import { PushSetting } from "./push-setting";
 import { markReadAction } from "./work-actions";
-import { noticesRead, refreshNotices, useNotices } from "./notice-store";
+import {
+  loadOlderNotices,
+  noticesRead,
+  refreshNotices,
+  useNotices,
+} from "./notice-store";
 
 /**
  * The notification centre (AUTO; spec auto.md §3.5): one bell with the
@@ -130,7 +135,7 @@ function NoticeRow({
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   // Shared by both bells (phone header, desktop sidebar): one read.
-  const { items, unread, failed } = useNotices();
+  const { items, unread, failed, nextBefore } = useNotices();
   const load = () => refreshNotices(true);
 
   // Updates are seen once shown; what needs them waits until dealt with.
@@ -248,6 +253,16 @@ export function NotificationCenter() {
                   </ul>
                 </section>
               ))}
+              {nextBefore === undefined || nextBefore === null ? null : (
+                <button
+                  type="button"
+                  className="cq-body-sm inline-flex min-h-11 items-center self-start text-(--cq-text-secondary) underline underline-offset-4"
+                  onClick={() => void loadOlderNotices()}
+                  data-notices-older
+                >
+                  Show older
+                </button>
+              )}
             </>
           )}
           <div className="border-t border-(--cq-border-subtle) pt-4">

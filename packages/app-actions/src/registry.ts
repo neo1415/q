@@ -5,6 +5,7 @@ import { COMMITMENT_ACTIONS } from "./actions/commitments.js";
 import { SET_DECK_AUDIENCE } from "./actions/deck.js";
 import { DISCOVERY_DECISIONS } from "./actions/discovery.js";
 import { DOCUMENT_ACTIONS } from "./actions/documents.js";
+import { DOCUMENT_MANAGE_ACTIONS } from "./actions/document-manage.js";
 import { INTEREST_ACTIONS } from "./actions/interest.js";
 import { MANDATE_ACTIONS } from "./actions/mandate.js";
 import { ME_ACTIONS } from "./actions/me.js";
@@ -41,6 +42,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...DILIGENCE_ACTIONS,
   SET_DECK_AUDIENCE,
   ...DOCUMENT_ACTIONS,
+  ...DOCUMENT_MANAGE_ACTIONS,
   ...PROFILE_IMAGE_ACTIONS,
   ...SETTINGS_ACTIONS,
   ...WORK_ACTIONS,

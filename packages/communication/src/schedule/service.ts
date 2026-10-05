@@ -43,6 +43,9 @@ import type {
  * event id), and no transaction is held across one.
  */
 
+/** P3: notices per page; older ones by cursor. */
+export const NOTIFICATIONS_PAGE = 30;
+
 export type OrganiserCalendar = {
   readonly email: string;
   readonly busy: (window: {
@@ -379,7 +382,11 @@ export type ScheduleService = {
     actor: ActorContext,
     reminderId: string,
   ) => Promise<boolean>;
-  readonly listNotifications: (actor: ActorContext) => Promise<{
+  readonly listNotifications: (
+    actor: ActorContext,
+    /** P3: one older page, after the cursor the last page ended on. */
+    before?: { readonly createdAt: Date; readonly id: string },
+  ) => Promise<{
     readonly items: readonly NotificationRecord[];
     readonly unread: number;
   }>;
@@ -1377,10 +1384,14 @@ export function createScheduleService(
       UUID.test(reminderId) &&
       store.dismissReminder(actor.userId, reminderId),
 
-    listNotifications: async (actor) =>
+    listNotifications: async (actor, before) =>
       actor.actorType !== "HUMAN"
         ? { items: [], unread: 0 }
-        : store.listNotifications(actor.userId, 30),
+        : store.listNotifications(
+            actor.userId,
+            NOTIFICATIONS_PAGE,
+            before !== undefined && UUID.test(before.id) ? before : undefined,
+          ),
 
     markNotificationsRead: async (actor, ids) => {
       if (actor.actorType !== "HUMAN") return;

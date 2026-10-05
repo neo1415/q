@@ -1,4 +1,7 @@
-import type { DeckAudiencePort } from "@capital-q/app-actions";
+import type {
+  DeckAudiencePort,
+  DocumentChangePort,
+} from "@capital-q/app-actions";
 import { DocumentIdSchema, type EvidenceService } from "@capital-q/evidence";
 
 /**
@@ -20,6 +23,28 @@ export function deckAudiencePort(
       }),
     setDocumentDownloadAudience: (command) =>
       evidence.setDocumentDownloadAudience({
+        ...command,
+        documentId: DocumentIdSchema.parse(command.documentId),
+      }),
+  };
+}
+
+/**
+ * P3: the rename/delete actions' port, over the same Evidence service
+ * (document.manage, audit, event). A deleted document is still the
+ * owner's to read, so it can be brought back.
+ */
+export function documentChangePort(
+  evidence: Pick<EvidenceService, "getDocument" | "changeDocument">,
+): DocumentChangePort {
+  return {
+    getDocument: ({ actor, documentId }) =>
+      evidence.getDocument({
+        actor,
+        documentId: DocumentIdSchema.parse(documentId),
+      }),
+    changeDocument: (command) =>
+      evidence.changeDocument({
         ...command,
         documentId: DocumentIdSchema.parse(command.documentId),
       }),

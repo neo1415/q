@@ -127,6 +127,28 @@ export const DocumentDownloadAudienceChangedEvent = defineEvent({
     "Who may download a pitch deck changed (ADR 0041): its organisation only, or also investors the company is viewable to. Never the file, its title or its storage.",
 });
 
+export const DocumentDetailsChangedEvent = defineEvent({
+  name: "evidence.document.details_changed",
+  version: 1,
+  owner: EVIDENCE_EVENT_OWNER,
+  producer: EVIDENCE_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "CONFIDENTIAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      documentId: UuidSchema,
+      ownerOrganisationId: UuidSchema,
+      companyId: UuidSchema.nullable(),
+      change: z.enum(["RENAME", "ARCHIVE", "RESTORE"]),
+      status: z.enum(["ACTIVE", "ARCHIVED"]),
+      documentVersion: z.number().int().min(1),
+    })
+    .strict(),
+  description:
+    "The owner renamed, deleted (archived) or restored a document (P3 documents page). Never the title, the file or its storage.",
+});
+
 export const ClaimChangedEvent = defineEvent({
   name: "evidence.claim.changed",
   version: 1,
@@ -205,6 +227,7 @@ export const EVIDENCE_EVENTS: readonly EventDefinition[] = [
   ClaimChangedEvent,
   EvidenceItemCreatedEvent,
   DocumentDownloadAudienceChangedEvent,
+  DocumentDetailsChangedEvent,
 ];
 
 type Context = {
@@ -352,4 +375,16 @@ export function documentReadyEvent(
     },
     data,
   };
+}
+
+export function documentDetailsChangedEvent(
+  context: Context,
+  data: z.infer<typeof DocumentDetailsChangedEvent.dataSchema>,
+) {
+  return envelope(
+    DocumentDetailsChangedEvent,
+    context,
+    { type: "document", id: data.documentId, version: data.documentVersion },
+    data,
+  );
 }

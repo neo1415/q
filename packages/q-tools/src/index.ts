@@ -570,3 +570,11 @@ export {
   ReadMyInboundEmailInputSchema,
   ReadMyInboundEmailOutputSchema,
 } from "./tools/inbound-email.js";
+export {
+  USE_CAPABILITY,
+  USE_CAPABILITY_MAX,
+  USE_CAPABILITY_TOOL,
+  UseCapabilityOutputSchema,
+  matchCapabilities,
+  type UseCapabilityOutput,
+} from "./tools/use-capability.js";

@@ -40,6 +40,8 @@ const EVERY_PORT = new Proxy(GIVEN, {
 }) as unknown as QToolPorts;
 
 const CORE = [
+  // Lead 2026-10-04: anything else this run may use, loaded mid-turn.
+  "use_capability",
   "set_theme",
   "reload_page",
   "open_website",

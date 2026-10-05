@@ -285,6 +285,26 @@ export function createPostgresDocumentRepository(): DocumentRepository {
       return rows.length === 0 ? null : toDocument(rows[0]);
     },
     listByOwner: async (executor, tenantId, ownerOrganisationId, filter) => {
+      if (filter.page !== undefined) {
+        // Keyset, never offset (CLAUDE.md): the list changes under the reader.
+        const after = filter.page.after;
+        const rows = await executor`
+          ${selectDocuments(executor)}
+           where d.tenant_id = ${tenantId}
+             and d.owner_organisation_id = ${ownerOrganisationId}
+             and d.status = 'ACTIVE'
+             ${filter.companyId === undefined ? executor`` : executor`and d.company_id = ${filter.companyId}`}
+             ${
+               after === undefined
+                 ? executor``
+                 : executor`and (date_trunc('milliseconds', d.updated_at), d.id) < (${after.updatedAt}::timestamptz, ${after.id}::uuid)`
+             }
+           -- Milliseconds, as the cursor carries them (an ISO timestamp):
+           -- ordering and comparing at one precision never skips a row.
+           order by date_trunc('milliseconds', d.updated_at) desc, d.id desc
+           limit ${filter.page.limit}`;
+        return rows.map(toDocument);
+      }
       const rows =
         filter.companyId === undefined
           ? await executor`
@@ -319,8 +339,11 @@ export function createPostgresDocumentRepository(): DocumentRepository {
                document_type = coalesce(${changes.documentType ?? null}, d.document_type),
                -- ADR 0041: a deck reclassified as anything else stops being
                -- shared, rather than the update failing on the constraint.
+               -- A deleted (archived) deck stops being downloadable by
+               -- investors at once; restoring it does not reopen it.
                download_audience = case
                  when coalesce(${changes.documentType ?? null}, d.document_type) = 'PITCH_DECK'
+                  and coalesce(${changes.status ?? null}, d.status) = 'ACTIVE'
                    then d.download_audience
                  else 'ORGANISATION' end,
                sensitivity_class = coalesce(${changes.sensitivityClass ?? null}, d.sensitivity_class),
@@ -496,7 +519,12 @@ export function createPostgresDocumentVersionRepository(): DocumentVersionReposi
          order by v.version_number desc`;
       return rows.map(toVersion);
     },
-    listCurrentByOwner: async (executor, tenantId, ownerOrganisationId) => {
+    listCurrentByOwner: async (
+      executor,
+      tenantId,
+      ownerOrganisationId,
+      documentIds,
+    ) => {
       const rows = await executor`
         select v.id, v.tenant_id, v.document_id, v.version_number, v.storage_bucket, v.storage_key,
                v.original_filename, v.mime_type, v.size_bytes, v.sha256, v.uploaded_by_user_id,
@@ -508,7 +536,8 @@ export function createPostgresDocumentVersionRepository(): DocumentVersionReposi
            and d.tenant_id = v.tenant_id
            and d.current_version_id = v.id
          where v.tenant_id = ${tenantId}
-           and d.owner_organisation_id = ${ownerOrganisationId}`;
+           and d.owner_organisation_id = ${ownerOrganisationId}
+           ${documentIds === undefined ? executor`` : executor`and d.id = any(${[...documentIds]}::uuid[])`}`;
       return rows.map(toVersion);
     },
     findBySha256: async (executor, tenantId, ownerOrganisationId, sha256) => {

@@ -737,6 +737,120 @@ describe("answer seam tool loop", () => {
   });
 });
 
+describe("use_capability: a tool outside the turn's focus, loaded and called in the same turn (lead 2026-10-04)", () => {
+  const USE_CAPABILITY: QOfferedTool = {
+    toolName: "q.capability.use",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    definition: {
+      name: "use_capability",
+      description: "Loads a tool.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const PROPOSE_MEETING: QOfferedTool = {
+    toolName: "relationship.meeting.propose",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "propose_meeting",
+      description: "Prepares a meeting.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const port = (available: readonly QOfferedTool[], loads: string[]) => {
+    const executed: { name: string; focusTools: readonly string[] }[] = [];
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([USE_CAPABILITY, GET_COMPANY]),
+      available: () => Promise.resolve(available),
+      execute: (proposal, context) => {
+        executed.push({
+          name: proposal.name,
+          focusTools: context.focus?.tools ?? [],
+        });
+        return Promise.resolve(
+          succeeded(
+            proposal,
+            proposal.name === "use_capability"
+              ? {
+                  loaded: loads.map((name) => ({ name, does: "" })),
+                  message: "Loaded.",
+                }
+              : { status: "PREPARED" },
+          ),
+        );
+      },
+    };
+    return { tools, executed };
+  };
+  const script = (): FakeBehaviour[] => [
+    {
+      kind: "TOOL_CALLS",
+      calls: [
+        {
+          callId: "u1",
+          name: "use_capability",
+          arguments: { need: "book a call" },
+        },
+      ],
+    },
+    {
+      kind: "TOOL_CALLS",
+      calls: [{ callId: "m1", name: "propose_meeting", arguments: {} }],
+    },
+    { kind: "TEXT", text: JSON.stringify(analystResult("Prepared.")) },
+  ];
+
+  it("loads it for the next step, then executes it in the same turn", async () => {
+    const { tools, executed } = port(
+      [USE_CAPABILITY, GET_COMPANY, PROPOSE_MEETING],
+      ["propose_meeting"],
+    );
+    const { seam, alpha, request, logLines } = build({
+      script: script(),
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(alpha.calls[0]?.request.tools.map((t) => t.name)).toEqual([
+      "use_capability",
+      "get_company",
+    ]);
+    expect(alpha.calls[1]?.request.tools.map((t) => t.name)).toEqual([
+      "use_capability",
+      "get_company",
+      "propose_meeting",
+    ]);
+    expect(executed.map((e) => e.name)).toEqual([
+      "use_capability",
+      "propose_meeting",
+    ]);
+    // Executed under a focus that names it, as a named tool would be.
+    expect(executed[1]?.focusTools).toContain("propose_meeting");
+    expect(logLines.some((line) => line.includes("q.capability_loaded"))).toBe(
+      true,
+    );
+  });
+
+  it("never loads a tool the run's available list does not hold", async () => {
+    // The loader names it, but the plan does not allow it: not offered.
+    const { tools, executed } = port(
+      [USE_CAPABILITY, GET_COMPANY],
+      ["propose_meeting"],
+    );
+    const { seam, alpha, request } = build({ script: script(), tools });
+    await seam.answer(request);
+    for (const attempt of alpha.calls) {
+      expect(attempt.request.tools.map((t) => t.name)).not.toContain(
+        "propose_meeting",
+      );
+    }
+    expect(executed.at(-1)?.focusTools ?? []).not.toContain("propose_meeting");
+  });
+});
+
 describe("approval by conversation (live 2026-09-27 #1, #2)", () => {
   const APPROVE: QOfferedTool = {
     toolName: "proposal.pending.approve",
