@@ -44,6 +44,8 @@ vi.mock("../src/features/voice/use-voice-session", () => ({
 
 const { useVoiceInterview } =
   await import("../src/features/voice/use-voice-interview");
+const { WEAK_LINE_NOTICE } =
+  await import("../src/features/voice/provider/line-health");
 
 const CONVERSATION = QConversationIdSchema.parse(
   "7f000000-0000-4000-8000-000000000001",
@@ -88,6 +90,40 @@ describe("falling back from a duplex line", () => {
     });
     expect(result.current.notice).toBe(notice);
     expect(result.current.active).toBe(true);
+  });
+
+  it("says a weak line is switching at once, and resumes the same conversation on the standard voice", async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => useVoiceInterview());
+      await act(async () => {
+        await result.current.talk({
+          thread: { conversationId: CONVERSATION },
+        });
+      });
+      act(() => {
+        events.onFallback?.(WEAK_LINE_NOTICE);
+      });
+      // Shown before the standard line is even asked for: never silence.
+      expect(result.current.notice).toBe(WEAK_LINE_NOTICE);
+      expect(result.current.linkStatus).toBe(WEAK_LINE_NOTICE);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(startVoiceSessionAction.mock.calls[1]?.[0]).toMatchObject({
+        conversationId: CONVERSATION,
+        resume: true,
+        duplex: false,
+      });
+      // The standard line is up: the status clears after a moment.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(result.current.linkStatus).toBeNull();
+      expect(result.current.notice).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("falls back silently when there is nothing to say", async () => {

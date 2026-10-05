@@ -16,6 +16,7 @@ import {
   type DuplexLineEvents,
   type DuplexRelays,
 } from "../src/features/voice/provider/duplex-line";
+import { WEAK_LINE_NOTICE } from "../src/features/voice/provider/line-health";
 
 /**
  * DUPLEX in the browser, with a fake RTCPeerConnection and data channel:
@@ -437,7 +438,7 @@ describe("the line's own limits", () => {
     h.peer.fail();
     expect(h.events.onFallback).toHaveBeenCalledWith({
       cause: "NETWORK",
-      notice: null,
+      notice: WEAK_LINE_NOTICE,
       connected: true,
     });
   });

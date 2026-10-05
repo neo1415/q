@@ -60,6 +60,15 @@ const SPEECH_WITHIN_MS = 10_000;
 export const THINKING_GIVE_UP_MS = 14_000;
 /** A working microphone produces frames continuously, silence included. */
 const FRAMES_WITHIN_MS = 4_000;
+/**
+ * An unmuted microphone that has delivered no frame for this long is
+ * dead (its track ended, its device went away, the system took it, or
+ * its audio context was suspended in the background) and is re-acquired
+ * on the same line. The capture delivers frames continuously, silence
+ * included, so a gap this long is never just a quiet room.
+ */
+export const MIC_SILENT_MS = 2_000;
+const MIC_CHECK_MS = 500;
 
 /**
  * How long an injected message may wait for its echo before it is
@@ -246,6 +255,7 @@ export function useDeepgramVoiceSession(
       const heard = {
         frames: 0,
         totalFrames: 0,
+        lastFrameAt: Date.now(),
         lastEvent: "none",
         lastEventAt: 0,
       };
@@ -253,6 +263,7 @@ export function useDeepgramVoiceSession(
         (data) => {
           heard.frames += 1;
           heard.totalFrames += 1;
+          heard.lastFrameAt = Date.now();
           session.sendAudio(data);
         },
         { sampleRate: INPUT_SAMPLE_RATE, echoCancellation: true },
@@ -329,7 +340,9 @@ export function useDeepgramVoiceSession(
           );
         }, THINKING_GIVE_UP_MS);
       };
+      let lineUp = false;
       session.on("connected", () => {
+        lineUp = true;
         setConnected(true);
         // The socket, not the agent: until the settings are applied every
         // frame waits in the SDK's queue and nobody is listening.
@@ -575,6 +588,68 @@ export function useDeepgramVoiceSession(
         eventsRef.current.onError?.(PLAIN_ERRORS.microphone);
         return;
       }
+      /**
+       * Never a dead "listening" (founder: "it can't even hear me talk").
+       * The same microphone object is stopped and started again, which
+       * asks the browser for a fresh track and a fresh audio context; its
+       * mute is kept. A plugged or unplugged device, or the tab coming
+       * back, triggers the same check at once.
+       */
+      let restarting = false;
+      const restartMicrophone = async () => {
+        if (restarting || liveRef.current !== live || microphone.muted) return;
+        restarting = true;
+        console.warn("[voice] re-acquiring the microphone");
+        try {
+          microphone.stop();
+          await microphone.start();
+          heard.lastFrameAt = Date.now();
+        } catch {
+          fail(PLAIN_ERRORS.microphone);
+        } finally {
+          restarting = false;
+        }
+      };
+      const micWatch = window.setInterval(() => {
+        if (liveRef.current !== live) {
+          window.clearInterval(micWatch);
+          return;
+        }
+        if (microphone.muted) {
+          heard.lastFrameAt = Date.now();
+          return;
+        }
+        if (Date.now() - heard.lastFrameAt > MIC_SILENT_MS) {
+          void restartMicrophone();
+        }
+      }, MIC_CHECK_MS);
+      const devices =
+        typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
+      const onDeviceChange = () => {
+        if (liveRef.current !== live) {
+          devices?.removeEventListener("devicechange", onDeviceChange);
+          return;
+        }
+        void restartMicrophone();
+      };
+      devices?.addEventListener("devicechange", onDeviceChange);
+      const onVisible = () => {
+        if (liveRef.current !== live) {
+          document.removeEventListener("visibilitychange", onVisible);
+          return;
+        }
+        if (document.visibilityState !== "visible") return;
+        // A socket that died while the tab slept is reconnected now,
+        // rather than when the person next speaks into it.
+        if (session.open === false && lineUp) {
+          fail(PLAIN_ERRORS.connection);
+          return;
+        }
+        if (Date.now() - heard.lastFrameAt > MIC_SILENT_MS) {
+          void restartMicrophone();
+        }
+      };
+      document.addEventListener("visibilitychange", onVisible);
       if (muted) microphone.mute();
       else {
         // A capture that started but never delivers a frame is a
@@ -589,9 +664,9 @@ export function useDeepgramVoiceSession(
       try {
         await session.connect();
       } catch {
-        teardown();
-        setState("ERROR");
-        eventsRef.current.onError?.(PLAIN_ERRORS.connection);
+        // Reported as a drop, so the interview retries on the same thread
+        // with its bounded backoff instead of leaving a dead line.
+        fail(PLAIN_ERRORS.connection);
       }
     },
     [addLine, muted, teardown],
