@@ -1,0 +1,222 @@
+/*
+ * Design Studio B, 2026-10-06. Shared tokens for the mockups.
+ * Values mirror packages/ui/src/tokens/tokens.css (the --cq-* set) so the
+ * mockups can be built exactly; the black-and-gold preset is the K3 proposal.
+ */
+@font-face {
+  font-family: "Inter";
+  src: url("fonts/inter.woff2") format("woff2");
+  font-weight: 400 600;
+  font-display: block;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url("fonts/newsreader.woff2") format("woff2");
+  font-weight: 400 500;
+  font-display: block;
+}
+
+:root {
+  color-scheme: light;
+  --cq-font-ui: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  --cq-font-editorial: "Newsreader", Georgia, serif;
+
+  --cq-canvas: oklch(0.985 0.004 92);
+  --cq-surface: oklch(0.995 0.002 92);
+  --cq-surface-raised: oklch(1 0 0);
+  --cq-surface-subtle: oklch(0.965 0.005 92);
+  --cq-surface-strong: oklch(0.925 0.007 92);
+  --cq-text-primary: oklch(0.19 0.012 258);
+  --cq-text-secondary: oklch(0.43 0.012 258);
+  --cq-text-tertiary: oklch(0.53 0.01 258);
+  --cq-text-inverse: oklch(0.98 0.004 92);
+  --cq-border-subtle: oklch(0.91 0.006 258);
+  --cq-border: oklch(0.86 0.008 258);
+  --cq-border-strong: oklch(0.71 0.012 258);
+  --cq-accent: oklch(0.53 0.18 258);
+  --cq-accent-hover: oklch(0.48 0.18 258);
+  --cq-accent-soft: oklch(0.94 0.035 258);
+  --cq-on-accent: #fff;
+  --cq-positive: oklch(0.5 0.13 150);
+  --cq-caution: oklch(0.55 0.13 70);
+  --cq-focus: oklch(0.53 0.18 258);
+  --cq-shadow: 0 1px 2px oklch(0.2 0.02 258 / 0.06), 0 8px 24px oklch(0.2 0.02 258 / 0.06);
+
+  /* Stage: Q's surface. Unchanged by the theme (ADR 0017 F4). */
+  --cq-stage: oklch(0.17 0.012 258);
+  --cq-stage-text: oklch(0.95 0.005 92);
+  --cq-stage-text-2: oklch(0.76 0.01 258);
+  --cq-q-light: #6f9bff;
+  --cq-q-core: #eef3ff;
+  --cq-q-ember: #3e63c9;
+
+  /* Answer-card identity hues (dataviz palette, light steps). */
+  --hue-1: #2a78d6;
+  --hue-2: #d95926;
+  --hue-3: #199e70;
+  --hue-4: #c98500;
+  --hue-5: #d55181;
+  --hue-6: #008300;
+  --hue-7: #4a3aa7;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cq-canvas: oklch(0.16 0.01 258);
+  --cq-surface: oklch(0.19 0.01 258);
+  --cq-surface-raised: oklch(0.22 0.011 258);
+  --cq-surface-subtle: oklch(0.24 0.01 258);
+  --cq-surface-strong: oklch(0.3 0.01 258);
+  --cq-text-primary: oklch(0.95 0.005 92);
+  --cq-text-secondary: oklch(0.75 0.008 258);
+  --cq-text-tertiary: oklch(0.66 0.008 258);
+  --cq-text-inverse: oklch(0.17 0.01 258);
+  --cq-border-subtle: oklch(0.28 0.01 258);
+  --cq-border: oklch(0.34 0.011 258);
+  --cq-border-strong: oklch(0.47 0.012 258);
+  --cq-accent: oklch(0.72 0.15 258);
+  --cq-accent-hover: oklch(0.76 0.14 258);
+  --cq-accent-soft: oklch(0.27 0.06 258);
+  --cq-on-accent: oklch(0.17 0.01 258);
+  --cq-positive: oklch(0.75 0.13 150);
+  --cq-caution: oklch(0.8 0.12 75);
+  --cq-focus: oklch(0.72 0.15 258);
+  --cq-shadow: 0 1px 2px #0006, 0 8px 24px #0005;
+  --cq-stage: oklch(0.14 0.01 258);
+  --hue-1: #3987e5;
+  --hue-2: #e0703f;
+  --hue-3: #27b583;
+  --hue-4: #e0a100;
+  --hue-5: #e06a96;
+  --hue-6: #3fae3f;
+  --hue-7: #9085e9;
+}
+
+/* K3: the black-and-gold brand preset. Light keeps ivory reading surfaces
+   with black chrome; dark is warm black, not pure black. Pairs are checked
+   on brand.html. */
+:root[data-brand="gold"] {
+  --cq-canvas: #f6f4ef;
+  --cq-surface: #fbfaf7;
+  --cq-surface-raised: #ffffff;
+  --cq-surface-subtle: #efece5;
+  --cq-surface-strong: #e3ded3;
+  --cq-text-primary: #16140f;
+  --cq-text-secondary: #4f4a40;
+  --cq-text-tertiary: #6b6457;
+  --cq-border-subtle: #e6e1d6;
+  --cq-border: #d6cfc0;
+  --cq-border-strong: #a69d8a;
+  --cq-accent: #8a6516;
+  --cq-accent-hover: #765612;
+  --cq-accent-soft: #f3e8cc;
+  --cq-on-accent: #ffffff;
+  --cq-focus: #8a6516;
+  --cq-stage: #12110e;
+  --cq-stage-text: #f4efe2;
+  --cq-stage-text-2: #bdb39c;
+  --cq-q-light: #e2b858;
+  --cq-q-core: #fff5dc;
+  --cq-q-ember: #a8741c;
+  --gold-fill: #c9a24a;
+  --on-gold-fill: #16140f;
+  --chrome: #16140f;
+  --chrome-text: #f4efe2;
+  --chrome-gold: #e2b858;
+}
+:root[data-brand="gold"][data-theme="dark"] {
+  --cq-canvas: #0f0e0b;
+  --cq-surface: #17150f;
+  --cq-surface-raised: #1e1b15;
+  --cq-surface-subtle: #24211a;
+  --cq-surface-strong: #312d24;
+  --cq-text-primary: #f4efe2;
+  --cq-text-secondary: #c9c0ab;
+  --cq-text-tertiary: #a59c87;
+  --cq-border-subtle: #2a2620;
+  --cq-border: #3a352b;
+  --cq-border-strong: #5c5544;
+  --cq-accent: #e2b858;
+  --cq-accent-hover: #ecc773;
+  --cq-accent-soft: #3a2f17;
+  --cq-on-accent: #16140f;
+  --cq-focus: #e2b858;
+  --cq-stage: #0b0a08;
+  --gold-fill: #e2b858;
+  --chrome: #0b0a08;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--cq-canvas);
+  color: var(--cq-text-primary);
+  font: 400 15px/1.5 var(--cq-font-ui);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--cq-focus); outline-offset: 2px; border-radius: 6px; }
+
+.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.btn-icon {
+  inline-size: 44px; block-size: 44px; display: inline-grid; place-items: center;
+  border: 0; background: transparent; border-radius: 12px; cursor: pointer; color: var(--cq-text-secondary);
+}
+.btn-icon:hover { background: var(--cq-surface-subtle); color: var(--cq-text-primary); }
+.btn {
+  min-block-size: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--cq-border);
+  background: var(--cq-surface-raised); color: var(--cq-text-primary); font-weight: 500; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: transform 140ms var(--ease-out), background-color 160ms ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--cq-accent); border-color: transparent; color: var(--cq-on-accent); }
+.btn-primary:hover { background: var(--cq-accent-hover); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* App shell: sidebar on desktop, tab bar on phone. */
+.shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+.side {
+  border-right: 1px solid var(--cq-border-subtle); padding: 18px 12px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--cq-surface);
+}
+:root[data-brand="gold"] .side { background: var(--chrome); color: var(--chrome-text); border-color: transparent; }
+.brandmark { display: flex; align-items: center; gap: 10px; font-weight: 600; padding: 4px 10px 18px; letter-spacing: -0.01em; }
+.nav a {
+  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 10px;
+  color: inherit; text-decoration: none; opacity: 0.78;
+}
+.nav a[aria-current="page"] { background: var(--cq-surface-subtle); opacity: 1; font-weight: 500; }
+:root[data-brand="gold"] .nav a[aria-current="page"] { background: #ffffff14; color: var(--chrome-gold); }
+.side-foot { margin-top: auto; padding: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--cq-border); border-radius: 10px; padding: 2px; gap: 2px; }
+:root[data-brand="gold"] .side .seg { border-color: #ffffff26; }
+.seg button { border: 0; background: transparent; border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; color: inherit; opacity: .75; }
+.seg button[aria-pressed="true"] { background: var(--cq-surface-raised); opacity: 1; box-shadow: var(--cq-shadow); color: var(--cq-text-primary); }
+.main { min-width: 0; }
+.tabbar { display: none; }
+
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; }
+  .side { display: none; }
+  .tabbar {
+    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; inset: auto 0 0 0; z-index: 30;
+    background: var(--cq-surface); border-top: 1px solid var(--cq-border-subtle); padding: 4px 4px 22px;
+  }
+  :root[data-brand="gold"] .tabbar { background: var(--chrome); color: var(--chrome-text); border-color: transparent; }
+  .tabbar a { display: grid; justify-items: center; gap: 2px; min-height: 48px; padding-top: 6px; font-size: 11px; color: inherit; text-decoration: none; opacity: .7; }
+  .tabbar a[aria-current="page"] { opacity: 1; color: var(--cq-accent); font-weight: 500; }
+  :root[data-brand="gold"] .tabbar a[aria-current="page"] { color: var(--chrome-gold); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}
