@@ -303,9 +303,15 @@ function Converge() {
                 {CONVERGE.after.title}
               </h2>
             </div>
-            <p className="lede" data-conv="lede">
-              {CONVERGE.before.lede}
-            </p>
+            {/* Both ledes hold one cell, so the swap never moves the page. */}
+            <div className="swap-lede">
+              <p className="lede" data-conv="lede-a">
+                {CONVERGE.before.lede}
+              </p>
+              <p className="lede off" data-conv="lede-b" aria-hidden="true">
+                {CONVERGE.after.lede}
+              </p>
+            </div>
           </div>
           <div className="field" aria-hidden="true">
             <Frag i={0} icon="i-mail" source="Inbox">

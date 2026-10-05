@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
-import { CONVERGE } from "./landing-content";
 import { isSmallViewport, prefersReducedMotion } from "./scene";
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -27,7 +26,8 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
     const record = section.querySelector<HTMLElement>(".record");
     const a = section.querySelector<HTMLElement>("[data-conv=a]");
     const b = section.querySelector<HTMLElement>("[data-conv=b]");
-    const lede = section.querySelector<HTMLElement>("[data-conv=lede]");
+    const ledeA = section.querySelector<HTMLElement>("[data-conv=lede-a]");
+    const ledeB = section.querySelector<HTMLElement>("[data-conv=lede-b]");
     const homes = frags.map((f) => ({
       x: Number(f.dataset["x"]) * (small ? 0.42 : 1),
       y: Number(f.dataset["y"]) * (small ? 0.42 : 1),
@@ -73,9 +73,10 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
         b?.classList.toggle("off", !flip);
         a?.setAttribute("aria-hidden", String(flip));
         b?.setAttribute("aria-hidden", String(!flip));
-        if (lede !== null) {
-          lede.textContent = flip ? CONVERGE.after.lede : CONVERGE.before.lede;
-        }
+        ledeA?.classList.toggle("off", flip);
+        ledeB?.classList.toggle("off", !flip);
+        ledeA?.setAttribute("aria-hidden", String(flip));
+        ledeB?.setAttribute("aria-hidden", String(!flip));
       }
     };
     // One read and a few transform writes per frame at most; outside the

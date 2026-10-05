@@ -69,7 +69,8 @@ export function DemoScene({ children }: { readonly children: ReactNode }) {
     const reset = () => {
       fixed.forEach((s) => q(s)?.classList.remove("in"));
       INTRODUCTIONS.forEach((_, i) => {
-        card(i)?.classList.remove("in", "open");
+        card(i)?.classList.remove("in");
+        setOpen(i, false);
         const s = status(i);
         if (s !== null) {
           s.className = "status";
@@ -83,7 +84,40 @@ export function DemoScene({ children }: { readonly children: ReactNode }) {
       setLabel("Listening");
     };
 
-    return runScene(
+    // Opening a card never moves layout (see landing.css): its box grows
+    // behind it and what follows slides by the body's height.
+    const bodyHeight = (i: number) =>
+      card(i)?.querySelector<HTMLElement>(".acard-body")?.offsetHeight ?? 0;
+    const setOpen = (i: number, open: boolean) => {
+      const c = card(i);
+      if (c === null) return;
+      const h = open ? bodyHeight(i) : 0;
+      c.style.setProperty("--lp-open-h", `${h}px`);
+      c.classList.toggle("open", open);
+      const after = [
+        ...INTRODUCTIONS.map((_, j) => (j > i ? card(j) : null)),
+        q("[data-d1=done]"),
+      ];
+      for (const el of after) el?.style.setProperty("--lp-push", `${h}px`);
+    };
+    // The thread holds the tallest the story gets, so the window never
+    // resizes while it plays.
+    const reserve = () => {
+      if (thread === null) return;
+      const done = q("[data-d1=done]");
+      if (done === null) return;
+      const tallest = Math.max(...INTRODUCTIONS.map((_, i) => bodyHeight(i)));
+      // The content's own height (the thread itself may be stretched by
+      // the window's grid), with no card open, plus the tallest card body.
+      const pad = parseFloat(getComputedStyle(thread).paddingBottom) || 0;
+      const natural = done.offsetTop + done.offsetHeight + pad;
+      thread.style.minHeight = `${Math.ceil(natural + tallest)}px`;
+    };
+    reserve();
+    const onResize = () => reserve();
+    window.addEventListener("resize", onResize);
+
+    const stop = runScene(
       root,
       async (wait) => {
         reset();
@@ -103,7 +137,7 @@ export function DemoScene({ children }: { readonly children: ReactNode }) {
         }
         await wait(500);
         for (let i = 0; i < INTRODUCTIONS.length; i++) {
-          card(i)?.classList.add("open");
+          setOpen(i, true);
           await wait(i === 0 ? 1700 : 1000);
           const ap = approve(i);
           moveCursorTo(ap);
@@ -113,7 +147,7 @@ export function DemoScene({ children }: { readonly children: ReactNode }) {
           ap?.classList.remove("pressed");
           if (ap !== null) ap.textContent = "Approved";
           await wait(350);
-          card(i)?.classList.remove("open");
+          setOpen(i, false);
           markSent(i);
           await wait(500);
         }
@@ -133,6 +167,10 @@ export function DemoScene({ children }: { readonly children: ReactNode }) {
       },
       { reduce },
     );
+    return () => {
+      stop();
+      window.removeEventListener("resize", onResize);
+    };
   }, []);
 
   return (

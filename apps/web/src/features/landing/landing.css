@@ -628,6 +628,17 @@
   margin-top: 22px;
   transition: opacity 300ms ease;
 }
+.lp .swap-lede {
+  display: grid;
+}
+/* The swap is instant, as approved; only which one shows changes. */
+.lp .swap-lede .lede {
+  grid-area: 1 / 1;
+  transition: none;
+}
+.lp .swap-lede .lede.off {
+  opacity: 0;
+}
 .lp .field {
   position: relative;
   height: 520px;
@@ -798,22 +809,33 @@
   flex-direction: column;
   gap: 10px;
 }
+/* A card opens without moving anything in layout: its body is laid out
+   outside the flow, its box grows behind it, and the cards below slide by
+   the same height with \`translate\` (no layout shift). Instant, as approved. */
 .lp .acard {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.lp .acard::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
   border: 1px solid var(--cq-stage-border);
   background: var(--cq-stage-surface);
   border-radius: 14px;
-  padding: 14px 16px;
-  display: grid;
-  grid-template-rows: auto 0fr;
-  transition:
-    grid-template-rows 420ms var(--cq-landing-ease-drawer),
-    border-color 260ms ease,
-    background-color 260ms ease;
 }
-.lp .acard.open {
-  grid-template-rows: auto 1fr;
+.lp .acard.open::before {
+  bottom: calc(-1px - var(--lp-open-h, 0px));
   border-color: var(--cq-landing-stage-accent-edge);
   background: var(--cq-stage-surface-strong);
+}
+.lp .cards > .acard,
+.lp .thread > .done-line {
+  translate: 0 var(--lp-push, 0px);
 }
 .lp .acard-top {
   display: flex;
@@ -830,7 +852,14 @@
   font-size: 0.9rem;
 }
 .lp .acard-body {
-  overflow: hidden;
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: calc(100% - 14px);
+  visibility: hidden;
+}
+.lp .acard.open .acard-body {
+  visibility: visible;
 }
 .lp .acard-body > div {
   padding-top: 12px;
@@ -1703,6 +1732,8 @@
   position: absolute;
 }
 .lp .crit .word {
+  display: grid;
+  justify-items: end;
   font-size: 0.84rem;
   color: var(--cq-stage-text-muted);
   transition: color 200ms ease;
@@ -2059,6 +2090,15 @@
 }
 
 /* ---------- Responsive ---------- */
+
+/* The status word and its widest form share a cell, so a shorter word
+   never moves anything: it ends where the row ends, as before. */
+.lp .crit .word > span {
+  grid-area: 1 / 1;
+}
+.lp .crit .word .ghost {
+  visibility: hidden;
+}
 
 /* Q's swarm: bloom under, particles added onto it, the core added on top.
    The two gradients only move and fade (transform, opacity). */

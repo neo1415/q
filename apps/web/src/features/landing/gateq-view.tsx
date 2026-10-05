@@ -161,7 +161,12 @@ export function GateQView({
                 <small>{r.requiredness}</small>
               </span>
               <span className="word">
-                {r.status === null ? "Not yet answered" : WORD[r.status]}
+                <span>
+                  {r.status === null ? "Not yet answered" : WORD[r.status]}
+                </span>
+                <span className="ghost" aria-hidden="true">
+                  Not yet answered
+                </span>
               </span>
             </li>
           ))}

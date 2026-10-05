@@ -218,14 +218,15 @@ class Swarm {
   }
 
   /**
-   * Frame-budget guard: while frames run long (an average over the last
-   * dozen or so above 20 ms), shed a tenth of the particles every few
-   * frames, never below 40%. Shed particles stay shed for this visit.
+   * Frame-budget guard: only while frames run long for a sustained spell
+   * (an average above 28 ms, under ~35 fps), shed a tenth of the
+   * particles every half second or so, never below 60%, so a passing
+   * stall never thins Q. Shed particles stay shed for this visit.
    */
   budget(frameMs: number) {
-    this.frameAvg += (Math.min(frameMs, 100) - this.frameAvg) * 0.08;
-    if (++this.sinceShed < 8) return;
-    if (this.frameAvg > 20 && this.active > this.n * 0.4) {
+    this.frameAvg += (Math.min(frameMs, 100) - this.frameAvg) * 0.05;
+    if (++this.sinceShed < 30) return;
+    if (this.frameAvg > 28 && this.active > this.n * 0.6) {
       this.active = Math.floor(this.active * 0.9);
       this.sinceShed = 0;
     }
