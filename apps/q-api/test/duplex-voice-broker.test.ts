@@ -52,7 +52,10 @@ import {
   DUPLEX_DEFAULTS,
   duplexConfigFrom,
 } from "../src/voice/duplex/config.js";
-import { DUPLEX_INSTRUCTIONS_PREFIX } from "../src/voice/duplex/instructions.js";
+import {
+  DUPLEX_INSTRUCTIONS_PREFIX,
+  GUIDED_CONDUCT,
+} from "../src/voice/duplex/instructions.js";
 import {
   createMemoryListeningStore,
   LISTENING_MEMORY_KEY,
@@ -463,6 +466,23 @@ describe("opening a duplex line", () => {
       reason: "LEDGER_UNAVAILABLE",
     });
     expect(h.order).not.toContain("firewall");
+  });
+
+  it("leads a welcome or interview line through ask_q alone, never its own greeting", async () => {
+    // Founder live 2026-10-05: the welcome line answered "I'm raising"
+    // with "Good to connect, how can I assist you today?".
+    const h = harness();
+    const base = binding();
+    await h.broker.open({
+      binding: { ...base, thread: { ...base.thread, welcome: true } },
+      firstMessage: "Hi, I'm Q. Are you raising, or investing?",
+    });
+    const mint = h.mints[0];
+    expect(mint?.instructions.startsWith(DUPLEX_INSTRUCTIONS_PREFIX)).toBe(
+      true,
+    );
+    expect(mint?.instructions).toContain(GUIDED_CONDUCT);
+    expect(mint?.tools.map((t) => t.name)).toEqual(["ask_q", "set_listening"]);
   });
 
   it("never opens a rehearsal line", async () => {

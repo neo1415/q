@@ -23,6 +23,7 @@ import {
 } from "../voice/investor-research.js";
 import {
   FOUNDER_READER_OPTIONS,
+  ownWebsiteFinding,
   validateFounderReading,
 } from "../voice/founder-research.js";
 
@@ -423,13 +424,23 @@ export function createFounderResearchReader(dependencies: {
             request.identity.websiteUrl,
             request.identity.firmName,
           )
-        : [];
+        : ownWebsiteFinding(
+            request.pages,
+            request.identity.websiteUrl,
+            request.identity.firmName,
+          );
     } catch (error: unknown) {
       logger?.warn(
         { err: error, correlationId: request.correlationId },
         "founder research reader produced nothing",
       );
-      return [];
+      // The reader failing loses what it would have read, never their own
+      // site, which code finds from the pages alone.
+      return ownWebsiteFinding(
+        request.pages,
+        request.identity.websiteUrl,
+        request.identity.firmName,
+      );
     }
   };
 }

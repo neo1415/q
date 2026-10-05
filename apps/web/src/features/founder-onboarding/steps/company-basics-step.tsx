@@ -2,10 +2,19 @@
 
 import { useState, type FormEvent } from "react";
 
+import { Button } from "@capital-q/ui/button";
 import { Input } from "@capital-q/ui/input";
 import { Select } from "@capital-q/ui/select";
 
 import { StepHeading, type StepProps } from "./step-props";
+
+/** "https://www.acme.com/" read as "acme.com". */
+function displayHost(url: string): string {
+  return url
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/$/, "");
+}
 
 /** Name first; website optional; country from a native picker. */
 export function CompanyBasicsStep({
@@ -64,6 +73,28 @@ export function CompanyBasicsStep({
         disabled={busy}
         onChange={(event) => setWebsite(event.target.value)}
       />
+      {step.suggestedWebsite !== undefined && website.trim().length === 0 ? (
+        // What Q's research found, offered in place: one tap fills it,
+        // and nothing is recorded until they continue.
+        <div
+          className="flex flex-wrap items-center gap-2"
+          data-suggested-website
+        >
+          <span className="cq-body-sm text-(--cq-text-secondary)">
+            Q found {displayHost(step.suggestedWebsite)}. Is that yours?
+          </span>
+          <Button
+            variant="secondary"
+            size="compact"
+            disabled={busy}
+            onClick={() => {
+              setWebsite(step.suggestedWebsite ?? "");
+            }}
+          >
+            Use it
+          </Button>
+        </div>
+      ) : null}
       <Select
         id="company-country"
         label="Where is the company based?"

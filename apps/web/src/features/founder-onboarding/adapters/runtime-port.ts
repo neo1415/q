@@ -91,7 +91,7 @@ async function enrichGroup(
     }
     return { materials: await list(companyId) };
   }
-  if (group.id === "review") {
+  if (group.id === "review" || group.id === "company_basics") {
     // Straight from the session's own pending suggestions. Nothing is
     // reconstructed and nothing is invented: an empty list means Q has
     // proposed nothing, which is what F3 then says.

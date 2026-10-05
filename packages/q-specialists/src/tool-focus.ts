@@ -130,6 +130,40 @@ export function toolFocusOf(input: {
   readonly counterparty?: boolean | undefined;
   readonly areaOf: (toolName: string) => string | null;
   readonly previous: QToolFocus | null;
+  /**
+   * The person is setting up (the onboarding screen, or Q's first minute):
+   * Q is working out who they are and what their company or firm is, so
+   * the public-web tools stay in reach on every turn with a request
+   * (founder live 2026-10-05: onboarding Q said it could not search the
+   * internet). Offering is not authority; the plan still decides.
+   */
+  readonly onboarding?: boolean | undefined;
+}): QToolFocus | null {
+  const focus = focusOf(input);
+  if (
+    input.onboarding !== true ||
+    input.reading === null ||
+    CORE_ONLY.has(input.reading.kind)
+  ) {
+    return focus;
+  }
+  if (focus === null) {
+    // Nothing else in the reading: the purpose's whole list, as before,
+    // with the research tools leading so no bound can cut them.
+    return { areas: [], tools: [...RESEARCH_TOOLS], widen: true };
+  }
+  return {
+    ...focus,
+    tools: [...new Set([...focus.tools, ...RESEARCH_TOOLS])].sort(),
+  };
+}
+
+function focusOf(input: {
+  readonly reading: FocusReading | null;
+  readonly subjectKinds: readonly string[];
+  readonly counterparty?: boolean | undefined;
+  readonly areaOf: (toolName: string) => string | null;
+  readonly previous: QToolFocus | null;
 }): QToolFocus | null {
   const { reading } = input;
   if (reading === null) return null;

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { toolFocusOf, type FocusReading } from "../src/tool-focus.js";
+import {
+  RESEARCH_TOOLS,
+  toolFocusOf,
+  type FocusReading,
+} from "../src/tool-focus.js";
 
 /** Lead 2026-10-02: what a turn is about, decided by code from its reading. */
 describe("toolFocusOf", () => {
@@ -177,5 +181,33 @@ describe("toolFocusOf", () => {
     expect(
       focus(reading({ kind: "CONTROL", text: "stop" }), [], previous),
     ).toEqual({ areas: ["Screens"], tools: [] });
+  });
+
+  it("keeps the public-web tools in reach while the person is setting up", () => {
+    // Founder live 2026-10-05: onboarding Q said it could not search the
+    // internet. On the onboarding screen (and Q's first minute) every turn
+    // with a request has them leading the offer.
+    const onboarding = (read: FocusReading) =>
+      toolFocusOf({
+        reading: read,
+        subjectKinds: [],
+        areaOf,
+        previous: null,
+        onboarding: true,
+      });
+    expect(onboarding(reading({}))).toEqual({
+      areas: [],
+      tools: [...RESEARCH_TOOLS],
+      widen: true,
+    });
+    expect(
+      onboarding(reading({ questionKind: "THEIR_OWN_RECORDS" }))?.tools,
+    ).toEqual([...RESEARCH_TOOLS].sort());
+    // Small talk stays core-only, and off onboarding nothing changes.
+    expect(onboarding(reading({ kind: "SMALL_TALK" }))).toEqual({
+      areas: ["Screens"],
+      tools: [],
+    });
+    expect(focus(reading({}))).toBeNull();
   });
 });

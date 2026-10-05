@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, type KeyboardEvent } from "react";
 
-import { Button } from "@capital-q/ui/button";
 import { Check, ICON_SIZE } from "@capital-q/ui/icons";
 
 /**
@@ -23,7 +22,9 @@ import { Check, ICON_SIZE } from "@capital-q/ui/icons";
  *
  * Keyboard keeps the radio-group behaviour, because there it is the
  * behaviour people expect: arrows move between the options without
- * choosing, and Enter or Space on the focused card goes. That is why
+ * choosing, and Enter or Space on the focused card goes. There is no
+ * separate "Continue as …" button (founder live 2026-10-05: "why is there
+ * an extra button?"): the card is the button. That is why
  * these are buttons in a radiogroup rather than two links — a link would
  * navigate on arrow-focus and a div would do neither.
  *
@@ -68,8 +69,6 @@ export function PersonaCards({
   const [selected, setSelected] = useState<PersonaId>("founder");
   const [going, setGoing] = useState(false);
   const refs = useRef<Partial<Record<PersonaId, HTMLButtonElement | null>>>({});
-
-  const chosen = PERSONAS.find((persona) => persona.id === selected);
 
   const go = (id: PersonaId) => {
     const persona = PERSONAS.find((candidate) => candidate.id === id);
@@ -182,22 +181,6 @@ export function PersonaCards({
             </button>
           );
         })}
-      </div>
-      {/* Kept for the person who arrowed to an option and wants a
-          visible thing to press. A click on the option itself already
-          goes, so this is a second door rather than the only one. */}
-      <div>
-        <Button
-          variant="primary"
-          onClick={() => {
-            go(selected);
-          }}
-          disabled={going}
-        >
-          {chosen === undefined
-            ? "Continue"
-            : `Continue as ${chosen.role.toLowerCase()}`}
-        </Button>
       </div>
     </div>
   );

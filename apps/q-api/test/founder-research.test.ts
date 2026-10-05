@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { validateFounderReading } from "../src/voice/founder-research.js";
+import {
+  ownWebsiteFinding,
+  validateFounderReading,
+} from "../src/voice/founder-research.js";
 import type { ResearchPage } from "../src/voice/investor-research.js";
 
 /**
@@ -115,5 +118,36 @@ describe("the company's own site, when they have not given one (live 2026-09-30)
         "Greenbox",
       ).some((f) => f.stepKey === "F1.website"),
     ).toBe(false);
+  });
+});
+
+describe("the website suggestion (founder live 2026-10-05)", () => {
+  const ZINO: readonly ResearchPage[] = [
+    {
+      url: "https://www.zino-aviation.com/",
+      title: "Zino Aviation",
+      excerpt: "Zino Aviation flies cargo drones.",
+      provider: "public_web",
+      retrievedAt: "2026-10-05T10:00:00.000Z",
+    },
+  ];
+
+  it("matches a name with a legal form and a hyphenated domain", () => {
+    expect(ownWebsiteFinding(ZINO, null, "Zino Aviation Ltd")).toEqual([
+      expect.objectContaining({
+        stepKey: "F1.website",
+        value: "https://zino-aviation.com",
+      }),
+    ]);
+  });
+
+  it("is found by code alone, without the reader model", () => {
+    // The composition returns this when the reader fails or answers
+    // nothing usable: the site never depended on the model.
+    expect(ownWebsiteFinding(ZINO, null, "Zino Aviation")).toHaveLength(1);
+    expect(ownWebsiteFinding(ZINO, null, "Ltd")).toEqual([]);
+    expect(
+      ownWebsiteFinding(ZINO, "https://zino-aviation.com", "Zino Aviation"),
+    ).toEqual([]);
   });
 });
