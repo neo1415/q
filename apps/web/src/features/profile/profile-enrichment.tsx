@@ -206,9 +206,7 @@ export function ProfileFindings({
                 <button
                   type="button"
                   className={buttonClassName("quiet", "regular", "-ml-4")}
-                  onClick={() =>
-                    askNow(findingQuestion(subjectLabel, finding))
-                  }
+                  onClick={() => askNow(findingQuestion(subjectLabel, finding))}
                   aria-label={`Ask Q about: ${FINDING_LABELS[finding.key].toLowerCase()}`}
                 >
                   Ask Q about this

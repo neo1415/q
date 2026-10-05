@@ -418,7 +418,9 @@
   .cq-ac-cards[data-layout="row"] .cq-ac-card[data-state="focus"] {
     flex-grow: 2.4;
   }
-  .cq-ac-cards[data-layout="row"] .cq-ac-card[data-state="rest"] .cq-ac-oneline {
+  .cq-ac-cards[data-layout="row"]
+    .cq-ac-card[data-state="rest"]
+    .cq-ac-oneline {
     display: block;
   }
   .cq-ac-cards[data-layout="row"] .cq-ac-card[data-state="rest"] .cq-ac-line {
@@ -442,7 +444,10 @@
     gap: 6px;
     align-items: baseline;
   }
-  .cq-ac-cards[data-layout="row"] .cq-ac-card[data-state="rest"] .cq-ac-score .num {
+  .cq-ac-cards[data-layout="row"]
+    .cq-ac-card[data-state="rest"]
+    .cq-ac-score
+    .num {
     font-size: 24px;
   }
   .cq-ac-cards[data-layout="row"][data-n="1"] .cq-ac-card {
@@ -470,7 +475,10 @@
     -webkit-line-clamp: 2;
     font-size: 13px;
   }
-  .cq-ac-cards[data-layout="grid"] .cq-ac-card[data-state="rest"] .cq-ac-score .num {
+  .cq-ac-cards[data-layout="grid"]
+    .cq-ac-card[data-state="rest"]
+    .cq-ac-score
+    .num {
     font-size: 22px;
   }
   /* Overview (nobody in focus): every card shows its first reason. */

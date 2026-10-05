@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * already answering it; nothing is left in a box to send again.
  */
 
-const ask = vi.fn(async () => undefined);
+const ask = vi.fn(() => Promise.resolve());
 vi.mock("next/navigation", () => ({ usePathname: () => "/relationships" }));
 vi.mock("@/features/q/q-session", () => ({
   QSessionProvider: ({ children }: { children: React.ReactNode }) => children,

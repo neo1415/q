@@ -111,10 +111,14 @@ describe("the card Q is talking about (C2)", () => {
       useAnswerPlayback(block, "a1", "Want them side by side?", false),
     );
     expect(result.current.focus).toBe(0);
-    act(() => vi.advanceTimersByTime(playbackSteps(block, "").at(0)?.ms ?? 0));
+    act(() => {
+      vi.advanceTimersByTime(playbackSteps(block, "").at(0)?.ms ?? 0);
+    });
     expect(result.current.focus).toBe(1);
     act(() => result.current.choose(2));
-    act(() => vi.advanceTimersByTime(60_000));
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
     expect(result.current.focus).toBe(2);
   });
 

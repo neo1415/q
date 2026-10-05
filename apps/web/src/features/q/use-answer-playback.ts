@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
@@ -44,12 +44,23 @@ export function useAnswerPlayback(
     setState({ answerId, focus: live ? -1 : 0, said: "", chosen: false });
   }
 
+  // The block is rebuilt with each conversation update; what Q walks
+  // through is keyed by its content, so a re-render never restarts it.
+  const steps = playbackSteps(block, closing);
+  const plan = steps
+    .map((step) => `${String(step.focus)}:${step.said}`)
+    .join("\n");
+  const latest = useRef({ steps, cards: block.cards });
+  useEffect(() => {
+    latest.current = { steps, cards: block.cards };
+  });
+
   useEffect(() => {
     if (!live) return;
     const onSaid = (event: Event) => {
       const text = saidText(event);
       if (text === null) return;
-      const at = focusForSaid(block.cards, text);
+      const at = focusForSaid(latest.current.cards, text);
       setState((current) =>
         current.chosen
           ? { ...current, said: text }
@@ -58,28 +69,28 @@ export function useAnswerPlayback(
     };
     window.addEventListener(Q_SAID_EVENT, onSaid);
     return () => window.removeEventListener(Q_SAID_EVENT, onSaid);
-  }, [live, block]);
+  }, [live]);
 
   const chosen = state.chosen;
   useEffect(() => {
     if (live || chosen) return;
-    const steps = playbackSteps(block, closing);
+    const all = latest.current.steps;
     let timer: number | undefined;
     const run = (at: number) => {
-      const step = steps[at];
+      const step = all[at];
       if (step === undefined) return;
       setState((current) =>
         current.chosen
           ? current
           : { ...current, focus: step.focus, said: step.said },
       );
-      if (at + 1 < steps.length) {
+      if (at + 1 < all.length) {
         timer = window.setTimeout(() => run(at + 1), step.ms);
       }
     };
     run(0);
     return () => window.clearTimeout(timer);
-  }, [block, closing, live, chosen, answerId]);
+  }, [plan, live, chosen, answerId]);
 
   return {
     focus: state.focus,
