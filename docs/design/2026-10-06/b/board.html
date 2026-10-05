@@ -40,6 +40,7 @@
   .src li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; font-size: 14px; line-height: 1.4; }
   .src li small { display: block; color: var(--cq-text-secondary); font-size: 12.5px; }
   .ev { width: 12px; height: 12px; margin-top: 4px; }
+  .t-inline { display: none; }
   .note { font-size: 13px; color: var(--cq-text-secondary); margin: 4px 0 2px; }
   .file-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 44px; gap: 10px; align-items: center; min-height: 56px; padding: 4px 0; border-bottom: 1px solid var(--cq-border-subtle); }
   .file-row:last-child { border-bottom: 0; }
@@ -68,8 +69,14 @@
     .bgrid[data-tab="pinned"] .timeline, .bgrid[data-tab="files"] .timeline { display: none; }
     .bgrid[data-tab="pinned"] .rail .files, .bgrid[data-tab="files"] .rail .pins { display: none; }
     .bgrid { padding-top: 14px; }
-    .tl::before { left: 39px; }
-    .tl > li { grid-template-columns: 32px 16px minmax(0, 1fr); gap: 0 6px; }
+    .tl::before, .time, .node { display: none; }
+    .tl > li { grid-template-columns: minmax(0, 1fr); padding: 4px 0; }
+    .t-inline { display: inline !important; }
+    .acts .open-q { display: none; }
+    .minis { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: 0; }
+    .mini { white-space: nowrap; font-size: 13px; min-height: 32px; }
+    .said { font-size: 15px; }
+    .rail h2 { display: none; }
     .filter { display: none; }
   }
 </style>
@@ -88,8 +95,8 @@ const EV = {
 const mini = (h, name, score) => `<span class="mini" style="--hue:var(--hue-${h})"><i></i>${name}${score ? ` <b>${score}</b>` : ""}</span>`;
 const sources = (n, items, open) => `<details class="src" ${open ? "open" : ""}><summary>${icon("chev")}Where this came from: ${n} sources</summary><ul>${items.map(([ev, t, s]) => `<li>${EV[ev]}<span>${t}<small>${s}</small></span></li>`).join("")}</ul></details>`;
 const item = ({ time, title, kind, body, src, pinned }) => `<li><span class="time">${time}</span><span class="node" aria-hidden="true"></span>
-  <article class="item"><div class="item-top"><div><h2>${title}</h2><p class="kind">${kind}</p></div>
-  <div class="acts"><button class="btn-icon" aria-pressed="${!!pinned}" aria-label="${pinned ? "Unpin" : "Pin"} ${title}">${icon("pin")}</button><button class="btn-icon" aria-label="Show ${title} on the Q page">${icon("chev")}</button><button class="btn-icon" aria-label="Remove ${title} from the Board">${icon("x")}</button></div></div>
+  <article class="item"><div class="item-top"><div><h2>${title}</h2><p class="kind">${kind}<span class="t-inline">, ${time}</span></p></div>
+  <div class="acts"><button class="btn-icon" aria-pressed="${!!pinned}" aria-label="${pinned ? "Unpin" : "Pin"} ${title}">${icon("pin")}</button><button class="btn-icon open-q" aria-label="Show ${title} on the Q page">${icon("chev")}</button><button class="btn-icon" aria-label="Remove ${title} from the Board">${icon("x")}</button></div></div>
   ${body}${src ?? ""}</article></li>`;
 
 const openSrc = params.get("state") === "sources";
