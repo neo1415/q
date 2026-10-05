@@ -36,7 +36,12 @@ export default async function BrandPreviewPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (process.env.NODE_ENV === "production") {
+  // A production build serves it only for a local screenshot run
+  // (CQ_DEV_PREVIEW=1 at `next start`); deployed builds never set it.
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env["CQ_DEV_PREVIEW"] !== "1"
+  ) {
     notFound();
   }
   const params = await searchParams;

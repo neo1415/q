@@ -101,7 +101,7 @@ export function presenceUniforms(input: UniformInput): PresenceUniforms {
     shiftX: leanX * LEAN_SHIFT,
     shiftY: leanY * LEAN_SHIFT,
     // The face is drawn in finer points, so its tone reads as skin.
-    pointScale: (1 + voice * 0.25 + mic * 0.1) * (fine ? 0.62 : 1),
+    pointScale: (1 + voice * 0.25 + mic * 0.1) * (fine ? 0.8 : 1),
     glow:
       (0.75 + voice * 0.5 + mic * 0.3 + (WORKING.has(input.state) ? 0.15 : 0)) *
       (input.dim ? 0.45 : 1),
@@ -110,7 +110,7 @@ export function presenceUniforms(input: UniformInput): PresenceUniforms {
     core: (input.dim ? 0.4 : 1) * (cloud ? 1 : fine ? 0 : 0.2),
     fade: input.dim ? 0.45 : 1,
     keep: Math.max(0.2, Math.min(1, input.keep)),
-    floor: fine ? 0.04 : 0.38,
+    floor: fine ? 0.06 : 0.38,
     lift: fine ? 0.15 : 0.6,
   };
 }

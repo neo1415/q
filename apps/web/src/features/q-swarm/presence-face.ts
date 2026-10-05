@@ -45,7 +45,8 @@ type Part = (typeof PART)[keyof typeof PART];
 type FacePoint = { x: number; y: number; z: number; part: Part; b: number };
 
 /** The studio's units to the frame's (y is flipped at evaluation). */
-const SCALE = 0.92;
+export const FACE_FRAME_SCALE = 1;
+const SCALE = FACE_FRAME_SCALE;
 
 const G = (dx: number, dy: number, sx: number, sy: number) =>
   Math.exp(-(dx * dx) / sx - (dy * dy) / sy);
@@ -314,7 +315,7 @@ export function faceFigure(count: number): Figure {
   const part = Uint8Array.from(points, (p) => p.part);
   // Painted tone to brightness: the lit planes carry the face.
   const light = Float32Array.from(points, (p) =>
-    Math.min(1.2, Math.pow(p.b, 1.5) * 1.1),
+    Math.min(1.3, Math.pow(p.b, 1.25) * 1.6),
   );
   return {
     kind: "FACE",

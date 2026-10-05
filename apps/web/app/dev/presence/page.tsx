@@ -8,6 +8,8 @@ import {
 
 import { PresencePlayground } from "./presence-playground";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Q presence",
   robots: { index: false },
@@ -27,7 +29,12 @@ export default async function PresencePage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (process.env.NODE_ENV === "production") {
+  // A production build serves it only for a local screenshot run
+  // (CQ_DEV_PREVIEW=1 at `next start`); deployed builds never set it.
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env["CQ_DEV_PREVIEW"] !== "1"
+  ) {
     notFound();
   }
   const params = await searchParams;

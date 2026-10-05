@@ -81,7 +81,16 @@ const PLAYS: Readonly<Record<string, readonly QApertureState[]>> = {
     "COMPLETE",
     "IDLE",
   ],
-  face: ["IDLE", "LISTENING", "SPEAKING", "SPEAKING", "COMPLETE", "IDLE"],
+  face: [
+    "IDLE",
+    "LISTENING",
+    "SPEAKING",
+    "SPEAKING",
+    "SPEAKING",
+    "SPEAKING",
+    "COMPLETE",
+    "IDLE",
+  ],
 };
 
 export function PresencePlayground({

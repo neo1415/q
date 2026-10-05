@@ -14,7 +14,11 @@ import {
   morphSeconds,
   morphWeight,
 } from "../src/features/q-swarm/presence-dynamics";
-import { FACE_PARTS, facePartsOf } from "../src/features/q-swarm/presence-face";
+import {
+  FACE_FRAME_SCALE,
+  FACE_PARTS,
+  facePartsOf,
+} from "../src/features/q-swarm/presence-face";
 import {
   buildFigure,
   createFigureFrame,
@@ -373,8 +377,8 @@ describe("figures", () => {
     const parts = facePartsOf(count);
     // Around each eye, the skin stays lit (the old face had black sockets).
     for (const side of [-1, 1]) {
-      const cx = side * 0.23 * 0.92;
-      const cy = -0.1 * 0.92;
+      const cx = side * 0.23 * FACE_FRAME_SCALE;
+      const cy = -0.1 * FACE_FRAME_SCALE;
       const near: number[] = [];
       for (let i = 0; i < count; i += 1) {
         if (parts[i] !== FACE_PARTS.SKIN) continue;

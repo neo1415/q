@@ -76,7 +76,7 @@ export function layoutPoints(
   const unit = half / FRAME_HALF_UNITS;
   // Small surfaces get relatively larger points, so they still read.
   const fine = options.fine === true;
-  const base = Math.max(1.6, options.pixels / 150) * (fine ? 0.6 : 1);
+  const base = Math.max(1.6, options.pixels / 150) * (fine ? 0.75 : 1);
   const fade = options.dim ? 0.45 : 1;
   const floor = fine ? 0.03 : 0.25;
   for (let i = 0; i < n; i += 1) {
