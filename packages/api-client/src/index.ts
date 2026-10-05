@@ -319,6 +319,8 @@ export {
   applicationTurn,
   createGateway,
   draftGatewayVersion,
+  extractGatewayPolicy,
+  getGatewayPolicy,
   getPublicGateway,
   listGatewayApplications,
   listGateways,

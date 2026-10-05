@@ -559,3 +559,29 @@ describe("opening conversations from an embedded gateway (P7)", () => {
     expect(recorded.starts).toHaveLength(GATEQ_GUEST_QUOTAS.START.limit);
   });
 });
+
+describe("consent (P7): nothing reaches the investor without the founder's Share", () => {
+  it("a whole conversation that fits submits nothing until the founder asks", async () => {
+    const { app, recorded } = buildApp({});
+    const started = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_START_PATH,
+      payload: { gatewayPublicId: PUBLIC_ID },
+    });
+    expect(started.statusCode).toBe(201);
+    for (const [index, message] of [
+      "We are Lumen Pay, in Lagos.",
+      "Seed, raising $750k.",
+    ].entries()) {
+      const turned = await app.inject({
+        method: "POST",
+        url: GATEQ_APPLY_TURN_PATH,
+        headers: bearer(TOKEN),
+        payload: { message, clientTurnId: `turn-consent-${index}` },
+      });
+      expect(turned.statusCode).toBe(200);
+    }
+    // No submission, so nothing in the organisation's inbox.
+    expect(recorded.submits).toEqual([]);
+  });
+});

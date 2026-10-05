@@ -66,6 +66,23 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // P7: the one-line launcher any website loads. Short-lived cache so
+        // a fix reaches every embed within minutes; served as script, never
+        // sniffed.
+        source: "/gateq.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=300, stale-while-revalidate=3600",
+          },
+          {
+            key: "Content-Type",
+            value: "application/javascript; charset=utf-8",
+          },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+        ],
+      },
+      {
         // Authentication responses are never shared-cacheable: a callback that
         // sets session cookies, or a sign-in page rendered with a notice,
         // must not be served to anyone else by a CDN or proxy.

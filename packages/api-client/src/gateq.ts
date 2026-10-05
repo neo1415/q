@@ -8,8 +8,13 @@ import {
   GATEQ_GATEWAYS_PATH,
   gateqGatewayApplicationsPath,
   GatewayApplicationListDtoSchema,
+  GATEQ_GATEWAY_PATH,
+  GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
   GatewayDtoSchema,
+  GatewayPolicyDtoSchema,
   GatewayVersionDtoSchema,
+  PolicyExtractionDtoSchema,
+  type PolicyExtractionRequest,
   PublicGatewayDtoSchema,
   StartApplicationResponseSchema,
   SubmitApplicationResponseSchema,
@@ -144,5 +149,33 @@ export function submitApplication(
     GATEQ_APPLY_SUBMIT_PATH,
     SubmitApplicationResponseSchema,
     { body: { clientRequestId } },
+  );
+}
+
+/** The gateway's current published (or latest) policy, for its own members. */
+export function getGatewayPolicy(session: ApiSession, gatewayId: string) {
+  return call(
+    session,
+    "GET",
+    path(GATEQ_GATEWAY_PATH, { gatewayId }),
+    GatewayPolicyDtoSchema,
+  );
+}
+
+/**
+ * P7: read the investor's mandate into DRAFT criteria. Idempotent on the
+ * request's own `clientRequestId`; nothing is published.
+ */
+export function extractGatewayPolicy(
+  session: ApiSession,
+  gatewayId: string,
+  input: PolicyExtractionRequest,
+) {
+  return call(
+    session,
+    "POST",
+    path(GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH, { gatewayId }),
+    PolicyExtractionDtoSchema,
+    { body: input },
   );
 }
