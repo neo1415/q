@@ -139,14 +139,14 @@ export function useDuplexVoiceSession(
             storeListeningPreference(level);
           },
           onInterrupted: () => eventsRef.current.onInterrupted?.(),
-          onFallback: ({ notice, connected: wasUp }) => {
+          onFallback: ({ cause, notice, connected: wasUp }) => {
             if (lineRef.current === line) lineRef.current = null;
             setConnected(false);
             // Before it came up, `start` answers false and the caller
             // opens the standard line itself; nobody else needs to know.
             if (!wasUp) return;
             const fallback = eventsRef.current.onFallback;
-            if (fallback !== undefined) fallback(notice);
+            if (fallback !== undefined) fallback(notice, cause);
             else eventsRef.current.onEnded?.("dropped");
           },
           onEnded: () => {

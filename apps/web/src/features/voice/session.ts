@@ -111,7 +111,13 @@ export type VoiceSessionEvents = {
    * on the same thread; with one sentence for the person, or silently.
    * Absent: the line is reported as dropped.
    */
-  readonly onFallback?: ((notice: string | null) => void) | undefined;
+  readonly onFallback?:
+    | ((
+        notice: string | null,
+        /** Why the line ended; MAX_LENGTH is renewed, not downgraded. */
+        cause?: "CONNECT" | "NETWORK" | "RELAY" | "CAP" | "MAX_LENGTH",
+      ) => void)
+    | undefined;
 };
 
 export type VoiceSessionStart = {

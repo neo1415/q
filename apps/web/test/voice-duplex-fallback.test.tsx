@@ -126,6 +126,36 @@ describe("falling back from a duplex line", () => {
     }
   });
 
+  it("renews a line that reached its length on the same voice, then gives up after an hour (founder 2026-10-05)", async () => {
+    const { result } = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await result.current.talk({ thread: { conversationId: CONVERSATION } });
+    });
+    for (let renewal = 1; renewal <= 6; renewal += 1) {
+      await act(async () => {
+        events.onFallback?.(null, "MAX_LENGTH");
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const call = startVoiceSessionAction.mock.calls[renewal]?.[0] as
+        Record<string, unknown> | undefined;
+      expect(call).toMatchObject({
+        conversationId: CONVERSATION,
+        resume: true,
+      });
+      expect(call).not.toHaveProperty("duplex");
+    }
+    await act(async () => {
+      events.onFallback?.(null, "MAX_LENGTH");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(startVoiceSessionAction.mock.calls[7]?.[0]).toMatchObject({
+      duplex: false,
+    });
+    expect(result.current.notice).toBeNull();
+  });
+
   it("falls back silently when there is nothing to say", async () => {
     const { result } = renderHook(() => useVoiceInterview());
     await act(async () => {

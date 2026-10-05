@@ -37,6 +37,9 @@ import type {
  * interview restarts, because none of it lived in the provider session.
  */
 
+/** Ten-minute lines renewed in one conversation: an hour on one voice. */
+const MAX_DUPLEX_RENEWALS = 6;
+
 export type VoiceInterviewThread = {
   /** Q's first minute with a new person: no onboarding session yet. */
   readonly welcome?: true | undefined;
@@ -226,6 +229,7 @@ export function useVoiceInterview(
    * person ends voice, every line (a reconnect too) is the standard one.
    */
   const duplexOff = useRef(false);
+  const renewals = useRef(0);
   const client = useVoiceSession({
     ...events,
     onLine: (line) => {
@@ -236,8 +240,18 @@ export function useVoiceInterview(
     // DUPLEX: the same thread carries on, on the standard voice, at once.
     // Resumed: Q does not greet again. The cap's one sentence, if any, is
     // shown once the standard line is up (talk clears the notice first).
-    onFallback: (notice) => {
-      duplexOff.current = true;
+    onFallback: (notice, cause) => {
+      // A line that reached its length is renewed on the same voice
+      // (founder 2026-10-05: "the voice changed" at exactly 10 minutes):
+      // the person hears no switch. Bounded, so a line that cannot stay up
+      // still lands on the standard voice. The server still decides: past
+      // the daily cap the new session is issued as the standard one.
+      const renew =
+        cause === "MAX_LENGTH" &&
+        notice === null &&
+        renewals.current < MAX_DUPLEX_RENEWALS;
+      if (renew) renewals.current += 1;
+      else duplexOff.current = true;
       // A weak line is said at once; the standard voice is on its way.
       const weak = notice === WEAK_LINE_NOTICE;
       if (weak) setLinkStatus(WEAK_LINE_NOTICE);
@@ -251,7 +265,7 @@ export function useVoiceInterview(
         thread: last.thread,
         firstMessage: undefined,
         resume: true,
-        duplex: false,
+        ...(renew ? {} : { duplex: false }),
       }).then(() => {
         if (notice !== null && !weak) setNotice(notice);
       });
@@ -353,6 +367,7 @@ export function useVoiceInterview(
     reconnectAttempts.current = 0;
     upSince.current = null;
     duplexOff.current = false;
+    renewals.current = 0;
     setLinkStatus(null);
     await client.end();
   }, [client]);
