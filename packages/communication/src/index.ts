@@ -57,6 +57,7 @@ export {
 // BIZ-008: meetings, reminders, notifications.
 export {
   createScheduleService,
+  NOTIFICATIONS_PAGE,
   googleEventIdFor,
   JOINED_CALL_CONSENT,
   JOINED_CALL_MINUTES,

@@ -417,7 +417,7 @@ export function createPostgresScheduleStore(options: {
         on conflict (user_id, dedupe_key) do nothing`;
     },
 
-    listNotifications: async (userId, limit) => {
+    listNotifications: async (userId, limit, before) => {
       const rows = await sql<
         {
           id: string;
@@ -433,7 +433,14 @@ export function createPostgresScheduleStore(options: {
         select id, kind, title, body, link_path, read_at, created_at, priority
           from communication.notifications
          where user_id = ${userId}
-         order by created_at desc limit ${limit}`;
+           ${
+             before === undefined
+               ? sql``
+               : sql`and (date_trunc('milliseconds', created_at), id) < (${before.createdAt}, ${before.id}::uuid)`
+           }
+         -- Keyset, never offset (P3): ms precision, as the cursor carries it.
+         order by date_trunc('milliseconds', created_at) desc, id desc
+         limit ${limit}`;
       const unread = await sql<{ count: number }[]>`
         select count(*)::int as count from communication.notifications
          where user_id = ${userId} and read_at is null`;

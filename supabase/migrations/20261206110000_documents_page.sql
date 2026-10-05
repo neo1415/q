@@ -14,3 +14,7 @@ create index documents_owner_active_updated_idx
 create index artifacts_owner_updated_id_idx
   on artifacts.artifacts (tenant_id, organisation_id, updated_at desc, id desc)
   where archived_at is null;
+
+-- Notices, older pages by the same kind of keyset (P3 pagination audit).
+create index notifications_user_created_id_idx
+  on communication.notifications (user_id, created_at desc, id desc);

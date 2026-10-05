@@ -21,9 +21,10 @@ import {
   type ProblemDetails,
 } from "@capital-q/contracts";
 import { scheduleProblem } from "@capital-q/app-actions";
-import type {
-  ScheduleOutcome,
-  ScheduleService,
+import {
+  NOTIFICATIONS_PAGE,
+  type ScheduleOutcome,
+  type ScheduleService,
 } from "@capital-q/communication";
 
 import {
@@ -176,7 +177,14 @@ export function registerScheduleRoutes(
     NOTIFICATIONS_PATH,
     { onRequest: withContext },
     async (request, reply) => {
-      const own = await schedule.listNotifications(getActorContext(request));
+      // P3: `?before=` is the cursor the last page ended on (keyset).
+      const before = notificationCursor(
+        (request.query as Record<string, unknown> | undefined)?.["before"],
+      );
+      const own = await schedule.listNotifications(
+        getActorContext(request),
+        before,
+      );
       void reply.header("Cache-Control", "no-store");
       // A row the contract can't describe (a kind the table accepts before the
       // contract learns it) is skipped and logged, never allowed to fail the
@@ -220,7 +228,18 @@ export function registerScheduleRoutes(
         );
         return [];
       });
-      return NotificationListSchema.parse({ unread: own.unread, items });
+      const last = own.items.at(-1);
+      return NotificationListSchema.parse({
+        unread: own.unread,
+        items,
+        ...(last === undefined || own.items.length < NOTIFICATIONS_PAGE
+          ? {}
+          : {
+              nextBefore: Buffer.from(
+                JSON.stringify({ c: last.createdAt.toISOString(), i: last.id }),
+              ).toString("base64url"),
+            }),
+      });
     },
   );
 
@@ -237,4 +256,27 @@ export function registerScheduleRoutes(
       return reply.status(204).header("Cache-Control", "no-store").send();
     },
   );
+}
+
+/** P3: the notices cursor, (createdAt, id), or undefined when absent or bad. */
+function notificationCursor(
+  raw: unknown,
+): { readonly createdAt: Date; readonly id: string } | undefined {
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > 200) {
+    return undefined;
+  }
+  try {
+    const value: unknown = JSON.parse(
+      Buffer.from(raw, "base64url").toString("utf8"),
+    );
+    if (typeof value !== "object" || value === null) return undefined;
+    const { c, i } = value as { c?: unknown; i?: unknown };
+    if (typeof c !== "string" || typeof i !== "string") return undefined;
+    const createdAt = new Date(c);
+    return Number.isNaN(createdAt.getTime()) || !/^[0-9a-f-]{36}$/iu.test(i)
+      ? undefined
+      : { createdAt, id: i };
+  } catch {
+    return undefined;
+  }
 }

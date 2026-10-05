@@ -25,6 +25,8 @@ export type NoticeState = {
   readonly items: readonly NotificationDto[] | null;
   readonly unread: number;
   readonly failed: boolean;
+  /** P3: the cursor for older notices; null when there are none. */
+  readonly nextBefore?: string | null;
 };
 
 let state: NoticeState = { items: null, unread: 0, failed: false };
@@ -54,6 +56,7 @@ export function refreshNotices(force = false): Promise<void> {
               items: result.value.items,
               unread: result.value.unread,
               failed: false,
+              nextBefore: result.value.nextBefore ?? null,
             }
           : { ...state, failed: true },
       );
@@ -62,6 +65,26 @@ export function refreshNotices(force = false): Promise<void> {
       inFlight = null;
     });
   return inFlight;
+}
+
+/**
+ * P3: the next older page, by cursor (never offset), appended. A refresh
+ * starts again from the newest.
+ */
+export async function loadOlderNotices(): Promise<void> {
+  const before = state.nextBefore;
+  if (before === undefined || before === null || state.items === null) return;
+  const result = await listNoticesAction(before).catch(() => null);
+  if (result?.ok !== true) return;
+  const seen = new Set(state.items.map((item) => item.id));
+  emit({
+    ...state,
+    items: [
+      ...state.items,
+      ...result.value.items.filter((item) => !seen.has(item.id)),
+    ],
+    nextBefore: result.value.nextBefore ?? null,
+  });
 }
 
 /** Marks some as read locally, after the server said so. */
