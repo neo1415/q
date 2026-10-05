@@ -241,6 +241,16 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/brand-theme.ts GET ADMIN_BRAND_THEME_PATH": OPERATIONS_CONSOLE,
   "api/http/brand-theme.ts POST ADMIN_BRAND_THEME_PATH": OPERATIONS_CONSOLE,
   // end P5 block
+  // ETIQUETTE block (ADR 0050). Saving and removing their own guide are
+  // declared app actions (set_my_speaking_guide, remove_my_speaking_guide).
+  "api/http/etiquette.ts GET ME_ETIQUETTE_GUIDE_PATH": exempt(
+    "the person reading their own speaking guide and which house guide applies, in Settings; Q already follows it whenever it speaks for them",
+  ),
+  "api/http/etiquette.ts GET ADMIN_ETIQUETTE_GUIDE_PATH": OPERATIONS_CONSOLE,
+  "api/http/etiquette.ts POST ADMIN_ETIQUETTE_GUIDE_PATH": OPERATIONS_CONSOLE,
+  "api/http/etiquette.ts POST ADMIN_ETIQUETTE_GUIDE_ACTIVE_PATH":
+    OPERATIONS_CONSOLE,
+  // end ETIQUETTE block
   // Platform model cost per tenant and person: the operators' console.
   "api/http/admin-billing.ts GET ADMIN_BILLING_USAGE_PATH": OPERATIONS_CONSOLE,
   "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_EXPORT_PATH":
@@ -682,6 +692,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ADMIN block
   "/admin/accounts": OPERATIONS_CONSOLE,
   "/admin/brand": OPERATIONS_CONSOLE,
+  "/admin/etiquette": OPERATIONS_CONSOLE,
   "/admin/accounts/[userId]": OPERATIONS_CONSOLE,
   "/admin/organisations": OPERATIONS_CONSOLE,
   "/admin/organisations/[organisationId]": OPERATIONS_CONSOLE,

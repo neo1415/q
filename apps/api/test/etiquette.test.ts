@@ -258,7 +258,7 @@ describe("a person's own guide", () => {
       NOBODY,
       stores,
       "DELETE",
-      "/v1/me/etiquette-guide",
+      "/v1/me/etiquette-guide/versions",
     );
     expect(removed.statusCode).toBe(200);
     expect(removed.json<{ guide: null }>().guide).toBeNull();

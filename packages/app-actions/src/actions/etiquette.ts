@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   ME_ETIQUETTE_GUIDE_PATH,
+  ME_ETIQUETTE_GUIDE_VERSIONS_PATH,
   MyEtiquetteGuideDtoSchema,
   PERSONAL_ETIQUETTE_TEXT_MAX,
   SaveEtiquetteGuideRequestSchema,
@@ -191,7 +192,7 @@ const REMOVE = defineAppAction<z.infer<typeof Remove>, Mine>({
     "Removed. Q now follows Capital Q's house guide alone when it speaks for you.",
   http: {
     method: "DELETE",
-    path: ME_ETIQUETTE_GUIDE_PATH,
+    path: ME_ETIQUETTE_GUIDE_VERSIONS_PATH,
     fromRequest: () => ({}),
     respond: (out) => toMyEtiquetteDto(out),
   },

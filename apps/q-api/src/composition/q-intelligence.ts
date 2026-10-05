@@ -1,3 +1,4 @@
+import type { EtiquetteGuides } from "@capital-q/q-core";
 import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
@@ -156,6 +157,13 @@ export type QIntelligenceDependencies = {
   readonly ownOnboarding?: QOwnOnboardingPort | undefined;
   /** Setup reminders at a natural pause (founder directive 2026-09-27). */
   readonly onboardingNudge?: QOnboardingNudgePort | undefined;
+  /** ADR 0050: the business etiquette guides in force for this person. */
+  readonly etiquetteOf?:
+    | ((who: {
+        readonly tenantId: string;
+        readonly userId: string;
+      }) => Promise<EtiquetteGuides | null>)
+    | undefined;
   /** Who Q is with each person (founder direction 2026-09-30). */
   readonly personalityOf?:
     | ((request: {
@@ -310,6 +318,9 @@ export function composeQIntelligence(
     ...(dependencies.onboardingNudge === undefined
       ? {}
       : { onboardingNudge: dependencies.onboardingNudge }),
+    ...(dependencies.etiquetteOf === undefined
+      ? {}
+      : { etiquetteOf: dependencies.etiquetteOf }),
     ...(dependencies.personalityOf === undefined
       ? {}
       : { personalityOf: dependencies.personalityOf }),

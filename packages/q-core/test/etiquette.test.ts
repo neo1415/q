@@ -16,6 +16,7 @@ import {
   etiquetteVersions,
   renderEtiquetteGuidance,
   renderPrompt,
+  soundsLikeNo,
   UNTRUSTED_CLOSE,
   type EtiquetteGuides,
   type OutreachMoment,
@@ -294,5 +295,27 @@ describe("the consider step (pacing gate)", () => {
     expect(
       considerOutreach({ ...base, kind: "REPLY", alreadyThisSitting: 1 }),
     ).toEqual({ decision: "WAIT", code: "ONE_AT_A_TIME", until: null });
+  });
+});
+
+describe("reading a no by fixed phrases (delegated work)", () => {
+  it.each([
+    "Thanks, but we're not interested at this stage.",
+    "No thanks.",
+    "We'll pass on this one.",
+    "Please stop messaging me.",
+    "Not a fit for our fund.",
+    "Not right now, maybe next year.",
+  ])("hears %s as a no", (text) => {
+    expect(soundsLikeNo(text)).toBe(true);
+  });
+
+  it.each([
+    "Happy to chat next week.",
+    "What is your current traction?",
+    "Nothing interests me more than fintech in Lagos.",
+    null,
+  ])("does not hear %s as a no", (text) => {
+    expect(soundsLikeNo(text)).toBe(false);
   });
 });

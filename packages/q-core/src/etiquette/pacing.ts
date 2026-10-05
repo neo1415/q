@@ -146,3 +146,16 @@ export function considerationReason(
       return "it asked for a meeting before they've written back";
   }
 }
+
+/**
+ * Whether a message reads as a no, by fixed phrases only (no model): used
+ * where no quarantined reader has typed the thread, such as delegated
+ * work. Cautious on purpose -- a false "no" only means the person sees the
+ * reply first; a missed one is what the readers catch elsewhere.
+ */
+const NO_PHRASES =
+  /\b(not interested|no,? thanks?|no,? thank you|not for us|not a (good )?fit|not the right fit|(we|i)('ll| will| are going to|'re going to) pass|(we|i)('re| am| are) passing|please stop|stop (messaging|contacting|writing)|unsubscribe|don'?t contact|not (at this time|right now|now)|no longer interested)\b/iu;
+
+export function soundsLikeNo(text: string | null | undefined): boolean {
+  return text !== null && text !== undefined && NO_PHRASES.test(text);
+}

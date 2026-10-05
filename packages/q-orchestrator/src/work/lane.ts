@@ -1,4 +1,9 @@
 import {
+  considerationReason,
+  considerOutreach,
+  soundsLikeNo,
+} from "@capital-q/q-core";
+import {
   Annotation,
   END,
   START,
@@ -273,7 +278,36 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
     // No words this time (model unavailable): read again next time.
     if (result === null) return { waiting: true };
     let replies = state.qReplies;
-    if (result.reply !== null && mayReply) {
+    // ADR 0050, the consider step: a reply to what reads as a no is the
+    // person's to send, never Q's on its own. Code reads their words for
+    // the phrases; the model's reply waits for the person.
+    const considered = considerOutreach({
+      now: new Date(obs.now),
+      kind: "REPLY",
+      asksMeeting: false,
+      theyHaveWritten: true,
+      lastFromUsAt: null,
+      unansweredFromUs: 0,
+      declined: !otherSideIsQ && soundsLikeNo(latest.text),
+      negativeTone: false,
+      followUpsAllowed: true,
+      alreadyThisSitting: 0,
+    });
+    let held: string | null = null;
+    if (
+      result.reply !== null &&
+      mayReply &&
+      considered.decision !== "PROCEED"
+    ) {
+      held = considerationReason(considered);
+      await ports.notify(state.ref, {
+        key: `consider:${latest.id}`,
+        title: `${state.counterpartName} may have said no`,
+        body: `Q didn't reply: ${held}. Read their message and reply yourself if you want to.`,
+        link: state.chatPath,
+        priority: "NEEDS_YOU",
+      });
+    } else if (result.reply !== null && mayReply) {
       const sent = await post(
         state,
         `reply:${latest.id}`,
@@ -304,7 +338,9 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
       lastStep:
         replies > state.qReplies
           ? `Q replied to ${state.counterpartName}.`
-          : `${state.counterpartName} wrote.`,
+          : held !== null
+            ? `${state.counterpartName} wrote; Q held its reply: ${held}.`
+            : `${state.counterpartName} wrote.`,
     });
     return {
       seenUntil: latest.at,

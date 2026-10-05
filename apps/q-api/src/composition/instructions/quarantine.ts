@@ -40,9 +40,54 @@ type Variables = Omit<
   | "environmentNotes"
 >;
 
+/**
+ * ADR 0050: the pace of a conversation, read by code from the messages'
+ * sides and times -- never from a model. The consider step uses it to
+ * decide whether now is the moment for a message.
+ */
+export type ThreadPace = {
+  readonly lastFrom: "THEM" | "US" | "NONE";
+  /** When the person's side last wrote; null when it never has. */
+  readonly lastFromUsAt: Date | null;
+  /** The person's side's messages since the other side last wrote. */
+  readonly unansweredFromUs: number;
+  readonly theyHaveWritten: boolean;
+};
+
+export function threadPace(
+  messages: readonly {
+    readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
+    readonly sentAt: string;
+  }[],
+): ThreadPace {
+  let lastFromUsAt: Date | null = null;
+  let unansweredFromUs = 0;
+  let theyHaveWritten = false;
+  for (const message of messages) {
+    if (message.from === "OTHER_SIDE") {
+      theyHaveWritten = true;
+      unansweredFromUs = 0;
+      continue;
+    }
+    unansweredFromUs += 1;
+    const at = new Date(message.sentAt);
+    if (!Number.isNaN(at.getTime())) lastFromUsAt = at;
+  }
+  const last = messages[messages.length - 1];
+  return {
+    lastFrom:
+      last === undefined ? "NONE" : last.from === "OTHER_SIDE" ? "THEM" : "US",
+    lastFromUsAt,
+    unansweredFromUs,
+    theyHaveWritten,
+  };
+}
+
 export type ThreadRead = {
   readonly facts: InstructionThreadFactsV2 | null;
   readonly costUsd: number;
+  /** ADR 0050: the conversation's pace, by code; absent when unread. */
+  readonly pace?: ThreadPace | undefined;
   /**
    * QA run 8a1d57b9: their open question, verbatim, for CODE only -- quoted
    * to the person in a NEEDS_YOU notice when Q may not answer it. Never
@@ -82,19 +127,24 @@ export function createQuarantinedThreadReader(dependencies: {
       })
       .catch(() => null);
     const messages = read?.messages ?? [];
+    // Read only when the thread itself was read: an unread thread has no
+    // known pace, and code then falls back to the typed facts.
+    const pace = read === null ? undefined : threadPace(messages);
+    const paced = pace === undefined ? {} : { pace };
     const latest = messages[messages.length - 1];
-    if (latest === undefined) return { facts: null, costUsd: 0 };
+    if (latest === undefined) return { facts: null, costUsd: 0, ...paced };
     const key = `${input.instructionId}:${input.relationshipId}:${latest.id}`;
     const cached = cache.get(key);
     if (cached !== undefined) {
       return {
+        ...paced,
         facts: cached.facts,
         costUsd: 0,
         ...(cached.question === undefined ? {} : { question: cached.question }),
       };
     }
     if (input.maxCostUsd < THREAD_READ_MAX_COST_USD) {
-      return { facts: null, costUsd: 0 };
+      return { facts: null, costUsd: 0, ...paced };
     }
     try {
       const rendered = renderPrompt<Variables>(registry, {
@@ -150,11 +200,11 @@ export function createQuarantinedThreadReader(dependencies: {
         );
       const costUsd = response.cost.amount;
       if (response.output.kind !== "STRUCTURED")
-        return { facts: null, costUsd };
+        return { facts: null, costUsd, ...paced };
       const parsed = InstructionThreadFactsV2Schema.safeParse(
         response.output.value,
       );
-      if (!parsed.success) return { facts: null, costUsd };
+      if (!parsed.success) return { facts: null, costUsd, ...paced };
       // Topic numbers outside the approved list are dropped, not trusted.
       const facts: InstructionThreadFactsV2 = {
         ...parsed.data,
@@ -175,6 +225,7 @@ export function createQuarantinedThreadReader(dependencies: {
       if (cache.size >= CACHE_MAX) cache.clear();
       cache.set(key, { facts, question });
       return {
+        ...paced,
         facts,
         costUsd,
         ...(question === undefined ? {} : { question }),
@@ -184,7 +235,7 @@ export function createQuarantinedThreadReader(dependencies: {
         { err: error, instructionId: input.instructionId },
         "instruction thread not read",
       );
-      return { facts: null, costUsd: 0 };
+      return { facts: null, costUsd: 0, ...paced };
     }
   };
 }

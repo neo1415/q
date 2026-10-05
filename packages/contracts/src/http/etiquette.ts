@@ -8,8 +8,8 @@ import { z } from "zod";
  *                                            and which house guide applies.
  * - PUT    /v1/me/etiquette-guide            save a new version of their own
  *                                            guide (app action, INSTANT).
- * - DELETE /v1/me/etiquette-guide            remove their own guide (app
- *                                            action, INSTANT).
+ * - DELETE /v1/me/etiquette-guide/versions   remove their own guide, every
+ *                                            version (app action, INSTANT).
  * - GET    /v1/admin/etiquette-guide         platform admin: the house guide
  *                                            in force, its versions and the
  *                                            built-in one.
@@ -23,6 +23,8 @@ import { z } from "zod";
  * and its text sent; no file bytes reach Capital Q's servers for a guide.
  */
 export const ME_ETIQUETTE_GUIDE_PATH = "/v1/me/etiquette-guide" as const;
+export const ME_ETIQUETTE_GUIDE_VERSIONS_PATH =
+  "/v1/me/etiquette-guide/versions" as const;
 export const ADMIN_ETIQUETTE_GUIDE_PATH = "/v1/admin/etiquette-guide" as const;
 export const ADMIN_ETIQUETTE_GUIDE_ACTIVE_PATH =
   "/v1/admin/etiquette-guide/active" as const;

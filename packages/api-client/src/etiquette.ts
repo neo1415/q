@@ -3,6 +3,7 @@ import {
   ADMIN_ETIQUETTE_GUIDE_PATH,
   AdminEtiquetteGuideDtoSchema,
   ME_ETIQUETTE_GUIDE_PATH,
+  ME_ETIQUETTE_GUIDE_VERSIONS_PATH,
   MyEtiquetteGuideDtoSchema,
   type AdminEtiquetteGuideActiveRequest,
   type AdminEtiquetteGuideRequest,
@@ -26,7 +27,12 @@ export const saveMyEtiquetteGuide = (
 
 /** ADR 0050: remove their own guide. */
 export const removeMyEtiquetteGuide = (session: ApiSession) =>
-  call(session, "DELETE", ME_ETIQUETTE_GUIDE_PATH, MyEtiquetteGuideDtoSchema);
+  call(
+    session,
+    "DELETE",
+    ME_ETIQUETTE_GUIDE_VERSIONS_PATH,
+    MyEtiquetteGuideDtoSchema,
+  );
 
 /** ADR 0050, operations console: the house guide and its versions. */
 export const getAdminEtiquetteGuide = (session: ApiSession) =>

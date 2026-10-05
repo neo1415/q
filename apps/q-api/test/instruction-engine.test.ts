@@ -840,11 +840,22 @@ describe("a firing", () => {
     PEOPLE_OVERRIDE.value = many;
     try {
       const result = await engine.fire(row.id, "run-0012");
-      expect(result.done).toBe(6);
+      // ADR 0050: one message Q sends on its own per person per sitting, so
+      // the second to the first company is held (and says why).
+      expect(result.done).toBe(5);
       expect(result.deferred).toBe(2);
-      // Six steps taken, and one NOTED line naming who waits (QA run
+      // Five sent, one held, and one NOTED line naming who waits (QA run
       // 8a1d57b9: Tallyloom was skipped with no record).
       expect(recorded.size).toBe(7);
+      expect(
+        [...recorded.values()].find(
+          (step) => step.reasonCode === "PACE_ONE_AT_A_TIME",
+        ),
+      ).toMatchObject({
+        status: "NOTED",
+        words:
+          "Holding off: Say hello to Acme. -- one message to them at a time; the next waits for their reply.",
+      });
       expect(recorded.get(`instr:${row.id}:run-0012:199`)).toMatchObject({
         status: "NOTED",
         action: "q.note",
@@ -860,7 +871,7 @@ describe("a firing", () => {
         .map(
           (entry) => (entry.input as { input: { body: string } }).input.body,
         );
-      expect(first).toEqual(["Hello 0", "Second to the first"]);
+      expect(first).toEqual(["Hello 0"]);
     } finally {
       PEOPLE_OVERRIDE.value = null;
     }

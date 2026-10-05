@@ -27,7 +27,10 @@ import {
   type WorkShortlistVariables,
   type WorkStandInReplyResult,
   type WorkStandInReplyVariables,
+  type EtiquettePurpose,
 } from "@capital-q/q-core";
+
+import { etiquetteFor, type EtiquetteSource } from "../etiquette.js";
 
 /**
  * The words Q writes inside delegated work (AUTO, ADR 0030), each one
@@ -100,6 +103,8 @@ export function createWorkComposers(dependencies: {
   readonly gateway: ModelGateway;
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
+  /** ADR 0050: the principal's business etiquette guides. */
+  readonly etiquette?: EtiquetteSource | undefined;
 }) {
   const registry = createDefaultPromptRegistry();
 
@@ -110,10 +115,21 @@ export function createWorkComposers(dependencies: {
     schema: z.ZodType<O>,
     budget: typeof SMALL | typeof LARGE,
     environmentNotes: string,
+    /**
+     * ADR 0050: SPEAK_FOR when the words go to the counterpart as or for
+     * the person; STYLE_ONLY when they are for the person; none when Q is
+     * only reading or choosing.
+     */
+    purpose: EtiquettePurpose | null = null,
   ): Promise<O | null> {
     try {
+      const etiquette =
+        purpose === null
+          ? undefined
+          : await etiquetteFor(dependencies.etiquette, who, purpose);
       const rendered = renderPrompt<TaskVariables[K]>(registry, {
         task,
+        ...(etiquette === undefined ? {} : { etiquette }),
         operatingMode: "CONTINUOUS_INTELLIGENCE",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
         environmentNotes,
@@ -173,6 +189,7 @@ export function createWorkComposers(dependencies: {
         WorkConverseResultSchema,
         SMALL,
         CHAT_NOTE,
+        "SPEAK_FOR",
       ),
     interviewTurn: (
       who: Who,
@@ -185,6 +202,7 @@ export function createWorkComposers(dependencies: {
         WorkInterviewTurnResultSchema,
         SMALL,
         CHAT_NOTE,
+        "SPEAK_FOR",
       ),
     report: (who: Who, variables: TaskVariables["WORK_INTERVIEW_REPORT"]) =>
       call<"WORK_INTERVIEW_REPORT", WorkInterviewReportResult>(
@@ -194,6 +212,7 @@ export function createWorkComposers(dependencies: {
         WorkInterviewReportResultSchema,
         LARGE,
         "Your report is read only by the investor who asked for it, in Capital Q and as a PDF.",
+        "STYLE_ONLY",
       ),
     slotReader: (who: Who, variables: TaskVariables["WORK_SLOT_READER"]) =>
       call<"WORK_SLOT_READER", WorkSlotReaderResult>(
@@ -212,6 +231,7 @@ export function createWorkComposers(dependencies: {
         WorkStandInReplyResultSchema,
         SMALL,
         CHAT_NOTE,
+        "SPEAK_FOR",
       ),
   };
 }
