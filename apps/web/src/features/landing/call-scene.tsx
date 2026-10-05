@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { SwarmMode } from "./landing-swarm";
 import { REHEARSAL_SCRIPT } from "./landing-content";
-import { isSmallViewport, prefersReducedMotion, runScene } from "./scene";
+import { prefersReducedMotion, runScene, useLandingEnv } from "./scene";
 import { SwarmSlot } from "./swarm-slot";
 import { useInView } from "./use-in-view";
 
@@ -22,9 +22,7 @@ type Caption = {
 export function CallScene({ side }: { readonly side: ReactNode }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const near = useInView(rootRef, { rootMargin: "600px 0px" });
-  const [env, setEnv] = useState<{ reduce: boolean; small: boolean } | null>(
-    null,
-  );
+  const env = useLandingEnv();
   const [mode, setMode] = useState<SwarmMode>("listening");
   const [label, setLabel] = useState("Listening");
   const [captions, setCaptions] = useState<readonly Caption[]>([]);
@@ -39,7 +37,6 @@ export function CallScene({ side }: { readonly side: ReactNode }) {
     const root = rootRef.current;
     if (root === null) return;
     const reduce = prefersReducedMotion();
-    setEnv({ reduce, small: isSmallViewport() });
     let next = 0;
     const add = (who: "you" | "q", text: string) =>
       setCaptions((prev) => [...prev.slice(-1), { id: ++next, who, text }]);

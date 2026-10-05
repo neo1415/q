@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { SwarmMode } from "./landing-swarm";
 import { INTRODUCTIONS } from "./landing-content";
-import { isSmallViewport, prefersReducedMotion, runScene } from "./scene";
+import { prefersReducedMotion, runScene, useLandingEnv } from "./scene";
 import { SwarmSlot } from "./swarm-slot";
 import { useInView } from "./use-in-view";
 
@@ -19,9 +19,7 @@ const SENT_HTML =
 export function DemoScene({ children }: { readonly children: ReactNode }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const near = useInView(rootRef, { rootMargin: "600px 0px" });
-  const [env, setEnv] = useState<{ reduce: boolean; small: boolean } | null>(
-    null,
-  );
+  const env = useLandingEnv();
   const [mode, setMode] = useState<SwarmMode>("listening");
   const [label, setLabel] = useState("Listening");
 
@@ -29,7 +27,6 @@ export function DemoScene({ children }: { readonly children: ReactNode }) {
     const root = rootRef.current;
     if (root === null) return;
     const reduce = prefersReducedMotion();
-    setEnv({ reduce, small: isSmallViewport() });
     const q = <T extends Element = HTMLElement>(s: string) =>
       root.querySelector<T & HTMLElement>(s);
     const thread = q(".thread");

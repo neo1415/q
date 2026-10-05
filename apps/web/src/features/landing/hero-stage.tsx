@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { isSmallViewport, prefersReducedMotion } from "./scene";
+import { prefersReducedMotion, useLandingEnv } from "./scene";
 import { SwarmSlot } from "./swarm-slot";
 
 /**
@@ -12,9 +12,7 @@ import { SwarmSlot } from "./swarm-slot";
  * once content scrolls under it.
  */
 export function HeroStage({ children }: { readonly children: ReactNode }) {
-  const [env, setEnv] = useState<{ reduce: boolean; small: boolean } | null>(
-    null,
-  );
+  const env = useLandingEnv();
   const [gather, setGather] = useState(0);
   const heroRef = useRef<HTMLElement | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -22,7 +20,6 @@ export function HeroStage({ children }: { readonly children: ReactNode }) {
   useEffect(() => {
     heroRef.current = stageRef.current?.closest("section") ?? null;
     const reduce = prefersReducedMotion();
-    setEnv({ reduce, small: isSmallViewport() });
     const nav = document.querySelector<HTMLElement>("[data-lp-nav]");
     let raf = 0;
     const update = () => {

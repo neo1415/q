@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from "react";
+
 /**
  * The landing scenes' shared timing helpers. Client only: every function
  * here is called from an effect, never during render.
@@ -71,4 +73,26 @@ export function runScene(
     for (const id of timers) window.clearTimeout(id);
     timers.clear();
   };
+}
+
+export type LandingEnv = { readonly reduce: boolean; readonly small: boolean };
+
+let cached: LandingEnv | null = null;
+const readEnv = (): LandingEnv => {
+  const reduce = prefersReducedMotion();
+  const small = isSmallViewport();
+  if (cached === null || cached.reduce !== reduce || cached.small !== small) {
+    cached = { reduce, small };
+  }
+  return cached;
+};
+// Read once per visit, like the approved page: no live re-layout of Q.
+const noSubscribe = () => () => undefined;
+
+/**
+ * Reduced motion and the phone layout, known only in the browser: null
+ * while server-rendering and hydrating, so the swarm canvas mounts after.
+ */
+export function useLandingEnv(): LandingEnv | null {
+  return useSyncExternalStore(noSubscribe, readEnv, () => null);
 }
