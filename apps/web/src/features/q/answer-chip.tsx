@@ -10,7 +10,7 @@ import { ICON_SIZE, ICON_STROKE, PanelRight, X } from "@capital-q/ui/icons";
 
 import { QAperture } from "@/features/q-aperture";
 
-import { answerChipFor } from "./answer-canvas-logic";
+import { answerChipFor, type AnswerChipContent } from "./answer-canvas-logic";
 import { useQSessionOptional } from "./q-session";
 
 const Q_PAGE = "/home";
@@ -48,6 +48,27 @@ export function AnswerChip() {
     conversation === null
       ? Q_PAGE
       : `${Q_PAGE}?c=${encodeURIComponent(conversation)}`;
+  return (
+    <AnswerChipView
+      chip={chip}
+      home={home}
+      onDismiss={() =>
+        setDismissed((current) => new Set([...current, chip.answerId]))
+      }
+    />
+  );
+}
+
+export function AnswerChipView({
+  chip,
+  home,
+  onDismiss,
+}: {
+  readonly chip: AnswerChipContent;
+  /** The Q page, in this conversation. */
+  readonly home: string;
+  readonly onDismiss: () => void;
+}) {
   const board = `${home}${home.includes("?") ? "&" : "?"}board=1`;
   return (
     <aside
@@ -84,9 +105,7 @@ export function AnswerChip() {
         type="button"
         className="cq-ac-x chip-x"
         aria-label="Dismiss"
-        onClick={() =>
-          setDismissed((current) => new Set([...current, chip.answerId]))
-        }
+        onClick={onDismiss}
       >
         <X
           aria-hidden="true"
