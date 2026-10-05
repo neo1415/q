@@ -83,6 +83,16 @@ export function grantCard(
       `I ask you first:\n${ask.map((entry) => `- ${said(entry.action)}`).join("\n")}`,
     );
   }
+  if (
+    grant.routineReplies === true &&
+    grant.actions.some(
+      (entry) => entry.action === "chat.message.send" && entry.mode === "ASK",
+    )
+  ) {
+    lines.push(
+      "Routine replies to people already talking with you go out on their own; first messages and follow-ups ask you.",
+    );
+  }
   lines.push(
     "Never without your explicit yes: terms, money, commitments, signing, passing or declining.",
   );

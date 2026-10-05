@@ -418,6 +418,57 @@ describe("the validator: code decides each step", () => {
     expect(check({ declined: true })).toBe("ASK:THEY_DECLINED");
   });
 
+  it("routine replies go on their own where messages ask, when the grant says so (founder 2026-10-05)", () => {
+    const thread = (over: Partial<InstructionThreadFacts>) =>
+      new Map<string, InstructionThreadFacts>([
+        [
+          REL,
+          {
+            lastFrom: "THEM",
+            asksQuestion: false,
+            wantsToMeet: false,
+            proposedTime: null,
+            topicNumbers: [1],
+            mentionsTermsOrMoney: false,
+            declined: false,
+            tone: "POSITIVE",
+            ...over,
+          },
+        ],
+      ]);
+    const asking = (routineReplies?: boolean) =>
+      grant({
+        actions: [{ action: "chat.message.send", mode: "ASK" }],
+        ...(routineReplies === undefined ? {} : { routineReplies }),
+      });
+    const check = (
+      over: Partial<InstructionThreadFacts>,
+      routineReplies?: boolean,
+      body = "Thanks, good to hear from you.",
+    ) =>
+      verdictOf(
+        validateStep(chat(body), {
+          grant: asking(routineReplies),
+          actions: ACTIONS,
+          people: PEOPLE,
+          sent: new Map<string, number>(),
+          now: IN_HOURS,
+          stepKey: "instr:test:run:0",
+          facts: thread(over),
+        }),
+      );
+    // A reply to what they wrote: on its own.
+    expect(check({}, true)).toBe("AUTO");
+    // Still theirs: the grant does not say so, we wrote last (a follow-up),
+    // they raised terms or money, or they said no.
+    expect(check({})).toBe("ASK");
+    expect(check({ lastFrom: "US" }, true)).toBe("ASK");
+    expect(check({ mentionsTermsOrMoney: true }, true)).toBe(
+      "ASK:THEY_RAISED_TERMS",
+    );
+    expect(check({ declined: true }, true)).toBe("ASK:THEY_DECLINED");
+  });
+
   it("never lets a grant make a commitment Q's alone", () => {
     const forged = grant({
       actions: [{ action: "relationship.outcome.change", mode: "AUTO" }],

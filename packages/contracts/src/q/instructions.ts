@@ -124,6 +124,15 @@ export const InstructionGrantSchema = z
      * Optional, never defaulted: an approved payload is not reshaped.
      */
     followUps: z.boolean().optional(),
+    /**
+     * Founder 2026-10-05 ("not every message needs an approval"): where
+     * messages ask, a routine reply in a conversation already under way
+     * goes on its
+     * own. A reply is to what they wrote last. First messages, follow-ups,
+     * terms or money, a "no", attachments and off-topic replies still ask.
+     * Absent: as the messages' own mode.
+     */
+    routineReplies: z.boolean().optional(),
     maxMessagesPerCounterpart: z
       .number()
       .int()

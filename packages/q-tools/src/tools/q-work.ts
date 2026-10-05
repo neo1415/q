@@ -793,6 +793,9 @@ export function createQWorkTools(
                 ...(firstMessagesOnly(input.goal, input.firstMessagesOnly)
                   ? { followUps: false }
                   : {}),
+                // Founder 2026-10-05: not every message needs a yes. Routine
+                // replies go on their own unless they asked to approve all.
+                routineReplies: !input.askFirst,
               },
             },
           },

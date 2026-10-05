@@ -477,7 +477,16 @@ export function validateStep(
     relationshipId: subject,
     code,
   });
-  if (granted.mode === "ASK") {
+  // A routine reply in a conversation under way goes on its own where the
+  // grant says so; the AUTO checks below still apply to it in full.
+  const routineReply =
+    action.name === "chat.message.send" &&
+    context.grant.routineReplies === true &&
+    subject !== null &&
+    // Replying to what they wrote (Spheros wrote first, after accepting):
+    // their message is the conversation, so this is never a cold open.
+    context.facts?.get(subject)?.lastFrom === "THEM";
+  if (granted.mode === "ASK" && !routineReply) {
     return {
       verdict: "ASK",
       action,
@@ -798,6 +807,9 @@ function grantLines(grant: InstructionGrant): string {
     grant.followUps === false
       ? "Follow-ups: none. A first message only where their side has not heard from them; replies only to what they write."
       : "Follow-ups: allowed where their side has already written.",
+    grant.routineReplies === true
+      ? "Replies: a routine reply to someone already in conversation with them is sent on its own (code still asks for terms, money, a no, attachments or off-topic)."
+      : "Replies: as chat.message.send's mode.",
     `At most ${String(FANOUT_MAX)} people per run; the rest wait for the next run.`,
     "Terms, money and commitments: always theirs to approve.",
   ].join("\n");
