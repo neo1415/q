@@ -216,7 +216,7 @@ describe("RelationshipList", () => {
     expect(list.querySelector("[data-badge], .cq-badge")).toBeNull();
   });
 
-  it("shows a named investor's logo the list carries, and initials without one", () => {
+  it("shows a named investor's logo the list carries, and asks its gated photo route without one (founder, 2026-10-05)", () => {
     const LOGO = "https://storage.test/object/sign/cq-profile-images/l?t=1";
     const investor = (id: string, photoUrl: string | null) =>
       summary({
@@ -238,9 +238,12 @@ describe("RelationshipList", () => {
       />,
     );
     const images = [...container.querySelectorAll("img")];
-    expect(images.map((img) => img.getAttribute("src"))).toEqual([LOGO]);
-    // The other row is initials, never a guessed route.
-    expect(container.innerHTML).not.toContain("/api/");
+    // The other row asks the investor photo route, which answers only
+    // where this reader may see the name; a 404 there leaves initials.
+    expect(images.map((img) => img.getAttribute("src"))).toEqual([
+      LOGO,
+      "/api/investor-photo/33333333-0000-4000-8000-000000000002",
+    ]);
   });
 
   it("says one sentence when there are none", () => {

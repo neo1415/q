@@ -78,7 +78,7 @@ function RelationshipRow({
           kind="company"
           name={item.counterpart.name}
           companyId={item.counterpart.id}
-          src={item.counterpart.photoUrl}
+          src={item.counterpart.photoUrl ?? undefined}
           size="sm"
           decorative
         />
@@ -87,7 +87,8 @@ function RelationshipRow({
         <EntityAvatar
           kind="investor"
           name={item.counterpart.name}
-          src={item.counterpart.photoUrl ?? null}
+          investorOrganisationId={item.counterpart.id}
+          src={item.counterpart.photoUrl ?? undefined}
           size="sm"
           decorative
         />

@@ -9,6 +9,8 @@ import { ArrowUpRight, Check, Handshake, Mic } from "@capital-q/ui/icons";
 import { Button } from "@capital-q/ui/button";
 import { Input } from "@capital-q/ui/input";
 
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
 import {
   confirmAmountAction,
   confirmReceivedAction,
@@ -128,8 +130,25 @@ export function CommitmentCard({
         <Link
           id={`${id}-who`}
           href={href}
-          className="cq-body font-semibold text-(--cq-text-primary) hover:underline"
+          className="cq-body flex min-w-0 items-center gap-3 font-semibold text-(--cq-text-primary) hover:underline"
         >
+          {/* The counterpart's picture, by id: its photo route answers only
+              where this reader may see the name. */}
+          {side === "COMPANY" ? (
+            <EntityAvatar
+              kind="investor"
+              name={item.counterpartName}
+              investorOrganisationId={item.counterpartId}
+              decorative
+            />
+          ) : (
+            <EntityAvatar
+              kind="company"
+              name={item.counterpartName}
+              companyId={item.counterpartId}
+              decorative
+            />
+          )}
           {item.counterpartName}
         </Link>
         <span

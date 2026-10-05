@@ -19,6 +19,7 @@ import { ChevronRight, ICON_SIZE, Play } from "@capital-q/ui/icons";
 import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import { formatDay } from "@/components/date-format";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import { countryLabel, stageLabel } from "../../company/declared-labels";
 import { authorisePlaybackViaAction } from "../feed/action-feed-transport";
@@ -204,8 +205,17 @@ export function NetworkVideos({
                   aria-hidden="true"
                   className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-[linear-gradient(to_top,var(--cq-stage-canvas)_0%,transparent_100%)] px-2 pt-8 pb-2"
                 >
-                  <span className="cq-body-sm truncate font-medium text-(--cq-stage-text)">
-                    {item.canonicalName}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <EntityAvatar
+                      kind="company"
+                      name={item.canonicalName}
+                      companyId={item.companyId}
+                      size="xs"
+                      decorative
+                    />
+                    <span className="cq-body-sm truncate font-medium text-(--cq-stage-text)">
+                      {item.canonicalName}
+                    </span>
                   </span>
                   <span className="cq-caption truncate text-(--cq-stage-text-muted)">
                     {item.pitch.title ?? "Pitch"}

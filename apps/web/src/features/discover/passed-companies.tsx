@@ -6,6 +6,8 @@ import { useState } from "react";
 import type { PitchSummaryDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
 import { CompanyPitch } from "./company-pitch";
 import { undoPassAction } from "./feed/feed-actions";
 
@@ -72,14 +74,22 @@ export function PassedCompanies({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Link
                   href={`/company/${encodeURIComponent(company.companyId)}`}
-                  className="flex min-h-11 min-w-0 flex-1 flex-col justify-center gap-0.5 text-(--cq-text-primary) hover:text-(--cq-accent)"
+                  className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-(--cq-text-primary) hover:text-(--cq-accent)"
                 >
-                  <span className="cq-body font-medium">{company.name}</span>
-                  {company.facts === null ? null : (
-                    <span className="cq-caption text-(--cq-text-secondary)">
-                      {company.facts}
-                    </span>
-                  )}
+                  <EntityAvatar
+                    kind="company"
+                    name={company.name}
+                    companyId={company.companyId}
+                    decorative
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                    <span className="cq-body font-medium">{company.name}</span>
+                    {company.facts === null ? null : (
+                      <span className="cq-caption text-(--cq-text-secondary)">
+                        {company.facts}
+                      </span>
+                    )}
+                  </span>
                 </Link>
                 {isUndone ? (
                   <span

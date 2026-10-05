@@ -52,6 +52,8 @@ export type CounterpartProfile = {
    * the gated company photo route. Absent: an investor organisation.
    */
   readonly companyId?: string | undefined;
+  /** Set when the counterpart is an investor organisation: its photo route. */
+  readonly investorOrganisationId?: string | undefined;
   readonly about: string | null;
   readonly location: string | null;
   readonly websiteUrl: string | null;
@@ -292,8 +294,9 @@ export async function loadCompanySideRelationship(
     readAt: Date.now(),
     profile:
       investor === null
-        ? NO_PROFILE
+        ? { ...NO_PROFILE, investorOrganisationId }
         : {
+            investorOrganisationId,
             photoUrl: investor.photoUrl ?? null,
             coverUrl: investor.coverUrl ?? null,
             about: investor.publicDescription,
