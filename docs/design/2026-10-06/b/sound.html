@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q sounds</title>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  .sw { max-width: 1080px; margin: 0 auto; padding: 18px 24px 64px; }
+  h1 { margin: 0; font: 500 24px/1.2 var(--cq-font-ui); letter-spacing: -0.01em; }
+  .sub { margin: 4px 0 18px; color: var(--cq-text-secondary); max-width: 66ch; }
+  .setting { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  .seg { background: var(--cq-surface); }
+  .seg button { min-height: 40px; padding: 0 14px; }
+  .scope { width: 100%; height: 88px; border-radius: 14px; background: var(--cq-stage); display: block; margin-bottom: 16px; }
+  .list { display: grid; gap: 10px; }
+  .snd { display: grid; grid-template-columns: 56px minmax(0, 1.1fr) minmax(0, 1.6fr); gap: 14px; align-items: start; border: 1px solid var(--cq-border-subtle); border-radius: 16px; background: var(--cq-surface-raised); padding: 12px 16px 12px 12px; }
+  .play { width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--cq-border); background: var(--cq-surface); display: grid; place-items: center; cursor: pointer; transition: transform 140ms var(--ease-out); }
+  .play:active { transform: scale(0.95); }
+  .play[aria-pressed="true"] { background: var(--cq-accent); color: var(--cq-on-accent); border-color: transparent; }
+  .snd h2 { margin: 2px 0 2px; font-size: 15.5px; font-weight: 600; }
+  .snd .when { margin: 0; font-size: 14px; color: var(--cq-text-secondary); }
+  .snd dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 13.5px; }
+  .snd dt { color: var(--cq-text-tertiary); }
+  .snd dd { margin: 0; }
+  .rules { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .rules h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+  .rules ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14.5px; color: var(--cq-text-secondary); }
+  @media (max-width: 760px) {
+    .sw { padding: 10px 16px 110px; }
+    .snd { grid-template-columns: 56px minmax(0, 1fr); }
+    .snd dl { grid-column: 1 / -1; }
+    .rules { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { shell, icon } from "./assets/shell.js";
+
+// Earcons: one family. Sine and soft triangle partials tuned to A (A3, E4,
+// A4, E5), one shared short room, peaks at or below -18 dBFS, nothing longer
+// than a second except the hum. Recipes are data so production can share them.
+const SOUNDS = [
+  { id: "wake", name: "Wake", when: "Q hears its name or you open Q", sound: "A soft fifth that rises, A4 to E5", len: "0.45 s", level: "-20 dB", haptic: "Light tap" },
+  { id: "listenOn", name: "Listening on", when: "The mic opens", sound: "Two quick notes up, E5 then A5", len: "0.25 s", level: "-22 dB", haptic: "Light tap" },
+  { id: "listenOff", name: "Listening off", when: "The mic closes", sound: "The same two notes, down", len: "0.25 s", level: "-24 dB", haptic: "None" },
+  { id: "hum", name: "Thinking", when: "Q is working and you are on the Q page", sound: "A low, warm hum on A2 and E3 that breathes; it softens after 5 s and stops at 20 s", len: "Until done", level: "-34 dB", haptic: "None" },
+  { id: "ping", name: "Result ready", when: "An answer or a file is ready", sound: "A small bell on A5 with a soft octave under it", len: "0.9 s", level: "-20 dB", haptic: "Success" },
+  { id: "needs", name: "Needs you", when: "A job waits for your approval", sound: "Two soft knocks on A4", len: "0.35 s", level: "-22 dB", haptic: "Medium tap" },
+  { id: "error", name: "Something went wrong", when: "A job fails or voice drops", sound: "Two muted notes down a semitone, low and short; never a buzzer", len: "0.4 s", level: "-24 dB", haptic: "Warning" },
+];
+
+let ctx, master, room, analyser;
+function audio() {
+  if (ctx) return ctx;
+  ctx = new AudioContext();
+  master = ctx.createGain(); master.gain.value = 0.9;
+  analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+  // A short, dark room made from decaying noise: depth without a wash.
+  const len = Math.floor(ctx.sampleRate * 1.1), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  room = ctx.createConvolver(); room.buffer = ir;
+  const wet = ctx.createGain(); wet.gain.value = 0.22;
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3800;
+  master.connect(lp); lp.connect(analyser); analyser.connect(ctx.destination);
+  master.connect(room); room.connect(wet); wet.connect(lp);
+  draw();
+  return ctx;
+}
+const db = (d) => Math.pow(10, d / 20);
+function tone({ f, f2, t = 0, dur = 0.3, type = "sine", peak = -20, attack = 0.012, partials = [[1, 1]] }) {
+  const now = ctx.currentTime + t;
+  for (const [mult, amp] of partials) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f * mult, now);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2 * mult, now + dur * 0.4);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(db(peak) * amp, now + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    o.connect(g); g.connect(master); o.start(now); o.stop(now + dur + 0.05);
+  }
+}
+function bell(f, t, peak, dur) {
+  const now = ctx.currentTime + t;
+  const c = ctx.createOscillator(), m = ctx.createOscillator(), mg = ctx.createGain(), g = ctx.createGain();
+  c.frequency.value = f; m.frequency.value = f * 3.5;
+  mg.gain.setValueAtTime(f * 1.2, now); mg.gain.exponentialRampToValueAtTime(1, now + dur * 0.6);
+  m.connect(mg); mg.connect(c.frequency);
+  g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(db(peak), now + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  c.connect(g); g.connect(master); c.start(now); m.start(now); c.stop(now + dur + 0.05); m.stop(now + dur + 0.05);
+}
+let hum = null;
+function startHum() {
+  const now = ctx.currentTime, out = ctx.createGain();
+  out.gain.setValueAtTime(0, now); out.gain.linearRampToValueAtTime(db(-34), now + 0.6);
+  out.gain.setTargetAtTime(db(-40), now + 5, 1.5);
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 520; lp.Q.value = 0.4;
+  const lfo = ctx.createOscillator(), lfoG = ctx.createGain(); lfo.frequency.value = 0.22; lfoG.gain.value = db(-40);
+  lfo.connect(lfoG); lfoG.connect(out.gain);
+  const os = [110, 164.81, 220.4].map((f, i) => { const o = ctx.createOscillator(); o.type = i === 2 ? "triangle" : "sine"; o.frequency.value = f; const g = ctx.createGain(); g.gain.value = [1, 0.6, 0.18][i]; o.connect(g); g.connect(lp); o.start(); return o; });
+  lp.connect(out); out.connect(master); lfo.start();
+  const stop = () => { const t = ctx.currentTime; out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(out.gain.value, t); out.gain.linearRampToValueAtTime(0, t + 0.4); [...os, lfo].forEach((o) => o.stop(t + 0.45)); };
+  const timer = setTimeout(() => { stop(); hum = null; setPressed("hum", false); }, 20000);
+  return () => { clearTimeout(timer); stop(); };
+}
+const PLAY = {
+  wake: () => tone({ f: 440, f2: 659.25, dur: 0.45, peak: -20, attack: 0.03, partials: [[1, 1], [2, 0.18]] }),
+  listenOn: () => { tone({ f: 659.25, dur: 0.12, type: "triangle", peak: -22 }); tone({ f: 880, t: 0.09, dur: 0.16, type: "triangle", peak: -22 }); },
+  listenOff: () => { tone({ f: 880, dur: 0.12, type: "triangle", peak: -24 }); tone({ f: 659.25, t: 0.09, dur: 0.16, type: "triangle", peak: -24 }); },
+  ping: () => { bell(880, 0, -20, 0.9); tone({ f: 440, dur: 0.7, peak: -30, attack: 0.01 }); },
+  needs: () => { tone({ f: 440, dur: 0.12, peak: -22, partials: [[1, 1], [3, 0.08]] }); tone({ f: 440, t: 0.16, dur: 0.16, peak: -24, partials: [[1, 1], [3, 0.08]] }); },
+  error: () => { tone({ f: 392, dur: 0.18, type: "triangle", peak: -24 }); tone({ f: 369.99, t: 0.17, dur: 0.24, type: "triangle", peak: -26 }); },
+};
+const setPressed = (id, on) => document.querySelector(`[data-play="${id}"]`)?.setAttribute("aria-pressed", String(on));
+let mode = "on";
+function play(id) {
+  if (mode === "off") return;
+  audio(); ctx.resume();
+  if (id === "hum") { if (hum) { hum(); hum = null; setPressed("hum", false); } else { hum = startHum(); setPressed("hum", true); } return; }
+  if (mode === "quiet" && (id === "wake" || id === "listenOff")) return;
+  PLAY[id]();
+}
+function draw() {
+  const cv = document.querySelector(".scope"), g = cv.getContext("2d");
+  const data = new Uint8Array(analyser.fftSize);
+  const css = getComputedStyle(document.documentElement);
+  const loop = () => {
+    const w = (cv.width = cv.clientWidth * 2), h = (cv.height = cv.clientHeight * 2);
+    analyser.getByteTimeDomainData(data);
+    g.clearRect(0, 0, w, h); g.lineWidth = 3; g.strokeStyle = css.getPropertyValue("--cq-q-light").trim(); g.beginPath();
+    for (let i = 0; i < data.length; i++) { const x = (i / data.length) * w, y = h / 2 + ((data[i] - 128) / 128) * h * 2.2; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke(); requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+const main = `<div class="sw">
+  <h1>Q’s sounds</h1>
+  <p class="sub">Seven small sounds from one family, tuned to A, so they feel like the same voice. Quiet, short and warm: they confirm what you can already see, never replace it.</p>
+  <div class="setting"><span>Sounds</span><div class="seg" role="group" aria-label="Sounds"><button aria-pressed="true" data-mode="on">On</button><button aria-pressed="false" data-mode="quiet">Quiet</button><button aria-pressed="false" data-mode="off">Off</button></div><span class="sub" style="margin:0;font-size:13.5px">Quiet keeps only Result ready, Needs you and errors.</span></div>
+  <canvas class="scope" aria-hidden="true"></canvas>
+  <div class="list">${SOUNDS.map((s) => `<article class="snd"><button class="play" data-play="${s.id}" aria-pressed="false" aria-label="Play ${s.name}">${icon(s.id === "hum" ? "sound" : "play")}</button>
+    <div><h2>${s.name}</h2><p class="when">${s.when}</p></div>
+    <dl><dt>Sound</dt><dd>${s.sound}</dd><dt>Length</dt><dd>${s.len}</dd><dt>Peak</dt><dd>${s.level}</dd><dt>On a phone</dt><dd>${s.haptic}</dd></dl></article>`).join("")}</div>
+  <div class="rules">
+    <section><h2>When Q plays a sound</h2><ul>
+      <li>Only for real state: the same events that move Q’s presence.</li>
+      <li>Never while Q is speaking; never in Discover’s swipe path.</li>
+      <li>At most one sound every 0.6 s; the rest are dropped, not queued.</li>
+      <li>The hum plays only on the Q page, only while a job runs, and stops by itself after 20 s.</li>
+    </ul></section>
+    <section><h2>Respecting people</h2><ul>
+      <li>On, Quiet or Off in Settings, next to Q motion. New accounts start on Quiet.</li>
+      <li>The phone’s silent switch and Focus modes win; sounds follow the media volume.</li>
+      <li>Every sound has a visible label, so nothing depends on hearing it.</li>
+      <li>Reduced motion does not mute sound; Off does.</li>
+    </ul></section>
+  </div>
+</div>`;
+document.getElementById("app").innerHTML = shell("settings", main);
+document.querySelector(".list").addEventListener("click", (e) => { const b = e.target.closest("[data-play]"); if (!b) return; play(b.dataset.play); if (b.dataset.play !== "hum") { b.setAttribute("aria-pressed", "true"); setTimeout(() => b.setAttribute("aria-pressed", "false"), 500); } });
+document.querySelector(".setting .seg").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (!b) return; mode = b.dataset.mode; document.querySelectorAll("[data-mode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); if (mode === "off" && hum) { hum(); hum = null; setPressed("hum", false); } });
+</script>
+</body>
+</html>

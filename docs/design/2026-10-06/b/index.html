@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design studio B</title>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  .iw { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font: 500 30px/1.2 var(--cq-font-editorial); margin: 0 0 6px; }
+  .lede { color: var(--cq-text-secondary); margin: 0 0 24px; }
+  h2 { font-size: 16px; font-weight: 600; margin: 28px 0 8px; }
+  ul { padding-left: 18px; display: grid; gap: 6px; margin: 0; }
+  li { line-height: 1.5; }
+  a { color: var(--cq-accent); }
+  .pages a { display: grid; grid-template-columns: 1fr auto; padding: 12px 0; border-bottom: 1px solid var(--cq-border-subtle); text-decoration: none; color: inherit; min-height: 44px; }
+  .pages a span { color: var(--cq-text-secondary); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="iw">
+  <h1>Design studio B, 6 October</h1>
+  <p class="lede">Interactive mockups for the Q answer canvas, the Board, Q’s team, Q’s presence, black and gold, and Q’s sounds. Every page takes <code>?theme=light|dark</code> and <code>&amp;brand=gold</code>.</p>
+  <nav class="pages">
+    <a href="answer-canvas.html?play=3">Answer canvas, timed choreography <span>C1–C6, C8</span></a>
+    <a href="answer-canvas.html?state=top&n=10&focus=0">Answer canvas, ten cards <span>C1, C2</span></a>
+    <a href="answer-canvas.html?state=compare&focus=0">Side by side, not a PDF <span>C5</span></a>
+    <a href="answer-canvas.html?page=discover">Answer chip on another page <span>C6</span></a>
+    <a href="board.html">Board <span>C7</span></a>
+    <a href="workforce.html">Q’s team <span>J5</span></a>
+    <a href="workforce.html?state=draft">Draft, review, redraft, approve <span>J2, J5</span></a>
+    <a href="presence.html">Q’s presence studio <span>K1, K2</span></a>
+    <a href="presence.html?sheet=faces&animate=1">The two face options <span>K2</span></a>
+    <a href="brand.html?brand=gold">Black and gold <span>K3</span></a>
+    <a href="sound.html">Q’s sounds <span>I2</span></a>
+  </nav>
+
+  <h2>Key decisions</h2>
+  <ul>
+    <li>Answers are cards with an identity hue, a score out of 10, three reasons and six measures in words (Strong, Good, Partial, Unknown) with distinct shapes, so colour never carries meaning alone. Unknown stays Unknown.</li>
+    <li>The card Q is talking about expands; the rest shrink to rows (up to three) or half-width tiles (four or more on a phone; a 1 + 3 × 3 grid for ten on desktop). Q’s presence moves to a 52 px mark beside the spoken line.</li>
+    <li>Every card and every answer has a close. A new topic sends the whole answer to the Board button, the count ticks up and the presence returns to the centre.</li>
+    <li>Suggestions run on one tap: the chip becomes the request line and Q starts at once. A PDF is only an item in the More menu, or a file you asked for.</li>
+    <li>The Board is a timeline of what Q showed, with Pinned and Files beside it (tabs on a phone). Sources fold under “Where this came from” with the evidence in plain words.</li>
+    <li>Q’s team reads like a run log: one job, its steps, who owns each, hand-offs, the reviewer’s score against a stated bar, and an approval bound to the exact text. Cost by specialist, with a monthly limit.</li>
+    <li>Motion: on-screen moves use cubic-bezier(0.77, 0, 0.175, 1) at 420–560 ms; entries 380 ms ease-out with a 60 ms stagger; reduced motion keeps fades, drops movement, and stills the presence.</li>
+  </ul>
+
+  <h2>Faces: recommendation</h2>
+  <ul>
+    <li>Recommended: option B, the warm human face, but only while Q speaks on the Q page stage at 160 px or more. Everywhere else (the dock, the 52 px mark, Calm motion) Q is option A: no face, expression carried by motion.</li>
+    <li>Why the old face read as a demon: hollow dark sockets, bright staring eyes and edge-traced features. B avoids all three: an evenly sampled skin lit by a painted tone map, thin lines of light for lids, brows and lips, a closed smile, level brows, blinking, and a lower lip that moves with the voice.</li>
+  </ul>
+
+  <h2>Flags for the lead</h2>
+  <ul>
+    <li>Scores out of 10 conflict with ADR 0017’s ban on “fit meters” and match percentages. The mockups use a number with words and reasons, never a percentage or a meter; B1–B4 need an ADR amendment to allow it.</li>
+    <li>A face on Q conflicts with ADR 0017’s “face or character imagery” line. ADRs 0045 and 0049 already ship a face; option B needs that recorded.</li>
+    <li>Black and gold is more than an accent: today’s brand editor changes one colour. The preset also sets neutrals, the menu bar and Q’s light, so the brand-theme feature needs a preset layer.</li>
+  </ul>
+</div>
+</body>
+</html>
