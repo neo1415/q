@@ -868,6 +868,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           // Submit organisation verification (KYB, ADR 0040 offer): any
           // organisation verifies, an investor's included.
           expect.objectContaining({ destination: "VERIFICATION" }),
+          // GateQ: an investor sets up their gateway from their mandate.
+          expect.objectContaining({ destination: "GATEWAY" }),
         ],
       },
     ]);
