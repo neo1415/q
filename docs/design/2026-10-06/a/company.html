@@ -345,29 +345,25 @@ function qmark(size = 28, glow = true) {
 }
 /* Fit verdict glyphs: each a distinct shape, always paired with a word. */
 const FIT = {
-  fit: { word: "Fits", svg: '<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="m4.8 8.2 2.1 2.1 4.3-4.4" stroke="var(--cq-surface-raised)" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' },
-  part: { word: "Partly", svg: '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/>' },
-  no: { word: "Doesn't fit", svg: '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 8h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>' },
+  fit: { word: "Strong match", svg: '<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="m4.8 8.2 2.1 2.1 4.3-4.4" stroke="var(--cq-surface-raised)" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' },
+  part: { word: "Partial", svg: '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/>' },
+  no: { word: "Mismatch", svg: '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 8h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>' },
   unk: { word: "Unknown", svg: '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.2 2"/><path d="M6.4 6.4a1.7 1.7 0 0 1 3.2.7c0 1.1-1.6 1.4-1.6 2.2M8 11.3v.05" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>' },
 };
 function fg(kind) {
   return `<svg class="fg ${kind}" viewBox="0 0 16 16" aria-hidden="true">${FIT[kind].svg}</svg>`;
 }
-/* A fit is a count of the investor's own declared criteria met: never a percentage. */
-function fitSummary(params) {
-  const fit = params.filter((p) => p.v === "fit").length;
-  const unk = params.filter((p) => p.v === "unk").length;
-  return { fit, total: params.length, unk };
-}
-function fitScore(params, opts = {}) {
-  const s = fitSummary(params);
-  const pips = params.map((p) => fg(p.v)).join("");
-  const label = `Fits ${s.fit} of ${s.total} of your criteria${s.unk ? `, ${s.unk} unknown` : ""}. Show why`;
+/* Fit (docs/research/2026-10-06/matching.md): a band from the deterministic profile,
+   a confidence word from coverage and evidence, and one pip per parameter. Never a percentage. */
+const PARAMS = ["Stage", "Sector", "Geography", "Cheque size", "Business model", "Traction", "Team", "Thesis", "Round"];
+function fitScore(f, opts = {}) {
+  const pips = f.p.map((v) => fg(v)).join("");
+  const unk = f.p.filter((v) => v === "unk").length;
+  const label = `${f.band}, ${f.conf.toLowerCase()} confidence${unk ? `, ${unk} unknown` : ""}. Show why`;
   return `<button class="fitscore" type="button" aria-label="${label}" ${opts.onclick ? `onclick="${opts.onclick}"` : ""}>
-    <span style="display:flex;flex-direction:column;gap:3px"><span class="big">Fits ${s.fit} of ${s.total}</span><span class="fitpips">${pips}</span></span>
+    <span style="display:flex;flex-direction:column;gap:4px"><span class="big">${f.band}</span><span class="fitpips">${pips}</span><span class="small">${f.conf} confidence</span></span>
     ${opts.noChevron ? "" : `<span class="t3">${ic("chevron-right", "sm")}</span>`}</button>`;
 }
-
 /* ===== Shell ===== */
 const NAV = {
   investor: [
@@ -631,10 +627,7 @@ document.body.insertAdjacentHTML("afterbegin", shell({ active: persona === "foun
 const main = document.getElementById("main");
 
 /* ---------- Data ---------- */
-const FITP = [
-  { k: "Stage", v: "fit" }, { k: "Sector", v: "fit" }, { k: "Geography", v: "fit" }, { k: "Cheque size", v: "fit" },
-  { k: "Traction", v: "part" }, { k: "Team", v: "fit" }, { k: "Evidence", v: "unk" },
-];
+const FITP = { band: "Good fit", conf: "Medium", p: ["fit", "fit", "fit", "fit", "fit", "part", "fit", "fit", "unk"] };
 const SECTIONS = [
   ["problem", "Problem", "ok"], ["solution", "Solution", "ok"], ["value", "Value proposition", "ok"], ["market", "Market", "thin"],
   ["gtm", "Go-to-market", "thin"], ["model", "Business model", "ok"], ["traction", "Traction", "ok"], ["competition", "Competition", "miss"],
@@ -663,7 +656,7 @@ function header() {
   </header>
   <div class="phone-only" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     ${fitScore(FITP, { onclick: "openFit()" })}
-    <button class="btn ghost sm" onclick="openQView()" style="gap:8px">${qmark(18)}<span>Q's view: worth a first call</span></button>
+    <button class="btn ghost sm" onclick="openQView()" style="gap:8px">${qmark(18)}<span>Q's view: worth a look</span></button>
   </div>
   <div class="actions">
     <button class="btn primary">${limited ? "Express interest" : "Express interest"}</button>
@@ -679,13 +672,14 @@ function tabs(active) {
 function rail() {
   return `<aside class="rail" aria-label="Fit and Q's view">
     <section class="card" style="padding:18px;display:flex;flex-direction:column;gap:14px">
-      <div class="sect-h"><h2 class="cq-title-sm">How it fits your mandate</h2></div>
-      <ul style="display:flex;flex-direction:column;gap:2px">${FITP.map((p) => `<li style="display:flex;align-items:center;gap:10px;min-height:32px;font-size:14px">${fg(p.v)}<span style="flex:1">${p.k}</span><span class="t2">${FIT[p.v].word}</span></li>`).join("")}</ul>
+      <div class="sect-h"><h2 class="cq-label t2">Fit with your mandate</h2></div>
+      <p style="display:flex;gap:8px;align-items:baseline"><span class="cq-title-md">${FITP.band}</span><span class="cq-body-sm t2">· ${FITP.conf} confidence</span></p>
+      <ul style="display:flex;flex-direction:column;gap:2px">${FITP.p.map((v, i) => `<li style="display:flex;align-items:center;gap:10px;min-height:30px;font-size:14px">${fg(v)}<span style="flex:1">${PARAMS[i]}</span><span class="t2">${FIT[v].word}</span></li>`).join("")}</ul>
       <button class="btn secondary sm" onclick="openFit()">See why</button>
     </section>
     <section class="qview" style="flex-direction:column">
       <div style="display:flex;gap:10px;align-items:center">${qmark(24)}<span class="who">Q's view, not a verified fact</span></div>
-      <p class="cq-title-sm">Worth a first call.</p>
+      <p class="cq-title-sm">Worth a look.</p>
       <p class="cq-body-sm t2">Fits your seed health mandate in West Africa. Revenue matches the accounts they shared. Ask how they compare with other claims tools: the deck doesn't say.</p>
       <button class="btn ghost sm" style="align-self:flex-start;padding:0">Ask Q about Kora Health ${ic("chevron-right", "sm")}</button>
     </section>
@@ -1117,25 +1111,28 @@ function person() {
 /* ---------- Sheets: fit breakdown + Q's view (phone) ---------- */
 function openFit() {
   const rows = [
-    ["Stage", "fit", "Seed", "You invest at pre-seed and seed"],
-    ["Sector", "fit", "Health insurance software", "Health and fintech are in your mandate"],
-    ["Geography", "fit", "Nigeria", "You invest in West Africa"],
-    ["Cheque size", "fit", "Raising $1.2M", "Your cheque: $150k–$400k, fits the round"],
-    ["Traction", "part", "$31k monthly revenue", "You look for $50k+; growing 3x this year"],
-    ["Team", "fit", "2 founders, both full-time", "Your minimum: a full-time technical founder"],
-    ["Evidence", "unk", "Revenue checked; customers not yet", "Q can't tell until contracts are shared"],
+    ["fit", "Raising a seed round; you invest at pre-seed and seed.", "Company profile"],
+    ["fit", "Health insurance software, one of your sectors.", "Company profile"],
+    ["fit", "Based in Lagos; you invest in Nigeria.", "Company profile"],
+    ["fit", "Raising $1.2M; your typical cheque of $250k fits.", "Deck, slide 12"],
+    ["fit", "Takes a fee on every claim paid, a model you prefer.", "Deck, slide 8"],
+    ["part", "$31k monthly revenue, below the $50k you ask for at seed, but up 3x this year.", "Deck, slide 9 · matches accounts"],
+    ["fit", "Technical co-founder with 8 years in hospital software.", "Founder profiles"],
+    ["fit", "Close to your thesis on paying healthcare providers faster.", "Your mandate"],
+    ["unk", "Round terms not shared: Q can't tell if they need a lead.", ""],
   ];
-  openSheet(`<div style="display:flex;flex-direction:column;gap:16px">
-    <div class="sect-h"><h2 id="sheet-title" class="cq-title-md">Fits 5 of 7 of your criteria</h2><button class="iconbtn" onclick="closeSheet()" aria-label="Close">${ic("x")}</button></div>
-    <p class="cq-body-sm t2">Measured against the mandate you set. Unknown means Q doesn't have the facts yet. It never counts against them.</p>
-    <ul class="hair">${rows.map(([k, v, a, b]) => `<li style="display:grid;grid-template-columns:20px 1fr auto;gap:2px 10px;padding:12px 0;align-items:start">${fg(v)}<span style="font-weight:500">${k}</span><span class="cq-body-sm t2">${FIT[v].word}</span><span></span><span class="cq-body-sm t1" style="grid-column:2/4">${a}</span><span></span><span class="cq-caption t3" style="grid-column:2/4">${b}</span></li>`).join("")}</ul>
+  openSheet(`<div style="display:flex;flex-direction:column;gap:14px">
+    <div class="sect-h"><h2 id="sheet-title" class="cq-title-md">Good fit · Medium confidence</h2><button class="iconbtn" onclick="closeSheet()" aria-label="Close">${ic("x")}</button></div>
+    <p class="cq-body-sm t2">Measured against the mandate you set, the same way for every company. Unknown never counts against them; it only lowers confidence.</p>
+    <ul class="hair">${rows.map(([v, a, src], i) => `<li style="display:grid;grid-template-columns:20px 1fr auto;gap:2px 10px;padding:11px 0;align-items:start">${fg(v)}<span style="font-weight:500">${PARAMS[i]}</span><span class="cq-body-sm t2">${FIT[v].word}</span><span></span><span class="cq-body-sm t1" style="grid-column:2/4">${a}</span>${src ? `<span></span><span class="cq-caption t3" style="grid-column:2/4">From: ${src}</span>` : ""}</li>`).join("")}</ul>
+    <p class="cq-caption t3">Fit rules version 4 · Q's view never changes this.</p>
     <a class="btn ghost sm" style="align-self:flex-start" href="#">Change your mandate ${ic("chevron-right", "sm")}</a>
   </div>`);
 }
 function openQView() {
   openSheet(`<div style="display:flex;flex-direction:column;gap:14px">
     <div class="sect-h"><span style="display:flex;gap:10px;align-items:center">${qmark(24)}<h2 id="sheet-title" class="cq-title-md">Q's view</h2></span><button class="iconbtn" onclick="closeSheet()" aria-label="Close">${ic("x")}</button></div>
-    <p class="cq-title-sm">Worth a first call.</p>
+    <p class="cq-title-sm">Worth a look.</p>
     <p class="cq-body t2">Fits your seed health mandate in West Africa. Revenue matches the accounts they shared. Ask how they compare with other claims tools: the deck doesn't say.</p>
     <p class="cq-caption t3">Q's reading of what's shared with you. Not a verified fact, and not advice to invest.</p>
   </div>`);
