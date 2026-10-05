@@ -65,6 +65,91 @@ function sourceOf(
   return { type: "PUBLIC_WEB", said: `found on a public page (${host})` };
 }
 
+/** Words a company name carries that its domain usually drops. */
+const LEGAL_SUFFIXES = new Set([
+  "ltd",
+  "limited",
+  "inc",
+  "llc",
+  "plc",
+  "corp",
+  "co",
+  "company",
+  "gmbh",
+  "sa",
+  "bv",
+  "hq",
+]);
+
+/**
+ * The labels a company's own domain is likely to carry: the whole name
+ * squeezed together, and the same without a trailing legal form ("Zino
+ * Aviation Ltd" -> zinoaviationltd, zinoaviation).
+ */
+function nameLabels(companyName: string): ReadonlySet<string> {
+  const words = companyName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length > 0);
+  const labels = new Set<string>();
+  const whole = words.join("");
+  if (whole.length >= 3) labels.add(whole);
+  let trimmed = words;
+  while (
+    trimmed.length > 1 &&
+    LEGAL_SUFFIXES.has(trimmed[trimmed.length - 1] ?? "")
+  ) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  const core = trimmed.join("");
+  if (core.length >= 3) labels.add(core);
+  return labels;
+}
+
+/**
+ * Their own site, when research met it and they have not given one (live
+ * 2026-09-30: Q asked a YC founder for the website it had just read).
+ * Structural, and independent of the reader model: a web page whose host
+ * is named for the company is offered as its home page for them to
+ * confirm (founder live 2026-10-05: no website was suggested when the
+ * reader produced nothing, or the name carried "Ltd").
+ */
+export function ownWebsiteFinding(
+  pages: readonly ResearchPage[],
+  websiteUrl: string | null,
+  companyName: string,
+): readonly ResearchFinding[] {
+  if (websiteUrl !== null) return [];
+  const names = nameLabels(companyName);
+  if (names.size === 0) return [];
+  const own = pages.find((page) => {
+    if (
+      page.provider === "public_registry" ||
+      page.provider === "public_profile"
+    ) {
+      return false;
+    }
+    const host = domainOf(page.url);
+    if (host === null) return false;
+    const label = (host.split(".")[0] ?? "").replace(/-/g, "");
+    return [...names].some(
+      (named) =>
+        label === named || label === `get${named}` || label === `${named}hq`,
+    );
+  });
+  const host = own === undefined ? null : domainOf(own.url);
+  if (own === undefined || host === null) return [];
+  return [
+    {
+      stepKey: FOUNDER_STEPS.website,
+      value: `https://${host}`,
+      because: `found on a public page (${host})`,
+      sources: [{ sourceType: "PUBLIC_WEB", url: own.url }],
+      after: FOUNDER_STEPS.companyName,
+    },
+  ];
+}
+
 /**
  * The reading, checked and mapped to the founder journey's steps. Code
  * decides nothing about meaning: it checks the cited words are on the
@@ -79,37 +164,7 @@ export function validateFounderReading(
 ): readonly ResearchFinding[] {
   if (reading.wrongSubject) return [];
   const findings: ResearchFinding[] = [];
-  // Their own site, when research met it and they have not given one
-  // (live 2026-09-30: Q asked a YC founder for the website it had just
-  // read). Structural: a web page whose host is named for the company,
-  // offered as its home page for them to confirm.
-  const named = companyName.toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (websiteUrl === null && named.length >= 3) {
-    const own = pages.find((page) => {
-      if (
-        page.provider === "public_registry" ||
-        page.provider === "public_profile"
-      ) {
-        return false;
-      }
-      const host = domainOf(page.url);
-      if (host === null) return false;
-      const label = host.split(".")[0] ?? "";
-      return (
-        label === named || label === `get${named}` || label === `${named}hq`
-      );
-    });
-    const host = own === undefined ? null : domainOf(own.url);
-    if (own !== undefined && host !== null) {
-      findings.push({
-        stepKey: FOUNDER_STEPS.website,
-        value: `https://${host}`,
-        because: `found on a public page (${host})`,
-        sources: [{ sourceType: "PUBLIC_WEB", url: own.url }],
-        after: FOUNDER_STEPS.companyName,
-      });
-    }
-  }
+  findings.push(...ownWebsiteFinding(pages, websiteUrl, companyName));
   const push = (
     stepKey: string,
     value: ResearchFinding["value"],

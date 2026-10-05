@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+const talk = vi.fn(() => Promise.resolve());
 
 // The two-way interview is a different capability with its own tests; it
 // is stubbed to "not running" so this is only about one-way speech.
@@ -28,7 +29,7 @@ vi.mock("../src/features/voice/use-voice-interview", () => ({
     turn: null,
     client: {},
     voice: "FEMALE",
-    talk: vi.fn(),
+    talk,
     end: vi.fn(),
     chooseVoice: vi.fn(),
     clearNotice: vi.fn(),
@@ -126,9 +127,18 @@ describe("Q-FIRST-RUN-TTS-001 · arriving for the first time", () => {
     );
     render(<WelcomeScreen knownName={null} />);
 
+    // Before any gesture there is no extra button to press: Start is the
+    // gesture (founder live 2026-10-05).
+    await waitFor(() => {
+      expect(
+        document.querySelector('[data-q-speech="blocked"]'),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByText("Hear Q")).toBeNull();
+    await userEvent.click(screen.getByText("Start"));
+    // Audio still refused after the gesture (here, voice did not open):
+    // only now is Hear Q offered.
     const hear = await screen.findByText("Hear Q");
-    // Start was never held up waiting for audio.
-    expect(screen.getByText("Start")).toBeTruthy();
 
     play.mockResolvedValue(undefined);
     await userEvent.click(hear);
@@ -182,5 +192,27 @@ describe("Q-FIRST-RUN-TTS-001 · arriving for the first time", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(play).not.toHaveBeenCalled();
     expect(screen.getByText("Unmute Q")).toBeTruthy();
+  });
+});
+
+describe("Start opens the conversation (founder live 2026-10-05)", () => {
+  it("opens two-way voice on the welcome thread with the one press", async () => {
+    talk.mockClear();
+    render(<WelcomeScreen knownName="Ada" knownOrganisation="Zino" />);
+    await userEvent.click(screen.getByText("Start"));
+    expect(talk).toHaveBeenCalledWith({
+      thread: { welcome: true, organisationHint: "Zino" },
+    });
+  });
+
+  it("offers typing quietly, as the role cards, without opening voice", async () => {
+    talk.mockClear();
+    render(<WelcomeScreen knownName={null} />);
+    expect(document.querySelector("[data-persona-cards]")).toBeNull();
+    await userEvent.click(screen.getByText("Prefer to type?"));
+    expect(document.querySelector("[data-persona-cards]")).toBeTruthy();
+    expect(talk).not.toHaveBeenCalled();
+    // One door per mode: no second "continue" beside the cards.
+    expect(screen.queryByRole("button", { name: /continue as/i })).toBeNull();
   });
 });

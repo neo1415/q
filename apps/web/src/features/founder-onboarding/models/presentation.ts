@@ -44,6 +44,8 @@ export type FounderSuggestionView = {
   readonly source: string | undefined;
   /** Q's own confidence word. Never a percentage, never invented. */
   readonly confidence: string | undefined;
+  /** The journey step it answers, when known (the website, say). */
+  readonly stepKey?: string | undefined;
 };
 
 export const SECTION_IDS = ["company", "business", "raise", "review"] as const;
@@ -196,6 +198,11 @@ export type StepView =
     })
   | (StepBase<"company_basics"> & {
       readonly countries: readonly ChoiceOption[];
+      /**
+       * The website Q's research found and has not been confirmed: offered
+       * as a one-tap fill, never entered for them (founder live 2026-10-05).
+       */
+      readonly suggestedWebsite?: string | undefined;
       readonly response?:
         Extract<StepResponse, { kind: "company_basics" }> | undefined;
     })

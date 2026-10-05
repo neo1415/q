@@ -432,3 +432,38 @@ describe("founder journey over the runtime contract", () => {
     ).rejects.toMatchObject({ kind: "UNAVAILABLE" });
   });
 });
+
+describe("the website Q found (founder live 2026-10-05)", () => {
+  it("is offered on the company step while no website is recorded", async () => {
+    const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
+    const founder = createRuntimeFounderClient(port, SOURCE);
+    await founder.getSession();
+    await founder.saveResponse({
+      stepId: "intent",
+      response: { kind: "choice", value: "raising_now" },
+    });
+    const view = await port.current();
+    if (view === null) throw new Error("no session");
+    const suggestion = {
+      id: "s-1",
+      stepId: "company_basics",
+      label: "Your company",
+      value: "https://zinoaviation.com",
+      source: undefined,
+      confidence: undefined,
+      stepKey: FOUNDER_STEPS.website,
+    };
+    const presented = toPresentation(view, SOURCE, {
+      suggestions: [suggestion],
+    });
+    const basics = expectKind(presented.step, "company_basics");
+    expect(basics.suggestedWebsite).toBe("https://zinoaviation.com");
+    // Another step's suggestion is not a website.
+    const other = toPresentation(view, SOURCE, {
+      suggestions: [{ ...suggestion, stepKey: FOUNDER_STEPS.description }],
+    });
+    expect(
+      expectKind(other.step, "company_basics").suggestedWebsite,
+    ).toBeUndefined();
+  });
+});

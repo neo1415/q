@@ -8,6 +8,7 @@ import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { useQSpeech } from "../voice/use-q-speech";
 import { useVoiceInterview } from "../voice/use-voice-interview";
+import { VoiceHandover } from "../voice/voice-handover";
 import { VoiceStage } from "../voice/voice-stage";
 import { QAperture } from "../q-aperture";
 
@@ -33,10 +34,13 @@ import { QAperture } from "../q-aperture";
  * person presses Start. An introduction that immediately becomes a
  * question is not an introduction.
  *
- * **The choice is visible.** "What do you want to do?" with no options is
- * a prompt, not a product. Both roles are on screen, selectable by
- * keyboard, and remain there while Q is speaking — so answering aloud and
- * answering with a click are the same choice, not two different flows.
+ * **Start is the gesture voice needs** (founder live 2026-10-05: "I still
+ * have to click Hear Q"). Browsers refuse audio without one, so Start
+ * opens the two-way conversation directly: Q introduces itself and asks,
+ * by voice, whether they are raising or investing, and stays in voice
+ * through their setup. "Prefer to type?" is the quiet other door: the two
+ * roles as cards, and the typed setup. One surface per mode, never both.
+ * "Hear Q" appears only if audio is still refused after that gesture.
  *
  * Nothing here decides identity. Choosing a card navigates to that
  * onboarding path, and the canonical role is established there under the
@@ -76,7 +80,14 @@ export function WelcomeScreen({
   const router = useRouter();
   const voice = useVoiceInterview();
   const speech = useQSpeech();
-  const [started, setStarted] = useState(false);
+  /** "Prefer to type?": the role cards and the typed setup. */
+  const [typing, setTyping] = useState(false);
+  /** Start was pressed: the gesture, so audio may play from here. */
+  const [pressed, setPressed] = useState(false);
+  /** The two-way line is being opened. */
+  const [connecting, setConnecting] = useState(false);
+  /** Q has handed them to their setup by voice; the next screen carries it. */
+  const [leaving, setLeaving] = useState<string | null>(null);
 
   const lines = introduction(knownName);
   const spoken = lines.join(" ");
@@ -110,6 +121,9 @@ export function WelcomeScreen({
   }, [voice.active, stopSpeaking]);
 
   const begin = async () => {
+    setPressed(true);
+    setTyping(false);
+    setConnecting(true);
     await voice.talk({
       thread: {
         welcome: true,
@@ -118,6 +132,7 @@ export function WelcomeScreen({
           : { organisationHint: knownOrganisation }),
       },
     });
+    setConnecting(false);
   };
 
   const turn = voice.turn;
@@ -129,10 +144,24 @@ export function WelcomeScreen({
     }
     const path = destinationPath(followed.navigate);
     if (path !== null) {
+      // Their setup, by voice: the interview's line opens on the next
+      // screen (`?talk=1`), and this stage holds until it does, so the
+      // person never lands on the typed chat or the form in between.
+      setLeaving(
+        followed.navigate === "INTERVIEW_INVESTOR"
+          ? "Setting up your investor profile"
+          : followed.navigate === "INTERVIEW_FOUNDER"
+            ? "Setting up your company"
+            : "One moment",
+      );
       void end();
       router.push(path);
     }
   });
+
+  if (leaving !== null) {
+    return <VoiceHandover line={leaving} />;
+  }
 
   if (voice.active) {
     return (
@@ -214,12 +243,13 @@ export function WelcomeScreen({
 
         {/*
           Hearing Q, as a control rather than as something that happens to
-          you. "Hear Q" appears only when the browser actually refused to
-          start audio on its own; the rest of the time this is a mute
-          toggle, and a failed synthesis shows nothing at all.
+          you. "Hear Q" appears only when audio is still refused after the
+          person pressed Start (the gesture browsers ask for); the rest of
+          the time this is a mute toggle, and a failed synthesis shows
+          nothing at all.
         */}
         <div className="flex items-center gap-3" data-q-speech={speech.status}>
-          {speech.status === "blocked" ? (
+          {speech.status === "blocked" && pressed ? (
             <button
               type="button"
               className="cq-stage-quiet"
@@ -242,10 +272,10 @@ export function WelcomeScreen({
           )}
         </div>
 
-        {started ? (
-          // Q's first question, with both answers on screen. The cards are
-          // the same component Home uses, so the choice reads the same
-          // wherever it is offered.
+        {typing || (pressed && !connecting && !voice.active) ? (
+          // Typing, or voice could not open: Q's question with both
+          // answers on screen. The cards are the same component Home
+          // uses, so the choice reads the same wherever it is offered.
           <div className="flex w-full flex-col gap-5" data-q-role-question>
             <p className="cq-body text-center text-(--cq-text-secondary)">
               Are you here to raise capital, or to invest it?
@@ -254,9 +284,9 @@ export function WelcomeScreen({
               <PersonaCards
                 autoFocus
                 onChoose={() => {
-                  // Leaving for onboarding: Q stops talking here rather
-                  // than following the person into the next screen.
-                  if (voice.active) void voice.end();
+                  // Leaving for the typed setup: Q stops talking here
+                  // rather than following the person into the next screen.
+                  stopSpeaking();
                 }}
               />
             </div>
@@ -265,8 +295,9 @@ export function WelcomeScreen({
                 type="button"
                 className="cq-stage-quiet"
                 onClick={() => void begin()}
+                data-q-welcome-talk
               >
-                Or tell Q in your own words
+                Talk with Q instead
               </button>
             </div>
           </div>
@@ -275,20 +306,24 @@ export function WelcomeScreen({
             <button
               type="button"
               className="cq-stage-primary px-8"
-              onClick={() => setStarted(true)}
+              onClick={() => void begin()}
+              disabled={connecting}
               data-q-welcome-begin
             >
               Start
             </button>
-            {/* Hearing Q is an offer. A two-way conversation needs the
-                microphone; reading this page never does. */}
+            {/* The quiet other door: a two-way conversation needs the
+                microphone; reading and typing never do. */}
             <button
               type="button"
               className="cq-stage-quiet"
-              onClick={() => void begin()}
-              data-q-welcome-hear
+              onClick={() => {
+                stopSpeaking();
+                setTyping(true);
+              }}
+              data-q-welcome-type
             >
-              Talk with Q instead
+              Prefer to type?
             </button>
           </div>
         )}

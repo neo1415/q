@@ -282,6 +282,16 @@ function renderValue(
   }
 }
 
+/** Q's pending website suggestion, as a step field, when there is one. */
+function suggestedWebsiteOf(
+  suggestions: readonly FounderSuggestionView[],
+): { readonly suggestedWebsite?: string } {
+  const found = suggestions.find(
+    (suggestion) => suggestion.stepKey === S.website,
+  );
+  return found === undefined ? {} : { suggestedWebsite: found.value };
+}
+
 export function describeSuggestion(
   suggestion: {
     readonly id: string;
@@ -309,6 +319,7 @@ export function describeSuggestion(
     // nothing safe to show yet; provenance stays on the server (§12).
     source: undefined,
     confidence: suggestion.confidence ?? undefined,
+    stepKey: suggestion.stepKey,
   };
 }
 
@@ -566,6 +577,9 @@ function buildStep(
       return {
         ...base(group, "company_basics", state),
         countries: optionsOf(S.country),
+        ...(website === undefined
+          ? suggestedWebsiteOf(extras.suggestions ?? [])
+          : {}),
         response:
           name === undefined
             ? undefined

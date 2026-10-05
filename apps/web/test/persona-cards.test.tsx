@@ -81,22 +81,27 @@ describe("continuing", () => {
     push.mockClear();
     const chosen = vi.fn();
     render(<PersonaCards onChoose={chosen} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Continue as founder" }),
-    );
+    fireEvent.click(screen.getAllByRole("radio")[0] as HTMLElement);
     expect(chosen).toHaveBeenCalledWith("founder");
     expect(push).toHaveBeenCalledWith("/onboarding/founder");
   });
 
-  it("sends an investor to the investor path", () => {
+  it("sends an investor to the investor path from the focused card", () => {
+    // Arrow to the option, then press it (Enter or Space on a focused
+    // button is a click): the card is the only control.
     push.mockClear();
     render(<PersonaCards />);
     fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Continue as investor" }),
-    );
+    const focused = document.activeElement as HTMLElement;
+    expect(focused.getAttribute("data-persona")).toBe("investor");
+    fireEvent.click(focused);
     // The canonical role is established by the onboarding path under the
     // person's own authority. This component only takes them there.
     expect(push).toHaveBeenCalledWith("/onboarding/investor");
+  });
+
+  it("has no separate Continue button (founder live 2026-10-05)", () => {
+    render(<PersonaCards />);
+    expect(screen.queryByRole("button", { name: /continue/i })).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import { reviewLines } from "../onboarding-conversation/conversation";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
+import { VoiceHandover } from "../voice/voice-handover";
 import { useOnboardingJourney } from "../onboarding-kit/controller";
 import type {
   InvestorOnboardingSessionView,
@@ -81,6 +82,12 @@ export function InvestorOnboardingScreen({
         />
       </div>
     );
+  }
+
+  // Handed over by voice from Q's first minute: the voice stage holds
+  // while the setup loads, so no skeleton flashes between two lines.
+  if (startTalking && state.phase === "loading") {
+    return <VoiceHandover line="Q is getting your setup ready" />;
   }
 
   if (state.phase === "error" || state.session === undefined) {

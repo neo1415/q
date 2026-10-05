@@ -1,4 +1,3 @@
-import type { PromptDefinition } from "../definition.js";
 import {
   WELCOME_CONDUCTOR_V1,
   WELCOME_CONDUCTOR_V1_TEMPLATE,

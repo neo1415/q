@@ -42,6 +42,7 @@ import {
 } from "../onboarding-kit/material-actions";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
+import { VoiceHandover } from "../voice/voice-handover";
 import { VoiceStage } from "../voice/voice-stage";
 import {
   acknowledgeValue,
@@ -1058,7 +1059,11 @@ export function QOnboardingWorkspace({
     if (
       prompt === null ||
       prompt.autoSay === undefined ||
-      autoAnsweredRef.current === prompt.stepKey
+      autoAnsweredRef.current === prompt.stepKey ||
+      // A spoken turn is the conversation while voice is on: a typed turn
+      // started beside it talked over Q (founder live 2026-10-05). The
+      // voice interview reads the same session and settles the step.
+      voiceActive
     ) {
       return;
     }
@@ -1071,7 +1076,7 @@ export function QOnboardingWorkspace({
       void actions.say(autoSay, recentTurns());
     }, 0);
     return () => clearTimeout(timer);
-  }, [prompt, push, actions, recentTurns]);
+  }, [prompt, push, actions, recentTurns, voiceActive]);
 
   const keep = async (suggestionId: string) => {
     settleReading();
@@ -1280,6 +1285,12 @@ export function QOnboardingWorkspace({
   // and a spoken one composed side by side (the fixture's 19:47:33 and
   // 19:47:48 lines).
   const talkedOnOpen = useRef(false);
+  /**
+   * Arriving by voice (Q's first minute handed over): the voice stage
+   * holds until the interview's line is up, or until it fails and the
+   * notice says so here (founder live 2026-10-05: one surface per mode).
+   */
+  const [arriving, setArriving] = useState(talkOnOpen);
   // Voice asked for while Q's opening is still on its way (seen in the
   // browser run: Talk tapped a few seconds after arrival started a second,
   // spoken opening beside the typed one). The request waits for the
@@ -1292,7 +1303,9 @@ export function QOnboardingWorkspace({
     }
     talkedOnOpen.current = true;
     setTalkWhenOpened(false);
-    void talkWithQ({ withGreeting: onArrival });
+    void talkWithQ({ withGreeting: onArrival }).finally(() => {
+      setArriving(false);
+    });
     // talkWithQ is recreated each render; the guards make this run once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [talkOnOpen, talkWhenOpened, view, opened]);
@@ -1350,6 +1363,9 @@ export function QOnboardingWorkspace({
       className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-4 pb-28"
       data-q-onboarding-workspace
     >
+      {arriving && !voice.active && voice.notice === null ? (
+        <VoiceHandover line="Q is getting your setup ready" />
+      ) : null}
       {voice.active ? (
         <VoiceStage
           client={voice.client}
