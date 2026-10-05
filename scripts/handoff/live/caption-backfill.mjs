@@ -1,3 +1,4 @@
+/* global process, console, fetch */
 // Caption backfill (R18): ask Cloudflare Stream to generate English
 // captions for every live, READY pitch that has none.
 //
