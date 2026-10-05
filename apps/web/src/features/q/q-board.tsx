@@ -420,3 +420,43 @@ export function QBoard({
     </ViewTransition>
   );
 }
+
+/**
+ * This conversation's Board arrangement (pinned, removed) for the Board
+ * timeline and the answer canvas's pin, from the same per-tab store.
+ */
+export function useBoardMarks(conversationId: string | null): {
+  readonly pinned: readonly string[];
+  readonly dismissed: readonly string[];
+  readonly togglePin: (key: string) => void;
+  readonly pin: (key: string) => void;
+  readonly remove: (key: string) => void;
+} {
+  const key = conversationId ?? "new";
+  const marks = useSyncExternalStore(
+    subscribeMarks,
+    () => readMarks(key),
+    () => EMPTY,
+  );
+  return {
+    pinned: marks.pinned,
+    dismissed: marks.dismissed,
+    togglePin: (item) =>
+      writeMarks(key, {
+        ...marks,
+        pinned: marks.pinned.includes(item)
+          ? marks.pinned.filter((one) => one !== item)
+          : [...marks.pinned, item],
+      }),
+    pin: (item) => {
+      if (!marks.pinned.includes(item)) {
+        writeMarks(key, { ...marks, pinned: [...marks.pinned, item] });
+      }
+    },
+    remove: (item) =>
+      writeMarks(key, {
+        pinned: marks.pinned.filter((one) => one !== item),
+        dismissed: [...marks.dismissed, item],
+      }),
+  };
+}
