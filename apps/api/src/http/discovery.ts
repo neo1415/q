@@ -117,9 +117,10 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
       } | null>)
     | undefined;
   /**
-   * "Your companies" (founder decision 2026-10-02): the investor's own
-   * connected, interested and saved companies, by identity, from the
-   * Network and interaction contexts. Absent: the row is empty.
+   * "Your companies" (founder decisions 2026-10-02, 2026-10-05): the
+   * companies the investor's organisation is connected with (CONNECTED and
+   * later, never a pass or a bare interest), by identity, from the Network
+   * context. Absent: the row is empty.
    */
   readonly yourCompanies?:
     | ((actor: ActorContext) => Promise<
@@ -439,8 +440,7 @@ export function registerDiscoveryRoutes(
 
   // "Your companies" (founder decisions 2026-10-02, 2026-10-04): Discover's
   // second tab, never part of the recommended feed. Every company they are
-  // connected with (and later), interested in or saved, most recent
-  // activity first. Each company passes the same disclosure read the
+  // connected with (2026-10-05: connections only), latest first. Each company passes the same disclosure read the
   // network preview uses; a pitch is carried only when the media service
   // would sign it for this viewer, and each play is authorised again.
   app.get(

@@ -26,8 +26,6 @@ import {
 import { createRequestDatabaseClient } from "@capital-q/database";
 import {
   CorrelationIdSchema,
-  isMatchedRelationshipState,
-  type YourCompanyLabel,
   type AdminUsageDto,
   PolicyExtractionDtoSchema,
 } from "@capital-q/contracts";
@@ -38,6 +36,7 @@ import {
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import { createOutboxWriter } from "@capital-q/eventing";
+import { connectedCompanies } from "./http/your-companies.js";
 import {
   createCorrelationId,
   createLogger,
@@ -1537,60 +1536,14 @@ const { app, logger } = createApp(config, security, {
         subjectType: "INVESTOR_ORGANISATION",
         subjectId: investorOrganisationId,
       }),
-    // "Your companies" (founder decision 2026-10-02): the investor's own
-    // connected and interested companies (the Network context's list for
-    // their side) and their saved ones (the interaction projection).
-    // Identities only; the route re-checks disclosure for each.
-    yourCompanies: async (actor) => {
-      const [relationships, saved] = await Promise.all([
-        interests.listRelationshipsForInvestor({ actor }).catch(() => []),
-        interactions
-          .savedCompanyIds({ actor, limit: 100 })
-          .catch(() => [] as readonly string[]),
-      ]);
-      const labelled = new Map<string, YourCompanyLabel>();
-      const latest = new Map<string, string>();
-      const touch = (companyId: string, at: string | null | undefined) => {
-        if (at === null || at === undefined) return;
-        const known = latest.get(companyId);
-        if (known === undefined || known < at) latest.set(companyId, at);
-      };
-      for (const listing of relationships) {
-        const state = listing.projection.state;
-        const companyId = listing.relationship.companyId;
-        if (isMatchedRelationshipState(state)) {
-          labelled.set(companyId, "CONNECTED");
-          touch(companyId, listing.projection.stateSince);
-        } else if (state === "INTEREST_EXPRESSED" && !labelled.has(companyId)) {
-          labelled.set(companyId, "INTERESTED");
-          touch(companyId, listing.projection.stateSince);
-        }
-      }
-      for (const companyId of saved) {
-        if (!labelled.has(companyId)) labelled.set(companyId, "SAVED");
-      }
-      // Their latest save or interaction with each, for the tab's order
-      // (follow-55: most recent activity first). Failing keeps the
-      // relationship's own time.
-      const states: ReadonlyMap<
-        string,
-        {
-          readonly savedAt: string | null;
-          readonly lastInteractionAt: string | null;
-        }
-      > = await interactions
-        .stateForCompanies({ actor, companyIds: [...labelled.keys()] })
-        .catch(() => new Map());
-      for (const [companyId, state] of states) {
-        touch(companyId, state.savedAt);
-        touch(companyId, state.lastInteractionAt);
-      }
-      return [...labelled].map(([companyId, label]) => ({
-        companyId,
-        label,
-        activityAt: latest.get(companyId) ?? null,
-      }));
-    },
+    // "Your companies" (founder decision 2026-10-05): only the companies
+    // the investor's organisation has established a connection with (the
+    // Network context's list for their side). Interest, saves and passes
+    // are not connections. Identities only; the route re-checks disclosure.
+    yourCompanies: async (actor) =>
+      connectedCompanies(
+        await interests.listRelationshipsForInvestor({ actor }).catch(() => []),
+      ),
     // The row lists only what the player will sign: the media service's
     // own playback rule, as a yes or no (live 2026-10-02).
     mayPlay: async (actor, companyId, mediaAssetId) => {
