@@ -16,6 +16,7 @@ import type { QSubject } from "@/features/q/q-subject";
 import { QSwarmPointer } from "@/features/q-swarm/q-swarm-pointer";
 import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
 import { adminContext } from "@/features/admin/admin-context";
+import { BrandStyle, loadBrandStyle } from "@/features/brand-theme/brand-style";
 import { InstallPrompt } from "@/pwa/install-prompt";
 
 // Session-bound HTML is rendered per request and never prerendered or
@@ -79,13 +80,15 @@ export default async function ApplicationLayout({
   // shows nothing rather than a wrong state.
   // WORK-58: the Admin group shows only to a platform admin, decided by
   // the API (the console's own route refuses anyone else regardless).
-  const [verifyNudgeState, admin] = await Promise.all([
+  // P5: the brand colour, read alongside so it paints with the first frame.
+  const [verifyNudgeState, admin, brandCss] = await Promise.all([
     unfinished === null && context.kind !== "NONE"
       ? loadVerifyNudge()
       : Promise.resolve(null),
     adminContext()
       .then((found) => found !== null)
       .catch(() => false),
+    loadBrandStyle().catch(() => null),
   ]);
   return (
     <AppShell
@@ -95,6 +98,7 @@ export default async function ApplicationLayout({
       onboarding={unfinished}
       verifyNudge={verifyNudgeState}
     >
+      <BrandStyle css={brandCss} />
       {children}
       <InstallPrompt />
       <QSwarmPointer />

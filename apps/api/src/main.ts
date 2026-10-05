@@ -30,7 +30,10 @@ import {
   type YourCompanyLabel,
   type AdminUsageDto,
 } from "@capital-q/contracts";
-import { createPlatformAdmin } from "@capital-q/platform-admin";
+import {
+  createBrandThemeStore,
+  createPlatformAdmin,
+} from "@capital-q/platform-admin";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import { createOutboxWriter } from "@capital-q/eventing";
@@ -1821,6 +1824,11 @@ const { app, logger } = createApp(config, security, {
   // end BILLING block
   // ADMIN block (ADR 0033)
   admin: platformAdmin,
+  // P5: brand colour
+  brand: createBrandThemeStore({
+    sql: database.sql,
+    transactions: database.transactions,
+  }),
   results,
   adminFreshTokens: createSupabaseAccessTokenAuthenticator(supabaseAuth),
   adminVerificationDecider: createDecideByOperator({

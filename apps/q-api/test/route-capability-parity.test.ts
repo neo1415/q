@@ -230,6 +230,14 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/admin-billing.ts POST ADMIN_BILLING_OVERRIDE_PATH":
     OPERATIONS_CONSOLE,
   "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_PATH": OPERATIONS_CONSOLE,
+  // P5 block: brand theming. The colour the app is painted in is read by
+  // the shell itself; changing it is the console's alone.
+  "api/http/brand-theme.ts GET BRAND_THEME_PATH": exempt(
+    "the app shell's own paint (the brand colour in effect for the tenant), read on every page; not a person's action",
+  ),
+  "api/http/brand-theme.ts GET ADMIN_BRAND_THEME_PATH": OPERATIONS_CONSOLE,
+  "api/http/brand-theme.ts POST ADMIN_BRAND_THEME_PATH": OPERATIONS_CONSOLE,
+  // end P5 block
   // Platform model cost per tenant and person: the operators' console.
   "api/http/admin-billing.ts GET ADMIN_BILLING_USAGE_PATH": OPERATIONS_CONSOLE,
   "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_EXPORT_PATH":
@@ -667,6 +675,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/g/[publicId]/embed": PUBLIC,
   // ADMIN block
   "/admin/accounts": OPERATIONS_CONSOLE,
+  "/admin/brand": OPERATIONS_CONSOLE,
   "/admin/accounts/[userId]": OPERATIONS_CONSOLE,
   "/admin/organisations": OPERATIONS_CONSOLE,
   "/admin/organisations/[organisationId]": OPERATIONS_CONSOLE,
@@ -727,6 +736,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/daily/[editionId]": cap("tool.get_q_daily"),
   "/settings/memory": cap("navigate.MEMORY"),
   "/settings/usage": cap("navigate.USAGE"),
+  "/settings/billing": cap("tool.get_my_plan"),
   // meetfix-57: the reconnect link in Q's answers and notices; it only
   // redirects to Settings (navigate.SETTINGS), where Q already takes them.
   "/settings/reconnect/google": cap("navigate.SETTINGS"),

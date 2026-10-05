@@ -270,3 +270,25 @@ export function brandStyleSheet(palette: BrandPalette): string {
     `:root[data-theme="dark"]{${dark}}`,
   ].join("\n");
 }
+
+/**
+ * The preview's fixed surfaces for each theme, mirroring tokens.css, so the
+ * admin sees the colour on paper and on the dark canvas side by side
+ * whatever theme they are in.
+ */
+export const PREVIEW_SURFACES = {
+  light: {
+    canvas: "oklch(0.985 0.004 92)",
+    border: "oklch(0.91 0.006 258)",
+    text: "oklch(0.19 0.012 258)",
+    muted: "oklch(0.43 0.012 258)",
+    inverse: REFERENCE.light.inverse,
+  },
+  dark: {
+    canvas: "oklch(0.16 0.01 258)",
+    border: "oklch(0.28 0.01 258)",
+    text: "oklch(0.95 0.005 92)",
+    muted: "oklch(0.75 0.008 258)",
+    inverse: REFERENCE.dark.inverse,
+  },
+} as const;
