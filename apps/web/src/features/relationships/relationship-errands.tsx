@@ -25,7 +25,7 @@ export function RelationshipErrands({
   readonly counterpart: string;
   readonly connected: boolean;
 }) {
-  const { askAbout, setOpen } = useGlobalQ();
+  const { askNow, setOpen } = useGlobalQ();
   const session = useQSessionOptional();
   const [errands, setErrands] = useState<readonly QErrandDto[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export function RelationshipErrands({
           // plan comes back as a card to approve. Without a live session
           // the words are left in the composer, as before.
           if (session === null) {
-            askAbout(ask);
+            askNow(ask);
             return;
           }
           setOpen(true);

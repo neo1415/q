@@ -25,7 +25,7 @@ const attachment = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 const block = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 const report = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 vi.mock("@/components/app-shell/global-q", () => ({
-  useGlobalQ: () => ({ askAbout, open: false, setOpen: () => undefined }),
+  useGlobalQ: () => ({ askAbout, askNow: askAbout, open: false, setOpen: () => undefined }),
 }));
 vi.mock("@/features/q-aperture", () => ({ QAperture: () => null }));
 vi.mock("@/features/onboarding-kit/material-actions", () => ({

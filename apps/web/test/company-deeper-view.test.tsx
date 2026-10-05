@@ -42,7 +42,7 @@ vi.mock("../src/features/company/explanation-action", () => ({
 }));
 
 vi.mock("@/components/app-shell/global-q", () => ({
-  useGlobalQ: () => ({ open: false, setOpen: vi.fn(), askAbout }),
+  useGlobalQ: () => ({ open: false, setOpen: vi.fn(), askAbout, askNow: askAbout }),
 }));
 
 const { CompanyDeeperView, factQuestion } =

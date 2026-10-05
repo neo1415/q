@@ -51,6 +51,13 @@ type GlobalQValue = {
   /** A draft question the panel opens with; null for an empty composer. */
   readonly seed: string | null;
   readonly askAbout: (seed: string) => void;
+  /**
+   * Run a whole question now (C8, founder brief 2026-10-05): a suggestion
+   * Q wrote is sent as tapped, never put in a box to send again.
+   */
+  readonly askNow: (question: string) => void;
+  /** The question waiting to be sent by `askNow`, once per id. */
+  readonly run: { readonly id: number; readonly text: string } | null;
   /** Where in a pitch the person was when this opening happened. */
   readonly moment: QMoment | null;
   readonly registerMomentSource: (source: QMomentSource | null) => void;
@@ -62,6 +69,8 @@ const GlobalQContext = createContext<GlobalQValue>({
   connected: false,
   seed: null,
   askAbout: () => undefined,
+  askNow: () => undefined,
+  run: null,
   moment: null,
   registerMomentSource: () => undefined,
 });
@@ -130,6 +139,20 @@ export function GlobalQProvider({
   // conversation in full. Derived, so the panel is gone in the very
   // render that shows the page -- which is what lets the aperture morph
   // from one to the other in the navigation's transition.
+  const [run, setRun] = useState<{
+    readonly id: number;
+    readonly text: string;
+  } | null>(null);
+  const askNow = useCallback(
+    (question: string) => {
+      const text = question.trim();
+      if (text.length === 0) return;
+      // Off the Q page the panel opens on the answer as it comes.
+      if (!onQPage) openWith(null);
+      setRun((current) => ({ id: (current?.id ?? 0) + 1, text }));
+    },
+    [onQPage, openWith],
+  );
   const open = requested && !onQPage;
   const [closedFor, setClosedFor] = useState(pathname);
   if (closedFor !== pathname) {
@@ -165,10 +188,22 @@ export function GlobalQProvider({
       connected,
       seed,
       askAbout,
+      askNow,
+      run,
       moment,
       registerMomentSource,
     }),
-    [open, setOpen, connected, seed, askAbout, moment, registerMomentSource],
+    [
+      open,
+      setOpen,
+      connected,
+      seed,
+      askAbout,
+      askNow,
+      run,
+      moment,
+      registerMomentSource,
+    ],
   );
   return (
     <QSubjectProvider own={subject}>
@@ -176,6 +211,7 @@ export function GlobalQProvider({
         <GlobalQContext.Provider value={value}>
           {children}
           <GlobalQSheet />
+          <GlobalQRunner />
           {dock}
         </GlobalQContext.Provider>
       </QSessionProvider>
@@ -195,9 +231,10 @@ export function useGlobalQ(): {
   readonly open: boolean;
   readonly setOpen: (open: boolean) => void;
   readonly askAbout: (seed: string) => void;
+  readonly askNow: (question: string) => void;
 } {
-  const { open, setOpen, askAbout } = useContext(GlobalQContext);
-  return { open, setOpen, askAbout };
+  const { open, setOpen, askAbout, askNow } = useContext(GlobalQContext);
+  return { open, setOpen, askAbout, askNow };
 }
 
 /**
@@ -299,4 +336,26 @@ function GlobalQSheet() {
       ) : null}
     </SheetRoot>
   );
+}
+
+/**
+ * Sends what `askNow` was given, once: down an open voice line when there
+ * is one, otherwise as a question in the one conversation.
+ */
+function GlobalQRunner() {
+  const { run } = useContext(GlobalQContext);
+  const session = useQSessionOptional();
+  const sent = useRef(0);
+  const ask = session?.q.ask;
+  const voice = session?.voice;
+  useEffect(() => {
+    if (run === null || ask === undefined || sent.current >= run.id) return;
+    sent.current = run.id;
+    if (voice?.active === true && voice.client.connected) {
+      voice.client.sendText(run.text);
+    } else {
+      void ask(run.text);
+    }
+  }, [run, ask, voice]);
+  return null;
 }

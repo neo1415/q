@@ -15,6 +15,7 @@ import { CompanyAvatar } from "../company/company-avatar";
 import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
 import { ComparisonCards } from "./comparison-cards";
+import { StaticAnswerCards } from "./static-answer-cards";
 import { recordPagePath, setupPath } from "./client-actions";
 import type { QTurnObjectBlock } from "./conversation";
 
@@ -353,6 +354,13 @@ export function QResultBlocks({
 
           case "COMPARISON_CARDS":
             return <ComparisonCards key={key} block={block} onAsk={onAsk} />;
+
+          case "ANSWER_CARDS":
+            // In the thread and on the Board: the overview, every card
+            // with its first reason; tapping one opens it.
+            return (
+              <StaticAnswerCards key={key} block={block} onAsk={onAsk} />
+            );
 
           case "COMPARISON":
             return (

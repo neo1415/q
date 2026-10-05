@@ -372,7 +372,7 @@ export function DocumentLibrary({
   readonly companyId: string | null;
   readonly openOnArrival?: string | null;
 }) {
-  const { askAbout } = useGlobalQ();
+  const { askAbout, askNow } = useGlobalQ();
   const searchId = useId();
   const sortId = useId();
   const renameId = useId();
@@ -819,7 +819,7 @@ export function DocumentLibrary({
             <button
               type="button"
               className={buttonClassName("secondary")}
-              onClick={() => askAbout("Make me a pitch deck.")}
+              onClick={() => askNow("Make me a pitch deck.")}
               data-documents-ask
             >
               Ask Q for a deck
