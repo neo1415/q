@@ -81,7 +81,7 @@ export function PresencePlayground({
     isState(initialState) ? initialState : "IDLE",
   );
   const [figure, setFigure] = useState("CLOUD");
-  const [webgl, setWebgl] = useState<boolean | null>(null);
+  const [renderer, setRenderer] = useState<string | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const timers = useRef<number[]>([]);
   const input = useSyntheticLevel(5.2, state === "LISTENING");
@@ -124,7 +124,7 @@ export function PresencePlayground({
     const timer = window.setInterval(() => {
       const canvas = stageRef.current?.querySelector("canvas");
       setFigure(canvas?.dataset["qFigure"] ?? "");
-      setWebgl(presenceStats().webgl);
+      setRenderer(presenceStats().renderer);
     }, 250);
     return () => window.clearInterval(timer);
   }, []);
@@ -163,7 +163,13 @@ export function PresencePlayground({
           data-presence-figure={figure}
         >
           forming {figure} ·{" "}
-          {webgl === null ? "…" : webgl ? "WebGL2" : "Canvas2D"}
+          {renderer === null
+            ? "…"
+            : renderer === "3d"
+              ? "WebGL2 3D"
+              : renderer === "2d"
+                ? "Canvas2D"
+                : "…"}
         </span>
       </div>
 
