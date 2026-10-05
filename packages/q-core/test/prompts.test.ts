@@ -146,6 +146,11 @@ describe("registry", () => {
         "DAILY_Q_TAKE",
         // MEET-HOST (ADR 0037): Q in a live call.
         "MEETING_HOST_TURN",
+        // Founder brief J1-J9: Q's workforce of agents.
+        "DRAFT_REVIEW",
+        "DRAFT_REDRAFT",
+        "REPLY_READER",
+        "JOB_PLAN",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

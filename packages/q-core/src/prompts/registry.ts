@@ -88,6 +88,12 @@ import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
 import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
 import { MEETING_NOTES_V3 } from "./tasks/meeting-notes.v3.js";
 import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
+import {
+  DRAFT_REDRAFT_V1,
+  DRAFT_REVIEW_V1,
+  JOB_PLAN_V1,
+  REPLY_READER_V1,
+} from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
 // AUTO block (ADR 0030)
 import {
@@ -397,6 +403,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     MEETING_NOTES_V2,
     MEETING_NOTES_V3,
     ERRAND_REPLY_V1,
+    DRAFT_REVIEW_V1,
+    DRAFT_REDRAFT_V1,
+    REPLY_READER_V1,
+    JOB_PLAN_V1,
     INVESTOR_PERSONA_V1,
     INVESTOR_TWIN_TURN_V1,
     REHEARSAL_SCORE_V1,
