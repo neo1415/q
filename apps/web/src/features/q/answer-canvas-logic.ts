@@ -167,3 +167,51 @@ export function topicMovedOn(
   }
   return false;
 }
+
+const NUMBER_WORDS = [
+  "zero", "one", "two", "three", "four", "five",
+  "six", "seven", "eight", "nine", "ten",
+] as const;
+
+export type AnswerChipContent = {
+  readonly answerId: string;
+  readonly heading: string;
+  readonly names: string;
+  readonly hues: readonly number[];
+};
+
+/**
+ * The compact chip other pages show for a new answer with cards (C6):
+ * the newest such answer that was neither on screen before this page
+ * opened nor dismissed. Files keep their own floating card.
+ */
+export function answerChipFor(
+  turns: readonly QTurn[],
+  before: ReadonlySet<string>,
+  dismissed: ReadonlySet<string>,
+): AnswerChipContent | null {
+  const turn = turns.findLast(
+    (one) => one.kind === "Q" && !one.streaming && answerCardsOf(one) !== null,
+  );
+  const block = answerCardsOf(turn);
+  if (turn === undefined || block === null) return null;
+  if (before.has(turn.id) || dismissed.has(turn.id)) return null;
+  const n = block.cards.length;
+  const heading =
+    block.shape === "RESEARCH"
+      ? "Research ready"
+      : block.shape === "SIDE_BY_SIDE"
+        ? "Comparison ready"
+        : n === 1
+          ? "Top pick ready"
+          : `Top ${NUMBER_WORDS[n] ?? String(n)} ready`;
+  return {
+    answerId: turn.id,
+    heading,
+    names: block.cards
+      .slice(0, 4)
+      .map((card) => card.name.split(/\s+/u)[0] ?? card.name)
+      .join(", "),
+    hues: block.cards.slice(0, 7).map((card) => card.hue),
+  };
+}

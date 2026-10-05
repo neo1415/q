@@ -43,5 +43,10 @@ export default async function HomePage({
   const params = await searchParams;
   const raw = params["c"];
   const conversationId = typeof raw === "string" && raw.length > 0 ? raw : null;
-  return <HomeScreen conversationId={conversationId} />;
+  return (
+    <HomeScreen
+      conversationId={conversationId}
+      openBoard={params["board"] === "1"}
+    />
+  );
 }

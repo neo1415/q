@@ -24,6 +24,7 @@ import {
   type QMoment,
   type QMomentSource,
 } from "@/features/q/q-moment";
+import { AnswerChip } from "@/features/q/answer-chip";
 import { QSheetConversation } from "@/features/q/q-sheet";
 import { setScreenFocusSource } from "@/features/q/screen";
 import { QSessionProvider, useQSessionOptional } from "@/features/q/q-session";
@@ -212,6 +213,7 @@ export function GlobalQProvider({
           {children}
           <GlobalQSheet />
           <GlobalQRunner />
+          <AnswerChip />
           {dock}
         </GlobalQContext.Provider>
       </QSessionProvider>

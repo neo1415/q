@@ -109,6 +109,8 @@ export type QSurfaceContext = {
 export type QConversationPanelProps = {
   /** False when this build has no Q API configured. */
   readonly connected: boolean;
+  /** Open on the Board (from the answer chip on another page, C6). */
+  readonly openBoard?: boolean | undefined;
   readonly context: QSurfaceContext;
   /** The conversation the URL names, resolved on the server (QX-003A). */
   readonly conversationId?: string | null | undefined;
@@ -261,6 +263,7 @@ export function QConversationPanel({
   welcomeLine,
   welcomeLead,
   briefing,
+  openBoard = false,
 }: QConversationPanelProps) {
   const session = useQSession();
   const { q, turns, voice, spoken, spokenOnly, presence } = session;
@@ -533,11 +536,7 @@ export function QConversationPanel({
   // The Board is closed until its icon is pressed: what Q makes is in the
   // thread, inline (founder direction A, 2026-09-28).
   // The Board opens from the answer chip on other pages (?board=1, C6).
-  const [boardOpen, setBoardOpen] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("board") === "1",
-  );
+  const [boardOpen, setBoardOpen] = useState(openBoard);
   const boardDocked = wide && boardOpen;
   const boardMarks = useBoardMarks(q.conversationId);
   // C4: what the Board holds, less the answer still on the stage; it
