@@ -1227,6 +1227,7 @@ export {
   type RelationshipCommitmentsDto,
   type StateCommitmentRequest,
 } from "./commitments.js";
+export * from "./capital-rounds.js";
 export {
   ADMIN_ATTRIBUTION_PATH,
   ADMIN_DISPUTES_PATH,

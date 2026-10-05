@@ -89,8 +89,8 @@ type Organisation = NonNullable<ActorContext["organisationId"]>;
  * "not found". A company that exists elsewhere is indistinguishable from one
  * that does not exist.
  */
-async function visibleCompany(
-  dependencies: CapitalServiceDependencies,
+export async function visibleCompany(
+  dependencies: Pick<CapitalServiceDependencies, "companies">,
   actor: ActorContext,
   companyId: CompanyId,
 ): Promise<{ company: CompanyIdentity; organisationId: Organisation }> {
@@ -132,7 +132,7 @@ async function visibleObjective(
   return { company, organisationId, objective };
 }
 
-function companyScope(
+export function companyScope(
   actor: ActorContext,
   organisationId: Organisation,
   companyId: string,

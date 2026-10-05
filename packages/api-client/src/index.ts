@@ -299,6 +299,15 @@ export {
   withdrawCommitment,
 } from "./commitments.js";
 export {
+  closeCapitalRound,
+  confirmCommitmentAmount,
+  confirmCommitmentReceived,
+  getCapitalLedger,
+  getMyCommitments,
+  markCommitmentSent,
+  openCapitalRound,
+} from "./capital-rounds.js";
+export {
   getRelationshipPass,
   listPassReasons,
   passRelationship,

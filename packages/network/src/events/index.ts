@@ -211,6 +211,75 @@ export function relationshipMessageSentEvent(input: {
   };
 }
 
+/**
+ * A commitment moved a step (2026-10-04): one side confirmed the amount
+ * (asking the other), both sides confirmed it, the investor's side marked
+ * it sent, or the company's side confirmed receipt. Identifiers, the step
+ * and the acting side only -- never the amount or a reference. Consumers
+ * tell the other side and re-project the relationship (INVESTED on
+ * receipt).
+ */
+export const COMMITMENT_STEPS = [
+  "AMOUNT_STATED",
+  "AMOUNT_CONFIRMED",
+  "TRANSFER_SENT",
+  "RECEIVED",
+] as const;
+export type CommitmentStep = (typeof COMMITMENT_STEPS)[number];
+
+export const RelationshipCommitmentChangedEvent = defineEvent({
+  name: "network.relationship.commitment_changed",
+  version: 1,
+  owner: NETWORK_EVENT_OWNER,
+  producer: NETWORK_EVENT_PRODUCER,
+  consumers: ["@capital-q/q", "@capital-q/communication"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      relationshipId: UuidSchema,
+      commitmentId: UuidSchema,
+      step: z.enum(COMMITMENT_STEPS),
+      side: z.enum(["INVESTOR", "COMPANY"]),
+    })
+    .strict(),
+  description:
+    "A commitment on a canonical relationship moved a step. Carries identifiers, the step and the acting side; never the amount.",
+});
+
+export function relationshipCommitmentChangedEvent(input: {
+  readonly tenantId: string;
+  readonly actorUserId: string;
+  readonly correlationId: CorrelationId;
+  readonly relationshipId: string;
+  readonly commitmentId: string;
+  readonly step: CommitmentStep;
+  readonly side: "INVESTOR" | "COMPANY";
+}): CapitalQEvent<
+  z.infer<typeof RelationshipCommitmentChangedEvent.dataSchema>
+> {
+  return {
+    specVersion: "1.0",
+    id: EventIdSchema.parse(randomUUID()),
+    type: RelationshipCommitmentChangedEvent.name,
+    source: RelationshipCommitmentChangedEvent.producer,
+    time: UtcTimestampSchema.parse(new Date().toISOString()),
+    subject: `relationship/${input.relationshipId}`,
+    dataContentType: "application/json",
+    eventVersion: RelationshipCommitmentChangedEvent.version,
+    tenantId: input.tenantId,
+    actor: { type: "HUMAN", id: input.actorUserId },
+    correlationId: input.correlationId,
+    aggregate: { type: "commitment", id: input.commitmentId, version: 1 },
+    data: {
+      relationshipId: input.relationshipId,
+      commitmentId: input.commitmentId,
+      step: input.step,
+      side: input.side,
+    },
+  };
+}
+
 export const NETWORK_EVENTS: readonly EventDefinition[] = [
   RelationshipCreatedEvent,
   RelationshipInterestExpressedEvent,
@@ -218,6 +287,7 @@ export const NETWORK_EVENTS: readonly EventDefinition[] = [
   RelationshipInterestDeclinedEvent,
   RelationshipOutcomeRecordedEvent,
   RelationshipMessageSentEvent,
+  RelationshipCommitmentChangedEvent,
 ];
 
 export function relationshipOutcomeRecordedEvent(input: {

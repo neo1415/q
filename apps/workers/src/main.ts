@@ -168,6 +168,7 @@ import { withQWorkWake } from "./network/q-work-wake-handler.js";
 import { withChatMessageEvents } from "./network/chat-message-handler.js";
 import { withInterestNotices } from "./network/interest-notice-handler.js";
 import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
+import { withCommitmentNotices } from "./network/commitment-notice-handler.js";
 import { withDiligenceSummaries } from "./network/diligence-summary-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
@@ -788,66 +789,77 @@ const documentEvents = createQueueRunner({
       // AUTO block (founder direction 2026-10-01): acceptance wakes Q's
       // waiting work at once, after the state above is projected.
       withQWorkWake(
-        withOutcomeNotices(
-          withDiligenceSummary(
-            withInterestNotices(
-              withReadinessAfterVerification(
-                withVerificationDecisions(
-                  createDomainEventHandler({
-                    registry,
-                    queues,
-                    pipelineVersion: config.documents.pipelineVersion,
-                    mediaModeration: {
-                      onReady: (event) => {
-                        // The message names the asset; the decision re-reads it. An id that
-                        // is not one is archived by the handler's own outcome, not thrown.
-                        const mediaAssetId = MediaAssetIdSchema.safeParse(
-                          event.mediaAssetId,
-                        );
-                        if (!mediaAssetId.success) {
-                          return Promise.resolve({ kind: "SKIPPED" });
-                        }
-                        return mediaModeration({
-                          tenantId: event.tenantId,
-                          mediaAssetId: mediaAssetId.data,
-                          correlationId: CorrelationIdSchema.parse(
-                            event.correlationId ?? `cor_${randomUUID()}`,
-                          ),
-                        });
+        withCommitmentNotices(
+          withOutcomeNotices(
+            withDiligenceSummary(
+              withInterestNotices(
+                withReadinessAfterVerification(
+                  withVerificationDecisions(
+                    createDomainEventHandler({
+                      registry,
+                      queues,
+                      pipelineVersion: config.documents.pipelineVersion,
+                      mediaModeration: {
+                        onReady: (event) => {
+                          // The message names the asset; the decision re-reads it. An id that
+                          // is not one is archived by the handler's own outcome, not thrown.
+                          const mediaAssetId = MediaAssetIdSchema.safeParse(
+                            event.mediaAssetId,
+                          );
+                          if (!mediaAssetId.success) {
+                            return Promise.resolve({ kind: "SKIPPED" });
+                          }
+                          return mediaModeration({
+                            tenantId: event.tenantId,
+                            mediaAssetId: mediaAssetId.data,
+                            correlationId: CorrelationIdSchema.parse(
+                              event.correlationId ?? `cor_${randomUUID()}`,
+                            ),
+                          });
+                        },
                       },
-                    },
-                    ...(founderReview === undefined ? {} : { founderReview }),
-                    ...(mandateReview === undefined ? {} : { mandateReview }),
-                    ...(presenceResearch === undefined
-                      ? {}
-                      : { presenceResearch }),
-                    recommendations: {
-                      onEvent: (event) =>
-                        slateInvalidation.apply(refreshDirectiveFor(event), {
-                          correlationId: event.correlationId,
-                          causationId: `cau_${event.id}`,
-                        }),
-                    },
+                      ...(founderReview === undefined ? {} : { founderReview }),
+                      ...(mandateReview === undefined ? {} : { mandateReview }),
+                      ...(presenceResearch === undefined
+                        ? {}
+                        : { presenceResearch }),
+                      recommendations: {
+                        onEvent: (event) =>
+                          slateInvalidation.apply(refreshDirectiveFor(event), {
+                            correlationId: event.correlationId,
+                            causationId: `cau_${event.id}`,
+                          }),
+                      },
+                      logger,
+                    }),
+                    { registry, decide: verificationDecider, logger },
+                  ),
+                  {
+                    registry,
+                    ownerOf: createDecidedClaimOwnerLookup({
+                      sql: database.sql,
+                    }),
+                    reconcile:
+                      readinessCompanies.reconcileMarketplaceReadinessAsSystem,
                     logger,
-                  }),
-                  { registry, decide: verificationDecider, logger },
+                  },
                 ),
                 {
                   registry,
-                  ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
-                  reconcile:
-                    readinessCompanies.reconcileMarketplaceReadinessAsSystem,
+                  sql: database.sql,
+                  notices: createCounterpartNotices(database.sql),
                   logger,
                 },
               ),
-              {
-                registry,
-                sql: database.sql,
-                notices: createCounterpartNotices(database.sql),
-                logger,
-              },
             ),
+            {
+              registry,
+              sql: database.sql,
+              notices: createCounterpartNotices(database.sql),
+              logger,
+            },
           ),
+          // 2026-10-04: each commitment step, told to the other side.
           {
             registry,
             sql: database.sql,

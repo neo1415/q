@@ -101,4 +101,12 @@ export {
   createPostgresCapitalObjectiveRepository,
 } from "./infrastructure/postgres-repositories.js";
 
+export {
+  CapitalRoundClosedError,
+  CapitalRoundNotFoundError,
+  createCapitalRoundService,
+  isRoundNotFound,
+  type CapitalRoundService,
+} from "./application/rounds.js";
+
 export const PACKAGE_NAME = "@capital-q/capital" as const;

@@ -98,6 +98,10 @@ export const CommitmentDtoSchema = z
       "DETECTED",
       "ADOPTED",
       "DISPUTED",
+      // 2026-10-04: the investor's side marked it sent; the company's side
+      // confirmed it arrived.
+      "TRANSFER_SENT",
+      "RECEIVED",
     ]),
     /** PERSON: a party stated it. Q_MEETING: Q heard it in a recorded call. */
     source: z.enum(["PERSON", "Q_MEETING"]),
@@ -115,6 +119,15 @@ export const CommitmentDtoSchema = z
     /** Detected money either side may adopt (then the other confirms) or dispute. */
     canAdopt: z.boolean(),
     canDispute: z.boolean(),
+    /** The company round it counts toward (2026-10-04). */
+    roundId: UuidSchema.nullable().optional(),
+    transferReference: z.string().nullable().optional(),
+    transferSentAt: UtcTimestampSchema.nullable().optional(),
+    receivedAt: UtcTimestampSchema.nullable().optional(),
+    /** The investor's side, on confirmed money. */
+    canMarkSent: z.boolean().optional(),
+    /** The company's side, on confirmed or sent money. */
+    canConfirmReceived: z.boolean().optional(),
   })
   .strict();
 export type CommitmentDto = z.infer<typeof CommitmentDtoSchema>;

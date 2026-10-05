@@ -1,10 +1,16 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   CapitalObjectiveNotFoundError,
+  isRoundNotFound,
+  type CapitalRoundService,
   type CapitalService,
 } from "@capital-q/capital";
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
+  CapitalLedgerDtoSchema,
+  COMPANY_CAPITAL_LEDGER_PATH,
+  MyCommitmentsDtoSchema,
+  NETWORK_MY_COMMITMENTS_PATH,
   createProblemDetails,
   FundraisingDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
@@ -21,7 +27,11 @@ import {
   StateCommitmentRequestSchema,
   UuidSchema,
 } from "@capital-q/contracts";
-import type { CommitmentOutcome, CommitmentService } from "@capital-q/network";
+import type {
+  CommitmentLedger,
+  CommitmentOutcome,
+  CommitmentService,
+} from "@capital-q/network";
 
 import {
   getActorContext,
@@ -43,7 +53,46 @@ export type CommitmentRoutesDependencies = ActorContextDependencies & {
   /** The company's active raise, for the target and what remains. */
   readonly capital?:
     Pick<CapitalService, "getCurrentCapitalObjective"> | undefined;
+  /** The company's rounds (2026-10-04), for the Capital page's book. */
+  readonly capitalRounds?: Pick<CapitalRoundService, "listRounds"> | undefined;
 };
+
+type Sums = { raised: string; confirmed: string; pledged: string };
+const ZERO: Sums = { raised: "0", confirmed: "0", pledged: "0" };
+
+/**
+ * Per-currency totals over the ledger's per-round sums. Exact: integer
+ * minor units (amounts carry at most two decimals), never floats.
+ */
+export function totalsOf(
+  sums: CommitmentLedger["sums"],
+): (Sums & { currencyCode: string })[] {
+  const minor = (value: string) => {
+    const [whole = "0", fraction = ""] = value.split(".");
+    return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0").slice(0, 2));
+  };
+  const text = (value: bigint) =>
+    value % 100n === 0n
+      ? (value / 100n).toString()
+      : `${(value / 100n).toString()}.${(value % 100n).toString().padStart(2, "0")}`;
+  const by = new Map<string, [bigint, bigint, bigint]>();
+  for (const sum of sums) {
+    const at = by.get(sum.currencyCode) ?? [0n, 0n, 0n];
+    by.set(sum.currencyCode, [
+      at[0] + minor(sum.received),
+      at[1] + minor(sum.confirmed),
+      at[2] + minor(sum.pledged),
+    ]);
+  }
+  return [...by.entries()].map(
+    ([currencyCode, [raised, confirmed, pledged]]) => ({
+      currencyCode,
+      raised: text(raised),
+      confirmed: text(confirmed),
+      pledged: text(pledged),
+    }),
+  );
+}
 
 function paramOf(request: FastifyRequest, name: string): string | null {
   const params = request.params as Readonly<Record<string, unknown>>;
@@ -209,6 +258,79 @@ export function registerCommitmentRoutes(
         reply,
         await commitments.dispute(getActorContext(request), commitmentId),
       );
+    },
+  );
+
+  // The Capital page's book (2026-10-04): the company's rounds with what
+  // each raised (RECEIVED money only), the all-time totals, every live
+  // commitment with this side's next step. Rounds are the raise's own
+  // capability; the book is the company's own relationship listing.
+  app.get(
+    COMPANY_CAPITAL_LEDGER_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const rawCompanyId = paramOf(request, "companyId");
+      if (rawCompanyId === null || dependencies.capitalRounds === undefined) {
+        return reply.callNotFound();
+      }
+      const actor = getActorContext(request);
+      const companyId = CompanyIdSchema.parse(rawCompanyId);
+      let rounds: Awaited<ReturnType<CapitalRoundService["listRounds"]>>;
+      try {
+        rounds = await dependencies.capitalRounds.listRounds({
+          actor,
+          companyId,
+        });
+      } catch (error: unknown) {
+        if (isRoundNotFound(error)) return reply.callNotFound();
+        throw error;
+      }
+      const ledger = await commitments.ledger({
+        actor,
+        side: "COMPANY",
+        companyId,
+      });
+      void reply.header("Cache-Control", "no-store");
+      return CapitalLedgerDtoSchema.parse({
+        rounds: rounds.map((round) => {
+          const sum = ledger.sums.find(
+            (item) =>
+              item.roundId === round.id &&
+              item.currencyCode === round.target.currency,
+          );
+          return {
+            ...round,
+            sums:
+              sum === undefined
+                ? ZERO
+                : {
+                    raised: sum.received,
+                    confirmed: sum.confirmed,
+                    pledged: sum.pledged,
+                  },
+          };
+        }),
+        currentRoundId: rounds.find((round) => round.isCurrent)?.id ?? null,
+        totals: totalsOf(ledger.sums),
+        commitments: ledger.commitments,
+      });
+    },
+  );
+
+  // An investor's own commitments across companies, and what they invested.
+  app.get(
+    NETWORK_MY_COMMITMENTS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const ledger = await commitments.ledger({
+        actor: getActorContext(request),
+        side: "INVESTOR",
+      });
+      void reply.header("Cache-Control", "no-store");
+      return MyCommitmentsDtoSchema.parse({
+        totals: totalsOf(ledger.sums),
+        commitments: ledger.commitments,
+      });
     },
   );
 

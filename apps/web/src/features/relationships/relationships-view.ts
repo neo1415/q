@@ -305,6 +305,7 @@ function actionFor(
     case "Q_ERRAND":
     case "Q_STAND_IN":
     case "COMMITMENT_DETECTED":
+    case "COMMITMENT":
       return { label: "Review", href };
     case "REMINDER":
     case "MEETING_SCHEDULED":

@@ -347,6 +347,32 @@ export const CommitmentDisputedRelationshipEvent = defineRelationshipEvent({
   description: "A party disputed money Q detected in a call.",
 });
 
+/**
+ * The money's last two steps (2026-10-04): the investor's side marked a
+ * confirmed commitment sent, then the company's side confirmed it arrived.
+ * relationship-state.v2 moves to INVESTED on receipt; marking it sent is
+ * activity. The amount and any reference stay on the commitment row.
+ */
+export const RELATIONSHIP_EVENT_COMMITMENT_TRANSFER_SENT =
+  "commitment_transfer_sent" as const;
+export const CommitmentTransferSentRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_COMMITMENT_TRANSFER_SENT,
+  payloadSchema: CommitmentActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The investor's side marked a confirmed commitment as sent; it counts as raised only once the company's side confirms receipt.",
+});
+
+export const RELATIONSHIP_EVENT_COMMITMENT_RECEIVED =
+  "commitment_received" as const;
+export const CommitmentReceivedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_COMMITMENT_RECEIVED,
+  payloadSchema: CommitmentActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The company's side confirmed a commitment's money arrived: invested capital.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -549,6 +575,8 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     MeetingRecordingDeclinedRelationshipEvent,
     CommitmentDetectedRelationshipEvent,
     CommitmentDisputedRelationshipEvent,
+    CommitmentTransferSentRelationshipEvent,
+    CommitmentReceivedRelationshipEvent,
     MeetingNoShowRelationshipEvent,
     RelationshipPassedRelationshipEvent,
     RelationshipPausedRelationshipEvent,

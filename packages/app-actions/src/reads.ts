@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { MediaAsset } from "@capital-q/media";
 import type { ActorContext } from "@capital-q/security";
 
+import { capitalItems } from "./actions/capital-read.js";
 import { sharingOf } from "./actions/pitch.js";
 import type { AppActionPorts } from "./ports.js";
 
@@ -27,6 +28,9 @@ export const OWN_READ_KINDS = [
   "uploads",
   // Diligence (2026-10-02): requests, answers and shared documents.
   "diligence",
+  // 2026-10-04: rounds, what each raised, and every commitment's step, so
+  // "how much have I raised" reads the Capital page's own numbers.
+  "capital",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -183,6 +187,8 @@ export async function readOwn(
       return ports.diligenceAreas === undefined
         ? null
         : ports.diligenceAreas(actor);
+    case "capital":
+      return capitalItems(ports, actor);
   }
 }
 
@@ -194,6 +200,7 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   calls: "Recent calls with Q's notes",
   uploads: "Files they uploaded",
   diligence: "Diligence requests and shared documents",
+  capital: "Rounds, money raised and commitments",
 };
 
 /** One kind in the "what exists" index: a count and a few titles with state. */
