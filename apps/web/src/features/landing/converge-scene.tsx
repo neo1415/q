@@ -80,16 +80,24 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
     };
     // One read and a few transform writes per frame at most; outside the
     // section's range the progress is clamped and nothing is written.
+    // Applied in the scroll event itself (Chrome sends at most one per
+    // frame), so the record moves on the same frame as the scroll; a rAF
+    // hop would trail it by one. Resize waits for the next frame.
     const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      update();
+    };
+    const onResize = () => {
       if (raf === 0) raf = requestAnimationFrame(update);
     };
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
