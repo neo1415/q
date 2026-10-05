@@ -94,7 +94,7 @@ describe("the library model", () => {
     const reading = model.fromUpload(
       upload(2, {
         currentVersion: {
-          ...upload(2).currentVersion!,
+          ...(upload(2).currentVersion ?? ({} as never)),
           processingStatus: "PROCESSING",
           textExtractionStatus: "NOT_STARTED",
         },
@@ -207,7 +207,9 @@ describe("the documents library", () => {
       q: null,
       uploads: "cursor-2",
     });
-    expect((await screen.findAllByText("Old contract")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Old contract")).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Legal" }));
     expect(screen.queryByText("Northstar deck")).toBeNull();

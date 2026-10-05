@@ -191,19 +191,15 @@ describe("the documents list", () => {
     expect(screen.getByText(/Made by Q, version 3/)).toBeTruthy();
     expect(screen.getByText(/Q is writing this/)).toBeTruthy();
     expect(
-      (
-        screen.getByRole("button", {
-          name: "Open Northstar — investor deck",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(false);
+      screen.getByRole("button", {
+        name: "Open Northstar — investor deck",
+      }),
+    ).toHaveProperty("disabled", false);
     expect(
-      (
-        screen.getByRole("button", {
-          name: "Open Call notes",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
+      screen.getByRole("button", {
+        name: "Open Call notes",
+      }),
+    ).toHaveProperty("disabled", true);
   });
 });
 

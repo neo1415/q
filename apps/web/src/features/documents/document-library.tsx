@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
@@ -76,12 +77,34 @@ import {
 type View = "grid" | "list";
 const VIEW_KEY = "cq.documents.view";
 
+const VIEW_EVENT = "cq-documents-view";
+let sessionView: View | null = null;
+
 function rememberedView(): View {
   try {
     return window.localStorage.getItem(VIEW_KEY) === "list" ? "list" : "grid";
   } catch {
-    return "grid";
+    return sessionView ?? "grid";
   }
+}
+
+function storeView(next: View): void {
+  try {
+    window.localStorage.setItem(VIEW_KEY, next);
+  } catch {
+    // A private window keeps the choice for this visit only.
+    sessionView = next;
+  }
+  window.dispatchEvent(new Event(VIEW_EVENT));
+}
+
+function subscribeView(onChange: () => void): () => void {
+  window.addEventListener(VIEW_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(VIEW_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
 }
 
 type Upload = {
@@ -363,7 +386,6 @@ export function DocumentLibrary({
   );
   const [failed, setFailed] = useState(initial === null);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<View>("grid");
   const [filter, setFilter] = useState<LibraryFilter>("ALL");
   const [sort, setSort] = useState<LibrarySort>("RECENT");
   const [query, setQuery] = useState("");
@@ -376,15 +398,13 @@ export function DocumentLibrary({
   const [renaming, setRenaming] = useState<LibraryItem | null>(null);
   const [sharing, setSharing] = useState<LibraryItem | null>(null);
 
-  useEffect(() => setView(rememberedView()), []);
-  const chooseView = (next: View) => {
-    setView(next);
-    try {
-      window.localStorage.setItem(VIEW_KEY, next);
-    } catch {
-      // A private window keeps the choice for this visit only.
-    }
-  };
+  // Per device, read after hydration (the server always draws the grid).
+  const view = useSyncExternalStore(
+    subscribeView,
+    rememberedView,
+    (): View => "grid",
+  );
+  const chooseView = storeView;
 
   // A document Q was asked to open (`?open=<id>`), only when it is one of
   // theirs, listed and ready.
@@ -917,9 +937,8 @@ export function DocumentLibrary({
               className="flex flex-col gap-4"
               onSubmit={(event) => {
                 event.preventDefault();
-                const title = String(
-                  new FormData(event.currentTarget).get("title") ?? "",
-                ).trim();
+                const named = new FormData(event.currentTarget).get("title");
+                const title = typeof named === "string" ? named.trim() : "";
                 const item = renaming;
                 if (title.length === 0) return;
                 setRenaming(null);

@@ -3038,9 +3038,10 @@ export function createModelGatewayQAnswer(
                   {
                     key: "q.capability_loaded",
                     qRunId: request.runId,
-                    need: String(
-                      (call.arguments as { need?: unknown } | null)?.need ?? "",
-                    ).slice(0, 120),
+                    need: ((need: unknown) =>
+                      typeof need === "string" ? need.slice(0, 120) : "")(
+                      (call.arguments as { need?: unknown } | null)?.need,
+                    ),
                     loaded: loaded.map((tool) => tool.definition.name),
                     offered: offered.length,
                     round: rounds,
