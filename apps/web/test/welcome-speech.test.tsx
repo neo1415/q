@@ -130,9 +130,7 @@ describe("Q-FIRST-RUN-TTS-001 · arriving for the first time", () => {
     // Before any gesture there is no extra button to press: Start is the
     // gesture (founder live 2026-10-05).
     await waitFor(() => {
-      expect(
-        document.querySelector('[data-q-speech="blocked"]'),
-      ).toBeTruthy();
+      expect(document.querySelector('[data-q-speech="blocked"]')).toBeTruthy();
     });
     expect(screen.queryByText("Hear Q")).toBeNull();
     await userEvent.click(screen.getByText("Start"));

@@ -15,6 +15,7 @@ function props(
   suggestedWebsite: string | undefined,
 ): StepProps<"company_basics"> {
   const submit = vi.fn(() => Promise.resolve());
+  const reached: Partial<FounderOnboardingActions> = { submit };
   return {
     step: {
       id: "company_basics",
@@ -30,7 +31,7 @@ function props(
     formId: "f",
     busy: false,
     // Only submit is reached from this step; the rest are never called.
-    actions: new Proxy({ submit } as Partial<FounderOnboardingActions>, {
+    actions: new Proxy(reached, {
       get: (target, key) =>
         key in target ? target[key as keyof typeof target] : vi.fn(),
     }) as FounderOnboardingActions,
@@ -42,7 +43,7 @@ describe("the website Q found, on the form", () => {
     render(<CompanyBasicsStep {...props("https://www.zinoaviation.com/")} />);
     expect(screen.getByText(/Q found zinoaviation\.com/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Use it" }));
-    const input = screen.getByLabelText("Website") as HTMLInputElement;
+    const input = screen.getByLabelText<HTMLInputElement>("Website");
     expect(input.value).toBe("https://www.zinoaviation.com/");
     // Offered once: a filled field needs no suggestion beside it.
     expect(screen.queryByRole("button", { name: "Use it" })).toBeNull();

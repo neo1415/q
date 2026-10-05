@@ -73,8 +73,7 @@ export function CompanyBasicsStep({
         disabled={busy}
         onChange={(event) => setWebsite(event.target.value)}
       />
-      {step.suggestedWebsite !== undefined &&
-      website.trim().length === 0 ? (
+      {step.suggestedWebsite !== undefined && website.trim().length === 0 ? (
         // What Q's research found, offered in place: one tap fills it,
         // and nothing is recorded until they continue.
         <div
