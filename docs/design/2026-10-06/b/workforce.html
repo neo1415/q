@@ -45,7 +45,7 @@
   .step time { font-size: 12.5px; color: var(--cq-text-tertiary); font-variant-numeric: tabular-nums; padding-top: 4px; }
   .handoff { font-size: 12.5px; color: var(--cq-text-tertiary); padding: 0 0 2px 66px; display: flex; gap: 6px; align-items: center; }
   .handoff svg { width: 14px; height: 14px; }
-  .grade { display: inline-flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+  .grade { display: flex; margin-top: 2px; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
   .grade b { font: 500 18px/1 var(--cq-font-editorial); }
   .grade small { color: var(--cq-text-tertiary); font-size: 12px; }
   .fb { margin: 6px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--cq-surface-subtle); font-size: 13.5px; color: var(--cq-text-secondary); }
@@ -88,11 +88,14 @@
   @media (max-width: 760px) {
     .wwrap { padding: 8px 16px 110px; }
     .wgrid { grid-template-columns: 1fr; }
-    .whead .spend { margin-left: 0; text-align: left; }
+    .whead .spend { margin-left: 0; text-align: left; width: 100%; display: flex; align-items: baseline; gap: 8px; }
+    .whead .spend span { display: inline; margin: 0; }
+    .whead { margin-bottom: 10px; gap: 8px; }
+    .jobs > h2.sec { display: none; }
     .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--cq-border-subtle); margin: 0 -16px 14px; padding: 0 12px; }
     .tabs button { min-height: 44px; border: 0; background: none; padding: 0 12px; cursor: pointer; color: var(--cq-text-secondary); border-bottom: 2px solid transparent; font-weight: 500; }
     .tabs button[aria-selected="true"] { color: var(--cq-text-primary); border-bottom-color: var(--cq-accent); }
-    .wgrid[data-tab="now"] .side { display: none; }
+    .wgrid[data-tab="now"] .rail2 { display: none; }
     .wgrid[data-tab="team"] .jobs, .wgrid[data-tab="cost"] .jobs { display: none; }
     .wgrid[data-tab="team"] .cost, .wgrid[data-tab="cost"] .team { display: none; }
     .wgrid[data-tab="cost"] .cost { margin-top: 0; }
@@ -160,7 +163,7 @@ function main() {
     <div class="tabs" role="tablist"><button role="tab" aria-selected="${tab === "now"}">Now</button><button role="tab" aria-selected="${tab === "team"}">Team</button><button role="tab" aria-selected="${tab === "cost"}">Cost</button></div>
     <div class="wgrid" data-tab="${tab}">
       <div class="jobs"><h2 class="sec">Now</h2>${JOB_INTRO}${JOB_REPLY}${JOB_WATCH}${JOB_DONE}</div>
-      <div class="side">${team}${cost}</div>
+      <div class="rail2">${team}${cost}</div>
     </div>
   </div>`;
 }
