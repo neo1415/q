@@ -102,6 +102,8 @@ describe("registry", () => {
         "APP_ACTION_ROUTER",
         // 2026-10-04: Q's one line on a document shared in diligence.
         "DILIGENCE_DOCUMENT_SUMMARY",
+        // Overnight A5 2026-10-06: a pitch deck into twelve sections.
+        "DECK_EXTRACTION",
         // ADR 0011: a yes, a no or neither, read from the person's words.
         "DECISION_READER",
         // ADR 0012: what a conversation taught Q about the person.

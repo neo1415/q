@@ -131,6 +131,15 @@ export {
   type DiligenceDocumentSummariser,
 } from "./diligence-summary.js";
 export {
+  createDeckReader,
+  DECK_READER_PROMPT_VERSION,
+  DECK_READER_TEXT_MAX,
+  deckText,
+  normaliseDeckReading,
+  type DeckPassage,
+  type DeckReader,
+} from "./deck-reader.js";
+export {
   createQTurnReader,
   readerActions,
   TURN_READER_ACTIONS_MAX,

@@ -259,3 +259,9 @@ export {
   SHARED_DOWNLOAD_TTL_SECONDS,
   type SharedDocumentDownloads,
 } from "./application/shared-download.js";
+export {
+  coachDeck,
+  DECK_RUBRIC_VERSION,
+  MINIMUM_STANDARD_SECTIONS,
+  scoreDeckSection,
+} from "./domain/deck-coaching.js";

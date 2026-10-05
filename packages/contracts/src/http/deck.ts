@@ -235,3 +235,37 @@ export const DeckExtractionConfirmResultSchema = z
 export type DeckExtractionConfirmResult = z.infer<
   typeof DeckExtractionConfirmResultSchema
 >;
+
+// --- what the reader stores (internal; never on an investor's wire) ----------
+
+/**
+ * Q's reading of one section, as stored: the investor-facing section plus
+ * whether the deck meets each rung of the research rubric (§4) for that
+ * section. The model judges the content ("is the pain quantified?"); code
+ * turns those answers into the 0-5 score, the same way for every company.
+ * The criteria are stripped from every investor projection.
+ */
+export const DeckRubricCriteriaSchema = z
+  .object({
+    /** The rubric's "3 Clear" for this section is met. */
+    clear: z.boolean(),
+    /** "4 Strong" is met. */
+    strong: z.boolean(),
+    /** "5 Exceptional" is met. */
+    exceptional: z.boolean(),
+    /** One short, specific observation for the founder; null: nothing to add. */
+    note: z.string().trim().min(1).max(240).nullable(),
+  })
+  .strict();
+export type DeckRubricCriteria = z.infer<typeof DeckRubricCriteriaSchema>;
+
+export const DeckSectionReadingSchema = DeckSectionSchema.extend({
+  criteria: DeckRubricCriteriaSchema,
+}).strict();
+export type DeckSectionReading = z.infer<typeof DeckSectionReadingSchema>;
+
+/** The investor-facing section: the reading without the rubric. */
+export function deckSectionForReaders(reading: DeckSectionReading): DeckSection {
+  const { criteria: _criteria, ...section } = reading;
+  return section;
+}
