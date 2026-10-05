@@ -653,7 +653,9 @@ export function registerQVoiceRoutes(
           request.log.warn({ err: error }, "welcome opening line unavailable");
         }
       } else if (
-        !resume &&
+        // Q leads on a resumed line too (onboarding conductor): the
+        // conductor resumes on the next unanswered step without greeting
+        // again, so the person never has to speak first.
         input.onboarding !== undefined &&
         agent !== undefined &&
         apiBaseUrl !== undefined

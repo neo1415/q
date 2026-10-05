@@ -219,6 +219,16 @@ export type InterviewTurnOutcome = {
   readonly delivery?: SpeechDelivery | null | undefined;
   /** PRESENCE: what Q's particles form for which sentence of the reply. */
   readonly gestures?: QSentenceGestures | undefined;
+  /** The person asked to pause: the conductor asks nothing after this reply. */
+  readonly pausing?: boolean | undefined;
+  /**
+   * A finding the reply puts to the person for confirmation (the
+   * conductor's queue): "I found X — is that you / your website?".
+   */
+  readonly confirming?:
+    { readonly key: string; readonly kind: "PERSON" | "WEBSITE" } | undefined;
+  /** The reply resumed a conversation already under way: no greeting. */
+  readonly resumed?: boolean | undefined;
 };
 
 export type OnboardingRefusal = {

@@ -1,4 +1,5 @@
 import type { InterviewAgent } from "./interview-agent.js";
+import { dispatchTurn, nextUnansweredStep } from "./onboarding-conductor.js";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -34,7 +35,6 @@ import {
   type InterviewTurnInput,
   type InterviewTurnOutcome,
 } from "./interview-steps.js";
-import type { PresenceFound } from "./presence-trigger.js";
 import {
   endsUnfinished,
   followOfAnswer,
@@ -44,11 +44,7 @@ import {
   resumeAcknowledgement,
   withoutContinueSignal,
 } from "./navigation.js";
-import {
-  recognitionQuestion,
-  RIGHT_PERSON_LINE,
-  WRONG_PERSON_LINE,
-} from "./recognise.js";
+import { RIGHT_PERSON_LINE, WRONG_PERSON_LINE } from "./recognise.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
 import type { QTurnReader, QTurnReading } from "@capital-q/model-gateway/q";
@@ -1395,17 +1391,9 @@ export function createVoiceTurnHandler(
           ),
         );
       }
-      // Capital Q may now know enough to look this company up, and the
-      // person who named it. Detached: the read happens while they keep
-      // talking, and what it finds waits here for the next gap.
-      dependencies.presence?.afterInterviewTurn(
-        binding.actor,
-        outcome.view,
-        (found) => {
-          foundPerson.set(binding, found);
-        },
-        { organisationName: binding.thread.organisationHint ?? null },
-      );
+      // The public look-ups by name, and the findings they turn into
+      // questions, belong to the onboarding conductor (one owner): it
+      // started them inside the turn and queued what they found.
       dependencies.board?.record(binding.voiceSessionId, {
         asking:
           outcome.asking === null
@@ -1445,77 +1433,30 @@ export function createVoiceTurnHandler(
         void dependencies.pronunciation.teach(outcome.pronounce);
       }
       if (outcome.questionForQ !== null) {
-        if (outcome.reply.length > 0) {
-          await speakLine(speaker, outcome.reply, signal, binding);
-        }
         /**
-         * Research the person asked for (CQ-QX-005 §11, §13, §16). The
-         * interviewer decided it should run and where to return to; this
-         * carries it, tells the interviewer how it ended so a route that
-         * is down stops being offered, and then returns the conversation
-         * to the question that was open — the tool result re-enters the
-         * conversational state rather than leaving the person in the air.
+         * One brain (onboarding conductor, founder report 2026-10-05): a
+         * question asked mid-onboarding is never handed to the general
+         * ANSWER pipeline. Live, both ran for one sentence, one cancelled
+         * the other and Q interrupted itself. The conductor answers a
+         * look-up inside the flow; an unwrapped loop that still hands one
+         * over is told it ended, and the open question is put again.
          */
-        const asked = await askQ(
-          binding,
-          outcome.questionForQ,
-          signal,
-          speaker,
-          {
-            // A look-up: what it finds is offered, what it does not find
-            // is said in one line rather than narrated (QX-004 §1.6).
-            lookup: true,
-            proactive: false,
-          },
-        );
-        // The engine that handed the look-up over is told how it ended.
-        agent.researchEnded(
-          onboarding.sessionId,
-          lastRunFailed.get(binding) !== true,
-        );
-        if (asked.kind === "SPOKEN" && outcome.resume !== null) {
-          await speakLine(
-            speaker,
-            `Back to where we were. ${outcome.resume.question}`,
-            signal,
-            binding,
-          );
-        }
-        return asked;
+        agent.researchEnded(onboarding.sessionId, true);
+        const line =
+          outcome.resume === null
+            ? outcome.reply
+            : `${outcome.reply} ${outcome.resume.question}`.trim();
+        return (await speakLine(speaker, line, signal, binding))
+          ? { kind: "SPOKEN", path: "INTERVIEW" }
+          : { kind: "INTERRUPTED", path: "INTERVIEW" };
       }
       /**
-       * Q showing it already knows who it is talking to.
-       *
-       * Asked here, once, in the gap after an answer has been taken and
-       * before the next question: the research finished while the person
-       * was mid-sentence, and interrupting them with it would be worse
-       * than not having done it. It rides along with the reply rather
-       * than becoming a turn of its own.
+       * Q checking it has found the right person: the conductor put the
+       * finding at the end of this reply, in the gap after an answer was
+       * taken, so the next words are read as the yes or no to it.
        */
-      const found = foundPerson.get(binding);
-      if (found !== undefined && !awaitingRecognition.has(binding)) {
-        foundPerson.delete(binding);
-        const recognition = recognitionQuestion(found);
-        if (recognition !== null) {
-          awaitingRecognition.add(binding);
-          dependencies.board?.record(binding.voiceSessionId, {
-            asking: {
-              stepKey: "presence.recognition",
-              kind: "YES_NO",
-              options: [...recognition.options],
-            },
-            navigate: null,
-            handoff: null,
-            degraded: false,
-          });
-          const line =
-            outcome.reply.length > 0
-              ? `${outcome.reply} ${recognition.line}`
-              : recognition.line;
-          return (await speakLine(speaker, line, signal, binding))
-            ? { kind: "SPOKEN", path: "INTERVIEW" }
-            : { kind: "INTERRUPTED", path: "INTERVIEW" };
-        }
+      if (outcome.confirming?.kind === "PERSON") {
+        awaitingRecognition.add(binding);
       }
       return (await speakLine(speaker, outcome.reply, signal, binding))
         ? { kind: "SPOKEN", path: "INTERVIEW" }
@@ -1656,14 +1597,33 @@ export function createVoiceTurnHandler(
   };
 
   /**
-   * What Capital Q found about this person, waiting for Q to say it.
-   *
-   * The lookup happens the moment there is a name and something to tell
-   * them apart by, which is usually while they are mid-sentence. It is
-   * held here until the next natural gap, asked once, and then forgotten
-   * whichever way they answer.
+   * Q leads (onboarding conductor): after a line that settles a side
+   * question, the next unanswered onboarding step, so the person is never
+   * left waiting for Q to ask. Nothing when the line is not an interview's
+   * or the session cannot be read.
    */
-  const foundPerson = new WeakMap<VoiceSessionBinding, PresenceFound>();
+  const withNextQuestion = async (
+    binding: VoiceSessionBinding,
+    line: string,
+  ): Promise<string> => {
+    const onboarding = binding.thread.onboarding;
+    const api = dependencies.onboarding;
+    if (onboarding === undefined || api === undefined) return line;
+    try {
+      const view = await getOnboardingSession(
+        {
+          baseUrl: api.apiBaseUrl,
+          accessToken: binding.accessToken,
+          ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
+        },
+        onboarding.sessionId,
+      );
+      const next = nextUnansweredStep(view, onboarding.journeyType);
+      return next === null ? line : `${line} ${next.question}`;
+    } catch {
+      return line;
+    }
+  };
   /** Set while the recognition question is on the table. */
   const awaitingRecognition = new WeakSet<VoiceSessionBinding>();
 
@@ -1934,7 +1894,14 @@ export function createVoiceTurnHandler(
         // theirs is theirs, and Q says so rather than quietly keeping it.
         return carryOn(
           read,
-          (await speakLine(speaker, WRONG_PERSON_LINE, signal, binding))
+          (await speakLine(
+            speaker,
+            read.remainder === null
+              ? await withNextQuestion(binding, WRONG_PERSON_LINE)
+              : WRONG_PERSON_LINE,
+            signal,
+            binding,
+          ))
             ? { kind: "SPOKEN", path: "MOVE" }
             : { kind: "INTERRUPTED", path: "MOVE" },
         );
@@ -1942,7 +1909,14 @@ export function createVoiceTurnHandler(
       if (read.decision === "YES") {
         return carryOn(
           read,
-          (await speakLine(speaker, RIGHT_PERSON_LINE, signal, binding))
+          (await speakLine(
+            speaker,
+            read.remainder === null
+              ? await withNextQuestion(binding, RIGHT_PERSON_LINE)
+              : RIGHT_PERSON_LINE,
+            signal,
+            binding,
+          ))
             ? { kind: "SPOKEN", path: "MOVE" }
             : { kind: "INTERRUPTED", path: "MOVE" },
         );
@@ -2017,10 +1991,14 @@ export function createVoiceTurnHandler(
     // "Take me to Discover" is no longer matched here from the words (ADR
     // 0011, R20): it reaches Q like any turn, and the screen follows the
     // navigation block Q's answer carries (askQ), exactly as typed.
+    // The single dispatch (onboarding conductor): exactly one brain per
+    // turn. A line bound to an onboarding session is the interview's,
+    // whatever was said; the general pipeline never also runs for it.
+    const owner = dispatchTurn(binding.thread);
     const answering =
-      binding.thread.welcome === true
+      owner === "WELCOME"
         ? welcomeTurn(binding, text, turnSignal, speaker)
-        : binding.thread.onboarding !== undefined
+        : owner === "INTERVIEW"
           ? answerInterview(binding, text, turnSignal, speaker)
           : askQ(binding, text, turnSignal, speaker);
     // Never an unhandled rejection when the answer is stopped.

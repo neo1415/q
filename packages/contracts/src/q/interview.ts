@@ -121,6 +121,23 @@ export const QInterviewTurnResponseSchema = z
     conduct: QConductSchema.optional(),
     /** PRESENCE: what Q's particles form for which sentence of the reply. */
     gestures: QSentenceGesturesSchema.optional(),
+    /**
+     * The onboarding conductor resumed a conversation already under way
+     * (an empty-utterance opening on a kept thread): `reply` carries no
+     * greeting and ends on the next unanswered step; speak it at once.
+     * Absent from older servers and on a first opening.
+     */
+    resumed: z.literal(true).optional(),
+    /**
+     * The reply ends by putting a public finding to the person ("I found
+     * maisolifoundation.org — is that your website?"). WEBSITE findings
+     * are also held as a pending recommendation on the website step, so a
+     * plain yes accepts it like any other. Absent when nothing is asked.
+     */
+    confirming: z
+      .object({ kind: z.enum(["PERSON", "WEBSITE"]) })
+      .strict()
+      .optional(),
   })
   .strict();
 export type QInterviewTurnResponse = z.infer<

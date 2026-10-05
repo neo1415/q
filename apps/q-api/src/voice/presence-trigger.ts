@@ -81,6 +81,11 @@ export type PersonNameLookup = {
  * this, because a build only runs for a subject the actor already owns.
  */
 export type PresenceFound = {
+  /**
+   * Whose presence this is. Absent means the person (older callers): a
+   * company's findings carry "COMPANY" and become a website question.
+   */
+  readonly subjectType?: "PERSON" | "COMPANY" | undefined;
   readonly name: string;
   readonly statements: readonly string[];
   readonly domains: readonly string[];
@@ -160,16 +165,24 @@ export function createPresenceTrigger(
         });
         // Counts and a status. Never a statement, a query or a page.
         logger?.info(
-          { status: outcome.status, subjectType },
+          {
+            status: outcome.status,
+            subjectType,
+            ...(outcome.status === "SKIPPED" ? { reason: outcome.reason } : {}),
+            searchedByNameOnly: identity.websiteUrl === null,
+          },
           "public presence build finished",
         );
         if (
-          subjectType === "PERSON" &&
+          subjectType !== "INVESTOR_ORGANISATION" &&
           outcome.status === "COMPLETED" &&
-          outcome.understandings.length > 0 &&
+          (outcome.understandings.length > 0 || outcome.domains.length > 0) &&
           report !== undefined
         ) {
+          // What was found goes back to the person as a question (the
+          // onboarding conductor's queue), never straight onto the record.
           report({
+            subjectType,
             name: identity.name,
             statements: outcome.understandings.map((u) => u.statement),
             domains: outcome.domains,
@@ -269,6 +282,8 @@ export function createPresenceTrigger(
         interviewName.length >= 2 &&
         once(subject.type, subject.id)
       ) {
+        // By name even without a website (founder report 2026-10-05: the
+        // company read was skipped for want of one, and nothing was said).
         start(
           actor,
           subject.type,
@@ -279,7 +294,9 @@ export function createPresenceTrigger(
             profileUrl: null,
             qualifier: null,
           },
-          undefined,
+          // Only a company's own site becomes a question, and only while
+          // the website step is still open.
+          subject.type === "COMPANY" && website === null ? onFound : undefined,
         );
       }
 

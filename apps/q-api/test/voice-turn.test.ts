@@ -906,7 +906,7 @@ describe("a spoken question for Q", () => {
     ]);
   });
 
-  it("hands a look-up to Q, reports how it ended to the loop, and returns to the open question (P0-1)", async () => {
+  it("never hands a mid-onboarding look-up to the general ANSWER pipeline: one brain, and back to the open question (conductor)", async () => {
     const runtime = fakeRuntime();
     const ended: [string, boolean][] = [];
     const handle = createVoiceTurnHandler({
@@ -962,12 +962,15 @@ describe("a spoken question for Q", () => {
       speaker,
     );
 
-    expect(outcome.kind).toBe("SPOKEN");
-    expect(runtime.calls.createRun).toHaveLength(1);
+    expect(outcome).toEqual({ kind: "SPOKEN", path: "INTERVIEW" });
+    // Live 2026-10-05: an interview run and a Q ANSWER run both started for
+    // one sentence and one cancelled the other. Now no Q run starts.
+    expect(runtime.calls.createRun).toHaveLength(0);
     expect(ended).toEqual([[SESSION_ID, true]]);
     const said = speaker.spoken.join(" ");
     expect(said).toContain("Let me look that up.");
     expect(said).toContain("What stage are you at?");
+    expect(said).not.toContain("Three funds");
   });
 
   it("pauses at an interruption: nothing stale is spoken, the run keeps going, and 'go on' resumes the answer (rework)", async () => {

@@ -68,6 +68,12 @@ export type InvestorResearchIdentity = {
 };
 
 export type InvestorResearchDependencies = {
+  /**
+   * Whose journey this engine reads for. The same engine reads a
+   * founder's company; its log said "investor research" for a founder
+   * (founder report 2026-10-05). Default: investor.
+   */
+  readonly journey?: "investor" | "founder" | undefined;
   /** The public web: the firm's site and a declared profile link (Bright Data, C5). */
   readonly read: (request: {
     readonly actor: ActorContext;
@@ -485,8 +491,14 @@ export function createInvestorResearch(
     research.status = findings.length === 0 ? "NOTHING_FOUND" : "FOUND";
     // Counts only: never a page, a quote or a value.
     logger?.info(
-      { pages: bounded.length, findings: findings.length },
-      "investor research finished",
+      {
+        journey: dependencies.journey ?? "investor",
+        pages: bounded.length,
+        findings: findings.length,
+      },
+      dependencies.journey === "founder"
+        ? "founder research finished"
+        : "investor research finished",
     );
     if (findings.length > 0) {
       await offer(
