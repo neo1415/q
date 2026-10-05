@@ -56,6 +56,7 @@ export {
   Monitor,
   MonitorUp,
   Moon,
+  LogOut,
   MoreHorizontal,
   Newspaper,
   Move,

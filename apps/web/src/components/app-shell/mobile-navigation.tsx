@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SignOutControl } from "@/features/auth";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
@@ -266,6 +267,9 @@ function MoreSheet({
             Appearance
           </span>
           <ThemeToggle />
+        </div>
+        <div className="mt-3 border-t border-(--cq-border-subtle) pt-2">
+          <SignOutControl appearance="row" />
         </div>
       </SheetContent>
     </SheetRoot>

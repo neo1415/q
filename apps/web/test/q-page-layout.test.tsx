@@ -24,6 +24,7 @@ vi.mock("../src/features/q/chats-list", () => ({
 }));
 vi.mock("../src/features/q/active-conversation", () => ({
   useHomeHref: () => "/home",
+  forgetActiveConversations: () => undefined,
 }));
 
 const { DesktopSidebar } =
@@ -100,5 +101,10 @@ describe("R24 · the sidebar", () => {
     render(<DesktopSidebar context={INVESTOR} />);
     expect(screen.getByRole("button", { name: /^Theme: / })).toBeTruthy();
     expect(screen.queryByRole("group", { name: "Theme" })).toBeNull();
+  });
+
+  it("keeps Sign out in its footer, where people look for it", () => {
+    render(<DesktopSidebar context={INVESTOR} />);
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
 });

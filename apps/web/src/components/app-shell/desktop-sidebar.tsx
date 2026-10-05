@@ -10,6 +10,7 @@ import { ICON_SIZE, ICON_STROKE, PanelLeft, Search } from "@capital-q/ui/icons";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { ThemeMenu } from "@/features/appearance/theme-menu";
+import { SignOutControl } from "@/features/auth";
 import { NotificationCenter } from "@/features/work/notification-center";
 import { useHomeHref } from "@/features/q/active-conversation";
 
@@ -184,6 +185,7 @@ export function DesktopSidebar({
         <ThemeMenu align={collapsed ? "start" : "end"} />
         {/* AUTO: notices from Q and the push switch, one bell. */}
         <NotificationCenter />
+        <SignOutControl appearance="icon" />
       </div>
     </aside>
   );
