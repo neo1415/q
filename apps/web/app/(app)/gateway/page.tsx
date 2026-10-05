@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 
-import { listGatewayApplications, listGateways } from "@capital-q/api-client";
+import {
+  getGatewayPolicy,
+  listGatewayApplications,
+  listGateways,
+} from "@capital-q/api-client";
 import type { GatewayApplicationDto } from "@capital-q/contracts";
 
 import {
@@ -13,6 +17,7 @@ import {
   CopyButton,
   OpenGatewayButton,
 } from "@/features/gateq/gateway-controls";
+import { PolicyEditor } from "@/features/gateq/policy-editor";
 import { publicGateway } from "@/features/gateq/public-gateway";
 import { appOrigin } from "@/features/q-card/public-card-data";
 import { qrSvg } from "@/features/q-card/qr";
@@ -23,8 +28,17 @@ export const dynamic = "force-dynamic";
 
 const ACCESS_WORDS: Readonly<Record<string, string>> = {
   MAY_APPLY: "Fits",
-  MAY_NOT_APPLY: "Outside your rules",
-  NEEDS_INFORMATION: "Needs more",
+  MAY_NOT_APPLY: "Not a fit",
+  NEEDS_INFORMATION: "Partial",
+};
+
+const DIMENSION_WORDS: Readonly<Record<string, string>> = {
+  TAXONOMY: "Sector",
+  EXCLUDED_TAXONOMY: "Excluded sectors",
+  GEOGRAPHY: "Geography",
+  STAGE: "Stage",
+  RAISE_SIZE: "Raise size",
+  CHEQUE_COMPATIBILITY: "Cheque size",
 };
 
 /**
@@ -66,7 +80,10 @@ export default async function GatewayPage() {
 
   const origin = appOrigin();
   const link = `${origin}/g/${gateway.publicId}`;
-  const snippet = `<script src="${origin}/gateq-embed.js" data-gateway="${gateway.publicId}" async></script>`;
+  // P7: one line on any website; a "Do we fit? Ask Q" launcher.
+  const snippet = `<script src="${origin}/gateq.js" data-gate="${gateway.publicId}" async></script>`;
+  const policy = await getGatewayPolicy(session, gateway.id).catch(() => null);
+  const rules = policy?.version.status === "PUBLISHED" ? policy.criteria : [];
   const applications: readonly GatewayApplicationDto[] =
     await listGatewayApplications(session, gateway.id)
       .then((result) => result.applications)
@@ -74,8 +91,42 @@ export default async function GatewayPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Gateway" description={published.title} />
+      <PageHeader
+        title="Gateway"
+        description="Q checks founders against your mandate on your own website, and tells them whether they fit."
+      />
       <div className="flex flex-col gap-10">
+        <PageSection id="rules" title="Your rules">
+          <div className="flex flex-col gap-6">
+            {rules.length === 0 ? (
+              <p className="cq-body text-(--cq-text-secondary)">
+                No rules yet: every founder can share. Give Q your mandate and
+                it drafts them.
+              </p>
+            ) : (
+              <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
+                {rules.map((rule) => (
+                  <li
+                    key={rule.id}
+                    className="flex items-baseline justify-between gap-3 py-2.5"
+                  >
+                    <span className="cq-body text-(--cq-text-primary)">
+                      {rule.label}
+                    </span>
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      {DIMENSION_WORDS[rule.config.type] ?? rule.config.type} ·{" "}
+                      {rule.requiredness === "REQUIRED"
+                        ? "Required"
+                        : "Preferred"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <PolicyEditor hasRules={rules.length > 0} />
+          </div>
+        </PageSection>
+
         <PageSection id="share" title="Share">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
             <div
@@ -101,7 +152,7 @@ export default async function GatewayPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  On your website
+                  On your website: paste once, before the closing body tag
                 </span>
                 <code className="cq-caption block rounded-xl bg-(--cq-surface-subtle) p-3 break-all text-(--cq-text-primary)">
                   {snippet}
@@ -114,10 +165,27 @@ export default async function GatewayPage() {
           </div>
         </PageSection>
 
-        <PageSection id="applications" title="Applications">
+        <PageSection id="preview" title="Preview">
+          <div className="flex flex-col gap-2">
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              What a founder sees when they press &ldquo;Do we fit? Ask Q&rdquo;
+              on your website. Trying it here starts a real, anonymous
+              conversation.
+            </p>
+            <iframe
+              src={`/g/${gateway.publicId}/embed`}
+              title="Preview of your fit check"
+              loading="lazy"
+              className="h-[640px] w-full max-w-[400px] rounded-2xl border border-(--cq-border-subtle)"
+            />
+          </div>
+        </PageSection>
+
+        <PageSection id="applications" title="Founders who shared">
           {applications.length === 0 ? (
             <p className="cq-body text-(--cq-text-secondary)">
-              None yet. Share the link and they arrive here.
+              None yet. Founders appear here only when they choose to share with
+              you after their fit check.
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">

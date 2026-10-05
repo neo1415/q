@@ -27,6 +27,10 @@ export {
 } from "./define.js";
 export type { AppActionPorts } from "./ports.js";
 export { WORK_ACTIONS, type QWorkPagePort } from "./actions/work.js";
+export {
+  GATEQ_ACTIONS,
+  type GateQPolicyExtractionPort,
+} from "./actions/gateq.js";
 export { delegableOnItsOwn, settleGrant } from "./delegation.js";
 export {
   REFERENCE_KINDS,

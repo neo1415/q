@@ -166,8 +166,8 @@ select is((select count(*)::int from information_schema.columns
               and column_name in ('storage_key', 'content', 'extracted_text', 'bytes')), 0,
   'GateQ stores no bytes, no storage key and no extracted text: Evidence owns the document');
 
-select is((select count(*)::int from information_schema.tables where table_schema = 'gateq'), 8,
-  'eight gateq tables: three for the gateway, five for the application');
+select is((select count(*)::int from information_schema.tables where table_schema = 'gateq'), 9,
+  'nine gateq tables: three for the gateway, five for the application, one for mandate-reading provenance (P7)');
 
 select * from finish();
 rollback;

@@ -537,3 +537,51 @@ describe("what one credential may do", () => {
     expect(submitted.statusCode).toBe(200);
   });
 });
+
+describe("opening conversations from an embedded gateway (P7)", () => {
+  it("caps how many conversations one gateway can be made to open, before any row", async () => {
+    const { app, recorded } = buildApp({ throttle: createGuestThrottle() });
+    const start = () =>
+      app.inject({
+        method: "POST",
+        url: GATEQ_APPLY_START_PATH,
+        payload: { gatewayPublicId: PUBLIC_ID },
+      });
+    for (let i = 0; i < GATEQ_GUEST_QUOTAS.START.limit; i += 1) {
+      expect((await start()).statusCode).toBe(201);
+    }
+    const limited = await start();
+    expect(limited.statusCode).toBe(429);
+    expect(limited.headers["content-type"]).toContain(
+      "application/problem+json",
+    );
+    // The refused start never reached the intake service.
+    expect(recorded.starts).toHaveLength(GATEQ_GUEST_QUOTAS.START.limit);
+  });
+});
+
+describe("consent (P7): nothing reaches the investor without the founder's Share", () => {
+  it("a whole conversation that fits submits nothing until the founder asks", async () => {
+    const { app, recorded } = buildApp({});
+    const started = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_START_PATH,
+      payload: { gatewayPublicId: PUBLIC_ID },
+    });
+    expect(started.statusCode).toBe(201);
+    for (const [index, message] of [
+      "We are Lumen Pay, in Lagos.",
+      "Seed, raising $750k.",
+    ].entries()) {
+      const turned = await app.inject({
+        method: "POST",
+        url: GATEQ_APPLY_TURN_PATH,
+        headers: bearer(TOKEN),
+        payload: { message, clientTurnId: `turn-consent-${index}` },
+      });
+      expect(turned.statusCode).toBe(200);
+    }
+    // No submission, so nothing in the organisation's inbox.
+    expect(recorded.submits).toEqual([]);
+  });
+});

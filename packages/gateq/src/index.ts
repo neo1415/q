@@ -27,6 +27,26 @@ export {
 } from "./domain/qualification.js";
 export { publicProjectionOf } from "./domain/public-projection.js";
 export { generateGatewayPublicId } from "./domain/public-id.js";
+export {
+  readMandate,
+  MANDATE_READER_VERSION,
+  MANDATE_TEXT_MAX_CHARS,
+  SECTOR_VOCABULARY,
+  type MandateDimension,
+  type MandateReading,
+  type MandateVocabularyNode,
+  type PolicyProposal,
+} from "./domain/mandate-reader.js";
+export {
+  createPolicyExtractionService,
+  MandateTextEmptyError,
+  type PolicyExtraction,
+  type PolicyExtractionRecord,
+  type PolicyExtractionRepository,
+  type PolicyExtractionService,
+  type PolicySourceKind,
+} from "./application/policy-extraction.js";
+export { createPostgresPolicyExtractionRepository } from "./infrastructure/postgres-policy-extraction-repository.js";
 
 export {
   createGateQService,

@@ -674,6 +674,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/relationships": exempt("development-only page"),
   "/dev/results": exempt("development-only page"),
   "/dev/rehearsals": exempt("development-only page"),
+  "/dev/gateq": exempt("development-only page"),
   "/u/[handle]": PUBLIC,
   // GateQ: a gateway's public page and the embed another site frames.
   "/g/[publicId]": PUBLIC,

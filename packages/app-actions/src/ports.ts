@@ -42,6 +42,7 @@ import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 
 import type { DeckAudiencePort } from "./actions/deck.js";
 import type { DocumentChangePort } from "./actions/document-manage.js";
+import type { GateQPolicyExtractionPort } from "./actions/gateq.js";
 import type { QWorkPagePort } from "./actions/work.js";
 
 /**
@@ -59,6 +60,8 @@ export type DocumentUploadLimits = {
 export type AppActionPorts = {
   /** WORK-58: pause/resume their own standing instruction, set a card aside. */
   readonly qWork?: QWorkPagePort | undefined;
+  /** P7: an investor's mandate read into DRAFT gateway rules. */
+  readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
   /** ADR 0041: who may download a pitch deck (the Evidence service). */
   readonly deckAudience?: DeckAudiencePort | undefined;
   /** P3: rename and delete (archive) their own documents (Evidence). */

@@ -165,6 +165,7 @@ function build(options: {
     replaceDraft: notUnderTest,
     publishVersion: notUnderTest,
     qualifyCompany: notUnderTest,
+    authoriseEdit: notUnderTest,
     publicGateway: () => Promise.resolve(null),
   };
   const { app } = createApp(
