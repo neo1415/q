@@ -96,7 +96,7 @@
   .cards[data-layout="row"] .card[data-state="rest"] .score { grid-column: 2; grid-row: 2; justify-items: start; display: flex; gap: 6px; align-items: baseline; }
   .cards[data-layout="row"] .card[data-state="rest"] .score .num { font-size: 24px; }
   .cards[data-layout="row"][data-n="1"] .card { max-width: 640px; }
-  .cards[data-layout="grid"] { grid-template-columns: 1.6fr repeat(3, minmax(0, 1fr)); }
+  .cards[data-layout="grid"] { grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); }
   .cards[data-layout="grid"] { align-items: stretch; }
   .cards[data-layout="grid"] .card[data-state="focus"] { grid-column: 1; grid-row: 1 / span 3; align-self: start; }
   .cards[data-layout="grid"] .card[data-state="rest"] { background: color-mix(in oklab, var(--hue) 9%, var(--cq-surface-raised)); }
@@ -110,7 +110,7 @@
 @media (max-width: 760px) {
   .qbar { padding: 6px 8px 0 16px; }
   .stage { padding: 4px 16px 12px; gap: 12px; }
-  .cards { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .card { grid-column: span 2; }
   .cards[data-tiles] .card[data-state="rest"] { grid-column: span 1; }
   .cards[data-tiles] .card[data-state="rest"] .line { display: none; }
