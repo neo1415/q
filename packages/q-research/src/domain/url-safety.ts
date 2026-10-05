@@ -204,9 +204,7 @@ export function publicDomainOf(
  * forms still pass judgePublicUrl, so a private, local or metadata host
  * is refused exactly as before (ADR 0009 rule 4).
  */
-export function normaliseWebAddress(
-  candidate: string,
-): {
+export function normaliseWebAddress(candidate: string): {
   readonly url: string;
   readonly fallback: string;
   readonly domain: string;
