@@ -844,7 +844,9 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 92;
+// P5 (2026-10-05): 92 counted the operations console's 15 writes, which
+// ADR 0040 keeps exempt; they are now excluded by classification instead.
+const LEGACY_MUTATION_ROUTES_MAX = 77;
 
 /**
  * DUPLEX (flag CQ_VOICE_REALTIME): the full-duplex line's own transport —
@@ -905,7 +907,10 @@ describe("every route and page is something Q can do, or exempt with a reason (R
     const handWritten = routeKeys().filter(
       (key) =>
         / (POST|PUT|PATCH|DELETE) /.test(key) &&
-        !Q_TRANSPORT_NOT_ACTIONS.has(key),
+        !Q_TRANSPORT_NOT_ACTIONS.has(key) &&
+        // ADR 0040: the operations console stays exempt (never Q's to act
+        // on), so its writes are not legacy waiting to migrate.
+        ROUTE_COVERAGE[key] !== OPERATIONS_CONSOLE,
     );
     expect(
       handWritten.length,
