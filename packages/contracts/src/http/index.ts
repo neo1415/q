@@ -1276,6 +1276,10 @@ export * from "./results.js";
 export * from "./billing.js";
 // end BILLING block
 
+// P5 block: brand theming
+export * from "./brand-theme.js";
+// end P5 block
+
 // ADMIN-3 block
 export * from "./reviews-kyb.js";
 // end ADMIN-3 block
