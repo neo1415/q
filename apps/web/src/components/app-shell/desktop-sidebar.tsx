@@ -128,12 +128,16 @@ export function DesktopSidebar({
         )}
       </div>
 
+      {/* Scrolls up and down only. Folded, the rail has no side padding
+          and centres its 44 px icons, so a classic scrollbar (Windows,
+          Linux) still leaves them room instead of forcing a sideways bar. */}
       <nav
         aria-label="Primary"
         className={cx(
-          "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-3",
-          collapsed ? "px-2" : "px-3",
+          "flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto pb-3",
+          collapsed ? "items-center px-0" : "px-3",
         )}
+        data-sidebar-nav
       >
         {groups.map((group) => (
           <div
@@ -149,7 +153,12 @@ export function DesktopSidebar({
                 {group.label}
               </p>
             )}
-            <ul className="flex flex-col gap-0.5">
+            <ul
+              className={cx(
+                "flex flex-col gap-0.5",
+                collapsed ? "items-center" : null,
+              )}
+            >
               {group.items.map((item) => (
                 <li key={item.href}>
                   <SidebarLink
@@ -169,23 +178,31 @@ export function DesktopSidebar({
         ))}
       </nav>
 
+      {/* The footer never widens the rail: folded, its icons stack in one
+          column; open, where they act sits on its own line above them,
+          rather than squeezed beside three icons. */}
       <div
-        className={cx(
-          "flex gap-1 border-t border-(--cq-border-subtle) py-3",
-          collapsed ? "flex-col items-center px-2" : "items-center px-3",
-        )}
+        className="flex flex-col gap-1 overflow-x-hidden border-t border-(--cq-border-subtle) px-2 py-3"
+        data-sidebar-footer
       >
         {collapsed ? null : (
-          <div className="min-w-0 flex-1 px-2">
+          <div className="min-w-0 px-3 pb-1">
             {/* Where this person is acting: the scope, out of the input. */}
             <ContextIndicator scope={context.scope} detail={context.label} />
           </div>
         )}
-        {/* The appearance choice, one icon (R24; ADR 0017 F4). */}
-        <ThemeMenu align={collapsed ? "start" : "end"} />
-        {/* AUTO: notices from Q and the push switch, one bell. */}
-        <NotificationCenter />
-        <SignOutControl appearance="icon" />
+        <div
+          className={cx(
+            "flex gap-1",
+            collapsed ? "flex-col items-center" : "items-center px-1",
+          )}
+        >
+          {/* The appearance choice, one icon (R24; ADR 0017 F4). */}
+          <ThemeMenu align={collapsed ? "start" : "end"} />
+          {/* AUTO: notices from Q and the push switch, one bell. */}
+          <NotificationCenter />
+          <SignOutControl appearance="icon" />
+        </div>
       </div>
     </aside>
   );
