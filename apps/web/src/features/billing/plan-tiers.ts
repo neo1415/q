@@ -91,7 +91,9 @@ export function tierPrice(
 
 /** The tier a billing-service plan key stands for, if any. */
 export function tierOfPlan(planKey: string): PlanTier | null {
-  return PLAN_TIERS.tiers.find((tier) =>
-    (tier.planKeys as readonly string[]).includes(planKey),
-  ) ?? null;
+  return (
+    PLAN_TIERS.tiers.find((tier) =>
+      (tier.planKeys as readonly string[]).includes(planKey),
+    ) ?? null
+  );
 }

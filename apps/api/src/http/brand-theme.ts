@@ -88,12 +88,16 @@ export function registerBrandThemeRoutes(
     return null;
   }
 
-  app.get(BRAND_THEME_PATH, { onRequest: withContext }, async (request, reply) => {
-    const { tenantId } = getActorContext(request);
-    // Private: the colour can differ per tenant, so no shared cache keeps it.
-    void reply.header("Cache-Control", "private, max-age=60");
-    return BrandThemeDtoSchema.parse(await brand.effective(tenantId));
-  });
+  app.get(
+    BRAND_THEME_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const { tenantId } = getActorContext(request);
+      // Private: the colour can differ per tenant, so no shared cache keeps it.
+      void reply.header("Cache-Control", "private, max-age=60");
+      return BrandThemeDtoSchema.parse(await brand.effective(tenantId));
+    },
+  );
 
   app.get(
     ADMIN_BRAND_THEME_PATH,

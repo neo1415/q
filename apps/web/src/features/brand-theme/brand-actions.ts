@@ -38,7 +38,10 @@ export async function setBrandColourAction(
         };
       }
       if (error.status === 404) {
-        return { ok: false, message: "Only a platform owner or operator can change the brand." };
+        return {
+          ok: false,
+          message: "Only a platform owner or operator can change the brand.",
+        };
       }
     }
     return {

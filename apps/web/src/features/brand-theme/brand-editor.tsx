@@ -55,7 +55,10 @@ export function BrandEditor({
     <div className="grid gap-4 lg:grid-cols-2">
       {/* Live preview on this page (validated hex only; see brandStyleSheet). */}
       {liveCss === "" ? null : (
-        <style data-cq-brand-draft dangerouslySetInnerHTML={{ __html: liveCss }} />
+        <style
+          data-cq-brand-draft
+          dangerouslySetInnerHTML={{ __html: liveCss }}
+        />
       )}
       <div className="cq-panel flex flex-col gap-6 p-5">
         <fieldset className="flex flex-col gap-3">
@@ -108,7 +111,10 @@ export function BrandEditor({
               onChange={(event) => {
                 setTyped(event.target.value);
                 const normal = normaliseHex(event.target.value);
-                if (normal !== null && event.target.value.replace("#", "").length === 6) {
+                if (
+                  normal !== null &&
+                  event.target.value.replace("#", "").length === 6
+                ) {
                   setDraft(normal);
                 }
               }}
@@ -122,7 +128,9 @@ export function BrandEditor({
             id="brand-hex-help"
             className="cq-caption text-(--cq-text-tertiary)"
           >
-            {typedValid ? "A hex colour, like #0f766e." : "Use a hex colour, like #0f766e."}
+            {typedValid
+              ? "A hex colour, like #0f766e."
+              : "Use a hex colour, like #0f766e."}
           </p>
         </div>
 
@@ -142,7 +150,10 @@ export function BrandEditor({
             size="large"
             disabled={pending || saved === null}
             onClick={() =>
-              perform(() => setBrandColourAction(null), () => choose(DEFAULT_BRAND_HEX))
+              perform(
+                () => setBrandColourAction(null),
+                () => choose(DEFAULT_BRAND_HEX),
+              )
             }
           >
             Reset to Capital Q blue

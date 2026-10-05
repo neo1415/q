@@ -31,7 +31,5 @@ export const loadBrandStyle = cache(async (): Promise<string | null> => {
  */
 export function BrandStyle({ css }: { readonly css: string | null }) {
   if (css === null) return null;
-  return (
-    <style data-cq-brand dangerouslySetInnerHTML={{ __html: css }} />
-  );
+  return <style data-cq-brand dangerouslySetInnerHTML={{ __html: css }} />;
 }

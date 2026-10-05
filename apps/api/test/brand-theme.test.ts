@@ -43,7 +43,9 @@ function fakeSql() {
     const text = strings.join("?");
     if (text.includes("from identity.platform_admins where user_id")) {
       const person = PEOPLE.get(String(values[0]));
-      return Promise.resolve(person === undefined ? [] : [{ role: person.role }]);
+      return Promise.resolve(
+        person === undefined ? [] : [{ role: person.role }],
+      );
     }
     if (text.includes("from platform_ops.step_ups")) {
       const person = PEOPLE.get(String(values[0]));

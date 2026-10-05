@@ -96,7 +96,10 @@ export default async function BillingPage() {
           </section>
         )}
 
-        <section aria-labelledby="billing-plans" className="flex flex-col gap-3">
+        <section
+          aria-labelledby="billing-plans"
+          className="flex flex-col gap-3"
+        >
           <div className="flex flex-wrap items-center gap-3">
             <h2
               id="billing-plans"
@@ -198,7 +201,9 @@ function TierCard({
   return (
     <li
       className={`cq-panel flex flex-col gap-4 p-5 ${
-        current ? "border-(--cq-accent) ring-1 ring-(--cq-accent) ring-inset" : ""
+        current
+          ? "border-(--cq-accent) ring-1 ring-(--cq-accent) ring-inset"
+          : ""
       }`}
       data-plan-tier={tier.key}
     >

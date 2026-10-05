@@ -95,7 +95,10 @@ export function SettingsIndex({
   readonly sections: readonly { readonly id: string; readonly label: string }[];
 }) {
   return (
-    <nav aria-label="Settings sections" className="lg:sticky lg:top-6 lg:self-start">
+    <nav
+      aria-label="Settings sections"
+      className="lg:sticky lg:top-6 lg:self-start"
+    >
       <ul className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:px-0">
         {sections.map((section) => (
           <li key={section.id} className="shrink-0">

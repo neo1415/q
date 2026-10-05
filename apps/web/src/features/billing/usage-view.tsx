@@ -37,7 +37,10 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="This month">
+      <ul
+        className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+        aria-label="This month"
+      >
         <li className="cq-panel col-span-2 flex min-h-28 flex-col gap-1.5 p-4 lg:col-span-1">
           <span className="cq-label text-(--cq-text-secondary)">
             Q this month
@@ -60,8 +63,8 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
                 value={budgetUsd === 0 ? 0 : (budgetUsed / budgetUsd) * 100}
               />
               <span className="cq-caption text-(--cq-text-tertiary)">
-                {dollars(String(budgetUsed))} of{" "}
-                {dollars(String(budgetUsd))} in instruction budgets
+                {dollars(String(budgetUsed))} of {dollars(String(budgetUsd))} in
+                instruction budgets
               </span>
             </>
           )}
@@ -129,7 +132,10 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
       )}
 
       {rows.length === 0 ? null : (
-        <section aria-labelledby="usage-breakdown" className="cq-panel overflow-hidden">
+        <section
+          aria-labelledby="usage-breakdown"
+          className="cq-panel overflow-hidden"
+        >
           <h2
             id="usage-breakdown"
             className="cq-title-sm border-b border-(--cq-border-subtle) px-5 pt-4 pb-3 text-(--cq-text-primary)"
@@ -143,10 +149,16 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
                   <th scope="col" className="px-5 py-2.5 font-medium">
                     Purpose
                   </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                  <th
+                    scope="col"
+                    className="px-3 py-2.5 text-right font-medium"
+                  >
                     Cost
                   </th>
-                  <th scope="col" className="px-5 py-2.5 text-right font-medium">
+                  <th
+                    scope="col"
+                    className="px-5 py-2.5 text-right font-medium"
+                  >
                     Share
                   </th>
                 </tr>
@@ -240,7 +252,9 @@ function Tile({
     <li className="cq-panel flex min-h-28 flex-col gap-1.5 p-4">
       <span className="cq-label text-(--cq-text-secondary)">{label}</span>
       {row === null || usd <= 0 ? (
-        <span className="cq-body pt-2 text-(--cq-text-secondary)">None yet</span>
+        <span className="cq-body pt-2 text-(--cq-text-secondary)">
+          None yet
+        </span>
       ) : (
         <span className="cq-numeric text-3xl font-semibold tracking-tight text-(--cq-text-primary)">
           {dollars(row.usd)}
