@@ -25,11 +25,13 @@ export default async function UsagePage() {
   const usage =
     session === null ? null : await getMyUsage(session).catch(() => null);
   return (
-    <PageContainer width="reading">
+    <PageContainer>
       <PageHeader
         title="Usage"
         description={
-          usage === null ? undefined : `${monthName(usage.month)} · not charged`
+          usage === null
+            ? undefined
+            : `${monthName(usage.month)} · what Q's work for you cost, nothing charged`
         }
       />
       {usage === null ? (

@@ -23,12 +23,22 @@ const usage: QUsageDto = {
   plan: null,
 };
 
-describe("Settings → Usage (design-48)", () => {
+describe("Settings → Usage (design-48, P5 redesign)", () => {
   it("leads with the month's figure and its currency", () => {
     render(<UsageView usage={usage} />);
     expect(screen.getByText("$0.81")).toBeTruthy();
     expect(screen.getByText("USD")).toBeTruthy();
-    expect(screen.getByText("Conversations with Q")).toBeTruthy();
+    // In the chart and in the breakdown table.
+    expect(screen.getAllByText("Conversations with Q").length).toBe(2);
+  });
+
+  it("keeps what was never recorded or measured unknown, not zero", () => {
+    render(<UsageView usage={usage} />);
+    // No live voice or document rows this month: "None yet", not "$0".
+    expect(screen.getAllByText("None yet").length).toBe(2);
+    // Voice minutes are not measured, so no minute figure is ever shown.
+    expect(screen.getByText("Minutes not measured yet")).toBeTruthy();
+    expect(document.body.textContent ?? "").not.toMatch(/\d+ min/u);
   });
 
   it("never shows call counts or failed calls to the person", () => {
