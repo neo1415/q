@@ -1303,3 +1303,8 @@ export * from "./reviews-kyb.js";
 // end ADMIN-3 block
 // ETIQUETTE block (ADR 0050): how Q conducts business.
 export * from "./etiquette.js";
+// PROFILE block (overnight A1-A8): data room, pitch deck, founder as a person.
+export * from "./data-room.js";
+export * from "./deck.js";
+export * from "./founder-person.js";
+// end PROFILE block
