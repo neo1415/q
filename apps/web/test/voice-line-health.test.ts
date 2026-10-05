@@ -514,8 +514,10 @@ describe("the realtime line rejoining after a drop (I1)", () => {
   });
 
   it("says a tool result that came back during the drop on the new call", async () => {
-    let finish: (value: { output: string; approvalPending: boolean }) => void =
-      () => undefined;
+    let finish: (value: {
+      output: string;
+      approvalPending: boolean;
+    }) => void = () => undefined;
     const h = duplex({
       rejoin: fresh,
       tool: () =>

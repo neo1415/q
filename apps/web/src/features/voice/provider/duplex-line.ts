@@ -174,7 +174,7 @@ export type DuplexRelays = {
    * line. Rejects: the request did not get through (try again).
    */
   readonly rejoin?:
-    ((cause: RejoinCause) => Promise<QVoiceDuplexRejoinResult | null>)
+    | ((cause: RejoinCause) => Promise<QVoiceDuplexRejoinResult | null>)
     | undefined;
 };
 
@@ -637,10 +637,20 @@ export class DuplexLine {
     if (this.#over) return;
     if (!up) {
       if (typeof refusal === "string") this.#fallback("CAP", refusal);
-      else this.#fallback(cause, cause === "MAX_LENGTH" ? null : LINE_LOST_NOTICE);
+      else
+        this.#fallback(cause, cause === "MAX_LENGTH" ? null : LINE_LOST_NOTICE);
       return;
     }
     this.#transportUp();
+    // BACKCHANNEL: a level changed on the line outlives the rejoin (the
+    // fresh call was minted with the level the line opened with).
+    const minted = this.#credential.listening?.level;
+    if (
+      minted !== undefined &&
+      (minted === "OFF") !== (this.#policy.level === "OFF")
+    ) {
+      this.#sendTurnDetection(this.#policy.level);
+    }
     this.#replayConversation();
     this.#touch();
     this.#events.onLinkStatus?.(null);
@@ -723,7 +733,9 @@ export class DuplexLine {
         Math.round((worst.weakSamples * HEALTH_SAMPLE_MS) / 1000),
       ),
       worstLossPct:
-        worst.lossPct === null ? null : Math.min(100, Math.max(0, worst.lossPct)),
+        worst.lossPct === null
+          ? null
+          : Math.min(100, Math.max(0, worst.lossPct)),
       worstJitterMs: cap(worst.jitterMs),
       worstRttMs: cap(worst.rttMs),
       firstAudioMsP50: cap(sorted[Math.floor(sorted.length / 2)] ?? null),
@@ -885,6 +897,11 @@ export class DuplexLine {
     this.#policy.setLevel(level);
     if (level === "OFF") this.#cutOutOfBand(null);
     if ((was === "OFF") === (level === "OFF") || !this.#connected) return;
+    this.#sendTurnDetection(level);
+  }
+
+  /** The provider's turn detector, for this listening level. */
+  #sendTurnDetection(level: QVoiceListeningLevel): void {
     this.#send({
       type: "session.update",
       session: {

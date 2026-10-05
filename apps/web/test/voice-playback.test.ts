@@ -97,11 +97,23 @@ describe("PcmScheduler", () => {
 
   it("starts with what it has once the first frame has waited long enough", () => {
     const scheduler = new PcmScheduler({ sampleRate: RATE });
-    expect(scheduler.push(frame(), 1)).toHaveLength(0);
+    for (let i = 0; i < 5; i += 1) {
+      expect(scheduler.push(frame(), 1)).toHaveLength(0);
+    }
     expect(scheduler.wakeAt()).toBeCloseTo(1.25, 9);
     const blocks = scheduler.tick(1.25);
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.samples.length).toBe(FRAME);
+    expect(blocks[0]?.samples.length).toBe(5 * FRAME);
+  });
+
+  it("never starts a sentence on a lone frame: it waits for more, or for the reply's end (I1)", () => {
+    const scheduler = new PcmScheduler({ sampleRate: RATE });
+    expect(scheduler.push(frame(), 1)).toHaveLength(0);
+    // 20 ms in hand: no timer, the next frame decides.
+    expect(scheduler.wakeAt()).toBeNull();
+    expect(scheduler.tick(1.5)).toHaveLength(0);
+    const blocks = scheduler.flush(1.6);
+    expect(blocks).toHaveLength(1);
   });
 
   it("plays a short reply at once when the provider says it is complete", () => {
@@ -167,9 +179,82 @@ describe("PcmScheduler", () => {
     expect(scheduler.push(frame(), late)).toHaveLength(0);
     expect(scheduler.stats.underruns).toBe(1);
     expect(scheduler.stats.gapMs).toBe(300);
-    expect(scheduler.stats.prebufferMs).toBe(270);
+    expect(scheduler.stats.prebufferMs).toBe(360);
     // It buffers again rather than playing a lone 20 ms frame.
+    expect(scheduler.wakeAt()).toBeNull();
+    for (let i = 0; i < 4; i += 1) scheduler.push(frame(), late);
     expect(scheduler.wakeAt()).toBeCloseTo(late + 0.25, 9);
+  });
+
+  /*
+   * A simulated bad network for Q's streamed speech (I1). The speech
+   * service makes audio twice as fast as it plays; each frame then takes a
+   * variable time to arrive, in order (one socket), so a slow frame holds
+   * every frame behind it. Deterministic: a seeded generator, no clocks.
+   */
+  function networkArrivals(
+    frames: number,
+    delayOf: (index: number, sentAt: number) => number,
+  ): number[] {
+    const times: number[] = [];
+    let last = 0;
+    for (let i = 0; i < frames; i += 1) {
+      const sentAt = i * 0.01;
+      last = Math.max(last, sentAt + delayOf(i, sentAt));
+      times.push(last);
+    }
+    return times;
+  }
+  function seeded(seed: number) {
+    let state = seed;
+    return () => {
+      state = (state * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return state / 2_147_483_648;
+    };
+  }
+
+  it("network simulation: up to 300 ms of jitter costs at most one pause, then plays smoothly", () => {
+    const random = seeded(7);
+    const arrivals = networkArrivals(500, () => 0.08 + random() * 0.3);
+    const scheduler = new PcmScheduler({ sampleRate: RATE });
+    const blocks = drive(scheduler, arrivals);
+    assertGapless(blocks.slice(0, 1));
+    expect(scheduler.stats.underruns).toBeLessThanOrEqual(1);
+    // Ten seconds of speech, every sample played.
+    const samples = blocks.reduce((sum, b) => sum + b.samples.length, 0);
+    expect(samples).toBe(500 * FRAME);
+  });
+
+  it("network simulation: 10 % of frames late by up to 700 ms (RTT spikes) stay smooth after one refill", () => {
+    const random = seeded(11);
+    const arrivals = networkArrivals(500, () =>
+      random() < 0.1 ? 0.1 + random() * 0.7 : 0.1,
+    );
+    const scheduler = new PcmScheduler({ sampleRate: RATE });
+    drive(scheduler, arrivals);
+    expect(scheduler.stats.underruns).toBeLessThanOrEqual(2);
+  });
+
+  it("network simulation: a 2-second outage mid-reply is one pause, not a stutter", () => {
+    // Frames sent between 1 s and 3 s arrive together when the line returns.
+    const arrivals = networkArrivals(500, (_, sentAt) =>
+      sentAt >= 1 && sentAt < 3 ? 3 - sentAt + 0.1 : 0.1,
+    );
+    const scheduler = new PcmScheduler({ sampleRate: RATE });
+    const blocks = drive(scheduler, arrivals);
+    expect(scheduler.stats.underruns).toBe(1);
+    const samples = blocks.reduce((sum, b) => sum + b.samples.length, 0);
+    expect(samples).toBe(500 * FRAME);
+  });
+
+  it("network simulation: a clean line starts within 300 ms of the first frame", () => {
+    const arrivals = networkArrivals(100, () => 0.05);
+    const scheduler = new PcmScheduler({ sampleRate: RATE });
+    const blocks = drive(scheduler, arrivals);
+    const first = blocks[0];
+    expect(first).toBeDefined();
+    expect((first?.at ?? 99) - (arrivals[0] ?? 0)).toBeLessThan(0.3);
+    expect(scheduler.stats.underruns).toBe(0);
   });
 
   it("does not count the silence between two replies as a gap", () => {
@@ -311,7 +396,8 @@ describe("PcmPlayer", () => {
 
   it("starts a held sentence on its own timer when nothing more arrives", () => {
     const player = new PcmPlayer({ sampleRate: RATE });
-    player.queue(pcmFrame());
+    // 100 ms in hand: enough to start on the timer (a lone frame waits).
+    for (let i = 0; i < 5; i += 1) player.queue(pcmFrame());
     expect(FakeSource.all).toHaveLength(0);
     const ctx = FakeAudioContext.last;
     if (ctx === null) throw new Error("no context");

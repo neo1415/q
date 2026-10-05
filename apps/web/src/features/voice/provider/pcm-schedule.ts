@@ -36,6 +36,8 @@ export type PcmScheduleOptions = {
   readonly blockMs?: number | undefined;
   /** ...unless the lead has fallen below this, when they go at once. */
   readonly lowWaterMs?: number | undefined;
+  /** Max-wait never starts a sentence with less than this in hand. */
+  readonly minStartMs?: number | undefined;
   /** How far the prebuffer target may grow after underruns. */
   readonly maxPrebufferMs?: number | undefined;
 };
@@ -56,18 +58,29 @@ export type PcmScheduleStats = {
   readonly prebufferMs: number;
 };
 
+/*
+ * I1 (Dubai demo 2026-10-05, "slow and it stuttered"): on a jittery line
+ * the max-wait start began a sentence with a frame or two in hand and ran
+ * dry at once, and each underrun grew the buffer by only half. Now a
+ * sentence never starts on max-wait with less than `minStartMs` in hand
+ * (a complete reply is still played at once, however short), and an
+ * underrun doubles the buffer, up to a second: one pause, then smooth.
+ */
 const DEFAULTS = {
   prebufferMs: 180,
   maxWaitMs: 250,
+  minStartMs: 80,
   safetyMs: 25,
   blockMs: 100,
   lowWaterMs: 250,
-  maxPrebufferMs: 600,
+  maxPrebufferMs: 1_000,
 } as const;
+const UNDERRUN_GROWTH = 2;
 
 export class PcmScheduler {
   private readonly rate: number;
   private readonly maxWait: number;
+  private readonly minStart: number;
   private readonly safety: number;
   private readonly block: number;
   private readonly lowWater: number;
@@ -92,6 +105,7 @@ export class PcmScheduler {
     this.rate = options.sampleRate;
     this.prebuffer = (options.prebufferMs ?? DEFAULTS.prebufferMs) / 1000;
     this.maxWait = (options.maxWaitMs ?? DEFAULTS.maxWaitMs) / 1000;
+    this.minStart = (options.minStartMs ?? DEFAULTS.minStartMs) / 1000;
     this.safety = (options.safetyMs ?? DEFAULTS.safetyMs) / 1000;
     this.block = (options.blockMs ?? DEFAULTS.blockMs) / 1000;
     this.lowWater = (options.lowWaterMs ?? DEFAULTS.lowWaterMs) / 1000;
@@ -157,9 +171,11 @@ export class PcmScheduler {
   wakeAt(): number | null {
     if (this.pendingSamples === 0) return null;
     if (this.nextStart === null) {
-      return this.waitingSince === null
-        ? null
-        : this.waitingSince + this.maxWait;
+      // Too little in hand to start on max-wait: the next frame (or the
+      // end of the reply) decides, never a timer spinning on the past.
+      if (this.waitingSince === null) return null;
+      if (this.pendingSamples / this.rate < this.minStart) return null;
+      return this.waitingSince + this.maxWait;
     }
     return this.nextStart - this.lowWater;
   }
@@ -185,7 +201,10 @@ export class PcmScheduler {
     if (heard) {
       this.underruns += 1;
       this.gap += now - this.nextStart;
-      this.prebuffer = Math.min(this.maxPrebuffer, this.prebuffer * 1.5);
+      this.prebuffer = Math.min(
+        this.maxPrebuffer,
+        this.prebuffer * UNDERRUN_GROWTH,
+      );
     }
     this.waitingSince = this.pendingSamples > 0 ? now : null;
     this.nextStart = null;
@@ -196,7 +215,13 @@ export class PcmScheduler {
     const held = this.pendingSamples / this.rate;
     if (this.nextStart === null) {
       const waited = this.waitingSince === null ? 0 : now - this.waitingSince;
-      if (!final && held < this.prebuffer && waited < this.maxWait) return [];
+      if (
+        !final &&
+        held < this.prebuffer &&
+        (waited < this.maxWait || held < this.minStart)
+      ) {
+        return [];
+      }
       return [this.take(now + this.safety)];
     }
     const lead = this.nextStart - now;

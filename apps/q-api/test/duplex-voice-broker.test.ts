@@ -726,10 +726,18 @@ describe("usage and the caps", () => {
     // Past the cap a rejoin is refused with the sentence, and the line goes.
     spent = 1.0;
     expect(
-      await h.broker.rejoin({ actor: ACTOR, voiceSessionId: id, cause: "NETWORK" }),
+      await h.broker.rejoin({
+        actor: ACTOR,
+        voiceSessionId: id,
+        cause: "NETWORK",
+      }),
     ).toEqual({ notice: DUPLEX_CAP_NOTICE });
     expect(
-      await h.broker.rejoin({ actor: ACTOR, voiceSessionId: id, cause: "NETWORK" }),
+      await h.broker.rejoin({
+        actor: ACTOR,
+        voiceSessionId: id,
+        cause: "NETWORK",
+      }),
     ).toBeNull();
   });
 

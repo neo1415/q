@@ -653,7 +653,10 @@ export function createDuplexBroker(
         return {};
       }
       // This line's own reservation is already inside `reserved()`.
-      if (spent >= config.dailyCapUsd || spent + reserved() > config.dailyCapUsd) {
+      if (
+        spent >= config.dailyCapUsd ||
+        spent + reserved() > config.dailyCapUsd
+      ) {
         lines.delete(voiceSessionId);
         logger.info({ spentUsd: spent, cause }, "duplex daily cap reached");
         return { notice: DUPLEX_CAP_NOTICE };

@@ -194,8 +194,7 @@ export class LineHealth {
         this.#worst.rttMs,
         sample.rttMs === null ? null : Math.round(sample.rttMs),
       ),
-      weakSamples:
-        this.#worst.weakSamples + (this.#verdict === "WEAK" ? 1 : 0),
+      weakSamples: this.#worst.weakSamples + (this.#verdict === "WEAK" ? 1 : 0),
     };
     return this.#verdict;
   }
