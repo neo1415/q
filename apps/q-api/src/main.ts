@@ -3626,6 +3626,8 @@ void createWorkWakeListener({
   channel: Q_WORK_WAKE_CHANNEL,
   catchUp: () => {
     void workRuntime.tick().catch(() => undefined);
+    // Accepts and declines that landed while nobody listened (a deploy).
+    void instructionTriggers.catchUpMoves().catch(() => undefined);
   },
   targets: [
     {

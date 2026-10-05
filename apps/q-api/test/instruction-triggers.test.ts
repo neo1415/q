@@ -136,6 +136,50 @@ describe("instruction triggers", () => {
     expect(woken).toEqual(["rel-elsewhere", "rel-covered"]);
     expect(swept).toBeGreaterThanOrEqual(1);
   });
+
+  it("on (re)start, accepts missed while nobody listened make their instructions due, and sweep (live 2026-10-05, Spheros)", async () => {
+    let swept = 0;
+    let missed = 1;
+    const triggers = createInstructionTriggers({
+      store: {
+        claimDue: () => {
+          swept += 1;
+          return Promise.resolve([]);
+        },
+        defer: () => Promise.resolve(),
+        wakeFor: () => Promise.resolve(0),
+        wakeForMissedMoves: () => {
+          const now = missed;
+          missed = 0;
+          return Promise.resolve(now);
+        },
+      },
+      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+    });
+    expect(await triggers.catchUpMoves()).toBe(1);
+    await triggers.sweep();
+    expect(swept).toBeGreaterThanOrEqual(1);
+    // Idempotent: a second start finds nothing new.
+    expect(await triggers.catchUpMoves()).toBe(0);
+  });
+
+  it("a company becoming ready brings forward instructions open to new companies (founder 2026-10-05)", async () => {
+    const asked: string[] = [];
+    const triggers = createInstructionTriggers({
+      store: {
+        claimDue: () => Promise.resolve([]),
+        defer: () => Promise.resolve(),
+        wakeFor: () => Promise.resolve(0),
+        wakeForNewCompany: (companyId) => {
+          asked.push(companyId);
+          return Promise.resolve(1);
+        },
+      },
+      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+    });
+    expect(await triggers.wakeNewCompany("company-1")).toBe(1);
+    expect(asked).toEqual(["company-1"]);
+  });
 });
 
 describe("who an instruction may concern", () => {

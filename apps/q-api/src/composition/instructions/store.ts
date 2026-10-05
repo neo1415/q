@@ -354,13 +354,86 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
      * instruction: that instruction is due now.
      */
     wakeFor: async (relationshipId: string): Promise<number> => {
+      // The other side moved (accepted, declined). Every ACTIVE instruction
+      // covering the relationship runs now: one that already acted on it,
+      // or one whose grant covers it by scope (live 2026-10-05: Spheros
+      // accepted Zino's interest and nothing ran -- Q's interest step had
+      // no relationship id, so the step match alone found nothing). Covering
+      // = the owner is an active member on either side, the relationship is
+      // in the grant's scope, and its counterpart is not left out.
+      const rows = await sql<{ id: string }[]>`
+        with moved as (
+          select r.id, r.company_id, r.investor_organisation_id,
+                 c.organisation_id as company_org, i.organisation_id as investor_org
+            from network.relationships r
+            join core.companies c on c.id = r.company_id
+            join core.investor_organisations i on i.id = r.investor_organisation_id
+           where r.id = ${relationshipId}
+        )
+        update q_runtime.standing_instructions s
+           set next_fire_at = clock_timestamp(), updated_at = clock_timestamp()
+          from moved, q_runtime.instruction_grants g
+         where s.status = 'ACTIVE'
+           and g.instruction_id = s.id and g.version = s.grant_version
+           and (
+             exists (
+               select 1 from q_runtime.instruction_steps t
+                where t.instruction_id = s.id and t.relationship_id = moved.id)
+             or (
+               exists (
+                 select 1 from identity.organisation_memberships om
+                  where om.user_id = s.user_id
+                    and om.organisation_id in (moved.company_org, moved.investor_org)
+                    and om.membership_status = 'active')
+               and (g.grant_payload->'counterparts'->>'scope' = 'ALL_MY_RELATIONSHIPS'
+                    or coalesce(g.grant_payload->'counterparts'->'relationshipIds', '[]'::jsonb)
+                         ? moved.id::text)
+               and not exists (
+                 select 1
+                   from jsonb_array_elements(
+                          coalesce(g.grant_payload->'counterparts'->'exclude', '[]'::jsonb)) e
+                  where e->>'counterpartId' in (moved.company_id::text,
+                                                moved.investor_organisation_id::text))))
+        returning s.id`;
+      return rows.length;
+    },
+
+    /**
+     * Catch-up on (re)start: an accept or decline that landed while no
+     * process was listening (a deploy, a dropped connection) still wakes the
+     * instructions covering it. Any covered relationship whose other side
+     * moved after the instruction last ran brings that run forward.
+     */
+    wakeForMissedMoves: async (): Promise<number> => {
       const rows = await sql<{ id: string }[]>`
         update q_runtime.standing_instructions s
            set next_fire_at = clock_timestamp(), updated_at = clock_timestamp()
+          from q_runtime.instruction_grants g
          where s.status = 'ACTIVE'
+           and g.instruction_id = s.id and g.version = s.grant_version
+           and s.next_fire_at > clock_timestamp()
            and exists (
-             select 1 from q_runtime.instruction_steps t
-              where t.instruction_id = s.id and t.relationship_id = ${relationshipId})
+             select 1
+               from network.relationship_events e
+               join network.relationships r on r.id = e.relationship_id
+               join core.companies c on c.id = r.company_id
+               join core.investor_organisations i on i.id = r.investor_organisation_id
+              where e.event_type in ('connection_accepted', 'interest_declined')
+                and e.occurred_at > coalesce(s.last_fired_at, s.created_at)
+                and exists (
+                  select 1 from identity.organisation_memberships om
+                   where om.user_id = s.user_id
+                     and om.organisation_id in (c.organisation_id, i.organisation_id)
+                     and om.membership_status = 'active')
+                and (g.grant_payload->'counterparts'->>'scope' = 'ALL_MY_RELATIONSHIPS'
+                     or coalesce(g.grant_payload->'counterparts'->'relationshipIds', '[]'::jsonb)
+                          ? r.id::text)
+                and not exists (
+                  select 1
+                    from jsonb_array_elements(
+                           coalesce(g.grant_payload->'counterparts'->'exclude', '[]'::jsonb)) x
+                   where x->>'counterpartId' in (r.company_id::text,
+                                                 r.investor_organisation_id::text)))
         returning s.id`;
       return rows.length;
     },

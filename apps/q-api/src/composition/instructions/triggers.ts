@@ -27,6 +27,7 @@ export function createInstructionTriggers(dependencies: {
         | "notify"
         | "wakeForChat"
         | "wakeForNewCompany"
+        | "wakeForMissedMoves"
         | "resolveAnswered"
       >
     >;
@@ -129,6 +130,13 @@ export function createInstructionTriggers(dependencies: {
     wakeChat: async (relationshipId: string): Promise<number> => {
       if (store.wakeForChat === undefined) return 0;
       const woken = await store.wakeForChat(relationshipId);
+      if (woken > 0) void sweep().catch(() => undefined);
+      return woken;
+    },
+    /** On (re)start: accepts and declines missed while nobody listened. */
+    catchUpMoves: async (): Promise<number> => {
+      if (store.wakeForMissedMoves === undefined) return 0;
+      const woken = await store.wakeForMissedMoves();
       if (woken > 0) void sweep().catch(() => undefined);
       return woken;
     },
