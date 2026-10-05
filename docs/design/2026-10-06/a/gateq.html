@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GateQ Mockup</title>
+<style>/* ===== Capital Q tokens: copied verbatim from packages/ui/src/tokens/tokens.css ===== */
+:root {
+  color-scheme: light;
+  --cq-font-ui: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --cq-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --cq-canvas: oklch(0.985 0.004 92);
+  --cq-surface: oklch(0.995 0.002 92);
+  --cq-surface-raised: oklch(1 0 0);
+  --cq-surface-subtle: oklch(0.965 0.005 92);
+  --cq-surface-strong: oklch(0.925 0.007 92);
+  --cq-surface-sunken: oklch(0.955 0.005 92);
+  --cq-text-primary: oklch(0.19 0.012 258);
+  --cq-text-secondary: oklch(0.43 0.012 258);
+  --cq-text-tertiary: oklch(0.53 0.01 258);
+  --cq-text-inverse: oklch(0.98 0.004 92);
+  --cq-border-subtle: oklch(0.91 0.006 258);
+  --cq-border: oklch(0.86 0.008 258);
+  --cq-border-strong: oklch(0.71 0.012 258);
+  --cq-accent: oklch(0.53 0.18 258);
+  --cq-accent-hover: oklch(0.48 0.18 258);
+  --cq-accent-soft: oklch(0.94 0.035 258);
+  --cq-positive: oklch(0.5 0.13 151);
+  --cq-positive-soft: oklch(0.95 0.035 151);
+  --cq-warning: oklch(0.53 0.12 70);
+  --cq-warning-soft: oklch(0.96 0.045 78);
+  --cq-danger: oklch(0.56 0.2 27);
+  --cq-danger-soft: oklch(0.95 0.04 27);
+  --cq-focus-ring: var(--cq-accent);
+  --cq-overlay: oklch(0.19 0.012 258 / 0.42);
+  --cq-shadow-xs: 0 1px 2px oklch(0.19 0.012 258 / 0.06);
+  --cq-shadow-sm: 0 1px 2px oklch(0.19 0.012 258 / 0.06), 0 4px 12px -4px oklch(0.19 0.012 258 / 0.1);
+  --cq-shadow-overlay: 0 12px 32px -8px oklch(0.19 0.012 258 / 0.28);
+  --cq-radius-xs: 4px; --cq-radius-sm: 6px; --cq-radius-md: 10px; --cq-radius-lg: 14px; --cq-radius-xl: 18px; --cq-radius-full: 999px;
+  --cq-z-sticky: 10; --cq-z-navigation: 20; --cq-z-presence: 25; --cq-z-popover: 30; --cq-z-sheet: 40; --cq-z-modal: 50; --cq-z-toast: 60;
+  --cq-layout-reading: 760px; --cq-layout-narrow: 600px;
+  --cq-safe-top: env(safe-area-inset-top, 0px); --cq-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --cq-page-gutter: 16px; --cq-header-height: 52px; --cq-bottom-nav-height: 60px; --cq-sidebar-width: 240px;
+  --cq-motion-instant: 90ms; --cq-motion-fast: 140ms; --cq-motion-base: 200ms; --cq-motion-emphasis: 280ms; --cq-motion-slow: 360ms;
+  --cq-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --cq-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --cq-stage-canvas: oklch(0.17 0.02 262);
+  --cq-stage-surface: oklch(1 0 0 / 0.06);
+  --cq-stage-surface-strong: oklch(1 0 0 / 0.12);
+  --cq-stage-border: oklch(1 0 0 / 0.14);
+  --cq-stage-text: oklch(0.98 0.004 92);
+  --cq-stage-text-muted: oklch(1 0 0 / 0.62);
+  --cq-stage-accent: oklch(0.76 0.14 258);
+  --cq-stage-scrim: linear-gradient(to top, oklch(0.12 0.02 262 / 0.82), oklch(0.12 0.02 262 / 0) 62%);
+  --cq-q-light: oklch(0.5 0.2 258);
+  --cq-q-core: oklch(0.99 0.012 85);
+  --cq-q-bloom: oklch(0.62 0.19 258 / 0.34);
+  --cq-q-ember: oklch(0.5 0.035 258);
+}
+@media (min-width: 640px) { :root { --cq-page-gutter: 24px; } }
+@media (min-width: 1024px) { :root { --cq-page-gutter: 32px; } }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cq-canvas: oklch(0.16 0.01 258);
+  --cq-surface: oklch(0.19 0.01 258);
+  --cq-surface-raised: oklch(0.22 0.011 258);
+  --cq-surface-subtle: oklch(0.24 0.01 258);
+  --cq-surface-strong: oklch(0.3 0.01 258);
+  --cq-surface-sunken: oklch(0.14 0.01 258);
+  --cq-text-primary: oklch(0.95 0.005 92);
+  --cq-text-secondary: oklch(0.75 0.008 258);
+  --cq-text-tertiary: oklch(0.63 0.008 258);
+  --cq-text-inverse: oklch(0.17 0.01 258);
+  --cq-border-subtle: oklch(0.28 0.01 258);
+  --cq-border: oklch(0.34 0.011 258);
+  --cq-border-strong: oklch(0.47 0.012 258);
+  --cq-accent: oklch(0.72 0.15 258);
+  --cq-accent-hover: oklch(0.76 0.14 258);
+  --cq-accent-soft: oklch(0.27 0.06 258);
+  --cq-positive: oklch(0.72 0.12 151);
+  --cq-positive-soft: oklch(0.27 0.05 151);
+  --cq-warning: oklch(0.79 0.12 78);
+  --cq-warning-soft: oklch(0.3 0.06 78);
+  --cq-danger: oklch(0.7 0.16 27);
+  --cq-danger-soft: oklch(0.28 0.06 27);
+  --cq-overlay: oklch(0.1 0.01 258 / 0.6);
+  --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
+  --cq-shadow-sm: 0 1px 2px oklch(0.05 0.01 258 / 0.4), 0 4px 12px -4px oklch(0.05 0.01 258 / 0.5);
+  --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
+  --cq-q-light: oklch(0.8 0.13 258);
+  --cq-q-core: oklch(0.985 0.014 85);
+  --cq-q-bloom: oklch(0.7 0.17 258 / 0.48);
+  --cq-q-ember: oklch(0.63 0.035 258);
+}
+
+/* ===== Type scale (tokens.css @layer components) ===== */
+.cq-display { font-size: 34px; line-height: 1.08; font-weight: 600; letter-spacing: -0.02em; }
+.cq-title-xl { font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -0.015em; }
+.cq-title-lg { font-size: 24px; line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; }
+.cq-title-md { font-size: 20px; line-height: 1.3; font-weight: 600; }
+.cq-title-sm { font-size: 17px; line-height: 1.35; font-weight: 600; }
+.cq-body-lg { font-size: 17px; line-height: 1.55; }
+.cq-body { font-size: 16px; line-height: 1.5; }
+.cq-body-sm { font-size: 14px; line-height: 1.45; }
+.cq-label { font-size: 13px; line-height: 1.35; font-weight: 500; }
+.cq-caption { font-size: 12px; line-height: 1.35; }
+.cq-numeric { font-variant-numeric: tabular-nums; }
+@media (min-width: 768px) {
+  .cq-display { font-size: 40px; } .cq-title-xl { font-size: 32px; } .cq-title-lg { font-size: 26px; }
+  .cq-title-md { font-size: 21px; } .cq-title-sm { font-size: 18px; } .cq-body { font-size: 15px; }
+}
+.t1 { color: var(--cq-text-primary); } .t2 { color: var(--cq-text-secondary); } .t3 { color: var(--cq-text-tertiary); }
+
+/* ===== Base ===== */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--cq-canvas); color: var(--cq-text-primary); font-family: var(--cq-font-ui); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--cq-focus-ring); outline-offset: 2px; border-radius: 6px; }
+svg.i { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.sm { width: 16px; height: 16px; }
+svg.i.lg { width: 24px; height: 24px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+img { display: block; max-width: 100%; }
+
+/* ===== App shell ===== */
+.app { min-height: 100dvh; }
+.sidebar { display: none; }
+.mhead { position: sticky; top: 0; z-index: var(--cq-z-navigation); height: var(--cq-header-height); display: flex; align-items: center; gap: 8px; padding: 0 8px 0 4px; background: var(--cq-canvas); border-bottom: 1px solid var(--cq-border-subtle); }
+.mhead .title { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--cq-z-navigation); height: var(--cq-bottom-nav-height); display: grid; grid-template-columns: repeat(5, 1fr); background: var(--cq-surface); border-top: 1px solid var(--cq-border-subtle); }
+.mnav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--cq-text-tertiary); min-height: 44px; }
+.mnav a[aria-current="page"] { color: var(--cq-text-primary); font-weight: 500; }
+main.page { padding: 16px var(--cq-page-gutter) calc(var(--cq-bottom-nav-height) + 88px); }
+@media (min-width: 1024px) {
+  .app { display: grid; grid-template-columns: var(--cq-sidebar-width) 1fr; background: linear-gradient(to right, var(--cq-surface) calc(var(--cq-sidebar-width) - 1px), var(--cq-border-subtle) calc(var(--cq-sidebar-width) - 1px), var(--cq-border-subtle) var(--cq-sidebar-width), var(--cq-canvas) var(--cq-sidebar-width)); }
+  .sidebar { display: flex; flex-direction: column; position: sticky; top: 0; height: 100dvh; padding: 12px 12px 12px; border-right: 1px solid var(--cq-border-subtle); background: var(--cq-surface); overflow-y: auto; }
+  .mhead, .mnav { display: none; }
+  main.page { padding: 28px var(--cq-page-gutter) 64px; min-width: 0; }
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 8px 10px 14px; font-weight: 600; font-size: 15px; }
+.orgswitch { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 10px; border-radius: var(--cq-radius-md); text-align: left; }
+.orgswitch:hover { background: var(--cq-surface-subtle); }
+.navgroup { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
+.navgroup .gl { font-size: 12px; color: var(--cq-text-tertiary); padding: 8px 10px 4px; }
+.navlink { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 10px; border-radius: var(--cq-radius-md); font-size: 14px; color: var(--cq-text-secondary); }
+.navlink:hover { background: var(--cq-surface-subtle); color: var(--cq-text-primary); }
+.navlink[aria-current="page"] { background: var(--cq-surface-strong); color: var(--cq-text-primary); font-weight: 500; }
+.navlink .count { margin-left: auto; font-size: 12px; color: var(--cq-text-tertiary); font-variant-numeric: tabular-nums; }
+.themesw { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: var(--cq-radius-md); background: var(--cq-surface-subtle); font-size: 12px; }
+.themesw span { text-align: center; padding: 6px 0; border-radius: 7px; color: var(--cq-text-secondary); }
+.themesw span.on { background: var(--cq-surface-raised); color: var(--cq-text-primary); box-shadow: var(--cq-shadow-xs); }
+
+/* Q mark: ring-and-tail aperture. The only element allowed to glow (ADR 0017 F2). */
+.qmark { position: relative; display: inline-grid; place-items: center; flex: none; }
+.qmark svg { position: relative; }
+.qmark.glow::before { content: ""; position: absolute; inset: -30%; border-radius: 50%; background: radial-gradient(circle, var(--cq-q-bloom), transparent 68%); }
+.qdock { position: fixed; right: 16px; bottom: calc(var(--cq-bottom-nav-height) + 16px); z-index: var(--cq-z-presence); width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--cq-surface-raised); border: 1px solid var(--cq-border-subtle); box-shadow: var(--cq-shadow-sm); }
+@media (min-width: 1024px) { .qdock { bottom: 24px; right: 24px; } }
+
+/* ===== Controls ===== */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: var(--cq-radius-md); font-size: 15px; font-weight: 500; white-space: nowrap; transition: transform var(--cq-motion-fast) var(--cq-ease), background-color var(--cq-motion-fast) ease; }
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: var(--cq-accent); color: var(--cq-text-inverse); }
+.btn.primary:hover { background: var(--cq-accent-hover); }
+.btn.ink { background: var(--cq-text-primary); color: var(--cq-canvas); }
+.btn.secondary { border: 1px solid var(--cq-border); background: var(--cq-surface-raised); color: var(--cq-text-primary); }
+.btn.secondary:hover { background: var(--cq-surface-subtle); }
+.btn.ghost { color: var(--cq-text-secondary); padding: 0 12px; }
+.btn.ghost:hover { color: var(--cq-text-primary); background: var(--cq-surface-subtle); }
+.btn.sm { min-height: 36px; font-size: 14px; padding: 0 12px; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.iconbtn { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: var(--cq-radius-md); color: var(--cq-text-secondary); flex: none; }
+.iconbtn:hover { background: var(--cq-surface-subtle); color: var(--cq-text-primary); }
+.iconbtn.round { border-radius: 50%; border: 1px solid var(--cq-border); background: var(--cq-surface-raised); }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: var(--cq-radius-full); border: 1px solid var(--cq-border); font-size: 14px; color: var(--cq-text-secondary); white-space: nowrap; background: var(--cq-surface-raised); }
+.chip[aria-pressed="true"], .chip.on { background: var(--cq-text-primary); color: var(--cq-canvas); border-color: var(--cq-text-primary); }
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.chips::-webkit-scrollbar { display: none; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .flabel { font-size: 14px; font-weight: 500; color: var(--cq-text-primary); }
+.input { min-height: 44px; padding: 0 14px; border-radius: var(--cq-radius-md); border: 1px solid var(--cq-border); background: var(--cq-surface-raised); width: 100%; font-size: 16px; }
+.input::placeholder { color: var(--cq-text-tertiary); }
+.search { position: relative; }
+.search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--cq-text-tertiary); pointer-events: none; }
+.search .input { padding-left: 44px; border-radius: var(--cq-radius-full); background: var(--cq-surface-subtle); border-color: transparent; }
+
+/* Tabs: underline, existing profile style (company-profile-view.tsx tabClass). */
+.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--cq-border-subtle); overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a, .tabs button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; border-bottom: 2px solid transparent; font-size: 15px; color: var(--cq-text-secondary); white-space: nowrap; margin-bottom: -1px; padding: 0 1px; }
+.tabs [aria-current="page"], .tabs [aria-selected="true"] { color: var(--cq-text-primary); border-bottom-color: var(--cq-text-primary); font-weight: 500; }
+.tabs .n { font-size: 12px; color: var(--cq-text-tertiary); font-variant-numeric: tabular-nums; }
+
+/* Surfaces */
+.card { background: var(--cq-surface-raised); border: 1px solid var(--cq-border-subtle); border-radius: var(--cq-radius-lg); }
+.hair > * + * { border-top: 1px solid var(--cq-border-subtle); }
+.badge { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px 0 8px; border-radius: var(--cq-radius-full); font-size: 12.5px; font-weight: 500; border: 1px solid var(--cq-border); color: var(--cq-text-secondary); white-space: nowrap; background: var(--cq-surface-raised); }
+.badge svg { width: 14px; height: 14px; }
+.badge.pub { color: var(--cq-positive); border-color: color-mix(in oklch, var(--cq-positive) 40%, transparent); background: var(--cq-positive-soft); }
+.badge.req { color: var(--cq-warning); border-color: color-mix(in oklch, var(--cq-warning) 45%, transparent); background: var(--cq-warning-soft); }
+.badge.priv { color: var(--cq-text-secondary); border-style: dashed; }
+.badge.acc { color: var(--cq-accent); border-color: color-mix(in oklch, var(--cq-accent) 40%, transparent); background: var(--cq-accent-soft); }
+.avatar { border-radius: 50%; object-fit: cover; flex: none; background: var(--cq-surface-strong); }
+.logo { display: grid; place-items: center; flex: none; border-radius: 12px; font-weight: 600; color: var(--cq-text-primary); background: var(--cq-surface-strong); border: 1px solid var(--cq-border-subtle); }
+.sect { display: flex; flex-direction: column; gap: 12px; }
+.sect-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.muted-note { font-size: 13px; color: var(--cq-text-tertiary); }
+
+/* Q line: Q's view, labelled as Q's reading, never as fact. */
+.qview { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--cq-radius-lg); background: var(--cq-surface-subtle); }
+.qview .who { font-size: 12px; color: var(--cq-text-tertiary); }
+
+/* ===== Fit glyphs: shape + word, never colour alone ===== */
+.fg { width: 16px; height: 16px; flex: none; }
+.fg.fit { color: var(--cq-positive); }
+.fg.part { color: var(--cq-warning); }
+.fg.no { color: var(--cq-text-secondary); }
+.fg.unk { color: var(--cq-text-tertiary); }
+.fitpips { display: inline-flex; gap: 3px; align-items: center; }
+.fitpips .fg { width: 14px; height: 14px; }
+.fitscore { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 12px 4px 10px; border-radius: var(--cq-radius-md); border: 1px solid var(--cq-border-subtle); background: var(--cq-surface-raised); text-align: left; }
+.fitscore:hover { border-color: var(--cq-border); }
+.fitscore .big { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fitscore .small { font-size: 12px; color: var(--cq-text-tertiary); white-space: nowrap; }
+
+/* ===== Sheet: bottom sheet on phone, side panel on desktop ===== */
+.scrim { position: fixed; inset: 0; background: var(--cq-overlay); z-index: var(--cq-z-sheet); opacity: 0; pointer-events: none; transition: opacity var(--cq-motion-base) ease; }
+.sheet { position: fixed; z-index: calc(var(--cq-z-sheet) + 1); left: 0; right: 0; bottom: 0; max-height: 88dvh; overflow-y: auto; background: var(--cq-surface-raised); border-radius: 20px 20px 0 0; box-shadow: var(--cq-shadow-overlay); transform: translateY(100%); transition: transform var(--cq-motion-emphasis) cubic-bezier(0.32, 0.72, 0, 1); padding: 8px 20px 28px; }
+.sheet:focus { outline: none; }
+.sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--cq-border); margin: 0 auto 10px; }
+.sheet-open .scrim { opacity: 1; pointer-events: auto; }
+.sheet-open .sheet { transform: none; }
+@media (min-width: 1024px) {
+  .sheet { left: auto; top: 0; width: 460px; max-height: none; border-radius: 0; transform: translateX(100%); padding: 20px 28px 32px; }
+  .sheet:focus { outline: none; }
+.sheet .grab { display: none; }
+}
+
+/* ===== States ===== */
+.sk { background: var(--cq-surface-strong); border-radius: 8px; animation: skp 1.4s ease-in-out infinite; }
+@keyframes skp { 50% { opacity: .55; } }
+.state { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 28px 0; max-width: 520px; }
+.state .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--cq-surface-subtle); color: var(--cq-text-secondary); }
+.banner { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--cq-radius-md); border: 1px solid var(--cq-border-subtle); background: var(--cq-surface-subtle); font-size: 14px; color: var(--cq-text-secondary); }
+.banner.err { border-color: color-mix(in oklch, var(--cq-danger) 35%, transparent); background: var(--cq-danger-soft); color: var(--cq-text-primary); }
+.banner.err svg { color: var(--cq-danger); }
+.toast { position: fixed; left: 50%; bottom: calc(var(--cq-bottom-nav-height) + 20px); transform: translateX(-50%); z-index: var(--cq-z-toast); background: var(--cq-text-primary); color: var(--cq-canvas); padding: 12px 16px; border-radius: var(--cq-radius-md); font-size: 14px; box-shadow: var(--cq-shadow-overlay); display: none; }
+.toast.show { display: block; }
+
+/* ===== Mockup controls (not product UI; hidden in screenshots) ===== */
+.mock { position: fixed; z-index: 100; top: 8px; right: 8px; font: 12px/1.3 var(--cq-font-ui); background: #111; color: #eee; border-radius: 10px; padding: 6px 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; max-width: 96vw; opacity: .92; }
+.mock select { background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; padding: 3px; font-size: 12px; }
+.shot .mock { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+<script>/* Capital Q mockup kit: icons, shell, state switching. Mockup-only code. */
+const P = new URLSearchParams(location.search);
+const S = {
+  theme: P.get("theme") || "light",
+  state: P.get("state") || "full",
+  view: P.get("view") || null,
+  shot: P.get("shot") === "1",
+};
+document.documentElement.dataset.theme = S.theme;
+if (S.shot) document.documentElement.classList.add("shot");
+
+const ICONS = {
+  "chevron-right": '<path d="m9 18 6-6-6-6"/>',
+  "chevron-left": '<path d="m15 18-6-6 6-6"/>',
+  "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+  "chevrons-up-down": '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
+  "arrow-left": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  "arrow-up-right": '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  "eye-off": '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>',
+  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  play: '<polygon points="7 4 20 12 7 20 7 4" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  "star-fill": '<polygon fill="currentColor" points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  "user-plus": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  landmark: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
+  explore: '<rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/>',
+  gate: '<path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/>',
+  sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  menu: '<line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>',
+  alert: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+  pen: '<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+  building: '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-.67C7 5 9.5 4 12 2.24 14.5 4 17 5 19 5.33a1 1 0 0 1 1 .67z"/><path d="m9 12 2 2 4-4"/>',
+  bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+  archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  filter: '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+  grid: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>',
+  volume: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/>',
+  "volume-x": '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
+  maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  briefcase: '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
+  graduation: '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  "map-pin": '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  wand: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  checksq: '<rect width="18" height="18" x="3" y="3" rx="3"/><path d="m8 12 3 3 5-6"/>',
+  square: '<rect width="18" height="18" x="3" y="3" rx="3"/>',
+};
+function ic(name, cls = "") {
+  return `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+/* The Q aperture: a ring with a tail. Glow only on Q. */
+function qmark(size = 28, glow = true) {
+  // Geometry of apps/web/src/components/app-shell/q-nav-icon.tsx: the tail starts inside the ring.
+  return `<span class="qmark ${glow ? "glow" : ""}" style="width:${size}px;height:${size}px" aria-hidden="true"><svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="${glow ? "var(--cq-q-light)" : "currentColor"}" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="11.5" r="7.5"/><path d="M13.6 13.4 19 19.5"/><circle cx="12" cy="11.5" r="1.75" fill="${glow ? "var(--cq-q-light)" : "currentColor"}" stroke="none"/></svg></span>`;
+}
+/* Fit verdict glyphs: each a distinct shape, always paired with a word. */
+const FIT = {
+  fit: { word: "Strong match", svg: '<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="m4.8 8.2 2.1 2.1 4.3-4.4" stroke="var(--cq-surface-raised)" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' },
+  part: { word: "Partial", svg: '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/>' },
+  no: { word: "Mismatch", svg: '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 8h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>' },
+  unk: { word: "Unknown", svg: '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.2 2"/><path d="M6.4 6.4a1.7 1.7 0 0 1 3.2.7c0 1.1-1.6 1.4-1.6 2.2M8 11.3v.05" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>' },
+};
+function fg(kind) {
+  return `<svg class="fg ${kind}" viewBox="0 0 16 16" aria-hidden="true">${FIT[kind].svg}</svg>`;
+}
+/* Fit (docs/research/2026-10-06/matching.md): a band from the deterministic profile,
+   a confidence word from coverage and evidence, and one pip per parameter. Never a percentage. */
+const PARAMS = ["Stage", "Sector", "Geography", "Cheque size", "Business model", "Traction", "Team", "Thesis", "Round"];
+function fitScore(f, opts = {}) {
+  const pips = f.p.map((v) => fg(v)).join("");
+  const unk = f.p.filter((v) => v === "unk").length;
+  const label = `${f.band}, ${f.conf.toLowerCase()} confidence${unk ? `, ${unk} unknown` : ""}. Show why`;
+  return `<button class="fitscore" type="button" aria-label="${label}" ${opts.onclick ? `onclick="${opts.onclick}"` : ""}>
+    <span style="display:flex;flex-direction:column;gap:4px"><span class="big">${f.band}</span><span class="fitpips">${pips}</span><span class="small">${f.conf} confidence</span></span>
+    ${opts.noChevron ? "" : `<span class="t3">${ic("chevron-right", "sm")}</span>`}</button>`;
+}
+/* ===== Shell ===== */
+const NAV = {
+  investor: [
+    [null, [["discover", "Discover", "compass"], ["explore", "Explore", "explore"], ["q", "Q", "q"], ["capital", "Capital", "landmark"], ["relationships", "Relationships", "users"]]],
+    ["Workspace", [["gateq", "GateQ", "gate", 12], ["requests", "Company requests", "inbox", 4], ["documents", "Documents", "file"]]],
+    ["You", [["profile", "Profile", "user"], ["settings", "Settings", "sliders"]]],
+  ],
+  founder: [
+    [null, [["discover", "Discover", "compass"], ["explore", "Explore", "explore"], ["q", "Q", "q"], ["capital", "Capital", "landmark"], ["relationships", "Relationships", "users"]]],
+    ["Workspace", [["company", "Your company", "building"], ["gateq", "GateQ", "gate"], ["documents", "Documents", "file"]]],
+    ["You", [["profile", "Profile", "user"], ["settings", "Settings", "sliders"]]],
+  ],
+};
+const ORG = {
+  investor: { name: "Northbound Capital", sub: "Investor · 6 people", mono: "N" },
+  founder: { name: "Kora Health", sub: "Company · 4 people", mono: "K" },
+};
+function navIcon(name) {
+  return name === "q" ? qmark(20, false) : ic(name);
+}
+function shell({ active, title, back = false, persona = "investor", headRight = "", org = ORG[persona], noDock = false }) {
+  const groups = NAV[persona]
+    .map(([label, items]) => `<div class="navgroup">${label ? `<div class="gl">${label}</div>` : ""}${items
+      .map(([id, l, icn, count]) => `<a class="navlink" href="#" ${id === active ? 'aria-current="page"' : ""}>${navIcon(icn)}<span>${l}</span>${count ? `<span class="count">${count}</span>` : ""}</a>`)
+      .join("")}</div>`)
+    .join("");
+  const mob = [["discover", "Discover", "compass"], ["explore", "Explore", "explore"], ["q", "Q", "q"], ["relationships", "Relationships", "users"], ["more", "More", "menu"]];
+  return `
+  <div class="app">
+    <aside class="sidebar" aria-label="Main">
+      <div class="brand">${qmark(24, false)}<span>Capital Q</span></div>
+      <button class="orgswitch" type="button" data-orgswitch aria-label="Switch organisation. Current: ${org.name}">
+        <span class="logo" style="width:32px;height:32px;border-radius:8px;font-size:14px">${org.mono}</span>
+        <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${org.name}</span><span class="cq-caption t3">${org.sub}</span></span>
+        <span class="t3">${ic("chevrons-up-down", "sm")}</span>
+      </button>
+      <nav>${groups}</nav>
+      <div class="themesw" role="group" aria-label="Theme"><span class="${S.theme === "light" ? "on" : ""}">Light</span><span>Device</span><span class="${S.theme === "dark" ? "on" : ""}">Dark</span></div>
+    </aside>
+    <div style="min-width:0">
+      <header class="mhead">
+        ${back ? `<button class="iconbtn" aria-label="Back">${ic("chevron-left", "lg")}</button>` : `<span style="width:12px"></span>`}
+        <span class="title">${title}</span>${headRight}
+      </header>
+      <main class="page" id="main"></main>
+    </div>
+    <nav class="mnav" aria-label="Main">${mob.map(([id, l, icn]) => `<a href="#" ${id === active || (active === "requests" && id === "more") || (active === "gateq" && id === "more") || (active === "settings" && id === "more") ? 'aria-current="page"' : ""}>${navIcon(icn)}<span>${l}</span></a>`).join("")}</nav>
+    ${noDock ? "" : `<button class="qdock" aria-label="Ask Q about this page">${qmark(28)}</button>`}
+  </div>
+  <div class="scrim" onclick="closeSheet()"></div>
+  <aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></aside>
+  <div class="toast" id="toast" role="status"></div>`;
+}
+
+function openSheet(html) {
+  const el = document.getElementById("sheet");
+  el.innerHTML = `<div class="grab"></div>${html}`;
+  document.body.classList.add("sheet-open");
+  el.tabIndex = -1;
+  setTimeout(() => el.focus({ preventScroll: true }), 50);
+}
+function closeSheet() {
+  document.body.classList.remove("sheet-open");
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("show"), 2400);
+}
+
+/* Mockup controls: switch view/state/theme. Hidden with ?shot=1. */
+function mockControls(cfg) {
+  const sel = (key, opts) => `<select data-k="${key}" aria-label="${key}">${opts.map(([v, l]) => `<option value="${v}" ${String(S[key] ?? cfg.defaults?.[key]) === v ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+  const el = document.createElement("div");
+  el.className = "mock";
+  el.innerHTML = `<b>Mockup</b>${cfg.views ? sel("view", cfg.views) : ""}${sel("state", cfg.states || [["full", "Full"], ["loading", "Loading"], ["empty", "Empty"], ["error", "Error"], ["limited", "Permission-limited"]])}${sel("theme", [["light", "Light"], ["dark", "Dark"]])}${(cfg.extra || []).map(([k, opts]) => { S[k] = P.get(k) ?? opts[0][0]; return sel(k, opts); }).join("")}`;
+  el.addEventListener("change", (e) => {
+    const k = e.target.dataset.k;
+    P.set(k, e.target.value);
+    location.search = P.toString();
+  });
+  document.body.appendChild(el);
+}
+function param(k, d) { return P.get(k) ?? d; }
+
+/* Shared state blocks */
+function stateBlock({ icon = "alert", title, body, actions = "" }) {
+  return `<div class="state"><span class="ic">${ic(icon)}</span><h2 class="cq-title-sm">${title}</h2><p class="cq-body-sm t2">${body}</p>${actions ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${actions}</div>` : ""}</div>`;
+}
+function errorBlock(what) {
+  return stateBlock({ icon: "alert", title: `${what} didn't load`, body: "The connection dropped before it finished. Nothing you did was lost.", actions: `<button class="btn secondary">${ic("refresh", "sm")}Try again</button>` });
+}
+function sk(w, h, r = 8) { return `<div class="sk" style="width:${w};height:${h}px;border-radius:${r}px"></div>`; }
+</script>
+<style>
+.gwrap { max-width: 1240px; display: flex; flex-direction: column; gap: 16px; }
+/* ---------- Founder form ---------- */
+.form { max-width: 1040px; display: grid; gap: 24px; }
+@media (min-width: 1024px) { .form { grid-template-columns: 300px minmax(0, 1fr); gap: 48px; align-items: start; } }
+.gcs::-webkit-details-marker { display: none; }
+.gatecard { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+@media (min-width: 1024px) { .gatecard { position: sticky; top: 28px; } }
+.crit { display: flex; flex-direction: column; gap: 8px; }
+.crit li { display: flex; gap: 10px; font-size: 14px; align-items: flex-start; }
+.crit li .fg { margin-top: 2px; }
+.steps { display: flex; gap: 4px; }
+.steps i { flex: 1; height: 4px; border-radius: 2px; background: var(--cq-surface-strong); }
+.steps i.on { background: var(--cq-text-primary); }
+.q { display: flex; flex-direction: column; gap: 10px; padding: 18px 0; border-bottom: 1px solid var(--cq-border-subtle); }
+.q:last-of-type { border-bottom: 0; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--cq-border); background: var(--cq-surface-raised); font-size: 15px; color: var(--cq-text-primary); display: inline-flex; align-items: center; gap: 6px; }
+.opt[aria-pressed="true"] { background: var(--cq-text-primary); color: var(--cq-canvas); border-color: var(--cq-text-primary); }
+.opt.skip { color: var(--cq-text-secondary); border-style: dashed; }
+.prefill { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--cq-text-tertiary); }
+.prefill svg { width: 13px; height: 13px; }
+.cocard { display: flex; gap: 12px; align-items: center; padding: 14px; }
+.formbar { display: flex; gap: 8px; justify-content: space-between; align-items: center; padding-top: 8px; }
+@media (max-width: 767px) { .formbar { position: sticky; bottom: calc(var(--cq-bottom-nav-height) + 8px); background: var(--cq-canvas); padding: 10px 0; } }
+.result { display: flex; flex-direction: column; gap: 14px; padding: 20px; }
+.check { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 12px 0; border-top: 1px solid var(--cq-border-subtle); font-size: 15px; }
+.check .fg { margin-top: 3px; }
+.status { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--cq-text-secondary); white-space: nowrap; }
+/* ---------- Inbox ---------- */
+.ibx { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; border-top: 1px solid var(--cq-border-subtle); }
+@media (max-width: 1023px) { .listhead .hide-s { display: none; } .row .right { max-width: 92px; } .row .right .sla { white-space: normal; text-align: right; } }
+@media (min-width: 1024px) { .ibx { grid-template-columns: 440px minmax(0, 1fr); height: calc(100dvh - 210px); min-height: 640px; border: 1px solid var(--cq-border-subtle); border-radius: 14px; overflow: hidden; background: var(--cq-surface); } .ibx .list { border-right: 1px solid var(--cq-border-subtle); overflow-y: auto; } .ibx .detail { overflow-y: auto; } }
+.ibx .detail { display: none; }
+@media (min-width: 1024px) { .ibx .detail { display: block; } }
+.listhead { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 4px; border-bottom: 1px solid var(--cq-border-subtle); position: sticky; top: 0; background: var(--cq-surface); z-index: 2; }
+.row { display: grid; grid-template-columns: 36px 30px minmax(0, 1fr) auto; gap: 0 6px; align-items: start; padding: 12px 12px 12px 4px; border-bottom: 1px solid var(--cq-border-subtle); cursor: pointer; position: relative; }
+.row:hover { background: var(--cq-surface-subtle); }
+.row[aria-selected="true"] { background: var(--cq-surface-strong); }
+.row.unread .nm { font-weight: 600; }
+.row.unread::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--cq-accent); }
+.row .ck, .row .st { width: 36px; height: 36px; display: grid; place-items: center; color: var(--cq-text-tertiary); border-radius: 8px; }
+.row .st { width: 30px; }
+.row .st.on { color: var(--cq-warning); }
+.row .ck.on { color: var(--cq-accent); }
+.row .main { min-width: 0; display: flex; flex-direction: column; gap: 3px; padding-top: 7px; }
+.row .nm { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .ln { font-size: 13.5px; color: var(--cq-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 3px; }
+.row .right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 8px; }
+.mini { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--cq-text-secondary); padding: 2px 7px; border-radius: 999px; border: 1px solid var(--cq-border-subtle); white-space: nowrap; }
+.mini .fg { width: 12px; height: 12px; }
+.lbl { font-size: 11.5px; padding: 1px 7px; border-radius: 6px; background: var(--cq-surface-strong); color: var(--cq-text-secondary); white-space: nowrap; }
+.sla { font-size: 12px; white-space: nowrap; display: inline-flex; gap: 4px; align-items: center; color: var(--cq-text-tertiary); }
+.sla.warn { color: var(--cq-warning); font-weight: 500; }
+.sla svg { width: 13px; height: 13px; }
+.ini { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 600; background: var(--cq-surface-strong); color: var(--cq-text-secondary); }
+.bulk { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: var(--cq-text-primary); color: var(--cq-canvas); border-radius: 12px; flex-wrap: wrap; }
+.bulk .btn { color: var(--cq-canvas); }
+.bulk .btn:hover { background: oklch(1 0 0 / 0.12); color: var(--cq-canvas); }
+.dt { padding: 22px 26px 40px; display: flex; flex-direction: column; gap: 20px; }
+.dt .acts { display: flex; gap: 8px; flex-wrap: wrap; position: sticky; top: 0; background: var(--cq-surface); padding: 10px 0; z-index: 2; border-bottom: 1px solid var(--cq-border-subtle); }
+.note { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.tl { display: flex; flex-direction: column; gap: 0; }
+.tl li { display: grid; grid-template-columns: 90px 1fr; gap: 10px; padding: 8px 0; font-size: 13.5px; border-top: 1px solid var(--cq-border-subtle); }
+.phonedetail { position: fixed; inset: 0; z-index: var(--cq-z-modal); background: var(--cq-canvas); overflow-y: auto; }
+.phonedetail .dt { padding: 0 16px 120px; }
+.phonedetail .pbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; padding: 10px 16px calc(10px + var(--cq-safe-bottom)); background: var(--cq-surface); border-top: 1px solid var(--cq-border-subtle); }
+.phonedetail .pbar .btn { flex: 1; }
+/* Find */
+.findbox { display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+.findbox textarea { min-height: 84px; padding: 12px 14px; resize: vertical; }
+.resrow { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--cq-border-subtle); }
+</style>
+</head>
+<body>
+<script>
+const VIEW = S.view || "inbox";
+const STATE = S.state;
+const founder = ["form", "founder", "claim"].includes(VIEW);
+mockControls({
+  views: [["form", "Founder: GateQ form"], ["founder", "Founder: GateQ page"], ["claim", "Founder: Find my startup"], ["inbox", "Investor: GateQ inbox"], ["inbox-detail", "Investor: application (phone detail)"], ["find", "Investor: Find a startup"], ["gate", "Investor: your gate"]],
+  defaults: { view: "inbox" },
+  extra: [["step", [["1", "Form step 1"], ["2", "Form step 2"], ["3", "Form step 3"], ["4", "Form step 4"], ["check", "Check result"], ["sent", "Sent"]]]],
+});
+document.body.insertAdjacentHTML("afterbegin", shell({ active: "gateq", title: "GateQ", persona: founder ? "founder" : "investor", back: VIEW === "form" }));
+const main = document.getElementById("main");
+
+/* ---------- Tabs at the top of the GateQ page ---------- */
+function gtabs(active) {
+  const t = founder ? [["founder", "Applications"], ["claim", "Find my startup"]] : [["inbox", "Inbox", 12], ["find", "Find a startup"], ["gate", "Your gate"]];
+  return `<div class="sect-h" style="align-items:center;flex-wrap:wrap"><h1 class="cq-title-lg">GateQ</h1>${founder ? "" : `<button class="btn secondary sm" onclick="toast('Gate link copied')">${ic("link", "sm")}Copy gate link</button>`}</div>
+    <nav class="tabs" aria-label="GateQ">${t.map(([id, l, n]) => `<a href="?view=${id}&theme=${S.theme}" ${id === active ? 'aria-current="page"' : ""}>${l}${n ? `<span class="n">${n}</span>` : ""}</a>`).join("")}</nav>`;
+}
+
+/* ================= Founder: the form ================= */
+const GATE = { fund: "Sahel Capital", crit: [["Stage", "Pre-seed or seed"], ["Sector", "Fintech, health, or agriculture finance"], ["Where", "West Africa"], ["Round size", "$500k to $3M"]] };
+function gateCard(res) {
+  return `<aside class="card gatecard">
+    <div style="display:flex;gap:12px;align-items:center"><span class="logo" style="width:44px;height:44px;border-radius:50%">S</span><div><p class="cq-title-sm">Sahel Capital</p><p class="cq-caption t2">Dakar and Lagos · Replies within 10 working days</p></div></div>
+    <details class="gcd" ${matchMedia("(min-width: 1024px)").matches || res ? "open" : ""}><summary class="gcs" style="list-style:none;display:flex;justify-content:space-between;align-items:center;min-height:44px;cursor:pointer"><span class="cq-label">What they look for</span><span class="t3" style="display:flex;gap:4px;align-items:center;font-size:13px">4 rules ${ic("chevron-down", "sm")}</span></summary>
+    <div style="display:flex;flex-direction:column;gap:12px"><p class="cq-body-sm t1">We back early companies making money move better in West Africa.</p>
+    <div class="sect"><ul class="crit">${GATE.crit.map(([k, v], i) => `<li>${res ? fg(res[i]) : `<span class="t3">${ic("check", "sm")}</span>`}<span><b style="font-weight:500">${k}</b><br><span class="t2">${v}</span></span></li>`).join("")}</ul></div>
+    <p class="cq-caption t3">They answer 87% of qualified applications. Nothing is sent until you press Send.</p></div></details>
+  </aside>`;
+}
+function opts(list, sel) { return `<div class="opts" role="radiogroup">${list.map((o) => `<button class="opt" role="radio" aria-pressed="${o === sel}" aria-checked="${o === sel}">${o}</button>`).join("")}<button class="opt skip" role="radio" aria-pressed="false">I'd rather not say</button></div>`; }
+function form() {
+  const step = S.step;
+  const n = { 1: 1, 2: 2, 3: 3, 4: 4, check: 5, sent: 5 }[step];
+  const head = `<div style="display:flex;flex-direction:column;gap:10px"><p class="cq-caption t2">Apply to Sahel Capital${n <= 4 ? ` · Step ${n} of 4` : ""}</p><div class="steps" aria-hidden="true">${[1, 2, 3, 4].map((i) => `<i class="${i <= n ? "on" : ""}"></i>`).join("")}</div></div>`;
+  if (STATE === "loading") return `<div class="form">${sk("100%", 300, 14)}<div style="display:flex;flex-direction:column;gap:14px">${sk("40%", 24)}${sk("100%", 44, 22)}${sk("100%", 44, 22)}${sk("70%", 44, 22)}</div></div>`;
+  if (STATE === "empty") return `<div class="form">${gateCard()}<div>${stateBlock({ icon: "building", title: "First, find your company", body: "Sahel Capital needs to know which company is applying. Find it on Capital Q or add it in a minute: upload your deck and Q fills in the rest.", actions: `<a class="btn primary" href="?view=claim">Find my startup</a>` })}</div></div>`;
+  if (STATE === "limited") return `<div class="form">${gateCard(["fit", "fit", "no", "fit"])}<div class="card result"><h2 class="cq-title-md">Sahel Capital only takes companies in West Africa</h2><p class="cq-body t2">Kora Health meets 3 of their 4 rules, but this gate only accepts companies that meet all of them. Your company is listed in Nairobi, Kenya.</p>
+    <div>${[["Stage", "Seed", "fit"], ["Sector", "Health insurance software", "fit"], ["Where", "Nairobi, Kenya", "no"], ["Round size", "$1.2M", "fit"]].map(([k, v, r]) => `<div class="check">${fg(r)}<span><b style="font-weight:500">${k}</b><br><span class="cq-body-sm t2">${v}</span></span><span class="status">${r === "fit" ? "Meets" : "Doesn't meet"}</span></div>`).join("")}</div>
+    <p class="cq-body-sm t2">Wrong country? <a href="#" style="text-decoration:underline">Fix it in your profile</a>. Or let Q find investors who back companies in East Africa.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary">Find investors for Kenya</button><button class="btn ghost">Back</button></div></div></div>`;
+  let body = "";
+  if (step === "1") body = `<h1 class="cq-title-lg">Your company</h1><p class="cq-body t2">Filled in from your profile. Change anything that's out of date.</p>
+    <div class="card cocard"><span class="logo" style="width:48px;height:48px">K</span><span style="flex:1;min-width:0"><b class="cq-title-sm">Kora Health</b><span class="cq-body-sm t2" style="display:block">Gets clinics paid for insurance claims in weeks, not months.</span></span><button class="btn ghost sm">Edit</button></div>
+    <div class="q"><p class="flabel" id="q-stage">Stage <span class="prefill">${ic("check")}From your profile</span></p>${opts(["Pre-seed", "Seed", "Series A", "Later"], "Seed")}</div>
+    <div class="q"><p class="flabel">Sector <span class="prefill">${ic("check")}From your profile</span></p>${opts(["Fintech", "Health", "Agriculture finance", "Something else"], "Health")}</div>
+    <div class="q"><p class="flabel">Where is the company based?</p>${opts(["Nigeria", "Ghana", "Senegal", "Côte d'Ivoire", "Elsewhere"], "Nigeria")}</div>`;
+  if (step === "2") body = `<h1 class="cq-title-lg">Your round</h1><p class="cq-body t2">Rough numbers are fine. You can say you'd rather not.</p>
+    <div class="q"><p class="flabel">How much are you raising?</p>${opts(["Under $500k", "$500k–$1M", "$1M–$3M", "Over $3M"], "$1M–$3M")}<div style="display:flex;gap:8px;max-width:360px"><select class="input" style="width:96px" aria-label="Currency"><option>USD</option><option>NGN</option></select><input class="input" inputmode="decimal" value="1,200,000" aria-label="Exact amount (optional)"></div></div>
+    <div class="q"><p class="flabel">How are you raising?</p>${opts(["SAFE", "Equity", "Convertible note", "Not decided"], "SAFE")}</div>
+    <div class="q"><p class="flabel">Do you have a lead investor?</p>${opts(["Yes", "Looking for one", "Not needed"], "Looking for one")}</div>`;
+  if (step === "3") body = `<h1 class="cq-title-lg">What to share</h1><p class="cq-body t2">Your deck is attached. Pick anything else Sahel Capital should see. They only get what you tick.</p>
+    <ul class="hair">${[["Pitch deck, version 3", "14 slides · view only", true, "pub"], ["One-page summary", "Public", true, "pub"], ["Key numbers, monthly", "On request · shares it with Sahel Capital", false, "req"], ["Management accounts, last 12 months", "On request · shares it with Sahel Capital", false, "req"]].map(([n, m, on]) => `<li><label style="display:flex;gap:12px;align-items:center;min-height:60px;cursor:pointer"><input type="checkbox" ${on ? "checked" : ""} style="width:22px;height:22px;accent-color:var(--cq-accent)"><span style="flex:1"><b style="display:block;font-weight:500">${n}</b><span class="cq-caption t2">${m}</span></span>${ic("file")}</label></li>`).join("")}</ul>`;
+  if (step === "4") body = `<h1 class="cq-title-lg">A short note</h1><p class="cq-body t2">Optional. Q wrote a first draft from your profile; it's yours to change.</p>
+    <div class="field"><label for="msg">Note to Sahel Capital</label><textarea id="msg" class="input" rows="6" style="padding:12px 14px;line-height:1.5">Hi Sahel team, we help Nigerian clinics get paid by insurers in weeks instead of months. 64 clinics use Kora today and revenue has grown 3x this year. We're raising $1.2M and would value an investor who knows payments in West Africa.</textarea><span class="cq-caption t3" style="text-align:right">281 of 600</span></div>
+    <button class="btn ghost sm" style="align-self:flex-start">${qmark(16, false)}Make it shorter</button>`;
+  if (step === "check") body = `<div class="card result"><div style="display:flex;gap:12px;align-items:center">${fg("fit").replace('class="fg', 'style="width:28px;height:28px" class="fg')}<h1 class="cq-title-md">You meet all 4 of Sahel Capital's rules</h1></div>
+    <div>${[["Stage", "Seed", "fit"], ["Sector", "Health", "fit"], ["Where", "Lagos, Nigeria", "fit"], ["Round size", "$1.2M SAFE", "fit"]].map(([k, v, r]) => `<div class="check">${fg(r)}<span><b style="font-weight:500">${k}</b><br><span class="cq-body-sm t2">${v}</span></span><span class="status">Meets</span></div>`).join("")}</div>
+    <p class="cq-body-sm t2">Sending shares: your company profile, deck (view only), one-page summary and your note. Sahel Capital usually replies within 10 working days.</p></div>`;
+  if (step === "sent") body = `<div class="result" style="padding:8px 0">${qmark(40)}<h1 class="cq-title-lg">Sent to Sahel Capital</h1><p class="cq-body t2" style="max-width:52ch">They usually reply within 10 working days. You'll see every step on your GateQ page, and Q will tell you when they answer.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn primary" href="?view=founder">See your applications</a><button class="btn secondary">Find more investors like this</button></div></div>`;
+  const bar = step === "sent" ? "" : `<div class="formbar"><button class="btn ghost">${ic("chevron-left", "sm")}Back</button>${STATE === "error" ? "" : `<button class="btn primary" style="min-width:160px">${step === "check" ? "Send to Sahel Capital" : "Continue"}</button>`}</div>`;
+  const err = STATE === "error" ? `<div class="banner err">${ic("alert", "sm")}<span><b>Not sent.</b> The connection dropped. Your answers are saved on this device. <button class="btn secondary sm" style="margin-left:6px">Try again</button></span></div>` : "";
+  return `<div class="form">${gateCard(step === "check" || step === "sent" ? ["fit", "fit", "fit", "fit"] : null)}<div style="display:flex;flex-direction:column;gap:16px;min-width:0">${head}${err}${body}${bar}</div></div>`;
+}
+
+/* ================= Founder: GateQ page ================= */
+function founderPage() {
+  if (STATE === "loading") return `<div class="gwrap" style="max-width:860px">${gtabs("founder")}${[1, 2, 3].map(() => sk("100%", 64, 12)).join("")}</div>`;
+  if (STATE === "error") return `<div class="gwrap" style="max-width:860px">${gtabs("founder")}${errorBlock("Your applications")}</div>`;
+  if (STATE === "empty") return `<div class="gwrap" style="max-width:860px">${gtabs("founder")}${stateBlock({ icon: "gate", title: "No applications yet", body: "Many investors have a gate: a short form that tells you at once if you fit what they look for. Q found 6 whose rules Kora Health meets.", actions: `<button class="btn primary">See the 6 investors</button>` })}</div>`;
+  const lim = STATE === "limited";
+  const apps = [["Sahel Capital", "Sent 3 Oct", "In review", "clock"], ["Lagoon Angels", "Sent 28 Sep", "Asked for more: key numbers", "alert"], ["Northbound Capital", "Sent 20 Sep", "Call booked, 9 Oct", "check"], ["Baobab Fund", "Sent 2 Sep", "Passed: outside our cheque range", "x"]];
+  return `<div class="gwrap" style="max-width:860px">${gtabs("founder")}
+    ${lim ? `<div class="banner">${ic("lock", "sm")}<span>You're a member of Kora Health. Admins send applications; you can see where each stands.</span></div>` : ""}
+    <section class="sect"><h2 class="cq-title-sm">Your applications</h2><ul class="hair">${apps.map(([f, d, s, i]) => `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:2px 12px;align-items:center;padding:14px 0"><span class="logo" style="width:44px;height:44px;border-radius:50%">${f[0]}</span><span><b style="font-weight:500">${f}</b><span class="cq-caption t2" style="display:block">${d}</span></span><span class="status">${ic(i, "sm")}${s}</span></li>`).join("")}</ul></section>
+    <section class="sect"><div class="sect-h"><h2 class="cq-title-sm">Gates you meet</h2><span class="cq-caption t2">From their published rules</span></div>
+      <ul class="hair">${[["Kola Ventures", "Seed · Health · Nigeria", "4 of 4 rules"], ["Atlantic Seed", "Pre-seed to Seed · Africa", "3 of 3 rules"]].map(([f, m, r]) => `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:2px 12px;align-items:center;padding:14px 0"><span class="logo" style="width:44px;height:44px;border-radius:50%">${f[0]}</span><span><b style="font-weight:500">${f}</b><span class="cq-caption t2" style="display:block">${m} · ${r}</span></span><a class="btn secondary sm" href="?view=form&step=1">Apply</a></li>`).join("")}</ul></section></div>`;
+}
+
+/* ================= Founder: Find my startup (claim) ================= */
+function claim() {
+  const head = `${gtabs("claim")}<div class="card findbox"><h2 class="cq-title-sm">Find your company on Capital Q</h2><p class="cq-body-sm t2">It may already be here: from a deck, a colleague, or public records. Search by name, website or CAC number.</p><label class="search"><span class="sr">Company name, website or registration number</span>${ic("search")}<input class="input" value="kora health"></label></div>`;
+  if (STATE === "loading") return `<div class="gwrap" style="max-width:760px">${head}${sk("100%", 64, 12)}${sk("100%", 64, 12)}</div>`;
+  if (STATE === "error") return `<div class="gwrap" style="max-width:760px">${head}${errorBlock("Search")}</div>`;
+  if (STATE === "empty") return `<div class="gwrap" style="max-width:760px">${head}${stateBlock({ icon: "building", title: "Not on Capital Q yet", body: "Add it now: upload your deck and Q fills in your profile. You check everything before anyone sees it.", actions: `<button class="btn primary">${ic("upload", "sm")}Upload your deck</button><button class="btn secondary">Add it by hand</button>` })}</div>`;
+  const lim = STATE === "limited";
+  return `<div class="gwrap" style="max-width:760px">${head}
+    <section class="sect"><h2 class="cq-label t2">2 companies match</h2><div>
+      <div class="resrow"><span class="logo" style="width:48px;height:48px">K</span><span><b style="font-weight:600">Kora Health Technologies Ltd</b><span class="cq-body-sm t2" style="display:block">korahealth.ng · Lagos · RC 1789234</span><span class="cq-caption t3">${lim ? "Already has 3 members" : "Not claimed yet · added from a public registry"}</span></span>${lim ? `<button class="btn secondary sm">Ask to join</button>` : `<button class="btn primary sm" onclick="openClaim()">This is mine</button>`}</div>
+      <div class="resrow"><span class="logo" style="width:48px;height:48px">K</span><span><b style="font-weight:600">Kora Foods</b><span class="cq-body-sm t2" style="display:block">korafoods.com · Accra</span></span><span class="t3">${ic("chevron-right")}</span></div>
+    </div></section>
+    ${lim ? `<div class="banner">${ic("users", "sm")}<span>Kora Health already has members on Capital Q. Ask to join and an admin will let you in. If you think someone claimed it wrongly, <a href="#" style="text-decoration:underline">tell us</a>.</span></div>` : ""}
+    <p class="cq-body-sm t2">Not listed? <a href="#" style="text-decoration:underline">Add your company</a></p></div>`;
+}
+function openClaim() {
+  openSheet(`<div style="display:flex;flex-direction:column;gap:14px"><div class="sect-h"><h2 id="sheet-title" class="cq-title-md">Show it's yours</h2><button class="iconbtn" onclick="closeSheet()" aria-label="Close">${ic("x")}</button></div>
+  <p class="cq-body-sm t2">Pick one. It takes a minute.</p>
+  <ul class="hair">${[["mail", "Email at korahealth.ng", "We send a 6-digit code to your work email."], ["file", "Upload a CAC document", "Q matches the name and RC number."], ["users", "Ask a colleague", "Someone already in the company says yes."]].map(([i, a, b], k) => `<li><label style="display:flex;gap:12px;align-items:flex-start;padding:14px 0;cursor:pointer"><input type="radio" name="c" ${k === 0 ? "checked" : ""} style="width:20px;height:20px;accent-color:var(--cq-accent);margin-top:2px"><span style="flex:1"><b style="display:flex;gap:8px;align-items:center;font-weight:500">${ic(i, "sm")}${a}</b><span class="cq-body-sm t2">${b}</span></span></label></li>`).join("")}</ul>
+  <div class="field"><label for="em">Work email</label><input id="em" class="input" value="amara@korahealth.ng"></div>
+  <button class="btn primary" onclick="closeSheet();toast('Code sent to amara@korahealth.ng')">Send code</button></div>`);
+}
+
+/* ================= Investor: inbox ================= */
+const APPS = [
+  { id: "sunline", n: "Sunline Energy", l: "Pay-as-you-go solar for small shops in Kenya", meta: "Seed · Energy · Nairobi", band: "Strong fit", bv: "fit", req: "4 of 4 rules", q: "Worth a look", who: "DR", sla: "2 days left", warn: true, t: "09:40", unread: true, star: true, labels: ["IC next week"] },
+  { id: "kora", n: "Kora Health", l: "Gets clinics paid for claims in weeks", meta: "Seed · Health · Lagos", band: "Good fit", bv: "fit", req: "4 of 4 rules", q: "Worth a look", who: "SK", sla: "6 days left", t: "Yesterday", unread: true, labels: ["Health"] },
+  { id: "tally", n: "Tally Pay", l: "Card payments for corner shops", meta: "Seed · Payments · Dubai", band: "Good fit", bv: "fit", req: "3 of 4 rules", q: "Worth a look", who: "", sla: "8 days left", t: "Yesterday", unread: true, labels: [] },
+  { id: "harvest", n: "Harvest Ledger", l: "Loans repaid at harvest", meta: "Pre-seed · Agri finance · Accra", band: "Partial fit", bv: "part", req: "3 of 4 rules, 1 unanswered", q: "Maybe", who: "JO", sla: "Waiting on founder", t: "2 Oct", labels: ["Asked for more"] },
+  { id: "okra", n: "Okra Finance", l: "Savings that beat inflation", meta: "Pre-seed · Fintech · Lagos", band: "Good fit", bv: "fit", req: "4 of 4 rules", q: "Maybe", who: "", sla: "9 days left", t: "1 Oct", labels: [] },
+  { id: "mosaic", n: "Mosaic", l: "Payroll for remote African teams", meta: "Pre-seed · HR software · Kigali", band: "Not enough information", bv: "unk", req: "2 of 4 rules, 2 unanswered", q: "Too early to say", who: "", sla: "9 days left", t: "30 Sep", labels: [] },
+  { id: "bazaar", n: "Bazaar Box", l: "Wholesale delivered overnight", meta: "Seed · Commerce · Lagos", band: "Partial fit", bv: "part", req: "4 of 4 rules", q: "Maybe", who: "DR", sla: "10 days left", t: "29 Sep", star: true, labels: ["Fintech"] },
+];
+function rowHtml(a, i, sel, checked) {
+  return `<div class="row ${a.unread ? "unread" : ""}" role="option" aria-selected="${i === sel}" tabindex="${i === sel ? 0 : -1}" onclick="pick(${i})">
+    <button class="ck ${checked ? "on" : ""}" aria-label="Select ${a.n}" onclick="event.stopPropagation();this.classList.toggle('on')">${ic(checked ? "checksq" : "square")}</button>
+    <button class="st ${a.star ? "on" : ""}" aria-label="${a.star ? "Unstar" : "Star"} ${a.n}" aria-pressed="${!!a.star}" onclick="event.stopPropagation()">${ic(a.star ? "star-fill" : "star", "sm")}</button>
+    <div class="main"><span class="nm">${a.n}</span><span class="ln">${a.l}</span>
+      <span class="tags"><span class="mini">${fg(a.bv)}${a.band}</span><span class="mini">${a.req}</span>${a.labels.map((l) => `<span class="lbl">${l}</span>`).join("")}</span></div>
+    <div class="right"><span class="cq-caption t3">${a.t}</span>${a.who ? `<span class="ini" title="Assigned">${a.who}</span>` : ""}<span class="sla ${a.warn ? "warn" : ""}">${a.warn ? ic("clock") : ""}${a.sla}</span></div>
+  </div>`;
+}
+function detailHtml(a, lim, solo) {
+  const crit = a.id === "harvest" ? [["Stage", "Pre-seed", "fit"], ["Sector", "Agriculture finance", "fit"], ["Where", "Accra, Ghana", "fit"], ["Round size", "Not answered", "unk"]] : [["Stage", "Seed", "fit"], ["Sector", a.meta.split(" · ")[1], "fit"], ["Where", a.meta.split(" · ")[2], "fit"], ["Round size", "$2M SAFE", "fit"]];
+  return `<div class="dt">
+    <div style="display:flex;gap:14px;align-items:flex-start"><span class="logo" style="width:56px;height:56px;font-size:22px">${a.n[0]}</span><div style="flex:1;min-width:0"><h2 class="cq-title-lg">${a.n}</h2><p class="cq-body">${a.l}.</p><p class="cq-caption t2">${a.meta} · Raising $2M SAFE · Applied ${a.t}</p><a class="cq-body-sm" href="company.html" style="display:inline-flex;gap:4px;align-items:center;min-height:36px;text-decoration:underline;text-underline-offset:4px">Open full profile ${ic("arrow-up-right", "sm")}</a></div></div>
+    <div class="acts">
+      <button class="btn primary sm" ${lim ? "disabled" : ""}>${ic("message", "sm")}Reply</button>
+      <button class="btn secondary sm" ${lim ? "disabled" : ""}>Book a call</button>
+      <button class="btn secondary sm" ${lim ? "disabled" : ""}>Express interest</button>
+      <button class="btn secondary sm" ${lim ? "disabled" : ""} onclick="openPass()">Pass</button>
+      <span style="flex:1"></span>
+      ${solo ? "" : `<button class="btn ghost sm" ${lim ? "disabled" : ""}>${ic("user-plus", "sm")}Assign</button>`}
+      <button class="btn ghost sm" onclick="openPack()">${ic("download", "sm")}Download pack</button>
+      <button class="iconbtn" aria-label="More: ask for more, label, snooze, done">${ic("more")}</button>
+    </div>
+    ${lim ? `<div class="banner">${ic("lock", "sm")}<span>You're a <b>Viewer</b>: you can read applications, add notes and download packs. Partners reply, pass and express interest.</span></div>` : ""}
+    <div class="qview">${qmark(22)}<div style="display:flex;flex-direction:column;gap:2px"><p class="who">Q's view, not a verified fact</p><p class="cq-body"><b>${a.q}.</b> <span class="t2">Fastest growth in your inbox this month, with revenue backed by bank statements. Ask about repayment in the dry season.</span></p></div></div>
+    <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      <section class="sect"><h3 class="cq-title-sm">Your gate's rules</h3><div>${crit.map(([k, v, r]) => `<div class="check" style="font-size:14px">${fg(r)}<span><b style="font-weight:500">${k}</b> <span class="t2">${v}</span></span><span class="status">${r === "fit" ? "Meets" : "Not answered"}</span></div>`).join("")}</div></section>
+      <section class="sect"><h3 class="cq-title-sm">${a.band} · high confidence</h3><ul style="display:flex;flex-direction:column;gap:2px">${PARAMS.map((p, i) => { const v = a.id === "harvest" ? ["fit", "part", "part", "fit", "unk", "unk", "part", "fit", "unk"][i] : ["fit", "fit", "fit", "fit", "fit", "fit", "fit", "part", "fit"][i]; return `<li style="display:flex;gap:8px;align-items:center;font-size:14px;min-height:28px">${fg(v)}<span style="flex:1">${p}</span><span class="t2 cq-caption">${FIT[v].word}</span></li>`; }).join("")}</ul></section>
+    </div>
+    <section class="sect"><h3 class="cq-title-sm">Their note</h3><p class="cq-body t1" style="max-width:62ch">"We sell solar to 12,000 small shops on daily payments. Revenue is $58k a month and grew 4x in a year. We're closing on 30 October and would love a co-investor who knows SME finance."</p></section>
+    <section class="sect"><h3 class="cq-title-sm">What they shared</h3><ul class="hair">${[["Pitch deck, 16 slides", "View only · Q's 12 sections ready"], ["Key numbers, monthly", "Sheet · Sep 2026"], ["Bank statements summary", "PDF · 4 pages"]].map(([n, m]) => `<li style="display:flex;gap:12px;align-items:center;min-height:52px">${ic("file")}<span style="flex:1"><b style="font-weight:500;display:block">${n}</b><span class="cq-caption t2">${m}</span></span><button class="btn ghost sm">Open</button></li>`).join("")}</ul></section>
+    <section class="sect"><div class="sect-h"><h3 class="cq-title-sm">Team notes</h3><span class="cq-caption t3">Only Northbound Capital sees these</span></div>
+      <div class="note"><span class="ini">SK</span><span><b style="font-weight:500">Sara</b> <span class="cq-caption t3">yesterday</span><br>Met Wanjiru at Africa Fintech Summit, sharp on unit economics. @Daniel worth an IC slot?</span></div>
+      <div style="display:flex;gap:8px"><input class="input" placeholder="Add a note, @ to mention" aria-label="Add a note"><button class="btn secondary">${ic("send", "sm")}</button></div></section>
+    <section class="sect"><h3 class="cq-title-sm">What's happened</h3><ul class="tl">${[["Today 09:40", "Applied through your Seed gate"], ["Today 09:40", "Auto-reply sent: \"We reply within 10 working days\""], ["Today 09:42", "Q prepared the summary and fit"], ["Today 10:05", "Assigned to Daniel"]].map(([a2, b]) => `<li><span class="t3">${a2}</span><span>${b}</span></li>`).join("")}</ul></section>
+  </div>`;
+}
+let SEL = Number(param("sel", "0"));
+function inbox() {
+  const views = [["Inbox", 7, 1], ["Starred", 2], ["Assigned to me", 2], ["Waiting on founder", 1], ["Outside mandate", 3], ["Done"]];
+  const head = `<div class="gwrap">${gtabs("inbox")}<div class="chips" role="tablist" aria-label="Views">${views.map(([l, n, on]) => `<button class="chip" aria-pressed="${!!on}">${l}${n ? ` <span class="cq-numeric" style="opacity:.7">${n}</span>` : ""}</button>`).join("")}</div>`;
+  if (STATE === "loading") return `${head}<div class="ibx"><div class="list">${[1, 2, 3, 4, 5].map(() => `<div style="display:flex;gap:10px;padding:14px 12px;border-bottom:1px solid var(--cq-border-subtle)">${sk("24px", 24, 6)}<div style="flex:1;display:flex;flex-direction:column;gap:6px">${sk("50%", 15)}${sk("80%", 12)}${sk("60%", 18, 9)}</div></div>`).join("")}</div><div class="detail"><div class="dt">${sk("60%", 28)}${sk("100%", 40, 10)}${sk("100%", 200, 14)}</div></div></div></div>`;
+  if (STATE === "error") return `${head}${errorBlock("Your GateQ inbox")}</div>`;
+  if (STATE === "empty") return `${head}<div style="display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start">${stateBlock({ icon: "inbox", title: "No applications yet", body: "Share your gate and founders can check their fit with you in two minutes. Only companies that meet your rules land here.", actions: `<button class="btn primary">${ic("link", "sm")}Copy gate link</button><a class="btn secondary" href="?view=gate">Preview the form</a>` })}<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:8px"><p class="cq-label t2">Your gate link</p><p class="cq-body" style="font-family:var(--cq-font-mono);font-size:14px">capitalq.app/g/northbound-seed</p><p class="cq-caption t3">Also as a QR code and a snippet for your website.</p></div></div></div>`;
+  const lim = STATE === "limited";
+  const solo = param("solo") === "1";
+  const selecting = param("bulk") === "1";
+  const checked = selecting ? [0, 1, 4] : [];
+  const bulk = selecting ? `<div class="bulk" role="toolbar" aria-label="3 selected"><b style="padding:0 8px;font-weight:500">3 selected</b><button class="btn ghost sm">${ic("tag", "sm")}Label</button><button class="btn ghost sm">${ic("user-plus", "sm")}Assign</button><button class="btn ghost sm">${ic("download", "sm")}Download packs</button><button class="btn ghost sm">${ic("archive", "sm")}Done</button><button class="btn ghost sm">Pass…</button><span style="flex:1"></span><button class="btn ghost sm" aria-label="Clear selection">${ic("x", "sm")}</button></div>` : "";
+  return `${head}${bulk}
+    <div class="ibx">
+      <div class="list" role="listbox" aria-label="Applications" aria-multiselectable="true">
+        <div class="listhead"><button class="iconbtn" aria-label="Select all">${ic(selecting ? "checksq" : "square")}</button><button class="btn ghost sm">${ic("filter", "sm")}Filter</button><button class="btn ghost sm hide-s">Reply-by date ${ic("chevron-down", "sm")}</button><span style="flex:1"></span><button class="btn ghost sm" title="Q proposes labels, assignees and replies for you to approve">${qmark(16, false)}Triage</button></div>
+        ${APPS.map((a, i) => rowHtml(a, i, SEL, checked.includes(i))).join("")}
+        <p class="cq-caption t3" style="padding:14px 12px">3 applications outside your rules are in Outside mandate. Q never passes on your behalf.</p>
+      </div>
+      <div class="detail" id="detail">${detailHtml(APPS[SEL], lim, solo)}</div>
+    </div>
+    <p class="cq-caption t3">Keys: j k move, x select, s star, e done, r reply, p pass, d download. <a href="#" style="text-decoration:underline">Turn off</a></p></div>`;
+}
+function pick(i) {
+  if (!matchMedia("(min-width: 1024px)").matches) { location.search = `view=inbox-detail&sel=${i}&theme=${S.theme}`; return; }
+  SEL = i;
+  document.querySelectorAll(".row").forEach((r, j) => r.setAttribute("aria-selected", j === i));
+  document.getElementById("detail").innerHTML = detailHtml(APPS[i], STATE === "limited", param("solo") === "1");
+}
+function inboxDetail() {
+  const a = APPS[SEL];
+  if (matchMedia("(min-width: 1024px)").matches) return inbox();
+  return `<div class="phonedetail"><header class="mhead"><a class="iconbtn" href="?view=inbox&theme=${S.theme}" aria-label="Back to inbox">${ic("chevron-left", "lg")}</a><span class="title">${a.n}</span><button class="iconbtn" aria-label="Star">${ic(a.star ? "star-fill" : "star")}</button><button class="iconbtn" aria-label="Done">${ic("archive")}</button><button class="iconbtn" aria-label="More">${ic("more")}</button></header>
+    ${detailHtml(a, STATE === "limited", false).replace('<div class="acts">', '<div class="acts" style="display:none">')}
+    <div class="pbar"><button class="btn secondary" onclick="openPass()">Pass</button><button class="btn secondary">Book a call</button><button class="btn primary">Reply</button></div></div>`;
+}
+function openPass() {
+  openSheet(`<div style="display:flex;flex-direction:column;gap:14px"><div class="sect-h"><h2 id="sheet-title" class="cq-title-md">Pass on ${APPS[SEL].n}</h2><button class="iconbtn" onclick="closeSheet()" aria-label="Close">${ic("x")}</button></div>
+    <p class="flabel">Main reason</p><div class="opts">${["Outside our stage", "Outside our sector", "Cheque doesn't fit", "Timing", "Other"].map((r, i) => `<button class="opt" aria-pressed="${i === 3}">${r}</button>`).join("")}</div>
+    <div class="field"><label for="pm">Message to the founder <span class="prefill">${qmark(13, false)}Drafted by Q in your style</span></label><textarea id="pm" class="input" rows="5" style="padding:12px 14px;line-height:1.5">Hi Wanjiru, thank you for applying. We've just committed our remaining seed allocation for this year, so we can't take this round. What you've built with shop owners is impressive, and we'd like to hear from you when you raise next.</textarea></div>
+    <p class="cq-caption t3">Sent only when you press the button, exactly as shown. Founders always get a reason.</p>
+    <div style="display:flex;gap:8px"><button class="btn primary" onclick="closeSheet();toast('Sent. Moved to Done.')">Send and pass</button><button class="btn ghost" onclick="closeSheet()">Cancel</button></div></div>`);
+}
+function openPack() {
+  openSheet(`<div style="display:flex;flex-direction:column;gap:14px"><div class="sect-h"><h2 id="sheet-title" class="cq-title-md">Download pack</h2><button class="iconbtn" onclick="closeSheet()" aria-label="Close">${ic("x")}</button></div>
+    <p class="cq-body-sm t2">One zip with everything ${APPS[SEL].n} shared with you, with your name on every page.</p>
+    <ul class="hair">${[["One-page summary", "Company, round, your rules, fit and Q's view", true], ["Pitch deck", "Not included: the founder keeps it view only", false], ["Key numbers, monthly", "Sheet", true], ["Bank statements summary", "PDF", true], ["Application data for your CRM", "CSV and JSON", true]].map(([n, m, on]) => `<li><label style="display:flex;gap:12px;align-items:center;min-height:56px"><input type="checkbox" ${on ? "checked" : "disabled"} style="width:20px;height:20px;accent-color:var(--cq-accent)"><span><b style="display:block;font-weight:500;${on ? "" : "color:var(--cq-text-tertiary)"}">${n}</b><span class="cq-caption t2">${m}</span></span></label></li>`).join("")}</ul>
+    <button class="btn primary" onclick="closeSheet();toast('Preparing your pack. The link works for 24 hours.')">${ic("download", "sm")}Download zip</button></div>`);
+}
+
+/* ================= Investor: Find a startup ================= */
+function find() {
+  const head = `<div class="gwrap" style="max-width:900px">${gtabs("find")}<div class="card findbox"><label class="flabel" for="fq">Describe the company you're looking for</label><textarea id="fq" class="input">Seed fintech in Nigeria or Ghana with at least $30k monthly revenue, raising under $2M</textarea>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="cq-caption t2">Q understood:</span>${["Seed", "Fintech", "Nigeria or Ghana", "Revenue $30k+ a month", "Raising under $2M"].map((x) => `<span class="mini" style="font-size:13px;padding:4px 10px">${x} ${ic("x", "sm")}</span>`).join("")}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary">${ic("search", "sm")}Find</button><button class="btn ghost">Try: "${"climate hardware in East Africa"}"</button></div></div>`;
+  if (STATE === "loading") return `${head}<div class="reading" style="display:flex;gap:12px;align-items:center;padding:14px;border-radius:12px;background:var(--cq-surface-subtle)">${qmark(22)}<span class="cq-body-sm">Searching 1,240 companies you can see…</span></div>${sk("100%", 70, 12)}${sk("100%", 70, 12)}</div>`;
+  if (STATE === "error") return `${head}${errorBlock("Your search")}</div>`;
+  if (STATE === "empty") return `${head}${stateBlock({ icon: "search", title: "No company on Capital Q matches all five yet", body: "Q can watch for you and tell you the day one does. Or loosen one: the closest results need a lower revenue bar.", actions: `<button class="btn primary">Watch for me</button><button class="btn secondary">Revenue $15k+ instead</button>` })}</div>`;
+  const lim = STATE === "limited";
+  const rs = [["Okra Finance", "Savings that beat inflation", "Pre-seed · Fintech · Lagos", "Strong fit", "fit", "$41k a month"], ["Tally Pay", "Card payments for corner shops", "Seed · Payments · Lagos and Dubai", "Good fit", "fit", "$44k a month"], ["Bazaar Box", "Wholesale delivered overnight, pay later", "Seed · Commerce · Lagos", "Partial fit", "part", "$36k a month"]];
+  return `${head}
+    ${lim ? `<div class="banner">${ic("shield", "sm")}<span>Showing companies open to everyone. Verify Northbound Capital to search companies that share only with verified investors.</span></div>` : ""}
+    <div class="sect-h"><h2 class="cq-label t2">${lim ? 2 : 3} companies match</h2><button class="btn secondary sm">${ic("bookmark", "sm")}Save as alert</button></div>
+    <div>${rs.slice(0, lim ? 2 : 3).map(([n, l, m, b, v, r]) => `<a class="resrow" href="company.html"><span class="logo" style="width:48px;height:48px">${n[0]}</span><span style="min-width:0"><b style="font-weight:600">${n}</b><span class="cq-body-sm t1" style="display:block">${l}</span><span class="cq-caption t2">${m} · ${r}</span></span><span class="mini">${fg(v)}${b}</span></a>`).join("")}</div>
+    <div class="card" style="padding:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:220px"><b style="font-weight:500">Know a company that isn't here?</b><span class="cq-body-sm t2" style="display:block">Send them your gate link. Nothing goes out until you approve the message.</span></span><button class="btn secondary sm">Invite a founder</button></div></div>`;
+}
+
+/* ================= Investor: your gate ================= */
+function gate() {
+  const head = `<div class="gwrap" style="max-width:900px">${gtabs("gate")}`;
+  if (STATE === "loading") return `${head}${sk("100%", 120, 14)}${sk("100%", 220, 14)}</div>`;
+  if (STATE === "error") return `${head}${errorBlock("Your gate")}</div>`;
+  const lim = STATE === "limited";
+  const off = STATE === "empty";
+  return `${head}
+    ${lim ? `<div class="banner">${ic("lock", "sm")}<span>Only admins of Northbound Capital can change the gate. You can copy and share the link.</span></div>` : ""}
+    <section class="card" style="padding:18px;display:flex;flex-direction:column;gap:12px"><div class="sect-h"><h2 class="cq-title-sm">Who can apply</h2></div>
+      <div class="seg" role="radiogroup" aria-label="Who can apply" style="display:inline-flex;flex-wrap:wrap;max-width:100%;padding:3px;gap:2px;border-radius:10px;background:var(--cq-surface-subtle);align-self:flex-start">${[["Closed", off], ["Only companies that meet my rules", !off], ["Anyone"]].map(([l, on]) => `<button class="btn sm ${on ? "secondary" : "ghost"}" aria-pressed="${!!on}" ${lim ? "disabled" : ""}>${l}</button>`).join("")}</div>
+      <p class="cq-body-sm t2">${off ? "Your gate is closed. Founders see that you're not taking applications right now." : "Founders who don't meet a rule see why, and can't send. Unanswered questions never count as a no."}</p></section>
+    <section class="sect"><div class="sect-h"><h2 class="cq-title-sm">Your rules</h2><button class="btn ghost sm" ${lim ? "disabled" : ""}>Edit</button></div><ul class="hair">${[["Stage", "Pre-seed or seed"], ["Sector", "Fintech, health, agriculture finance"], ["Where", "Nigeria, Ghana, Kenya"], ["Round size", "$300k to $3M"], ["Never", "Gambling, tobacco, weapons"]].map(([k, v]) => `<li style="display:flex;justify-content:space-between;gap:12px;min-height:48px;align-items:center"><span class="t2">${k}</span><span style="text-align:right">${v}</span></li>`).join("")}</ul></section>
+    <section class="sect"><h2 class="cq-title-sm">Promise to founders</h2><p class="cq-body">We reply to every qualified application within <b>10 working days</b>.</p><p class="cq-caption t3">Last 90 days: 41 received, 38 answered in time, median 4 days.</p></section>
+    <section class="sect"><h2 class="cq-title-sm">Share</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn secondary sm">${ic("link", "sm")}Copy link</button><button class="btn secondary sm">${ic("grid", "sm")}QR code</button><button class="btn secondary sm">${ic("copy", "sm")}Website snippet</button><a class="btn ghost sm" href="?view=form&step=1">Preview the form</a></div></section></div>`;
+}
+
+main.innerHTML = ({ form, founder: founderPage, claim, inbox, "inbox-detail": inboxDetail, find, gate })[VIEW]();
+if (param("sheet") === "pass") openPass();
+if (param("sheet") === "pack") openPack();
+if (param("sheet") === "claim") openClaim();
+</script>
+</body>
+</html>
