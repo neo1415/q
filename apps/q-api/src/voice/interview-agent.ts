@@ -78,6 +78,7 @@ import { createReplySentenceStream } from "./reply-stream.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { settleKnownAnswers } from "./known-answers.js";
 import { textStatedIn } from "./value-support.js";
 
 /**
@@ -426,7 +427,7 @@ export function turnNotesFor(input: {
   switch (input.lookup?.kind) {
     case "RUN":
       notes.push(
-        `A look-up will run right after your reply for their question: "${input.lookup.question.slice(0, 300)}". Say in a few words you will look it up; don't answer it or ask anything now. If they were only chatting (no real question), set chatter PERSON, acknowledge it warmly and carry on: then nothing is looked up.`,
+        `A look-up will run right after your reply for their question: "${input.lookup.question.slice(0, 300)}". Acknowledge the question in a few words; don't answer it, don't promise what you will find, and ask nothing now: what happens with it is said right after your reply. If they were only chatting (no real question), set chatter PERSON, acknowledge it warmly and carry on: then nothing is looked up.`,
       );
       break;
     case "RUNNING":
@@ -901,6 +902,10 @@ export function createInterviewAgent(
         )
         .catch(() => false);
     };
+    // No stuck steps: what the platform already holds (the journey they
+    // chose answers F0.intent) is on the record before any model reads the
+    // turn. Every turn, so a session already stuck on one is repaired.
+    await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
     let state = await port.state();
     if (research !== undefined) {
@@ -1614,6 +1619,7 @@ export function createInterviewAgent(
       reply,
       intent: opening ? "OPENING" : "ANSWER",
       ...(gestures.length === 0 ? {} : { gestures }),
+      ...(pausing ? { pausing: true } : {}),
       asking:
         stillOpen && askedOpen !== null && askedStep !== undefined
           ? {

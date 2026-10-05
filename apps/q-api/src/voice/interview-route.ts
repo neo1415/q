@@ -131,16 +131,8 @@ export function registerQInterviewRoute(
           .send({ ...problem, paused: true });
       }
 
-      // Detached, best effort: never delays or fails the turn.
-      dependencies.presence?.afterInterviewTurn(
-        actor,
-        outcome.view,
-        undefined,
-        {
-          organisationName:
-            signupContextFromToken(accessToken).organisationName ?? null,
-        },
-      );
+      // The public look-ups by name, and the questions their findings
+      // become, are the onboarding conductor's (inside `agent.turn`).
       void reply.header("Cache-Control", "no-store");
       return QInterviewTurnResponseSchema.parse({
         reply: outcome.reply,
@@ -181,6 +173,10 @@ export function registerQInterviewRoute(
         ...(outcome.gestures === undefined || outcome.gestures.length === 0
           ? {}
           : { gestures: [...outcome.gestures] }),
+        ...(outcome.resumed === true ? { resumed: true } : {}),
+        ...(outcome.confirming === undefined
+          ? {}
+          : { confirming: { kind: outcome.confirming.kind } }),
       });
     },
   );

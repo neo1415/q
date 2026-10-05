@@ -425,6 +425,7 @@ import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
 import { createVoiceSessionSealer } from "./voice/session-token.js";
 import { createInterviewAgent } from "./voice/interview-agent.js";
+import { createOnboardingConductor } from "./voice/onboarding-conductor.js";
 import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
 import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
 import { createVoiceTurnBoard } from "./voice/turn-board.js";
@@ -4297,6 +4298,7 @@ const founderResearch =
   researchComposition.research === undefined
     ? undefined
     : createInvestorResearch({
+        journey: "founder",
         read: founderResearchReadFrom(
           createPresenceReadPort({
             research: researchComposition.research,
@@ -4401,7 +4403,7 @@ const reportPausedAccount = async (
     }
   }
 };
-const interviewAgent = createInterviewAgent({
+const interviewLoop = createInterviewAgent({
   standing: standingStore,
   onPaused: reportPausedAccount,
   gateway: modelGateway,
@@ -4469,6 +4471,25 @@ const presenceTrigger =
         logger,
       });
 
+// The onboarding conductor (founder report 2026-10-05): the one owner of a
+// first-run onboarding conversation, wrapped around the interview loop so
+// every entry -- typed route, voice think, duplex ask_q, a voice line's
+// opening -- goes through the same rules: one brain, no stuck steps, Q
+// leads, research findings put back as questions, one turn at a time.
+const interviewAgent = createOnboardingConductor({
+  agent: interviewLoop,
+  portFor: ({ actor, session, onboardingSessionId, journeyType }) =>
+    createOnboardingPort({
+      session,
+      onboardingSessionId,
+      journeyType,
+      ownerUserId: actor.userId,
+      personTurns: [],
+      recommendations: onboardingRecommendations,
+    }),
+  presence: presenceTrigger,
+  logger,
+});
 const voiceTurn = timedVoiceTurns(
   createVoiceTurnHandler({
     qRuntime,

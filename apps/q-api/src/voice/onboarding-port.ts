@@ -176,6 +176,13 @@ export type BoundOnboardingPort = OnboardingToolPort &
       stepKey: string,
       text: string,
     ) => Promise<boolean>;
+    /**
+     * An answer the platform already holds as canonical data (the journey
+     * the person chose answers F0.intent; onboarding-conductor names
+     * which). Recorded through the ordinary validated submit under the
+     * person's own token; nothing when the step already has an answer.
+     */
+    readonly recordKnown: (stepKey: string, raw: string) => Promise<boolean>;
     /** Q's recommendations still waiting on the person, as Q would say them. */
     readonly pendingRecommendations: () => Promise<
       readonly {
@@ -1320,6 +1327,31 @@ export function createOnboardingPort(input: {
     return written;
   };
 
+  /**
+   * An answer that does not come from a model's reading of a sentence:
+   * what they typed at sign-up, or what their journey choice already says.
+   */
+  const recordPlatformHeld = async (
+    stepKey: string,
+    text: string,
+  ): Promise<boolean> => {
+    const step = steps.get(stepKey);
+    const words = text.trim();
+    if (step === undefined || words.length === 0) return false;
+    const view = await current();
+    if (view.responses.some((r) => r.stepKey === stepKey)) return false;
+    const value = toResponseValue(step, words);
+    if (value === null) return false;
+    try {
+      await submit(stepKey, value);
+      written.push(stepKey);
+      return true;
+    } catch {
+      // Not recordable yet (another step first): Q asks as before.
+      return false;
+    }
+  };
+
   return {
     ownerUserId: input.ownerUserId,
     state,
@@ -1858,23 +1890,8 @@ export function createOnboardingPort(input: {
     },
     view: () => latest,
     recorded: () => [...written],
-    recordFromSignup: async (stepKey, text) => {
-      const step = steps.get(stepKey);
-      const words = text.trim();
-      if (step === undefined || words.length === 0) return false;
-      const view = await current();
-      if (view.responses.some((r) => r.stepKey === stepKey)) return false;
-      const value = toResponseValue(step, words);
-      if (value === null) return false;
-      try {
-        await submit(stepKey, value);
-        written.push(stepKey);
-        return true;
-      } catch {
-        // Not recordable yet (another step first): Q asks as before.
-        return false;
-      }
-    },
+    recordFromSignup: (stepKey, text) => recordPlatformHeld(stepKey, text),
+    recordKnown: (stepKey, raw) => recordPlatformHeld(stepKey, raw),
     pendingRecommendations: async () => {
       const view = await current();
       const list = await pendingNow().catch(() => []);
