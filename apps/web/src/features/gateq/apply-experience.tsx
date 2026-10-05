@@ -177,6 +177,7 @@ export function ApplyExperience({
   const [transitionPending, startTransition] = useTransition();
   const pending = preview?.pending ?? transitionPending;
   const end = useRef<HTMLDivElement>(null);
+  const resultEnd = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const lastTurn = useRef<{ id: string; text: string } | null>(null);
 
@@ -195,6 +196,15 @@ export function ApplyExperience({
       ? null
       : verdictOf(application, stage === "STOPPED");
   const criteria = criterionLines(gateway, application);
+
+  // A verdict arriving is the moment the founder came for: bring it into view.
+  useEffect(() => {
+    if (verdict !== null && preview === undefined) {
+      requestAnimationFrame(() =>
+        resultEnd.current?.scrollIntoView({ block: "end" }),
+      );
+    }
+  }, [verdict, preview]);
 
   const fail = (result: { message: string; rateLimited?: boolean }) =>
     setProblem({
@@ -430,7 +440,7 @@ export function ApplyExperience({
           rows={1}
           maxLength={2000}
           aria-label="Your answer"
-          placeholder="Answer, or paste your website or deck link"
+          placeholder="Answer, or paste a link"
           className="cq-body min-h-11 flex-1 resize-none rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         />
         <Button
@@ -541,9 +551,7 @@ export function ApplyExperience({
     stage === "SHARED" ? (
       <section className="flex flex-col items-start gap-3" role="status">
         <QSwarm state="COMPLETE" pixels={72} />
-        <h2 className="cq-title-sm text-(--cq-text-primary)">
-          Sent to {fund}
-        </h2>
+        <h2 className="cq-title-sm text-(--cq-text-primary)">Sent to {fund}</h2>
         <p className="cq-body text-(--cq-text-secondary)">
           {fund} has your answers
           {application === null || application.reference === ""
@@ -609,9 +617,12 @@ export function ApplyExperience({
       closing
     ) : (
       <>
-        {criteria.length === 0 ? null : <Criteria lines={criteria} compact />}
+        {criteria.length === 0 || verdict !== null ? null : (
+          <Criteria lines={criteria} compact />
+        )}
         {transcript}
         {result}
+        <div ref={resultEnd} />
       </>
     );
 

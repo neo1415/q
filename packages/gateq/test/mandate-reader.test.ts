@@ -43,7 +43,9 @@ const VOCABULARY: readonly MandateVocabularyNode[] = [
   node(15, "geography", "east_africa", "East Africa", 11),
   node(16, "geography", "kenya", "Kenya", 15, "KE"),
   node(17, "geography", "india", "India", null, "IN"),
-  node(20, "industry", "fintech", "Fintech", null, null, ["financial technology"]),
+  node(20, "industry", "fintech", "Fintech", null, null, [
+    "financial technology",
+  ]),
   node(21, "industry", "payments", "Payments", 20),
   node(22, "industry", "gambling", "Gambling", null, null, ["online betting"]),
   node(23, "industry", "climate", "Climate"),
@@ -128,7 +130,10 @@ describe("readMandate", () => {
   });
 
   it("reads 'global' as no geographic rule rather than every country", () => {
-    const global = readMandate("Global, sector-agnostic seed fund.", VOCABULARY);
+    const global = readMandate(
+      "Global, sector-agnostic seed fund.",
+      VOCABULARY,
+    );
     expect(global.proposals.some((p) => p.dimension === "GEOGRAPHY")).toBe(
       false,
     );

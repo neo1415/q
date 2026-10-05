@@ -121,21 +121,20 @@ export async function extractPolicyAction(input: {
     if (own === null) {
       return { ok: false, message: "Open your gateway first." };
     }
-    const extraction = await extractGatewayPolicy(
-      own.session,
-      own.gateway.id,
-      {
-        text,
-        sourceKind:
-          input.sourceKind === "UPLOADED_FILE" ? "UPLOADED_FILE" : "PASTED_TEXT",
-        clientRequestId: key.data,
-      },
-    );
+    const extraction = await extractGatewayPolicy(own.session, own.gateway.id, {
+      text,
+      sourceKind:
+        input.sourceKind === "UPLOADED_FILE" ? "UPLOADED_FILE" : "PASTED_TEXT",
+      clientRequestId: key.data,
+    });
     return { ok: true, extraction };
   } catch (error: unknown) {
     return {
       ok: false,
-      message: problemWords(error, "Couldn't read that just now. Please try again."),
+      message: problemWords(
+        error,
+        "Couldn't read that just now. Please try again.",
+      ),
     };
   }
 }

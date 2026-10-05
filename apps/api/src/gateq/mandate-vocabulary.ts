@@ -1,5 +1,8 @@
 import type { MandateVocabularyNode } from "@capital-q/gateq";
-import { REFERENCE_TAXONOMY, type ReferenceTaxonomy } from "@capital-q/taxonomy";
+import {
+  REFERENCE_TAXONOMY,
+  type ReferenceTaxonomy,
+} from "@capital-q/taxonomy";
 
 /**
  * The reference taxonomy, shaped for GateQ's mandate reader (P7).

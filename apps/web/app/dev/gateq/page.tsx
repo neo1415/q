@@ -10,6 +10,7 @@ import {
   ApplyExperience,
   type ApplyPreview,
 } from "@/features/gateq/apply-experience";
+import { PolicyEditor } from "@/features/gateq/policy-editor";
 
 export const metadata: Metadata = {
   title: "GateQ fit check",
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
  * Every state of the "Do we fit? Ask Q" panel (P7), for design review and
  * the screenshot checks. Development only; nothing here calls the API.
  * `?state=intro|questions|thinking|fits|consent|partial|no|shared|error|limited`
+ * (founder side) or `?state=mandate|drafted` (the investor's rules editor)
  * and `?layout=page` for the gateway page instead of the embed panel.
  */
 
@@ -56,10 +58,26 @@ const application = (
   status: access === "MAY_APPLY" ? "READY_TO_SUBMIT" : "IN_PROGRESS",
   declaredName: "Lumen Pay (fictional)",
   facts: [
-    { dimension: "company.name", summary: "Lumen Pay", provenance: "APPLICANT_PROVIDED" },
-    { dimension: "company.stage", summary: "seed", provenance: "APPLICANT_PROVIDED" },
-    { dimension: "company.country", summary: "NG", provenance: "APPLICANT_PROVIDED" },
-    { dimension: "raise.amount", summary: "750000 USD", provenance: "APPLICANT_PROVIDED" },
+    {
+      dimension: "company.name",
+      summary: "Lumen Pay",
+      provenance: "APPLICANT_PROVIDED",
+    },
+    {
+      dimension: "company.stage",
+      summary: "seed",
+      provenance: "APPLICANT_PROVIDED",
+    },
+    {
+      dimension: "company.country",
+      summary: "NG",
+      provenance: "APPLICANT_PROVIDED",
+    },
+    {
+      dimension: "raise.amount",
+      summary: "750000 USD",
+      provenance: "APPLICANT_PROVIDED",
+    },
   ],
   documentCount: 0,
   submittedAt: null,
@@ -144,6 +162,86 @@ const STATES: Readonly<Record<string, ApplyPreview>> = {
   },
 };
 
+const MANDATE =
+  "Demo Ridge Capital (fictional) invests $250k to $1.5m in pre-seed to Series A fintech and payments companies in West Africa and Kenya. We don't invest in online betting.";
+
+const node = (n: number) =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+const DRAFTED = {
+  proposals: [
+    {
+      dimension: "STAGE" as const,
+      requiredness: "REQUIRED" as const,
+      label: "Stage",
+      config: {
+        type: "STAGE" as const,
+        allowedStageCodes: ["pre_seed", "seed", "series_a"],
+      },
+      valueLabels: ["Pre-seed", "Seed", "Series A"],
+      quote: MANDATE,
+    },
+    {
+      dimension: "GEOGRAPHY" as const,
+      requiredness: "REQUIRED" as const,
+      label: "Where you're based",
+      config: {
+        type: "GEOGRAPHY" as const,
+        allowedCountries: ["NG", "GH", "CI", "SN", "BJ", "TG", "KE"],
+      },
+      valueLabels: [
+        "Nigeria",
+        "Ghana",
+        "Côte d'Ivoire",
+        "Senegal",
+        "Benin",
+        "Togo",
+        "Kenya",
+      ],
+      quote: MANDATE,
+    },
+    {
+      dimension: "SECTOR" as const,
+      requiredness: "REQUIRED" as const,
+      label: "Sector",
+      config: {
+        type: "TAXONOMY" as const,
+        vocabularyCode: "industry",
+        allowedNodeIds: [node(1), node(2)],
+      },
+      valueLabels: ["Fintech", "Payments"],
+      quote: MANDATE,
+    },
+    {
+      dimension: "SECTOR" as const,
+      requiredness: "REQUIRED" as const,
+      label: "Sectors we don't fund",
+      config: {
+        type: "EXCLUDED_TAXONOMY" as const,
+        vocabularyCode: "industry",
+        excludedNodeIds: [node(3)],
+      },
+      valueLabels: ["Online betting"],
+      quote: "We don't invest in online betting.",
+    },
+    {
+      dimension: "CHEQUE" as const,
+      requiredness: "PREFERRED" as const,
+      label: "Cheque size",
+      config: {
+        type: "CHEQUE_COMPATIBILITY" as const,
+        currency: "USD",
+        minCheque: "250000",
+        maxCheque: "1500000",
+      },
+      valueLabels: ["USD 250000–1500000"],
+      quote: MANDATE,
+    },
+  ],
+  notFound: [],
+  excludedPlaces: [],
+};
+
 export default async function GateQPreviewPage({
   searchParams,
 }: {
@@ -154,6 +252,21 @@ export default async function GateQPreviewPage({
   const name = typeof params["state"] === "string" ? params["state"] : "intro";
   const preview: ApplyPreview = STATES[name] ?? { stage: "INTRO" };
   const page = params["layout"] === "page";
+  if (name === "mandate" || name === "drafted") {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-4 px-4 py-10">
+        <h2 className="cq-title-sm text-(--cq-text-primary)">Your rules</h2>
+        <PolicyEditor
+          hasRules={false}
+          preview={
+            name === "mandate"
+              ? { text: MANDATE }
+              : { text: MANDATE, extraction: DRAFTED }
+          }
+        />
+      </main>
+    );
+  }
   return page ? (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col gap-6 px-4 py-10">
       <ApplyExperience key={name} gateway={GATEWAY} preview={preview} />

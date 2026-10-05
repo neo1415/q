@@ -1,5 +1,5 @@
 /*
- * Capital Q · GateQ "Do we fit? Ask Q" launcher. Paste once, anywhere on a page:
+ * Capital Q - GateQ "Do we fit? Ask Q" launcher. Paste once, anywhere on a page:
  *
  *   <script src="https://<capital-q>/gateq.js" data-gate="gq_..." async></script>
  *
@@ -19,13 +19,18 @@
   var script = document.currentScript;
   if (!script || !("attachShadow" in Element.prototype)) return;
   var id =
-    script.getAttribute("data-gate") || script.getAttribute("data-gateway") || "";
+    script.getAttribute("data-gate") ||
+    script.getAttribute("data-gateway") ||
+    "";
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(id)) return;
   if (window.__capitalQGateQ) return; // one launcher per page
   window.__capitalQGateQ = true;
 
   var origin = new URL(script.src).origin;
-  var label = (script.getAttribute("data-label") || "Do we fit? Ask Q").slice(0, 40);
+  var label = (script.getAttribute("data-label") || "Do we fit? Ask Q").slice(
+    0,
+    40,
+  );
   var left = script.getAttribute("data-position") === "left";
   var theme = script.getAttribute("data-theme");
   var dark =
@@ -45,22 +50,42 @@
     "<style>" +
     ":host{all:initial}" +
     "*{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}" +
-    ".launch{position:fixed;bottom:20px;" + side + ":20px;z-index:2147483000;display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 18px 0 12px;border-radius:999px;border:1px solid " + edge + ";background:" + ink + ";color:" + paper + ";font-size:15px;font-weight:600;letter-spacing:0;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.18)}" +
+    ".launch{position:fixed;bottom:20px;" +
+    side +
+    ":20px;z-index:2147483000;display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 18px 0 12px;border-radius:999px;border:1px solid " +
+    edge +
+    ";background:" +
+    ink +
+    ";color:" +
+    paper +
+    ";font-size:15px;font-weight:600;letter-spacing:0;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.18)}" +
     ".launch:focus-visible,.close:focus-visible{outline:3px solid #6aa8ff;outline-offset:2px}" +
     ".mark{width:24px;height:24px;flex:none}" +
-    ".panel{position:fixed;bottom:84px;" + side + ":20px;z-index:2147483001;width:400px;height:min(680px,calc(100vh - 112px));border-radius:16px;overflow:hidden;border:1px solid " + edge + ";background:" + paper + ";box-shadow:0 24px 64px rgba(0,0,0,.28);opacity:0;transform:translateY(8px);transition:opacity .18s ease,transform .18s ease}" +
+    ".panel{position:fixed;bottom:84px;" +
+    side +
+    ":20px;z-index:2147483001;width:400px;height:min(680px,calc(100vh - 112px));border-radius:16px;overflow:hidden;border:1px solid " +
+    edge +
+    ";background:" +
+    paper +
+    ";box-shadow:0 24px 64px rgba(0,0,0,.28);opacity:0;transform:translateY(8px);transition:opacity .18s ease,transform .18s ease}" +
     ".panel[data-open]{opacity:1;transform:none}" +
     ".panel[hidden]{display:none}" +
-    "iframe{display:block;width:100%;height:100%;border:0;background:" + paper + "}" +
-    ".close{position:absolute;top:6px;right:6px;width:44px;height:44px;border:0;border-radius:999px;background:transparent;color:" + ink + ";font-size:22px;line-height:1;cursor:pointer}" +
-    "@media (max-width:520px){.panel{inset:0;width:100%;height:100%;border-radius:0;bottom:0;" + side + ":0}}" +
+    "iframe{display:block;width:100%;height:100%;border:0;background:" +
+    paper +
+    "}" +
+    ".close{position:absolute;top:6px;right:6px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:0;border-radius:999px;background:transparent;color:" +
+    ink +
+    ";cursor:pointer}" +
+    "@media (max-width:520px){.panel{inset:0;width:100%;height:100%;border-radius:0;bottom:0;" +
+    side +
+    ":0}}" +
     "@media (prefers-reduced-motion:reduce){.panel{transition:none}}" +
     "</style>" +
     '<button class="launch" type="button" aria-haspopup="dialog" aria-expanded="false">' +
     '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 19 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>' +
     '<span class="text"></span></button>' +
     '<div class="panel" role="dialog" aria-modal="false" aria-label="Fit check with Q" hidden>' +
-    '<button class="close" type="button" aria-label="Close">×</button></div>';
+    '<button class="close" type="button" aria-label="Close"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>';
 
   var launch = root.querySelector(".launch");
   var panel = root.querySelector(".panel");
@@ -69,6 +94,9 @@
   var frame = null;
 
   function open() {
+    // Shown first, framed second: the conversation lays out in a visible
+    // panel, so Q's presence measures and draws at its real size.
+    panel.hidden = false;
     if (!frame) {
       // Created on first press: an embed costs the host page nothing until used.
       frame = document.createElement("iframe");
@@ -83,7 +111,6 @@
       );
       panel.insertBefore(frame, close);
     }
-    panel.hidden = false;
     requestAnimationFrame(function () {
       panel.setAttribute("data-open", "");
     });

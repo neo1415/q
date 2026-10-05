@@ -74,7 +74,8 @@ const Key = z
 const RATE_LIMITED = {
   ok: false,
   rateLimited: true,
-  message: "That's a lot in a short time. Give it a few minutes, then carry on.",
+  message:
+    "That's a lot in a short time. Give it a few minutes, then carry on.",
 } as const;
 
 function failure(error: unknown): ApplyResult {

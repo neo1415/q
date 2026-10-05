@@ -393,12 +393,23 @@ describe("reading a mandate into a draft policy (P7)", () => {
   it("refuses an empty mandate or an unknown field as a validation problem", async () => {
     const { app } = buildApp({ principal: PRINCIPAL, extractions: [] });
     for (const payload of [
-      { text: "   ", sourceKind: "PASTED_TEXT", clientRequestId: "extract-test-0003" },
-      { text: MANDATE, sourceKind: "PASTED_TEXT", clientRequestId: "extract-test-0004", tenantId: "x" },
+      {
+        text: "   ",
+        sourceKind: "PASTED_TEXT",
+        clientRequestId: "extract-test-0003",
+      },
+      {
+        text: MANDATE,
+        sourceKind: "PASTED_TEXT",
+        clientRequestId: "extract-test-0004",
+        tenantId: "x",
+      },
     ]) {
       const response = await app.inject({ method: "POST", url, payload });
       expect(response.statusCode).toBe(422);
-      expect(response.headers["content-type"]).toContain("application/problem+json");
+      expect(response.headers["content-type"]).toContain(
+        "application/problem+json",
+      );
     }
   });
 

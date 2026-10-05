@@ -44,42 +44,41 @@ const Read = z
   .object({ gatewayId: UuidSchema, input: PolicyExtractionRequestSchema })
   .strict();
 
-const READ_MANDATE = defineAppAction<
-  z.infer<typeof Read>,
-  PolicyExtractionDto
->({
-  name: "gateway.policy.read_mandate",
-  short: "draft gateway rules from mandate",
-  area: "gateway",
-  classification: "INSTANT",
-  does: "Reads their mandate into draft GateQ rules they then review and publish on the Gateway page.",
-  input: Read,
-  output: PolicyExtractionDtoSchema,
-  authorize: serviceDecides,
-  run: (ports, context, input) =>
-    port(ports).extract({
-      actor: context.actor,
-      gatewayId: input.gatewayId,
-      text: input.input.text,
-      sourceKind: input.input.sourceKind,
-      clientRequestId: input.input.clientRequestId,
-    }),
-  targets: () => [],
-  card: () => ({ summary: "Draft gateway rules", preview: "" }),
-  done: (out) =>
-    `Drafted ${out.proposals.length} rule${out.proposals.length === 1 ? "" : "s"} to review.`,
-  http: {
-    method: "POST",
-    path: GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
-    fromRequest: (params, body) => ({
-      gatewayId: params["gatewayId"],
-      input: body,
-    }),
-    status: (out) => (out.deduplicated ? 200 : 201),
-    respond: (out) => PolicyExtractionDtoSchema.parse(out),
-    idempotencyKeyOf: (input) => input.input.clientRequestId,
+const READ_MANDATE = defineAppAction<z.infer<typeof Read>, PolicyExtractionDto>(
+  {
+    name: "gateway.policy.read_mandate",
+    short: "draft gateway rules from mandate",
+    area: "gateway",
+    classification: "INSTANT",
+    does: "Reads their mandate into draft GateQ rules they then review and publish on the Gateway page.",
+    input: Read,
+    output: PolicyExtractionDtoSchema,
+    authorize: serviceDecides,
+    run: (ports, context, input) =>
+      port(ports).extract({
+        actor: context.actor,
+        gatewayId: input.gatewayId,
+        text: input.input.text,
+        sourceKind: input.input.sourceKind,
+        clientRequestId: input.input.clientRequestId,
+      }),
+    targets: () => [],
+    card: () => ({ summary: "Draft gateway rules", preview: "" }),
+    done: (out) =>
+      `Drafted ${out.proposals.length} rule${out.proposals.length === 1 ? "" : "s"} to review.`,
+    http: {
+      method: "POST",
+      path: GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
+      fromRequest: (params, body) => ({
+        gatewayId: params["gatewayId"],
+        input: body,
+      }),
+      status: (out) => (out.deduplicated ? 200 : 201),
+      respond: (out) => PolicyExtractionDtoSchema.parse(out),
+      idempotencyKeyOf: (input) => input.input.clientRequestId,
+    },
+    qCapability: "offer.gateway_mandate",
   },
-  qCapability: "offer.gateway_mandate",
-});
+);
 
 export const GATEQ_ACTIONS: readonly AnyAppAction[] = [READ_MANDATE];

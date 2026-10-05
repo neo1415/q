@@ -6,16 +6,11 @@ import type { z } from "zod";
 
 import type {
   GatewayDraftCriterionSchema,
+  PolicyExtractionDto,
   PolicyProposalDto,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
-import {
-  ICON_SIZE,
-  ICON_STROKE,
-  Trash2,
-  Upload,
-  X,
-} from "@capital-q/ui/icons";
+import { ICON_SIZE, ICON_STROKE, Trash2, Upload, X } from "@capital-q/ui/icons";
 
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
@@ -32,13 +27,14 @@ type Draft = z.infer<typeof GatewayDraftCriterionSchema>;
 
 type Proposal = PolicyProposalDto & { readonly key: string };
 
-const DIMENSION_WORDS: Readonly<Record<PolicyProposalDto["dimension"], string>> =
-  {
-    STAGE: "stage",
-    GEOGRAPHY: "where they're based",
-    SECTOR: "sector",
-    CHEQUE: "cheque size",
-  };
+const DIMENSION_WORDS: Readonly<
+  Record<PolicyProposalDto["dimension"], string>
+> = {
+  STAGE: "stage",
+  GEOGRAPHY: "where they're based",
+  SECTOR: "sector",
+  CHEQUE: "cheque size",
+};
 
 const MAX_FILE_BYTES = 200_000;
 
@@ -53,7 +49,8 @@ function valuesOf(config: Proposal["config"]): readonly string[] | null {
       return config.allowedNodeIds;
     case "EXCLUDED_TAXONOMY":
       return config.excludedNodeIds;
-    default:
+    case "RAISE_SIZE":
+    case "CHEQUE_COMPATIBILITY":
       return null;
   }
 }
@@ -76,7 +73,8 @@ function withoutValue(proposal: Proposal, index: number): Proposal | null {
     case "EXCLUDED_TAXONOMY":
       next = { ...config, excludedNodeIds: drop(config.excludedNodeIds) };
       break;
-    default:
+    case "RAISE_SIZE":
+    case "CHEQUE_COMPATIBILITY":
       return proposal;
   }
   const remaining = valuesOf(next);
@@ -90,22 +88,44 @@ function amount(text: string): string | null {
   return digits === "" ? null : digits.slice(0, 16);
 }
 
+/** For the development preview and screenshots only. */
+export type PolicyEditorPreview = {
+  readonly text?: string;
+  readonly extraction?: Pick<
+    PolicyExtractionDto,
+    "proposals" | "notFound" | "excludedPlaces"
+  >;
+};
+
 export function PolicyEditor({
   hasRules,
+  preview,
 }: {
   /** Whether a published version already has rules (wording only). */
   readonly hasRules: boolean;
+  readonly preview?: PolicyEditorPreview;
 }) {
   const router = useRouter();
   const textId = useId();
   const file = useRef<HTMLInputElement>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(preview?.text ?? "");
   const [source, setSource] = useState<"PASTED_TEXT" | "UPLOADED_FILE">(
     "PASTED_TEXT",
   );
-  const [proposals, setProposals] = useState<readonly Proposal[] | null>(null);
-  const [notFound, setNotFound] = useState<readonly string[]>([]);
-  const [excludedPlaces, setExcludedPlaces] = useState<readonly string[]>([]);
+  const [proposals, setProposals] = useState<readonly Proposal[] | null>(
+    preview?.extraction === undefined
+      ? null
+      : preview.extraction.proposals.map((proposal, index) => ({
+          ...proposal,
+          key: `${proposal.dimension}-${index}`,
+        })),
+  );
+  const [notFound, setNotFound] = useState<readonly string[]>(
+    preview?.extraction?.notFound ?? [],
+  );
+  const [excludedPlaces, setExcludedPlaces] = useState<readonly string[]>(
+    preview?.extraction?.excludedPlaces ?? [],
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -246,8 +266,8 @@ export function PolicyEditor({
             {pending ? <QSwarm state="THINKING" pixels={28} /> : null}
           </div>
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Your mandate stays private. Founders see only the name of each
-            rule, never its values or your text.
+            Your mandate stays private. Founders see only the name of each rule,
+            never its values or your text.
           </p>
         </div>
       ) : (
@@ -261,8 +281,7 @@ export function PolicyEditor({
                   : `Q drafted ${proposals.length} rule${proposals.length === 1 ? "" : "s"}. Check each one.`}
               </h3>
               <p className="cq-body-sm text-(--cq-text-secondary)">
-                Nothing is live until you publish. Remove anything Q read
-                wrong.
+                Nothing is live until you publish. Remove anything Q read wrong.
               </p>
             </div>
           </div>

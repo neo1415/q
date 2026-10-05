@@ -168,8 +168,8 @@ export default async function GatewayPage() {
         <PageSection id="preview" title="Preview">
           <div className="flex flex-col gap-2">
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              What a founder sees when they press &ldquo;Do we fit? Ask
-              Q&rdquo; on your website. Trying it here starts a real, anonymous
+              What a founder sees when they press &ldquo;Do we fit? Ask Q&rdquo;
+              on your website. Trying it here starts a real, anonymous
               conversation.
             </p>
             <iframe
@@ -184,8 +184,8 @@ export default async function GatewayPage() {
         <PageSection id="applications" title="Founders who shared">
           {applications.length === 0 ? (
             <p className="cq-body text-(--cq-text-secondary)">
-              None yet. Founders appear here only when they choose to share
-              with you after their fit check.
+              None yet. Founders appear here only when they choose to share with
+              you after their fit check.
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">

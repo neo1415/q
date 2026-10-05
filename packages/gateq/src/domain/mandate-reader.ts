@@ -1,4 +1,7 @@
-import type { CriterionConfig, CriterionRequiredness } from "../contracts/index.js";
+import type {
+  CriterionConfig,
+  CriterionRequiredness,
+} from "../contracts/index.js";
 
 /**
  * Reading an investor's mandate into a DRAFT gate policy (P7: "investors
@@ -80,11 +83,13 @@ function escape(text: string): string {
  * Dashes between amounts or stages are kept: they are what makes a range.
  */
 function normalise(text: string): string {
-  return text
-    .replace(/(?<=[A-Za-z])[-‐‑](?=[A-Za-z])/g, " ")
-    // A wrapped line is one sentence; a blank line still ends a paragraph.
-    .replace(/(?<!\n)\n(?!\n)/g, " ")
-    .replace(/[ \t]+/g, " ");
+  return (
+    text
+      .replace(/(?<=[A-Za-z])[-‐‑](?=[A-Za-z])/g, " ")
+      // A wrapped line is one sentence; a blank line still ends a paragraph.
+      .replace(/(?<!\n)\n(?!\n)/g, " ")
+      .replace(/[ \t]+/g, " ")
+  );
 }
 
 /** Where a sentence ends: a full stop that is not a decimal point, or a break. */
@@ -112,8 +117,11 @@ function findHits(
   text: string,
   nodes: readonly MandateVocabularyNode[],
 ): Hit[] {
-  const phrases: { phrase: string; node: MandateVocabularyNode; exact: boolean }[] =
-    [];
+  const phrases: {
+    phrase: string;
+    node: MandateVocabularyNode;
+    exact: boolean;
+  }[] = [];
   for (const node of nodes) {
     phrases.push({ phrase: node.displayName, node, exact: false });
     for (const alias of node.aliases) {
@@ -181,7 +189,8 @@ function readStages(
     label: "Stage",
     config: { type: "STAGE", allowedStageCodes: codes },
     valueLabels: codes.map(
-      (code) => nodes.find((n) => n.canonicalCode === code)?.displayName ?? code,
+      (code) =>
+        nodes.find((n) => n.canonicalCode === code)?.displayName ?? code,
     ),
     quote: first === undefined ? "" : sentenceAt(text, first.index),
   };
@@ -293,7 +302,7 @@ function readSectors(
 const CURRENCY_WORDS: Readonly<Record<string, string>> = {
   $: "USD",
   usd: "USD",
-  "us$": "USD",
+  us$: "USD",
   dollars: "USD",
   "€": "EUR",
   eur: "EUR",
@@ -368,7 +377,8 @@ function readCheque(text: string): PolicyProposal | null {
       clause.slice(0, first.index),
     );
     const min = upTo ? 0 : first.value;
-    const max = ranged && second !== undefined ? second.value : upTo ? first.value : null;
+    const max =
+      ranged && second !== undefined ? second.value : upTo ? first.value : null;
     if (max !== null && max < min) continue;
     return {
       dimension: "CHEQUE",
@@ -409,8 +419,8 @@ export function readMandate(
     (proposal): proposal is PolicyProposal => proposal !== null,
   );
   const found = new Set(proposals.map((proposal) => proposal.dimension));
-  const notFound = (
-    ["STAGE", "GEOGRAPHY", "SECTOR", "CHEQUE"] as const
-  ).filter((dimension) => !found.has(dimension));
+  const notFound = (["STAGE", "GEOGRAPHY", "SECTOR", "CHEQUE"] as const).filter(
+    (dimension) => !found.has(dimension),
+  );
   return { proposals, notFound, excludedPlaces: geography.excluded };
 }
