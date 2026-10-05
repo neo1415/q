@@ -519,6 +519,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/workforce.ts GET Q_WORKFORCE_JOBS_PATH": exempt(
     "the workforce page's audit-style record of Q's own agents (jobs, runs, grades); Q reports the same work in conversation through list_q_work",
   ),
+  "q-api/http/workforce.ts GET Q_WORKFORCE_OVERVIEW_PATH": exempt(
+    "the workforce page's team and month spend against the person's limit; Q reports its usage in conversation through its usage tools",
+  ),
   "q-api/http/workforce.ts GET Q_WORKFORCE_JOB_PATH": exempt(
     "one job's agent record (runs, hand-offs, drafts, grades, timeline) for the workforce page; Q reports its work through list_q_work",
   ),
@@ -668,6 +671,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_END_PATH": Q_TRANSPORT,
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_REJOIN_PATH": Q_TRANSPORT,
   "q-api/voice/think.ts POST dependencies.path": Q_TRANSPORT,
   "q-api/voice/think.ts POST `${dependencies.path}/chat/completions`":
     Q_TRANSPORT,
@@ -688,6 +692,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/daily": exempt("development-only page"),
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
+  "/dev/workforce": exempt("development-only page"),
   "/dev/relationships": exempt("development-only page"),
   "/dev/results": exempt("development-only page"),
   "/dev/rehearsals": exempt("development-only page"),
@@ -884,6 +889,8 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_END_PATH",
+  // The same line minted again after a network drop (I1): transport.
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_REJOIN_PATH",
 ]);
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */

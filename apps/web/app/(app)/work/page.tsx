@@ -14,6 +14,7 @@ import {
   listSuggestionsAction,
 } from "@/features/work/work-page-actions";
 import { WorkPage } from "@/features/work/work-page";
+import { loadWorkforceAction } from "@/features/work/workforce-actions";
 
 export const metadata: Metadata = { title: "Work" };
 
@@ -26,11 +27,12 @@ export const metadata: Metadata = { title: "Work" };
  * the shell's own left the page on its skeleton).
  */
 async function WorkLists() {
-  const [suggestions, approvals, work, done] = await Promise.all([
+  const [suggestions, approvals, work, done, workforce] = await Promise.all([
     listSuggestionsAction().catch(() => null),
     pendingQApprovalsAction().catch(() => null),
     listWorkAction().catch(() => null),
     listDoneAction().catch(() => null),
+    loadWorkforceAction().catch(() => null),
   ]);
   return (
     <WorkPage
@@ -38,6 +40,7 @@ async function WorkLists() {
       approvals={approvals?.ok === true ? approvals.value : null}
       work={work?.ok === true ? work.value : null}
       done={done?.ok === true ? done.value : null}
+      workforce={workforce}
     />
   );
 }

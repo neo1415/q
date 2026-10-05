@@ -373,6 +373,9 @@ export {
   setQWorkPaused,
   subscribePush,
   unsubscribePush,
+  listWorkforceJobs,
+  getWorkforceJob,
+  getWorkforceOverview,
 } from "./work.js";
 // end AUTO block
 

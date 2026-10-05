@@ -27,6 +27,12 @@ import {
   QWorkSuggestionListDtoSchema,
   qWorkPausePath,
   qWorkResumePath,
+  Q_WORKFORCE_JOBS_PATH,
+  Q_WORKFORCE_OVERVIEW_PATH,
+  qWorkforceJobPath,
+  WorkforceJobDetailDtoSchema,
+  WorkforceJobListDtoSchema,
+  WorkforceOverviewDtoSchema,
 } from "@capital-q/contracts";
 
 import { readProblemResponse } from "./problem.js";
@@ -244,3 +250,39 @@ export function setQWorkPaused(
     { body: {} },
   );
 }
+
+// WORKFORCE block (founder brief J5): Q's workforce, read-only (a Q API session).
+export function listWorkforceJobs(
+  session: ApiSession,
+  query: { readonly cursor?: string | undefined; readonly limit?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (query.cursor !== undefined) params.set("cursor", query.cursor);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  return call(
+    session,
+    "GET",
+    `${Q_WORKFORCE_JOBS_PATH}${suffix}`,
+    WorkforceJobListDtoSchema,
+  );
+}
+
+export function getWorkforceJob(session: ApiSession, jobId: string) {
+  return call(
+    session,
+    "GET",
+    qWorkforceJobPath(jobId),
+    WorkforceJobDetailDtoSchema,
+  );
+}
+
+export function getWorkforceOverview(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    Q_WORKFORCE_OVERVIEW_PATH,
+    WorkforceOverviewDtoSchema,
+  );
+}
+// end WORKFORCE block

@@ -202,6 +202,28 @@ export function createPostgresUsageReader(sql: DatabaseExecutor) {
       }));
     },
 
+    /**
+     * J6: what the person's workforce agents spent this month, by agent
+     * run, from the same ledger (the run's role is the workforce's own).
+     */
+    workforceMonth: async (
+      who: { readonly userId: string; readonly tenantId: string },
+      at: Date,
+    ): Promise<readonly { readonly runId: string; readonly usd: string }[]> => {
+      const { start, end } = monthOf(at);
+      const rows = await sql<{ run_id: string | null; usd: string }[]>`
+        select substring(u.correlation_id from ${WORKFORCE_RUN_SQL}) as run_id,
+               round(coalesce(sum(u.cost_usd), 0), 6)::text as usd
+          from ai_ops.model_usage u
+         where u.user_id = ${who.userId} and u.tenant_id = ${who.tenantId}
+           and u.correlation_id like 'cor\\_job\\_%'
+           and u.occurred_at >= ${start} and u.occurred_at < ${end}
+         group by 1`;
+      return rows.flatMap((row) =>
+        row.run_id === null ? [] : [{ runId: row.run_id, usd: row.usd }],
+      );
+    },
+
     /** The whole platform's month, for the platform admin only. */
     adminMonth: async (at: Date, limit = 20): Promise<AdminMonthUsage> => {
       const { start, end } = monthOf(at);

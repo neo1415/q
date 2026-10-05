@@ -118,6 +118,25 @@ export type JobDetail = {
   readonly grades: readonly GradeRow[];
   readonly outcomes: readonly OutcomeRow[];
   readonly feedback: readonly FeedbackRow[];
+  /** The approval cards its offered drafts sit on, where they stand. */
+  readonly approvals: readonly ApprovalRow[];
+};
+
+export type ApprovalRow = {
+  readonly id: string;
+  readonly action_id: string;
+  readonly status: string;
+};
+
+/** One role's day (J5): counts read by code, never a model's. */
+export type TeamRow = {
+  readonly role: string;
+  readonly runs: number;
+  readonly running: number;
+  readonly needs_you: number;
+  readonly drafts: number;
+  readonly sent_back: number;
+  readonly latest: string | null;
 };
 
 export type JobListRow = JobRow & {
@@ -235,6 +254,17 @@ export type WorkforceStore = {
     page: { readonly limit: number; readonly before: Date | null },
   ) => Promise<readonly JobListRow[]>;
   readonly job: (owner: Owner, jobId: string) => Promise<JobDetail | null>;
+  /** Each role's runs since `since` (J5's "who's on it"). */
+  readonly team: (owner: Owner, since: Date) => Promise<readonly TeamRow[]>;
+  /** Open jobs, and those waiting on the person. */
+  readonly openJobs: (
+    owner: Owner,
+  ) => Promise<{ readonly open: number; readonly needsYou: number }>;
+  /** The role of each of the person's own agent runs (costs by role, J6). */
+  readonly runRoles: (
+    owner: Owner,
+    runIds: readonly string[],
+  ) => Promise<ReadonlyMap<string, string>>;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -472,7 +502,76 @@ export function createPostgresWorkforceStore(
               from q_runtime.workforce_feedback where job_id = ${job.id}
              order by created_at`,
         ]);
-      return { job, runs, handoffs, drafts, grades, outcomes, feedback };
+      const actionIds = outcomes
+        .map((one) => one.q_action_id)
+        .filter((id): id is string => id !== null);
+      const approvals =
+        actionIds.length === 0
+          ? []
+          : await sql<ApprovalRow[]>`
+              select a.id, a.action_id, a.status from q_runtime.approvals a
+               where a.action_id = any(${actionIds}::uuid[])
+                 and a.tenant_id = ${owner.tenantId}
+                 and a.requested_from_user_id = ${owner.userId}`;
+      return {
+        job,
+        runs,
+        handoffs,
+        drafts,
+        grades,
+        outcomes,
+        feedback,
+        approvals,
+      };
+    },
+
+    team: async (owner, since) =>
+      sql<TeamRow[]>`
+        select r.role,
+               count(*)::int as runs,
+               count(*) filter (where r.status = 'RUNNING')::int as running,
+               count(*) filter (where r.status = 'HELD' and j.status in ('RUNNING', 'HELD'))::int as needs_you,
+               (case r.role
+                  when 'WRITER' then (select count(*)::int from q_runtime.workforce_drafts d
+                                       where d.tenant_id = ${owner.tenantId} and d.user_id = ${owner.userId}
+                                         and d.created_at >= ${since})
+                  when 'REVIEWER' then (select count(*)::int from q_runtime.workforce_grades g
+                                         where g.tenant_id = ${owner.tenantId} and g.user_id = ${owner.userId}
+                                           and g.created_at >= ${since})
+                  else 0 end) as drafts,
+               (case r.role
+                  when 'REVIEWER' then (select count(*)::int from q_runtime.workforce_grades g
+                                         where g.tenant_id = ${owner.tenantId} and g.user_id = ${owner.userId}
+                                           and g.created_at >= ${since} and not g.passed)
+                  else 0 end) as sent_back,
+               (array_agg(r.summary order by r.started_at desc) filter (where r.summary is not null))[1] as latest
+          from q_runtime.workforce_agent_runs r
+          join q_runtime.workforce_jobs j on j.id = r.job_id
+         where r.tenant_id = ${owner.tenantId} and r.user_id = ${owner.userId}
+           and (r.started_at >= ${since} or r.status = 'RUNNING')
+         group by r.role`,
+
+    openJobs: async (owner) => {
+      const rows = await sql<{ open: number; needs_you: number }[]>`
+        select count(*) filter (where j.status in ('PLANNING', 'RUNNING', 'HELD'))::int as open,
+               count(*) filter (where j.status = 'HELD' or exists (
+                 select 1 from q_runtime.workforce_draft_outcomes o
+                   join q_runtime.approvals a on a.action_id = o.q_action_id
+                  where o.job_id = j.id and o.outcome = 'OFFERED' and a.status = 'PENDING'
+                    and a.requested_from_user_id = ${owner.userId}))::int as needs_you
+          from q_runtime.workforce_jobs j
+         where j.tenant_id = ${owner.tenantId} and j.user_id = ${owner.userId}`;
+      return { open: rows[0]?.open ?? 0, needsYou: rows[0]?.needs_you ?? 0 };
+    },
+
+    runRoles: async (owner, runIds) => {
+      const ids = runIds.filter((id) => UUID.test(id));
+      if (ids.length === 0) return new Map();
+      const rows = await sql<{ id: string; role: string }[]>`
+        select id, role from q_runtime.workforce_agent_runs
+         where id = any(${ids}::uuid[]) and tenant_id = ${owner.tenantId}
+           and user_id = ${owner.userId}`;
+      return new Map(rows.map((row) => [row.id, row.role]));
     },
   };
 }
@@ -492,6 +591,8 @@ export function createInMemoryWorkforceStore(
     readonly grades: (GradeRow & { owner: string })[];
     readonly outcomes: (OutcomeRow & { owner: string })[];
     readonly feedback: (FeedbackRow & { owner: string; key: string })[];
+    /** Approval cards, as the Approval Engine would hold them (tests). */
+    readonly approvals: ApprovalRow[];
   };
 } {
   const key = (owner: Owner) => `${owner.tenantId}:${owner.userId}`;
@@ -503,6 +604,7 @@ export function createInMemoryWorkforceStore(
     grades: [] as (GradeRow & { owner: string })[],
     outcomes: [] as (OutcomeRow & { owner: string })[],
     feedback: [] as (FeedbackRow & { owner: string; key: string })[],
+    approvals: [] as ApprovalRow[],
   };
   const ownJob = (owner: Owner, jobId: string) =>
     rows.jobs.find((job) => job.id === jobId && job.owner === key(owner));
@@ -766,7 +868,84 @@ export function createInMemoryWorkforceStore(
         grades: of(rows.grades),
         outcomes: of(rows.outcomes),
         feedback: of(rows.feedback),
+        approvals: rows.approvals.filter((one) =>
+          of(rows.outcomes).some((o) => o.q_action_id === one.action_id),
+        ),
       });
     },
+    team: (owner, since) => {
+      const mine = rows.runs.filter(
+        (run) =>
+          run.owner === key(owner) &&
+          (run.started_at >= since || run.status === "RUNNING"),
+      );
+      const roles = [...new Set(mine.map((run) => run.role))];
+      const grades = rows.grades.filter(
+        (one) => one.owner === key(owner) && one.created_at >= since,
+      );
+      return Promise.resolve(
+        roles.map((role) => {
+          const runs = mine
+            .filter((run) => run.role === role)
+            .sort((a, b) => b.started_at.getTime() - a.started_at.getTime());
+          return {
+            role,
+            runs: runs.length,
+            running: runs.filter((run) => run.status === "RUNNING").length,
+            needs_you: runs.filter(
+              (run) =>
+                run.status === "HELD" &&
+                ["RUNNING", "HELD"].includes(
+                  ownJob(owner, run.job_id)?.status ?? "",
+                ),
+            ).length,
+            drafts:
+              role === "WRITER"
+                ? rows.drafts.filter(
+                    (one) =>
+                      one.owner === key(owner) && one.created_at >= since,
+                  ).length
+                : role === "REVIEWER"
+                  ? grades.length
+                  : 0,
+            sent_back:
+              role === "REVIEWER"
+                ? grades.filter((one) => !one.passed).length
+                : 0,
+            latest: runs.find((run) => run.summary !== null)?.summary ?? null,
+          };
+        }),
+      );
+    },
+    openJobs: (owner) => {
+      const mine = rows.jobs.filter((job) => job.owner === key(owner));
+      const pendingCard = (jobId: string) =>
+        rows.outcomes.some(
+          (one) =>
+            one.job_id === jobId &&
+            one.outcome === "OFFERED" &&
+            rows.approvals.some(
+              (a) => a.action_id === one.q_action_id && a.status === "PENDING",
+            ),
+        );
+      return Promise.resolve({
+        open: mine.filter((job) =>
+          ["PLANNING", "RUNNING", "HELD"].includes(job.status),
+        ).length,
+        needsYou: mine.filter(
+          (job) => job.status === "HELD" || pendingCard(job.id),
+        ).length,
+      });
+    },
+    runRoles: (owner, runIds) =>
+      Promise.resolve(
+        new Map(
+          rows.runs
+            .filter(
+              (run) => run.owner === key(owner) && runIds.includes(run.id),
+            )
+            .map((run) => [run.id, run.role]),
+        ),
+      ),
   };
 }

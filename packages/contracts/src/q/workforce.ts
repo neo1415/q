@@ -194,6 +194,15 @@ export const WorkforceDraftDtoSchema = z
         reason: z.string().max(64).nullable(),
         /** OFFERED: the approval card, approved through the Approval Engine. */
         qActionId: UuidSchema.nullable(),
+        /**
+         * OFFERED: the card's approval, which binds to this exact text, and
+         * where it stands. Null: no card, or one not readable for them.
+         */
+        approvalId: UuidSchema.nullable().default(null),
+        approvalStatus: z
+          .enum(["PENDING", "APPROVED", "REJECTED", "EXPIRED", "REVOKED"])
+          .nullable()
+          .default(null),
       })
       .strict()
       .nullable(),
@@ -246,3 +255,56 @@ export const WorkforceJobDetailDtoSchema = z
   })
   .strict();
 export type WorkforceJobDetailDto = z.infer<typeof WorkforceJobDetailDtoSchema>;
+
+export const Q_WORKFORCE_OVERVIEW_PATH = "/v1/q/workforce/overview" as const;
+
+export const WORKFORCE_TEAM_STATES = ["WORKING", "NEEDS_YOU", "IDLE"] as const;
+
+/**
+ * The workforce at a glance (J5, J6): who is on what today, and what Q's
+ * work cost this month against the person's monthly limit. Counts and
+ * money only; the page writes the words.
+ */
+export const WorkforceOverviewDtoSchema = z
+  .object({
+    /** The calendar month, UTC, as YYYY-MM. */
+    month: z.string().regex(/^\d{4}-\d{2}$/u),
+    spentUsd: UsdSchema,
+    /** Q pauses new jobs and asks the person at this; null: no limit. */
+    limitUsd: UsdSchema.nullable(),
+    /** Spent has reached the limit: new jobs wait for the person. */
+    paused: z.boolean(),
+    /** This month's spend by agent role, largest first. */
+    byRole: z
+      .array(
+        z.object({ role: WorkforceAgentRoleSchema, usd: UsdSchema }).strict(),
+      )
+      .max(WORKFORCE_AGENT_ROLES.length),
+    /** Each role's day so far. */
+    team: z
+      .array(
+        z
+          .object({
+            role: WorkforceAgentRoleSchema,
+            state: z.enum(WORKFORCE_TEAM_STATES),
+            /** Runs today. */
+            runs: z.number().int().min(0),
+            /** Drafts written today (the writer) or graded (the reviewer). */
+            drafts: z.number().int().min(0),
+            /** Drafts the reviewer sent back today. */
+            sentBack: z.number().int().min(0),
+            /** Its latest run's own line, in plain words. */
+            latest: z.string().max(500).nullable(),
+          })
+          .strict(),
+      )
+      .max(WORKFORCE_AGENT_ROLES.length),
+    jobs: z
+      .object({
+        open: z.number().int().min(0),
+        needsYou: z.number().int().min(0),
+      })
+      .strict(),
+  })
+  .strict();
+export type WorkforceOverviewDto = z.infer<typeof WorkforceOverviewDtoSchema>;

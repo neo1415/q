@@ -1,5 +1,6 @@
 import {
   WORKFORCE_AGENT_ROLES,
+  WORKFORCE_TEAM_STATES,
   WORKFORCE_JOB_STATUSES,
   WORKFORCE_RUN_STATUSES,
   WorkforceGradeDtoSchema,
@@ -9,6 +10,7 @@ import type {
   WorkforceJobDetailDto,
   WorkforceJobListDto,
   WorkforceJobSummaryDto,
+  WorkforceOverviewDto,
   WorkforceTimelineEntryDto,
 } from "@capital-q/contracts";
 
@@ -39,7 +41,20 @@ export type WorkforceCosts = (
   }[]
 >;
 
+/** This month's workforce spend, by agent run (the usage ledger). */
+export type WorkforceMonthCosts = (
+  owner: Owner,
+  at: Date,
+) => Promise<readonly { readonly runId: string; readonly usd: string }[]>;
+
 const ZERO = "0";
+const APPROVAL_STATUSES = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "EXPIRED",
+  "REVOKED",
+] as const;
 
 /** A stored code read back into its closed set (the table's check holds it). */
 function oneOf<T extends string>(
@@ -97,6 +112,11 @@ function integrityOf(value: unknown) {
 export function createWorkforcePage(dependencies: {
   readonly store: WorkforceStore;
   readonly costs?: WorkforceCosts | undefined;
+  readonly monthCosts?: WorkforceMonthCosts | undefined;
+  /** The person's monthly limit for Q's work, USD; null: none. */
+  readonly monthlyLimitUsd?:
+    ((owner: Owner) => Promise<number | null>) | undefined;
+  readonly now?: (() => Date) | undefined;
 }) {
   const { store } = dependencies;
 
@@ -185,11 +205,24 @@ export function createWorkforcePage(dependencies: {
           outcome:
             outcome === undefined
               ? null
-              : {
-                  outcome: outcome.outcome,
-                  reason: outcome.reason,
-                  qActionId: outcome.q_action_id,
-                },
+              : (() => {
+                  const card =
+                    outcome.q_action_id === null
+                      ? undefined
+                      : detail.approvals.find(
+                          (one) => one.action_id === outcome.q_action_id,
+                        );
+                  return {
+                    outcome: outcome.outcome,
+                    reason: outcome.reason,
+                    qActionId: outcome.q_action_id,
+                    approvalId: card?.id ?? null,
+                    approvalStatus:
+                      card === undefined
+                        ? null
+                        : oneOf(APPROVAL_STATUSES, card.status, "PENDING"),
+                  };
+                })(),
           feedback: detail.feedback
             .filter((one) => one.draft_id === draft.id)
             .slice(0, 10)
@@ -320,6 +353,75 @@ export function createWorkforcePage(dependencies: {
         })),
         drafts: drafts.slice(0, 200),
         timeline: timeline.slice(-1_000),
+      };
+    },
+
+    /**
+     * Who is on what today, and this month's spend by role against the
+     * person's limit (J5, J6). A ledger or limit that cannot be read shows
+     * nothing spent and no limit, never a failed page.
+     */
+    overview: async (owner: Owner): Promise<WorkforceOverviewDto> => {
+      const at = dependencies.now?.() ?? new Date();
+      const today = new Date(
+        Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
+      );
+      const [month, limit, team, jobs] = await Promise.all([
+        (dependencies.monthCosts?.(owner, at) ?? Promise.resolve([])).catch(
+          () => [],
+        ),
+        (dependencies.monthlyLimitUsd?.(owner) ?? Promise.resolve(null)).catch(
+          () => null,
+        ),
+        store.team(owner, today),
+        store.openJobs(owner),
+      ]);
+      const roles = await store.runRoles(
+        owner,
+        month.map((row) => row.runId),
+      );
+      // Summed in micro-dollars: the ledger's numeric, never a float sum.
+      const byRole = new Map<(typeof WORKFORCE_AGENT_ROLES)[number], number>();
+      let total = 0;
+      for (const row of month) {
+        const micros = Math.round(Number(row.usd) * 1_000_000);
+        if (!Number.isFinite(micros)) continue;
+        total += micros;
+        const role = oneOf(
+          WORKFORCE_AGENT_ROLES,
+          roles.get(row.runId) ?? "AD_HOC",
+          "AD_HOC",
+        );
+        byRole.set(role, (byRole.get(role) ?? 0) + micros);
+      }
+      const dollars = (micros: number) => usd(micros / 1_000_000);
+      const limitMicros = limit === null ? null : Math.round(limit * 1_000_000);
+      return {
+        month: `${String(at.getUTCFullYear())}-${String(at.getUTCMonth() + 1).padStart(2, "0")}`,
+        spentUsd: dollars(total),
+        limitUsd: limitMicros === null ? null : dollars(limitMicros),
+        paused: limitMicros !== null && total >= limitMicros,
+        byRole: [...byRole.entries()]
+          .filter(([, micros]) => micros > 0)
+          .sort((a, b) => b[1] - a[1])
+          .map(([role, micros]) => ({ role, usd: dollars(micros) })),
+        team: team.map((row) => ({
+          role: oneOf(WORKFORCE_AGENT_ROLES, row.role, "AD_HOC"),
+          state: oneOf(
+            WORKFORCE_TEAM_STATES,
+            row.needs_you > 0
+              ? "NEEDS_YOU"
+              : row.running > 0
+                ? "WORKING"
+                : "IDLE",
+            "IDLE",
+          ),
+          runs: row.runs,
+          drafts: row.drafts,
+          sentBack: row.sent_back,
+          latest: row.latest?.slice(0, 500) ?? null,
+        })),
+        jobs,
       };
     },
   };

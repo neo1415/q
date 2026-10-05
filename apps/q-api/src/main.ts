@@ -116,6 +116,7 @@ import {
   learnedNotesFrom,
 } from "./composition/workforce/learning.js";
 import { createWorkforceModels } from "./composition/workforce/models.js";
+import { workforceMonthlyLimitUsd } from "./composition/workforce/limit.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
 import { createPostgresWorkforceStore } from "./composition/workforce/store.js";
@@ -1255,6 +1256,7 @@ const integrations = composeGoogleIntegrations({
 // WORKFORCE block (founder brief J1-J9): the reviewer every outward
 // message passes, and the record of Q's agents for the workforce page.
 const workforceStore = createPostgresWorkforceStore(database.sql);
+const workforceMonthlyLimit = workforceMonthlyLimitUsd(process.env);
 const workforceModels = createWorkforceModels({
   gateway: modelGateway,
   dataPosture: demoDataPosture,
@@ -4714,6 +4716,9 @@ const { app, logger: appLogger } = createApp(
         store: workforceStore,
         costs: (owner, jobIds) =>
           createPostgresUsageReader(database.sql).workforceCosts(owner, jobIds),
+        monthCosts: (owner, at) =>
+          createPostgresUsageReader(database.sql).workforceMonth(owner, at),
+        monthlyLimitUsd: () => Promise.resolve(workforceMonthlyLimit),
       }),
       onDecision: feedbackFromApprovals({
         store: workforceStore,

@@ -55,6 +55,8 @@ import { EmailDraftEditor } from "@/features/integrations/email-draft-editor";
 import { useQSessionOptional } from "@/features/q/q-session";
 
 import { groupNotices, type NoticeGroup } from "./notice-groups";
+import type { WorkforceView } from "./workforce-actions";
+import { WorkforcePanel } from "./workforce-panel";
 import { noticesRead, refreshNotices, useNotices } from "./notice-store";
 import {
   answerWorkAction,
@@ -94,6 +96,11 @@ type Props = {
    */
   readonly prepared?:
     { readonly key: string; readonly view: QApprovalView } | undefined;
+  /**
+   * Q's team (founder brief J5): its jobs as run logs, who is on what and
+   * this month's cost. Absent: the section is not shown; null: it failed.
+   */
+  readonly workforce?: WorkforceView | null | undefined;
 };
 
 export function WorkPage({
@@ -102,6 +109,7 @@ export function WorkPage({
   work,
   done,
   prepared,
+  workforce,
 }: Props) {
   const running = (work ?? []).filter((item) => item.status === "ACTIVE");
   const timeLanes = running.flatMap((item) =>
@@ -167,6 +175,12 @@ export function WorkPage({
           </div>
         </div>
       </div>
+      {workforce === undefined ? null : (
+        <WorkforcePanel
+          overview={workforce?.overview ?? null}
+          jobs={workforce?.jobs ?? null}
+        />
+      )}
     </div>
   );
 }

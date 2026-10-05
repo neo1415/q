@@ -6,7 +6,9 @@ import {
   PROBLEM_CONTENT_TYPE,
   Q_WORKFORCE_JOB_PATH,
   Q_WORKFORCE_JOBS_PATH,
+  Q_WORKFORCE_OVERVIEW_PATH,
   WorkforceJobDetailDtoSchema,
+  WorkforceOverviewDtoSchema,
   WorkforceJobListDtoSchema,
   WorkforceJobListQuerySchema,
 } from "@capital-q/contracts";
@@ -73,6 +75,20 @@ export function registerWorkforceRoutes(
       );
       void reply.header("Cache-Control", "no-store");
       return WorkforceJobListDtoSchema.parse(list);
+    },
+  );
+
+  app.get(
+    Q_WORKFORCE_OVERVIEW_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const overview = await page.overview({
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      });
+      void reply.header("Cache-Control", "no-store");
+      return WorkforceOverviewDtoSchema.parse(overview);
     },
   );
 

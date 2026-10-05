@@ -155,7 +155,11 @@ export async function runJob(input: {
     let summary: string;
     if (blocked !== undefined) {
       status = "SKIPPED";
-      summary = `Waited on "${blocked}", which did not finish.`;
+      // Plain words: the step's own agent, never its plan key.
+      const waitedOn =
+        input.steps.find((one) => one.key === blocked)?.agentName ??
+        "an earlier step";
+      summary = `Waited on ${waitedOn}, which did not finish.`;
     } else {
       const executor = executorFor(step, input.executors);
       if (executor === null) {
