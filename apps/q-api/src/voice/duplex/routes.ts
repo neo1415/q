@@ -7,9 +7,12 @@ import type {
 import {
   parseContract,
   Q_VOICE_DUPLEX_END_PATH,
+  Q_VOICE_DUPLEX_REJOIN_PATH,
   Q_VOICE_DUPLEX_TOOL_PATH,
   Q_VOICE_DUPLEX_USAGE_PATH,
   QVoiceDuplexEndSchema,
+  QVoiceDuplexRejoinResultSchema,
+  QVoiceDuplexRejoinSchema,
   QVoiceDuplexToolCallSchema,
   QVoiceDuplexToolResultSchema,
   QVoiceDuplexUsageReportSchema,
@@ -98,6 +101,29 @@ export function registerDuplexVoiceRoutes(
     },
   );
 
+  // I1: a dropped line asks for a fresh call instead of falling back.
+  app.post(
+    Q_VOICE_DUPLEX_REJOIN_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const body = parseContract(
+        QVoiceDuplexRejoinSchema,
+        request.body ?? {},
+        "That is not a reason to rejoin.",
+      );
+      const result = await broker.rejoin({
+        actor: actorOf(request),
+        voiceSessionId: idOf(request.params),
+        cause: body.cause,
+      });
+      if (result === null) return gone(reply);
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(QVoiceDuplexRejoinResultSchema.parse(result));
+    },
+  );
+
   app.post(
     Q_VOICE_DUPLEX_END_PATH,
     { onRequest: withContext },
@@ -111,6 +137,8 @@ export function registerDuplexVoiceRoutes(
         actor: actorOf(request),
         voiceSessionId: idOf(request.params),
         reason: body.reason,
+        cause: body.cause,
+        stats: body.stats,
       });
       // Ending a line that already ended is not an error.
       return reply.code(204).send();

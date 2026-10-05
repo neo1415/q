@@ -16,7 +16,7 @@ import {
   type DuplexLineEvents,
   type DuplexRelays,
 } from "../src/features/voice/provider/duplex-line";
-import { WEAK_LINE_NOTICE } from "../src/features/voice/provider/line-health";
+import { LINE_LOST_NOTICE } from "../src/features/voice/provider/line-health";
 
 /**
  * DUPLEX in the browser, with a fake RTCPeerConnection and data channel:
@@ -379,7 +379,7 @@ describe("tool calls and usage", () => {
     expect(h.channel().types()).not.toContain("response.create");
   });
 
-  it("falls back when the relay says the line is gone", async () => {
+  it("keeps the line when a tool relay does not get through, and has Q say so (I1)", async () => {
     const h = harness({ tool: () => Promise.resolve(null) });
     await h.line.open();
     h.channel().emit({
@@ -389,12 +389,16 @@ describe("tool calls and usage", () => {
       arguments: "{}",
     });
     await settle();
-    expect(h.events.onFallback).toHaveBeenCalledWith({
-      cause: "RELAY",
-      notice: null,
-      connected: true,
-    });
-    expect(h.relays.end).toHaveBeenCalledWith("FALLBACK");
+    expect(h.events.onFallback).not.toHaveBeenCalled();
+    const output = h
+      .channel()
+      .sent.find(
+        (event) =>
+          (event.item as { type?: string } | undefined)?.type ===
+          "function_call_output",
+      );
+    expect(JSON.stringify(output)).toContain("did not get through");
+    expect(h.channel().types()).toContain("response.create");
   });
 
   it("reports each response's usage and falls back with the cap's sentence", async () => {
@@ -463,11 +467,14 @@ describe("the line's own limits", () => {
     await h.line.open();
     vi.advanceTimersByTime(CREDENTIAL.idleMs + 10);
     expect(h.events.onEnded).toHaveBeenCalledWith("IDLE");
-    expect(h.relays.end).toHaveBeenCalledWith("IDLE");
+    expect(h.relays.end).toHaveBeenCalledWith(
+      "IDLE",
+      expect.objectContaining({ stats: expect.any(Object) as unknown }),
+    );
     expect(h.track.stop).toHaveBeenCalled();
   });
 
-  it("hands over to the standard voice at its maximum length", async () => {
+  it("hands over at its maximum length when it cannot rejoin", async () => {
     const h = harness();
     await h.line.open();
     // Keep it busy so idle does not end it first.
@@ -480,16 +487,20 @@ describe("the line's own limits", () => {
       notice: null,
       connected: true,
     });
-    expect(h.relays.end).toHaveBeenCalledWith("MAX_LENGTH");
+    expect(h.relays.end).toHaveBeenCalledWith(
+      "MAX_LENGTH",
+      expect.objectContaining({ cause: "MAX_LENGTH" }),
+    );
   });
 
-  it("falls back when the network drops", async () => {
+  it("falls back when the network drops and it cannot rejoin", async () => {
     const h = harness();
     await h.line.open();
     h.peer.fail();
+    await vi.advanceTimersByTimeAsync(0);
     expect(h.events.onFallback).toHaveBeenCalledWith({
       cause: "NETWORK",
-      notice: WEAK_LINE_NOTICE,
+      notice: LINE_LOST_NOTICE,
       connected: true,
     });
   });

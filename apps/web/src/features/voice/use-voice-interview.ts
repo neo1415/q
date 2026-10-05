@@ -25,7 +25,7 @@ import {
   openVoiceLine,
   type VoiceLineHolder,
 } from "./voice-line";
-import { RECONNECTING_NOTICE, WEAK_LINE_NOTICE } from "./provider/line-health";
+import { LINE_LOST_NOTICE, RECONNECTING_NOTICE } from "./provider/line-health";
 import type {
   VoiceSessionClient,
   VoiceSessionEvents,
@@ -172,6 +172,12 @@ export function useVoiceInterview(
   const voice = settled ?? preferred;
   const [notice, setNotice] = useState<string | null>(null);
   const [linkStatus, setLinkStatus] = useState<string | null>(null);
+  /**
+   * I1: the duplex line's own status while it carries on (weak,
+   * reconnecting). Separate from `linkStatus`, which the line coming up
+   * clears: a rejoining line never stops being "up".
+   */
+  const [lineStatus, setLineStatus] = useState<string | null>(null);
   const [turn, setTurn] = useState<QVoiceTurnState | null>(null);
   const [voiceSessionId, setVoiceSessionId] = useState<string | null>(null);
   /**
@@ -297,7 +303,11 @@ export function useVoiceInterview(
       if (line.role === "q") lastQLine.current = line.text;
       events.onLine?.(line);
     },
-    onEnded: ended,
+    onEnded: (reason) => {
+      setLineStatus(null);
+      ended(reason);
+    },
+    onLinkStatus: setLineStatus,
     // DUPLEX: the same thread carries on, on the standard voice, at once.
     // Resumed: Q does not greet again. The cap's one sentence, if any, is
     // shown once the standard line is up (talk clears the notice first).
@@ -315,6 +325,7 @@ export function useVoiceInterview(
         return;
       }
       fellBack.current = current;
+      setLineStatus(null);
       // A line that reached its length is renewed on the same voice
       // (founder 2026-10-05: "the voice changed" at exactly 10 minutes):
       // the person hears no switch. Bounded, so a line that cannot stay up
@@ -326,9 +337,9 @@ export function useVoiceInterview(
         renewals.current < MAX_DUPLEX_RENEWALS;
       if (renew) renewals.current += 1;
       else duplexOff.current = true;
-      // A weak line is said at once; the standard voice is on its way.
-      const weak = notice === WEAK_LINE_NOTICE;
-      if (weak) setLinkStatus(WEAK_LINE_NOTICE);
+      // A lost line is said at once; the standard voice is on its way.
+      const weak = notice === LINE_LOST_NOTICE;
+      if (weak) setLinkStatus(LINE_LOST_NOTICE);
       const last = lastStart.current;
       const again = talkRef.current;
       if (last === null || again === null) {
@@ -412,6 +423,7 @@ export function useVoiceInterview(
     renewals.current = 0;
     fellBack.current = null;
     setLinkStatus(null);
+    setLineStatus(null);
   }, []);
 
   useEffect(() => {
@@ -635,14 +647,15 @@ export function useVoiceInterview(
     client,
     active,
     voice,
-    notice: linkStatus ?? notice,
-    linkStatus,
+    notice: linkStatus ?? lineStatus ?? notice,
+    linkStatus: linkStatus ?? lineStatus,
     talk,
     end,
     chooseVoice,
     clearNotice: () => {
       setNotice(null);
       setLinkStatus(null);
+      setLineStatus(null);
     },
     turn,
   };

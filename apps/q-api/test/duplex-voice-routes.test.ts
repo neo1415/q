@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   Q_VOICE_SESSIONS_PATH,
   qVoiceDuplexEndPath,
+  qVoiceDuplexRejoinPath,
   qVoiceDuplexToolPath,
 } from "@capital-q/contracts";
 import {
@@ -58,6 +59,7 @@ function fakeBroker(
     open: vi.fn(open),
     tool: () => Promise.resolve(null),
     usage: () => Promise.resolve(null),
+    rejoin: () => Promise.resolve(null),
     end: () => false,
     size: () => 0,
   };
@@ -183,6 +185,42 @@ describe("the voice session route with duplex", () => {
       payload: { reason: "ENDED" },
     });
     expect(end.statusCode).toBe(204);
+    const rejoin = await server.inject({
+      method: "POST",
+      url: qVoiceDuplexRejoinPath(id),
+      headers: { authorization: `Bearer ${BEARER}` },
+      payload: { cause: "NETWORK" },
+    });
+    expect(rejoin.statusCode).toBe(404);
+    // I1: why it ended and what the line measured ride along.
+    const measured = await server.inject({
+      method: "POST",
+      url: qVoiceDuplexEndPath(id),
+      headers: { authorization: `Bearer ${BEARER}` },
+      payload: {
+        reason: "FALLBACK",
+        cause: "NETWORK",
+        stats: {
+          rejoins: 2,
+          weakSeconds: 14,
+          worstLossPct: 31.5,
+          worstJitterMs: 240,
+          worstRttMs: 1900,
+          firstAudioMsP50: 640,
+          firstAudioMsMax: 1800,
+          turns: 9,
+        },
+      },
+    });
+    expect(measured.statusCode).toBe(204);
+    // A cause outside the contract never reaches the broker.
+    const bogus = await server.inject({
+      method: "POST",
+      url: qVoiceDuplexRejoinPath(id),
+      headers: { authorization: `Bearer ${BEARER}` },
+      payload: { cause: "BECAUSE" },
+    });
+    expect(bogus.statusCode).toBeGreaterThanOrEqual(400);
     await server.close();
   });
 });

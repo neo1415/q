@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   endDuplexAction,
+  rejoinDuplexAction,
   relayDuplexToolAction,
   reportDuplexUsageAction,
 } from "../duplex-actions";
@@ -118,7 +119,8 @@ export function useDuplexVoiceSession(
       const relays: DuplexRelays = optionsRef.current.relays?.(id) ?? {
         tool: (call) => relayDuplexToolAction(id, call),
         usage: (report) => reportDuplexUsageAction(id, report),
-        end: (reason) => endDuplexAction(id, reason),
+        end: (reason, detail) => endDuplexAction(id, reason, detail),
+        rejoin: (cause) => rejoinDuplexAction(id, cause),
       };
       const line = new DuplexLine({
         credential: duplex,
@@ -142,6 +144,11 @@ export function useDuplexVoiceSession(
             storeListeningPreference(level);
           },
           onInterrupted: () => eventsRef.current.onInterrupted?.(),
+          onLinkStatus: (status) => {
+            if (lineRef.current === line) {
+              eventsRef.current.onLinkStatus?.(status);
+            }
+          },
           onFallback: ({ cause, notice, connected: wasUp }) => {
             // A line already replaced or ended reports nothing: only the
             // current line may bring up its standard successor (live

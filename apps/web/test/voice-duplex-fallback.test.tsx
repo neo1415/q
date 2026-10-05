@@ -44,7 +44,7 @@ vi.mock("../src/features/voice/use-voice-session", () => ({
 
 const { useVoiceInterview } =
   await import("../src/features/voice/use-voice-interview");
-const { WEAK_LINE_NOTICE } =
+const { LINE_LOST_NOTICE } =
   await import("../src/features/voice/provider/line-health");
 
 const CONVERSATION = QConversationIdSchema.parse(
@@ -94,7 +94,7 @@ describe("falling back from a duplex line", () => {
     expect(result.current.active).toBe(true);
   });
 
-  it("says a weak line is switching at once, and resumes the same conversation on the standard voice", async () => {
+  it("says a lost line is switching at once, and resumes the same conversation on the standard voice", async () => {
     vi.useFakeTimers();
     try {
       const { result } = renderHook(() => useVoiceInterview());
@@ -104,11 +104,11 @@ describe("falling back from a duplex line", () => {
         });
       });
       act(() => {
-        events.onFallback?.(WEAK_LINE_NOTICE);
+        events.onFallback?.(LINE_LOST_NOTICE);
       });
       // Shown before the standard line is even asked for: never silence.
-      expect(result.current.notice).toBe(WEAK_LINE_NOTICE);
-      expect(result.current.linkStatus).toBe(WEAK_LINE_NOTICE);
+      expect(result.current.notice).toBe(LINE_LOST_NOTICE);
+      expect(result.current.linkStatus).toBe(LINE_LOST_NOTICE);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0);
       });

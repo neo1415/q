@@ -1,5 +1,9 @@
 import type {
   QVoiceDuplexCredential,
+  QVoiceDuplexEnd,
+  QVoiceDuplexLineStats,
+  QVoiceDuplexRejoin,
+  QVoiceDuplexRejoinResult,
   QVoiceDuplexToolCall,
   QVoiceDuplexToolResult,
   QVoiceDuplexUsageReport,
@@ -12,7 +16,9 @@ import {
   countersOf,
   DISCONNECTED_GRACE_MS,
   HEALTH_SAMPLE_MS,
+  LINE_LOST_NOTICE,
   LineHealth,
+  RECONNECTING_NOTICE,
   WEAK_LINE_NOTICE,
 } from "./line-health";
 import {
@@ -37,10 +43,19 @@ import {
  * cleared, and the item truncated to what was actually heard, so Q's
  * memory of the conversation matches the person's.
  *
- * Any failure — no microphone, no connection, a refused relay, the cap,
- * the maximum length — ends the line with `fallback`, and the caller
- * carries on with the standard voice. Silence for the idle window ends it
- * plainly. Nothing here changes reduced motion or accessibility: audio is
+ * Resilience (I1, Dubai demo 2026-10-05: the line handed over to the
+ * slower standard voice on a hotel network; founder: "even if it has a
+ * bad network, it still needs to work"). A weak line (loss, jitter, round
+ * trip) is never a reason to leave: Opus FEC and a deeper playout buffer
+ * carry it, and the person sees a calm notice. A transport that drops is
+ * given DISCONNECTED_GRACE_MS to heal on its own, then the line REJOINS:
+ * the server mints a fresh realtime call for the same line (same voice,
+ * same instructions, same cap), the microphone and the speaker are kept,
+ * and the recent conversation is replayed so Q carries on mid-thought.
+ * The length limit rejoins the same way. Only a cap, a line the server no
+ * longer knows, or MAX_REJOINS drops in one line end it with `fallback`,
+ * and the caller carries on with the standard voice. Silence for the
+ * idle window ends it plainly. Nothing here changes reduced motion or accessibility: audio is
  * unaffected by them, and the transcript is the same lines as before.
  *
  * BACKCHANNEL (when the credential carries `listening`): Q listens like a
@@ -100,6 +115,24 @@ const OPENING_MAX = 700;
 
 export type DuplexFallbackCause =
   "CONNECT" | "NETWORK" | "RELAY" | "CAP" | "MAX_LENGTH";
+type RejoinCause = QVoiceDuplexRejoin["cause"];
+
+/** Rejoins one line may make before it hands over for good. */
+export const MAX_REJOINS = 6;
+/** Fresh calls tried per rejoin, with a growing pause between them. */
+export const REJOIN_ATTEMPTS = 4;
+export const REJOIN_BACKOFF_MS = 1_000;
+/** Usage reports retried before the relay counts as down. */
+const REPORT_ATTEMPTS = 3;
+const REPORT_BACKOFF_MS = 600;
+/** Recent lines replayed into a rejoined call. */
+const REPLAY_MAX = 8;
+const REPLAY_CHARS = 400;
+/**
+ * Playout buffer on a WEAK line, in ms: words arrive a little later and
+ * whole, rather than on time and clipped.
+ */
+export const WEAK_PLAYOUT_BUFFER_MS = 400;
 
 export type DuplexLineEvents = {
   readonly onState: (state: VoiceState) => void;
@@ -115,6 +148,11 @@ export type DuplexLineEvents = {
   }) => void;
   /** The line ended without fallback (idle, or the person ended it). */
   readonly onEnded: (reason: "IDLE" | "ENDED") => void;
+  /**
+   * I1: a calm status while the line carries on (weak, reconnecting);
+   * null when it is fine again. Never a reason to switch voices.
+   */
+  readonly onLinkStatus?: ((status: string | null) => void) | undefined;
   /** BACKCHANNEL: the person changed the level by voice. */
   readonly onListening?: ((level: QVoiceListeningLevel) => void) | undefined;
 };
@@ -129,7 +167,15 @@ export type DuplexRelays = {
   ) => Promise<QVoiceDuplexUsageResult | null>;
   readonly end: (
     reason: "ENDED" | "IDLE" | "MAX_LENGTH" | "FALLBACK",
+    detail?: Pick<QVoiceDuplexEnd, "cause" | "stats">,
   ) => Promise<void>;
+  /**
+   * I1: a fresh call for this line. Null: the server no longer knows the
+   * line. Rejects: the request did not get through (try again).
+   */
+  readonly rejoin?:
+    | ((cause: RejoinCause) => Promise<QVoiceDuplexRejoinResult | null>)
+    | undefined;
 };
 
 /** What the line needs from the browser; injected so a test can fake it. */
@@ -222,8 +268,8 @@ export function browserDuplexEnvironment(): DuplexEnvironment {
   };
 }
 
-/** How long the provider has to answer the session offer. */
-export const DUPLEX_CONNECT_MS = 8_000;
+/** How long the provider has to answer the session offer (a slow line too). */
+export const DUPLEX_CONNECT_MS = 10_000;
 
 /** Read a field of an untrusted event without trusting its shape. */
 function field(value: unknown, key: string): unknown {
@@ -282,7 +328,7 @@ export function transcriptionReportOf(
 }
 
 export class DuplexLine {
-  readonly #credential: QVoiceDuplexCredential;
+  #credential: QVoiceDuplexCredential;
   readonly #relays: DuplexRelays;
   readonly #events: DuplexLineEvents;
   readonly #env: DuplexEnvironment;
@@ -312,6 +358,18 @@ export class DuplexLine {
   #healthTimer: unknown = null;
   #graceTimer: unknown = null;
   #reacquiring = false;
+  // I1: rejoining a dropped transport, and what the line measured.
+  #receiver: (RTCRtpReceiver & { jitterBufferTarget?: number | null }) | null =
+    null;
+  #rejoining = false;
+  #rejoins = 0;
+  /** Bumped by every new transport: a tool result from before it is replayed. */
+  #transport = 0;
+  readonly #replay: { role: "user" | "q"; text: string }[] = [];
+  #turnEndedAt: number | null = null;
+  readonly #firstAudio: number[] = [];
+  /** Tool results that came back while the line was rejoining. */
+  readonly #pendingResults: string[] = [];
   readonly #unsubscribe: (() => void)[] = [];
   // BACKCHANNEL
   readonly #policy: BackchannelPolicy;
@@ -366,67 +424,33 @@ export class DuplexLine {
   async open(): Promise<boolean> {
     this.#events.onState("CONNECTING");
     try {
-      if (Date.parse(this.#credential.expiresAt) <= this.#env.now()) {
-        throw new Error("secret expired");
-      }
       const microphone = await this.#env.getMicrophone();
       if (this.#over) {
         for (const track of microphone.getTracks()) track.stop();
         return false;
       }
       this.#microphone = microphone;
-      const peer = this.#env.createPeer();
-      this.#peer = peer;
-      const audio = this.#env.createAudio();
-      audio.volume = this.#volume;
-      this.#audio = audio;
-      peer.ontrack = (event) => {
-        const [stream] = event.streams;
-        if (stream !== undefined) audio.srcObject = stream;
-        // A slightly deeper playout buffer: words are delayed, not cut.
-        const receiver = event.receiver as
-          (RTCRtpReceiver & { jitterBufferTarget?: number | null }) | undefined;
-        if (receiver !== undefined && "jitterBufferTarget" in receiver) {
-          try {
-            receiver.jitterBufferTarget = PLAYOUT_BUFFER_MS;
-          } catch {
-            // Out of the browser's range: its own default stands.
-          }
-        }
-      };
-      for (const track of microphone.getTracks()) {
-        const sender = peer.addTrack(track, microphone) as
-          RTCRtpSender | undefined;
-        if (track.kind === "audio" && sender !== undefined) {
-          this.#sender = sender;
-        }
-        this.#watchTrack(track);
-      }
-      const channel = peer.createDataChannel("oai-events");
-      this.#channel = channel;
-      channel.onmessage = (message: MessageEvent) => {
-        this.#receive(message.data);
-      };
-      peer.onconnectionstatechange = () => {
-        this.#onConnectionState(peer.connectionState);
-      };
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      const answered = await this.#withTimeout(
-        this.#env.fetch(this.#credential.callsUrl, {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${this.#credential.clientSecret}`,
-            "content-type": "application/sdp",
-          },
-          body: offer.sdp ?? "",
-        }),
-      );
-      if (!answered.ok) throw new Error("offer refused");
-      const sdp = await answered.text();
-      await peer.setRemoteDescription({ type: "answer", sdp });
-      await this.#withTimeout(this.#channelOpen(channel));
+      for (const track of microphone.getTracks()) this.#watchTrack(track);
+      this.#audio = this.#env.createAudio();
+      this.#audio.volume = this.#volume;
     } catch {
+      this.#fallback("CONNECT", null);
+      return false;
+    }
+    // A slow first connect gets a second chance on a fresh call before
+    // the standard voice is used (the secret lives a minute at most).
+    let up = false;
+    if (Date.parse(this.#credential.expiresAt) > this.#env.now()) {
+      up = await this.#tryConnect();
+    }
+    if (!up && !this.#over && this.#relays.rejoin !== undefined) {
+      const fresh = await this.#relays.rejoin("NETWORK").catch(() => null);
+      if (!this.#over && fresh?.credential !== undefined) {
+        this.#credential = fresh.credential;
+        up = await this.#tryConnect();
+      }
+    }
+    if (!up) {
       this.#fallback("CONNECT", null);
       return false;
     }
@@ -434,11 +458,8 @@ export class DuplexLine {
     this.#connected = true;
     this.#events.onState("LISTENING");
     this.#touch();
-    this.#maxTimer = this.#env.setTimeout(() => {
-      this.#fallback("MAX_LENGTH", null);
-    }, this.#credential.maxSessionMs);
+    this.#transportUp();
     this.#startListening();
-    this.#sampleHealth();
     const onDeviceChange = this.#env.onDeviceChange?.(() => {
       void this.#reacquireMicrophone();
     });
@@ -450,32 +471,308 @@ export class DuplexLine {
     return true;
   }
 
+  async #tryConnect(): Promise<boolean> {
+    try {
+      await this.#connect();
+      return !this.#over;
+    } catch {
+      this.#dropTransport();
+      return false;
+    }
+  }
+
+  /**
+   * One realtime call on the current credential: a new peer carrying the
+   * same microphone and playing into the same element. Used by `open` and
+   * by every rejoin.
+   */
+  async #connect(): Promise<void> {
+    const microphone = this.#microphone;
+    const audio = this.#audio;
+    if (microphone === null || audio === null) throw new Error("no media");
+    const peer = this.#env.createPeer();
+    this.#peer = peer;
+    this.#transport += 1;
+    peer.ontrack = (event) => {
+      if (this.#peer !== peer) return;
+      const [stream] = event.streams;
+      if (stream !== undefined) audio.srcObject = stream;
+      // A slightly deeper playout buffer: words are delayed, not cut.
+      const receiver = event.receiver as
+        (RTCRtpReceiver & { jitterBufferTarget?: number | null }) | undefined;
+      if (receiver !== undefined && "jitterBufferTarget" in receiver) {
+        this.#receiver = receiver;
+        this.#setPlayoutBuffer(
+          this.#health.verdict === "WEAK"
+            ? WEAK_PLAYOUT_BUFFER_MS
+            : PLAYOUT_BUFFER_MS,
+        );
+      }
+    };
+    for (const track of microphone.getTracks()) {
+      const sender = peer.addTrack(track, microphone) as
+        RTCRtpSender | undefined;
+      if (track.kind === "audio" && sender !== undefined) {
+        this.#sender = sender;
+      }
+    }
+    const channel = peer.createDataChannel("oai-events");
+    this.#channel = channel;
+    channel.onmessage = (message: MessageEvent) => {
+      if (this.#channel === channel) this.#receive(message.data);
+    };
+    peer.onconnectionstatechange = () => {
+      if (this.#peer === peer) this.#onConnectionState(peer.connectionState);
+    };
+    const offer = await peer.createOffer();
+    await peer.setLocalDescription(offer);
+    const answered = await this.#withTimeout(
+      this.#env.fetch(this.#credential.callsUrl, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.#credential.clientSecret}`,
+          "content-type": "application/sdp",
+        },
+        body: offer.sdp ?? "",
+      }),
+    );
+    if (!answered.ok) throw new Error("offer refused");
+    const sdp = await answered.text();
+    await peer.setRemoteDescription({ type: "answer", sdp });
+    await this.#withTimeout(this.#channelOpen(channel));
+  }
+
+  /** A call is up: its length limit and its health sampling start. */
+  #transportUp(): void {
+    this.#health.restart();
+    if (this.#maxTimer !== null) this.#env.clearTimeout(this.#maxTimer);
+    this.#maxTimer = this.#env.setTimeout(() => {
+      this.#maxTimer = null;
+      void this.#rejoin("MAX_LENGTH");
+    }, this.#credential.maxSessionMs);
+    this.#sampleHealth();
+  }
+
+  /** The current call is let go; the microphone and the speaker are kept. */
+  #dropTransport(): void {
+    for (const timer of [this.#healthTimer, this.#graceTimer, this.#maxTimer]) {
+      if (timer !== null) this.#env.clearTimeout(timer);
+    }
+    this.#healthTimer = null;
+    this.#graceTimer = null;
+    this.#maxTimer = null;
+    this.#cutOutOfBand(null);
+    if (this.#heldAnswer !== null) {
+      this.#env.clearTimeout(this.#heldAnswer.timer);
+      this.#heldAnswer = null;
+    }
+    const peer = this.#peer;
+    const channel = this.#channel;
+    this.#peer = null;
+    this.#channel = null;
+    this.#sender = null;
+    this.#receiver = null;
+    this.#speaking = false;
+    this.#responseActive = false;
+    this.#item = null;
+    this.#turnEndedAt = null;
+    try {
+      channel?.close();
+    } catch {
+      // Already closed.
+    }
+    try {
+      peer?.close();
+    } catch {
+      // Already closed.
+    }
+  }
+
+  /**
+   * The line dropped, or reached its length: a fresh call for the same
+   * line, without a word about it unless the person would notice. Bounded:
+   * after MAX_REJOINS, or when the server says no (the cap, a line it no
+   * longer knows), the standard voice takes over.
+   */
+  async #rejoin(cause: RejoinCause): Promise<void> {
+    if (this.#over || this.#rejoining) return;
+    const rejoin = this.#relays.rejoin;
+    if (rejoin === undefined || this.#rejoins >= MAX_REJOINS) {
+      this.#fallback(cause, cause === "MAX_LENGTH" ? null : LINE_LOST_NOTICE);
+      return;
+    }
+    this.#rejoining = true;
+    this.#rejoins += 1;
+    const audible = cause !== "MAX_LENGTH";
+    if (audible) {
+      this.#events.onLinkStatus?.(RECONNECTING_NOTICE);
+      this.#events.onState("CONNECTING");
+    }
+    this.#dropTransport();
+    let up = false;
+    let refusal: string | null | undefined;
+    for (let attempt = 0; attempt < REJOIN_ATTEMPTS; attempt += 1) {
+      if (attempt > 0) await this.#wait(REJOIN_BACKOFF_MS * attempt);
+      if (this.#over) break;
+      let result: QVoiceDuplexRejoinResult | null | undefined;
+      try {
+        result = await rejoin(cause);
+      } catch {
+        // Did not get through (the network is still down): try again.
+        result = undefined;
+      }
+      if (this.#over) break;
+      if (result === undefined) continue;
+      if (result === null || result.credential === undefined) {
+        refusal = result?.notice ?? null;
+        break;
+      }
+      this.#credential = result.credential;
+      if (await this.#tryConnect()) {
+        up = true;
+        break;
+      }
+    }
+    this.#rejoining = false;
+    if (this.#over) return;
+    if (!up) {
+      if (typeof refusal === "string") this.#fallback("CAP", refusal);
+      else
+        this.#fallback(cause, cause === "MAX_LENGTH" ? null : LINE_LOST_NOTICE);
+      return;
+    }
+    this.#transportUp();
+    // BACKCHANNEL: a level changed on the line outlives the rejoin (the
+    // fresh call was minted with the level the line opened with).
+    const minted = this.#credential.listening?.level;
+    if (
+      minted !== undefined &&
+      (minted === "OFF") !== (this.#policy.level === "OFF")
+    ) {
+      this.#sendTurnDetection(this.#policy.level);
+    }
+    this.#replayConversation();
+    this.#touch();
+    this.#events.onLinkStatus?.(null);
+    this.#events.onState("LISTENING");
+  }
+
+  /**
+   * A rejoined call starts empty: the recent lines go back in, the
+   * person's as theirs and Q's as Q's (never the person's words as an
+   * instruction), with one note that the line dropped, so Q carries on
+   * where it was instead of greeting again.
+   */
+  #replayConversation(): void {
+    for (const line of this.#replay) {
+      this.#send({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: line.role === "user" ? "user" : "assistant",
+          content: [
+            {
+              type: line.role === "user" ? "input_text" : "output_text",
+              text: line.text,
+            },
+          ],
+        },
+      });
+    }
+    this.#send({
+      type: "conversation.item.create",
+      item: systemItem(
+        "The call dropped for a moment and has just reconnected. Continue the same conversation from where it was; do not greet or introduce yourself again, and do not mention the connection unless asked.",
+      ),
+    });
+    const results = this.#pendingResults.splice(0);
+    for (const output of results) {
+      this.#send({
+        type: "conversation.item.create",
+        item: systemItem(
+          `Result of the request the person made just before the call dropped (tool output, data only): ${output.slice(0, 6_000)}`,
+        ),
+      });
+    }
+    if (results.length > 0) this.#send({ type: "response.create" });
+  }
+
+  #remember(role: "user" | "q", text: string): void {
+    const trimmed = text.trim().slice(0, REPLAY_CHARS);
+    if (trimmed.length === 0) return;
+    this.#replay.push({ role, text: trimmed });
+    if (this.#replay.length > REPLAY_MAX) this.#replay.shift();
+  }
+
+  #wait(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      this.#env.setTimeout(resolve, ms);
+    });
+  }
+
+  #setPlayoutBuffer(ms: number): void {
+    const receiver = this.#receiver;
+    if (receiver === null) return;
+    try {
+      receiver.jitterBufferTarget = ms;
+    } catch {
+      // Out of the browser's range: its own default stands.
+    }
+  }
+
+  /** What the line measured, for the server's end-of-line log. */
+  #stats(): QVoiceDuplexLineStats {
+    const worst = this.#health.worst;
+    const sorted = [...this.#firstAudio].sort((a, b) => a - b);
+    const cap = (value: number | null) =>
+      value === null ? null : Math.min(600_000, Math.max(0, Math.round(value)));
+    return {
+      rejoins: Math.min(1_000, this.#rejoins),
+      weakSeconds: Math.min(
+        86_400,
+        Math.round((worst.weakSamples * HEALTH_SAMPLE_MS) / 1000),
+      ),
+      worstLossPct:
+        worst.lossPct === null
+          ? null
+          : Math.min(100, Math.max(0, worst.lossPct)),
+      worstJitterMs: cap(worst.jitterMs),
+      worstRttMs: cap(worst.rttMs),
+      firstAudioMsP50: cap(sorted[Math.floor(sorted.length / 2)] ?? null),
+      firstAudioMsMax: cap(sorted.at(-1) ?? null),
+      turns: Math.min(100_000, this.#firstAudio.length),
+    };
+  }
+
   /**
    * `failed` is final: hand over to the standard voice at once.
    * `disconnected` is often a blip that ICE repairs by itself, so it gets
    * a short grace; still disconnected after it, the line is handed over.
    */
   #onConnectionState(state: RTCPeerConnectionState): void {
+    // Before the line is up, or while it rejoins, the connect timeout
+    // decides; a state change of a call being set up is not a drop.
+    if (!this.#connected || this.#rejoining) return;
     if (state === "failed") {
-      this.#fallback("NETWORK", WEAK_LINE_NOTICE);
+      void this.#rejoin("NETWORK");
       return;
     }
     if (state === "disconnected") {
-      if (!this.#connected) {
-        this.#fallback("NETWORK", null);
-        return;
-      }
       if (this.#graceTimer !== null) return;
+      this.#events.onLinkStatus?.(RECONNECTING_NOTICE);
       this.#graceTimer = this.#env.setTimeout(() => {
         this.#graceTimer = null;
         const now = this.#peer?.connectionState;
-        if (now !== "connected") this.#fallback("NETWORK", WEAK_LINE_NOTICE);
+        if (now !== "connected") void this.#rejoin("NETWORK");
       }, DISCONNECTED_GRACE_MS);
       return;
     }
     if (state === "connected" && this.#graceTimer !== null) {
       this.#env.clearTimeout(this.#graceTimer);
       this.#graceTimer = null;
+      this.#events.onLinkStatus?.(
+        this.#health.verdict === "WEAK" ? WEAK_LINE_NOTICE : null,
+      );
     }
   }
 
@@ -489,14 +786,23 @@ export class DuplexLine {
       peer.getStats().then(
         (report) => {
           if (this.#over || this.#peer !== peer) return;
-          if (this.#health.observe(countersOf(report))) {
-            this.#fallback("NETWORK", WEAK_LINE_NOTICE);
-            return;
+          const was = this.#health.verdict;
+          const now = this.#health.observe(countersOf(report));
+          if (now !== was) {
+            // Weak is ridden out, never left: a deeper buffer and a note.
+            this.#setPlayoutBuffer(
+              now === "WEAK" ? WEAK_PLAYOUT_BUFFER_MS : PLAYOUT_BUFFER_MS,
+            );
+            if (this.#graceTimer === null) {
+              this.#events.onLinkStatus?.(
+                now === "WEAK" ? WEAK_LINE_NOTICE : null,
+              );
+            }
           }
           this.#sampleHealth();
         },
         () => {
-          if (!this.#over) this.#sampleHealth();
+          if (!this.#over && this.#peer === peer) this.#sampleHealth();
         },
       );
     }, HEALTH_SAMPLE_MS);
@@ -559,8 +865,9 @@ export class DuplexLine {
   /** The person ended it. */
   close(): void {
     if (this.#over) return;
+    const stats = this.#stats();
     this.#finish();
-    void this.#relays.end("ENDED").catch(() => undefined);
+    void this.#relays.end("ENDED", { stats }).catch(() => undefined);
     this.#events.onEnded("ENDED");
   }
 
@@ -590,6 +897,11 @@ export class DuplexLine {
     this.#policy.setLevel(level);
     if (level === "OFF") this.#cutOutOfBand(null);
     if ((was === "OFF") === (level === "OFF") || !this.#connected) return;
+    this.#sendTurnDetection(level);
+  }
+
+  /** The provider's turn detector, for this listening level. */
+  #sendTurnDetection(level: QVoiceListeningLevel): void {
     this.#send({
       type: "session.update",
       session: {
@@ -649,6 +961,8 @@ export class DuplexLine {
     });
     this.#send({ type: "response.create" });
     this.#events.onLine("user", trimmed);
+    this.#remember("user", trimmed);
+    this.#turnEndedAt = this.#env.now();
     this.#events.onState("THINKING");
     this.#touch();
   }
@@ -697,14 +1011,15 @@ export class DuplexLine {
   #touch(): void {
     if (this.#idleTimer !== null) this.#env.clearTimeout(this.#idleTimer);
     this.#idleTimer = this.#env.setTimeout(() => {
-      // Never while Q is talking or a turn is working.
-      if (this.#speaking || this.#responseActive) {
+      // Never while Q is talking, a turn is working or the line rejoins.
+      if (this.#speaking || this.#responseActive || this.#rejoining) {
         this.#touch();
         return;
       }
       if (this.#over) return;
+      const stats = this.#stats();
       this.#finish();
-      void this.#relays.end("IDLE").catch(() => undefined);
+      void this.#relays.end("IDLE", { stats }).catch(() => undefined);
       this.#events.onEnded("IDLE");
     }, this.#credential.idleMs);
   }
@@ -756,6 +1071,7 @@ export class DuplexLine {
     switch (type) {
       case "input_audio_buffer.speech_started": {
         this.#touch();
+        this.#turnEndedAt = null;
         // The person talking cancels any reaction or bridge at once.
         this.#cutOutOfBand(null);
         if (this.#policy.turnStarted(this.#env.now())) this.#turnItems = [];
@@ -766,6 +1082,7 @@ export class DuplexLine {
       }
       case "input_audio_buffer.speech_stopped":
         this.#touch();
+        this.#turnEndedAt = this.#env.now();
         this.#policy.turnEnded(this.#env.now());
         this.#events.onState("THINKING");
         break;
@@ -782,6 +1099,7 @@ export class DuplexLine {
         const itemId = text(event, "item_id");
         const said = text(event, "transcript")?.trim() ?? "";
         if (itemId !== undefined && said.length > 0) {
+          this.#remember("user", said);
           this.#transcripts.set(itemId, said.slice(0, 600));
           this.#heard.push(said.slice(0, 600));
           if (this.#heard.length > HEARD_MAX) this.#heard.shift();
@@ -806,6 +1124,12 @@ export class DuplexLine {
         break;
       }
       case "output_audio_buffer.started":
+        // Time to first audio: the end of the person's turn to Q's voice.
+        if (this.#turnEndedAt !== null) {
+          this.#firstAudio.push(this.#env.now() - this.#turnEndedAt);
+          if (this.#firstAudio.length > 500) this.#firstAudio.shift();
+          this.#turnEndedAt = null;
+        }
         this.#speaking = true;
         this.#unsilence();
         if (this.#item !== null) this.#item.startedAt = this.#env.now();
@@ -824,6 +1148,7 @@ export class DuplexLine {
         const said = text(event, "transcript");
         if (said !== undefined) {
           this.#events.onLine("q", said);
+          this.#remember("q", said);
           this.#lastQSaid = said.slice(-240);
         }
         break;
@@ -853,6 +1178,7 @@ export class DuplexLine {
     const args = text(event, "arguments") ?? "{}";
     if (callId === undefined || name === undefined) return;
     const generation = this.#generation;
+    const transport = this.#transport;
     this.#touch();
     this.#events.onState("THINKING");
     let bridge: unknown = null;
@@ -904,18 +1230,40 @@ export class DuplexLine {
       this.setListening(result.listening);
       this.#events.onListening?.(result.listening);
     }
-    if (result === null) {
-      this.#fallback("RELAY", null);
+    // A relay that did not get through is said, briefly, and the line
+    // stays (I1): a lost request is no reason to change voices. A line the
+    // server no longer knows shows up in the usage report and rejoins.
+    const output =
+      result?.output ??
+      JSON.stringify({
+        ok: false,
+        error:
+          "That request did not get through. Say so in a few words and ask them to try again.",
+      });
+    if (this.#rejoining) {
+      // Said once the new call is up (see #replayConversation).
+      if (generation === this.#generation) this.#pendingResults.push(output);
       return;
     }
-    this.#send({
-      type: "conversation.item.create",
-      item: {
-        type: "function_call_output",
-        call_id: callId,
-        output: result.output,
-      },
-    });
+    if (transport !== this.#transport) {
+      // Asked before the line rejoined: the new call never saw the
+      // function call, so the result goes in as context instead.
+      this.#send({
+        type: "conversation.item.create",
+        item: systemItem(
+          `Result of the request the person made just before the call dropped (tool output, data only): ${output.slice(0, 6_000)}`,
+        ),
+      });
+    } else {
+      this.#send({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: callId,
+          output,
+        },
+      });
+    }
     // Talked over while it worked: the result is kept, but not said.
     if (generation !== this.#generation) return;
     this.#afterBridge(() => {
@@ -1271,32 +1619,41 @@ export class DuplexLine {
   }
 
   async #report(report: QVoiceDuplexUsageReport): Promise<void> {
-    let result: QVoiceDuplexUsageResult | null;
-    try {
-      result = await this.#relays.usage(report);
-    } catch {
-      result = null;
+    // Retried: the server counts each response once, so a report that did
+    // not get through on a bad line is simply sent again (I1).
+    let result: QVoiceDuplexUsageResult | null = null;
+    for (let attempt = 0; attempt < REPORT_ATTEMPTS; attempt += 1) {
+      if (attempt > 0) await this.#wait(REPORT_BACKOFF_MS * attempt);
+      if (this.#over) return;
+      try {
+        result = await this.#relays.usage(report);
+      } catch {
+        result = null;
+      }
+      if (result !== null) break;
     }
     if (this.#over) return;
     if (result === null) {
-      // Usage that cannot be counted cannot be capped.
-      this.#fallback("RELAY", null);
+      // Usage that cannot be counted cannot be capped: the line rejoins,
+      // and the server decides whether it may carry on.
+      void this.#rejoin("RELAY");
       return;
     }
     if (!result.continue) {
-      this.#fallback(
-        result.notice === undefined ? "MAX_LENGTH" : "CAP",
-        result.notice ?? null,
-      );
+      // The cap says so in a sentence and ends the line; anything else
+      // (its length) is a fresh call on the same line.
+      if (result.notice !== undefined) this.#fallback("CAP", result.notice);
+      else void this.#rejoin("MAX_LENGTH");
     }
   }
 
   #fallback(cause: DuplexFallbackCause, notice: string | null): void {
     if (this.#over) return;
     const connected = this.#connected;
+    const stats = this.#stats();
     this.#finish();
     void this.#relays
-      .end(cause === "MAX_LENGTH" ? "MAX_LENGTH" : "FALLBACK")
+      .end(cause === "MAX_LENGTH" ? "MAX_LENGTH" : "FALLBACK", { cause, stats })
       .catch(() => undefined);
     this.#events.onFallback({ cause, notice, connected });
   }

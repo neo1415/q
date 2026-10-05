@@ -111,6 +111,11 @@ export type VoiceSessionEvents = {
    * on the same thread; with one sentence for the person, or silently.
    * Absent: the line is reported as dropped.
    */
+  /**
+   * I1: the duplex line's calm status while it carries on ("Weak
+   * connection…", "Reconnecting…"); null when it is fine again.
+   */
+  readonly onLinkStatus?: ((status: string | null) => void) | undefined;
   readonly onFallback?:
     | ((
         notice: string | null,

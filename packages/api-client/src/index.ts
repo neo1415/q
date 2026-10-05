@@ -169,6 +169,7 @@ export {
   setQVoiceScreen,
   relayQVoiceDuplexTool,
   reportQVoiceDuplexUsage,
+  rejoinQVoiceDuplex,
   endQVoiceDuplex,
   getQApproval,
   listPendingQApprovals,
