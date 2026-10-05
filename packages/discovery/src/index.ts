@@ -724,3 +724,52 @@ export {
 export type { PassReintroduction } from "./rerank/ports.js";
 export { createMaterialChanges } from "./infrastructure/material-changes.js";
 export { createPostgresCompanySectorsPort } from "./infrastructure/postgres-filter-facts.js";
+
+// MATCH block (B1-B3; ADR 0052): the fit profile with a mandate.
+export {
+  FIT_CONFIG_CURRENT,
+  FIT_CONFIG_V4,
+  FIT_CONFIGS,
+  FitConfigSchema,
+  fitConfigByVersion,
+  type FitConfig,
+} from "./fit/config.js";
+export {
+  FIT_REASON_TEMPLATES,
+  FIT_REASON_TEMPLATES_VERSION,
+  renderFitReason,
+  type FitReasonKey,
+} from "./fit/templates.js";
+export {
+  assessFit,
+  compareAssessments,
+  notApplicableObservation,
+  unknownObservation,
+  type FitAssessment,
+  type FitInputs,
+  type FitObservation,
+} from "./fit/model.js";
+export {
+  formatMoney,
+  hardRuleFrom,
+  observeFit,
+  type DeclaredFitFacts,
+  type DeclaredMoney,
+  type ObserveFitInput,
+} from "./fit/observe.js";
+export {
+  FIT_TOP_CANDIDATES_MAX,
+  buildFitComparison,
+  createFitService,
+  fitComparisonText,
+  fitProfileText,
+  type FitCandidate,
+  type FitCompanyInputs,
+  type FitInputSource,
+  type FitProfileItem,
+  type FitProfilesResult,
+  type FitService,
+  type FitServiceDependencies,
+  type FitTopResult,
+} from "./fit/service.js";
+// end MATCH block

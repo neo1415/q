@@ -79,6 +79,11 @@ export const FitParameterResultDtoSchema = z
     evidenceStatus: EvidenceStatusSchema.nullable(),
     /** The input is older than the config's freshness window. */
     stale: z.boolean(),
+    /**
+     * False when the investor declared no preference here: the parameter
+     * counts toward neither fit nor confidence (outcome is UNKNOWN).
+     */
+    applicable: z.boolean(),
   })
   .strict();
 export type FitParameterResultDto = z.infer<typeof FitParameterResultDtoSchema>;
@@ -245,3 +250,50 @@ export const FitTopQuerySchema = z
     limit: z.coerce.number().int().min(1).max(FIT_COMPARISON_MAX).default(3),
   })
   .strict();
+
+// ---------------------------------------------------------------------------
+// Words (ADR 0052: every score is shown as words; one vocabulary everywhere)
+// ---------------------------------------------------------------------------
+
+export const FIT_BAND_LABELS: Readonly<Record<FitBand, string>> = {
+  STRONG_FIT: "Strong fit",
+  GOOD_FIT: "Good fit",
+  PARTIAL_FIT: "Partial fit",
+  WEAK_FIT: "Weak fit",
+  NOT_ENOUGH_INFORMATION: "Not enough information",
+  OUTSIDE_MANDATE: "Outside your mandate",
+};
+
+export const FIT_CONFIDENCE_LABELS: Readonly<Record<FitConfidence, string>> = {
+  HIGH: "High confidence",
+  MEDIUM: "Medium confidence",
+  LOW: "Low confidence",
+};
+
+export const FIT_PARAMETER_LABELS: Readonly<Record<FitParameter, string>> = {
+  STAGE: "Stage",
+  SECTOR: "Sector",
+  GEOGRAPHY: "Geography",
+  CHEQUE_SIZE: "Cheque size",
+  BUSINESS_MODEL: "Business model",
+  TRACTION: "Traction",
+  TEAM: "Team",
+  THESIS: "Thesis",
+  ROUND_TERMS: "Round",
+};
+
+export const FIT_OUTCOME_LABELS: Readonly<Record<FitOutcome, string>> = {
+  STRONG: "Strong match",
+  PARTIAL: "Partial",
+  MISMATCH: "Mismatch",
+  UNKNOWN: "Unknown",
+};
+
+/** The word for a parameter the investor declared no preference on. */
+export const FIT_NOT_APPLICABLE_LABEL = "No preference";
+
+export const Q_VIEW_VERDICT_LABELS: Readonly<Record<QViewVerdict, string>> = {
+  WORTH_A_LOOK: "Worth a look",
+  MAYBE: "Maybe",
+  PROBABLY_NOT: "Probably not",
+};
