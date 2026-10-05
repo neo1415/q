@@ -239,6 +239,7 @@ import {
   QActionProposalIdSchema,
   Q_WORK_WAKE_CHANNEL,
   Q_INSTRUCTION_WAKE_CHANNEL,
+  Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_THINK_PATH,
   Q_VOICE_WS_PATH,
@@ -3673,6 +3674,26 @@ void createWorkWakeListener({
   .catch((error: unknown) => {
     // The sweep still fires each instruction on its cadence.
     logger.warn({ err: error }, "instruction wake listener not started");
+  });
+// A company became marketplace-ready (founder 2026-10-05): standing
+// instructions open to new companies run within minutes, not hours.
+void createWorkWakeListener({
+  listen: (channel, onNotify, onListen) =>
+    database.listen(channel, onNotify, onListen),
+  channel: Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
+  targets: [
+    {
+      name: "instructions-new-company",
+      wake: (companyId) => instructionTriggers.wakeNewCompany(companyId),
+    },
+  ],
+  logger,
+})
+  .start()
+  .then(() => logger.info({}, "new-company instruction listener started"))
+  .catch((error: unknown) => {
+    // The cadence still runs each instruction; only the early run is lost.
+    logger.warn({ err: error }, "new-company instruction listener not started");
   });
 // end AUTO block
 

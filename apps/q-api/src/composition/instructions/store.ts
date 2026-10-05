@@ -415,6 +415,34 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       return rows.length;
     },
 
+    /**
+     * A company became marketplace-ready: every active instruction open to
+     * new companies runs soon, not at its next cadence (founder 2026-10-05).
+     * Soon, not now: the investor's slate is rebuilt from the same event
+     * and the run reads it. At most once per ten minutes per instruction,
+     * so a burst of new companies is one run. A company the grant excludes
+     * wakes nothing. The engine still decides fit under the owner's access.
+     */
+    wakeForNewCompany: async (companyId: string): Promise<number> => {
+      const rows = await sql<{ id: string }[]>`
+        update q_runtime.standing_instructions s
+           set next_fire_at = least(s.next_fire_at, clock_timestamp() + interval '90 seconds'),
+               updated_at = clock_timestamp()
+          from q_runtime.instruction_grants g
+         where s.status = 'ACTIVE'
+           and g.instruction_id = s.id and g.version = s.grant_version
+           and (g.grant_payload->'counterparts'->>'includeNewCompanies')::boolean is true
+           and (s.last_fired_at is null
+                or s.last_fired_at < clock_timestamp() - interval '10 minutes')
+           and not exists (
+             select 1
+               from jsonb_array_elements(
+                      coalesce(g.grant_payload->'counterparts'->'exclude', '[]'::jsonb)) e
+              where e->>'counterpartId' = ${companyId}::text)
+        returning s.id`;
+      return rows.length;
+    },
+
     /** S5: model spend under this instruction; a new month starts at zero. */
     addSpend: async (id: string, amountUsd: number): Promise<void> => {
       if (!(amountUsd > 0)) return;

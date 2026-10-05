@@ -26,6 +26,7 @@ export function createInstructionTriggers(dependencies: {
         | "instruction"
         | "notify"
         | "wakeForChat"
+        | "wakeForNewCompany"
         | "resolveAnswered"
       >
     >;
@@ -130,6 +131,11 @@ export function createInstructionTriggers(dependencies: {
       const woken = await store.wakeForChat(relationshipId);
       if (woken > 0) void sweep().catch(() => undefined);
       return woken;
+    },
+    /** A company became ready: instructions open to new companies run soon. */
+    wakeNewCompany: async (companyId: string): Promise<number> => {
+      if (store.wakeForNewCompany === undefined) return 0;
+      return store.wakeForNewCompany(companyId);
     },
   };
 }

@@ -50,6 +50,15 @@ export const Q_WORK_WAKE_CHANNEL = "q_work_wake" as const;
  */
 export const Q_INSTRUCTION_WAKE_CHANNEL = "q_instruction_wake" as const;
 
+/**
+ * The channel that wakes standing instructions open to new companies when a
+ * company becomes marketplace-ready (founder 2026-10-05: "as soon as there
+ * is any company that matches my mandate"). The payload is the company id
+ * only; the waking process re-reads everything under the owner's access.
+ */
+export const Q_INSTRUCTION_NEW_COMPANY_CHANNEL =
+  "q_instruction_new_company" as const;
+
 export const Q_WORK_KINDS = [
   "INVESTOR_OUTREACH",
   "FOUNDER_STAND_IN",

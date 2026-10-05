@@ -44,6 +44,7 @@ import {
   CONTRACTS_VERSION,
   CorrelationIdSchema,
   Q_INSTRUCTION_WAKE_CHANNEL,
+  Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
   Q_WORK_WAKE_CHANNEL,
   type ModelDataPosture,
 } from "@capital-q/contracts";
@@ -169,6 +170,7 @@ import { withChatMessageEvents } from "./network/chat-message-handler.js";
 import { withInterestNotices } from "./network/interest-notice-handler.js";
 import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
 import { withCommitmentNotices } from "./network/commitment-notice-handler.js";
+import { newlyReadyCompanyOf } from "./network/newly-ready-company.js";
 import { withDiligenceSummaries } from "./network/diligence-summary-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
@@ -824,11 +826,23 @@ const documentEvents = createQueueRunner({
                         ? {}
                         : { presenceResearch }),
                       recommendations: {
-                        onEvent: (event) =>
-                          slateInvalidation.apply(refreshDirectiveFor(event), {
-                            correlationId: event.correlationId,
-                            causationId: `cau_${event.id}`,
-                          }),
+                        onEvent: async (event) => {
+                          const applied = await slateInvalidation.apply(
+                            refreshDirectiveFor(event),
+                            {
+                              correlationId: event.correlationId,
+                              causationId: `cau_${event.id}`,
+                            },
+                          );
+                          // A company that became ready wakes standing
+                          // instructions open to new companies (founder
+                          // 2026-10-05). The id only; q-api re-reads all.
+                          const ready = newlyReadyCompanyOf(event);
+                          if (ready !== null) {
+                            await database.sql`select pg_notify(${Q_INSTRUCTION_NEW_COMPANY_CHANNEL}, ${ready})`;
+                          }
+                          return applied;
+                        },
                       },
                       logger,
                     }),
