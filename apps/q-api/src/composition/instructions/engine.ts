@@ -46,6 +46,7 @@ import {
   type QuarantinedThreadReader,
   type ThreadPace,
 } from "./quarantine.js";
+import type { OutwardReview, OutwardVerdict } from "../workforce/review.js";
 import type { InstructionRow, InstructionStore } from "./store.js";
 
 /**
@@ -131,6 +132,8 @@ export const REFUSAL_CODES = [
   "UNGROUNDED_CLAIM",
   // ADR 0050: the consider step.
   "MEETING_BEFORE_RAPPORT",
+  // Founder brief J2: the reviewer held the message below the bar.
+  "BELOW_THE_BAR",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -212,6 +215,11 @@ export const REFUSAL_WORDS: Readonly<
   MEETING_BEFORE_RAPPORT: {
     reason: "it asked for a meeting before they've written back",
     instead: "I'll open warmly with a question first and ask for time later",
+  },
+  BELOW_THE_BAR: {
+    reason: "the message didn't reach the bar for writing on your behalf",
+    instead:
+      "the draft, its grade and what to change are on your workforce page",
   },
 };
 
@@ -958,9 +966,45 @@ export type InstructionEngineDependencies = {
    * the quarantine (S6) are live. Off, every AUTO step is asked instead.
    */
   readonly autoEnabled: boolean;
+  /**
+   * Founder brief J2: every message this instruction would send or offer
+   * is graded by the reviewer first; below the bar it is redrafted, and a
+   * draft that never passes is neither sent nor offered.
+   */
+  readonly review?: OutwardReview | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
+
+/** A chat message step's text body, when it has one. */
+function textBody(input: unknown): string | null {
+  if (typeof input !== "object" || input === null || !("input" in input)) {
+    return null;
+  }
+  const inner = input.input;
+  if (
+    typeof inner !== "object" ||
+    inner === null ||
+    !("kind" in inner) ||
+    inner.kind !== "TEXT" ||
+    !("body" in inner) ||
+    typeof inner.body !== "string"
+  ) {
+    return null;
+  }
+  return inner.body;
+}
+
+/** The same step input with its text body replaced. */
+function withTextBody(input: unknown, body: string): unknown {
+  if (typeof input !== "object" || input === null || !("input" in input)) {
+    return input;
+  }
+  const inner = input.input;
+  return typeof inner === "object" && inner !== null
+    ? { ...input, input: { ...inner, body } }
+    : input;
+}
 
 function grantLines(grant: InstructionGrant): string {
   return [
@@ -1445,6 +1489,115 @@ export function createInstructionEngine(
         );
       }
 
+      // Founder brief J2: the reviewer grades each message before it is
+      // sent or offered. A redraft is re-checked by code's own message
+      // rules; a draft that never passes becomes a refusal, recorded with
+      // the reason, and is neither sent nor offered.
+      const graded = new Map<number, OutwardVerdict>();
+      const review = dependencies.review;
+      if (review !== undefined) {
+        const principalName =
+          (await dependencies.principalName?.(actor).catch(() => null)) ??
+          "the person";
+        const recheckContext: ValidationContext = {
+          grant: grant.data,
+          actions: dependencies.actions,
+          people,
+          sent: new Map(sentBefore),
+          now: at,
+          stepKey: "review",
+          facts,
+          request: plan.request,
+          material,
+          introduced,
+          pace: paces,
+        };
+        const reviewedPlan = plan;
+        verdicts = await Promise.all(
+          verdicts.map(async (verdict, index): Promise<StepVerdict> => {
+            const step = reviewedPlan.steps[index];
+            if (
+              step === undefined ||
+              (verdict.verdict !== "AUTO" && verdict.verdict !== "ASK") ||
+              verdict.action.name !== "chat.message.send"
+            ) {
+              return verdict;
+            }
+            const body = textBody(verdict.input);
+            if (body === null || (await store.stepDone(keyOf(index)))) {
+              return verdict;
+            }
+            const subject = verdict.relationshipId;
+            const thread = subject === null ? undefined : facts.get(subject);
+            const counterpartId =
+              subject === null
+                ? undefined
+                : people.find((person) => person.relationshipId === subject)
+                    ?.counterpartId;
+            const counterpartName =
+              (subject === null
+                ? undefined
+                : people.find((person) => person.relationshipId === subject)
+                    ?.name) ?? "them";
+            const factsText = [
+              ...(material?.sender.facts ?? []).map(
+                (fact) => `Sender ${fact.label}: ${fact.text}`,
+              ),
+              ...(counterpartId === undefined
+                ? []
+                : (material?.counterparts.get(counterpartId) ?? [])
+              ).map((fact) => `Their ${fact.label}: ${fact.text}`),
+            ].join("\n");
+            const outcome = await review.review(
+              { tenantId: row.tenant_id, userId: row.user_id },
+              { kind: "INSTRUCTION", id: row.id, goal: row.goal_text },
+              {
+                principalName,
+                counterpartName,
+                channel: "CHAT",
+                stage:
+                  thread?.lastFrom === "THEM"
+                    ? "REPLY"
+                    : sidesWritten(subject, recheckContext)
+                      ? "FOLLOW_UP"
+                      : "FIRST",
+                purpose: `${step.words} (their standing instruction: ${row.goal_text})`,
+                material: factsText,
+                thread: "",
+                body,
+              },
+              {
+                recheck: (redrafted) =>
+                  messageProblem(
+                    withTextBody(verdict.input, redrafted),
+                    subject,
+                    recheckContext,
+                    step,
+                  ).problem,
+              },
+            );
+            graded.set(index, outcome);
+            if (outcome.verdict === "HELD") {
+              return {
+                verdict: "REFUSED",
+                code: "BELOW_THE_BAR",
+                relationshipId: subject,
+              };
+            }
+            const reparsed = verdict.action.input.safeParse(
+              withTextBody(verdict.input, outcome.body),
+            );
+            return reparsed.success
+              ? { ...verdict, input: reparsed.data }
+              : {
+                  verdict: "REFUSED",
+                  code: "BAD_ARGUMENTS",
+                  relationshipId: subject,
+                };
+          }),
+        );
+      }
+
       let done = 0;
       let asked = 0;
       const askedWords: string[] = [];
@@ -1595,6 +1748,14 @@ export function createInstructionEngine(
               verdict.input,
             );
             done += 1;
+            const sentDraft = graded.get(index);
+            if (sentDraft !== undefined) {
+              await review?.settle(
+                { tenantId: row.tenant_id, userId: row.user_id },
+                sentDraft,
+                "SENT",
+              );
+            }
             await record({
               status: "DONE",
               mode: "AUTO",
@@ -1645,6 +1806,15 @@ export function createInstructionEngine(
         }
         asked += 1;
         askedWords.push(step.words);
+        const offeredDraft = graded.get(index);
+        if (offeredDraft !== undefined) {
+          await review?.settle(
+            { tenantId: row.tenant_id, userId: row.user_id },
+            offeredDraft,
+            "OFFERED",
+            card.qActionId,
+          );
+        }
         const code = verdict.verdict === "AUTO" ? "AUTONOMY_OFF" : verdict.code;
         const why = code === null ? null : (ASK_WORDS[code] ?? null);
         await record({

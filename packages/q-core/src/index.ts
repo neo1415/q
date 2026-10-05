@@ -891,7 +891,6 @@ export {
   considerationReason,
   considerOutreach,
   ETIQUETTE_PACING,
-  soundsLikeNo,
   type OutreachConsideration,
   type OutreachKind,
   type OutreachMoment,
@@ -1097,3 +1096,40 @@ export {
   type AppActionArgumentsResult,
   type AppActionArgumentsVariables,
 } from "./prompts/schemas/app-action-arguments.js";
+
+// Founder brief J1-J9 (2026-10-06): Q's workforce of agents.
+export {
+  DRAFT_REDRAFT_V1,
+  DRAFT_REVIEW_V1,
+  JOB_PLAN_V1,
+  REPLY_READER_V1,
+} from "./prompts/tasks/workforce.v1.js";
+export {
+  DRAFT_CHANNELS,
+  DRAFT_INTEGRITY_RULES,
+  DRAFT_RUBRIC_CRITERIA,
+  DRAFT_STAGES,
+  DraftRedraftResultSchema,
+  DraftReviewResultSchema,
+  JobPlanResultSchema,
+  PLAN_AGENT_ROLES,
+  REPLY_REQUEST_KINDS,
+  REPLY_STANCES,
+  REPLY_TONES,
+  ReplyReaderResultSchema,
+  stanceDeclines,
+  type DraftChannel,
+  type DraftIntegrityRule,
+  type DraftRedraftResult,
+  type DraftRedraftVariables,
+  type DraftReviewResult,
+  type DraftReviewVariables,
+  type DraftRubricCriterion,
+  type DraftStage,
+  type JobPlanResult,
+  type JobPlanVariables,
+  type ReplyReaderResult,
+  type ReplyReaderVariables,
+  type ReplyStance,
+  type ReplyTone,
+} from "./prompts/schemas/workforce.js";

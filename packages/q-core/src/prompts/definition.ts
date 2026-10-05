@@ -85,6 +85,11 @@ export const PROMPT_IDS = [
   "APP_ACTION_ROUTER",
   /** 2026-10-04: Q's one line on a document shared in diligence. */
   "DILIGENCE_DOCUMENT_SUMMARY",
+  /** Founder brief J1-J9 2026-10-06: Q's workforce of agents. */
+  "DRAFT_REVIEW",
+  "DRAFT_REDRAFT",
+  "REPLY_READER",
+  "JOB_PLAN",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -132,6 +137,11 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   // DAILY block
   DAILY_STORY_WRITER: "daily-story-writer",
   DAILY_Q_TAKE: "daily-q-take",
+  // WORKFORCE block (founder brief J1-J9).
+  DRAFT_REVIEW: "draft-review",
+  DRAFT_REDRAFT: "draft-redraft",
+  REPLY_READER: "reply-reader",
+  JOB_PLAN: "job-plan",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

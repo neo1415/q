@@ -16,7 +16,7 @@ import {
   etiquetteVersions,
   renderEtiquetteGuidance,
   renderPrompt,
-  soundsLikeNo,
+  stanceDeclines,
   UNTRUSTED_CLOSE,
   type EtiquetteGuides,
   type OutreachMoment,
@@ -298,24 +298,25 @@ describe("the consider step (pacing gate)", () => {
   });
 });
 
-describe("reading a no by fixed phrases (delegated work)", () => {
-  it.each([
-    "Thanks, but we're not interested at this stage.",
-    "No thanks.",
-    "We'll pass on this one.",
-    "Please stop messaging me.",
-    "Not a fit for our fund.",
-    "Not right now, maybe next year.",
-  ])("hears %s as a no", (text) => {
-    expect(soundsLikeNo(text)).toBe(true);
+describe("reading a no by meaning (J7: no phrase list)", () => {
+  it("is a FAST_CLASSIFICATION prompt with a closed stance", () => {
+    const active = registry.getActive("REPLY_READER");
+    expect(active.definition.taskClass).toBe("FAST_CLASSIFICATION");
+    expect(active.definition.variables.untrusted).toEqual([
+      "counterpartName",
+      "thread",
+      "latest",
+    ]);
   });
 
   it.each([
-    "Happy to chat next week.",
-    "What is your current traction?",
-    "Nothing interests me more than fintech in Lagos.",
-    null,
-  ])("does not hear %s as a no", (text) => {
-    expect(soundsLikeNo(text)).toBe(false);
+    ["NOT_NOW", true],
+    ["DECLINE", true],
+    ["STOP", true],
+    ["INTERESTED", false],
+    ["NEUTRAL", false],
+    ["QUESTION", false],
+  ] as const)("treats %s as a no: %s", (stance, declines) => {
+    expect(stanceDeclines(stance)).toBe(declines);
   });
 });

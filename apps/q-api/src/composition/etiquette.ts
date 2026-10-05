@@ -1,6 +1,7 @@
 import type { Logger } from "@capital-q/observability";
 import {
   DEFAULT_ETIQUETTE_GUIDES,
+  etiquetteExcerpt,
   platformEtiquetteSource,
   type ActivePlatformGuideLike,
   type EtiquetteGuides,
@@ -36,6 +37,13 @@ export function createEtiquetteSource(dependencies: {
   readonly personal: (
     owner: EtiquetteOwner,
   ) => Promise<{ readonly version: number; readonly text: string } | null>;
+  /**
+   * Founder brief J3: the person's "what worked" notes (their approvals and
+   * edits, kept by the memory Write Gate as their preferences). They join
+   * the person's own guide as reference text on style, newest first.
+   */
+  readonly learned?:
+    ((owner: EtiquetteOwner) => Promise<readonly string[]>) | undefined;
   readonly now?: (() => number) | undefined;
   readonly logger?: Logger | undefined;
 }): EtiquetteSource {
@@ -73,20 +81,26 @@ export function createEtiquetteSource(dependencies: {
     if (cached !== undefined && now() - cached.at < TTL_MS) {
       return cached.value;
     }
-    const value = await dependencies
-      .personal(owner)
-      .then((guide) =>
-        guide === null
-          ? null
-          : { version: `personal/v${String(guide.version)}`, text: guide.text },
-      )
-      .catch((error: unknown) => {
-        dependencies.logger?.warn(
-          { err: error },
-          "personal etiquette guide not read; the house guide alone applies",
-        );
-        return null;
-      });
+    const [guide, notes] = await Promise.all([
+      dependencies
+        .personal(owner)
+        .then((own) =>
+          own === null
+            ? null
+            : { version: `personal/v${String(own.version)}`, text: own.text },
+        )
+        .catch((error: unknown) => {
+          dependencies.logger?.warn(
+            { err: error },
+            "personal etiquette guide not read; the house guide alone applies",
+          );
+          return null;
+        }),
+      (dependencies.learned?.(owner) ?? Promise.resolve([])).catch(
+        (): readonly string[] => [],
+      ),
+    ]);
+    const value = withLearned(guide, notes);
     if (personal.size >= PEOPLE_CACHED) personal.clear();
     personal.set(key, { at: now(), value });
     return value;
@@ -99,6 +113,28 @@ export function createEtiquetteSource(dependencies: {
     ]);
     return { platform: house, personal: own };
   };
+}
+
+/**
+ * The person's guide with their "what worked" notes after it, both theirs
+ * and both reference text on style. The notes come first in no case: the
+ * guide they wrote outranks what Q inferred from their edits.
+ */
+export function withLearned(
+  guide: EtiquetteGuides["personal"],
+  notes: readonly string[],
+): EtiquetteGuides["personal"] {
+  if (notes.length === 0) return guide;
+  const learned = `What worked for this person before (their approvals and edits):\n${notes
+    .map((note) => `- ${note}`)
+    .join("\n")}`;
+  return guide === null
+    ? { version: `learned/n${String(notes.length)}`, text: learned }
+    : {
+        version: `${guide.version}+learned/n${String(notes.length)}`,
+        // The guide is cut first so the notes still fit the prompt budget.
+        text: `${etiquetteExcerpt(guide.text, 800)}\n\n${learned}`,
+      };
 }
 
 /** The renderer's etiquette input for one call, or none without a source. */

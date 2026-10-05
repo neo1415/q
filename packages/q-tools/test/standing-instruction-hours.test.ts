@@ -280,21 +280,18 @@ describe("propose_standing_instruction: clear hours are read by code (live QA 01
   });
 });
 
-describe("propose_standing_instruction: a first message only (live QA, instruction 76d6f281)", () => {
-  it("'a first message to founders who haven't heard from me' allows no follow-ups; other goals leave them as they were", async () => {
-    const first = await world().propose({
-      goal: "Send a short first message to founders I'm connected with who haven't heard from me yet",
-    });
-    expect(grantOf(first.prepared[0]).followUps).toBe(false);
+describe("propose_standing_instruction: a first message only (live QA, instruction 76d6f281; J7)", () => {
+  it("is the model's typed reading of their words, never a phrase list over the goal", async () => {
     const read = await world().propose({
       goal: "Say hello to my new connections",
       firstMessagesOnly: true,
     });
     expect(grantOf(read.prepared[0]).followUps).toBe(false);
-    const both = await world().propose({
-      goal: "Send a first message and follow up a week later",
+    // The same words that a phrase list used to catch change nothing alone.
+    const unread = await world().propose({
+      goal: "Send a short first message to founders I'm connected with who haven't heard from me yet",
     });
-    expect(grantOf(both.prepared[0]).followUps).toBeUndefined();
+    expect(grantOf(unread.prepared[0]).followUps).toBeUndefined();
     const all = await world().propose({ goal: "Handle all the work for me" });
     expect(grantOf(all.prepared[0]).followUps).toBeUndefined();
   });

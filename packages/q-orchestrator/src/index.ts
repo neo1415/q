@@ -102,4 +102,8 @@ export {
 } from "./work/types.js";
 // end AUTO block
 
+// WORKFORCE block (founder brief J1-J9): Q's workforce of agents.
+export * from "./workforce/index.js";
+// end WORKFORCE block
+
 export const PACKAGE_NAME = "@capital-q/q-orchestrator" as const;

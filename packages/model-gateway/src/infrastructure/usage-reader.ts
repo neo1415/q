@@ -75,6 +75,16 @@ export type AdminMonthUsage = {
 const isPurpose = (value: string): value is ModelUsagePurpose =>
   (MODEL_USAGE_PURPOSES as readonly string[]).includes(value);
 
+export type WorkforceCostRow = {
+  readonly jobId: string;
+  readonly runId: string;
+  readonly usd: string;
+  readonly calls: number;
+};
+
+const WORKFORCE_JOB_SQL = "^cor_job_([0-9a-f-]{36})_";
+const WORKFORCE_RUN_SQL = "^cor_job_[0-9a-f-]{36}_([0-9a-f-]{36})";
+
 export function createPostgresUsageReader(sql: DatabaseExecutor) {
   return {
     /** One person's own month, in their tenant. */
@@ -159,6 +169,37 @@ export function createPostgresUsageReader(sql: DatabaseExecutor) {
           }))
           .sort((a, b) => Number(b.usd) - Number(a.usd)),
       };
+    },
+
+    /**
+     * Founder brief J6: what Q's workforce agents spent on the person's
+     * jobs, by job and by agent run, read from the same ledger. A workforce
+     * call carries `cor_job_<job id>_<agent run id>` (see
+     * `workforceCorrelationId`); only the person's own rows are read.
+     */
+    workforceCosts: async (
+      who: { readonly userId: string; readonly tenantId: string },
+      jobIds: readonly string[],
+    ): Promise<readonly WorkforceCostRow[]> => {
+      if (jobIds.length === 0) return [];
+      const rows = await sql<
+        { job_id: string; run_id: string; usd: string; calls: number }[]
+      >`
+        select substring(u.correlation_id from ${WORKFORCE_JOB_SQL}) as job_id,
+               substring(u.correlation_id from ${WORKFORCE_RUN_SQL}) as run_id,
+               round(coalesce(sum(u.cost_usd), 0), 6)::text as usd,
+               count(*)::int as calls
+          from ai_ops.model_usage u
+         where u.user_id = ${who.userId} and u.tenant_id = ${who.tenantId}
+           and u.correlation_id like 'cor\_job\_%'
+           and substring(u.correlation_id from ${WORKFORCE_JOB_SQL}) = any(${[...jobIds]}::text[])
+         group by 1, 2`;
+      return rows.map((row) => ({
+        jobId: row.job_id,
+        runId: row.run_id,
+        usd: row.usd,
+        calls: row.calls,
+      }));
     },
 
     /** The whole platform's month, for the platform admin only. */

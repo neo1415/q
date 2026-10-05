@@ -1,3 +1,4 @@
+import type { ActorContext } from "@capital-q/security";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   ApproveQApprovalRequestSchema,
@@ -75,6 +76,22 @@ export type QApprovalRoutesDependencies = ActorContextDependencies & {
   readonly continueApproved?: ApprovedContinuation | undefined;
   /** Pictures of who an approval names. Absent: none are carried. */
   readonly namedPhotos?: Pick<NamedImageReader, "photos"> | undefined;
+  /**
+   * Founder brief J3: the person's decision on an action Q prepared, for
+   * the agents' learning. After the decision is durable, detached: it
+   * never changes or delays the decision itself.
+   */
+  readonly onDecision?:
+    | ((
+        actor: ActorContext,
+        decision: {
+          readonly qActionId: string;
+          readonly kind: "APPROVED" | "REJECTED" | "EDITED";
+          readonly editedBody?: string | undefined;
+          readonly note?: string | undefined;
+        },
+      ) => Promise<void>)
+    | undefined;
 };
 
 /**
@@ -195,6 +212,14 @@ export function registerQApprovalRoutes(
         approvalId: approvalIdParam(request),
         correlationId,
       });
+      if (result.decided) {
+        void dependencies
+          .onDecision?.(actor, {
+            qActionId: result.action.id,
+            kind: "APPROVED",
+          })
+          .catch(() => undefined);
+      }
 
       // The decision is durable; execution is the run's continuation,
       // re-verified by the gate. A retried approve does not resume twice.
@@ -252,6 +277,13 @@ export function registerQApprovalRoutes(
         correlationId: correlation(),
         reason: input.reason,
       });
+      void dependencies
+        .onDecision?.(getActorContext(request), {
+          qActionId: result.action.id,
+          kind: "REJECTED",
+          note: input.reason ?? undefined,
+        })
+        .catch(() => undefined);
       return reply
         .header("Cache-Control", "no-store")
         .send(QApprovalViewSchema.parse(result.view));
@@ -305,6 +337,13 @@ export function registerQApprovalRoutes(
         correlationId: correlation(),
         payload: { ...payload, subject: input.subject, body: input.body },
       });
+      void dependencies
+        .onDecision?.(getActorContext(request), {
+          qActionId: result.action.id,
+          kind: "EDITED",
+          editedBody: input.body,
+        })
+        .catch(() => undefined);
       return reply
         .header("Cache-Control", "no-store")
         .send(QApprovalViewSchema.parse(result.view));

@@ -43,6 +43,7 @@ import {
 import type { ErrandNegotiation } from "../errands.js";
 import { slotLabel, workingHourSlots } from "../slots.js";
 import type { CounterpartNudger } from "../waiting.js";
+import { reviewedReply, type OutwardReview } from "../workforce/review.js";
 import type { WorkComposers } from "./composers.js";
 import {
   TERMINAL_STAGES,
@@ -81,6 +82,26 @@ export type WorkRuntimeDependencies = {
   readonly resolver: ActorContextResolver;
   readonly authUserOf: (userId: string) => Promise<string | null>;
   readonly composers: WorkComposers;
+  /** Founder brief J2: every reply Q writes here is graded before it goes. */
+  readonly review?: OutwardReview | undefined;
+  /**
+   * Founder brief J7: their latest message read by meaning (REPLY_READER).
+   * Absent or failing: null, and the lane treats it as a possible no.
+   */
+  readonly readReply?:
+    | ((
+        who: { readonly tenantId: string; readonly userId: string },
+        input: {
+          readonly principalName: string;
+          readonly counterpartName: string;
+          readonly thread: string;
+          readonly latest: string;
+        },
+      ) => Promise<{
+        readonly declined: boolean;
+        readonly negativeTone: boolean;
+      } | null>)
+    | undefined;
   readonly chat: {
     readonly readForQ: ChatService["readForQ"];
     readonly send: (
@@ -401,15 +422,34 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
       }
     },
 
-    converse: (ref, input) =>
-      composers.converse(ref, {
-        principalName: input.principalName,
-        counterpartName: input.counterpartName,
-        brief: input.brief ?? "",
-        topicsOpen: input.topicsOpen.join("\n"),
-        otherSideIsQ: input.otherSideIsQ,
-        thread: input.thread,
-      }),
+    converse: async (ref, input) =>
+      reviewedReply(
+        dependencies.review,
+        ref,
+        {
+          kind: "DELEGATED_WORK",
+          id: ref.delegationId,
+          goal: "Q's outreach for you",
+        },
+        {
+          principalName: input.principalName,
+          counterpartName: input.counterpartName,
+          channel: "CHAT",
+          stage: "REPLY",
+          purpose:
+            "Answer what they last said from the approved brief, and ask the open topics one at a time.",
+          material: input.brief ?? "",
+          thread: input.thread,
+        },
+        await composers.converse(ref, {
+          principalName: input.principalName,
+          counterpartName: input.counterpartName,
+          brief: input.brief ?? "",
+          topicsOpen: input.topicsOpen.join("\n"),
+          otherSideIsQ: input.otherSideIsQ,
+          thread: input.thread,
+        }),
+      ),
 
     interviewTurn: (ref, input) =>
       composers.interviewTurn(ref, {
@@ -618,14 +658,45 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
       };
     },
 
-    standInReply: (ref, input) =>
-      composers.standInReply(ref, {
-        principalName: input.principalName,
-        counterpartName: input.counterpartName,
-        brief: input.brief,
-        otherSideIsQ: input.otherSideIsQ,
-        thread: input.thread,
-      }),
+    readReply: async (ref, input) =>
+      dependencies.readReply === undefined
+        ? null
+        : dependencies
+            .readReply(ref, {
+              principalName: ref.principalName,
+              counterpartName: input.counterpartName,
+              thread: input.thread.slice(-4_000),
+              latest: input.latest.slice(0, 4_000),
+            })
+            .catch(() => null),
+
+    standInReply: async (ref, input) =>
+      reviewedReply(
+        dependencies.review,
+        ref,
+        {
+          kind: "DELEGATED_WORK",
+          id: ref.delegationId,
+          goal: "Q standing in for you",
+        },
+        {
+          principalName: input.principalName,
+          counterpartName: input.counterpartName,
+          channel: "CHAT",
+          stage: "REPLY",
+          purpose:
+            "Stand in for the founder: answer the investor's latest message from the approved brief only.",
+          material: input.brief,
+          thread: input.thread,
+        },
+        await composers.standInReply(ref, {
+          principalName: input.principalName,
+          counterpartName: input.counterpartName,
+          brief: input.brief,
+          otherSideIsQ: input.otherSideIsQ,
+          thread: input.thread,
+        }),
+      ),
 
     nudgeCounterpart: async (ref, relationshipId, key) =>
       dependencies.nudger === undefined

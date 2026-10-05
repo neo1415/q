@@ -61,6 +61,7 @@ type Script = {
   converse?: QWorkPorts["converse"];
   interviewTurn?: QWorkPorts["interviewTurn"];
   standInReply?: QWorkPorts["standInReply"];
+  readReply?: QWorkPorts["readReply"];
 };
 
 function fakePorts(script: Script = {}): { ports: QWorkPorts; rec: Recorder } {
@@ -154,6 +155,10 @@ function fakePorts(script: Script = {}): { ports: QWorkPorts; rec: Recorder } {
         meetLink: "https://meet.google.com/abc-defg-hij",
       });
     },
+    // J7: the model's reading, faked; by default an ordinary reply.
+    readReply:
+      script.readReply ??
+      (() => Promise.resolve({ declined: false, negativeTone: false })),
     standInReply:
       script.standInReply ??
       (() =>
@@ -356,6 +361,57 @@ describe("outreach: source → shortlist → open lanes", () => {
     await engine.runOutreach(REF, GRANT);
     expect(rec.notices[0]?.key).toBe("no-fits");
     expect(rec.finished[0]?.status).toBe("DONE");
+  });
+});
+
+describe("lane: their reply read by meaning (J7)", () => {
+  const converse: QWorkPorts["converse"] = () =>
+    Promise.resolve({
+      reply: "Thanks for coming back to us.",
+      learned: [],
+      forPerson: [],
+      ready: false,
+    });
+
+  it.each([
+    ["the reader hears a no", { declined: true, negativeTone: false }],
+    [
+      "the reader hears an unhappy tone",
+      { declined: false, negativeTone: true },
+    ],
+    ["the reader cannot be reached", null],
+  ] as const)("holds Q's reply when %s", async (_label, reading) => {
+    const { ports, rec } = fakePorts({
+      converse,
+      readReply: () => Promise.resolve(reading),
+    });
+    const engine = createQWorkEngine({
+      checkpoints: createInMemoryQCheckpointStore(),
+      ports,
+    });
+    const lane = LANE("lane-j7");
+    await engine.advanceLane(lane, observe());
+    // Words no phrase list ever held: the model's reading decides.
+    const m1 = message(
+      "m1",
+      "Appreciate it, though the timing isn't ideal for us.",
+    );
+    await engine.advanceLane(lane, observe({ messages: [m1] }));
+    expect(rec.posts.some((post) => post.key === "reply:m1")).toBe(false);
+    expect(rec.notices.some((n) => n.key === "consider:m1")).toBe(true);
+  });
+
+  it("replies when the reader hears an ordinary reply", async () => {
+    const { ports, rec } = fakePorts({ converse });
+    const engine = createQWorkEngine({
+      checkpoints: createInMemoryQCheckpointStore(),
+      ports,
+    });
+    const lane = LANE("lane-j7b");
+    await engine.advanceLane(lane, observe());
+    const m1 = message("m1", "Not interested in a call yet, but tell me more.");
+    await engine.advanceLane(lane, observe({ messages: [m1] }));
+    expect(rec.posts.at(-1)?.key).toBe("reply:m1");
   });
 });
 

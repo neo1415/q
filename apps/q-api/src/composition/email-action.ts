@@ -22,6 +22,8 @@ import {
 import type { EmailIntelligencePort } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
+import { heldLine, type OutwardReview } from "./workforce/review.js";
+
 /**
  * `email.send` (BIZ-007; R9): an email from the approver's own connected
  * Gmail to a person on the other side of one canonical relationship.
@@ -216,7 +218,14 @@ const READING_TTL_MS = 10 * 60 * 1000;
 
 /** One drafted email per run, waiting for the run's prepare step. */
 export function createEmailActionBoard(
-  options: { readonly now?: (() => number) | undefined } = {},
+  options: {
+    readonly now?: (() => number) | undefined;
+    /**
+     * Founder brief J2: the drafted email is graded before it reaches the
+     * approval board; a redraft replaces it, a held one is not offered.
+     */
+    readonly review?: OutwardReview | undefined;
+  } = {},
 ): {
   readonly prepareForApproval: EmailIntelligencePort["prepareForApproval"];
   readonly proposer: QActionProposer;
@@ -264,11 +273,51 @@ export function createEmailActionBoard(
           return Promise.resolve(null);
         }
         const parsed = EmailSendPayloadSchema.safeParse(entry.payload);
-        return Promise.resolve(
-          parsed.success
-            ? { actionType: EMAIL_SEND, payload: parsed.data }
-            : { refused: "that email isn't something I can prepare from here" },
-        );
+        if (!parsed.success) {
+          return Promise.resolve({
+            refused: "that email isn't something I can prepare from here",
+          });
+        }
+        const review = options.review;
+        if (review === undefined) {
+          return Promise.resolve({
+            actionType: EMAIL_SEND,
+            payload: parsed.data,
+          });
+        }
+        const payload = parsed.data;
+        return review
+          .review(
+            context.actor,
+            {
+              kind: "EMAIL_DRAFT",
+              id: context.runId,
+              goal: `Email ${payload.toName}`,
+            },
+            {
+              principalName: "the person",
+              counterpartName: payload.toName,
+              channel: "EMAIL",
+              stage: "FOLLOW_UP",
+              purpose: `An email the person asked Q to draft. Subject: ${payload.subject}`,
+              material: "",
+              thread: "",
+              body: payload.body,
+            },
+          )
+          .then(async (verdict) => {
+            if (verdict.verdict === "HELD") {
+              return { refused: heldLine(verdict, payload.toName) };
+            }
+            await review.settle(context.actor, verdict, "OFFERED");
+            const graded = EmailSendPayloadSchema.safeParse({
+              ...payload,
+              body: verdict.body,
+            });
+            return graded.success
+              ? { actionType: EMAIL_SEND, payload: graded.data }
+              : { actionType: EMAIL_SEND, payload };
+          });
       },
     },
   };

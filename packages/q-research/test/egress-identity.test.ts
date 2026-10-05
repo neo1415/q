@@ -32,6 +32,8 @@ function run(
   subject: Parameters<
     ReturnType<typeof createPublicWebResearchService>["research"]
   >[0]["subject"],
+  // J7: the model's reading of their words, as the research tool passes it.
+  aboutThemselves = false,
 ) {
   const provider = createFakeResearchProvider({ pages: [PAGE] });
   const service = createPublicWebResearchService({ provider });
@@ -43,6 +45,7 @@ function run(
       requestedQuery: userText,
       userText,
       subject,
+      aboutThemselves,
       extractCount: 1,
     })
     .then((outcome) => ({ outcome, provider }));
@@ -90,6 +93,7 @@ describe("research service: whose name leads the query", () => {
         name: "Meridian Ventures",
         identityAuthorised: true,
       },
+      true,
     );
     expect(outcome.status).toBe("OK");
     expect(provider.egressed()).toContain("Meridian Ventures");

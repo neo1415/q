@@ -110,7 +110,16 @@ import {
 } from "./composition/work/actions.js";
 import { createWorkComposers } from "./composition/work/composers.js";
 import { createEtiquetteSource } from "./composition/etiquette.js";
-import { houseEtiquetteOf } from "@capital-q/q-core";
+import {
+  createWorkforceLearning,
+  feedbackFromApprovals,
+  learnedNotesFrom,
+} from "./composition/workforce/learning.js";
+import { createWorkforceModels } from "./composition/workforce/models.js";
+import { createWorkforcePage } from "./composition/workforce/page.js";
+import { createOutwardReview } from "./composition/workforce/review.js";
+import { createPostgresWorkforceStore } from "./composition/workforce/store.js";
+import { houseEtiquetteOf, stanceDeclines } from "@capital-q/q-core";
 import { createWorkPage } from "./composition/work/page.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
@@ -574,9 +583,21 @@ const etiquettePersonal = createPostgresEtiquetteGuideStore({
   sql: database.sql,
   transactions: database.transactions,
 });
+// Founder brief J3: what worked for the person (their approvals and edits,
+// kept by the memory Write Gate as their preferences) joins their guide.
+const learnedMemory = createPostgresMemoryRepository();
 const etiquette = createEtiquetteSource({
   platform: () => etiquetteAdmin.active(),
   personal: (owner) => etiquettePersonal.read(owner),
+  learned: async (owner) =>
+    learnedNotesFrom(
+      await learnedMemory.listLive(
+        database.sql,
+        TenantIdSchema.parse(owner.tenantId),
+        { ownerContextType: "user", ownerContextId: owner.userId },
+        60,
+      ),
+    ),
 });
 const etiquetteGuides: EtiquetteGuidePort = {
   ...etiquettePersonal,
@@ -1231,7 +1252,22 @@ const integrations = composeGoogleIntegrations({
   pushTopic: googleWorkspace.push?.topic,
   logger,
 });
-const emailBoard = createEmailActionBoard();
+// WORKFORCE block (founder brief J1-J9): the reviewer every outward
+// message passes, and the record of Q's agents for the workforce page.
+const workforceStore = createPostgresWorkforceStore(database.sql);
+const workforceModels = createWorkforceModels({
+  gateway: modelGateway,
+  dataPosture: demoDataPosture,
+  logger,
+  etiquette,
+});
+const outwardReview = createOutwardReview({
+  models: workforceModels,
+  store: workforceStore,
+  logger,
+});
+// end WORKFORCE block
+const emailBoard = createEmailActionBoard({ review: outwardReview });
 // Inbound email: what arrived at a person's Q address, read by Q only
 // through the quarantined reader; a reply is a card they approve, sent by
 // Capital Q's own sender on their behalf with Reply-To their Q address.
@@ -3116,6 +3152,7 @@ const recallBots = createRecallBots({
   transcriber: transcriberOf(process.env.RECALL_TRANSCRIBER),
 });
 const meetingFollowUpCards = createMeetingFollowUpCards({
+  review: outwardReview,
   sql: database.sql,
   resolver: actorContextResolver,
   runtime: qRuntime,
@@ -3434,6 +3471,7 @@ const errandNegotiation: ErrandNegotiation = {
   },
 };
 const errands = createErrandRunner({
+  review: outwardReview,
   nudger: counterpartNudger,
   counterpartNotices,
   negotiation: errandNegotiation,
@@ -3476,6 +3514,16 @@ const workFeed = createInvestorFeedPort({
   logger,
 });
 const workRuntime = createWorkRuntime({
+  review: outwardReview,
+  readReply: async (who, input) => {
+    const reading = await workforceModels.readReply(who, null, input);
+    return reading === null
+      ? null
+      : {
+          declined: stanceDeclines(reading.stance),
+          negativeTone: reading.tone === "NEGATIVE",
+        };
+  },
   nudger: counterpartNudger,
   counterpartNotices,
   noCalendar: {
@@ -3559,6 +3607,7 @@ const instructionDiscovery = createPostgresDiscoveryRepository({
   sql: database.sql,
 });
 instructionEngine.current = createInstructionEngine({
+  review: outwardReview,
   store: instructionStore,
   autoEnabled: instructionsAuto,
   actions: APP_ACTIONS,
@@ -4659,6 +4708,21 @@ const { app, logger: appLogger } = createApp(
     errands,
     // AUTO block (ADR 0030)
     work: workPort,
+    // WORKFORCE block (founder brief J5, J3, J6)
+    workforce: {
+      page: createWorkforcePage({
+        store: workforceStore,
+        costs: (owner, jobIds) =>
+          createPostgresUsageReader(database.sql).workforceCosts(owner, jobIds),
+      }),
+      onDecision: feedbackFromApprovals({
+        store: workforceStore,
+        learning: createWorkforceLearning({
+          store: workforceStore,
+          memory: memoryService,
+        }),
+      }),
+    },
     namedPhotos,
     // WORK-58: Q's work page, read by code from the person's own signals.
     workPage: createWorkPage({
