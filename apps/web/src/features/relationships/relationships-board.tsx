@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import type { RelationshipSummaryDto } from "@capital-q/contracts";
+import type {
+  FitProfileDto,
+  RelationshipSummaryDto,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { cx } from "@capital-q/ui";
 import {
@@ -18,6 +21,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
+import { RelationshipFitChips } from "@/features/fit/relationship-fit-chips";
 import {
   dismissReminderAction,
   markNoticesReadAction,
@@ -123,8 +127,14 @@ export function RelationshipsBoard({
   needsYou,
   firstCursor,
   now,
+  fits,
 }: {
   readonly side: ListSide;
+  /**
+   * Fit with the investor's own mandate by company id (ADR 0052; B3).
+   * Absent: no fit is shown. A null entry: no mandate to fit against.
+   */
+  readonly fits?: Readonly<Record<string, FitProfileDto | null>> | undefined;
   readonly items: readonly RelationshipSummaryDto[];
   readonly digests: Readonly<Record<string, RelationshipDigest>>;
   /** R34: unread chat messages per relationship id. */
@@ -321,6 +331,13 @@ export function RelationshipsBoard({
                   }
                   unread={(row.facts?.unread ?? 0) > 0}
                   now={now}
+                  fit={
+                    fits === undefined ||
+                    row.item.counterpart.kind !== "COMPANY" ||
+                    !(row.item.counterpart.id in fits)
+                      ? undefined
+                      : (fits[row.item.counterpart.id] ?? null)
+                  }
                 />
               </li>
             ))}
@@ -358,8 +375,10 @@ function RelationshipRow({
   photoUrl,
   unread,
   now,
+  fit,
 }: {
   readonly item: RelationshipSummaryDto;
+  readonly fit?: FitProfileDto | null | undefined;
   readonly step: NextStep;
   readonly activity: string;
   readonly about: string | null;
@@ -434,6 +453,7 @@ function RelationshipRow({
             {about}
           </p>
         )}
+        {fit === undefined ? null : <RelationshipFitChips profile={fit} />}
         <div className="flex items-center gap-2 lg:hidden">
           {pill}
           {when}

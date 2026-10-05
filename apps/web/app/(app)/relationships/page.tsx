@@ -3,15 +3,26 @@ import Link from "next/link";
 
 import {
   getChatUnread,
+  getFitProfiles,
   listNotifications,
   listReminders,
 } from "@capital-q/api-client";
-import type { NotificationDto, ReminderDto } from "@capital-q/contracts";
+import {
+  FIT_IDS_MAX,
+  type FitProfileDto,
+  type NotificationDto,
+  type RelationshipSummaryDto,
+  type ReminderDto,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
 import { PageContainer } from "@/components/app-shell/page-container";
-import { apiSession, resolveOwnContext } from "@/features/q/context";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+} from "@/features/q/context";
 import {
   ownRelationships,
   relationshipDigests,
@@ -95,6 +106,7 @@ export default async function RelationshipsPage() {
         notices={needs.notices}
         reminders={needs.reminders}
         now={now}
+        fits={side === "INVESTOR" ? await relationshipFits(items) : undefined}
       />
     </PageContainer>
   );
@@ -133,4 +145,28 @@ async function noticesAndReminders(): Promise<{
       .catch(() => [] as const),
   ]);
   return { notices, reminders };
+}
+
+/**
+ * Fit with the investor's own mandate for the companies they are in touch
+ * with (ADR 0052; B3). A company without a fit simply shows none.
+ */
+async function relationshipFits(
+  items: readonly RelationshipSummaryDto[] | undefined,
+): Promise<Readonly<Record<string, FitProfileDto>>> {
+  const ids = [
+    ...new Set(
+      (items ?? [])
+        .filter((item) => item.counterpart.kind === "COMPANY")
+        .map((item) => item.counterpart.id),
+    ),
+  ].slice(0, FIT_IDS_MAX);
+  const session = await qApiSession();
+  if (session === null || ids.length === 0) return {};
+  try {
+    const { items: fits } = await getFitProfiles(session, ids);
+    return Object.fromEntries(fits.map((f) => [f.companyId, f.profile]));
+  } catch {
+    return {};
+  }
 }
