@@ -428,6 +428,9 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "dismiss_reminder",
   "set_notification_settings",
   "set_q_personality",
+  // ADR 0050: their own speaking guide, versioned and removable in Settings.
+  "set_my_speaking_guide",
+  "remove_my_speaking_guide",
   // meet-47: "Q, join this call" -- their word is the click; Q joins as
   // the same note-taker, with the same consent line, for both sides.
   "join_call",

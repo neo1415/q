@@ -19,6 +19,7 @@ Q follows two **business etiquette guides** whenever it writes or speaks for a p
    - the guides are never quoted.
 
    The Context Firewall, grants, `Prepare → Recommend → Approve` and the Write Gate do not read the guides at all.
+
 5. **Token budget.** The section keeps its existing limit of 4,000 characters (every task schema). The person's guide is excerpted first (up to 1,400 characters), then the house guide's digest or excerpt (up to 1,300 characters). Excerpts are deterministic: whole lines, normalised. With guides present, the bundle reads `comm.v2`; without them, it is unchanged (`comm.v1`).
 6. **Where the guides apply.** They are passed as `SPEAK_FOR` to:
    - the standing-instruction planner;
@@ -27,12 +28,14 @@ Q follows two **business etiquette guides** whenever it writes or speaks for a p
    - the meeting host, with the organiser's guides.
 
    They are passed as `STYLE_ONLY` to Q's own answers (which also covers drafts Q writes for the person to approve) and to the delegated-work report. Q reads guides for the principal only, never for the counterpart.
+
 7. **The consider step is in code.** The function is `considerOutreach` in q-core. Before a chat message under a standing instruction, the engine reads the conversation's pace from the messages themselves (who wrote last, when, and how many of the person's side's messages are unanswered) and decides:
    - **Wait.** No follow-up within 5 days of the person's side's last message. Q sends at most one message per person per sitting on its own (cards are not held). The step is recorded as NOTED with the reason, for example "your side wrote on 3 Oct and they haven't replied yet; a gentle follow-up can go from 8 Oct".
    - **Ask the owner.** After a decline, after 2 unanswered messages, or before a reply to someone who sounded unhappy, the step becomes the person's card, in every mode.
    - **Soften.** A meeting ask before the other side has written back is refused (`MEETING_BEFORE_RAPPORT`), and the planner writes it again warmly.
 
    The planner also sees a code-written `pacing:` line per person. In delegated work, a reply to a message whose fixed phrases read as a no ("not interested", "we'll pass", "please stop") is not sent. Instead, the person is notified with the reason, and the lane step records it.
+
 8. **Prompt versions.** `INSTRUCTION_PLAN` v6 (active; v5 deprecated) adds the consider section and keeps v5's variables and output. It is pinned in `prompts.lock.json`. The charter and the other task templates are unchanged: their guides arrive through the communication section, and the bundle identity (`comm.v2`) records that.
 
 ## Consequences

@@ -86,6 +86,7 @@ export function etiquetteExcerpt(text: string, max: number): string {
   const lines = text
     .replace(/\r\n?/gu, "\n")
     // Control characters (other than newline and tab) carry no meaning here.
+    // eslint-disable-next-line no-control-regex -- removing them is the point.
     .replace(/[\u0000-\u0008\u000B-\u001F\u007F]/gu, "")
     .split("\n")
     .map((line) => line.replace(/[\t ]+/gu, " ").trim())
