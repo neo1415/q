@@ -126,6 +126,9 @@ export {
   getDocumentUploadSession,
   listDocuments,
   setDocumentDownloadAudience,
+  archiveDocument,
+  getDocumentFile,
+  renameDocument,
 } from "./documents.js";
 
 export {
