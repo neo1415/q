@@ -41,6 +41,8 @@ export type BoardEntry = {
   /** Q's words about it, the first sentence or two. */
   readonly said: string | null;
   readonly sources: readonly BoardSource[];
+  /** How many sources in all (a line may stand for several records). */
+  readonly sourceTotal: number;
   readonly files: readonly BoardFile[];
   readonly blocks: readonly QTurnObjectBlock[];
 };
@@ -179,6 +181,7 @@ export function boardTimeline(turns: readonly QTurn[]): BoardEntry[] {
       minis: minisOf(blocks),
       said: firstWords(turn.text),
       sources: sourcesOf(turn),
+      sourceTotal: turn.publicSources.length + Math.max(0, turn.sourceCount),
       files: blocks.flatMap((block) =>
         block.kind === "ARTIFACT_REFERENCE"
           ? [

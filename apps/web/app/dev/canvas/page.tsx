@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 
 import { CanvasPreview } from "./canvas-preview";
 
+// Read per request: the preview's gate is the running server's setting.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Answer canvas",
   robots: { index: false },

@@ -180,7 +180,7 @@ function Entry({
                 size={16}
                 strokeWidth={ICON_STROKE}
               />
-              {`Where this came from: ${String(entry.sources.length)} ${entry.sources.length === 1 ? "source" : "sources"}`}
+              {`Where this came from: ${String(entry.sourceTotal)} ${entry.sourceTotal === 1 ? "source" : "sources"}`}
             </summary>
             <ul>
               {entry.sources.map((source) => (
