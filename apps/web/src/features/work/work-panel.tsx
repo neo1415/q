@@ -1,10 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 
 import type { QWorkDto } from "@capital-q/contracts";
-import { Button } from "@capital-q/ui/button";
+import { Button, IconButton } from "@capital-q/ui/button";
+import { ChevronDown as Expand, X } from "@capital-q/ui/icons";
 import { EmptyState, ErrorState, Skeleton } from "@capital-q/ui/states";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
@@ -351,6 +358,19 @@ function WorkItem({
   );
 }
 
+/** Which running set the person hid on Q's page, for this tab. */
+const HIDDEN_KEY = "cq.work-panel.hidden";
+
+const noSubscription = () => () => undefined;
+
+function readHidden(): string | null {
+  try {
+    return window.sessionStorage.getItem(HIDDEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function WorkPanel({
   variant,
   initial = null,
@@ -397,8 +417,24 @@ export function WorkPanel({
 
   const running = (items ?? []).filter((item) => item.status === "ACTIVE");
   const finished = (items ?? []).filter((item) => item.status !== "ACTIVE");
+  // Founder 2026-10-05: on Q's page the panel pushed Q off the screen.
+  // It folds to one line and can be hidden; new work brings it back.
+  const runningKey = running
+    .map((item) => item.id)
+    .sort()
+    .join(",");
+  const [folded, setFolded] = useState(true);
+  const [hiddenNow, setHiddenFor] = useState<string | null>(null);
+  // The server render and the first paint agree (null on the server).
+  const storedHidden = useSyncExternalStore(
+    noSubscription,
+    readHidden,
+    () => null,
+  );
+  const hiddenFor = hiddenNow ?? storedHidden;
 
   if (variant === "home" && running.length === 0) return null;
+  if (variant === "home" && hiddenFor === runningKey) return null;
 
   const list = (shown: readonly QWorkDto[]) => (
     <div className="flex flex-col">
@@ -471,6 +507,61 @@ export function WorkPanel({
       </>
     );
 
+  if (variant === "home") {
+    const hide = () => {
+      setHiddenFor(runningKey);
+      try {
+        window.sessionStorage.setItem(HIDDEN_KEY, runningKey);
+      } catch {
+        // Hidden for this view only.
+      }
+    };
+    return (
+      <section
+        aria-labelledby="q-work-home"
+        className="flex max-w-(--cq-layout-reading) flex-col gap-1"
+        data-work-panel="home"
+      >
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFolded((now) => !now)}
+            aria-expanded={!folded}
+            className="flex min-h-11 flex-1 items-center gap-2 text-left"
+          >
+            <h2
+              id="q-work-home"
+              className="cq-title-sm text-(--cq-text-primary)"
+            >
+              Q is working on{" "}
+              {running.length === 1
+                ? "1 thing"
+                : `${String(running.length)} things`}
+            </h2>
+            <Expand
+              aria-hidden="true"
+              size={16}
+              className={`text-(--cq-text-tertiary) transition-transform ${folded ? "" : "rotate-180"}`}
+            />
+          </button>
+          <IconButton
+            aria-label="Hide Q's work here"
+            variant="quiet"
+            onClick={hide}
+            data-work-panel-hide
+          >
+            <X aria-hidden="true" size={16} />
+          </IconButton>
+        </div>
+        {folded ? null : (
+          <div className="max-h-[40vh] overflow-y-auto overscroll-contain">
+            {body}
+          </div>
+        )}
+      </section>
+    );
+  }
+
   return (
     <section
       aria-labelledby={`q-work-${variant}`}
@@ -481,7 +572,7 @@ export function WorkPanel({
         id={`q-work-${variant}`}
         className="cq-title-sm text-(--cq-text-primary)"
       >
-        {variant === "home" ? "Q is working on" : "Running"}
+        Running
       </h2>
       {body}
     </section>
