@@ -1,510 +1,640 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 
-import {
-  isActiveMatchState,
-  isMatchedRelationshipState,
-  type RelationshipSummaryDto,
-} from "@capital-q/contracts";
+import type { RelationshipSummaryDto } from "@capital-q/contracts";
+import { buttonClassName } from "@capital-q/ui/button";
 import { cx } from "@capital-q/ui";
 import {
-  ArrowUpRight,
   CalendarDays,
+  FileText,
   ICON_SIZE,
   MessageSquare,
   Search,
+  Upload,
+  X,
 } from "@capital-q/ui/icons";
 
-import { useGlobalQ } from "@/components/app-shell/global-q";
-import { useDockAvoid } from "@/features/q-dock";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
+import {
+  dismissReminderAction,
+  markNoticesReadAction,
+} from "@/features/schedule/schedule-actions";
 
 import type { RelationshipDigest } from "./relationship-data";
-import { StatusPill, type StatusTone } from "./status-pill";
+import { relationshipHref, STATE_WORDS } from "./relationship-words";
+import { moreRelationshipDigestsAction } from "./relationships-actions";
 import {
-  formatRelationshipDate,
-  relationshipHref,
-  STATE_WORDS,
-} from "./relationship-words";
+  lastActivityAt,
+  listOrder,
+  nextStepFor,
+  pageAfter,
+  since,
+  stageTone,
+  type ListSide,
+  type NeedsYouCard,
+  type NextStep,
+  type RowFacts,
+} from "./relationships-view";
+import { StatusPill, type StatusTone } from "./status-pill";
 
 /**
- * The Relationships list (founder design 2026-09-28): search, filters by
- * where each stands with their counts, a sort, and one card per
- * relationship. A card says who the counterpart is, where it stands and
- * since when, the last message, and four tiles that each open the real
- * thing: the conversation, calls, reminders, and Q. A tile whose thing
- * does not exist yet offers the action that creates it; one that cannot
- * exist yet (messages before connecting) says so and links nowhere.
- * Filters are the relationship's own states plus "Follow-up due" (a
- * reminder on it came due); nothing is scored or ranked.
+ * The Relationships list (founder critique 2026-10-04): search first, then
+ * where each stands as tabs with counts, then "Needs you" as one card per
+ * relationship and action, then one row per relationship with its
+ * counterpart, its stage, the time since anything last happened, and the
+ * ONE next step as a button. Rows page by cursor; nothing is ranked.
  */
 
 type Filter =
   | "ALL"
-  | "AWAITING"
+  | "NEEDS_YOU"
+  | "INTEREST_EXPRESSED"
   | "CONNECTED"
-  | "FOLLOW_UP"
-  | "DISCOVERED"
-  | "DECLINED"
-  // relationship-state.v2 (2026-10-02): where a match went after a call.
   | "MEETING_HELD"
   | "IN_DILIGENCE"
   | "PAUSED"
   | "PASSED"
-  | "INVESTED";
-type Sort = "RECENT" | "NAME";
+  | "INVESTED"
+  | "DECLINED"
+  | "DISCOVERED";
 
 const FILTER_WORDS: Readonly<Record<Filter, string>> = {
   ALL: "All",
-  AWAITING: "Awaiting reply",
-  CONNECTED: "Connected",
-  FOLLOW_UP: "Follow-up due",
-  DISCOVERED: "Discovered",
-  DECLINED: "Not taken forward",
+  NEEDS_YOU: "Needs you",
+  INTEREST_EXPRESSED: "Awaiting reply",
+  CONNECTED: STATE_WORDS.CONNECTED,
   MEETING_HELD: STATE_WORDS.MEETING_HELD,
   IN_DILIGENCE: STATE_WORDS.IN_DILIGENCE,
   PAUSED: STATE_WORDS.PAUSED,
   PASSED: STATE_WORDS.PASSED,
   INVESTED: STATE_WORDS.INVESTED,
+  DECLINED: STATE_WORDS.DECLINED,
+  DISCOVERED: STATE_WORDS.DISCOVERED,
+};
+const FILTERS = Object.keys(FILTER_WORDS) as Filter[];
+
+const TONE: Readonly<Record<ReturnType<typeof stageTone>, StatusTone>> = {
+  positive: "positive",
+  waiting: "waiting",
+  accent: "attention",
+  neutral: "neutral",
 };
 
-function matches(
-  filter: Filter,
-  item: RelationshipSummaryDto,
+const ICONS = {
+  upload: Upload,
+  file: FileText,
+  reply: MessageSquare,
+  calendar: CalendarDays,
+  answer: null,
+} as const;
+
+function factsOf(
   digest: RelationshipDigest | undefined,
-): boolean {
-  switch (filter) {
-    case "ALL":
-      return true;
-    case "AWAITING":
-      return item.state === "INTEREST_EXPRESSED";
-    case "CONNECTED":
-      return item.state === "CONNECTED";
-    case "FOLLOW_UP":
-      return digest?.followUpDue === true;
-    case "DISCOVERED":
-      return item.state === "DISCOVERED";
-    case "DECLINED":
-    case "MEETING_HELD":
-    case "IN_DILIGENCE":
-    case "PAUSED":
-    case "PASSED":
-    case "INVESTED":
-      return item.state === filter;
+  unread: number,
+): RowFacts | undefined {
+  if (digest === undefined) {
+    return unread > 0
+      ? {
+          unread,
+          followUpDue: false,
+          nextCallAt: null,
+          lastMessageAt: null,
+          diligence: null,
+        }
+      : undefined;
   }
-}
-
-/** The status pill's words, from the side reading it. */
-function statusWords(
-  item: RelationshipSummaryDto,
-  digest: RelationshipDigest | undefined,
-): string {
-  if (digest?.followUpDue === true) return "Follow-up due";
-  if (item.nextStep === "ANSWER_INTEREST") return "Needs your answer";
-  if (item.nextStep === "AWAIT_ANSWER") return "Awaiting reply";
-  return STATE_WORDS[item.state];
-}
-
-function statusTone(
-  item: RelationshipSummaryDto,
-  digest: RelationshipDigest | undefined,
-): StatusTone {
-  if (digest?.followUpDue === true) return "attention";
-  // A live or completed match reads positive; a pause or a pass is
-  // neutral, never an alarm (Pass is neutral, not red).
-  if (isActiveMatchState(item.state) || item.state === "INVESTED") {
-    return "positive";
-  }
-  if (item.state === "INTEREST_EXPRESSED") return "waiting";
-  return "neutral";
-}
-
-function lastActivity(
-  item: RelationshipSummaryDto,
-  digest: RelationshipDigest | undefined,
-): number {
-  const said = digest?.messages?.last?.sentAt;
-  return Math.max(
-    Date.parse(item.stateSince),
-    said === undefined ? 0 : Date.parse(said),
-  );
+  return {
+    unread,
+    followUpDue: digest.followUpDue,
+    nextCallAt: digest.nextCall?.startsAt ?? null,
+    lastMessageAt: digest.messages?.last?.sentAt ?? null,
+    diligence: digest.diligence ?? null,
+  };
 }
 
 export function RelationshipsBoard({
+  side,
   items,
-  digests,
+  digests: initialDigests,
   unread,
+  needsYou,
+  firstCursor,
+  now,
 }: {
+  readonly side: ListSide;
   readonly items: readonly RelationshipSummaryDto[];
   readonly digests: Readonly<Record<string, RelationshipDigest>>;
   /** R34: unread chat messages per relationship id. */
   readonly unread: Readonly<Record<string, number>>;
+  readonly needsYou: readonly NeedsYouCard[];
+  /** The cursor after the first page; null when it is the whole list. */
+  readonly firstCursor: string | null;
+  /** When the page was read, so server and browser say the same "2h". */
+  readonly now: number;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
-  const [sort, setSort] = useState<Sort>("RECENT");
+  const [digests, setDigests] = useState(initialDigests);
+  const [cursor, setCursor] = useState(firstCursor);
+  const ordered = useMemo(() => items.toSorted(listOrder), [items]);
+  const [shown, setShown] = useState(
+    () => pageAfter(ordered, null).items.length,
+  );
+  const [loading, startLoading] = useTransition();
+  const [moreFailed, setMoreFailed] = useState(false);
+
+  const rows = useMemo(
+    () =>
+      ordered.map((item) => {
+        const facts = factsOf(
+          digests[item.relationshipId],
+          unread[item.relationshipId] ?? 0,
+        );
+        return {
+          item,
+          facts,
+          step: nextStepFor(item, facts, side, now, relationshipHref(item)),
+          activity: lastActivityAt(item, facts),
+        };
+      }),
+    [ordered, digests, unread, side, now],
+  );
 
   const counts = useMemo(() => {
     const out = new Map<Filter, number>();
-    for (const key of Object.keys(FILTER_WORDS) as Filter[]) {
+    for (const key of FILTERS) {
       out.set(
         key,
-        items.filter((item) => matches(key, item, digests[item.relationshipId]))
-          .length,
+        rows.filter((row) =>
+          key === "ALL"
+            ? true
+            : key === "NEEDS_YOU"
+              ? row.step.urgent
+              : row.item.state === key,
+        ).length,
       );
     }
     return out;
-  }, [items, digests]);
+  }, [rows]);
 
-  const shown = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return items
-      .filter((item) => matches(filter, item, digests[item.relationshipId]))
-      .filter(
-        (item) =>
-          needle.length === 0 ||
-          item.counterpart.name.toLowerCase().includes(needle) ||
-          (digests[item.relationshipId]?.about ?? "")
-            .toLowerCase()
-            .includes(needle),
-      )
-      .toSorted((a, b) =>
-        sort === "NAME"
-          ? a.counterpart.name.localeCompare(b.counterpart.name)
-          : lastActivity(b, digests[b.relationshipId]) -
-            lastActivity(a, digests[a.relationshipId]),
-      );
-  }, [items, digests, filter, query, sort]);
+  const needle = query.trim().toLowerCase();
+  const filtered = rows.filter(
+    (row) =>
+      (filter === "ALL" ||
+        (filter === "NEEDS_YOU"
+          ? row.step.urgent
+          : row.item.state === filter)) &&
+      (needle.length === 0 ||
+        row.item.counterpart.name.toLowerCase().includes(needle) ||
+        (digests[row.item.relationshipId]?.about ?? "")
+          .toLowerCase()
+          .includes(needle)),
+  );
+  // The cursor window applies to the whole list; a filter or a search
+  // reads across everything already listed.
+  const paging = filter === "ALL" && needle.length === 0;
+  const visible = paging ? filtered.slice(0, shown) : filtered;
 
-  // Filters with nothing in them are not offered, except the four the
-  // design names, which read as zero honestly.
-  const filters = (Object.keys(FILTER_WORDS) as Filter[]).filter(
-    (key) =>
-      key === "ALL" ||
-      key === "AWAITING" ||
-      key === "CONNECTED" ||
-      key === "FOLLOW_UP" ||
-      (counts.get(key) ?? 0) > 0,
+  const more = () => {
+    if (cursor === null) return;
+    setMoreFailed(false);
+    startLoading(async () => {
+      const page = await moreRelationshipDigestsAction(cursor);
+      if (!page.ok) {
+        setMoreFailed(true);
+        return;
+      }
+      setDigests((current) => ({ ...current, ...page.digests }));
+      setShown((count) => count + page.ids.length);
+      setCursor(page.next);
+    });
+  };
+
+  const tabs = FILTERS.filter(
+    (key) => key === "ALL" || key === "NEEDS_YOU" || (counts.get(key) ?? 0) > 0,
   );
 
   return (
     <div className="flex flex-col gap-5" data-relationships-board>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
-          <Search
-            size={ICON_SIZE.compact}
-            aria-hidden="true"
-            className="text-(--cq-text-tertiary)"
-          />
-          <span className="sr-only">Search relationships</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by name"
-            className="cq-body min-w-0 flex-1 bg-transparent text-(--cq-text-primary) outline-none"
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="cq-body-sm text-(--cq-text-secondary)">Sort</span>
-          <select
-            value={sort}
-            onChange={(event) => setSort(event.target.value as Sort)}
-            className="cq-body-sm min-h-11 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary)"
-          >
-            <option value="RECENT">Recent activity</option>
-            <option value="NAME">Name</option>
-          </select>
-        </label>
-      </div>
+      <label className="flex min-h-12 items-center gap-2.5 rounded-xl border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
+        <Search
+          size={ICON_SIZE.regular}
+          aria-hidden="true"
+          className="shrink-0 text-(--cq-text-tertiary)"
+        />
+        <span className="sr-only">Search relationships</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={
+            side === "INVESTOR" ? "Search companies" : "Search investors"
+          }
+          className="cq-body min-w-0 flex-1 bg-transparent text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
+          data-relationships-search
+        />
+      </label>
 
       <div
         role="group"
-        aria-label="Filter by status"
-        className="flex flex-wrap gap-2"
+        aria-label="Show"
+        className="-mx-(--cq-page-gutter) flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-(--cq-page-gutter) [scrollbar-width:none]"
       >
-        {filters.map((key) => (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={filter === key}
-            onClick={() => setFilter(key)}
-            className={cx(
-              "cq-body-sm inline-flex min-h-11 items-center gap-2 rounded-full border px-4",
-              filter === key
-                ? "border-(--cq-text-primary) bg-(--cq-text-primary) text-(--cq-surface)"
-                : "border-(--cq-border-subtle) bg-(--cq-surface) text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
-            )}
-            data-filter={key}
-          >
-            {FILTER_WORDS[key]}{" "}
-            <span className="cq-numeric">{counts.get(key) ?? 0}</span>
-          </button>
-        ))}
+        {tabs.map((key) => {
+          const count = counts.get(key) ?? 0;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={filter === key}
+              onClick={() => setFilter(key)}
+              className={cx(
+                "cq-body-sm -mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-2.5 whitespace-nowrap",
+                filter === key
+                  ? "border-(--cq-text-primary) font-medium text-(--cq-text-primary)"
+                  : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
+              )}
+              data-filter={key}
+            >
+              {FILTER_WORDS[key]}{" "}
+              <span
+                className={cx(
+                  "cq-caption cq-numeric rounded-full px-1.5",
+                  key === "NEEDS_YOU" && count > 0
+                    ? "bg-(--cq-accent) text-(--cq-text-inverse)"
+                    : "bg-(--cq-surface-subtle)",
+                )}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {shown.length === 0 ? (
+      {filter === "ALL" && needle.length === 0 && needsYou.length > 0 ? (
+        <NeedsYouStrip cards={needsYou} now={now} />
+      ) : null}
+
+      {visible.length === 0 ? (
         <p
           className="cq-body text-(--cq-text-secondary)"
           role="status"
           data-state="filtered-empty"
         >
-          {query.trim().length > 0
+          {needle.length > 0
             ? `Nothing matches “${query.trim()}”.`
-            : `No relationships are ${FILTER_WORDS[filter].toLowerCase()} right now.`}
+            : filter === "NEEDS_YOU"
+              ? "Nothing needs you right now."
+              : `None ${FILTER_WORDS[filter].toLowerCase()} right now.`}
         </p>
       ) : (
-        <ul aria-label="Relationships" className="flex flex-col gap-4">
-          {shown.map((item) => (
-            <li
-              key={item.relationshipId}
-              data-relationship-id={item.relationshipId}
-            >
-              <RelationshipCard
-                item={item}
-                digest={digests[item.relationshipId]}
-                unread={unread[item.relationshipId] ?? 0}
-              />
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-2">
+          <div
+            aria-hidden="true"
+            className="cq-caption hidden grid-cols-[40px_minmax(0,1fr)_150px_96px_190px] gap-3 px-4 text-(--cq-text-tertiary) lg:grid"
+          >
+            <span />
+            <span>Name</span>
+            <span>Stage</span>
+            <span className="text-right">Last activity</span>
+            <span className="text-right">Next step</span>
+          </div>
+          <ul aria-label="Relationships" className="flex flex-col gap-2">
+            {visible.map((row) => (
+              <li
+                key={row.item.relationshipId}
+                data-relationship-id={row.item.relationshipId}
+              >
+                <RelationshipRow
+                  item={row.item}
+                  step={row.step}
+                  activity={row.activity}
+                  about={digests[row.item.relationshipId]?.about ?? null}
+                  photoUrl={
+                    row.item.counterpart.photoUrl ??
+                    digests[row.item.relationshipId]?.photoUrl ??
+                    null
+                  }
+                  unread={(row.facts?.unread ?? 0) > 0}
+                  now={now}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
+
+      {paging && cursor !== null && shown < filtered.length ? (
+        <div className="flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={more}
+            disabled={loading}
+            className={buttonClassName("quiet")}
+            data-show-more
+          >
+            {loading ? "Loading…" : "Show more"}
+          </button>
+          {moreFailed ? (
+            <p role="alert" className="cq-body-sm text-(--cq-text-secondary)">
+              More didn&apos;t load. Try again.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function RelationshipCard({
+function RelationshipRow({
   item,
-  digest,
+  step,
+  activity,
+  about,
+  photoUrl,
   unread,
+  now,
 }: {
   readonly item: RelationshipSummaryDto;
-  readonly digest: RelationshipDigest | undefined;
-  readonly unread: number;
+  readonly step: NextStep;
+  readonly activity: string;
+  readonly about: string | null;
+  readonly photoUrl: string | null;
+  readonly unread: boolean;
+  readonly now: number;
 }) {
-  const { askAbout } = useGlobalQ();
-  // The card's actions are never under the Q dock (ADR 0017 F1).
-  const actions = useRef<HTMLUListElement>(null);
-  useDockAvoid(actions);
   const href = relationshipHref(item);
   const name = item.counterpart.name;
-  // The match outlives CONNECTED: the thread and calls stay open after it.
-  const connected = isMatchedRelationshipState(item.state);
-  const messages = digest?.messages ?? null;
-  const last = messages?.last ?? null;
-  const ask = () =>
-    askAbout(
-      `Where does our relationship with ${name} stand, what has happened so far, and what comes next?`,
-    );
-
+  const Icon = step.icon === null ? null : ICONS[step.icon];
+  const pill = (
+    <StatusPill tone={TONE[stageTone(item.state)]}>
+      {STATE_WORDS[item.state]}
+    </StatusPill>
+  );
+  const when = (
+    <time
+      dateTime={activity}
+      className="cq-caption cq-numeric text-(--cq-text-tertiary)"
+    >
+      {since(activity, now)}
+    </time>
+  );
+  const quiet = step.label === null && step.why === "";
   return (
     <article
-      className="cq-glow-card flex flex-col gap-4 rounded-2xl p-4 sm:p-5"
       aria-labelledby={`relationship-${item.relationshipId}`}
+      className="relative grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-xs) lg:grid-cols-[40px_minmax(0,1fr)_150px_96px_190px] lg:px-4 lg:py-3"
       data-relationship-card={item.state}
     >
-      <div className="flex min-w-0 items-start gap-4">
-        {item.counterpart.kind === "COMPANY" ? (
-          // A company's photo through its gated route, lazily, per card.
-          <EntityAvatar
-            kind="company"
-            name={name}
-            companyId={item.counterpart.id}
-            src={item.counterpart.photoUrl ?? digest?.photoUrl ?? undefined}
-            size={48}
-            decorative
-          />
-        ) : (
-          <EntityAvatar
-            kind="investor"
-            name={name}
-            src={item.counterpart.photoUrl ?? digest?.photoUrl ?? null}
-            size={48}
-            decorative
-          />
+      {item.counterpart.kind === "COMPANY" ? (
+        <EntityAvatar
+          kind="company"
+          name={name}
+          companyId={item.counterpart.id}
+          src={photoUrl ?? undefined}
+          size={40}
+          decorative
+        />
+      ) : (
+        <EntityAvatar
+          kind="investor"
+          name={name}
+          investorOrganisationId={item.counterpart.id}
+          src={photoUrl}
+          size={40}
+          decorative
+        />
+      )}
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <h2
+          id={`relationship-${item.relationshipId}`}
+          className="cq-body flex min-w-0 items-center gap-2 font-semibold text-(--cq-text-primary)"
+        >
+          {unread ? (
+            <span
+              // The why line says it in words; the dot only echoes it.
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-full bg-(--cq-accent)"
+            />
+          ) : null}
+          {/* The whole row opens the relationship; the button stays its own. */}
+          <Link
+            href={href}
+            className="truncate after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-(--cq-focus-ring)"
+          >
+            {name}
+          </Link>
+        </h2>
+        {about === null ? null : (
+          <p className="cq-body-sm hidden truncate text-(--cq-text-secondary) lg:block">
+            {about}
+          </p>
         )}
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h2
-              id={`relationship-${item.relationshipId}`}
-              className="cq-body min-w-0 font-semibold text-(--cq-text-primary)"
-            >
-              {/* The name is the card's way in: a 44 px tall hit area
-                  around 24 px of text, with no change to the layout
-                  (demo-44 phone pass). */}
-              <Link
-                href={href}
-                className="relative inline-flex items-center gap-1 underline-offset-4 after:absolute after:inset-x-0 after:-inset-y-2.5 after:content-[''] hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-              >
-                {name}
-                <ArrowUpRight size={ICON_SIZE.compact} aria-hidden="true" />
-              </Link>
-            </h2>
-            <StatusPill tone={statusTone(item, digest)}>
-              {statusWords(item, digest)}
-            </StatusPill>
-          </div>
-          {digest?.about === null || digest?.about === undefined ? null : (
-            <p className="cq-body-sm line-clamp-2 text-(--cq-text-secondary)">
-              {digest.about}
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-2">
-            {(digest?.chips ?? []).map((chip) => (
-              <span
-                key={chip}
-                className="cq-caption rounded-full bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)"
-              >
-                {chip}
-              </span>
-            ))}
-            <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
-              {STATE_WORDS[item.state]} since{" "}
-              {formatRelationshipDate(item.stateSince)}
-            </span>
-          </div>
+        <div className="flex items-center gap-2 lg:hidden">
+          {pill}
+          {when}
         </div>
       </div>
-
-      {last === null ? null : (
-        <Link
-          href={`${href}/messages`}
-          className="flex min-h-11 min-w-0 items-center gap-3 rounded-lg bg-(--cq-surface-subtle) px-3 py-2 hover:bg-(--cq-surface) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-          data-last-message
-        >
-          <MessageSquare
-            size={ICON_SIZE.compact}
-            aria-hidden="true"
-            className="shrink-0 text-(--cq-text-tertiary)"
-          />
-          <span className="cq-body-sm min-w-0 flex-1 truncate text-(--cq-text-secondary)">
-            <span className="text-(--cq-text-primary)">
-              {last.mine ? "You" : last.senderName}:
-            </span>{" "}
-            {last.text}
-          </span>
-          {unread > 0 ? (
-            <span className="cq-caption cq-numeric shrink-0 rounded-full bg-(--cq-accent-soft) px-2 py-0.5 text-(--cq-text-primary)">
-              {unread === 1 ? "1 new" : `${unread > 99 ? "99+" : unread} new`}
-            </span>
-          ) : null}
-          <time
-            dateTime={last.sentAt}
-            className="cq-caption cq-numeric shrink-0 text-(--cq-text-tertiary)"
-          >
-            {formatRelationshipDate(last.sentAt)}
-          </time>
-        </Link>
-      )}
-
-      <ul
-        ref={actions}
-        className="grid grid-cols-2 gap-2"
-        aria-label="At a glance"
+      <div className="hidden lg:block">{pill}</div>
+      <div className="hidden text-right lg:block">{when}</div>
+      <div
+        className={cx(
+          "col-span-2 flex items-center justify-between gap-3 lg:col-span-1 lg:justify-end",
+          quiet
+            ? "hidden lg:flex"
+            : "mt-2 border-t border-(--cq-border-subtle) pt-2.5 lg:mt-0 lg:border-0 lg:pt-0",
+        )}
       >
-        <li>
-          <Tile
-            icon={<MessageSquare size={ICON_SIZE.compact} aria-hidden="true" />}
-            label="Messages"
-            value={
-              messages === null
-                ? connected
-                  ? "Open the conversation"
-                  : "Open once connected"
-                : messages.count === 0
-                  ? "Say hello"
-                  : `${messages.count}${messages.more ? "+" : ""}${last === null ? "" : ` · ${formatRelationshipDate(last.sentAt)}`}`
-            }
-            href={connected ? `${href}/messages` : undefined}
-          />
-        </li>
-        <li>
-          <Tile
-            icon={<CalendarDays size={ICON_SIZE.compact} aria-hidden="true" />}
-            label="Calls"
-            value={
-              digest?.nextCall === null || digest?.nextCall === undefined
-                ? connected
-                  ? "Book a call"
-                  : "After you connect"
-                : `Next ${formatRelationshipDate(digest.nextCall.startsAt)}`
-            }
-            href={connected ? `${href}#calls` : undefined}
-          />
-        </li>
-      </ul>
-      {/*
-        Two tiles, the two next steps (re-capture 2026-10-03: four tiles
-        per card were dense on a phone). A reminder and Q are quiet links.
-      */}
-      <div className="flex flex-wrap gap-x-4">
-        <Link
-          href={`${href}#reminders`}
-          className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-secondary) underline-offset-4 hover:underline"
-        >
-          {digest?.nextReminder === null || digest?.nextReminder === undefined
-            ? "Set a reminder"
-            : `Reminder ${formatRelationshipDate(digest.nextReminder.dueAt)}`}
-        </Link>
-        <button
-          type="button"
-          onClick={ask}
-          className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-secondary) underline-offset-4 hover:underline"
-        >
-          Ask Q about this
-        </button>
+        <span className="cq-body-sm min-w-0 truncate text-(--cq-text-secondary) lg:hidden">
+          {step.why}
+        </span>
+        {step.label === null || step.href === null ? (
+          <span className="cq-body-sm hidden text-(--cq-text-tertiary) lg:inline">
+            {step.why}
+          </span>
+        ) : (
+          <Link
+            href={step.href}
+            className={cx(
+              buttonClassName(step.urgent ? "primary" : "secondary", "compact"),
+              "relative shrink-0",
+            )}
+            data-next-step
+          >
+            {Icon === null ? null : (
+              <Icon size={ICON_SIZE.compact} aria-hidden="true" />
+            )}
+            {step.label}
+          </Link>
+        )}
       </div>
     </article>
   );
 }
 
-function Tile({
-  icon,
-  label,
-  value,
-  href,
-  onClick,
+/**
+ * Needs you: one card per relationship and action, newest first; three at
+ * a time, the rest one tap away. Acting on a card (or dismissing it) clears
+ * every notice it stands for.
+ */
+function NeedsYouStrip({
+  cards,
+  now,
 }: {
-  readonly icon: React.ReactNode;
-  readonly label: string;
-  readonly value: string;
-  readonly href?: string | undefined;
-  readonly onClick?: (() => void) | undefined;
+  readonly cards: readonly NeedsYouCard[];
+  readonly now: number;
 }) {
-  const body = (
-    <>
-      <span className="flex items-center gap-2 text-(--cq-text-tertiary)">
-        {icon}
-        <span className="cq-caption">{label}</span>
-      </span>
-      <span className="cq-body-sm truncate text-(--cq-text-primary)">
-        {value}
-      </span>
-    </>
-  );
-  const className =
-    "flex h-full min-h-14 w-full min-w-0 flex-col items-start justify-center gap-1 rounded-md px-2 py-2 text-left";
-  const interactive =
-    "hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
-  if (href !== undefined) {
-    return (
-      <Link href={href} className={cx(className, interactive)}>
-        {body}
-      </Link>
-    );
-  }
-  if (onClick !== undefined) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={cx(className, interactive)}
+  const router = useRouter();
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const [all, setAll] = useState(false);
+  const [, startClearing] = useTransition();
+  const left = cards.filter((card) => !gone.has(card.key));
+  if (left.length === 0) return null;
+  const shown = all ? left : left.slice(0, 3);
+
+  const clear = (card: NeedsYouCard) => {
+    setGone((current) => new Set([...current, card.key]));
+    startClearing(async () => {
+      if (card.noticeIds.length > 0) {
+        await markNoticesReadAction([...card.noticeIds]);
+      }
+      if (card.reminderId !== null) {
+        await dismissReminderAction(card.reminderId);
+      }
+    });
+  };
+
+  return (
+    <section
+      aria-labelledby="needs-you"
+      className="flex flex-col gap-2.5"
+      data-needs-you
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="needs-you" className="cq-title-sm text-(--cq-text-primary)">
+          Needs you
+        </h2>
+        {left.length > 3 ? (
+          <button
+            type="button"
+            onClick={() => setAll((open) => !open)}
+            className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+            aria-expanded={all}
+          >
+            {all ? "Show fewer" : `See all ${String(left.length)}`}
+          </button>
+        ) : null}
+      </div>
+      <ul
+        className={cx(
+          "-mx-(--cq-page-gutter) grid snap-x snap-mandatory gap-2.5 overflow-x-auto px-(--cq-page-gutter) pb-1 [scrollbar-width:none] md:mx-0 md:grid-flow-row md:grid-cols-3 md:overflow-visible md:px-0",
+          all ? "grid-flow-row" : "auto-cols-[82%] grid-flow-col",
+        )}
       >
-        {body}
-      </button>
-    );
-  }
-  return <div className={className}>{body}</div>;
+        {shown.map((card, index) => {
+          const relationship = card.relationship;
+          return (
+            <li key={card.key} className="snap-start">
+              <article
+                aria-label={card.title}
+                className="relative flex h-full flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-xs)"
+                data-needs-you-card
+              >
+                <div className="flex min-w-0 items-center gap-2.5 pr-9">
+                  {relationship === null ? null : (
+                    <CounterpartAvatar item={relationship} size={32} />
+                  )}
+                  <span className="flex min-w-0 flex-col">
+                    {relationship === null ? null : (
+                      <span className="cq-body-sm truncate font-semibold text-(--cq-text-primary)">
+                        {relationship.counterpart.name}
+                      </span>
+                    )}
+                    <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+                      {card.count > 1
+                        ? `${String(card.count)} updates · ${since(card.latestAt, now)}`
+                        : since(card.latestAt, now)}
+                    </span>
+                  </span>
+                </div>
+                <p className="cq-body line-clamp-2 font-medium text-(--cq-text-primary)">
+                  {card.title}
+                </p>
+                <div className="mt-auto">
+                  {card.action.href === null ? (
+                    <button
+                      type="button"
+                      onClick={() => clear(card)}
+                      className={buttonClassName("secondary", "compact")}
+                    >
+                      {card.action.label}
+                    </button>
+                  ) : (
+                    <Link
+                      href={card.action.href}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        clear(card);
+                        router.push(card.action.href ?? "/relationships");
+                      }}
+                      className={buttonClassName(
+                        index === 0 ? "primary" : "secondary",
+                        "compact",
+                      )}
+                    >
+                      {card.action.label === "Upload & share" ? (
+                        <Upload size={ICON_SIZE.compact} aria-hidden="true" />
+                      ) : null}
+                      {card.action.label}
+                    </Link>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => clear(card)}
+                  aria-label={`Dismiss ${card.title}`}
+                  className="absolute top-1 right-1 inline-flex size-11 items-center justify-center rounded-md text-(--cq-text-tertiary) hover:text-(--cq-text-primary)"
+                >
+                  <X size={ICON_SIZE.compact} aria-hidden="true" />
+                </button>
+              </article>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function CounterpartAvatar({
+  item,
+  size,
+}: {
+  readonly item: RelationshipSummaryDto;
+  readonly size: number;
+}) {
+  const name = item.counterpart.name;
+  return item.counterpart.kind === "COMPANY" ? (
+    <EntityAvatar
+      kind="company"
+      name={name}
+      companyId={item.counterpart.id}
+      src={item.counterpart.photoUrl ?? undefined}
+      size={size}
+      decorative
+    />
+  ) : (
+    <EntityAvatar
+      kind="investor"
+      name={name}
+      investorOrganisationId={item.counterpart.id}
+      src={item.counterpart.photoUrl ?? null}
+      size={size}
+      decorative
+    />
+  );
 }

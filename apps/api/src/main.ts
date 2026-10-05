@@ -1213,7 +1213,19 @@ const diligence = createDiligenceService({
     // Its scan state rides along (ADR 0042): the list says "Not
     // virus-scanned yet" beside a NOT_SCANNED file.
     canonical: (documentId) => diligenceDocumentLookup(documentId),
-    signedDownload: async (document) => {
+    // Upload and share in one step: the documents screen's own completion,
+    // as the founder (Evidence authorises their own upload session).
+    completeUpload: async (command) => {
+      const completed = await evidence.completeDocumentUploadSession({
+        actor: command.actor,
+        uploadSessionId: command.uploadSessionId,
+        input: {},
+        idempotencyKey: command.idempotencyKey,
+        correlationId: command.correlationId,
+      });
+      return { documentId: completed.document.id };
+    },
+    signedDownload: async (document, disposition = "ATTACHMENT") => {
       if (
         diligenceDocuments === undefined ||
         document.currentVersionId === null
@@ -1224,7 +1236,7 @@ const diligence = createDiligenceService({
         documentTenantId: document.tenantId,
         documentId: document.id,
         documentVersionId: document.currentVersionId,
-        disposition: "ATTACHMENT",
+        disposition,
       });
       return {
         url: link.url,
@@ -1249,9 +1261,10 @@ const diligence = createDiligenceService({
       kind: "DILIGENCE",
       title: input.title,
       body: null,
-      target: "RELATIONSHIP",
+      // Straight to the relationship's Diligence tab.
+      target: "DILIGENCE",
       key: input.key,
-      priority: "UPDATE",
+      priority: input.priority,
     }),
   newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
 });

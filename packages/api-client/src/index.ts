@@ -398,6 +398,7 @@ export * from "./reviews-kyb.js";
 export {
   diligenceDownload,
   fulfilDiligenceRequest,
+  uploadAndFulfilDiligenceRequest,
   getDiligence,
   requestDiligenceDocument,
   revokeDiligenceShare,

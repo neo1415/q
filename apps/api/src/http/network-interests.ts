@@ -233,6 +233,13 @@ export function registerNetworkInterestRoutes(
           actor: getActorContext(request),
           relationshipId: param(request, "relationshipId"),
           documentId: param(request, "documentId"),
+          // View opens it in the browser; anything else saves it.
+          disposition:
+            (request.query as Record<string, unknown> | undefined)?.[
+              "disposition"
+            ] === "inline"
+              ? "INLINE"
+              : "ATTACHMENT",
         });
         if (link === null) {
           // The one not-found: a relationship or a share this person

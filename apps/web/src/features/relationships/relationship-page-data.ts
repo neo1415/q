@@ -4,6 +4,7 @@ import {
   getChatThread,
   getCompanyNetworkPreview,
   getCompanyProfile,
+  getDiligence,
   getDiscoveredInvestor,
   getOwnInterest,
   getRelationshipWithCompany,
@@ -15,6 +16,7 @@ import {
 import {
   isMatchedRelationshipState,
   type ChatThreadDto,
+  type DiligenceDto,
   type CompanyInterestStatusDto,
   type IncomingInterestDto,
   type MeetingDto,
@@ -80,6 +82,8 @@ type Loaded<Extra> =
       readonly meetings: readonly MeetingDto[];
       /** When this was read (request time), for past vs booked calls. */
       readonly readAt: number;
+      /** The diligence area once diligence started; null before or unreadable. */
+      readonly diligence: DiligenceDto | null;
       /** Said when nothing is on record that this side can see. */
       readonly absentSentence: string;
     } & Extra);
@@ -97,6 +101,21 @@ async function meetingsFor(
   return listRelationshipMeetings(session, relationship.relationshipId)
     .then((list) => list.items)
     .catch(() => []);
+}
+
+async function diligenceFor(
+  session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
+  relationship: RelationshipStatusDto | null,
+): Promise<DiligenceDto | null> {
+  if (
+    relationship === null ||
+    !relationship.milestones.some(
+      (milestone) => milestone.state === "IN_DILIGENCE",
+    )
+  ) {
+    return null;
+  }
+  return getDiligence(session, relationship.relationshipId).catch(() => null);
 }
 
 async function threadFor(
@@ -187,6 +206,7 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
           },
     thread: await threadFor(session, relationship),
     meetings: await meetingsFor(session, relationship),
+    diligence: await diligenceFor(session, relationship),
     readAt: Date.now(),
     profile: {
       ...NO_PROFILE,
@@ -268,6 +288,7 @@ export async function loadCompanySideRelationship(
       fromThisInvestor.find((item) => item.response === "PENDING") ?? null,
     thread: await threadFor(session, relationship),
     meetings: await meetingsFor(session, relationship),
+    diligence: await diligenceFor(session, relationship),
     readAt: Date.now(),
     profile:
       investor === null

@@ -4,6 +4,7 @@ import {
   type ApiSession,
   getChatThread,
   getCompanyNetworkPreview,
+  getDiligence,
   getDiscoveredInvestor,
   listCompanyRelationships,
   listInvestorRelationships,
@@ -79,10 +80,19 @@ export type RelationshipDigest = {
   } | null;
   /** A reminder on it has come due and not been dismissed. */
   readonly followUpDue: boolean;
+  /**
+   * In diligence (2026-10-04): what waits on this side. The founder's open
+   * requests; the investor's shares nobody on their side has opened yet.
+   */
+  readonly diligence?: {
+    readonly openRequests: number;
+    readonly firstOpenTitle: string | null;
+    readonly unopenedShares: number;
+  } | null;
 };
 
 /** Cards read in full; beyond this the list still shows state and dates. */
-const DIGEST_LIMIT = 24;
+const DIGEST_LIMIT = 20;
 
 function messagePreview(message: ChatMessageDto): string {
   if (message.unsent) return "Message unsent";
@@ -110,7 +120,7 @@ export async function relationshipDigests(
   const entries = await Promise.all(
     items.slice(0, DIGEST_LIMIT).map(async (item) => {
       const connected = isMatchedRelationshipState(item.state);
-      const [profile, thread, meetings] = await Promise.all([
+      const [profile, thread, meetings, diligence] = await Promise.all([
         counterpartProfile(session, context, item).catch(() => null),
         connected
           ? getChatThread(session, item.relationshipId).catch(() => null)
@@ -120,8 +130,14 @@ export async function relationshipDigests(
               .then((list) => list.items)
               .catch(() => [] as const)
           : Promise.resolve([] as const),
+        item.state === "IN_DILIGENCE"
+          ? getDiligence(session, item.relationshipId).catch(() => null)
+          : Promise.resolve(null),
       ]);
       const reminders = await remindersRead;
+      const open = (diligence?.requests ?? []).filter(
+        (request) => request.status === "OPEN",
+      );
       const own = reminders.filter(
         (reminder) => reminder.relationshipId === item.relationshipId,
       );
@@ -171,6 +187,16 @@ export async function relationshipDigests(
             (reminder.status === "PENDING" &&
               Date.parse(reminder.dueAt) <= now),
         ),
+        diligence:
+          diligence === null
+            ? null
+            : {
+                openRequests: open.length,
+                firstOpenTitle: open[0]?.title ?? null,
+                unopenedShares: diligence.shares.filter(
+                  (share) => share.viewedAt === null,
+                ).length,
+              },
       };
       return [item.relationshipId, digest] as const;
     }),

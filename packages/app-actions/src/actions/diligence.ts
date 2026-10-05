@@ -7,11 +7,13 @@ import {
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
   NETWORK_DILIGENCE_REQUEST_FULFIL_PATH,
+  NETWORK_DILIGENCE_REQUEST_UPLOAD_PATH,
   NETWORK_DILIGENCE_REQUESTS_PATH,
   NETWORK_DILIGENCE_SHARE_REVOKE_PATH,
   NETWORK_DILIGENCE_SHARES_PATH,
   RequestDiligenceDocumentRequestSchema,
   ShareDiligenceDocumentRequestSchema,
+  UploadDiligenceDocumentRequestSchema,
   type KnownErrorCode,
 } from "@capital-q/contracts";
 import type {
@@ -304,6 +306,77 @@ const FULFIL = defineAppAction<
   },
 });
 
+const Upload = z
+  .object({
+    relationshipId: z.string().max(64),
+    requestId: z.string().max(64),
+    idempotencyKey: IdempotencyKeyHeaderSchema,
+    input: UploadDiligenceDocumentRequestSchema,
+  })
+  .strict();
+
+/**
+ * Upload and share in one step (founder critique 2026-10-04: "they
+ * requested something... there's nowhere to upload it"). The founder's own
+ * file, already in storage through a document upload session, is finished
+ * into their Documents and answers the request with the same share as
+ * FULFIL. It needs their file, so Q offers the upload screen and never
+ * takes it itself (as document.upload.complete).
+ */
+const UPLOAD_AND_FULFIL = defineAppAction<
+  z.infer<typeof Upload>,
+  DiligenceOutcome<{ readonly policyId: string }>
+>({
+  name: "diligence.request.upload_fulfil",
+  short: "upload a requested document",
+  area: "relationships",
+  classification: "CONSEQUENTIAL",
+  does: "Finishes the founder's upload of a new document and answers the investor's diligence request with it in one step, as the request card does.",
+  input: Upload,
+  output: z.custom<DiligenceOutcome<{ readonly policyId: string }>>(),
+  authorize: servicesDecide,
+  run: (ports, context, input) =>
+    diligence(ports).uploadAndFulfil({
+      actor: context.actor,
+      relationshipId: input.relationshipId,
+      requestId: input.requestId,
+      uploadSessionId: input.input.uploadSessionId,
+      idempotencyKey: input.idempotencyKey,
+      correlationId: context.correlationId,
+    }),
+  targets: (input) => [
+    { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+  ],
+  card: () => ({
+    summary: "Upload this file and answer their request",
+    preview:
+      "It is added to your Documents and shared with them only. You can take it back at any time.",
+  }),
+  done: (out) =>
+    out.outcome === "OK"
+      ? "Uploaded and shared; the request is fulfilled."
+      : failedWords(out),
+  succeeded,
+  http: {
+    method: "POST",
+    path: NETWORK_DILIGENCE_REQUEST_UPLOAD_PATH,
+    fromRequest: (params, body, headers) => ({
+      relationshipId: params["relationshipId"],
+      requestId: params["requestId"],
+      idempotencyKey: keyOf(headers),
+      input: body,
+    }),
+    status: 201,
+    problem,
+    notFound,
+    respond: (out) =>
+      out.outcome === "OK"
+        ? DiligenceShareResultDtoSchema.parse(out.value)
+        : undefined,
+  },
+  qCapability: "offer.document_upload",
+});
+
 const DiligenceTool = z
   .object({
     relationship: z
@@ -339,7 +412,7 @@ const DiligenceTool = z
   })
   .strict();
 
-export const DILIGENCE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
+const DILIGENCE_FAMILY: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof DiligenceTool>
 >({
   name: "diligence.change",
@@ -429,3 +502,8 @@ export const DILIGENCE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
     },
   },
 });
+
+export const DILIGENCE_ACTIONS: readonly AnyAppAction[] = [
+  ...DILIGENCE_FAMILY,
+  UPLOAD_AND_FULFIL,
+];

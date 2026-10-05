@@ -29,15 +29,22 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
       readonly kind: CounterpartNoticeKind;
       readonly title: string;
       readonly body: string | null;
-      /** Where they act: their inbox, their chat, or the relationship page. */
-      readonly target: "INBOX" | "CHAT" | "RELATIONSHIP";
+      /**
+       * Where they act: their inbox, their chat, the relationship page, or
+       * its Diligence tab. `{actor}` in the title becomes the acting side's
+       * own name, read here from the relationship, never from the caller.
+       */
+      readonly target: "INBOX" | "CHAT" | "RELATIONSHIP" | "DILIGENCE";
       readonly key: string;
       readonly priority: "NEEDS_YOU" | "UPDATE";
     }): Promise<number> => {
       const rows = await sql<{ id: string }[]>`
         insert into communication.notifications
           (tenant_id, user_id, kind, title, body, link_path, dedupe_key, priority)
-        select m.tenant_id, m.user_id, ${input.kind}, ${input.title.slice(0, 200)},
+        select m.tenant_id, m.user_id, ${input.kind},
+               left(replace(${input.title}, '{actor}',
+                            case when ${input.actingSide} = 'INVESTOR' then i.display_name
+                                 else c.canonical_name end), 200),
                ${input.body === null ? null : input.body.slice(0, 1000)},
                case
                  when ${input.target} = 'INBOX' and ${input.actingSide} = 'INVESTOR' then '/company/interest'
@@ -46,6 +53,10 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
                    then '/relationships/investor/' || r.investor_organisation_id::text
                  when ${input.target} = 'RELATIONSHIP'
                    then '/relationships/company/' || r.company_id::text
+                 when ${input.target} = 'DILIGENCE' and ${input.actingSide} = 'INVESTOR'
+                   then '/relationships/investor/' || r.investor_organisation_id::text || '/diligence'
+                 when ${input.target} = 'DILIGENCE'
+                   then '/relationships/company/' || r.company_id::text || '/diligence'
                  when ${input.actingSide} = 'INVESTOR'
                    then '/relationships/investor/' || r.investor_organisation_id::text || '/messages'
                  else '/relationships/company/' || r.company_id::text || '/messages'
