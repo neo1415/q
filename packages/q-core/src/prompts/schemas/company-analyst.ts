@@ -443,7 +443,7 @@ export type CompanyAnalystV15Result = z.infer<
 export const COMPANY_ANALYST_V15_SCHEMA_VERSION = 15;
 
 /**
- * v17 (founder brief 2026-10-05, C1-C5; ADR 0051): "top three", a
+ * v17 (founder brief 2026-10-05, C1-C5; ADR 0053): "top three", a
  * comparison or a piece of research comes back as answer cards the page
  * lays out, not as a Markdown table or a PDF. The model reads; code
  * counts: each measure's level is the model's reading of the evidence

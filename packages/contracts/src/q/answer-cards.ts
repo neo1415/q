@@ -3,7 +3,7 @@ import { z } from "zod";
 import { QSubjectRefSchema } from "./subject.js";
 
 /**
- * Q's answer as cards (founder brief 2026-10-05, C1-C5; ADR 0051).
+ * Q's answer as cards (founder brief 2026-10-05, C1-C5; ADR 0053).
  *
  * "Top three", "compare them" and "research Y Combinator" are answered on
  * the Q page as a set of cards, not as prose, a Markdown table or a PDF.

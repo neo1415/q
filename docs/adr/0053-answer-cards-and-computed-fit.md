@@ -1,4 +1,4 @@
-# ADR 0051: Q answers as cards, with fit computed by code
+# ADR 0053: Q answers as cards, with fit computed by code
 
 Status: Accepted (founder brief 2026-10-05, items B2, C1-C5, C9)
 Amends: COMPANY_ANALYST charter rule "produce no score, rating, ranking" (v2 onward); ADR-001 is unchanged.

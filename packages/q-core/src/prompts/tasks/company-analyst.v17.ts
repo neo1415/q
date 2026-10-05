@@ -10,7 +10,7 @@ import { COMPANY_ANALYST_V16 } from "./company-analyst.v16.js";
 
 /**
  * COMPANY_ANALYST v17 -- answers as cards (founder brief 2026-10-05,
- * C1-C5 and C9; ADR 0051).
+ * C1-C5 and C9; ADR 0053).
  *
  * Live on 5 October: "the companies in my feed ranked against my mandate"
  * came back as a paragraph; "three startups side by side" came back as a

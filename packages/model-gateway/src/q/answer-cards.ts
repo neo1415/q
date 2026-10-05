@@ -8,7 +8,7 @@ import {
 } from "@capital-q/contracts";
 
 /**
- * The model's answer cards, made reproducible (ADR 0051).
+ * The model's answer cards, made reproducible (ADR 0053).
  *
  * The model reads each measure's level; this code turns those levels into
  * the fit out of 10 and the order of a ranked answer, so the same reading

@@ -26,7 +26,7 @@ const card = (name: string, levels: Level[]) => ({
   citations: ["F1", "F2", "F1"],
 });
 
-describe("answer card fit (ADR 0051)", () => {
+describe("answer card fit (ADR 0053)", () => {
   it("is the mean of known measures, to one decimal", () => {
     expect(answerCardFit(measures("STRONG", "GOOD", "PARTIAL"))).toEqual({
       score: 7.2,

@@ -67,7 +67,7 @@ export type AnalystResultLike = {
   readonly contradictions?: readonly string[] | undefined;
   readonly clarifyingQuestions?:
     readonly { readonly question: string }[] | undefined;
-  /** v17: things to see together, already schema-checked (ADR 0051). */
+  /** v17: things to see together, already schema-checked (ADR 0053). */
   readonly answerCards?: ModelAnswerCardsLike | null | undefined;
   /** v12: named things side by side, already schema-checked. */
   readonly comparisonCards?:

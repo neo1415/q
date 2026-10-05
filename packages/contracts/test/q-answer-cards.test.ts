@@ -19,7 +19,7 @@ const card = (
   subject: null,
 });
 
-describe("ANSWER_CARDS (ADR 0051)", () => {
+describe("ANSWER_CARDS (ADR 0053)", () => {
   it("accepts one to ten cards", () => {
     const ok = (n: number) =>
       QAnswerCardsBlockSchema.safeParse({

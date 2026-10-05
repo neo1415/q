@@ -455,7 +455,7 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
   "recommendation",
-  // A malformed card set loses the cards, never the answer (ADR 0051).
+  // A malformed card set loses the cards, never the answer (ADR 0053).
   "answerCards",
   "comparisonCards",
 ];
