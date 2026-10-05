@@ -119,7 +119,7 @@ import { createWorkforceModels } from "./composition/workforce/models.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
 import { createPostgresWorkforceStore } from "./composition/workforce/store.js";
-import { houseEtiquetteOf } from "@capital-q/q-core";
+import { houseEtiquetteOf, stanceDeclines } from "@capital-q/q-core";
 import { createWorkPage } from "./composition/work/page.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
@@ -3515,6 +3515,15 @@ const workFeed = createInvestorFeedPort({
 });
 const workRuntime = createWorkRuntime({
   review: outwardReview,
+  readReply: async (who, input) => {
+    const reading = await workforceModels.readReply(who, null, input);
+    return reading === null
+      ? null
+      : {
+          declined: stanceDeclines(reading.stance),
+          negativeTone: reading.tone === "NEGATIVE",
+        };
+  },
   nudger: counterpartNudger,
   counterpartNotices,
   noCalendar: {

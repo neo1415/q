@@ -891,7 +891,6 @@ export {
   considerationReason,
   considerOutreach,
   ETIQUETTE_PACING,
-  soundsLikeNo,
   type OutreachConsideration,
   type OutreachKind,
   type OutreachMoment,

@@ -435,22 +435,6 @@ export function workingHoursFor(
 }
 
 /**
- * Live QA (instruction 76d6f281): "a short first message to founders ...
- * who haven't heard from me yet" is a first message only -- the grant then
- * allows no follow-ups. Read by code from the goal, or from the model.
- */
-const FIRST_ONLY =
-  /\b(?:first|opening|intro(?:ductory)?) (?:message|note|hello)s?\b|\bhaven'?t (?:yet )?heard from (?:me|us)\b|\bhave not (?:yet )?heard from (?:me|us)\b|\bnot (?:yet )?heard from (?:me|us)\b|\bhaven'?t (?:yet )?(?:messaged|contacted|written to)\b/iu;
-
-const FOLLOW_UPS =
-  /\bfollow[- ]?ups?\b|\bfollow(?:ing)? up\b|\bkeep (?:the )?\w+ (?:going|moving)\b/iu;
-
-export function firstMessagesOnly(goal: string, read: boolean): boolean {
-  if (FOLLOW_UPS.test(goal)) return false;
-  return read || FIRST_ONLY.test(goal);
-}
-
-/**
  * A model's reading of "do not book calls" arrives in its own words
  * (QA 07a90dd8, 4a2c9bc4: a strict enum failed the whole card as
  * INVALID_ARGUMENTS). Read leniently, in execute: case and
@@ -549,7 +533,7 @@ export const ProposeStandingInstructionInputSchema = z
       .boolean()
       .default(false)
       .describe(
-        "True when the goal is a first message only ('send a first message to founders who haven't heard from me'): Q then sends no follow-ups.",
+        "True when the goal is a first message only, in any words ('send a first message to founders who haven't heard from me', 'just say hello once'), and false when they also want follow-ups: Q then sends no follow-ups.",
       ),
     workingHours: z
       .object({
@@ -790,9 +774,10 @@ export function createQWorkTools(
                   input.workingHours,
                   base.workingHours,
                 ),
-                ...(firstMessagesOnly(input.goal, input.firstMessagesOnly)
-                  ? { followUps: false }
-                  : {}),
+                // Founder brief J7: "a first message only" is read by the
+                // model from their words (the tool's typed field), never
+                // by a phrase list over the goal.
+                ...(input.firstMessagesOnly ? { followUps: false } : {}),
                 // Founder 2026-10-05: not every message needs a yes. Routine
                 // replies go on their own unless they asked to approve all.
                 routineReplies: !input.askFirst,

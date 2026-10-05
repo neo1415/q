@@ -84,6 +84,24 @@ export type WorkRuntimeDependencies = {
   readonly composers: WorkComposers;
   /** Founder brief J2: every reply Q writes here is graded before it goes. */
   readonly review?: OutwardReview | undefined;
+  /**
+   * Founder brief J7: their latest message read by meaning (REPLY_READER).
+   * Absent or failing: null, and the lane treats it as a possible no.
+   */
+  readonly readReply?:
+    | ((
+        who: { readonly tenantId: string; readonly userId: string },
+        input: {
+          readonly principalName: string;
+          readonly counterpartName: string;
+          readonly thread: string;
+          readonly latest: string;
+        },
+      ) => Promise<{
+        readonly declined: boolean;
+        readonly negativeTone: boolean;
+      } | null>)
+    | undefined;
   readonly chat: {
     readonly readForQ: ChatService["readForQ"];
     readonly send: (
@@ -639,6 +657,18 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
         meetLink: booked.meeting.meetLink,
       };
     },
+
+    readReply: async (ref, input) =>
+      dependencies.readReply === undefined
+        ? null
+        : dependencies
+            .readReply(ref, {
+              principalName: ref.principalName,
+              counterpartName: input.counterpartName,
+              thread: input.thread.slice(-4_000),
+              latest: input.latest.slice(0, 4_000),
+            })
+            .catch(() => null),
 
     standInReply: async (ref, input) =>
       reviewedReply(

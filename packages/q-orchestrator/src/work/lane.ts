@@ -1,8 +1,4 @@
-import {
-  considerationReason,
-  considerOutreach,
-  soundsLikeNo,
-} from "@capital-q/q-core";
+import { considerationReason, considerOutreach } from "@capital-q/q-core";
 import {
   Annotation,
   END,
@@ -278,9 +274,22 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
     // No words this time (model unavailable): read again next time.
     if (result === null) return { waiting: true };
     let replies = state.qReplies;
-    // ADR 0050, the consider step: a reply to what reads as a no is the
-    // person's to send, never Q's on its own. Code reads their words for
-    // the phrases; the model's reply waits for the person.
+    // ADR 0050, the consider step: a reply to what reads as a no, or to an
+    // unhappy message, is the person's to send, never Q's on its own.
+    // J7: their words are read by meaning (REPLY_READER), only when there
+    // is a reply to hold; unreadable is treated as a possible no.
+    const words = latest.text;
+    const needsReading =
+      !otherSideIsQ && result.reply !== null && mayReply && words !== null;
+    const reading = needsReading
+      ? await ports
+          .readReply(state.ref, {
+            counterpartName: state.counterpartName,
+            thread: threadText(obs.messages, state.ref.principalName),
+            latest: words,
+          })
+          .catch(() => null)
+      : null;
     const considered = considerOutreach({
       now: new Date(obs.now),
       kind: "REPLY",
@@ -288,8 +297,8 @@ export function buildLaneGraph(ports: QWorkPorts, saver: BaseCheckpointSaver) {
       theyHaveWritten: true,
       lastFromUsAt: null,
       unansweredFromUs: 0,
-      declined: !otherSideIsQ && soundsLikeNo(latest.text),
-      negativeTone: false,
+      declined: needsReading && (reading?.declined ?? true),
+      negativeTone: needsReading && reading?.negativeTone === true,
       followUpsAllowed: true,
       alreadyThisSitting: 0,
     });

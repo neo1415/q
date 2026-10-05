@@ -282,6 +282,22 @@ export type QWorkPorts = {
     ref: DelegationRef,
     input: ConverseInput,
   ) => Promise<ConverseResult | null>;
+  /**
+   * Founder brief J7: the other side's latest message read by meaning (a
+   * no, a not-now, an unhappy tone), never by a phrase list. Null: it could
+   * not be read, and the lane is cautious: the person sees the reply first.
+   */
+  readonly readReply: (
+    ref: DelegationRef,
+    input: {
+      readonly counterpartName: string;
+      readonly thread: string;
+      readonly latest: string;
+    },
+  ) => Promise<{
+    readonly declined: boolean;
+    readonly negativeTone: boolean;
+  } | null>;
   readonly interviewTurn: (
     ref: DelegationRef,
     input: InterviewTurnInput,
