@@ -6,28 +6,26 @@ import { getBrandTheme } from "@capital-q/api-client";
 
 import { apiSession } from "@/features/q/context";
 
-import { brandPalette, brandStyleSheet } from "./brand-colour";
+import { composeBrandStyle } from "./brand-compose";
 
 /**
- * The brand colour in effect for the signed-in person as a style sheet, or
- * null for Capital Q's own colours (and whenever the read fails: the app
- * then simply keeps its default accent, never a broken one).
+ * The brand in effect for the signed-in person as a style sheet: the
+ * preset's look (black and gold by default; K3) and the admin's own
+ * accent on top, or null for classic blue with no colour of its own. A
+ * read that fails paints the default preset, never a broken page.
  */
 export const loadBrandStyle = cache(async (): Promise<string | null> => {
   const session = await apiSession();
   if (session === null) return null;
   const theme = await getBrandTheme(session).catch(() => null);
-  if (theme?.primaryHex == null) return null;
-  const palette = brandPalette(theme.primaryHex);
-  if (palette === null) return null;
-  const css = brandStyleSheet(palette);
-  return css === "" ? null : css;
+  return composeBrandStyle(theme);
 });
 
 /**
  * Rendered after the global stylesheets so the same selectors win by
- * source order. The text is built only from validated #rrggbb values
- * (brandStyleSheet re-checks each one), so it is safe to write inline.
+ * source order. The text is built only from validated hex values
+ * (presetStyleSheet and brandStyleSheet re-check each one), so it is safe
+ * to write inline.
  */
 export function BrandStyle({ css }: { readonly css: string | null }) {
   if (css === null) return null;

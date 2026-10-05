@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseApiConfig } from "@capital-q/config/api";
 import {
   createPlatformAdmin,
+  isBrandReset,
   type AdminRole,
   type BrandTheme,
   type BrandThemeStore,
@@ -61,7 +62,12 @@ function fakeSql() {
 }
 
 function memoryBrand() {
-  let current: BrandTheme = { primaryHex: null, updatedAt: null };
+  const initial: BrandTheme = {
+    presetKey: "black_gold",
+    primaryHex: null,
+    updatedAt: null,
+  };
+  let current = initial;
   const asked: (string | null)[] = [];
   const store: BrandThemeStore = {
     effective: (tenantId) => {
@@ -69,11 +75,14 @@ function memoryBrand() {
       return Promise.resolve(current);
     },
     platform: () => Promise.resolve(current),
-    setPlatform: (_grant, primaryHex) => {
-      current = {
-        primaryHex,
-        updatedAt: primaryHex === null ? null : "2026-10-05T09:00:00.000Z",
-      };
+    setPlatform: (_grant, change) => {
+      current = isBrandReset(change)
+        ? initial
+        : {
+            presetKey: change.presetKey ?? current.presetKey,
+            primaryHex: change.primaryHex,
+            updatedAt: "2026-10-05T09:00:00.000Z",
+          };
       return Promise.resolve(current);
     },
   };
@@ -141,11 +150,15 @@ async function call(
 }
 
 describe("brand theme routes", () => {
-  it("any signed-in person reads the colour for their own tenant", async () => {
+  it("any signed-in person reads the theme for their own tenant (black and gold by default)", async () => {
     const brand = memoryBrand();
     const response = await call(NOBODY, brand.store, "GET", "/v1/brand-theme");
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ primaryHex: null, updatedAt: null });
+    expect(response.json()).toEqual({
+      presetKey: "black_gold",
+      primaryHex: null,
+      updatedAt: null,
+    });
     expect(brand.asked).toEqual([TENANT]);
   });
 
@@ -210,6 +223,60 @@ describe("brand theme routes", () => {
     expect(reset.statusCode).toBe(200);
     expect(brand.now().primaryHex).toBeNull();
   });
+
+  it("an operator switches preset back to classic blue and on to black and gold, keeping or dropping a colour", async () => {
+    const brand = memoryBrand();
+    const blue = await call(
+      OPERATOR,
+      brand.store,
+      "POST",
+      "/v1/admin/brand-theme",
+      {
+        presetKey: "classic_blue",
+        primaryHex: null,
+      },
+    );
+    expect(blue.statusCode).toBe(200);
+    expect(brand.now()).toMatchObject({
+      presetKey: "classic_blue",
+      primaryHex: null,
+    });
+    // A colour alone keeps the preset.
+    await call(OPERATOR, brand.store, "POST", "/v1/admin/brand-theme", {
+      primaryHex: "#0f766e",
+    });
+    expect(brand.now()).toMatchObject({
+      presetKey: "classic_blue",
+      primaryHex: "#0f766e",
+    });
+    await call(OPERATOR, brand.store, "POST", "/v1/admin/brand-theme", {
+      presetKey: "black_gold",
+      primaryHex: null,
+    });
+    expect(brand.now()).toMatchObject({
+      presetKey: "black_gold",
+      primaryHex: null,
+    });
+  });
+
+  it.each(["neon", "", "BLACK_GOLD", "black_gold;}"])(
+    "refuses an unknown preset %s",
+    async (presetKey) => {
+      const brand = memoryBrand();
+      const response = await call(
+        OPERATOR,
+        brand.store,
+        "POST",
+        "/v1/admin/brand-theme",
+        {
+          presetKey,
+          primaryHex: null,
+        },
+      );
+      expect(response.statusCode).toBe(422);
+      expect(brand.now().presetKey).toBe("black_gold");
+    },
+  );
 
   it.each(["red", "#0F766E", "#fff", "#0f766e;}</style>"])(
     "refuses %s: only a lowercase #rrggbb is stored",

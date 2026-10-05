@@ -23,8 +23,8 @@ import {
 } from "../security/actor-context.js";
 
 /**
- * Brand theming (P5). Any signed-in person reads the colour in effect for
- * their own tenant (how the app looks; nothing about anyone). Changing it
+ * Brand theming (P5; K3 presets). Any signed-in person reads the preset and
+ * colour in effect for their own tenant (how the app looks; nothing about anyone). Changing it
  * is a platform-console write: the platform admin service decides, with
  * the kill-switch permission (`flags.write`: platform owner or operator,
  * live step-up) because it changes the product for everyone at once. A
@@ -121,11 +121,14 @@ export function registerBrandThemeRoutes(
           request,
           reply,
           "VALIDATION_FAILED",
-          "Give a colour as #rrggbb.",
+          "Give a known preset and a colour as #rrggbb.",
         );
       }
       return BrandThemeDtoSchema.parse(
-        await brand.setPlatform(grant, parsed.data.primaryHex),
+        await brand.setPlatform(grant, {
+          presetKey: parsed.data.presetKey,
+          primaryHex: parsed.data.primaryHex,
+        }),
       );
     },
   );

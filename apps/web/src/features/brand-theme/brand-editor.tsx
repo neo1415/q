@@ -2,58 +2,63 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 
+import type { BrandPresetKey } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import { ResultLine, useConsoleAction } from "@/features/admin/console-ui";
 
-import { setBrandColourAction } from "./brand-actions";
+import { setBrandThemeAction } from "./brand-actions";
+import { brandPalette, normaliseHex } from "./brand-colour";
+import { composeBrandStyle } from "./brand-compose";
 import {
-  AA,
-  DEFAULT_BRAND_HEX,
-  PREVIEW_SURFACES,
-  brandPalette,
-  brandStyleSheet,
-  normaliseHex,
-  type ThemePalette,
-} from "./brand-colour";
-import { BRAND_PRESETS } from "./brand-presets";
+  ACCENT_PICKS,
+  BRAND_THEME_PRESET_LIST,
+  brandPreset,
+  checkContrast,
+  contrastPairs,
+  type BrandPreset,
+  type PresetMode,
+} from "./brand-presets";
 
 /**
- * The console's brand colour control: quick picks, a colour picker and a
- * hex field, a live preview on paper and on the dark canvas, and the
- * contrast each reaches. While the admin edits, this page itself takes on
- * the draft colour, so they see it on real chrome before saving. Saving
- * and resetting go through the console's step-up guard; the API decides.
+ * The console's brand control (K3; design B's brand board): pick a theme
+ * -- black and gold, or Capital Q blue -- and, if wanted, your own accent
+ * on top. While the admin edits, this page itself takes on the draft, so
+ * they see it on real chrome before saving; the contrast table shows that
+ * every pair still reads. Saving and resetting go through the console's
+ * step-up guard; the API decides.
  */
 export function BrandEditor({
-  saved,
+  savedPreset,
+  savedHex,
 }: {
-  /** The platform colour now, or null for Capital Q's own. */
-  readonly saved: string | null;
+  readonly savedPreset: BrandPresetKey;
+  /** The colour on top of the preset, or null for the preset's own. */
+  readonly savedHex: string | null;
 }) {
-  const [draft, setDraft] = useState(saved ?? DEFAULT_BRAND_HEX);
-  const [typed, setTyped] = useState(saved ?? DEFAULT_BRAND_HEX);
+  const [preset, setPreset] = useState<BrandPresetKey>(savedPreset);
+  const [accent, setAccent] = useState<string | null>(savedHex);
+  const [typed, setTyped] = useState(savedHex ?? "");
   const { perform, pending, result } = useConsoleAction();
 
-  const palette = useMemo(() => brandPalette(draft), [draft]);
   const liveCss = useMemo(
-    () => (palette === null ? "" : brandStyleSheet(palette)),
-    [palette],
+    () => composeBrandStyle({ presetKey: preset, primaryHex: accent }) ?? "",
+    [preset, accent],
   );
-  const typedValid = normaliseHex(typed) !== null;
-  const current = saved ?? DEFAULT_BRAND_HEX;
-  const changed = draft !== current;
+  const typedValid = typed === "" || normaliseHex(typed) !== null;
+  const changed = preset !== savedPreset || accent !== savedHex;
+  const chosen = brandPreset(preset);
 
-  const choose = (hex: string) => {
-    const normal = normaliseHex(hex);
-    if (normal === null) return;
-    setDraft(normal);
-    setTyped(normal);
+  const chooseAccent = (hex: string | null) => {
+    const normal = hex === null ? null : normaliseHex(hex);
+    if (hex !== null && normal === null) return;
+    setAccent(normal);
+    setTyped(normal ?? "");
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {/* Live preview on this page (validated hex only; see brandStyleSheet). */}
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+      {/* Live preview on this page (validated hex only; see brand-presets). */}
       {liveCss === "" ? null : (
         <style
           data-cq-brand-draft
@@ -62,41 +67,61 @@ export function BrandEditor({
       )}
       <div className="cq-panel flex flex-col gap-6 p-5">
         <fieldset className="flex flex-col gap-3">
-          <legend className="cq-label pb-3 text-(--cq-text-secondary)">
-            Quick picks
+          <legend className="cq-label pb-1 text-(--cq-text-primary)">
+            Theme
           </legend>
-          <div className="flex flex-wrap gap-2">
-            {BRAND_PRESETS.map((preset) => {
-              const on = preset.hex === draft;
-              return (
-                <button
-                  key={preset.hex}
-                  type="button"
-                  aria-label={preset.name}
-                  aria-pressed={on}
-                  title={preset.name}
-                  onClick={() => choose(preset.hex)}
-                  className="size-11 rounded-(--cq-radius-md) border border-(--cq-border) outline-offset-2 aria-pressed:outline-2 aria-pressed:outline-(--cq-text-primary) aria-pressed:outline-solid"
-                  style={{ backgroundColor: preset.hex }}
-                />
-              );
-            })}
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            A theme sets the page, the menu bar, the buttons and Q&apos;s light
+            together. Your own colour can still go on top.
+          </p>
+          <div
+            className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2"
+            role="group"
+            aria-label="Theme"
+          >
+            {BRAND_THEME_PRESET_LIST.map((item) => (
+              <PresetButton
+                key={item.key}
+                preset={item}
+                on={item.key === preset}
+                onPick={() => setPreset(item.key)}
+              />
+            ))}
           </div>
         </fieldset>
 
-        <div className="flex flex-col gap-2">
-          <label
-            htmlFor="brand-hex"
-            className="cq-label text-(--cq-text-secondary)"
-          >
-            Your colour
-          </label>
+        <fieldset className="flex flex-col gap-3">
+          <legend className="cq-label pb-1 text-(--cq-text-primary)">
+            Your own accent (optional)
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              aria-pressed={accent === null}
+              onClick={() => chooseAccent(null)}
+              className="cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
+            >
+              The theme&apos;s own
+            </button>
+            {ACCENT_PICKS.map((pick) => (
+              <button
+                key={pick.hex}
+                type="button"
+                aria-label={pick.name}
+                aria-pressed={pick.hex === accent}
+                title={pick.name}
+                onClick={() => chooseAccent(pick.hex)}
+                className="size-11 rounded-(--cq-radius-md) border border-(--cq-border) outline-offset-2 aria-pressed:outline-2 aria-pressed:outline-(--cq-text-primary) aria-pressed:outline-solid"
+                style={{ backgroundColor: pick.hex }}
+              />
+            ))}
+          </div>
           <div className="flex items-center gap-2">
             <input
               type="color"
               aria-label="Pick a colour"
-              value={draft}
-              onChange={(event) => choose(event.target.value)}
+              value={accent ?? chosen.swatch[1]}
+              onChange={(event) => chooseAccent(event.target.value)}
               className="size-11 shrink-0 cursor-pointer rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) p-1"
             />
             <input
@@ -106,6 +131,8 @@ export function BrandEditor({
               spellCheck={false}
               maxLength={7}
               value={typed}
+              placeholder="#rrggbb"
+              aria-label="Accent colour as hex"
               aria-invalid={typedValid ? undefined : true}
               aria-describedby="brand-hex-help"
               onChange={(event) => {
@@ -115,13 +142,14 @@ export function BrandEditor({
                   normal !== null &&
                   event.target.value.replace("#", "").length === 6
                 ) {
-                  setDraft(normal);
+                  setAccent(normal);
                 }
               }}
               onBlur={() => {
-                if (typedValid) choose(typed);
+                if (typed === "") chooseAccent(null);
+                else if (typedValid) chooseAccent(typed);
               }}
-              className="cq-body cq-numeric h-11 w-36 rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) aria-invalid:border-(--cq-danger)"
+              className="cq-body cq-numeric h-11 w-36 rounded-md border border-(--cq-border-strong) bg-(--cq-surface) px-3 text-(--cq-text-primary) aria-invalid:border-(--cq-danger)"
             />
           </div>
           <p
@@ -129,139 +157,190 @@ export function BrandEditor({
             className="cq-caption text-(--cq-text-tertiary)"
           >
             {typedValid
-              ? "A hex colour, like #0f766e."
+              ? accent === null
+                ? `Using ${chosen.name.toLowerCase()}'s own accent.`
+                : "Adjusted where needed so text on it stays readable."
               : "Use a hex colour, like #0f766e."}
           </p>
-        </div>
+        </fieldset>
 
-        {palette === null ? null : saved === null &&
-          draft === DEFAULT_BRAND_HEX ? (
-          <p className="cq-body-sm text-(--cq-text-secondary)">
-            Capital Q&apos;s own colours are in use.
-          </p>
-        ) : (
-          <AdjustNote palette={palette} />
-        )}
-
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="primary"
             size="large"
             disabled={pending || !changed}
-            onClick={() => perform(() => setBrandColourAction(draft))}
+            onClick={() =>
+              perform(() =>
+                setBrandThemeAction({ presetKey: preset, primaryHex: accent }),
+              )
+            }
           >
-            {pending ? "Saving…" : "Save brand colour"}
+            {pending ? "Saving…" : `Use ${chosen.name.toLowerCase()}`}
           </Button>
           <Button
             variant="secondary"
             size="large"
-            disabled={pending || saved === null}
+            disabled={pending}
             onClick={() =>
               perform(
-                () => setBrandColourAction(null),
-                () => choose(DEFAULT_BRAND_HEX),
+                () => setBrandThemeAction(null),
+                () => {
+                  setPreset("black_gold");
+                  chooseAccent(null);
+                },
               )
             }
           >
-            Reset to Capital Q blue
+            Reset to black and gold
           </Button>
+          <span className="cq-caption text-(--cq-text-secondary)">
+            Everyone in your firm sees it from their next page.
+          </span>
         </div>
         <ResultLine result={result} />
       </div>
 
-      {palette === null ? null : (
-        <div className="flex flex-col gap-3" aria-label="Preview">
-          <Preview mode="light" theme={palette.light} />
-          <Preview mode="dark" theme={palette.dark} />
-        </div>
-      )}
+      <ContrastPanel preset={chosen} accent={accent} />
     </div>
   );
 }
 
-function AdjustNote({
-  palette,
+function PresetButton({
+  preset,
+  on,
+  onPick,
 }: {
-  readonly palette: NonNullable<ReturnType<typeof brandPalette>>;
+  readonly preset: BrandPreset;
+  readonly on: boolean;
+  readonly onPick: () => void;
 }) {
-  const light = palette.light.adjusted;
-  const dark = palette.dark.adjusted;
-  if (!light && !dark) {
-    return (
-      <p className="cq-body-sm text-(--cq-text-secondary)">
-        Used exactly as picked in light and dark.
-      </p>
-    );
-  }
-  const where =
-    light && dark
-      ? "in both themes"
-      : light
-        ? "on light backgrounds (darker)"
-        : "in dark mode (lighter)";
   return (
-    <p className="cq-body-sm rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-4 py-3 text-(--cq-text-secondary)">
-      Adjusted slightly {where} so text on it stays readable.
-    </p>
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onPick}
+      data-brand-preset={preset.key}
+      className="grid min-h-14 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-left aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
+    >
+      <span
+        aria-hidden="true"
+        className="grid size-10 grid-cols-2 overflow-hidden rounded-(--cq-radius-sm) border border-(--cq-border)"
+      >
+        <span style={{ backgroundColor: preset.swatch[0] }} />
+        <span style={{ backgroundColor: preset.swatch[1] }} />
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="cq-body-sm font-medium text-(--cq-text-primary)">
+          {preset.name}
+        </span>
+        <span className="cq-caption text-(--cq-text-secondary)">
+          {preset.description}
+        </span>
+      </span>
+    </button>
   );
 }
 
-function ratio(value: number): string {
-  return `${value.toFixed(1)}:1`;
-}
-
-function Preview({
-  mode,
-  theme,
+/**
+ * Design B's contrast table, for the chosen theme in both modes. The
+ * accent rows use the colour on top when one is chosen (as adjusted).
+ */
+function ContrastPanel({
+  preset,
+  accent,
 }: {
-  readonly mode: "light" | "dark";
-  readonly theme: ThemePalette;
+  readonly preset: BrandPreset;
+  readonly accent: string | null;
 }) {
-  const surface = PREVIEW_SURFACES[mode];
-  const pass = theme.fillContrast >= AA && theme.textContrast >= AA;
+  const palette = preset.palette;
+  const custom = accent === null ? null : brandPalette(accent);
+  const modes = (["light", "dark"] as const).flatMap((theme) => {
+    if (palette === null) return [];
+    const base: PresetMode = palette[theme];
+    const mode: PresetMode =
+      custom === null
+        ? base
+        : {
+            ...base,
+            accent: custom[theme].accent,
+            "accent-hover": custom[theme].hover,
+            "accent-soft": custom[theme].soft,
+          };
+    return [
+      {
+        theme,
+        rows: checkContrast(
+          contrastPairs(mode, palette.chrome, {
+            canvas: palette.stage.canvas,
+            qLight: palette.stage.qLight,
+          }),
+        ),
+      },
+    ];
+  });
   return (
-    <figure
-      className="flex flex-col gap-3 rounded-(--cq-radius-lg) border p-4"
-      style={
-        {
-          backgroundColor: surface.canvas,
-          borderColor: surface.border,
-          color: surface.text,
-        } satisfies CSSProperties
-      }
+    <section
+      className="cq-panel flex flex-col gap-3 p-5"
+      aria-labelledby="brand-contrast"
     >
-      <figcaption className="cq-label" style={{ color: surface.muted }}>
-        {mode === "light" ? "Light" : "Dark"}
-      </figcaption>
-      <div
-        className="cq-body-sm flex min-h-11 items-center gap-3 rounded-(--cq-radius-md) px-3"
-        style={{ backgroundColor: theme.soft }}
-      >
-        <span
-          aria-hidden="true"
-          className="h-5 w-0.5 rounded-full"
-          style={{ backgroundColor: theme.accent }}
-        />
-        Discover
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <span
-          className="cq-body-sm inline-flex h-11 items-center rounded-md px-4 font-medium"
-          style={{ backgroundColor: theme.accent, color: surface.inverse }}
-        >
-          Express interest
-        </span>
-        <span
-          className="cq-body-sm font-medium underline underline-offset-4"
-          style={{ color: theme.accent }}
-        >
-          Open profile
-        </span>
-      </div>
-      <p className="cq-caption cq-numeric" style={{ color: surface.muted }}>
-        Button text {ratio(theme.fillContrast)} · Link text{" "}
-        {ratio(theme.textContrast)} · {pass ? "Passes AA" : "Below AA"}
+      <h3 id="brand-contrast" className="cq-label text-(--cq-text-primary)">
+        Contrast
+      </h3>
+      <p className="cq-body-sm text-(--cq-text-secondary)">
+        Every pair is checked against WCAG AA. Gold is a fill or a deep bronze
+        for text, never pale gold text on white.
       </p>
-    </figure>
+      {palette === null ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          Capital Q blue is the product&apos;s classic look; its pairs are
+          checked in the design tokens.
+        </p>
+      ) : (
+        modes.map(({ theme, rows }) => (
+          <table key={theme} className="cq-body-sm w-full border-collapse">
+            <caption className="cq-caption pb-1 text-left text-(--cq-text-secondary)">
+              {theme === "light" ? "Light" : "Dark"}
+            </caption>
+            <thead className="sr-only">
+              <tr>
+                <th scope="col">Pair</th>
+                <th scope="col">Sample</th>
+                <th scope="col">Ratio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.name}
+                  className="border-b border-(--cq-border-subtle)"
+                >
+                  <td className="py-1.5 pr-2 text-(--cq-text-primary)">
+                    {row.name}
+                  </td>
+                  <td className="py-1.5">
+                    <span
+                      className="inline-grid h-6 w-11 place-items-center rounded-(--cq-radius-xs) font-semibold"
+                      style={
+                        {
+                          color: row.fg.slice(0, 7),
+                          backgroundColor: row.bg.slice(0, 7),
+                        } satisfies CSSProperties
+                      }
+                      aria-hidden="true"
+                    >
+                      Aa
+                    </span>
+                  </td>
+                  <td className="cq-numeric py-1.5 text-right whitespace-nowrap text-(--cq-text-secondary)">
+                    {row.ratio.toFixed(1)}:1 · {row.passes ? "Passes" : "Below"}{" "}
+                    {row.need}:1
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ))
+      )}
+    </section>
   );
 }
