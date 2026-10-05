@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { QActionProposalSchema } from "./action.js";
+import { QAnswerCardsBlockSchema } from "./answer-cards.js";
 import { QArtifactStatusSchema, QArtifactTypeSchema } from "./artifact.js";
 import { QArtifactIdSchema } from "./ids.js";
 import { QUncertainConfidenceLevelSchema } from "./confidence.js";
@@ -39,6 +40,7 @@ export const Q_RESULT_BLOCK_KINDS = [
   "INVESTOR_REFERENCE",
   "COMPARISON",
   "COMPARISON_CARDS",
+  "ANSWER_CARDS",
   "EVIDENCE",
   "FINDING",
   "UNCERTAINTY",
@@ -279,6 +281,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QInvestorReferenceBlockSchema,
   QComparisonBlockSchema,
   QComparisonCardsBlockSchema,
+  QAnswerCardsBlockSchema,
   QEvidenceBlockSchema,
   QFindingBlockSchema,
   QUncertaintyBlockSchema,

@@ -66,7 +66,7 @@ describe("COMPANY_ANALYST v10", () => {
 describe("COMPANY_ANALYST v11", () => {
   it("was the active analyst version until v12 took over", () => {
     const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(16);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(17);
     expect(COMPANY_ANALYST_V11.status).toBe("DEPRECATED");
   });
 
@@ -163,7 +163,7 @@ describe("COMPANY_ANALYST v13 (founder live 2026-09-29)", () => {
 describe("COMPANY_ANALYST v16", () => {
   it("is active, keeps v15's instructions, and puts every variable at the end", () => {
     const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(16);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(17);
     expect(COMPANY_ANALYST_V15.status).toBe("DEPRECATED");
     const template = COMPANY_ANALYST_V16.template;
     const turn = template.indexOf(COMPANY_ANALYST_V16_TURN);

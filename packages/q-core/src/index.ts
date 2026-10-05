@@ -262,6 +262,10 @@ export {
   TURN_READER_V42_MESSY_WORDS,
 } from "./prompts/tasks/turn-reader.v42.js";
 export {
+  TURN_READER_V43,
+  V43_PREPARE_HEAD,
+} from "./prompts/tasks/turn-reader.v43.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -652,6 +656,10 @@ export {
 export { COMPANY_ANALYST_V14 } from "./prompts/tasks/company-analyst.v14.js";
 export { COMPANY_ANALYST_V15 } from "./prompts/tasks/company-analyst.v15.js";
 export {
+  COMPANY_ANALYST_V17,
+  V17_CARDS_LINE,
+} from "./prompts/tasks/company-analyst.v17.js";
+export {
   COMPANY_ANALYST_V16,
   COMPANY_ANALYST_V16_TURN,
 } from "./prompts/tasks/company-analyst.v16.js";
@@ -722,6 +730,12 @@ export {
   CompanyAnalystV12ResultSchema,
   CompanyAnalystV14ResultSchema,
   CompanyAnalystV15ResultSchema,
+  CompanyAnalystV17ResultSchema,
+  COMPANY_ANALYST_V17_SCHEMA_VERSION,
+  ANSWER_CARDS_GUIDANCE,
+  ModelAnswerCardsSchema,
+  type ModelAnswerCards,
+  type CompanyAnalystV17Result,
   COMPANY_ANALYST_V15_SCHEMA_VERSION,
   PROPOSAL_STATUS_GUIDANCE,
   COMPANY_ANALYST_V14_SCHEMA_VERSION,

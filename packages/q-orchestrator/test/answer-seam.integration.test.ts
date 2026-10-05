@@ -383,7 +383,7 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(final.run.modelPolicyVersion).toBe("normal_dialogue.v1");
       // The active analyst (v15: proposalStatus beside v14's gestures).
       expect(final.run.promptBundleVersion).toBe(
-        "q-system.v1_company-analyst.v16_comm.v1",
+        "q-system.v1_company-analyst.v17_comm.v1",
       );
       expect(google.calls[0]?.request.messages[0]?.content).toContain(
         "You are Q",

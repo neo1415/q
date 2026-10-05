@@ -97,6 +97,27 @@ const completedRun = {
       ],
     },
     {
+      kind: "ANSWER_CARDS",
+      shape: "RESEARCH",
+      title: "Research Y Combinator",
+      cards: [
+        {
+          key: "what-it-is",
+          name: "What it is",
+          line: null,
+          hue: 1,
+          fit: null,
+          reasons: ["An accelerator"],
+          measures: [],
+          view: null,
+          said: null,
+          sourceCount: 4,
+          subject: null,
+        },
+      ],
+      followUps: [],
+    },
+    {
       kind: "EVIDENCE",
       evidenceRefs: [{ kind: "DOCUMENT", documentId: UUID, page: 3 }],
     },
@@ -278,6 +299,8 @@ describe("type-level guarantees", () => {
           return String(block.rows.length);
         case "COMPARISON_CARDS":
           return String(block.items.length);
+        case "ANSWER_CARDS":
+          return String(block.cards.length);
         case "EVIDENCE":
           return String(block.evidenceRefs.length);
         case "FINDING":

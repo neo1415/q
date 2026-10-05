@@ -70,6 +70,11 @@ function blockItems(blocks: readonly QResultBlock[]): ShownItem[] {
       for (const card of block.items) {
         items.push({ kind: "NAMED", id: null, name: card.name });
       }
+    } else if (block.kind === "ANSWER_CARDS") {
+      // "The second one" means the second card as shown.
+      for (const card of block.cards) {
+        items.push({ kind: "NAMED", id: null, name: card.name });
+      }
     }
   }
   return items;

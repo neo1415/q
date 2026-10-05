@@ -378,6 +378,28 @@ export {
 } from "./result-block.js";
 
 export {
+  Q_ANSWER_CARD_FOLLOW_UPS_MAX,
+  Q_ANSWER_CARD_HUES,
+  Q_ANSWER_CARD_LEVELS,
+  Q_ANSWER_CARD_MEASURES_MAX,
+  Q_ANSWER_CARD_REASONS_MAX,
+  Q_ANSWER_CARDS_MAX,
+  Q_ANSWER_CARDS_SHAPES,
+  QAnswerCardFitSchema,
+  QAnswerCardLevelSchema,
+  QAnswerCardMeasureSchema,
+  QAnswerCardSchema,
+  QAnswerCardsBlockSchema,
+  QAnswerCardsShapeSchema,
+  type QAnswerCard,
+  type QAnswerCardFit,
+  type QAnswerCardLevel,
+  type QAnswerCardMeasure,
+  type QAnswerCardsBlock,
+  type QAnswerCardsShape,
+} from "./answer-cards.js";
+
+export {
   Q_COMPARISON_SUBJECTS_MAX,
   Q_COMPARISON_SUBJECTS_MIN,
   Q_UI_COMPANY_SECTIONS,

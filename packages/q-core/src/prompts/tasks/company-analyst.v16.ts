@@ -44,7 +44,8 @@ export const COMPANY_ANALYST_V16: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V15,
   version: 16,
-  status: "ACTIVE",
+  // Deprecated by v17 (answer cards, 2026-10-05).
+  status: "DEPRECATED",
   changeDescription:
     "Lead 2026-10-02 (speed): v15 in prompt-cache order -- capability, subject, this turn's notes, institutional notes and memory moved to a THIS TURN tail; wording and schema unchanged.",
   effectiveFrom: "2026-10-02",

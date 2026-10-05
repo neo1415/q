@@ -82,6 +82,27 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       { name: "Kivu Freight", subtitle: null, points: ["Not known"] },
     ],
   },
+  ANSWER_CARDS: {
+    kind: "ANSWER_CARDS",
+    shape: "RANKED",
+    title: "Top three for your mandate",
+    cards: [
+      {
+        key: "ledgerfold",
+        name: "Ledgerfold",
+        line: "Treasury software",
+        hue: 1,
+        fit: { score: 8.6, measured: 3, of: 4 },
+        reasons: ["Seed round in range"],
+        measures: [{ label: "Stage", level: "STRONG", value: "Seed" }],
+        view: null,
+        said: null,
+        sourceCount: 2,
+        subject: null,
+      },
+    ],
+    followUps: [],
+  },
   EVIDENCE: { kind: "EVIDENCE", evidenceRefs: [evidenceRef] },
   FINDING: { kind: "FINDING", finding: publicFinding },
   PUBLIC_SOURCE: {
