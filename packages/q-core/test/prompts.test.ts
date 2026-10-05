@@ -93,6 +93,8 @@ describe("registry", () => {
         "INVESTOR_MANDATE_SYNTHESIS",
         "COMPANY_ANALYST",
         "FIT_EXPLANATION",
+        // ADR 0052: Q's view beside a computed fit.
+        "FIT_Q_VIEW",
         // CQ-Q-PRESENCE-001: reads public pages about one subject.
         "PRESENCE_READER",
         // HARDEN P0 2026-10-02: public sources onto their profile's open fields.

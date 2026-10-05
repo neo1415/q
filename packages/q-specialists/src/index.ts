@@ -125,6 +125,14 @@ export {
   type RecommendationNarrator,
   type RecommendationNarratorDependencies,
 } from "./recommendation/narrator.js";
+// MATCH block (ADR 0052): Q's view beside a computed fit.
+export {
+  createFitQViewer,
+  fitQViewGroundingFailure,
+  type FitQViewer,
+  type FitQViewerDependencies,
+  type FitQViewRequest,
+} from "./recommendation/fit-q-view.js";
 
 export {
   applyRevisedBodies,
