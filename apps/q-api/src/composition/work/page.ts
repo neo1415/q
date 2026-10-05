@@ -50,11 +50,16 @@ export type SuggestionFacts = {
     readonly companyId: string;
     readonly name: string;
   }[];
-  /** Calls they were on that ended recently. */
+  /**
+   * Calls they were on that ended recently. `followedUp` is true once the
+   * person wrote to that side after the call (the recap went) or Q already
+   * proposed that call's own follow-up cards: either way, no recap card.
+   */
   readonly callsEnded: readonly {
     readonly meetingId: string;
     readonly relationshipId: string;
     readonly endedAt: string;
+    readonly followedUp: boolean;
   }[];
   /** Founder: their company has a deck and none is shared with investors. */
   readonly deckUnshared: boolean;
@@ -137,26 +142,57 @@ export function composeSuggestions(
     }
   }
 
+  // One card per counterpart, never one per row: a meeting read twice (a
+  // person on it twice) is one call, and several calls with the same side
+  // are one "Send recaps?" card. A dismissal covers every call with that
+  // side that had ended by then; a newer call asks again.
+  const calls = new Map<string, Map<string, number>>();
+  const dismissedUntil = new Map<string, number>();
+  const dismissedMeetings = new Set<string>();
+  for (const key of facts.dismissed) {
+    const parts = key.split(":");
+    if (parts[0] !== "call_recap") continue;
+    if (parts.length === 2 && parts[1] !== undefined) {
+      dismissedMeetings.add(parts[1]);
+    } else if (parts.length === 3 && parts[1] !== undefined) {
+      const minute = Number(parts[2]);
+      if (!Number.isFinite(minute)) continue;
+      dismissedUntil.set(
+        parts[1],
+        Math.max(dismissedUntil.get(parts[1]) ?? 0, minute * 60_000),
+      );
+    }
+  }
   for (const call of facts.callsEnded) {
-    const item = byId.get(call.relationshipId);
+    if (call.followedUp || dismissedMeetings.has(call.meetingId)) continue;
+    const endedMs = Date.parse(call.endedAt);
+    if (endedMs <= (dismissedUntil.get(call.relationshipId) ?? -1)) continue;
+    const group = calls.get(call.relationshipId) ?? new Map<string, number>();
+    group.set(call.meetingId, Math.max(group.get(call.meetingId) ?? 0, endedMs));
+    calls.set(call.relationshipId, group);
+  }
+  for (const [relationshipId, group] of calls) {
+    const item = byId.get(relationshipId);
     if (item === undefined || !free(item)) continue;
-    const age = days(call.endedAt, now);
+    const latest = Math.max(...group.values());
+    const count = group.size;
+    const age = days(new Date(latest).toISOString(), now);
+    const when =
+      age === 0 ? "today" : age === 1 ? "yesterday" : `${String(age)} days ago`;
     out.push({
-      key: `call_recap:${call.meetingId}`,
+      key: `call_recap:${relationshipId}:${String(Math.floor(latest / 60_000))}`,
       kind: "CALL_RECAP",
-      lead: 1,
-      unit: "call",
-      subject:
-        `${item.name} call ended ${age === 0 ? "today" : age === 1 ? "yesterday" : `${String(age)} days ago`}`.slice(
-          0,
-          120,
-        ),
-      question: "Send the recap?",
-      prompt:
-        `Prepare a short recap of my call with ${item.name}, from the call's notes, as a message to them for me to approve.`.slice(
-          0,
-          400,
-        ),
+      lead: count,
+      unit: plural(count, "call", "calls"),
+      subject: (count === 1
+        ? `${item.name} call ended ${when}`
+        : `${String(count)} calls with ${item.name}`
+      ).slice(0, 120),
+      question: count === 1 ? "Send the recap?" : "Send recaps?",
+      prompt: (count === 1
+        ? `Prepare a short recap of my call with ${item.name}, from the call's notes, as a message to them for me to approve.`
+        : `Prepare one short recap of my last ${String(count)} calls with ${item.name}, from the calls' notes, as a message to them for me to approve.`
+      ).slice(0, 400),
       linkPath: relationshipPath(item),
       age,
     });
@@ -335,16 +371,40 @@ export function createWorkPage(dependencies: {
         await Promise.all([
           investor ? reads.feed(actor).catch(quiet(null)) : null,
           investor ? reads.decisions(actor).catch(quiet([])) : [],
-          sql<{ id: string; relationship_id: string; ends_at: Date }[]>`
-            select m.id, m.relationship_id, m.ends_at
+          // Each meeting once (never one row per participant row), and
+          // whether it is already followed up: the person wrote to that
+          // side after it ended, or Q proposed its follow-up cards
+          // (meeting-follow-up-cards keys them `meet:<meeting id>:...`).
+          sql<
+            {
+              id: string;
+              relationship_id: string;
+              ends_at: Date;
+              followed_up: boolean;
+            }[]
+          >`
+            select m.id, m.relationship_id, m.ends_at,
+                   (exists (
+                      select 1 from communication.conversations c
+                        join communication.messages x on x.conversation_id = c.id
+                       where c.relationship_id = m.relationship_id
+                         and x.sender_user_id = ${actor.userId}
+                         and x.created_at >= m.ends_at)
+                    or exists (
+                      select 1 from q_runtime.actions a
+                       where a.proposed_by_user_id = ${actor.userId}
+                         and a.tenant_id = ${actor.tenantId}
+                         and a.proposed_payload->>'idempotencyKey'
+                             like 'meet:' || m.id::text || ':%')) as followed_up
               from communication.meetings m
-              join communication.meeting_participants p on p.meeting_id = m.id
-             where p.user_id = ${actor.userId}
+             where exists (
+                     select 1 from communication.meeting_participants p
+                      where p.meeting_id = m.id and p.user_id = ${actor.userId})
                and m.status = 'SCHEDULED'
                and m.ends_at <= ${current}
                and m.ends_at > ${new Date(current.getTime() - RECAP_WITHIN_DAYS * DAY_MS)}
              order by m.ends_at desc
-             limit 5`.catch(quiet([])),
+             limit 20`.catch(quiet([])),
           // Only a founder's own company's documents.
           investor || companyId === null
             ? []
@@ -420,6 +480,7 @@ export function createWorkPage(dependencies: {
             meetingId: row.id,
             relationshipId: row.relationship_id,
             endedAt: new Date(row.ends_at).toISOString(),
+            followedUp: row.followed_up,
           })),
           deckUnshared:
             deckRow !== undefined && deckRow.decks > 0 && deckRow.shared === 0,

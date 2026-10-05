@@ -116,6 +116,7 @@ describe("Q suggests (WORK-58)", () => {
             meetingId: "30000000-0000-4000-8000-000000000001",
             relationshipId: one.relationshipId,
             endedAt: daysAgo(1),
+            followedUp: false,
           },
         ],
         deckUnshared: true,
@@ -130,6 +131,105 @@ describe("Q suggests (WORK-58)", () => {
     expect(out[0]?.linkPath).toBe(
       `/relationships/investor/${one.counterpartId}`,
     );
+  });
+
+  describe("call recaps: one card per counterpart, never repeated", () => {
+    const one = rel(1, "NONE", 0);
+    const two = rel(2, "NONE", 0);
+    const m = (n: number) => `30000000-0000-4000-8000-00000000000${String(n)}`;
+    const call = (
+      meeting: number,
+      item: typeof one,
+      age: number,
+      followedUp = false,
+    ): SuggestionFacts["callsEnded"][number] => ({
+      meetingId: m(meeting),
+      relationshipId: item.relationshipId,
+      endedAt: daysAgo(age),
+      followedUp,
+    });
+    const recaps = (facts: Partial<SuggestionFacts>) =>
+      composeSuggestions(
+        { ...empty, relationships: [one, two], ...facts },
+        NOW,
+      ).filter((item) => item.kind === "CALL_RECAP");
+
+    it("the same meeting read twice is one card (the four-card bug)", () => {
+      const out = recaps({
+        callsEnded: [call(1, one, 0), call(1, one, 0)],
+      });
+      expect(out).toHaveLength(1);
+      expect(out[0]?.subject).toBe("Company 1 call ended today");
+      expect(out[0]?.question).toBe("Send the recap?");
+      expect(QWorkSuggestionDtoSchema.safeParse(out[0]).success).toBe(true);
+    });
+
+    it("several calls with the same side are grouped into one card", () => {
+      const out = recaps({
+        callsEnded: [
+          call(1, one, 0),
+          call(1, one, 0),
+          call(2, one, 2),
+          call(2, one, 2),
+          call(3, two, 1),
+        ],
+      });
+      expect(out).toHaveLength(2);
+      const grouped = out.find((item) => item.subject.includes("Company 1"));
+      expect(grouped?.subject).toBe("2 calls with Company 1");
+      expect(grouped?.question).toBe("Send recaps?");
+      expect(grouped?.lead).toBe(2);
+      expect(grouped?.unit).toBe("calls");
+      expect(new Set(out.map((item) => item.key)).size).toBe(2);
+      for (const item of out) {
+        expect(QWorkSuggestionDtoSchema.safeParse(item).success).toBe(true);
+      }
+    });
+
+    it("never for a call already followed up (recap sent or cards proposed)", () => {
+      expect(recaps({ callsEnded: [call(1, one, 0, true)] })).toEqual([]);
+      const out = recaps({
+        callsEnded: [call(1, one, 0, true), call(2, one, 2)],
+      });
+      expect(out).toHaveLength(1);
+      expect(out[0]?.subject).toBe("Company 1 call ended 2 days ago");
+    });
+
+    it("never while that side is already in a pending card", () => {
+      expect(
+        recaps({
+          callsEnded: [call(1, one, 0)],
+          busy: new Set([one.relationshipId]),
+        }),
+      ).toEqual([]);
+    });
+
+    it("Not now covers every call that had ended; a newer call asks again", () => {
+      const first = recaps({ callsEnded: [call(1, one, 2), call(2, one, 1)] });
+      const key = first[0]?.key ?? "";
+      expect(key).toMatch(/^call_recap:/u);
+      expect(
+        recaps({
+          callsEnded: [call(1, one, 2), call(2, one, 1)],
+          dismissed: new Set([key]),
+        }),
+      ).toEqual([]);
+      const later = recaps({
+        callsEnded: [call(1, one, 2), call(2, one, 1), call(3, one, 0)],
+        dismissed: new Set([key]),
+      });
+      expect(later).toHaveLength(1);
+      expect(later[0]?.subject).toBe("Company 1 call ended today");
+    });
+
+    it("an older per-meeting dismissal still holds", () => {
+      expect(
+        recaps({
+          callsEnded: [call(1, one, 0)],
+          dismissed: new Set([`call_recap:${m(1)}`]),
+        }),
+      ).toEqual([]);
+    });
   });
 
   it("a cursor round-trips and anything malformed is the first page", () => {
