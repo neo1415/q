@@ -131,6 +131,12 @@ importers:
       '@capital-q/public-identity':
         specifier: workspace:*
         version: link:../../packages/public-identity
+      '@capital-q/q-core':
+        specifier: workspace:*
+        version: link:../../packages/q-core
+      '@capital-q/q-runtime':
+        specifier: workspace:*
+        version: link:../../packages/q-runtime
       '@capital-q/results':
         specifier: workspace:*
         version: link:../../packages/results

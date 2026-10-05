@@ -83,3 +83,10 @@ export {
   type DocumentChangePort,
   type ManagedDocument,
 } from "./actions/document-manage.js";
+// ETIQUETTE block (ADR 0050): how Q speaks for you.
+export {
+  ETIQUETTE_ACTIONS,
+  toMyEtiquetteDto,
+  type EtiquetteGuidePort,
+  type HouseEtiquette,
+} from "./actions/etiquette.js";

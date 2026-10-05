@@ -2,6 +2,7 @@ import { fenceUntrusted } from "../prompts/definition.js";
 import {
   BUILT_IN_ETIQUETTE_DIGEST,
   BUILT_IN_ETIQUETTE_GUIDE,
+  BUILT_IN_ETIQUETTE_TITLE,
   BUILT_IN_ETIQUETTE_VERSION,
 } from "./default-guide.js";
 
@@ -176,4 +177,39 @@ export function etiquetteVersions(guides: EtiquetteGuides): string {
   return [guides.platform.version, guides.personal?.version]
     .filter((version): version is string => version !== undefined)
     .join("+");
+}
+
+/** The platform's uploaded guide in force, as stored (structural). */
+export type ActivePlatformGuideLike = {
+  readonly version: number;
+  readonly title: string;
+  readonly text: string;
+} | null;
+
+/** The platform guide Q follows: the admin's upload, else the built-in one. */
+export function platformEtiquetteSource(
+  active: ActivePlatformGuideLike,
+): EtiquetteGuideSource {
+  return active === null
+    ? BUILT_IN_ETIQUETTE
+    : { version: `platform/v${String(active.version)}`, text: active.text };
+}
+
+/** Which house guide applies, in the words Settings shows. */
+export function houseEtiquetteOf(active: ActivePlatformGuideLike): {
+  readonly source: "BUILT_IN" | "UPLOADED";
+  readonly title: string;
+  readonly version: string;
+} {
+  return active === null
+    ? {
+        source: "BUILT_IN",
+        title: BUILT_IN_ETIQUETTE_TITLE,
+        version: BUILT_IN_ETIQUETTE_VERSION,
+      }
+    : {
+        source: "UPLOADED",
+        title: active.title,
+        version: `platform/v${String(active.version)}`,
+      };
 }

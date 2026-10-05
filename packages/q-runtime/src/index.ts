@@ -221,3 +221,12 @@ export {
   type OrphanedRunSweepDependencies,
   type OrphanedRunSweepResult,
 } from "./application/orphaned-runs.js";
+// ETIQUETTE block (ADR 0050): a person's own business etiquette guide.
+export {
+  createPostgresEtiquetteGuideStore,
+  type EtiquetteGuideOwner,
+  type PersonalEtiquetteGuide,
+  type PersonalEtiquetteGuideStore,
+  type PersonalEtiquetteSourceKind,
+  type SavePersonalEtiquetteGuide,
+} from "./infrastructure/postgres-etiquette-guides.js";
