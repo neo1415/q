@@ -21,6 +21,8 @@ import {
   type ActorContextResolver,
 } from "@capital-q/security";
 
+import type { OutwardReview } from "./workforce/review.js";
+
 /**
  * After the call, Q works in the app (meet-47, founder direction
  * 2026-10-03). From the record Q wrote (MEETING_NOTES v3), each person on
@@ -324,10 +326,73 @@ export function createMeetingFollowUpCards(dependencies: {
     "begin" | "advanceThrough" | "fail"
   >;
   readonly actions: Pick<QActionService, "propose">;
+  /** Founder brief J2: the recap to the other side is graded first. */
+  readonly review?: OutwardReview | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 }) {
   const { sql, logger } = dependencies;
+
+  /**
+   * The recap message, through the reviewer: a passing recap is offered
+   * (perhaps redrafted); a held one is not offered at all.
+   */
+  async function reviewed(
+    actor: ActorContext,
+    card: FollowUpCard,
+    meetingId: string,
+    counterpartName: string,
+    agreements: readonly string[],
+  ): Promise<{
+    card: FollowUpCard;
+    settle: (() => Promise<void>) | null;
+  } | null> {
+    const review = dependencies.review;
+    const input = card.payload["input"];
+    if (
+      review === undefined ||
+      card.actionType !== "app.chat.message.send" ||
+      typeof input !== "object" ||
+      input === null ||
+      !("body" in input) ||
+      typeof input.body !== "string"
+    ) {
+      return { card, settle: null };
+    }
+    const verdict = await review.review(
+      actor,
+      {
+        kind: "MEETING_FOLLOW_UP",
+        id: meetingId,
+        goal: `Follow up the call with ${counterpartName}`,
+      },
+      {
+        principalName: "the organiser",
+        counterpartName,
+        channel: "CHAT",
+        stage: "FOLLOW_UP",
+        purpose:
+          "A short, warm recap after a call: what was agreed and the next steps, exactly as both sides heard them.",
+        material: agreements.join("\n"),
+        thread: "",
+        body: input.body,
+      },
+    );
+    if (verdict.verdict === "HELD") {
+      logger?.info(
+        { meetingId, reason: verdict.reason },
+        "meeting recap held below the bar",
+      );
+      return null;
+    }
+    return {
+      card: {
+        ...card,
+        payload: { ...card.payload, input: { ...input, body: verdict.body } },
+      },
+      settle: () => review.settle(actor, verdict, "OFFERED"),
+    };
+  }
   const now = dependencies.now ?? (() => new Date());
 
   async function actorOf(person: Person): Promise<ActorContext | null> {
@@ -533,16 +598,26 @@ export function createMeetingFollowUpCards(dependencies: {
         if (actor === null) continue;
         let conversationId: string | null = null;
         let count = 0;
-        for (const card of cards) {
+        for (const proposed of cards) {
           try {
+            const graded = await reviewed(
+              actor,
+              proposed,
+              held.meetingId,
+              person.counterpart,
+              held.agreements,
+            );
+            if (graded === null) continue;
+            const { card } = graded;
             conversationId = await propose(actor, card, conversationId);
+            await graded.settle?.();
             count += 1;
           } catch (error: unknown) {
             logger?.warn(
               {
                 err: error,
                 meetingId: held.meetingId,
-                action: card.actionType,
+                action: proposed.actionType,
               },
               "meeting follow-up card not prepared",
             );

@@ -198,6 +198,8 @@ create table q_runtime.workforce_draft_outcomes (
   -- approval (ASK). HELD: not sent and not offered; the reason says why.
   outcome           text not null check (outcome in ('SENT', 'OFFERED', 'HELD')),
   reason            text check (reason is null or reason ~ '^[A-Z][A-Z_]{1,63}$'),
+  -- OFFERED: the approval card it went to (q_runtime's Approval Engine).
+  q_action_id       uuid,
   created_at        timestamptz not null default clock_timestamp(),
   foreign key (job_id, tenant_id, user_id)
     references q_runtime.workforce_jobs (id, tenant_id, user_id) on delete cascade,

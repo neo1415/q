@@ -126,6 +126,7 @@ export {
   type AdminMonthUsage,
   type OwnMonthUsage,
   type UsageReader,
+  type WorkforceCostRow,
 } from "./infrastructure/usage-reader.js";
 
 export const PACKAGE_NAME = "@capital-q/model-gateway" as const;

@@ -533,6 +533,17 @@ export const ModelAttributionSchema = z
 /** The prefix an instruction's model calls carry in their correlation id. */
 export const INSTRUCTION_CORRELATION_PREFIX = "cor_instr_" as const;
 
+/**
+ * Founder brief J6: a workforce agent's model call carries its job and its
+ * agent run, so the usage ledger answers "what did this job, and this
+ * agent, cost?" (`cor_job_<job uuid>_<run uuid>`, at most 81 characters).
+ */
+export const WORKFORCE_CORRELATION_PREFIX = "cor_job_" as const;
+
+export function workforceCorrelationId(jobId: string, runId: string): string {
+  return `${WORKFORCE_CORRELATION_PREFIX}${jobId}_${runId}`;
+}
+
 /** The purpose a call is recorded under: declared, else derived. */
 export function usagePurposeOf(attribution: {
   readonly purpose?: ModelUsagePurpose | undefined;

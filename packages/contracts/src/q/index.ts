@@ -896,3 +896,35 @@ export * from "./daily.js";
 // BILLING-2 block (ADR 0036): the Capital Readiness Blueprint's contracts.
 export * from "./readiness-blueprint.js";
 // end BILLING-2 block
+
+// WORKFORCE block (founder brief J1-J9): Q's workforce of agents.
+export {
+  Q_WORKFORCE_JOB_PATH,
+  Q_WORKFORCE_JOBS_PATH,
+  WORKFORCE_AGENT_ROLES,
+  WORKFORCE_DRAFT_OUTCOMES,
+  WORKFORCE_FEEDBACK_KINDS,
+  WORKFORCE_JOB_SOURCES,
+  WORKFORCE_JOB_STATUSES,
+  WORKFORCE_RUN_STATUSES,
+  WORKFORCE_TIMELINE_KINDS,
+  WorkforceAgentRoleSchema,
+  WorkforceAgentRunDtoSchema,
+  WorkforceDraftDtoSchema,
+  WorkforceGradeDtoSchema,
+  WorkforceJobDetailDtoSchema,
+  WorkforceJobListDtoSchema,
+  WorkforceJobListQuerySchema,
+  WorkforceJobSourceSchema,
+  WorkforceJobSummaryDtoSchema,
+  WorkforceReviewBarDtoSchema,
+  WorkforceTimelineEntryDtoSchema,
+  qWorkforceJobPath,
+  type WorkforceAgentRunDto,
+  type WorkforceDraftDto,
+  type WorkforceJobDetailDto,
+  type WorkforceJobListDto,
+  type WorkforceJobSummaryDto,
+  type WorkforceTimelineEntryDto,
+} from "./workforce.js";
+// end WORKFORCE block

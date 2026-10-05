@@ -32,6 +32,7 @@ import {
   type ErrandReplyVariables,
 } from "@capital-q/q-core";
 import { etiquetteFor, type EtiquetteSource } from "./etiquette.js";
+import { reviewedReply, type OutwardReview } from "./workforce/review.js";
 import {
   ERRAND_START as ERRAND_START_NAME,
   type RelationshipIntelligencePort,
@@ -690,6 +691,8 @@ export function createErrandRunner(dependencies: {
     Partial<Pick<ScheduleService, "calendarStatus" | "counterpartCanHost">>;
   readonly relationships: Pick<RelationshipIntelligencePort, "byRelationship">;
   readonly composer: ErrandReplyComposer;
+  /** Founder brief J2: every errand reply is graded before it goes. */
+  readonly review?: OutwardReview | undefined;
   readonly nameOf: (userId: string) => Promise<string | null>;
   /** One gentle reminder to the other side when they stay silent. */
   readonly nudger?: Pick<CounterpartNudger, "nudge"> | undefined;
@@ -1351,15 +1354,34 @@ export function createErrandRunner(dependencies: {
               `${message.from === "OTHER_SIDE" ? message.senderName : `${message.senderName} (${principalName}'s side)`}: ${message.text ?? `[${message.attachmentTitle ?? message.kind}]`}`,
           )
           .join("\n");
-        const answer = await composer.compose({
+        const answer = await reviewedReply(
+          dependencies.review,
           actor,
-          principalName,
-          counterpartName: row.counterpart_name,
-          brief,
-          callComing:
-            plan.data.bookCall !== null && current.meeting_id === null,
-          thread,
-        });
+          {
+            kind: "ERRAND",
+            id: row.id,
+            goal: `Look after ${row.counterpart_name}`,
+          },
+          {
+            principalName,
+            counterpartName: row.counterpart_name,
+            channel: "CHAT",
+            stage: "REPLY",
+            purpose:
+              "Answer what the other side last asked or said, using only the approved brief.",
+            material: brief,
+            thread,
+          },
+          await composer.compose({
+            actor,
+            principalName,
+            counterpartName: row.counterpart_name,
+            brief,
+            callComing:
+              plan.data.bookCall !== null && current.meeting_id === null,
+            thread,
+          }),
+        );
         if (answer?.reply != null) {
           await post(
             actor,

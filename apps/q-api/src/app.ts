@@ -59,6 +59,10 @@ import {
   type WorkRoutesDependencies,
 } from "./http/work.js";
 import {
+  registerWorkforceRoutes,
+  type WorkforceRoutesDependencies,
+} from "./http/workforce.js";
+import {
   registerStandingRoutes,
   type StandingRoutesDependencies,
 } from "./http/standing.js";
@@ -139,6 +143,12 @@ export type QApiModules = {
   readonly work?: WorkRoutesDependencies["work"] | undefined;
   /** WORK-58: Q's work page reads (suggestions, Not now, done). */
   readonly workPage?: WorkRoutesDependencies["page"] | undefined;
+  /** Founder brief J5: Q's workforce, the person's own jobs and feedback. */
+  readonly workforce?:
+    | (Pick<WorkforceRoutesDependencies, "page"> & {
+        readonly onDecision?: QApprovalRoutesDependencies["onDecision"];
+      })
+    | undefined;
   /**
    * Pictures of who work and approvals name (founder decision
    * 2026-10-04). Absent: those rows read as initials.
@@ -444,6 +454,20 @@ export function createApp(
     });
   }
 
+  // WORKFORCE block (founder brief J5)
+  if (modules.workforce !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: workforce routes require an actor context resolver",
+      );
+    }
+    registerWorkforceRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      page: modules.workforce.page,
+    });
+  }
+
   // BILLING-2 block
   if (modules.readinessBlueprint !== undefined) {
     if (security.resolver === undefined) {
@@ -524,6 +548,7 @@ export function createApp(
       orchestrator: modules.orchestration?.orchestrator,
       continueApproved: modules.continueApproved,
       namedPhotos: modules.namedPhotos,
+      onDecision: modules.workforce?.onDecision,
     });
   }
 

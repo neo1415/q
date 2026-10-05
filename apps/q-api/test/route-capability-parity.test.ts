@@ -515,6 +515,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/work.ts DELETE Q_WORK_LANE_PATH": cap("tool.stop_q_work"),
   "q-api/http/work.ts POST Q_WORK_LANE_ANSWER_PATH": cap("tool.answer_q_work"),
   "q-api/http/work.ts GET Q_WORK_LANE_REPORT_PATH": DOWNLOAD,
+  // WORKFORCE (founder brief J5): the workforce page's record of Q's agents.
+  "q-api/http/workforce.ts GET Q_WORKFORCE_JOBS_PATH": exempt(
+    "the workforce page's audit-style record of Q's own agents (jobs, runs, grades); Q reports the same work in conversation through list_q_work",
+  ),
+  "q-api/http/workforce.ts GET Q_WORKFORCE_JOB_PATH": exempt(
+    "one job's agent record (runs, hand-offs, drafts, grades, timeline) for the workforce page; Q reports its work through list_q_work",
+  ),
   "q-api/http/work.ts PUT Q_PRESENCE_PATH": cap("tool.set_away"),
   // WORK-58: Q's work page.
   "q-api/http/work.ts GET Q_WORK_SUGGESTIONS_PATH": cap("navigate.WORK"),
