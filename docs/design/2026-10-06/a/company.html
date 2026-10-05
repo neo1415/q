@@ -464,7 +464,7 @@ function sk(w, h, r = 8) { return `<div class="sk" style="width:${w};height:${h}
 </script>
 <style>
 /* ---------- Profile layout ---------- */
-.prof { display: grid; gap: 24px; max-width: 1180px; }
+.prof { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; max-width: 1180px; }
 @media (min-width: 1200px) { .prof { grid-template-columns: minmax(0, 1fr) 340px; gap: 40px; align-items: start; } .rail { position: sticky; top: 28px; } }
 .rail { display: none; flex-direction: column; gap: 16px; }
 @media (min-width: 1200px) { .rail { display: flex; } .phone-only { display: none !important; } }
@@ -713,7 +713,7 @@ function loadingProfile() {
   return `<div class="prof"><div style="display:flex;flex-direction:column;gap:20px" aria-busy="true" aria-label="Loading profile">
     <div style="display:flex;gap:16px">${sk("72px", 72, 18)}<div style="flex:1;display:flex;flex-direction:column;gap:10px">${sk("50%", 26)}${sk("90%", 16)}${sk("40%", 12)}</div></div>
     <div style="display:flex;gap:8px">${sk("150px", 44, 10)}${sk("80px", 44, 10)}${sk("80px", 44, 10)}</div>
-    <div style="display:flex;gap:22px;border-bottom:1px solid var(--cq-border-subtle);padding-bottom:12px">${["70px", "70px", "80px", "80px", "50px"].map((w) => sk(w, 16)).join("")}</div>
+    <div style="display:flex;gap:22px;border-bottom:1px solid var(--cq-border-subtle);padding-bottom:12px;overflow:hidden">${["70px", "70px", "80px", "80px", "50px"].map((w) => sk(w, 16)).join("")}</div>
     ${sk("100%", 200, 14)}${sk("70%", 16)}${sk("85%", 16)}
   </div><aside class="rail">${sk("100%", 300, 14)}${sk("100%", 160, 14)}</aside></div>`;
 }
