@@ -11,18 +11,27 @@ const redirect = vi.fn((to: string): never => {
   throw new Error(`REDIRECT ${to}`);
 });
 vi.mock("next/navigation", () => ({ redirect }));
+// next/font is a build-time transform; in a unit test it is just a class.
+vi.mock("next/font/local", () => ({
+  default: () => ({ className: "font", variable: "font-var", style: {} }),
+}));
 
 /** Discover is home (founder directive, 2026-09-27); Q is one tap away. */
 describe("Discover is where the product starts", () => {
-  it("the root sends everyone to arrival; the landing waits for its redo", async () => {
-    // Founder 2026-10-04: until the landing's visual redo is approved, the
-    // root is the app's arrival again for everyone.
-    const { default: RootPage } = await import("../app/page");
-    expect(() => RootPage()).toThrow("REDIRECT /welcome");
+  it("the root is the landing for signed-out visitors; signed-in people go to arrival", async () => {
+    // Founder 2026-10-04: the approved landing is the root again. The
+    // request proxy still sends signed-in people and installed launches
+    // into the app before any HTML (landing-proxy.test.ts).
+    const page = await import("../app/page");
+    expect(page.dynamic).toBe("force-static");
+    expect(redirect).not.toHaveBeenCalled();
     const { landingRedirect } = await import("../src/auth/landing-route");
     expect(
       landingRedirect({ signedIn: true, searchParams: new URLSearchParams() }),
     ).toBe("/welcome");
+    expect(
+      landingRedirect({ signedIn: false, searchParams: new URLSearchParams() }),
+    ).toBeNull();
   });
 
   it("keeps Q reachable at /home, and /q redirects there with its query", async () => {
