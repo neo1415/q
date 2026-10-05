@@ -314,18 +314,23 @@ describe("POST /v1/q/voice/sessions", () => {
     await app.close();
   });
 
-  it("opens an interview once: a resumed line composes, records and says no opening of its own", async () => {
+  it("opens an interview once, and a resumed line is led by Q without a second greeting (onboarding conductor)", async () => {
     // The acceptance fixture: a text opener, a voice opener, then one more
-    // per dropped line -- three "Welcome back"s for one arrival. A resumed
-    // line (a reconnect, a voice switch, voice turned on over a question
-    // already on screen) must not ask the loop to open again, and the
-    // opening is what the loop records.
+    // per dropped line -- three "Welcome back"s for one arrival. Since the
+    // onboarding conductor (founder report 2026-10-05: Q never waits for
+    // the person to speak first) a resumed line asks the conductor for its
+    // opening too; the conductor resumes on the next unanswered step
+    // deterministically, with no greeting, and the route passes it on.
     const openings: string[] = [];
     const interviewAgent = {
       turn: (input: { readonly utterance: string }) => {
         openings.push(input.utterance);
         return Promise.resolve({
-          reply: "Welcome back. What's a typical cheque for you?",
+          reply:
+            openings.length === 1
+              ? "Welcome back. What's a typical cheque for you?"
+              : "Picking up where we left off. What's a typical cheque for you?",
+          resumed: openings.length > 1,
         });
       },
       researchEnded: () => undefined,
@@ -351,7 +356,7 @@ describe("POST /v1/q/voice/sessions", () => {
     expect(first.json<{ firstMessage?: string }>().firstMessage).toContain(
       "typical cheque",
     );
-    expect(openings).toHaveLength(1);
+    expect(openings).toEqual([""]);
 
     const resumed = await app.inject({
       method: "POST",
@@ -360,11 +365,10 @@ describe("POST /v1/q/voice/sessions", () => {
       payload: { onboarding, resume: true },
     });
     expect(resumed.statusCode).toBe(201);
-    // No second opening was composed, and no greeting invented in its place.
-    expect(openings).toHaveLength(1);
-    expect(
-      resumed.json<{ firstMessage?: string }>().firstMessage,
-    ).toBeUndefined();
+    // Q speaks first on the resumed line too, and greets nobody again.
+    const line = resumed.json<{ firstMessage?: string }>().firstMessage;
+    expect(line).toContain("typical cheque");
+    expect(line).not.toMatch(/welcome/i);
     await app.close();
   });
 

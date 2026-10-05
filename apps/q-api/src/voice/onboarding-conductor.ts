@@ -188,7 +188,15 @@ export type FoundConfirmation = {
 const MAX_STATEMENT = 140;
 
 function clip(text: string, max: number): string {
-  const flat = text.replace(/\s+/g, " ").trim().replace(/[.;,:]+$/u, "");
+  let flat = text
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[;,:]+$/u, "");
+  // A closing full stop goes; an abbreviation's own ("Ed.M.") stays.
+  const last = flat.split(" ").at(-1) ?? "";
+  if (flat.endsWith(".") && (last.match(/\./gu) ?? []).length < 2) {
+    flat = flat.replace(/\.+$/u, "");
+  }
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
 
@@ -219,8 +227,7 @@ export function confirmationsFromPresence(
   if (name.length < 2) return out;
   if (found.subjectType === "COMPANY") {
     const websiteAnswered =
-      view?.responses.some((r) => r.stepKey === FOUNDER_STEPS.website) ??
-      false;
+      view?.responses.some((r) => r.stepKey === FOUNDER_STEPS.website) ?? false;
     const own = found.domains.map(hostOf).find((d) => !NOT_OWN_SITE.test(d));
     if (own !== undefined && own.length > 3 && !websiteAnswered) {
       out.push({
@@ -241,8 +248,8 @@ export function confirmationsFromPresence(
     .map((s) => clip(s, MAX_STATEMENT))
     .find((s) => s.length >= 8);
   const where = found.domains.map(hostOf).find((d) => d.length > 3);
-  const about =
-    statement === undefined ? "" : `, ${statement.replace(/^[A-Z]/u, (c) => c.toLowerCase())}`;
+  // As found: a statement often opens on a proper noun ("Harvard Ed.M.").
+  const about = statement === undefined ? "" : `, ${statement}`;
   out.push({
     key: `person:${name.toLowerCase()}:${where ?? ""}`,
     kind: "PERSON",
@@ -273,7 +280,10 @@ export function createConfirmationQueue(
   const of = (id: string) => {
     const existing = bySession.get(id);
     if (existing !== undefined) return existing;
-    const created = { waiting: [] as FoundConfirmation[], seen: new Set<string>() };
+    const created = {
+      waiting: [] as FoundConfirmation[],
+      seen: new Set<string>(),
+    };
     bySession.set(id, created);
     while (bySession.size > maxSessions) {
       const oldest = bySession.keys().next().value;
@@ -304,11 +314,15 @@ export function createConfirmationQueue(
  * which Q answers by searching for them by name. Anything else waits for
  * Home Q once the setup is done: the interview stays the one voice.
  */
-export function isSelfLookup(question: string, names: readonly string[]): boolean {
+export function isSelfLookup(
+  question: string,
+  names: readonly string[],
+): boolean {
   const text = ` ${question.toLowerCase()} `;
   if (/[^a-z](me|my|myself|us|our|ours|we|mine)[^a-z]/u.test(text)) return true;
   return names.some(
-    (name) => name.trim().length >= 2 && text.includes(name.trim().toLowerCase()),
+    (name) =>
+      name.trim().length >= 2 && text.includes(name.trim().toLowerCase()),
   );
 }
 
@@ -346,7 +360,7 @@ export type TurnSerializer = {
     key: string,
     dedupeKey: string,
     work: () => Promise<T>,
-    signal?: AbortSignal | undefined,
+    signal?: AbortSignal,
   ) => Promise<T>;
 };
 
@@ -441,7 +455,9 @@ export type ConductorPortFactory = (input: {
 }) => KnownAnswerPort & {
   readonly view: () => OnboardingSessionView | null;
   readonly recommendFound?:
-    | ((items: readonly FoundRecommendation[]) => Promise<
+    | ((
+        items: readonly FoundRecommendation[],
+      ) => Promise<
         readonly { readonly stepKey: string; readonly outcome: string }[]
       >)
     | undefined;
@@ -501,17 +517,21 @@ export function createOnboardingConductor(
     stepKey: string | null,
   ) => {
     if (text.length === 0) return;
-    void appendOnboardingInterviewTurns(input.session, input.onboardingSessionId, {
-      turnRef: randomUUID(),
-      turns: [
-        {
-          role: "Q",
-          text: text.slice(0, 4_000),
-          channel: input.channel === "voice" ? "VOICE" : "TEXT",
-          ...(stepKey === null ? {} : { stepKey }),
-        },
-      ],
-    }).catch((error: unknown) => {
+    void appendOnboardingInterviewTurns(
+      input.session,
+      input.onboardingSessionId,
+      {
+        turnRef: randomUUID(),
+        turns: [
+          {
+            role: "Q",
+            text: text.slice(0, 4_000),
+            channel: input.channel === "voice" ? "VOICE" : "TEXT",
+            ...(stepKey === null ? {} : { stepKey }),
+          },
+        ],
+      },
+    ).catch((error: unknown) => {
       logger.warn({ err: error }, "the conductor's line was not kept");
     });
   };
@@ -715,7 +735,8 @@ export function createOnboardingConductor(
         }
       }
     }
-    if (extra.length === 0) return { ...outcome, questionForQ: null, researching: null };
+    if (extra.length === 0)
+      return { ...outcome, questionForQ: null, researching: null };
     const added = extra.join(" ");
     keep(input, added, asking?.stepKey ?? null);
     const tail = outcome.reply.trim().length === 0 ? added : ` ${added}`;

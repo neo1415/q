@@ -226,8 +226,7 @@ export type InterviewTurnOutcome = {
    * conductor's queue): "I found X — is that you / your website?".
    */
   readonly confirming?:
-    | { readonly key: string; readonly kind: "PERSON" | "WEBSITE" }
-    | undefined;
+    { readonly key: string; readonly kind: "PERSON" | "WEBSITE" } | undefined;
   /** The reply resumed a conversation already under way: no greeting. */
   readonly resumed?: boolean | undefined;
 };
