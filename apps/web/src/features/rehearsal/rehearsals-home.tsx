@@ -342,9 +342,15 @@ export function RehearsalsHome({
                         </span>
                       </span>
                       <span className="flex shrink-0 flex-col items-end">
-                        <span className="cq-body font-semibold tabular-nums text-(--cq-text-primary)">
-                          {item.score === null ? "No score" : item.score}
-                        </span>
+                        {item.score === null ? (
+                          <span className="cq-caption text-(--cq-text-secondary)">
+                            No score
+                          </span>
+                        ) : (
+                          <span className="cq-body font-semibold tabular-nums text-(--cq-text-primary)">
+                            {item.score}
+                          </span>
+                        )}
                         {change === undefined ? null : (
                           <span className="cq-caption tabular-nums text-(--cq-text-secondary)">
                             {signed(change)}

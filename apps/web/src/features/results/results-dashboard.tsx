@@ -108,9 +108,16 @@ function Tile({
   const body = (
     <>
       <span className="cq-body-sm text-(--cq-text-secondary)">{label}</span>
-      <span className="text-[1.625rem] leading-tight font-semibold tracking-[-0.01em] tabular-nums text-(--cq-text-primary) sm:text-[1.875rem]">
-        {value}
-      </span>
+      {/^\d/.test(value) ? (
+        <span className="text-[1.625rem] leading-tight font-semibold tracking-[-0.01em] tabular-nums text-(--cq-text-primary) sm:text-[1.875rem]">
+          {value}
+        </span>
+      ) : (
+        // An unknown is said in words, never drawn as large as a number.
+        <span className="cq-body flex min-h-[2.25rem] items-end font-medium text-(--cq-text-primary)">
+          {value}
+        </span>
+      )}
       {note === undefined ? null : (
         <span className="cq-caption text-(--cq-text-secondary)">{note}</span>
       )}
@@ -290,11 +297,19 @@ function Pipeline({
       }
     >
       {stages.length === 0 ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          {side === "INVESTOR"
-            ? "No relationships yet. They start when you express interest."
-            : "No relationships yet. They start when an investor expresses interest."}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {side === "INVESTOR"
+              ? "No relationships yet. They start when you express interest."
+              : "No relationships yet. They start when an investor expresses interest."}
+          </p>
+          <Link
+            href={side === "INVESTOR" ? "/discover" : "/profile"}
+            className={buttonClassName("primary", "compact")}
+          >
+            {side === "INVESTOR" ? "Find founders" : "Polish your profile"}
+          </Link>
+        </div>
       ) : (
         <>
           <ul className="flex flex-col gap-0.5">
