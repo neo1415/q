@@ -74,6 +74,13 @@
   --cq-landing-scrim: oklch(0.12 0.02 262 / 0.55);
   --cq-landing-scrim-clear: oklch(0.12 0.02 262 / 0);
   --cq-landing-highlight: oklch(1 0 0);
+  /* Q's glow (ADR 0045: light on Q only, one hue family), at its brightest;
+     the swarm fades these layers to the current glow. */
+  --cq-landing-q-bloom-core: rgb(96 140 255 / 0.735);
+  --cq-landing-q-bloom-mid: rgb(70 110 235 / 0.28);
+  --cq-landing-q-bloom-edge: rgb(50 80 200 / 0);
+  --cq-landing-q-aperture: rgb(255 246 228 / 0.875);
+  --cq-landing-q-aperture-edge: rgb(160 190 255 / 0);
   --cq-stage-ink-90: oklch(1 0 0 / 0.9);
   --cq-stage-ink-80: oklch(1 0 0 / 0.8);
   --cq-stage-ink-78: oklch(1 0 0 / 0.78);
@@ -2052,6 +2059,45 @@
 }
 
 /* ---------- Responsive ---------- */
+
+/* Q's swarm: bloom under, particles added onto it, the core added on top.
+   The two gradients only move and fade (transform, opacity). */
+.lp .stage,
+.lp .qwin-presence,
+.lp .call-main {
+  isolation: isolate;
+}
+.lp .lp-swarm-bloom,
+.lp .lp-swarm-core {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.lp .lp-swarm-bloom {
+  background: radial-gradient(
+    circle closest-side,
+    var(--cq-landing-q-bloom-core) 0%,
+    var(--cq-landing-q-bloom-mid) 35%,
+    var(--cq-landing-q-bloom-edge) 100%
+  );
+}
+.lp .lp-swarm-core {
+  background: radial-gradient(
+    circle closest-side,
+    var(--cq-landing-q-aperture) 0%,
+    var(--cq-landing-q-aperture-edge) 100%
+  );
+  mix-blend-mode: plus-lighter;
+}
+.lp canvas.lp-swarm {
+  mix-blend-mode: plus-lighter;
+}
 
 /* An installed launch that slipped past the proxy is leaving: show nothing. */
 html[data-pwa] .cq-landing {

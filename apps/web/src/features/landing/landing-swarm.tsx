@@ -63,6 +63,8 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 /* One hue family, light only on Q. Canvas paint, so literal channels. */
 const BANDS = ["255,248,232", "190,212,255", "120,160,255"] as const;
 const ALPHA_STEPS = 12;
+/** The brightest the glow gets (rest, attention, voice and ring at once). */
+const MAX_GLOW = 0.75 + 0.3 + 0.5 + 0.2;
 
 type Home = {
   hx: number;
@@ -109,7 +111,8 @@ class Swarm {
   private ampT = 0;
   private ampTarget = 0;
   private orbitMix = 0;
-  private slowFrames = 0;
+  private frameAvg = 16;
+  private sinceShed = 0;
   private readonly lean = { x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0 };
   readonly ptr = { x: -9999, y: -9999, on: false };
   mode: SwarmMode = "cloud";
@@ -117,18 +120,24 @@ class Swarm {
   energy = 0;
 
   private readonly canvas: HTMLCanvasElement;
+  private readonly bloom: HTMLElement | null;
+  private readonly core: HTMLElement | null;
   private readonly scale: number;
   private readonly ox: number;
   private readonly oy: number;
 
   constructor(
     canvas: HTMLCanvasElement,
+    bloom: HTMLElement | null,
+    core: HTMLElement | null,
     count: number,
     scale: number,
     ox: number,
     oy: number,
   ) {
     this.canvas = canvas;
+    this.bloom = bloom;
+    this.core = core;
     this.scale = scale;
     this.ox = ox;
     this.oy = oy;
@@ -178,6 +187,15 @@ class Swarm {
     this.cx = this.w * this.ox;
     this.cy = this.h * this.oy;
     this.R = Math.min(this.w, this.h) * this.scale;
+    const place = (el: HTMLElement | null, radius: number) => {
+      if (el === null) return;
+      el.style.left = `${this.cx - radius}px`;
+      el.style.top = `${this.cy - radius}px`;
+      el.style.width = `${radius * 2}px`;
+      el.style.height = `${radius * 2}px`;
+    };
+    place(this.bloom, this.R * 2.2);
+    place(this.core, this.R * 0.38);
   }
 
   pointer(clientX: number, clientY: number) {
@@ -199,13 +217,17 @@ class Swarm {
     this.lean.ty = 0;
   }
 
-  /** Frame-budget guard: long frames shed particles, never below 45%. */
+  /**
+   * Frame-budget guard: while frames run long (an average over the last
+   * dozen or so above 20 ms), shed a tenth of the particles every few
+   * frames, never below 40%. Shed particles stay shed for this visit.
+   */
   budget(frameMs: number) {
-    if (frameMs > 24) this.slowFrames++;
-    else this.slowFrames = Math.max(0, this.slowFrames - 1);
-    if (this.slowFrames > 20 && this.active > this.n * 0.45) {
-      this.active = Math.floor(this.active * 0.85);
-      this.slowFrames = 0;
+    this.frameAvg += (Math.min(frameMs, 100) - this.frameAvg) * 0.08;
+    if (++this.sinceShed < 8) return;
+    if (this.frameAvg > 20 && this.active > this.n * 0.4) {
+      this.active = Math.floor(this.active * 0.9);
+      this.sinceShed = 0;
     }
   }
 
@@ -283,17 +305,18 @@ class Swarm {
     const x = this.ctx;
     const R = this.R;
     x.clearRect(0, 0, this.w, this.h);
-    // bloom: Q only, one hue family, brighter while speaking or attended to
+    // bloom and core: Q only, one hue family, brighter while speaking or
+    // attended to. Painted by the compositor as two gradient layers that
+    // only move and fade, so the canvas rasterises particles alone.
     const glow =
       0.75 + this.energy * 0.3 + this.amp * 0.5 + this.orbitMix * 0.2;
-    const lx = this.cx + this.lean.x * R;
-    const ly = this.cy + this.lean.y * R;
-    let g = x.createRadialGradient(lx, ly, 0, lx, ly, R * 2.2);
-    g.addColorStop(0, `rgba(96,140,255,${0.42 * glow})`);
-    g.addColorStop(0.35, `rgba(70,110,235,${0.16 * glow})`);
-    g.addColorStop(1, "rgba(50,80,200,0)");
-    x.fillStyle = g;
-    x.fillRect(0, 0, this.w, this.h);
+    const lean = `translate3d(${this.lean.x * R}px,${this.lean.y * R}px,0)`;
+    const fade = String(Math.min(1, glow / MAX_GLOW));
+    for (const layer of [this.bloom, this.core]) {
+      if (layer === null) continue;
+      layer.style.transform = lean;
+      layer.style.opacity = fade;
+    }
     x.globalCompositeOperation = "lighter";
     // Batch by colour band and quantised alpha: a few fills, not thousands.
     const counts = this.counts;
@@ -346,14 +369,6 @@ class Swarm {
       }
       x.fill();
     }
-    // a near-white core: the aperture of light at Q's centre
-    g = x.createRadialGradient(lx, ly, 0, lx, ly, R * 0.38);
-    g.addColorStop(0, `rgba(255,246,228,${0.5 * glow})`);
-    g.addColorStop(1, "rgba(160,190,255,0)");
-    x.fillStyle = g;
-    x.beginPath();
-    x.arc(lx, ly, R * 0.38, 0, 7);
-    x.fill();
     x.globalCompositeOperation = "source-over";
   }
 
@@ -376,6 +391,8 @@ export function LandingSwarm({
   small,
 }: LandingSwarmProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bloomRef = useRef<HTMLDivElement>(null);
+  const coreRef = useRef<HTMLDivElement>(null);
   const swarmRef = useRef<Swarm | null>(null);
   const kickRef = useRef<() => void>(() => undefined);
 
@@ -389,6 +406,8 @@ export function LandingSwarm({
     try {
       swarm = new Swarm(
         canvas,
+        bloomRef.current,
+        coreRef.current,
         pick(v.count),
         pick(v.scale),
         v.centre[0],
@@ -482,5 +501,11 @@ export function LandingSwarm({
     if (swarm !== null && pulse > 0) swarm.energy = 1;
   }, [pulse]);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="lp-swarm" />;
+  return (
+    <>
+      <div ref={bloomRef} className="lp-swarm-bloom" aria-hidden="true" />
+      <canvas ref={canvasRef} aria-hidden="true" className="lp-swarm" />
+      <div ref={coreRef} className="lp-swarm-core" aria-hidden="true" />
+    </>
+  );
 }
