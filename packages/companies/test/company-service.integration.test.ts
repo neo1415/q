@@ -331,6 +331,7 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         "capital_objective_creation_requests",
         "capital_objective_events",
         "capital_objectives",
+        "capital_rounds",
         "companies",
         "company_creation_requests",
         "company_members",

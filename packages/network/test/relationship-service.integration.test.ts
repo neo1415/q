@@ -431,7 +431,8 @@ describe("@capital-q/network against local PostgreSQL", () => {
              and table_name not in ('relationships', 'relationship_events', 'interests', 'interest_requests',
                                     'interest_responses', 'interest_response_requests', 'matches',
                                     'commitments', 'relationship_pass_reasons', 'relationship_passes',
-                                    'diligence_requests', 'diligence_fulfilments')`;
+                                    'diligence_requests', 'diligence_fulfilments',
+                                    'diligence_document_views', 'diligence_document_summaries')`;
         expect(tables).toEqual([]);
         // Ensuring a relationship expresses no interest.
         expect(

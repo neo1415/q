@@ -430,11 +430,13 @@ describe("@capital-q/q-tools against local PostgreSQL", () => {
       const ctx = context(w.founder, plan);
       const offered = await w.tools.offer(ctx);
       // R33 order: fewer declared purposes first, then id.
-      expect(offered.map((t) => t.definition.name)).toEqual([
-        "get_company",
-        "search_companies",
-        "get_capital_objective",
-      ]);
+      // use_capability is always offered (ADR 0048); it loads only what the plan allows.
+      expect(offered.map((t) => t.definition.name)).toContain("use_capability");
+      expect(
+        offered
+          .map((t) => t.definition.name)
+          .filter((name) => name !== "use_capability"),
+      ).toEqual(["get_company", "search_companies", "get_capital_objective"]);
 
       const company = await w.tools.execute(
         {
@@ -509,7 +511,11 @@ describe("@capital-q/q-tools against local PostgreSQL", () => {
       // can read a raise a company shared with them. Being offered grants
       // nothing: the tool authorises every call (company visibility, then
       // the disclosure engine on the objective), asserted below.
-      expect(offered.map((t) => t.definition.name)).toEqual([
+      expect(
+        offered
+          .map((t) => t.definition.name)
+          .filter((name) => name !== "use_capability"),
+      ).toEqual([
         "get_investor_mandate",
         "get_company",
         "search_companies",

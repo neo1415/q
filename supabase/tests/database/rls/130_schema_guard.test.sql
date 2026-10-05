@@ -84,6 +84,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('network', 'interest_responses',       'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'interest_response_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'matches',                  'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'diligence_document_views',   'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'diligence_document_summaries', 'INTERNAL_SERVER_ONLY', '{}'),
   ('permissions', 'capabilities',          'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'roles',                 'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'role_capabilities',     'PUBLIC_REFERENCE',     '{SELECT}'),
