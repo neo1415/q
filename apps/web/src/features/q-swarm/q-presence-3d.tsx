@@ -63,7 +63,8 @@ export function QPresence3D({
   className,
 }: QPresence3DProps) {
   if (variant !== "hero") {
-    const size = variant === "dock" ? "dock" : variant === "voice" ? 96 : "stage";
+    const size =
+      variant === "dock" ? "dock" : variant === "voice" ? 96 : "stage";
     return (
       <QAperture
         state={state}

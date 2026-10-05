@@ -320,7 +320,10 @@ function core(
   const y = size / 2 + u.shiftY * unit;
   const radius = unit * 0.36;
   const gradient = target.createRadialGradient(x, y, 0, x, y, radius);
-  gradient.addColorStop(0, `rgba(255,246,228,${String(0.42 * u.glow * u.core)})`);
+  gradient.addColorStop(
+    0,
+    `rgba(255,246,228,${String(0.42 * u.glow * u.core)})`,
+  );
   gradient.addColorStop(1, "rgba(255,246,228,0)");
   target.globalCompositeOperation = "lighter";
   target.fillStyle = gradient;

@@ -21,7 +21,8 @@ export function particleCount(pixels: number): number {
  * draw. Small surfaces (the dock, inline loaders) never grow.
  */
 export function deviceShare(cores: number | undefined, pixels: number): number {
-  const c = cores !== undefined && Number.isFinite(cores) && cores > 0 ? cores : 4;
+  const c =
+    cores !== undefined && Number.isFinite(cores) && cores > 0 ? cores : 4;
   const share = c >= 8 ? 1.15 : c >= 6 ? 1 : c >= 4 ? 0.8 : 0.55;
   return pixels < 150 ? Math.min(1, share) : share;
 }

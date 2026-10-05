@@ -90,10 +90,7 @@ export function presenceUniforms(input: UniformInput): PresenceUniforms {
     shiftY: leanY * LEAN_SHIFT,
     pointScale: 1 + voice * 0.25 + mic * 0.1,
     glow:
-      (0.75 +
-        voice * 0.5 +
-        mic * 0.3 +
-        (WORKING.has(input.state) ? 0.15 : 0)) *
+      (0.75 + voice * 0.5 + mic * 0.3 + (WORKING.has(input.state) ? 0.15 : 0)) *
       (input.dim ? 0.45 : 1),
     // The white core is the cloud's dense centre; a ring or a glyph has
     // none, so it gets none.

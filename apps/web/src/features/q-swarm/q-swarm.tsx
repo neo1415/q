@@ -184,7 +184,7 @@ export function QSwarm({
         dim: view.dim,
         keep: budgetSettings(budget).keep,
       });
-            if (renderer === "3d" && draw3d !== null) {
+      if (renderer === "3d" && draw3d !== null) {
         const drawn = draw3d(context, sim, {
           pixels: device,
           colour,
