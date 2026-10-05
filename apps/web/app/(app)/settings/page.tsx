@@ -92,7 +92,7 @@ export default async function SettingsPage({
   return (
     <PageContainer>
       <PageHeader title="Settings" />
-      <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
         <SettingsIndex sections={SECTIONS} />
         <div className="flex max-w-(--cq-layout-reading) min-w-0 flex-col gap-4">
           <SettingsCard id="account" title="Account">

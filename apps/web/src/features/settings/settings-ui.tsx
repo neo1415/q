@@ -97,7 +97,7 @@ export function SettingsIndex({
   return (
     <nav
       aria-label="Settings sections"
-      className="lg:sticky lg:top-6 lg:self-start"
+      className="min-w-0 lg:sticky lg:top-6 lg:self-start"
     >
       <ul className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:px-0">
         {sections.map((section) => (

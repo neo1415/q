@@ -134,7 +134,14 @@ export function BrandEditor({
           </p>
         </div>
 
-        {palette === null ? null : <AdjustNote palette={palette} />}
+        {palette === null ? null : saved === null &&
+          draft === DEFAULT_BRAND_HEX ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Capital Q&apos;s own colours are in use.
+          </p>
+        ) : (
+          <AdjustNote palette={palette} />
+        )}
 
         <div className="flex flex-wrap gap-2">
           <Button

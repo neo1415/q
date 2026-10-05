@@ -249,7 +249,7 @@ function Tile({
 }) {
   const usd = row === null ? 0 : Number(row.usd);
   return (
-    <li className="cq-panel flex min-h-28 flex-col gap-1.5 p-4">
+    <li className="cq-panel flex min-h-28 flex-col gap-1.5 p-4 last:col-span-2 lg:last:col-span-1">
       <span className="cq-label text-(--cq-text-secondary)">{label}</span>
       {row === null || usd <= 0 ? (
         <span className="cq-body pt-2 text-(--cq-text-secondary)">
