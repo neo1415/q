@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Black and gold</title>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  .bw { max-width: 1240px; margin: 0 auto; padding: 18px 24px 56px; }
+  h1 { margin: 0; font: 500 24px/1.2 var(--cq-font-ui); letter-spacing: -0.01em; }
+  .sub { margin: 4px 0 18px; color: var(--cq-text-secondary); max-width: 66ch; }
+  .admin { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+  .panel { border: 1px solid var(--cq-border-subtle); border-radius: 16px; background: var(--cq-surface-raised); padding: 16px; }
+  .panel h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .panel p { margin: 0 0 12px; font-size: 14px; color: var(--cq-text-secondary); }
+  .presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .preset { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; align-items: center; min-height: 56px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--cq-border); background: var(--cq-surface); cursor: pointer; text-align: left; }
+  .preset[aria-pressed="true"] { border: 2px solid var(--cq-accent); padding: 7px 9px; }
+  .preset small { display: block; font-size: 12px; color: var(--cq-text-secondary); }
+  .sw { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #0002; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+  .hint { font-size: 13px; color: var(--cq-text-secondary); }
+  .tokens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .tok h3 { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--cq-text-secondary); }
+  .tok ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .tok li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
+  .tok li i { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #0002; }
+  .tok code { font-size: 12px; color: var(--cq-text-tertiary); }
+  table.aa { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .aa th, .aa td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--cq-border-subtle); }
+  .aa th { font-weight: 500; color: var(--cq-text-secondary); font-size: 12.5px; }
+  .aa td.r { font-variant-numeric: tabular-nums; text-align: right; }
+  .pair { display: inline-grid; place-items: center; width: 44px; height: 26px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+  .pass { color: var(--cq-positive); } .fail { color: var(--cq-caution); }
+  .screens h2 { font-size: 15px; font-weight: 600; margin: 32px 0 10px; }
+  .strip { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; }
+  .phone { flex: none; width: 214px; }
+  .phone .frame { width: 214px; height: 452px; border-radius: 30px; border: 7px solid #16140f; overflow: hidden; background: #000; position: relative; }
+  .phone iframe { width: 390px; height: 844px; border: 0; transform: scale(0.5128); transform-origin: 0 0; position: absolute; inset: 0; pointer-events: none; }
+  .phone p { margin: 8px 0 0; font-size: 13px; color: var(--cq-text-secondary); text-align: center; }
+  @media (max-width: 760px) {
+    .bw { padding: 10px 16px 110px; }
+    .admin { grid-template-columns: 1fr; }
+    .tokens { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { shell, params } from "./assets/shell.js";
+
+const gold = document.documentElement.dataset.brand === "gold";
+const theme = document.documentElement.dataset.theme;
+const LIGHT = { canvas: "#f6f4ef", surface: "#fbfaf7", text: "#16140f", text2: "#4f4a40", text3: "#6b6457", accent: "#8a6516", onAccent: "#ffffff", chrome: "#16140f", chromeText: "#f4efe2", chromeGold: "#e2b858", goldFill: "#c9a24a", onGold: "#16140f", border: "#8f8673", stage: "#12110e", qLight: "#e2b858" };
+const DARK = { canvas: "#0f0e0b", surface: "#17150f", text: "#f4efe2", text2: "#c9c0ab", text3: "#a59c87", accent: "#e2b858", onAccent: "#16140f", chrome: "#0b0a08", chromeText: "#f4efe2", chromeGold: "#e2b858", goldFill: "#e2b858", onGold: "#16140f", border: "#7a715c", stage: "#0b0a08", qLight: "#e2b858" };
+
+const lum = (hex) => {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+const PAIRS = (p) => [
+  ["Body text on the page", p.text, p.canvas, 4.5],
+  ["Secondary text on the page", p.text2, p.canvas, 4.5],
+  ["Quiet text on cards", p.text3, p.surface, 4.5],
+  ["Gold links and labels on cards", p.accent, p.surface, 4.5],
+  ["Button label on gold", p.onAccent, p.accent, 4.5],
+  ["Menu text on the black bar", p.chromeText, p.chrome, 4.5],
+  ["Gold on the black bar", p.chromeGold, p.chrome, 4.5],
+  ["Text on a gold fill", p.onGold, p.goldFill, 4.5],
+  ["Focus ring against the page", p.accent, p.canvas, 3],
+  ["Field and control borders against cards", p.border, p.surface, 3],
+  ["Q’s gold against the stage", p.qLight, p.stage, 3],
+];
+const table = (p, label) => `<table class="aa"><thead><tr><th>${label}</th><th>Sample</th><th class="r">Ratio</th><th class="r">Needs</th></tr></thead><tbody>${PAIRS(p).map(([n, fg, bg, need]) => {
+  const r = ratio(fg, bg); const ok = r >= need;
+  return `<tr><td>${n}</td><td><span class="pair" style="color:${fg};background:${bg}">Aa</span></td><td class="r">${r.toFixed(2)}:1</td><td class="r"><span class="${ok ? "pass" : "fail"}">${ok ? "Passes" : "Fails"}</span> ${need}:1</td></tr>`;
+}).join("")}</tbody></table>`;
+
+const sw = (a, b) => `<span class="sw" aria-hidden="true"><i style="background:${a}"></i><i style="background:${b}"></i></span>`;
+const PRESETS = [
+  ["gold", "Black and gold", "Capital Q brand", sw("#16140f", "#c9a24a")],
+  ["blue", "Capital Q blue", "The current default", sw("#f7f7f5", "#2f5bd3")],
+  ["teal", "Teal", "Accent only", sw("#f7f7f5", "#0f766e")],
+  ["forest", "Forest", "Accent only", sw("#f7f7f5", "#166534")],
+  ["graphite", "Graphite", "Accent only", sw("#f7f7f5", "#27272a")],
+];
+const tokList = (p) => [["Page", p.canvas, "canvas"], ["Cards", p.surface, "surface"], ["Text", p.text, "text-primary"], ["Gold for text", p.accent, "accent"], ["Gold fill", p.goldFill, "gold-fill"], ["Black bar", p.chrome, "chrome"], ["Q’s light", p.qLight, "q-light"]].map(([n, h, t]) => `<li><i style="background:${h}"></i><span>${n} <code>--cq-${t}</code></span><code>${h}</code></li>`).join("");
+
+const screens = [
+  ["Q, answering", "answer-canvas.html?state=top&n=3&focus=0&still=1"],
+  ["Discover, with Q’s chip", "answer-canvas.html?page=discover&still=1"],
+  ["Board", "board.html?"],
+  ["Q’s team", "workforce.html?"],
+  ["Q’s presence", "presence.html?state=pleased&shape=constellation&still=2"],
+];
+const strip = (th) => `<div class="strip">${screens.map(([n, u]) => `<figure class="phone" style="margin:0"><div class="frame"><iframe loading="eager" title="${n}, ${th}" src="${u}&theme=${th}&brand=${gold ? "gold" : "blue"}" tabindex="-1"></iframe></div><p>${n}</p></figure>`).join("")}</div>`;
+
+const main = `<div class="bw">
+  <h1>Brand</h1>
+  <p class="sub">Admins choose how Capital Q looks for their firm. Black and gold changes the page, the menu bar, the buttons and Q’s light together. Switch back at any time; nothing else changes.</p>
+  <div class="admin">
+    <section class="panel">
+      <h2>Theme</h2><p>A theme sets the page, the menu bar and the accent. Your own colour can still go on top.</p>
+      <div class="presets" role="group" aria-label="Theme">${PRESETS.map(([k, n, s, w]) => `<button class="preset" aria-pressed="${(gold ? "gold" : "blue") === k}" data-k="${k}">${w}<span>${n}<small>${s}</small></span></button>`).join("")}</div>
+      <div class="row"><button class="btn btn-primary">Use black and gold</button><button class="btn">Keep Capital Q blue</button><span class="hint">Everyone in your firm sees it from their next page.</span></div>
+      <div class="tokens" style="margin-top:20px">
+        <div class="tok"><h3>Light</h3><ul>${tokList(LIGHT)}</ul></div>
+        <div class="tok"><h3>Dark</h3><ul>${tokList(DARK)}</ul></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Contrast</h2><p>Every pair is checked before a theme can be saved. Gold is a fill or a dark gold for text, never pale gold text on white.</p>
+      ${table(LIGHT, "Light")}<div style="height:12px"></div>${table(DARK, "Dark")}
+    </section>
+  </div>
+  <section class="screens"><h2>${gold ? "Black and gold" : "Capital Q blue"}, light</h2>${strip("light")}<h2>${gold ? "Black and gold" : "Capital Q blue"}, dark</h2>${strip("dark")}</section>
+</div>`;
+document.getElementById("app").innerHTML = shell("settings", main);
+document.querySelector(".presets").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-k]"); if (!b) return;
+  const u = new URL(location.href); u.searchParams.set("brand", b.dataset.k === "gold" ? "gold" : "blue"); location.href = u.toString();
+});
+</script>
+</body>
+</html>
