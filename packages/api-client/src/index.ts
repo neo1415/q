@@ -436,3 +436,4 @@ export {
   removeMyEtiquetteGuide,
   saveMyEtiquetteGuide,
 } from "./etiquette.js";
+export * from "./fit.js";

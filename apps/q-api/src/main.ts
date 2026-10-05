@@ -15,6 +15,7 @@
  * a credential, a connection or a table.
  */
 
+import { createFitComposition } from "./composition/fit.js";
 import { createCounterpartNames } from "./composition/counterpart-names.js";
 import { createWaitingLines } from "./composition/waiting-lines.js";
 import { randomUUID } from "node:crypto";
@@ -280,7 +281,10 @@ import {
   createTelemetryRuntime,
 } from "@capital-q/observability";
 import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
-import { createRecommendationNarrator } from "@capital-q/q-specialists";
+import {
+  createFitQViewer,
+  createRecommendationNarrator,
+} from "@capital-q/q-specialists";
 import {
   actorPrincipal,
   createDefaultDisclosureResolvers,
@@ -1691,6 +1695,33 @@ const investorFeed = createInvestorFeedPort({
   decisions: createPostgresInvestorDecisionReader({ sql: database.sql }),
   logger,
 });
+// MATCH block (B1-B3; ADR 0052): fit with the investor's own mandate,
+// for Q's tools and the /v1/fit routes alike -- one fit service, so the
+// card, the profile and Q's answer say the same thing.
+const fitComposition = createFitComposition({
+  sql: database.sql,
+  eligibilityPorts: slateRead.eligibilityPorts,
+  eligibility: slateRead.eligibility,
+  companies,
+  capital,
+  disclosure,
+  relationships: async (actor) =>
+    (await interestService.listRelationshipsForInvestor({ actor })).map(
+      (listing) => listing.relationship.companyId,
+    ),
+  requests: async (actor) =>
+    (await connectionService.listConnectionRequests({ actor }))
+      .filter((item) => item.interest.response == null)
+      .map((item) => item.interest.companyId),
+  feed: investorFeed,
+  viewer: createFitQViewer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  logger,
+});
+// end MATCH block
 const appActionPorts: OwnReadPorts = {
   // ADR 0050: their own speaking guide, saved or removed by asking Q.
   etiquetteGuides,
@@ -1977,6 +2008,8 @@ const qTools = createQTools({
     // ranking, which is correct rather than degraded: the alternative is a
     // model reasoning about fit on its own (doc 19 §59).
     recommendationExplanations: currentSlateExplanations,
+    // MATCH block (ADR 0052): fit.profile and fit.top_candidates.
+    fit: fitComposition.fit,
     ...(researchComposition.research === undefined
       ? {}
       : { research: researchComposition.research }),
@@ -4694,6 +4727,8 @@ const { app, logger: appLogger } = createApp(
     artifacts: qArtifacts.service,
     documentStudio,
     recommendationExplanations,
+    // MATCH block (ADR 0052): /v1/fit.
+    fit: fitComposition,
     // The profile page's "Q found" column (BIZ-002): firewall first, then
     // the own-public-presence envelope, then the cited pages.
     profileFindings: profileFindingsReader,
