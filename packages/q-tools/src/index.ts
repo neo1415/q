@@ -578,3 +578,19 @@ export {
   matchCapabilities,
   type UseCapabilityOutput,
 } from "./tools/use-capability.js";
+
+// MATCH block (ADR 0052): fit with the investor's own mandate, by Q.
+export {
+  FIT_PROFILE,
+  FIT_TOP_CANDIDATES,
+  createFitProfileTool,
+  createFitTopCandidatesTool,
+  FitProfileInputSchema,
+  FitProfileOutputSchema,
+  FitTopCandidatesInputSchema,
+  FitTopCandidatesOutputSchema,
+  type FitProfileInput,
+  type FitProfileOutput,
+  type FitTopCandidatesInput,
+  type FitTopCandidatesOutput,
+} from "./tools/fit.js";

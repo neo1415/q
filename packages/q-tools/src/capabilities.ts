@@ -451,7 +451,7 @@ const OFFERS: readonly QCapability[] = [
   offer(
     "connection_request_answer",
     "RELATIONSHIP",
-    "Accept or decline founders' Connection Requests to their investor organisation (Founder requests, linked from Relationships)",
+    "Accept or decline Company requests (companies' Connection Requests to their investor organisation, linked from Relationships)",
     "RELATIONSHIPS",
     "Accepting or declining is the investor's own decision about a founder; Q prepares it for their approval and never answers a request without it.",
     false,
@@ -1009,6 +1009,17 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "recommendation_explanation",
     "RECORDS",
     "Explains why a company was recommended to them.",
+  ),
+  // MATCH block (ADR 0052): the fit the cards and profile show, by asking.
+  tool(
+    "fit_profile",
+    "RECORDS",
+    "Reads how well a company fits their mandate, parameter by parameter.",
+  ),
+  tool(
+    "fit_top_candidates",
+    "RECORDS",
+    "Ranks their own candidates by fit and puts the top ones side by side.",
   ),
   tool(
     "research_public_web",
