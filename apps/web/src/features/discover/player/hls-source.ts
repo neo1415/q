@@ -155,8 +155,18 @@ export const attachHlsOrNativeSource: AttachSource = (video, url) => {
       // manifest that will not load) never reaches the element on its own:
       // it is said on the element, so the player can show its fallback
       // instead of a poster that never moves.
+      // A fatal media error (the decoder or buffer tripping, as it can on
+      // the seek back to the start when a pitch loops) is recovered in
+      // place once, as hls.js documents, before it counts as a failure.
+      let recovered = false;
       engine.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) video.dispatchEvent(new Event(PLAYBACK_FAILED_EVENT));
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
+          recovered = true;
+          engine.recoverMediaError();
+          return;
+        }
+        video.dispatchEvent(new Event(PLAYBACK_FAILED_EVENT));
       });
       engine.loadSource(url);
       engine.attachMedia(video);

@@ -239,27 +239,55 @@ export function PitchPlayer({
   // stream engine, or no first frame within a bounded time of being asked
   // to play (a browser without H.264 raises nothing at all).
   const [unplayable, setUnplayable] = useState<string | null>(null);
+  /**
+   * A pitch that has already played and then fails -- at its end, on the
+   * loop back to the start, or when its stream session lapses -- is not a
+   * browser that cannot play it (founder, 2026-10-05: the end of a pitch
+   * showed "This pitch can't play here"). That source is refreshed once,
+   * silently: a new grant, a new attach, playing from the start. Only a
+   * source that fails again before it plays says so.
+   */
+  const silentRefresh = useRef<(() => void) | null>(null);
   useEffect(() => {
     const video = videoRef.current;
     if (video === null || playbackUrl === null) return;
     let timer: number | undefined;
-    const give = () => setUnplayable(playbackUrl);
+    let played = false;
+    const give = () => {
+      if (played && silentRefresh.current !== null) {
+        played = false;
+        silentRefresh.current();
+        return;
+      }
+      setUnplayable(playbackUrl);
+    };
     const stopWaiting = () => {
       if (timer !== undefined) window.clearTimeout(timer);
       timer = undefined;
     };
     const startWaiting = () => {
       stopWaiting();
+      // The first-frame bound is for the first frame only: a loop back to
+      // the start re-buffering for a moment is not a failure.
+      if (played) return;
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return;
       timer = window.setTimeout(() => {
         if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) give();
       }, FIRST_FRAME_TIMEOUT_MS);
+    };
+    const progressed = () => {
+      if (video.currentTime > 0 || video.ended) {
+        played = true;
+        stopWaiting();
+      }
     };
     video.addEventListener("error", give);
     video.addEventListener(PLAYBACK_FAILED_EVENT, give);
     video.addEventListener("play", startWaiting);
     video.addEventListener("loadeddata", stopWaiting);
     video.addEventListener("pause", stopWaiting);
+    video.addEventListener("timeupdate", progressed);
+    video.addEventListener("ended", progressed);
     return () => {
       stopWaiting();
       video.removeEventListener("error", give);
@@ -267,6 +295,8 @@ export function PitchPlayer({
       video.removeEventListener("play", startWaiting);
       video.removeEventListener("loadeddata", stopWaiting);
       video.removeEventListener("pause", stopWaiting);
+      video.removeEventListener("timeupdate", progressed);
+      video.removeEventListener("ended", progressed);
     };
   }, [playbackUrl]);
   // Attaching and detaching is the strategy's job, including cancelling an
@@ -438,6 +468,17 @@ export function PitchPlayer({
   }, [playbackUrl]);
 
   /** Try again, on a press: re-ask for the grant and reload the source. */
+  // The silent refresh above: a new grant and source, played once attached.
+  useEffect(() => {
+    silentRefresh.current = () => {
+      pendingPlay.current = true;
+      retry();
+    };
+    return () => {
+      silentRefresh.current = null;
+    };
+  }, [retry]);
+
   const tryAgain = () => {
     setUnplayable(null);
     retry();

@@ -500,8 +500,11 @@ export function RelationshipHero({
           <EntityAvatar
             kind={profile.companyId === undefined ? "investor" : "company"}
             name={counterpart}
-            src={profile.photoUrl}
+            // No signed picture on the read: the gated photo route by id
+            // (the name's scope) rather than initials.
+            src={profile.photoUrl ?? undefined}
             companyId={profile.companyId}
+            investorOrganisationId={profile.investorOrganisationId}
             size="lg"
             decorative
           />

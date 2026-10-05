@@ -902,3 +902,122 @@ describe("a pitch this browser cannot play (R30 #22, #23)", () => {
     );
   });
 });
+
+describe("the end of a pitch is never a failure (founder, 2026-10-05)", () => {
+  it("a pitch that played and then fails at its end refreshes once, silently, and plays on", async () => {
+    let grants = 0;
+    const authorize = vi.fn(() => {
+      grants += 1;
+      return Promise.resolve(
+        authorization({ playbackUrl: `https://cdn.test/sample-${grants}.mp4` }),
+      );
+    });
+    const attachSource = vi.fn(() => () => undefined);
+    const { container } = render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+        attachSource={attachSource}
+      />,
+    );
+    await waitFor(() => expect(attachSource).toHaveBeenCalledTimes(1));
+    const video = videoIn(container);
+    // It played to its end...
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 60,
+    });
+    act(() => {
+      video.dispatchEvent(new Event("timeupdate"));
+      video.dispatchEvent(new Event("ended"));
+      // ...and the stream session gave up on the way back to the start.
+      video.dispatchEvent(new Event("cq-playback-failed"));
+    });
+    await waitFor(() => expect(attachSource).toHaveBeenCalledTimes(2));
+    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(attachSource).toHaveBeenLastCalledWith(
+      video,
+      "https://cdn.test/sample-2.mp4",
+    );
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(video.loop).toBe(true);
+  });
+
+  it("the end and the loop back to the start start no first-frame timer", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const authorize = vi.fn(() => Promise.resolve(authorization()));
+      const attachSource = vi.fn(() => () => undefined);
+      const { container } = render(
+        <PitchPlayer
+          company={company(1)}
+          policy="ACTIVE"
+          authorize={authorize}
+          reducedMotion={false}
+          attachSource={attachSource}
+        />,
+      );
+      await waitFor(() => expect(attachSource).toHaveBeenCalled());
+      const video = videoIn(container);
+      Object.defineProperty(video, "currentTime", {
+        configurable: true,
+        writable: true,
+        value: 60,
+      });
+      act(() => {
+        video.dispatchEvent(new Event("timeupdate"));
+        video.dispatchEvent(new Event("ended"));
+        // The loop: back to the start, re-buffering (readyState 0 here).
+        video.dispatchEvent(new Event("play"));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
+      expect(screen.queryByRole("status")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a source that fails again before it plays still says so", async () => {
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    const attachSource = vi.fn(() => () => undefined);
+    const { container } = render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+        attachSource={attachSource}
+      />,
+    );
+    await waitFor(() => expect(attachSource).toHaveBeenCalledTimes(1));
+    const video = videoIn(container);
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 30,
+    });
+    act(() => {
+      video.dispatchEvent(new Event("timeupdate"));
+      video.dispatchEvent(new Event("cq-playback-failed"));
+    });
+    await waitFor(() => expect(attachSource).toHaveBeenCalledTimes(2));
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 0,
+    });
+    act(() => {
+      video.dispatchEvent(new Event("cq-playback-failed"));
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain(
+        "can't play in this browser",
+      ),
+    );
+  });
+});

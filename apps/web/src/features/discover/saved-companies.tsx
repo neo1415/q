@@ -9,6 +9,7 @@ import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 import type { PitchSummaryDto } from "@capital-q/contracts";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import { CompanyPitch } from "./company-pitch";
 
@@ -92,6 +93,12 @@ export function SavedCompanies({
                   href={`/company/${encodeURIComponent(company.companyId)}`}
                   className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-3 text-(--cq-text-primary) hover:text-(--cq-accent)"
                 >
+                  <EntityAvatar
+                    kind="company"
+                    name={company.name}
+                    companyId={company.companyId}
+                    decorative
+                  />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="cq-body font-medium">{company.name}</span>
                     {company.facts === null ? null : (
