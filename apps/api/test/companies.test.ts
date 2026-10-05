@@ -800,6 +800,7 @@ describe("the company's publishable pitch (CQ-MEDIA-012)", () => {
       captionState: "NOT_REQUESTED" as const,
       title: `Video ${String(n)}`,
       audience,
+      downloadable: false,
     });
     const port: DiscoverablePitchQueryPort = {
       findDiscoverablePitches: () =>

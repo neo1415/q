@@ -126,6 +126,7 @@ function harness(
     return row;
   };
   const mediaAssets: MediaAssetRepository = {
+    setDownloadable: () => Promise.reject(new Error("not used here")),
     insert: (_tx, input) => {
       inserted += 1;
       const id = MediaAssetIdSchema.parse(

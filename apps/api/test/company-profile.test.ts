@@ -140,6 +140,7 @@ function pitch(
     aspectRatio: "9:16",
     durationSeconds: 60,
     captionState: "NOT_REQUESTED",
+    downloadable: false,
     title: null,
     audience,
   };

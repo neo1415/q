@@ -112,6 +112,7 @@ function harness(options: {
     Promise.resolve(row.tenantId === tenantId && row.id === id ? row : null);
   const notUnderTest = () => Promise.reject(new Error("not under test"));
   const mediaAssets: MediaAssetRepository = {
+    setDownloadable: () => Promise.reject(new Error("not used here")),
     insert: notUnderTest,
     findById: (_e, tenantId, id) => find(tenantId, id),
     findByProviderAssetId: () => Promise.reject(new Error("not under test")),

@@ -607,6 +607,7 @@ describe("GET /v1/discovery/network-pitches (ADR 0021)", () => {
     captionState: "NOT_REQUESTED" as const,
     title: `Video ${String(n)}`,
     audience: "NETWORK" as const,
+    downloadable: false,
     createdAt: `2026-09-2${String(9 - n)}T10:00:00.000Z`,
   });
   const VISIBLE = "c1000000-0000-4000-8000-000000000001";

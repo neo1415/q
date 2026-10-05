@@ -111,6 +111,8 @@ function world(options: { refuse?: boolean } = {}) {
       media: {
         listCompanyMedia: () => Promise.resolve([pitch()]),
         setPitchDetails: () => Promise.reject(new Error("not on Q's path")),
+        setPitchDownloadable: () =>
+          Promise.reject(new Error("not on Q's path")),
       },
     },
     appApprovals: {
@@ -252,6 +254,7 @@ describe("read_my", () => {
         media: {
           listCompanyMedia: () => Promise.resolve([pitch({ title: null })]),
           setPitchDetails: () => Promise.reject(new Error("unused")),
+          setPitchDownloadable: () => Promise.reject(new Error("unused")),
         },
       },
     });

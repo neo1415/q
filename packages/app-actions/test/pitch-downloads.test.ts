@@ -83,7 +83,7 @@ describe("pitch downloads through pitch.details.set (ADR 0047)", () => {
       mediaAssetId: ASSET,
       downloadable: true,
     });
-    expect(out.downloadable).toBe(true);
+    expect(out).toMatchObject({ downloadable: true });
     expect(calls).toEqual([
       {
         method: "setPitchDownloadable",
