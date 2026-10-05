@@ -25,6 +25,7 @@ import { Button, IconButton } from "@capital-q/ui/button";
 import {
   ArrowUp,
   ArrowUpRight,
+  Bell,
   CalendarDays,
   Check,
   ChevronDown,
@@ -53,7 +54,13 @@ import { EntityAvatar, type EntityKind } from "@/features/entity/entity-avatar";
 import { EmailDraftEditor } from "@/features/integrations/email-draft-editor";
 import { useQSessionOptional } from "@/features/q/q-session";
 
-import { answerWorkAction, stopWorkAction } from "./work-actions";
+import { groupNotices, type NoticeGroup } from "./notice-groups";
+import { noticesRead, refreshNotices, useNotices } from "./notice-store";
+import {
+  answerWorkAction,
+  markReadAction,
+  stopWorkAction,
+} from "./work-actions";
 import {
   dismissSuggestionAction,
   listDoneAction,
@@ -104,9 +111,13 @@ export function WorkPage({
   );
   const [cards, setCards] = useState(suggestions ?? []);
   const [pending, setPending] = useState(approvals ?? []);
+  // The Work count in the navigation is these notices (founder 2026-10-05:
+  // "it says 2 things, but the page says nothing"): they are listed here.
+  const notices = groupNotices(useNotices().items ?? []).needsYou;
   const nothingElse =
     running.length === 0 &&
     pending.length === 0 &&
+    notices.length === 0 &&
     timeLanes.length === 0 &&
     (done === null || (done.items.length === 0 && done.thisWeek === 0));
 
@@ -139,6 +150,7 @@ export function WorkPage({
             <NeedsYou
               approvals={pending}
               lanes={timeLanes}
+              notices={notices}
               onDecided={(id) => {
                 setPending((now) => now.filter((a) => a.approvalId !== id));
               }}
@@ -888,16 +900,18 @@ type TimeLane = {
 function NeedsYou({
   approvals,
   lanes,
+  notices,
   onDecided,
 }: {
   readonly approvals: readonly QPendingApproval[];
   readonly lanes: readonly TimeLane[];
+  readonly notices: readonly NoticeGroup[];
   readonly onDecided: (approvalId: string) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
   const left = lanes.filter((item) => !answered.has(item.lane.id));
-  const count = approvals.length + left.length;
+  const count = approvals.length + left.length + notices.length;
   if (count === 0) return null;
   return (
     <section aria-labelledby="work-needs-you" data-work-needs-you>
@@ -966,8 +980,60 @@ function NeedsYou({
             ) : null}
           </li>
         ))}
+        {notices.map((group) => (
+          <li key={group.key} className="border-b border-(--cq-border-subtle)">
+            <NoticeRow group={group} />
+          </li>
+        ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * A notice that waits on them, as the bell lists it: opening it is dealing
+ * with it, so it is read and leaves (the same rule as the bell's "Needs you").
+ */
+function NoticeRow({ group }: { readonly group: NoticeGroup }) {
+  const { notice } = group;
+  const done = () => {
+    void markReadAction(group.ids.slice(0, 50)).then((result) => {
+      if (!result.ok) return;
+      noticesRead(group.ids.length);
+      void refreshNotices(true);
+    });
+  };
+  const meta =
+    group.count > 1
+      ? `${String(group.count)} like this · ${shortAge(notice.createdAt)}`
+      : (notice.body ?? shortAge(notice.createdAt));
+  return (
+    <div className="flex min-h-16 items-center gap-3 py-2.5">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+        <Bell aria-hidden="true" size={16} strokeWidth={ICON_STROKE} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate cq-body-sm font-medium text-(--cq-text-primary)">
+          {notice.title}
+        </p>
+        <p className="truncate cq-label font-normal text-(--cq-text-tertiary)">
+          {meta}
+        </p>
+      </div>
+      {notice.linkPath === null ? (
+        <Button variant="secondary" size="compact" onClick={done}>
+          Got it
+        </Button>
+      ) : (
+        <Link
+          href={notice.linkPath}
+          onClick={done}
+          className="inline-flex min-h-11 items-center rounded-md border border-(--cq-border-strong) px-3 cq-body-sm font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) pointer-fine:min-h-9"
+        >
+          Open
+        </Link>
+      )}
+    </div>
   );
 }
 

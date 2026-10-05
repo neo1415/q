@@ -1063,6 +1063,10 @@ export function createMeetingAssistantService(dependencies: {
             quote: c.quote,
           })),
           partial: partial !== null,
+          transcript: transcriptLines.map((line) => ({
+            speaker: line.speaker,
+            text: line.text,
+          })),
         }).catch((error: unknown) => {
           logger?.warn(
             { err: error, meetingId: row.meeting_id },

@@ -27,7 +27,42 @@ export type MeetingRecap = {
   }[];
   /** The record is from part of the call (ended early, partial audio). */
   readonly partial: boolean;
+  /**
+   * The call's transcript, as both sides read it on the meeting record
+   * (founder 2026-10-05: "the actual transcript sent three ways"). Shared
+   * by both sides already, so it crosses no firewall.
+   */
+  readonly transcript?: readonly {
+    readonly speaker: string | null;
+    readonly text: string;
+  }[];
 };
+
+/** Enough for any real call; a very long one says where the rest is. */
+const TRANSCRIPT_MAX_LINES = 400;
+const TRANSCRIPT_MAX_CHARS = 60_000;
+
+function transcriptLinesOf(recap: MeetingRecap): {
+  readonly lines: readonly string[];
+  readonly cut: boolean;
+} {
+  const lines: string[] = [];
+  let chars = 0;
+  for (const line of recap.transcript ?? []) {
+    const text = line.text.replace(/\s+/g, " ").trim();
+    if (text.length === 0) continue;
+    const entry = `${line.speaker?.trim() || "Someone"}: ${text}`;
+    if (
+      lines.length >= TRANSCRIPT_MAX_LINES ||
+      chars + entry.length > TRANSCRIPT_MAX_CHARS
+    ) {
+      return { lines, cut: true };
+    }
+    lines.push(entry);
+    chars += entry.length;
+  }
+  return { lines, cut: false };
+}
 
 export type MeetingRecapEmail = {
   readonly to: string;
@@ -88,6 +123,11 @@ export function meetingRecapEmail(
       MONEY_NOTE,
     );
   }
+  const transcript = transcriptLinesOf(recap);
+  if (transcript.lines.length > 0) {
+    lines.push("", "Transcript:", ...transcript.lines);
+    if (transcript.cut) lines.push("(The rest is on the meeting record.)");
+  }
   lines.push(
     "",
     link === null
@@ -109,6 +149,13 @@ export function meetingRecapEmail(
       : `<p><strong>Money mentioned</strong></p>${list(
           money.map((item) => `${item.amount}, ${item.party}: "${item.quote}"`),
         )}<p>${escapeHtml(MONEY_NOTE)}</p>`,
+    transcript.lines.length === 0
+      ? ""
+      : `<p><strong>Transcript</strong></p>${transcript.lines
+          .map((line) => `<p style="margin:0 0 6px">${escapeHtml(line)}</p>`)
+          .join("")}${
+          transcript.cut ? "<p>(The rest is on the meeting record.)</p>" : ""
+        }`,
     link === null
       ? "<p>The full transcript is on the meeting record in Capital Q.</p>"
       : `<p><a href="${escapeHtml(link)}">Open the meeting record</a></p>`,

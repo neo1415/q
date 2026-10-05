@@ -226,6 +226,35 @@ describe("the meeting record always reaches both sides", () => {
 });
 
 describe("the recap email", () => {
+  it("carries the call's transcript, escaped, for every side (founder 2026-10-05)", () => {
+    const email = meetingRecapEmail(
+      {
+        meetingId: MEETING,
+        userId: ZINO,
+        to: "zino@example.test",
+        name: "Zino",
+        purpose: "Introductory call",
+        startsAt: START,
+        linkPath: null,
+        attendees: ["Zino", "Nixo"],
+        agreements: [],
+        money: [],
+        partial: false,
+        transcript: [
+          { speaker: "Zino", text: "Q, I've sent one million dollars." },
+          { speaker: null, text: "  " },
+          { speaker: "Nixo", text: "Received <b>it</b>." },
+        ],
+      },
+      null,
+    );
+    expect(email.text).toContain("Transcript:");
+    expect(email.text).toContain("Zino: Q, I've sent one million dollars.");
+    expect(email.text).toContain("Nixo: Received <b>it</b>.");
+    expect(email.html).toContain("Received &lt;b&gt;it&lt;/b&gt;.");
+    expect(email.html).not.toContain("<b>it</b>");
+  });
+
   it("carries only what both sides read, and money as detected", () => {
     const email = meetingRecapEmail(
       {

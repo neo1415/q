@@ -19,6 +19,9 @@ import type { PushSubscriptionKeys, WebPushSender } from "./web-push.js";
  */
 
 const PUSH_WINDOW_MS = 24 * 3_600_000;
+/** Only a Google Meet address ever rides on a push as the place to open. */
+export const MEET_LINK_PATTERN =
+  "^https://meet[.]google[.]com/[a-z0-9-]{3,40}$";
 const EMAIL_AFTER_MS = 10 * 60_000;
 const EMAIL_WINDOW_MS = 48 * 3_600_000;
 /** A device failing this often in a row is put to rest. */
@@ -33,6 +36,8 @@ type DueNotice = {
   title: string;
   body: string | null;
   link_path: string | null;
+  /** The call's Meet link, for a call notice whose call has not ended. */
+  join_url: string | null;
   priority: "NEEDS_YOU" | "UPDATE";
   created_at: Date;
 };
@@ -142,6 +147,7 @@ export function createNotificationDelivery(dependencies: {
           title: notice.title,
           body: notice.body,
           path: notice.link_path,
+          joinUrl: notice.join_url,
           tag: notice.id,
           urgent: notice.priority === "NEEDS_YOU",
         });
@@ -203,11 +209,16 @@ export function createNotificationDelivery(dependencies: {
     ): Promise<{ readonly pushed: number; readonly emailed: number }> => {
       const current = now();
       const toPush = await sql<DueNotice[]>`
-        select id, user_id, title, body, link_path, priority, created_at
-          from communication.notifications
-         where pushed_at is null and read_at is null
-           and created_at > ${new Date(current.getTime() - PUSH_WINDOW_MS)}
-         order by created_at
+        select n.id, n.user_id, n.title, n.body, n.link_path, n.priority, n.created_at,
+               case when n.kind in ('REMINDER', 'MEETING_SCHEDULED', 'Q_MESSAGE')
+                     and m.meet_link ~ ${MEET_LINK_PATTERN}
+                     and m.starts_at > now() - interval '3 hours'
+                    then m.meet_link end as join_url
+          from communication.notifications n
+          left join communication.meetings m on m.id = n.meeting_id
+         where n.pushed_at is null and n.read_at is null
+           and n.created_at > ${new Date(current.getTime() - PUSH_WINDOW_MS)}
+         order by n.created_at
          limit ${limit}`;
       let pushed = 0;
       for (const notice of toPush) {
@@ -225,7 +236,7 @@ export function createNotificationDelivery(dependencies: {
         }
       }
       const toEmail = await sql<DueNotice[]>`
-        select id, user_id, title, body, link_path, priority, created_at
+        select id, user_id, title, body, link_path, null::text as join_url, priority, created_at
           from communication.notifications
          where priority = 'NEEDS_YOU' and emailed_at is null and read_at is null
            and created_at < ${new Date(current.getTime() - EMAIL_AFTER_MS)}

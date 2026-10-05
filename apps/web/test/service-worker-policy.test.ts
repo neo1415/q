@@ -22,6 +22,7 @@ type LoadedWorker = {
   readonly listeners: readonly string[];
   readonly source: string;
   readonly safePath: (path: unknown) => string;
+  readonly safeJoinUrl: (url: unknown) => string | null;
   readonly readPush: (event: unknown) => {
     title: string;
     body: string;
@@ -43,6 +44,7 @@ function loadServiceWorker(): LoadedWorker {
           ALLOWED_EXACT: string[];
           DENIED_PREFIXES: string[];
           safePath?: (path: unknown) => string;
+          safeJoinUrl?: (url: unknown) => string | null;
           readPush?: (event: unknown) => {
             title: string;
             body: string;
@@ -69,6 +71,7 @@ function loadServiceWorker(): LoadedWorker {
     listeners,
     source,
     safePath: self.__cq.safePath ?? (() => ""),
+    safeJoinUrl: self.__cq.safeJoinUrl ?? (() => "unset"),
     readPush: self.__cq.readPush ?? (() => ({ title: "", body: "", path: "" })),
   };
 }
@@ -100,6 +103,22 @@ describe("service worker cache policy", () => {
     expect(worker.safePath("//localhost/x")).toBe("/home");
     expect(worker.safePath("/work?x=1")).toBe("/home");
     expect(worker.safePath(undefined)).toBe("/home");
+  });
+
+  it("opens a call notice straight in Google Meet, and nothing else outside the app", () => {
+    expect(worker.safeJoinUrl("https://meet.google.com/dks-jiji-bgv")).toBe(
+      "https://meet.google.com/dks-jiji-bgv",
+    );
+    for (const bad of [
+      "https://meet.google.com.evil.example/abc-defg-hij",
+      "http://meet.google.com/abc-defg-hij",
+      "https://evil.example/abc",
+      "javascript:alert(1)",
+      "https://meet.google.com/abc?authuser=1",
+      undefined,
+    ]) {
+      expect(worker.safeJoinUrl(bad)).toBeNull();
+    }
   });
 
   it("always has something to show for a push, even an unreadable one", () => {

@@ -140,6 +140,12 @@ export type PushMessage = {
   readonly title: string;
   readonly body: string | null;
   readonly path: string | null;
+  /**
+   * A call's Google Meet link (founder 2026-10-05: "let it take me straight
+   * to the google meet"). Only ever a meet.google.com address; the service
+   * worker re-checks it before opening.
+   */
+  readonly joinUrl?: string | null;
   /** Replaces an earlier notification with the same tag on the device. */
   readonly tag: string;
   readonly urgent: boolean;
@@ -182,6 +188,7 @@ export function createWebPushSender(options: {
           title: message.title.slice(0, 120),
           body: message.body?.slice(0, 240) ?? null,
           path: message.path,
+          joinUrl: message.joinUrl ?? null,
           tag: message.tag,
         }),
       );

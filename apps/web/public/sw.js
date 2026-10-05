@@ -171,6 +171,14 @@ function safePath(path) {
     : "/home";
 }
 
+/** A call's Meet link, re-checked here: nothing else opens outside the app. */
+function safeJoinUrl(url) {
+  return typeof url === "string" &&
+    /^https:\/\/meet\.google\.com\/[a-z0-9-]{3,40}$/.test(url)
+    ? url
+    : null;
+}
+
 function readPush(event) {
   try {
     const data = event.data ? event.data.json() : null;
@@ -179,6 +187,7 @@ function readPush(event) {
         title: data.title.slice(0, 120),
         body: typeof data.body === "string" ? data.body.slice(0, 240) : "",
         path: safePath(data.path),
+        joinUrl: safeJoinUrl(data.joinUrl),
         tag: typeof data.tag === "string" ? data.tag.slice(0, 64) : undefined,
       };
     }
@@ -194,6 +203,7 @@ function readPush(event) {
 
 self.__cq.safePath = safePath;
 self.__cq.readPush = readPush;
+self.__cq.safeJoinUrl = safeJoinUrl;
 
 self.addEventListener("push", (event) => {
   const push = readPush(event);
@@ -203,13 +213,21 @@ self.addEventListener("push", (event) => {
       tag: push.tag,
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
-      data: { path: push.path },
+      data: { path: push.path, joinUrl: push.joinUrl || null },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  // A call notice opens the call itself (founder 2026-10-05).
+  const joinUrl = safeJoinUrl(
+    event.notification.data && event.notification.data.joinUrl,
+  );
+  if (joinUrl) {
+    event.waitUntil(self.clients.openWindow(joinUrl));
+    return;
+  }
   const path = safePath(
     event.notification.data && event.notification.data.path,
   );

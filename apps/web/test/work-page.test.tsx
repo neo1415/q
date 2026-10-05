@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { NotificationDto } from "@capital-q/contracts";
 
 import {
   QApprovalViewSchema,
@@ -48,6 +49,20 @@ vi.mock("../src/features/work/work-page-actions", () => ({
 vi.mock("../src/features/work/work-actions", () => ({
   answerWorkAction: () => Promise.resolve({ ok: true, value: null }),
   stopWorkAction: () => Promise.resolve({ ok: true, value: null }),
+  markReadAction: () => Promise.resolve({ ok: true, value: null }),
+}));
+
+// What the bell (and the Work count) holds; each test sets its own.
+const noticeItems: { current: NotificationDto[] } = { current: [] };
+vi.mock("../src/features/work/notice-store", () => ({
+  useNotices: () => ({
+    items: noticeItems.current,
+    unread: 0,
+    failed: false,
+    nextBefore: null,
+  }),
+  noticesRead: () => undefined,
+  refreshNotices: () => Promise.resolve(),
 }));
 
 const { WorkPage, readPlan } = await import("../src/features/work/work-page");
@@ -118,6 +133,35 @@ const instruction = QWorkDtoSchema.parse({
 });
 
 describe("Work (WORK-58)", () => {
+  it("lists what the Work count counts: a notice that needs them (founder 2026-10-05)", () => {
+    noticeItems.current = [
+      {
+        id: "11111111-0000-4000-8000-000000000001",
+        kind: "Q_MESSAGE",
+        title: "Q is waiting to be let in: Introductory call",
+        body: null,
+        linkPath: "/relationships/company/x",
+        read: false,
+        createdAt: new Date().toISOString(),
+        priority: "NEEDS_YOU",
+      },
+    ];
+    render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[]}
+        work={[]}
+        done={{ items: [], thisWeek: 0, nextCursor: null }}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: /Needs you/ })).toBeTruthy();
+    expect(
+      screen.getByText("Q is waiting to be let in: Introductory call"),
+    ).toBeTruthy();
+    expect(screen.queryByText("Nothing running yet.")).toBeNull();
+    noticeItems.current = [];
+  });
+
   it("a new person sees the input and what Q suggests, nothing else", () => {
     render(
       <WorkPage
