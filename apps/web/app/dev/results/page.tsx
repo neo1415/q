@@ -24,6 +24,11 @@ export const metadata: Metadata = {
  * `?side=founder`, `?state=empty`, `?range=7d|30d|all`, `?stage=CONNECTED`.
  */
 
+/** The review page's clock, read once per request (fixtures are relative to it). */
+function reviewClock(): number {
+  return Date.now();
+}
+
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
@@ -57,7 +62,8 @@ export default async function ResultsReviewPage({
   const empty = one("state") === "empty";
   const range = rangeOf(one("range"));
   const stage = one("stage") ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const now = reviewClock();
+  const today = new Date(now).toISOString().slice(0, 10);
   const days = range === "7d" ? 7 : range === "30d" ? 30 : 365;
   const window = {
     from: range === "all" ? null : today,
@@ -96,11 +102,11 @@ export default async function ResultsReviewPage({
         : [
             {
               companyName: "Tarmacly",
-              startsAt: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+              startsAt: new Date(now + 2 * 86_400_000).toISOString(),
             },
             {
               companyName: "Nsuo Labs",
-              startsAt: new Date(Date.now() + 4 * 86_400_000).toISOString(),
+              startsAt: new Date(now + 4 * 86_400_000).toISOString(),
             },
           ],
     },
@@ -222,9 +228,7 @@ export default async function ResultsReviewPage({
           ].map(([name, state], index) => ({
             investorName: String(name),
             state: String(state),
-            since: new Date(
-              Date.now() - (index + 1) * 86_400_000,
-            ).toISOString(),
+            since: new Date(now - (index + 1) * 86_400_000).toISOString(),
             investorOrganisationId: id(100 + index),
           })),
     },
@@ -243,14 +247,14 @@ export default async function ResultsReviewPage({
       ? []
       : [
           {
-            at: new Date().toISOString(),
+            at: new Date(now).toISOString(),
             counterpart: "Voltron Capital",
             outcome: "FOUNDER_ENDED",
             score: 58,
             ratings: [],
           },
           {
-            at: new Date(Date.now() - 3_600_000).toISOString(),
+            at: new Date(now - 3_600_000).toISOString(),
             counterpart: "Ventures Platform",
             outcome: "DECLINED",
             score: 46,

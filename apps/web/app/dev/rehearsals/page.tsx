@@ -21,6 +21,11 @@ export const metadata: Metadata = {
  * `?state=empty` is a new founder; `?with=<id>` filters the history.
  */
 
+/** The review page's clock, read once per request (fixtures are relative to it). */
+function reviewClock(): number {
+  return Date.now();
+}
+
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
@@ -33,7 +38,7 @@ export default async function RehearsalsReviewPage({
   const params = await searchParams;
   const empty = params["state"] === "empty";
   const withId = typeof params["with"] === "string" ? params["with"] : null;
-  const now = Date.now();
+  const now = reviewClock();
   const at = (hours: number) => new Date(now + hours * 3_600_000).toISOString();
   const voltron = {
     kind: "INVESTOR_ORGANISATION" as const,
