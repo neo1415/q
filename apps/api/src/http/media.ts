@@ -114,6 +114,9 @@ export function mediaProviderProblem(
   return null;
 }
 
+/** How long the caption track waits for a just-finished provider step. */
+const CAPTIONS_SYNC_WAIT_MS = 3_000;
+
 export function registerMediaRoutes(
   app: FastifyInstance,
   dependencies: MediaRoutesDependencies,
@@ -267,26 +270,47 @@ function registerPitchRoutes(
    * pitches that were READY before transcripts existed catch up when first
    * watched. The answer is always what is stored now.
    */
-  const transcriptOf = async (request: FastifyRequest) => {
-    const view = await service.getPitchTranscript({
-      actor: getActorContext(request),
-      companyId: companyIdParam(request),
-      mediaAssetId: mediaAssetIdParam(request),
-    });
-    if (view.status !== "AVAILABLE") {
-      void service
-        .syncPitchTranscript({
-          tenantId: view.tenantId,
-          mediaAssetId: view.mediaAssetId,
-        })
-        .catch((error: unknown) => {
-          request.log.warn(
-            { err: error, mediaAssetId: view.mediaAssetId },
-            "pitch transcript sync did not complete",
-          );
-        });
-    }
-    return view;
+  const transcriptOf = async (
+    request: FastifyRequest,
+    options: { readonly waitMs?: number } = {},
+  ) => {
+    const read = () =>
+      service.getPitchTranscript({
+        actor: getActorContext(request),
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+      });
+    const view = await read();
+    if (view.status === "AVAILABLE") return view;
+    const sync = service
+      .syncPitchTranscript({
+        tenantId: view.tenantId,
+        mediaAssetId: view.mediaAssetId,
+      })
+      .catch((error: unknown) => {
+        request.log.warn(
+          { err: error, mediaAssetId: view.mediaAssetId },
+          "pitch transcript sync did not complete",
+        );
+        return null;
+      });
+    // The player's caption track may wait a moment: captions the provider
+    // finished since the last sweep are stored and served on this read
+    // rather than the next. Bounded, so a slow provider costs the track a
+    // few seconds at most and never the video.
+    const waitMs = options.waitMs ?? 0;
+    if (waitMs <= 0) return view;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const outcome = await Promise.race([
+      sync,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => {
+          resolve(null);
+        }, waitMs);
+      }),
+    ]);
+    clearTimeout(timer);
+    return outcome === "AVAILABLE" ? read() : view;
   };
 
   app.get(
@@ -312,7 +336,9 @@ function registerPitchRoutes(
     `${pitch}/:mediaAssetId${MEDIA_CAPTIONS_VTT_SUFFIX}`,
     { onRequest: withContext },
     async (request, reply) => {
-      const view = await transcriptOf(request);
+      const view = await transcriptOf(request, {
+        waitMs: CAPTIONS_SYNC_WAIT_MS,
+      });
       if (view.status !== "AVAILABLE") {
         return reply
           .status(404)

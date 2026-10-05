@@ -407,8 +407,33 @@ export function createPostgresPitchTranscriptRepository(): PitchTranscriptReposi
       const row = rows[0] as { owner_id?: unknown } | undefined;
       return typeof row?.owner_id === "string" ? row.owner_id : null;
     },
+    listCaptionBacklog: async (executor, limit) => {
+      const rows = await executor`
+        select m.tenant_id, m.id
+          from media.media_assets m
+         where m.purpose = 'FOUNDER_PITCH'
+           and m.status = 'READY'
+           and m.deleted_at is null
+           and m.superseded_at is null
+           and m.provider_asset_id is not null
+           and m.caption_state in ('NOT_REQUESTED', 'PENDING')
+           and not exists (
+             select 1 from media.pitch_transcripts t
+              where t.media_asset_id = m.id)
+         order by m.ready_at nulls last, m.id
+         limit ${Math.max(1, Math.min(200, Math.trunc(limit)))}`;
+      return rows.map((row) => {
+        const parsed = BacklogRow.parse(row);
+        return { tenantId: parsed.tenant_id, mediaAssetId: parsed.id };
+      });
+    },
   };
 }
+
+const BacklogRow = z.object({
+  tenant_id: TenantIdSchema,
+  id: MediaAssetIdSchema,
+});
 
 const PitchRequestRow = z.object({
   request_hash: z.string(),

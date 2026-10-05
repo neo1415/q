@@ -148,6 +148,55 @@ export function createSyncPitchTranscript(
   };
 }
 
+export type SweepPitchCaptionsResult = {
+  readonly examined: number;
+  readonly outcomes: Readonly<Record<SyncPitchTranscriptOutcome, number>>;
+  /** Pitches whose step threw (provider or database); retried next sweep. */
+  readonly errors: number;
+};
+
+/**
+ * Every pitch gets captions (R18): one pass over the caption backlog,
+ * under the platform's own authority, advancing each pitch one step --
+ * ask the provider for captions on a pitch that never asked, store them
+ * on one whose captions are ready. Run on a timer by the API, so a pitch
+ * published now has captions minutes later without anyone having to open
+ * its transcript first, and pitches published before this existed catch
+ * up. Sequential and bounded: one provider call at a time, at most
+ * `limit` pitches per pass. A failure on one pitch never stops the rest.
+ */
+export function createSweepPitchCaptions(
+  dependencies: MediaServiceDependencies,
+) {
+  const sync = createSyncPitchTranscript(dependencies);
+  const { repositories, videoProvider, sql } = dependencies;
+  return async (input: {
+    readonly limit: number;
+  }): Promise<SweepPitchCaptionsResult> => {
+    const outcomes: Record<SyncPitchTranscriptOutcome, number> = {
+      AVAILABLE: 0,
+      PENDING: 0,
+      FAILED: 0,
+      NOT_READY: 0,
+      UNSUPPORTED: 0,
+    };
+    const list = repositories.pitchTranscripts?.listCaptionBacklog;
+    if (list === undefined || !videoProvider.capabilities.captions) {
+      return { examined: 0, outcomes, errors: 0 };
+    }
+    const backlog = await list(sql, input.limit);
+    let errors = 0;
+    for (const item of backlog) {
+      try {
+        outcomes[await sync(item)] += 1;
+      } catch {
+        errors += 1;
+      }
+    }
+    return { examined: backlog.length, outcomes, errors };
+  };
+}
+
 /** The transcript of a pitch this actor may play; not-found otherwise. */
 export function createGetPitchTranscript(
   dependencies: MediaServiceDependencies,

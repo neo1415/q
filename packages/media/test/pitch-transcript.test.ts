@@ -125,6 +125,11 @@ function harness(options: {
   readonly asset: MediaAsset;
   readonly viewable?: boolean;
   readonly captions?: GeneratedCaptions[];
+  /** Backlog entries naming assets the fake does not hold. */
+  readonly extraBacklog?: readonly {
+    readonly tenantId: typeof TENANT_A;
+    readonly mediaAssetId: typeof ASSET_ID;
+  }[];
 }) {
   let row: MediaAsset = options.asset;
   const stored: StoredPitchTranscript[] = [];
@@ -184,6 +189,18 @@ function harness(options: {
     },
     findOwnerCompany: (_e, id) =>
       Promise.resolve(id === row.id ? row.ownerId : null),
+    listCaptionBacklog: () =>
+      Promise.resolve(
+        row.status === "READY" &&
+          (row.captionState === "NOT_REQUESTED" ||
+            row.captionState === "PENDING") &&
+          !stored.some((t) => t.mediaAssetId === row.id)
+          ? [
+              ...(options.extraBacklog ?? []),
+              { tenantId: row.tenantId, mediaAssetId: row.id },
+            ]
+          : [...(options.extraBacklog ?? [])],
+      ),
   };
   const captions = [...(options.captions ?? [])];
   const provider: VideoProvider = {
@@ -328,6 +345,44 @@ describe("syncPitchTranscript", () => {
       }),
     ).toBe("NOT_READY");
     expect(h.calls).toEqual([]);
+  });
+});
+
+describe("sweepPitchCaptions: every pitch gets captions", () => {
+  it("asks for captions on a pitch that never asked, then stores them on a later pass", async () => {
+    const h = harness({
+      asset: asset(),
+      captions: [{ status: "NONE" }, { status: "READY", vtt: VTT }],
+    });
+    const first = await h.service.sweepPitchCaptions({ limit: 50 });
+    expect(first.examined).toBe(1);
+    expect(first.outcomes.PENDING).toBe(1);
+    expect(h.current().captionState).toBe("PENDING");
+    const second = await h.service.sweepPitchCaptions({ limit: 50 });
+    expect(second.outcomes.AVAILABLE).toBe(1);
+    expect(h.current().captionState).toBe("AVAILABLE");
+    expect(h.stored).toHaveLength(1);
+    // Done: the backlog is empty and nothing more is asked of the provider.
+    const third = await h.service.sweepPitchCaptions({ limit: 50 });
+    expect(third.examined).toBe(0);
+    expect(h.calls).toEqual(["get", "request", "get"]);
+  });
+
+  it("keeps going past a pitch whose step fails", async () => {
+    const other = MediaAssetIdSchema.parse(
+      "f0000000-0000-4000-8000-000000000009",
+    );
+    const h = harness({
+      asset: asset(),
+      captions: [{ status: "READY", vtt: VTT }],
+      extraBacklog: [{ tenantId: TENANT_A, mediaAssetId: other }],
+    });
+    const result = await h.service.sweepPitchCaptions({ limit: 50 });
+    expect(result.examined).toBe(2);
+    // The unknown asset is simply not ready; the real one is stored.
+    expect(result.outcomes.NOT_READY).toBe(1);
+    expect(result.outcomes.AVAILABLE).toBe(1);
+    expect(result.errors).toBe(0);
   });
 });
 
