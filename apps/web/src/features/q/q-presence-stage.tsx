@@ -1,11 +1,24 @@
 "use client";
 
 import { LazyMotion, domAnimation, m, useReducedMotion } from "motion/react";
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
 import { History, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
 
+import { AnswerCanvas, flyToBoard } from "./answer-canvas";
+import { answerCardsOf, topicMovedOn } from "./answer-canvas-logic";
 import type { QTurn } from "./conversation";
+import { firstWords } from "./board-timeline";
+import { useAnswerPlayback } from "./use-answer-playback";
 import { plainFromMarkdown } from "./markdown";
 import { QResultBlocks } from "./q-result-blocks";
 import {
@@ -15,6 +28,20 @@ import {
   shownRecently,
   type ShownItem,
 } from "./shown";
+
+const SHOW_ON_STAGE = "cq:q-show-answer";
+
+/** Put an answer Q showed earlier back on the stage (from the Board). */
+export function showOnStage(answerId: string): void {
+  // A frame later: the stage may only now be mounting (from Chat view).
+  window.requestAnimationFrame(() => {
+    window.dispatchEvent(
+      new CustomEvent<{ readonly id: string }>(SHOW_ON_STAGE, {
+        detail: { id: answerId },
+      }),
+    );
+  });
+}
 
 /**
  * The Q page in its presence view (founder request 2026-10-03): Q's
@@ -39,12 +66,21 @@ export function QPresenceStage({
   onAsk,
   onOpenArtifact,
   onShowingChange,
+  live = false,
+  onBoardLanded,
+  onPin,
 }: {
+  /** A live voice line is open: Q's own lines drive which card is open. */
+  readonly live?: boolean | undefined;
+  /** An answer flew into the Board (C4): the Board button counts it. */
+  readonly onBoardLanded?: (() => void) | undefined;
+  /** Pin an answer to the Board. */
+  readonly onPin?: ((answerId: string) => void) | undefined;
   /**
    * Q's presence: full size, or small and pinned at the top while an
    * object is shown (lead 2026-10-03: the presence never leaves the screen).
    */
-  readonly presence: (compact: boolean) => ReactNode;
+  readonly presence: (compact: boolean, mini?: boolean) => ReactNode;
   /** Told when an object starts or stops being shown (the stage stops following newest). */
   readonly onShowingChange?: ((showing: boolean) => void) | undefined;
   readonly turns: readonly QTurn[];
@@ -68,7 +104,13 @@ export function QPresenceStage({
     readonly atAnswer: number;
   } | null>(null);
   const [listOpen, setListOpen] = useState(false);
-  const shown = onStage(items, answers, dismissed, reopened);
+  const staged = onStage(items, answers, dismissed, reopened);
+  // C4: cards whose topic the conversation has left are not on the stage.
+  const movedOn =
+    staged !== null &&
+    reopened?.id !== staged.id &&
+    topicMovedOn(turns, staged.id);
+  const shown = movedOn ? null : staged;
   const recent = shownRecently(items);
   const latestQ = turns.findLast(
     (turn): turn is Extract<QTurn, { kind: "Q" }> => turn.kind === "Q",
@@ -82,6 +124,63 @@ export function QPresenceStage({
     setDismissed((current) => new Set([...current, key]));
     if (reopened?.id === item.id) setReopened(null);
   };
+
+  // The answer on the stage as cards, and one leaving for the Board.
+  const canvas =
+    shown === null
+      ? null
+      : (() => {
+          const turn = turns.find((one) => one.id === shown.id);
+          const block = answerCardsOf(turn);
+          return block === null ? null : { item: shown, block, turn };
+        })();
+  const [leaving, setLeaving] = useState<{
+    readonly id: string;
+    readonly block: QAnswerCardsBlock;
+  } | null>(null);
+  const leavingRef = useRef<HTMLDivElement>(null);
+  // Which answer's cards are on the stage; when that changes, the one
+  // that was there flies to the Board (state adjusted during render).
+  const [onStageCanvas, setOnStageCanvas] = useState<{
+    readonly id: string;
+    readonly block: QAnswerCardsBlock;
+  } | null>(null);
+  const canvasId = canvas?.item.id ?? null;
+  if ((onStageCanvas?.id ?? null) !== canvasId) {
+    if (onStageCanvas !== null) setLeaving(onStageCanvas);
+    setOnStageCanvas(
+      canvas === null ? null : { id: canvas.item.id, block: canvas.block },
+    );
+  }
+  useEffect(() => {
+    if (leaving === null) return;
+    let done = false;
+    void flyToBoard(leavingRef.current).then(() => {
+      if (done) return;
+      setLeaving(null);
+      onBoardLanded?.();
+    });
+    return () => {
+      done = true;
+    };
+  }, [leaving, onBoardLanded]);
+
+  useEffect(() => {
+    const onShow = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return;
+      const detail: unknown = event.detail;
+      if (
+        typeof detail === "object" &&
+        detail !== null &&
+        "id" in detail &&
+        typeof detail.id === "string"
+      ) {
+        setReopened({ id: detail.id, atAnswer: answers });
+      }
+    };
+    window.addEventListener(SHOW_ON_STAGE, onShow);
+    return () => window.removeEventListener(SHOW_ON_STAGE, onShow);
+  }, [answers]);
 
   const showing = shown !== null;
   useEffect(() => {
@@ -97,6 +196,7 @@ export function QPresenceStage({
       <LazyMotion features={domAnimation} strict>
         {/* The presence stays on screen: small while an object is shown,
             full again once it is dismissed (reduced motion: no scale). */}
+        {canvas !== null || leaving !== null ? null : (
         <m.div
           key={showing ? "compact" : "full"}
           className="flex w-full flex-col items-center"
@@ -111,6 +211,7 @@ export function QPresenceStage({
         >
           {presence(showing)}
         </m.div>
+        )}
       </LazyMotion>
 
       {/* Q's words for a screen reader, never as text on the page. */}
@@ -122,7 +223,34 @@ export function QPresenceStage({
 
       {captions ? <div data-q-captions>{caption}</div> : null}
 
-      {shown === null ? null : (
+      {leaving === null ? null : (
+        <div ref={leavingRef} className="w-full" data-q-canvas-leaving>
+          <AnswerCanvas
+            block={leaving.block}
+            focus={-1}
+            said=""
+            presence={presence(true, true)}
+            showFollowUps={false}
+          />
+        </div>
+      )}
+
+      {canvas === null || leaving !== null ? null : (
+        <StageCanvas
+          key={canvas.item.id}
+          answerId={canvas.item.id}
+          block={canvas.block}
+          asked={askedBefore(turns, canvas.item.id)}
+          closing={closingLine(canvas.turn)}
+          live={live}
+          presence={presence(true, true)}
+          onCloseAll={() => dismiss(canvas.item)}
+          onAsk={onAsk}
+          onPin={onPin === undefined ? undefined : () => onPin(canvas.item.id)}
+        />
+      )}
+
+      {shown === null || canvas !== null ? null : (
         <section
           aria-labelledby={`${listId}-shown-title`}
           className="flex max-h-[60dvh] w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
@@ -209,6 +337,71 @@ export function QPresenceStage({
           ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+/** What the person asked just before an answer, for the line above Q's. */
+function askedBefore(turns: readonly QTurn[], answerId: string): string | undefined {
+  const at = turns.findIndex((turn) => turn.id === answerId);
+  const asked = turns.slice(0, Math.max(0, at)).findLast((turn) => turn.kind === "PERSON");
+  return asked?.text;
+}
+
+/** Q's last sentence of the answer: said over the overview. */
+function closingLine(turn: QTurn | undefined): string {
+  if (turn === undefined || turn.kind !== "Q") return "";
+  const plain = plainFromMarkdown(turn.text).replace(/\s+/gu, " ").trim();
+  const sentences = plain.match(/[^.!?]+[.!?]+/gu) ?? [plain];
+  return (sentences.at(-1) ?? firstWords(plain) ?? "").trim();
+}
+
+/** The answer on the stage, walked through card by card (C1-C3). */
+function StageCanvas({
+  answerId,
+  block,
+  asked,
+  closing,
+  live,
+  presence,
+  onCloseAll,
+  onAsk,
+  onPin,
+}: {
+  readonly answerId: string;
+  readonly block: QAnswerCardsBlock;
+  readonly asked: string | undefined;
+  readonly closing: string;
+  readonly live: boolean;
+  readonly presence: ReactNode;
+  readonly onCloseAll: () => void;
+  readonly onAsk?: ((question: string) => void) | undefined;
+  readonly onPin?: (() => void) | undefined;
+}) {
+  const playback = useAnswerPlayback(block, answerId, closing, live);
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set());
+  const closeCard = (key: string) => {
+    const next = new Set([...closed, key]);
+    // The last card closed closes the answer.
+    if (block.cards.every((card) => next.has(card.key))) onCloseAll();
+    else setClosed(next);
+  };
+  return (
+    <div className="w-full" data-q-canvas={answerId}>
+      <AnswerCanvas
+        block={block}
+        asked={asked}
+        said={playback.said}
+        focus={playback.focus}
+        presence={presence}
+        dismissed={closed}
+        onFocus={playback.choose}
+        onCloseCard={closeCard}
+        onCloseAll={onCloseAll}
+        onFollowUp={onAsk}
+        onAsk={onAsk}
+        onPin={onPin === undefined ? undefined : () => onPin()}
+      />
     </div>
   );
 }
