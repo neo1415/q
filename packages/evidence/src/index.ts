@@ -265,3 +265,11 @@ export {
   MINIMUM_STANDARD_SECTIONS,
   scoreDeckSection,
 } from "./domain/deck-coaching.js";
+export {
+  createPostgresDataRoom,
+  type DataRoomChecklistRow,
+  type DataRoomDocumentRow,
+  type DataRoomRequestRow,
+  type DeckExtractionRow,
+  type PostgresDataRoom,
+} from "./infrastructure/postgres-data-room.js";

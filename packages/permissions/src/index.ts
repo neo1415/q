@@ -175,3 +175,19 @@ export {
   type DiligenceService,
   type DiligenceView,
 } from "./application/diligence.js";
+export {
+  activeGrants,
+  checklistFor,
+  createDataRoomService,
+  fileKind,
+  projectForInvestor,
+  stageRank,
+  type DataRoomChecklistEntry,
+  type DataRoomCompany,
+  type DataRoomDocument,
+  type DataRoomOutcome,
+  type DataRoomRefusal,
+  type DataRoomRequestRecord,
+  type DataRoomService,
+  type DataRoomStore,
+} from "./application/data-room.js";
