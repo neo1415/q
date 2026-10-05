@@ -179,6 +179,7 @@ describe("the plan gate on Q's tools", () => {
       relationships: STUB,
       chat: STUB,
       work: STUB,
+      jobs: STUB,
       entitlements,
     };
     const ids = new Set(createDefaultQTools(ports).map((tool) => tool.id));

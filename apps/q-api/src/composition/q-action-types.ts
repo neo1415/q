@@ -1,3 +1,4 @@
+import { Q_WORKFORCE_JOB_START } from "@capital-q/contracts";
 import type { QActionRegistry } from "@capital-q/q-actions";
 
 import { COMPANY_PROFILE_UPDATE } from "./company-profile-action.js";
@@ -74,6 +75,8 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   // AUTO block (ADR 0030): Q's delegated work, one approval each.
   WORK_OUTREACH_START,
   WORK_STANDIN_START,
+  // WORKFORCE block (J1, J4): a job the lead Q planned, run as approved.
+  Q_WORKFORCE_JOB_START,
   // ADR 0043: a standing instruction's grant, one approval per version.
   INSTRUCTION_GRANT,
   // ADMIN-3 block: appeals Stage 4 (PADL #050).

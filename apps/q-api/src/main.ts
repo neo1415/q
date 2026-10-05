@@ -116,7 +116,22 @@ import {
   learnedNotesFrom,
 } from "./composition/workforce/learning.js";
 import { createWorkforceModels } from "./composition/workforce/models.js";
-import { workforceMonthlyLimitUsd } from "./composition/workforce/limit.js";
+import {
+  createWorkforceJobActions,
+  createWorkforceJobBoard,
+} from "./composition/workforce/job-actions.js";
+import {
+  createWorkforceJobs,
+  workforceTracker,
+} from "./composition/workforce/jobs.js";
+import {
+  withinMonthlyLimit,
+  workforceMonthlyLimitUsd,
+} from "./composition/workforce/limit.js";
+import {
+  createWorkforcePorts,
+  workforceNotifier,
+} from "./composition/workforce/ports.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
 import { createPostgresWorkforceStore } from "./composition/workforce/store.js";
@@ -1274,6 +1289,87 @@ const outwardReview = createOutwardReview({
   store: workforceStore,
   logger,
 });
+// The lead Q's jobs (J1, J4): planned, approved as a plan, then run as the
+// approver through the app's own services. The services are composed
+// further down; they are read only when a job runs.
+const workforceWithinLimit = (owner: { tenantId: string; userId: string }) =>
+  withinMonthlyLimit(
+    () =>
+      createPostgresUsageReader(database.sql).workforceMonth(owner, new Date()),
+    workforceMonthlyLimit,
+  );
+const workforceWriter = createErrandReplyComposer({
+  gateway: modelGateway,
+  dataPosture: demoDataPosture,
+  logger,
+  etiquette,
+});
+const workforcePortsFor = createWorkforcePorts(
+  {
+    feed: async (actor, limit) =>
+      (await workFeed.page(actor, limit))?.items ?? null,
+    expressInterest: (input) =>
+      interestService.expressInterest({
+        ...input,
+        correlationId: CorrelationIdSchema.parse(input.correlationId),
+      }),
+    relationships: async (actor) =>
+      ((await errandRelationships.ownRelationships?.(actor))?.items ?? []).map(
+        (item) => ({
+          relationshipId: item.relationshipId,
+          name: item.counterpart.name,
+        }),
+      ),
+    readChat: (input) => chat.readForQ(input),
+    sendChat: (input) =>
+      chat.send({
+        actor: input.actor,
+        relationshipId: input.relationshipId,
+        request: { kind: "TEXT", body: input.body },
+        idempotencyKey: input.idempotencyKey,
+      }),
+    writeReply: async (input) =>
+      (
+        await workforceWriter.compose({
+          actor: input.actor,
+          principalName: input.principalName,
+          counterpartName: input.counterpartName,
+          brief: "",
+          callComing: input.callComing,
+          thread: input.thread,
+          correlationId: input.correlationId,
+        })
+      )?.reply ?? null,
+    findSlots: async (input) => {
+      const found = await schedule.findSlots(input);
+      return found.outcome === "OK"
+        ? found.slots.map((slot) => slot.start)
+        : [];
+    },
+    book: async (input) => {
+      const booked = await schedule.schedule({
+        ...input,
+        correlationId: CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+      });
+      return booked.outcome === "OK" ? booked.meeting.id : null;
+    },
+    nameOf: workforceDisplayName,
+  },
+  workforceNotifier(database.sql),
+);
+const workforceJobsFor = (actor: ActorContext) =>
+  createWorkforceJobs({
+    store: workforceStore,
+    models: workforceModels,
+    review: outwardReview,
+    ports: workforcePortsFor(actor),
+    withinLimit: workforceWithinLimit,
+    logger,
+  });
+const workforceJobBoard = createWorkforceJobBoard({
+  jobsFor: workforceJobsFor,
+  withinLimit: workforceWithinLimit,
+});
 // end WORKFORCE block
 const emailBoard = createEmailActionBoard({
   review: outwardReview,
@@ -1937,6 +2033,8 @@ const qTools = createQTools({
     // end BILLING block
     // AUTO block (ADR 0030)
     work: workPort,
+    // WORKFORCE block (J1, J4): a job the lead Q plans, one approval.
+    jobs: workforceJobBoard.port,
     // ADMIN block
     results: {
       read: (actor, query) => ownResults.read(actor, resultsWindow(query)),
@@ -2527,9 +2625,15 @@ const qActionRegistry = createQActionRegistry([
     store: workStore,
     isInvestor: workIsInvestor,
     ownCompany: workOwnCompany,
+    track: workforceTracker(workforceStore, "DELEGATED_WORK"),
     logger,
   }).map((definition) =>
     meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
+  ),
+  // WORKFORCE block (J1, J4): a job the lead Q planned, run as approved.
+  ...createWorkforceJobActions({ jobsFor: workforceJobsFor, logger }).map(
+    (definition) =>
+      meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // ADR 0043: a standing instruction's grant, one approval per version.
   ...createInstructionActions({
@@ -2590,6 +2694,8 @@ const qActionPort = createQActionPort({
     chatBoard.proposer,
     // AUTO block (ADR 0030)
     workBoard.proposer,
+    // WORKFORCE block (J1, J4)
+    workforceJobBoard.proposer,
     profileChangeBoard.proposer,
     profileGapsBoard.proposer,
     humanReviewBoard.proposer,
@@ -3619,6 +3725,7 @@ const instructionDiscovery = createPostgresDiscoveryRepository({
 });
 instructionEngine.current = createInstructionEngine({
   review: outwardReview,
+  track: workforceTracker(workforceStore, "INSTRUCTION"),
   // The person's own name for the planner and the reviewer (J2), never
   // "the person".
   principalName: (actor) => workforceDisplayName(actor.userId),

@@ -171,6 +171,7 @@ const SHORTS: Readonly<Record<string, string>> = {
   propose_q_outreach: "Q reaches out for them",
   propose_stand_in: "Q stands in for them",
   propose_standing_instruction: "Q works on a goal for them",
+  propose_q_job: "Q's team does a job for them",
   set_onboarding_reminders: "sets setup reminders",
   set_pitch_sharing: "who may play their pitch",
   reload_page: "reloads the page",
@@ -891,6 +892,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RELATIONSHIP",
     "A founder's stand-in for one approval: while they are away Q answers investors only from a brief they approved, labelled as Q, and hands the chats back on return.",
     { approval: "PREPARE_APPROVE", executes: ["q.work.standin.start"] },
+  ),
+  tool(
+    "propose_q_job",
+    "RELATIONSHIP",
+    "A one-off job of several steps for Q's team for one approval: the lead Q plans it, each step done by a specialist or a helper with only the tools it needs; every message passes the reviewer first.",
+    { approval: "PREPARE_APPROVE", executes: ["q.workforce.job.start"] },
   ),
   tool(
     "propose_standing_instruction",

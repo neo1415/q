@@ -7,9 +7,11 @@ import {
   runJob,
   type AgentExecutor,
   type AgentRole,
+  type BoundStep,
   type JobRecorder,
   type StepResult,
 } from "@capital-q/q-orchestrator";
+import { workforceCorrelationId } from "@capital-q/contracts";
 import { stanceDeclines } from "@capital-q/q-core";
 
 import type { WorkforceModels } from "./models.js";
@@ -65,6 +67,8 @@ export type WorkforcePorts = {
     owner: Owner,
     conversation: OpenConversation,
     intent: "WARM_REPLY" | "PROPOSE_TIMES",
+    /** J6: the writer's call is priced under the job's own run. */
+    correlationId?: string  ,
   ) => Promise<string | null>;
   readonly send: (
     owner: Owner,
@@ -254,7 +258,12 @@ export function createWorkforceExecutors(dependencies: {
           // The scheduler books it; a reply now would cross with the invite.
           continue;
         }
-        const draft = await ports.writeReply(owner, one, "WARM_REPLY");
+        const draft = await ports.writeReply(
+          owner,
+          one,
+          "WARM_REPLY",
+          workforceCorrelationId(context.jobId, context.runId),
+        );
         if (draft === null) continue;
         const verdict = await review.review(
           owner,
@@ -350,6 +359,31 @@ export type StartJobResult =
       readonly jobId: string | null;
     };
 
+/** What the lead Q may plan with: the tools its specialists can carry out. */
+export const EXECUTABLE_JOB_TOOLS: readonly string[] = [
+  "search_companies",
+  "list_my_relationships",
+  "relationship.interest.express",
+  "list_messages",
+  "chat.message.send",
+  "find_meeting_times",
+  "list_schedule",
+  "schedule.meeting.book",
+];
+
+/** The default budget of one job the lead Q proposes, USD. */
+export const DEFAULT_JOB_BUDGET_USD = 0.5;
+
+export type PlannedJob = {
+  readonly summary: string;
+  readonly steps: readonly BoundStep[];
+  readonly refused: readonly {
+    readonly key: string;
+    readonly reason: string;
+  }[];
+  readonly cannot: readonly string[];
+};
+
 export function createWorkforceJobs(dependencies: {
   readonly store: WorkforceStore;
   readonly models: Pick<WorkforceModels, "plan" | "readReply">;
@@ -358,9 +392,178 @@ export function createWorkforceJobs(dependencies: {
   /** J6: one unit of `q.agent_jobs` per job; false is the plan's limit. */
   readonly meter?:
     ((owner: Owner, idempotencyKey: string) => Promise<boolean>) | undefined;
+  /** J6: whether this month's spend leaves room for a new job. */
+  readonly withinLimit?: ((owner: Owner) => Promise<boolean>) | undefined;
   readonly logger?: Logger | undefined;
 }) {
+  const { store } = dependencies;
+
+  /** The lead Q's plan, bounded by what is permitted and the budget. */
+  async function plan(
+    owner: Owner,
+    input: {
+      readonly goal: string;
+      readonly permitted: readonly string[];
+      readonly budgetUsd: number;
+    },
+    trace: { readonly jobId: string; readonly runId: string } | null,
+  ): Promise<PlannedJob | null> {
+    const permitted = new Set(input.permitted);
+    const planned = await dependencies.models.plan(owner, trace, {
+      goal: input.goal.slice(0, 2_000),
+      roster: rosterText(permitted),
+      allowed: `Tools and actions: ${[...permitted].join(", ") || "none"}. Budget for the whole job: $${input.budgetUsd.toFixed(2)}.`,
+    });
+    if (planned === null) return null;
+    const bound = boundPlan(planned.steps, {
+      permitted,
+      // The lead's own planning comes out of the same budget.
+      budgetUsd: Math.max(0, input.budgetUsd - AGENT_REGISTRY.LEAD.budgetUsd),
+    });
+    return {
+      summary: planned.summary,
+      steps: bound.steps,
+      refused: bound.refused,
+      cannot: planned.cannot,
+    };
+  }
+
+  /** Files the job for its source (one per source), with its lead run. */
+  async function file(
+    owner: Owner,
+    input: {
+      readonly goal: string;
+      readonly budgetUsd: number;
+      readonly source: {
+        readonly kind: "JOB" | "INSTRUCTION" | "DELEGATED_WORK";
+        readonly id: string;
+      };
+    },
+  ): Promise<{ readonly jobId: string; readonly leadRunId: string }> {
+    const one = await store.ensureJob(owner, {
+      source: input.source,
+      goal: input.goal,
+      budgetUsd: input.budgetUsd,
+      threshold: 75,
+      maxRedrafts: 2,
+      rubricVersion: RUBRIC_VERSION,
+    });
+    return { jobId: one.job.id, leadRunId: one.leadRunId };
+  }
+
+  /**
+   * The month's limit and the plan's agent-job allowance, checked before
+   * anything is planned or run; false holds the job with the reason.
+   */
+  async function gate(
+    owner: Owner,
+    filed: { readonly jobId: string; readonly leadRunId: string },
+  ): Promise<boolean> {
+    const hold = async (summary: string) => {
+      await store.endRun(owner, filed.leadRunId, "HELD", summary);
+      await store.setJobStatus(owner, filed.jobId, "HELD");
+    };
+    if (dependencies.withinLimit !== undefined) {
+      const room = await dependencies.withinLimit(owner).catch(() => true);
+      if (!room) {
+        await hold(
+          "This month's limit for Q's work is reached; raise it to go on.",
+        );
+        return false;
+      }
+    }
+    if (dependencies.meter !== undefined) {
+      const allowed = await dependencies
+        .meter(owner, `wf:${filed.jobId}`)
+        .catch(() => false);
+      if (!allowed) {
+        await hold("Your plan's agent jobs for this month are used up.");
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Carries out a plan already bound (and, for a proposed job, approved):
+   * never re-planned here. Files the job for its source, checks the plan's
+   * agent-job allowance and the month's limit, then runs agent by agent.
+   */
+  async function run(
+    owner: Owner,
+    input: {
+      readonly goal: string;
+      readonly budgetUsd: number;
+      readonly source: {
+        readonly kind: "JOB" | "INSTRUCTION" | "DELEGATED_WORK";
+        readonly id: string;
+      };
+      readonly planned: PlannedJob;
+    },
+    filedAlready?: { readonly jobId: string; readonly leadRunId: string },
+    options: { readonly gated?: boolean | undefined } = {},
+  ): Promise<StartJobResult> {
+    const filed = filedAlready ?? (await file(owner, input));
+    if (options.gated !== true && !(await gate(owner, filed))) {
+      return { outcome: "PLAN_LIMIT", jobId: filed.jobId };
+    }
+    const { jobId, leadRunId } = filed;
+    const { planned } = input;
+    const result = await runJob({
+      jobId,
+      goal: planned.summary,
+      steps: planned.steps,
+      executors: createWorkforceExecutors({
+        owner,
+        ports: dependencies.ports,
+        models: dependencies.models,
+        review: dependencies.review,
+        scheduling: planned.steps.some((step) =>
+          step.tools.includes("schedule.meeting.book"),
+        ),
+      }),
+      recorder: {
+        ...recorderFor(store, owner),
+        // The lead is the job's lead run, not a second one.
+        startRun: (one) =>
+          one.role === "LEAD"
+            ? Promise.resolve(leadRunId)
+            : recorderFor(store, owner).startRun(one),
+      },
+    });
+    const done = result.steps.filter((step) => step.status === "DONE").length;
+    await store.setJobStatus(
+      owner,
+      jobId,
+      result.steps.length > 0 && done === result.steps.length ? "DONE" : "HELD",
+    );
+    return {
+      outcome: "STARTED",
+      jobId,
+      summary: planned.summary,
+      steps: result.steps.map((step) => ({
+        key: step.key,
+        status: step.status,
+        summary: step.summary,
+      })),
+      refused: planned.refused,
+      cannot: planned.cannot,
+    };
+  }
+
   return {
+    plan: (
+      owner: Owner,
+      input: {
+        readonly goal: string;
+        readonly permitted: readonly string[];
+        readonly budgetUsd: number;
+      },
+    ) => plan(owner, input, null),
+
+    file,
+    run,
+
     /**
      * Plan and carry out one job the person approved. `permitted` is the
      * job's grant (tool and action names); `source` ties it to what it was
@@ -378,7 +581,6 @@ export function createWorkforceJobs(dependencies: {
         };
       },
     ): Promise<StartJobResult> => {
-      const { store } = dependencies;
       const filed = await store.ensureJob(owner, {
         source: input.source,
         goal: input.goal,
@@ -388,32 +590,15 @@ export function createWorkforceJobs(dependencies: {
         rubricVersion: RUBRIC_VERSION,
       });
       const jobId = filed.job.id;
-      if (dependencies.meter !== undefined) {
-        const allowed = await dependencies
-          .meter(owner, `wf:${jobId}`)
-          .catch(() => false);
-        if (!allowed) {
-          await store.endRun(
-            owner,
-            filed.leadRunId,
-            "HELD",
-            "Your plan's agent jobs for this month are used up.",
-          );
-          await store.setJobStatus(owner, jobId, "HELD");
-          return { outcome: "PLAN_LIMIT", jobId };
-        }
+      const lead = { jobId, leadRunId: filed.leadRunId };
+      if (!(await gate(owner, lead))) {
+        return { outcome: "PLAN_LIMIT", jobId };
       }
-      const permitted = new Set(input.permitted);
-      const plan = await dependencies.models.plan(
-        owner,
-        { jobId, runId: filed.leadRunId },
-        {
-          goal: input.goal.slice(0, 2_000),
-          roster: rosterText(permitted),
-          allowed: `Tools and actions: ${[...permitted].join(", ") || "none"}. Budget for the whole job: $${input.budgetUsd.toFixed(2)}.`,
-        },
-      );
-      if (plan === null) {
+      const planned = await plan(owner, input, {
+        jobId,
+        runId: filed.leadRunId,
+      });
+      if (planned === null) {
         await store.endRun(
           owner,
           filed.leadRunId,
@@ -423,55 +608,35 @@ export function createWorkforceJobs(dependencies: {
         await store.setJobStatus(owner, jobId, "HELD");
         return { outcome: "NOT_PLANNED", jobId };
       }
-      const bound = boundPlan(plan.steps, {
-        permitted,
-        // The lead's own planning comes out of the same budget.
-        budgetUsd: Math.max(0, input.budgetUsd - AGENT_REGISTRY.LEAD.budgetUsd),
-      });
-      const result = await runJob({
-        jobId,
-        goal: plan.summary,
-        steps: bound.steps,
-        executors: createWorkforceExecutors({
-          owner,
-          ports: dependencies.ports,
-          models: dependencies.models,
-          review: dependencies.review,
-          scheduling: bound.steps.some((step) =>
-            step.tools.includes("schedule.meeting.book"),
-          ),
-        }),
-        recorder: {
-          ...recorderFor(store, owner),
-          // The lead is the job's lead run, not a second one.
-          startRun: (run) =>
-            run.role === "LEAD"
-              ? Promise.resolve(filed.leadRunId)
-              : recorderFor(store, owner).startRun(run),
-        },
-      });
-      const done = result.steps.filter((step) => step.status === "DONE").length;
-      await store.setJobStatus(
-        owner,
-        jobId,
-        result.steps.length > 0 && done === result.steps.length
-          ? "DONE"
-          : "HELD",
-      );
-      return {
-        outcome: "STARTED",
-        jobId,
-        summary: plan.summary,
-        steps: result.steps.map((step) => ({
-          key: step.key,
-          status: step.status,
-          summary: step.summary,
-        })),
-        refused: bound.refused,
-        cannot: plan.cannot,
-      };
+      return run(owner, { ...input, planned }, lead, { gated: true });
     },
   };
 }
 
 export type WorkforceJobs = ReturnType<typeof createWorkforceJobs>;
+
+/**
+ * Founder brief J5: standing instructions and delegated work are Q's jobs
+ * too -- the same job record, one per source, shown on the workforce page
+ * as it runs. Best effort: a record that cannot be written never stops the
+ * work it describes.
+ */
+export function workforceTracker(
+  store: WorkforceStore,
+  kind: "INSTRUCTION" | "DELEGATED_WORK",
+) {
+  return async (
+    owner: Owner,
+    source: { readonly id: string; readonly goal: string },
+  ): Promise<void> => {
+    const filed = await store.ensureJob(owner, {
+      source: { kind, id: source.id },
+      goal: source.goal,
+      budgetUsd: DEFAULT_JOB_BUDGET_USD,
+      threshold: 75,
+      maxRedrafts: 2,
+      rubricVersion: RUBRIC_VERSION,
+    });
+    await store.setJobStatus(owner, filed.job.id, "RUNNING");
+  };
+}

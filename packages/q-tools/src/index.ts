@@ -578,3 +578,11 @@ export {
   matchCapabilities,
   type UseCapabilityOutput,
 } from "./tools/use-capability.js";
+
+// WORKFORCE block (J1, J4): a job the lead Q plans and the person approves.
+export {
+  PROPOSE_Q_JOB,
+  createQJobTools,
+  type QJobPlanView,
+  type QJobPort,
+} from "./tools/q-job.js";

@@ -972,6 +972,17 @@ export type InstructionEngineDependencies = {
    * draft that never passes is neither sent nor offered.
    */
   readonly review?: OutwardReview | undefined;
+  /**
+   * Founder brief J5: a standing instruction is one of Q's jobs. Each
+   * firing that plans keeps its job on the workforce page (one job per
+   * instruction, never a parallel record of the work).
+   */
+  readonly track?:
+    | ((
+        owner: { readonly tenantId: string; readonly userId: string },
+        source: { readonly id: string; readonly goal: string },
+      ) => Promise<void>)
+    | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -1383,6 +1394,13 @@ export function createInstructionEngine(
           })
           .catch(() => false);
       }
+
+      await dependencies
+        .track?.(
+          { tenantId: row.tenant_id, userId: row.user_id },
+          { id: row.id, goal: row.goal_text },
+        )
+        .catch(() => undefined);
 
       // Plan; validate; re-plan with the reasons at most twice.
       let refusals = "None.";

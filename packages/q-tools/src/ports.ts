@@ -26,6 +26,7 @@ import type { ChatIntelligencePort } from "./tools/chat.js";
 import type { ScheduleIntelligencePort } from "./tools/schedule.js";
 import type { OnboardingRemindersPort } from "./tools/onboarding-reminders.js";
 // AUTO block (ADR 0030)
+import type { QJobPort } from "./tools/q-job.js";
 import type { QWorkIntelligencePort } from "./tools/q-work.js";
 import type { ResultsToolPort } from "./tools/results.js";
 import type { HumanReviewPort } from "./tools/human-review.js";
@@ -432,6 +433,8 @@ export type QToolPorts = {
   readonly onboardingReminders?: OnboardingRemindersPort | undefined;
   // AUTO block (ADR 0030): Q's delegated work; absent means no work tool.
   readonly work?: QWorkIntelligencePort | undefined;
+  /** WORKFORCE (J1, J4): a job the lead Q plans; absent means no job tool. */
+  readonly jobs?: QJobPort | undefined;
   // DAILY block: The Q Daily, read and set by the person's own Q.
   readonly daily?: QDailyToolPort | undefined;
 };

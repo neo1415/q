@@ -66,6 +66,7 @@ const EVERY_PORT: QToolPorts = {
   onboardingReminders: STUB,
   // AUTO (ADR 0030)
   work: STUB,
+  jobs: STUB,
   // DAILY block
   daily: { request: STUB } as never,
   // ADR 0040: the app's declared actions and read_my.

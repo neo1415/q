@@ -40,6 +40,7 @@ import { createProposeEmailTool } from "./tools/email.js";
 import { createInboundEmailTools } from "./tools/inbound-email.js";
 import { createChatTools } from "./tools/chat.js";
 import { createErrandTools, PROPOSE_ERRAND } from "./tools/errands.js";
+import { createQJobTools, PROPOSE_Q_JOB } from "./tools/q-job.js";
 // AUTO block (ADR 0030)
 import {
   createQWorkTools,
@@ -94,6 +95,7 @@ export const Q_TOOL_GATES: Readonly<Record<string, QToolGate>> = {
   [PROPOSE_Q_OUTREACH]: { feature: "q.delegations", mode: "CHECK" },
   [PROPOSE_STAND_IN]: { feature: "q.delegations", mode: "CHECK" },
   [PROPOSE_STANDING_INSTRUCTION]: { feature: "q.delegations", mode: "CHECK" },
+  [PROPOSE_Q_JOB]: { feature: "q.delegations", mode: "CHECK" },
   [RESEARCH_PUBLIC_WEB]: { feature: "q.research", mode: "CONSUME" },
 };
 
@@ -149,6 +151,7 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     // AUTO block (ADR 0030): "Q, handle it" -- outreach, stand-in, and
     // following, answering and stopping them, from any Q surface.
     ...(ports.work === undefined ? [] : createQWorkTools(ports.work)),
+    ...(ports.jobs === undefined ? [] : createQJobTools(ports.jobs)),
     // BIZ-008: calls and reminders, prepared on the same board.
     ...(ports.schedule === undefined ||
     ports.chat === undefined ||

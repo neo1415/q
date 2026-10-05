@@ -108,6 +108,13 @@ export function createWorkStartActions(dependencies: {
   readonly store: WorkStore;
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
+  /** J5: delegated work is one of Q's jobs on the workforce page. */
+  readonly track?:
+    | ((
+        owner: { readonly tenantId: string; readonly userId: string },
+        source: { readonly id: string; readonly goal: string },
+      ) => Promise<void>)
+    | undefined;
   readonly logger?: Logger | undefined;
 }): readonly AnyQActionDefinition[] {
   const { store, logger } = dependencies;
@@ -160,6 +167,12 @@ export function createWorkStartActions(dependencies: {
               ),
               summary: "Starting: reading your feed.",
             });
+            await dependencies
+              .track?.(context.approver, {
+                id: delegationId,
+                goal: `Outreach to up to ${String(action.payload.grant.maxCompanies)} founders`,
+              })
+              .catch(() => undefined);
             return { outcome: "EXECUTED", result: { delegationId } };
           } catch (error: unknown) {
             logger?.warn(
@@ -221,6 +234,12 @@ export function createWorkStartActions(dependencies: {
               owner(context.approver),
               delegationId,
             );
+            await dependencies
+              .track?.(context.approver, {
+                id: delegationId,
+                goal: "Stand in for you while you're away",
+              })
+              .catch(() => undefined);
             return { outcome: "EXECUTED", result: { delegationId } };
           } catch (error: unknown) {
             logger?.warn(

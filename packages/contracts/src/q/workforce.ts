@@ -308,3 +308,50 @@ export const WorkforceOverviewDtoSchema = z
   })
   .strict();
 export type WorkforceOverviewDto = z.infer<typeof WorkforceOverviewDtoSchema>;
+
+// ---------------------------------------------------------------------------
+// A job the lead Q proposes (J1, J4): Prepare -> Recommend -> Approve
+// ---------------------------------------------------------------------------
+
+/**
+ * The Q action that starts a job the lead Q planned. Its payload IS the
+ * plan: the steps, the specialist that owns each, the tools each may use,
+ * and the budget. The person approves exactly that plan; on approval it
+ * runs as planned and is never re-planned under the same approval (a
+ * changed plan is a new card).
+ */
+export const Q_WORKFORCE_JOB_START = "q.workforce.job.start" as const;
+
+export const WorkforcePlannedStepSchema = z
+  .object({
+    key: z.string().trim().min(1).max(40),
+    role: WorkforceAgentRoleSchema,
+    /** Plain words the person sees: a role's name or a helper's. */
+    agentName: z.string().trim().min(1).max(60),
+    goal: z.string().trim().min(1).max(400),
+    tools: z.array(z.string().max(80)).max(8),
+    dependsOn: z.array(z.string().max(40)).max(8),
+    budgetUsd: UsdSchema,
+    /** A helper the lead Q spawned for this step, with only these tools. */
+    spawned: z.boolean(),
+  })
+  .strict();
+export type WorkforcePlannedStep = z.infer<typeof WorkforcePlannedStepSchema>;
+
+export const WorkforceJobStartPayloadSchema = z
+  .object({
+    ownerUserId: UuidSchema,
+    goal: z.string().trim().min(1).max(2_000),
+    /** The lead Q's one-line summary of the plan. */
+    summary: z.string().trim().min(1).max(400),
+    steps: z.array(WorkforcePlannedStepSchema).min(1).max(12),
+    /** What the job may use: the union of its steps' tools. */
+    permitted: z.array(z.string().max(80)).max(24),
+    budgetUsd: UsdSchema,
+    /** What it asked that no permitted tool can do, in plain words. */
+    cannot: z.array(z.string().max(300)).max(5),
+  })
+  .strict();
+export type WorkforceJobStartPayload = z.infer<
+  typeof WorkforceJobStartPayloadSchema
+>;
