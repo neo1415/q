@@ -40,6 +40,7 @@ import type {
 import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 
 import type { DeckAudiencePort } from "./actions/deck.js";
+import type { DocumentChangePort } from "./actions/document-manage.js";
 import type { QWorkPagePort } from "./actions/work.js";
 
 /**
@@ -59,6 +60,8 @@ export type AppActionPorts = {
   readonly qWork?: QWorkPagePort | undefined;
   /** ADR 0041: who may download a pitch deck (the Evidence service). */
   readonly deckAudience?: DeckAudiencePort | undefined;
+  /** P3: rename and delete (archive) their own documents (Evidence). */
+  readonly documentChanges?: DocumentChangePort | undefined;
   readonly media?:
     | Pick<
         MediaService,

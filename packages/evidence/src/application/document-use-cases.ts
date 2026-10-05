@@ -10,6 +10,7 @@ import {
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
   MessageSensitivitySchema,
+  UtcTimestampSchema,
   UuidSchema,
   type CorrelationId,
   type MessageSensitivity,
@@ -46,6 +47,7 @@ import {
 } from "../domain/sensitivity.js";
 import {
   documentCreatedEvent,
+  documentDetailsChangedEvent,
   documentDownloadAudienceChangedEvent,
   documentVersionCreatedEvent,
 } from "../events/index.js";
@@ -75,6 +77,7 @@ const ACTION = {
   downloadAudienceChanged: AuditActionTypeSchema.parse(
     "document.download_audience_changed",
   ),
+  detailsChanged: AuditActionTypeSchema.parse("document.details_changed"),
 };
 
 /** Doc 15 §27 V1 formats. Broader acceptance is a security decision, not a default. */
@@ -505,6 +508,14 @@ export function createGetDocument(dependencies: EvidenceServiceDependencies) {
 export type ListDocumentsQuery = {
   readonly actor: ActorContext;
   readonly companyId?: string | undefined;
+  /** One page of active documents, newest change first (keyset). */
+  readonly page?:
+    | {
+        readonly limit: number;
+        readonly after?:
+          { readonly updatedAt: string; readonly id: string } | undefined;
+      }
+    | undefined;
 };
 
 export function createListDocuments(dependencies: EvidenceServiceDependencies) {
@@ -529,6 +540,23 @@ export function createListDocuments(dependencies: EvidenceServiceDependencies) {
           query.companyId === undefined
             ? undefined
             : UuidSchema.parse(query.companyId),
+        ...(query.page === undefined
+          ? {}
+          : {
+              page: {
+                limit: Math.min(Math.max(query.page.limit, 1), 100),
+                ...(query.page.after === undefined
+                  ? {}
+                  : {
+                      after: {
+                        updatedAt: UtcTimestampSchema.parse(
+                          query.page.after.updatedAt,
+                        ),
+                        id: UuidSchema.parse(query.page.after.id),
+                      },
+                    }),
+              },
+            }),
       },
     );
   };
@@ -623,6 +651,10 @@ export function createListDocumentsWithVersions(
         dependencies.sql,
         query.actor.tenantId,
         activeOrganisation(query.actor),
+        // A page reads only its own documents' versions.
+        query.page === undefined
+          ? undefined
+          : documents.map((document) => document.id),
       );
     const byId = new Map(versions.map((version) => [version.id, version]));
     return documents.map((document) => ({
@@ -733,6 +765,138 @@ export function createSetDocumentDownloadAudience(
             ownerOrganisationId: document.ownerOrganisationId,
             companyId: document.companyId,
             downloadAudience: command.audience,
+            documentVersion: document.version + 1,
+          },
+        ),
+      );
+      const after = await repositories.documents.findById(
+        tx.sql,
+        actor.tenantId,
+        organisationId,
+        documentId,
+      );
+      if (after === null) {
+        throw new DocumentNotFoundError();
+      }
+      return after;
+    });
+  };
+}
+
+export type DocumentChange =
+  | { readonly kind: "RENAME"; readonly title: string }
+  | { readonly kind: "ARCHIVE" }
+  | { readonly kind: "RESTORE" };
+
+export type ChangeDocumentCommand = {
+  readonly actor: ActorContext;
+  readonly documentId: DocumentId;
+  readonly change: DocumentChange;
+  /** The version the screen saw; absent acts on the current one (Q). */
+  readonly expectedVersion?: number | undefined;
+  readonly correlationId: CorrelationId;
+};
+
+/**
+ * Rename, delete (archive) or restore one of the organisation's own
+ * documents (P3 documents page). Deleting is the existing soft archive, so
+ * it can be undone; a deleted pitch deck stops being downloadable by
+ * investors at once. The file and its versions are never touched. The same
+ * capability as the download choice (document.manage), one audit entry and
+ * one event per change; asking for what is already so changes nothing.
+ */
+export function createChangeDocument(
+  dependencies: EvidenceServiceDependencies,
+) {
+  const { transactions, repositories, audit, outbox } = dependencies;
+  return async (command: ChangeDocumentCommand): Promise<Document> => {
+    const { actor, change } = command;
+    const organisationId = activeOrganisation(actor);
+    const documentId = DocumentIdSchema.parse(command.documentId);
+    const title =
+      change.kind === "RENAME" ? change.title.trim().slice(0, 200) : null;
+    if (change.kind === "RENAME" && (title === null || title.length === 0)) {
+      throw new EvidenceRuleError("a document needs a name");
+    }
+    const visible = await repositories.documents.findById(
+      dependencies.sql,
+      actor.tenantId,
+      organisationId,
+      documentId,
+    );
+    if (visible === null) {
+      throw new DocumentNotFoundError();
+    }
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: DOCUMENT_MANAGE,
+      resource: documentScope(actor, organisationId, visible.id),
+    });
+    return transactions.run(async (tx) => {
+      const document = await repositories.documents.lockById(
+        tx,
+        actor.tenantId,
+        organisationId,
+        documentId,
+      );
+      if (document === null) {
+        throw new DocumentNotFoundError();
+      }
+      if (
+        command.expectedVersion !== undefined &&
+        document.version !== command.expectedVersion
+      ) {
+        throw new DocumentVersionConflictError();
+      }
+      const status =
+        change.kind === "ARCHIVE"
+          ? ("ARCHIVED" as const)
+          : change.kind === "RESTORE"
+            ? ("ACTIVE" as const)
+            : undefined;
+      const unchanged =
+        (title !== null && title === document.title) ||
+        (status !== undefined && status === document.status);
+      if (unchanged) return document;
+      const updated = await repositories.documents.updateDetails(tx, {
+        tenantId: actor.tenantId,
+        documentId,
+        expectedVersion: document.version,
+        changes: {
+          ...(title === null ? {} : { title }),
+          ...(status === undefined ? {} : { status }),
+        },
+      });
+      if (!updated) {
+        throw new DocumentVersionConflictError();
+      }
+      await audit.record(tx, {
+        ...auditActorFromContext(actor),
+        auditEventId: createAuditEventId(),
+        actionType: ACTION.detailsChanged,
+        resourceType: RESOURCE_DOCUMENT,
+        resourceId: document.id,
+        occurredAt: occurredNow(),
+        outcome: "SUCCEEDED",
+        // The kind of change and the states, never the old or new title.
+        metadata: {
+          change: change.kind,
+          fromStatus: document.status,
+          toStatus: status ?? document.status,
+          companyId: document.companyId,
+        },
+        correlationId: command.correlationId,
+      });
+      await outbox.enqueue(
+        tx,
+        documentDetailsChangedEvent(
+          { actor, organisationId, correlationId: command.correlationId },
+          {
+            documentId: document.id,
+            ownerOrganisationId: document.ownerOrganisationId,
+            companyId: document.companyId,
+            change: change.kind,
+            status: status ?? document.status,
             documentVersion: document.version + 1,
           },
         ),

@@ -72,3 +72,10 @@ export {
   type ParityCase,
   type ParityExpectation,
 } from "./eval-cases.js";
+export {
+  ARCHIVE_DOCUMENT,
+  DOCUMENT_MANAGE_ACTIONS,
+  RENAME_DOCUMENT,
+  type DocumentChangePort,
+  type ManagedDocument,
+} from "./actions/document-manage.js";

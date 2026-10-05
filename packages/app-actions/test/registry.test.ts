@@ -192,6 +192,9 @@ describe("the action registry", () => {
       ["document.upload.start", "offer.document_upload", "CONSEQUENTIAL"],
       ["document.upload.complete", "offer.document_upload", "CONSEQUENTIAL"],
       ["document.upload.cancel", "offer.document_upload", "CONSEQUENTIAL"],
+      // P3 documents page.
+      ["document.rename", "rename_document", "CONSEQUENTIAL"],
+      ["document.archive", "delete_document", "CONSEQUENTIAL"],
       [
         "profile_image.upload.start",
         "offer.profile_photo_upload",

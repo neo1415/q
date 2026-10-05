@@ -164,6 +164,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/documents.ts GET DOCUMENTS_PATH": cap(
     "tool.list_uploaded_documents",
   ),
+  // P3: the owner's own file from the documents page (a download).
+  "api/http/documents.ts GET `${DOCUMENTS_PATH}/:documentId${DOCUMENT_FILE_SEGMENT}`":
+    DOWNLOAD,
   "api/http/documents.ts GET `${DOCUMENTS_PATH}/:documentId`": cap(
     "tool.list_uploaded_documents",
   ),

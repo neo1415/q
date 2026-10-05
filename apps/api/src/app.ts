@@ -46,7 +46,7 @@ import {
 } from "./http/documents.js";
 import type { QWorkPagePort } from "@capital-q/app-actions";
 
-import { deckAudiencePort } from "./deck-audience-port.js";
+import { deckAudiencePort, documentChangePort } from "./deck-audience-port.js";
 import {
   registerAppActionRoutes,
   registerPersonActionRoutes,
@@ -266,6 +266,8 @@ export type ApiModules = {
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
   readonly onboardingNudges?: OnboardingRoutesDependencies["nudges"];
   readonly evidence?: DocumentRoutesDependencies["evidence"] | undefined;
+  /** P3: the owner's own file, a short-lived link (needs storage). */
+  readonly documentFileLink?: DocumentRoutesDependencies["fileLink"];
   readonly media?: MediaRoutesDependencies["media"] | undefined;
   /** CQ-VERIFY-001: a founder asks and reads; nothing here decides. */
   readonly verification?:
@@ -529,7 +531,10 @@ export function createApp(
         : { chatSafety: modules.chatSafety }),
       ...(modules.evidence === undefined
         ? {}
-        : { deckAudience: deckAudiencePort(modules.evidence) }),
+        : {
+            deckAudience: deckAudiencePort(modules.evidence),
+            documentChanges: documentChangePort(modules.evidence),
+          }),
       ...(modules.qWork === undefined ? {} : { qWork: modules.qWork }),
     },
   });
@@ -735,6 +740,9 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       evidence: modules.evidence,
+      ...(modules.documentFileLink === undefined
+        ? {}
+        : { fileLink: modules.documentFileLink }),
     });
   }
 

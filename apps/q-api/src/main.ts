@@ -1662,6 +1662,19 @@ const appActionPorts: OwnReadPorts = {
         documentId: DocumentIdSchema.parse(command.documentId),
       }),
   },
+  // P3: rename and delete their own documents, through Evidence.
+  documentChanges: {
+    getDocument: ({ actor, documentId }) =>
+      researchComposition.evidence.getDocument({
+        actor,
+        documentId: DocumentIdSchema.parse(documentId),
+      }),
+    changeDocument: (command) =>
+      researchComposition.evidence.changeDocument({
+        ...command,
+        documentId: DocumentIdSchema.parse(command.documentId),
+      }),
+  },
   interactions: createInteractionSignalService({
     ports: slateRead.eligibilityPorts,
     eligibility: slateRead.eligibility,
