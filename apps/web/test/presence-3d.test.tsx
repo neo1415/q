@@ -59,7 +59,7 @@ describe("state to uniforms", () => {
       presenceUniforms({ ...base, state: "LISTENING" }).pitch,
     ).toBeGreaterThan(idle.pitch);
     expect(
-      presenceUniforms({ ...base, state: "WORKING", figure: "ORBIT" }).glow,
+      presenceUniforms({ ...base, state: "WORKING", figure: "RING" }).glow,
     ).toBeGreaterThan(idle.glow);
     const error = presenceUniforms({ ...base, state: "ERROR", dim: true });
     expect(error.fade).toBeLessThan(1);
@@ -80,9 +80,26 @@ describe("state to uniforms", () => {
     );
   });
 
+  it("draws the face fine: smaller points, a dark floor, no white core", () => {
+    const face = presenceUniforms({
+      ...base,
+      figure: "FACE",
+      state: "SPEAKING",
+    });
+    const wave = presenceUniforms({
+      ...base,
+      figure: "WAVE",
+      state: "SPEAKING",
+    });
+    expect(face.floor).toBeLessThan(0.1);
+    expect(wave.floor).toBeGreaterThan(0.3);
+    expect(face.pointScale).toBeLessThan(wave.pointScale);
+    expect(face.core).toBe(0);
+  });
+
   it("whitens only the cloud's dense core, never a ring or a glyph", () => {
     expect(presenceUniforms(base).core).toBe(1);
-    expect(presenceUniforms({ ...base, figure: "ORBIT" }).core).toBeLessThan(
+    expect(presenceUniforms({ ...base, figure: "RING" }).core).toBeLessThan(
       0.5,
     );
     expect(presenceUniforms({ ...base, figure: "QUESTION" }).core).toBeLessThan(
@@ -115,7 +132,6 @@ describe("reduced motion: one still 3D frame", () => {
   it("settles every particle with depth and no velocity", () => {
     const sim = createPresenceSim({
       count: 400,
-      voice: "FEMALE",
       initial: "CLOUD",
     });
     sim.settle("CLOUD", 0, { input: 0, output: 0 });

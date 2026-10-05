@@ -1,6 +1,10 @@
 import type { QApertureState } from "../q-aperture/aperture-state";
 import type { QMotion } from "../q-aperture/aperture-frame";
-import { FACE_FIGURES, type FigureKind } from "./presence-figures";
+import {
+  FACE_FIGURES,
+  FINE_FIGURES,
+  type FigureKind,
+} from "./presence-figures";
 
 /**
  * What the 3D renderer is told each frame (ADR 0049), as a pure function
@@ -28,6 +32,13 @@ export type PresenceUniforms = {
   readonly fade: number;
   /** Share of particles drawn, 0..1 (the frame budget's lever). */
   readonly keep: number;
+  /**
+   * The darkest a particle may be drawn, 0..1: high for the swarm (every
+   * point a spark), near zero for the face, whose shade is its shape.
+   */
+  readonly floor: number;
+  /** How much the frame's centre brightens points, 0..1. */
+  readonly lift: number;
 };
 
 export type UniformInput = {
@@ -78,6 +89,7 @@ export function presenceUniforms(input: UniformInput): PresenceUniforms {
   // turn half as far as the cloud, so they stay legible.
   const cloud = CLOUD_FIGURES.has(input.figure);
   const face = FACE_FIGURES.has(input.figure);
+  const fine = FINE_FIGURES.has(input.figure);
   const turn = cloud ? 1 : face ? 0.3 : 0.55;
   return {
     yaw: (STILL_YAW + swayYaw) * turn + leanX * LEAN_YAW * (face ? 0.6 : 1),
@@ -88,15 +100,18 @@ export function presenceUniforms(input: UniformInput): PresenceUniforms {
       listening * 0.08,
     shiftX: leanX * LEAN_SHIFT,
     shiftY: leanY * LEAN_SHIFT,
-    pointScale: 1 + voice * 0.25 + mic * 0.1,
+    // The face is drawn in finer points, so its tone reads as skin.
+    pointScale: (1 + voice * 0.25 + mic * 0.1) * (fine ? 0.62 : 1),
     glow:
       (0.75 + voice * 0.5 + mic * 0.3 + (WORKING.has(input.state) ? 0.15 : 0)) *
       (input.dim ? 0.45 : 1),
     // The white core is the cloud's dense centre; a ring or a glyph has
     // none, so it gets none.
-    core: (input.dim ? 0.4 : 1) * (cloud ? 1 : 0.2),
+    core: (input.dim ? 0.4 : 1) * (cloud ? 1 : fine ? 0 : 0.2),
     fade: input.dim ? 0.45 : 1,
     keep: Math.max(0.2, Math.min(1, input.keep)),
+    floor: fine ? 0.04 : 0.38,
+    lift: fine ? 0.15 : 0.6,
   };
 }
 

@@ -5,24 +5,28 @@ import type { FigureKind } from "./presence-figures";
 
 /**
  * Which figure Q's particles form, from real signals only (PRESENCE spec
- * §3): the surface's Q state (voice or run), and the gestures Q's answer
- * asked for, timed against its voice. Pure and clock-driven, so every
- * transition is tested rather than eyeballed.
+ * §3; K1-K2, ADR 0051): the surface's Q state (voice or run), and the
+ * gestures Q's answer asked for, timed against its voice. Pure and
+ * clock-driven, so every transition is tested rather than eyeballed.
  *
- * - Nobody talking: the cloud, no face.
+ * - Nobody talking: the cloud, breathing.
  * - The person talking: the cloud leaning in, with their voice.
  * - Addressed from rest ("Hey Q", a session opening): a "!" first.
  * - Q asking or waiting on an approval: a "?".
- * - Thinking: a head, tilting slowly. Working: an orbit.
- * - Q speaking: the face, and the answer's gestures as their sentences
- *   are said.
+ * - Thinking: a turning spiral. Working: the ring.
+ * - Q speaking: the wave, or the human face where the surface allows one
+ *   (the Q page, 160 px or more: `faceAllowed`); the answer's gestures
+ *   as their sentences are said.
+ * - An answer ready: the Q mark in knots of light, once, then the cloud.
+ * - Arriving on a surface Q travels to (the dock and the Q page): a ribbon,
+ *   briefly, flowing into the state's shape.
  */
 
 export type PresenceView = {
   readonly figure: FigureKind;
   readonly dim: boolean;
   /** What put this figure up, for the playground and the tests. */
-  readonly cause: "STATE" | "WAKE" | "GESTURE";
+  readonly cause: "STATE" | "WAKE" | "GESTURE" | "READY" | "ARRIVE";
 };
 
 /** Every gesture's figure. */
@@ -33,10 +37,11 @@ export const GESTURE_FIGURE: Readonly<Record<QPresenceGesture, FigureKind>> = {
   BUILDINGS: "BUILDINGS",
   CHART_UP: "CHART_UP",
   CLAP: "CLAP",
-  LAUGH: "LAUGH",
-  THINK_TILT: "THINK_TILT",
-  NOD: "NOD",
-  HANDS_EXPLAIN: "HANDS_EXPLAIN",
+  // The face-borne gestures became shapes when the old face went (ADR 0051).
+  LAUGH: "RIBBON",
+  THINK_TILT: "SPIRAL",
+  NOD: "CONSTELLATION",
+  HANDS_EXPLAIN: "HANDS",
 };
 
 /** How long each gesture holds before the state's figure returns. */
@@ -54,6 +59,12 @@ export const GESTURE_MS: Readonly<Record<QPresenceGesture, number>> = {
 };
 
 export const WAKE_MS = 1_600;
+/** The Q mark holds this long when an answer is ready, then the cloud. */
+export const READY_MS = 2_400;
+/** The ribbon holds this long when Q arrives on a surface it travels to. */
+export const ARRIVE_MS = 900;
+/** The smallest surface a face is drawn on (ADR 0051). */
+export const FACE_MIN_PIXELS = 160;
 /** A gesture this late is no longer about what is being said. */
 export const STALE_AFTER_MS = 6_000;
 /** Spoken English, about 14 characters a second. */
@@ -63,25 +74,41 @@ export const SENTENCE_MS = 2_600;
 /** Spoken gestures wait this long for Q's voice to start, then play. */
 const WAIT_FOR_VOICE_MS = 5_000;
 
-/** The figure for a state, before any gesture. */
+/**
+ * Whether a surface may show Q's human face (ADR 0051): only one the
+ * caller marks as the Q page's own presence, and only at 160 px or more.
+ * Everywhere else Q has no face (design B's option A).
+ */
+export function faceAllowed(surface: {
+  readonly face: boolean;
+  readonly pixels: number;
+}): boolean {
+  return surface.face && surface.pixels >= FACE_MIN_PIXELS;
+}
+
+/**
+ * The figure for a state, before any gesture. `face` says the surface may
+ * show the face (`faceAllowed`); it is used only while Q speaks.
+ */
 export function figureForState(
   state: QApertureState,
   small: boolean,
+  face = false,
 ): FigureKind {
   switch (state) {
     case "IDLE":
     case "ERROR":
+    case "COMPLETE":
       return "CLOUD";
     case "LISTENING":
       return "ATTENTIVE";
     case "THINKING":
-      return small ? "ORBIT" : "HEAD";
+      return "SPIRAL";
     case "WORKING":
-      return "ORBIT";
+      return "RING";
     case "SPEAKING":
-    case "COMPLETE":
-      // Below 72 px a face cannot be read: the cloud swells with the voice.
-      return small ? "CLOUD" : "FACE";
+      // Below 72 px a wave cannot be read: the cloud swells with the voice.
+      return small ? "CLOUD" : face ? "FACE" : "WAVE";
     case "NEEDS_INPUT":
     case "NEEDS_APPROVAL":
       return small ? "ATTENTIVE" : "QUESTION";
@@ -161,14 +188,24 @@ export type PresenceMachine = {
     readonly small: boolean;
     /** Milliseconds, any monotonic clock. */
     readonly now: number;
+    /** The surface may show the face while Q speaks (`faceAllowed`). */
+    readonly face?: boolean | undefined;
   }) => PresenceView;
   readonly schedule: (batch: GestureBatch, now: number) => void;
   /** Gestures waiting, for tests and the playground. */
   readonly waiting: () => number;
 };
 
-export function createPresenceMachine(): PresenceMachine {
+export function createPresenceMachine(
+  options: {
+    /** A surface Q travels to (the dock, the Q page): a ribbon on arrival. */
+    readonly arrive?: boolean | undefined;
+  } = {},
+): PresenceMachine {
   let previous: QApertureState | null = null;
+  let readyUntil = 0;
+  // -1: arriving, timed from the first frame; 0: not a travelling surface.
+  let arriveUntil = options.arrive === true ? -1 : 0;
   let speakingSince: number | null = null;
   let wakeUntil = 0;
   let active: {
@@ -198,8 +235,12 @@ export function createPresenceMachine(): PresenceMachine {
         });
       });
     },
-    step: ({ state, small, now }) => {
+    step: ({ state, small, now, face = false }) => {
+      if (arriveUntil === -1) arriveUntil = now + ARRIVE_MS;
       if (state !== previous) {
+        // An answer is ready: the Q mark once, then the cloud.
+        readyUntil =
+          state === "COMPLETE" && previous !== null ? now + READY_MS : 0;
         if (state === "SPEAKING") speakingSince = now;
         else if (previous === "SPEAKING") {
           speakingSince = null;
@@ -237,6 +278,9 @@ export function createPresenceMachine(): PresenceMachine {
       if (small) {
         return { figure: figureForState(state, true), dim, cause: "STATE" };
       }
+      if (now < arriveUntil) {
+        return { figure: "RIBBON", dim, cause: "ARRIVE" };
+      }
       if (active !== null && now >= active.until) active = null;
       if (active === null) {
         let next = -1;
@@ -266,7 +310,14 @@ export function createPresenceMachine(): PresenceMachine {
         };
       }
       if (now < wakeUntil) return { figure: "EXCLAIM", dim, cause: "WAKE" };
-      return { figure: figureForState(state, false), dim, cause: "STATE" };
+      if (now < readyUntil) {
+        return { figure: "CONSTELLATION", dim, cause: "READY" };
+      }
+      return {
+        figure: figureForState(state, false, face),
+        dim,
+        cause: "STATE",
+      };
     },
   };
 }

@@ -12,8 +12,9 @@ import { QSwarm } from "../q-swarm/q-swarm";
  * The Q Aperture: Q's one presence (ADR 0017 F2; spec §5). Q's ring and
  * tail as an aperture of light — it opens to listen, focuses to think,
  * shows progress while working, projects light from the tail while
- * speaking, and dims to an ember when paused. Never a face, a brain or an
- * orb, and the only thing in the product that glows.
+ * speaking, and dims to an ember when paused. Never a brain or an orb,
+ * and the only thing in the product that glows. A face only where the
+ * caller marks the Q page's own presence (`face`; ADR 0051).
  *
  * The API is the state and the real signals behind it; nothing here runs
  * a decorative loop:
@@ -57,6 +58,10 @@ export type QApertureProps = {
   readonly label?: string | true | undefined;
   /** A second line: an approved stage, a subject. */
   readonly detail?: string | undefined;
+  /** The Q page's own presence: it may show Q's face while Q speaks (ADR 0051). */
+  readonly face?: boolean | undefined;
+  /** Q travels to this surface between the dock and the stage. */
+  readonly travels?: boolean | undefined;
   readonly className?: string | undefined;
 };
 
@@ -87,6 +92,8 @@ export function QAperture({
   progress: _progress = null,
   label,
   detail,
+  face = false,
+  travels = false,
   className,
 }: QApertureProps) {
   const stage = useStageApertureSize();
@@ -118,6 +125,8 @@ export function QAperture({
           pixels={px}
           inputLevel={inputLevel}
           outputLevel={outputLevel}
+          face={face}
+          travels={travels}
         />
       </div>
       {text !== undefined || detail !== undefined ? (

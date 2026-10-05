@@ -70,16 +70,47 @@ const nextId = () => {
   return `playground-${String(sequence)}-${String(Date.now())}`;
 };
 
+/** Timed state sequences for a screen recording of the free shapes and the face. */
+const PLAYS: Readonly<Record<string, readonly QApertureState[]>> = {
+  shapes: [
+    "IDLE",
+    "LISTENING",
+    "THINKING",
+    "WORKING",
+    "SPEAKING",
+    "COMPLETE",
+    "IDLE",
+  ],
+  face: ["IDLE", "LISTENING", "SPEAKING", "SPEAKING", "COMPLETE", "IDLE"],
+};
+
 export function PresencePlayground({
   initialState,
   initialGesture,
+  initialFace,
+  play,
 }: {
   readonly initialState: string | null;
   readonly initialGesture: string | null;
+  readonly initialFace: boolean;
+  readonly play: string | null;
 }) {
   const [state, setState] = useState<QApertureState>(
     isState(initialState) ? initialState : "IDLE",
   );
+  const [face, setFace] = useState(initialFace);
+  useEffect(() => {
+    const sequence = play === null ? undefined : PLAYS[play];
+    if (sequence === undefined) return;
+    let step = 0;
+    const next = () => {
+      setState(sequence[step % sequence.length] ?? "IDLE");
+      step += 1;
+    };
+    next();
+    const timer = window.setInterval(next, 2_600);
+    return () => window.clearInterval(timer);
+  }, [play]);
   const [figure, setFigure] = useState("CLOUD");
   const [renderer, setRenderer] = useState<string | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -183,6 +214,7 @@ export function PresencePlayground({
             size="stage"
             inputLevel={input}
             outputLevel={output}
+            face={face}
             label
           />
         </div>
@@ -197,6 +229,13 @@ export function PresencePlayground({
                 A spoken answer
               </Button>
               <Button onClick={heyQ}>“Hey Q”</Button>
+              <Button
+                aria-pressed={face}
+                variant={face ? "primary" : "secondary"}
+                onClick={() => setFace((on) => !on)}
+              >
+                Face while speaking (Q page)
+              </Button>
             </div>
           </fieldset>
 

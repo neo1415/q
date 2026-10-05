@@ -9,11 +9,13 @@ export function particleCount(pixels: number): number {
     ? 2400
     : pixels >= 300
       ? 2200
-      : pixels >= 150
-        ? 900
-        : pixels >= 72
-          ? 480
-          : 160;
+      : pixels >= 220
+        ? 1400
+        : pixels >= 150
+          ? 900
+          : pixels >= 72
+            ? 480
+            : 160;
 }
 
 /**
