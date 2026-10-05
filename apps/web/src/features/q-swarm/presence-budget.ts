@@ -6,9 +6,9 @@
 /** Particles per surface size, before the device's share. */
 export function particleCount(pixels: number): number {
   return pixels >= 440
-    ? 2200
+    ? 2400
     : pixels >= 300
-      ? 1800
+      ? 2200
       : pixels >= 150
         ? 900
         : pixels >= 72

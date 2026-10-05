@@ -68,7 +68,7 @@ void main(){
   if(r2>1.)discard;
   // A small bright disc with a soft rim: crisp at a distance, never a square.
   float a=vA*(1.-smoothstep(.25,1.,r2)*.85);
-  vec3 c=mix(uC,uW,clamp(pow(vCore,1.8)*.85,0.,1.)*uWhite);
+  vec3 c=mix(uC,uW,clamp(pow(vCore,2.2)*.78,0.,1.)*uWhite);
   o=vec4(c*a,a);
 }`;
 
@@ -256,7 +256,7 @@ export function drawPresence3d(
   gl.uniform2f(g.u["uRes"] ?? null, size, size);
   gl.uniform1f(g.u["uUnit"] ?? null, unit);
   // Point size follows the surface, so a dock swarm still reads.
-  gl.uniform1f(g.u["uPoint"] ?? null, Math.max(1.5, size / 195));
+  gl.uniform1f(g.u["uPoint"] ?? null, Math.max(2, size / 195));
   gl.uniform2f(g.u["uTurn"] ?? null, u.yaw, u.pitch);
   gl.uniform2f(g.u["uShift"] ?? null, u.shiftX, u.shiftY);
   gl.uniform1f(g.u["uDepth"] ?? null, DEPTH_UNITS);

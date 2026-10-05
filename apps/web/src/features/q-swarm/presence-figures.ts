@@ -754,7 +754,7 @@ function faceFigure(kind: FigureKind, voice: FaceVoice, count: number): Figure {
 export const DEPTH_UNITS = 0.7;
 
 /** The cloud's radius in frame units: room for the voice to swell it and for perspective. */
-const CLOUD_RADIUS = 0.78;
+const CLOUD_RADIUS = 0.88;
 
 /**
  * The resting cloud: a soft sphere of light, denser at its core, turning

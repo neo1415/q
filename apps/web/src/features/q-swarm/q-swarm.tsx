@@ -143,6 +143,8 @@ export function QSwarm({
     let onScreen = true;
     let last = 0;
     let clock = 0;
+    let core = 1;
+    let stepped = 0;
     const frame = (now: number) => {
       const began = performance.now();
       const current = live.current;
@@ -158,6 +160,7 @@ export function QSwarm({
         const dt = Math.min(MAX_DT, last === 0 ? 1 / 60 : interval / 1000);
         last = now;
         clock += dt;
+        stepped = dt;
         const raw = levels();
         sim.step(clock, dt, raw);
         const k = (was: number, next: number) =>
@@ -165,14 +168,14 @@ export function QSwarm({
         eased.input += (raw.input - eased.input) * k(eased.input, raw.input);
         eased.output +=
           (raw.output - eased.output) * k(eased.output, raw.output);
-        const target = leanTarget();
-        stepLean(lean, target.x, target.y, dt);
+        const aim = leanTarget();
+        stepLean(lean, aim.x, aim.y, dt);
       } else if (sim.figure() !== view.figure || figure === "") {
         // Reduced motion: each figure drawn still, no flow between.
         sim.settle(view.figure, clock, { input: 0, output: 0 });
       }
       note(view.figure);
-      const uniforms = presenceUniforms({
+      const target = presenceUniforms({
         state: current.state,
         figure: sim.figure(),
         input: moving ? eased.input : 0,
@@ -184,6 +187,12 @@ export function QSwarm({
         dim: view.dim,
         keep: budgetSettings(budget).keep,
       });
+      // The white core follows the particles, not the figure's name: it
+      // fades in as a glyph flows back into the cloud, never ahead of it.
+      core = moving
+        ? core + (target.core - core) * (1 - Math.exp(-stepped * 1.8))
+        : target.core;
+      const uniforms = { ...target, core };
       if (renderer === "3d" && draw3d !== null) {
         const drawn = draw3d(context, sim, {
           pixels: device,
