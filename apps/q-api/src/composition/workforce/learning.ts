@@ -54,7 +54,10 @@ export function createWorkforceLearning(dependencies: {
       actor: ActorContext,
       draftId: string,
       input: DraftFeedback,
-    ): Promise<{ readonly feedbackId: string; readonly learned: boolean } | null> => {
+    ): Promise<{
+      readonly feedbackId: string;
+      readonly learned: boolean;
+    } | null> => {
       const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
       const draft = await dependencies.store.draft(owner, draftId);
       if (draft === null) return null;

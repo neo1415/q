@@ -86,7 +86,11 @@ export type WorkforcePorts = {
   /** Something the person should see (a possible no, a held draft). */
   readonly notify: (
     owner: Owner,
-    notice: { readonly key: string; readonly title: string; readonly body: string },
+    notice: {
+      readonly key: string;
+      readonly title: string;
+      readonly body: string;
+    },
   ) => Promise<void>;
 };
 
@@ -128,10 +132,18 @@ export function createWorkforceExecutors(dependencies: {
   readonly ports: WorkforcePorts;
   readonly models: Pick<WorkforceModels, "readReply">;
   readonly review: OutwardReview;
+  /** Another agent in this job books calls: a wish to meet is its. */
+  readonly scheduling: boolean;
 }): Partial<Record<AgentRole, AgentExecutor>> {
   const { owner, ports, models, review } = dependencies;
 
   const has = (tools: readonly string[], tool: string) => tools.includes(tool);
+  // One reading per message per job: the conversation and the scheduler
+  // agents act on the same reading, and a reply is classified once.
+  const readings = new Map<
+    string,
+    Promise<Awaited<ReturnType<WorkforceModels["readReply"]>>>
+  >();
 
   const watcher: AgentExecutor = async (step, context) => {
     if (!has(step.tools, "relationship.interest.express")) {
@@ -167,27 +179,40 @@ export function createWorkforceExecutors(dependencies: {
   const conversation =
     (mode: "REPLY" | "SCHEDULE"): AgentExecutor =>
     async (step, context) => {
-      if (!has(step.tools, mode === "REPLY" ? "chat.message.send" : "schedule.meeting.book")) {
+      if (
+        !has(
+          step.tools,
+          mode === "REPLY" ? "chat.message.send" : "schedule.meeting.book",
+        )
+      ) {
         return { status: "HELD", summary: "Not allowed to do this step." };
       }
       const principalName = await ports.principalName(owner);
-      const open = (await ports.openConversations(owner)).slice(0, MAX_PER_STEP);
+      const open = (await ports.openConversations(owner)).slice(
+        0,
+        MAX_PER_STEP,
+      );
       let replied = 0;
       let booked = 0;
       let held = 0;
       let handed = 0;
       for (const one of open) {
         if (one.latest === null) continue;
-        const reading = await models.readReply(
-          owner,
-          { jobId: context.jobId, runId: context.runId },
-          {
-            principalName,
-            counterpartName: one.counterpartName,
-            thread: one.thread.slice(-4_000),
-            latest: one.latest.text.slice(0, 4_000),
-          },
-        );
+        const latest = one.latest;
+        const once =
+          readings.get(latest.id) ??
+          models.readReply(
+            owner,
+            { jobId: context.jobId, runId: context.runId },
+            {
+              principalName,
+              counterpartName: one.counterpartName,
+              thread: one.thread.slice(-4_000),
+              latest: latest.text.slice(0, 4_000),
+            },
+          );
+        readings.set(latest.id, once);
+        const reading = await once;
         // Unreadable, a no, a not-now or an unhappy tone: the person's.
         if (
           reading === null ||
@@ -215,12 +240,17 @@ export function createWorkforceExecutors(dependencies: {
           const first = slots[0];
           if (first === undefined) continue;
           const result = await ports
-            .book(owner, one.relationshipId, `wf:${context.jobId}:book:${one.relationshipId}`, first)
+            .book(
+              owner,
+              one.relationshipId,
+              `wf:${context.jobId}:book:${one.relationshipId}`,
+              first,
+            )
             .catch(() => ({ ok: false, meetingId: null }));
           if (result.ok) booked += 1;
           continue;
         }
-        if (reading.wantsMeeting && has(step.tools, "schedule.meeting.book")) {
+        if (reading.wantsMeeting && dependencies.scheduling) {
           // The scheduler books it; a reply now would cross with the invite.
           continue;
         }
@@ -250,7 +280,12 @@ export function createWorkforceExecutors(dependencies: {
           continue;
         }
         const sent = await ports
-          .send(owner, one.relationshipId, `wf:${context.jobId}:reply:${one.latest.id}`, verdict.body)
+          .send(
+            owner,
+            one.relationshipId,
+            `wf:${context.jobId}:reply:${one.latest.id}`,
+            verdict.body,
+          )
           .catch(() => false);
         if (sent) {
           replied += 1;
@@ -261,15 +296,22 @@ export function createWorkforceExecutors(dependencies: {
         mode === "SCHEDULE"
           ? {
               status: "DONE",
-              summary: booked === 0 ? "No calls to book yet." : `Booked ${plural(booked, "call", "calls")}.`,
+              summary:
+                booked === 0
+                  ? "No calls to book yet."
+                  : `Booked ${plural(booked, "call", "calls")}.`,
               outputs: { booked },
             }
           : {
               status: "DONE",
               summary: [
                 `Replied to ${plural(replied, "person", "people")}`,
-                held > 0 ? `held ${plural(held, "draft", "drafts")} below the bar` : null,
-                handed > 0 ? `left ${plural(handed, "reply", "replies")} for you` : null,
+                held > 0
+                  ? `held ${plural(held, "draft", "drafts")} below the bar`
+                  : null,
+                handed > 0
+                  ? `left ${plural(handed, "reply", "replies")} for you`
+                  : null,
               ]
                 .filter((part) => part !== null)
                 .join("; ")
@@ -292,11 +334,21 @@ export type StartJobResult =
       readonly outcome: "STARTED";
       readonly jobId: string;
       readonly summary: string;
-      readonly steps: readonly { readonly key: string; readonly status: string; readonly summary: string }[];
-      readonly refused: readonly { readonly key: string; readonly reason: string }[];
+      readonly steps: readonly {
+        readonly key: string;
+        readonly status: string;
+        readonly summary: string;
+      }[];
+      readonly refused: readonly {
+        readonly key: string;
+        readonly reason: string;
+      }[];
       readonly cannot: readonly string[];
     }
-  | { readonly outcome: "NOT_PLANNED" | "PLAN_LIMIT"; readonly jobId: string | null };
+  | {
+      readonly outcome: "NOT_PLANNED" | "PLAN_LIMIT";
+      readonly jobId: string | null;
+    };
 
 export function createWorkforceJobs(dependencies: {
   readonly store: WorkforceStore;
@@ -304,7 +356,8 @@ export function createWorkforceJobs(dependencies: {
   readonly review: OutwardReview;
   readonly ports: WorkforcePorts;
   /** J6: one unit of `q.agent_jobs` per job; false is the plan's limit. */
-  readonly meter?: ((owner: Owner, idempotencyKey: string) => Promise<boolean>) | undefined;
+  readonly meter?:
+    ((owner: Owner, idempotencyKey: string) => Promise<boolean>) | undefined;
   readonly logger?: Logger | undefined;
 }) {
   return {
@@ -319,7 +372,10 @@ export function createWorkforceJobs(dependencies: {
         readonly goal: string;
         readonly permitted: readonly string[];
         readonly budgetUsd: number;
-        readonly source: { readonly kind: "JOB" | "INSTRUCTION" | "DELEGATED_WORK"; readonly id: string };
+        readonly source: {
+          readonly kind: "JOB" | "INSTRUCTION" | "DELEGATED_WORK";
+          readonly id: string;
+        };
       },
     ): Promise<StartJobResult> => {
       const { store } = dependencies;
@@ -337,7 +393,12 @@ export function createWorkforceJobs(dependencies: {
           .meter(owner, `wf:${jobId}`)
           .catch(() => false);
         if (!allowed) {
-          await store.endRun(owner, filed.leadRunId, "HELD", "Your plan's agent jobs for this month are used up.");
+          await store.endRun(
+            owner,
+            filed.leadRunId,
+            "HELD",
+            "Your plan's agent jobs for this month are used up.",
+          );
           await store.setJobStatus(owner, jobId, "HELD");
           return { outcome: "PLAN_LIMIT", jobId };
         }
@@ -353,7 +414,12 @@ export function createWorkforceJobs(dependencies: {
         },
       );
       if (plan === null) {
-        await store.endRun(owner, filed.leadRunId, "HELD", "Couldn't plan this job just now.");
+        await store.endRun(
+          owner,
+          filed.leadRunId,
+          "HELD",
+          "Couldn't plan this job just now.",
+        );
         await store.setJobStatus(owner, jobId, "HELD");
         return { outcome: "NOT_PLANNED", jobId };
       }
@@ -362,8 +428,6 @@ export function createWorkforceJobs(dependencies: {
         // The lead's own planning comes out of the same budget.
         budgetUsd: Math.max(0, input.budgetUsd - AGENT_REGISTRY.LEAD.budgetUsd),
       });
-      // The lead's run of this job already exists: the runner records the
-      // steps under a fresh lead run only when there is none (direct use).
       const result = await runJob({
         jobId,
         goal: plan.summary,
@@ -373,6 +437,9 @@ export function createWorkforceJobs(dependencies: {
           ports: dependencies.ports,
           models: dependencies.models,
           review: dependencies.review,
+          scheduling: bound.steps.some((step) =>
+            step.tools.includes("schedule.meeting.book"),
+          ),
         }),
         recorder: {
           ...recorderFor(store, owner),
@@ -387,7 +454,9 @@ export function createWorkforceJobs(dependencies: {
       await store.setJobStatus(
         owner,
         jobId,
-        result.steps.length > 0 && done === result.steps.length ? "DONE" : "HELD",
+        result.steps.length > 0 && done === result.steps.length
+          ? "DONE"
+          : "HELD",
       );
       return {
         outcome: "STARTED",

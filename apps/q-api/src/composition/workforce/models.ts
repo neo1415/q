@@ -108,7 +108,8 @@ export function createWorkforceModels(dependencies: {
   const registry = createDefaultPromptRegistry();
 
   async function call<V, O>(input: {
-    readonly task: "DRAFT_REVIEW" | "DRAFT_REDRAFT" | "REPLY_READER" | "JOB_PLAN";
+    readonly task:
+      "DRAFT_REVIEW" | "DRAFT_REDRAFT" | "REPLY_READER" | "JOB_PLAN";
     readonly taskClass: ModelTextTaskClass;
     readonly who: Who;
     readonly trace: Trace;

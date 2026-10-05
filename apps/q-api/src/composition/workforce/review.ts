@@ -79,8 +79,7 @@ export type OutwardReview = {
       readonly recheck?: ((body: string) => string | null) | undefined;
       /** A job planned by the lead Q files the draft under its own run. */
       readonly job?:
-        | { readonly jobId: string; readonly parentRunId: string }
-        | undefined;
+        { readonly jobId: string; readonly parentRunId: string } | undefined;
     },
   ) => Promise<OutwardVerdict>;
   /** What happened to a passed draft: sent by Q, or offered for approval. */
@@ -132,57 +131,53 @@ export function createOutwardReview(dependencies: {
       const filed =
         store === undefined
           ? null
-          : await quietly(
-              async () => {
-                const job =
-                  options?.job === undefined
-                    ? await store.ensureJob(who, {
-                        source: { kind: source.kind, id: source.id },
-                        goal: source.goal,
-                        budgetUsd: 0.5,
-                        threshold: basePolicy.threshold,
-                        maxRedrafts: basePolicy.maxRedrafts,
-                        rubricVersion: RUBRIC_VERSION,
-                      })
-                    : null;
-                const jobId = options?.job?.jobId ?? job?.job.id ?? null;
-                const parent =
-                  options?.job?.parentRunId ?? job?.leadRunId ?? null;
-                if (jobId === null || parent === null) return null;
-                const goal = `${draft.channel === "EMAIL" ? "Email" : "Message"} to ${draft.counterpartName}`;
-                const writer = await store.startRun(who, {
-                  jobId,
-                  role: "WRITER",
-                  agentName: "Writer",
-                  goal,
-                  tools: [],
-                  budgetUsd: 0.1,
-                  stepKey: null,
-                  spawnedByRunId: parent,
-                });
-                const reviewer = await store.startRun(who, {
-                  jobId,
-                  role: "REVIEWER",
-                  agentName: "Reviewer",
-                  goal: `Grade: ${goal}`,
-                  tools: [],
-                  budgetUsd: 0.1,
-                  stepKey: null,
-                  spawnedByRunId: parent,
-                });
-                return {
-                  jobId,
-                  writer,
-                  reviewer,
-                  policy: {
-                    threshold: job?.job.review_threshold ?? basePolicy.threshold,
-                    maxRedrafts:
-                      job?.job.max_redrafts ?? basePolicy.maxRedrafts,
-                  },
-                };
-              },
-              null,
-            );
+          : await quietly(async () => {
+              const job =
+                options?.job === undefined
+                  ? await store.ensureJob(who, {
+                      source: { kind: source.kind, id: source.id },
+                      goal: source.goal,
+                      budgetUsd: 0.5,
+                      threshold: basePolicy.threshold,
+                      maxRedrafts: basePolicy.maxRedrafts,
+                      rubricVersion: RUBRIC_VERSION,
+                    })
+                  : null;
+              const jobId = options?.job?.jobId ?? job?.job.id ?? null;
+              const parent =
+                options?.job?.parentRunId ?? job?.leadRunId ?? null;
+              if (jobId === null || parent === null) return null;
+              const goal = `${draft.channel === "EMAIL" ? "Email" : "Message"} to ${draft.counterpartName}`;
+              const writer = await store.startRun(who, {
+                jobId,
+                role: "WRITER",
+                agentName: "Writer",
+                goal,
+                tools: [],
+                budgetUsd: 0.1,
+                stepKey: null,
+                spawnedByRunId: parent,
+              });
+              const reviewer = await store.startRun(who, {
+                jobId,
+                role: "REVIEWER",
+                agentName: "Reviewer",
+                goal: `Grade: ${goal}`,
+                tools: [],
+                budgetUsd: 0.1,
+                stepKey: null,
+                spawnedByRunId: parent,
+              });
+              return {
+                jobId,
+                writer,
+                reviewer,
+                policy: {
+                  threshold: job?.job.review_threshold ?? basePolicy.threshold,
+                  maxRedrafts: job?.job.max_redrafts ?? basePolicy.maxRedrafts,
+                },
+              };
+            }, null);
       const policy = filed?.policy ?? basePolicy;
       const frame = {
         principalName: draft.principalName.slice(0, 120),
@@ -335,7 +330,10 @@ export function createOutwardReview(dependencies: {
  * reviewer, or with nothing to send, the result is unchanged.
  */
 export async function reviewedReply<
-  T extends { readonly reply: string | null; readonly forPerson: readonly string[] },
+  T extends {
+    readonly reply: string | null;
+    readonly forPerson: readonly string[];
+  },
 >(
   review: OutwardReview | undefined,
   who: Owner,
@@ -358,6 +356,9 @@ export async function reviewedReply<
   return {
     ...result,
     reply: null,
-    forPerson: [...result.forPerson, heldLine(verdict, draft.counterpartName)].slice(0, 5),
+    forPerson: [
+      ...result.forPerson,
+      heldLine(verdict, draft.counterpartName),
+    ].slice(0, 5),
   };
 }

@@ -396,7 +396,8 @@ export function createPostgresWorkforceStore(
                 ${input.idempotencyKey})
         on conflict (tenant_id, user_id, idempotency_key) do nothing
         returning id`;
-      if (inserted[0] !== undefined) return { id: inserted[0].id, created: true };
+      if (inserted[0] !== undefined)
+        return { id: inserted[0].id, created: true };
       const replay = await sql<{ id: string }[]>`
         select id from q_runtime.workforce_feedback
          where tenant_id = ${owner.tenantId} and user_id = ${owner.userId}
