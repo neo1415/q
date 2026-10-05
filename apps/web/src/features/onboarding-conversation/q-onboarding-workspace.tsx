@@ -283,6 +283,13 @@ export function QOnboardingWorkspace({
     },
   });
   const voiceActive = voice.active;
+  /**
+   * Arriving by voice (Q's first minute handed over): the voice stage
+   * holds until the interview's line is up, or until it fails and the
+   * notice says so here (founder live 2026-10-05: one surface per mode).
+   * Nothing typed starts a turn meanwhile: the line is about to carry it.
+   */
+  const [arriving, setArriving] = useState(talkOnOpen);
   // Only a connected line carries typed words; one that never connected
   // (no microphone) would drop them (live bench 2026-09-30: an investor's
   // typed answers in the composer below the voice stage went nowhere).
@@ -1063,7 +1070,8 @@ export function QOnboardingWorkspace({
       // A spoken turn is the conversation while voice is on: a typed turn
       // started beside it talked over Q (founder live 2026-10-05). The
       // voice interview reads the same session and settles the step.
-      voiceActive
+      voiceActive ||
+      arriving
     ) {
       return;
     }
@@ -1076,7 +1084,7 @@ export function QOnboardingWorkspace({
       void actions.say(autoSay, recentTurns());
     }, 0);
     return () => clearTimeout(timer);
-  }, [prompt, push, actions, recentTurns, voiceActive]);
+  }, [prompt, push, actions, recentTurns, voiceActive, arriving]);
 
   const keep = async (suggestionId: string) => {
     settleReading();
@@ -1120,19 +1128,34 @@ export function QOnboardingWorkspace({
    * person has not yet had one read to them. Only a screen with no line of
    * Q's yet (the opening failed) asks the server to open.
    */
+  /**
+   * The question Q is asking now, for a line that reopens with nothing of
+   * its own to say (a duplex fallback, a reconnect, a change of voice):
+   * Q asks it at once instead of waiting for the person, and never
+   * welcomes them a second time.
+   */
+  const askingNow = useRef<string | null>(null);
+  useEffect(() => {
+    askingNow.current = isFinal ? null : liveQuestion;
+  });
   const talkWithQ = async (
     options: { readonly withGreeting?: boolean } = {},
   ) => {
     if (view === undefined) {
       return;
     }
+    // Q's own question when it has asked one; otherwise, for a person Q
+    // already welcomed on the way here, the step's question -- resumed, so
+    // the server composes no second welcome, and said at once.
     const asking =
       prompt !== null &&
       !isFinal &&
       qQuestion !== null &&
       (qQuestion.stepKey === prompt.stepKey || silentStep)
         ? qQuestion.text
-        : null;
+        : greeted && !isFinal && liveQuestion !== null
+          ? liveQuestion
+          : null;
     const conversationId = QConversationIdSchema.safeParse(
       qConversationId.current,
     ).data;
@@ -1156,6 +1179,7 @@ export function QOnboardingWorkspace({
             }),
         ...(conversationId === undefined ? {} : { conversationId }),
       },
+      lead: () => askingNow.current,
       ...(asking === null
         ? {
             firstMessage:
@@ -1178,6 +1202,8 @@ export function QOnboardingWorkspace({
   // proposals a typed upload produces, read back aloud (rework: "drop
   // your profile and Q reads it back").
   const [uploadNote, setUploadNote] = useState<string | null>(null);
+  /** A finished upload waiting for the person to hand it to Q. */
+  const [heldUpload, setHeldUpload] = useState<string | null>(null);
   const companyIdForUpload =
     qSubject !== undefined && "companyId" in qSubject
       ? qSubject.companyId
@@ -1248,12 +1274,18 @@ export function QOnboardingWorkspace({
       // walkthrough F2): the upload is part of the conversation, not a
       // detour to the company page.
       if (voiceActive) {
-        voiceSendText(told);
+        // But a reading that lands in the background never starts a turn
+        // over the line (founder live 2026-10-05: "it interrupts itself"):
+        // it is shown in place, and the person's tap hands it to Q.
+        setUploadNote(
+          ready ? `${file.name} is read.` : `${file.name} is still being read.`,
+        );
+        setHeldUpload(told);
       } else {
         await say(told);
       }
     },
-    [companyIdForUpload, actions, voiceSendText, voiceActive, say],
+    [companyIdForUpload, actions, voiceActive, say],
   );
 
   // Q takes the person somewhere, or leaves them with the form: followed
@@ -1285,12 +1317,6 @@ export function QOnboardingWorkspace({
   // and a spoken one composed side by side (the fixture's 19:47:33 and
   // 19:47:48 lines).
   const talkedOnOpen = useRef(false);
-  /**
-   * Arriving by voice (Q's first minute handed over): the voice stage
-   * holds until the interview's line is up, or until it fails and the
-   * notice says so here (founder live 2026-10-05: one surface per mode).
-   */
-  const [arriving, setArriving] = useState(talkOnOpen);
   // Voice asked for while Q's opening is still on its way (seen in the
   // browser run: Talk tapped a few seconds after arrival started a second,
   // spoken opening beside the typed one). The request waits for the
@@ -1389,6 +1415,18 @@ export function QOnboardingWorkspace({
           }}
           onUpload={uploadWhileTalking}
           uploadNote={uploadNote}
+          uploadAction={
+            heldUpload === null
+              ? null
+              : {
+                  label: "Go through it with Q",
+                  onPress: () => {
+                    voiceSendText(heldUpload);
+                    setHeldUpload(null);
+                    setUploadNote(null);
+                  },
+                }
+          }
           onUseForm={
             prompt !== null &&
             vocabulary.editorFor(prompt.stepKey) !== undefined

@@ -107,4 +107,23 @@ describe("R24 · the sidebar", () => {
     render(<DesktopSidebar context={INVESTOR} />);
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
+
+  it("never scrolls sideways: the rail clamps its nav and stacks its footer", async () => {
+    const { container } = render(<DesktopSidebar context={INVESTOR} />);
+    const nav = container.querySelector("[data-sidebar-nav]");
+    const footer = container.querySelector("[data-sidebar-footer]");
+    // Folded (the Q page): no side padding to squeeze the 44 px icons,
+    // and the footer's controls in one column.
+    expect(nav?.className).toContain("overflow-x-hidden");
+    expect(nav?.className).toContain("px-0");
+    expect(footer?.className).toContain("overflow-x-hidden");
+    expect(footer?.lastElementChild?.className).toContain("flex-col");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Expand sidebar" }),
+    );
+    // Open: still clamped; the controls sit in a row under the scope.
+    expect(nav?.className).toContain("overflow-x-hidden");
+    expect(footer?.lastElementChild?.className).not.toContain("flex-col");
+  });
 });

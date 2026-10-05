@@ -154,8 +154,12 @@ export function WelcomeScreen({
             ? "Setting up your company"
             : "One moment",
       );
-      void end();
-      router.push(path);
+      // One line at a time: the welcome line is ended, and that end
+      // awaited, before the next screen opens the interview's line
+      // (live 2026-10-05: the two overlapped and stacked).
+      void end().then(() => {
+        router.push(path);
+      });
     }
   });
 

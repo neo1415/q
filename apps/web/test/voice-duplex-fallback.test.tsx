@@ -60,6 +60,8 @@ beforeEach(() => {
       voice: "FEMALE",
       provider: "deepgram",
       token: "t",
+      // A duplex line: only one of those falls back to the standard voice.
+      duplex: {},
     },
   });
 });

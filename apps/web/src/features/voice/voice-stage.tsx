@@ -40,6 +40,13 @@ export type VoiceStageProps = {
   readonly onUpload?: ((file: File) => Promise<void>) | undefined;
   /** What the surface says about a document in flight, if any. */
   readonly uploadNote?: string | null | undefined;
+  /**
+   * The person's one tap that hands a finished reading to Q. A document
+   * finishing in the background never starts a turn by itself: it is
+   * shown here, and Q takes it up when the person says so.
+   */
+  readonly uploadAction?:
+    { readonly label: string; readonly onPress: () => void } | null | undefined;
   readonly progress: readonly {
     readonly label: string;
     readonly done: number;
@@ -88,6 +95,7 @@ export function VoiceStage({
   onUseForm,
   onUpload,
   uploadNote,
+  uploadAction,
   progress,
 }: VoiceStageProps) {
   const [typing, setTyping] = useState(false);
@@ -279,8 +287,20 @@ export function VoiceStage({
           ) : null}
 
           {uploadNote !== null && uploadNote !== undefined ? (
-            <span className="cq-caption text-(--cq-text-secondary)">
-              {uploadNote}
+            <span className="flex items-center gap-3">
+              <span className="cq-caption text-(--cq-text-secondary)">
+                {uploadNote}
+              </span>
+              {uploadAction !== null && uploadAction !== undefined ? (
+                <button
+                  type="button"
+                  className="cq-stage-quiet"
+                  onClick={uploadAction.onPress}
+                  data-voice-upload-action
+                >
+                  {uploadAction.label}
+                </button>
+              ) : null}
             </span>
           ) : null}
           {notice !== null ? (

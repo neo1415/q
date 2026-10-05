@@ -223,6 +223,57 @@ describe("opening the duplex line", () => {
   });
 });
 
+describe("Q speaks first, and never over a reply (founder live 2026-10-05)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("says the opening as its own turn the moment the line is up", async () => {
+    const h = harness();
+    await h.line.open();
+    const channel = h.channel();
+    const before = channel.sent.length;
+    h.line.speakFirst("What is your company called?");
+    const sent = channel.sent.slice(before);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      type: "response.create",
+      response: { tool_choice: "none" },
+    });
+    expect(JSON.stringify(sent[0])).toContain("What is your company called?");
+    expect(h.events.onState).toHaveBeenLastCalledWith("THINKING");
+  });
+
+  it("does not start an opening over a reply already in flight", async () => {
+    const h = harness();
+    await h.line.open();
+    const channel = h.channel();
+    channel.emit({ type: "response.created", response: { id: "resp_1" } });
+    const before = channel.sent.length;
+    h.line.speakFirst("What is your company called?");
+    expect(channel.sent.length).toBe(before);
+  });
+
+  it("cuts Q's reply before a typed turn, rather than starting a second response on top", async () => {
+    const h = harness();
+    await h.line.open();
+    const channel = h.channel();
+    channel.emit({ type: "response.created", response: { id: "resp_1" } });
+    channel.emit({ type: "output_audio_buffer.started" });
+    const before = channel.sent.length;
+    h.line.sendText("Actually, we're pre-seed.");
+    const types = channel.types().slice(before);
+    expect(types.indexOf("response.cancel")).toBeGreaterThanOrEqual(0);
+    expect(types.indexOf("response.cancel")).toBeLessThan(
+      types.lastIndexOf("response.create"),
+    );
+    expect(types.filter((type) => type === "response.create")).toHaveLength(1);
+  });
+});
+
 describe("barge-in", () => {
   beforeEach(() => {
     vi.useFakeTimers();
