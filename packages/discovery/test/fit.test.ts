@@ -40,6 +40,11 @@ import {
   type FitCompanyInputs,
 } from "../src/fit/service.js";
 import {
+  createFitInputSource,
+  stageLabel,
+} from "../src/infrastructure/fit-inputs.js";
+import type { MandateHardConstraint } from "../src/eligibility/ports.js";
+import {
   FIT_REASON_TEMPLATES,
   renderFitReason,
   type FitReasonKey,
@@ -713,6 +718,174 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     const result = await w.service.top(actor, 3);
     expect(result.kind === "OK" && result.comparison.entries).toEqual([]);
     expect(w.read).toEqual([]);
+  });
+});
+
+describe("fit inputs from the investor's own mandate and what the reader may see", () => {
+  const actor = {
+    userId: ID(100),
+    tenantId: ID(101),
+    actorType: "USER",
+  } as unknown as ActorContext;
+  const constraint = (
+    dimension: string,
+    value: MandateHardConstraint["value"],
+    importance: MandateHardConstraint["importance"] = "STRONG",
+  ) =>
+    ({
+      dimension,
+      operator: "IN",
+      value,
+      importance,
+      isHardExclusion: false,
+      automatedUse: "ELIGIBLE",
+    }) as unknown as MandateHardConstraint;
+
+  function source(roles: readonly string[], raise: boolean) {
+    // No snapshot row exists: every read returns nothing.
+    const sql = (() => Promise.resolve([])) as never;
+    return createFitInputSource({
+      sql,
+      eligibilityPorts: {
+        mandates: {
+          activeMandate: () =>
+            Promise.resolve({
+              kind: "FOUND" as const,
+              mandate: {
+                mandateId: ID(200),
+                investorOrganisationId: ID(300),
+                version: 3,
+                status: "ACTIVE" as const,
+                taxonomyPreferences: [],
+                stage: { minStageCode: "pre_seed", maxStageCode: "seed" },
+                constraints: [
+                  constraint("investment_role", {
+                    kind: "codes",
+                    values: [...roles],
+                  } as never),
+                  constraint(
+                    "cheque.typical",
+                    {
+                      kind: "amount",
+                      amount: "300000",
+                      currency: "USD",
+                    } as never,
+                    "NEUTRAL",
+                  ),
+                  constraint("business.attribute", {
+                    kind: "codes",
+                    values: ["saas"],
+                  } as never),
+                  constraint(
+                    "business.attribute",
+                    { kind: "codes", values: ["hardware"] } as never,
+                    "AVOID",
+                  ),
+                ],
+              },
+            }),
+        },
+        companies: {
+          findMany: (ids) =>
+            Promise.resolve(
+              ids.map((companyId) => ({
+                companyId,
+                tenantId: ID(9),
+                organisationId: ID(8),
+                companyStatus: "active" as const,
+                marketplaceVisibility: "network_visible",
+                marketplaceParticipation: "ELIGIBLE" as const,
+                currentStageCode: "series_a",
+                headquartersCountry: "KE",
+              })),
+            ),
+        },
+      },
+      // The reader may see company 1 only.
+      identities: (ids) =>
+        Promise.resolve(
+          new Map(
+            ids
+              .filter((id) => id === ID(1))
+              .map((id) => [
+                id,
+                { name: "Sunline Energy", shortDescription: null },
+              ]),
+          ),
+        ),
+      ...(raise
+        ? {
+            raises: () =>
+              Promise.resolve(
+                new Map([[ID(1), { amount: "2000000", currency: "USD" }]]),
+              ),
+          }
+        : {}),
+    });
+  }
+
+  it("reads lead policy, cheque, business models and stages from declared constraints", async () => {
+    const read = (roles: readonly string[]) =>
+      source(roles, true).read({
+        actor,
+        investorOrganisationId: ID(300),
+        mandateId: ID(200),
+        companyIds: [ID(1), ID(2)],
+      });
+    const one = await read(["lead"]);
+    expect([...one.keys()]).toEqual([ID(1)]);
+    const declared = one.get(ID(1))?.declared;
+    expect(declared?.leadPolicy).toBe("ALWAYS");
+    expect(declared?.cheque).toEqual({ currency: "USD", typical: "300000" });
+    expect(declared?.businessModelPreferences).toEqual({
+      preferred: ["saas"],
+      avoided: ["hardware"],
+    });
+    expect(declared?.mandateStages).toBe("pre-seed to seed");
+    expect(declared?.companyStage).toBe("Series A");
+    expect(declared?.companyPlace).toBe("Kenya");
+    expect(declared?.round).toEqual({
+      amount: "2000000",
+      currency: "USD",
+      evidenceStatus: "SELF_REPORTED",
+    });
+    expect(one.get(ID(1))?.snapshot).toBeNull();
+    expect(one.get(ID(1))?.line).toBe("Series A · Kenya");
+    expect(
+      (await read(["lead", "co_invest"])).get(ID(1))?.declared.leadPolicy,
+    ).toBe("SOMETIMES");
+    expect((await read(["follow"])).get(ID(1))?.declared.leadPolicy).toBe(
+      "NEVER",
+    );
+    expect((await read([])).get(ID(1))?.declared.leadPolicy).toBeNull();
+  });
+
+  it("a raise the reader may not see stays unknown", async () => {
+    const out = await source(["lead"], false).read({
+      actor,
+      investorOrganisationId: ID(300),
+      mandateId: ID(200),
+      companyIds: [ID(1)],
+    });
+    expect(out.get(ID(1))?.declared.round).toBeNull();
+    const observed = observeFit({
+      companyId: ID(1),
+      snapshot: null,
+      declared: out.get(ID(1))?.declared ?? {},
+      eligibilityReasons: [],
+      config: FIT_CONFIG_V4,
+      now: NOW,
+    });
+    expect(observed.observations.CHEQUE_SIZE.outcome).toBe("UNKNOWN");
+  });
+
+  it("labels stages plainly", () => {
+    expect([
+      stageLabel("pre_seed"),
+      stageLabel("seed"),
+      stageLabel("series_b"),
+      stageLabel(null),
+    ]).toEqual(["pre-seed", "seed", "Series B", undefined]);
   });
 });
 

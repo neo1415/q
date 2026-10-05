@@ -772,4 +772,9 @@ export {
   type FitServiceDependencies,
   type FitTopResult,
 } from "./fit/service.js";
+export {
+  createFitInputSource,
+  stageLabel,
+  type FitInputSourceDependencies,
+} from "./infrastructure/fit-inputs.js";
 // end MATCH block
