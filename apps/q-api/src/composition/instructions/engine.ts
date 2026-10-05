@@ -546,8 +546,7 @@ export function validateStep(
   };
 }
 
-export type QuestionVerdict =
-  "ANSWERABLE" | "TERMS_OR_MONEY" | "NOT_DECLARED" | "MESSAGES_NOT_AUTO";
+export type QuestionVerdict = "ANSWERABLE" | "TERMS_OR_MONEY" | "NOT_DECLARED";
 
 /**
  * QA run 8a1d57b9: whether Q may answer their open question itself. Only
@@ -557,18 +556,14 @@ export type QuestionVerdict =
  */
 export function questionVerdict(
   facts: ThreadFacts,
-  grant: InstructionGrant,
   sender: readonly MaterialFact[] | null,
 ): QuestionVerdict | null {
   if (!facts.asksQuestion || facts.lastFrom !== "THEM") return null;
   if (facts.mentionsTermsOrMoney) return "TERMS_OR_MONEY";
-  if (
-    !grant.actions.some(
-      (entry) => entry.action === "chat.message.send" && entry.mode === "AUTO",
-    )
-  ) {
-    return "MESSAGES_NOT_AUTO";
-  }
+  // Whether Q may answer is about the facts, not the mode (live 2026-10-05:
+  // Spheros wrote, and with messages on ASK Q only said "reply in the
+  // chat"). Under ASK the drafted reply becomes a card for the person's
+  // yes, exactly like a first message; under AUTO it is sent.
   const kinds =
     facts.questionAbout === undefined || facts.questionAbout.length === 0
       ? ["OTHER" as const]
@@ -589,8 +584,6 @@ export const QUESTION_WORDS: Readonly<
     "It's about terms or money, so the answer is yours. Reply in the chat when you're ready.",
   NOT_DECLARED:
     "The answer isn't among the facts you've declared, so I won't guess. Reply in the chat, or declare it and I can answer next time.",
-  MESSAGES_NOT_AUTO:
-    "You haven't let me send messages on my own under this instruction. Reply in the chat.",
 };
 
 /** Whether the sender's side has written in this conversation, by code. */
@@ -614,7 +607,7 @@ function templatedAnswer(
 ): string | null {
   if (thread === undefined || context.material === undefined) return null;
   const facts = context.material?.sender.facts ?? null;
-  if (questionVerdict(thread, context.grant, facts) !== "ANSWERABLE") {
+  if (questionVerdict(thread, facts) !== "ANSWERABLE") {
     return null;
   }
   return factAnswer(thread.questionAbout ?? [], facts ?? []);
@@ -667,8 +660,8 @@ function messageProblem(
   const open =
     thread === undefined
       ? null
-      : questionVerdict(thread, context.grant, material?.sender.facts ?? null);
-  if (open === "NOT_DECLARED" || open === "MESSAGES_NOT_AUTO") {
+      : questionVerdict(thread, material?.sender.facts ?? null);
+  if (open === "NOT_DECLARED") {
     return refuse("UNANSWERED_QUESTION");
   }
   const answering =
@@ -836,7 +829,6 @@ function peopleLines(
   facts: ReadonlyMap<string, ThreadFacts>,
   topics: readonly string[],
   material: InstructionMaterial | null | undefined,
-  grant: InstructionGrant,
   introduced?: ReadonlySet<string>,
 ): string {
   if (people.length === 0) return "No one yet.";
@@ -883,7 +875,6 @@ function peopleLines(
               if (read === undefined || material === undefined) return null;
               const verdict = questionVerdict(
                 read,
-                grant,
                 material?.sender.facts ?? null,
               );
               if (verdict === null) return null;
@@ -1116,11 +1107,7 @@ export function createInstructionEngine(
       // person at once, quoted (their words reach the person, never the
       // planner), and is noted on /work. Once per message.
       for (const [relationshipId, read] of facts) {
-        const verdict = questionVerdict(
-          read,
-          grant.data,
-          material?.sender.facts ?? null,
-        );
+        const verdict = questionVerdict(read, material?.sender.facts ?? null);
         const question = questions.get(relationshipId);
         if (
           verdict === null ||
@@ -1189,7 +1176,6 @@ export function createInstructionEngine(
               facts,
               grant.data.topics,
               material,
-              grant.data,
               introduced,
             ),
             history:
