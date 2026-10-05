@@ -668,6 +668,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_END_PATH": Q_TRANSPORT,
+  // I1 (2026-10-05): a dropped line rejoins on a fresh call, same voice.
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_REJOIN_PATH": Q_TRANSPORT,
   "q-api/voice/think.ts POST dependencies.path": Q_TRANSPORT,
   "q-api/voice/think.ts POST `${dependencies.path}/chat/completions`":
     Q_TRANSPORT,
@@ -884,6 +886,7 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_END_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_REJOIN_PATH",
 ]);
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */
