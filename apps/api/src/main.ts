@@ -114,6 +114,8 @@ import {
 } from "@capital-q/organisations";
 import {
   createGateQService,
+  createPolicyExtractionService,
+  createPostgresPolicyExtractionRepository,
   createPostgresGatewayPolicyPort,
   createPostgresGatewayRepository,
   createPostgresGatewayVersionRepository,
@@ -149,6 +151,7 @@ import {
   createGateQCompanyProjectionPort,
   createGateQOrganisationDisplayPort,
 } from "./gateq/company-projection.js";
+import { mandateVocabularyFrom } from "./gateq/mandate-vocabulary.js";
 import {
   createIntakeBoundPolicyPort,
   createIntakeTaxonomyPort,
@@ -1882,6 +1885,13 @@ const { app, logger } = createApp(config, security, {
   },
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
+  gateqPolicyExtraction: createPolicyExtractionService({
+    gateq,
+    repository: createPostgresPolicyExtractionRepository({
+      sql: database.sql,
+    }),
+    vocabulary: mandateVocabularyFrom(),
+  }),
   capital,
   taxonomy: {
     query: taxonomy.query,

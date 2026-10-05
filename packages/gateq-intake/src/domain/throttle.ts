@@ -42,6 +42,14 @@ export const GATEQ_GUEST_OPERATIONS = [
   "SUBMIT",
   /** Asking for an upload authorisation. */
   "UPLOAD",
+  /**
+   * Opening a new application at one gateway (P7: the embed puts the door
+   * on any website). There is no session yet, so this is charged to the
+   * gateway's public id: a ceiling on how many conversations one gateway can
+   * be made to open per window, which bounds the model spend a script
+   * could run up against an investor's front door.
+   */
+  "START",
 ] as const;
 export type GateQGuestOperation = (typeof GATEQ_GUEST_OPERATIONS)[number];
 
@@ -65,6 +73,7 @@ export const GATEQ_GUEST_QUOTAS: Readonly<
   RESUME: { limit: 120, windowMs: 10 * 60_000 },
   SUBMIT: { limit: 5, windowMs: 10 * 60_000 },
   UPLOAD: { limit: 10, windowMs: 10 * 60_000 },
+  START: { limit: 60, windowMs: 10 * 60_000 },
 };
 
 /** Beyond this many live buckets the oldest window is dropped. */

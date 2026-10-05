@@ -3,10 +3,19 @@ import type { FastifyInstance } from "fastify";
 
 import { parseApiConfig } from "@capital-q/config/api";
 import {
+  GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
   GATEQ_GATEWAYS_PATH,
   GATEQ_PUBLIC_GATEWAY_PATH,
+  PolicyExtractionDtoSchema,
 } from "@capital-q/contracts";
-import type { Gateway, GateQService, PublicGateway } from "@capital-q/gateq";
+import {
+  createPolicyExtractionService,
+  GatewayNotFoundError,
+  type Gateway,
+  type GateQService,
+  type PolicyExtractionRecord,
+  type PublicGateway,
+} from "@capital-q/gateq";
 import {
   AuthUserIdSchema,
   MembershipIdSchema,
@@ -18,6 +27,7 @@ import {
 } from "@capital-q/security";
 
 import { createApp, type ApiSecurityDependencies } from "../src/app.js";
+import { mandateVocabularyFrom } from "../src/gateq/mandate-vocabulary.js";
 
 /**
  * `/v1/gateq` over HTTP (CQ-GATE-001 §24–§25).
@@ -81,6 +91,8 @@ function buildApp(options: {
   readonly publicGateway?: PublicGateway | null;
   readonly created?: Gateway | Error;
   readonly images?: { photo: string | null; cover: string | null };
+  readonly editDenied?: boolean;
+  readonly extractions?: PolicyExtractionRecord[];
 }): {
   readonly app: FastifyInstance;
   readonly publicLookups: string[];
@@ -100,6 +112,10 @@ function buildApp(options: {
     replaceDraft: notUnderTest,
     publishVersion: notUnderTest,
     qualifyCompany: notUnderTest,
+    authoriseEdit: () =>
+      options.editDenied === true
+        ? Promise.reject(new GatewayNotFoundError())
+        : Promise.resolve(GATEWAY),
     publicGateway: (publicId) => {
       publicLookups.push(publicId);
       return Promise.resolve(options.publicGateway ?? null);
@@ -114,8 +130,37 @@ function buildApp(options: {
     identities: { lookup: () => Promise.resolve(null) },
   };
   const images = options.images;
+  const recorded = options.extractions;
+  const policyExtraction =
+    recorded === undefined
+      ? undefined
+      : createPolicyExtractionService({
+          gateq,
+          vocabulary: mandateVocabularyFrom(),
+          repository: {
+            record: (input) => {
+              const index = recorded.findIndex(
+                (row) => row.clientRequestId === input.clientRequestId,
+              );
+              if (index >= 0) {
+                return Promise.resolve({
+                  id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+                  deduplicated: true,
+                });
+              }
+              recorded.push(input);
+              return Promise.resolve({
+                id: `00000000-0000-4000-8000-${String(recorded.length).padStart(12, "0")}`,
+                deduplicated: false,
+              });
+            },
+          },
+        });
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     gateq,
+    ...(policyExtraction === undefined
+      ? {}
+      : { gateqPolicyExtraction: policyExtraction }),
     ...(images === undefined
       ? {}
       : {
@@ -271,5 +316,113 @@ describe("the public route", () => {
       authenticated.app.inject({ method: "GET", url: url(PUBLIC_ID) }),
     ]);
     expect(a.json()).toEqual(b.json());
+  });
+});
+
+describe("reading a mandate into a draft policy (P7)", () => {
+  const url = GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH.replace(
+    ":gatewayId",
+    GATEWAY.id,
+  );
+  const MANDATE =
+    "Demo Ridge Capital (fictional) backs pre-seed and seed fintech in Nigeria and Kenya. Cheques of $100k-$500k.";
+
+  it("proposes canonical draft criteria and records provenance without the text", async () => {
+    const extractions: PolicyExtractionRecord[] = [];
+    const { app } = buildApp({ principal: PRINCIPAL, extractions });
+    const response = await app.inject({
+      method: "POST",
+      url,
+      payload: {
+        text: MANDATE,
+        sourceKind: "PASTED_TEXT",
+        clientRequestId: "extract-test-0001",
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    const body = PolicyExtractionDtoSchema.parse(response.json());
+    const configs = body.proposals.map((p) => p.config);
+    expect(configs).toContainEqual({
+      type: "STAGE",
+      allowedStageCodes: ["pre_seed", "seed"],
+    });
+    expect(configs).toContainEqual({
+      type: "GEOGRAPHY",
+      allowedCountries: ["NG", "KE"],
+    });
+    expect(configs).toContainEqual({
+      type: "CHEQUE_COMPATIBILITY",
+      currency: "USD",
+      minCheque: "100000",
+      maxCheque: "500000",
+    });
+    expect(extractions).toHaveLength(1);
+    expect(extractions[0]?.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    // A digest and the proposals (with their short quotes), never the text.
+    expect(Object.keys(extractions[0] ?? {})).not.toContain("text");
+    expect(extractions[0]?.sourceChars).toBe(MANDATE.length);
+  });
+
+  it("is idempotent on the client request id", async () => {
+    const extractions: PolicyExtractionRecord[] = [];
+    const { app } = buildApp({ principal: PRINCIPAL, extractions });
+    const payload = {
+      text: MANDATE,
+      sourceKind: "PASTED_TEXT",
+      clientRequestId: "extract-test-0002",
+    };
+    const first = await app.inject({ method: "POST", url, payload });
+    const second = await app.inject({ method: "POST", url, payload });
+    expect(first.statusCode).toBe(201);
+    expect(second.statusCode).toBe(200);
+    expect(second.json<{ deduplicated: boolean }>().deduplicated).toBe(true);
+    expect(extractions).toHaveLength(1);
+  });
+
+  it("refuses an empty mandate or an unknown field as a validation problem", async () => {
+    const { app } = buildApp({ principal: PRINCIPAL, extractions: [] });
+    for (const payload of [
+      { text: "   ", sourceKind: "PASTED_TEXT", clientRequestId: "extract-test-0003" },
+      { text: MANDATE, sourceKind: "PASTED_TEXT", clientRequestId: "extract-test-0004", tenantId: "x" },
+    ]) {
+      const response = await app.inject({ method: "POST", url, payload });
+      expect(response.statusCode).toBe(422);
+      expect(response.headers["content-type"]).toContain("application/problem+json");
+    }
+  });
+
+  it("records nothing for someone who may not edit the gateway", async () => {
+    const extractions: PolicyExtractionRecord[] = [];
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      extractions,
+      editDenied: true,
+    });
+    const response = await app.inject({
+      method: "POST",
+      url,
+      payload: {
+        text: MANDATE,
+        sourceKind: "PASTED_TEXT",
+        clientRequestId: "extract-test-0005",
+      },
+    });
+    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(extractions).toHaveLength(0);
+  });
+
+  it("requires an authenticated actor", async () => {
+    const { app } = buildApp({ principal: null, extractions: [] });
+    const response = await app.inject({
+      method: "POST",
+      url,
+      payload: {
+        text: MANDATE,
+        sourceKind: "PASTED_TEXT",
+        clientRequestId: "extract-test-0006",
+      },
+    });
+    expect(response.statusCode).toBe(401);
   });
 });

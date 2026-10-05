@@ -159,6 +159,14 @@ export type GateQService = {
     readonly companyId: string;
     readonly companyTenantId: string;
   }) => Promise<QualificationResult>;
+  /**
+   * Resolve a gateway the actor may edit (P7: reading a mandate into a
+   * draft is editing). Another organisation's gateway is "not found".
+   */
+  readonly authoriseEdit: (command: {
+    readonly actor: ActorContext;
+    readonly gatewayId: GatewayId;
+  }) => Promise<Gateway>;
   /** Anonymous. No actor, no authority, and only ever a published gateway. */
   readonly publicGateway: (
     publicId: GatewayPublicId,
@@ -445,6 +453,9 @@ export function createGateQService(
         evaluatedAt: clock().toISOString(),
       });
     },
+
+    authoriseEdit: (command) =>
+      authorised(command.actor, command.gatewayId, GATEWAY_EDIT),
 
     publicGateway: async (publicId) => {
       const policy = await policies.publishedPolicyByPublicId(publicId);

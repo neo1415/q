@@ -255,3 +255,66 @@ export const PublicGatewayDtoSchema = z
   })
   .strict();
 export type PublicGatewayDto = z.infer<typeof PublicGatewayDtoSchema>;
+
+// ---------------------------------------------------------------------------
+// P7 · reading a mandate into a DRAFT gate policy
+// ---------------------------------------------------------------------------
+
+export const GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH =
+  "/v1/gateq/gateways/:gatewayId/policy-extractions" as const;
+
+export const GATEQ_MANDATE_TEXT_MAX_CHARS = 20_000;
+
+/**
+ * The investor's mandate, pasted or read from a text file in their browser.
+ * Consequential enough to be idempotent: one `clientRequestId` is one
+ * reading, however often a flaky connection retries it.
+ */
+export const PolicyExtractionRequestSchema = z
+  .object({
+    text: z.string().trim().min(1).max(GATEQ_MANDATE_TEXT_MAX_CHARS),
+    sourceKind: z.enum(["PASTED_TEXT", "UPLOADED_FILE"]),
+    clientRequestId: z
+      .string()
+      .min(8)
+      .max(128)
+      .regex(/^[A-Za-z0-9:_-]+$/),
+  })
+  .strict();
+export type PolicyExtractionRequest = z.infer<
+  typeof PolicyExtractionRequestSchema
+>;
+
+export const MandateDimensionDtoSchema = z.enum([
+  "STAGE",
+  "GEOGRAPHY",
+  "SECTOR",
+  "CHEQUE",
+]);
+
+/** One proposed criterion. A draft: nothing is a rule until published. */
+export const PolicyProposalDtoSchema = z
+  .object({
+    dimension: MandateDimensionDtoSchema,
+    requiredness: CriterionRequirednessDtoSchema,
+    label: z.string().min(1).max(120),
+    config: GatewayCriterionInputSchema,
+    valueLabels: z.array(z.string().max(200)).max(64),
+    quote: z.string().max(240),
+  })
+  .strict();
+export type PolicyProposalDto = z.infer<typeof PolicyProposalDtoSchema>;
+
+export const PolicyExtractionDtoSchema = z
+  .object({
+    extractionId: UuidSchema,
+    readerVersion: z.string().max(64),
+    proposals: z.array(PolicyProposalDtoSchema).max(64),
+    /** What the mandate never said. Unknown, not "anything goes". */
+    notFound: z.array(MandateDimensionDtoSchema).max(4),
+    /** Places named negatively. Reported for the investor; never a rule. */
+    excludedPlaces: z.array(z.string().max(200)).max(64),
+    deduplicated: z.boolean(),
+  })
+  .strict();
+export type PolicyExtractionDto = z.infer<typeof PolicyExtractionDtoSchema>;

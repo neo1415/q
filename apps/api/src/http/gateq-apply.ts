@@ -175,6 +175,17 @@ export function registerGateQApplyRoutes(
       "No such gateway.",
     );
     try {
+      // Before any row or model call. Keyed on the gateway, because a
+      // stranger has no session yet; the web tier adds a per-visitor limit.
+      if (
+        throttle !== undefined &&
+        !throttle.charge({
+          sessionId: `start:${input.gatewayPublicId}`,
+          operation: "START",
+        })
+      ) {
+        throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+      }
       const started = await intake.start({
         gatewayPublicId: input.gatewayPublicId,
       });

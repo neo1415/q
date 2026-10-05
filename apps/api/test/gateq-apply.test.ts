@@ -537,3 +537,25 @@ describe("what one credential may do", () => {
     expect(submitted.statusCode).toBe(200);
   });
 });
+
+describe("opening conversations from an embedded gateway (P7)", () => {
+  it("caps how many conversations one gateway can be made to open, before any row", async () => {
+    const { app, recorded } = buildApp({ throttle: createGuestThrottle() });
+    const start = () =>
+      app.inject({
+        method: "POST",
+        url: GATEQ_APPLY_START_PATH,
+        payload: { gatewayPublicId: PUBLIC_ID },
+      });
+    for (let i = 0; i < GATEQ_GUEST_QUOTAS.START.limit; i += 1) {
+      expect((await start()).statusCode).toBe(201);
+    }
+    const limited = await start();
+    expect(limited.statusCode).toBe(429);
+    expect(limited.headers["content-type"]).toContain(
+      "application/problem+json",
+    );
+    // The refused start never reached the intake service.
+    expect(recorded.starts).toHaveLength(GATEQ_GUEST_QUOTAS.START.limit);
+  });
+});

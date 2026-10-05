@@ -12,6 +12,7 @@ import {
   GATEQ_GATEWAY_VERSIONS_PATH,
   GATEQ_GATEWAYS_PATH,
   GATEQ_PUBLIC_GATEWAY_PATH,
+  GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
   GatewayDraftRequestSchema,
   GatewayDtoSchema,
   GatewayPolicyDtoSchema,
@@ -19,6 +20,8 @@ import {
   parseContract,
   PublicGatewayDtoSchema,
   QualificationResultDtoSchema,
+  PolicyExtractionDtoSchema,
+  PolicyExtractionRequestSchema,
   QualifyCompanyRequestSchema,
   UuidSchema,
 } from "@capital-q/contracts";
@@ -31,6 +34,7 @@ import {
   type GatewayVersion,
   type GatewayVersionId,
   type GateQService,
+  type PolicyExtractionService,
   type QualificationResult,
 } from "@capital-q/gateq";
 import type { SubmissionInbox } from "@capital-q/gateq-intake";
@@ -73,6 +77,11 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly gateq: GateQService;
   /** Submitted applications, read after GateQ authorises the gateway. */
   readonly inbox?: SubmissionInbox | undefined;
+  /**
+   * P7: the investor's mandate read into DRAFT criteria. Absent, the route
+   * is not registered (tests of the GateQ domain alone).
+   */
+  readonly policyExtraction?: PolicyExtractionService | undefined;
   // BILLING block (ADR 0034): how many gateways the account's plan allows.
   // Absent: no plan control (tests of the GateQ domain alone).
   readonly entitlements?: Pick<EntitlementService, "check"> | undefined;
@@ -358,6 +367,35 @@ export function registerGateQRoutes(
       return versionDto(version);
     },
   );
+
+  // P7: a mandate read into a draft. It changes nothing anyone is judged
+  // against (only publishing does), so it is EDIT, not PUBLISH; it is still
+  // idempotent on the client's request id because it records provenance.
+  const { policyExtraction } = dependencies;
+  if (policyExtraction !== undefined) {
+    app.post(
+      GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const input = parseContract(
+          PolicyExtractionRequestSchema,
+          request.body,
+          "The mandate text is not valid.",
+        );
+        const extraction = await policyExtraction.extract({
+          actor: getActorContext(request),
+          gatewayId: gatewayIdOf(request),
+          text: input.text,
+          sourceKind: input.sourceKind,
+          clientRequestId: input.clientRequestId,
+        });
+        void reply
+          .code(extraction.deduplicated ? 200 : 201)
+          .header("Cache-Control", "no-store");
+        return PolicyExtractionDtoSchema.parse(extraction);
+      },
+    );
+  }
 
   app.post(
     GATEQ_GATEWAY_QUALIFY_PATH,
