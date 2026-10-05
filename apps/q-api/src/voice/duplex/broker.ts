@@ -367,14 +367,20 @@ export function createDuplexBroker(
         };
       }
 
+      const guided =
+        binding.thread.welcome === true ||
+        binding.thread.onboarding !== undefined;
       const minted = await gateway.mint({
         instructions: duplexInstructions({
           firstMessage,
           locale,
           listening: listens,
+          guided,
         }),
         tools: duplexTools(
-          direct.map((tool) => tool.definition),
+          // A guided line answers through ask_q alone: the interview is
+          // the one voice, so no read tool can answer around it.
+          guided ? [] : direct.map((tool) => tool.definition),
           { listening: listens },
         ),
         voice: binding.voice,

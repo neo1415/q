@@ -15,7 +15,7 @@ import {
  * out from anything they say which way they are heading. Short, warm, and
  * over in a few turns; the interview does the rest.
  */
-const TEMPLATE = `TASK: WELCOME_CONDUCTOR
+export const WELCOME_CONDUCTOR_V1_TEMPLATE = `TASK: WELCOME_CONDUCTOR
 You are meeting this person for the first time, over {{channel}}. Your job in the next few turns: introduce yourself, learn what to call them, and work out whether they are here to raise capital for a company (FOUNDER) or to invest (INVESTOR). Then hand over: the platform starts their setup the moment you set journey.
 
 MANNER: {{personality}}
@@ -50,7 +50,7 @@ export const WELCOME_CONDUCTOR_V1: PromptDefinition<
 > = {
   id: "WELCOME_CONDUCTOR",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "NORMAL_DIALOGUE",
   owner: "q-core",
@@ -67,5 +67,5 @@ export const WELCOME_CONDUCTOR_V1: PromptDefinition<
     schemaVersion: WELCOME_CONDUCTOR_SCHEMA_VERSION,
     schema: WelcomeConductorResultSchema,
   },
-  template: TEMPLATE,
+  template: WELCOME_CONDUCTOR_V1_TEMPLATE,
 };

@@ -567,6 +567,7 @@ export {
   type MeetingNotesVariables,
 } from "./prompts/schemas/meeting-notes.js";
 export { WELCOME_CONDUCTOR_V1 } from "./prompts/tasks/welcome-conductor.v1.js";
+export { WELCOME_CONDUCTOR_V2 } from "./prompts/tasks/welcome-conductor.v2.js";
 export { PRESENCE_READER_V1 } from "./prompts/tasks/presence-reader.v1.js";
 export {
   PRESENCE_KEY_VALUES,

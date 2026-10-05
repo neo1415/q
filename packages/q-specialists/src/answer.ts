@@ -2654,6 +2654,7 @@ export function createSpecialistQAnswer(
       counterparty: await aboutCounterparty(request, latest.content, read),
       areaOf: toolAreaOf,
       previous: focuses.get(conversationId) ?? null,
+      onboarding: request.plan.screen?.route === "ONBOARDING",
     });
     focuses.delete(conversationId);
     if (read?.kind === "TOOL_REQUEST") {

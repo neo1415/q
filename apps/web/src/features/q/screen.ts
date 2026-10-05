@@ -14,6 +14,8 @@ import { viewingOf, type QMomentSource } from "./q-moment";
  */
 const EXACT: Readonly<Record<string, QScreenRoute>> = {
   "/home": "HOME",
+  // Q's first minute is the start of onboarding (founder live 2026-10-05).
+  "/welcome": "ONBOARDING",
   "/discover": "DISCOVER",
   "/capital": "CAPITAL",
   "/profile": "PROFILE",

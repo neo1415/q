@@ -128,6 +128,17 @@ export const BRIDGE_INSTRUCTIONS = `You are Q on a live call. The person asked y
 - Different from the bridging lines you used recently (listed below).
 - Use the language they are speaking.`;
 
+/**
+ * A line Capital Q leads (Q's first minute, or an onboarding interview).
+ * Founder live 2026-10-05: on the welcome line the realtime model answered
+ * "I'm raising" with its own "Good to connect, how can I assist you
+ * today?" instead of passing it on. Here every word is the interview's.
+ */
+export const GUIDED_CONDUCT = `GUIDED LINE
+This line is Q leading the person's setup; Capital Q composes every reply.
+- Pass everything the person says to ask_q, every time: a greeting, a name, raising or investing, a yes or no, an aside. Then say what it returns.
+- Never compose a reply of your own, never greet again, and never ask an open question such as "how can I help", "how can I assist you" or "what can I do for you".`;
+
 export function duplexInstructions(input: {
   /** Q's opening line, composed on the server for this line; said first. */
   readonly firstMessage?: string | undefined;
@@ -135,11 +146,14 @@ export function duplexInstructions(input: {
   readonly locale?: string | undefined;
   /** BACKCHANNEL: the line listens like a person (the set_listening conduct). */
   readonly listening?: boolean | undefined;
+  /** Q leads this line (welcome or interview): every word goes to ask_q. */
+  readonly guided?: boolean | undefined;
 }): string {
   const parts = [
     input.listening === true
       ? DUPLEX_LISTENING_INSTRUCTIONS_PREFIX
       : DUPLEX_INSTRUCTIONS_PREFIX,
+    ...(input.guided === true ? [GUIDED_CONDUCT] : []),
     "THIS LINE",
   ];
   if (input.locale !== undefined && !/^en\b/i.test(input.locale)) {

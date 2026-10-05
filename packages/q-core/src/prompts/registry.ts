@@ -167,6 +167,7 @@ import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { DAILY_Q_TAKE_V1 } from "./tasks/daily-q-take.v1.js";
 import { DAILY_STORY_WRITER_V1 } from "./tasks/daily-story-writer.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
+import { WELCOME_CONDUCTOR_V2 } from "./tasks/welcome-conductor.v2.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./tasks/investor-mandate-synthesis.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./tasks/investor-mandate-synthesis.v2.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./tasks/investor-mandate-synthesis.v3.js";
@@ -320,6 +321,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DELEGATION_READER_V4,
     DELEGATION_READER_V5,
     WELCOME_CONDUCTOR_V1,
+    WELCOME_CONDUCTOR_V2,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,
     INVESTOR_MANDATE_SYNTHESIS_V2,
