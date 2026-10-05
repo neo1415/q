@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 /**
@@ -9,9 +9,15 @@ import { describe, expect, it, vi } from "vitest";
  * stage holds in between, never the typed chat or the form.
  */
 
-const push = vi.fn();
+const order: string[] = [];
+const push = vi.fn(() => {
+  order.push("push");
+});
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
-const end = vi.fn(() => Promise.resolve());
+const end = vi.fn(async () => {
+  await Promise.resolve();
+  order.push("ended");
+});
 vi.mock("../src/features/voice/use-voice-interview", () => ({
   useVoiceInterview: () => ({
     active: false,
@@ -62,10 +68,14 @@ const { WelcomeScreen } =
   await import("../src/features/welcome/welcome-screen");
 
 describe("a role chosen by voice", () => {
-  it("goes to that setup with the voice on, holding the voice stage", () => {
+  it("goes to that setup with the voice on, holding the voice stage", async () => {
     render(<WelcomeScreen knownName="Ada" />);
-    expect(push).toHaveBeenCalledWith("/onboarding/founder?talk=1");
-    expect(end).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith("/onboarding/founder?talk=1");
+    });
+    // One line at a time: the welcome line has ended before the next
+    // screen can open the interview's.
+    expect(order).toEqual(["ended", "push"]);
     expect(document.querySelector("[data-voice-handover]")).toBeTruthy();
     expect(screen.getByText("Setting up your company")).toBeTruthy();
     // Not the typed choice, and not the intro page.

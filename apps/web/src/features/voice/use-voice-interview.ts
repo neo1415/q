@@ -19,6 +19,12 @@ import { announceQGestures } from "../q-swarm/q-gestures";
 import { storeVoicePreference, useVoicePreference } from "./voice-preference";
 import { deviceLocale } from "./device-locale";
 import { useVoiceSession } from "./use-voice-session";
+import {
+  dropVoiceLine,
+  endVoiceLine,
+  openVoiceLine,
+  type VoiceLineHolder,
+} from "./voice-line";
 import { RECONNECTING_NOTICE, WEAK_LINE_NOTICE } from "./provider/line-health";
 import type {
   VoiceSessionClient,
@@ -72,6 +78,13 @@ export type VoiceInterview = {
     readonly resume?: boolean | undefined;
     /** DUPLEX: the standard line, even where full duplex is offered. */
     readonly duplex?: false | undefined;
+    /**
+     * The question Q is asking now, read each time a line (re)opens with
+     * nothing of its own to say -- a fallback, a renewal, a reconnect -- so
+     * Q speaks first instead of waiting for the person (founder live
+     * 2026-10-05). Never a greeting: a reopened line does not welcome.
+     */
+    readonly lead?: (() => string | null | undefined) | undefined;
   }) => Promise<void>;
   readonly end: () => Promise<void>;
   readonly chooseVoice: (voice: QVoiceChoice) => Promise<void>;
@@ -119,6 +132,16 @@ const GREETING_MAX = 700;
  * greeting, or with none. Only for a resumed thread: the server composed
  * no opening, and the line on screen is the one Q is already asking.
  */
+function hasGreeting(credential: CreateQVoiceSessionResponse): boolean {
+  const greeting: unknown = credential.deepgram?.agent.greeting;
+  return typeof greeting === "string" && greeting.trim().length > 0;
+}
+
+function said(line: string | null | undefined): string | undefined {
+  const trimmed = line?.trim() ?? "";
+  return trimmed.length === 0 ? undefined : trimmed;
+}
+
 export function withGreeting(
   credential: CreateQVoiceSessionResponse,
   line: string | undefined,
@@ -168,12 +191,46 @@ export function useVoiceInterview(
   const upSince = useRef<number | null>(null);
   const talkRef = useRef<VoiceInterview["talk"] | null>(null);
   /**
+   * Which line is current. Bumped by every open and every end, so anything
+   * that belongs to an older line -- a reconnect timer, a fallback from a
+   * duplex line already replaced, a poll answer, an open still waiting on
+   * the server -- sees it is stale and does nothing.
+   */
+  const generation = useRef(0);
+  /** The generation whose line is up; null while none is. */
+  const liveGeneration = useRef<number | null>(null);
+  /** Whether the live line is a duplex one: only those fall back. */
+  const liveDuplex = useRef(false);
+  /** The generation that already fell back: one standard line per drop. */
+  const fellBack = useRef<number | null>(null);
+  const reconnectTimer = useRef<number | null>(null);
+  const clearReconnect = () => {
+    if (reconnectTimer.current !== null) {
+      window.clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+  };
+  const mounted = useRef(true);
+  /** Q's latest spoken line, to time its gestures by sentence. */
+  const lastQLine = useRef("");
+  /** What Q is asking now, from the surface (see `talk`'s `lead`). */
+  const leadRef = useRef<(() => string | null | undefined) | null>(null);
+  /**
+   * What Q says first on a line that reopens: the surface's current
+   * question, else Q's last words. Never the opening's greeting.
+   */
+  const reopening = (): string | undefined =>
+    said(leadRef.current?.()) ?? said(lastQLine.current);
+  /**
    * One handler for a line ending, reachable from the transport's own
    * "ended" and from the poll that notices the server has let a session
    * go. Both are the same event to the person: the line is gone, and it
    * should come back without them doing anything.
    */
   const ended = (reason: "ended" | "dropped" | "error"): void => {
+    // A line that is no longer the current one ending says nothing.
+    if (liveGeneration.current !== generation.current) return;
+    liveGeneration.current = null;
     const last = lastStart.current;
     const again = talkRef.current;
     const heldFor = upSince.current === null ? 0 : Date.now() - upSince.current;
@@ -208,10 +265,16 @@ export function useVoiceInterview(
     // `talk` clears the notice as it starts and sets its own on failure.
     // The same line coming back, not a new arrival: no greeting, and no
     // second opening recorded (the fixture's repeated "Welcome back").
-    window.setTimeout(() => {
+    // Q re-asks what it is asking, so the person is not left waiting.
+    // One timer at a time, and none survives an end or a newer line.
+    clearReconnect();
+    const scheduledFor = generation.current;
+    reconnectTimer.current = window.setTimeout(() => {
+      reconnectTimer.current = null;
+      if (!mounted.current || generation.current !== scheduledFor) return;
       void again({
         thread: last.thread,
-        firstMessage: undefined,
+        firstMessage: reopening(),
         resume: true,
       });
     }, delay);
@@ -222,8 +285,6 @@ export function useVoiceInterview(
   useEffect(() => {
     endedRef.current = ended;
   });
-  /** Q's latest spoken line, to time its gestures by sentence. */
-  const lastQLine = useRef("");
   /**
    * DUPLEX: a full-duplex line ended into the standard voice. Until the
    * person ends voice, every line (a reconnect too) is the standard one.
@@ -241,6 +302,19 @@ export function useVoiceInterview(
     // Resumed: Q does not greet again. The cap's one sentence, if any, is
     // shown once the standard line is up (talk clears the notice first).
     onFallback: (notice, cause) => {
+      // Exactly one standard line per duplex line that fails: a second
+      // report from the same line, or one from a line already replaced or
+      // ended, opens nothing (live 2026-10-05: a second standard line came
+      // up beside the first, both listening).
+      const current = generation.current;
+      if (
+        liveGeneration.current !== current ||
+        !liveDuplex.current ||
+        fellBack.current === current
+      ) {
+        return;
+      }
+      fellBack.current = current;
       // A line that reached its length is renewed on the same voice
       // (founder 2026-10-05: "the voice changed" at exactly 10 minutes):
       // the person hears no switch. Bounded, so a line that cannot stay up
@@ -261,9 +335,11 @@ export function useVoiceInterview(
         ended("dropped");
         return;
       }
+      // Q carries on speaking first on the standard line: the question it
+      // is asking, never a second welcome.
       void again({
         thread: last.thread,
-        firstMessage: undefined,
+        firstMessage: reopening(),
         resume: true,
         ...(renew ? {} : { duplex: false }),
       }).then(() => {
@@ -296,66 +372,32 @@ export function useVoiceInterview(
     };
   }, [lineUp, linkStatus]);
 
-  const talk = useCallback<VoiceInterview["talk"]>(
-    async ({
-      thread,
-      firstMessage,
-      voice: requested,
-      resume = false,
-      duplex,
-    }) => {
-      const chosen = requested ?? voice;
-      setNotice(null);
-      lastStart.current = { thread, firstMessage };
-      const started = await startVoiceSessionAction({
-        ...(resume ? { resume: true } : {}),
-        ...(duplex === false || duplexOff.current ? { duplex: false } : {}),
-        ...(thread.welcome === true ? { welcome: true } : {}),
-        ...(thread.onboarding === undefined
-          ? {}
-          : { onboarding: thread.onboarding }),
-        ...(thread.subjects === undefined ? {} : { subjects: thread.subjects }),
-        ...(thread.conversationId === undefined
-          ? {}
-          : { conversationId: thread.conversationId }),
-        ...(thread.organisationHint === undefined
-          ? {}
-          : { organisationHint: thread.organisationHint }),
-        // R21: the screen the line opens on; moves follow below.
-        screen: currentScreen(),
-        // Heard and spoken in the person's own language.
-        ...deviceLocale(),
-        voice: chosen,
-      });
-      if (!started.ok) {
-        setNotice(started.message);
-        return;
-      }
-      setVoice(started.value.voice);
-      sessionToken.current = started.value.sessionToken;
-      setVoiceSessionId(started.value.voiceSessionId);
-      setTurn(null);
-      setActive(true);
-      upSince.current = Date.now();
-      // Q composes its own opening from the interview's state; the caller's
-      // line is only a fallback when the server had none to give. On a
-      // resumed thread the server composes none, and what Q says first is
-      // the caller's line -- already on screen -- or nothing at all.
-      await client.start({
-        credential: resume
-          ? withGreeting(started.value, firstMessage)
-          : started.value,
-        firstMessage: started.value.firstMessage ?? firstMessage,
-      });
-    },
-    [client, voice],
+  /**
+   * This hook's place in the tab's one voice line (`voice-line.ts`). When
+   * another surface opens a line, this one's is ended first, awaited.
+   */
+  const releaseRef = useRef<(reopening: boolean) => Promise<void>>(() =>
+    Promise.resolve(),
   );
+  const [holder] = useState<VoiceLineHolder>(() => ({
+    release: (reopening) => releaseRef.current(reopening),
+  }));
 
-  useEffect(() => {
-    talkRef.current = talk;
-  }, [talk]);
+  /** The transport and the polling stop; the thread is kept. */
+  const closeTransport = useCallback(async () => {
+    liveGeneration.current = null;
+    clearReconnect();
+    setVoiceSessionId(null);
+    sessionToken.current = undefined;
+    upSince.current = null;
+    await clientRef.current.end();
+  }, []);
 
-  const end = useCallback(async () => {
+  /** Everything about this line is let go: the person, or another surface, ended it. */
+  const reset = useCallback(() => {
+    generation.current += 1;
+    liveGeneration.current = null;
+    clearReconnect();
     setActive(false);
     setVoiceSessionId(null);
     sessionToken.current = undefined;
@@ -368,9 +410,124 @@ export function useVoiceInterview(
     upSince.current = null;
     duplexOff.current = false;
     renewals.current = 0;
+    fellBack.current = null;
     setLinkStatus(null);
-    await client.end();
-  }, [client]);
+  }, []);
+
+  useEffect(() => {
+    releaseRef.current = async (reopening) => {
+      if (!reopening) reset();
+      await closeTransport();
+    };
+  }, [reset, closeTransport]);
+
+  const talk = useCallback<VoiceInterview["talk"]>(
+    async ({
+      thread,
+      firstMessage,
+      voice: requested,
+      resume = false,
+      duplex,
+      lead,
+    }) => {
+      // This call is now the line the person wants; anything older still
+      // on its way (a reconnect timer, an open waiting on the server)
+      // stands down when it sees the generation has moved on.
+      generation.current += 1;
+      const mine = generation.current;
+      clearReconnect();
+      if (lead !== undefined) leadRef.current = lead;
+      const chosen = requested ?? voice;
+      // The previous line -- this surface's own or another's -- is ended
+      // and awaited before the server is asked for the next one.
+      await openVoiceLine(holder, async () => {
+        if (!mounted.current || generation.current !== mine) return;
+        setNotice(null);
+        lastStart.current = { thread, firstMessage };
+        const started = await startVoiceSessionAction({
+          ...(resume ? { resume: true } : {}),
+          ...(duplex === false || duplexOff.current ? { duplex: false } : {}),
+          ...(thread.welcome === true ? { welcome: true } : {}),
+          ...(thread.onboarding === undefined
+            ? {}
+            : { onboarding: thread.onboarding }),
+          ...(thread.subjects === undefined
+            ? {}
+            : { subjects: thread.subjects }),
+          ...(thread.conversationId === undefined
+            ? {}
+            : { conversationId: thread.conversationId }),
+          ...(thread.organisationHint === undefined
+            ? {}
+            : { organisationHint: thread.organisationHint }),
+          // R21: the screen the line opens on; moves follow below.
+          screen: currentScreen(),
+          // Heard and spoken in the person's own language.
+          ...deviceLocale(),
+          voice: chosen,
+        });
+        // Ended, superseded or unmounted while the server answered: this
+        // line is never brought up.
+        if (!mounted.current || generation.current !== mine) return;
+        if (!started.ok) {
+          setNotice(started.message);
+          return;
+        }
+        setVoice(started.value.voice);
+        sessionToken.current = started.value.sessionToken;
+        setVoiceSessionId(started.value.voiceSessionId);
+        setTurn(null);
+        setActive(true);
+        upSince.current = Date.now();
+        liveGeneration.current = mine;
+        liveDuplex.current = started.value.duplex !== undefined;
+        /**
+         * Q speaks first (founder live 2026-10-05: "I listen and it waits
+         * for me to talk"). The server's opening when it composed one; on a
+         * resumed thread it composes none, and Q says the caller's line --
+         * the question already on screen -- or, failing that, the question
+         * the surface says it is asking now. Never nothing when there is a
+         * question to ask.
+         */
+        const opening =
+          said(started.value.firstMessage) ??
+          said(firstMessage) ??
+          said(leadRef.current?.());
+        await clientRef.current.start({
+          credential:
+            resume || !hasGreeting(started.value)
+              ? withGreeting(started.value, opening)
+              : started.value,
+          firstMessage: opening,
+        });
+      });
+    },
+    [holder, voice],
+  );
+
+  useEffect(() => {
+    talkRef.current = talk;
+  }, [talk]);
+
+  // A surface that goes away takes its line with it, and nothing it
+  // scheduled (a reconnect) may open another afterwards.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      generation.current += 1;
+      liveGeneration.current = null;
+      clearReconnect();
+      dropVoiceLine(holder);
+    };
+  }, [holder]);
+
+  const end = useCallback(async () => {
+    reset();
+    // After any open still in progress, so an End pressed while connecting
+    // is never followed by the line coming up.
+    await endVoiceLine(holder, () => clientRef.current.end());
+  }, [holder, reset]);
 
   // While talking, follow what Q is asking; a stale read is dropped.
   useEffect(() => {
@@ -431,8 +588,11 @@ export function useVoiceInterview(
         // open here. Nothing said into it will ever be answered, so the
         // line is ended as dropped, which is what brings it back.
         cancelled = true;
+        const gone = generation.current;
         void clientRef.current.end().then(() => {
-          endedRef.current("dropped");
+          // Only if this is still the current line: a newer one is not
+          // ended because an older session was let go.
+          if (generation.current === gone) endedRef.current("dropped");
         });
         return;
       }
@@ -459,16 +619,16 @@ export function useVoiceInterview(
         return;
       }
       // A new provider session with the other voice; the interview and
-      // the Q conversation are where they were, on the server.
-      await client.end();
+      // the Q conversation are where they were, on the server. `talk` ends
+      // the current line first; Q picks up with the question it is asking.
       await talk({
         thread: last.thread,
-        firstMessage: undefined,
+        firstMessage: reopening(),
         voice: next,
         resume: true,
       });
     },
-    [voice, active, client, talk],
+    [voice, active, talk],
   );
 
   return {

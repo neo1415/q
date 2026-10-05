@@ -103,7 +103,10 @@ export function useDuplexVoiceSession(
   );
 
   const start = useCallback(
-    async ({ credential }: VoiceSessionStart): Promise<boolean> => {
+    async ({
+      credential,
+      firstMessage,
+    }: VoiceSessionStart): Promise<boolean> => {
       const duplex = credential.duplex;
       if (duplex === undefined) return false;
       const previous = lineRef.current;
@@ -140,7 +143,12 @@ export function useDuplexVoiceSession(
           },
           onInterrupted: () => eventsRef.current.onInterrupted?.(),
           onFallback: ({ cause, notice, connected: wasUp }) => {
-            if (lineRef.current === line) lineRef.current = null;
+            // A line already replaced or ended reports nothing: only the
+            // current line may bring up its standard successor (live
+            // 2026-10-05: a stale report opened a second standard line).
+            const current = lineRef.current === line;
+            if (!current) return;
+            lineRef.current = null;
             setConnected(false);
             // Before it came up, `start` answers false and the caller
             // opens the standard line itself; nobody else needs to know.
@@ -161,7 +169,11 @@ export function useDuplexVoiceSession(
       });
       lineRef.current = line;
       const up = await line.open();
-      if (up && lineRef.current === line) setConnected(true);
+      if (up && lineRef.current === line) {
+        setConnected(true);
+        // Q speaks first: the opening the interview has, at once.
+        if (firstMessage !== undefined) line.speakFirst(firstMessage);
+      }
       return up;
     },
     [addLine],

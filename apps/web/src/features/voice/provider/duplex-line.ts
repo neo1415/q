@@ -95,6 +95,8 @@ const COMMIT_WAIT_MS = 400;
 const BRIDGE_HOLD_MS = 2_500;
 const TURN_ITEMS_MAX = 3;
 const HEARD_MAX = 4;
+/** What a line accepts as its opening; the contract caps firstMessage at 700. */
+const OPENING_MAX = 700;
 
 export type DuplexFallbackCause =
   "CONNECT" | "NETWORK" | "RELAY" | "CAP" | "MAX_LENGTH";
@@ -606,10 +608,37 @@ export class DuplexLine {
     });
   }
 
-  /** Typed while the line is open: the same turn, answered aloud. */
+  /**
+   * Q speaks first (founder live 2026-10-05: "I listen and it waits for me
+   * to talk"). The opening -- the server's, or the question already on
+   * screen -- said as written, as Q's own turn, the moment the line is up.
+   * Only into a quiet line: never over the person or over a reply.
+   */
+  speakFirst(line: string): void {
+    const words = line.trim().slice(0, OPENING_MAX);
+    if (words.length === 0 || !this.#connected || this.#over) return;
+    if (this.#responseActive || this.#speaking) return;
+    this.#send({
+      type: "response.create",
+      response: {
+        instructions: `Say exactly this to the person, word for word, and nothing else; then stop and listen: ${JSON.stringify(words)}`,
+        tool_choice: "none",
+      },
+    });
+    this.#events.onState("THINKING");
+    this.#touch();
+  }
+
+  /**
+   * Typed while the line is open: the same turn, answered aloud. Typing is
+   * the person taking the turn, so a reply in flight is cut first, exactly
+   * as if they had spoken over it; a second response is never started on
+   * top of one still running.
+   */
   sendText(words: string): void {
     const trimmed = words.trim();
     if (trimmed.length === 0 || !this.#connected) return;
+    if (this.#speaking || this.#responseActive) this.#bargeIn();
     this.#send({
       type: "conversation.item.create",
       item: {

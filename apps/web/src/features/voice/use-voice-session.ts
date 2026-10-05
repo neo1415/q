@@ -113,8 +113,20 @@ export function useVoiceSession(
     };
   }, [transportSetMuted]);
 
+  /**
+   * Every transport, not only the one shown: a duplex line that fell back
+   * inside `start` leaves the standard one current, and an end that
+   * reached only one of them could leave the other listening.
+   */
+  const endDuplex = duplex.end;
+  const endDeepgram = deepgram.end;
+  const endElevenLabs = elevenLabs.end;
+  const end = useCallback(async () => {
+    await Promise.all([endDuplex(), endDeepgram(), endElevenLabs()]);
+  }, [endDuplex, endDeepgram, endElevenLabs]);
+
   return useMemo(
-    () => ({ ...client, start, setMuted, pausedAway }),
-    [client, start, setMuted, pausedAway],
+    () => ({ ...client, start, end, setMuted, pausedAway }),
+    [client, start, end, setMuted, pausedAway],
   );
 }
