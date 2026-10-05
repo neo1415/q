@@ -4,6 +4,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
+  FounderResultsSchema,
+  InvestorResultsSchema,
+} from "@capital-q/contracts";
+import {
   createRequestDatabaseClient,
   type RequestDatabase,
   type TransactionContext,
@@ -195,6 +199,16 @@ describe("@capital-q/results against local Postgres", () => {
         "Ventures Platform",
         "Voltron",
       ]);
+      // Dashboard reads: only firms with a recorded step; no interest yet
+      // means no response time (unknown, not 0).
+      expect(results.investorsEngaged).toBe(1);
+      expect(results.diligence).toEqual({ requested: 0, fulfilled: 0 });
+      expect(results.responseTime).toEqual({
+        medianHours: null,
+        answered: 0,
+        waiting: 0,
+      });
+      expect(FounderResultsSchema.safeParse(results).success).toBe(true);
 
       // A third investor firm crosses the floor.
       const third = await org(tx, "investment_firm", "Third");
@@ -242,6 +256,14 @@ describe("@capital-q/results against local Postgres", () => {
       ]);
       expect(results.hasMandate).toBe(false);
       expect(results.pipelineFit[0]?.reasons).toEqual([]);
+      expect(results.pipelineFit[0]?.companyId).toEqual(expect.any(String));
+      // Their own relationships only: Voltron's Chowdeck is not here.
+      expect(results.pipeline?.byState).toEqual([
+        { state: "CONNECTED", count: 1 },
+      ]);
+      expect(results.interest).toEqual({ sent: 0, accepted: 0, declined: 0 });
+      expect(results.commitments).toEqual([]);
+      expect(InvestorResultsSchema.safeParse(results).success).toBe(true);
     });
   });
 

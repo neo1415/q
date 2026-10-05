@@ -10,7 +10,7 @@ import { z } from "zod";
 export const RESULTS_PATH = "/v1/results" as const;
 export const RESULTS_REPORT_PATH = "/v1/results/report" as const;
 
-export const RESULTS_RANGES = ["30d", "90d", "12m", "all"] as const;
+export const RESULTS_RANGES = ["7d", "30d", "90d", "12m", "all"] as const;
 export const ResultsRangeSchema = z.enum(RESULTS_RANGES);
 export type ResultsRange = z.infer<typeof ResultsRangeSchema>;
 
@@ -38,6 +38,43 @@ export const FlooredCountSchema = z
 
 const Window = z
   .object({ from: Day.nullable(), to: Day, label: z.string().max(60) })
+  .strict();
+
+/**
+ * Activity over the window, a bar per day (a window of a month or less) or
+ * per week (Monday), oldest first. Recorded events only. Absent from an
+ * older server.
+ */
+export const ResultsActivitySchema = z
+  .object({
+    bucket: z.enum(["DAY", "WEEK"]),
+    points: z
+      .array(
+        z
+          .object({
+            start: Day,
+            interests: Count,
+            connections: Count,
+            meetings: Count,
+          })
+          .strict(),
+      )
+      .max(60),
+  })
+  .strict();
+export type ResultsActivity = z.infer<typeof ResultsActivitySchema>;
+
+/**
+ * How long an interest waited for its answer (accepted or declined), in
+ * hours: the median over interests sent in the window that were answered.
+ * Null when none were answered: unknown, never 0.
+ */
+export const ResultsResponseTimeSchema = z
+  .object({
+    medianHours: z.number().min(0).nullable(),
+    answered: Count,
+    waiting: Count,
+  })
   .strict();
 
 export const FounderResultsSchema = z
@@ -84,6 +121,8 @@ export const FounderResultsSchema = z
                 investorName: z.string().max(300),
                 state: z.string(),
                 since: z.string(),
+                /** For the link to the relationship. Absent from an older server. */
+                investorOrganisationId: z.string().uuid().optional(),
               })
               .strict(),
           )
@@ -115,6 +154,15 @@ export const FounderResultsSchema = z
       )
       .max(100),
     documents: z.array(z.object({ type: z.string(), count: Count }).strict()),
+    /** Distinct investor firms with any recorded step in the window. */
+    investorsEngaged: Count.optional(),
+    diligence: z
+      .object({ requested: Count, fulfilled: Count })
+      .strict()
+      .optional(),
+    /** How long the founder took to answer an investor's interest. */
+    responseTime: ResultsResponseTimeSchema.optional(),
+    activity: ResultsActivitySchema.optional(),
   })
   .strict();
 export type FounderResults = z.infer<typeof FounderResultsSchema>;
@@ -163,6 +211,8 @@ export const InvestorResultsSchema = z
         z
           .object({
             companyName: z.string().max(300),
+            /** For the link to the relationship. Absent from an older server. */
+            companyId: z.string().uuid().optional(),
             state: z.string(),
             excluded: z.boolean(),
             reasons: z.array(
@@ -175,6 +225,37 @@ export const InvestorResultsSchema = z
       )
       .max(200),
     hasMandate: z.boolean(),
+    /** Every relationship by where it stands now, declined included. */
+    pipeline: z
+      .object({
+        byState: z.array(
+          z.object({ state: z.string(), count: Count }).strict(),
+        ),
+      })
+      .strict()
+      .optional(),
+    /** Interest the firm sent in the window, and what came of it. */
+    interest: z
+      .object({ sent: Count, accepted: Count, declined: Count })
+      .strict()
+      .optional(),
+    /** How long founders took to answer the firm's interest. */
+    responseTime: ResultsResponseTimeSchema.optional(),
+    /** Commitments now (not superseded), by status, per currency. */
+    commitments: z
+      .array(
+        z
+          .object({
+            status: z.enum(["STATED", "CONFIRMED", "WITHDRAWN"]),
+            currencyCode: z.string().length(3),
+            count: Count,
+            amount: z.string(),
+          })
+          .strict(),
+      )
+      .max(30)
+      .optional(),
+    activity: ResultsActivitySchema.optional(),
   })
   .strict();
 export type InvestorResults = z.infer<typeof InvestorResultsSchema>;

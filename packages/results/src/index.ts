@@ -8,6 +8,7 @@
  * contexts. Server-side only; no model, no write.
  */
 export {
+  activitySeries,
   createResultsReader,
   ENGAGEMENT_FLOOR,
   resultsWindow,
