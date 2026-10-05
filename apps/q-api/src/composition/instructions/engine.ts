@@ -16,9 +16,12 @@ import {
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
+  considerationReason,
+  considerOutreach,
   ENGINE_ABILITIES,
   type InstructionQuestionKind,
   type InstructionThreadFacts,
+  type OutreachConsideration,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
@@ -38,7 +41,11 @@ import {
   type InstructionMaterial,
   type MaterialFact,
 } from "./material.js";
-import { factsLine, type QuarantinedThreadReader } from "./quarantine.js";
+import {
+  factsLine,
+  type QuarantinedThreadReader,
+  type ThreadPace,
+} from "./quarantine.js";
 import type { InstructionRow, InstructionStore } from "./store.js";
 
 /**
@@ -91,6 +98,16 @@ export type StepVerdict =
       readonly verdict: "REFUSED";
       readonly code: RefusalCode;
       readonly relationshipId: string | null;
+    }
+  | {
+      /**
+       * ADR 0050: not now. The consider step held the message (too soon to
+       * follow up, one at a time); recorded with its reason, not replanned.
+       */
+      readonly verdict: "HOLD";
+      readonly code: string;
+      readonly relationshipId: string | null;
+      readonly reason: string;
     };
 
 export const REFUSAL_CODES = [
@@ -112,6 +129,8 @@ export const REFUSAL_CODES = [
   "OUTSIDE_MANDATE",
   "UNSUPPORTED_FIT",
   "UNGROUNDED_CLAIM",
+  // ADR 0050: the consider step.
+  "MEETING_BEFORE_RAPPORT",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -190,6 +209,10 @@ export const REFUSAL_WORDS: Readonly<
       "the message said how you take part in a round in a way your mandate doesn't declare",
     instead: "I'll say only what your mandate declares",
   },
+  MEETING_BEFORE_RAPPORT: {
+    reason: "it asked for a meeting before they've written back",
+    instead: "I'll open warmly with a question first and ask for time later",
+  },
 };
 
 /** Why a granted AUTO step is asked instead, in plain words. */
@@ -204,6 +227,10 @@ export const ASK_WORDS: Readonly<Record<string, string>> = {
   AUTONOMY_OFF: "I ask for each step until autonomy is switched on",
   THEY_RAISED_TERMS: "they raised terms or money",
   THEY_DECLINED: "they said no or not now",
+  // ADR 0050: the consider step hands these to the person.
+  UNANSWERED:
+    "they haven't answered two messages; another would feel like pressure",
+  THEY_SOUND_UNHAPPY: "they sounded unhappy, so you should see the reply first",
 };
 
 // ---------------------------------------------------------------------------
@@ -314,6 +341,13 @@ export type ValidationContext = {
    * code falls back to this instruction's own count and the thread facts.
    */
   readonly introduced?: ReadonlySet<string> | undefined;
+  /**
+   * ADR 0050: each conversation's pace, read by code from its messages
+   * (who wrote last, when, how many of theirs are unanswered).
+   */
+  readonly pace?: ReadonlyMap<string, ThreadPace> | undefined;
+  /** ADR 0050: messages to each person already passed in this sitting. */
+  readonly sitting?: Map<string, number> | undefined;
 };
 
 const Args = z.record(z.string(), z.unknown());
@@ -470,6 +504,41 @@ export function validateStep(
     factReply = checked.factReply;
   }
 
+  // ADR 0050: consider the moment before any message, whatever the mode:
+  // a held or softened step never reaches a card or the chat.
+  let considered: OutreachConsideration = { decision: "PROCEED" };
+  if (action.name === "chat.message.send") {
+    considered = considerMessage(step, subject, context);
+    if (considered.decision === "SOFTEN") {
+      return {
+        verdict: "REFUSED",
+        code: considered.code,
+        relationshipId: subject,
+      };
+    }
+    if (considered.decision === "WAIT") {
+      return {
+        verdict: "HOLD",
+        code: considered.code,
+        relationshipId: subject,
+        reason: considerationReason(considered, {
+          lastFromUsAt:
+            subject === null
+              ? null
+              : (context.pace?.get(subject)?.lastFromUsAt ?? null),
+          timeZone: context.grant.workingHours.timeZone,
+        }),
+      };
+    }
+  }
+  /** The consider step's hand-over, as the ASK reason code. */
+  const ownerCode =
+    considered.decision === "ASK_OWNER"
+      ? considered.code === "AFTER_DECLINE"
+        ? "THEY_DECLINED"
+        : considered.code
+      : null;
+
   const ask = (code: string): StepVerdict => ({
     verdict: "ASK",
     action,
@@ -492,11 +561,12 @@ export function validateStep(
       action,
       input: parsed.data,
       relationshipId: subject,
-      code: null,
+      code: ownerCode,
     };
   }
   // AUTO as granted -- but what Q may do alone is fixed in code.
   if (context.request === "PREPARE") return ask("ASKED_TO_PREPARE");
+  if (ownerCode !== null) return ask(ownerCode);
   if (!delegableOnItsOwn(action)) return ask("NOT_DELEGABLE");
   // A declared cheque range or role, in code's own words, answering their
   // question about it, is a declared fact, not terms or a commitment (live
@@ -523,6 +593,25 @@ export function validateStep(
     const sent = subject === null ? 0 : (context.sent.get(subject) ?? 0);
     if (sent >= context.grant.maxMessagesPerCounterpart) {
       return ask("OVER_MESSAGE_CAP");
+    }
+    // ADR 0050: one message Q sends on its own per person per sitting; a
+    // second in the same breath reads as a machine. (Cards are the
+    // person's to send when they choose, so they are not held.)
+    if (subject !== null && context.sitting !== undefined) {
+      if ((context.sitting.get(subject) ?? 0) > 0) {
+        const held: OutreachConsideration = {
+          decision: "WAIT",
+          code: "ONE_AT_A_TIME",
+          until: null,
+        };
+        return {
+          verdict: "HOLD",
+          code: held.code,
+          relationshipId: subject,
+          reason: considerationReason(held),
+        };
+      }
+      context.sitting.set(subject, 1);
     }
     if (subject !== null) context.sent.set(subject, sent + 1);
   }
@@ -553,6 +642,82 @@ export function validateStep(
     relationshipId: subject,
     code: null,
   };
+}
+
+/**
+ * ADR 0050: the consider step for one planned message. What kind of
+ * message it is comes from the conversation itself (code's pace, else the
+ * typed facts), never from the planner's own label.
+ */
+function considerMessage(
+  step: InstructionPlanStep,
+  subject: string | null,
+  context: ValidationContext,
+): OutreachConsideration {
+  if (subject === null) return { decision: "PROCEED" };
+  const pace = context.pace?.get(subject);
+  const thread = context.facts?.get(subject);
+  const replying =
+    pace === undefined ? thread?.lastFrom === "THEM" : pace.lastFrom === "THEM";
+  const written =
+    sidesWritten(subject, context) || (pace?.lastFromUsAt ?? null) !== null;
+  return considerOutreach({
+    now: context.now,
+    kind: replying ? "REPLY" : written ? "FOLLOW_UP" : "FIRST",
+    asksMeeting: step.message?.asks === "MEETING",
+    theyHaveWritten: pace?.theyHaveWritten ?? replying,
+    lastFromUsAt: pace?.lastFromUsAt ?? null,
+    unansweredFromUs: pace?.unansweredFromUs ?? 0,
+    declined: thread?.declined === true,
+    negativeTone: thread?.tone === "NEGATIVE",
+    followUpsAllowed: context.grant.followUps !== false,
+    // Batching is code's, below: only what Q sends on its own counts.
+    alreadyThisSitting: 0,
+  });
+}
+
+/**
+ * ADR 0050: what the moment allows in one conversation, for the planner's
+ * THEIR PEOPLE line. Fixed words from code; the planner is told to follow.
+ */
+export function pacingLine(
+  pace: ThreadPace | undefined,
+  thread: ThreadFacts | undefined,
+  now: Date,
+  timeZone: string,
+): string | null {
+  if (thread?.declined === true) {
+    return "pacing: they said no or not now: write nothing to them";
+  }
+  if (pace === undefined) return null;
+  if (pace.lastFrom === "US") {
+    const held = considerOutreach({
+      now,
+      kind: "FOLLOW_UP",
+      asksMeeting: false,
+      theyHaveWritten: pace.theyHaveWritten,
+      lastFromUsAt: pace.lastFromUsAt,
+      unansweredFromUs: pace.unansweredFromUs,
+      declined: false,
+      negativeTone: false,
+      followUpsAllowed: true,
+      alreadyThisSitting: 0,
+    });
+    if (held.decision === "WAIT" || held.decision === "ASK_OWNER") {
+      return `pacing: ${considerationReason(held, {
+        lastFromUsAt: pace.lastFromUsAt,
+        timeZone,
+      })}: write nothing to them now`;
+    }
+    return "pacing: they haven't replied yet: at most one gentle follow-up that adds something, no meeting ask";
+  }
+  if (pace.lastFrom === "THEM" && thread?.tone === "NEGATIVE") {
+    return "pacing: they sounded unhappy: if you reply, acknowledge it gently and simply";
+  }
+  if (!pace.theyHaveWritten) {
+    return "pacing: they haven't written yet: warmth first, no meeting ask";
+  }
+  return null;
 }
 
 export type QuestionVerdict = "ANSWERABLE" | "TERMS_OR_MONEY" | "NOT_DECLARED";
@@ -842,6 +1007,11 @@ function peopleLines(
   topics: readonly string[],
   material: InstructionMaterial | null | undefined,
   introduced?: ReadonlySet<string>,
+  pacing?: {
+    readonly paces: ReadonlyMap<string, ThreadPace>;
+    readonly now: Date;
+    readonly timeZone: string;
+  },
 ): string {
   if (people.length === 0) return "No one yet.";
   return people
@@ -902,6 +1072,15 @@ function peopleLines(
                 ? "their question: answer it from WHO YOU WRITE AS"
                 : `their question: answer with exactly "${answer}"`;
             })(facts.get(person.relationshipId)),
+        // ADR 0050: what the moment allows here, in code's words.
+        person.relationshipId === null || pacing === undefined
+          ? null
+          : pacingLine(
+              pacing.paces.get(person.relationshipId),
+              facts.get(person.relationshipId),
+              pacing.now,
+              pacing.timeZone,
+            ),
         // Their network-visible material, each fact with its source.
         material === undefined
           ? null
@@ -1065,6 +1244,8 @@ export function createInstructionEngine(
       // S6: their messages, read only through the quarantined extractor,
       // keeping one planning call in reserve.
       const facts = new Map<string, ThreadFacts>();
+      // ADR 0050: each conversation's pace, by code, for the consider step.
+      const paces = new Map<string, ThreadPace>();
       const questions = new Map<
         string,
         { readonly messageId: string; readonly text: string }
@@ -1089,6 +1270,7 @@ export function createInstructionEngine(
             await store.addSpend(row.id, read.costUsd);
           }
           if (read.facts !== null) facts.set(relationshipId, read.facts);
+          if (read.pace !== undefined) paces.set(relationshipId, read.pace);
           if (read.question !== undefined) {
             questions.set(relationshipId, read.question);
           }
@@ -1189,6 +1371,7 @@ export function createInstructionEngine(
               grant.data.topics,
               material,
               introduced,
+              { paces, now: at, timeZone: grant.data.workingHours.timeZone },
             ),
             history:
               history.length === 0
@@ -1211,6 +1394,7 @@ export function createInstructionEngine(
         plan = planned.plan;
         if (plan === null) return empty("PLANNER_UNAVAILABLE");
         const sent = new Map(sentBefore);
+        const sitting = new Map<string, number>();
         const current = plan;
         verdicts = current.steps.map((step, index) =>
           validateStep(step, {
@@ -1224,6 +1408,8 @@ export function createInstructionEngine(
             request: current.request,
             material,
             introduced,
+            pace: paces,
+            sitting,
           }),
         );
         const refused = verdicts
@@ -1331,7 +1517,7 @@ export function createInstructionEngine(
         const key = keyOf(index);
         if (await store.stepDone(key)) return;
         const record = (input: {
-          readonly status: "DONE" | "ASKED" | "REFUSED" | "FAILED";
+          readonly status: "DONE" | "ASKED" | "REFUSED" | "FAILED" | "NOTED";
           readonly mode: "AUTO" | "ASK";
           readonly words: string;
           readonly reasonCode: string | null;
@@ -1347,6 +1533,18 @@ export function createInstructionEngine(
             ...input,
           });
 
+        if (verdict.verdict === "HOLD") {
+          // ADR 0050: Q held back; the person sees why, and nothing is
+          // replanned around it.
+          await record({
+            status: "NOTED",
+            mode: "ASK",
+            words: `Holding off: ${step.words} -- ${verdict.reason}.`,
+            reasonCode: `PACE_${verdict.code}`,
+            qActionId: null,
+          });
+          return;
+        }
         if (verdict.verdict === "REFUSED") {
           refusedCount += 1;
           const words = REFUSAL_WORDS[verdict.code];

@@ -533,3 +533,13 @@ export {
 // end P5 block
 
 export const PACKAGE_NAME = "@capital-q/platform-admin" as const;
+// ETIQUETTE block (ADR 0050): the platform's business etiquette guide.
+export {
+  activePlatformEtiquetteGuide,
+  createEtiquetteGuideAdminStore,
+  type ActivePlatformEtiquetteGuide,
+  type EtiquetteGuideAdminStore,
+  type NewPlatformEtiquetteVersion,
+  type PlatformEtiquetteVersion,
+  type PlatformEtiquetteView,
+} from "./etiquette-guide.js";

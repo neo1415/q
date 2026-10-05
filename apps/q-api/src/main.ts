@@ -109,6 +109,8 @@ import {
   createWorkStartActions,
 } from "./composition/work/actions.js";
 import { createWorkComposers } from "./composition/work/composers.js";
+import { createEtiquetteSource } from "./composition/etiquette.js";
+import { houseEtiquetteOf } from "@capital-q/q-core";
 import { createWorkPage } from "./composition/work/page.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
@@ -326,6 +328,7 @@ import {
   createRelationshipQSubjectResolver,
   createSelfUserQSubjectResolver,
   neverPause,
+  createPostgresEtiquetteGuideStore,
 } from "@capital-q/q-runtime";
 import {
   createKnowledgeQueryService,
@@ -380,6 +383,7 @@ import {
   APP_ACTIONS,
   ownIndex,
   type OwnReadPorts,
+  type EtiquetteGuidePort,
 } from "@capital-q/app-actions";
 import {
   createEvidenceDocumentsPort,
@@ -533,6 +537,7 @@ import {
   isSuspended as isAccountSuspended,
   recordingEmailSender,
   recordingFirewall,
+  createEtiquetteGuideAdminStore,
 } from "@capital-q/platform-admin";
 import { withSuspension } from "./composition/suspension.js";
 import { createOwnCalls } from "./composition/own-calls.js";
@@ -559,6 +564,25 @@ await telemetry.start();
 // migration credential. Holding it is not authority; every route still passes
 // through ActorContext and the runtime's ownership checks.
 const database = createRequestDatabaseClient(loadDatabaseConfig());
+// ETIQUETTE block (ADR 0050): the business etiquette guides Q follows when
+// it writes or speaks for a person: the house guide and their own.
+const etiquetteAdmin = createEtiquetteGuideAdminStore({
+  sql: database.sql,
+  transactions: database.transactions,
+});
+const etiquettePersonal = createPostgresEtiquetteGuideStore({
+  sql: database.sql,
+  transactions: database.transactions,
+});
+const etiquette = createEtiquetteSource({
+  platform: () => etiquetteAdmin.active(),
+  personal: (owner) => etiquettePersonal.read(owner),
+});
+const etiquetteGuides: EtiquetteGuidePort = {
+  ...etiquettePersonal,
+  house: async () => houseEtiquetteOf(await etiquetteAdmin.active()),
+};
+// end ETIQUETTE block
 
 const logger = createLogger(
   {
@@ -1632,6 +1656,8 @@ const investorFeed = createInvestorFeedPort({
   logger,
 });
 const appActionPorts: OwnReadPorts = {
+  // ADR 0050: their own speaking guide, saved or removed by asking Q.
+  etiquetteGuides,
   media: pitchMedia,
   // The services the dedicated routes call, for the declared actions Q
   // proposes and standing instructions take (live 2026-10-03, card
@@ -2787,6 +2813,8 @@ const qIntelligence = composeQIntelligence({
       (await qReceipts.action(context.actor, proposalId).catch(() => null))
         ?.progress ?? null,
   }),
+  // ADR 0050: the house guide and theirs shape Q's manner with them.
+  etiquetteOf: (who) => etiquette(who),
   personalityOf: ({ tenantId, userId }) =>
     standingStore
       .read(userId, tenantId, new Date())
@@ -3137,6 +3165,7 @@ const meetingHost = createMeetingHostRuntime({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
     logger,
+    etiquette,
   }),
   followThrough: createMeetingHostFollowThrough({
     sql: database.sql,
@@ -3344,6 +3373,7 @@ const errandComposers = createWorkComposers({
   gateway: modelGateway,
   dataPosture: demoDataPosture,
   logger,
+  etiquette,
 });
 const errandNegotiation: ErrandNegotiation = {
   zoneOf: async (userId) =>
@@ -3416,6 +3446,7 @@ const errands = createErrandRunner({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
     logger,
+    etiquette,
   }),
   nameOf: (userId) =>
     database.sql<{ display_name: string | null }[]>`
@@ -3467,6 +3498,7 @@ const workRuntime = createWorkRuntime({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
     logger,
+    etiquette,
   }),
   chat,
   schedule,
@@ -3595,6 +3627,7 @@ instructionEngine.current = createInstructionEngine({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
     logger,
+    etiquette,
   }),
   readThread: createQuarantinedThreadReader({
     gateway: modelGateway,

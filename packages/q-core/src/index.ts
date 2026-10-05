@@ -51,6 +51,7 @@ export {
 
 export {
   bundleVersionOf,
+  COMMUNICATION_GUIDANCE_MAX,
   renderPrompt,
   type PromptBundle,
   type PromptBundleVersion,
@@ -861,6 +862,42 @@ export {
   type PublicSourcePresentation,
 } from "./communication/source-presentation.js";
 
+// ETIQUETTE block (ADR 0050): how Q conducts business.
+export {
+  BUILT_IN_ETIQUETTE_DIGEST,
+  BUILT_IN_ETIQUETTE_GUIDE,
+  BUILT_IN_ETIQUETTE_TITLE,
+  BUILT_IN_ETIQUETTE_VERSION,
+} from "./etiquette/default-guide.js";
+export {
+  BUILT_IN_ETIQUETTE,
+  DEFAULT_ETIQUETTE_GUIDES,
+  ETIQUETTE_GUIDE_TEXT_MAX,
+  ETIQUETTE_PERSONAL_EXCERPT_MAX,
+  ETIQUETTE_PLATFORM_EXCERPT_MAX,
+  ETIQUETTE_RENDERING_VERSION,
+  etiquetteExcerpt,
+  etiquetteVersions,
+  houseEtiquetteOf,
+  platformEtiquetteSource,
+  renderEtiquetteGuidance,
+  type ActivePlatformGuideLike,
+  type EtiquetteGuides,
+  type EtiquetteGuideSource,
+  type EtiquettePurpose,
+  type EtiquetteRequest,
+} from "./etiquette/guidance.js";
+export {
+  considerationReason,
+  considerOutreach,
+  ETIQUETTE_PACING,
+  soundsLikeNo,
+  type OutreachConsideration,
+  type OutreachKind,
+  type OutreachMoment,
+} from "./etiquette/pacing.js";
+// end ETIQUETTE block
+
 export {
   COMMUNICATION_FORBIDDEN_TERMS,
   COMMUNICATION_RENDERING_VERSION,
@@ -960,6 +997,7 @@ export {
   INSTRUCTION_PLAN_V3,
   INSTRUCTION_PLAN_V4,
   INSTRUCTION_PLAN_V5,
+  INSTRUCTION_PLAN_V6,
   INSTRUCTION_THREAD_READER_V1,
   INSTRUCTION_THREAD_READER_V2,
 } from "./prompts/tasks/instructions.v1.js";

@@ -31,6 +31,7 @@ import {
   type WorkSlotReaderResult,
   type ErrandReplyVariables,
 } from "@capital-q/q-core";
+import { etiquetteFor, type EtiquetteSource } from "./etiquette.js";
 import {
   ERRAND_START as ERRAND_START_NAME,
   type RelationshipIntelligencePort,
@@ -425,12 +426,20 @@ export function createErrandReplyComposer(dependencies: {
   readonly gateway: ModelGateway;
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
+  /** ADR 0050: the principal's business etiquette guides. */
+  readonly etiquette?: EtiquetteSource | undefined;
 }): ErrandReplyComposer {
   const registry = createDefaultPromptRegistry();
   return {
     compose: async (input) => {
+      const etiquette = await etiquetteFor(
+        dependencies.etiquette,
+        { tenantId: input.actor.tenantId, userId: input.actor.userId },
+        "SPEAK_FOR",
+      );
       const rendered = renderPrompt<ErrandReplyVariables>(registry, {
         task: "ERRAND_REPLY",
+        ...(etiquette === undefined ? {} : { etiquette }),
         operatingMode: "CONTINUOUS_INTELLIGENCE",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
         environmentNotes:

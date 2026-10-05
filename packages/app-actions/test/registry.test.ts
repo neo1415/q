@@ -249,6 +249,13 @@ describe("the action registry", () => {
       ],
       ["review.request", "legacy:propose_human_review", "CONSEQUENTIAL"],
       ["verification.kyb.submit", "offer.kyb_submission", "CONSEQUENTIAL"],
+      // ADR 0050: how Q speaks for them.
+      ["settings.etiquette_guide.save", "set_my_speaking_guide", "INSTANT"],
+      [
+        "settings.etiquette_guide.remove",
+        "remove_my_speaking_guide",
+        "INSTANT",
+      ],
       // WORK-58: Q's work page.
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
       ["q.work.resume", "legacy:stop_q_work", "INSTANT"],

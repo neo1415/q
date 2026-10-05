@@ -29,6 +29,7 @@ import {
   type MeetingHostResultV2 as MeetingHostResult,
   type MeetingHostVariables,
 } from "@capital-q/q-core";
+import { etiquetteFor, type EtiquetteSource } from "./etiquette.js";
 import { z } from "zod";
 
 /**
@@ -1052,12 +1053,23 @@ export function createMeetingHostComposer(dependencies: {
   readonly gateway: ModelGateway;
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger;
+  /**
+   * ADR 0050: the organiser's business etiquette guides. Q hosts the call
+   * for them, so their manner shapes what Q says; never what it may say.
+   */
+  readonly etiquette?: EtiquetteSource | undefined;
 }): MeetingHostComposer {
   const registry = createDefaultPromptRegistry();
   return {
     turn: async (who, variables) => {
+      const etiquette = await etiquetteFor(
+        dependencies.etiquette,
+        who,
+        "SPEAK_FOR",
+      );
       const rendered = renderPrompt<typeof variables>(registry, {
         task: "MEETING_HOST_TURN",
+        ...(etiquette === undefined ? {} : { etiquette }),
         operatingMode: "CONTINUOUS_INTELLIGENCE",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
         environmentNotes:

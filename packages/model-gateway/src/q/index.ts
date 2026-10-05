@@ -50,6 +50,7 @@ import {
   NOTHING_REMEMBERED,
   ProfileUpdateSchema,
   type CompanyAnalystV4Variables,
+  type EtiquetteGuides,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   type PromptRegistry,
@@ -1174,6 +1175,18 @@ export type ModelGatewayQAnswerDependencies = {
       }) => Promise<string | null>)
     | undefined;
   /**
+   * ADR 0050: the business etiquette guides in force for this person (the
+   * house guide and their own), rendered as fenced reference text that
+   * shapes Q's manner with them and the drafts it writes for them. Null or
+   * absent: none. A failure never stops the answer.
+   */
+  readonly etiquetteOf?:
+    | ((request: {
+        readonly tenantId: string;
+        readonly userId: string;
+      }) => Promise<EtiquetteGuides | null>)
+    | undefined;
+  /**
    * Who is asking, in their own record's words: their own company and its
    * site (founder live 2026-09-30: Q asked a founder whether "the Nixo
    * founded by Priya Khandelwal" was the company she meant, and for a
@@ -2255,8 +2268,25 @@ export function createModelGatewayQAnswer(
       const environmentNotes = notesInTail
         ? noteParts.standing
         : joinedNoteParts(noteParts);
+      const etiquetteGuides =
+        dependencies.etiquetteOf === undefined
+          ? null
+          : await dependencies
+              .etiquetteOf({
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+              })
+              .catch(() => null);
       const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
         task: "COMPANY_ANALYST",
+        ...(etiquetteGuides === null
+          ? {}
+          : {
+              etiquette: {
+                guides: etiquetteGuides,
+                purpose: "STYLE_ONLY" as const,
+              },
+            }),
         operatingMode: operatingModeForCapability(request.capability),
         communicationProfile: profile,
         environmentNotes,

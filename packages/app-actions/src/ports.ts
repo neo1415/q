@@ -44,6 +44,7 @@ import type { DeckAudiencePort } from "./actions/deck.js";
 import type { DocumentChangePort } from "./actions/document-manage.js";
 import type { GateQPolicyExtractionPort } from "./actions/gateq.js";
 import type { QWorkPagePort } from "./actions/work.js";
+import type { EtiquetteGuidePort } from "./actions/etiquette.js";
 
 /**
  * The services the declared actions call (ADR 0040). Each composition (the
@@ -139,6 +140,8 @@ export type AppActionPorts = {
   readonly profileImages?:
     | Pick<ProfileImageService, "requestUpload" | "completeUpload" | "remove">
     | undefined;
+  /** ADR 0050: their own business etiquette guide (How Q speaks for you). */
+  readonly etiquetteGuides?: EtiquetteGuidePort | undefined;
   /** Settings: their notification switches, and whether push can work here. */
   readonly notificationSettings?:
     | (Pick<PushSubscriptionStore, "settings" | "saveSettings"> & {

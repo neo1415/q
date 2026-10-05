@@ -31,8 +31,11 @@ import {
 } from "@capital-q/contracts";
 import {
   createBrandThemeStore,
+  createEtiquetteGuideAdminStore,
   createPlatformAdmin,
 } from "@capital-q/platform-admin";
+import { houseEtiquetteOf } from "@capital-q/q-core";
+import { createPostgresEtiquetteGuideStore } from "@capital-q/q-runtime";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import { createOutboxWriter } from "@capital-q/eventing";
@@ -1782,6 +1785,23 @@ const { app, logger } = createApp(config, security, {
   // end BILLING block
   // ADMIN block (ADR 0033)
   admin: platformAdmin,
+  // ADR 0050: business etiquette guides (a person's own; the console's).
+  etiquette: (() => {
+    const adminStore = createEtiquetteGuideAdminStore({
+      sql: database.sql,
+      transactions: database.transactions,
+    });
+    return {
+      adminStore,
+      guides: {
+        ...createPostgresEtiquetteGuideStore({
+          sql: database.sql,
+          transactions: database.transactions,
+        }),
+        house: async () => houseEtiquetteOf(await adminStore.active()),
+      },
+    };
+  })(),
   // P5: brand colour
   brand: createBrandThemeStore({
     sql: database.sql,

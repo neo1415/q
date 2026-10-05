@@ -18,6 +18,7 @@ import { PROFILE_IMAGE_ACTIONS } from "./actions/profile-images.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
 import { SCHEDULE_ACTIONS } from "./actions/schedule.js";
 import { SETTINGS_ACTIONS } from "./actions/settings.js";
+import { ETIQUETTE_ACTIONS } from "./actions/etiquette.js";
 import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
 import { WORK_ACTIONS } from "./actions/work.js";
 import { GATEQ_ACTIONS } from "./actions/gateq.js";
@@ -46,6 +47,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...DOCUMENT_MANAGE_ACTIONS,
   ...PROFILE_IMAGE_ACTIONS,
   ...SETTINGS_ACTIONS,
+  ...ETIQUETTE_ACTIONS,
   ...WORK_ACTIONS,
   ...GATEQ_ACTIONS,
 ]);

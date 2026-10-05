@@ -139,7 +139,10 @@ describe("the quarantined thread reader", () => {
     const forged = setup({ ...FACTS, tone: INJECTION });
     expect((await forged.read()).facts).toBeNull();
     const poor = setup(FACTS);
-    expect(await poor.read(0.005)).toEqual({ facts: null, costUsd: 0 });
+    // ADR 0050: the pace is code's, read from the thread without a model.
+    const unread = await poor.read(0.005);
+    expect(unread).toMatchObject({ facts: null, costUsd: 0 });
+    expect(unread.pace?.lastFrom).toBeDefined();
     expect(poor.calls).toHaveLength(0);
   });
 });

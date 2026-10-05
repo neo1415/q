@@ -12,6 +12,8 @@ import {
   type InstructionPlanV4Variables,
 } from "@capital-q/q-core";
 
+import { etiquetteFor, type EtiquetteSource } from "../etiquette.js";
+
 /**
  * The standing-instruction planner (ADR 0043 §4, §7): one structured call
  * through the Q Model Gateway. Its spend belongs to the instruction: the
@@ -64,12 +66,24 @@ export function createInstructionPlanner(dependencies: {
   readonly gateway: ModelGateway;
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * ADR 0050: the person's business etiquette guides. Q writes these
+   * messages for them, so the guides shape the wording (never what the
+   * plan may contain: code checks every step against the grant).
+   */
+  readonly etiquette?: EtiquetteSource | undefined;
 }): InstructionPlanner {
   const registry = createDefaultPromptRegistry();
   return async (who, variables, limits) => {
     try {
+      const etiquette = await etiquetteFor(
+        dependencies.etiquette,
+        { tenantId: who.tenantId, userId: who.userId },
+        "SPEAK_FOR",
+      );
       const rendered = renderPrompt<PlanVariables>(registry, {
         task: "INSTRUCTION_PLAN",
+        ...(etiquette === undefined ? {} : { etiquette }),
         operatingMode: "CONTINUOUS_INTELLIGENCE",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
         environmentNotes:

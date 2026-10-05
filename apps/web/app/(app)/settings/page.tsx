@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 
-import { getMyPlan, getQDailyPreferences } from "@capital-q/api-client";
+import {
+  getMyEtiquetteGuide,
+  getMyPlan,
+  getQDailyPreferences,
+} from "@capital-q/api-client";
 
 import {
   PageContainer,
@@ -14,6 +18,7 @@ import { GmailConnection } from "@/features/integrations/gmail-connection";
 import { QEmailAddress } from "@/features/integrations/q-email-address";
 import { QMotionToggle } from "@/features/q-aperture";
 import { DailySetting } from "@/features/daily/daily-setting";
+import { MyGuide } from "@/features/etiquette/my-guide";
 import {
   apiSession,
   qApiSession,
@@ -39,6 +44,7 @@ const SECTIONS = [
   { id: "account", label: "Account" },
   { id: "appearance", label: "Appearance" },
   { id: "q", label: "Q" },
+  { id: "speaking", label: "How Q speaks for you" },
   { id: "notifications", label: "Notifications" },
   { id: "connections", label: "Connections" },
   { id: "billing", label: "Plan and billing" },
@@ -68,19 +74,24 @@ export default async function SettingsPage({
     qApiSession(),
     apiSession(),
   ]);
-  const [standing, daily, user, context, plan, admin] = await Promise.all([
-    resolveQStanding(),
-    // DAILY: how The Q Daily comes; null when the Q API could not be asked.
-    session === null
-      ? Promise.resolve(null)
-      : getQDailyPreferences(session).catch(() => null),
-    getSessionUser(),
-    resolveOwnContext(),
-    billingSession === null
-      ? Promise.resolve(null)
-      : getMyPlan(billingSession).catch(() => null),
-    adminContext().catch(() => null),
-  ]);
+  const [standing, daily, user, context, plan, admin, speaking] =
+    await Promise.all([
+      resolveQStanding(),
+      // DAILY: how The Q Daily comes; null when the Q API could not be asked.
+      session === null
+        ? Promise.resolve(null)
+        : getQDailyPreferences(session).catch(() => null),
+      getSessionUser(),
+      resolveOwnContext(),
+      billingSession === null
+        ? Promise.resolve(null)
+        : getMyPlan(billingSession).catch(() => null),
+      adminContext().catch(() => null),
+      // ADR 0050: their own guide to how Q speaks for them.
+      billingSession === null
+        ? Promise.resolve(null)
+        : getMyEtiquetteGuide(billingSession).catch(() => null),
+    ]);
   const organisation =
     context.kind === "NONE"
       ? null
@@ -143,6 +154,14 @@ export default async function SettingsPage({
                 <RowLink href="/admin/brand">Customise</RowLink>
               </SettingRow>
             ) : null}
+            {canBrand ? (
+              <SettingRow
+                term="How Q conducts business"
+                hint="The house guide for everyone · admins only"
+              >
+                <RowLink href="/admin/etiquette">Open</RowLink>
+              </SettingRow>
+            ) : null}
           </SettingsCard>
 
           <SettingsCard
@@ -174,6 +193,23 @@ export default async function SettingsPage({
             >
               <RowLink href="/work">Open</RowLink>
             </SettingRow>
+          </SettingsCard>
+
+          {/* ETIQUETTE block (ADR 0050) */}
+          <SettingsCard
+            id="speaking"
+            title="How Q speaks for you"
+            description="Your guide to how Q writes and talks to investors and founders for you."
+          >
+            {speaking === null ? (
+              <SettingRow term="Your guide">
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  Your guide couldn&apos;t load. Reload in a moment.
+                </p>
+              </SettingRow>
+            ) : (
+              <MyGuide initial={speaking} />
+            )}
           </SettingsCard>
 
           <SettingsCard

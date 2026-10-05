@@ -135,6 +135,10 @@ import { registerProblemHandling } from "./http/problem-handler.js";
 import type { BrandThemeStore } from "@capital-q/platform-admin";
 
 import { registerBrandThemeRoutes } from "./http/brand-theme.js";
+// ETIQUETTE block (ADR 0050)
+import type { EtiquetteGuidePort } from "@capital-q/app-actions";
+import type { EtiquetteGuideAdminStore } from "@capital-q/platform-admin";
+import { registerEtiquetteRoutes } from "./http/etiquette.js";
 // end P5 block
 // BILLING block (ADR 0034)
 import {
@@ -232,6 +236,16 @@ export type ApiModules = {
   readonly admin?: AdminRoutesDependencies["admin"] | undefined;
   /** P5: brand colour; registers only alongside `admin`. */
   readonly brand?: BrandThemeStore | undefined;
+  /**
+   * ADR 0050: business etiquette guides. A person's own guide always; the
+   * platform's house guide in the console only alongside `admin`.
+   */
+  readonly etiquette?:
+    | {
+        readonly guides: EtiquetteGuidePort;
+        readonly adminStore?: EtiquetteGuideAdminStore | undefined;
+      }
+    | undefined;
   // ADMIN block (ADR 0033)
   readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
   readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
@@ -455,6 +469,20 @@ export function createApp(
     }
   }
 
+  // ETIQUETTE block (ADR 0050): reading one's own guide, and the console's
+  // house guide (its writes need a platform admin with step-up).
+  if (modules.etiquette !== undefined) {
+    const adminStore = modules.etiquette.adminStore;
+    registerEtiquetteRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      guides: modules.etiquette.guides,
+      ...(modules.admin === undefined || adminStore === undefined
+        ? {}
+        : { admin: { platform: modules.admin, store: adminStore } }),
+    });
+  }
+
   // ADR 0040 (Proposed): the routes of the app's declared actions, each on
   // its own path, through the services composed above.
   const push = modules.push;
@@ -557,6 +585,9 @@ export function createApp(
             documentChanges: documentChangePort(modules.evidence),
           }),
       ...(modules.qWork === undefined ? {} : { qWork: modules.qWork }),
+      ...(modules.etiquette === undefined
+        ? {}
+        : { etiquetteGuides: modules.etiquette.guides }),
       ...(modules.gateqPolicyExtraction === undefined
         ? {}
         : { gateqPolicyExtraction: modules.gateqPolicyExtraction }),
