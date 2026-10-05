@@ -50,7 +50,7 @@ export default async function InvestorsPage() {
     return (
       <PageContainer>
         <PageHeader
-          title="Founder requests"
+          title="Company requests"
           description="Accepting connects you. It isn’t an investment."
         />
         {inbox === null ? (

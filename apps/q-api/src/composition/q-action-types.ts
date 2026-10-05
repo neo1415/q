@@ -43,7 +43,7 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   COMPANY_VISIBILITY_SET,
   RELATIONSHIP_INTEREST_EXPRESS,
   RELATIONSHIP_INTEREST_RESPOND,
-  // Live 2026-10-02: an investor's answer to a founder's request, with a message.
+  // Live 2026-10-02: an investor's answer to a company request, with a message.
   RELATIONSHIP_CONNECTION_REQUEST_RESPOND,
   // Action parity 2026-10-02: a founder's Connection Request, by Q.
   RELATIONSHIP_CONNECTION_REQUEST_SEND,

@@ -69,9 +69,9 @@ export default async function RelationshipsPage() {
           <Link
             href="/investors"
             className={buttonClassName("quiet", "compact")}
-            data-founder-requests-link
+            data-company-requests-link
           >
-            Founder requests
+            Company requests
           </Link>
         ) : null}
         {side === "NONE" ? null : (

@@ -127,9 +127,21 @@ export const FitProfileDtoSchema = z
   .strict();
 export type FitProfileDto = z.infer<typeof FitProfileDtoSchema>;
 
+/** A company's fit with the reader's mandate, with what the reader may see of it. */
+export const FitCompanyDtoSchema = z
+  .object({
+    companyId: UuidSchema,
+    name: z.string().min(1).max(200),
+    /** "Seed · Kenya"; null when nothing is known. */
+    line: z.string().max(200).nullable(),
+    profile: FitProfileDtoSchema,
+  })
+  .strict();
+export type FitCompanyDto = z.infer<typeof FitCompanyDtoSchema>;
+
 export const FitProfileListDtoSchema = z
   .object({
-    items: z.array(FitProfileDtoSchema).max(50),
+    items: z.array(FitCompanyDtoSchema).max(50),
   })
   .strict();
 export type FitProfileListDto = z.infer<typeof FitProfileListDtoSchema>;

@@ -250,7 +250,7 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   PASSED:
     "Opens Passed: the companies they passed on in Discover, to look back at or undo a pass.",
   INVESTORS:
-    "Opens Investors: for a founder, the discoverable investors to request a connection with; for an investor, the connection requests founders sent them.",
+    "Opens Investors: for a founder, the discoverable investors to request a connection with; for an investor, Company requests: the companies that asked to connect with them.",
   SEARCH: "Opens Search: people by name or handle, and pitch videos.",
   GATEWAY:
     "Opens their GateQ gateway: its public link, QR code, website snippet and the applications that came in.",
@@ -800,7 +800,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "propose_connection_request_answer",
     "RELATIONSHIP",
-    "For an investor: accepts or declines a founder's Connection Request and, on acceptance, sends the opening message Q drafted -- one approval for both.",
+    "For an investor: accepts or declines a company's Connection Request (Company requests) and, on acceptance, sends the opening message Q drafted -- one approval for both.",
     {
       approval: "PREPARE_APPROVE",
       executes: ["relationship.connection_request.respond"],

@@ -304,8 +304,8 @@ function answerConnection(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
     area: "relationships",
     classification: "CONSEQUENTIAL",
     does: accept
-      ? "Accepts a founder's Connection Request, from the investor's inbox."
-      : "Declines a founder's Connection Request, from the investor's inbox.",
+      ? "Accepts a company's Connection Request, from Company requests."
+      : "Declines a company's Connection Request, from Company requests.",
     input: Answer,
     output: serviceResult(),
     authorize: servicesDecide,

@@ -75,7 +75,12 @@ export function registerFitRoutes(
       return FitProfileListDtoSchema.parse({
         items:
           result.kind === "OK"
-            ? result.items.map((item) => item.assessment.profile)
+            ? result.items.map((item) => ({
+                companyId: item.assessment.profile.companyId,
+                name: item.name,
+                line: item.line,
+                profile: item.assessment.profile,
+              }))
             : [],
       });
     },

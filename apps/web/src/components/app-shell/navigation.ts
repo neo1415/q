@@ -98,13 +98,14 @@ export const FOUNDER_MEDIA_NAVIGATION: NavigationItem = {
 };
 
 /**
- * Founder requests (ADR 0023): founders' Connection Requests to an
+ * Company requests (ADR 0023; renamed by the founder brief B4, ADR 0052):
+ * companies' Connection Requests to an
  * investor's organisation. A founder's /investors now opens Discover's
  * Investors tab, so only investors see this entry.
  */
-export const FOUNDER_REQUESTS_NAVIGATION: NavigationItem = {
+export const COMPANY_REQUESTS_NAVIGATION: NavigationItem = {
   href: "/investors",
-  label: "Founder requests",
+  label: "Company requests",
   icon: Handshake,
 };
 
@@ -229,7 +230,7 @@ export function navigationGroupsFor(
       items: [
         WORK_NAVIGATION,
         ...(founder ? [FOUNDER_MEDIA_NAVIGATION] : []),
-        ...(investor ? [FOUNDER_REQUESTS_NAVIGATION] : []),
+        ...(investor ? [COMPANY_REQUESTS_NAVIGATION] : []),
         DOCUMENTS_NAVIGATION,
         ...(founder || investor ? [REHEARSALS_NAVIGATION] : []),
         DAILY_NAVIGATION,

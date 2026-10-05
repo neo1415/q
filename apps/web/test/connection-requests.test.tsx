@@ -182,6 +182,6 @@ describe("ConnectionRequestsInbox", () => {
 
   it("is an honest empty state when no founder has asked", () => {
     render(<ConnectionRequestsInbox items={[]} />);
-    expect(screen.getByText("No requests from founders yet.")).toBeTruthy();
+    expect(screen.getByText("No company requests yet.")).toBeTruthy();
   });
 });
