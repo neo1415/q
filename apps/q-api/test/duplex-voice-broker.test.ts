@@ -691,6 +691,61 @@ describe("usage and the caps", () => {
     expect(last).toEqual({ continue: false });
   });
 
+  it("rejoins a dropped line with the same minted session, and keeps it past its length (I1)", async () => {
+    let spent = 0.2;
+    const h = harness({ spent: () => spent });
+    await h.broker.open({ binding: binding() });
+    // A line in use for its full ten minutes.
+    let last = null as Awaited<ReturnType<typeof h.broker.usage>>;
+    for (let n = 1; n <= 30; n += 1) {
+      h.advance(20_000);
+      last = await h.broker.usage({
+        actor: ACTOR,
+        voiceSessionId: id,
+        report: { ...REPORT, responseId: `len_${String(n)}` },
+      });
+    }
+    // At its length the line is kept for the browser to rejoin.
+    expect(last).toEqual({ continue: false });
+    const rejoined = await h.broker.rejoin({
+      actor: ACTOR,
+      voiceSessionId: id,
+      cause: "MAX_LENGTH",
+    });
+    expect(rejoined?.credential?.clientSecret).toBeDefined();
+    expect(h.mints).toHaveLength(2);
+    expect(h.mints[1]).toEqual(h.mints[0]);
+    // The fresh call has the full length again.
+    expect(
+      await h.broker.usage({
+        actor: ACTOR,
+        voiceSessionId: id,
+        report: { ...REPORT, responseId: "resp_2" },
+      }),
+    ).toEqual({ continue: true });
+    // Past the cap a rejoin is refused with the sentence, and the line goes.
+    spent = 1.0;
+    expect(
+      await h.broker.rejoin({ actor: ACTOR, voiceSessionId: id, cause: "NETWORK" }),
+    ).toEqual({ notice: DUPLEX_CAP_NOTICE });
+    expect(
+      await h.broker.rejoin({ actor: ACTOR, voiceSessionId: id, cause: "NETWORK" }),
+    ).toBeNull();
+  });
+
+  it("never rejoins another person's line", async () => {
+    const h = harness();
+    await h.broker.open({ binding: binding() });
+    expect(
+      await h.broker.rejoin({
+        actor: STRANGER,
+        voiceSessionId: id,
+        cause: "NETWORK",
+      }),
+    ).toBeNull();
+    expect(h.mints).toHaveLength(1);
+  });
+
   it("forgets a line that went silent past its idle window", async () => {
     const h = harness();
     await h.broker.open({ binding: binding() });
