@@ -114,6 +114,33 @@ describe("voice reconnect budget", () => {
   });
 });
 
+describe("a dropped line (bad network)", () => {
+  it("says Reconnecting… instead of going silent, and resumes the same conversation", async () => {
+    const conversationId = "7f000000-0000-4000-8000-000000000001";
+    const { result } = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await result.current.talk({
+        thread: { conversationId } as never,
+      });
+    });
+    // The socket drops (the fake transport reports it at once).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.notice).toBe("Reconnecting…");
+    expect(result.current.active).toBe(true);
+    // The first retry comes within the recovery window.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_500);
+    });
+    expect(startVoiceSessionAction).toHaveBeenCalledTimes(2);
+    expect(startVoiceSessionAction.mock.calls[1]?.[0]).toMatchObject({
+      conversationId,
+      resume: true,
+    });
+  });
+});
+
 describe("withGreeting", () => {
   const credential = {
     voiceSessionId: "00000000-0000-4000-8000-000000000001",

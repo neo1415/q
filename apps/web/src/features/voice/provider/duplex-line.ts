@@ -9,6 +9,13 @@ import type {
 
 import type { VoiceState } from "../session";
 import {
+  countersOf,
+  DISCONNECTED_GRACE_MS,
+  HEALTH_SAMPLE_MS,
+  LineHealth,
+  WEAK_LINE_NOTICE,
+} from "./line-health";
+import {
   BackchannelPolicy,
   LEVEL_FRAME_MS,
   overlongReaction,
@@ -135,7 +142,19 @@ export type DuplexEnvironment = {
   /** BACKCHANNEL: the local level meter; absent means no reactions. */
   readonly createLevelMeter?:
     ((stream: MediaStream) => LevelMeter | null) | undefined;
+  /** A microphone was plugged in or out; returns the unsubscribe. */
+  readonly onDeviceChange?: ((handler: () => void) => () => void) | undefined;
+  /** The tab came back to the foreground; returns the unsubscribe. */
+  readonly onVisible?: ((handler: () => void) => () => void) | undefined;
 };
+
+/**
+ * How much audio the browser holds before playing Q's voice, in ms. A
+ * little more than WebRTC's adaptive default, so a jittery line costs a
+ * fraction of a second of latency rather than clipped words. Ignored by a
+ * browser without the knob.
+ */
+export const PLAYOUT_BUFFER_MS = 150;
 
 export function browserDuplexEnvironment(): DuplexEnvironment {
   return {
@@ -145,6 +164,23 @@ export function browserDuplexEnvironment(): DuplexEnvironment {
         audio: { echoCancellation: true, noiseSuppression: true },
       }),
     fetch: (input, init) => fetch(input, init),
+    onDeviceChange: (handler) => {
+      const devices = navigator.mediaDevices as MediaDevices | undefined;
+      if (devices === undefined) return () => undefined;
+      devices.addEventListener("devicechange", handler);
+      return () => {
+        devices.removeEventListener("devicechange", handler);
+      };
+    },
+    onVisible: (handler) => {
+      const listener = () => {
+        if (document.visibilityState === "visible") handler();
+      };
+      document.addEventListener("visibilitychange", listener);
+      return () => {
+        document.removeEventListener("visibilitychange", listener);
+      };
+    },
     createAudio: () => {
       const audio = document.createElement("audio");
       audio.autoplay = true;
@@ -267,6 +303,14 @@ export class DuplexLine {
   #generation = 0;
   #idleTimer: unknown = null;
   #maxTimer: unknown = null;
+  // Line health (founder: "the voice starts to break").
+  #muted = false;
+  #sender: RTCRtpSender | null = null;
+  readonly #health = new LineHealth();
+  #healthTimer: unknown = null;
+  #graceTimer: unknown = null;
+  #reacquiring = false;
+  readonly #unsubscribe: (() => void)[] = [];
   // BACKCHANNEL
   readonly #policy: BackchannelPolicy;
   readonly #detector = new PauseDetector();
@@ -337,9 +381,24 @@ export class DuplexLine {
       peer.ontrack = (event) => {
         const [stream] = event.streams;
         if (stream !== undefined) audio.srcObject = stream;
+        // A slightly deeper playout buffer: words are delayed, not cut.
+        const receiver = event.receiver as
+          (RTCRtpReceiver & { jitterBufferTarget?: number | null }) | undefined;
+        if (receiver !== undefined && "jitterBufferTarget" in receiver) {
+          try {
+            receiver.jitterBufferTarget = PLAYOUT_BUFFER_MS;
+          } catch {
+            // Out of the browser's range: its own default stands.
+          }
+        }
       };
       for (const track of microphone.getTracks()) {
-        peer.addTrack(track, microphone);
+        const sender = peer.addTrack(track, microphone) as
+          RTCRtpSender | undefined;
+        if (track.kind === "audio" && sender !== undefined) {
+          this.#sender = sender;
+        }
+        this.#watchTrack(track);
       }
       const channel = peer.createDataChannel("oai-events");
       this.#channel = channel;
@@ -347,10 +406,7 @@ export class DuplexLine {
         this.#receive(message.data);
       };
       peer.onconnectionstatechange = () => {
-        const state = peer.connectionState;
-        if (state === "failed" || state === "disconnected") {
-          this.#fallback("NETWORK", null);
-        }
+        this.#onConnectionState(peer.connectionState);
       };
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
@@ -380,7 +436,122 @@ export class DuplexLine {
       this.#fallback("MAX_LENGTH", null);
     }, this.#credential.maxSessionMs);
     this.#startListening();
+    this.#sampleHealth();
+    const onDeviceChange = this.#env.onDeviceChange?.(() => {
+      void this.#reacquireMicrophone();
+    });
+    if (onDeviceChange !== undefined) this.#unsubscribe.push(onDeviceChange);
+    const onVisible = this.#env.onVisible?.(() => {
+      this.#onVisible();
+    });
+    if (onVisible !== undefined) this.#unsubscribe.push(onVisible);
     return true;
+  }
+
+  /**
+   * `failed` is final: hand over to the standard voice at once.
+   * `disconnected` is often a blip that ICE repairs by itself, so it gets
+   * a short grace; still disconnected after it, the line is handed over.
+   */
+  #onConnectionState(state: RTCPeerConnectionState): void {
+    if (state === "failed") {
+      this.#fallback("NETWORK", WEAK_LINE_NOTICE);
+      return;
+    }
+    if (state === "disconnected") {
+      if (!this.#connected) {
+        this.#fallback("NETWORK", null);
+        return;
+      }
+      if (this.#graceTimer !== null) return;
+      this.#graceTimer = this.#env.setTimeout(() => {
+        this.#graceTimer = null;
+        const now = this.#peer?.connectionState;
+        if (now !== "connected") this.#fallback("NETWORK", WEAK_LINE_NOTICE);
+      }, DISCONNECTED_GRACE_MS);
+      return;
+    }
+    if (state === "connected" && this.#graceTimer !== null) {
+      this.#env.clearTimeout(this.#graceTimer);
+      this.#graceTimer = null;
+    }
+  }
+
+  /** Packet loss, jitter and round trip, sampled while the line is up. */
+  #sampleHealth(): void {
+    const peer = this.#peer;
+    if (peer === null || typeof peer.getStats !== "function") return;
+    this.#healthTimer = this.#env.setTimeout(() => {
+      this.#healthTimer = null;
+      if (this.#over) return;
+      peer.getStats().then(
+        (report) => {
+          if (this.#over || this.#peer !== peer) return;
+          if (this.#health.observe(countersOf(report))) {
+            this.#fallback("NETWORK", WEAK_LINE_NOTICE);
+            return;
+          }
+          this.#sampleHealth();
+        },
+        () => {
+          if (!this.#over) this.#sampleHealth();
+        },
+      );
+    }, HEALTH_SAMPLE_MS);
+  }
+
+  /** A microphone track that ends (unplugged, taken by the system) is replaced. */
+  #watchTrack(track: MediaStreamTrack): void {
+    if (typeof track.addEventListener !== "function") return;
+    track.addEventListener("ended", () => {
+      if (!this.#over && this.#microphone?.getTracks().includes(track)) {
+        void this.#reacquireMicrophone();
+      }
+    });
+  }
+
+  /**
+   * A fresh microphone on the same line: the new track replaces the old
+   * one on the sender, so the conversation carries on without a new
+   * session. Mute is kept. If no microphone can be had, the line is
+   * handed to the standard voice, which says so plainly.
+   */
+  async #reacquireMicrophone(): Promise<void> {
+    const sender = this.#sender;
+    if (this.#over || this.#reacquiring || sender === null) return;
+    this.#reacquiring = true;
+    try {
+      const fresh = await this.#env.getMicrophone();
+      const [track] = fresh.getAudioTracks();
+      if (this.#over || track === undefined) {
+        for (const old of fresh.getTracks()) old.stop();
+        return;
+      }
+      track.enabled = !this.#muted;
+      await sender.replaceTrack(track);
+      const previous = this.#microphone;
+      this.#microphone = fresh;
+      this.#watchTrack(track);
+      for (const old of previous?.getTracks() ?? []) old.stop();
+    } catch {
+      this.#fallback("NETWORK", null);
+    } finally {
+      this.#reacquiring = false;
+    }
+  }
+
+  /** Back from the background: repair what broke while away. */
+  #onVisible(): void {
+    if (this.#over) return;
+    const state = this.#peer?.connectionState;
+    if (state === "failed" || state === "disconnected") {
+      this.#onConnectionState(state);
+      return;
+    }
+    const live = this.#microphone
+      ?.getAudioTracks()
+      .some((track) => track.readyState !== "ended");
+    if (live === false) void this.#reacquireMicrophone();
   }
 
   /** The person ended it. */
@@ -392,6 +563,7 @@ export class DuplexLine {
   }
 
   setMuted(muted: boolean): void {
+    this.#muted = muted;
     for (const track of this.#microphone?.getAudioTracks() ?? []) {
       track.enabled = !muted;
     }
@@ -1106,6 +1278,11 @@ export class DuplexLine {
     if (this.#idleTimer !== null) this.#env.clearTimeout(this.#idleTimer);
     if (this.#maxTimer !== null) this.#env.clearTimeout(this.#maxTimer);
     if (this.#meterTimer !== null) this.#env.clearTimeout(this.#meterTimer);
+    if (this.#healthTimer !== null) this.#env.clearTimeout(this.#healthTimer);
+    if (this.#graceTimer !== null) this.#env.clearTimeout(this.#graceTimer);
+    this.#healthTimer = null;
+    this.#graceTimer = null;
+    for (const unsubscribe of this.#unsubscribe.splice(0)) unsubscribe();
     this.#idleTimer = null;
     this.#maxTimer = null;
     this.#meterTimer = null;

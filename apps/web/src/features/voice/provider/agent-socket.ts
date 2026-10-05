@@ -26,6 +26,15 @@ import { z } from "zod";
 export const DEEPGRAM_AGENT_URL = "wss://agent.deepgram.com/v1/agent/converse";
 
 const KEEP_ALIVE_MS = 8_000;
+/** How often the outgoing queue is checked for a stalled line. */
+export const STALL_CHECK_MS = 500;
+/**
+ * Unsent audio, in seconds, at which the line counts as stalled. A socket
+ * whose network has gone quiet does not close for a minute or more; it
+ * just stops sending, and the person talks into nothing (founder: "it
+ * can't even hear me talk"). The browser's queue says so within seconds.
+ */
+export const STALL_AFTER_SECONDS = 2;
 /** Microphone frames kept while the agent applies its settings (~2 s). */
 const MAX_HELD_FRAMES = 256;
 const OPEN_TIMEOUT_MS = 10_000;
@@ -96,6 +105,7 @@ export class AgentSocket {
   private applied = false;
   private held: ArrayBuffer[] = [];
   private keepAlive: ReturnType<typeof setInterval> | null = null;
+  private stallWatch: ReturnType<typeof setInterval> | null = null;
   /** Set when this side closed the line, so its close is not a drop. */
   private closing = false;
 
@@ -223,6 +233,7 @@ export class AgentSocket {
         this.keepAlive ??= setInterval(() => {
           this.sendJson({ type: "KeepAlive" });
         }, KEEP_ALIVE_MS);
+        this.watchForStall(socket);
         this.emit("settings-applied");
         break;
       }
@@ -274,6 +285,28 @@ export class AgentSocket {
     }
   }
 
+  /** Whether the socket can carry audio right now. */
+  get open(): boolean {
+    return this.socket?.readyState === OPEN;
+  }
+
+  /**
+   * A line that stops draining is dropped and reported, so the interview
+   * above reconnects on the same thread within seconds instead of the
+   * person talking into a socket that will never deliver.
+   */
+  private watchForStall(socket: WebSocket): void {
+    if (this.stallWatch !== null) return;
+    const limit = this.options.input.sampleRate * 2 * STALL_AFTER_SECONDS;
+    this.stallWatch = setInterval(() => {
+      if (this.socket !== socket) return;
+      if (socket.readyState !== OPEN || socket.bufferedAmount > limit) {
+        this.drop(socket);
+        this.emit("disconnected", "stalled");
+      }
+    }, STALL_CHECK_MS);
+  }
+
   private drop(socket: WebSocket): void {
     this.stop();
     this.socket = null;
@@ -289,5 +322,7 @@ export class AgentSocket {
     this.held = [];
     if (this.keepAlive !== null) clearInterval(this.keepAlive);
     this.keepAlive = null;
+    if (this.stallWatch !== null) clearInterval(this.stallWatch);
+    this.stallWatch = null;
   }
 }

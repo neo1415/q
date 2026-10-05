@@ -1935,7 +1935,50 @@ if (inboundEmailConfig.inbound === undefined) {
   );
 }
 
+// Every pitch gets captions (R18). A short timer asks the provider for
+// captions on any READY pitch that has none and stores them once they are
+// generated, so a pitch published now has captions minutes later and the
+// pitches published before this existed catch up on their own. One pass
+// at a time, bounded, sequential; a pass that finds nothing makes no
+// provider call. Stream's generated captions carry no extra charge.
+const CAPTION_SWEEP_INTERVAL_MS = 90_000;
+const CAPTION_SWEEP_LIMIT = 25;
+let captionSweepRunning = false;
+const runCaptionSweep = async () => {
+  if (captionSweepRunning || !media.provider.capabilities.captions) return;
+  captionSweepRunning = true;
+  try {
+    const result = await media.sweepPitchCaptions({
+      limit: CAPTION_SWEEP_LIMIT,
+    });
+    if (result.examined > 0) {
+      logger.info(
+        {
+          examined: result.examined,
+          outcomes: result.outcomes,
+          errors: result.errors,
+        },
+        "pitch caption sweep",
+      );
+    }
+  } catch (error) {
+    logger.warn({ err: error }, "pitch caption sweep did not complete");
+  } finally {
+    captionSweepRunning = false;
+  }
+};
+const captionSweepFirst = setTimeout(() => {
+  void runCaptionSweep();
+}, 15_000);
+const captionSweepTimer = setInterval(() => {
+  void runCaptionSweep();
+}, CAPTION_SWEEP_INTERVAL_MS);
+captionSweepFirst.unref();
+captionSweepTimer.unref();
+
 app.addHook("onClose", async () => {
+  clearTimeout(captionSweepFirst);
+  clearInterval(captionSweepTimer);
   await database.close();
 });
 

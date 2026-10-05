@@ -19,6 +19,7 @@ import { announceQGestures } from "../q-swarm/q-gestures";
 import { storeVoicePreference, useVoicePreference } from "./voice-preference";
 import { deviceLocale } from "./device-locale";
 import { useVoiceSession } from "./use-voice-session";
+import { RECONNECTING_NOTICE, WEAK_LINE_NOTICE } from "./provider/line-health";
 import type {
   VoiceSessionClient,
   VoiceSessionEvents,
@@ -50,6 +51,12 @@ export type VoiceInterview = {
   readonly active: boolean;
   readonly voice: QVoiceChoice;
   readonly notice: string | null;
+  /**
+   * The line is being repaired: "Reconnecting…" or "Weak connection:
+   * switching to standard voice." Shown in `notice` too, so every surface
+   * that shows a notice says it instead of going silent.
+   */
+  readonly linkStatus?: string | null | undefined;
   /** Start (or restart with a different voice). */
   readonly talk: (input: {
     readonly thread: VoiceInterviewThread;
@@ -96,6 +103,8 @@ const RECONNECT_DELAYS_MS = [1_200, 3_000, 8_000] as const;
  * few seconds (seen live, 2026-09-24).
  */
 const STABLE_LINE_MS = 20_000;
+/** How long "switching to standard voice" stays once that voice is up. */
+const LINK_STATUS_LINGER_MS = 4_000;
 const GAVE_UP =
   "I couldn't get the line back. You can keep typing, or start voice again when you're ready.";
 
@@ -136,6 +145,7 @@ export function useVoiceInterview(
   const [settled, setVoice] = useState<QVoiceChoice | null>(null);
   const voice = settled ?? preferred;
   const [notice, setNotice] = useState<string | null>(null);
+  const [linkStatus, setLinkStatus] = useState<string | null>(null);
   const [turn, setTurn] = useState<QVoiceTurnState | null>(null);
   const [voiceSessionId, setVoiceSessionId] = useState<string | null>(null);
   /**
@@ -172,6 +182,7 @@ export function useVoiceInterview(
     }
     if (reason === "ended" || last === null || again === null) {
       reconnectAttempts.current = 0;
+      setLinkStatus(null);
       setActive(false);
       events.onEnded?.(reason);
       return;
@@ -180,12 +191,15 @@ export function useVoiceInterview(
     if (delay === undefined) {
       // Out of tries. Say so once, in Q's own words, and stop.
       reconnectAttempts.current = 0;
+      setLinkStatus(null);
       setActive(false);
       setNotice(GAVE_UP);
       events.onEnded?.(reason);
       return;
     }
     reconnectAttempts.current += 1;
+    // A calm word instead of silence while the line comes back.
+    setLinkStatus(RECONNECTING_NOTICE);
     // Silent: a deploy of the Q API or a network blip is picked back up
     // before the person needs to know; only giving up is said (HARDEN P0).
     // `talk` clears the notice as it starts and sets its own on failure.
@@ -224,6 +238,9 @@ export function useVoiceInterview(
     // shown once the standard line is up (talk clears the notice first).
     onFallback: (notice) => {
       duplexOff.current = true;
+      // A weak line is said at once; the standard voice is on its way.
+      const weak = notice === WEAK_LINE_NOTICE;
+      if (weak) setLinkStatus(WEAK_LINE_NOTICE);
       const last = lastStart.current;
       const again = talkRef.current;
       if (last === null || again === null) {
@@ -236,7 +253,7 @@ export function useVoiceInterview(
         resume: true,
         duplex: false,
       }).then(() => {
-        if (notice !== null) setNotice(notice);
+        if (notice !== null && !weak) setNotice(notice);
       });
     },
     onError: (message) => {
@@ -248,6 +265,22 @@ export function useVoiceInterview(
   useEffect(() => {
     clientRef.current = client;
   });
+
+  // The line is back: "Reconnecting…" goes at once; the switch to the
+  // standard voice stays a moment longer so it can be read.
+  const lineUp = client.connected;
+  useEffect(() => {
+    if (!lineUp || linkStatus === null) return;
+    const timer = setTimeout(
+      () => {
+        setLinkStatus(null);
+      },
+      linkStatus === RECONNECTING_NOTICE ? 0 : LINK_STATUS_LINGER_MS,
+    );
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [lineUp, linkStatus]);
 
   const talk = useCallback<VoiceInterview["talk"]>(
     async ({
@@ -320,6 +353,7 @@ export function useVoiceInterview(
     reconnectAttempts.current = 0;
     upSince.current = null;
     duplexOff.current = false;
+    setLinkStatus(null);
     await client.end();
   }, [client]);
 
@@ -426,11 +460,15 @@ export function useVoiceInterview(
     client,
     active,
     voice,
-    notice,
+    notice: linkStatus ?? notice,
+    linkStatus,
     talk,
     end,
     chooseVoice,
-    clearNotice: () => setNotice(null),
+    clearNotice: () => {
+      setNotice(null);
+      setLinkStatus(null);
+    },
     turn,
   };
 }

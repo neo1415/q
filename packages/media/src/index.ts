@@ -117,9 +117,11 @@ export {
   createGetPitchTranscript,
   createGetPitchTranscriptByPitch,
   createMayPlayPitch,
+  createSweepPitchCaptions,
   createSyncPitchTranscript,
   PITCH_TRANSCRIPT_LANGUAGE,
   type PitchTranscriptView,
+  type SweepPitchCaptionsResult,
   type SyncPitchTranscriptOutcome,
 } from "./application/transcript-use-cases.js";
 export {

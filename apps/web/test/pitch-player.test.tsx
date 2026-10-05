@@ -653,6 +653,66 @@ describe("R36 · poster first, on request", () => {
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("shows captions during muted autoplay, and the toggle hides and restores them", async () => {
+    // jsdom has no TextTrackList: model the element's list from its
+    // <track> children, one stable TextTrack per element.
+    const tracks = new WeakMap<Element, { mode: string }>();
+    const descriptor = Object.getOwnPropertyDescriptor(
+      HTMLMediaElement.prototype,
+      "textTracks",
+    );
+    Object.defineProperty(HTMLMediaElement.prototype, "textTracks", {
+      configurable: true,
+      get(this: HTMLMediaElement) {
+        return Array.from(this.querySelectorAll("track"), (element) => {
+          const existing = tracks.get(element);
+          if (existing !== undefined) return existing;
+          const created = { mode: "disabled" };
+          tracks.set(element, created);
+          return created;
+        });
+      },
+    });
+    try {
+      const authorize = vi.fn(() =>
+        Promise.resolve(authorization({ mediaAssetId: FIRST_PITCH_ID })),
+      );
+      const { container } = render(
+        <PitchPlayer
+          company={company(1)}
+          policy="ACTIVE"
+          authorize={authorize}
+          reducedMotion={false}
+          muted
+        />,
+      );
+      await waitFor(() =>
+        expect(container.querySelector("track")).not.toBeNull(),
+      );
+      const video = videoIn(container);
+      const element = container.querySelector("track");
+      if (element === null) throw new Error("no track");
+      expect(video.muted).toBe(true);
+      await waitFor(() => expect(tracks.get(element)?.mode).toBe("showing"));
+      expect(element.hasAttribute("default")).toBe(true);
+      const toggle = screen.getByRole("button", { name: "Captions" });
+      await userEvent.click(toggle);
+      expect(tracks.get(element)?.mode).toBe("hidden");
+      await userEvent.click(toggle);
+      expect(tracks.get(element)?.mode).toBe("showing");
+    } finally {
+      if (descriptor === undefined) {
+        Reflect.deleteProperty(HTMLMediaElement.prototype, "textTracks");
+      } else {
+        Object.defineProperty(
+          HTMLMediaElement.prototype,
+          "textTracks",
+          descriptor,
+        );
+      }
+    }
+  });
+
   it("frames a landscape narrated pitch whole, without cropping it", () => {
     const narrated = company(1);
     const { container } = render(

@@ -268,6 +268,21 @@ export type PitchTranscriptRepository = {
     executor: DatabaseExecutor,
     mediaAssetId: MediaAssetId,
   ) => Promise<string | null>;
+  /**
+   * The caption backlog, across tenants, for the platform's own sweep:
+   * live, current, READY pitches with a provider asset whose captions are
+   * not requested or still pending and that hold no transcript yet. Oldest
+   * first, at most `limit`. Identifiers only; it grants nothing.
+   */
+  readonly listCaptionBacklog?: (
+    executor: DatabaseExecutor,
+    limit: number,
+  ) => Promise<
+    readonly {
+      readonly tenantId: TenantId;
+      readonly mediaAssetId: MediaAssetId;
+    }[]
+  >;
 };
 
 /**

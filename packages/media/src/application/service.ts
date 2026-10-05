@@ -27,6 +27,7 @@ import {
   createGetPitchTranscript,
   createGetPitchTranscriptByPitch,
   createMayPlayPitch,
+  createSweepPitchCaptions,
   createSyncPitchTranscript,
 } from "./transcript-use-cases.js";
 import {
@@ -76,6 +77,8 @@ export type MediaService = {
   readonly mayPlayPitch: ReturnType<typeof createMayPlayPitch>;
   /** Trusted: advance one pitch's transcript a step. Never a browser route. */
   readonly syncPitchTranscript: ReturnType<typeof createSyncPitchTranscript>;
+  /** Trusted: one pass over every pitch still without captions (R18). */
+  readonly sweepPitchCaptions: ReturnType<typeof createSweepPitchCaptions>;
   /**
    * A verified provider report, applied under the platform's authority
    * (CQ-MEDIA-012). Reached only by a webhook route that has checked the
@@ -153,6 +156,7 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     getPitchTranscript: createGetPitchTranscript(dependencies),
     getPitchTranscriptByPitch: createGetPitchTranscriptByPitch(dependencies),
     syncPitchTranscript: createSyncPitchTranscript(dependencies),
+    sweepPitchCaptions: createSweepPitchCaptions(dependencies),
     mayPlayPitch: createMayPlayPitch(dependencies),
     applyProviderStatusReport: createApplyProviderStatusReport(dependencies),
     setPitchDetails: createSetPitchDetails(dependencies),

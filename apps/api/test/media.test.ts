@@ -1018,6 +1018,27 @@ describe("GET /v1/companies/:companyId/pitch/:mediaAssetId/{transcript,captions.
     await app.close();
   });
 
+  it("serves captions the provider finished since the last sweep on the same track read", async () => {
+    const none = { status: "NONE", mediaAssetId: ASSET_ID, tenantId: TENANT };
+    let synced = false;
+    const service = fakeService({
+      getPitchTranscript: () =>
+        Promise.resolve((synced ? available : none) as never),
+      syncPitchTranscript: () => {
+        synced = true;
+        return Promise.resolve("AVAILABLE");
+      },
+    }).service;
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const track = await app.inject({
+      method: "GET",
+      url: `${transcriptUrl}/captions.vtt`,
+    });
+    expect(track.statusCode).toBe(200);
+    expect(track.body).toBe(VTT);
+    await app.close();
+  });
+
   it("is the same 404 for a pitch the caller may not play", async () => {
     const app = buildApp({
       principal: PRINCIPAL,
