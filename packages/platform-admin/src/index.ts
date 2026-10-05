@@ -524,4 +524,12 @@ export {
 } from "./reviews.js";
 // end ADMIN-3 block
 
+// P5 block: brand theming
+export {
+  createBrandThemeStore,
+  type BrandTheme,
+  type BrandThemeStore,
+} from "./brand-theme.js";
+// end P5 block
+
 export const PACKAGE_NAME = "@capital-q/platform-admin" as const;

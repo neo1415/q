@@ -233,6 +233,14 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/admin-billing.ts POST ADMIN_BILLING_OVERRIDE_PATH":
     OPERATIONS_CONSOLE,
   "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_PATH": OPERATIONS_CONSOLE,
+  // P5 block: brand theming. The colour the app is painted in is read by
+  // the shell itself; changing it is the console's alone.
+  "api/http/brand-theme.ts GET BRAND_THEME_PATH": exempt(
+    "the app shell's own paint (the brand colour in effect for the tenant), read on every page; not a person's action",
+  ),
+  "api/http/brand-theme.ts GET ADMIN_BRAND_THEME_PATH": OPERATIONS_CONSOLE,
+  "api/http/brand-theme.ts POST ADMIN_BRAND_THEME_PATH": OPERATIONS_CONSOLE,
+  // end P5 block
   // Platform model cost per tenant and person: the operators' console.
   "api/http/admin-billing.ts GET ADMIN_BILLING_USAGE_PATH": OPERATIONS_CONSOLE,
   "api/http/admin-billing.ts GET ADMIN_BILLING_FEES_EXPORT_PATH":
@@ -672,6 +680,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/g/[publicId]/embed": PUBLIC,
   // ADMIN block
   "/admin/accounts": OPERATIONS_CONSOLE,
+  "/admin/brand": OPERATIONS_CONSOLE,
   "/admin/accounts/[userId]": OPERATIONS_CONSOLE,
   "/admin/organisations": OPERATIONS_CONSOLE,
   "/admin/organisations/[organisationId]": OPERATIONS_CONSOLE,
@@ -732,6 +741,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/daily/[editionId]": cap("tool.get_q_daily"),
   "/settings/memory": cap("navigate.MEMORY"),
   "/settings/usage": cap("navigate.USAGE"),
+  "/settings/billing": cap("tool.get_my_plan"),
   // meetfix-57: the reconnect link in Q's answers and notices; it only
   // redirects to Settings (navigate.SETTINGS), where Q already takes them.
   "/settings/reconnect/google": cap("navigate.SETTINGS"),
@@ -839,7 +849,9 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  * declared once in @capital-q/app-actions, which generates its route and
  * its Q tool; this count is the legacy that has not migrated yet.
  */
-const LEGACY_MUTATION_ROUTES_MAX = 92;
+// P5 (2026-10-05): 92 counted the operations console's 15 writes, which
+// ADR 0040 keeps exempt; they are now excluded by classification instead.
+const LEGACY_MUTATION_ROUTES_MAX = 77;
 
 /**
  * DUPLEX (flag CQ_VOICE_REALTIME): the full-duplex line's own transport —
@@ -900,7 +912,10 @@ describe("every route and page is something Q can do, or exempt with a reason (R
     const handWritten = routeKeys().filter(
       (key) =>
         / (POST|PUT|PATCH|DELETE) /.test(key) &&
-        !Q_TRANSPORT_NOT_ACTIONS.has(key),
+        !Q_TRANSPORT_NOT_ACTIONS.has(key) &&
+        // ADR 0040: the operations console stays exempt (never Q's to act
+        // on), so its writes are not legacy waiting to migrate.
+        ROUTE_COVERAGE[key] !== OPERATIONS_CONSOLE,
     );
     expect(
       handWritten.length,

@@ -1,22 +1,32 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import type { ReactNode } from "react";
 
-import { getQDailyPreferences } from "@capital-q/api-client";
-import { buttonClassName } from "@capital-q/ui/button";
+import { getMyPlan, getQDailyPreferences } from "@capital-q/api-client";
 
 import {
   PageContainer,
   PageHeader,
-  PageSection,
 } from "@/components/app-shell/page-container";
+import { getSessionUser } from "@/auth/session";
+import { adminContext } from "@/features/admin/admin-context";
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
+import { SignOutButton } from "@/features/auth";
 import { GmailConnection } from "@/features/integrations/gmail-connection";
 import { QEmailAddress } from "@/features/integrations/q-email-address";
 import { QMotionToggle } from "@/features/q-aperture";
 import { DailySetting } from "@/features/daily/daily-setting";
-import { qApiSession, resolveQStanding } from "@/features/q/context";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+  resolveQStanding,
+} from "@/features/q/context";
 import { PersonalitySetting } from "@/features/settings/personality-setting";
+import {
+  RowLink,
+  SettingRow,
+  SettingsCard,
+  SettingsIndex,
+} from "@/features/settings/settings-ui";
 import {
   ListeningSetting,
   VoiceSetting,
@@ -25,15 +35,25 @@ import { PushSetting } from "@/features/work/push-setting";
 
 export const metadata: Metadata = { title: "Settings" };
 
+const SECTIONS = [
+  { id: "account", label: "Account" },
+  { id: "appearance", label: "Appearance" },
+  { id: "q", label: "Q" },
+  { id: "notifications", label: "Notifications" },
+  { id: "connections", label: "Connections" },
+  { id: "billing", label: "Plan and billing" },
+  { id: "privacy", label: "Privacy" },
+] as const;
+
 /**
- * Settings (R28): how Capital Q looks and how Q behaves on this device.
+ * Settings (R28; P5 redesign): one card per group, an index beside them.
  *
- * Every choice here is a per-device preference the browser keeps (theme,
- * Q motion, Q's voice, its listening sounds). Connections (BIZ-007: Google) read their own status after
- * the page opens; Q's personality and The Q Daily are kept by Capital Q
- * and read in parallel as the page renders. Notifications (AUTO): a push on this device and email
- * for what needs them; in-app notices always show. The page offers no
- * switch that does nothing.
+ * Per-device choices (theme, Q motion, Q's voice, listening sounds) are kept
+ * by the browser; Q's personality, The Q Daily and the plan are kept by
+ * Capital Q and read in parallel as the page renders. Connections (BIZ-007:
+ * Google) read their own status after the page opens. Notifications (AUTO):
+ * a push on this device and email for what needs them; in-app notices
+ * always show. Every control here does something; none is decoration.
  */
 export default async function SettingsPage({
   searchParams,
@@ -44,31 +64,92 @@ export default async function SettingsPage({
   const google = params["google"];
   // Who Q is with them is kept by Capital Q, so it follows them to every
   // device (founder direction 2026-09-30).
-  const session = await qApiSession();
-  const [standing, daily] = await Promise.all([
+  const [session, billingSession] = await Promise.all([
+    qApiSession(),
+    apiSession(),
+  ]);
+  const [standing, daily, user, context, plan, admin] = await Promise.all([
     resolveQStanding(),
     // DAILY: how The Q Daily comes; null when the Q API could not be asked.
     session === null
       ? Promise.resolve(null)
       : getQDailyPreferences(session).catch(() => null),
+    getSessionUser(),
+    resolveOwnContext(),
+    billingSession === null
+      ? Promise.resolve(null)
+      : getMyPlan(billingSession).catch(() => null),
+    adminContext().catch(() => null),
   ]);
+  const organisation =
+    context.kind === "NONE"
+      ? null
+      : {
+          name: context.label,
+          role: context.kind === "FOUNDER" ? "Founder" : "Investor",
+        };
+  const canBrand = admin?.can("flags.write") === true;
   return (
-    <PageContainer width="reading">
+    <PageContainer>
       <PageHeader title="Settings" />
-      <div className="flex flex-col gap-10">
-        <PageSection id="appearance" title="Appearance">
-          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
+        <SettingsIndex sections={SECTIONS} />
+        <div className="flex max-w-(--cq-layout-reading) min-w-0 flex-col gap-4">
+          <SettingsCard id="account" title="Account">
+            <SettingRow term="Profile" hint="What investors and founders see">
+              <RowLink href="/profile">Edit profile</RowLink>
+            </SettingRow>
+            <SettingRow
+              term="Organisation"
+              hint={
+                organisation === null
+                  ? "Set up when Q onboards you"
+                  : `You are here as ${organisation.role.toLowerCase()}`
+              }
+            >
+              <span className="cq-body-sm text-(--cq-text-secondary)">
+                {organisation?.name ?? "Not set yet"}
+              </span>
+            </SettingRow>
+            <SettingRow term="Email">
+              <span className="cq-body-sm break-all text-(--cq-text-secondary)">
+                {user?.email ?? "Not available"}
+              </span>
+            </SettingRow>
+            <SettingRow term="Password">
+              <RowLink href="/auth/update-password">Change</RowLink>
+            </SettingRow>
+            <SettingRow term="This device" hint="Ends your session here">
+              <SignOutButton />
+            </SettingRow>
+          </SettingsCard>
+
+          <SettingsCard
+            id="appearance"
+            title="Appearance"
+            description="How Capital Q looks on this device."
+          >
             <SettingRow term="Theme">
               <ThemeToggle />
             </SettingRow>
-            <SettingRow term="Q motion">
+            <SettingRow term="Q motion" hint="How much Q's light moves">
               <QMotionToggle size="touch" />
             </SettingRow>
-          </dl>
-        </PageSection>
+            {canBrand ? (
+              <SettingRow
+                term="Brand colour"
+                hint="For everyone on Capital Q · admins only"
+              >
+                <RowLink href="/admin/brand">Customise</RowLink>
+              </SettingRow>
+            ) : null}
+          </SettingsCard>
 
-        <PageSection id="voice" title="Q's voice">
-          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+          <SettingsCard
+            id="q"
+            title="Q"
+            description="How Q sounds and works with you."
+          >
             <SettingRow term="Voice">
               <VoiceSetting />
             </SettingRow>
@@ -78,29 +159,7 @@ export default async function SettingsPage({
             <SettingRow term="Personality">
               <PersonalitySetting initial={standing?.personality ?? "AUTO"} />
             </SettingRow>
-          </dl>
-        </PageSection>
-
-        <PageSection id="notifications" title="Notifications">
-          <PushSetting />
-        </PageSection>
-
-        <PageSection id="q-work" title="Q's work">
-          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            <SettingRow term="Outreach and stand-in">
-              <Link
-                href="/work"
-                className={buttonClassName("secondary", "compact")}
-              >
-                Open
-              </Link>
-            </SettingRow>
-          </dl>
-        </PageSection>
-
-        <PageSection id="q-daily" title="The Q Daily">
-          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            <SettingRow term="Your newspaper">
+            <SettingRow term="The Q Daily" hint="Your morning newspaper">
               {daily === null ? (
                 <p className="cq-body-sm text-(--cq-text-secondary)">
                   These choices couldn&apos;t load. Reload in a moment.
@@ -109,48 +168,27 @@ export default async function SettingsPage({
                 <DailySetting initial={daily} />
               )}
             </SettingRow>
-          </dl>
-        </PageSection>
-        {/* BILLING block (ADR 0034) */}
-        <PageSection id="plan" title="Plan">
-          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            <SettingRow term="Your plan and usage">
-              <Link
-                href="/settings/plan"
-                className={buttonClassName("secondary", "compact")}
-              >
-                Open
-              </Link>
+            <SettingRow
+              term="Outreach and stand-in"
+              hint="What Q may do on your behalf"
+            >
+              <RowLink href="/work">Open</RowLink>
             </SettingRow>
-            <SettingRow term="What Q used for you">
-              <Link
-                href="/settings/usage"
-                className={buttonClassName("secondary", "compact")}
-              >
-                Usage
-              </Link>
-            </SettingRow>
-          </dl>
-        </PageSection>
-        {/* end BILLING block */}
+          </SettingsCard>
 
-        <PageSection id="memory" title="Q's memory">
-          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            <SettingRow term="What Q remembers">
-              <Link
-                href="/settings/memory"
-                className={buttonClassName("secondary", "compact")}
-              >
-                Review
-              </Link>
-            </SettingRow>
-          </dl>
-        </PageSection>
+          <SettingsCard
+            id="notifications"
+            title="Notifications"
+            description="In-app notices always show."
+          >
+            <div className="px-5 py-4">
+              <PushSetting />
+            </div>
+          </SettingsCard>
 
-        {/* meetfix-57: "Settings → Connections", where Q's reconnect link lands. */}
-        <PageSection id="connections" title="Connections">
-          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            <SettingRow term="Google (Gmail, Calendar, Meet)">
+          {/* meetfix-57: "Settings → Connections", where Q's reconnect link lands. */}
+          <SettingsCard id="connections" title="Connections">
+            <SettingRow term="Google" hint="Gmail, Calendar and Meet">
               <GmailConnection
                 outcome={typeof google === "string" ? google : undefined}
                 reconnect={params["reconnect"] === "google"}
@@ -159,26 +197,41 @@ export default async function SettingsPage({
             <SettingRow term="Your Q email address">
               <QEmailAddress />
             </SettingRow>
-          </dl>
-        </PageSection>
+          </SettingsCard>
+
+          {/* BILLING block (ADR 0034) */}
+          <SettingsCard id="billing" title="Plan and billing">
+            <SettingRow
+              term="Plan"
+              hint={
+                plan === null
+                  ? "Open Billing to see your plan"
+                  : plan.source === "LAUNCH_DEFAULT"
+                    ? `${plan.plan.name} · free while Capital Q launches`
+                    : plan.plan.name
+              }
+            >
+              <RowLink href="/settings/billing">Billing</RowLink>
+            </SettingRow>
+            <SettingRow term="Allowances" hint="What your plan includes">
+              <RowLink href="/settings/plan">Open</RowLink>
+            </SettingRow>
+            <SettingRow term="Usage" hint="What Q used for you this month">
+              <RowLink href="/settings/usage">Usage</RowLink>
+            </SettingRow>
+          </SettingsCard>
+          {/* end BILLING block */}
+
+          <SettingsCard id="privacy" title="Privacy">
+            <SettingRow
+              term="What Q remembers"
+              hint="See, correct or forget it"
+            >
+              <RowLink href="/settings/memory">Review</RowLink>
+            </SettingRow>
+          </SettingsCard>
+        </div>
       </div>
     </PageContainer>
-  );
-}
-
-function SettingRow({
-  term,
-  children,
-}: {
-  readonly term: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5 py-4 sm:flex-row sm:items-center sm:gap-6">
-      <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-40">
-        {term}
-      </dt>
-      <dd className="min-w-0 flex-1">{children}</dd>
-    </div>
   );
 }

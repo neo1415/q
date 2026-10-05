@@ -128,6 +128,11 @@ import {
   type OrganisationRoutesDependencies,
 } from "./http/organisations.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
+// P5 block: brand theming
+import type { BrandThemeStore } from "@capital-q/platform-admin";
+
+import { registerBrandThemeRoutes } from "./http/brand-theme.js";
+// end P5 block
 // BILLING block (ADR 0034)
 import {
   registerAdminBillingRoutes,
@@ -222,6 +227,8 @@ export type ApiModules = {
     NetworkInterestRoutesDependencies["interests"] | undefined;
   /** Capital Q's admin console. Absent: those routes do not register. */
   readonly admin?: AdminRoutesDependencies["admin"] | undefined;
+  /** P5: brand colour; registers only alongside `admin`. */
+  readonly brand?: BrandThemeStore | undefined;
   // ADMIN block (ADR 0033)
   readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
   readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
@@ -584,6 +591,16 @@ export function createApp(
     }
     // end ADMIN-3 block
     // BILLING block
+    // P5 block: brand theming
+    if (modules.brand !== undefined) {
+      registerBrandThemeRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        admin: modules.admin,
+        brand: modules.brand,
+      });
+    }
+    // end P5 block
     if (modules.adminBilling !== undefined) {
       registerAdminBillingRoutes(app, {
         authenticator: security.authenticator,
