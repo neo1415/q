@@ -33,6 +33,26 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
       y: Number(f.dataset["y"]) * (small ? 0.42 : 1),
       r: Number(f.dataset["r"]),
     }));
+    const wrap = section.querySelector<HTMLElement>(".wrap");
+    const column = ledeA?.closest<HTMLElement>(".swap-lede")?.parentElement;
+    const field = section.querySelector<HTMLElement>(".field");
+    // Both ledes hold one cell (no layout shift when they swap). The page
+    // was approved with the shorter one centred on its own, so the block
+    // is nudged by transform to where its own height would centre it:
+    // the text column alone beside the field, everything when stacked.
+    const centre = (flip: boolean) => {
+      if (!ledeA || !ledeB || !wrap || !column || !field) return;
+      const hA = ledeA.offsetHeight;
+      const hB = ledeB.offsetHeight;
+      const nudge = (Math.max(hA, hB) - (flip ? hB : hA)) / 2;
+      const stacked = field.offsetTop >= column.offsetTop + column.offsetHeight;
+      wrap.style.transform = stacked && nudge ? `translateY(${nudge}px)` : "";
+      // Stacked, the field sits right under the shorter lede, as approved.
+      field.style.transform =
+        stacked && nudge ? `translateY(${-2 * nudge}px)` : "";
+      column.style.transform =
+        !stacked && nudge ? `translateY(${nudge}px)` : "";
+    };
     let flipped: boolean | null = null;
     let last = -1;
     let raf = 0;
@@ -77,6 +97,7 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
         ledeB?.classList.toggle("off", !flip);
         ledeA?.setAttribute("aria-hidden", String(flip));
         ledeB?.setAttribute("aria-hidden", String(!flip));
+        centre(flip);
       }
     };
     // One read and a few transform writes per frame at most; outside the
@@ -90,6 +111,8 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
       update();
     };
     const onResize = () => {
+      flipped = null;
+      last = -1;
       if (raf === 0) raf = requestAnimationFrame(update);
     };
     update();

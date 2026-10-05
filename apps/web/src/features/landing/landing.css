@@ -634,6 +634,7 @@
 /* The swap is instant, as approved; only which one shows changes. */
 .lp .swap-lede .lede {
   grid-area: 1 / 1;
+  align-self: start;
   transition: none;
 }
 .lp .swap-lede .lede.off {
