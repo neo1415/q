@@ -121,7 +121,7 @@ export function ProfileFindings({
   /** Inside the Signals card, which already heads and explains it. */
   readonly bare?: boolean | undefined;
 }) {
-  const { askAbout } = useGlobalQ();
+  const { askNow } = useGlobalQ();
   const headingId = `found-${subjectLabel.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <section
@@ -206,9 +206,7 @@ export function ProfileFindings({
                 <button
                   type="button"
                   className={buttonClassName("quiet", "regular", "-ml-4")}
-                  onClick={() =>
-                    askAbout(findingQuestion(subjectLabel, finding))
-                  }
+                  onClick={() => askNow(findingQuestion(subjectLabel, finding))}
                   aria-label={`Ask Q about: ${FINDING_LABELS[finding.key].toLowerCase()}`}
                 >
                   Ask Q about this
@@ -276,8 +274,8 @@ export type SignalsSubject = {
  * The profile's right rail (founder design 2026-09-28): one card, two
  * parts. What Q found on public pages (never the profile's value until the
  * person confirms it), and what Capital Q verified claim by claim. Q itself
- * is always one tap away in the dock, so the rail carries no "ask Q" box. Every button opens something real: Q with a draft
- * the person edits or sends, or the verification page for a company.
+ * is always one tap away in the dock, so the rail carries no "ask Q" box. Every button opens something real: Q, already
+ * answering the question (one tap runs it, C8), or the verification page for a company.
  */
 export function SignalsAndVerification({
   subjects,
@@ -296,7 +294,7 @@ export function SignalsAndVerification({
   /** Minted by the server render, so a double press is the same request. */
   readonly verificationRequestKey?: string | null | undefined;
 }) {
-  const { askAbout } = useGlobalQ();
+  const { askNow } = useGlobalQ();
   const primary = subjects[0];
   const loading = subjects.some((s) => s.findings.status === "LOADING");
   const read = subjects.flatMap((subject) =>
@@ -372,7 +370,7 @@ export function SignalsAndVerification({
         <button
           type="button"
           className={buttonClassName("quiet", "compact", "-ml-2 self-start")}
-          onClick={() => askAbout(lookDraft)}
+          onClick={() => askNow(lookDraft)}
           data-signals-look
         >
           Ask Q to look
@@ -467,7 +465,7 @@ export function SignalsAndVerification({
             type="button"
             className={buttonClassName("quiet", "compact", "-ml-2 self-start")}
             onClick={() =>
-              askAbout(
+              askNow(
                 "How does verification work on Capital Q, and what can be verified for my organisation?",
               )
             }

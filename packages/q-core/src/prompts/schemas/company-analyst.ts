@@ -442,6 +442,61 @@ export type CompanyAnalystV15Result = z.infer<
 >;
 export const COMPANY_ANALYST_V15_SCHEMA_VERSION = 15;
 
+/**
+ * v17 (founder brief 2026-10-05, C1-C5; ADR 0051): "top three", a
+ * comparison or a piece of research comes back as answer cards the page
+ * lays out, not as a Markdown table or a PDF. The model reads; code
+ * counts: each measure's level is the model's reading of the evidence
+ * against what the person declared, and Capital Q computes the fit out of
+ * 10 and the order from those levels. No number is written here.
+ */
+export const ANSWER_CARDS_GUIDANCE =
+  'Fill when the answer is a set of things to see together: a ranked "top N" of companies or investors (RANKED, 1-10 cards), two to four things compared (SIDE_BY_SIDE, the same measures on every card, in the order asked) or the parts of a piece of research (RESEARCH, 2-5 cards, no measures). Else null. Never write a score, rank or percentage: give each measure a level and Capital Q computes the fit and the order. A level is how well what the evidence shows fits what the person declared (their mandate or their goal), never a verdict on the business; with no evidence the level is UNKNOWN. Reasons: up to three short plain sentences, evidence first. said: one short spoken sentence about that card, naming it. The answer text stays a short spoken summary; never repeat the cards as a table.';
+
+export const ModelAnswerCardSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    line: z.string().trim().max(140).nullable().default(null),
+    reasons: z.array(z.string().trim().min(1).max(160)).min(1).max(3),
+    measures: z
+      .array(
+        z
+          .object({
+            label: z.string().trim().min(1).max(40),
+            level: z.enum(["STRONG", "GOOD", "PARTIAL", "UNKNOWN"]),
+            value: z.string().trim().max(80).nullable().default(null),
+          })
+          .strict(),
+      )
+      .max(8)
+      .default([]),
+    view: z.string().trim().max(120).nullable().default(null),
+    said: z.string().trim().max(300).nullable().default(null),
+    citations: z.array(z.string().trim().min(1).max(20)).max(20).default([]),
+  })
+  .strict();
+export type ModelAnswerCard = z.infer<typeof ModelAnswerCardSchema>;
+
+export const ModelAnswerCardsSchema = z
+  .object({
+    shape: z.enum(["RANKED", "SIDE_BY_SIDE", "RESEARCH"]),
+    title: z.string().trim().min(1).max(120),
+    cards: z.array(ModelAnswerCardSchema).min(1).max(10),
+    followUps: z.array(z.string().trim().min(1).max(120)).max(3).default([]),
+  })
+  .strict()
+  .describe(ANSWER_CARDS_GUIDANCE);
+export type ModelAnswerCards = z.infer<typeof ModelAnswerCardsSchema>;
+
+export const CompanyAnalystV17ResultSchema =
+  CompanyAnalystV15ResultSchema.extend({
+    answerCards: ModelAnswerCardsSchema.nullable().default(null),
+  }).strict();
+export type CompanyAnalystV17Result = z.infer<
+  typeof CompanyAnalystV17ResultSchema
+>;
+export const COMPANY_ANALYST_V17_SCHEMA_VERSION = 17;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

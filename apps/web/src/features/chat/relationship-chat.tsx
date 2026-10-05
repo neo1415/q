@@ -123,7 +123,7 @@ export function RelationshipChat({
   readonly headerEnd?: ReactNode | undefined;
 }) {
   const [attachOpen, setAttachOpen] = useState(false);
-  const { askAbout } = useGlobalQ();
+  const { askNow } = useGlobalQ();
   const [messages, setMessages] = useState<ChatMessageDto[]>(
     () => initial?.messages.slice() ?? [],
   );
@@ -237,7 +237,7 @@ export function RelationshipChat({
   };
 
   const invokeQ = (question: string) => {
-    askAbout(
+    askNow(
       question.length > 0
         ? question
         : `Summarise my chat with ${counterpart}: what's outstanding, and what should I say next?`,

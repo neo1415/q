@@ -10,14 +10,14 @@ import { useGlobalQ } from "@/components/app-shell/global-q";
  * list itself carries no score.
  */
 export function AskQAboutFit({ name }: { readonly name: string }) {
-  const { askAbout } = useGlobalQ();
+  const { askNow } = useGlobalQ();
   return (
     <Button
       variant="quiet"
       size="compact"
       className="min-h-11 self-start"
       onClick={() =>
-        askAbout(
+        askNow(
           `How well does ${name} fit my raise, from what they have declared publicly? What is unknown?`,
         )
       }

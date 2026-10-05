@@ -71,7 +71,12 @@ vi.mock("../src/features/profile/profile-actions", () => ({
   saveInvestorFieldAction: vi.fn(),
 }));
 vi.mock("@/components/app-shell/global-q", () => ({
-  useGlobalQ: () => ({ open: false, setOpen: vi.fn(), askAbout }),
+  useGlobalQ: () => ({
+    open: false,
+    setOpen: vi.fn(),
+    askAbout,
+    askNow: askAbout,
+  }),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh }),

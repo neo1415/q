@@ -1,3 +1,4 @@
+import { answerCardsBlock, type ModelAnswerCardsLike } from "./answer-cards.js";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -66,6 +67,8 @@ export type AnalystResultLike = {
   readonly contradictions?: readonly string[] | undefined;
   readonly clarifyingQuestions?:
     readonly { readonly question: string }[] | undefined;
+  /** v17: things to see together, already schema-checked (ADR 0051). */
+  readonly answerCards?: ModelAnswerCardsLike | null | undefined;
   /** v12: named things side by side, already schema-checked. */
   readonly comparisonCards?:
     | {
@@ -308,7 +311,13 @@ export function analystResultBlocks(input: {
 
   // The cards lead: they are the answer's shape when the person compared
   // things. Copied as written, in the order written; nothing here sorts.
-  const cards = input.result.comparisonCards;
+  // v17's answer cards replace v12's comparison cards when both came.
+  const answer =
+    input.result.answerCards === null || input.result.answerCards === undefined
+      ? null
+      : answerCardsBlock(input.result.answerCards);
+  if (answer !== null) blocks.push(answer);
+  const cards = answer === null ? input.result.comparisonCards : null;
   if (cards !== null && cards !== undefined && cards.items.length >= 2) {
     blocks.push({
       kind: "COMPARISON_CARDS",

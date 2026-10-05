@@ -39,7 +39,7 @@ export function SavedCompanies({
 }: {
   readonly companies: readonly SavedCompanyRow[];
 }) {
-  const { askAbout } = useGlobalQ();
+  const { askNow } = useGlobalQ();
   const [selected, setSelected] = useState<readonly string[]>([]);
   const names = companies
     .filter((company) => selected.includes(company.companyId))
@@ -61,7 +61,7 @@ export function SavedCompanies({
           <Button
             variant="secondary"
             disabled={!canCompare(selected.length)}
-            onClick={() => askAbout(compareQuestion(names))}
+            onClick={() => askNow(compareQuestion(names))}
           >
             Compare with Q
           </Button>

@@ -24,6 +24,7 @@ const SHOWABLE: ReadonlySet<QTurnObjectBlock["kind"]> = new Set([
   "ARTIFACT_REFERENCE",
   "COMPARISON",
   "COMPARISON_CARDS",
+  "ANSWER_CARDS",
   "CLARIFICATION_REQUEST",
 ]);
 
@@ -40,6 +41,8 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
   for (const block of blocks) {
     switch (block.kind) {
       case "ARTIFACT_REFERENCE":
+        return block.title;
+      case "ANSWER_CARDS":
         return block.title;
       case "COMPARISON_CARDS":
         if (block.title !== null && block.title.length > 0) return block.title;

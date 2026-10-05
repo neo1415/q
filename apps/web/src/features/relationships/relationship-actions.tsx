@@ -68,12 +68,12 @@ export function AskQAboutRelationship({
 }: {
   readonly counterpart: string;
 }) {
-  const { askAbout } = useGlobalQ();
+  const { askNow } = useGlobalQ();
   return (
     <Button
       variant="secondary"
       onClick={() =>
-        askAbout(
+        askNow(
           `Where does our relationship with ${counterpart} stand, what has happened so far, and what comes next?`,
         )
       }

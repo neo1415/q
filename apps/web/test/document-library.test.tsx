@@ -31,7 +31,7 @@ vi.mock("../src/features/q/actions", () => ({
 }));
 const askAbout = vi.fn();
 vi.mock("../src/components/app-shell/global-q", () => ({
-  useGlobalQ: () => ({ askAbout }),
+  useGlobalQ: () => ({ askAbout, askNow: askAbout }),
 }));
 
 const model = await import("../src/features/documents/library-model");

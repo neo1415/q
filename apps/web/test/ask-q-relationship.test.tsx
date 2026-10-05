@@ -9,7 +9,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const askAbout = vi.fn<(seed: string) => void>();
 vi.mock("@/components/app-shell/global-q", () => ({
-  useGlobalQ: () => ({ open: false, setOpen: vi.fn(), askAbout }),
+  useGlobalQ: () => ({
+    open: false,
+    setOpen: vi.fn(),
+    askAbout,
+    askNow: askAbout,
+  }),
 }));
 
 const { AskQRelationshipPanel } =

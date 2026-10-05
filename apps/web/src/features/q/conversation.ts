@@ -37,6 +37,8 @@ export type QTurn =
       readonly id: string;
       /** DOCS: the run this answer belongs to, for filing it as a PDF. */
       readonly runId?: string | undefined;
+      /** When it was recorded (ISO); the Board's timeline groups by it. */
+      readonly at?: string | undefined;
       readonly text: string;
       /** True while more text may still arrive for this message. */
       readonly streaming: boolean;
@@ -88,6 +90,7 @@ export type QTurnObjectBlock = Extract<
       | "INVESTOR_REFERENCE"
       | "COMPARISON"
       | "COMPARISON_CARDS"
+      | "ANSWER_CARDS"
       | "CLARIFICATION_REQUEST"
       | "ACTION_PROPOSAL"
       | "ARTIFACT_REFERENCE"
@@ -128,6 +131,7 @@ function objectBlocksOf(
       case "INVESTOR_REFERENCE":
       case "COMPARISON":
       case "COMPARISON_CARDS":
+      case "ANSWER_CARDS":
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":
       case "ARTIFACT_REFERENCE":
@@ -281,6 +285,7 @@ export function turnsFrom(
         kind: "Q",
         id: message.messageId,
         runId: message.runId,
+        at: message.createdAt,
         text,
         streaming: false,
         sourceCount: sourceCountOf(message.blocks),
