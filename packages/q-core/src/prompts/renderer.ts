@@ -15,6 +15,11 @@ import {
   renderCommunicationGuidance,
 } from "../communication/guidance.js";
 import {
+  ETIQUETTE_RENDERING_VERSION,
+  renderEtiquetteGuidance,
+  type EtiquetteRequest,
+} from "../etiquette/guidance.js";
+import {
   renderTemplate,
   type PromptId,
   type PromptVersionId,
@@ -73,6 +78,11 @@ export type RenderRequest<V> = {
   readonly communicationProfile: QCommunicationProfile;
   /** What the runtime honestly knows about its own limits, trusted text. */
   readonly environmentNotes: string;
+  /**
+   * ADR 0050: the business etiquette guides, rendered as fenced reference
+   * text in the communication section. Absent: the bundle is unchanged.
+   */
+  readonly etiquette?: EtiquetteRequest | undefined;
   /** The task's own variables, minus the frame the renderer supplies. */
   readonly variables: Omit<
     V,
@@ -86,6 +96,9 @@ export type RenderRequest<V> = {
 function slugOf(versionId: PromptVersionId): string {
   return versionId.replace("/", ".");
 }
+
+/** Every task schema caps `communicationGuidance` at this many characters. */
+export const COMMUNICATION_GUIDANCE_MAX = 4_000;
 
 export function bundleVersionOf(
   charter: PromptVersionId,
@@ -126,9 +139,24 @@ export function renderPrompt<V>(
   ) {
     throw new Error(`${task.versionId} is not a task prompt`);
   }
-  const communicationGuidance = renderCommunicationGuidance(
+  const profileGuidance = renderCommunicationGuidance(
     request.communicationProfile,
   );
+  // The etiquette block shares the section's fixed budget with the
+  // profile, so every task's existing variable limit still holds.
+  const etiquette =
+    request.etiquette === undefined
+      ? ""
+      : renderEtiquetteGuidance(
+          request.etiquette,
+          COMMUNICATION_GUIDANCE_MAX - profileGuidance.length - 2,
+        );
+  const communicationGuidance =
+    etiquette === "" ? profileGuidance : `${profileGuidance}\n\n${etiquette}`;
+  const communicationRenderingVersion =
+    etiquette === ""
+      ? COMMUNICATION_RENDERING_VERSION
+      : ETIQUETTE_RENDERING_VERSION;
   const frame = {
     operatingMode: request.operatingMode,
     communicationProfile: request.communicationProfile,
@@ -154,12 +182,16 @@ export function renderPrompt<V>(
     output.kind === "TEXT"
       ? "text"
       : `${output.schemaName}/v${output.schemaVersion}`;
-  const bundleVersion = bundleVersionOf(charter.versionId, task.versionId);
+  const bundleVersion = bundleVersionOf(
+    charter.versionId,
+    task.versionId,
+    communicationRenderingVersion,
+  );
   const bundleHash = createHash("sha256")
     .update(charter.contentHash)
     .update(task.contentHash)
     .update(outputIdentity)
-    .update(`comm.v${COMMUNICATION_RENDERING_VERSION}`)
+    .update(`comm.v${String(communicationRenderingVersion)}`)
     .digest("hex");
 
   const messages: ModelMessage[] = [
@@ -173,7 +205,7 @@ export function renderPrompt<V>(
       charter: charter.versionId,
       task: task.versionId,
       outputSchema: outputIdentity,
-      communicationRenderingVersion: COMMUNICATION_RENDERING_VERSION,
+      communicationRenderingVersion,
     },
     taskClass: task.definition.taskClass,
     messages,

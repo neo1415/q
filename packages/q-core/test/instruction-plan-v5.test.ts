@@ -15,8 +15,9 @@ describe("INSTRUCTION_PLAN v5", () => {
   const registry = createDefaultPromptRegistry();
   const active = registry.getActive("INSTRUCTION_PLAN");
 
-  it("is the active version and carries each new rule", () => {
-    expect(active.definition.version).toBe(5);
+  // v6 (ADR 0050) is v5 plus the consider step: v5's rules all hold.
+  it("is carried by the active version, with each new rule", () => {
+    expect(active.definition.version).toBe(6);
     const template = active.definition.template;
     for (const rule of [
       "message: for every chat message, its kind and what its final sentence asks",
@@ -26,7 +27,7 @@ describe("INSTRUCTION_PLAN v5", () => {
       "outside your declared mandate, write no first message",
       "never a request for time",
       "write it word for word",
-      "(v5, with request, each cannot's needs and each step's message)",
+      "(v6, with request, each cannot's needs and each step's message)",
     ]) {
       expect(template, rule).toContain(rule);
     }
