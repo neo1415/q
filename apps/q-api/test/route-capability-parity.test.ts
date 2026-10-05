@@ -655,6 +655,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/daily": exempt("development-only page"),
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
+  "/dev/relationships": exempt("development-only page"),
   "/u/[handle]": PUBLIC,
   // GateQ: a gateway's public page and the embed another site frames.
   "/g/[publicId]": PUBLIC,
@@ -756,6 +757,15 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/relationships/investor/[investorOrganisationId]": cap("tool.open_page"),
   "/relationships/company/[companyId]/messages": cap("tool.open_page"),
   "/relationships/investor/[investorOrganisationId]/messages":
+    cap("tool.open_page"),
+  // 2026-10-04: a relationship's Diligence and Calls tabs, reached from the
+  // relationship page Q opens; Q shares and asks through diligence_documents
+  // and books through the schedule tools.
+  "/relationships/company/[companyId]/diligence": cap("tool.open_page"),
+  "/relationships/investor/[investorOrganisationId]/diligence":
+    cap("tool.open_page"),
+  "/relationships/company/[companyId]/calls": cap("tool.open_page"),
+  "/relationships/investor/[investorOrganisationId]/calls":
     cap("tool.open_page"),
 };
 

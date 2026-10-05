@@ -306,7 +306,17 @@ function actionFor(
     case "Q_STAND_IN":
     case "COMMITMENT_DETECTED":
       return { label: "Review", href };
-    default:
+    case "REMINDER":
+    case "MEETING_SCHEDULED":
+    case "MEETING_CANCELLED":
+    case "Q_SCOUT":
+    case "MEETING_RECORDING_DECLINED":
+    case "ACCOUNT_PAUSED":
+    case "TIME_PROPOSED":
+    case "HUMAN_REVIEW":
+    case "VERIFICATION_DECIDED":
+    case "VERIFICATION_REQUESTED":
+    case "RELATIONSHIP_OUTCOME":
       return href === null
         ? { label: "Got it", href: null }
         : { label: "Open", href };

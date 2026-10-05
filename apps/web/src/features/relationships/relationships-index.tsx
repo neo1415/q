@@ -29,7 +29,7 @@ export function RelationshipsIndex({
   digests = {},
   notices = [],
   reminders = [],
-  now = Date.now(),
+  now = readClock(),
 }: {
   readonly side: "INVESTOR" | "COMPANY" | "NONE";
   readonly digests?: Readonly<Record<string, RelationshipDigest>> | undefined;
@@ -90,6 +90,10 @@ export function RelationshipsIndex({
       now={now}
     />
   );
+}
+
+function readClock(): number {
+  return Date.now();
 }
 
 function Empty({

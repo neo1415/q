@@ -48,7 +48,7 @@ export default async function RelationshipsPage() {
           context,
           pageAfter(items.toSorted(listOrder), null).items,
         );
-  const now = Date.now();
+  const now = readClock();
   const side =
     context.kind === "FOUNDER"
       ? "COMPANY"
@@ -110,6 +110,11 @@ async function unreadByRelationship(): Promise<ReadonlyMap<string, number>> {
   } catch {
     return new Map();
   }
+}
+
+/** When the page was read: rows say "2h" from here, on server and browser alike. */
+function readClock(): number {
+  return Date.now();
 }
 
 /** BIZ-008: the person's own notices and reminders; unreadable is none. */

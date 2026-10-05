@@ -60,7 +60,7 @@ export function summaryLine(
   result: DiligenceDocumentSummaryResult,
 ): string | null {
   const line = result.summary
-    ?.replace(/[\u0000-\u001f\u007f]+/g, " ")
+    ?.replace(/\p{Cc}+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
   return line === undefined || line.length < 3

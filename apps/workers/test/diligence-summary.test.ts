@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createEventRegistry, type CorrelationId } from "@capital-q/contracts";
+import { createEventRegistry } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import {
   disclosureGrantedEvent,
@@ -32,7 +32,7 @@ const granted = (resourceType: string, scopeType: string) =>
     tenantId: TENANT_A,
     organisationId: undefined,
     actorUserId: "b0000000-0000-4000-8000-000000000001",
-    correlationId: "cor_c0000000-0000-4000-8000-000000000001" as CorrelationId,
+    correlationId: "cor_c0000000-0000-4000-8000-000000000001",
     policy: {
       id: "f0000000-0000-4000-8000-000000000001",
       resource: { type: resourceType, id: DOC },
