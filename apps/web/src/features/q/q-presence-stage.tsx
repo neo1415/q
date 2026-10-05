@@ -197,20 +197,22 @@ export function QPresenceStage({
         {/* The presence stays on screen: small while an object is shown,
             full again once it is dismissed (reduced motion: no scale). */}
         {canvas !== null || leaving !== null ? null : (
-        <m.div
-          key={showing ? "compact" : "full"}
-          className="flex w-full flex-col items-center"
-          data-q-presence-size={showing ? "compact" : "full"}
-          initial={
-            reduced ? false : { opacity: 0.4, scale: showing ? 1.2 : 0.8 }
-          }
-          animate={{ opacity: 1, scale: 1 }}
-          transition={
-            reduced ? { duration: 0 } : { duration: 0.24, ease: [0.2, 0, 0, 1] }
-          }
-        >
-          {presence(showing)}
-        </m.div>
+          <m.div
+            key={showing ? "compact" : "full"}
+            className="flex w-full flex-col items-center"
+            data-q-presence-size={showing ? "compact" : "full"}
+            initial={
+              reduced ? false : { opacity: 0.4, scale: showing ? 1.2 : 0.8 }
+            }
+            animate={{ opacity: 1, scale: 1 }}
+            transition={
+              reduced
+                ? { duration: 0 }
+                : { duration: 0.24, ease: [0.2, 0, 0, 1] }
+            }
+          >
+            {presence(showing)}
+          </m.div>
         )}
       </LazyMotion>
 
@@ -342,9 +344,14 @@ export function QPresenceStage({
 }
 
 /** What the person asked just before an answer, for the line above Q's. */
-function askedBefore(turns: readonly QTurn[], answerId: string): string | undefined {
+function askedBefore(
+  turns: readonly QTurn[],
+  answerId: string,
+): string | undefined {
   const at = turns.findIndex((turn) => turn.id === answerId);
-  const asked = turns.slice(0, Math.max(0, at)).findLast((turn) => turn.kind === "PERSON");
+  const asked = turns
+    .slice(0, Math.max(0, at))
+    .findLast((turn) => turn.kind === "PERSON");
   return asked?.text;
 }
 

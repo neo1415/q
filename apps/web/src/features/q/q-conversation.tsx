@@ -876,34 +876,35 @@ export function QConversationPanel({
                           />
                         </ViewTransition>
                       ) : (
-                      <div
-                        className="flex flex-col items-center gap-2 pt-2"
-                        data-q-presence="stage"
-                      >
-                        <ViewTransition
-                          name="q-aperture"
-                          share="cq-q-morph"
-                          default="none"
+                        <div
+                          className="flex flex-col items-center gap-2 pt-2"
+                          data-q-presence="stage"
                         >
-                          <QAperture
-                            state={presence.state}
-                            size={compact ? 64 : 200}
-                            inputLevel={client.inputLevel}
-                            outputLevel={client.outputLevel}
-                          />
-                        </ViewTransition>
-                        {!compact &&
-                        thread.length > latestExchange(thread).length ? (
-                          <button
-                            type="button"
-                            className="cq-stage-quiet"
-                            onClick={() => chooseView("chat")}
+                          <ViewTransition
+                            name="q-aperture"
+                            share="cq-q-morph"
+                            default="none"
                           >
-                            Earlier in this conversation
-                          </button>
-                        ) : null}
-                      </div>
-                    )}
+                            <QAperture
+                              state={presence.state}
+                              size={compact ? 64 : 200}
+                              inputLevel={client.inputLevel}
+                              outputLevel={client.outputLevel}
+                            />
+                          </ViewTransition>
+                          {!compact &&
+                          thread.length > latestExchange(thread).length ? (
+                            <button
+                              type="button"
+                              className="cq-stage-quiet"
+                              onClick={() => chooseView("chat")}
+                            >
+                              Earlier in this conversation
+                            </button>
+                          ) : null}
+                        </div>
+                      )
+                    }
                     onShowingChange={setObjectShown}
                     turns={turns}
                     captions={captions}

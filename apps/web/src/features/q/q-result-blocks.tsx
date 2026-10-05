@@ -358,9 +358,7 @@ export function QResultBlocks({
           case "ANSWER_CARDS":
             // In the thread and on the Board: the overview, every card
             // with its first reason; tapping one opens it.
-            return (
-              <StaticAnswerCards key={key} block={block} onAsk={onAsk} />
-            );
+            return <StaticAnswerCards key={key} block={block} onAsk={onAsk} />;
 
           case "COMPARISON":
             return (

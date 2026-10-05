@@ -45,6 +45,7 @@ const loadFeatures = () =>
 
 const WIDE_QUERY = "(min-width: 761px)";
 function subscribeWide(onChange: () => void): () => void {
+  if (typeof window.matchMedia !== "function") return () => undefined;
   const query = window.matchMedia(WIDE_QUERY);
   query.addEventListener("change", onChange);
   return () => query.removeEventListener("change", onChange);
@@ -52,7 +53,9 @@ function subscribeWide(onChange: () => void): () => void {
 function useWideCanvas(): boolean {
   return useSyncExternalStore(
     subscribeWide,
-    () => window.matchMedia(WIDE_QUERY).matches,
+    () =>
+      typeof window.matchMedia !== "function" ||
+      window.matchMedia(WIDE_QUERY).matches,
     () => true,
   );
 }
@@ -66,11 +69,25 @@ export function LevelShape({ level }: { readonly level: QAnswerCardLevel }) {
           <circle cx="6" cy="6" r="5" fill="currentColor" />
         ) : level === "GOOD" ? (
           <>
-            <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+            <circle
+              cx="6"
+              cy="6"
+              r="4.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.2"
+            />
             <path d="M6 1.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" />
           </>
         ) : level === "PARTIAL" ? (
-          <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <circle
+            cx="6"
+            cy="6"
+            r="4.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.2"
+          />
         ) : (
           <circle
             cx="6"
@@ -88,7 +105,9 @@ export function LevelShape({ level }: { readonly level: QAnswerCardLevel }) {
 }
 
 function Icon({ of: Of }: { readonly of: typeof X }) {
-  return <Of aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />;
+  return (
+    <Of aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+  );
 }
 
 export type AnswerCardActions = {
@@ -140,18 +159,28 @@ function AnswerCard({
           <h3>
             <span className="sr-only">{`Number ${String(rank)}: `}</span>
             {card.name}
-            <span className="cq-ac-talking" role="img" aria-label="Q is talking about this">
+            <span
+              className="cq-ac-talking"
+              role="img"
+              aria-label="Q is talking about this"
+            >
               <i />
               <i />
               <i />
             </span>
           </h3>
-          {card.line === null ? null : <p className="cq-ac-line">{card.line}</p>}
+          {card.line === null ? null : (
+            <p className="cq-ac-line">{card.line}</p>
+          )}
         </button>
         {number === null ? (
           <span aria-hidden="true" />
         ) : (
-          <div className="cq-ac-score" aria-label={words ?? undefined} role="img">
+          <div
+            className="cq-ac-score"
+            aria-label={words ?? undefined}
+            role="img"
+          >
             <span className="num" aria-hidden="true">
               {number}
             </span>
@@ -171,12 +200,17 @@ function AnswerCard({
         </button>
       </header>
       <div className="cq-ac-body">
-        <div className="inner">
+        {/* Closed, its body is out of reach (no hidden tab stops). */}
+        <div className="inner" inert={state !== "focus"}>
           <div className="cq-ac-pad">
             <ul className="cq-ac-why">
               {card.reasons.map((reason) => (
                 <li key={reason}>
-                  <Check aria-hidden="true" size={16} strokeWidth={ICON_STROKE} />
+                  <Check
+                    aria-hidden="true"
+                    size={16}
+                    strokeWidth={ICON_STROKE}
+                  />
                   <span>{reason}</span>
                 </li>
               ))}
@@ -211,7 +245,11 @@ function AnswerCard({
             )}
             <div className="cq-ac-actions">
               {card.subject !== null && actions.onOpenProfile !== undefined ? (
-                <button type="button" className="cq-ac-btn" onClick={() => actions.onOpenProfile?.(card)}>
+                <button
+                  type="button"
+                  className="cq-ac-btn"
+                  onClick={() => actions.onOpenProfile?.(card)}
+                >
                   Open profile
                 </button>
               ) : null}
@@ -219,7 +257,9 @@ function AnswerCard({
                 <button
                   type="button"
                   className="cq-ac-btn"
-                  onClick={() => actions.onAsk?.(`Tell me more about ${card.name}.`)}
+                  onClick={() =>
+                    actions.onAsk?.(`Tell me more about ${card.name}.`)
+                  }
                 >
                   Ask about this
                 </button>
@@ -238,7 +278,9 @@ function AnswerCard({
           </div>
         </div>
       </div>
-      <p className="cq-ac-oneline">{card.reasons[0]}</p>
+      <p className="cq-ac-oneline" aria-hidden={state === "focus"}>
+        {card.reasons[0]}
+      </p>
     </m.article>
   );
 }
@@ -264,7 +306,12 @@ function CompareTable({
         <h3>Side by side</h3>
         <div className="flex">
           {onPin === undefined ? null : (
-            <button type="button" className="cq-ac-x" aria-label="Pin to the Board" onClick={onPin}>
+            <button
+              type="button"
+              className="cq-ac-x"
+              aria-label="Pin to the Board"
+              onClick={onPin}
+            >
               <Icon of={Pin} />
             </button>
           )}
@@ -277,7 +324,12 @@ function CompareTable({
             <Icon of={MoreHorizontal} />
           </button>
           {onClose === undefined ? null : (
-            <button type="button" className="cq-ac-x" aria-label="Close the comparison" onClick={onClose}>
+            <button
+              type="button"
+              className="cq-ac-x"
+              aria-label="Close the comparison"
+              onClick={onClose}
+            >
               <Icon of={X} />
             </button>
           )}
@@ -288,7 +340,12 @@ function CompareTable({
           <tr>
             <th className="blank" aria-hidden="true" />
             {cards.map((card, index) => (
-              <th key={card.key} scope="col" className={cell(index)} data-hue={String(card.hue)}>
+              <th
+                key={card.key}
+                scope="col"
+                className={cell(index)}
+                data-hue={String(card.hue)}
+              >
                 <span className="cname">
                   <span className="cq-ac-rank" aria-hidden="true">
                     {index + 1}
@@ -296,7 +353,10 @@ function CompareTable({
                   {card.name}
                 </span>
                 {card.fit === null ? null : (
-                  <div className="cscore" aria-label={fitWords(card) ?? undefined}>
+                  <div
+                    className="cscore"
+                    aria-label={fitWords(card) ?? undefined}
+                  >
                     {card.fit.score.toFixed(1)}
                     <small>of 10</small>
                   </div>
@@ -316,12 +376,18 @@ function CompareTable({
                 const measure = card.measures[row];
                 if (measure === undefined) return <td key={card.key} />;
                 return (
-                  <td key={card.key} className={cell(index)} data-hue={String(card.hue)}>
+                  <td
+                    key={card.key}
+                    className={cell(index)}
+                    data-hue={String(card.hue)}
+                  >
                     <span className="v">
                       <LevelShape level={measure.level} />
                       {LEVEL_WORD[measure.level]}
                     </span>
-                    {measure.value === null ? null : <span className="s">{measure.value}</span>}
+                    {measure.value === null ? null : (
+                      <span className="s">{measure.value}</span>
+                    )}
                   </td>
                 );
               })}
@@ -335,7 +401,11 @@ function CompareTable({
                 <tr key="view">
                   <th scope="row">Q’s view</th>
                   {cards.map((card, index) => (
-                    <td key={card.key} className={cell(index)} data-hue={String(card.hue)}>
+                    <td
+                      key={card.key}
+                      className={cell(index)}
+                      data-hue={String(card.hue)}
+                    >
                       {card.view ?? "Not stated"}
                     </td>
                   ))}
@@ -385,7 +455,12 @@ export function AnswerCanvas({
 
   return (
     <LazyMotion features={loadFeatures} strict>
-      <section className="cq-ac" aria-label={block.title} data-ac-shape={block.shape} data-ac>
+      <section
+        className="cq-ac"
+        aria-label={block.title}
+        data-ac-shape={block.shape}
+        data-ac
+      >
         {said === undefined ? null : (
           <div className="cq-ac-speakline">
             <div className="cq-ac-mini">{presence}</div>
@@ -415,7 +490,11 @@ export function AnswerCanvas({
             block={block}
             focus={focus}
             onClose={onCloseAll}
-            onPin={actions.onPin === undefined ? undefined : () => block.cards[0] && actions.onPin?.(block.cards[0])}
+            onPin={
+              actions.onPin === undefined
+                ? undefined
+                : () => block.cards[0] && actions.onPin?.(block.cards[0])
+            }
           />
         ) : (
           <div
@@ -440,8 +519,16 @@ export function AnswerCanvas({
             </AnimatePresence>
           </div>
         )}
-        {showFollowUps && focus < 0 && block.followUps.length > 0 && onFollowUp !== undefined ? (
-          <div className="cq-ac-followups" role="group" aria-label="Ask next" data-ac-followups>
+        {showFollowUps &&
+        focus < 0 &&
+        block.followUps.length > 0 &&
+        onFollowUp !== undefined ? (
+          <div
+            className="cq-ac-followups"
+            role="group"
+            aria-label="Ask next"
+            data-ac-followups
+          >
             {block.followUps.map((question) => (
               <button
                 key={question}
@@ -467,11 +554,15 @@ export function AnswerCanvas({
 export async function flyToBoard(container: HTMLElement | null): Promise<void> {
   if (container === null) return;
   const target = document.querySelector('[data-q-control="board"]');
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduced =
+    typeof window.matchMedia !== "function" ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (target === null || reduced) return;
   const to = target.getBoundingClientRect();
   const pieces = [
-    ...container.querySelectorAll<HTMLElement>("[data-ac-card], [data-ac-compare]"),
+    ...container.querySelectorAll<HTMLElement>(
+      "[data-ac-card], [data-ac-compare]",
+    ),
   ];
   const flights = pieces.map((piece, index) => {
     const from = piece.getBoundingClientRect();
@@ -481,7 +572,10 @@ export async function flyToBoard(container: HTMLElement | null): Promise<void> {
     return piece.animate(
       [
         { transform: "none", opacity: 1 },
-        { transform: `translate(${String(dx)}px, ${String(dy)}px) scale(0.08)`, opacity: 0.2 },
+        {
+          transform: `translate(${String(dx)}px, ${String(dy)}px) scale(0.08)`,
+          opacity: 0.2,
+        },
       ],
       {
         duration: 560,

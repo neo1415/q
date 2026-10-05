@@ -6,12 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 
-import {
-  ICON_SIZE,
-  ICON_STROKE,
-  PanelRight,
-  X,
-} from "@capital-q/ui/icons";
+import { ICON_SIZE, ICON_STROKE, PanelRight, X } from "@capital-q/ui/icons";
 
 import { QAperture } from "@/features/q-aperture";
 
@@ -50,10 +45,16 @@ export function AnswerChip() {
   if (pathname === Q_PAGE || chip === null || session === null) return null;
   const conversation = session.q.conversationId;
   const home =
-    conversation === null ? Q_PAGE : `${Q_PAGE}?c=${encodeURIComponent(conversation)}`;
+    conversation === null
+      ? Q_PAGE
+      : `${Q_PAGE}?c=${encodeURIComponent(conversation)}`;
   const board = `${home}${home.includes("?") ? "&" : "?"}board=1`;
   return (
-    <aside className="cq-answer-chip" aria-label="Q answer ready" data-answer-chip>
+    <aside
+      className="cq-answer-chip"
+      aria-label="Q answer ready"
+      data-answer-chip
+    >
       <span className="mark">
         <QAperture state="IDLE" size={40} />
       </span>
@@ -68,7 +69,11 @@ export function AnswerChip() {
       </div>
       <span className="acts">
         <Link href={board} className="cq-ac-btn" aria-label="Open in the Board">
-          <PanelRight aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+          <PanelRight
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
           Board
         </Link>
         <Link href={home} className="open inline-flex items-center">
@@ -79,9 +84,15 @@ export function AnswerChip() {
         type="button"
         className="cq-ac-x chip-x"
         aria-label="Dismiss"
-        onClick={() => setDismissed((current) => new Set([...current, chip.answerId]))}
+        onClick={() =>
+          setDismissed((current) => new Set([...current, chip.answerId]))
+        }
       >
-        <X aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+        <X
+          aria-hidden="true"
+          size={ICON_SIZE.compact}
+          strokeWidth={ICON_STROKE}
+        />
       </button>
     </aside>
   );

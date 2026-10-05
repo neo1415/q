@@ -169,8 +169,17 @@ export function topicMovedOn(
 }
 
 const NUMBER_WORDS = [
-  "zero", "one", "two", "three", "four", "five",
-  "six", "seven", "eight", "nine", "ten",
+  "zero",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
 ] as const;
 
 export type AnswerChipContent = {

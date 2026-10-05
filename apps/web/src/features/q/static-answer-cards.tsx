@@ -24,7 +24,9 @@ export function StaticAnswerCards({
       block={block}
       focus={focus}
       dismissed={closed}
-      onFocus={(index) => setFocus((current) => (current === index ? -1 : index))}
+      onFocus={(index) =>
+        setFocus((current) => (current === index ? -1 : index))
+      }
       onCloseCard={(key) => setClosed((current) => new Set([...current, key]))}
       onAsk={onAsk}
       onFollowUp={onAsk}

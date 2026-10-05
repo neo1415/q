@@ -69,7 +69,9 @@ export function useAnswerPlayback(
       const step = steps[at];
       if (step === undefined) return;
       setState((current) =>
-        current.chosen ? current : { ...current, focus: step.focus, said: step.said },
+        current.chosen
+          ? current
+          : { ...current, focus: step.focus, said: step.said },
       );
       if (at + 1 < steps.length) {
         timer = window.setTimeout(() => run(at + 1), step.ms);

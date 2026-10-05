@@ -62,8 +62,10 @@ function kindOf(blocks: readonly QTurnObjectBlock[]): string {
     switch (block.kind) {
       case "ANSWER_CARDS": {
         const n = block.cards.length;
-        if (block.shape === "RESEARCH") return `Research, ${count(n, "part", "parts")}`;
-        if (block.shape === "SIDE_BY_SIDE") return `Comparison of ${count(n, "thing", "things")}`;
+        if (block.shape === "RESEARCH")
+          return `Research, ${count(n, "part", "parts")}`;
+        if (block.shape === "SIDE_BY_SIDE")
+          return `Comparison of ${count(n, "thing", "things")}`;
         return `Ranked answer, ${count(n, "result", "results")}`;
       }
       case "COMPARISON_CARDS":
@@ -87,7 +89,8 @@ function titleOf(
 ): string {
   for (const block of blocks) {
     if (block.kind === "ANSWER_CARDS") return block.title;
-    if (block.kind === "COMPARISON_CARDS" && block.title !== null) return block.title;
+    if (block.kind === "COMPARISON_CARDS" && block.title !== null)
+      return block.title;
     if (block.kind === "ARTIFACT_REFERENCE") return block.title;
   }
   return question?.trim().slice(0, 120) || "Shown by Q";
@@ -103,7 +106,11 @@ function minisOf(blocks: readonly QTurnObjectBlock[]): BoardMini[] {
       }));
     }
     if (block.kind === "COMPARISON_CARDS") {
-      return block.items.map((item, at) => ({ name: item.name, hue: (at % 7) + 1, score: null }));
+      return block.items.map((item, at) => ({
+        name: item.name,
+        hue: (at % 7) + 1,
+        score: null,
+      }));
     }
   }
   return [];
@@ -121,11 +128,16 @@ export function firstWords(text: string, max = 180): string | null {
     if (out.length >= max) break;
   }
   const trimmed = out.trim();
-  return trimmed.length > max ? `${trimmed.slice(0, max - 1).trimEnd()}…` : trimmed;
+  return trimmed.length > max
+    ? `${trimmed.slice(0, max - 1).trimEnd()}…`
+    : trimmed;
 }
 
 function day(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function sourcesOf(turn: Extract<QTurn, { kind: "Q" }>): BoardSource[] {
@@ -166,7 +178,13 @@ export function boardTimeline(turns: readonly QTurn[]): BoardEntry[] {
       sources: sourcesOf(turn),
       files: blocks.flatMap((block) =>
         block.kind === "ARTIFACT_REFERENCE"
-          ? [{ artifactId: block.artifactId, title: block.title, detail: "Made by Q because you asked" }]
+          ? [
+              {
+                artifactId: block.artifactId,
+                title: block.title,
+                detail: "Made by Q because you asked",
+              },
+            ]
           : [],
       ),
       blocks,
@@ -176,25 +194,39 @@ export function boardTimeline(turns: readonly QTurn[]): BoardEntry[] {
 }
 
 /** "Today", "Yesterday" or the date, for grouping the timeline. */
-export function dayLabel(iso: string | undefined, now: Date = new Date()): string {
+export function dayLabel(
+  iso: string | undefined,
+  now: Date = new Date(),
+): string {
   if (iso === undefined) return "Today";
   const at = new Date(iso);
-  const start = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const start = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const days = Math.round((start(now) - start(at)) / 86_400_000);
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
-  return at.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  return at.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 export function timeLabel(iso: string | undefined): string {
   if (iso === undefined) return "";
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function groupByDay(
   entries: readonly BoardEntry[],
   now: Date = new Date(),
-): readonly { readonly day: string; readonly entries: readonly BoardEntry[] }[] {
+): readonly {
+  readonly day: string;
+  readonly entries: readonly BoardEntry[];
+}[] {
   const groups: { day: string; entries: BoardEntry[] }[] = [];
   for (const entry of entries) {
     const label = dayLabel(entry.at, now);

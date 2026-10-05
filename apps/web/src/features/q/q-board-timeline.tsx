@@ -38,11 +38,26 @@ function SourceShape({ kind }: { readonly kind: BoardSource["kind"] }) {
     <svg className="cq-board-ev" viewBox="0 0 12 12" aria-hidden="true">
       {kind === "record" ? (
         <>
-          <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+          <circle
+            cx="6"
+            cy="6"
+            r="4.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+          />
           <path d="M6 1.5a4.5 4.5 0 0 1 0 9z" fill="currentColor" />
         </>
       ) : (
-        <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeDasharray="2 2" />
+        <circle
+          cx="6"
+          cy="6"
+          r="4.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeDasharray="2 2"
+        />
       )}
     </svg>
   );
@@ -74,7 +89,9 @@ function Entry({
             <h2>{entry.title}</h2>
             <p className="kind">
               {entry.kind}
-              {time.length > 0 ? <span className="t-inline">, {time}</span> : null}
+              {time.length > 0 ? (
+                <span className="t-inline">, {time}</span>
+              ) : null}
             </p>
           </div>
           <div className="flex">
@@ -85,7 +102,11 @@ function Entry({
               aria-label={`${pinned ? "Unpin" : "Pin"} ${entry.title}`}
               onClick={onPin}
             >
-              <Pin aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+              <Pin
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
             </button>
             {onShow === undefined ? null : (
               <button
@@ -94,7 +115,11 @@ function Entry({
                 aria-label={`Show ${entry.title} on the Q page`}
                 onClick={onShow}
               >
-                <ChevronRight aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+                <ChevronRight
+                  aria-hidden="true"
+                  size={ICON_SIZE.compact}
+                  strokeWidth={ICON_STROKE}
+                />
               </button>
             )}
             <button
@@ -103,14 +128,22 @@ function Entry({
               aria-label={`Remove ${entry.title} from the Board`}
               onClick={onRemove}
             >
-              <X aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+              <X
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
             </button>
           </div>
         </div>
         {entry.minis.length === 0 ? null : (
           <div className="cq-board-minis">
             {entry.minis.map((mini) => (
-              <span key={mini.name} className="cq-board-mini" data-hue={String(mini.hue)}>
+              <span
+                key={mini.name}
+                className="cq-board-mini"
+                data-hue={String(mini.hue)}
+              >
                 <i aria-hidden="true" />
                 {mini.name}
                 {mini.score === null ? null : (
@@ -127,11 +160,17 @@ function Entry({
             className="cq-ac-btn mt-2"
             onClick={() => onOpenArtifact(file.artifactId)}
           >
-            <FileText aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+            <FileText
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
             Open {file.title}
           </button>
         ))}
-        {entry.said === null ? null : <p className="cq-board-said">“{entry.said}”</p>}
+        {entry.said === null ? null : (
+          <p className="cq-board-said">“{entry.said}”</p>
+        )}
         {entry.sources.length === 0 ? null : (
           <details className="cq-board-src">
             <summary>
@@ -197,8 +236,17 @@ export function QBoardTimeline({
       <div className="cq-board-head">
         <h1>Board</h1>
         {onClose === undefined ? null : (
-          <button type="button" className="cq-ac-x" aria-label="Close the Board" onClick={onClose}>
-            <X aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+          <button
+            type="button"
+            className="cq-ac-x"
+            aria-label="Close the Board"
+            onClick={onClose}
+          >
+            <X
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
           </button>
         )}
       </div>
@@ -229,8 +277,8 @@ export function QBoardTimeline({
             <div className="cq-board-empty">
               <h2>Nothing on the Board yet</h2>
               <p>
-                What Q shows you lands here, so you can find it again. Pin
-                what matters; files Q makes for you sit alongside.
+                What Q shows you lands here, so you can find it again. Pin what
+                matters; files Q makes for you sit alongside.
               </p>
               {onAsk === undefined || suggestions.length === 0 ? null : (
                 <div className="flex flex-wrap justify-center gap-2">
@@ -259,7 +307,11 @@ export function QBoardTimeline({
                       pinned={marks.pinned.includes(entry.id)}
                       onPin={() => marks.togglePin(entry.id)}
                       onRemove={() => marks.remove(entry.id)}
-                      onShow={onShow === undefined ? undefined : () => onShow(entry.id)}
+                      onShow={
+                        onShow === undefined
+                          ? undefined
+                          : () => onShow(entry.id)
+                      }
                       onOpenArtifact={onOpenArtifact}
                     />
                   ))}
@@ -278,10 +330,17 @@ export function QBoardTimeline({
                 <p className="cq-board-note">Pin an answer to keep it here.</p>
               ) : (
                 pinned.map((entry) => (
-                  <div key={entry.id} className="cq-board-pin" data-hue={String(entry.minis[0]?.hue ?? 1)}>
+                  <div
+                    key={entry.id}
+                    className="cq-board-pin"
+                    data-hue={String(entry.minis[0]?.hue ?? 1)}
+                  >
                     <div className="min-w-0">
                       <strong>{entry.title}</strong>
-                      <span>{entry.minis.map((mini) => mini.name).join(", ") || entry.kind}</span>
+                      <span>
+                        {entry.minis.map((mini) => mini.name).join(", ") ||
+                          entry.kind}
+                      </span>
                     </div>
                     <button
                       type="button"
@@ -289,7 +348,11 @@ export function QBoardTimeline({
                       aria-label={`Unpin ${entry.title}`}
                       onClick={() => marks.togglePin(entry.id)}
                     >
-                      <X aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+                      <X
+                        aria-hidden="true"
+                        size={ICON_SIZE.compact}
+                        strokeWidth={ICON_STROKE}
+                      />
                     </button>
                   </div>
                 ))
@@ -300,7 +363,9 @@ export function QBoardTimeline({
                 Files <span>{files.length}</span>
               </h2>
               {files.length === 0 ? (
-                <p className="cq-board-note">Files Q makes when you ask for one sit here.</p>
+                <p className="cq-board-note">
+                  Files Q makes when you ask for one sit here.
+                </p>
               ) : (
                 files.map((file) => (
                   <button
@@ -310,7 +375,11 @@ export function QBoardTimeline({
                     onClick={() => onOpenArtifact(file.artifactId)}
                   >
                     <span className="ficon">
-                      <FileText aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+                      <FileText
+                        aria-hidden="true"
+                        size={ICON_SIZE.compact}
+                        strokeWidth={ICON_STROKE}
+                      />
                     </span>
                     <span className="min-w-0">
                       <strong>{file.title}</strong>
