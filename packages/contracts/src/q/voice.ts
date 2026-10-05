@@ -356,6 +356,11 @@ export const Q_VOICE_DUPLEX_END_PATH =
   "/v1/q/voice/sessions/:voiceSessionId/duplex/end" as const;
 export const qVoiceDuplexEndPath = (voiceSessionId: string) =>
   `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/end`;
+/** POST: a fresh realtime call for the same line after a drop (I1). */
+export const Q_VOICE_DUPLEX_REJOIN_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/rejoin" as const;
+export const qVoiceDuplexRejoinPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/rejoin`;
 
 /** A model's proposal: untrusted input, validated again by the tool pipeline. */
 export const QVoiceDuplexToolCallSchema = z
@@ -434,12 +439,68 @@ export type QVoiceDuplexUsageResult = z.infer<
   typeof QVoiceDuplexUsageResultSchema
 >;
 
+/** Why a duplex line handed over to the standard voice. */
+export const Q_VOICE_DUPLEX_FALLBACK_CAUSES = [
+  "CONNECT",
+  "NETWORK",
+  "RELAY",
+  "CAP",
+  "MAX_LENGTH",
+] as const;
+
+/**
+ * What the line measured, sent with its end (I1, Dubai demo 2026-10-05:
+ * the server knew only "FALLBACK", never why). Measurements, never words.
+ */
+export const QVoiceDuplexLineStatsSchema = z
+  .object({
+    /** Times the line rejoined after a drop or its length limit. */
+    rejoins: z.number().int().min(0).max(1_000),
+    /** Seconds the line spent weak (loss, jitter or round trip high). */
+    weakSeconds: z.number().int().min(0).max(86_400),
+    /** Worst one-second packet loss seen, in percent. */
+    worstLossPct: z.number().min(0).max(100).nullable(),
+    worstJitterMs: z.number().int().min(0).max(600_000).nullable(),
+    worstRttMs: z.number().int().min(0).max(600_000).nullable(),
+    /** End of the person's turn to Q's first audio, in ms. */
+    firstAudioMsP50: z.number().int().min(0).max(600_000).nullable(),
+    firstAudioMsMax: z.number().int().min(0).max(600_000).nullable(),
+    turns: z.number().int().min(0).max(100_000),
+  })
+  .strict();
+export type QVoiceDuplexLineStats = z.infer<typeof QVoiceDuplexLineStatsSchema>;
+
 export const QVoiceDuplexEndSchema = z
   .object({
     reason: z.enum(["ENDED", "IDLE", "MAX_LENGTH", "FALLBACK"]),
+    cause: z.enum(Q_VOICE_DUPLEX_FALLBACK_CAUSES).optional(),
+    stats: QVoiceDuplexLineStatsSchema.optional(),
   })
   .strict();
 export type QVoiceDuplexEnd = z.infer<typeof QVoiceDuplexEndSchema>;
+
+/**
+ * POST: the line dropped (or reached its length) and the browser wants a
+ * fresh realtime call for the same line, the same voice and the same
+ * conversation, instead of handing over to the standard voice.
+ */
+export const QVoiceDuplexRejoinSchema = z
+  .object({
+    cause: z.enum(["NETWORK", "MAX_LENGTH", "RELAY"]),
+  })
+  .strict();
+export type QVoiceDuplexRejoin = z.infer<typeof QVoiceDuplexRejoinSchema>;
+
+/** A fresh credential, or no line (with a sentence when the person should know). */
+export const QVoiceDuplexRejoinResultSchema = z
+  .object({
+    credential: QVoiceDuplexCredentialSchema.optional(),
+    notice: z.string().min(1).max(300).optional(),
+  })
+  .strict();
+export type QVoiceDuplexRejoinResult = z.infer<
+  typeof QVoiceDuplexRejoinResultSchema
+>;
 
 /** Where Q may take the person on a spoken request; the browser maps each to a route. */
 export const Q_VOICE_DESTINATIONS = [

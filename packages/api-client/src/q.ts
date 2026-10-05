@@ -10,11 +10,14 @@ import {
   qVoiceTurnPath,
   qVoiceScreenPath,
   qVoiceDuplexEndPath,
+  qVoiceDuplexRejoinPath,
   qVoiceDuplexToolPath,
   qVoiceDuplexUsagePath,
+  QVoiceDuplexRejoinResultSchema,
   QVoiceDuplexToolResultSchema,
   QVoiceDuplexUsageResultSchema,
   type QVoiceDuplexEnd,
+  type QVoiceDuplexRejoin,
   type QVoiceDuplexToolCall,
   type QVoiceDuplexUsageReport,
   type QVoiceScreenUpdate,
@@ -263,6 +266,21 @@ export function reportQVoiceDuplexUsage(
     "POST",
     qVoiceDuplexUsagePath(voiceSessionId),
     QVoiceDuplexUsageResultSchema,
+    { body: input },
+  );
+}
+
+/** DUPLEX: a fresh realtime call for the same line after a drop (I1). */
+export function rejoinQVoiceDuplex(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexRejoin,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexRejoinPath(voiceSessionId),
+    QVoiceDuplexRejoinResultSchema,
     { body: input },
   );
 }

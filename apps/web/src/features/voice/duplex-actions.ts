@@ -2,15 +2,18 @@
 
 import {
   endQVoiceDuplex,
+  rejoinQVoiceDuplex,
   relayQVoiceDuplexTool,
   reportQVoiceDuplexUsage,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   QVoiceDuplexEndSchema,
+  QVoiceDuplexRejoinSchema,
   QVoiceDuplexToolCallSchema,
   QVoiceDuplexUsageReportSchema,
   UuidSchema,
+  type QVoiceDuplexRejoinResult,
   type QVoiceDuplexToolResult,
   type QVoiceDuplexUsageResult,
 } from "@capital-q/contracts";
@@ -65,12 +68,40 @@ export async function reportDuplexUsageAction(
   }
 }
 
+/** I1: a fresh realtime call for the same line after a drop. */
+export async function rejoinDuplexAction(
+  rawVoiceSessionId: unknown,
+  rawCause: unknown,
+): Promise<QVoiceDuplexRejoinResult | null> {
+  const id = UuidSchema.safeParse(rawVoiceSessionId);
+  const body = QVoiceDuplexRejoinSchema.safeParse({ cause: rawCause });
+  if (!id.success || !body.success) return null;
+  const session = await sessionFor();
+  if (session === null) return null;
+  try {
+    return await rejoinQVoiceDuplex(session, id.data, body.data);
+  } catch {
+    return null;
+  }
+}
+
 export async function endDuplexAction(
   rawVoiceSessionId: unknown,
   rawReason: unknown,
+  rawDetail?: unknown,
 ): Promise<void> {
   const id = UuidSchema.safeParse(rawVoiceSessionId);
-  const body = QVoiceDuplexEndSchema.safeParse({ reason: rawReason });
+  const detail =
+    rawDetail !== null && typeof rawDetail === "object" ? rawDetail : {};
+  // What the line measured rides along; a malformed detail is dropped,
+  // never the end itself.
+  const withDetail = QVoiceDuplexEndSchema.safeParse({
+    ...detail,
+    reason: rawReason,
+  });
+  const body = withDetail.success
+    ? withDetail
+    : QVoiceDuplexEndSchema.safeParse({ reason: rawReason });
   if (!id.success || !body.success) return;
   const session = await sessionFor();
   if (session === null) return;

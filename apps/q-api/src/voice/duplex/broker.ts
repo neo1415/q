@@ -6,12 +6,18 @@ import {
   QRunIdSchema,
   type QVoiceDuplexListening,
   type QVoiceDuplexCredential,
+  type QVoiceDuplexLineStats,
+  type QVoiceDuplexRejoin,
+  type QVoiceDuplexRejoinResult,
   type QVoiceDuplexToolCall,
   type QVoiceDuplexToolResult,
   type QVoiceDuplexUsageReport,
   type QVoiceDuplexUsageResult,
 } from "@capital-q/contracts";
-import type { RealtimeVoiceGateway } from "@capital-q/model-gateway/realtime";
+import type {
+  RealtimeMintRequest,
+  RealtimeVoiceGateway,
+} from "@capital-q/model-gateway/realtime";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type {
   ContextFirewallPort,
@@ -125,7 +131,12 @@ type DuplexLine = {
   readonly binding: VoiceSessionBinding;
   readonly context: QToolExecutionContext;
   readonly direct: ReadonlySet<string>;
-  readonly openedAt: number;
+  /** Reset by a rejoin: each realtime call gets the full length. */
+  openedAt: number;
+  /** What was minted, so a rejoin mints the same session (I1). */
+  readonly mint: RealtimeMintRequest;
+  readonly listeningCredential: QVoiceDuplexListening | undefined;
+  rejoins: number;
   lastActivityAt: number;
   spentUsd: number;
   readonly seen: Set<string>;
@@ -167,10 +178,23 @@ export type DuplexBroker = {
     readonly voiceSessionId: string;
     readonly report: QVoiceDuplexUsageReport;
   }) => Promise<QVoiceDuplexUsageResult | null>;
+  /**
+   * I1: a fresh realtime call for a line that dropped or reached its
+   * length, so the conversation carries on instead of falling back. Null
+   * when there is no such line; no credential when the cap or the
+   * provider says no.
+   */
+  readonly rejoin: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly cause: QVoiceDuplexRejoin["cause"];
+  }) => Promise<QVoiceDuplexRejoinResult | null>;
   readonly end: (input: {
     readonly actor: ActorContext;
     readonly voiceSessionId: string;
     readonly reason: string;
+    readonly cause?: string | undefined;
+    readonly stats?: QVoiceDuplexLineStats | undefined;
   }) => boolean;
   /** Open lines, for tests and the startup log. */
   readonly size: () => number;
@@ -370,7 +394,7 @@ export function createDuplexBroker(
       const guided =
         binding.thread.welcome === true ||
         binding.thread.onboarding !== undefined;
-      const minted = await gateway.mint({
+      const mint: RealtimeMintRequest = {
         instructions: duplexInstructions({
           firstMessage,
           locale,
@@ -402,7 +426,8 @@ export function createDuplexBroker(
           userId: actor.userId,
           correlationId,
         },
-      });
+      };
+      const minted = await gateway.mint(mint);
       if (minted.status !== "MINTED") return fallback("MINT_UNAVAILABLE");
 
       const at = now();
@@ -413,6 +438,9 @@ export function createDuplexBroker(
         context,
         direct: new Set(direct.map((tool) => tool.definition.name)),
         openedAt: at,
+        mint,
+        listeningCredential: listening,
+        rejoins: 0,
         lastActivityAt: at,
         spentUsd: 0,
         seen: new Set(),
@@ -594,7 +622,8 @@ export function createDuplexBroker(
         }
       }
       if (at - line.openedAt >= config.maxSessionMs) {
-        lines.delete(voiceSessionId);
+        // Kept (I1): the browser rejoins this line with a fresh call; an
+        // abandoned one is swept GRACE_MS past its length.
         return { continue: false };
       }
       let spent: number;
@@ -612,7 +641,55 @@ export function createDuplexBroker(
       return { continue: true };
     },
 
-    end: ({ actor, voiceSessionId, reason }) => {
+    rejoin: async ({ actor, voiceSessionId, cause }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return null;
+      let spent: number;
+      try {
+        spent = await spend.spentTodayUsd(new Date(now()));
+      } catch (error: unknown) {
+        logger.warn({ err: error }, "duplex spend ledger unreadable");
+        lines.delete(voiceSessionId);
+        return {};
+      }
+      // This line's own reservation is already inside `reserved()`.
+      if (spent >= config.dailyCapUsd || spent + reserved() > config.dailyCapUsd) {
+        lines.delete(voiceSessionId);
+        logger.info({ spentUsd: spent, cause }, "duplex daily cap reached");
+        return { notice: DUPLEX_CAP_NOTICE };
+      }
+      const minted = await gateway.mint(line.mint);
+      if (minted.status !== "MINTED") {
+        logger.warn(
+          { qVoiceSessionId: voiceSessionId, cause },
+          "duplex voice rejoin could not mint",
+        );
+        lines.delete(voiceSessionId);
+        return {};
+      }
+      const at = now();
+      line.openedAt = at;
+      line.lastActivityAt = at;
+      line.rejoins += 1;
+      logger.info(
+        { qVoiceSessionId: voiceSessionId, cause, rejoins: line.rejoins },
+        "duplex voice line rejoined",
+      );
+      return {
+        credential: {
+          clientSecret: minted.grant.clientSecret,
+          callsUrl: minted.grant.callsUrl,
+          expiresAt: minted.grant.expiresAt.toISOString(),
+          maxSessionMs: config.maxSessionMs,
+          idleMs: config.idleMs,
+          ...(line.listeningCredential === undefined
+            ? {}
+            : { listening: line.listeningCredential }),
+        },
+      };
+    },
+
+    end: ({ actor, voiceSessionId, reason, cause, stats }) => {
       const line = ownLine(actor, voiceSessionId);
       if (line === null) return false;
       lines.delete(voiceSessionId);
@@ -620,6 +697,9 @@ export function createDuplexBroker(
         {
           qVoiceSessionId: voiceSessionId,
           reason,
+          ...(cause === undefined ? {} : { cause }),
+          ...(stats === undefined ? {} : { line: stats }),
+          rejoins: line.rejoins,
           spentUsd: Math.round(line.spentUsd * 1e6) / 1e6,
           reports: line.kinds,
           seconds: Math.round((now() - line.openedAt) / 1000),

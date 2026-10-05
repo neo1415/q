@@ -256,6 +256,15 @@ export {
   type QVoiceDuplexUsageResult,
   QVoiceDuplexEndSchema,
   type QVoiceDuplexEnd,
+  Q_VOICE_DUPLEX_FALLBACK_CAUSES,
+  QVoiceDuplexLineStatsSchema,
+  type QVoiceDuplexLineStats,
+  Q_VOICE_DUPLEX_REJOIN_PATH,
+  qVoiceDuplexRejoinPath,
+  QVoiceDuplexRejoinSchema,
+  type QVoiceDuplexRejoin,
+  QVoiceDuplexRejoinResultSchema,
+  type QVoiceDuplexRejoinResult,
 } from "./voice.js";
 
 export {
