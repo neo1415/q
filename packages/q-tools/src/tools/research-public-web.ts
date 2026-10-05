@@ -71,6 +71,18 @@ export const ResearchPublicWebInputSchema = z
       .enum(PUBLIC_WEB_FRESHNESS)
       .optional()
       .describe("ANY (default), PAST_YEAR or PAST_MONTH."),
+    freshRead: z
+      .boolean()
+      .default(false)
+      .describe(
+        "True when they want the web read afresh rather than a recent result reused, in any words ('anything new?', 'check again', 'latest').",
+      ),
+    aboutThemselves: z
+      .boolean()
+      .default(false)
+      .describe(
+        "True only when they are asking about their own organisation ('what does the web say about us?'); false when the research is about someone else.",
+      ),
     maxSources: z
       .number()
       .int()
@@ -307,6 +319,8 @@ export function createResearchPublicWebTool(
         userText: context.conversation?.latestUserText ?? "",
         subject: grant.subject,
         freshness: input.freshness,
+        freshRead: input.freshRead,
+        aboutThemselves: input.aboutThemselves,
         extractCount: input.maxSources,
         includeDomains: input.includeDomains,
         signal: context.signal,

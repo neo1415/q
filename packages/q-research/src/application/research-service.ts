@@ -71,6 +71,17 @@ export type ResearchCommand = {
   readonly userText: string;
   readonly subject: ResearchSubject | null;
   readonly freshness?: PublicWebFreshness | undefined;
+  /**
+   * Founder brief J7: the model's reading of the person's words, never a
+   * phrase list. True when they want the web read afresh ("anything new?",
+   * "check again"); absent or false, a recent read may be reused.
+   */
+  readonly freshRead?: boolean | undefined;
+  /**
+   * True when the person is asking about their own organisation. Absent or
+   * false, an investor's own name never leads a search about someone else.
+   */
+  readonly aboutThemselves?: boolean | undefined;
   readonly extractCount?: number | undefined;
   readonly includeDomains?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
@@ -221,13 +232,6 @@ const PROVIDER_UNAVAILABLE_MESSAGE =
 const NO_IDENTITY_MESSAGE =
   "Nothing about this subject is authorised for public research yet: the company is private to its organisation and has no declared website. Ask the person which public name or website to search for.";
 
-/** "Refresh", "latest", "again", "check now": the person wants the web read afresh, not remembered. */
-const REFRESH_CUES =
-  /\b(?:refresh|re-?check|check again|look again|search again|latest|up[- ]to[- ]date|right now|as of (?:today|now)|newest|recent(?:ly)? changed|update[ds]?|has (?:anything|it) changed)\b/i;
-
-/** "us", "our", "we", "my": the person is asking about their own organisation. */
-const SELF_REFERENCE = /\b(?:we|us|our|ours|ourselves|my|me|mine)\b/i;
-
 /**
  * A company subject is what the conversation is about, so its name leads
  * the query when the person did not say it. An investor's own organisation
@@ -237,12 +241,12 @@ const SELF_REFERENCE = /\b(?:we|us|our|ours|ourselves|my|me|mine)\b/i;
  */
 function prependIdentityFor(
   subject: ResearchSubject | null,
-  userText: string,
+  aboutThemselves: boolean,
 ): boolean {
   if (subject === null) {
     return true;
   }
-  return subject.kind === "COMPANY" ? true : SELF_REFERENCE.test(userText);
+  return subject.kind === "COMPANY" ? true : aboutThemselves;
 }
 
 function identityTerms(subject: ResearchSubject | null): readonly string[] {
@@ -487,7 +491,10 @@ export function createPublicWebResearchService(
         requestedQuery: command.requestedQuery,
         userText: command.userText,
         publicIdentity: identity,
-        prependIdentity: prependIdentityFor(command.subject, command.userText),
+        prependIdentity: prependIdentityFor(
+          command.subject,
+          command.aboutThemselves === true,
+        ),
       });
       if (!egress.ok) {
         return { status: "NO_PUBLIC_IDENTITY", message: NO_IDENTITY_MESSAGE };
@@ -524,7 +531,7 @@ export function createPublicWebResearchService(
         .slice(0, RESEARCH_BOUNDS.maxIncludeDomains);
       const context = {
         signal: command.signal,
-        freshRead: REFRESH_CUES.test(command.userText),
+        freshRead: command.freshRead === true,
       };
 
       let searchCalls = 0;
