@@ -68,6 +68,7 @@ The founder pre-approved shipping once the mockups and screenshots exist.
 | F1 | GateQ is **a form, not a chat**, like the landing page's try-it. |
 | F2 | GateQ gets **its own page in the sidebar**. |
 | F3 | A **"Find my startup"** tab: research and define what it should be, then build it. |
+| F4 | GateQ for the investor is **like a Gmail inbox**: every founder who came through their gate, with all the information, easy to download, and whatever else they need (research what that is, enrich it, design it, then build it). |
 
 ## G. Organisations
 
