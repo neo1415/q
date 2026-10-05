@@ -673,7 +673,7 @@ function detailHtml(a, lim, solo) {
       <button class="btn ghost sm" onclick="openPack()">${ic("download", "sm")}Download pack</button>
       <button class="iconbtn" aria-label="More: ask for more, label, snooze, done">${ic("more")}</button>
     </div>
-    ${lim ? `<div class="banner">${ic("lock", "sm")}<span>You're a <b>Viewer</b>: you can read applications, add notes and download packs. Partners reply, pass and express interest.</span></div>` : ""}
+    ${lim ? `<div class="banner">${ic("lock", "sm")}<span>You're a <b>Member</b>: you can read applications, add notes and download packs. Admins reply, pass and express interest.</span></div>` : ""}
     <div class="qview">${qmark(22)}<div style="display:flex;flex-direction:column;gap:2px"><p class="who">Q's view, not a verified fact</p><p class="cq-body"><b>${a.q}.</b> <span class="t2">Fastest growth in your inbox this month, with revenue backed by bank statements. Ask about repayment in the dry season.</span></p></div></div>
     <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
       <section class="sect"><h3 class="cq-title-sm">Your gate's rules</h3><div>${crit.map(([k, v, r]) => `<div class="check" style="font-size:14px">${fg(r)}<span><b style="font-weight:500">${k}</b> <span class="t2">${v}</span></span><span class="status">${r === "fit" ? "Meets" : "Not answered"}</span></div>`).join("")}</div></section>

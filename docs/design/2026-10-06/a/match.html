@@ -575,7 +575,7 @@ function requests() {
   if (STATE === "error") return `<div class="wrap">${head}${errorBlock("Company requests")}</div>`;
   if (STATE === "empty") return `<div class="wrap">${head.replace(/<a class="btn secondary"[^]*?<\/a>/, "")}${stateBlock({ icon: "inbox", title: "No company requests yet", body: "When a founder asks to connect, they show up here with how well they fit your mandate. Share your GateQ link to let founders check their fit first.", actions: `<a class="btn primary" href="gateq.html?view=inbox">Open GateQ</a><button class="btn secondary">Review your mandate</button>` })}</div>`;
   const lim = STATE === "limited";
-  return `<div class="wrap">${head}${lim ? `<div class="banner">${ic("lock", "sm")}<span>You're a <b>Viewer</b> at Northbound Capital. You can read requests and add notes; partners accept or decline. <a href="#" style="text-decoration:underline">Ask Daniel for access</a></span></div>` : ""}
+  return `<div class="wrap">${head}${lim ? `<div class="banner">${ic("lock", "sm")}<span>You're a <b>Member</b> at Northbound Capital. You can read requests and add notes; admins accept or decline. <a href="#" style="text-decoration:underline">Ask Daniel to make you an admin</a></span></div>` : ""}
     <div class="reqs">${["sunline", "kora", "harvest", "freightly"].map((id) => card(id, lim)).join("")}</div></div>`;
 }
 const LONG = {
