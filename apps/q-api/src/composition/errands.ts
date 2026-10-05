@@ -32,7 +32,11 @@ import {
   type ErrandReplyVariables,
 } from "@capital-q/q-core";
 import { etiquetteFor, type EtiquetteSource } from "./etiquette.js";
-import { reviewedReply, type OutwardReview } from "./workforce/review.js";
+import {
+  reviewedReply,
+  type OutwardReview,
+  type OutwardVerdict,
+} from "./workforce/review.js";
 import {
   ERRAND_START as ERRAND_START_NAME,
   type RelationshipIntelligencePort,
@@ -413,6 +417,8 @@ export type ErrandReplyComposer = {
     readonly brief: string;
     readonly callComing: boolean;
     readonly thread: string;
+    /** J6: the workforce job's correlation, so the draft is priced there. */
+    readonly correlationId?: string | undefined;
   }) => Promise<ErrandReplyResult | null>;
 };
 
@@ -468,7 +474,7 @@ export function createErrandReplyComposer(dependencies: {
               purpose: "DELEGATED_WORK",
               tenantId: input.actor.tenantId,
               userId: input.actor.userId,
-              correlationId: `cor_${randomUUID()}`,
+              correlationId: input.correlationId ?? `cor_${randomUUID()}`,
             },
           },
           { schema: ErrandReplyResultSchema },
@@ -1354,14 +1360,26 @@ export function createErrandRunner(dependencies: {
               `${message.from === "OTHER_SIDE" ? message.senderName : `${message.senderName} (${principalName}'s side)`}: ${message.text ?? `[${message.attachmentTitle ?? message.kind}]`}`,
           )
           .join("\n");
+        const passedBox: { verdict: OutwardVerdict | null } = {
+          verdict: null,
+        };
+        const errandSource = {
+          kind: "ERRAND",
+          id: row.id,
+          goal: `Look after ${row.counterpart_name}`,
+        } as const;
+        // Filed first, so the writer's own call is priced under the job (J6).
+        const prepared =
+          (await dependencies.review
+            ?.prepare(actor, errandSource, {
+              channel: "CHAT",
+              counterpartName: row.counterpart_name,
+            })
+            .catch(() => null)) ?? null;
         const answer = await reviewedReply(
           dependencies.review,
           actor,
-          {
-            kind: "ERRAND",
-            id: row.id,
-            goal: `Look after ${row.counterpart_name}`,
-          },
+          errandSource,
           {
             principalName,
             counterpartName: row.counterpart_name,
@@ -1380,15 +1398,29 @@ export function createErrandRunner(dependencies: {
             callComing:
               plan.data.bookCall !== null && current.meeting_id === null,
             thread,
+            ...(prepared === null
+              ? {}
+              : { correlationId: prepared.correlationId }),
           }),
+          (verdict) => {
+            passedBox.verdict = verdict;
+          },
+          prepared,
         );
+        const passed = passedBox.verdict;
         if (answer?.reply != null) {
-          await post(
+          const sent = await post(
             actor,
             row,
             `reply:${newest.toISOString()}`,
             answer.reply,
           ).catch(() => false);
+          // The graded draft really went: its outcome is "sent" (J5).
+          if (sent && passed !== null) {
+            await dependencies.review
+              ?.settle(actor, passed, "SENT")
+              .catch(() => undefined);
+          }
         }
         await update(row.id, {
           seenUntil: newest,

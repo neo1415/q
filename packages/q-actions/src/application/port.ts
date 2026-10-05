@@ -27,6 +27,13 @@ import type { QActionService } from "./service.js";
 export type QActionProposal = {
   readonly actionType: string;
   readonly payload: unknown;
+  /**
+   * Told the card's action id once the proposal and its approval request
+   * are committed (founder brief J3: a graded draft is tied to its card so
+   * the person's decision reaches the agents' learning). Best effort: a
+   * failure here never undoes or fails the proposal.
+   */
+  readonly onProposed?: ((actionId: string) => Promise<void>) | undefined;
 };
 
 /**
@@ -200,6 +207,9 @@ export function createQActionPort(options: {
           });
         // What this result covers: the card it is, and the cards it replaced.
         covered.add(action.id);
+        if (alreadyDone === undefined && proposal.onProposed !== undefined) {
+          await proposal.onProposed(action.id).catch(() => undefined);
+        }
         for (const older of superseded ?? []) covered.add(older.id);
         if (alreadyDone !== undefined) {
           // Carried out already (voiceq-63): where it stands, from its

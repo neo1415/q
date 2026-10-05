@@ -113,6 +113,18 @@ export function createWorkforcePage(dependencies: {
   readonly store: WorkforceStore;
   readonly costs?: WorkforceCosts | undefined;
   readonly monthCosts?: WorkforceMonthCosts | undefined;
+  /**
+   * A standing instruction's own planning (its first drafts), by
+   * instruction id: priced under its job's lead (J6).
+   */
+  readonly sourceCosts?:
+    | ((
+        owner: Owner,
+        instructionIds: readonly string[],
+      ) => Promise<
+        readonly { readonly instructionId: string; readonly usd: string }[]
+      >)
+    | undefined;
   /** The person's monthly limit for Q's work, USD; null: none. */
   readonly monthlyLimitUsd?:
     ((owner: Owner) => Promise<number | null>) | undefined;
@@ -120,10 +132,30 @@ export function createWorkforcePage(dependencies: {
 }) {
   const { store } = dependencies;
 
-  async function costsOf(owner: Owner, jobIds: readonly string[]) {
-    const rows = await (
-      dependencies.costs?.(owner, jobIds) ?? Promise.resolve([])
-    ).catch(() => []);
+  async function costsOf(
+    owner: Owner,
+    jobs: readonly Pick<JobRow, "id" | "source_kind" | "source_id">[],
+    leadRunId: string | null = null,
+  ) {
+    const instructions = new Map(
+      jobs.flatMap((job) =>
+        job.source_kind === "INSTRUCTION" && job.source_id !== null
+          ? [[job.source_id, job.id] as const]
+          : [],
+      ),
+    );
+    const [rows, planning] = await Promise.all([
+      (
+        dependencies.costs?.(
+          owner,
+          jobs.map((job) => job.id),
+        ) ?? Promise.resolve([])
+      ).catch(() => []),
+      (instructions.size === 0 || dependencies.sourceCosts === undefined
+        ? Promise.resolve([])
+        : dependencies.sourceCosts(owner, [...instructions.keys()])
+      ).catch(() => []),
+    ]);
     const byJob = new Map<string, number>();
     const byRun = new Map<string, number>();
     for (const row of rows) {
@@ -131,6 +163,16 @@ export function createWorkforcePage(dependencies: {
       if (!Number.isFinite(value)) continue;
       byJob.set(row.jobId, (byJob.get(row.jobId) ?? 0) + value);
       byRun.set(row.runId, (byRun.get(row.runId) ?? 0) + value);
+    }
+    // The instruction's planning wrote its first drafts: the lead's cost.
+    for (const row of planning) {
+      const value = Number(row.usd);
+      const jobId = instructions.get(row.instructionId);
+      if (!Number.isFinite(value) || jobId === undefined) continue;
+      byJob.set(jobId, (byJob.get(jobId) ?? 0) + value);
+      if (leadRunId !== null) {
+        byRun.set(leadRunId, (byRun.get(leadRunId) ?? 0) + value);
+      }
     }
     return { byJob, byRun };
   }
@@ -149,10 +191,7 @@ export function createWorkforcePage(dependencies: {
         before,
       });
       const shown = rows.slice(0, page.limit);
-      const { byJob } = await costsOf(
-        owner,
-        shown.map((row) => row.id),
-      );
+      const { byJob } = await costsOf(owner, shown);
       const last = shown.at(-1);
       return {
         items: shown.map((row) =>
@@ -171,7 +210,11 @@ export function createWorkforcePage(dependencies: {
     ): Promise<WorkforceJobDetailDto | null> => {
       const detail: JobDetail | null = await store.job(owner, jobId);
       if (detail === null) return null;
-      const { byJob, byRun } = await costsOf(owner, [detail.job.id]);
+      const { byJob, byRun } = await costsOf(
+        owner,
+        [detail.job],
+        detail.runs.find((run) => run.role === "LEAD")?.id ?? null,
+      );
       const held = detail.outcomes.filter((one) => one.outcome === "HELD");
       const names = new Map(detail.runs.map((run) => [run.id, run.agent_name]));
       const name = (id: string | null) =>

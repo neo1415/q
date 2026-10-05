@@ -43,7 +43,11 @@ import {
 import type { ErrandNegotiation } from "../errands.js";
 import { slotLabel, workingHourSlots } from "../slots.js";
 import type { CounterpartNudger } from "../waiting.js";
-import { reviewedReply, type OutwardReview } from "../workforce/review.js";
+import {
+  createPassedDrafts,
+  reviewedReply,
+  type OutwardReview,
+} from "../workforce/review.js";
 import type { WorkComposers } from "./composers.js";
 import {
   TERMINAL_STAGES,
@@ -216,6 +220,7 @@ function chatPathOf(counterpart: {
 export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
   const { store, composers, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
+  const passedReplies = createPassedDrafts();
 
   // --- who acts ------------------------------------------------------------
 
@@ -412,6 +417,13 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
             priority: "UPDATE",
           })
           .catch(() => 0);
+        // A reply the reviewer passed has now really gone: "sent" (J5).
+        const passed = passedReplies.take(ref.delegationId, parsed.data);
+        if (passed !== null) {
+          await dependencies.review
+            ?.settle(ref, passed, "SENT")
+            .catch(() => undefined);
+        }
         return true;
       } catch (error: unknown) {
         logger?.warn(
@@ -422,15 +434,36 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
       }
     },
 
-    converse: async (ref, input) =>
-      reviewedReply(
-        dependencies.review,
+    converse: async (ref, input) => {
+      const source = {
+        kind: "DELEGATED_WORK",
+        id: ref.delegationId,
+        goal: "Q's outreach for you",
+      } as const;
+      // Filed first, so the writer's own call is priced under the job (J6).
+      const prepared =
+        (await dependencies.review
+          ?.prepare(ref, source, {
+            channel: "CHAT",
+            counterpartName: input.counterpartName,
+          })
+          .catch(() => null)) ?? null;
+      const written = await composers.converse(
         ref,
         {
-          kind: "DELEGATED_WORK",
-          id: ref.delegationId,
-          goal: "Q's outreach for you",
+          principalName: input.principalName,
+          counterpartName: input.counterpartName,
+          brief: input.brief ?? "",
+          topicsOpen: input.topicsOpen.join("\n"),
+          otherSideIsQ: input.otherSideIsQ,
+          thread: input.thread,
         },
+        prepared?.correlationId ?? null,
+      );
+      return reviewedReply(
+        dependencies.review,
+        ref,
+        source,
         {
           principalName: input.principalName,
           counterpartName: input.counterpartName,
@@ -441,15 +474,13 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
           material: input.brief ?? "",
           thread: input.thread,
         },
-        await composers.converse(ref, {
-          principalName: input.principalName,
-          counterpartName: input.counterpartName,
-          brief: input.brief ?? "",
-          topicsOpen: input.topicsOpen.join("\n"),
-          otherSideIsQ: input.otherSideIsQ,
-          thread: input.thread,
-        }),
-      ),
+        written,
+        (verdict) => {
+          passedReplies.remember(ref.delegationId, verdict);
+        },
+        prepared,
+      );
+    },
 
     interviewTurn: (ref, input) =>
       composers.interviewTurn(ref, {
@@ -670,15 +701,35 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
             })
             .catch(() => null),
 
-    standInReply: async (ref, input) =>
-      reviewedReply(
-        dependencies.review,
+    standInReply: async (ref, input) => {
+      const source = {
+        kind: "DELEGATED_WORK",
+        id: ref.delegationId,
+        goal: "Q standing in for you",
+      } as const;
+      // Filed first, so the writer's own call is priced under the job (J6).
+      const prepared =
+        (await dependencies.review
+          ?.prepare(ref, source, {
+            channel: "CHAT",
+            counterpartName: input.counterpartName,
+          })
+          .catch(() => null)) ?? null;
+      const written = await composers.standInReply(
         ref,
         {
-          kind: "DELEGATED_WORK",
-          id: ref.delegationId,
-          goal: "Q standing in for you",
+          principalName: input.principalName,
+          counterpartName: input.counterpartName,
+          brief: input.brief,
+          otherSideIsQ: input.otherSideIsQ,
+          thread: input.thread,
         },
+        prepared?.correlationId ?? null,
+      );
+      return reviewedReply(
+        dependencies.review,
+        ref,
+        source,
         {
           principalName: input.principalName,
           counterpartName: input.counterpartName,
@@ -689,14 +740,13 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
           material: input.brief,
           thread: input.thread,
         },
-        await composers.standInReply(ref, {
-          principalName: input.principalName,
-          counterpartName: input.counterpartName,
-          brief: input.brief,
-          otherSideIsQ: input.otherSideIsQ,
-          thread: input.thread,
-        }),
-      ),
+        written,
+        (verdict) => {
+          passedReplies.remember(ref.delegationId, verdict);
+        },
+        prepared,
+      );
+    },
 
     nudgeCounterpart: async (ref, relationshipId, key) =>
       dependencies.nudger === undefined

@@ -1,3 +1,4 @@
+import { workforceCorrelationId } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   DEFAULT_REVIEW_POLICY,
@@ -69,7 +70,26 @@ export type OutwardVerdict =
       readonly draftId: string | null;
     };
 
+/**
+ * A message's job, writer and reviewer runs, filed before its first draft
+ * is written so the writer's own call is priced under the job (J6).
+ */
+export type PreparedDraft = {
+  readonly jobId: string;
+  readonly writer: string;
+  readonly reviewer: string;
+  readonly policy: { readonly threshold: number; readonly maxRedrafts: number };
+  /** The correlation id the first draft's model call carries. */
+  readonly correlationId: string;
+};
+
 export type OutwardReview = {
+  /** Files the job and runs before the first draft; null without a store. */
+  readonly prepare: (
+    who: Owner,
+    source: OutwardSource,
+    draft: Pick<OutwardDraft, "channel" | "counterpartName">,
+  ) => Promise<PreparedDraft | null>;
   readonly review: (
     who: Owner,
     source: OutwardSource,
@@ -80,8 +100,12 @@ export type OutwardReview = {
       /** A job planned by the lead Q files the draft under its own run. */
       readonly job?:
         { readonly jobId: string; readonly parentRunId: string } | undefined;
+      /** Filed already, before the first draft was written. */
+      readonly prepared?: PreparedDraft | null | undefined;
     },
   ) => Promise<OutwardVerdict>;
+  /** A prepared message the writer had nothing honest for: its runs end. */
+  readonly abandon: (who: Owner, prepared: PreparedDraft) => Promise<void>;
   /** What happened to a passed draft: sent by Q, or offered for approval. */
   readonly settle: (
     who: Owner,
@@ -125,59 +149,82 @@ export function createOutwardReview(dependencies: {
     }
   }
 
+  async function file(
+    who: Owner,
+    source: OutwardSource,
+    draft: Pick<OutwardDraft, "channel" | "counterpartName">,
+    job: { readonly jobId: string; readonly parentRunId: string } | undefined,
+  ): Promise<PreparedDraft | null> {
+    if (store === undefined) return null;
+    return quietly(async () => {
+      const filedJob =
+        job === undefined
+          ? await store.ensureJob(who, {
+              source: { kind: source.kind, id: source.id },
+              goal: source.goal,
+              budgetUsd: 0.5,
+              threshold: basePolicy.threshold,
+              maxRedrafts: basePolicy.maxRedrafts,
+              rubricVersion: RUBRIC_VERSION,
+            })
+          : null;
+      const jobId = job?.jobId ?? filedJob?.job.id ?? null;
+      const parent = job?.parentRunId ?? filedJob?.leadRunId ?? null;
+      if (jobId === null || parent === null) return null;
+      const goal = `${draft.channel === "EMAIL" ? "Email" : "Message"} to ${draft.counterpartName}`;
+      const writer = await store.startRun(who, {
+        jobId,
+        role: "WRITER",
+        agentName: "Writer",
+        goal,
+        tools: [],
+        budgetUsd: 0.1,
+        stepKey: null,
+        spawnedByRunId: parent,
+      });
+      const reviewer = await store.startRun(who, {
+        jobId,
+        role: "REVIEWER",
+        agentName: "Reviewer",
+        goal: `Grade: ${goal}`,
+        tools: [],
+        budgetUsd: 0.1,
+        stepKey: null,
+        spawnedByRunId: parent,
+      });
+      return {
+        jobId,
+        writer,
+        reviewer,
+        policy: {
+          threshold: filedJob?.job.review_threshold ?? basePolicy.threshold,
+          maxRedrafts: filedJob?.job.max_redrafts ?? basePolicy.maxRedrafts,
+        },
+        correlationId: workforceCorrelationId(jobId, writer),
+      };
+    }, null);
+  }
+
   return {
+    prepare: (who, source, draft) => file(who, source, draft, undefined),
+
+    abandon: async (who, prepared) => {
+      if (store === undefined) return;
+      await quietly(async () => {
+        await store.endRun(who, prepared.writer, "DONE", "Nothing to say yet.");
+        await store.endRun(
+          who,
+          prepared.reviewer,
+          "SKIPPED",
+          "Nothing to grade.",
+        );
+      }, undefined);
+    },
+
     review: async (who, source, draft, options) => {
       // The job, its lead, and this message's writer and reviewer runs.
       const filed =
-        store === undefined
-          ? null
-          : await quietly(async () => {
-              const job =
-                options?.job === undefined
-                  ? await store.ensureJob(who, {
-                      source: { kind: source.kind, id: source.id },
-                      goal: source.goal,
-                      budgetUsd: 0.5,
-                      threshold: basePolicy.threshold,
-                      maxRedrafts: basePolicy.maxRedrafts,
-                      rubricVersion: RUBRIC_VERSION,
-                    })
-                  : null;
-              const jobId = options?.job?.jobId ?? job?.job.id ?? null;
-              const parent =
-                options?.job?.parentRunId ?? job?.leadRunId ?? null;
-              if (jobId === null || parent === null) return null;
-              const goal = `${draft.channel === "EMAIL" ? "Email" : "Message"} to ${draft.counterpartName}`;
-              const writer = await store.startRun(who, {
-                jobId,
-                role: "WRITER",
-                agentName: "Writer",
-                goal,
-                tools: [],
-                budgetUsd: 0.1,
-                stepKey: null,
-                spawnedByRunId: parent,
-              });
-              const reviewer = await store.startRun(who, {
-                jobId,
-                role: "REVIEWER",
-                agentName: "Reviewer",
-                goal: `Grade: ${goal}`,
-                tools: [],
-                budgetUsd: 0.1,
-                stepKey: null,
-                spawnedByRunId: parent,
-              });
-              return {
-                jobId,
-                writer,
-                reviewer,
-                policy: {
-                  threshold: job?.job.review_threshold ?? basePolicy.threshold,
-                  maxRedrafts: job?.job.max_redrafts ?? basePolicy.maxRedrafts,
-                },
-              };
-            }, null);
+        options?.prepared ?? (await file(who, source, draft, options?.job));
       const policy = filed?.policy ?? basePolicy;
       const frame = {
         principalName: draft.principalName.slice(0, 120),
@@ -340,15 +387,28 @@ export async function reviewedReply<
   source: OutwardSource,
   draft: Omit<OutwardDraft, "body">,
   result: T | null,
+  /**
+   * Told the passing verdict, so the caller records "sent" (`settle`) once
+   * its own sender has really sent the graded text.
+   */
+  onPassed?: ((verdict: OutwardVerdict) => void)  ,
+  /** Filed before the first draft, which was priced under the job. */
+  prepared?: PreparedDraft | null  ,
 ): Promise<T | null> {
   if (review === undefined || result === null || result.reply === null) {
+    if (review !== undefined && prepared != null) {
+      await review.abandon(who, prepared);
+    }
     return result;
   }
-  const verdict = await review.review(who, source, {
-    ...draft,
-    body: result.reply,
-  });
+  const verdict = await review.review(
+    who,
+    source,
+    { ...draft, body: result.reply },
+    { prepared },
+  );
   if (verdict.verdict === "PASSED") {
+    onPassed?.(verdict);
     // Released to the path's own sender, which still applies its own
     // checks (the consider step, caps); what it sends is the graded text.
     return { ...result, reply: verdict.body };
@@ -360,5 +420,33 @@ export async function reviewedReply<
       ...result.forPerson,
       heldLine(verdict, draft.counterpartName),
     ].slice(0, 5),
+  };
+}
+
+/**
+ * Passed drafts waiting for their path's own sender (J5: delegated replies
+ * record "sent"). The orchestrator decides when a reply goes, so the
+ * verdict is kept here by its scope and exact text and taken when that
+ * text is really sent. In memory and bounded: a restart between grading
+ * and sending loses only the "sent" line, never the message or its grade.
+ */
+export function createPassedDrafts(limit = 500) {
+  const waiting = new Map<string, OutwardVerdict>();
+  const key = (scope: string, body: string) => `${scope}\u0000${body.trim()}`;
+  return {
+    remember: (scope: string, verdict: OutwardVerdict) => {
+      if (verdict.verdict !== "PASSED") return;
+      waiting.set(key(scope, verdict.body), verdict);
+      while (waiting.size > limit) {
+        const oldest = waiting.keys().next().value;
+        if (oldest === undefined) break;
+        waiting.delete(oldest);
+      }
+    },
+    take: (scope: string, body: string): OutwardVerdict | null => {
+      const found = waiting.get(key(scope, body)) ?? null;
+      waiting.delete(key(scope, body));
+      return found;
+    },
   };
 }

@@ -121,6 +121,8 @@ export function createWorkComposers(dependencies: {
      * only reading or choosing.
      */
     purpose: EtiquettePurpose | null = null,
+    /** J6: a first draft filed under a workforce job is priced there. */
+    correlationId: string | null = null,
   ): Promise<O | null> {
     try {
       const etiquette =
@@ -149,7 +151,7 @@ export function createWorkComposers(dependencies: {
             purpose: "DELEGATED_WORK",
             tenantId: who.tenantId,
             userId: who.userId,
-            correlationId: `cor_${randomUUID()}`,
+            correlationId: correlationId ?? `cor_${randomUUID()}`,
           },
         },
         { schema },
@@ -181,7 +183,11 @@ export function createWorkComposers(dependencies: {
         LARGE,
         "You are choosing, not writing to anyone. Nothing is sent until code acts on your picks.",
       ),
-    converse: (who: Who, variables: TaskVariables["WORK_CONVERSE"]) =>
+    converse: (
+      who: Who,
+      variables: TaskVariables["WORK_CONVERSE"],
+      correlationId: string | null = null,
+    ) =>
       call<"WORK_CONVERSE", WorkConverseResult>(
         "WORK_CONVERSE",
         who,
@@ -190,6 +196,7 @@ export function createWorkComposers(dependencies: {
         SMALL,
         CHAT_NOTE,
         "SPEAK_FOR",
+        correlationId,
       ),
     interviewTurn: (
       who: Who,
@@ -223,7 +230,11 @@ export function createWorkComposers(dependencies: {
         SMALL,
         "You are reading a reply, not writing one. Code books only what you report.",
       ),
-    standInReply: (who: Who, variables: TaskVariables["WORK_STAND_IN_REPLY"]) =>
+    standInReply: (
+      who: Who,
+      variables: TaskVariables["WORK_STAND_IN_REPLY"],
+      correlationId: string | null = null,
+    ) =>
       call<"WORK_STAND_IN_REPLY", WorkStandInReplyResult>(
         "WORK_STAND_IN_REPLY",
         who,
@@ -232,6 +243,7 @@ export function createWorkComposers(dependencies: {
         SMALL,
         CHAT_NOTE,
         "SPEAK_FOR",
+        correlationId,
       ),
   };
 }

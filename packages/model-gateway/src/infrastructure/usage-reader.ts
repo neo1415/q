@@ -203,6 +203,31 @@ export function createPostgresUsageReader(sql: DatabaseExecutor) {
     },
 
     /**
+     * J6: a standing instruction's own planning calls (`cor_instr_<id>_`),
+     * which write its first drafts, priced under the instruction's job.
+     */
+    instructionCosts: async (
+      who: { readonly userId: string; readonly tenantId: string },
+      instructionIds: readonly string[],
+    ): Promise<
+      readonly { readonly instructionId: string; readonly usd: string }[]
+    > => {
+      if (instructionIds.length === 0) return [];
+      const rows = await sql<{ instruction_id: string; usd: string }[]>`
+        select substring(u.correlation_id from '^cor_instr_([0-9a-f-]{36})_') as instruction_id,
+               round(coalesce(sum(u.cost_usd), 0), 6)::text as usd
+          from ai_ops.model_usage u
+         where u.user_id = ${who.userId} and u.tenant_id = ${who.tenantId}
+           and u.correlation_id like 'cor\\_instr\\_%'
+           and substring(u.correlation_id from '^cor_instr_([0-9a-f-]{36})_') = any(${[...instructionIds]}::text[])
+         group by 1`;
+      return rows.map((row) => ({
+        instructionId: row.instruction_id,
+        usd: row.usd,
+      }));
+    },
+
+    /**
      * J6: what the person's workforce agents spent this month, by agent
      * run, from the same ledger (the run's role is the workforce's own).
      */

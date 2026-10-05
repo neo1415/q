@@ -8,9 +8,11 @@ import {
   handleEverythingGrant,
   type InstructionGrant,
 } from "@capital-q/contracts";
-import type {
-  InstructionPlanResult,
-  InstructionThreadFacts,
+import {
+  DRAFT_INTEGRITY_RULES,
+  DRAFT_RUBRIC_CRITERIA,
+  type InstructionPlanResult,
+  type InstructionThreadFacts,
 } from "@capital-q/q-core";
 import { ActorContextSchema } from "@capital-q/security";
 
@@ -30,6 +32,8 @@ import {
   type InstructionMaterial,
 } from "../src/composition/instructions/material.js";
 import { createIntroducedReader } from "../src/composition/instructions/introduced.js";
+import { createOutwardReview } from "../src/composition/workforce/review.js";
+import { createInMemoryWorkforceStore } from "../src/composition/workforce/store.js";
 import type { ThreadRead } from "../src/composition/instructions/quarantine.js";
 import type {
   InstructionRow,
@@ -515,6 +519,7 @@ function world(
   autoEnabled = true,
   at = IN_HOURS,
   spent = "0",
+  extra: Partial<Parameters<typeof createInstructionEngine>[0]> = {},
 ) {
   const spends: number[] = [];
   const paused: string[] = [];
@@ -622,6 +627,7 @@ function world(
     },
     now: () => at,
     autoEnabled,
+    ...extra,
   });
   return { engine, row, steps, asked, planned, spends, paused, asks, notices };
 }
@@ -1557,5 +1563,134 @@ describe("any hour (live QA 01a6124a)", () => {
     ]) {
       expect(withinWorkingHours(new Date(at), always), at).toBe(true);
     }
+  });
+});
+
+/**
+ * Founder brief J2 at the engine (review gap 2026-10-06): with the reviewer
+ * on, a standing instruction's message is graded before it goes. A draft
+ * below the bar is redrafted from the reviewer's feedback and the redraft
+ * is what is sent; one that never passes is neither sent nor offered; an
+ * offered one is tied to its approval card so the person's decision
+ * reaches the agents' learning.
+ */
+describe("a firing with the reviewer on", () => {
+  const passing = {
+    criteria: DRAFT_RUBRIC_CRITERIA.map((criterion) => ({
+      criterion,
+      score: 5,
+      note: "",
+    })),
+    integrity: DRAFT_INTEGRITY_RULES.map((rule) => ({
+      rule,
+      ok: true,
+      note: "",
+    })),
+    feedback: "",
+  };
+  const failing = {
+    ...passing,
+    criteria: passing.criteria.map((one) => ({ ...one, score: 1 })),
+    feedback: "Asks for a meeting in the first line; start warm.",
+  };
+
+  function reviewer(
+    grades: readonly (typeof passing)[],
+    redraft: string | null,
+  ) {
+    const store = createInMemoryWorkforceStore();
+    const seen: string[] = [];
+    let call = 0;
+    const review = createOutwardReview({
+      store,
+      models: {
+        review: (_who, _trace, variables) => {
+          seen.push(variables.draft);
+          const grade = grades[Math.min(call, grades.length - 1)];
+          call += 1;
+          return Promise.resolve(grade ?? null);
+        },
+        redraft: () => Promise.resolve(redraft),
+      },
+    });
+    return { store, review, seen };
+  }
+
+  it("redrafts a draft below the bar and sends the one that passed", async () => {
+    ran.length = 0;
+    const { store, review, seen } = reviewer(
+      [failing, passing],
+      "Ada, your 310 installs stand out.",
+    );
+    const { engine, row } = world(
+      [{ steps: [chat("Could we get 30 minutes this week?")], cannot: [] }],
+      true,
+      IN_HOURS,
+      "0",
+      { review, principalName: () => Promise.resolve("Ada Obi") },
+    );
+    const result = await engine.fire(row.id, "run-review-1");
+    expect(result).toMatchObject({ outcome: "RAN", done: 1 });
+    expect(seen).toEqual([
+      "Could we get 30 minutes this week?",
+      "Ada, your 310 installs stand out.",
+    ]);
+    expect(ran).toHaveLength(1);
+    expect(ran[0]?.name).toBe("chat.message.send");
+    expect(ran[0]?.input).toMatchObject({
+      input: { kind: "TEXT", body: "Ada, your 310 installs stand out." },
+    });
+    expect(store.rows.drafts.map((d) => d.attempt)).toEqual([1, 2]);
+    expect(store.rows.grades.map((g) => g.passed)).toEqual([false, true]);
+    expect(store.rows.outcomes).toEqual([
+      expect.objectContaining({ outcome: "SENT" }),
+    ]);
+    expect(store.rows.jobs[0]).toMatchObject({
+      source_kind: "INSTRUCTION",
+      source_id: row.id,
+    });
+  });
+
+  it("never sends or offers a draft that does not pass", async () => {
+    ran.length = 0;
+    const { store, review } = reviewer([failing], null);
+    const { engine, row, asked, steps } = world(
+      [{ steps: [chat("Could we get 30 minutes this week?")], cannot: [] }],
+      true,
+      IN_HOURS,
+      "0",
+      { review },
+    );
+    await engine.fire(row.id, "run-review-2");
+    expect(ran).toHaveLength(0);
+    expect(asked).toHaveLength(0);
+    expect(store.rows.outcomes).toEqual([
+      expect.objectContaining({ outcome: "HELD" }),
+    ]);
+    expect(
+      [...steps.values()].some((step) => step.reasonCode === "BELOW_THE_BAR"),
+    ).toBe(true);
+  });
+
+  it("ties an offered draft to its approval card, so the decision teaches", async () => {
+    ran.length = 0;
+    const { store, review } = reviewer([passing], null);
+    const { engine, row, asked } = world(
+      [{ steps: [chat("Ada, your installs stand out.")], cannot: [] }],
+      false,
+      IN_HOURS,
+      "0",
+      { review },
+    );
+    await engine.fire(row.id, "run-review-3");
+    expect(asked).toHaveLength(1);
+    const offered = store.rows.outcomes.find((o) => o.outcome === "OFFERED");
+    expect(offered?.q_action_id).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(
+      await store.draftForAction(
+        { tenantId, userId },
+        offered?.q_action_id ?? "",
+      ),
+    ).toBe(offered?.draft_id);
   });
 });

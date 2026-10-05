@@ -343,9 +343,10 @@ export function createMeetingFollowUpCards(dependencies: {
     meetingId: string,
     counterpartName: string,
     agreements: readonly string[],
+    principalName: string,
   ): Promise<{
     card: FollowUpCard;
-    settle: (() => Promise<void>) | null;
+    settle: ((qActionId: string | null) => Promise<void>) | null;
   } | null> {
     const review = dependencies.review;
     const input = card.payload["input"];
@@ -367,7 +368,8 @@ export function createMeetingFollowUpCards(dependencies: {
         goal: `Follow up the call with ${counterpartName}`,
       },
       {
-        principalName: "the organiser",
+        // The person the recap speaks for, by their own name (J2).
+        principalName: principalName.trim().slice(0, 120) || "the organiser",
         counterpartName,
         channel: "CHAT",
         stage: "FOLLOW_UP",
@@ -390,7 +392,10 @@ export function createMeetingFollowUpCards(dependencies: {
         ...card,
         payload: { ...card.payload, input: { ...input, body: verdict.body } },
       },
-      settle: () => review.settle(actor, verdict, "OFFERED"),
+      // Tied to the card it was offered on, so the person's approval,
+      // edit or rejection reaches the agents' learning (J3).
+      settle: (qActionId) =>
+        review.settle(actor, verdict, "OFFERED", qActionId),
     };
   }
   const now = dependencies.now ?? (() => new Date());
@@ -412,7 +417,10 @@ export function createMeetingFollowUpCards(dependencies: {
     actor: ActorContext,
     card: FollowUpCard,
     conversationId: string | null,
-  ): Promise<string | null> {
+  ): Promise<{
+    readonly conversationId: string | null;
+    readonly actionId: string | null;
+  }> {
     const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
     const own = card.payload["idempotencyKey"];
     const key =
@@ -435,7 +443,9 @@ export function createMeetingFollowUpCards(dependencies: {
       correlationId,
     });
     // Already proposed (a retried settle): the card stands as it was.
-    if (!created.created) return created.conversation.id;
+    if (!created.created) {
+      return { conversationId: created.conversation.id, actionId: null };
+    }
     const ref = runRef(created.run);
     await dependencies.orchestration.begin(
       ref,
@@ -447,21 +457,23 @@ export function createMeetingFollowUpCards(dependencies: {
       "PLANNING",
       "SYNTHESIS",
     ]);
+    let actionId: string;
     try {
-      await dependencies.actions.propose({
+      const proposed = await dependencies.actions.propose({
         actor,
         runId: created.run.id,
         correlationId,
         actionType: card.actionType,
         payload: card.payload,
       });
+      actionId = proposed.action.id;
     } catch (error: unknown) {
       await dependencies.orchestration
         .fail(ref, "INTERNAL_ERROR")
         .catch(() => undefined);
       throw error;
     }
-    return created.conversation.id;
+    return { conversationId: created.conversation.id, actionId };
   }
 
   async function peopleOf(
@@ -606,11 +618,13 @@ export function createMeetingFollowUpCards(dependencies: {
               held.meetingId,
               person.counterpart,
               held.agreements,
+              person.name,
             );
             if (graded === null) continue;
             const { card } = graded;
-            conversationId = await propose(actor, card, conversationId);
-            await graded.settle?.();
+            const filed = await propose(actor, card, conversationId);
+            conversationId = filed.conversationId;
+            await graded.settle?.(filed.actionId);
             count += 1;
           } catch (error: unknown) {
             logger?.warn(

@@ -225,6 +225,10 @@ export function createEmailActionBoard(
      * approval board; a redraft replaces it, a held one is not offered.
      */
     readonly review?: OutwardReview | undefined;
+    /** The person's own name, for the reviewer (never a placeholder). */
+    readonly principalName?:
+      | ((actor: { readonly userId: string }) => Promise<string | null>)
+      | undefined;
   } = {},
 ): {
   readonly prepareForApproval: EmailIntelligencePort["prepareForApproval"];
@@ -286,37 +290,44 @@ export function createEmailActionBoard(
           });
         }
         const payload = parsed.data;
-        return review
-          .review(
-            context.actor,
-            {
-              kind: "EMAIL_DRAFT",
-              id: context.runId,
-              goal: `Email ${payload.toName}`,
-            },
-            {
-              principalName: "the person",
-              counterpartName: payload.toName,
-              channel: "EMAIL",
-              stage: "FOLLOW_UP",
-              purpose: `An email the person asked Q to draft. Subject: ${payload.subject}`,
-              material: "",
-              thread: "",
-              body: payload.body,
-            },
+        const principalNameOf = async (actor: { readonly userId: string }) =>
+          (await options.principalName?.(actor).catch(() => null)) ?? null;
+        return principalNameOf(context.actor)
+          .then((principalName) =>
+            review.review(
+              context.actor,
+              {
+                kind: "EMAIL_DRAFT",
+                id: context.runId,
+                goal: `Email ${payload.toName}`,
+              },
+              {
+                principalName: principalName ?? "the person",
+                counterpartName: payload.toName,
+                channel: "EMAIL",
+                stage: "FOLLOW_UP",
+                purpose: `An email the person asked Q to draft. Subject: ${payload.subject}`,
+                material: "",
+                thread: "",
+                body: payload.body,
+              },
+            ),
           )
-          .then(async (verdict) => {
+          .then((verdict) => {
             if (verdict.verdict === "HELD") {
               return { refused: heldLine(verdict, payload.toName) };
             }
-            await review.settle(context.actor, verdict, "OFFERED");
             const graded = EmailSendPayloadSchema.safeParse({
               ...payload,
               body: verdict.body,
             });
-            return graded.success
-              ? { actionType: EMAIL_SEND, payload: graded.data }
-              : { actionType: EMAIL_SEND, payload };
+            return {
+              actionType: EMAIL_SEND,
+              payload: graded.success ? graded.data : payload,
+              // Offered on this card: its decision is the draft's feedback.
+              onProposed: (actionId: string) =>
+                review.settle(context.actor, verdict, "OFFERED", actionId),
+            };
           });
       },
     },

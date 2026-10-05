@@ -1257,6 +1257,12 @@ const integrations = composeGoogleIntegrations({
 // message passes, and the record of Q's agents for the workforce page.
 const workforceStore = createPostgresWorkforceStore(database.sql);
 const workforceMonthlyLimit = workforceMonthlyLimitUsd(process.env);
+/** The person's own name, for drafts written on their behalf (J2). */
+const workforceDisplayName = (userId: string) =>
+  database.sql<{ display_name: string | null }[]>`
+    select display_name from identity.user_profiles where id = ${userId} limit 1`.then(
+    (rows) => rows[0]?.display_name ?? null,
+  );
 const workforceModels = createWorkforceModels({
   gateway: modelGateway,
   dataPosture: demoDataPosture,
@@ -1269,7 +1275,10 @@ const outwardReview = createOutwardReview({
   logger,
 });
 // end WORKFORCE block
-const emailBoard = createEmailActionBoard({ review: outwardReview });
+const emailBoard = createEmailActionBoard({
+  review: outwardReview,
+  principalName: (actor) => workforceDisplayName(actor.userId),
+});
 // Inbound email: what arrived at a person's Q address, read by Q only
 // through the quarantined reader; a reply is a card they approve, sent by
 // Capital Q's own sender on their behalf with Reply-To their Q address.
@@ -3610,6 +3619,9 @@ const instructionDiscovery = createPostgresDiscoveryRepository({
 });
 instructionEngine.current = createInstructionEngine({
   review: outwardReview,
+  // The person's own name for the planner and the reviewer (J2), never
+  // "the person".
+  principalName: (actor) => workforceDisplayName(actor.userId),
   store: instructionStore,
   autoEnabled: instructionsAuto,
   actions: APP_ACTIONS,
@@ -4718,6 +4730,11 @@ const { app, logger: appLogger } = createApp(
           createPostgresUsageReader(database.sql).workforceCosts(owner, jobIds),
         monthCosts: (owner, at) =>
           createPostgresUsageReader(database.sql).workforceMonth(owner, at),
+        sourceCosts: (owner, instructionIds) =>
+          createPostgresUsageReader(database.sql).instructionCosts(
+            owner,
+            instructionIds,
+          ),
         monthlyLimitUsd: () => Promise.resolve(workforceMonthlyLimit),
       }),
       onDecision: feedbackFromApprovals({
