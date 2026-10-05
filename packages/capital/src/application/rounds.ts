@@ -120,10 +120,7 @@ export function createCapitalRoundService(
   async function authorised(
     actor: ActorContext,
     companyId: CompanyId,
-    capability:
-      | typeof CAPITAL_OBJECTIVE_VIEW
-      | typeof CAPITAL_OBJECTIVE_EDIT
-      | typeof CAPITAL_OBJECTIVE_CLOSE,
+    capability: typeof CAPITAL_OBJECTIVE_VIEW,
   ) {
     const { company, organisationId } = await visibleCompany(
       dependencies,
@@ -155,7 +152,7 @@ export function createCapitalRoundService(
   async function record(
     tx: TransactionContext,
     actor: ActorContext,
-    action: typeof OPENED | typeof CLOSED,
+    action: typeof OPENED,
     roundId: string,
     companyId: string,
     correlationId: CorrelationId,

@@ -151,7 +151,11 @@ export function commitmentNextStep(
       return side === "INVESTOR" ? "MARK_SENT" : "CONFIRM_RECEIVED";
     case "TRANSFER_SENT":
       return side === "COMPANY" ? "CONFIRM_RECEIVED" : null;
-    default:
+    case "SUPERSEDED":
+    case "WITHDRAWN":
+    case "ADOPTED":
+    case "DISPUTED":
+    case "RECEIVED":
       return null;
   }
 }
