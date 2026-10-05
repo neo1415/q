@@ -71,7 +71,7 @@ const actor: ActorContext = ActorContextSchema.parse({
 });
 
 const eligible = (companyId: string): EligibilityResult => ({
-  eligibilityPolicyVersion: "eligibility.v3",
+  eligibilityPolicyVersion: "eligibility.v4",
   mode: "INVESTOR_DISCOVER",
   companyId,
   investorOrganisationId: INVESTOR,
@@ -125,14 +125,14 @@ function pool(
     poolVersion: "hybrid-candidate-pool.v1",
     structuredGeneratorVersion: "structured-mandate.v5",
     semanticGeneratorVersion: "semantic-mandate.v1",
-    eligibilityPolicyVersion: "eligibility.v3",
+    eligibilityPolicyVersion: "eligibility.v4",
     context: {
       tenantId: TENANT,
       investorOrganisationId: INVESTOR,
       mode: "INVESTOR_DISCOVER",
       mandateId: MANDATE,
       taxonomyVersion: { industry: 2 },
-      eligibilityPolicyVersion: "eligibility.v3",
+      eligibilityPolicyVersion: "eligibility.v4",
     },
     semanticUnavailable:
       unavailable === undefined
@@ -619,7 +619,7 @@ describe("slate builder (CQ-REC-006)", () => {
       mode: "INVESTOR_DISCOVER",
       mandateVersion: 1,
       versions: {
-        eligibilityPolicyVersion: "eligibility.v3",
+        eligibilityPolicyVersion: "eligibility.v4",
         structuredGeneratorVersion: "structured-mandate.v5",
         semanticGeneratorVersion: "semantic-mandate.v1",
         featureSchemaVersion: FEATURE_SCHEMA_VERSION,
@@ -653,7 +653,7 @@ describe("slate builder (CQ-REC-006)", () => {
       mode: "INVESTOR_DISCOVER",
     };
     const versions = {
-      eligibilityPolicyVersion: "eligibility.v3" as const,
+      eligibilityPolicyVersion: "eligibility.v4" as const,
       structuredGeneratorVersion: "structured-mandate.v5" as const,
       semanticGeneratorVersion: "semantic-mandate.v1" as const,
       featureSchemaVersion: FEATURE_SCHEMA_VERSION,

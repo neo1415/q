@@ -359,7 +359,7 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
         await tx.sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
         values (${tenantC}, 'COMPANY', ${companyId}, ${node("business_model", "marketplace")}, 'q_inferred')`;
         const [inferred] = await evaluate([companyId]);
-        expect(inferred?.eligibilityPolicyVersion).toBe("eligibility.v3");
+        expect(inferred?.eligibilityPolicyVersion).toBe("eligibility.v4");
         // v3 (ADR 0020): an exclusion the company's declared facts cannot
         // answer never withholds; the criterion stays UNKNOWN and is reported.
         expect(inferred?.decision).toBe("ELIGIBLE");

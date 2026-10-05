@@ -587,7 +587,7 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
         .sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
         values (${target.tenantId}, 'COMPANY', ${target.id}, ${node("industry", "media_entertainment")}, 'q_inferred')`;
       const inferred = generatedOf(await w.generate());
-      expect(inferred.eligibilityPolicyVersion).toBe("eligibility.v3");
+      expect(inferred.eligibilityPolicyVersion).toBe("eligibility.v4");
       expect(labelsOf(w, inferred)).toContain("TaxonomyOnly");
 
       // RegionOnly comes in through its declared west_africa row and, since

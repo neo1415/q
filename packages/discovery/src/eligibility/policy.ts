@@ -83,10 +83,28 @@ const GEOGRAPHY_DIMENSION = "geography.country";
  */
 export const RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY: readonly string[] = [
   "PASSED",
+  // The founder declined this investor's interest: their no is respected.
+  "DECLINED",
 ];
 
-/** Relationship states this policy understands as open. */
-const RELATIONSHIP_STATES_OPEN: readonly string[] = ["DISCOVERED"];
+/**
+ * Relationship states this policy understands as open.
+ *
+ * eligibility.v4 (founder 2026-10-05): a company the investor is engaging
+ * with stays in Discover. Before, every state past DISCOVERED was UNKNOWN,
+ * so expressing interest (by hand or by Q under a standing instruction)
+ * took the company out of the feed: Q's outreach emptied Zino's Discover
+ * down to one company. Engaging is not leaving.
+ */
+const RELATIONSHIP_STATES_OPEN: readonly string[] = [
+  "DISCOVERED",
+  "INTEREST_EXPRESSED",
+  "CONNECTED",
+  "MEETING_HELD",
+  "IN_DILIGENCE",
+  "PAUSED",
+  "INVESTED",
+];
 
 export const DISCOVERABLE_VISIBILITIES: readonly string[] = [
   "network_visible",

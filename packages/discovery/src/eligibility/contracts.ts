@@ -38,8 +38,12 @@ import { z } from "zod";
  * cannot evaluate the rule's dimension at all, the criterion stays UNKNOWN
  * and is reported, but it no longer makes the company UNDETERMINED: v2
  * turned one unmapped `red_flag` exclusion into an empty feed.
+ *
+ * v4 (founder 2026-10-05): a relationship the investor is engaging in
+ * (interest expressed, connected, met, in diligence, paused, invested)
+ * keeps the company eligible; PASSED (unless reopened) and DECLINED close it.
  */
-export const ELIGIBILITY_POLICY_VERSION = "eligibility.v3" as const;
+export const ELIGIBILITY_POLICY_VERSION = "eligibility.v4" as const;
 
 /**
  * Every eligibility policy version a persisted artifact may name (feature
@@ -50,6 +54,7 @@ export const ELIGIBILITY_POLICY_VERSION = "eligibility.v3" as const;
 export const ELIGIBILITY_POLICY_VERSIONS = [
   "eligibility.v1",
   "eligibility.v2",
+  "eligibility.v3",
   ELIGIBILITY_POLICY_VERSION,
 ] as const;
 

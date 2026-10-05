@@ -450,7 +450,7 @@ function eligibility(w: World): EligibilityService {
           mode: "INVESTOR_DISCOVER",
           mandateId: active?.mandateId ?? null,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v3",
+          eligibilityPolicyVersion: "eligibility.v4",
         },
         results,
       });
@@ -1099,6 +1099,6 @@ describe("structured candidate service", () => {
       expect("rank" in c).toBe(false);
     }
     expect(r.generatorVersion).toBe("structured-mandate.v5");
-    expect(r.eligibilityPolicyVersion).toBe("eligibility.v3");
+    expect(r.eligibilityPolicyVersion).toBe("eligibility.v4");
   });
 });

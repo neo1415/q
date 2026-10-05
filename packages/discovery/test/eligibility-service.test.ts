@@ -287,7 +287,7 @@ describe("eligibility service", () => {
       mode: "INVESTOR_DISCOVER",
       mandateId: ACTIVE_MANDATE,
       taxonomyVersion: { industry: 1 },
-      eligibilityPolicyVersion: "eligibility.v3",
+      eligibilityPolicyVersion: "eligibility.v4",
     });
     expect(results.map((r) => [r.companyId, r.decision])).toEqual([
       [COMPANY, "ELIGIBLE"],
@@ -520,7 +520,7 @@ describe("eligibility service", () => {
     const line = JSON.stringify(logs[0]);
     expect(logs[0]).toMatchObject({
       mode: "INVESTOR_DISCOVER",
-      eligibilityPolicyVersion: "eligibility.v3",
+      eligibilityPolicyVersion: "eligibility.v4",
       mandateVersion: 2,
       requested: 2,
       evaluated: 2,
@@ -569,17 +569,15 @@ describe("eligibility for VIEW (pitch playback and the INVESTORS deck)", () => {
   };
 
   for (const state of ["CONNECTED", "IN_DILIGENCE"]) {
-    it(`a ${state} investor whose mandate fits may view; Discover still does not re-show the company`, async () => {
+    it(`a ${state} investor whose mandate fits may view, and Discover keeps the company (v4)`, async () => {
       const w = world();
       w.relationships.set(COMPANY, { kind: "STATE", currentState: state });
       expect((await forPurpose(w, "VIEW")).decision).toBe("ELIGIBLE");
-      // The default and an explicit DISCOVER are the feed's rule, unchanged.
       for (const discover of [
         await forPurpose(w),
         await forPurpose(w, "DISCOVER"),
       ]) {
-        expect(discover.decision).toBe("UNDETERMINED");
-        expect(discover.reasonCodes).toContain("RELATIONSHIP_STATE_UNKNOWN");
+        expect(discover.decision).toBe("ELIGIBLE");
       }
     });
 

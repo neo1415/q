@@ -205,7 +205,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
     ] as const;
 
     it("pins the policy version this behaviour belongs to", () => {
-      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v3");
+      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v4");
     });
 
     it("an undeclared classification on the excluded node, alone in the vocabulary → UNKNOWN, kept (v3), never FAIL", () => {
@@ -650,13 +650,34 @@ describe("eligibility policy v1 — golden scenarios", () => {
     );
   });
 
-  it("K. relationship standing: none or DISCOVERED passes; an unknown state is UNDETERMINED; only PASSED closes", () => {
-    expect(RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY).toEqual(["PASSED"]);
-    expect(
-      evaluateHardEligibility(
-        input({ relationship: { kind: "STATE", currentState: "DISCOVERED" } }),
-      ).decision,
-    ).toBe("ELIGIBLE");
+  it("K. relationship standing (v4): engaging keeps a company in Discover; an unknown state is UNDETERMINED; PASSED and DECLINED close", () => {
+    expect(RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY).toEqual([
+      "PASSED",
+      "DECLINED",
+    ]);
+    // Founder 2026-10-05: Q expressing interest under a standing
+    // instruction emptied Discover; engaging is not leaving.
+    for (const currentState of [
+      "DISCOVERED",
+      "INTEREST_EXPRESSED",
+      "CONNECTED",
+      "MEETING_HELD",
+      "IN_DILIGENCE",
+      "PAUSED",
+      "INVESTED",
+    ]) {
+      expect(
+        evaluateHardEligibility(
+          input({ relationship: { kind: "STATE", currentState } }),
+        ).decision,
+        currentState,
+      ).toBe("ELIGIBLE");
+    }
+    const declined = evaluateHardEligibility(
+      input({ relationship: { kind: "STATE", currentState: "DECLINED" } }),
+    );
+    expect(declined.decision).toBe("INELIGIBLE");
+    expect(declined.reasonCodes).toEqual(["RELATIONSHIP_CLOSED"]);
     const unknown = evaluateHardEligibility(
       input({ relationship: { kind: "STATE", currentState: "SOMETHING_NEW" } }),
     );
