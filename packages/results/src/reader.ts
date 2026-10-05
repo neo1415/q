@@ -1,6 +1,7 @@
 import type {
   FounderResults,
   InvestorResults,
+  ResultsActivity,
   ResultsDto,
   ResultsRange,
 } from "@capital-q/contracts";
@@ -78,7 +79,8 @@ export function resultsWindow(
   }
   const range = input.range ?? "30d";
   if (range === "all") return { from: null, to: today, label: "All time" };
-  const days = range === "30d" ? 30 : range === "90d" ? 90 : 365;
+  const days =
+    range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 365;
   const from = new Date(now.getTime() - (days - 1) * 86_400_000);
   return {
     from: isoDay(from),
@@ -87,12 +89,163 @@ export function resultsWindow(
   };
 }
 
+const DAY_MS = 86_400_000;
+/** At most this many bars: a long window is the most recent weeks. */
+const ACTIVITY_MAX_POINTS = 52;
+
+type ActivityRow = {
+  readonly day: string;
+  readonly kind: "interest" | "connection" | "meeting";
+  readonly count: number;
+};
+
+function mondayOf(day: string): string {
+  const date = new Date(`${day}T00:00:00.000Z`);
+  const back = (date.getUTCDay() + 6) % 7;
+  return isoDay(new Date(date.getTime() - back * DAY_MS));
+}
+
+/**
+ * Pure: recorded events per day folded into the window's bars. A month or
+ * less is a bar a day; longer is a bar a week (from Monday). Every bar in
+ * the window is present, zero when nothing was recorded that day, so the
+ * gaps read as quiet, not as missing. "All time" starts at the first
+ * recorded event (nothing recorded: no bars).
+ */
+export function activitySeries(
+  rows: readonly ActivityRow[],
+  window: ResultsWindow,
+): ResultsActivity {
+  const days = rows.map((row) => row.day).sort();
+  const first = window.from ?? days[0] ?? null;
+  if (first === null) return { bucket: "WEEK", points: [] };
+  const span =
+    (Date.parse(`${window.to}T00:00:00Z`) - Date.parse(`${first}T00:00:00Z`)) /
+      DAY_MS +
+    1;
+  const bucket: ResultsActivity["bucket"] = span <= 31 ? "DAY" : "WEEK";
+  const step = bucket === "DAY" ? DAY_MS : 7 * DAY_MS;
+  const keyOf = (day: string) => (bucket === "DAY" ? day : mondayOf(day));
+  const starts: string[] = [];
+  for (
+    let at = Date.parse(`${keyOf(first)}T00:00:00Z`);
+    at <= Date.parse(`${window.to}T00:00:00Z`);
+    at += step
+  ) {
+    starts.push(isoDay(new Date(at)));
+  }
+  const kept = starts.slice(-ACTIVITY_MAX_POINTS);
+  const points = new Map(
+    kept.map((start) => [
+      start,
+      { start, interests: 0, connections: 0, meetings: 0 },
+    ]),
+  );
+  for (const row of rows) {
+    const point = points.get(keyOf(row.day));
+    if (point === undefined) continue;
+    if (row.kind === "interest") point.interests += row.count;
+    else if (row.kind === "connection") point.connections += row.count;
+    else point.meetings += row.count;
+  }
+  return { bucket, points: [...points.values()] };
+}
+
 export function createResultsReader(options: {
   readonly sql: DatabaseExecutor;
   readonly raise?: RaisePort | undefined;
 }) {
   const { sql } = options;
   const discovery = createPostgresDiscoveryRepository({ sql });
+
+  /** One side's relationships: exactly one of the two ids is set. */
+  async function activityOf(
+    side: { company: string | null; investor: string | null },
+    window: ResultsWindow,
+  ): Promise<ResultsActivity> {
+    const from = window.from;
+    const to = window.to;
+    const rows = await sql<
+      { day: string; kind: ActivityRow["kind"]; count: number }[]
+    >`
+      select to_char(x.at at time zone 'UTC', 'YYYY-MM-DD') as day, x.kind, count(*)::int as count
+        from (
+          select i.created_at as at, 'interest' as kind
+            from network.interests i
+            join network.relationships r on r.id = i.relationship_id
+           where (r.company_id = ${side.company}::uuid or r.investor_organisation_id = ${side.investor}::uuid)
+          union all
+          select e.occurred_at as at,
+                 case e.event_type when 'connection_accepted' then 'connection' else 'meeting' end as kind
+            from network.relationship_events e
+            join network.relationships r on r.id = e.relationship_id
+           where (r.company_id = ${side.company}::uuid or r.investor_organisation_id = ${side.investor}::uuid)
+             and e.event_type in ('connection_accepted', 'meeting_held')
+        ) x
+       where (${from}::date is null or x.at >= ${from}::date) and x.at < ${to}::date + 1
+       group by 1, 2`;
+    return activitySeries(rows, window);
+  }
+
+  /**
+   * Interest sent in the window and its answer: the first accept or
+   * decline after it. The median is over answered interest only.
+   */
+  async function responseOf(
+    side: { company: string | null; investor: string | null },
+    window: ResultsWindow,
+  ) {
+    const from = window.from;
+    const to = window.to;
+    const [row] = await sql<
+      {
+        sent: number;
+        accepted: number;
+        declined: number;
+        median_hours: number | null;
+      }[]
+    >`
+      with sent as (
+        select i.created_at,
+               (select e.event_type from network.relationship_events e
+                 where e.relationship_id = i.relationship_id
+                   and e.event_type in ('connection_accepted', 'interest_declined')
+                   and e.occurred_at >= i.created_at
+                 order by e.occurred_at limit 1) as answer,
+               (select e.occurred_at from network.relationship_events e
+                 where e.relationship_id = i.relationship_id
+                   and e.event_type in ('connection_accepted', 'interest_declined')
+                   and e.occurred_at >= i.created_at
+                 order by e.occurred_at limit 1) as answered_at
+          from network.interests i
+          join network.relationships r on r.id = i.relationship_id
+         where (r.company_id = ${side.company}::uuid or r.investor_organisation_id = ${side.investor}::uuid)
+           and (${from}::date is null or i.created_at >= ${from}::date)
+           and i.created_at < ${to}::date + 1
+      )
+      select count(*)::int as sent,
+             (count(*) filter (where answer = 'connection_accepted'))::int as accepted,
+             (count(*) filter (where answer = 'interest_declined'))::int as declined,
+             (percentile_cont(0.5) within group (
+                order by extract(epoch from (answered_at - created_at)) / 3600)
+                filter (where answered_at is not null))::float8 as median_hours
+        from sent`;
+    const sent = row?.sent ?? 0;
+    const answered = (row?.accepted ?? 0) + (row?.declined ?? 0);
+    return {
+      sent,
+      accepted: row?.accepted ?? 0,
+      declined: row?.declined ?? 0,
+      responseTime: {
+        medianHours:
+          row?.median_hours === null || row?.median_hours === undefined
+            ? null
+            : Math.round(row.median_hours * 10) / 10,
+        answered,
+        waiting: Math.max(0, sent - answered),
+      },
+    };
+  }
 
   async function sideOf(actor: ActorContext) {
     if (actor.organisationId === undefined || actor.tenantId === undefined) {
@@ -148,14 +301,45 @@ export function createResultsReader(options: {
       options.raise === undefined
         ? null
         : await options.raise(actor, companyId).catch(() => null);
+    const side = { company: companyId, investor: null };
+    const [extra, activity, response] = await Promise.all([
+      sql<{ engaged: number; requested: number; fulfilled: number }[]>`
+        select
+          (select count(distinct r.investor_organisation_id)::int
+             from network.relationship_events e
+             join network.relationships r on r.id = e.relationship_id
+            where r.company_id = ${companyId}
+              and (${from}::date is null or e.occurred_at >= ${from}::date)
+              and e.occurred_at < ${toExclusive}::date + 1) as engaged,
+          (select count(*)::int from network.diligence_requests d
+             join network.relationships r on r.id = d.relationship_id
+            where r.company_id = ${companyId}
+              and (${from}::date is null or d.created_at >= ${from}::date)
+              and d.created_at < ${toExclusive}::date + 1) as requested,
+          (select count(*)::int from network.diligence_requests d
+             join network.relationships r on r.id = d.relationship_id
+             join network.diligence_fulfilments f on f.request_id = d.id
+            where r.company_id = ${companyId}
+              and (${from}::date is null or d.created_at >= ${from}::date)
+              and d.created_at < ${toExclusive}::date + 1) as fulfilled`,
+      activityOf(side, window),
+      responseOf(side, window),
+    ]);
     const [states, rows, counts, views, rehearsals, documents] =
       await Promise.all([
         sql<{ state: string; count: number }[]>`
         select current_state as state, count(*)::int as count
           from network.relationships where company_id = ${companyId}
          group by current_state order by count desc`,
-        sql<{ investor_name: string; state: string; since: Date }[]>`
-        select io.display_name as investor_name, r.current_state as state, r.state_updated_at as since
+        sql<
+          {
+            investor_id: string;
+            investor_name: string;
+            state: string;
+            since: Date;
+          }[]
+        >`
+        select io.id as investor_id, io.display_name as investor_name, r.current_state as state, r.state_updated_at as since
           from network.relationships r
           join core.investor_organisations io on io.id = r.investor_organisation_id
          where r.company_id = ${companyId}
@@ -242,6 +426,7 @@ export function createResultsReader(options: {
           investorName: r.investor_name,
           state: r.state,
           since: new Date(r.since).toISOString(),
+          investorOrganisationId: r.investor_id,
         })),
       },
       engagement: {
@@ -259,6 +444,13 @@ export function createResultsReader(options: {
         ratings: ratingsOf(r.dimensions),
       })),
       documents,
+      investorsEngaged: extra[0]?.engaged ?? 0,
+      diligence: {
+        requested: extra[0]?.requested ?? 0,
+        fulfilled: extra[0]?.fulfilled ?? 0,
+      },
+      responseTime: response.responseTime,
+      activity,
     };
   }
 
@@ -328,6 +520,7 @@ export function createResultsReader(options: {
               and (${from}::date is null or a.created_at >= ${from}::date) and a.created_at < ${to}::date + 1) as documents`,
         sql<
           {
+            company_id: string;
             company_name: string;
             state: string;
             stage: string | null;
@@ -335,7 +528,7 @@ export function createResultsReader(options: {
               { node_id: string; vocabulary: string; label: string }[] | null;
           }[]
         >`
-        select co.canonical_name as company_name, r.current_state as state,
+        select co.id as company_id, co.canonical_name as company_name, r.current_state as state,
                co.current_stage_code as stage,
                (select jsonb_agg(jsonb_build_object('node_id', n.id, 'vocabulary', v.code, 'label', n.display_name))
                   from taxonomy.entity_assignments a
@@ -350,6 +543,31 @@ export function createResultsReader(options: {
         discovery.ownActiveMandate(actor).catch(() => null),
       ],
     );
+    const side = { company: null, investor: investorId };
+    const [states, commitments, activity, response] = await Promise.all([
+      sql<{ state: string; count: number }[]>`
+        select current_state as state, count(*)::int as count
+          from network.relationships where investor_organisation_id = ${investorId}
+         group by current_state order by count desc`,
+      sql<
+        {
+          status: "STATED" | "CONFIRMED" | "WITHDRAWN";
+          currency_code: string;
+          count: number;
+          amount: string;
+        }[]
+      >`
+        select c.status, c.currency_code, count(*)::int as count, sum(c.amount)::text as amount
+          from network.commitments c
+          join network.relationships r on r.id = c.relationship_id
+         where r.investor_organisation_id = ${investorId}
+           and c.status in ('STATED', 'CONFIRMED', 'WITHDRAWN')
+         group by c.status, c.currency_code
+         order by c.status, c.currency_code
+         limit 30`,
+      activityOf(side, window),
+      responseOf(side, window),
+    ]);
     const met = await sql<{ held: number }[]>`
       select count(*)::int as held from network.relationship_events e
         join network.relationships r on r.id = e.relationship_id
@@ -389,6 +607,7 @@ export function createResultsReader(options: {
         if (mandate === null) {
           return {
             companyName: row.company_name,
+            companyId: row.company_id,
             state: row.state,
             excluded: false,
             reasons: [],
@@ -403,6 +622,7 @@ export function createResultsReader(options: {
         });
         return {
           companyName: row.company_name,
+          companyId: row.company_id,
           state: row.state,
           excluded: isExcluded(mandate.preferences, classifications),
           reasons: fit.reasons.map((reason) => ({
@@ -412,6 +632,20 @@ export function createResultsReader(options: {
         };
       }),
       hasMandate: mandate !== null,
+      pipeline: { byState: states },
+      interest: {
+        sent: response.sent,
+        accepted: response.accepted,
+        declined: response.declined,
+      },
+      responseTime: response.responseTime,
+      commitments: commitments.map((c) => ({
+        status: c.status,
+        currencyCode: c.currency_code,
+        count: c.count,
+        amount: c.amount,
+      })),
+      activity,
     };
   }
 

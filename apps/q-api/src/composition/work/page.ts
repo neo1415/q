@@ -168,7 +168,10 @@ export function composeSuggestions(
     const endedMs = Date.parse(call.endedAt);
     if (endedMs <= (dismissedUntil.get(call.relationshipId) ?? -1)) continue;
     const group = calls.get(call.relationshipId) ?? new Map<string, number>();
-    group.set(call.meetingId, Math.max(group.get(call.meetingId) ?? 0, endedMs));
+    group.set(
+      call.meetingId,
+      Math.max(group.get(call.meetingId) ?? 0, endedMs),
+    );
     calls.set(call.relationshipId, group);
   }
   for (const [relationshipId, group] of calls) {
