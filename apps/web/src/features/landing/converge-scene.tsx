@@ -34,8 +34,8 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
       r: Number(f.dataset["r"]),
     }));
     let flipped: boolean | null = null;
+    let last = -1;
     let raf = 0;
-    let onScreen = true;
 
     const update = () => {
       raf = 0;
@@ -50,6 +50,9 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
               ? 1
               : 0
             : clamp(-box.top / total, 0, 1);
+      // Outside its scroll range nothing changes, so nothing is written.
+      if (prog === last) return;
+      last = prog;
       const t = easeInOut(clamp((prog - 0.18) / 0.5, 0, 1));
       frags.forEach((f, i) => {
         const h = homes[i];
@@ -75,26 +78,15 @@ export function ConvergeScene({ children }: { readonly children: ReactNode }) {
         }
       }
     };
+    // One read and a few transform writes per frame at most; outside the
+    // section's range the progress is clamped and nothing is written.
     const onScroll = () => {
-      if (onScreen && raf === 0) raf = requestAnimationFrame(update);
+      if (raf === 0) raf = requestAnimationFrame(update);
     };
-    // Off screen, scrolling elsewhere costs nothing. (No observer: always on.)
-    const seen =
-      typeof IntersectionObserver === "undefined"
-        ? null
-        : new IntersectionObserver(
-            (entries) => {
-              onScreen = entries.some((e) => e.isIntersecting);
-              if (onScreen) onScroll();
-            },
-            { rootMargin: "200px 0px" },
-          );
-    seen?.observe(section);
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => {
-      seen?.disconnect();
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
