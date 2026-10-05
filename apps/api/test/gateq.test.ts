@@ -160,7 +160,17 @@ function buildApp(options: {
     gateq,
     ...(policyExtraction === undefined
       ? {}
-      : { gateqPolicyExtraction: policyExtraction }),
+      : {
+          gateqPolicyExtraction: {
+            extract: (command) =>
+              policyExtraction
+                .extract({
+                  ...command,
+                  gatewayId: command.gatewayId as Gateway["id"],
+                })
+                .then((out) => PolicyExtractionDtoSchema.parse(out)),
+          },
+        }),
     ...(images === undefined
       ? {}
       : {

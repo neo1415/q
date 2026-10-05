@@ -45,7 +45,10 @@ import {
   registerDocumentRoutes,
   type DocumentRoutesDependencies,
 } from "./http/documents.js";
-import type { QWorkPagePort } from "@capital-q/app-actions";
+import type {
+  GateQPolicyExtractionPort,
+  QWorkPagePort,
+} from "@capital-q/app-actions";
 
 import { deckAudiencePort } from "./deck-audience-port.js";
 import {
@@ -259,9 +262,8 @@ export type ApiModules = {
     NetworkInterestRoutesDependencies["connections"] | undefined;
   /** A gateway's submitted applications, for its organisation. */
   readonly gateqInbox?: GateQRoutesDependencies["inbox"] | undefined;
-  readonly gateqPolicyExtraction?:
-    | GateQRoutesDependencies["policyExtraction"]
-    | undefined;
+  /** P7: an investor's mandate read into DRAFT gateway rules (ADR 0040 port). */
+  readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
   /** CQ-GATE-001: the investor organisation's inbound gateway. */
   readonly gateq?: GateQRoutesDependencies["gateq"] | undefined;
   /** The public gateway page's card-scoped organisation images. */
@@ -543,6 +545,9 @@ export function createApp(
         ? {}
         : { deckAudience: deckAudiencePort(modules.evidence) }),
       ...(modules.qWork === undefined ? {} : { qWork: modules.qWork }),
+      ...(modules.gateqPolicyExtraction === undefined
+        ? {}
+        : { gateqPolicyExtraction: modules.gateqPolicyExtraction }),
     },
   });
   // ADR 0040: person-scoped routes (onboarding), under the onboarding actor.
@@ -675,7 +680,6 @@ export function createApp(
       resolver: security.resolver,
       gateq: modules.gateq,
       inbox: modules.gateqInbox,
-      policyExtraction: modules.gateqPolicyExtraction,
       entitlements: modules.billing?.entitlements,
       publicImages: modules.gateqPublicImages,
     });

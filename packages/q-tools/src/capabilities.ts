@@ -471,6 +471,14 @@ const OFFERS: readonly QCapability[] = [
     "KYB is the person's own submission of their organisation's details and their ID; they enter and upload it themselves on the Verification page.",
     false,
   ),
+  offer(
+    "gateway_mandate",
+    "SETTINGS",
+    "Set up their GateQ gateway from their mandate: paste or upload it, Q drafts the rules, they confirm and publish, then copy the website snippet",
+    "GATEWAY",
+    "Q drafts the rules from their mandate on the Gateway page, but publishing who may approach their organisation is the investor's own act there, after reviewing every rule.",
+    false,
+  ),
 ];
 
 /** Where a registry area's actions sit among the capability groups. */
@@ -497,6 +505,8 @@ export const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   integrations: "SETTINGS",
   // WORK-58: Q's work page (pause, resume, set a suggestion aside).
   work: "RELATIONSHIP",
+  // P7: the investor's GateQ gateway, set up from their mandate.
+  gateway: "SETTINGS",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([

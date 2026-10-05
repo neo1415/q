@@ -29,6 +29,7 @@ import {
   isMatchedRelationshipState,
   type YourCompanyLabel,
   type AdminUsageDto,
+  PolicyExtractionDtoSchema,
 } from "@capital-q/contracts";
 import { createPlatformAdmin } from "@capital-q/platform-admin";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
@@ -113,6 +114,7 @@ import {
   createPostgresOrganisationQueryPort,
 } from "@capital-q/organisations";
 import {
+  GatewayIdSchema,
   createGateQService,
   createPolicyExtractionService,
   createPostgresPolicyExtractionRepository,
@@ -1885,13 +1887,24 @@ const { app, logger } = createApp(config, security, {
   },
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
-  gateqPolicyExtraction: createPolicyExtractionService({
-    gateq,
-    repository: createPostgresPolicyExtractionRepository({
-      sql: database.sql,
-    }),
-    vocabulary: mandateVocabularyFrom(),
-  }),
+  gateqPolicyExtraction: (() => {
+    const service = createPolicyExtractionService({
+      gateq,
+      repository: createPostgresPolicyExtractionRepository({
+        sql: database.sql,
+      }),
+      vocabulary: mandateVocabularyFrom(),
+    });
+    return {
+      extract: (command) =>
+        service
+          .extract({
+            ...command,
+            gatewayId: GatewayIdSchema.parse(command.gatewayId),
+          })
+          .then((out) => PolicyExtractionDtoSchema.parse(out)),
+    };
+  })(),
   capital,
   taxonomy: {
     query: taxonomy.query,

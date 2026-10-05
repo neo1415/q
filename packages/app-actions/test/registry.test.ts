@@ -250,6 +250,8 @@ describe("the action registry", () => {
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
       ["q.work.resume", "legacy:stop_q_work", "INSTANT"],
       ["q.work.suggestion.dismiss", "offer.work_suggestions", "INSTANT"],
+      // P7: GateQ rules drafted from a mandate, confirmed on the Gateway page.
+      ["gateway.policy.read_mandate", "offer.gateway_mandate", "INSTANT"],
     ]);
   });
 });
