@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q answer canvas</title>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/canvas.css">
+<style>
+  .discover { padding: 20px 24px; display: grid; gap: 16px; max-width: 760px; }
+  .discover h1 { margin: 0; font: 500 22px/1.2 var(--cq-font-ui); }
+  .poster { position: relative; border-radius: 18px; overflow: hidden; aspect-ratio: 16 / 10; background: oklch(0.27 0.03 240); color: #fff; display: grid; align-content: end; padding: 20px; }
+  .poster .shade { position: absolute; inset: 0; background: linear-gradient(transparent 40%, #000a); }
+  .poster > * { position: relative; }
+  .poster h2 { margin: 0; font-size: 22px; font-weight: 600; }
+  .poster p { margin: 4px 0 0; opacity: .85; }
+  .poster .play { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; background: #fff2; display: grid; place-items: center; }
+  .feedmeta { display: flex; gap: 8px; flex-wrap: wrap; }
+  @media (max-width: 760px) { .discover { padding: 12px 16px 160px; } .poster { aspect-ratio: 9 / 13; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { shell, icon, params, reduced, qMark, wait } from "./assets/shell.js";
+import { Swarm } from "./assets/swarm.js";
+import { COMPANIES, RESEARCH } from "./assets/data.js";
+
+const dark = document.documentElement.dataset.theme === "dark";
+const gold = document.documentElement.dataset.brand === "gold";
+const phone = matchMedia("(max-width: 760px)").matches;
+const app = document.getElementById("app");
+
+const LVL = {
+  Strong: '<svg class="lvl" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="currentColor"/></svg>',
+  Good: '<svg class="lvl" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6 1.5a4.5 4.5 0 0 1 0 9z" fill="currentColor"/></svg>',
+  Partial: '<svg class="lvl" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+  Unknown: '<svg class="lvl" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/></svg>',
+};
+const SUGGEST = ["Top three for my mandate", "Compare my shortlist", "Research Y Combinator", "What changed this week?"];
+
+// ---------- Q page ----------
+function qPage() {
+  return `<div class="qpage">
+    <header class="qbar">
+      <h1 class="qtitle">Q</h1>
+      <div class="qbar-actions">
+        <button class="btn-icon" aria-label="Past conversations">${icon("history")}</button>
+        <button class="board-btn" id="boardBtn" aria-label="Open the Board, 2 items">${icon("board")}<span>Board</span><span class="count" id="boardCount">2</span></button>
+      </div>
+    </header>
+    <section class="stage" id="stage" data-mode="idle" aria-label="Q">
+      <div class="hero">
+        <div class="hero-slot" id="heroSlot"><div class="presence" id="presence"><canvas aria-hidden="true"></canvas></div></div>
+        <p class="hello" id="hello">Good evening, Amara</p>
+        <p class="state" id="state" role="status">Ready</p>
+      </div>
+      <div class="speakline">
+        <div class="mini-slot" id="miniSlot"></div>
+        <div class="caption"><p class="asked" id="asked"></p><p class="said" id="said" aria-live="polite"></p></div>
+        <button class="btn-icon" id="closeAll" aria-label="Close this answer">${icon("x")}</button>
+      </div>
+      <div class="cards" id="cards"></div>
+      <div class="followups" id="followups"></div>
+      <div class="suggest" id="suggest"><div class="suggest-row">${SUGGEST.map((s) => `<button class="chip" data-run="${s}">${s}</button>`).join("")}</div></div>
+    </section>
+    <form class="composer" onsubmit="return false"><input id="ask" aria-label="Ask Q" placeholder="Ask Q anything"><button class="btn-icon" type="button" aria-label="Talk to Q">${icon("mic")}</button><button class="btn-icon send" aria-label="Send">${icon("send")}</button></form>
+  </div>`;
+}
+
+function card(c, i, state) {
+  const hue = `var(--hue-${c.hue})`;
+  const score = c.score == null ? "" : `<div class="score"><span class="num">${c.score.toFixed(1)}</span><span class="of">fit, out of 10</span></div>`;
+  const params = c.params ? `<dl class="params">${c.params.map(([k, l, v]) => `<div><dt>${k}</dt><dd><span style="color:${l === "Unknown" ? "var(--cq-text-tertiary)" : hue}">${LVL[l]}</span>${l}</dd><dd class="val">${v}</dd></div>`).join("")}</dl>` : "";
+  const sources = c.sources ? `<button class="btn sources-fold" style="min-height:44px;justify-self:start">${icon("link")}Show ${c.sources} sources</button>` : "";
+  return `<article class="card" data-id="${c.id}" data-state="${state}" style="--hue:${hue}">
+    <header class="card-head">
+      <span class="rank">${i + 1}</span>
+      <div style="min-width:0"><h3>${c.name}<span class="talking" role="img" aria-label="Q is talking about this"><i></i><i></i><i></i></span></h3><p class="line">${c.line}</p></div>
+      ${score}
+      <button class="btn-icon card-x" aria-label="Close ${c.name}">${icon("x")}</button>
+    </header>
+    <div class="card-body"><div class="inner"><div class="inner-pad">
+      <ul class="why">${c.why.map((w) => `<li>${icon("check")}<span>${w}</span></li>`).join("")}</ul>
+      ${params}${sources}
+      <div class="card-actions">${c.score != null ? `<button class="btn">Open profile</button>` : ""}<button class="btn">Ask about this</button><button class="btn-icon" aria-label="Pin ${c.name} to the Board">${icon("pin")}</button></div>
+    </div></div></div>
+    <p class="oneline">${c.why[0]}</p>
+  </article>`;
+}
+
+function compareTable(list, on) {
+  const head = list.map((c, i) => `<th class="${i === on ? "on" : ""}" style="--hue:var(--hue-${c.hue})"><span class="cname"><span class="rank">${i + 1}</span>${c.name}</span><div class="cscore">${c.score.toFixed(1)}<small>of 10</small></div></th>`).join("");
+  const rows = list[0].params.map(([k], r) => {
+    const cells = list.map((c, i) => { const [, l, v] = c.params[r]; return `<td class="${i === on ? "on" : ""}" style="--hue:var(--hue-${c.hue})"><span class="v"><span style="color:${l === "Unknown" ? "var(--cq-text-tertiary)" : `var(--hue-${c.hue})`}">${LVL[l]}</span>${l}</span><span class="s">${v}</span></td>`; }).join("");
+    return `<tr class="label"><td colspan="${list.length}">${k}</td></tr><tr><th scope="row">${k}</th>${cells}</tr>`;
+  }).join("");
+  const view = ["Go for it: book a call", "Meet: ask who leads", "Wait for revenue documents"];
+  const qrow = `<tr class="label"><td colspan="${list.length}">Q’s view</td></tr><tr><th scope="row">Q’s view</th>${list.map((c, i) => `<td class="${i === on ? "on" : ""}" style="--hue:var(--hue-${c.hue})">${view[i]}</td>`).join("")}</tr>`;
+  return `<div class="compare" id="compare"><div class="compare-head"><h3>Side by side</h3><div class="acts"><button class="btn-icon" aria-label="Pin to the Board">${icon("pin")}</button><button class="btn-icon" aria-label="More: share or save as PDF">${icon("more")}</button><button class="btn-icon" aria-label="Close the comparison">${icon("x")}</button></div></div>
+    <table class="ctable"><thead><tr><th class="blank"></th>${head}</tr></thead><tbody>${rows}${qrow}</tbody></table></div>`;
+}
+
+// ---------- Discover with the answer chip ----------
+function discoverPage() {
+  return `<div class="discover">
+    <h1>Discover</h1>
+    <div class="poster"><div class="shade"></div><div class="play">${icon("play")}</div><h2>Norrland Grid</h2><p>Seed, Stockholm. Schedules grid batteries to sell power at the best hour.</p></div>
+    <div class="feedmeta"><button class="btn">Save</button><button class="btn">Pass</button><button class="btn">Ask Q</button></div>
+  </div>
+  <aside class="dock-chip" aria-label="Q answer ready">
+    <span class="dock-mark"><canvas aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%"></canvas></span>
+    <div style="min-width:0"><strong>Top three ready</strong><span class="sub">Norrland, Kestrel, Atlas</span><div class="dot-row" aria-hidden="true"><i style="--hue:var(--hue-1)"></i><i style="--hue:var(--hue-2)"></i><i style="--hue:var(--hue-3)"></i></div></div>
+    <span class="chip-acts" style="display:flex;gap:6px"><button class="btn" style="min-height:40px" aria-label="Open in the Board">${icon("board")}Board</button><button class="open">Open in Q</button></span>
+    <button class="btn-icon chip-x" aria-label="Dismiss">${icon("x")}</button>
+  </aside>`;
+}
+
+const page = params.get("page") ?? "q";
+app.innerHTML = shell(page === "discover" ? "discover" : "q", page === "discover" ? discoverPage() : qPage());
+
+if (page === "discover") {
+  const s = new Swarm(document.querySelector(".dock-mark canvas"), { palette: gold ? "gold" : "blue", count: 500, scale: 0.36, reduced });
+  s.setState("pleased"); s.setShape("constellation"); s.morphStart = -10; s.prevShape = "constellation";
+  if (reduced || params.get("still")) s.settle(2); else s.start();
+} else {
+  runQ();
+}
+
+function runQ() {
+  const $ = (id) => document.getElementById(id);
+  const stage = $("stage"), cards = $("cards"), said = $("said"), asked = $("asked");
+  const swarm = new Swarm(document.querySelector("#presence canvas"), {
+    palette: gold ? "gold" : "blue", surface: dark ? "dark" : "light", count: phone ? 1100 : 1500, scale: 0.33, reduced, halo: dark,
+  });
+  const still = !!params.get("still") || params.get("play") == null;
+  let list = [], focus = -1, mode = "idle", boardN = 2, mini = false;
+
+  const setSaid = async (text, instant) => {
+    if (instant || reduced) { said.textContent = text; return; }
+    said.classList.add("swap"); await wait(180); said.textContent = text; said.classList.remove("swap");
+  };
+  const setState = (label, swarmState, shape) => { $("state").textContent = label; swarm.setState(swarmState); if (shape) swarm.setShape(mini && shape === "wave" ? "cloud" : shape); };
+
+  function movePresence(slot, instant) {
+    const el = $("presence");
+    const a = el.getBoundingClientRect();
+    slot.appendChild(el);
+    swarm.resize();
+    const b = el.getBoundingClientRect();
+    swarm.scale = slot.id === "miniSlot" ? 0.4 : 0.33;
+    mini = slot.id === "miniSlot";
+    swarm.alphaScale = mini ? (dark ? 0.2 : 0.32) : Math.min(1, 1800 / swarm.N);
+    if (instant || reduced || !a.width) return;
+    el.animate([{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width})`, transformOrigin: "0 0" }, { transform: "none", transformOrigin: "0 0" }], { duration: 520, easing: "cubic-bezier(0.77, 0, 0.175, 1)" });
+  }
+
+  function flip(mutate) {
+    const els = () => [...cards.querySelectorAll(".card")];
+    const before = new Map(els().map((e) => [e, e.getBoundingClientRect()]));
+    mutate();
+    if (reduced) return;
+    for (const e of els()) {
+      const a = before.get(e); if (!a) continue;
+      const b = e.getBoundingClientRect();
+      if (Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height) < 2) continue;
+      e.animate([
+        // Position and width only: height follows the card's own body
+        // transition, so text is never squashed.
+        { transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)`, width: `${a.width}px` },
+        { transform: "none", width: `${b.width}px` },
+      ], { duration: 460, easing: "cubic-bezier(0.77, 0, 0.175, 1)" });
+    }
+  }
+
+  function layoutFor(n) { return !phone && n > 5 ? "grid" : "row"; }
+  function showCards(items, f, instant) {
+    list = items; focus = f; mode = "cards";
+    stage.dataset.mode = "cards";
+    $("suggest").hidden = true;
+    movePresence($("miniSlot"), instant);
+    cards.dataset.n = String(items.length);
+    cards.dataset.layout = layoutFor(items.length);
+    if (items.length >= 4) cards.dataset.tiles = ""; else delete cards.dataset.tiles;
+    cards.innerHTML = items.map((c, i) => card(c, i, i === f ? "focus" : "rest")).join("");
+    if (!instant && !reduced) {
+      [...cards.children].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(12px) scale(0.97)" }, { opacity: 1, transform: "none" }], { duration: 380, delay: i * 60, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "backwards" }));
+    }
+  }
+  function focusOn(f) {
+    focus = f;
+    if (mode === "compare") {
+      $("compare").outerHTML = compareTable(list, f);
+      return;
+    }
+    flip(() => cards.querySelectorAll(".card").forEach((el, i) => (el.dataset.state = i === f ? "focus" : "rest")));
+  }
+  function showCompare(items, on, instant) {
+    list = items; mode = "compare"; stage.dataset.mode = "compare";
+    $("suggest").hidden = true;
+    movePresence($("miniSlot"), instant);
+    cards.dataset.layout = "row"; cards.dataset.n = "1"; delete cards.dataset.tiles;
+    cards.innerHTML = compareTable(items, on);
+    if (!instant && !reduced) cards.firstElementChild.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 360, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
+  }
+  function followups(items) {
+    $("followups").innerHTML = items.map((s) => `<button class="chip" data-run="${s}">${s}</button>`).join("");
+  }
+
+  // Topic changes: the answer flies to the Board and the presence comes back.
+  async function toBoard(pauseAt) {
+    const target = $("boardBtn").getBoundingClientRect();
+    const els = [...cards.children];
+    const anims = els.map((el, i) => {
+      const r = el.getBoundingClientRect();
+      const dx = target.left + target.width / 2 - (r.left + r.width / 2), dy = target.top + target.height / 2 - (r.top + r.height / 2);
+      el.classList.add("flying");
+      return el.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.08)`, opacity: 0.2 }], { duration: 560, delay: i * 50, easing: "cubic-bezier(0.77, 0, 0.175, 1)", fill: "forwards" });
+    });
+    $("followups").innerHTML = "";
+    if (pauseAt != null) { anims.forEach((a) => { a.pause(); a.currentTime = pauseAt; }); return; }
+    await Promise.all(anims.map((a) => a.finished));
+    boardN += 1; $("boardCount").textContent = String(boardN);
+    $("boardBtn").classList.remove("bump"); void $("boardBtn").offsetWidth; $("boardBtn").classList.add("bump");
+    cards.innerHTML = ""; mode = "idle"; stage.dataset.mode = "idle";
+    movePresence($("heroSlot"));
+  }
+
+  async function runSuggestion(text, press) {
+    if (press) { press.classList.add("pressed"); await wait(160); press.classList.remove("pressed"); }
+    $("suggest").hidden = true; $("hello").textContent = text;
+    setState("Checking 214 companies against your mandate", "thinking", "spiral");
+  }
+
+  // --- Static states for screenshots ---
+  const st = params.get("state") ?? "idle";
+  const n = Number(params.get("n") ?? 3);
+  const f = Number(params.get("focus") ?? 0);
+  swarm.setShape("cloud");
+  const pickTop = (k) => COMPANIES.slice(0, k);
+  const lines = {
+    1: "Norrland Grid is the one: a seed round in your range, grid software, and revenue backed by statements.",
+    3: ["Norrland Grid fits best: a seed round in your range, and revenue backed by statements.", "Kestrel Heat is close behind: a strong team, and the round has no lead yet.", "Atlas Ledger fits the sector, but its revenue is only a claim so far."],
+  };
+  function speakFor(k, i) {
+    if (k === 1) return lines[1];
+    if (k === 3) return lines[3][i] ?? "Want them side by side?";
+    const c = COMPANIES[i];
+    return `${c.name}: ${c.why[0].toLowerCase()}.`;
+  }
+  if (st === "thinking") {
+    $("suggest").hidden = true; $("hello").textContent = "Top three for my mandate";
+    setState("Checking 214 companies against your mandate", "thinking", "spiral");
+  } else if (st === "top") {
+    asked.textContent = n === 3 ? "Top three for your mandate" : `Top ${n} for your mandate`;
+    showCards(pickTop(n), f, true); setSaid(speakFor(n, f), true); setState("Speaking", "speaking", "wave"); swarm.autoLevel = true;
+  } else if (st === "overview") {
+    asked.textContent = "Top three for your mandate";
+    showCards(pickTop(3), -1, true); setSaid("Want them side by side, or an intro to Norrland?", true); setState("Ready", "idle", "cloud");
+    followups(["Compare side by side", "Draft an intro to Norrland Grid", "Why is Atlas Ledger third?"]);
+  } else if (st === "compare") {
+    asked.textContent = "Compare them side by side";
+    showCompare(pickTop(3), f, true); setSaid(["Norrland leads on traction, with documents to back it.", "Kestrel has the strongest team of the three.", "Atlas fits the sector; the revenue is a claim so far."][f] ?? "", true); setState("Speaking", "speaking", "wave"); swarm.autoLevel = true;
+  } else if (st === "research") {
+    asked.textContent = "Research Y Combinator";
+    showCards(RESEARCH, f, true); setSaid(["Y Combinator invests in very early companies, in several batches a year.", "For you, its climate and fintech companies are worth watching after Demo Day.", "Three things I couldn’t confirm. I can keep looking."][f] ?? "", true); setState("Speaking", "speaking", "wave"); swarm.autoLevel = true;
+  } else if (st === "flying") {
+    asked.textContent = "Top three for your mandate";
+    showCards(pickTop(3), -1, true); setSaid("What’s on tomorrow?", true);
+    asked.textContent = "New topic";
+    requestAnimationFrame(() => toBoard(300));
+  } else if (st === "after") {
+    boardN = 3; $("boardCount").textContent = "3";
+    $("suggest").hidden = true; $("hello").textContent = "Two meetings tomorrow. Kestrel Heat at 10, and your partners’ meeting at 4.";
+    setState("Ready", "idle", "cloud");
+  }
+  if (st !== "thinking" && st !== "top" && st !== "compare" && st !== "research") setState($("state").textContent, swarm.state ?? "idle");
+
+  stage.addEventListener("click", async (e) => {
+    const run = e.target.closest("[data-run]");
+    if (run && mode === "idle") { await runSuggestion(run.dataset.run, run); await wait(1600); asked.textContent = run.dataset.run; showCards(pickTop(3), 0); setSaid(lines[3][0]); setState("Speaking", "speaking", "wave"); swarm.autoLevel = true; return; }
+    const head = e.target.closest(".card-head");
+    if (e.target.closest(".card-x")) {
+      const el = e.target.closest(".card");
+      flip(() => el.remove());
+      return;
+    }
+    if (e.target.closest("#closeAll")) { await toBoard(); return; }
+    if (head && mode === "cards") { const i = [...cards.children].indexOf(head.parentElement); focusOn(i); }
+    if (run && run.dataset.run === "Compare side by side") { $("followups").innerHTML = ""; showCompare(list.slice(0, 3), 0); setSaid("Here they are side by side."); }
+  });
+
+  if (reduced || still) { swarm.morphStart = -10; swarm.prevShape = swarm.shape; swarm.settle(2.5); if (!reduced && !params.get("still")) swarm.start(); }
+  else swarm.start();
+
+  // --- The timed choreography, for the MP4 ---
+  if (params.get("play")) (async () => {
+    const big = params.get("play") === "10";
+    swarm.start();
+    await wait(1400);
+    const chip = $("suggest").querySelector(".chip");
+    await runSuggestion(big ? "Top ten for my mandate" : chip.textContent, chip);
+    await wait(2200);
+    asked.textContent = big ? "Top ten for your mandate" : "Top three for your mandate";
+    const items = pickTop(big ? 10 : 3);
+    showCards(items, -1); setState("Speaking", "speaking", "wave"); swarm.autoLevel = true;
+    await setSaid(big ? "Ten fit. Here’s how they rank." : "Three stand out.");
+    await wait(1300);
+    const order = big ? [0, 1, 2, 5, 9] : [0, 1, 2];
+    for (const i of order) {
+      focusOn(i);
+      await setSaid(big ? speakFor(10, i) : lines[3][i]);
+      await wait(big ? 2600 : 3600);
+    }
+    focusOn(-1); swarm.autoLevel = false; swarm.setLevel(0); setState("Ready", "idle", "cloud");
+    await setSaid("Want them side by side?");
+    followups(["Compare side by side", "Draft an intro to Norrland Grid", "Why is Atlas Ledger third?"]);
+    await wait(1800);
+    if (!big) {
+      const c = $("followups").querySelector(".chip"); c.classList.add("pressed"); await wait(160);
+      $("followups").innerHTML = ""; asked.textContent = "Compare them side by side";
+      showCompare(items, 0); swarm.autoLevel = true; setState("Speaking", "speaking", "wave");
+      await setSaid("Norrland leads on traction, with documents to back it.");
+      await wait(2600); focusOn(1); await setSaid("Kestrel has the strongest team of the three."); await wait(2400);
+      focusOn(2); await setSaid("Atlas fits the sector; the revenue is a claim so far."); await wait(2400);
+    }
+    // New topic: typed into the composer.
+    const ask = $("ask");
+    for (const ch of "What’s on tomorrow?") { ask.value += ch; await wait(45); }
+    await wait(300); ask.value = "";
+    asked.textContent = "New topic"; swarm.autoLevel = false;
+    await toBoard();
+    $("hello").textContent = "What’s on tomorrow?"; $("suggest").hidden = true;
+    setState("Checking your calendar", "thinking", "spiral");
+    await wait(1800);
+    $("hello").textContent = "Two meetings tomorrow. Kestrel Heat at 10, and your partners’ meeting at 4.";
+    setState("Speaking", "speaking", "wave"); swarm.autoLevel = true;
+    await wait(2600); swarm.autoLevel = false; setState("Ready", "idle", "cloud");
+  })();
+}
+</script>
+</body>
+</html>

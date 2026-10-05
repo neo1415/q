@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q's team</title>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  [hidden] { display: none !important; }
+  .wwrap { max-width: 1200px; margin: 0 auto; padding: 16px 24px 48px; }
+  .whead { display: flex; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .whead h1 { margin: 0; font: 500 24px/1.2 var(--cq-font-ui); letter-spacing: -0.01em; }
+  .whead p { margin: 2px 0 0; color: var(--cq-text-secondary); }
+  .whead .spend { margin-left: auto; text-align: right; }
+  .whead .spend b { font: 500 22px/1 var(--cq-font-editorial); font-variant-numeric: tabular-nums; }
+  .whead .spend span { display: block; font-size: 13px; color: var(--cq-text-secondary); margin-top: 4px; }
+  .wgrid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+  h2.sec { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+  .job { border: 1px solid var(--cq-border-subtle); border-radius: 16px; background: var(--cq-surface-raised); margin-bottom: 12px; overflow: hidden; }
+  .job-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 12px 8px 12px 16px; align-items: center; }
+  .job-head h3 { margin: 0; font-size: 15.5px; font-weight: 600; }
+  .job-head p { margin: 2px 0 0; font-size: 13px; color: var(--cq-text-secondary); }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; padding: 4px 10px; border-radius: 999px; background: var(--cq-surface-subtle); white-space: nowrap; }
+  .status svg { width: 14px; height: 14px; }
+  .status.needs { background: var(--cq-accent-soft); color: var(--cq-accent); }
+  .steps { list-style: none; margin: 0; padding: 4px 16px 12px; border-top: 1px solid var(--cq-border-subtle); }
+  .step { display: grid; grid-template-columns: 22px 34px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; position: relative; }
+  .step::before { content: ""; position: absolute; left: 10px; top: 30px; bottom: -8px; width: 1.5px; background: var(--cq-border-subtle); }
+  .step:last-child::before { display: none; }
+  .si { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; margin-top: 6px; background: var(--cq-surface); position: relative; z-index: 1; }
+  .si svg { width: 14px; height: 14px; }
+  .si.done { background: var(--cq-positive); color: var(--cq-surface-raised); }
+  .si.run { border: 2px solid var(--cq-accent); }
+  .si.run::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cq-accent); animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .si.back { border: 2px solid var(--cq-caution); color: var(--cq-caution); }
+  .si.you { border: 2px solid var(--cq-accent); color: var(--cq-accent); }
+  .si.wait { border: 2px dashed var(--cq-border-strong); }
+  .mono { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 12.5px; font-weight: 600; background: var(--cq-surface-subtle); color: var(--cq-text-secondary); letter-spacing: 0.01em; }
+  .mono.lead { background: var(--cq-stage); color: var(--cq-q-core); }
+  .mono.you { background: var(--cq-accent-soft); color: var(--cq-accent); }
+  .step b { font-weight: 500; font-size: 14.5px; }
+  .step .who { font-size: 12.5px; color: var(--cq-text-tertiary); display: block; }
+  .step .what { font-size: 14px; color: var(--cq-text-secondary); margin-top: 2px; }
+  .step time { font-size: 12.5px; color: var(--cq-text-tertiary); font-variant-numeric: tabular-nums; padding-top: 4px; }
+  .handoff { font-size: 12.5px; color: var(--cq-text-tertiary); padding: 0 0 2px 66px; display: flex; gap: 6px; align-items: center; }
+  .handoff svg { width: 14px; height: 14px; }
+  .grade { display: inline-flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+  .grade b { font: 500 18px/1 var(--cq-font-editorial); }
+  .grade small { color: var(--cq-text-tertiary); font-size: 12px; }
+  .fb { margin: 6px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--cq-surface-subtle); font-size: 13.5px; color: var(--cq-text-secondary); }
+  .approve { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .roster { border: 1px solid var(--cq-border-subtle); border-radius: 16px; background: var(--cq-surface-raised); padding: 4px 0; }
+  .member { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 14px; min-height: 56px; }
+  .member + .member { border-top: 1px solid var(--cq-border-subtle); }
+  .member strong { font-weight: 500; font-size: 14.5px; display: block; }
+  .member span.d { font-size: 13px; color: var(--cq-text-secondary); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .st { font-size: 12.5px; color: var(--cq-text-secondary); display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--cq-border-strong); }
+  .st.on::before { background: var(--cq-accent); }
+  .st.you::before { background: var(--cq-caution); }
+  .cost { border: 1px solid var(--cq-border-subtle); border-radius: 16px; background: var(--cq-surface-raised); padding: 14px 16px; margin-top: 16px; }
+  .cost table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .cost td { padding: 5px 0; vertical-align: middle; }
+  .cost td:last-child { text-align: right; font-variant-numeric: tabular-nums; width: 64px; }
+  .bar { height: 8px; border-radius: 4px; background: var(--cq-accent); opacity: .85; min-width: 2px; }
+  .cost .total { display: flex; justify-content: space-between; border-top: 1px solid var(--cq-border-subtle); margin-top: 8px; padding-top: 10px; font-size: 14px; }
+  .cost p { margin: 8px 0 0; font-size: 13px; color: var(--cq-text-secondary); }
+  .tabs { display: none; }
+  /* Draft loop detail */
+  .drafts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .draft { border: 1px solid var(--cq-border-subtle); border-radius: 14px; background: var(--cq-surface-raised); padding: 12px 14px; }
+  .draft header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+  .draft header strong { font-weight: 600; font-size: 14px; }
+  .mail { font: 400 15px/1.55 var(--cq-font-editorial); color: var(--cq-text-primary); }
+  .mail p { margin: 0 0 8px; }
+  mark.cut { background: color-mix(in oklab, var(--cq-caution) 18%, transparent); color: inherit; text-decoration: line-through; text-decoration-color: var(--cq-caution); border-radius: 3px; }
+  mark.add { background: color-mix(in oklab, var(--cq-positive) 18%, transparent); color: inherit; border-radius: 3px; }
+  .rules { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; font-size: 13.5px; }
+  .rules li { display: grid; grid-template-columns: 18px 1fr; gap: 6px; color: var(--cq-text-secondary); }
+  .rules svg { width: 16px; height: 16px; margin-top: 2px; }
+  .ok { color: var(--cq-positive); } .no { color: var(--cq-caution); }
+  .bind { font-size: 13px; color: var(--cq-text-secondary); margin: 10px 0 0; }
+  .sheet-scrim { position: fixed; inset: 0; background: oklch(0.15 0.01 258 / 0.45); z-index: 60; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; background: var(--cq-surface-raised); border-radius: 20px 20px 0 0; padding: 8px 16px 28px; box-shadow: 0 -12px 40px #0003; max-height: 86vh; overflow: auto; }
+  .sheet .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--cq-border); margin: 4px auto 10px; }
+  @media (min-width: 761px) { .sheet { left: 50%; right: auto; width: 520px; transform: translateX(-50%); bottom: auto; top: 50%; translate: 0 -50%; border-radius: 20px; } .sheet .grab { display: none; } }
+  @media (max-width: 760px) {
+    .wwrap { padding: 8px 16px 110px; }
+    .wgrid { grid-template-columns: 1fr; }
+    .whead .spend { margin-left: 0; text-align: left; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--cq-border-subtle); margin: 0 -16px 14px; padding: 0 12px; }
+    .tabs button { min-height: 44px; border: 0; background: none; padding: 0 12px; cursor: pointer; color: var(--cq-text-secondary); border-bottom: 2px solid transparent; font-weight: 500; }
+    .tabs button[aria-selected="true"] { color: var(--cq-text-primary); border-bottom-color: var(--cq-accent); }
+    .wgrid[data-tab="now"] .side { display: none; }
+    .wgrid[data-tab="team"] .jobs, .wgrid[data-tab="cost"] .jobs { display: none; }
+    .wgrid[data-tab="team"] .cost, .wgrid[data-tab="cost"] .team { display: none; }
+    .wgrid[data-tab="cost"] .cost { margin-top: 0; }
+    .drafts { grid-template-columns: 1fr; }
+    .step { grid-template-columns: 22px 30px minmax(0, 1fr); }
+    .step time { display: none; }
+    .mono { width: 30px; height: 30px; font-size: 11.5px; }
+    .handoff { padding-left: 62px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { shell, icon, params, qMark } from "./assets/shell.js";
+
+const S = {
+  done: `<span class="si done">${icon("check")}</span>`, run: `<span class="si run"></span>`,
+  back: `<span class="si back">${icon("refresh")}</span>`, you: `<span class="si you">${icon("hand")}</span>`, wait: `<span class="si wait"></span>`,
+};
+const mono = (t, cls = "") => `<span class="mono ${cls}" aria-hidden="true">${t}</span>`;
+const step = (s, m, who, b, what, time, extra = "") => `<li class="step">${S[s]}${m}<div><span class="who">${who}</span><b>${b}</b>${what ? `<div class="what">${what}</div>` : ""}${extra}</div><time>${time}</time></li>`;
+const hand = (t) => `<li class="handoff">${icon("chevd")}${t}</li>`;
+
+const JOB_INTRO = `<article class="job">
+  <div class="job-head"><div><h3>Intro to Kestrel Heat</h3><p>You asked at 21:00. Lead Q planned 6 steps.</p></div><span class="status needs">${icon("hand")}Needs you</span></div>
+  <ol class="steps">
+    ${step("done", mono("Q", "lead"), "Lead Q", "Planned the job", "Read your guide first: warm start, no meeting ask in the first email.", "21:00")}
+    ${step("done", mono("Re"), "Research", "Read Kestrel’s deck and install log", "Found the founders’ last company and 310 installs.", "21:01")}
+    ${hand("Handed to Writer with 4 facts")}
+    ${step("done", mono("Wr"), "Writer", "Wrote draft 1", "", "21:02")}
+    ${step("back", mono("Rv"), "Reviewer", "Draft 1 below the bar", "", "21:02", `<div class="grade"><b>6.2</b><small>out of 10, the bar is 8.0</small></div><p class="fb">Asks for a meeting in the first line; your guide says start warm. Sent back to Writer.</p>`)}
+    ${step("done", mono("Wr"), "Writer", "Wrote draft 2", "", "21:03")}
+    ${step("done", mono("Rv"), "Reviewer", "Draft 2 passed", "", "21:03", `<div class="grade"><b>8.7</b><small>out of 10</small></div>`)}
+    ${step("you", mono("You", "you"), "You", "Approve and send", "Nothing is sent until you approve this exact text.", "now", `<div class="approve"><button class="btn btn-primary">Approve and send</button><button class="btn">Read draft 2</button><button class="btn">Not now</button></div>`)}
+    ${step("wait", mono("Sc"), "Scheduler", "Offer three times when they reply", "Waits for the reply.", "")}
+  </ol></article>`;
+const JOB_WATCH = `<article class="job"><div class="job-head"><div><h3>Watch for new matches</h3><p>Always on. 2 new companies fit your mandate today.</p></div><span class="status">${icon("refresh")}Running</span></div>
+  <ol class="steps">${step("run", mono("Mw"), "Mandate watcher", "Checking new companies against your mandate", "Expresses interest only with your approval.", "live")}</ol></article>`;
+const JOB_REPLY = `<article class="job"><div class="job-head"><div><h3>Reply to Morrow Pay</h3><p>They asked for your fund’s terms.</p></div><span class="status">${icon("refresh")}Running</span></div>
+  <ol class="steps">${step("done", mono("Dc"), "Documents", "Found your standard term sheet", "Shared with you, not with them yet.", "20:51")}${hand("Handed to Conversation")}${step("run", mono("Cv"), "Conversation", "Writing the reply", "", "20:52")}</ol></article>`;
+const JOB_DONE = `<article class="job"><div class="job-head"><div><h3>Book a call with Norrland Grid</h3><p>Done at 18:40. Thursday, 10:00.</p></div><span class="status">${icon("check")}Done</span></div></article>`;
+
+const TEAM = [
+  ["Q", "lead", "Lead Q", "Planning 4 jobs for you", "on", "Working"],
+  ["Ou", "", "Outreach", "1 intro waiting for you", "you", "Needs you"],
+  ["Mw", "", "Mandate watcher", "214 companies watched", "on", "Working"],
+  ["Cv", "", "Conversation", "Replying to Morrow Pay", "on", "Working"],
+  ["Wr", "", "Writer", "Draft 2 passed review", "", "Idle"],
+  ["Rv", "", "Reviewer", "6 drafts today, 2 sent back", "", "Idle"],
+  ["Sc", "", "Scheduler", "Waiting on 1 reply", "", "Waiting"],
+  ["Dc", "", "Documents", "Found 2 files today", "", "Idle"],
+  ["Re", "", "Research", "Read 3 decks today", "", "Idle"],
+];
+const COST = [["Research", 14.2], ["Writer", 9.6], ["Reviewer", 6.1], ["Conversation", 5.3], ["Mandate watcher", 3.9], ["Others", 2.7]];
+const max = Math.max(...COST.map((c) => c[1]));
+
+function main() {
+  const tab = params.get("tab") ?? "now";
+  const team = `<section class="team"><h2 class="sec">Who’s on it</h2><div class="roster">${TEAM.map(([m, c, n, d, s, w]) => `<div class="member">${mono(m, c)}<div style="min-width:0"><strong>${n}</strong><span class="d">${d}</span></div><span class="st ${s}">${w}</span></div>`).join("")}</div></section>`;
+  const cost = `<section class="cost"><h2 class="sec">Cost of Q’s work this month</h2><table>${COST.map(([n, v]) => `<tr><td style="width:120px">${n}</td><td><div class="bar" style="width:${(v / max) * 100}%"></div></td><td>£${v.toFixed(2)}</td></tr>`).join("")}</table>
+    <div class="total"><span>Total</span><b>£41.80 of £60</b></div><p>Q pauses new work and asks you at £60. Billed with your plan on 1 November.</p><div class="approve"><button class="btn">Change the limit</button><button class="btn">See every job</button></div></section>`;
+  return `<div class="wwrap">
+    <div class="whead"><div><h1>Q’s team</h1><p>4 jobs. 1 needs you.</p></div><div class="spend"><b>£41.80</b><span>this month, of your £60 limit</span></div></div>
+    <div class="tabs" role="tablist"><button role="tab" aria-selected="${tab === "now"}">Now</button><button role="tab" aria-selected="${tab === "team"}">Team</button><button role="tab" aria-selected="${tab === "cost"}">Cost</button></div>
+    <div class="wgrid" data-tab="${tab}">
+      <div class="jobs"><h2 class="sec">Now</h2>${JOB_INTRO}${JOB_REPLY}${JOB_WATCH}${JOB_DONE}</div>
+      <div class="side">${team}${cost}</div>
+    </div>
+  </div>`;
+}
+
+function draftSheet() {
+  return `<div class="sheet-scrim"></div><div class="sheet" role="dialog" aria-label="Draft 2 for Kestrel Heat">
+    <div class="grab"></div>
+    <div style="display:flex;align-items:center;gap:8px"><h2 class="sec" style="margin:0;flex:1">Intro to Kestrel Heat</h2><button class="btn-icon" aria-label="Close">${icon("x")}</button></div>
+    <p style="margin:2px 0 12px;color:var(--cq-text-secondary);font-size:13.5px">To Priya Shah, co-founder. From you.</p>
+    <div class="drafts">
+      <div class="draft"><header><strong>Draft 1</strong><span class="grade"><b>6.2</b><small>of 10</small></span></header>
+        <div class="mail"><p><mark class="cut">Could we get 30 minutes this week?</mark> I lead climate investing at Harbour Lane.</p></div>
+        <ul class="rules"><li><span class="no">${icon("x")}</span>Asks for a meeting in the first line</li><li><span class="ok">${icon("check")}</span>Short and plain</li></ul></div>
+      <div class="draft"><header><strong>Draft 2</strong><span class="grade"><b>8.7</b><small>of 10</small></span></header>
+        <div class="mail"><p>Priya, <mark class="add">310 installs in a year, with a day’s fitting time, is rare.</mark> I lead climate investing at Harbour Lane, and home heat is where we want to back more teams.</p><p>Happy to share what we’ve seen work for installers, if useful.</p></div>
+        <ul class="rules"><li><span class="ok">${icon("check")}</span>Starts warm, with something specific</li><li><span class="ok">${icon("check")}</span>No meeting ask yet</li><li><span class="ok">${icon("check")}</span>Your tone: direct, no jargon</li></ul></div>
+    </div>
+    <p class="bind">You approve this exact text. If you edit it, Reviewer checks it again before it goes.</p>
+    <div class="approve"><button class="btn btn-primary">Approve and send</button><button class="btn">Edit</button><button class="btn">Not now</button></div>
+  </div>`;
+}
+
+document.getElementById("app").innerHTML = shell("work", main()) + (params.get("state") === "draft" ? draftSheet() : "");
+document.querySelector(".tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const t = ["now", "team", "cost"][[...b.parentElement.children].indexOf(b)];
+  document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  document.querySelector(".wgrid").dataset.tab = t;
+});
+</script>
+</body>
+</html>
