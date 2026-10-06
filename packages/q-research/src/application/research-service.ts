@@ -24,6 +24,7 @@ import {
   matchOf,
   rankForReading,
   resolveEntity,
+  textNames,
   type EntityResolution,
   type FoundHit,
   type NamedEntity,
@@ -559,18 +560,16 @@ export function createPublicWebResearchService(
         entity !== null &&
         (command.subject === null ||
           entity.name.toLowerCase() !== command.subject.name.toLowerCase());
-      const compose = (requestedQuery: string) =>
+      const leadWithSubject =
+        !aboutSomeoneElse &&
+        prependIdentityFor(command.subject, command.aboutThemselves === true);
+      const compose = (requestedQuery: string, prepend = leadWithSubject) =>
         composeEgressQuery({
           requestedQuery,
           userText: command.userText,
           earlierUserText: command.earlierUserText,
           publicIdentity: identity,
-          prependIdentity:
-            !aboutSomeoneElse &&
-            prependIdentityFor(
-              command.subject,
-              command.aboutThemselves === true,
-            ),
+          prependIdentity: prepend,
         });
       const egress = compose(command.requestedQuery);
       // Plan 2-4 differently-worded queries (web search 2026-10-06: one
@@ -582,10 +581,10 @@ export function createPublicWebResearchService(
       const planned: string[] = [];
       let dropped = 0;
       let fellBack = false;
-      const plan = (candidate: string) => {
+      const plan = (candidate: string, prepend = leadWithSubject) => {
         if (planned.length >= RESEARCH_BOUNDS.maxPlannedQueries) return;
         if (candidate.trim().length === 0) return;
-        const composed = compose(candidate);
+        const composed = compose(candidate, prepend);
         if (!composed.ok) return;
         if (
           planned.some(
@@ -600,9 +599,20 @@ export function createPublicWebResearchService(
         planned.push(composed.query);
       };
       plan(command.requestedQuery);
+      // The same words without the subject in front, when it was put
+      // there: the question may be about the world, not about them.
+      plan(command.requestedQuery, false);
       for (const also of command.alsoQueries ?? []) plan(also);
-      plan(searchPhrase(command.userText));
-      if (entity !== null) {
+      // Their sentence as they put it, with nothing put in front: a market
+      // question is not a question about their own company.
+      plan(searchPhrase(command.userText), false);
+      // The name with its country, when a name is what is being looked up.
+      if (
+        entity !== null &&
+        (aboutSomeoneElse ||
+          command.aboutThemselves === true ||
+          textNames(command.requestedQuery, entity.name))
+      ) {
         const country = identity.includes(countryName(entity.country) ?? "")
           ? countryName(entity.country)
           : null;

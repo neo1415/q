@@ -46,10 +46,9 @@ import type { QToolPorts } from "../ports.js";
  *     public, and only its network projection identifies it; nothing is
  *     recorded against a company the actor does not own (§14, §29);
  *   - an investor about its own organisation: the public display name.
- * A company the actor may not see, or that does not exist, is searched as
- * an open question on the person's own words alone: nothing of the record
- * leaves, and the outcome is the same either way, never a confirmation
- * (§27). The open web is always reachable; only the record is guarded.
+ * A subject the plan denies, or that does not exist, is "not available" —
+ * one wording, never a confirmation (§27). The open web stays reachable:
+ * the same tool without a companyId searches the person's own words.
  *
  * Results are public material of unknown reliability (`truthClass: UNKNOWN`)
  * and untrusted data: a page that instructs is still only a page (§12).
@@ -86,7 +85,7 @@ export const ResearchPublicWebInputSchema = z
         "When looking up one company or person by name, that name exactly as the person said it. Pages are then checked to be about them before anything is attributed.",
       ),
     companyId: UuidSchema.optional().describe(
-      "The company the research is about, when this conversation has one. Omit for a general question.",
+      "The company the research is about, when this conversation has one. Omit for a general question or someone else named by the person (use entityName). If it comes back not available, search again without it.",
     ),
     freshness: z
       .enum(PUBLIC_WEB_FRESHNESS)
@@ -255,8 +254,7 @@ export function createResearchPublicWebTool(
           CompanyIdSchema.parse(companyId),
         );
         if (profile === null) {
-          // Searched as an open question on their words: never a confirmation.
-          return allow("PUBLIC", { subject: null });
+          return deny("NOT_AVAILABLE");
         }
         const owner =
           actor.organisationId !== undefined &&
@@ -306,9 +304,7 @@ export function createResearchPublicWebTool(
           (disclosed.reasonCode !== "NETWORK_VISIBLE" &&
             disclosed.reasonCode !== "PUBLIC_EXTERNAL")
         ) {
-          // Not theirs to see: nothing of the record may shape the query,
-          // so it is an open question on the person's own words alone.
-          return allow("PUBLIC", { subject: null });
+          return deny("NOT_AVAILABLE");
         }
         // Network projection fields only; nothing founder-private exists here.
         return allow("PUBLIC", {
@@ -351,7 +347,7 @@ export function createResearchPublicWebTool(
             },
           });
         }
-        return allow("PUBLIC", { subject: null });
+        return deny("NOT_AVAILABLE");
       }
       return allow("PUBLIC", { subject: null });
     },
