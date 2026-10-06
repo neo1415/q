@@ -36,6 +36,8 @@ import {
   type CompanySearchPage,
   type CompanySearchQuery,
 } from "../application/ports.js";
+import { parseCompanySearch } from "../domain/company-search.js";
+import { companySearchJoins } from "./company-search-sql.js";
 
 /**
  * PostgreSQL adapter for the company ports. Parameterised SQL on the
@@ -512,14 +514,25 @@ const SearchRowSchema = CompanyRowSchema.pick({
   marketplace_visibility: true,
 });
 
+const SearchScoreSchema = z.object({ score: z.coerce.number().int().min(0) });
+
+// `s` (the match score) is present only on a text search's cursor, which
+// pages by (score desc, name, id); a filter-only search pages by (name, id).
 const SearchCursorSchema = z
-  .object({ n: z.string().min(1).max(200), id: CompanyIdSchema })
+  .object({
+    n: z.string().min(1).max(200),
+    id: CompanyIdSchema,
+    s: z.number().int().min(0).max(10_000).optional(),
+  })
   .strict();
 
-function encodeSearchCursor(name: string, id: string): string {
-  return Buffer.from(JSON.stringify({ n: name, id }), "utf8").toString(
-    "base64url",
-  );
+function encodeSearchCursor(name: string, id: string, score?: number): string {
+  return Buffer.from(
+    JSON.stringify(
+      score === undefined ? { n: name, id } : { n: name, id, s: score },
+    ),
+    "utf8",
+  ).toString("base64url");
 }
 
 function decodeSearchCursor(
@@ -539,12 +552,6 @@ function decodeSearchCursor(
     throw new CompanySearchCursorError();
   }
   return parsed.data;
-}
-
-/** A LIKE pattern from untrusted text: wildcards in the text are literal. */
-function likePattern(text: string): string {
-  const escaped = text.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-  return `%${escaped}%`;
 }
 
 /** Candidate classifications for network discovery (ADR-001). Never merged with each other. */
@@ -638,58 +645,63 @@ export function createPostgresCompanyQueryPort(options: {
         Math.min(query.limit, COMPANY_SEARCH_LIMIT_MAX),
       );
       const text = query.text?.trim().slice(0, COMPANY_SEARCH_TEXT_MAX_LENGTH);
-      const pattern =
-        text === undefined || text.length === 0 ? null : likePattern(text);
+      const parsed =
+        text === undefined || text.length === 0
+          ? null
+          : parseCompanySearch(text);
       const after =
         query.cursor === undefined ? null : decodeSearchCursor(query.cursor);
+      const textGiven = text !== undefined && text.length > 0;
+      // A cursor from the other kind of search is not one this one issued.
+      if (after !== null && (after.s !== undefined) !== textGiven) {
+        throw new CompanySearchCursorError();
+      }
+      // Text with no letters or digits cannot name anything.
+      if (textGiven && parsed === null) {
+        return { items: [], nextCursor: null };
+      }
       const viewerOrganisation = query.viewer.organisationId ?? null;
-      // Discoverable classification OR the viewer's own organisation; active
-      // companies only. Keyset on (canonical_name, id), one row past the
-      // page to learn whether another exists.
-      const rows = await sql`
-        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
-               c.headquarters_country, c.short_description, c.marketplace_visibility
-          from core.companies c
-         where c.company_status = 'active'
+      const visible = sql`c.company_status = 'active'
            and (c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
                 or (${viewerOrganisation}::uuid is not null
                     and c.tenant_id = ${query.viewer.tenantId}
                     and c.organisation_id = ${viewerOrganisation}::uuid))
-           and (${pattern}::text is null or c.canonical_name ilike ${pattern}::text escape '\\')
            and (${query.stageCode ?? null}::text is null or c.current_stage_code = ${query.stageCode ?? null}::text)
            and (${query.headquartersCountry ?? null}::text is null
-                or c.headquarters_country = ${query.headquartersCountry ?? null}::text)
+                or c.headquarters_country = ${query.headquartersCountry ?? null}::text)`;
+      // Discoverable classification OR the viewer's own organisation; active
+      // companies only; one row past the page tells whether another exists.
+      // With text (P13), every candidate is scored -- exact name, website,
+      // sound-alike, prefix, contains, close misspelling ("young field agro"
+      // for Yamfield Agro, founder report 2026-09-30), or a described match
+      // on place, stage and sector words -- best first, keyset on
+      // (score desc, name, id). Without text, keyset on (name, id).
+      const rows =
+        parsed === null
+          ? await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
+               c.headquarters_country, c.short_description, c.marketplace_visibility
+          from core.companies c
+         where ${visible}
            and (${after?.n ?? null}::text is null
                 or (c.canonical_name, c.id) > (${after?.n ?? null}::text, ${after?.id ?? null}::uuid))
          order by c.canonical_name, c.id
+         limit ${limit + 1}`
+          : await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
+               c.headquarters_country, c.short_description, c.marketplace_visibility,
+               s.score
+          from core.companies c
+          ${companySearchJoins(sql, parsed)}
+         where ${visible}
+           and s.score > 0
+           and (${after?.s ?? null}::int is null
+                or s.score < ${after?.s ?? null}::int
+                or (s.score = ${after?.s ?? null}::int
+                    and (c.canonical_name, c.id) > (${after?.n ?? null}::text, ${after?.id ?? null}::uuid)))
+         order by s.score desc, c.canonical_name, c.id
          limit ${limit + 1}`;
-      // A name heard by voice is often misheard ("young field agro" for
-      // Yamfield Agro; founder report 2026-09-30). When the exact search
-      // finds nothing on a first page, the closest names by letter
-      // trigrams (spaces and punctuation ignored) stand in, best first;
-      // the same visibility rule applies.
-      if (rows.length === 0 && pattern !== null && after === null) {
-        const letters = (text ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-        if (letters.length >= 4) {
-          const close = await sql`
-            select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
-                   c.headquarters_country, c.short_description, c.marketplace_visibility
-              from core.companies c
-             where c.company_status = 'active'
-               and (c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
-                    or (${viewerOrganisation}::uuid is not null
-                        and c.tenant_id = ${query.viewer.tenantId}
-                        and c.organisation_id = ${viewerOrganisation}::uuid))
-               and extensions.similarity(
-                     regexp_replace(lower(c.canonical_name), '[^a-z0-9]', '', 'g'),
-                     ${letters}::text) >= 0.3
-             order by extensions.similarity(
-                     regexp_replace(lower(c.canonical_name), '[^a-z0-9]', '', 'g'),
-                     ${letters}::text) desc, c.canonical_name, c.id
-             limit ${Math.min(limit, 5)}`;
-          rows.push(...close);
-        }
-      }
+      const scoreOf = (row: unknown) => SearchScoreSchema.parse(row).score;
       const page = rows.slice(0, limit).map((row): CompanySearchCandidate => {
         const p = SearchRowSchema.parse(row);
         return {
@@ -712,7 +724,11 @@ export function createPostgresCompanyQueryPort(options: {
         items: page,
         nextCursor:
           rows.length > limit && last !== undefined
-            ? encodeSearchCursor(last.canonicalName, last.id)
+            ? encodeSearchCursor(
+                last.canonicalName,
+                last.id,
+                parsed === null ? undefined : scoreOf(rows[limit - 1]),
+              )
             : null,
       };
     },

@@ -24,14 +24,15 @@ import { networkVisibleCompanies } from "./network-companies.js";
  * Bounded discovery over companies classified network_visible or
  * public_external (ADR-001: two distinct scopes, both discoverable to an
  * authenticated participant), under the plan's actor-wide
- * NETWORK_VISIBLE_DATA scope. Filters are exact structured fields plus a
- * case-insensitive name substring; results are keyset-paged and every
+ * NETWORK_VISIBLE_DATA scope. Filters are exact structured fields plus the
+ * text, which the Companies context reads and ranks deterministically (P13:
+ * exact, sound-alike, prefix, misspelling, or described place/stage/sector
+ * words over declared profile facts); results are keyset-paged and every
  * candidate is re-checked through the Permissions bounded context before
  * it is returned — classification selects candidates, disclosure decides.
  * The actor's own organisation-private companies are not search results:
- * they are subjects of their own conversations. No ranking, no score, no
- * semantic retrieval (CQ-RAG), no taxonomy filter yet (no companies-by-node
- * query exists in the Taxonomy context).
+ * they are subjects of their own conversations. The match score never
+ * leaves the repository; no semantic retrieval (CQ-RAG).
  */
 
 export const SEARCH_COMPANIES = "company.search" as const;
@@ -47,7 +48,9 @@ export const SearchCompaniesInputSchema = z
       .min(1)
       .max(COMPANY_SEARCH_TEXT_MAX_LENGTH)
       .optional()
-      .describe("Case-insensitive substring of the company name."),
+      .describe(
+        "A company name as heard (partial or misspelt is fine), its website, or a few words of place, stage and sector, e.g. Nigerian fintech seed. Best matches first.",
+      ),
     stageCode: z
       .string()
       .trim()
@@ -103,7 +106,7 @@ export function createSearchCompaniesTool(
     status: "ACTIVE",
     providerName: "search_companies",
     description:
-      "Searches companies visible across the Capital Q network by name substring, stage code and headquarters country, returning up to 20 per page with a cursor. Call it to find a company the person names or describes; then use get_company for a profile. Results are declared profiles, not assessments, and not recommendations: being visible is not being in anyone's feed, so never use these results to say what an investor should look at — that comes only from discovery_slate.",
+      "Searches companies visible across the Capital Q network by name (partial, misspelt or sound-alike), website, or described place, stage and sector words, plus exact stage code and headquarters country filters; best matches first, up to 20 per page with a cursor. Call it to find a company the person names or describes; then use get_company for a profile. Results are declared profiles, not assessments, and not recommendations: being visible is not being in anyone's feed, so never use these results to say what an investor should look at — that comes only from discovery_slate.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],

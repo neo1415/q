@@ -208,3 +208,17 @@ export {
   emailAtCompany,
   type CompanyClaims,
 } from "./claims/company-claims.js";
+
+// P13: one reading and ranking of a typed company search, for every surface.
+export {
+  foldSearchText,
+  isTransposition,
+  isDescriptiveSearch,
+  parseCompanySearch,
+  scoreCompanySearch,
+  searchKey,
+  searchLetters,
+  trigramSimilarity,
+  type CompanySearchDocument,
+  type ParsedCompanySearch,
+} from "./domain/company-search.js";
