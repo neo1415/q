@@ -35,13 +35,7 @@ vi.mock("@capital-q/api-client", async (importOriginal) => {
           journeys.inFlight -= 1;
           const status = journeys.status[journey] ?? 404;
           if (status === 404) {
-            reject(
-              new actual.ApiProblemError({
-                type: "about:blank",
-                title: "Not Found",
-                status: 404,
-              } as never),
-            );
+            reject(new actual.ApiProblemError("Not Found", 404, "NOT_FOUND"));
           } else {
             resolve({ session: { status } });
           }
@@ -69,5 +63,13 @@ describe("where a person stands with onboarding", () => {
   it("is DONE when either journey completed, whatever the other says", async () => {
     journeys.status = { founder: "ACTIVE", investor: "COMPLETED" };
     expect(await resolveOnboardingState()).toEqual({ kind: "DONE" });
+  });
+
+  it("a journey this person does not have (404) is not a failure", async () => {
+    journeys.status = { investor: "ACTIVE" };
+    expect(await resolveOnboardingState()).toEqual({
+      kind: "UNFINISHED",
+      journey: "investor",
+    });
   });
 });
