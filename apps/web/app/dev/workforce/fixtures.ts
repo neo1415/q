@@ -1,6 +1,8 @@
 import {
+  QWorkDtoSchema,
   WorkforceJobDetailDtoSchema,
   WorkforceOverviewDtoSchema,
+  type QWorkDto,
   type WorkforceJobDetailDto,
   type WorkforceOverviewDto,
 } from "@capital-q/contracts";
@@ -415,4 +417,217 @@ export function workforceFixtures(now: number): {
   });
 
   return { overview, jobs: [intro, reply, watch, done] };
+}
+
+/**
+ * Every agent state at once (P7 team map review): the four jobs above plus
+ * a draft held below the bar, a step that failed, a job being planned, a
+ * message sent and waiting on a reply, and live work paused outside the
+ * person's working hours. Fictional; nothing is read or sent.
+ */
+export function workforceAllStates(
+  now: number,
+  options: { readonly budgetPaused?: boolean; readonly hours?: boolean } = {},
+): {
+  readonly overview: WorkforceOverviewDto;
+  readonly jobs: readonly WorkforceJobDetailDto[];
+  readonly work: readonly QWorkDto[];
+} {
+  const base = workforceFixtures(now);
+  const at = (minutesAgo: number) =>
+    new Date(now - minutesAgo * 60_000).toISOString();
+  const draft = (
+    draftId: string,
+    to: string,
+    body: string,
+    outcome: Record<string, unknown>,
+    minutesAgo: number,
+  ) => ({
+    id: draftId,
+    attempt: 2,
+    parentDraftId: null,
+    channel: "EMAIL",
+    counterpartName: to,
+    body,
+    grade: null,
+    outcome,
+    feedback: [],
+    createdAt: at(minutesAgo),
+  });
+
+  const held = WorkforceJobDetailDtoSchema.parse({
+    job: summary(
+      id(40),
+      "Follow up Atlas Ventures",
+      "INSTRUCTION",
+      "RUNNING",
+      at(12),
+    ),
+    agents: [
+      run(
+        id(41),
+        "WRITER",
+        "Follow-up to Atlas Ventures",
+        "DONE",
+        "Wrote 2 drafts.",
+        at(13),
+        null,
+      ),
+      run(
+        id(42),
+        "REVIEWER",
+        "Grade: Follow-up to Atlas Ventures",
+        "DONE",
+        "68 against a bar of 75.",
+        at(12),
+        null,
+      ),
+    ],
+    drafts: [
+      draft(
+        id(43),
+        "Mara Lind",
+        "Hi Mara, following up on our call. Could we lock a partner meeting this week?",
+        { outcome: "HELD", reason: "BELOW_BAR", qActionId: null },
+        12,
+      ),
+    ],
+    timeline: [],
+  });
+  const failed = WorkforceJobDetailDtoSchema.parse({
+    job: summary(
+      id(50),
+      "Read Fernhill Robotics’ deck",
+      "JOB",
+      "RUNNING",
+      at(7),
+    ),
+    agents: [
+      run(
+        id(51),
+        "DOCUMENTS",
+        "Open Fernhill’s deck",
+        "FAILED",
+        "Couldn’t open the deck: the file is password protected.",
+        at(7),
+        null,
+      ),
+      run(
+        id(52),
+        "RESEARCH",
+        "Read Fernhill’s site and press",
+        "DONE",
+        "4 findings, 1 open question.",
+        at(9),
+        null,
+      ),
+    ],
+    drafts: [],
+    timeline: [],
+  });
+  const planning = WorkforceJobDetailDtoSchema.parse({
+    job: summary(
+      id(60),
+      "Meet three robotics founders this month",
+      "JOB",
+      "PLANNING",
+      at(1),
+    ),
+    agents: [],
+    drafts: [],
+    timeline: [],
+  });
+  const waiting = WorkforceJobDetailDtoSchema.parse({
+    job: summary(
+      id(70),
+      "Keep Kestrel Bio warm",
+      "INSTRUCTION",
+      "RUNNING",
+      at(60 * 20),
+    ),
+    agents: [
+      run(
+        id(71),
+        "CONVERSATION",
+        "Note to Tom Reyes",
+        "DONE",
+        "Sent.",
+        at(60 * 20),
+        null,
+      ),
+    ],
+    drafts: [
+      draft(
+        id(72),
+        "Tom Reyes",
+        "Hi Tom, congratulations on the Phase I readout.",
+        { outcome: "SENT", reason: null, qActionId: null },
+        60 * 20,
+      ),
+    ],
+    timeline: [],
+  });
+  const asking = WorkforceJobDetailDtoSchema.parse({
+    job: summary(
+      id(90),
+      "Introduce me to Fernhill Robotics",
+      "JOB",
+      "RUNNING",
+      at(4),
+    ),
+    agents: [
+      run(
+        id(91),
+        "OUTREACH",
+        "First message to Nadia Okafor",
+        "DONE",
+        "Draft passed the bar.",
+        at(4),
+        null,
+      ),
+    ],
+    drafts: [
+      draft(
+        id(92),
+        "Nadia Okafor",
+        "Hi Nadia, I read Fernhill’s note on picking cells for mid-size warehouses. The cut in re-slotting time is the kind of result we look for at seed. Would a 20-minute call next week be useful?",
+        {
+          outcome: "OFFERED",
+          reason: null,
+          qActionId: id(93),
+          approvalId: id(94),
+          approvalStatus: "PENDING",
+        },
+        4,
+      ),
+    ],
+    timeline: [],
+  });
+  const work = [
+    QWorkDtoSchema.parse({
+      id: id(80),
+      kind: "STANDING_INSTRUCTION",
+      status: "ACTIVE",
+      summary: null,
+      createdAt: at(60 * 24 * 3),
+      expiresAt: new Date(now + 30 * 86_400_000).toISOString(),
+      lanes: [],
+      goal: "Book calls with founders who reply",
+      run: { state: "PAUSED", pauseReason: "OUTSIDE_HOURS" },
+      lastStep: { words: "Waiting for 08:00", at: at(40) },
+    }),
+  ];
+  return {
+    overview: WorkforceOverviewDtoSchema.parse({
+      ...base.overview,
+      paused: options.budgetPaused === true,
+      spentUsd: options.budgetPaused === true ? "60" : base.overview.spentUsd,
+      jobs: { open: 7, needsYou: 2 },
+    }),
+    jobs:
+      options.hours === true
+        ? [asking, ...base.jobs.slice(2, 3), held, failed, waiting]
+        : [planning, asking, ...base.jobs.slice(2, 3), held, failed, waiting],
+    work,
+  };
 }

@@ -70,10 +70,16 @@ export function WorkforcePanel({
   jobs,
   initialTab = "now",
   openDraftId,
+  part = "all",
 }: {
   readonly overview: WorkforceOverviewDto | null;
   readonly jobs: readonly WorkforceJobDetailDto[] | null;
   readonly initialTab?: Tab | undefined;
+  /**
+   * The Work page shows the jobs under In progress and the team and cost
+   * under their own tabs (P7); the design review page shows it all.
+   */
+  readonly part?: "all" | "jobs" | undefined;
   /** A draft shown open (the design review page renders it this way). */
   readonly openDraftId?: string | undefined;
 }) {
@@ -140,43 +146,8 @@ export function WorkforcePanel({
         </div>
       </header>
 
-      <div
-        role="tablist"
-        aria-label="Q’s team"
-        className="-mx-4 mb-3.5 flex gap-1 border-b border-(--cq-border-subtle) px-3 lg:hidden"
-      >
-        {(
-          [
-            ["now", "Now"],
-            ["team", "Team"],
-            ["cost", "Cost"],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            onClick={() => {
-              setTab(key);
-            }}
-            className={cx(
-              "min-h-11 cursor-pointer border-b-2 bg-transparent px-3 font-medium",
-              tab === key
-                ? "border-(--cq-accent) text-(--cq-text-primary)"
-                : "border-transparent text-(--cq-text-secondary)",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className={cx("min-w-0", tab !== "now" && "hidden lg:block")}>
-          <h3 className="mb-2.5 hidden text-[15px] font-semibold lg:block">
-            Now
-          </h3>
+      {part === "jobs" ? (
+        <div className="min-w-0">
           {jobs.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
               No jobs yet. Give Q a task above and its team takes it from there.
@@ -193,15 +164,73 @@ export function WorkforcePanel({
             ))
           )}
         </div>
-        <div className={cx("min-w-0", tab === "now" && "hidden lg:block")}>
-          <div className={cx(tab === "cost" && "hidden lg:block")}>
-            <Team overview={overview} />
+      ) : (
+        <>
+          <div
+            role="tablist"
+            aria-label="Q’s team"
+            className="-mx-4 mb-3.5 flex gap-1 border-b border-(--cq-border-subtle) px-3 lg:hidden"
+          >
+            {(
+              [
+                ["now", "Now"],
+                ["team", "Team"],
+                ["cost", "Cost"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => {
+                  setTab(key);
+                }}
+                className={cx(
+                  "min-h-11 cursor-pointer border-b-2 bg-transparent px-3 font-medium",
+                  tab === key
+                    ? "border-(--cq-accent) text-(--cq-text-primary)"
+                    : "border-transparent text-(--cq-text-secondary)",
+                )}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <div className={cx(tab === "team" && "hidden lg:block")}>
-            <Cost overview={overview} first={tab === "cost"} />
+
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div className={cx("min-w-0", tab !== "now" && "hidden lg:block")}>
+              <h3 className="mb-2.5 hidden text-[15px] font-semibold lg:block">
+                Now
+              </h3>
+              {jobs.length === 0 ? (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  No jobs yet. Give Q a task above and its team takes it from
+                  there.
+                </p>
+              ) : (
+                jobs.map((job) => (
+                  <JobCard
+                    key={job.job.id}
+                    job={job}
+                    onRead={(draftId) => {
+                      setReading({ job, draftId });
+                    }}
+                  />
+                ))
+              )}
+            </div>
+            <div className={cx("min-w-0", tab === "now" && "hidden lg:block")}>
+              <div className={cx(tab === "cost" && "hidden lg:block")}>
+                <Team overview={overview} />
+              </div>
+              <div className={cx(tab === "team" && "hidden lg:block")}>
+                <Cost overview={overview} first={tab === "cost"} />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
       <DraftSheet
         reading={reading}
@@ -247,7 +276,7 @@ function JobCard({
   const lines = job.job.status === "DONE" && !needs ? [] : jobLines(job);
   return (
     <article
-      className="mb-3 overflow-hidden rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+      className="mb-3 overflow-hidden rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) [contain-intrinsic-size:auto_160px] [content-visibility:auto]"
       data-job={job.job.id}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 py-3 pr-2 pl-4">
@@ -474,12 +503,15 @@ function Step({
   );
 }
 
-function ApproveButton({
+export function ApproveButton({
   approvalId,
   children = "Approve and send",
+  onDone,
 }: {
   readonly approvalId: string;
   readonly children?: ReactNode;
+  /** After the approval went through (the live view reads again). */
+  readonly onDone?: (() => void) | undefined;
 }) {
   const router = useRouter();
   const [busy, start] = useTransition();
@@ -499,6 +531,7 @@ function ApproveButton({
               setError(result?.message ?? "That didn't go through. Try again.");
               return;
             }
+            onDone?.();
             router.refresh();
           });
         }}
@@ -722,7 +755,7 @@ function DraftCard({
   );
 }
 
-function DraftSheet({
+export function DraftSheet({
   reading,
   onClose,
 }: {

@@ -56,7 +56,15 @@ import { useQSessionOptional } from "@/features/q/q-session";
 
 import { groupNotices, type NoticeGroup } from "./notice-groups";
 import type { WorkforceView } from "./workforce-actions";
+import { WorkforceCost } from "./workforce-cost";
 import { WorkforcePanel } from "./workforce-panel";
+import {
+  LiveLine,
+  WorkforceTeamView,
+  useClock,
+  useWorkforceLive,
+} from "./workforce-section";
+import { dollars as usd } from "./workforce-view";
 import { noticesRead, refreshNotices, useNotices } from "./notice-store";
 import {
   answerWorkAction,
@@ -101,6 +109,10 @@ type Props = {
    * this month's cost. Absent: the section is not shown; null: it failed.
    */
   readonly workforce?: WorkforceView | null | undefined;
+  /** The view shown first (the design review page picks one). */
+  readonly initialView?: WorkView | undefined;
+  /** False: never read the team again (the design review page). */
+  readonly liveReads?: boolean | undefined;
 };
 
 export function WorkPage({
@@ -110,6 +122,8 @@ export function WorkPage({
   done,
   prepared,
   workforce,
+  initialView,
+  liveReads = true,
 }: Props) {
   const running = (work ?? []).filter((item) => item.status === "ACTIVE");
   const timeLanes = running.flatMap((item) =>
@@ -135,24 +149,52 @@ export function WorkPage({
   // The first screen shows what matters (founder, demo 2026-10-06: the page
   // "just flows down forever"): what waits on them, else what runs.
   const [view, setView] = useState<WorkView>(
-    needsCount > 0 ? "needs" : running.length > 0 ? "progress" : "done",
+    initialView ??
+      (needsCount > 0
+        ? "needs"
+        : running.length > 0 || (workforce?.overview.jobs.open ?? 0) > 0
+          ? "progress"
+          : "done"),
   );
-  const views: readonly (readonly [WorkView, string, number])[] = [
+  // Q's team, read again while the page is visible (P7): In progress,
+  // Team and Cost share one reader so they never disagree.
+  const live = useWorkforceLive(
+    workforce,
+    view === "team" || view === "progress",
+    liveReads,
+  );
+  const now = useClock();
+  const team = live.data;
+  const hasTeam = workforce !== undefined;
+  const views: readonly (readonly [WorkView, string, number | string])[] = [
     ["needs", "Needs you", needsCount],
     ["progress", "In progress", running.length],
     ["done", "Done", doneCount],
+    ...(hasTeam
+      ? ([
+          ["team", "Team", team === null ? "" : team.overview.jobs.open],
+          ["cost", "Cost", team === null ? "" : usd(team.overview.spentUsd)],
+        ] as const)
+      : []),
   ];
+  const teamNeedsYou = (team?.overview.jobs.needsYou ?? 0) > 0;
 
   return (
     <div
-      className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-5"
+      className={cx(
+        "mx-auto flex w-full flex-col gap-5",
+        // The team map needs the room; reading views keep the measure.
+        view === "team" || view === "cost"
+          ? "max-w-(--cq-layout-content)"
+          : "max-w-(--cq-layout-reading)",
+      )}
       data-work-page
     >
       <TaskComposer />
       <div
         role="tablist"
         aria-label="Work"
-        className="sticky top-[calc(var(--cq-header-height)+var(--cq-safe-top))] z-(--cq-z-sticky) -mx-1 flex gap-1 border-b border-(--cq-border-subtle) bg-(--cq-canvas) px-1 lg:top-0"
+        className="sticky top-[calc(var(--cq-header-height)+var(--cq-safe-top))] z-(--cq-z-sticky) -mx-4 flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) bg-(--cq-canvas) px-3 [scrollbar-width:none] lg:top-0 lg:-mx-1 lg:px-1"
         data-work-views
       >
         {views.map(([key, label, count]) => (
@@ -163,21 +205,40 @@ export function WorkPage({
             id={`work-tab-${key}`}
             aria-selected={view === key}
             aria-controls={`work-view-${key}`}
-            onClick={() => setView(key)}
+            onClick={(event) => {
+              setView(key);
+              event.currentTarget.scrollIntoView({
+                block: "nearest",
+                inline: "nearest",
+              });
+            }}
             className={cx(
-              "-mb-px flex min-h-11 items-center gap-1.5 border-b-2 px-3 cq-label motion-safe:transition-colors motion-safe:duration-(--cq-motion-fast)",
+              "-mb-px flex min-h-11 flex-none items-center gap-1.5 border-b-2 px-2.5 whitespace-nowrap cq-label motion-safe:transition-colors motion-safe:duration-(--cq-motion-fast) lg:px-3",
               view === key
                 ? "border-(--cq-text-primary) text-(--cq-text-primary)"
                 : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
             )}
           >
             {label}
-            <span className="cq-numeric font-normal text-(--cq-text-tertiary)">
+            <span
+              className={cx(
+                "cq-numeric",
+                key === "team" && teamNeedsYou
+                  ? "font-semibold text-(--cq-accent)"
+                  : "font-normal text-(--cq-text-tertiary)",
+              )}
+            >
               {count}
             </span>
           </button>
         ))}
       </div>
+      {hasTeam &&
+      (view === "team" || view === "progress" || view === "cost") ? (
+        <div className="-mt-3 flex justify-end">
+          <LiveLine live={live} now={now} />
+        </div>
+      ) : null}
       <div
         role="tabpanel"
         id="work-view-needs"
@@ -220,13 +281,48 @@ export function WorkPage({
             Nothing running yet.
           </p>
         ) : null}
-        {workforce === undefined ? null : (
+        {hasTeam ? (
           <WorkforcePanel
-            overview={workforce?.overview ?? null}
-            jobs={workforce?.jobs ?? null}
+            overview={team?.overview ?? null}
+            jobs={team?.jobs ?? null}
+            part="jobs"
           />
-        )}
+        ) : null}
       </div>
+      {hasTeam ? (
+        <div
+          role="tabpanel"
+          id="work-view-team"
+          aria-labelledby="work-tab-team"
+          hidden={view !== "team"}
+        >
+          {team === null ? (
+            <TeamUnavailable onRetry={live.refresh} />
+          ) : view === "team" ? (
+            <WorkforceTeamView
+              view={team}
+              work={work}
+              now={Math.max(now, live.updatedAt)}
+              onGoTo={setView}
+              onChanged={live.refresh}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {hasTeam ? (
+        <div
+          role="tabpanel"
+          id="work-view-cost"
+          aria-labelledby="work-tab-cost"
+          hidden={view !== "cost"}
+        >
+          {team === null ? (
+            <TeamUnavailable onRetry={live.refresh} />
+          ) : (
+            <WorkforceCost overview={team.overview} jobs={team.jobs} />
+          )}
+        </div>
+      ) : null}
       <div
         role="tabpanel"
         id="work-view-done"
@@ -245,7 +341,20 @@ export function WorkPage({
   );
 }
 
-type WorkView = "needs" | "progress" | "done";
+type WorkView = "needs" | "progress" | "done" | "team" | "cost";
+
+function TeamUnavailable({ onRetry }: { readonly onRetry: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
+        Q’s team couldn’t load. It keeps working; this view catches up.
+      </p>
+      <Button variant="secondary" onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
+  );
+}
 
 /** Rows shown before "Show N more" in a long group. */
 const GROUP_PREVIEW = 5;
