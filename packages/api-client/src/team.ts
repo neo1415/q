@@ -46,7 +46,10 @@ export const getTeam = (session: ApiSession) =>
 export const inviteToTeam = (session: ApiSession, body: InviteRequest) =>
   call(session, "POST", TEAM_INVITATIONS_PATH, InviteResultDtoSchema, { body });
 
-export const resendTeamInvitation = (session: ApiSession, invitationId: string) =>
+export const resendTeamInvitation = (
+  session: ApiSession,
+  invitationId: string,
+) =>
   call(
     session,
     "POST",
@@ -54,17 +57,31 @@ export const resendTeamInvitation = (session: ApiSession, invitationId: string) 
     TeamDtoSchema,
   );
 
-export const revokeTeamInvitation = (session: ApiSession, invitationId: string) =>
-  call(session, "DELETE", at(TEAM_INVITATION_PATH, { invitationId }), TeamDtoSchema);
+export const revokeTeamInvitation = (
+  session: ApiSession,
+  invitationId: string,
+) =>
+  call(
+    session,
+    "DELETE",
+    at(TEAM_INVITATION_PATH, { invitationId }),
+    TeamDtoSchema,
+  );
 
 export const changeTeamRole = (
   session: ApiSession,
   membershipId: string,
   role: InvitableRole,
 ) =>
-  call(session, "PUT", at(TEAM_MEMBER_ROLE_PATH, { membershipId }), TeamDtoSchema, {
-    body: { role },
-  });
+  call(
+    session,
+    "PUT",
+    at(TEAM_MEMBER_ROLE_PATH, { membershipId }),
+    TeamDtoSchema,
+    {
+      body: { role },
+    },
+  );
 
 export const removeTeamMember = (
   session: ApiSession,
@@ -117,7 +134,10 @@ export const getMyOrganisations = (session: ApiSession) =>
   call(session, "GET", MY_ORGANISATIONS_PATH, MyOrganisationsDtoSchema);
 
 /** Switching: the server sets the active context from the person's own membership. */
-export const switchOrganisation = (session: ApiSession, organisationId: string) =>
+export const switchOrganisation = (
+  session: ApiSession,
+  organisationId: string,
+) =>
   call(
     session,
     "POST",
@@ -132,9 +152,15 @@ export const previewInvitation = (session: ApiSession, token: string) =>
   });
 
 export const acceptInvitation = (session: ApiSession, token: string) =>
-  call(session, "POST", INVITATION_ACCEPT_PATH, AcceptInvitationResultDtoSchema, {
-    body: { token },
-  });
+  call(
+    session,
+    "POST",
+    INVITATION_ACCEPT_PATH,
+    AcceptInvitationResultDtoSchema,
+    {
+      body: { token },
+    },
+  );
 
 export const requestToJoin = (
   session: ApiSession,
@@ -142,5 +168,6 @@ export const requestToJoin = (
   message?: string,
 ) =>
   call(session, "POST", JOIN_REQUESTS_PATH, JoinRequestResultDtoSchema, {
-    body: message === undefined ? { organisationId } : { organisationId, message },
+    body:
+      message === undefined ? { organisationId } : { organisationId, message },
   });

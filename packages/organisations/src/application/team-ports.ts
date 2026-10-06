@@ -263,7 +263,8 @@ export type TeamJournalEntry = {
   readonly tenantId: string;
   readonly organisationId: string;
   readonly actorUserId: string;
-  readonly resourceType: "invitation" | "membership" | "ownership_offer" | "join_request";
+  readonly resourceType:
+    "invitation" | "membership" | "ownership_offer" | "join_request";
   readonly resourceId: string;
   /** Ids and codes only; never an email address or a message. */
   readonly metadata: Readonly<Record<string, string | number | boolean | null>>;

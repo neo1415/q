@@ -102,7 +102,9 @@ export function DesktopSidebar({
 
       {/* G2: who they act for, when they have two or more. */}
       {(context.organisations?.length ?? 0) < 2 ? null : (
-        <div className={collapsed ? "flex justify-center px-2 pb-2" : "px-3 pb-2"}>
+        <div
+          className={collapsed ? "flex justify-center px-2 pb-2" : "px-3 pb-2"}
+        >
           <SidebarOrganisationSwitcher
             organisations={context.organisations ?? []}
             compact={collapsed}

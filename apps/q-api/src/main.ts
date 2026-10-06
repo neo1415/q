@@ -1716,7 +1716,11 @@ const team = createTeamService({
     teamEmailConfig.brevoApi !== undefined
       ? recordingEmailSender(
           createBrevoApiEmailSender(teamEmailConfig.brevoApi),
-          { sql: database.sql, source: "q_api.team_invitation", provider: "BREVO_API" },
+          {
+            sql: database.sql,
+            source: "q_api.team_invitation",
+            provider: "BREVO_API",
+          },
         )
       : teamEmailConfig.smtp === undefined
         ? unavailableAppEmailSender

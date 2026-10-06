@@ -35,11 +35,17 @@ export const metadata: Metadata = {
  * `?view=team|founder|switcher|accept`, `&state=full|loading|empty|error|limited`.
  */
 
-const IDS = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const IDS = (n: number) =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const AGO = (days: number) =>
   new Date(Date.now() - days * 86_400_000).toISOString();
 
-type Row = readonly [name: string, email: string, role: "OWNER" | "ADMIN" | "MEMBER", title: string];
+type Row = readonly [
+  name: string,
+  email: string,
+  role: "OWNER" | "ADMIN" | "MEMBER",
+  title: string,
+];
 
 const FIRM: readonly Row[] = [
   ["Daniel Reyes", "daniel@northbound.vc", "OWNER", "Managing partner"],
@@ -59,7 +65,14 @@ const COMPANY: readonly Row[] = [
 function fixture(founder: boolean, state: string): TeamDto {
   const solo = state === "empty";
   const rows: readonly Row[] = solo
-    ? [[founder ? "Amara Okafor" : "Ada Okafor", "you@example.com", "OWNER", ""]]
+    ? [
+        [
+          founder ? "Amara Okafor" : "Ada Okafor",
+          "you@example.com",
+          "OWNER",
+          "",
+        ],
+      ]
     : founder
       ? COMPANY
       : FIRM;
@@ -69,14 +82,25 @@ function fixture(founder: boolean, state: string): TeamDto {
   return {
     organisation: {
       organisationId: IDS(1),
-      name: solo ? (founder ? "Kora Health" : "Ada Okafor (angel)") : founder ? "Kora Health" : "Northbound Capital",
+      name: solo
+        ? founder
+          ? "Kora Health"
+          : "Ada Okafor (angel)"
+        : founder
+          ? "Kora Health"
+          : "Northbound Capital",
       kind: founder ? "COMPANY" : "FIRM",
       organisationType: founder ? "company" : "investment_firm",
     },
     you: {
       membershipId: IDS(100 + me),
       role: myRole,
-      can: { invite: admin, changeRoles: admin, removeMembers: admin, own: myRole === "OWNER" },
+      can: {
+        invite: admin,
+        changeRoles: admin,
+        removeMembers: admin,
+        own: myRole === "OWNER",
+      },
     },
     ownerCount: 1,
     members: rows.map(([name, email, role, title], index) => ({
@@ -93,23 +117,84 @@ function fixture(founder: boolean, state: string): TeamDto {
       solo || !admin
         ? []
         : founder
-          ? [{ invitationId: IDS(301), email: "kwame@korahealth.ng", role: "MEMBER", state: "PENDING", sentAt: AGO(2), sentCount: 1, expiresAt: AGO(-5), invitedByName: "Amara Okafor" }]
+          ? [
+              {
+                invitationId: IDS(301),
+                email: "kwame@korahealth.ng",
+                role: "MEMBER",
+                state: "PENDING",
+                sentAt: AGO(2),
+                sentCount: 1,
+                expiresAt: AGO(-5),
+                invitedByName: "Amara Okafor",
+              },
+            ]
           : [
-              { invitationId: IDS(301), email: "peter@northbound.vc", role: "MEMBER", state: "PENDING", sentAt: AGO(2), sentCount: 1, expiresAt: AGO(-5), invitedByName: "Sara Kimani" },
-              { invitationId: IDS(302), email: "grace.ade@gmail.com", role: "ADMIN", state: "EXPIRED", sentAt: AGO(9), sentCount: 1, expiresAt: AGO(2), invitedByName: "Daniel Reyes" },
+              {
+                invitationId: IDS(301),
+                email: "peter@northbound.vc",
+                role: "MEMBER",
+                state: "PENDING",
+                sentAt: AGO(2),
+                sentCount: 1,
+                expiresAt: AGO(-5),
+                invitedByName: "Sara Kimani",
+              },
+              {
+                invitationId: IDS(302),
+                email: "grace.ade@gmail.com",
+                role: "ADMIN",
+                state: "EXPIRED",
+                sentAt: AGO(9),
+                sentCount: 1,
+                expiresAt: AGO(2),
+                invitedByName: "Daniel Reyes",
+              },
             ],
     joinRequests:
       solo || !admin || founder
         ? []
-        : [{ requestId: IDS(401), name: "Omar Farouk", email: "omar@northbound.vc", message: null, requestedAt: AGO(1) }],
+        : [
+            {
+              requestId: IDS(401),
+              name: "Omar Farouk",
+              email: "omar@northbound.vc",
+              message: null,
+              requestedAt: AGO(1),
+            },
+          ],
     ownershipOffers: [],
   };
 }
 
 const ORGS: readonly MyOrganisationDto[] = [
-  { organisationId: IDS(1), name: "Northbound Capital", kind: "FIRM", organisationType: "investment_firm", role: "OWNER", memberCount: 6, active: true },
-  { organisationId: IDS(2), name: "Daniel Reyes (angel)", kind: "FIRM", organisationType: "syndicate", role: "OWNER", memberCount: 1, active: false },
-  { organisationId: IDS(3), name: "Lagoon Angels", kind: "FIRM", organisationType: "syndicate", role: "MEMBER", memberCount: 14, active: false },
+  {
+    organisationId: IDS(1),
+    name: "Northbound Capital",
+    kind: "FIRM",
+    organisationType: "investment_firm",
+    role: "OWNER",
+    memberCount: 6,
+    active: true,
+  },
+  {
+    organisationId: IDS(2),
+    name: "Daniel Reyes (angel)",
+    kind: "FIRM",
+    organisationType: "syndicate",
+    role: "OWNER",
+    memberCount: 1,
+    active: false,
+  },
+  {
+    organisationId: IDS(3),
+    name: "Lagoon Angels",
+    kind: "FIRM",
+    organisationType: "syndicate",
+    role: "MEMBER",
+    memberCount: 14,
+    active: false,
+  },
 ];
 
 const PREVIEW: InvitationPreviewDto = {
@@ -154,8 +239,12 @@ export default async function TeamReviewPage({
       ) : (
         <JoinCard
           token="x"
-          preview={state === "error" ? { ...PREVIEW, state: "EXPIRED" } : PREVIEW}
-          signedInAs={state === "limited" ? "peter.m@gmail.com" : "peter@northbound.vc"}
+          preview={
+            state === "error" ? { ...PREVIEW, state: "EXPIRED" } : PREVIEW
+          }
+          signedInAs={
+            state === "limited" ? "peter.m@gmail.com" : "peter@northbound.vc"
+          }
           keeps={state === "empty" ? null : "Peter Musa (angel)"}
           alreadyIn={false}
         />

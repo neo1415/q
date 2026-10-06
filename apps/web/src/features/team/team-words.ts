@@ -36,7 +36,9 @@ export function splitEmailInput(raw: string): readonly string[] {
 
 /** "2 days ago", "today": when an invitation went. */
 export function timeAgo(iso: string, now: Date = new Date()): string {
-  const days = Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000);
+  const days = Math.floor(
+    (now.getTime() - new Date(iso).getTime()) / 86_400_000,
+  );
   if (!Number.isFinite(days) || days <= 0) return "today";
   if (days === 1) return "yesterday";
   return `${String(days)} days ago`;

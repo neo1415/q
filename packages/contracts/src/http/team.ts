@@ -165,7 +165,10 @@ export type TeamDto = z.infer<typeof TeamDtoSchema>;
 
 export const InviteRequestSchema = z
   .object({
-    emails: z.array(z.string().trim().min(3).max(254)).min(1).max(INVITE_EMAILS_MAX),
+    emails: z
+      .array(z.string().trim().min(3).max(254))
+      .min(1)
+      .max(INVITE_EMAILS_MAX),
     role: InvitableRoleSchema,
     message: z.string().trim().max(500).optional(),
   })

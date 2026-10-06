@@ -192,7 +192,10 @@ function MoreSheet({
       </SheetTrigger>
       <SheetContent title="More">
         {/* G2: who they act for, first, when they have two or more. */}
-        <MoreOrganisationSwitcher organisations={organisations} onPicked={close} />
+        <MoreOrganisationSwitcher
+          organisations={organisations}
+          onPicked={close}
+        />
         <nav aria-label="More sections">
           {/* Profile heads the sheet; Search is its field (WORK-58). */}
           <Link

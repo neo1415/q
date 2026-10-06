@@ -47,7 +47,12 @@ function Problem({
   return (
     <div className="px-4">
       <div className={CARD} data-join-state="error">
-        <CircleAlert aria-hidden="true" size={28} strokeWidth={ICON_STROKE} className="text-(--cq-text-secondary)" />
+        <CircleAlert
+          aria-hidden="true"
+          size={28}
+          strokeWidth={ICON_STROKE}
+          className="text-(--cq-text-secondary)"
+        />
         <h1 className="cq-title-lg text-(--cq-text-primary)">{title}</h1>
         <p className="cq-body text-(--cq-text-secondary)">{body}</p>
         {children ?? (
@@ -106,13 +111,19 @@ export function JoinCard({
   }
   if (preview.state === "ACCEPTED") {
     return alreadyIn ? (
-      <Problem title={`You're in ${preview.organisationName}`} body="This invitation was already used to join.">
+      <Problem
+        title={`You're in ${preview.organisationName}`}
+        body="This invitation was already used to join."
+      >
         <Link href="/settings/team" className={buttonClassName("primary")}>
           Open your team
         </Link>
       </Problem>
     ) : (
-      <Problem title="This invitation was already used" body={`Ask ${inviterFirst} at ${preview.organisationName} for a new one.`} />
+      <Problem
+        title="This invitation was already used"
+        body={`Ask ${inviterFirst} at ${preview.organisationName} for a new one.`}
+      />
     );
   }
   const mismatch =
@@ -122,9 +133,12 @@ export function JoinCard({
       <div className="px-4">
         <div className={CARD} data-join-state="limited">
           <Logo name={preview.organisationName} />
-          <h1 className="cq-title-lg text-(--cq-text-primary)">This invitation is for {preview.email}</h1>
+          <h1 className="cq-title-lg text-(--cq-text-primary)">
+            This invitation is for {preview.email}
+          </h1>
           <p className="cq-body text-(--cq-text-secondary)">
-            You&apos;re signed in as {signedInAs}. Sign in with the invited email, or ask {inviterFirst} to invite this one.
+            You&apos;re signed in as {signedInAs}. Sign in with the invited
+            email, or ask {inviterFirst} to invite this one.
           </p>
           <div className="w-full [&>*]:w-full">
             <SignOutButton />
@@ -133,15 +147,23 @@ export function JoinCard({
       </div>
     );
   }
-  const others = Math.max(0, preview.memberCount - preview.memberInitials.length);
+  const others = Math.max(
+    0,
+    preview.memberCount - preview.memberInitials.length,
+  );
   return (
     <div className="px-4">
       <div className={CARD} data-join-state={keeps === null ? "empty" : "full"}>
         <Logo name={preview.organisationName} />
-        <h1 className="cq-title-lg text-(--cq-text-primary)">Join {preview.organisationName}</h1>
+        <h1 className="cq-title-lg text-(--cq-text-primary)">
+          Join {preview.organisationName}
+        </h1>
         <p className="cq-body text-(--cq-text-secondary)">
           {inviter} invited you as {preview.role === "ADMIN" ? "an" : "a"}{" "}
-          <b className="font-medium text-(--cq-text-primary)">{ROLE[preview.role]}</b>.{" "}
+          <b className="font-medium text-(--cq-text-primary)">
+            {ROLE[preview.role]}
+          </b>
+          .{" "}
           {preview.kind === "COMPANY"
             ? "You'll work on the company's profile, data room and investor conversations."
             : `You'll share the ${words.word}'s inbox, notes and relationships.`}
@@ -159,13 +181,18 @@ export function JoinCard({
               </span>
             ))}
             <span className="ml-2 cq-caption text-(--cq-text-secondary)">
-              {others > 0 ? `and ${String(others)} ${others === 1 ? "other" : "others"}` : `${String(preview.memberCount)} ${preview.memberCount === 1 ? "person" : "people"}`}
+              {others > 0
+                ? `and ${String(others)} ${others === 1 ? "other" : "others"}`
+                : `${String(preview.memberCount)} ${preview.memberCount === 1 ? "person" : "people"}`}
             </span>
           </div>
         ) : null}
         {keeps === null ? null : (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            You&apos;ll keep <b className="font-medium text-(--cq-text-primary)">{keeps}</b> too, and switch between them from the top of the sidebar (on a phone, from More).
+            You&apos;ll keep{" "}
+            <b className="font-medium text-(--cq-text-primary)">{keeps}</b> too,
+            and switch between them from the top of the sidebar (on a phone,
+            from More).
           </p>
         )}
         {error === null ? null : (
@@ -192,7 +219,10 @@ export function JoinCard({
         >
           Join {preview.organisationName}
         </button>
-        <Link href="/home" className={buttonClassName("quiet", "regular", "w-full")}>
+        <Link
+          href="/home"
+          className={buttonClassName("quiet", "regular", "w-full")}
+        >
           Not now
         </Link>
       </div>

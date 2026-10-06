@@ -33,7 +33,8 @@ export default async function JoinPage({
     !valid.success || session === null
       ? null
       : await previewInvitation(session, valid.data).catch(() => null);
-  const current = organisations.find((organisation) => organisation.active) ?? null;
+  const current =
+    organisations.find((organisation) => organisation.active) ?? null;
   return (
     <JoinCard
       token={valid.success ? valid.data : ""}
@@ -42,7 +43,9 @@ export default async function JoinPage({
       keeps={current === null ? null : current.name}
       alreadyIn={
         preview !== null &&
-        organisations.some((organisation) => organisation.name === preview.organisationName)
+        organisations.some(
+          (organisation) => organisation.name === preview.organisationName,
+        )
       }
     />
   );

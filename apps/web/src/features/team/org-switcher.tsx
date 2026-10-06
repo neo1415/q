@@ -33,7 +33,13 @@ import { teamWords } from "./team-words";
 
 const ROLE = { OWNER: "Owner", ADMIN: "Admin", MEMBER: "Member" } as const;
 
-function Monogram({ name, size = 34 }: { readonly name: string; readonly size?: number }) {
+function Monogram({
+  name,
+  size = 34,
+}: {
+  readonly name: string;
+  readonly size?: number;
+}) {
   return (
     <span
       aria-hidden="true"
@@ -74,7 +80,9 @@ function OrganisationList({
   const { pending, error, switchTo } = useSwitch();
   return (
     <div role="menu" aria-label="Switch company or firm" data-org-switcher-list>
-      <p className="px-2.5 pt-2 pb-1 cq-caption text-(--cq-text-tertiary)">Acting for</p>
+      <p className="px-2.5 pt-2 pb-1 cq-caption text-(--cq-text-tertiary)">
+        Acting for
+      </p>
       {organisations.map((organisation) => (
         <button
           key={organisation.organisationId}
@@ -83,7 +91,8 @@ function OrganisationList({
           aria-checked={organisation.active}
           disabled={pending}
           onClick={() => {
-            if (!organisation.active) switchTo(organisation.organisationId, onPicked);
+            if (!organisation.active)
+              switchTo(organisation.organisationId, onPicked);
           }}
           className={cx(
             "flex min-h-13 w-full items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
@@ -100,7 +109,12 @@ function OrganisationList({
             </span>
           </span>
           {organisation.active ? (
-            <Check aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} className="text-(--cq-text-primary)" />
+            <Check
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+              className="text-(--cq-text-primary)"
+            />
           ) : null}
         </button>
       ))}
@@ -108,7 +122,10 @@ function OrganisationList({
         Q keeps each one&apos;s work and memory separate.
       </p>
       {error === null ? null : (
-        <p role="alert" className="px-2.5 pb-2 cq-caption text-(--cq-text-primary)">
+        <p
+          role="alert"
+          className="px-2.5 pb-2 cq-caption text-(--cq-text-primary)"
+        >
           {error}
         </p>
       )}
@@ -144,10 +161,19 @@ export function SidebarOrganisationSwitcher({
           {compact ? null : (
             <>
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate cq-body-sm font-medium text-(--cq-text-primary)">{active.name}</span>
-                <span className="truncate cq-caption text-(--cq-text-secondary)">{sub}</span>
+                <span className="truncate cq-body-sm font-medium text-(--cq-text-primary)">
+                  {active.name}
+                </span>
+                <span className="truncate cq-caption text-(--cq-text-secondary)">
+                  {sub}
+                </span>
               </span>
-              <ChevronsUpDown aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} className="text-(--cq-text-tertiary)" />
+              <ChevronsUpDown
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+                className="text-(--cq-text-tertiary)"
+              />
             </>
           )}
         </button>

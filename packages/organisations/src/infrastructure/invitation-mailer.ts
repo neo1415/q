@@ -36,8 +36,17 @@ export function renderInvitationEmail(email: InvitationEmail) {
       ...(email.message === null
         ? []
         : [{ kind: "note" as const, text: `"${email.message}"` }]),
-      { kind: "button", label: `Join ${email.organisationName}`, href: email.link },
-      { kind: "link", label: "Or open this link", href: email.link, showUrl: true },
+      {
+        kind: "button",
+        label: `Join ${email.organisationName}`,
+        href: email.link,
+      },
+      {
+        kind: "link",
+        label: "Or open this link",
+        href: email.link,
+        showUrl: true,
+      },
       {
         kind: "note",
         text: `The link works for ${String(email.expiresInDays)} days, once. Sign in with this email address to accept.`,

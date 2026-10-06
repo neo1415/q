@@ -78,9 +78,7 @@ export function registerTeamRoutes(
     const token = InvitationTokenSchema.safeParse(
       typeof raw === "string" ? raw : undefined,
     );
-    const out = token.success
-      ? await team.previewInvitation(token.data)
-      : null;
+    const out = token.success ? await team.previewInvitation(token.data) : null;
     if (out === null || !out.ok) {
       reply.callNotFound();
       return undefined;

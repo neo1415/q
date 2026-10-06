@@ -32,15 +32,23 @@ const context: AppActionContext = {
     userId: UserIdSchema.parse("00000000-0000-4000-8000-00000000d002"),
     tenantId: TenantIdSchema.parse("00000000-0000-4000-8000-0000000000a3"),
     organisationId: ORG,
-    membershipId: MembershipIdSchema.parse("00000000-0000-4000-8000-0000000000e2"),
+    membershipId: MembershipIdSchema.parse(
+      "00000000-0000-4000-8000-0000000000e2",
+    ),
     actorType: "HUMAN",
   },
   idempotencyKey: "k",
-  correlationId: CorrelationIdSchema.parse("cor_00000000-0000-4000-8000-00000000c0de"),
+  correlationId: CorrelationIdSchema.parse(
+    "cor_00000000-0000-4000-8000-00000000c0de",
+  ),
   surface: "Q",
 };
 
-const member = (name: string, role: "OWNER" | "ADMIN" | "MEMBER", n: number) => ({
+const member = (
+  name: string,
+  role: "OWNER" | "ADMIN" | "MEMBER",
+  n: number,
+) => ({
   membershipId: `00000000-0000-4000-8000-0000000000e${String(n)}`,
   userId: `00000000-0000-4000-8000-00000000d00${String(n)}`,
   name,
@@ -52,11 +60,36 @@ const member = (name: string, role: "OWNER" | "ADMIN" | "MEMBER", n: number) => 
 });
 
 const TEAM: TeamDto = {
-  organisation: { organisationId: ORG, name: "Northbound Capital", kind: "FIRM", organisationType: "investment_firm" },
-  you: { membershipId: member("Sara Kimani", "ADMIN", 2).membershipId, role: "ADMIN", can: { invite: true, changeRoles: true, removeMembers: true, own: false } },
+  organisation: {
+    organisationId: ORG,
+    name: "Northbound Capital",
+    kind: "FIRM",
+    organisationType: "investment_firm",
+  },
+  you: {
+    membershipId: member("Sara Kimani", "ADMIN", 2).membershipId,
+    role: "ADMIN",
+    can: { invite: true, changeRoles: true, removeMembers: true, own: false },
+  },
   ownerCount: 1,
-  members: [member("Daniel Reyes", "OWNER", 1), member("Sara Kimani", "ADMIN", 2), member("James Okoro", "MEMBER", 3), member("James Hale", "MEMBER", 4)],
-  invitations: [{ invitationId: "00000000-0000-4000-8000-0000000000f1", email: "peter@northbound.example", role: "MEMBER", state: "EXPIRED", sentAt: "2026-09-01T00:00:00.000Z", sentCount: 1, expiresAt: "2026-09-08T00:00:00.000Z", invitedByName: "Sara Kimani" }],
+  members: [
+    member("Daniel Reyes", "OWNER", 1),
+    member("Sara Kimani", "ADMIN", 2),
+    member("James Okoro", "MEMBER", 3),
+    member("James Hale", "MEMBER", 4),
+  ],
+  invitations: [
+    {
+      invitationId: "00000000-0000-4000-8000-0000000000f1",
+      email: "peter@northbound.example",
+      role: "MEMBER",
+      state: "EXPIRED",
+      sentAt: "2026-09-01T00:00:00.000Z",
+      sentCount: 1,
+      expiresAt: "2026-09-08T00:00:00.000Z",
+      invitedByName: "Sara Kimani",
+    },
+  ],
   joinRequests: [],
   ownershipOffers: [],
 };
@@ -93,24 +126,48 @@ describe("Q's team tools", () => {
       context,
       ports,
     );
-    expect(canonical).toEqual({ organisationId: ORG, input: { emails: ["peter@northbound.example"], role: "MEMBER" } });
-    expect(invite.targets(canonical)).toEqual([{ kind: "ORGANISATION", organisationId: ORG }]);
-    expect(invite.card(canonical).summary).toBe("Invite peter@northbound.example to your team as a Member");
+    expect(canonical).toEqual({
+      organisationId: ORG,
+      input: { emails: ["peter@northbound.example"], role: "MEMBER" },
+    });
+    expect(invite.targets(canonical)).toEqual([
+      { kind: "ORGANISATION", organisationId: ORG },
+    ]);
+    expect(invite.card(canonical).summary).toBe(
+      "Invite peter@northbound.example to your team as a Member",
+    );
   });
 
   it("refuses a card that names someone else's organisation", async () => {
     const invite = action("team.invite");
-    const verdict = await invite.authorize(ports, context, { organisationId: OTHER, input: { emails: ["a@b.example"], role: "MEMBER" } });
+    const verdict = await invite.authorize(ports, context, {
+      organisationId: OTHER,
+      input: { emails: ["a@b.example"], role: "MEMBER" },
+    });
     expect(verdict.ok).toBe(false);
-    const own = await invite.authorize(ports, context, { input: { emails: ["a@b.example"], role: "MEMBER" } });
+    const own = await invite.authorize(ports, context, {
+      input: { emails: ["a@b.example"], role: "MEMBER" },
+    });
     expect(own.ok).toBe(true);
   });
 
   it("change_team_role names one clear teammate, and asks when several match", async () => {
     const role = action("team.member.role.set");
-    const one = await role.tool?.toCanonical({ person: "Daniel", role: "ADMIN" }, context, ports);
-    expect(one).toMatchObject({ organisationId: ORG, membershipId: TEAM.members[0]?.membershipId, name: "Daniel Reyes" });
-    const several = await role.tool?.toCanonical({ person: "James", role: "ADMIN" }, context, ports);
+    const one = await role.tool?.toCanonical(
+      { person: "Daniel", role: "ADMIN" },
+      context,
+      ports,
+    );
+    expect(one).toMatchObject({
+      organisationId: ORG,
+      membershipId: TEAM.members[0]?.membershipId,
+      name: "Daniel Reyes",
+    });
+    const several = await role.tool?.toCanonical(
+      { person: "James", role: "ADMIN" },
+      context,
+      ports,
+    );
     expect(isRefusal(several) && several.refused).toContain("Which one?");
     expect(typeof findTeammate(TEAM.members, "nobody")).toBe("string");
   });
@@ -128,8 +185,21 @@ describe("Q's team tools", () => {
 
   it("a refusal is the person's words, a not-found the one 404", () => {
     const http = action("team.member.remove").http;
-    expect(http?.problem?.({ ok: false, code: "LAST_OWNER", message: "Every team keeps at least one owner." })).toEqual({ code: "RESOURCE_CONFLICT", detail: "Every team keeps at least one owner." });
-    expect(http?.problem?.({ ok: false, code: "NOT_FOUND", message: "x" })).toBeNull();
-    expect(http?.notFound?.({ ok: false, code: "NOT_FOUND", message: "x" })).toBe(true);
+    expect(
+      http?.problem?.({
+        ok: false,
+        code: "LAST_OWNER",
+        message: "Every team keeps at least one owner.",
+      }),
+    ).toEqual({
+      code: "RESOURCE_CONFLICT",
+      detail: "Every team keeps at least one owner.",
+    });
+    expect(
+      http?.problem?.({ ok: false, code: "NOT_FOUND", message: "x" }),
+    ).toBeNull();
+    expect(
+      http?.notFound?.({ ok: false, code: "NOT_FOUND", message: "x" }),
+    ).toBe(true);
   });
 });

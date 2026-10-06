@@ -40,7 +40,9 @@ export type TeamActionResult<T = TeamDto> =
 const SIGN_IN = "Please sign in again to continue.";
 
 async function run<T>(
-  work: (session: NonNullable<Awaited<ReturnType<typeof apiSession>>>) => Promise<T>,
+  work: (
+    session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
+  ) => Promise<T>,
 ): Promise<TeamActionResult<T>> {
   const session = await apiSession();
   if (session === null) return { ok: false, message: SIGN_IN };
@@ -51,7 +53,11 @@ async function run<T>(
   } catch (error: unknown) {
     if (error instanceof ApiProblemError) {
       if (error.status === 404) {
-        return { ok: false, message: "That isn't on your team any more. Reload to see it as it is." };
+        return {
+          ok: false,
+          message:
+            "That isn't on your team any more. Reload to see it as it is.",
+        };
       }
       if (error.problem?.detail !== undefined) {
         return { ok: false, message: error.problem.detail };
@@ -62,7 +68,10 @@ async function run<T>(
 }
 
 const id = (value: string) => UuidSchema.safeParse(value).success;
-const BAD = { ok: false as const, message: "That didn't go through. Reload and try again." };
+const BAD = {
+  ok: false as const,
+  message: "That didn't go through. Reload and try again.",
+};
 
 export async function inviteAction(
   emails: readonly string[],
@@ -77,17 +86,23 @@ export async function inviteAction(
     inviteToTeam(session, {
       emails: emails.slice(0, 20),
       role: parsedRole.data,
-      ...(message.trim() === "" ? {} : { message: message.trim().slice(0, 500) }),
+      ...(message.trim() === ""
+        ? {}
+        : { message: message.trim().slice(0, 500) }),
     }),
   );
 }
 
 export async function resendAction(invitationId: string) {
-  return id(invitationId) ? run((s) => resendTeamInvitation(s, invitationId)) : BAD;
+  return id(invitationId)
+    ? run((s) => resendTeamInvitation(s, invitationId))
+    : BAD;
 }
 
 export async function revokeAction(invitationId: string) {
-  return id(invitationId) ? run((s) => revokeTeamInvitation(s, invitationId)) : BAD;
+  return id(invitationId)
+    ? run((s) => revokeTeamInvitation(s, invitationId))
+    : BAD;
 }
 
 export async function changeRoleAction(membershipId: string, role: string) {
@@ -97,7 +112,10 @@ export async function changeRoleAction(membershipId: string, role: string) {
     : BAD;
 }
 
-export async function removeAction(membershipId: string, handOverTo: string | null) {
+export async function removeAction(
+  membershipId: string,
+  handOverTo: string | null,
+) {
   return id(membershipId) && (handOverTo === null || id(handOverTo))
     ? run((s) => removeTeamMember(s, membershipId, handOverTo))
     : BAD;
@@ -110,15 +128,21 @@ export async function leaveAction() {
 }
 
 export async function offerOwnershipAction(membershipId: string) {
-  return id(membershipId) ? run((s) => offerTeamOwnership(s, membershipId)) : BAD;
+  return id(membershipId)
+    ? run((s) => offerTeamOwnership(s, membershipId))
+    : BAD;
 }
 
 export async function respondOwnershipAction(offerId: string, accept: boolean) {
-  return id(offerId) ? run((s) => respondToTeamOwnership(s, offerId, accept)) : BAD;
+  return id(offerId)
+    ? run((s) => respondToTeamOwnership(s, offerId, accept))
+    : BAD;
 }
 
 export async function decideJoinAction(requestId: string, approve: boolean) {
-  return id(requestId) ? run((s) => decideTeamJoinRequest(s, requestId, approve)) : BAD;
+  return id(requestId)
+    ? run((s) => decideTeamJoinRequest(s, requestId, approve))
+    : BAD;
 }
 
 /** Switching: the server sets who they act for, from their own membership. */

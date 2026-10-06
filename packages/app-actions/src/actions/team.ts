@@ -222,7 +222,9 @@ const INVITE = defineAppAction<
     toCanonical: (tool, context) => {
       if (context.actor.organisationId === undefined) {
         return Promise.resolve(
-          refusal("Set up your company or firm first; then you can invite people."),
+          refusal(
+            "Set up your company or firm first; then you can invite people.",
+          ),
         );
       }
       const parsed = InviteRequestSchema.safeParse({
@@ -325,7 +327,10 @@ const SET_ROLE = defineAppAction<
         : "Members work day to day; they can suggest, but can't approve what Q sends.",
   }),
   done: (out, input) =>
-    teamDone(out, `${input.name ?? "They"} ${input.name === undefined ? "are" : "is"} now ${roleWord(input.input.role)}.`),
+    teamDone(
+      out,
+      `${input.name ?? "They"} ${input.name === undefined ? "are" : "is"} now ${roleWord(input.input.role)}.`,
+    ),
   succeeded,
   http: {
     method: "PUT",
@@ -344,10 +349,7 @@ const SET_ROLE = defineAppAction<
     input: RoleTool,
     references: {},
     eval: {
-      say: [
-        "Make Sara an admin on my team.",
-        "Change Tunde's role to member.",
-      ],
+      say: ["Make Sara an admin on my team.", "Change Tunde's role to member."],
       orSays: "couldn't find|isn't on your team|which one",
     },
     toCanonical: async (tool, context, ports) => {
@@ -374,7 +376,10 @@ const TEAM_PAGE = "offer.team_manage" as const;
 
 const Invitation = z.object({ invitationId: UuidSchema }).strict();
 
-const RESEND = defineAppAction<z.infer<typeof Invitation>, TeamOutcome<TeamDto>>({
+const RESEND = defineAppAction<
+  z.infer<typeof Invitation>,
+  TeamOutcome<TeamDto>
+>({
   name: "team.invitation.resend",
   short: "resend an invitation",
   area: "team",
@@ -384,7 +389,11 @@ const RESEND = defineAppAction<z.infer<typeof Invitation>, TeamOutcome<TeamDto>>
   output: result(),
   authorize: () => Promise.resolve({ ok: true }),
   run: (ports, context, input) =>
-    team(ports).resendInvitation(context.actor, input.invitationId, context.correlationId),
+    team(ports).resendInvitation(
+      context.actor,
+      input.invitationId,
+      context.correlationId,
+    ),
   targets: () => [],
   card: () => ({ summary: "Resend an invitation", preview: "" }),
   done: (out) => teamDone(out, "Sent again. The new link works for 7 days."),
@@ -398,7 +407,10 @@ const RESEND = defineAppAction<z.infer<typeof Invitation>, TeamOutcome<TeamDto>>
   qCapability: TEAM_PAGE,
 });
 
-const REVOKE = defineAppAction<z.infer<typeof Invitation>, TeamOutcome<TeamDto>>({
+const REVOKE = defineAppAction<
+  z.infer<typeof Invitation>,
+  TeamOutcome<TeamDto>
+>({
   name: "team.invitation.revoke",
   short: "cancel an invitation",
   area: "team",
@@ -408,7 +420,11 @@ const REVOKE = defineAppAction<z.infer<typeof Invitation>, TeamOutcome<TeamDto>>
   output: result(),
   authorize: () => Promise.resolve({ ok: true }),
   run: (ports, context, input) =>
-    team(ports).revokeInvitation(context.actor, input.invitationId, context.correlationId),
+    team(ports).revokeInvitation(
+      context.actor,
+      input.invitationId,
+      context.correlationId,
+    ),
   targets: () => [],
   card: () => ({ summary: "Cancel an invitation", preview: "" }),
   done: (out) => teamDone(out, "Cancelled. That link no longer works."),
@@ -460,7 +476,10 @@ const REMOVE = defineAppAction<z.infer<typeof Remove>, TeamOutcome<TeamDto>>({
 
 const Leave = z.object({}).strict();
 
-const LEAVE = defineAppAction<z.infer<typeof Leave>, TeamOutcome<z.infer<typeof LeaveResultDtoSchema>>>({
+const LEAVE = defineAppAction<
+  z.infer<typeof Leave>,
+  TeamOutcome<z.infer<typeof LeaveResultDtoSchema>>
+>({
   name: "team.leave",
   short: "leave my team",
   area: "team",
@@ -469,7 +488,8 @@ const LEAVE = defineAppAction<z.infer<typeof Leave>, TeamOutcome<z.infer<typeof 
   input: Leave,
   output: result(),
   authorize: () => Promise.resolve({ ok: true }),
-  run: (ports, context) => team(ports).leave(context.actor, context.correlationId),
+  run: (ports, context) =>
+    team(ports).leave(context.actor, context.correlationId),
   targets: () => [],
   card: () => ({ summary: "Leave your team", preview: "" }),
   done: (out) => teamDone(out, "You left."),
@@ -497,10 +517,15 @@ const OFFER = defineAppAction<z.infer<typeof Offer>, TeamOutcome<TeamDto>>({
   output: result(),
   authorize: () => Promise.resolve({ ok: true }),
   run: (ports, context, input) =>
-    team(ports).offerOwnership(context.actor, input.input.membershipId, context.correlationId),
+    team(ports).offerOwnership(
+      context.actor,
+      input.input.membershipId,
+      context.correlationId,
+    ),
   targets: () => [],
   card: () => ({ summary: "Make someone an owner", preview: "" }),
-  done: (out) => teamDone(out, "Request sent. Once they accept, you're both owners."),
+  done: (out) =>
+    teamDone(out, "Request sent. Once they accept, you're both owners."),
   succeeded,
   http: {
     method: "POST",
@@ -540,7 +565,10 @@ const RESPOND = defineAppAction<z.infer<typeof Respond>, TeamOutcome<TeamDto>>({
   http: {
     method: "POST",
     path: TEAM_OWNERSHIP_OFFER_RESPONSE_PATH,
-    fromRequest: (params, body) => ({ offerId: params["offerId"], input: body }),
+    fromRequest: (params, body) => ({
+      offerId: params["offerId"],
+      input: body,
+    }),
     ...teamHttp(toTeamDto),
   },
   qCapability: TEAM_PAGE,
@@ -574,7 +602,10 @@ const DECIDE = defineAppAction<z.infer<typeof Decide>, TeamOutcome<TeamDto>>({
   http: {
     method: "POST",
     path: TEAM_JOIN_REQUEST_DECISION_PATH,
-    fromRequest: (params, body) => ({ requestId: params["requestId"], input: body }),
+    fromRequest: (params, body) => ({
+      requestId: params["requestId"],
+      input: body,
+    }),
     ...teamHttp(toTeamDto),
   },
   qCapability: TEAM_PAGE,
@@ -660,7 +691,11 @@ export const TEAM_PERSON_ACTIONS: readonly AnyPersonAction[] = [ACCEPT, JOIN];
 
 // --- read_my("team") -------------------------------------------------------
 
-const ROLE_WORDS = { OWNER: "Owner", ADMIN: "Admin", MEMBER: "Member" } as const;
+const ROLE_WORDS = {
+  OWNER: "Owner",
+  ADMIN: "Admin",
+  MEMBER: "Member",
+} as const;
 
 /** Their team as the Team page shows it: people with roles, then invitations. */
 export async function teamItems(

@@ -395,11 +395,14 @@ const organisations = createOrganisationService({
 const teamEmailConfig = loadAppEmailConfig(process.env);
 const teamEmail =
   teamEmailConfig.brevoApi !== undefined
-    ? recordingEmailSender(createBrevoApiEmailSender(teamEmailConfig.brevoApi), {
-        sql: database.sql,
-        source: "api.team_invitation",
-        provider: "BREVO_API",
-      })
+    ? recordingEmailSender(
+        createBrevoApiEmailSender(teamEmailConfig.brevoApi),
+        {
+          sql: database.sql,
+          source: "api.team_invitation",
+          provider: "BREVO_API",
+        },
+      )
     : teamEmailConfig.smtp === undefined
       ? unavailableAppEmailSender
       : recordingEmailSender(createSmtpAppEmailSender(teamEmailConfig.smtp), {

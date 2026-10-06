@@ -68,8 +68,7 @@ export type TeamActor = {
 };
 
 export type TeamOutcome<T> =
-  | { readonly ok: true; readonly value: T }
-  | TeamRefusal;
+  { readonly ok: true; readonly value: T } | TeamRefusal;
 
 export type TeamServiceDependencies<Tx> = {
   readonly store: TeamStore<Tx>;
@@ -80,8 +79,7 @@ export type TeamServiceDependencies<Tx> = {
   readonly now?: (() => Date) | undefined;
   /** Test seam: a known token. */
   readonly newToken?:
-    | (() => { readonly token: string; readonly hash: string })
-    | undefined;
+    (() => { readonly token: string; readonly hash: string }) | undefined;
   readonly onWarning?: ((message: string, error: unknown) => void) | undefined;
 };
 
@@ -160,10 +158,7 @@ const ROLE_RANK: Readonly<Record<TeamRole, number>> = {
 
 const NOT_FOUND = refuse("NOT_FOUND", "That isn't on your team any more.");
 
-function displayName(
-  name: string | null,
-  email: string | null,
-): string {
+function displayName(name: string | null, email: string | null): string {
   const trimmed = name?.trim() ?? "";
   if (trimmed.length > 0) return trimmed.slice(0, 200);
   const local = email?.split("@")[0]?.trim() ?? "";
@@ -309,8 +304,7 @@ export function createTeamService<Tx>(
       ownershipOffers: offers
         .filter(
           (offer) =>
-            s.myRole === "OWNER" ||
-            offer.toMembershipId === s.me.membershipId,
+            s.myRole === "OWNER" || offer.toMembershipId === s.me.membershipId,
         )
         .map((offer) => ({
           offerId: offer.id,
@@ -531,10 +525,16 @@ export function createTeamService<Tx>(
         );
         if (invitation === null) return NOT_FOUND;
         if (invitation.status !== "pending") {
-          return refuse("NOT_PENDING", "That invitation was already used or cancelled.");
+          return refuse(
+            "NOT_PENDING",
+            "That invitation was already used or cancelled.",
+          );
         }
         if (invitation.sentCount >= 20) {
-          return refuse("NOT_ALLOWED", "That invitation was sent too many times. Cancel it and invite again.");
+          return refuse(
+            "NOT_ALLOWED",
+            "That invitation was sent too many times. Cancel it and invite again.",
+          );
         }
         const { token, hash } = newToken();
         await store.rotateInvitation(tx, invitation.id, {
@@ -586,7 +586,10 @@ export function createTeamService<Tx>(
         );
         if (invitation === null) return NOT_FOUND;
         if (invitation.status !== "pending") {
-          return refuse("NOT_PENDING", "That invitation was already used or cancelled.");
+          return refuse(
+            "NOT_PENDING",
+            "That invitation was already used or cancelled.",
+          );
         }
         await store.decideInvitation(tx, invitation.id, {
           status: "revoked",
@@ -663,7 +666,12 @@ export function createTeamService<Tx>(
               member.membershipId !== target.membershipId,
           ) ?? s.me;
         await store.endMembership(tx, target.membershipId, "revoked");
-        await moveContextAway(tx, target.userId, target.membershipId, s.organisation.id);
+        await moveContextAway(
+          tx,
+          target.userId,
+          target.membershipId,
+          s.organisation.id,
+        );
         await journal.record(tx, {
           action: "membership.removed",
           tenantId: s.organisation.tenantId,
@@ -801,7 +809,11 @@ export function createTeamService<Tx>(
         if (!abilitiesOf(s.myRole).invite) {
           return refuse("NOT_ALLOWED", "Only admins can let people in.");
         }
-        const request = await store.joinRequest(tx, s.organisation.id, requestId);
+        const request = await store.joinRequest(
+          tx,
+          s.organisation.id,
+          requestId,
+        );
         if (request === null || request.status !== "pending") return NOT_FOUND;
         let membershipId: string | null = null;
         if (approve) {
@@ -883,7 +895,11 @@ export function createTeamService<Tx>(
         return {
           ok: true as const,
           value: {
-            state: invitationState(invitation.status, invitation.expiresAt, now()),
+            state: invitationState(
+              invitation.status,
+              invitation.expiresAt,
+              now(),
+            ),
             organisationName: organisation.name,
             kind: teamKindOf(organisation.type),
             role: invitationRoleOf(invitation.roleCode),
@@ -936,7 +952,10 @@ export function createTeamService<Tx>(
         if (invitation.status === "revoked") {
           return refuse("NOT_PENDING", "This invitation was cancelled.");
         }
-        if (invitationState(invitation.status, invitation.expiresAt, now()) === "EXPIRED") {
+        if (
+          invitationState(invitation.status, invitation.expiresAt, now()) ===
+          "EXPIRED"
+        ) {
           return refuse(
             "EXPIRED",
             `This invitation has expired. Invitations last ${String(INVITATION_TTL_DAYS)} days.`,
@@ -1009,7 +1028,10 @@ export function createTeamService<Tx>(
       store.transaction(async (tx) => {
         const organisation = await store.lockOrganisation(tx, organisationId);
         // Whether it exists is not said: every refusal reads the same.
-        const asked = { ok: true as const, value: { requested: true as const } };
+        const asked = {
+          ok: true as const,
+          value: { requested: true as const },
+        };
         if (organisation === null || organisation.status !== "active") {
           return asked;
         }
@@ -1021,7 +1043,8 @@ export function createTeamService<Tx>(
           tenantId: organisation.tenantId,
           organisationId: organisation.id,
           userId,
-          message: message === null || message.trim() === "" ? null : message.trim(),
+          message:
+            message === null || message.trim() === "" ? null : message.trim(),
         });
         if (requestId !== null) {
           await journal.record(tx, {
@@ -1051,7 +1074,11 @@ export function createTeamService<Tx>(
     organisationId: string,
   ): Promise<string | null> {
     const current = await store.activeContextOf(tx, userId);
-    const other = await store.anotherActiveMembership(tx, userId, organisationId);
+    const other = await store.anotherActiveMembership(
+      tx,
+      userId,
+      organisationId,
+    );
     if (current === endedMembershipId && other !== null) {
       await store.setActiveContext(tx, userId, other.membershipId);
     }
