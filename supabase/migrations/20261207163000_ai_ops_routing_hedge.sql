@@ -8,10 +8,11 @@
 -- NULL keeps the old behaviour (fall back only after a failure).
 --
 -- FAST_CLASSIFICATION, hosted ledger 2026-10-05 (gemini-3.5-flash-lite,
--- n=192 successes): p50 1172 ms, p90 1479 ms, max 2298 ms. 1600 ms sits
--- past the healthy p90, so a hedge is paid for roughly one call in ten at
--- most, and a stalled or refused primary no longer holds a person's turn
--- for the 6 s attempt timeout.
+-- n=192 successes): p50 1172 ms, p90 1479 ms, max 2298 ms. 2000 ms sits
+-- past the healthy p99, so a hedge (to gpt-5.6-luna, paid from the
+-- founder's OpenAI credit) is paid for only by a call that is genuinely
+-- stalling, and a stalled primary no longer holds a person's turn for the
+-- 6 s attempt timeout.
 --
 -- Streaming requests (a voice answer being spoken) are never hedged: two
 -- models must not both speak.
@@ -30,6 +31,6 @@ comment on column ai_ops.routing_policies.hedge_after_ms is
   'Milliseconds after which a non-streaming request also asks the next eligible model (hedged request). NULL: no hedge.';
 
 update ai_ops.routing_policies
-   set hedge_after_ms = 1600
+   set hedge_after_ms = 2000
  where status = 'ACTIVE'
    and code = 'fast_classification.v1';
