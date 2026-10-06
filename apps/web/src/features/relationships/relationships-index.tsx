@@ -73,7 +73,7 @@ export function RelationshipsIndex({
       />
     ) : (
       <Empty
-        sentence="No investor relationships yet. When an investor organisation expresses interest in your company, it appears here. Investors can only find you once your company is visible."
+        sentence="No investor relationships yet. When an investor expresses interest in your company, it appears here. Investors can only find you once your company is visible."
         href="/company/visibility"
         action="Check visibility"
       />

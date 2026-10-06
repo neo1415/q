@@ -47,7 +47,7 @@ const NOTICE: Record<
   },
   "nothing-to-request": {
     tone: "info",
-    text: "Nothing new to ask for: every standing is already requested or verified.",
+    text: "Nothing new to ask for: everything is already requested or verified.",
   },
   "sign-in": {
     tone: "warning",

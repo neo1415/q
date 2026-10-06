@@ -473,10 +473,10 @@ function InvestorDashboard(
     state: row.state,
     name: row.companyName,
     detail: row.excluded
-      ? "Hits one of your declared exclusions"
+      ? "Hits one of your exclusions"
       : row.reasons.length === 0
         ? results.hasMandate
-          ? "No declared overlap yet"
+          ? "Nothing in common yet"
           : "Add your mandate to see fit"
         : row.reasons
             .map(
@@ -631,7 +631,7 @@ function InvestorDashboard(
                   label: "Prepared for your approval",
                   value: String(prepared),
                 },
-                { label: "Errands run", value: String(results.qWork.errands) },
+                { label: "Errands done", value: String(results.qWork.errands) },
                 {
                   label: "Documents prepared",
                   value: String(results.qWork.documents),

@@ -188,7 +188,7 @@ export function ReviewStep({
             <dd className="cq-body text-(--cq-text-primary)">
               {step.materials === undefined || step.materials.length === 0 ? (
                 <span className="text-(--cq-text-secondary)">
-                  None declared yet
+                  None added yet
                 </span>
               ) : (
                 step.materials.join(", ")

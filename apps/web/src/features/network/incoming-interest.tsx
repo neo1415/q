@@ -276,7 +276,7 @@ export function IncomingInterest({
     return (
       <EmptyState
         title="No investor interest yet."
-        description="When an investor organisation expresses interest in your company, it appears here for you to accept or decline."
+        description="When an investor expresses interest in your company, it appears here for you to accept or decline."
       />
     );
   }

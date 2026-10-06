@@ -65,7 +65,11 @@ export async function readCommitmentsAction(
   relationshipId: string,
 ): Promise<CommitmentResult<RelationshipCommitmentsDto>> {
   const id = Id.safeParse(relationshipId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => getRelationshipCommitments(session, id.data));
 }
 
@@ -77,7 +81,11 @@ export async function stateCommitmentAction(
   const id = Id.safeParse(relationshipId);
   const body = StateCommitmentRequestSchema.safeParse(request);
   const key = Key.safeParse(idempotencyKey);
-  if (!id.success || !key.success) return { ok: false, message: "Not found." };
+  if (!id.success || !key.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   if (!body.success) {
     return { ok: false, message: "Enter an amount, like 250000." };
   }
@@ -90,7 +98,11 @@ export async function confirmCommitmentAction(
   commitmentId: string,
 ): Promise<CommitmentResult<RelationshipCommitmentsDto>> {
   const id = Id.safeParse(commitmentId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => confirmCommitment(session, id.data));
 }
 
@@ -100,7 +112,11 @@ export async function adoptCommitmentAction(
 ): Promise<CommitmentResult<RelationshipCommitmentsDto>> {
   const id = Id.safeParse(commitmentId);
   const key = Key.safeParse(idempotencyKey);
-  if (!id.success || !key.success) return { ok: false, message: "Not found." };
+  if (!id.success || !key.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => adoptCommitment(session, id.data, key.data));
 }
 
@@ -108,7 +124,11 @@ export async function disputeCommitmentAction(
   commitmentId: string,
 ): Promise<CommitmentResult<RelationshipCommitmentsDto>> {
   const id = Id.safeParse(commitmentId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => disputeCommitment(session, id.data));
 }
 
@@ -116,7 +136,11 @@ export async function withdrawCommitmentAction(
   commitmentId: string,
 ): Promise<CommitmentResult<RelationshipCommitmentsDto>> {
   const id = Id.safeParse(commitmentId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => withdrawCommitment(session, id.data));
 }
 
@@ -124,6 +148,10 @@ export async function readFundraisingAction(
   companyId: string,
 ): Promise<CommitmentResult<FundraisingDto>> {
   const id = Id.safeParse(companyId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => getCompanyFundraising(session, id.data));
 }

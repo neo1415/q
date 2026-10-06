@@ -146,7 +146,7 @@ export async function MandateSummary({
     [
       "Never shown",
       neverShown.length === 0 && hardRules === 0
-        ? "No exclusions declared"
+        ? "No exclusions set"
         : [
             ...neverShown,
             ...(hardRules === 0

@@ -125,9 +125,7 @@ function Reasons({
 }) {
   if (reasons.length === 0) {
     return (
-      <p className="cq-status-line">
-        Discoverable, with nothing declared in common yet.
-      </p>
+      <p className="cq-status-line">Nothing in common with your mandate yet.</p>
     );
   }
   return (

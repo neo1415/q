@@ -261,7 +261,7 @@ export function InvestorDataRoom({
             className={buttonClassName("secondary", "regular")}
             onClick={() => setAsking("ALL")}
           >
-            Request all on request
+            Request the rest
           </button>
         ) : null}
       </div>
@@ -470,7 +470,7 @@ function RequestSheet({
         <SheetContent
           title={
             target === "ALL"
-              ? "Request everything on request"
+              ? "Request the rest of the data room"
               : "Request this document"
           }
           side="side"

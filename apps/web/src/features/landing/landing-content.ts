@@ -21,7 +21,7 @@ export const CONVERGE = {
   },
   after: {
     title: "Capital Q keeps one.",
-    lede: "One record per company and investor. Its stage is computed from what happened, never edited by hand.",
+    lede: "One record per company and investor. Its stage follows what actually happened, never edited by hand.",
   },
 } as const;
 

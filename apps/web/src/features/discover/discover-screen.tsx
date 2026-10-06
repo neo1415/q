@@ -38,13 +38,13 @@ const REASON_LABELS: Readonly<Record<DiscoveryReasonDto["kind"], string>> = {
 
 const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
   NO_ACTIVE_MANDATE:
-    "You have no active mandate yet, so nothing below is matched to you. Finish your mandate and Q will match on what you declared.",
+    "You have no active mandate yet, so nothing below is matched to you. Finish your mandate and Q will match on what you told it.",
   MANDATE_HAS_NO_PREFERENCES:
     "Your mandate does not name a stage, sector or geography yet. Adding them is what turns this list into a shortlist.",
   NO_DISCOVERABLE_COUNTERPARTS:
     "Nobody has made themselves discoverable yet. This fills as people choose to be found.",
   RANKED_ON_DECLARED_PROFILE_ONLY:
-    "Ordered by what each investor has declared publicly. An investor's mandate is theirs and is never read to rank this list.",
+    "Ordered by what each investor says publicly. An investor's mandate stays private and is never used to rank this list.",
   RECOMMENDATIONS_REFRESHING:
     "Your recommendations are being prepared. Check back in a moment.",
   SLATE_RESTARTED:
@@ -64,7 +64,7 @@ function Reasons({
   if (reasons.length === 0) {
     return (
       <p className="cq-caption text-(--cq-text-tertiary)">
-        Discoverable, with nothing declared in common yet.
+        Nothing in common with your company yet.
       </p>
     );
   }

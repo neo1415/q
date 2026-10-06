@@ -68,14 +68,14 @@ export function PushSetting({
     state === null
       ? "Checking this device."
       : state === "ON"
-        ? "Pushes are on for this device."
+        ? "Notifications are on for this device."
         : state === "OFF"
-          ? "Get a push on this device when Q needs you."
+          ? "Get a notification on this device when Q needs you."
           : state === "BLOCKED"
-            ? "Pushes are blocked for Capital Q in this browser's settings."
+            ? "Notifications are blocked for Capital Q in this browser's settings."
             : state === "NEEDS_INSTALL"
-              ? "To get pushes on iPhone, add Capital Q to your Home Screen: tap Share, then Add to Home Screen, and open it from there."
-              : "This browser can't receive pushes.";
+              ? "To get notifications on iPhone, add Capital Q to your Home Screen: tap Share, then Add to Home Screen, and open it from there."
+              : "This browser can't show notifications.";
 
   return (
     <div className="flex flex-col gap-3" data-push-setting>
@@ -90,7 +90,7 @@ export function PushSetting({
             disabled={pending}
             onClick={turnOn}
           >
-            Turn on pushes
+            Turn on notifications
           </Button>
         ) : null}
         {state === "ON" ? (

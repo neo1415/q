@@ -74,7 +74,10 @@ export async function rehearsalPersonaAction(
   const parsedKind = RehearsalCounterpartKindSchema.safeParse(kind);
   const id = Id.safeParse(counterpartId);
   if (!parsedKind.success || !id.success) {
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   }
   return run((session) =>
     getRehearsalPersona(session, parsedKind.data, id.data),
@@ -94,7 +97,10 @@ export async function startRehearsalAction(input: {
   const voice = z.enum(["FEMALE", "MALE"]).safeParse(input.voice);
   const difficulty = RehearsalDifficultySchema.safeParse(input.difficulty);
   if (!kind.success || !id.success || !meeting.success) {
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   }
   return run((session) =>
     startRehearsal(session, {
@@ -110,7 +116,11 @@ export async function readRehearsalAction(
   rehearsalId: unknown,
 ): Promise<RehearsalResult> {
   const id = Id.safeParse(rehearsalId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => getRehearsal(session, id.data));
 }
 
@@ -130,7 +140,11 @@ export async function raiseHandAction(
   rehearsalId: unknown,
 ): Promise<RehearsalResult> {
   const id = Id.safeParse(rehearsalId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) =>
     sayInRehearsal(session, id.data, { cue: "HAND_RAISED" }),
   );
@@ -166,6 +180,10 @@ export async function finishRehearsalAction(
   rehearsalId: unknown,
 ): Promise<RehearsalResult> {
   const id = Id.safeParse(rehearsalId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => finishRehearsal(session, id.data));
 }

@@ -450,7 +450,7 @@ export function judgeFile(
   if (file.sizeBytes > hardMax * MAX_BYTES_PER_SECOND) {
     return {
       ok: false,
-      message: `That file is larger than a ${String(hardMax)}-second pitch could be. Trim it or export at a lower bitrate.`,
+      message: `That file is larger than a ${String(hardMax)}-second pitch could be. Trim it, or save it at a smaller size.`,
     };
   }
   return { ok: true };

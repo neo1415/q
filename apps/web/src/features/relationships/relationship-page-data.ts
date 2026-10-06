@@ -278,7 +278,7 @@ export async function loadCompanySideRelationship(
       sentence:
         incoming === null || status === null
           ? "This relationship couldn't load just now. Nothing has changed; try again in a moment."
-          : "Nothing is on record between your company and this investor organisation.",
+          : "Nothing is on record between your company and this investor.",
     };
   }
   const relationship = status?.relationship ?? null;

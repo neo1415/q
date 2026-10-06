@@ -264,7 +264,7 @@ describe("a card", () => {
     ).toBeTruthy();
     expect(screen.getAllByText("Pre-seed · Nigeria").length).toBeGreaterThan(0);
     const text = container.textContent ?? "";
-    expect(text).not.toMatch(/nothing declared in common/);
+    expect(text).not.toMatch(/nothing in common with your mandate/i);
     // Missingness and mismatch are never shown as a reason.
     expect(text).not.toMatch(/mismatch/i);
   });

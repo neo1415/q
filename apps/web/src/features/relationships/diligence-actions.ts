@@ -62,7 +62,11 @@ export async function readDiligenceAction(
   relationshipId: string,
 ): Promise<DiligenceResult<DiligenceDto>> {
   const id = Id.safeParse(relationshipId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => getDiligence(session, id.data));
 }
 
@@ -73,7 +77,11 @@ export async function ownDocumentsAction(
   DiligenceResult<readonly { readonly id: string; readonly title: string }[]>
 > {
   const id = Id.safeParse(companyId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run(async (session) =>
     (await listDocuments(session, { companyId: id.data })).documents.map(
       (document) => ({ id: document.id, title: document.title }),
@@ -89,10 +97,17 @@ export async function shareDiligenceAction(
   const id = Id.safeParse(relationshipId);
   const document = Id.safeParse(documentId);
   if (!id.success || !document.success)
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   if (requestId !== null) {
     const request = Id.safeParse(requestId);
-    if (!request.success) return { ok: false, message: "Not found." };
+    if (!request.success)
+      return {
+        ok: false,
+        message: "We couldn't find that. Refresh the page and try again.",
+      };
     return run((session) =>
       fulfilDiligenceRequest(session, id.data, request.data, document.data),
     );
@@ -109,7 +124,10 @@ export async function revokeDiligenceAction(
   const id = Id.safeParse(relationshipId);
   const policy = Id.safeParse(policyId);
   if (!id.success || !policy.success)
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => revokeDiligenceShare(session, id.data, policy.data));
 }
 
@@ -121,7 +139,11 @@ export async function requestDiligenceAction(
   const id = Id.safeParse(relationshipId);
   const key = Key.safeParse(idempotencyKey);
   const body = RequestDiligenceDocumentRequestSchema.safeParse(request);
-  if (!id.success || !key.success) return { ok: false, message: "Not found." };
+  if (!id.success || !key.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   if (!body.success)
     return { ok: false, message: "Name the document you need." };
   return run((session) =>
@@ -145,7 +167,10 @@ export async function uploadAndFulfilAction(
   const upload = Id.safeParse(uploadSessionId);
   const key = Key.safeParse(idempotencyKey);
   if (!id.success || !request.success || !upload.success || !key.success) {
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   }
   return run((session) =>
     uploadAndFulfilDiligenceRequest(

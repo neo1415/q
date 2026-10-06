@@ -351,7 +351,9 @@ export function RelationshipDetail({
 
           <Card
             className="max-lg:order-last"
-            title={side === "INVESTOR" ? "Company context" : "Investor context"}
+            title={
+              side === "INVESTOR" ? "About the company" : "About the investor"
+            }
             id="context"
           >
             <div className="flex flex-col gap-3">

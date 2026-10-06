@@ -495,8 +495,8 @@ function Claims() {
         <div className="sec-head">
           <h2 className="d2">Built so you can trust what you see.</h2>
           <p className="lede">
-            Q has intelligence authority. You keep commercial authority. Capital
-            Q keeps the rules.
+            Q does the analysis. You make the decisions. Capital Q keeps the
+            rules.
           </p>
         </div>
         <div className="bento">
@@ -561,7 +561,7 @@ function Claims() {
             </div>
           </article>
           <article className="tile t2 ink">
-            <h3>A firewall on founder-private data.</h3>
+            <h3>Founder-private data stays private.</h3>
             <p>
               What a founder keeps private never shapes what an investor is
               shown.
@@ -807,7 +807,7 @@ function Success() {
         >
           <div className="work-head">
             <b>Relationships</b>
-            <span className="small">Each stage computed from its history</span>
+            <span className="small">Each stage follows what happened</span>
           </div>
           {RELATIONSHIPS.map(
             ([org, stage, stageClass, last, next, nextClass]) => (
@@ -833,8 +833,8 @@ function Success() {
           <div>
             <h3 className="d3">If you&apos;re investing</h3>
             <p>
-              A pipeline that fits your mandate with the reasons visible, and a
-              history both sides read from the same row.
+              A pipeline that fits your mandate with the reasons visible, and
+              one history both sides share.
             </p>
           </div>
         </div>
