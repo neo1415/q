@@ -6,7 +6,10 @@ import { Select } from "@capital-q/ui/select";
 import { PRO_RATA_WORDS } from "./round-words";
 import type { TermsDraft } from "./round-terms";
 
-export type LeadOption = { readonly relationshipId: string; readonly name: string };
+export type LeadOption = {
+  readonly relationshipId: string;
+  readonly name: string;
+};
 export type RoundOption = { readonly id: string; readonly name: string };
 
 /**
@@ -60,11 +63,7 @@ export function RoundTermsFields({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {past ? <div className="sm:col-span-2">{reported}</div> : null}
-      {amountField(
-        "valuationCap",
-        "Valuation cap",
-        "For a SAFE, ASA or note.",
-      )}
+      {amountField("valuationCap", "Valuation cap", "For a SAFE, ASA or note.")}
       <Input
         id={`${id}-discount`}
         label="Discount (%)"

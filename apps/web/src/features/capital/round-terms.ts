@@ -109,7 +109,10 @@ export function termsFromDraft(
   if (!reported.ok) return reported;
   const discount = draft.discountPercent.replace(/[\s%]/g, "");
   if (discount !== "" && (!PERCENT.test(discount) || !/[1-9]/.test(discount))) {
-    return { ok: false, message: "A discount is a percent above 0 and below 100, like 20." };
+    return {
+      ok: false,
+      message: "A discount is a percent above 0 and below 100, like 20.",
+    };
   }
   const target = cleanAmount(context.target);
   if (
@@ -120,7 +123,10 @@ export function termsFromDraft(
     return { ok: false, message: "The hard cap can't be below the target." };
   }
   if (draft.leadChoice === "named" && draft.leadName.trim() === "") {
-    return { ok: false, message: "Add the lead investor's name, or pick none." };
+    return {
+      ok: false,
+      message: "Add the lead investor's name, or pick none.",
+    };
   }
   return {
     ok: true,
@@ -153,7 +159,7 @@ export function saidTerms(
   for (const [key, value] of Object.entries(terms)) {
     if (value !== null && value !== undefined) out[key] = value;
   }
-  return out as CapitalRoundTermsInput;
+  return out;
 }
 
 /** Only the terms that differ from what the round has: an edit sends just those. */
@@ -168,5 +174,5 @@ export function changedTerms(
       out[key] = value;
     }
   }
-  return out as CapitalRoundTermsInput;
+  return out;
 }

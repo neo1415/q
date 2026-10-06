@@ -163,14 +163,28 @@ describe("the founder's book (P8)", () => {
           status: "FIRST_CLOSED",
           terms: { ...round(SEED, "Seed").terms, targetCloseOn: "2026-10-01" },
         }),
-        round(BRIDGE, "Seed bridge", { target: { amount: "250000", currency: "USD" } }),
+        round(BRIDGE, "Seed bridge", {
+          target: { amount: "250000", currency: "USD" },
+        }),
       ],
       ledger: {
         side: "COMPANY",
         commitments: [],
         sums: [
-          { roundId: SEED, currencyCode: "USD", received: "900000", confirmed: "200000", pledged: "0" },
-          { roundId: SEED, currencyCode: "GBP", received: "50000", confirmed: "0", pledged: "0" },
+          {
+            roundId: SEED,
+            currencyCode: "USD",
+            received: "900000",
+            confirmed: "200000",
+            pledged: "0",
+          },
+          {
+            roundId: SEED,
+            currencyCode: "GBP",
+            received: "50000",
+            confirmed: "0",
+            pledged: "0",
+          },
         ],
       },
     });
@@ -181,7 +195,12 @@ describe("the founder's book (P8)", () => {
     });
     expect(response.statusCode).toBe(200);
     const body = response.json<{
-      rounds: { id: string; sums: { raised: string }; otherCurrencies: { currencyCode: string; raised: string }[]; notices: string[] }[];
+      rounds: {
+        id: string;
+        sums: { raised: string };
+        otherCurrencies: { currencyCode: string; raised: string }[];
+        notices: string[];
+      }[];
       totals: { currencyCode: string; raised: string }[];
     }>();
     const seed = body.rounds.find((item) => item.id === SEED);
@@ -195,11 +214,16 @@ describe("the founder's book (P8)", () => {
       "OTHER_CURRENCY",
       "PAST_TARGET_CLOSE",
     ]);
-    expect(body.totals.map((total) => total.currencyCode).sort()).toEqual(["GBP", "USD"]);
+    expect(body.totals.map((total) => total.currencyCode).sort()).toEqual([
+      "GBP",
+      "USD",
+    ]);
   });
 
   it("a round that is not theirs has no history (the same 404)", async () => {
-    const { app } = build({ ledger: { side: "COMPANY", commitments: [], sums: [] } });
+    const { app } = build({
+      ledger: { side: "COMPANY", commitments: [], sums: [] },
+    });
     const response = await app.inject({
       method: "GET",
       url: `/v1/companies/${COMPANY}/capital-rounds/${SEED}/history`,
@@ -221,7 +245,15 @@ describe("the investor's commitments (P8)", () => {
             next: null,
           }),
         ],
-        sums: [{ roundId: SEED, currencyCode: "USD", received: "200000", confirmed: "0", pledged: "200000" }],
+        sums: [
+          {
+            roundId: SEED,
+            currencyCode: "USD",
+            received: "200000",
+            confirmed: "0",
+            pledged: "200000",
+          },
+        ],
       },
     });
     const response = await app.inject({
@@ -230,7 +262,9 @@ describe("the investor's commitments (P8)", () => {
       headers: { authorization: "Bearer test" },
     });
     expect(response.statusCode).toBe(200);
-    const body = response.json<{ commitments: { id: string; round?: Record<string, unknown> }[] }>();
+    const body = response.json<{
+      commitments: { id: string; round?: Record<string, unknown> }[];
+    }>();
     expect(investorRoundsAsked).toEqual([[SEED]]);
     expect(body.commitments[0]?.round).toEqual({
       id: SEED,

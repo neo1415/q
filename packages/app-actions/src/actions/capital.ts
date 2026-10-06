@@ -445,7 +445,8 @@ async function roundOperation(
     readonly roundPlanned: boolean | undefined;
     readonly roundPast?: boolean | undefined;
     readonly stepDate?: string | undefined;
-    readonly roundTerms?: z.infer<typeof CapitalRoundTermsInputSchema> | undefined;
+    readonly roundTerms?:
+      z.infer<typeof CapitalRoundTermsInputSchema> | undefined;
     readonly target:
       { readonly amount: string; readonly currency: string } | undefined;
     readonly targetStage: string | undefined;
@@ -507,7 +508,9 @@ async function roundOperation(
         ...(said.roundPast === true
           ? {
               status: "CLOSED" as const,
-              ...(said.stepDate === undefined ? {} : { closedOn: said.stepDate }),
+              ...(said.stepDate === undefined
+                ? {}
+                : { closedOn: said.stepDate }),
             }
           : said.roundPlanned === true
             ? { status: "PLANNED" as const }
@@ -533,7 +536,8 @@ async function roundChange(
     readonly stepDate: string | undefined;
     readonly stepAmount: string | undefined;
     readonly stepNote: string | undefined;
-    readonly roundTerms: z.infer<typeof CapitalRoundTermsInputSchema> | undefined;
+    readonly roundTerms:
+      z.infer<typeof CapitalRoundTermsInputSchema> | undefined;
     readonly target:
       { readonly amount: string; readonly currency: string } | undefined;
   },

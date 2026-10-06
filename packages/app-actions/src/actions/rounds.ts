@@ -64,7 +64,9 @@ export function revisionPreview(input: ReviseCapitalRoundRequest): string {
   const parts: string[] = [];
   if (input.name !== undefined) parts.push(`name ${input.name}`);
   if (input.target !== undefined) {
-    parts.push(`target ${moneyText(input.target.amount, input.target.currency)}`);
+    parts.push(
+      `target ${moneyText(input.target.amount, input.target.currency)}`,
+    );
   }
   if (input.instrument !== undefined) {
     parts.push(INSTRUMENT_WORDS[input.instrument]);

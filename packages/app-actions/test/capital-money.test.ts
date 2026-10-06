@@ -310,10 +310,12 @@ describe("change_my_raise steps and corrects a round (P8)", () => {
       stepAmount: "5",
       stepNote: "Lead pulled out",
     });
-    expect(await raise.toCanonical(said, context, portsWith([]))).toMatchObject({
-      operation: "ROUND_STEP",
-      input: { input: { step: "CANCEL", note: "Lead pulled out" } },
-    });
+    expect(await raise.toCanonical(said, context, portsWith([]))).toMatchObject(
+      {
+        operation: "ROUND_STEP",
+        input: { input: { step: "CANCEL", note: "Lead pulled out" } },
+      },
+    );
   });
 
   it("asks which step, and which round, rather than guessing", async () => {
@@ -356,8 +358,7 @@ describe("change_my_raise steps and corrects a round (P8)", () => {
     });
     expect(family()?.card(canonical)).toEqual({
       summary: "Correct this round",
-      preview:
-        "valuation cap set. The previous values stay in its history.",
+      preview: "valuation cap set. The previous values stay in its history.",
     });
   });
 
@@ -371,18 +372,20 @@ describe("change_my_raise steps and corrects a round (P8)", () => {
       target: { amount: "300000", currency: "GBP" },
       roundTerms: { reportedRaised: "320000" },
     });
-    expect(await raise.toCanonical(said, context, portsWith([]))).toMatchObject({
-      operation: "OPEN_ROUND",
-      input: {
+    expect(await raise.toCanonical(said, context, portsWith([]))).toMatchObject(
+      {
+        operation: "OPEN_ROUND",
         input: {
-          name: "Pre-Seed",
-          instrument: "ASA",
-          status: "CLOSED",
-          closedOn: "2024-06-30",
-          terms: { reportedRaised: "320000" },
+          input: {
+            name: "Pre-Seed",
+            instrument: "ASA",
+            status: "CLOSED",
+            closedOn: "2024-06-30",
+            terms: { reportedRaised: "320000" },
+          },
         },
       },
-    });
+    );
   });
 });
 

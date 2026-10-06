@@ -131,9 +131,7 @@ export function isRaising(status: CapitalRoundStatus): boolean {
 // ---------------------------------------------------------------------------
 
 export type TermsRefusal =
-  | "HARD_CAP_BELOW_TARGET"
-  | "CLOSE_DATE_BEFORE_OPEN"
-  | "EXTENDS_ITSELF";
+  "HARD_CAP_BELOW_TARGET" | "CLOSE_DATE_BEFORE_OPEN" | "EXTENDS_ITSELF";
 
 /** Cross-field rules the schema cannot see. */
 export function checkRoundTerms(input: {

@@ -86,13 +86,14 @@ export class CapitalRoundRevisionConflictError extends Error {
   }
 }
 
-const STEP_REFUSALS: Readonly<Record<StepRefusal | "DATE_BEFORE_OPEN", string>> =
-  {
-    NOT_FROM_THIS_STATUS: "That step doesn't apply to this round right now.",
-    MONEY_HAS_CLOSED:
-      "Money has already closed in this round, so it can't be cancelled. Record a final close instead.",
-    DATE_BEFORE_OPEN: "That date is before the round opened.",
-  };
+const STEP_REFUSALS: Readonly<
+  Record<StepRefusal | "DATE_BEFORE_OPEN", string>
+> = {
+  NOT_FROM_THIS_STATUS: "That step doesn't apply to this round right now.",
+  MONEY_HAS_CLOSED:
+    "Money has already closed in this round, so it can't be cancelled. Record a final close instead.",
+  DATE_BEFORE_OPEN: "That date is before the round opened.",
+};
 
 export class CapitalRoundStepRefusedError extends Error {
   readonly refusal: StepRefusal | "DATE_BEFORE_OPEN";
@@ -207,7 +208,10 @@ function termsOf(row: RoundRow): CapitalRoundTerms {
     valuation:
       row.valuation_amount === null || row.valuation_basis === null
         ? null
-        : { amount: plain(row.valuation_amount) ?? "0", basis: row.valuation_basis },
+        : {
+            amount: plain(row.valuation_amount) ?? "0",
+            basis: row.valuation_basis,
+          },
     valuationCap: plain(row.valuation_cap_amount),
     discountPercent: plain(row.discount_percent),
     hardCap: plain(row.hard_cap_amount),
@@ -383,7 +387,10 @@ export function createCapitalRoundService(
 
   type Executor = TransactionContext["sql"] | typeof sql;
 
-  async function rows(executor: Executor, companyId: string): Promise<RoundRow[]> {
+  async function rows(
+    executor: Executor,
+    companyId: string,
+  ): Promise<RoundRow[]> {
     return executor<RoundRow[]>`
       select ${columns(executor)}
         from core.capital_rounds
@@ -653,7 +660,8 @@ export function createCapitalRoundService(
                  closed_on = ${on}::date, closed_by_user_id = ${actor.userId},
                  revision = ${revision}, updated_at = clock_timestamp()
            where id = ${roundId}`;
-        if (round.is_current) await handOverCurrent(tx, companyId, roundId, all);
+        if (round.is_current)
+          await handOverCurrent(tx, companyId, roundId, all);
         break;
       case "REOPEN":
         await tx.sql`
@@ -678,7 +686,8 @@ export function createCapitalRoundService(
                  cancelled_on = ${on}::date, cancelled_reason = ${input.note ?? null},
                  revision = ${revision}, updated_at = clock_timestamp()
            where id = ${roundId}`;
-        if (round.is_current) await handOverCurrent(tx, companyId, roundId, all);
+        if (round.is_current)
+          await handOverCurrent(tx, companyId, roundId, all);
         break;
     }
     await appendEvent(tx, actor, companyId, roundId, {
@@ -705,7 +714,11 @@ export function createCapitalRoundService(
 
   return {
     listRounds: async ({ actor, companyId }) => {
-      const company = await authorised(actor, companyId, CAPITAL_OBJECTIVE_VIEW);
+      const company = await authorised(
+        actor,
+        companyId,
+        CAPITAL_OBJECTIVE_VIEW,
+      );
       const [all, history] = await Promise.all([
         rows(sql, company.id),
         events(sql, company.id),
@@ -714,15 +727,29 @@ export function createCapitalRoundService(
     },
 
     currentRound: async ({ actor, companyId }) => {
-      const company = await authorised(actor, companyId, CAPITAL_OBJECTIVE_VIEW);
+      const company = await authorised(
+        actor,
+        companyId,
+        CAPITAL_OBJECTIVE_VIEW,
+      );
       const found = (await rows(sql, company.id)).find((row) => row.is_current);
       return found === undefined
         ? null
         : toRound(found, await events(sql, company.id, found.id));
     },
 
-    openRound: async ({ actor, companyId, input, idempotencyKey, correlationId }) => {
-      const company = await authorised(actor, companyId, CAPITAL_OBJECTIVE_EDIT);
+    openRound: async ({
+      actor,
+      companyId,
+      input,
+      idempotencyKey,
+      correlationId,
+    }) => {
+      const company = await authorised(
+        actor,
+        companyId,
+        CAPITAL_OBJECTIVE_EDIT,
+      );
       const status = input.status ?? "OPEN";
       return guarded(input.terms, () =>
         transactions.run(async (tx) => {
@@ -733,14 +760,16 @@ export function createCapitalRoundService(
              where created_by_user_id = ${actor.userId}
                and idempotency_key = ${idempotencyKey}
                and company_id = ${company.id}`;
-          if (replay[0] !== undefined) return dto(tx.sql, company.id, replay[0].id);
+          if (replay[0] !== undefined)
+            return dto(tx.sql, company.id, replay[0].id);
           const existing = await rows(tx.sql, company.id);
           const terms = mergeTerms(EMPTY_TERMS, input.terms);
           const openedOn =
             status === "PLANNED"
               ? (input.openedOn ?? null)
               : (input.openedOn ?? today());
-          const closedOn = status === "CLOSED" ? (input.closedOn ?? today()) : null;
+          const closedOn =
+            status === "CLOSED" ? (input.closedOn ?? today()) : null;
           if (closedOn !== null && openedOn !== null && closedOn < openedOn) {
             throw new CapitalRoundStepRefusedError("DATE_BEFORE_OPEN");
           }
@@ -800,7 +829,11 @@ export function createCapitalRoundService(
     },
 
     closeRound: async ({ actor, companyId, roundId, input, correlationId }) => {
-      const company = await authorised(actor, companyId, CAPITAL_OBJECTIVE_CLOSE);
+      const company = await authorised(
+        actor,
+        companyId,
+        CAPITAL_OBJECTIVE_CLOSE,
+      );
       return transactions.run(async (tx) => {
         await tx.sql`select id from core.companies where id = ${company.id} for update`;
         const { round } = await read(tx.sql, company.id, roundId);
@@ -829,8 +862,18 @@ export function createCapitalRoundService(
       });
     },
 
-    reviseRound: async ({ actor, companyId, roundId, input, correlationId }) => {
-      const company = await authorised(actor, companyId, CAPITAL_OBJECTIVE_EDIT);
+    reviseRound: async ({
+      actor,
+      companyId,
+      roundId,
+      input,
+      correlationId,
+    }) => {
+      const company = await authorised(
+        actor,
+        companyId,
+        CAPITAL_OBJECTIVE_EDIT,
+      );
       return guarded(input.terms, () =>
         transactions.run(async (tx) => {
           await tx.sql`select id from core.companies where id = ${company.id} for update`;
@@ -871,9 +914,17 @@ export function createCapitalRoundService(
             note: input.note,
             payload: { changes },
           });
-          await record(tx, actor, AUDIT.REVISED, roundId, company.id, correlationId, {
-            fields: changes.map((change) => change.field).join(","),
-          });
+          await record(
+            tx,
+            actor,
+            AUDIT.REVISED,
+            roundId,
+            company.id,
+            correlationId,
+            {
+              fields: changes.map((change) => change.field).join(","),
+            },
+          );
           return dto(tx.sql, company.id, roundId);
         }),
       );
@@ -900,7 +951,8 @@ export function createCapitalRoundService(
              and idempotency_key = ${idempotencyKey}
              and company_id = ${company.id}`;
         if (replay[0] !== undefined) {
-          if (replay[0].round_id !== roundId) throw new CapitalRoundNotFoundError();
+          if (replay[0].round_id !== roundId)
+            throw new CapitalRoundNotFoundError();
           return dto(tx.sql, company.id, roundId);
         }
         await recordStepIn(
@@ -917,7 +969,11 @@ export function createCapitalRoundService(
     },
 
     roundHistory: async ({ actor, companyId, roundId }) => {
-      const company = await authorised(actor, companyId, CAPITAL_OBJECTIVE_VIEW);
+      const company = await authorised(
+        actor,
+        companyId,
+        CAPITAL_OBJECTIVE_VIEW,
+      );
       await read(sql, company.id, roundId);
       const history = await events(sql, company.id, roundId);
       return history.map((event) => {
@@ -928,7 +984,13 @@ export function createCapitalRoundService(
         const changes = Array.isArray(payload.changes)
           ? payload.changes
               .filter(
-                (change): change is { field: string; from: string | null; to: string | null } =>
+                (
+                  change,
+                ): change is {
+                  field: string;
+                  from: string | null;
+                  to: string | null;
+                } =>
                   typeof change === "object" &&
                   change !== null &&
                   typeof (change as { field?: unknown }).field === "string",

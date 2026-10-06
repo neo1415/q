@@ -23,12 +23,9 @@ vi.mock("../src/features/capital/capital-actions", () => ({
 }));
 
 const { RoundTimeline } = await import("../src/features/capital/round-card");
-const { stepWarning } = await import(
-  "../src/features/capital/round-controls"
-);
-const { termsFromDraft, changedTerms, EMPTY_DRAFT } = await import(
-  "../src/features/capital/round-terms"
-);
+const { stepWarning } = await import("../src/features/capital/round-controls");
+const { termsFromDraft, changedTerms, EMPTY_DRAFT } =
+  await import("../src/features/capital/round-terms");
 
 type Round = CapitalLedgerDto["rounds"][number];
 
@@ -113,9 +110,7 @@ describe("RoundTimeline", () => {
   ];
 
   it("shows earlier, now and next, with status in words and reported money kept apart", () => {
-    render(
-      <RoundTimeline rounds={rounds} currentRoundId={SEED} leads={[]} />,
-    );
+    render(<RoundTimeline rounds={rounds} currentRoundId={SEED} leads={[]} />);
     const groups = screen.getAllByRole("heading", { level: 3 });
     expect(groups.map((heading) => heading.textContent)).toEqual([
       "Earlier",
@@ -132,9 +127,7 @@ describe("RoundTimeline", () => {
   });
 
   it("words the edge cases: overlapping rounds, another currency, an extension", () => {
-    render(
-      <RoundTimeline rounds={rounds} currentRoundId={SEED} leads={[]} />,
-    );
+    render(<RoundTimeline rounds={rounds} currentRoundId={SEED} leads={[]} />);
     expect(
       screen.getByText(/Another round is raising at the same time/),
     ).toBeTruthy();
@@ -144,18 +137,16 @@ describe("RoundTimeline", () => {
   });
 
   it("offers only the steps the server allows, and sends one against the revision it read", async () => {
-    render(
-      <RoundTimeline rounds={rounds} currentRoundId={SEED} leads={[]} />,
-    );
-    expect(screen.getAllByRole("button", { name: "Start raising" })).toHaveLength(1);
+    render(<RoundTimeline rounds={rounds} currentRoundId={SEED} leads={[]} />);
+    expect(
+      screen.getAllByRole("button", { name: "Start raising" }),
+    ).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Start raising" }));
     const sheetButton = await screen.findAllByRole("button", {
       name: "Start raising",
     });
     // The planned round opening while the bridge raises: said before the press.
-    expect(
-      screen.getByText(/Another round is already raising/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Another round is already raising/)).toBeTruthy();
     fireEvent.click(sheetButton[sheetButton.length - 1] as HTMLElement);
     await vi.waitFor(() => expect(step).toHaveBeenCalledTimes(1));
     const [roundId, request, key] = step.mock.calls[0] ?? [];
@@ -167,9 +158,9 @@ describe("RoundTimeline", () => {
 
 describe("step warnings", () => {
   it("asks before a final close with nothing received or reported", () => {
-    expect(
-      stepWarning(round(SEED, {}), "FINAL_CLOSE", false),
-    ).toMatch(/Nothing has been received/);
+    expect(stepWarning(round(SEED, {}), "FINAL_CLOSE", false)).toMatch(
+      /Nothing has been received/,
+    );
     expect(
       stepWarning(
         round(SEED, { terms: { ...TERMS, reportedRaised: "0" } }),
@@ -208,11 +199,15 @@ describe("terms as typed", () => {
   });
 
   it("refuses symbols, a hard cap below target and a 100% discount, in plain words", () => {
-    expect(termsFromDraft({ ...EMPTY_DRAFT, valuationCap: "$8m" }, context)).toEqual({
+    expect(
+      termsFromDraft({ ...EMPTY_DRAFT, valuationCap: "$8m" }, context),
+    ).toEqual({
       ok: false,
       message: "Write the valuation cap in USD as a number, like 1500000.",
     });
-    expect(termsFromDraft({ ...EMPTY_DRAFT, hardCap: "999999" }, context)).toEqual({
+    expect(
+      termsFromDraft({ ...EMPTY_DRAFT, hardCap: "999999" }, context),
+    ).toEqual({
       ok: false,
       message: "The hard cap can't be below the target.",
     });
@@ -228,6 +223,8 @@ describe("terms as typed", () => {
       context,
     );
     if (!after.ok) throw new Error("expected terms");
-    expect(changedTerms(before, after.terms)).toEqual({ discountPercent: null });
+    expect(changedTerms(before, after.terms)).toEqual({
+      discountPercent: null,
+    });
   });
 });

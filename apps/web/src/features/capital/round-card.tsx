@@ -8,7 +8,12 @@ import { figure, money, percent, shareOf } from "./money";
 import { RoundControls } from "./round-controls";
 import { INSTRUMENT_LABELS } from "./round-labels";
 import type { LeadOption } from "./round-terms-fields";
-import { isLive, NOTICE_WORDS, PRO_RATA_WORDS, STATUS_WORDS } from "./round-words";
+import {
+  isLive,
+  NOTICE_WORDS,
+  PRO_RATA_WORDS,
+  STATUS_WORDS,
+} from "./round-words";
 
 export { INSTRUMENT_LABELS } from "./round-labels";
 
@@ -305,8 +310,7 @@ export function TotalCard({
   const withMoney = rounds.filter((round) => round.sums.raised !== "0");
   const reported = rounds.filter(
     (round) =>
-      round.terms.reportedRaised !== null &&
-      round.terms.reportedRaised !== "0",
+      round.terms.reportedRaised !== null && round.terms.reportedRaised !== "0",
   );
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6">
@@ -352,11 +356,12 @@ export function TotalCard({
                 key={round.id}
                 className="cq-body-sm cq-numeric flex justify-between gap-3"
               >
-                <span className="text-(--cq-text-secondary)">
-                  {round.name}
-                </span>
+                <span className="text-(--cq-text-secondary)">{round.name}</span>
                 <span className="text-(--cq-text-primary)">
-                  {money(round.terms.reportedRaised ?? "0", round.target.currency)}
+                  {money(
+                    round.terms.reportedRaised ?? "0",
+                    round.target.currency,
+                  )}
                 </span>
               </li>
             ))}
@@ -415,9 +420,7 @@ export function RoundTimeline({
     <ol className="flex flex-col gap-6" aria-label="Your rounds over time">
       {groups.map((group) => (
         <li key={group.key} className="flex flex-col gap-3">
-          <h3 className="cq-label text-(--cq-text-secondary)">
-            {group.title}
-          </h3>
+          <h3 className="cq-label text-(--cq-text-secondary)">{group.title}</h3>
           {group.items.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-tertiary)">
               {group.key === "earlier"
