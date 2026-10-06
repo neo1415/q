@@ -347,9 +347,7 @@ export function createDataRoomService(dependencies: {
   readonly store: DataRoomStore;
   readonly company: (companyId: string) => Promise<DataRoomCompany | null>;
   /** The actor's own investor organisation, or null when they are not an investor. */
-  readonly investorOf: (
-    actor: ActorContext,
-  ) => Promise<{
+  readonly investorOf: (actor: ActorContext) => Promise<{
     readonly investorOrganisationId: string;
     readonly name: string;
   } | null>;
@@ -401,8 +399,7 @@ export function createDataRoomService(dependencies: {
   readonly now?: (() => UtcTimestamp) | undefined;
 }) {
   const { sql, store, transactions } = dependencies;
-  const now =
-    dependencies.now ?? (() => new Date().toISOString());
+  const now = dependencies.now ?? (() => new Date().toISOString());
   const refused = <T>(code: DataRoomRefusal): DataRoomOutcome<T> => ({
     outcome: "REFUSED",
     code,

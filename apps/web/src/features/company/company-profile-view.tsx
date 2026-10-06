@@ -259,7 +259,11 @@ export function CompanyProfileView({
 
   return (
     <article
-      className="grid grid-cols-1 gap-6 [grid-template-areas:'head'_'fit'_'tabs'_'body'] lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-x-10 lg:[grid-template-areas:'head_fit'_'tabs_fit'_'body_fit']"
+      className={
+        investor
+          ? "grid grid-cols-1 gap-6 [grid-template-areas:'head'_'fit'_'tabs'_'body'] lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-x-10 lg:[grid-template-areas:'head_fit'_'tabs_fit'_'body_fit']"
+          : "grid grid-cols-1 gap-6 [grid-template-areas:'head'_'tabs'_'body']"
+      }
       aria-labelledby="company-name"
       data-company-profile={profile.viewer}
     >

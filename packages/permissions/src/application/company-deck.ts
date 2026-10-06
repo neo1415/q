@@ -128,8 +128,7 @@ export function createCompanyDeckService(dependencies: {
   const { sql, store } = dependencies;
   const quietly = <T>(promise: Promise<T>, fallback: T) =>
     promise.catch(() => fallback);
-  const now =
-    dependencies.now ?? (() => new Date().toISOString());
+  const now = dependencies.now ?? (() => new Date().toISOString());
 
   async function readerOf(actor: ActorContext, companyId: string) {
     const company = await quietly(dependencies.company(companyId), null);

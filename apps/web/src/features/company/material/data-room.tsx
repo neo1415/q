@@ -550,7 +550,7 @@ function LevelControl({
     <div
       role="radiogroup"
       aria-label={`Who can see ${document.title}`}
-      className="flex shrink-0 flex-wrap gap-1 rounded-md bg-(--cq-surface-subtle) p-1"
+      className="grid w-full shrink-0 grid-cols-4 gap-1 rounded-md bg-(--cq-surface-subtle) p-1 lg:flex lg:w-auto"
     >
       {LEVELS.map(([level, label, Icon]) => {
         const active = document.level === level;
@@ -562,7 +562,7 @@ function LevelControl({
             aria-checked={active}
             disabled={disabled}
             onClick={() => (active ? undefined : onChange(level))}
-            className={`cq-caption inline-flex min-h-11 items-center gap-1 rounded px-2.5 sm:min-h-9 ${
+            className={`cq-caption inline-flex min-h-11 flex-col items-center justify-center gap-0.5 rounded px-1 text-center sm:flex-row sm:gap-1 sm:px-2.5 lg:min-h-9 ${
               active
                 ? "bg-(--cq-surface-raised) font-medium text-(--cq-text-primary) shadow-(--cq-shadow-xs)"
                 : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)"

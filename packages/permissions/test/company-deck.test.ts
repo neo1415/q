@@ -6,10 +6,7 @@ import {
   type DeckSectionReading,
   type UtcTimestamp,
 } from "@capital-q/contracts";
-import type {
-  DatabaseExecutor,
-  TransactionContext,
-} from "@capital-q/database";
+import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
 import {

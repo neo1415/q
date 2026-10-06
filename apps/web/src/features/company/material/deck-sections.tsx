@@ -9,10 +9,7 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import {
-  DECK_SECTION_LABELS,
-  type DeckSection,
-} from "@capital-q/contracts";
+import { DECK_SECTION_LABELS, type DeckSection } from "@capital-q/contracts";
 import {
   ChevronLeft,
   ChevronRight,

@@ -57,13 +57,13 @@ const deckView = (viewer: "INVESTOR" | "OWNER"): CompanyDeckView => ({
   },
   coaching:
     viewer === "OWNER"
-      ? ({
+      ? {
           rubricVersion: 1,
           sections: [],
           checks: [],
           sectionsAtStandard: 0,
           atMinimumStandard: false,
-        })
+        }
       : null,
 });
 const roomView: DataRoomView = {

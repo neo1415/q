@@ -130,14 +130,13 @@ export const SET_DATA_ROOM_LEVEL = defineAppAction<
   classification: "CONSEQUENTIAL",
   does: "Sets who can see one of the company's documents in its data room: public, on request, shared only, or private.",
   input: SetLevel,
-  output:
-    z.custom<
-      DataRoomOutcome<{
-        readonly documentId: string;
-        readonly level: DataRoomLevel;
-        readonly version: number;
-      }>
-    >(),
+  output: z.custom<
+    DataRoomOutcome<{
+      readonly documentId: string;
+      readonly level: DataRoomLevel;
+      readonly version: number;
+    }>
+  >(),
   authorize: servicesDecide,
   run: (ports, context, input) =>
     room(ports).setLevel({
@@ -400,13 +399,12 @@ export const DECIDE_DATA_ROOM_REQUEST = defineAppAction<
   classification: "CONSEQUENTIAL",
   does: "Approves an investor's data-room request until a date, or declines it, as the data room's request card does.",
   input: Decide,
-  output:
-    z.custom<
-      DataRoomOutcome<{
-        readonly requestId: string;
-        readonly status: "APPROVED" | "DECLINED";
-      }>
-    >(),
+  output: z.custom<
+    DataRoomOutcome<{
+      readonly requestId: string;
+      readonly status: "APPROVED" | "DECLINED";
+    }>
+  >(),
   authorize: servicesDecide,
   run: (ports, context, input) =>
     room(ports).decide({

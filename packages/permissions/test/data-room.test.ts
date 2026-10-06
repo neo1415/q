@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  DataRoomLevel,
-  UtcTimestamp,
-} from "@capital-q/contracts";
+import type { DataRoomLevel, UtcTimestamp } from "@capital-q/contracts";
 import type {
   DatabaseExecutor,
   TransactionContext,
