@@ -35,6 +35,8 @@ describe("the sidebar's groups", () => {
       "/home",
       "/capital",
       "/relationships",
+      // F2: GateQ, its own page, first in Workspace.
+      "/gateq",
       "/work",
       "/investors",
       "/documents",
@@ -50,6 +52,7 @@ describe("the sidebar's groups", () => {
       group.items.map((item) => item.href),
     );
     expect(founder).toContain("/pitch");
+    expect(founder).toContain("/gateq");
     expect(founder).not.toContain("/investors");
     expect(founder).not.toContain("/admin");
     expect(sectionsFor("unset").map((item) => item.href)).toContain("/search");

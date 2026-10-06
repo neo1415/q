@@ -705,6 +705,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/daily": exempt("development-only page"),
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
+  "/dev/gateq-v2": exempt("development-only page"),
+  "/dev/canvas": exempt("development-only page"),
   "/dev/relationships": exempt("development-only page"),
   "/dev/results": exempt("development-only page"),
   "/dev/rehearsals": exempt("development-only page"),
@@ -741,6 +743,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "Capital Q's admin console: platform operators only, never a place Q sends anyone",
   ),
   "/gateway": cap("navigate.GATEWAY"),
+  // F2: GateQ's own page; /gateway now redirects to its "Your gate" tab.
+  "/gateq": cap("navigate.GATEWAY"),
   "/onboarding/founder": exempt(
     "the founder interview: Q's own onboarding loop (voice INTERVIEW_FOUNDER)",
   ),
