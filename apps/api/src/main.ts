@@ -7,7 +7,10 @@
  * import business logic from domain packages rather than defining it here.
  */
 
-import { createCompanyClaims } from "@capital-q/companies";
+import {
+  createCompanyClaims,
+  createPlatformCompanyPublishing,
+} from "@capital-q/companies";
 import { createApplicationMaterials } from "./gateq/application-materials.js";
 import { sharedDocumentsPort } from "./gateq/inbox.js";
 import { loadApiConfig } from "@capital-q/config/api";
@@ -151,6 +154,8 @@ import {
   createPostgresApplicationSubmissionRepository,
   createPostgresSubmissionInbox,
   createGateqInbox,
+  renderClaimCodeEmail,
+  sendGateqEmailLogged,
   type GateqEmailEvent,
   createPostgresInboxRepository,
   createStartupAlerts,
@@ -2158,7 +2163,37 @@ const { app, logger } = createApp(config, security, {
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
   // F3: "Find my startup": claim requests and saved startup searches.
-  companyClaims: createCompanyClaims({ sql: database.sql }),
+  // P14 item 7: a platform admin makes an unclaimed company's profile
+  // public (or returns it to the network); the console authorises.
+  adminPublishCompany: createPlatformCompanyPublishing({
+    transactions: database.transactions,
+    outbox,
+    audit,
+  }),
+  companyClaims: createCompanyClaims({
+    sql: database.sql,
+    // P14: the one-time code to the work email, through the app sender,
+    // outcome logged with the domain only.
+    codeMailer: async ({ to, companyName, code, expiresInMinutes }) => {
+      const rendered = renderClaimCodeEmail({
+        companyName,
+        code,
+        expiresInMinutes,
+      });
+      return sendGateqEmailLogged(
+        gateqFounderMail,
+        logGateqEmail,
+        "CLAIM_CODE",
+        to,
+        {
+          subject: rendered.subject,
+          text: rendered.text,
+          html: rendered.html,
+          fromName: "Capital Q",
+        },
+      );
+    },
+  }),
   startupAlerts: createStartupAlerts({ sql: database.sql }),
   // F4: the investor's GateQ inbox. Reads here; writes are declared actions.
   gateqInboxService: gateqInboxService,

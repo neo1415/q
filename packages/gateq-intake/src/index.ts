@@ -141,7 +141,9 @@ export {
 // P14: founders hear GateQ answers by email.
 export {
   recipientDomain as gateqRecipientDomain,
+  renderClaimCodeEmail,
   renderGateqAnswerEmail,
+  sendLogged as sendGateqEmailLogged,
   type GateqEmailEvent,
   type GateqEmailKind,
   type GateqOutboundSender,

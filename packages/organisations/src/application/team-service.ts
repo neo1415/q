@@ -153,6 +153,20 @@ export type TeamService = {
     correlationId: CorrelationId,
   ) => Promise<TeamOutcome<TeamDto>>;
   readonly myOrganisations: (userId: string) => Promise<MyOrganisationsDto>;
+  /**
+   * P14: a company claim was approved (by a company admin, or by a platform
+   * admin for a company nobody had claimed): the requester becomes a
+   * member, or the owner of an unclaimed company. The caller has already
+   * decided and authorised; this only admits, once, and records it.
+   */
+  readonly admitClaim: (input: {
+    readonly organisationId: string;
+    readonly userId: string;
+    readonly role: "OWNER" | "MEMBER";
+    readonly decidedByUserId: string;
+    readonly claimRequestId: string;
+    readonly correlationId: CorrelationId;
+  }) => Promise<TeamOutcome<{ readonly membershipId: string }>>;
   readonly previewInvitation: (
     token: string,
   ) => Promise<TeamOutcome<InvitationPreviewDto>>;
@@ -979,6 +993,56 @@ export function createTeamService<Tx>(
       if (outcome.ok) await sendNotice(box.notice);
       return outcome;
     },
+
+    admitClaim: (input) =>
+      store.transaction(async (tx) => {
+        const organisation = await store.lockOrganisation(
+          tx,
+          input.organisationId,
+        );
+        if (organisation === null || organisation.status !== "active") {
+          return NOT_FOUND;
+        }
+        const members = await store.members(tx, organisation.id);
+        const already = members.find(
+          (member) => member.userId === input.userId,
+        );
+        if (already !== undefined) {
+          return {
+            ok: true as const,
+            value: { membershipId: already.membershipId },
+          };
+        }
+        // Owner only of a company nobody holds: a claim never displaces anyone.
+        const role = members.length === 0 ? input.role : "MEMBER";
+        const membershipId = await store.insertMembership(tx, {
+          tenantId: organisation.tenantId,
+          organisationId: organisation.id,
+          userId: input.userId,
+          invitedByUserId: input.decidedByUserId,
+        });
+        await store.setRoles(tx, membershipId, ROLE_CODES_FOR[role]);
+        if ((await store.activeContextOf(tx, input.userId)) === null) {
+          await store.setActiveContext(tx, input.userId, membershipId);
+        }
+        await journal.record(tx, {
+          action: "membership.admitted_by_claim",
+          tenantId: organisation.tenantId,
+          organisationId: organisation.id,
+          actorUserId: input.decidedByUserId,
+          resourceType: "company_claim",
+          resourceId: input.claimRequestId,
+          metadata: { role },
+          correlationId: input.correlationId,
+          membership: {
+            change: "CREATED" as const,
+            membershipId,
+            userId: input.userId,
+            role,
+          },
+        });
+        return { ok: true as const, value: { membershipId } };
+      }),
 
     myOrganisations: async (userId) => {
       const rows = await store.myOrganisations(userId);

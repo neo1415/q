@@ -260,12 +260,17 @@ export type TeamJournalEntry = {
     | "ownership.declined"
     | "join_request.created"
     | "join_request.approved"
-    | "join_request.declined";
+    | "join_request.declined"
+    | "membership.admitted_by_claim";
   readonly tenantId: string;
   readonly organisationId: string;
   readonly actorUserId: string;
   readonly resourceType:
-    "invitation" | "membership" | "ownership_offer" | "join_request";
+    | "invitation"
+    | "membership"
+    | "ownership_offer"
+    | "join_request"
+    | "company_claim";
   readonly resourceId: string;
   /** Ids and codes only; never an email address or a message. */
   readonly metadata: Readonly<Record<string, string | number | boolean | null>>;

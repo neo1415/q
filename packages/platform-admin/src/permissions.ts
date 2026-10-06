@@ -15,7 +15,8 @@ export const ADMIN_ROLES = [
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 // 2: BILLING permissions added (ADR 0034).
-export const ADMIN_PERMISSIONS_VERSION = 3 as const;
+// 4: P14 company claims and publishing (claims.read/decide, companies.publish).
+export const ADMIN_PERMISSIONS_VERSION = 4 as const;
 
 const ALL: readonly AdminRole[] = ADMIN_ROLES;
 const OWNER_OPERATOR_TS: readonly AdminRole[] = [
@@ -100,6 +101,14 @@ export const ADMIN_PERMISSIONS = {
   },
   "reviews.decide": { roles: OWNER_OPERATOR_TS, stepUp: true },
   // end ADMIN-3 block
+  // P14: claims on companies nobody holds, and making such a company's
+  // profile public at an external URL. Decisions and publishing are writes.
+  "claims.read": {
+    roles: ["platform_owner", "operator", "trust_and_safety", "support"],
+    stepUp: false,
+  },
+  "claims.decide": { roles: OWNER_OPERATOR_TS, stepUp: true },
+  "companies.publish": { roles: ["platform_owner", "operator"], stepUp: true },
 } as const satisfies Record<
   string,
   { readonly roles: readonly AdminRole[]; readonly stepUp: boolean }

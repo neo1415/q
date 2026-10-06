@@ -68,6 +68,31 @@ export function renderGateqAnswerEmail(input: {
   });
 }
 
+/** P14: the one-time code that proves a work address, for a company claim. */
+export function renderClaimCodeEmail(input: {
+  readonly companyName: string;
+  readonly code: string;
+  readonly expiresInMinutes: number;
+}) {
+  return renderEmail({
+    subject: `Your code to claim ${input.companyName} on Capital Q`,
+    preheader: `Enter ${input.code} on Capital Q. It works for ${String(input.expiresInMinutes)} minutes.`,
+    heading: `Your code: ${input.code}`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: `Someone using this address asked to claim ${input.companyName} on Capital Q. Enter this code on the screen where you asked; it works for ${String(input.expiresInMinutes)} minutes, once.`,
+      },
+      {
+        kind: "note",
+        text: "A confirmed work email is evidence for the people who decide the claim; it does not make you a member by itself. If this wasn't you, ignore this email.",
+      },
+    ],
+    reason: `This address was entered to claim ${input.companyName} on Capital Q.`,
+    origin: null,
+  });
+}
+
 /** Sends one email and reports it; a failure never throws to the caller. */
 export async function sendLogged(
   sender: GateqOutboundSender | undefined,

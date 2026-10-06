@@ -823,6 +823,51 @@ describe("join requests", () => {
   });
 });
 
+describe("P14: admitting an approved company claim", () => {
+  it("makes the requester the owner of an organisation nobody holds, once", async () => {
+    const w = world();
+    const EMPTY = "00000000-0000-4000-8000-0000000000e4";
+    w.db.organisations.set(EMPTY, {
+      id: EMPTY,
+      tenantId: TENANT,
+      type: "company",
+      name: "Unclaimed Co",
+      status: "active",
+    });
+    const input = {
+      organisationId: EMPTY,
+      userId: PETER,
+      role: "OWNER" as const,
+      decidedByUserId: DANIEL,
+      claimRequestId: "00000000-0000-4000-8000-0000000000c9",
+      correlationId: correlation,
+    };
+    const first = ok(await w.service.admitClaim(input));
+    const again = ok(await w.service.admitClaim(input));
+    expect(again.membershipId).toBe(first.membershipId);
+    const mine = (await w.service.myOrganisations(PETER)).items;
+    expect(mine.map((o) => [o.name, o.role, o.active])).toEqual([
+      ["Unclaimed Co", "OWNER", true],
+    ]);
+  });
+
+  it("never makes anyone owner of a company that already has members", async () => {
+    const w = world();
+    ok(
+      await w.service.admitClaim({
+        organisationId: ORG_B,
+        userId: PETER,
+        role: "OWNER",
+        decidedByUserId: OUTSIDER,
+        claimRequestId: "00000000-0000-4000-8000-0000000000ca",
+        correlationId: correlation,
+      }),
+    );
+    const team = ok(await w.service.team(w.actorOf(OUTSIDER, ORG_B)));
+    expect(team.members.find((m) => m.userId === PETER)?.role).toBe("MEMBER");
+  });
+});
+
 describe("the switcher's list", () => {
   it("F11: names the company an organisation is, when it is one", async () => {
     const w = world();

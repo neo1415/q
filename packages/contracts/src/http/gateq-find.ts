@@ -78,9 +78,107 @@ export const CompanyClaimResultDtoSchema = z
       "ALREADY_YOURS",
       "EMAIL_NOT_AT_COMPANY",
     ]),
+    /** P14: a work-email claim: whether its one-time code was emailed. */
+    codeSent: z.boolean().optional(),
   })
   .strict();
 export type CompanyClaimResultDto = z.infer<typeof CompanyClaimResultDtoSchema>;
+
+// ---------------------------------------------------------------------------
+// P14: confirming a work-email code, and deciding a claim
+// ---------------------------------------------------------------------------
+
+export const COMPANY_CLAIM_CONFIRM_PATH =
+  "/v1/companies/:companyId/claim-requests/confirm" as const;
+export const COMPANY_CLAIM_DECISION_PATH =
+  "/v1/companies/:companyId/claim-requests/:requestId/decision" as const;
+export const ADMIN_COMPANY_CLAIMS_PATH = "/v1/admin/company-claims" as const;
+export const ADMIN_COMPANY_CLAIM_DECISION_PATH =
+  "/v1/admin/company-claims/:requestId/decision" as const;
+
+export const ConfirmClaimCodeRequestSchema = z
+  .object({ code: z.string().regex(/^\d{6}$/u) })
+  .strict();
+export type ConfirmClaimCodeRequest = z.infer<
+  typeof ConfirmClaimCodeRequestSchema
+>;
+
+export const ConfirmClaimCodeResultDtoSchema = z
+  .object({
+    status: z.enum(["CONFIRMED", "WRONG_CODE", "EXPIRED", "NOT_FOUND"]),
+  })
+  .strict();
+export type ConfirmClaimCodeResultDto = z.infer<
+  typeof ConfirmClaimCodeResultDtoSchema
+>;
+
+export const ClaimDecisionRequestSchema = z
+  .object({
+    approve: z.boolean(),
+    reason: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+export type ClaimDecisionRequest = z.infer<typeof ClaimDecisionRequestSchema>;
+
+export const ClaimDecisionResultDtoSchema = z
+  .object({ status: z.enum(["APPROVED", "DECLINED"]) })
+  .strict();
+export type ClaimDecisionResultDto = z.infer<
+  typeof ClaimDecisionResultDtoSchema
+>;
+
+/** A pending claim, for whoever may decide it. Name and how, never the code. */
+export const PendingClaimDtoSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    companyId: z.string().uuid(),
+    companyName: z.string().max(200),
+    requesterName: z.string().max(200).nullable(),
+    method: CompanyClaimMethodSchema,
+    /** WORK_EMAIL only: the domain (never the address) and whether its code was confirmed. */
+    workEmailDomain: z.string().max(254).nullable(),
+    emailConfirmed: z.boolean(),
+    requestedAt: z.string(),
+  })
+  .strict();
+export type PendingClaimDto = z.infer<typeof PendingClaimDtoSchema>;
+
+export const PendingClaimListDtoSchema = z
+  .object({ claims: z.array(PendingClaimDtoSchema).max(200) })
+  .strict();
+export type PendingClaimListDto = z.infer<typeof PendingClaimListDtoSchema>;
+
+/** P14 item 7: an unclaimed company's profile, public or back to the network. */
+export const ADMIN_COMPANY_PUBLISH_PATH =
+  "/v1/admin/companies/:companyId/public-external" as const;
+
+export const AdminCompanyPublishRequestSchema = z
+  .object({
+    publicExternal: z.boolean(),
+    reason: z.string().trim().min(3).max(500),
+  })
+  .strict();
+export type AdminCompanyPublishRequest = z.infer<
+  typeof AdminCompanyPublishRequestSchema
+>;
+
+export const AdminCompanyPublishResultDtoSchema = z
+  .object({
+    outcome: z.enum(["CHANGED", "UNCHANGED", "CLAIMED"]),
+    /** What it is now; public_external and network_visible stay distinct. */
+    visibility: z.enum(["public_external", "network_visible"]).nullable(),
+  })
+  .strict();
+export type AdminCompanyPublishResultDto = z.infer<
+  typeof AdminCompanyPublishResultDtoSchema
+>;
+
+export const AdminClaimDecisionRequestSchema = z
+  .object({
+    approve: z.boolean(),
+    reason: z.string().trim().min(3).max(500),
+  })
+  .strict();
 
 export const StartupAlertRequestSchema = z
   .object({

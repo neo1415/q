@@ -9,6 +9,14 @@ import {
   FounderApplicationListDtoSchema,
   GATEQ_MY_APPLICATIONS_PATH,
   ClaimableCompanyListDtoSchema,
+  ClaimDecisionRequestSchema,
+  ClaimDecisionResultDtoSchema,
+  COMPANY_CLAIM_CONFIRM_PATH,
+  COMPANY_CLAIM_DECISION_PATH,
+  COMPANY_CLAIM_REQUESTS_PATH,
+  ConfirmClaimCodeRequestSchema,
+  ConfirmClaimCodeResultDtoSchema,
+  PendingClaimListDtoSchema,
   type ClaimableCompanyDto,
   GATEQ_INBOX_ITEM_PATH,
   GATEQ_INBOX_PACK_PATH,
@@ -30,6 +38,7 @@ import {
   GatewayDtoSchema,
   GatewayPolicyDtoSchema,
   GatewayVersionDtoSchema,
+  CorrelationIdSchema,
   parseContract,
   PublicGatewayDtoSchema,
   QualificationResultDtoSchema,
@@ -69,6 +78,8 @@ import {
   requireOnboardingActorHook,
 } from "../security/onboarding-actor.js";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
+import type { CompanyClaims } from "@capital-q/companies";
+import type { TeamService } from "@capital-q/organisations";
 import { sendEntitlementRequired } from "./billing.js";
 import {
   MaterialNotSharableError,
@@ -121,6 +132,17 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
    * no organisation yet (exactly who joins a team). Absent: context only.
    */
   readonly identities?: ApplicationIdentityLookup | undefined;
+  /**
+   * P14: confirming a claim's work-email code, and a company admin's
+   * decision on a claim to their company (admission is the team's).
+   */
+  readonly claims?:
+    | Pick<
+        CompanyClaims,
+        "confirmCode" | "pending" | "decide" | "isCompanyAdmin"
+      >
+    | undefined;
+  readonly admitClaim?: TeamService["admitClaim"] | undefined;
   /** F4: the organisation's GateQ inbox (its writes are declared app actions). */
   readonly inboxService?: InboxService | undefined;
   /** F4: the gateway's published reply promise, for its public page. */
@@ -343,6 +365,110 @@ export function registerGateQRoutes(
         const companies = await claimable(searcher, text);
         void reply.header("Cache-Control", "no-store");
         return ClaimableCompanyListDtoSchema.parse({ companies });
+      },
+    );
+  }
+
+  const claims = dependencies.claims;
+  if (claims !== undefined) {
+    const companyIdOf = (request: FastifyRequest) =>
+      parseContract(
+        UuidSchema,
+        (request.params as Record<string, string | undefined>)["companyId"],
+        "The id is not valid.",
+      );
+    const identities = dependencies.identities;
+    const withPerson =
+      identities === undefined
+        ? withContext
+        : requireOnboardingActorHook({ ...dependencies, identities });
+    // P14: the requester confirms the code from their work email.
+    app.post(
+      COMPANY_CLAIM_CONFIRM_PATH,
+      { onRequest: withPerson },
+      async (request, reply) => {
+        const input = parseContract(
+          ConfirmClaimCodeRequestSchema,
+          request.body,
+          "Enter the six-digit code from the email.",
+        );
+        const userId =
+          identities === undefined
+            ? getActorContext(request).userId
+            : getOnboardingActor(request).userId;
+        const out = await claims.confirmCode(
+          { userId },
+          companyIdOf(request),
+          input.code,
+        );
+        void reply.header("Cache-Control", "no-store");
+        return ConfirmClaimCodeResultDtoSchema.parse(out);
+      },
+    );
+    // P14: the claims waiting on a company, for its admins only.
+    app.get(
+      COMPANY_CLAIM_REQUESTS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const companyId = companyIdOf(request);
+        const actor = getActorContext(request);
+        if (!(await claims.isCompanyAdmin(actor.userId, companyId))) {
+          reply.callNotFound();
+          return undefined;
+        }
+        void reply.header("Cache-Control", "no-store");
+        return PendingClaimListDtoSchema.parse({
+          claims: await claims.pending({ companyId }),
+        });
+      },
+    );
+    // P14: a company admin decides; approval admits the requester as a member.
+    app.post(
+      COMPANY_CLAIM_DECISION_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const companyId = companyIdOf(request);
+        const requestId = parseContract(
+          UuidSchema,
+          (request.params as Record<string, string | undefined>)["requestId"],
+          "The id is not valid.",
+        );
+        const input = parseContract(
+          ClaimDecisionRequestSchema,
+          request.body,
+          "The decision is not valid.",
+        );
+        const actor = getActorContext(request);
+        if (!(await claims.isCompanyAdmin(actor.userId, companyId))) {
+          reply.callNotFound();
+          return undefined;
+        }
+        const decided = await claims.decide({
+          requestId,
+          approve: input.approve,
+          deciderUserId: actor.userId,
+          via: "COMPANY_MEMBER",
+          companyId,
+          reason: input.reason,
+        });
+        if (decided === null) {
+          reply.callNotFound();
+          return undefined;
+        }
+        if (decided.status === "APPROVED" && dependencies.admitClaim) {
+          await dependencies.admitClaim({
+            organisationId: decided.organisationId,
+            userId: decided.requesterUserId,
+            role: "MEMBER",
+            decidedByUserId: actor.userId,
+            claimRequestId: requestId,
+            correlationId: CorrelationIdSchema.parse(
+              `cor_${crypto.randomUUID()}`,
+            ),
+          });
+        }
+        void reply.header("Cache-Control", "no-store");
+        return ClaimDecisionResultDtoSchema.parse({ status: decided.status });
       },
     );
   }

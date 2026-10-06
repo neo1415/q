@@ -185,6 +185,12 @@ export {
   createSetCompanyVisibility,
   type SetCompanyVisibilityCommand,
 } from "./application/set-company-visibility.js";
+// P14 item 7: an unclaimed company made public (or back to the network) by a platform admin.
+export {
+  createPlatformCompanyPublishing,
+  type PlatformCompanyPublishing,
+  type PlatformPublishingOutcome,
+} from "./application/platform-publishing.js";
 export {
   CompanyVisibilityChangedEvent,
   companyVisibilityChangedEvent,
@@ -207,5 +213,6 @@ export {
   createCompanyClaims,
   emailAtCompany,
   type ClaimSearcher,
+  type ClaimCodeMailer,
   type CompanyClaims,
 } from "./claims/company-claims.js";
