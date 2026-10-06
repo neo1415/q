@@ -1060,6 +1060,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/email':
+        specifier: workspace:*
+        version: link:../email
       '@capital-q/gateq':
         specifier: workspace:*
         version: link:../gateq

@@ -138,19 +138,32 @@ function describeState(state: VisibilityStateDto): GetDisclosureStateOutput {
       what: OBJECT_NAMES[object.object] ?? object.object,
       scope: object.scope,
       visibleTo: SCOPE_WORDS[object.scope] ?? object.scope,
-      sharedWith: state.shares
-        .filter((share) => share.object === object.object)
-        .map((share) => share.recipientName ?? "an investor"),
+      sharedWith: [
+        ...state.shares
+          .filter((share) => share.object === object.object)
+          .map((share) => share.recipientName ?? "an investor"),
+        // ADR 0060: the founder's own network-wide share of the raise.
+        ...(object.object === "CAPITAL_OBJECTIVE" &&
+        (state.networkRaiseShare ?? null) !== null
+          ? ["every investor on Capital Q"]
+          : []),
+      ],
     })),
     alwaysPrivate:
       "Setup answers, documents, what Q read from them, conversations with Q and the use of funds stay private to the company's own organisation, whatever is chosen.",
-    shares: state.shares.map((share, index) => ({
-      shareId: share.policyId,
-      what: OBJECT_NAMES[share.object] ?? share.object,
-      with: sharedNames[index] ?? "an investor",
-      relationshipId: share.relationshipId,
-      since: share.createdAt,
-    })),
+    shares: state.shares.flatMap((share, index) =>
+      share.relationshipId === null
+        ? []
+        : [
+            {
+              shareId: share.policyId,
+              what: OBJECT_NAMES[share.object] ?? share.object,
+              with: sharedNames[index] ?? "an investor",
+              relationshipId: share.relationshipId,
+              since: share.createdAt,
+            },
+          ],
+    ),
     shareableWith: state.relationships
       .filter(
         (r) => !state.shares.some((s) => s.relationshipId === r.relationshipId),

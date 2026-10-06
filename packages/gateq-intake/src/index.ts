@@ -137,3 +137,12 @@ export {
   type ApplicationFounders,
   type FounderApplication,
 } from "./infrastructure/postgres-application-founders.js";
+
+// P14: founders hear GateQ answers by email.
+export {
+  recipientDomain as gateqRecipientDomain,
+  renderGateqAnswerEmail,
+  type GateqEmailEvent,
+  type GateqEmailKind,
+  type GateqOutboundSender,
+} from "./inbox/founder-mail.js";

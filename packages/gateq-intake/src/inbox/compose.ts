@@ -5,6 +5,7 @@ import type { ActorContext } from "@capital-q/security";
 import { createPostgresInboxRepository } from "../infrastructure/postgres-inbox.js";
 import type { InboxAuthority, SharedDocumentPort } from "./ports.js";
 import { createInboxService, type InboxService } from "./service.js";
+import type { GateqEmailEvent, GateqOutboundSender } from "./founder-mail.js";
 
 /**
  * F4: the GateQ inbox, composed. GateQ's own gateway authority decides who
@@ -44,12 +45,16 @@ export function createGateqInbox(options: {
   readonly transactions: TransactionManager;
   readonly gateq: Pick<GateQService, "gatewayAccess">;
   readonly documents?: SharedDocumentPort | undefined;
+  readonly founderMail?: GateqOutboundSender | undefined;
+  readonly onEmail?: ((event: GateqEmailEvent) => void) | undefined;
 }): InboxService {
   return createInboxService({
     repository: createPostgresInboxRepository({ sql: options.sql }),
     authority: gateqInboxAuthority(options.gateq),
     transactions: options.transactions,
     documents: options.documents,
+    founderMail: options.founderMail,
+    onEmail: options.onEmail,
   });
 }
 

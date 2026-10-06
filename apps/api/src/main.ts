@@ -151,6 +151,7 @@ import {
   createPostgresApplicationSubmissionRepository,
   createPostgresSubmissionInbox,
   createGateqInbox,
+  type GateqEmailEvent,
   createPostgresInboxRepository,
   createStartupAlerts,
   createPostgresApplicationFounders,
@@ -923,10 +924,43 @@ const discoverFilterFacts = createDiscoverFilterFacts({
   pitches: () => discoverablePitches,
 });
 // F4: the investor's GateQ inbox, under GateQ's own gateway authority.
+// P14: a founder hears a pass or a reply by email, through the same app
+// sender as team email, recorded like every app email; outcome logged with
+// the recipient's domain only.
+const gateqFounderMail =
+  teamEmailConfig.brevoApi !== undefined
+    ? recordingEmailSender(
+        createBrevoApiEmailSender(teamEmailConfig.brevoApi),
+        {
+          sql: database.sql,
+          source: "api.gateq_answer",
+          provider: "BREVO_API",
+        },
+      )
+    : teamEmailConfig.smtp === undefined
+      ? unavailableAppEmailSender
+      : recordingEmailSender(createSmtpAppEmailSender(teamEmailConfig.smtp), {
+          sql: database.sql,
+          source: "api.gateq_answer",
+          provider: "SMTP",
+        });
+const logGateqEmail = (event: GateqEmailEvent) => {
+  const fields = {
+    event: "gateq.email",
+    kind: event.kind,
+    outcome: event.outcome,
+    recipientDomain: event.recipientDomain,
+    ...(event.error instanceof Error ? { errorName: event.error.name } : {}),
+  };
+  if (event.outcome === "SENT") teamLogger.info(fields, "gateq email sent");
+  else teamLogger.warn(fields, "gateq email not sent");
+};
 const gateqInboxService = createGateqInbox({
   sql: database.sql,
   transactions: database.transactions,
   gateq,
+  founderMail: gateqFounderMail,
+  onEmail: logGateqEmail,
   documents: sharedDocumentsPort({
     sql: database.sql,
     authorizeVersion:

@@ -2002,6 +2002,40 @@ const gateqInbox = gateqInboxActionsPort(
     sql: database.sql,
     transactions: database.transactions,
     gateq: gateqForInbox,
+    // P14: an approved pass or reply reaches the founder by email too.
+    founderMail:
+      teamEmailConfig.brevoApi !== undefined
+        ? recordingEmailSender(
+            createBrevoApiEmailSender(teamEmailConfig.brevoApi),
+            {
+              sql: database.sql,
+              source: "q_api.gateq_answer",
+              provider: "BREVO_API",
+            },
+          )
+        : teamEmailConfig.smtp === undefined
+          ? unavailableAppEmailSender
+          : recordingEmailSender(
+              createSmtpAppEmailSender(teamEmailConfig.smtp),
+              {
+                sql: database.sql,
+                source: "q_api.gateq_answer",
+                provider: "SMTP",
+              },
+            ),
+    onEmail: (event) => {
+      const fields = {
+        event: "gateq.email",
+        kind: event.kind,
+        outcome: event.outcome,
+        recipientDomain: event.recipientDomain,
+        ...(event.error instanceof Error
+          ? { errorName: event.error.name }
+          : {}),
+      };
+      if (event.outcome === "SENT") logger.info(fields, "gateq email sent");
+      else logger.warn(fields, "gateq email not sent");
+    },
   }),
   ownGatewayIdFrom({
     gateq: gateqForInbox,
