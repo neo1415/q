@@ -39,6 +39,7 @@ import {
 import { ProfileHero } from "@/features/profile/profile-header";
 import { ProfileImageEditor } from "@/features/profile/profile-image-editor";
 import { QCardSection } from "@/features/q-card/q-card-section";
+import { ProfileTeamSection } from "@/features/team/profile-team";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
 
@@ -423,6 +424,11 @@ export default async function ProfilePage() {
               <AnswersSlot journey="founder" include={["traction", "raise"]} />
             </ProfileSectionShell>
           ) : null}
+
+          {/* G2: the company or firm as a team. */}
+          <Suspense fallback={null}>
+            <ProfileTeamSection />
+          </Suspense>
 
           {/* The shareable identity (BIZ-004). */}
           {company !== null || investor !== null ? (

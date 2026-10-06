@@ -12,6 +12,10 @@
     "./events": {
       "types": "./dist/events/index.d.ts",
       "default": "./dist/events/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/memory-team-store.d.ts",
+      "default": "./dist/testing/memory-team-store.js"
     }
   },
   "main": "./dist/index.js",
