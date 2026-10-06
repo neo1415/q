@@ -301,6 +301,8 @@ const SECTIONS: readonly {
   { href: "/admin/q", label: "Q monitor", permission: "q.monitor.read" },
   { href: "/admin/audit", label: "Audit", permission: "audit.read" },
   { href: "/admin/flags", label: "Kill switches", permission: "flags.read" },
+  // P14: claims on unclaimed companies, and public company profiles.
+  { href: "/admin/claims", label: "Claims", permission: "claims.read" },
   { href: "/admin/brand", label: "Brand", permission: "flags.write" },
   { href: "/admin/etiquette", label: "Etiquette", permission: "flags.write" },
   // BILLING block (ADR 0034)
