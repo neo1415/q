@@ -600,6 +600,7 @@ import { withSuspension } from "./composition/suspension.js";
 import { createOwnCalls } from "./composition/own-calls.js";
 import { createOwnDiligence } from "./composition/own-diligence.js";
 import { createProfileMaterial } from "./composition/profile-material.js";
+import { createMaterialDocumentReads } from "./composition/material-documents.js";
 // end ADMIN block
 // ADMIN-3 block
 import {
@@ -2543,6 +2544,13 @@ const qTools = createQTools({
       deck: (actor, companyId) =>
         profileMaterial.companyDeck.view(actor, companyId),
       ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
+      // R0: a document found by meaning, and its text, as the data room
+      // authorises them for this person.
+      ...createMaterialDocumentReads({
+        sql: database.sql,
+        view: (actor, companyId) =>
+          profileMaterial.dataRoom.view(actor, companyId),
+      }),
     },
     ownRecords: {
       read: (actor, query) => ownRecords.read(actor, query),

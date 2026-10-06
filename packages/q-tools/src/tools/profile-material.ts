@@ -47,6 +47,45 @@ export type ProfileMaterialPort = {
   ) => Promise<CompanyDeckView | null>;
   /** The actor's own company, from their membership on the server. */
   readonly ownCompanyId: (actor: ActorContext) => Promise<string | null>;
+  /**
+   * R0: the data-room documents this person may know exist at a company,
+   * as the Data room tab authorises them, with what helps find one by
+   * meaning (its type, and the opening of its extracted text where they
+   * may open it). Absent: no document is found or read by Q.
+   */
+  readonly documents?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<readonly MaterialDocument[] | null>)
+    | undefined;
+  /**
+   * R0: one document's extracted text, for a person who may open it now
+   * (re-authorised by the implementation through the same data-room
+   * view); null when they may not, or nothing was extracted.
+   */
+  readonly documentText?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+        documentId: string,
+      ) => Promise<{ readonly text: string; readonly truncated: boolean } | null>)
+    | undefined;
+};
+
+/** One data-room document as Q may find it (R0). */
+export type MaterialDocument = {
+  readonly documentId: string;
+  readonly title: string;
+  readonly folder: string;
+  /** The evidence document type ("CERTIFICATE_OF_INCORPORATION"); null: unknown. */
+  readonly documentType: string | null;
+  /** OPEN or OWNER may be opened and read; the rest only named. */
+  readonly access: "OPEN" | "OWNER" | "REQUESTABLE" | "REQUESTED";
+  readonly pageCount: number | null;
+  readonly updatedAt: string;
+  /** The first words of its extracted text, only where it may be opened. */
+  readonly opening: string | null;
 };
 
 const CompanyInputSchema = z
@@ -59,7 +98,7 @@ const CompanyInputSchema = z
 type CompanyInput = z.infer<typeof CompanyInputSchema>;
 
 /** The plan admits this company: bound to it, a subject of the run, or the actor-wide network scope. */
-function planAdmits(
+export function planAdmits(
   context: QToolExecutionContext,
   companyId: string,
 ): boolean {

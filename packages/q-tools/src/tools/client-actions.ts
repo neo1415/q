@@ -328,7 +328,8 @@ export function createSignOutTool(): AnyQToolDefinition {
 
 export const OpenPageInputSchema = z
   .object({
-    page: QRecordPageSchema.describe(
+    // A data-room document opens through open_company_document (R0).
+    page: QRecordPageSchema.exclude(["DATA_ROOM_DOCUMENT"]).describe(
       "COMPANY: a company's page. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it. COMPANY_PITCH: for an investor, a company of theirs (connected, interested or saved) in Discover's Your companies tab, with its pitch when the company shares it ('show me Nixo's pitch').",
     ),
     id: z
