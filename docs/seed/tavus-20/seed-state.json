@@ -1,0 +1,770 @@
+{
+  "companies": {
+    "10": {
+      "company": "Prumo",
+      "founderUserId": "3d2b4bb6-7d96-4cc1-b206-29e30fe26142",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "f02c2a50-da07-4889-b68f-024fdb9cd131",
+      "organisationId": "773efd35-3216-464e-af9b-62a461d69787",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "documents": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Juliana Tavares",
+          "userId": "6d981ed5-d3d3-433f-ac00-4f34ec9e6169",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Thiago Albuquerque",
+          "userId": "94598363-772e-467e-8674-9294824b887d",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Camila Rocha",
+          "userId": "5a06e8f3-6d0f-457d-a035-bb937efe9bf1",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "117e57ea-5db4-4428-8920-86a64ad5e6a5",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "11": {
+      "company": "Ferrolith",
+      "founderUserId": "d46121b6-b34e-4b84-be94-1109558297a3",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "742e15e5-db75-4a55-b4b6-1c87ffb252d6",
+      "organisationId": "ec2d6a07-5fdb-44ee-b0f1-0ba5b7d26a3e",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Dr Anna Weber",
+          "userId": "875e0742-e554-4368-9de0-4643c7635125",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Lukas Hoffmann",
+          "userId": "2c2127df-2800-4ddd-a4a2-42530ed08000",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Sabine Richter",
+          "userId": "b7e9b290-9d5c-4009-a1d7-488d132c62c3",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "f67359f7-eaed-460a-9045-5184c1418a17",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "12": {
+      "company": "Shiftwell",
+      "founderUserId": "2d5a4ecc-17f7-44fb-a490-345c3c1bf9f2",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "bfa975be-5611-4282-93b9-e886295b1140",
+      "organisationId": "5ef9aef1-8e49-4f45-9d27-7744391136e8",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Marcus Greene",
+          "userId": "593cf75e-923c-47f2-9711-d3080f24b974",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Danielle Ortiz",
+          "userId": "66094dc8-6e23-44e1-9e58-d3968cdc6835",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Brian Kowalski",
+          "userId": "e5d6a8f3-5c95-4ca6-87c0-43cd84ccf0d8",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "c1ff04c2-685a-45c6-8d06-40805ae1daf2",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "13": {
+      "company": "Halyard Security",
+      "founderUserId": "d7ecb835-1b14-4aab-8c80-636996eb7df1",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "1ab2cc02-160f-4812-a6b1-8be7e43afd3e",
+      "organisationId": "c1f2dd2f-65fe-4825-9cef-f6a05adee79f",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Eilidh MacLeod",
+          "userId": "296b468a-3ad4-45a4-9fb7-e6ae5935ca99",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Jamie Fraser",
+          "userId": "c4162e66-e51e-4977-9995-18074f3017a3",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "10f024de-eb99-4315-b0f4-ec3a09919a78",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "14": {
+      "company": "Hui",
+      "founderUserId": "514897fa-540e-407d-aff3-e56d817e74f0",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "ddf6f558-7c22-432e-8fa9-1c6c34a6413b",
+      "organisationId": "a494da19-71d4-4a61-a6ec-c785bd643f63",
+      "done": {
+        "onboarding": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "profile": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Nguyễn Thu Hà",
+          "userId": "230b5240-635f-4901-8526-8c92b939b054",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Lê Quốc Bảo",
+          "userId": "8fadbab9-d28b-40c7-8495-1967853282a8",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Phạm Ngọc Lan",
+          "userId": "9a9008db-9c65-4aef-9864-6a1fb1531315",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "fab878ce-3ff6-4139-b358-df5cd5112276",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "15": {
+      "company": "Cosecha Labs",
+      "founderUserId": "d93e5a61-5d09-4fb7-b893-db0fc0eea1e5",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "011867c1-3c66-4466-aa05-b8986e4337ed",
+      "organisationId": "32cb6c9b-3f79-4f99-b2b7-e96cb5fbe97b",
+      "done": {
+        "onboarding": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "profile": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Valeria Castañeda",
+          "userId": "fb215d80-fb0a-4f86-b819-7bf5839cb482",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Diego Herrera",
+          "userId": "81909a7b-58ff-4403-aec5-d78c0bee6d03",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "929f7a77-e98f-4679-8888-30991b7b7bdf",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "16": {
+      "company": "Mizan",
+      "founderUserId": "7fdf2142-0c3f-48c9-9c1f-b006d56a56fd",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "d9c03bb4-fa9b-4c55-8924-038d386cc8a8",
+      "organisationId": "2e35276c-dc5d-474b-bd83-845809335aca",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Nour El-Sayed",
+          "userId": "540678dd-bd74-45f7-8026-8e6605bf8f1f",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Omar Farouk",
+          "userId": "6e2158b5-845b-418e-a012-4430b114daf2",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Mariam Hassan",
+          "userId": "e39e8751-4ea6-4ee4-98ab-42da2b91bb8e",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "1942d6c9-c712-43e5-8711-1f40a8043a02",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "17": {
+      "company": "Rand Treasury",
+      "founderUserId": "813723c6-7ef9-45d6-aac6-3579e968c508",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "f027f73e-6872-4129-b562-327160fab164",
+      "organisationId": "044c7550-48aa-40d9-ae1d-af323b5a5d5c",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Sipho Ndlovu",
+          "userId": "723e357f-8d3c-423c-b331-9188b4e74948",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ayesha Patel",
+          "userId": "ed90e226-f97d-40c4-becb-99928a1aa766",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Pieter Botha",
+          "userId": "a75be0a6-4736-454e-9b6c-542d3827d22b",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "95e52695-7c27-4079-8a4c-2606c78cd19c",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "18": {
+      "company": "Orphéa Genomics",
+      "founderUserId": "63ff6734-9a86-456e-95ad-c91e2992ec0d",
+      "founderCount": 2,
+      "companyId": "fb7bb485-017f-44d3-9a3b-bdf3b8f9c5f4",
+      "organisationId": "1913eba0-db85-4bfc-b6ac-1b3671f8cbf1",
+      "done": {
+        "onboarding": true,
+        "capital": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "profile": true,
+        "documents": true,
+        "q": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Dr Julien Moreau",
+          "userId": "9299893f-ee56-4244-8ab8-dade2308c506",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Inès Benali",
+          "userId": "1e8c0092-84f7-4784-afd5-6f0b41a7898a",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Thomas Lefebvre",
+          "userId": "293a00be-67fe-40bd-80de-2636e7a31d8c",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "c508b45b-d78a-4bf1-b222-0aee4c9dd93d",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "19": {
+      "company": "Akshar",
+      "founderUserId": "30f82011-77cb-41c3-ad6e-cb6aaa1ea20f",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "71765150-4f97-4102-89a2-8c38f10334ef",
+      "organisationId": "d47343a3-94bd-4605-8a19-78743bba7a2d",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Karthik Subramanian",
+          "userId": "b25b8d01-0d3c-4f9d-9dbf-941a4fe0b299",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ananya Hegde",
+          "userId": "d3367a64-00d5-4c03-9289-9ce4a373c369",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Rahul Verma",
+          "userId": "2d2ba940-b329-4f4e-a923-b45d21c98af9",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "52e5bca7-acd4-4ea4-8687-c635bdced268",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "20": {
+      "company": "Railhead Robotics",
+      "founderUserId": "7c408104-43fe-4df6-b005-e5fe3092f228",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "c60d5fd1-25fc-4ac4-a446-41e79a0bf3d4",
+      "organisationId": "e23bd388-244a-4a04-8cba-5476f73ff705",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Sarah Lindqvist",
+          "userId": "0a738d69-1138-44f1-88f0-80933cc08566",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Tyrone Washington",
+          "userId": "478b411a-594e-4a89-9e2f-91aeb50b9319",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Emily Chen",
+          "userId": "3cfda160-d90b-4841-b783-2136577d635f",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "782410d9-ccac-4ca6-9ad4-8983f041516f",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "01": {
+      "company": "Ledgerline",
+      "companyId": "6f075a0b-8372-4458-9060-09afd73a9c37",
+      "founderUserId": "0fe3a13c-f464-4516-a0c6-23c0212347d0",
+      "onboarding": "completed",
+      "profile": {
+        "about": true,
+        "company": true,
+        "sector": true,
+        "headline": true,
+        "founderSummaries": true,
+        "teamFacts": true
+      },
+      "organisationId": "eefcc624-c466-44e8-af8a-b5eb5025a526",
+      "pitchId": "dd29efcc-fe71-4abf-aee8-25462dc7b782",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "pitch": true,
+        "visible": true,
+        "team": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Funmilayo Adebayo",
+          "userId": "82ee97da-ebaf-45f0-b65e-477997862717",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Emeka Chukwu",
+          "userId": "4ad3fcf2-904e-49a8-b8b8-767c50b1fdfd",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Zainab Lawal",
+          "userId": "cb71839b-5de7-4189-a6e3-33ca5665db6f",
+          "role": "MEMBER"
+        }
+      ],
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "02": {
+      "company": "Termly",
+      "founderUserId": "1d51e988-f11f-4fb6-93a4-18f6e42366c8",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "1d243b5e-fe0d-4be5-9549-cb60e28652e6",
+      "organisationId": "68f801e2-21c7-458e-b9be-b0b2e0e43005",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Oluwaseun Bakare",
+          "userId": "4a229b66-87f4-4745-ad54-5d65cd2dca91",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Chiamaka Eze",
+          "userId": "d796cec2-1b25-4428-a7d3-7f2c22eda92e",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Ibrahim Musa",
+          "userId": "a165c2f6-1340-4e8e-ae29-859e3c502849",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "f891a735-ed8e-44ff-902c-248344e2fa7c",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "03": {
+      "company": "Clearwater Assurance",
+      "founderUserId": "329e7564-2d9a-4470-aece-819d4cb3fd1f",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "6ed1da85-cddc-4015-b5c2-86a95a48cfc8",
+      "organisationId": "1506007e-21b5-483f-8c35-37e7200bb248",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Rohan Mehta",
+          "userId": "ede1a31f-ac86-4bbb-ba44-0f2ed0418b0e",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Siobhan Gallagher",
+          "userId": "ac5f0dea-8ce6-4f44-bb04-0532f20c3058",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Tom Ashworth",
+          "userId": "dbfd0ddf-d005-4c28-a5b0-2871f5bb2c24",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "918b81b8-62b4-4d59-96ba-4381809ba367",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "04": {
+      "company": "Tensorgate",
+      "founderUserId": "d068e858-01b6-49b5-8b57-901c29ff32e8",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "bf55d6e1-567a-470b-954d-054ae05990e2",
+      "organisationId": "de87e975-b868-41d7-98a6-f6dc1da8e649",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Laura Bennett",
+          "userId": "6bb7b735-e0e6-4503-b029-37ddd1e81298",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Marcus Delgado",
+          "userId": "453e0032-34e2-4617-ab9e-edc01007a58b",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Jordan Whitfield",
+          "userId": "c78fd451-8c08-4030-b214-8101a14897e5",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "278ec231-a070-4540-b599-396b0d6e68b3",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "05": {
+      "company": "Drishti Health",
+      "founderUserId": "dcffd7c4-4474-43e1-99e1-ccdc7f0d80b2",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "ba7189d9-6aab-44ef-8f02-d82c386527ed",
+      "organisationId": "1c0d4808-f1f4-4a72-880b-acd62ee9a0c6",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Aditya Kulkarni",
+          "userId": "96254f07-2c3f-4db9-84fc-2af752d08c05",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Sneha Deshpande",
+          "userId": "ad54ecde-6099-416a-b8a6-b6c029601724",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Dr Farhan Qureshi",
+          "userId": "870058b2-d186-4449-bde5-3161d3d23c08",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "2914f664-8edd-4490-8dbe-0a2459a2794b",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "06": {
+      "company": "Silo Credit",
+      "founderUserId": "cc295a40-4190-4bf9-af49-437b2b5d1d7f",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "fbff8cff-e09b-4a2c-9aa6-97cb68432613",
+      "organisationId": "b20c649d-1556-402a-aa02-b93b5f723de1",
+      "done": {
+        "onboarding": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "profile": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Abdullahi Sani",
+          "userId": "eb2bb3e3-a17b-4993-98ba-7ef8bf5b830d",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Aisha Yusuf",
+          "userId": "e9fe6d57-60ca-4e3c-a512-2b4b0851b5a2",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Chinedu Obi",
+          "userId": "854707ab-c15b-49da-a29a-fa4d10599d8f",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "d93bb9a2-124b-4426-800d-ca35da8ef601",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "07": {
+      "company": "Portside",
+      "founderUserId": "e88832b0-7cf5-4be9-ac11-0663ad1a903a",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "7b62eab6-39b9-4cb6-884a-878301f6928f",
+      "organisationId": "a1622b44-1f15-4658-b781-3fb570022dec",
+      "done": {
+        "onboarding": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "pitch": true,
+        "profile": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Folake Adeyemi",
+          "userId": "24e091a7-58cf-42af-8837-43bf01da8336",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Tunde Balogun",
+          "userId": "e02c2021-9434-4934-bb43-7a8962e70495",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "6446ecd8-59c6-40df-b704-6b8e2f0a5be8",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "08": {
+      "company": "MedTrail",
+      "founderUserId": "3545fbda-98be-4055-af13-065289a8a993",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "b5280fd1-c2ee-4824-8658-09529453f7be",
+      "organisationId": "c565d83a-726c-4941-86d2-7aac0a7c1e3a",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Ngozi Okeke",
+          "userId": "2978513d-191a-497b-a17d-2d654c40477d",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Yetunde Fashola",
+          "userId": "73b5c061-4322-4325-a431-047881e7cc13",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Samuel Etim",
+          "userId": "e8caf117-e403-4d8c-98de-c5d6bd92c6d6",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "0b18f34f-e22d-432d-88c4-e4d1b19e65fe",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "09": {
+      "company": "Baridi",
+      "founderUserId": "921cabb4-aabb-4b35-926b-afcfc1f6c494",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "7e5a7a76-857a-4528-9641-08c7bab9cc22",
+      "organisationId": "82818c0d-57da-4946-b9a1-21c9a559ec3a",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Otieno Ouma",
+          "userId": "d59f193e-b4e8-4ab8-97ee-bf5859140674",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Akinyi Achieng",
+          "userId": "0bc12d12-cb67-4fbe-919b-c60c0e4c4d87",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "f2e0f28a-83ac-472d-98d4-4f6ae33163c0",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    }
+  }
+}

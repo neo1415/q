@@ -600,7 +600,14 @@ export function createDataRoomService(dependencies: {
       if (reader.kind !== "OWNER") return refused("OWNER_ONLY");
       const correlationId =
         command.correlationId ?? dependencies.newCorrelationId();
-      const expected = command.expectedVersion ?? document.version;
+      // A document never filed has no entry (version 0), but the owner view
+      // reports it as version 1 (the DTO's floor), so the screen sends 1.
+      // A first filing is the store's insert, guarded by its own conflict
+      // check; only an existing entry is compared with what the screen saw.
+      const expected =
+        document.version === 0
+          ? 0
+          : (command.expectedVersion ?? document.version);
       if (
         document.version > 0 &&
         document.level === command.level &&

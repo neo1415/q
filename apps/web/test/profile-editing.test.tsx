@@ -86,7 +86,7 @@ const { EditableProfile } =
   await import("../src/features/profile/editable-profile");
 const { ProfileFindings, SignalsAndVerification } =
   await import("../src/features/profile/profile-enrichment");
-const { COMPANY_FIELDS, PERSON_FIELDS, normaliseDraft } =
+const { COMPANY_FIELDS, COUNTRIES, PERSON_FIELDS, normaliseDraft } =
   await import("../src/features/profile/profile-fields");
 
 configure({ asyncUtilTimeout: 10_000 });
@@ -195,6 +195,72 @@ describe("editing a profile field", () => {
     );
   });
 
+  it("refreshes after a save, and a sibling section on the same record adopts the newer version", async () => {
+    // About and Company are two sections of one company record, each
+    // holding the version the page was rendered with.
+    const sections = (version: number, oneLiner: string | null) => (
+      <>
+        <div data-section="about">
+          <EditableProfile
+            kind="PERSON"
+            fields={PERSON_FIELDS.filter((f) => f.field === "headline")}
+            values={{ headline: oneLiner }}
+            version={version}
+            provenance={DECLARED}
+          />
+        </div>
+        <div data-section="company">
+          <EditableProfile
+            kind="PERSON"
+            fields={PERSON_FIELDS.filter((f) => f.field === "displayName")}
+            values={{ displayName: "Ada" }}
+            version={version}
+            provenance={DECLARED}
+          />
+        </div>
+      </>
+    );
+    const view = render(sections(3, null));
+    savePersonFieldAction.mockResolvedValue({
+      ok: true,
+      value: "Founder",
+      version: 4,
+    });
+    fireEvent.click(
+      within(row("headline")).getByRole("button", { name: "Add headline" }),
+    );
+    const input = within(row("headline")).getByRole("textbox", {
+      name: "Headline",
+    });
+    fireEvent.change(input, { target: { value: "Founder" } });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+
+    // The refreshed server render carries version 4 to both sections.
+    view.rerender(sections(4, "Founder"));
+    savePersonFieldAction.mockResolvedValue({
+      ok: true,
+      value: "Ada L.",
+      version: 5,
+    });
+    fireEvent.click(
+      within(row("displayName")).getByRole("button", { name: "Edit name" }),
+    );
+    const name = within(row("displayName")).getByRole("textbox", {
+      name: "Name",
+    });
+    fireEvent.change(name, { target: { value: "Ada L." } });
+    fireEvent.submit(name.closest("form") as HTMLFormElement);
+    expect(savePersonFieldAction).toHaveBeenLastCalledWith(
+      "displayName",
+      "Ada L.",
+      4,
+    );
+    // An older render never rolls a section back.
+    view.rerender(sections(3, null));
+    expect(within(row("headline")).getByText("Founder")).toBeTruthy();
+  });
+
   it("cancels with Escape and sends nothing", () => {
     renderPerson();
     fireEvent.click(
@@ -287,6 +353,20 @@ describe("editing a profile field", () => {
     const alert = await within(row("headline")).findByRole("alert");
     expect(alert.textContent).toContain("administrator");
     expect((input as HTMLInputElement).value).toBe("Angel investor");
+  });
+});
+
+describe("company country", () => {
+  it("offers every country, the setup's short list first, and only ISO codes", () => {
+    const values = COUNTRIES.map((c) => c.value);
+    expect(values[0]).toBe("NG");
+    expect(values).toContain("VN");
+    expect(values).toContain("MX");
+    expect(COUNTRIES.find((c) => c.value === "VN")?.label).toBe("Vietnam");
+    expect(values.every((v) => /^[A-Z]{2}$/.test(v))).toBe(true);
+    expect(new Set(values).size).toBe(values.length);
+    expect(values).not.toContain("EU");
+    expect(values.length).toBeGreaterThan(200);
   });
 });
 

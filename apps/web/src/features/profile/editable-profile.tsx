@@ -89,6 +89,19 @@ export function EditableProfile({
 }: EditableProfileProps) {
   const [values, setValues] = useState(initialValues);
   const [version, setVersion] = useState(initialVersion);
+  // Several sections edit the same record (About and Company are both the
+  // company), each holding its own copy of the version. After a save the
+  // route is refreshed; a section adopts a newer server version (and the
+  // values read with it) so its next save does not conflict with a
+  // sibling's. An older or equal prop never overwrites local state.
+  const [seenVersion, setSeenVersion] = useState(initialVersion);
+  if (initialVersion !== seenVersion) {
+    setSeenVersion(initialVersion);
+    if (initialVersion > version) {
+      setVersion(initialVersion);
+      setValues(initialValues);
+    }
+  }
   const [editing, setEditing] = useState<string | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -140,6 +153,7 @@ export function EditableProfile({
                 setVersion(result.version);
                 setEditing(null);
                 setAnnouncement(`${spec.label} saved.`);
+                router.refresh();
                 return null;
               }
               if (result.reason === "CONFLICT") {
