@@ -16,7 +16,7 @@ import {
   type CounterpartPersonaStored,
   type PresenceReading,
   type RehearsalReviewResult,
-  type RehearsalTurnV7Result,
+  type RehearsalTurnV8Result,
 } from "@capital-q/q-core";
 
 /**
@@ -224,7 +224,7 @@ export function readPresence(raw: unknown): PresenceReading | null {
 }
 
 /** A played line: null only when there are no words to say. */
-export function readTurn(raw: unknown): RehearsalTurnV7Result | null {
+export function readTurn(raw: unknown): RehearsalTurnV8Result | null {
   if (!isRecord(raw)) return null;
   const onlyNoise = flag(raw["onlyNoise"], false);
   const line = text(raw["line"], 700, "");
@@ -254,7 +254,18 @@ export function readTurn(raw: unknown): RehearsalTurnV7Result | null {
     askedToSee: flag(raw["askedToSee"], false),
     wantsToEnd: flag(raw["wantsToEnd"], false),
     onlyNoise,
+    screenNote: readScreenNote(raw["screenNote"]),
   };
+}
+
+/** P5: Q's note on a shared screen; null when it says nothing. */
+function readScreenNote(
+  raw: unknown,
+): { readonly shows: string; readonly take: string } | null {
+  if (!isRecord(raw)) return null;
+  const shows = text(raw["shows"], 300, "");
+  const take = text(raw["take"], 300, "");
+  return shows.length === 0 && take.length === 0 ? null : { shows, take };
 }
 
 /** The review: null only when not one dimension could be read. */

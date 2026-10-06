@@ -22,7 +22,7 @@ export const INVESTOR_TWIN_TURN_V9: PromptDefinition<
 > = {
   ...INVESTOR_TWIN_TURN_V8,
   version: 9,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Live 2026-10-02 (e53c264f): whether the camera is shared is said by code's note only; the model never infers 'not shared' from cameraOn.",
   effectiveFrom: "2026-10-02",

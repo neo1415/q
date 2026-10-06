@@ -33,8 +33,8 @@ import {
   type CounterpartPersonaV5Variables as CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV7Result as RehearsalTurnResult,
-  type RehearsalTurnV6Variables as RehearsalTurnVariables,
+  type RehearsalTurnV8Result as RehearsalTurnResult,
+  type RehearsalTurnV8Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
@@ -64,6 +64,7 @@ import {
   type Temperament,
 } from "./rehearsal-temperament.js";
 import { readPersona, readReview, readTurn } from "./rehearsal-readings.js";
+import { questioningNote } from "./rehearsal-archetypes.js";
 import {
   newPresenceState,
   presenceNote,
@@ -552,6 +553,7 @@ export type RehearsalStore = {
       readonly review:
         | (RehearsalReviewResult & {
             readonly presence?: readonly PresenceObservation[];
+            readonly slides?: readonly ScreenNote[];
           })
         | ReturnType<typeof provisionalReview>
         | null;
@@ -565,6 +567,7 @@ export type RehearsalStore = {
       readonly score: number | null;
       readonly review: RehearsalReviewResult & {
         readonly presence?: readonly PresenceObservation[];
+        readonly slides?: readonly ScreenNote[];
       };
     },
   ) => Promise<RehearsalRow | null>;
@@ -928,6 +931,36 @@ const PresenceSectionSchema = z
   )
   .max(4);
 
+const SlidesSectionSchema = z
+  .array(
+    z
+      .object({
+        shows: z.string().max(300),
+        take: z.string().max(300),
+      })
+      .strict(),
+  )
+  .max(8);
+
+type ScreenNote = { readonly shows: string; readonly take: string };
+const SCREEN_NOTES_KEPT = 8;
+
+/** The review with what Q saw beside it: text only, written by code. */
+function withSeen(
+  graded: RehearsalReviewResult,
+  looks: readonly PresenceObservation[],
+  slides: readonly ScreenNote[],
+): RehearsalReviewResult & {
+  readonly presence?: readonly PresenceObservation[];
+  readonly slides?: readonly ScreenNote[];
+} {
+  return {
+    ...graded,
+    ...(looks.length === 0 ? {} : { presence: looks }),
+    ...(slides.length === 0 ? {} : { slides }),
+  };
+}
+
 const ProvisionalReviewSchema = z
   .object({
     overall: z.string().max(600),
@@ -961,7 +994,7 @@ export function provisionalReview(metrics: QRehearsalDto["metrics"]): {
 
 function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
   if (row.scorecard === null || typeof row.scorecard !== "object") return null;
-  const { presence, provisional, ...review } = row.scorecard as Record<
+  const { presence, slides, provisional, ...review } = row.scorecard as Record<
     string,
     unknown
   >;
@@ -981,10 +1014,12 @@ function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
   const parsed = RehearsalReviewResultSchema.safeParse(review);
   if (!parsed.success) return null;
   const looks = PresenceSectionSchema.safeParse(presence ?? []);
+  const seen = SlidesSectionSchema.safeParse(slides ?? []);
   return {
     ...parsed.data,
     score: row.score,
     ...(looks.success && looks.data.length > 0 ? { presence: looks.data } : {}),
+    ...(seen.success && seen.data.length > 0 ? { slides: seen.data } : {}),
   };
 }
 
@@ -1134,6 +1169,7 @@ export function yieldTo(previous: readonly Turn[]): {
       askedToSee: false,
       wantsToEnd: false,
       onlyNoise: false,
+      screenNote: null,
     },
     sawScreen: false,
   };
@@ -1270,6 +1306,7 @@ function holdingTurn(
       askedToSee: false,
       wantsToEnd: false,
       onlyNoise: false,
+      screenNote: null,
     },
     sawScreen: false,
   };
@@ -1319,6 +1356,27 @@ export function createRehearsalService(dependencies: {
   const frames = new Map<string, Frame>();
   /** Presence readings as text, per rehearsal; dropped when it finishes. */
   const presence = new Map<string, PresenceState>();
+  /**
+   * P5: Q's notes on their shared screen (what a slide shows, its gap), as
+   * text, per rehearsal; folded into the review, never the frames.
+   */
+  const screenNotes = new Map<string, ScreenNote[]>();
+  const noteScreen = (rehearsalId: string, note: ScreenNote) => {
+    const kept = screenNotes.get(rehearsalId) ?? [];
+    if (kept.some((n) => n.shows === note.shows)) return;
+    kept.push(note);
+    if (kept.length > SCREEN_NOTES_KEPT) kept.shift();
+    screenNotes.set(rehearsalId, kept);
+    if (screenNotes.size > 500) {
+      const oldest = screenNotes.keys().next().value;
+      if (oldest !== undefined) screenNotes.delete(oldest);
+    }
+  };
+  const takeScreenNotes = (rehearsalId: string): ScreenNote[] => {
+    const kept = screenNotes.get(rehearsalId) ?? [];
+    screenNotes.delete(rehearsalId);
+    return kept;
+  };
 
   /** Rehearsals whose person currently lets Q see them (frames arriving). */
   const consenting = new Set<string>();
@@ -1557,6 +1615,7 @@ export function createRehearsalService(dependencies: {
     actor: ActorContext,
     rehearsalId: string,
     looks: readonly PresenceObservation[],
+    slides: readonly ScreenNote[],
     attempt: number,
   ): void {
     const delay = REVIEW_RETRY_MS[attempt];
@@ -1582,13 +1641,13 @@ export function createRehearsalService(dependencies: {
           ending: row.outcome ?? "FOUNDER_ENDED",
         });
         if (review === null) {
-          reviewLater(actor, rehearsalId, looks, attempt + 1);
+          reviewLater(actor, rehearsalId, looks, slides, attempt + 1);
           return;
         }
         const graded = ownReview(review, turns, row.userRole);
         await store.completeReview(actor, rehearsalId, {
           score: scoreOf(graded.dimensions),
-          review: looks.length === 0 ? graded : { ...graded, presence: looks },
+          review: withSeen(graded, looks, slides),
         });
       })().catch(() => undefined);
     }, delay).unref();
@@ -1744,6 +1803,14 @@ export function createRehearsalService(dependencies: {
       screenShared: screenFrame !== null,
       cameraOn: cameraFrame !== null,
       presence: look.note,
+      questioning: questioningNote(counterpartRoleOf(row.counterpartKind), {
+        counterpartName: row.counterpartName,
+        style: persona.style,
+        summary: persona.summary,
+        priorities: persona.priorities,
+        likelyQuestions: persona.likelyQuestions,
+        ...(persona.conduct === undefined ? {} : { conduct: persona.conduct }),
+      }),
     };
     const first = await composer.turn(
       actor,
@@ -1793,6 +1860,15 @@ export function createRehearsalService(dependencies: {
       "rehearsal views",
     );
 
+    // Older composers (and fakes) may leave it out: absent is no note.
+    const screenNote: ScreenNote | null | undefined = result.screenNote;
+    if (
+      screenFrame !== null &&
+      screenNote !== null &&
+      screenNote !== undefined
+    ) {
+      noteScreen(row.id, screenNote);
+    }
     const sawYou = cameraFrame !== null || lookAgain;
     if (sawYou || look.offer !== null) {
       const state = seen ?? newPresenceState();
@@ -2252,6 +2328,7 @@ export function createRehearsalService(dependencies: {
       dropFrames(row.id);
       const looks = presenceReview(presence.get(row.id)?.readings ?? []);
       presence.delete(row.id);
+      const slides = takeScreenNotes(row.id);
       const turns = normaliseTurns(row.turns, row.userRole);
       if (!turns.some((turn) => turn.from === "YOU")) {
         // Nothing to review: they ended it before saying anything.
@@ -2296,7 +2373,7 @@ export function createRehearsalService(dependencies: {
           score: null,
           review: held,
         });
-        reviewLater(actor, row.id, looks, 0);
+        reviewLater(actor, row.id, looks, slides, 0);
         return okWithHistory(actor, saved ?? (await store.own(actor, row.id)));
       }
       const graded = ownReview(review, turns, row.userRole);
@@ -2304,7 +2381,7 @@ export function createRehearsalService(dependencies: {
         outcome,
         score: scoreOf(graded.dimensions),
         // Text only, written by code from the readings; never an image.
-        review: looks.length === 0 ? graded : { ...graded, presence: looks },
+        review: withSeen(graded, looks, slides),
       });
       return okWithHistory(actor, saved ?? (await store.own(actor, row.id)));
     },

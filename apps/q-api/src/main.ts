@@ -114,6 +114,11 @@ import {
   createPostgresMeetingHostStore,
 } from "./composition/meeting-host-runtime.js";
 import { createMeetingHostFollowThrough } from "./composition/meeting-host-follow-through.js";
+import {
+  createMeetingScreenNoter,
+  createMeetingScreenVision,
+  createPostgresMeetingScreenStore,
+} from "./composition/meeting-screen-vision.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
 import { createScout } from "./composition/scout.js";
 // AUTO block (ADR 0030): Q's delegated work.
@@ -3515,7 +3520,12 @@ const meetingFollowUpCards = createMeetingFollowUpCards({
 });
 let meetingSpeech:
   ReturnType<typeof createElevenLabsSpeechSynthesis> | undefined;
+// P5: Q looks at screens shared in calls it hosts, for the owner's private
+// notes. Off unless RECALL_SCREEN_VISION=on (Recall's 4-core bot with
+// separate video costs more per hour; the founder turns it on).
+const meetingScreensOn = process.env.RECALL_SCREEN_VISION === "on";
 const meetingHost = createMeetingHostRuntime({
+  seesScreens: meetingScreensOn,
   enabled:
     process.env.CQ_MEETING_HOST !== "off" &&
     recallBots?.say !== undefined &&
@@ -3592,6 +3602,19 @@ const meetingHost = createMeetingHostRuntime({
   logger,
 });
 // end MEET-HOST block
+const meetingScreens = createMeetingScreenVision({
+  enabled: meetingScreensOn,
+  publicBase: process.env.Q_API_PUBLIC_URL,
+  secret: recallKey,
+  store: createPostgresMeetingScreenStore(database.sql),
+  noter: createMeetingScreenNoter({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  recentWords: (meetingId) => meetingHost.recentWords(meetingId),
+  logger,
+});
 const meetingAssistant = createMeetingAssistantService({
   // J7: what a call led to, read by meaning from its agreed lines.
   outcomeReader: (who, lines) => wordsReaders.meetingOutcome(who, lines),
@@ -3599,6 +3622,7 @@ const meetingAssistant = createMeetingAssistantService({
   bots: recallBots,
   // MEET-HOST: the bot joins early, live, with a signed events endpoint.
   hosting: (meetingId) => meetingHost.urlFor(meetingId),
+  screenHosting: (meetingId) => meetingScreens.urlFor(meetingId),
   // meet2-64: each participant gets the recap by email once the record
   // exists (only what both sides read), through the app's own sender.
   recap: async (recap) => {
@@ -5062,6 +5086,7 @@ const { app, logger: appLogger } = createApp(
     meetingAssistant,
     // MEET-HOST block (ADR 0037)
     meetingHost,
+    meetingScreens,
     recallStatus: createRecallStatusWebhook({
       secret: process.env.RECALL_WEBHOOK_SECRET,
       settleBot: (botId) => meetingAssistant.settleBot(botId),

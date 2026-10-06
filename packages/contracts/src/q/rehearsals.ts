@@ -253,6 +253,22 @@ export const QRehearsalReviewDtoSchema = z
       .max(4)
       .optional(),
     /**
+     * P5: what Q saw on their shared screen and its private coaching note
+     * on it (a slide's gap, a number to source), kept as text during the
+     * rehearsal; never the frames.
+     */
+    slides: z
+      .array(
+        z
+          .object({
+            shows: z.string().max(300),
+            take: z.string().max(300),
+          })
+          .strict(),
+      )
+      .max(8)
+      .optional(),
+    /**
      * Written by code from the transcript while Q could not write the
      * review; Q fills in the real one shortly. No ratings, no score.
      */

@@ -3,6 +3,11 @@ import { registerUsageRoutes } from "./http/usage.js";
 import type { MeetingHostRuntime } from "./composition/meeting-host-runtime.js";
 import type { RecallStatusWebhook } from "./composition/recall-bots.js";
 import { registerMeetingHostRoutes } from "./http/meeting-host.js";
+import {
+  MEETING_SCREEN_WS_PATH,
+  type MeetingScreenVision,
+} from "./composition/meeting-screen-vision.js";
+import { attachWebSocketReceiver } from "./http/ws-receiver.js";
 import { randomUUID } from "node:crypto";
 
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
@@ -179,6 +184,8 @@ export type QApiModules = {
   readonly meetingHost?: MeetingHostRuntime | undefined;
   /** meet-47: Recall's status webhook (a late transcript settles at once). */
   readonly recallStatus?: RecallStatusWebhook | undefined;
+  /** P5: shared-screen frames from Recall's websocket, for Q's private notes. */
+  readonly meetingScreens?: MeetingScreenVision | undefined;
   /** What Q found about the actor's own profile subject (BIZ-002). */
   readonly profileFindings?:
     ProfileFindingsRoutesDependencies["findings"] | undefined;
@@ -531,6 +538,20 @@ export function createApp(
     registerMeetingHostRoutes(app, {
       host: modules.meetingHost,
       status: modules.recallStatus,
+    });
+  }
+  // P5: Recall connects here per meeting with the URL's signed token; any
+  // other connection is refused before the upgrade. Frames are never logged.
+  const screens = modules.meetingScreens;
+  if (screens !== undefined) {
+    attachWebSocketReceiver(app.server, {
+      path: MEETING_SCREEN_WS_PATH,
+      accept: (url) => {
+        const meetingId = screens.verify(url);
+        return meetingId === null
+          ? null
+          : { message: (text) => screens.receive(meetingId, text) };
+      },
     });
   }
 

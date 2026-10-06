@@ -196,6 +196,8 @@ export {
   HOST_REFUSAL,
   HOST_UNAVAILABLE,
   matchParty,
+  onlyCallsQ,
+  HOST_SEES_SCREENS,
   type CallParticipant,
   type HostAction,
   type HostContext,
@@ -207,4 +209,13 @@ export {
   type MeetingHost,
   type RosterEntry,
 } from "./meeting-host/host.js";
+export {
+  createScreenWatch,
+  DEFAULT_SCREEN_WATCH_LIMITS,
+  frameFingerprint,
+  type ScreenFrame,
+  type ScreenLook,
+  type ScreenWatch,
+  type ScreenWatchLimits,
+} from "./meeting-host/screen.js";
 // end MEET-HOST block

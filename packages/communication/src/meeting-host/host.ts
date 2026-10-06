@@ -47,6 +47,11 @@ export type HostContext = {
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly parties: readonly HostParty[];
+  /**
+   * P5: Q looks at screens shared in this call (never cameras); said in
+   * the greeting so everyone knows before they share.
+   */
+  readonly seesScreens?: boolean;
 };
 
 export type CallParticipant = {
@@ -237,7 +242,9 @@ export type HostLimits = {
 
 export const DEFAULT_HOST_LIMITS: HostLimits = {
   maxSpokenChars: 2_400,
-  maxModelCalls: 16,
+  // P4: about one question a minute for an hour's call (each is one short,
+  // cheap NORMAL_DIALOGUE turn); the per-call spend stays bounded.
+  maxModelCalls: 60,
   quietMs: 1_200,
   offerRecapBeforeEndMs: 3 * 60_000,
   replyHoldMs: 1_200,
@@ -257,6 +264,11 @@ export const HOST_TAKING_LATEST = "Taking the latest question:";
  */
 export const FRESH_SPEECH_MS = 1_500;
 
+/** P4: how long after a bare "hey q" the person's next line is the request. */
+export const CALL_FOLLOW_MS = 8_000;
+/** P4: a bare "hey q" with nothing after it is answered after this. */
+export const BARE_CALL_WAIT_MS = 2_000;
+
 /** The polite, fixed refusal: nothing said in the call gives Q authority. */
 export const HOST_REFUSAL =
   "I can't do that from the call. I'm here to take notes and help with what this meeting has shared; I'll put it to the organiser as a follow-up to approve afterwards.";
@@ -269,6 +281,9 @@ export const HOST_LEAVING = "Of course. I'm leaving the call now.";
  */
 export const HOST_INTRO =
   "I'm Q from Capital Q; I'll take notes for both sides and help when asked.";
+/** P5: added to the greeting when Q looks at shared screens. */
+export const HOST_SEES_SCREENS =
+  "I can also see screens you share, for my own notes; never your cameras.";
 
 /** Asked in the call to leave: Q stays, says why, and the ask is recorded. */
 export const HOST_STAYS =
@@ -368,7 +383,76 @@ export function addressedToQ(text: string): boolean {
     /(?:^|[,.!?]\s*|\b(?:hey|hi|hello|ok|okay|so|um)[,\s]+)(?:q|cue|kew)\s*[,?!]/.test(
       t,
     ) ||
-    /\bcapital q\b/.test(t)
+    /\bcapital q\b/.test(t) ||
+    addressedUnpunctuated(t)
+  );
+}
+
+/**
+ * P4 (live 2026-10-06, meeting d9eda847): Recall's low-latency streaming
+ * transcriber writes lowercase words with no punctuation ("hello q how you
+ * doing"), so every rule above that leans on a comma or a question mark
+ * missed Q's name for 54 minutes. Read by words instead: the name after
+ * nothing but greetings and fillers, the name closing the line, or the
+ * name followed by the start of a request ("i was wondering q can you").
+ * "Queue" counts only when it leads, never mid-line ("the queue is long").
+ */
+const LEAD_FILLERS = new Set(
+  "hey hi hello hiya ok okay so um uh er erm and but yeah yes yep right alright well now oh actually please sorry excuse me listen look".split(
+    " ",
+  ),
+);
+const REQUEST_STARTS = new Set(
+  "can could would will what whats who how when where why which do does did tell give please summarise summarize recap remind explain help note take are have should any".split(
+    " ",
+  ),
+);
+const NAME_WORDS = new Set(["q", "cue", "queue", "kew", "que", "kyu"]);
+const MID_NAME_WORDS = new Set(["q", "cue", "kew", "kyu"]);
+
+/** Words with digits kept, so "q3" is never read as the name "q". */
+function spokenWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter(Boolean);
+}
+
+function addressedUnpunctuated(lowered: string): boolean {
+  const words = spokenWords(lowered);
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i] ?? "";
+    if (!NAME_WORDS.has(word)) continue;
+    // "capital q" is handled above; "q three" (a quarter) is not a name.
+    const next = words[i + 1];
+    if (next !== undefined && /^(one|two|three|four)$/.test(next)) continue;
+    if (words.slice(0, i).every((w) => LEAD_FILLERS.has(w))) return true;
+    if (!MID_NAME_WORDS.has(word)) continue;
+    if (i === words.length - 1 && i > 0) return true;
+    if (next !== undefined && REQUEST_STARTS.has(next)) return true;
+  }
+  return false;
+}
+
+/**
+ * Only Q's name and greetings ("hey q", "q are you there"): the request is
+ * in the next line, which streaming transcription sends separately.
+ */
+export function onlyCallsQ(text: string): boolean {
+  const words = spokenWords(text);
+  return (
+    words.length > 0 &&
+    words.every(
+      (w) =>
+        NAME_WORDS.has(w) ||
+        LEAD_FILLERS.has(w) ||
+        w === "there" ||
+        w === "you" ||
+        w === "are" ||
+        w === "capital",
+    )
   );
 }
 
@@ -490,6 +574,17 @@ export function createMeetingHost(
   let composing = false;
   let left = false;
   let quiet = false;
+  /**
+   * P4: someone said only Q's name ("hey q"); streaming transcription
+   * sends the request as their next line. Joined with it, or answered as
+   * a bare call when nothing follows.
+   */
+  let called: {
+    readonly participantId: string;
+    readonly speaker: string;
+    readonly text: string;
+    readonly at: number;
+  } | null = null;
 
   const isBot = (p: CallParticipant) => BOT_NAME.test(p.name.trim());
   const humans = () => [...present.values()];
@@ -510,7 +605,11 @@ export function createMeetingHost(
     }
     const waiting = outbox.reduce((sum, line) => sum + line.text.length, 0);
     const overBudget = spoken + waiting + text.length > limits.maxSpokenChars;
-    if (overBudget && why !== "LEAVING" && why !== "REFUSE") return;
+    // P4: the spoken budget holds what Q says unprompted. An answer to a
+    // person who asked is bounded by the model-call cap instead, so Q keeps
+    // answering all meeting (live 2026-10-06: it went quiet once spent).
+    if (overBudget && why !== "LEAVING" && why !== "REFUSE" && why !== "REPLY")
+      return;
     outbox.push({ text, why, readyAt: clock });
   }
 
@@ -620,7 +719,10 @@ export function createMeetingHost(
     entry.greeted = true;
     const name =
       entry.party === null ? entry.participant.name : entry.party.name;
-    queue(`Hi ${firstName(name)}, welcome. ${HOST_INTRO}`, "GREET");
+    queue(
+      `Hi ${firstName(name)}, welcome. ${HOST_INTRO}${context.seesScreens === true ? ` ${HOST_SEES_SCREENS}` : ""}`,
+      "GREET",
+    );
   }
 
   function askGuest(entry: Present): void {
@@ -723,6 +825,42 @@ export function createMeetingHost(
     return [{ kind: "COMPOSE", speaker, utterance }];
   }
 
+  function speakerFor(entry: Present, participant: CallParticipant): string {
+    return (
+      entry.party?.name ??
+      (entry.introducedAs ? entry.introducedAs : participant.name)
+    );
+  }
+
+  /** A line that speaks to Q: refused, held behind a composing turn, or composed. */
+  function addressed(
+    entry: Present,
+    participant: CallParticipant,
+    text: string,
+  ): HostAction[] {
+    if (asksQToBreakRules(text)) {
+      queue(HOST_REFUSAL, "REFUSE");
+      return [];
+    }
+    const speaker = speakerFor(entry, participant);
+    // meet2-64: one answer at a time, and only to the latest question.
+    // Asked again while Q is composing: the newer question waits and
+    // the older answer is dropped when it comes back.
+    if (composing) {
+      pending = { speaker, utterance: text };
+      skipped += 1;
+      return [];
+    }
+    // An answer still waiting to be said is overtaken by a new question.
+    for (let i = outbox.length - 1; i >= 0; i -= 1) {
+      if (outbox[i]?.why === "REPLY") {
+        outbox.splice(i, 1);
+        skipped += 1;
+      }
+    }
+    return compose(speaker, text);
+  }
+
   function handle(event: HostEvent): HostAction[] {
     if (left) return [];
     clock = Math.max(clock, event.at);
@@ -799,6 +937,22 @@ export function createMeetingHost(
           out.push(...settleOneSided(!saysNeverMind(text)));
           return out;
         }
+        // P4: the line after a bare "hey q" from the same person is the
+        // request, whether or not it repeats the name.
+        const follows =
+          called !== null &&
+          called.participantId === event.participant.id &&
+          event.at - called.at <= CALL_FOLLOW_MS;
+        if (follows && called !== null) {
+          // A line that names Q itself stands alone; otherwise it is joined.
+          const joined =
+            addressedToQ(text) && !onlyCallsQ(text)
+              ? text
+              : `${called.text} ${text}`.slice(0, 2_000);
+          called = null;
+          out.push(...addressed(entry, event.participant, joined));
+          break;
+        }
         if (
           entry?.askedIntro === true &&
           entry.introducedAs === null &&
@@ -817,32 +971,32 @@ export function createMeetingHost(
           break;
         }
         if (!addressedToQ(text)) break;
-        if (asksQToBreakRules(text)) {
-          queue(HOST_REFUSAL, "REFUSE");
+        if (onlyCallsQ(text)) {
+          called = {
+            participantId: event.participant.id,
+            speaker: speakerFor(entry, event.participant),
+            text,
+            at: event.at,
+          };
           break;
         }
-        const speaker =
-          entry.party?.name ??
-          (entry.introducedAs ? entry.introducedAs : event.participant.name);
-        // meet2-64: one answer at a time, and only to the latest question.
-        // Asked again while Q is composing: the newer question waits and
-        // the older answer is dropped when it comes back.
-        if (composing) {
-          pending = { speaker, utterance: text };
-          skipped += 1;
-          break;
-        }
-        // An answer still waiting to be said is overtaken by a new question.
-        for (let i = outbox.length - 1; i >= 0; i -= 1) {
-          if (outbox[i]?.why === "REPLY") {
-            outbox.splice(i, 1);
-            skipped += 1;
-          }
-        }
-        out.push(...compose(speaker, text));
+        out.push(...addressed(entry, event.participant, text));
         break;
       }
       case "TICK": {
+        // P4: "hey q" and nothing after it: answered as it was said.
+        if (
+          called !== null &&
+          event.at - called.at >= BARE_CALL_WAIT_MS &&
+          event.at - lastWordsAt >= wordsGapMs
+        ) {
+          const bare = called;
+          called = null;
+          const entry = present.get(bare.participantId);
+          if (entry !== undefined) {
+            out.push(...addressed(entry, entry.participant, bare.text));
+          }
+        }
         // The latest question asked while Q was answering, now.
         if (!composing && pending !== null) {
           const next = pending;

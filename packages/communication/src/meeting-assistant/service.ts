@@ -104,6 +104,11 @@ export type MeetingBotHosting = {
   /** The hard cap on minutes in the call, whatever happens. */
   readonly maxCallMs: number;
   readonly metadata: Readonly<Record<string, string>>;
+  /**
+   * P5: our verified websocket for shared-screen frames; absent, the bot
+   * streams no video at all.
+   */
+  readonly visionUrl?: string;
 };
 
 export type MeetingBotProvider = {
@@ -447,6 +452,9 @@ export function createMeetingAssistantService(dependencies: {
    * per meeting. Absent: the bot stays the passive note-taker of ADR 0027.
    */
   readonly hosting?: ((meetingId: string) => string | undefined) | undefined;
+  /** P5: the shared-screen websocket per meeting, when Q may look. */
+  readonly screenHosting?:
+    ((meetingId: string) => string | undefined) | undefined;
   /**
    * meet2-64: the recap email to each participant once the record exists
    * (only what both sides read; see recap-email.ts). Absent: no email.
@@ -474,6 +482,7 @@ export function createMeetingAssistantService(dependencies: {
       };
     }
     const plan = hostedJoin(meeting, current);
+    const visionUrl = dependencies.screenHosting?.(meetingId);
     return {
       meetingUrl,
       joinAt: plan.joinAt,
@@ -483,6 +492,7 @@ export function createMeetingAssistantService(dependencies: {
         aloneLeaveMs: plan.aloneLeaveMs,
         maxCallMs: plan.maxCallMs,
         metadata: { meeting_id: meetingId },
+        ...(visionUrl === undefined ? {} : { visionUrl }),
       },
     };
   }

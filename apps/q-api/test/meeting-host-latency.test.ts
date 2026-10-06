@@ -397,3 +397,101 @@ describe("what Q hears is kept as the call goes", () => {
     ]);
   });
 });
+
+/**
+ * P4 (live 2026-10-06, meeting d9eda847, bot 670729df): with Recall's
+ * low-latency streaming transcriber Q greeted, asked the founder to
+ * introduce himself, read his reply (one model call at 08:08:36) and then
+ * made no other call for 54 minutes while transcript.data kept arriving:
+ * the words came lowercase and unpunctuated ("hello q how you doing"), and
+ * the address rules needed a comma or a question mark. Replayed here with
+ * that shape, through the runtime, with a fake clock, model and voice.
+ */
+describe("P4: Q hears its name in streaming transcription, all meeting", () => {
+  const LONG =
+    "Here is a fuller answer that runs to a couple of sentences, so the spoken budget for unprompted lines would be gone after a dozen of these. It still has to be said.";
+
+  it("answers 'hello q how you doing' (no punctuation) within three seconds", async () => {
+    const t = harness({ answers: ["I'm well, thanks."] });
+    await t.play(
+      [
+        ...JOINS,
+        [0.5, recall("participant_events.speech_off", OYENIYI, 0.5)],
+        [30, recall("transcript.data", OYENIYI, 29, "yeah im oyeniyi")],
+        [60, recall("transcript.data", OYENIYI, 59, "hello q how you doing")],
+      ],
+      70,
+    );
+    expect(t.asked).toEqual(["hello q how you doing"]);
+    const at = t.answeredAt("I'm well, thanks.");
+    expect(at).toBeDefined();
+    expect((at ?? Infinity) - t.at(60)).toBeLessThanOrEqual(3_000);
+  });
+
+  it("joins a bare 'hey q' with the request that follows it", async () => {
+    const t = harness({ answers: ["We agreed on two thousand dollars."] });
+    await t.play(
+      [
+        ...JOINS,
+        [30, recall("transcript.data", OYENIYI, 29, "yeah im oyeniyi")],
+        [60, recall("transcript.data", OYENIYI, 59, "hey q")],
+        [
+          61,
+          recall("transcript.data", OYENIYI, 60, "what did we agree on cost"),
+        ],
+      ],
+      70,
+    );
+    expect(t.asked).toEqual(["hey q what did we agree on cost"]);
+  });
+
+  it("keeps answering past the old spoken and model-call budgets", async () => {
+    const events: [number, unknown][] = [
+      ...JOINS,
+      [30, recall("transcript.data", OYENIYI, 29, "yeah im oyeniyi")],
+    ];
+    for (let i = 0; i < 24; i += 1) {
+      const s = 60 + i * 30;
+      events.push([
+        s,
+        recall(
+          "transcript.data",
+          OYENIYI,
+          s - 1,
+          `q what about point ${String(i)}`,
+        ),
+      ]);
+    }
+    const t = harness({ answers: Array.from({ length: 24 }, () => LONG) });
+    await t.play(events, 60 + 24 * 30 + 10);
+    expect(t.asked).toHaveLength(24);
+    const answers = t.spokenAt.filter((s) => s.text === LONG);
+    expect(answers).toHaveLength(24);
+  });
+
+  it("still ignores chatter that only mentions a queue or a quarter", async () => {
+    const t = harness({});
+    await t.play(
+      [
+        ...JOINS,
+        [30, recall("transcript.data", OYENIYI, 29, "yeah im oyeniyi")],
+        [
+          60,
+          recall(
+            "transcript.data",
+            OYENIYI,
+            59,
+            "the queue at the bank was long",
+          ),
+        ],
+        [
+          70,
+          recall("transcript.data", OYENIYI, 69, "our q3 numbers look fine"),
+        ],
+        [80, recall("transcript.data", OYENIYI, 79, "in q two we hired")],
+      ],
+      90,
+    );
+    expect(t.asked).toEqual([]);
+  });
+});

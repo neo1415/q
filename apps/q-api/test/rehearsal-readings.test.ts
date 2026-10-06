@@ -4,7 +4,7 @@ import {
   CounterpartPersonaStoredSchema,
   PresenceReadingSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnV7ResultSchema,
+  RehearsalTurnV8ResultSchema,
 } from "@capital-q/q-core";
 
 import {
@@ -168,7 +168,7 @@ describe("rehearsal readings never refuse whole for one field", () => {
         "an empty list",
       ].includes(how);
     expect(
-      fuzz(TURN, readTurn, RehearsalTurnV7ResultSchema, words),
+      fuzz(TURN, readTurn, RehearsalTurnV8ResultSchema, words),
     ).toBeGreaterThan(100);
   });
 

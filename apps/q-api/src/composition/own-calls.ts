@@ -58,6 +58,7 @@ export function createOwnCalls(dependencies: {
         own_notes: boolean;
         organiser: boolean;
         proposals: string[] | null;
+        screen_notes: string[] | null;
       }[]
     >`
       select m.id, m.purpose, m.starts_at,
@@ -67,7 +68,13 @@ export function createOwnCalls(dependencies: {
              m.organiser_user_id = ${actor.userId} as organiser,
              (select array_agg(n.body order by n.created_at)
                 from communication.meeting_host_notes n
-               where n.meeting_id = m.id and n.kind = 'PROPOSAL') as proposals
+               where n.meeting_id = m.id and n.kind = 'PROPOSAL') as proposals,
+             -- P5: Q's private notes on shared screens: the owner's alone.
+             (select array_agg(o.body order by o.observed_at)
+                from communication.meeting_private_observations o
+               where o.meeting_id = m.id
+                 and o.owner_user_id = ${actor.userId}
+                 and o.tenant_id = ${actor.tenantId}) as screen_notes
         from communication.meetings m
         join communication.meeting_participants p
           on p.meeting_id = m.id and p.user_id = ${actor.userId}
@@ -87,6 +94,8 @@ export function createOwnCalls(dependencies: {
           ? clip(texts(row.follow_ups, "text"))
           : null,
         proposedToQInTheCall: row.organiser ? clip(row.proposals ?? []) : null,
+        // Never shared with the other side or put in the recap.
+        yourPrivateScreenNotes: clip(row.screen_notes ?? []),
         // How Q acts on any of it: a reminder or a message draft, each
         // prepared for their approval; an outcome is recorded once they
         // confirm it.

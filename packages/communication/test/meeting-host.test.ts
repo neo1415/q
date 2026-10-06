@@ -12,6 +12,7 @@ import {
   HOST_STAYS,
   HOST_REFUSAL,
   matchParty,
+  onlyCallsQ,
   type CallParticipant,
   type HostAction,
   type HostContext,
@@ -270,6 +271,30 @@ describe("meeting host: turn-taking and when Q speaks", () => {
     ]) {
       expect(addressedToQ(no)).toBe(false);
     }
+  });
+
+  it("reads 'q' in unpunctuated streaming words (P4, live 2026-10-06)", () => {
+    for (const yes of [
+      "hello q how you doing",
+      "yeah so q what is this call about",
+      "i was wondering q can you recap",
+      "what do you think q",
+      "okay cue tell me the runway",
+      "hey q",
+    ]) {
+      expect(addressedToQ(yes)).toBe(true);
+    }
+    for (const no of [
+      "the queue at the bank was long",
+      "our q3 numbers look fine",
+      "in q two we hired",
+      "so tell me about your queue of customers",
+    ]) {
+      expect(addressedToQ(no)).toBe(false);
+    }
+    expect(onlyCallsQ("hey q")).toBe(true);
+    expect(onlyCallsQ("q are you there")).toBe(true);
+    expect(onlyCallsQ("q what did we agree")).toBe(false);
   });
 
   it("offers a recap once near the end, and recaps only when asked", () => {

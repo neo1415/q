@@ -155,6 +155,7 @@ describe("registry", () => {
         "DAILY_Q_TAKE",
         // MEET-HOST (ADR 0037): Q in a live call.
         "MEETING_HOST_TURN",
+        "MEETING_SCREEN_NOTE",
         // Founder brief J1-J9: Q's workforce of agents.
         "DRAFT_REVIEW",
         "DRAFT_REDRAFT",

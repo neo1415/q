@@ -74,7 +74,9 @@ describe("lenient rehearsal readings", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(6);
     expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(5);
-    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(9);
+    expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(
+      10,
+    );
   });
 
   it("the review writes to them as you, never by their role (QA 064ff78f)", () => {
