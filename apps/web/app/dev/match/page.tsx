@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+// Read per request: the review gate below is a runtime decision.
+export const dynamic = "force-dynamic";
+
 /**
  * Fit with your mandate, Company requests, top three and the profile's fit
  * panel in the real shell, with fictional data, for design review and
@@ -31,13 +34,13 @@ export default async function MatchReviewPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const params = await searchParams;
   if (
     process.env.NODE_ENV === "production" &&
     process.env["CQ_DESIGN_REVIEW"] !== "1"
   ) {
     notFound();
   }
-  const params = await searchParams;
   const pick = <T extends string>(
     key: string,
     values: readonly T[],

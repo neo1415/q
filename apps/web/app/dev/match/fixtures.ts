@@ -238,7 +238,7 @@ export const TALLY = company(
   "Seed · Payments · United Arab Emirates",
   "GOOD_FIT",
   "HIGH",
-  "SSPSSSPSS",
+  "SSPSSPPSS",
   [
     "Raising seed; you invest at pre-seed to seed.",
     "Payments, one of your sectors.",
