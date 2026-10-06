@@ -122,6 +122,9 @@ function chunk(
   })}\n\n`;
 }
 
+/** Marks this server's own tokenless reachability probe (main.ts). */
+export const VOICE_THINK_PROBE_HEADER = "x-capital-q-probe";
+
 export function registerVoiceThinkRoute(
   app: FastifyInstance,
   dependencies: VoiceThinkDependencies,
@@ -155,6 +158,24 @@ export function registerVoiceThinkRoute(
     const restored = token.length === 0 ? null : await bindings.restore(token);
     const bound = restored?.thinkToken === token ? restored : null;
     if (bound === null) {
+      // This server's own boot probe (main.ts) asks, tokenless, whether
+      // the public origin reaches this route; during a rolling deploy it
+      // lands on the old replica. All twelve refusals the founder saw on
+      // 2026-10-06 were that probe (presented="", one per deploy), read
+      // as a broken voice line. It is still refused -- the header proves
+      // nothing and grants nothing -- only logged as what it is.
+      if (
+        token.length === 0 &&
+        request.headers[VOICE_THINK_PROBE_HEADER] === "reachability"
+      ) {
+        request.log.debug("voice think reachability probe answered");
+        return reply.code(401).send({
+          type: "about:blank",
+          title: "Unauthorized",
+          status: 401,
+          detail: "No voice session for this request.",
+        });
+      }
       // Which it is matters: "no session" is a token for a binding that
       // has been released or swept, and the speech provider keeps calling
       // with it for a while after — that was three refused thinks in a
