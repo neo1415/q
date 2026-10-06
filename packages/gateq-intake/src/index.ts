@@ -26,6 +26,7 @@ export {
   applicationProjection,
   type ResolvedClassification,
 } from "./domain/projection.js";
+export { factsFromAnswers } from "./domain/form-answers.js";
 export {
   createGuestThrottle,
   GATEQ_GUEST_OPERATIONS,

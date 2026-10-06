@@ -36,6 +36,11 @@
 export const GATEQ_GUEST_OPERATIONS = [
   /** A conversational turn. The expensive one: it reaches a model. */
   "TURN",
+  /**
+   * F1: saving the form's answers. No model is reached, but every save
+   * re-runs the engine and a taxonomy lookup, so it is still counted.
+   */
+  "ANSWERS",
   /** Reading their own application back. Cheap, but not free. */
   "RESUME",
   /** Submitting. Idempotent, so a retry is not abuse — a flood is. */
@@ -70,6 +75,7 @@ export const GATEQ_GUEST_QUOTAS: Readonly<
   Record<GateQGuestOperation, GuestQuota>
 > = {
   TURN: { limit: 20, windowMs: 10 * 60_000 },
+  ANSWERS: { limit: 40, windowMs: 10 * 60_000 },
   RESUME: { limit: 120, windowMs: 10 * 60_000 },
   SUBMIT: { limit: 5, windowMs: 10 * 60_000 },
   UPLOAD: { limit: 10, windowMs: 10 * 60_000 },

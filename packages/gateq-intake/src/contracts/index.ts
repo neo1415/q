@@ -99,6 +99,10 @@ export const APPLICATION_DIMENSIONS = [
   "raise.currency",
   "raise.instrument",
   "raise.use_of_funds",
+  /** F1 form: whether the round has a lead. Intelligence, never a criterion. */
+  "raise.lead_status",
+  /** F1 form: the founder's short note to the investor (≤ 600 characters). */
+  "application.note",
 ] as const;
 export const ApplicationDimensionSchema = z.enum(APPLICATION_DIMENSIONS);
 export type ApplicationDimension = z.infer<typeof ApplicationDimensionSchema>;

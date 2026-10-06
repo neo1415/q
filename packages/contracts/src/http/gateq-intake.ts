@@ -21,6 +21,8 @@ export const GATEQ_APPLY_START_PATH = "/v1/gateq/apply" as const;
 export const GATEQ_APPLY_SESSION_PATH = "/v1/gateq/apply/session" as const;
 export const GATEQ_APPLY_TURN_PATH = "/v1/gateq/apply/turn" as const;
 export const GATEQ_APPLY_SUBMIT_PATH = "/v1/gateq/apply/submit" as const;
+/** F1: the founder answers a short form instead of talking to Q. */
+export const GATEQ_APPLY_ANSWERS_PATH = "/v1/gateq/apply/answers" as const;
 
 /** The credential is a bearer token, never a cookie: embeds are third-party. */
 export const GATEQ_SESSION_HEADER = "authorization" as const;
@@ -38,6 +40,12 @@ export const StartApplicationRequestSchema = z
   .object({
     /** The gateway's opaque public handle. Nothing else identifies it. */
     gatewayPublicId: z.string().max(64),
+    /**
+     * F1 (2026-10-06): "form" opens the application for the GateQ form.
+     * No opening line is composed, so no model is reached; the reply is
+     * empty. Omitted, the conversation opens as before.
+     */
+    mode: z.enum(["conversation", "form"]).optional(),
   })
   .strict();
 export type StartApplicationRequest = z.infer<
@@ -59,6 +67,67 @@ export const ApplicationTurnRequestSchema = z
   .strict();
 export type ApplicationTurnRequest = z.infer<
   typeof ApplicationTurnRequestSchema
+>;
+
+/**
+ * "I'd rather not say" (F1). A real answer, recorded as asked-and-unknown:
+ * the rule it feeds stays UNKNOWN, which is never a no.
+ */
+export const GATEQ_DECLINED = "DECLINED" as const;
+const Declined = z.literal(GATEQ_DECLINED);
+
+export const GATEQ_INSTRUMENTS = [
+  "SAFE",
+  "EQUITY",
+  "CONVERTIBLE_NOTE",
+  "NOT_DECIDED",
+] as const;
+export const GATEQ_LEAD_STATUSES = ["HAS_LEAD", "LOOKING", "NOT_NEEDED"] as const;
+export const GATEQ_NOTE_MAX_CHARS = 600;
+
+/**
+ * The GateQ form's answers (F1). Each field omitted is untouched; each
+ * DECLINED is "I'd rather not say". Every value is bounded vocabulary or a
+ * decimal with its currency: the server records them as applicant-provided
+ * facts and the deterministic engine decides fit from them. No model reads
+ * or writes any of it, and nothing here names a tenant, a gateway version
+ * or an outcome.
+ */
+export const ApplicationAnswersRequestSchema = z
+  .object({
+    companyName: z.string().trim().min(1).max(200).optional(),
+    oneLiner: z.string().trim().min(1).max(280).optional(),
+    website: z.string().trim().min(3).max(200).optional(),
+    stage: z
+      .union([z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), Declined])
+      .optional(),
+    /** Plain sector words; the taxonomy resolver maps them, never the browser. */
+    sectors: z
+      .union([z.array(z.string().trim().min(1).max(120)).min(1).max(6), Declined])
+      .optional(),
+    country: z.union([z.string().regex(/^[A-Z]{2}$/), Declined]).optional(),
+    raise: z
+      .union([
+        z
+          .object({
+            amount: z
+              .string()
+              .regex(/^(0|[1-9][0-9]{0,15})(\.[0-9]{1,2})?$/, "expected a decimal"),
+            currency: z.string().regex(/^[A-Z]{3}$/),
+          })
+          .strict(),
+        Declined,
+      ])
+      .optional(),
+    instrument: z.union([z.enum(GATEQ_INSTRUMENTS), Declined]).optional(),
+    lead: z.union([z.enum(GATEQ_LEAD_STATUSES), Declined]).optional(),
+    note: z.string().trim().max(GATEQ_NOTE_MAX_CHARS).optional(),
+    contactName: z.string().trim().min(1).max(200).optional(),
+    contactEmail: z.string().trim().email().max(254).optional(),
+  })
+  .strict();
+export type ApplicationAnswersRequest = z.infer<
+  typeof ApplicationAnswersRequestSchema
 >;
 
 export const SubmitApplicationRequestSchema = z
@@ -134,6 +203,13 @@ export const ApplicationTurnResponseSchema = z
   .strict();
 export type ApplicationTurnResponse = z.infer<
   typeof ApplicationTurnResponseSchema
+>;
+
+export const ApplicationAnswersResponseSchema = z
+  .object({ application: ApplicationSummaryDtoSchema })
+  .strict();
+export type ApplicationAnswersResponse = z.infer<
+  typeof ApplicationAnswersResponseSchema
 >;
 
 export const SubmitApplicationResponseSchema = z

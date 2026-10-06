@@ -905,6 +905,15 @@ export {
 
 // CQ-GATE-002 -- the public applicant surface: anonymous, credential-scoped.
 export {
+  ApplicationAnswersRequestSchema,
+  ApplicationAnswersResponseSchema,
+  GATEQ_APPLY_ANSWERS_PATH,
+  GATEQ_DECLINED,
+  GATEQ_INSTRUMENTS,
+  GATEQ_LEAD_STATUSES,
+  GATEQ_NOTE_MAX_CHARS,
+  type ApplicationAnswersRequest,
+  type ApplicationAnswersResponse,
   ApplicationFactDtoSchema,
   ApplicationSummaryDtoSchema,
   ApplicationTurnRequestSchema,

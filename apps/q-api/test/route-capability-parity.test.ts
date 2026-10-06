@@ -175,6 +175,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq-apply.ts GET GATEQ_APPLY_SESSION_PATH": PUBLIC,
   "api/http/gateq-apply.ts POST GATEQ_APPLY_TURN_PATH": PUBLIC,
   "api/http/gateq-apply.ts POST GATEQ_APPLY_SUBMIT_PATH": PUBLIC,
+  // F1: the GateQ form, the same anonymous applicant surface.
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_ANSWERS_PATH": PUBLIC,
   ...Object.fromEntries(
     [
       "POST GATEQ_GATEWAYS_PATH",
