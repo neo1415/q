@@ -7,11 +7,11 @@ import { describe, expect, it, vi } from "vitest";
  * asked side by side, with the same answer.
  */
 const READ_MS = 120;
-const journeys = vi.hoisted(() => ({
-  status: {} as Record<string, "ACTIVE" | "COMPLETED" | 404>,
-  inFlight: 0,
-  most: 0,
-}));
+type JourneyStatus = "ACTIVE" | "COMPLETED" | 404;
+const journeys = vi.hoisted(() => {
+  const status: Record<string, JourneyStatus> = {};
+  return { status, inFlight: 0, most: 0 };
+});
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/auth/session", () => ({

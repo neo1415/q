@@ -19,41 +19,11 @@ import {
 } from "../src/index.js";
 import {
   createModelGatewayQAnswer,
-  type QOnboardingNudge,
   type QOnboardingNudgePort,
 } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
 const RUN = randomUUID();
-
-function nudge(journeyType: "founder" | "investor"): QOnboardingNudge {
-  return {
-    journeyType,
-    doneCount: 4,
-    requiredCount: 9,
-    minutesLeft: 3,
-    remainingTopics: ["Your raise", 'Team "and" hires'],
-  };
-}
-
-/** Once per conversation, as the policy says; records what it was asked. */
-function oncePerConversation(value: QOnboardingNudge) {
-  const shown = new Set<string>();
-  const peeks: string[] = [];
-  const marks: string[] = [];
-  const port: QOnboardingNudgePort = {
-    peek: (actor, conversationId) => {
-      peeks.push(`${actor.userId}:${conversationId}`);
-      return Promise.resolve(shown.has(conversationId) ? null : value);
-    },
-    markShown: (_actor, conversationId) => {
-      marks.push(conversationId);
-      shown.add(conversationId);
-      return Promise.resolve();
-    },
-  };
-  return { port, peeks, marks };
-}
 
 function build(options: {
   readonly granted: boolean;
