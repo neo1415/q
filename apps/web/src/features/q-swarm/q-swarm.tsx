@@ -101,7 +101,8 @@ export function QSwarm({
     const machine = createPresenceMachine({ arrive: travels });
     const sim = createPresenceSim({
       count: scaledParticleCount(pixels, navigator.hardwareConcurrency),
-      initial: travels ? "RIBBON" : "CLOUD",
+      // Small surfaces never show the ribbon: they start as the cloud.
+      initial: travels && !small ? "RIBBON" : "CLOUD",
       seed: pixels * 7 + 3,
     });
 
