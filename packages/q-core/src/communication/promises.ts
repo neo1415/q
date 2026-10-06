@@ -11,6 +11,10 @@
  * sentence that announces the work is either redundant (the work is done,
  * the answer follows it) or false (no work was done). Both are removed.
  *
+ * Founder brief J7: kept as a deterministic check because it reads only
+ * Q's OWN answer, never a person's words, and only removes a forbidden
+ * claim (a promise of work the answer already is, or that will not come).
+ *
  * Only a LEADING sentence, and only when it is nothing but the promise:
  * "Let me check the filing and come back to you" inside a paragraph about
  * a filing is a real sentence about a real next step, and a rule that

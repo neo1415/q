@@ -112,6 +112,7 @@ import type {
 } from "./ports.js";
 import {
   interpretUtterance,
+  type UtteranceMove,
   isRichUtterance,
   type OnboardingUtteranceAliases,
 } from "../domain/interpretation.js";
@@ -146,6 +147,9 @@ import {
  * knows a Founder step from an Investor step.
  */
 
+/** Replies longer than this are answers or narrative, never a bare move. */
+const MOVE_WORDS_MAX = 20;
+
 export type OnboardingRuntimeDependencies = {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
@@ -163,6 +167,21 @@ export type OnboardingRuntimeDependencies = {
   readonly interviewTurns?: OnboardingInterviewTurnRepository | undefined;
   /** Journey-supplied plain-language names for options (CQ-PRE-REC-001 §19). */
   readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
+  /**
+   * Founder brief J7: a short reply's conversational move (skip, don't
+   * know, why, upload, a plain yes or no), read by meaning through the
+   * Model Gateway (ONBOARDING_MOVE_READER). Absent or failing: no move is
+   * recognised, and the words are placed as an answer or read by Q.
+   */
+  readonly moveReader?:
+    | ((input: {
+        readonly tenantId: string;
+        readonly userId: string;
+        readonly question: string;
+        readonly options: readonly string[];
+        readonly utterance: string;
+      }) => Promise<UtteranceMove | null>)
+    | undefined;
   /** Where a journey's figures and exclusions live (CQ-Q-VOICE-001 A §8, §12). */
   readonly interviewCues?: InterviewCues | undefined;
   /** Capital Q's taxonomy classifier, for category phrases in a sentence (§5, §10-§11). */
@@ -2052,6 +2071,26 @@ export function createOnboardingUseCases(
     }
     const step = current.currentStep;
     const stepKey = step.stepKey;
+    // A move is a short reply ("skip", "why do you need this?"): longer
+    // words are an answer or Q's to read, so they are not sent to be read.
+    const tenantId = actor.context?.tenantId;
+    const move =
+      runtime.moveReader === undefined ||
+      tenantId === undefined ||
+      command.text.split(/\s+/u).length > MOVE_WORDS_MAX
+        ? null
+        : await runtime
+            .moveReader({
+              tenantId,
+              userId: actor.userId,
+              question: step.prompt,
+              options:
+                "options" in step.presentation
+                  ? step.presentation.options.map((option) => option.label)
+                  : [],
+              utterance: command.text,
+            })
+            .catch(() => null);
     const reading = interpretUtterance(
       command.text,
       {
@@ -2061,6 +2100,7 @@ export function createOnboardingUseCases(
         context: step.context,
       },
       runtime.utteranceAliases ?? {},
+      move,
     );
     const why = step.whyQAsks ?? step.supportingText ?? null;
     const slug = (key: string): string =>

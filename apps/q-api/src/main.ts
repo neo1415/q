@@ -284,6 +284,8 @@ import {
 import { withTestRouting } from "@capital-q/model-gateway";
 import {
   createQDelegationReader,
+  createWordsReaders,
+  CLEAR_QUESTION,
   createQTurnReader,
   type QReceiptPort,
 } from "@capital-q/model-gateway/q";
@@ -1271,6 +1273,12 @@ const integrations = composeGoogleIntegrations({
 // WORKFORCE block (founder brief J1-J9): the reviewer every outward
 // message passes, and the record of Q's agents for the workforce page.
 const workforceStore = createPostgresWorkforceStore(database.sql);
+// Founder brief J7: people's words read by meaning, on FAST_CLASSIFICATION.
+const wordsReaders = createWordsReaders({
+  gateway: modelGateway,
+  dataPosture: demoDataPosture,
+  logger,
+});
 const workforceMonthlyLimit = workforceMonthlyLimitUsd(process.env);
 /** The person's own name, for drafts written on their behalf (J2). */
 const workforceDisplayName = (userId: string) =>
@@ -1707,6 +1715,12 @@ const workPort = createWorkPort({
   },
   store: workStore,
   board: workBoard,
+  // J7: "any hour" and the like, read by meaning on FAST_CLASSIFICATION.
+  wordsCheck: (actor, question, words) =>
+    wordsReaders.check(
+      { tenantId: actor.tenantId, userId: actor.userId },
+      { question, utterance: words },
+    ),
   isInvestor: workIsInvestor,
   ownCompany: workOwnCompany,
   // "Except Nixo": matched against who an instruction could reach. The
@@ -2400,6 +2414,12 @@ const investorRevisions = createInvestorOnboardingIntegration({
   securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
 });
 const onboardingRevisions = createOnboardingService({
+  // J7: a short reply's move (skip, why, a plain yes), read by meaning.
+  moveReader: (input) =>
+    wordsReaders.onboardingMove(
+      { tenantId: input.tenantId, userId: input.userId },
+      input,
+    ),
   sql: database.sql,
   transactions: database.transactions,
   outbox: revisionOutbox,
@@ -3108,6 +3128,12 @@ const qIntelligence = composeQIntelligence({
   embeddings,
   statements: researchComposition.statements,
   profileUpdates: profileBoard,
+  // J7: a quote that would clear a field is read for whether it asks to.
+  clearCheck: (input) =>
+    wordsReaders.check(
+      { tenantId: input.tenantId, userId: null },
+      { question: CLEAR_QUESTION, utterance: input.quote },
+    ),
   memory: memoryLearner.recall,
   // Who the person is, from their own setup (CQ-QX-007): their name and
   // their own onboarding sessions, read by their own user id only. The
@@ -3357,6 +3383,8 @@ const meetingHost = createMeetingHostRuntime({
 });
 // end MEET-HOST block
 const meetingAssistant = createMeetingAssistantService({
+  // J7: what a call led to, read by meaning from its agreed lines.
+  outcomeReader: (who, lines) => wordsReaders.meetingOutcome(who, lines),
   sql: database.sql,
   bots: recallBots,
   // MEET-HOST: the bot joins early, live, with a signed events endpoint.

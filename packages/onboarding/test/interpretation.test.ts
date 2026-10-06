@@ -5,7 +5,24 @@ import type { OnboardingStepPresentation } from "@capital-q/contracts";
 import {
   interpretUtterance,
   parseFigure,
+  type UtteranceMove,
 } from "../src/domain/interpretation.js";
+
+/**
+ * The move a model reads in a short reply (ONBOARDING_MOVE_READER, J7):
+ * the fake model of these tests. Words not listed read as no move.
+ */
+const HEARD: Readonly<Record<string, UtteranceMove>> = {
+  "I don't know": "DONT_KNOW",
+  "not sure": "DONT_KNOW",
+  skip: "SKIP",
+  "come back to this later": "SKIP",
+  "Why do you need this?": "WHY",
+  "let me upload my deck instead": "UPLOAD",
+  yes: "YES",
+  "not quite": "NO",
+};
+const heard = (text: string): UtteranceMove | null => HEARD[text] ?? null;
 
 /**
  * CQ-PRE-REC-001 §17-§19: the conversational interview places what a
@@ -72,7 +89,14 @@ describe("interpretUtterance · single select", () => {
   });
 
   it("makes a definition's own 'not sure' the answer to I don't know", () => {
-    expect(interpretUtterance("I don't know", step(STAGES))).toMatchObject({
+    expect(
+      interpretUtterance(
+        "I don't know",
+        step(STAGES),
+        {},
+        heard("I don't know"),
+      ),
+    ).toMatchObject({
       kind: "ANSWER",
       value: { optionKey: "unsure" },
     });
@@ -95,18 +119,56 @@ describe("interpretUtterance · single select", () => {
 });
 
 describe("interpretUtterance · conversational moves", () => {
+  it("recognises no move when the words were not read (the safe fallback)", () => {
+    // Without a reading, "skip" is not guessed into a skip, nor "yes" into
+    // an answer: the words are placed as an answer if they are one, or
+    // left for Q's reading.
+    expect(interpretUtterance("skip", step(STAGES))).toEqual({
+      kind: "UNCLEAR",
+    });
+    expect(
+      interpretUtterance(
+        "not quite",
+        step({
+          stepType: "confirmation",
+          confirmLabel: "Looks right",
+          requireAffirmative: true,
+        }),
+      ),
+    ).toEqual({ kind: "UNCLEAR" });
+  });
+
   it("recognises skip, why and upload", () => {
-    expect(interpretUtterance("skip", step(STAGES))).toEqual({ kind: "SKIP" });
-    expect(interpretUtterance("come back to this later", step(STAGES))).toEqual(
-      {
-        kind: "SKIP",
-      },
+    expect(interpretUtterance("skip", step(STAGES), {}, heard("skip"))).toEqual(
+      { kind: "SKIP" },
     );
-    expect(interpretUtterance("Why do you need this?", step(STAGES))).toEqual({
+    expect(
+      interpretUtterance(
+        "come back to this later",
+        step(STAGES),
+        {},
+        heard("come back to this later"),
+      ),
+    ).toEqual({
+      kind: "SKIP",
+    });
+    expect(
+      interpretUtterance(
+        "Why do you need this?",
+        step(STAGES),
+        {},
+        heard("Why do you need this?"),
+      ),
+    ).toEqual({
       kind: "WHY",
     });
     expect(
-      interpretUtterance("let me upload my deck instead", step(STAGES)),
+      interpretUtterance(
+        "let me upload my deck instead",
+        step(STAGES),
+        {},
+        heard("let me upload my deck instead"),
+      ),
     ).toEqual({ kind: "UPLOAD" });
   });
 
@@ -115,7 +177,14 @@ describe("interpretUtterance · conversational moves", () => {
       stepType: "single_select",
       options: STAGES.options.slice(0, 3),
     };
-    expect(interpretUtterance("not sure", step(withoutUnsure))).toEqual({
+    expect(
+      interpretUtterance(
+        "not sure",
+        step(withoutUnsure),
+        {},
+        heard("not sure"),
+      ),
+    ).toEqual({
       kind: "SKIP",
     });
   });
@@ -207,7 +276,9 @@ describe("interpretUtterance · other step types", () => {
       kind: "ANSWER",
       value: { type: "CONFIRMATION", confirmed: true },
     });
-    expect(interpretUtterance("not quite", step(confirm))).toEqual({
+    expect(
+      interpretUtterance("not quite", step(confirm), {}, heard("not quite")),
+    ).toEqual({
       kind: "DECLINE",
     });
   });
@@ -344,7 +415,7 @@ describe("interpretUtterance · reference steps with candidates (CQ-PRE-REC-001 
 
   it("answers a single candidate on plain assent, and a named one by name", () => {
     const one = withCandidates([{ mandateId: "m-1", name: "Primary mandate" }]);
-    expect(interpretUtterance("yes", one)).toEqual({
+    expect(interpretUtterance("yes", one, {}, heard("yes"))).toEqual({
       kind: "ANSWER",
       value: {
         type: "RESOURCE_REFERENCE",
@@ -362,7 +433,9 @@ describe("interpretUtterance · reference steps with candidates (CQ-PRE-REC-001 
       value: { resourceIds: ["m-2"] },
     });
     // Assent alone cannot pick between two.
-    expect(interpretUtterance("yes", two)).toEqual({ kind: "UNCLEAR" });
+    expect(interpretUtterance("yes", two, {}, heard("yes"))).toEqual({
+      kind: "UNCLEAR",
+    });
   });
 
   it("never invents a candidate", () => {

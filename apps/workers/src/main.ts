@@ -129,6 +129,7 @@ import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/go
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import {
+  createWordsReaders,
   budgetForTaskClass,
   createDiligenceDocumentSummariser,
 } from "@capital-q/model-gateway/q";
@@ -412,6 +413,14 @@ const mandateReview =
   modelProviders.length === 0
     ? undefined
     : createMandateReview({
+        // J7: whether each named red flag is ruled out or avoided, read by
+        // meaning on FAST_CLASSIFICATION.
+        polarity: (who, mentions) =>
+          createWordsReaders({
+            gateway: modelGateway,
+            dataPosture: demoDataPosture,
+            logger,
+          }).preferencePolarity(who, mentions),
         sql: database.sql,
         sessions: createPostgresOnboardingSessionRepository(),
         responses: createPostgresOnboardingResponseRepository(),

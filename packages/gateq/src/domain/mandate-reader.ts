@@ -10,7 +10,8 @@ import type {
  *   mandate text ≠ GateQ published policy
  *   a proposal ≠ a rule
  *
- * Deterministic and closed-vocabulary. A stage, country, region or sector
+ * Closed-vocabulary; whether the mandate wants or rules out each mention
+ * is a reading of meaning handed in (J7), never a list of negative words. A stage, country, region or sector
  * becomes a proposal only when Capital Q's own reference taxonomy names it;
  * anything else stays in the investor's words, where they read it. Nothing
  * here publishes: every proposal is a draft criterion the investor confirms,
@@ -58,20 +59,27 @@ export type MandateReading = {
   readonly excludedPlaces: readonly string[];
 };
 
-export const MANDATE_READER_VERSION = "gateq-mandate-reader.v1" as const;
+// v2 (J7): whether each mention is wanted or ruled out is read by meaning.
+export const MANDATE_READER_VERSION = "gateq-mandate-reader.v2" as const;
 export const MANDATE_TEXT_MAX_CHARS = 20_000;
 
 export const SECTOR_VOCABULARY = "industry";
 const STAGE_VOCABULARY = "company_stage";
 const GEOGRAPHY_VOCABULARY = "geography";
 
-const NEGATION =
-  /\b(?:not|no|never|except|excluding|exclude|excludes|avoid|avoids|outside|don't|do not|won't|will not|nor)\b[^.;:\n]{0,40}$/i;
+/**
+ * Whether the mandate wants each mention or rules it out, read by meaning
+ * (founder brief J7, PREFERENCE_POLARITY), by the mention's position in
+ * the normalised text. true: ruled out or avoided; false: wanted; null:
+ * not read, or neither -- such a mention proposes nothing (unknown stays
+ * unknown; a "we don't do betting" is never guessed into an allow-list).
+ */
+export type MentionPolarity = (index: number) => boolean | null;
 
 type Hit = {
   readonly node: MandateVocabularyNode;
   readonly index: number;
-  readonly negated: boolean;
+  readonly negated: boolean | null;
 };
 
 function escape(text: string): string {
@@ -116,6 +124,7 @@ function sentenceAt(text: string, index: number): string {
 function findHits(
   text: string,
   nodes: readonly MandateVocabularyNode[],
+  polarity: MentionPolarity,
 ): Hit[] {
   const phrases: {
     phrase: string;
@@ -149,7 +158,7 @@ function findHits(
       hits.push({
         node,
         index: start,
-        negated: NEGATION.test(text.slice(Math.max(0, start - 60), start)),
+        negated: polarity(start),
       });
     }
   }
@@ -163,8 +172,11 @@ function unique<T>(items: readonly T[]): T[] {
 function readStages(
   text: string,
   nodes: readonly MandateVocabularyNode[],
+  polarity: MentionPolarity,
 ): PolicyProposal | null {
-  const hits = findHits(text, nodes).filter((hit) => !hit.negated);
+  const hits = findHits(text, nodes, polarity).filter(
+    (hit) => hit.negated === false,
+  );
   if (hits.length === 0) return null;
   // Reference order is stage order (pre-seed → Series C+).
   const order = nodes.map((node) => node.canonicalCode);
@@ -209,12 +221,15 @@ function countriesUnder(
 function readGeography(
   text: string,
   nodes: readonly MandateVocabularyNode[],
+  polarity: MentionPolarity,
 ): { proposal: PolicyProposal | null; excluded: string[] } {
-  const hits = findHits(text, nodes);
+  const hits = findHits(text, nodes, polarity);
   const excluded = unique(
-    hits.filter((hit) => hit.negated).map((hit) => hit.node.displayName),
+    hits
+      .filter((hit) => hit.negated === true)
+      .map((hit) => hit.node.displayName),
   );
-  const allowed = hits.filter((hit) => !hit.negated);
+  const allowed = hits.filter((hit) => hit.negated === false);
   // "Global" or "anywhere" is no geographic rule at all, not every country.
   if (
     allowed.length === 0 ||
@@ -246,18 +261,22 @@ function readGeography(
   };
 }
 
+/** Only distinctive phrases: a four-letter word is too easily something else. */
+function sectorNodes(
+  nodes: readonly MandateVocabularyNode[],
+): MandateVocabularyNode[] {
+  return nodes.map((node) => ({
+    ...node,
+    aliases: node.aliases.filter((alias) => alias.length >= 4),
+  }));
+}
+
 function readSectors(
   text: string,
   nodes: readonly MandateVocabularyNode[],
+  polarity: MentionPolarity,
 ): PolicyProposal[] {
-  // Only distinctive phrases: a four-letter word is too easily something else.
-  const hits = findHits(
-    text,
-    nodes.map((node) => ({
-      ...node,
-      aliases: node.aliases.filter((alias) => alias.length >= 4),
-    })),
-  );
+  const hits = findHits(text, sectorNodes(nodes), polarity);
   const proposals: PolicyProposal[] = [];
   const build = (
     selected: readonly Hit[],
@@ -287,12 +306,12 @@ function readSectors(
     };
   };
   const allowed = build(
-    hits.filter((hit) => !hit.negated),
+    hits.filter((hit) => hit.negated === false),
     false,
   );
   if (allowed !== null) proposals.push(allowed);
   const excluded = build(
-    hits.filter((hit) => hit.negated),
+    hits.filter((hit) => hit.negated === true),
     true,
   );
   if (excluded !== null) proposals.push(excluded);
@@ -401,18 +420,60 @@ function readCheque(text: string): PolicyProposal | null {
   return null;
 }
 
-/** Read one mandate. Pure: the same text and vocabulary give the same draft. */
+/**
+ * Every stage, place and sector the mandate names, with its sentence, for
+ * the polarity reading (J7). The id is the mention's position, which is
+ * what `readMandate` looks its polarity up by.
+ */
+export function mandateMentions(
+  rawText: string,
+  vocabulary: readonly MandateVocabularyNode[],
+): readonly {
+  readonly id: string;
+  readonly term: string;
+  readonly sentence: string;
+}[] {
+  const text = normalise(rawText.slice(0, MANDATE_TEXT_MAX_CHARS));
+  const of = (code: string) =>
+    vocabulary.filter((node) => node.vocabularyCode === code);
+  const unread: MentionPolarity = () => null;
+  const hits = [
+    ...findHits(text, of(STAGE_VOCABULARY), unread),
+    ...findHits(text, of(GEOGRAPHY_VOCABULARY), unread),
+    ...findHits(text, sectorNodes(of(SECTOR_VOCABULARY)), unread),
+  ];
+  const seen = new Set<number>();
+  return hits
+    .filter((hit) => {
+      if (seen.has(hit.index)) return false;
+      seen.add(hit.index);
+      return true;
+    })
+    .slice(0, 80)
+    .map((hit) => ({
+      id: String(hit.index),
+      term: hit.node.displayName,
+      sentence: sentenceAt(text, hit.index),
+    }));
+}
+
+/**
+ * Read one mandate: the same text, vocabulary and polarity reading give
+ * the same draft. Without a reading every mention is unknown, and only
+ * what needs no reading (a cheque band) is proposed.
+ */
 export function readMandate(
   rawText: string,
   vocabulary: readonly MandateVocabularyNode[],
+  polarity: MentionPolarity = () => null,
 ): MandateReading {
   const text = normalise(rawText.slice(0, MANDATE_TEXT_MAX_CHARS));
   const of = (code: string) =>
     vocabulary.filter((node) => node.vocabularyCode === code);
 
-  const stage = readStages(text, of(STAGE_VOCABULARY));
-  const geography = readGeography(text, of(GEOGRAPHY_VOCABULARY));
-  const sectors = readSectors(text, of(SECTOR_VOCABULARY));
+  const stage = readStages(text, of(STAGE_VOCABULARY), polarity);
+  const geography = readGeography(text, of(GEOGRAPHY_VOCABULARY), polarity);
+  const sectors = readSectors(text, of(SECTOR_VOCABULARY), polarity);
   const cheque = readCheque(text);
 
   const proposals = [stage, geography.proposal, ...sectors, cheque].filter(

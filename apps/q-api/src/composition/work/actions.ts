@@ -509,6 +509,8 @@ export function createWorkPort(dependencies: {
   /** ADR 0043 standing instructions, listed and stopped beside work. */
   readonly instructions?: InstructionStore | undefined;
   readonly board: ReturnType<typeof createWorkActionBoard>;
+  /** J7: one closed question about their words, read by meaning. */
+  readonly wordsCheck?: QWorkIntelligencePort["wordsCheck"];
   /**
    * Who a standing instruction could reach (relationships, feed, saved):
    * what a name they said to leave out is matched against.
@@ -643,6 +645,9 @@ export function createWorkPort(dependencies: {
       store.answer(actor, delegationId, laneId, answer),
     setAway: (actor, away) => store.setAway(actor, away),
     prepareForApproval: dependencies.board.prepareForApproval,
+    ...(dependencies.wordsCheck === undefined
+      ? {}
+      : { wordsCheck: dependencies.wordsCheck }),
     seen: (actor) => store.seen(actor),
     pause: async (actor, id) =>
       (await dependencies.instructions?.pauseByOwner(actor, id)) ?? false,

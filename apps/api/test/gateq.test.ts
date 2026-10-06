@@ -137,6 +137,12 @@ function buildApp(options: {
       : createPolicyExtractionService({
           gateq,
           vocabulary: mandateVocabularyFrom(),
+          // The fake model's reading (PREFERENCE_POLARITY, J7): this
+          // mandate wants every stage and place it names.
+          polarity: (_who, mentions) =>
+            Promise.resolve(
+              new Map(mentions.map((one) => [one.id, "WANTED" as const])),
+            ),
           repository: {
             record: (input) => {
               const index = recorded.findIndex(

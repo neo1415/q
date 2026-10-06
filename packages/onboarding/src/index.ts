@@ -200,6 +200,7 @@ export { createPostgresOnboardingInterviewTurnRepository } from "./infrastructur
 export {
   interpretUtterance,
   isRichUtterance,
+  type UtteranceMove,
   parseFigure,
   referenceCandidatesOf,
   type ReferenceCandidate,

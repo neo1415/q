@@ -9,6 +9,7 @@ import {
   createQToolExecutor,
   createQToolRegistry,
   createQWorkTools,
+  ANY_HOUR_QUESTION,
   type QWorkIntelligencePort,
 } from "../src/index.js";
 import { actorA, contextFor, planFor } from "./support.js";
@@ -35,7 +36,22 @@ function ownPlan(): PermittedContextPlan {
   };
 }
 
-function world() {
+/**
+ * The fake model's reading of "may Q work round the clock?" (UTTERANCE_
+ * CHECK, J7), by the goal's words. Anything else reads as NO.
+ */
+const ROUND_THE_CLOCK: ReadonlySet<string> = new Set([
+  "Send a first message to my founders, starting right now at any hour",
+  "Handle my investors 24/7",
+  "Reply to founders anytime",
+  "Work round the clock on my outreach",
+  "Keep my investor conversations going, weekends too",
+  "Message new founders every day",
+  "Starting right now at any hour, message my founders",
+  "Weekends too, 8am to 10pm",
+]);
+
+function world(options: { readonly reads?: boolean } = {}) {
   const prepared: unknown[] = [];
   const unused = () => Promise.reject(new Error("not this tool"));
   const port: QWorkIntelligencePort = {
@@ -57,6 +73,16 @@ function world() {
       prepared.push(entry.proposal.payload);
       return "PREPARED";
     },
+    ...(options.reads === false
+      ? {}
+      : {
+          wordsCheck: (_actor, question, words) =>
+            Promise.resolve(
+              question === ANY_HOUR_QUESTION && ROUND_THE_CLOCK.has(words)
+                ? "YES"
+                : "NO",
+            ),
+        }),
   };
   const executor = createQToolExecutor({
     registry: createQToolRegistry(createQWorkTools(port)),
@@ -256,6 +282,15 @@ describe("propose_standing_instruction: clear hours are read by code (live QA 01
       const { prepared } = await world().propose({ goal });
       expect(grantOf(prepared[0]).workingHours, goal).toEqual(ALL_DAY);
     }
+  });
+
+  it("without a reading keeps the default hours (the safe fallback)", async () => {
+    const { prepared } = await world({ reads: false }).propose({
+      goal: "Handle my investors 24/7",
+    });
+    expect(grantOf(prepared[0]).workingHours).toMatchObject({
+      days: [1, 2, 3, 4, 5],
+    });
   });
 
   it("overrides a default reading (the flaky Mon-Fri 09:00-17:00), never an explicit one", async () => {

@@ -134,6 +134,17 @@ export type QWorkIntelligencePort = {
     readonly actorUserId: string;
     readonly proposal: QWorkProposal;
   }) => "PREPARED" | "ONE_PER_TURN";
+  /**
+   * Founder brief J7: one closed question about their words, read by
+   * meaning (UTTERANCE_CHECK). Absent or failing: not read.
+   */
+  readonly wordsCheck?:
+    | ((
+        actor: ActorContext,
+        question: string,
+        words: string,
+      ) => Promise<"YES" | "NO" | "UNSURE" | null>)
+    | undefined;
 };
 
 function ownConversation(
@@ -381,13 +392,16 @@ export type StandingProposalOutput = z.infer<
 
 /**
  * Live QA (runs 01a6124a, 9f948ed2): "starting right now at any hour" was
- * read once as Mon-Fri 09:00-17:00 and once correctly. Clear round-the-clock
- * wording ("any hour", "24/7", "anytime", "weekends too", "every day") is
- * read by code: every day, 00:00-23:59. It overrides an absent
- * reading or the default; explicit hours the model read still win.
+ * read once as Mon-Fri 09:00-17:00 and once correctly. Whether their goal
+ * says Q may work round the clock is read by meaning (founder brief J7,
+ * UTTERANCE_CHECK through the Model Gateway), never matched against a
+ * list of words: a clear YES is every day, 00:00-23:59. It overrides an
+ * absent reading or the default; explicit hours the model read still win.
+ * Unread or unsure: the default hours, which the card shows before they
+ * approve.
  */
-const ALL_HOURS =
-  /\b(?:any|all) hours?\b|\bat any time\b|\banytime\b|\bany time of (?:the )?(?:day|night)\b|\b24\s*\/\s*7\b|\b24-7\b|\b24 hours a day\b|\bround[- ]the[- ]clock\b|\baround the clock\b|\bday (?:and|or) night\b|\bweekends? (?:too|as well)\b|\bincluding weekends?\b|\bevery day\b|\b(?:seven|7) days a week\b/iu;
+export const ANY_HOUR_QUESTION =
+  "Do these words say Q may work at any hour or every day, round the clock (including nights or weekends), rather than only in working hours?";
 
 export type ClearHours = {
   readonly days: readonly number[];
@@ -395,12 +409,13 @@ export type ClearHours = {
   readonly end: string;
 };
 
-/** Code's own reading of clear working-hours words in the goal; else null. */
-export function clearHoursOf(goal: string): ClearHours | null {
-  if (ALL_HOURS.test(goal)) {
-    return { days: [1, 2, 3, 4, 5, 6, 7], start: "00:00", end: "23:59" };
-  }
-  return null;
+/** The hours a clear "any hour" reading gives; else null. */
+export function clearHoursOf(
+  anyHour: "YES" | "NO" | "UNSURE" | null,
+): ClearHours | null {
+  return anyHour === "YES"
+    ? { days: [1, 2, 3, 4, 5, 6, 7], start: "00:00", end: "23:59" }
+    : null;
 }
 
 const DEFAULT_DAYS = [1, 2, 3, 4, 5];
@@ -411,7 +426,7 @@ const DEFAULT_DAYS = [1, 2, 3, 4, 5];
  * default.
  */
 export function workingHoursFor(
-  goal: string,
+  anyHour: "YES" | "NO" | "UNSURE" | null,
   read: ClearHours | null,
   base: { readonly timeZone: string } & ClearHours,
 ): { timeZone: string; days: number[]; start: string; end: string } {
@@ -421,7 +436,7 @@ export function workingHoursFor(
       read.end === base.end &&
       [...new Set(read.days)].sort((a, b) => a - b).join(",") ===
         DEFAULT_DAYS.join(","));
-  const clear = clearHoursOf(goal);
+  const clear = clearHoursOf(anyHour);
   const chosen = isDefault ? (clear ?? read) : read;
   if (chosen === null) {
     return { ...base, days: [...base.days] };
@@ -742,6 +757,14 @@ export function createQWorkTools(
                   ? { ...entry, mode: "ASK" as const }
                   : entry,
               );
+        // J7: round the clock or not, read by meaning (the cheap class);
+        // explicit hours the model read still win in workingHoursFor.
+        const anyHour =
+          port.wordsCheck !== undefined
+            ? await port
+                .wordsCheck(context.actor, ANY_HOUR_QUESTION, input.goal)
+                .catch(() => null)
+            : null;
         const status = port.prepareForApproval({
           runId: context.runId,
           tenantId: context.actor.tenantId,
@@ -767,10 +790,10 @@ export function createQWorkTools(
                 expiresInDays: input.expiresInDays,
                 digest: input.digest,
                 // Their own hours when they gave them, in their own zone;
-                // clear words ("any hour", "24/7") read by code; the card
+                // round the clock when their words say so (read, J7); the card
                 // says them in plain words before they approve.
                 workingHours: workingHoursFor(
-                  input.goal,
+                  anyHour,
                   input.workingHours,
                   base.workingHours,
                 ),

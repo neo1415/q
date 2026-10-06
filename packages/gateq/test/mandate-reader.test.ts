@@ -2,9 +2,28 @@ import { describe, expect, it } from "vitest";
 
 import {
   CriterionConfigSchema,
-  readMandate,
+  mandateMentions,
+  readMandate as readWith,
   type MandateVocabularyNode,
 } from "../src/index.js";
+
+/**
+ * The fake model of these tests (PREFERENCE_POLARITY, J7): the terms its
+ * reading rules out; every other mention it reads as wanted.
+ */
+function readMandate(
+  text: string,
+  vocabulary: readonly MandateVocabularyNode[],
+  excluded: readonly string[] = ["India", "Gambling"],
+) {
+  const terms = new Map(
+    mandateMentions(text, vocabulary).map((one) => [one.id, one.term]),
+  );
+  return readWith(text, vocabulary, (index) => {
+    const term = terms.get(String(index));
+    return term === undefined ? null : excluded.includes(term);
+  });
+}
 
 /** A small slice of the reference taxonomy, with obviously synthetic ids. */
 const id = (n: number) =>
@@ -139,7 +158,23 @@ describe("readMandate", () => {
     );
   });
 
-  it("is deterministic", () => {
+  it("is deterministic for the same reading", () => {
     expect(readMandate(MANDATE, VOCABULARY)).toEqual(reading);
+  });
+
+  it("hands every mention to the reading, each with its own sentence", () => {
+    const mentions = mandateMentions(MANDATE, VOCABULARY);
+    expect(mentions.map((one) => one.term)).toEqual(
+      expect.arrayContaining(["India", "Gambling", "Kenya", "Fintech"]),
+    );
+    expect(mentions.find((one) => one.term === "India")?.sentence).toContain(
+      "India",
+    );
+  });
+
+  it("without a reading proposes nothing from a mention: unknown stays unknown", () => {
+    const unread = readWith(MANDATE, VOCABULARY);
+    expect(unread.proposals.map((p) => p.dimension)).toEqual(["CHEQUE"]);
+    expect(unread.excludedPlaces).toEqual([]);
   });
 });

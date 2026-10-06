@@ -15,11 +15,12 @@ export { parseFigure } from "./figure.js";
  *
  * The journey's own definition says what an answer may be; this module
  * only recognises when a sentence already is one — an option named in
- * plain words, a figure inside a range, a yes, a plain text answer — and
- * a handful of conversational moves: skip, I don't know, why, later,
- * upload. Nothing here consults a model, and nothing here decides that a
- * sentence it could not place means anything at all: that sentence goes
- * to Q's reading and comes back as suggestions the person confirms.
+ * plain words, a figure inside a range, a plain text answer. The
+ * conversational moves (skip, I don't know, why, upload, a plain yes or
+ * no) are read by meaning before this is called and handed in (J7);
+ * nothing here consults a model, and nothing here decides that a sentence
+ * it could not place means anything at all: that sentence goes to Q's
+ * reading and comes back as suggestions the person confirms.
  *
  * Journeys widen recognition with alias tables (an investor writes
  * "Series A", a definition stores `series_a`); the runtime never guesses
@@ -45,18 +46,16 @@ export type StepInterpretation =
   | { readonly kind: "NARRATIVE" }
   | { readonly kind: "UNCLEAR" };
 
-const SKIP =
-  /^(?:skip|skip (?:this|it|that)(?: for now)?|next|pass|move on|later|not now|come back to (?:this|it|that)(?: later)?|(?:i(?:'| a)?ll )?come back to (?:this|it)(?: later)?)[.!]?$/i;
-const DONT_KNOW =
-  /^(?:i )?(?:don'?t|do not|dont) know(?: yet| that)?[.!]?$|^(?:not sure|no idea|unsure|no clue)(?: yet)?[.!]?$/i;
-const WHY =
-  /^(?:why|why (?:do you (?:need|ask|want)|does (?:this|that|it) matter|is (?:this|that) (?:needed|important|relevant))(?: (?:this|that|it))?|what(?:'s| is) (?:this|that) for)\??[.!]?$/i;
-const UPLOAD =
-  /\b(?:upload|attach|send (?:you )?(?:my|a|the) (?:deck|document|file|memo|model)|share (?:my|a|the) (?:deck|document|file|memo|model)|(?:my|the) deck (?:covers|has|says|answers)|let me upload)\b/i;
-const YES =
-  /^(?:yes|yep|yeah|yup|correct|right|that'?s right|looks right|looks good|confirmed?|sure|ok|okay|exactly|all good)[.!]?$/i;
-const NO =
-  /^(?:no|nope|not quite|not right|wrong|that'?s wrong|incorrect|not really|change (?:it|that|something))[.!]?$/i;
+/**
+ * A conversational move in reply to a step, read by meaning (founder brief
+ * J7, ONBOARDING_MOVE_READER): skip, don't know, why, upload, a plain yes
+ * or no. Fixed phrase lists used to guess these; now the runtime reads the
+ * move through the Model Gateway and hands it here. Null: not read, and no
+ * move is recognised -- the words are placed as an answer if they are one,
+ * or go to Q's reading, never guessed into a skip or a yes.
+ */
+export type UtteranceMove =
+  "SKIP" | "DONT_KNOW" | "WHY" | "UPLOAD" | "YES" | "NO" | "NONE";
 
 /** Option keys that already mean "I cannot say": a real answer, not a skip. */
 const UNSURE_OPTION_KEYS = new Set([
@@ -100,9 +99,6 @@ export type ReferenceCandidate = {
   readonly id: string;
   readonly name: string;
 };
-
-const ONLY_ONE =
-  /^(?:yes|yep|ok|okay|sure|that one|the only one|use it|use that|go ahead|fine|that's the one)[.!]?$/i;
 
 /** Words that carry no name: "the growth fund" names "Growth Fund II". */
 const FILLER_WORDS = new Set([
@@ -171,21 +167,25 @@ export function interpretUtterance(
   text: string,
   step: InterpretableStep,
   aliases: OnboardingUtteranceAliases = {},
+  /** The move read by meaning (J7); null or absent: none recognised. */
+  move: UtteranceMove | null = null,
 ): StepInterpretation {
   const trimmed = text.trim();
   const { presentation } = step;
   const stepAliases = aliases[step.stepKey];
+  const yes = move === "YES";
+  const no = move === "NO";
 
-  if (WHY.test(trimmed)) {
+  if (move === "WHY") {
     return { kind: "WHY" };
   }
-  if (UPLOAD.test(trimmed) && wordsOf(trimmed).length <= 16) {
+  if (move === "UPLOAD") {
     return { kind: "UPLOAD" };
   }
-  if (SKIP.test(trimmed)) {
+  if (move === "SKIP") {
     return { kind: "SKIP" };
   }
-  if (DONT_KNOW.test(trimmed)) {
+  if (move === "DONT_KNOW") {
     // A definition that offers "not sure" makes that the honest answer;
     // otherwise unknown stays unknown, which is what a skip records.
     if (
@@ -233,14 +233,14 @@ export function interpretUtterance(
       // Two-option yes/no steps answered as such.
       if (presentation.options.length === 2) {
         const [first, second] = presentation.options;
-        if (YES.test(trimmed) && first !== undefined) {
+        if (yes && first !== undefined) {
           return {
             kind: "ANSWER",
             value: { type: "SINGLE_SELECT", optionKey: first.optionKey },
             summary: first.label,
           };
         }
-        if (NO.test(trimmed) && second !== undefined) {
+        if (no && second !== undefined) {
           return {
             kind: "ANSWER",
             value: { type: "SINGLE_SELECT", optionKey: second.optionKey },
@@ -330,7 +330,7 @@ export function interpretUtterance(
       // The step's own labels ("Save my raise", "Looks right") are answers
       // too; a chip says exactly them.
       const exact = normalise(trimmed);
-      if (YES.test(trimmed) || exact === normalise(presentation.confirmLabel)) {
+      if (yes || exact === normalise(presentation.confirmLabel)) {
         return {
           kind: "ANSWER",
           value: { type: "CONFIRMATION", confirmed: true },
@@ -338,7 +338,7 @@ export function interpretUtterance(
         };
       }
       if (
-        NO.test(trimmed) ||
+        no ||
         (presentation.declineLabel !== undefined &&
           exact === normalise(presentation.declineLabel))
       ) {
@@ -363,9 +363,7 @@ export function interpretUtterance(
         const chosen =
           named.length === 1
             ? named[0]
-            : named.length === 0 &&
-                candidates.length === 1 &&
-                ONLY_ONE.test(trimmed)
+            : named.length === 0 && candidates.length === 1 && yes
               ? candidates[0]
               : undefined;
         if (chosen !== undefined) {

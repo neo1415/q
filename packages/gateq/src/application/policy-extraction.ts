@@ -5,6 +5,7 @@ import type { ActorContext } from "@capital-q/security";
 import type { GatewayId } from "../contracts/index.js";
 import {
   MANDATE_READER_VERSION,
+  mandateMentions,
   readMandate,
   type MandateDimension,
   type MandateVocabularyNode,
@@ -64,6 +65,25 @@ export function createPolicyExtractionService(dependencies: {
   readonly gateq: Pick<GateQService, "authoriseEdit">;
   readonly repository: PolicyExtractionRepository;
   readonly vocabulary: readonly MandateVocabularyNode[];
+  /**
+   * Founder brief J7: whether the mandate wants or rules out each mention,
+   * read by meaning (PREFERENCE_POLARITY) through the Model Gateway. By id:
+   * EXCLUDED or AVOIDED rule it out, WANTED wants it; NEUTRAL, a missing id
+   * or no reading leaves it unknown and proposes nothing from it.
+   */
+  readonly polarity?:
+    | ((
+        who: { readonly tenantId: string; readonly userId: string },
+        mentions: readonly {
+          readonly id: string;
+          readonly term: string;
+          readonly sentence: string;
+        }[],
+      ) => Promise<ReadonlyMap<
+        string,
+        "WANTED" | "EXCLUDED" | "AVOIDED" | "NEUTRAL"
+      > | null>)
+    | undefined;
 }) {
   const { gateq, repository, vocabulary } = dependencies;
   return {
@@ -82,7 +102,25 @@ export function createPolicyExtractionService(dependencies: {
       });
       const text = command.text.trim();
       if (text === "") throw new MandateTextEmptyError();
-      const reading = readMandate(text, vocabulary);
+      // The reading runs before anything is written; no transaction waits.
+      const mentions = mandateMentions(text, vocabulary);
+      const read =
+        mentions.length === 0 || dependencies.polarity === undefined
+          ? null
+          : await dependencies
+              .polarity(
+                { tenantId: gateway.tenantId, userId: command.actor.userId },
+                mentions,
+              )
+              .catch(() => null);
+      const reading = readMandate(text, vocabulary, (index) => {
+        const polarity = read?.get(String(index));
+        return polarity === "EXCLUDED" || polarity === "AVOIDED"
+          ? true
+          : polarity === "WANTED"
+            ? false
+            : null;
+      });
       const recorded = await repository.record({
         tenantId: gateway.tenantId,
         gatewayId: gateway.id,

@@ -123,6 +123,7 @@ export {
   howDidItGo,
   notesQuestions,
   proposeMeetingOutcome,
+  type MeetingOutcomeReader,
   type ProposedMeetingOutcome,
 } from "./meeting-assistant/outcome-proposal.js";
 export {

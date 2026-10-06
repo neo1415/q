@@ -8,6 +8,7 @@ import {
   createQTurnReader,
   type QArtifactReviser,
   type QReceiptPort,
+  type ClearCheck,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
   type QMemoryRecall,
@@ -128,6 +129,8 @@ export type QIntelligenceDependencies = {
   readonly statements?: QUserStatementRecorder | undefined;
   /** Where a requested profile change is noted for the action proposer (ADR 0011). */
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
+  /** J7: whether a quote asks to clear a field, read by meaning. */
+  readonly clearCheck?: ClearCheck | undefined;
   /**
    * A typed yes or no to a change waiting in the conversation, read by
    * DECISION_READER and acted on through the Approval Engine (founder
@@ -309,6 +312,9 @@ export function composeQIntelligence(
     ...(dependencies.profileUpdates === undefined
       ? {}
       : { profileUpdates: dependencies.profileUpdates }),
+    ...(dependencies.clearCheck === undefined
+      ? {}
+      : { clearCheck: dependencies.clearCheck }),
     ...(dependencies.memory === undefined
       ? {}
       : { memory: dependencies.memory }),
@@ -367,6 +373,9 @@ export function composeQIntelligence(
     ...(dependencies.profileUpdates === undefined
       ? {}
       : { profileUpdates: dependencies.profileUpdates }),
+    ...(dependencies.clearCheck === undefined
+      ? {}
+      : { clearCheck: dependencies.clearCheck }),
     ...(dependencies.memory === undefined
       ? {}
       : { memory: dependencies.memory }),

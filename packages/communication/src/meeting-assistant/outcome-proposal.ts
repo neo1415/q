@@ -6,8 +6,9 @@ import type { QMeetingFollowUp } from "@capital-q/contracts";
  * meeting seems to have led to, from the notes' own agreements and
  * follow-ups, and asks; nothing is recorded until the person says yes.
  *
- * Deterministic, never a model: plain phrases the notes already carry.
- * When nothing clearly matches, there is no proposal -- unknown stays
+ * What the lines led to is read by meaning (founder brief J7,
+ * MEETING_OUTCOME_READER), never matched against phrase rules. When it is
+ * not read, or reads as none, there is no proposal -- unknown stays
  * unknown, and Q just asks how it went. Never infers a pass: a decision
  * not to proceed is the investor's own to state.
  */
@@ -15,44 +16,26 @@ import type { QMeetingFollowUp } from "@capital-q/contracts";
 export type ProposedMeetingOutcome =
   "DILIGENCE" | "FOLLOW_UP_MEETING" | "MATERIALS_REQUESTED" | "INTRODUCTIONS";
 
-/** Strongest first: diligence outranks another call, which outranks materials. */
-const RULES: readonly {
-  readonly outcome: ProposedMeetingOutcome;
-  readonly pattern: RegExp;
-}[] = [
-  {
-    outcome: "DILIGENCE",
-    pattern:
-      /\b(?:due diligence|diligence|data ?room|term sheet|investment committee|IC memo)\b/i,
-  },
-  {
-    outcome: "FOLLOW_UP_MEETING",
-    pattern:
-      /\b(?:follow[- ]up (?:call|meeting)|next (?:call|meeting)|second (?:call|meeting)|meet again|another (?:call|meeting)|reconvene|catch up (?:again|next))\b/i,
-  },
-  {
-    outcome: "MATERIALS_REQUESTED",
-    pattern:
-      /\b(?:send|share|provide)\b[^.]{0,40}\b(?:deck|financials?|model|metrics|materials|data|cap table|projections)\b/i,
-  },
-  {
-    outcome: "INTRODUCTIONS",
-    pattern: /\b(?:intro(?:duce|duction|s)?|connect (?:you|them) with)\b/i,
-  },
-];
+/** The reading of a call's lines; null: not read. */
+export type MeetingOutcomeReader = (
+  lines: readonly string[],
+) => Promise<ProposedMeetingOutcome | "NONE" | null>;
 
-export function proposeMeetingOutcome(notes: {
-  readonly agreements: readonly string[];
-  readonly followUps: readonly QMeetingFollowUp[];
-}): ProposedMeetingOutcome | null {
+/** What the lines led to, by the reader; no reader or no reading: none. */
+export async function proposeMeetingOutcome(
+  notes: {
+    readonly agreements: readonly string[];
+    readonly followUps: readonly QMeetingFollowUp[];
+  },
+  reader: MeetingOutcomeReader | undefined,
+): Promise<ProposedMeetingOutcome | null> {
   const said = [
     ...notes.agreements,
     ...notes.followUps.map((followUp) => followUp.text),
-  ];
-  for (const rule of RULES) {
-    if (said.some((line) => rule.pattern.test(line))) return rule.outcome;
-  }
-  return null;
+  ].filter((line) => line.trim().length > 0);
+  if (said.length === 0 || reader === undefined) return null;
+  const read = await reader(said).catch(() => null);
+  return read === null || read === "NONE" ? null : read;
 }
 
 const PROPOSAL_WORDS: Readonly<Record<ProposedMeetingOutcome, string>> = {
@@ -90,22 +73,30 @@ export function howDidItGo(input: {
  * only from what both sides read -- the agreements. Context Firewall: the
  * organiser's private Q analysis never shapes the other side's question.
  */
-export function notesQuestions(input: {
-  readonly agreements: readonly string[];
-  readonly followUps: readonly QMeetingFollowUp[];
-  readonly inCallProposals: number;
-}): { readonly organiser: string; readonly others: string } {
+export async function notesQuestions(
+  input: {
+    readonly agreements: readonly string[];
+    readonly followUps: readonly QMeetingFollowUp[];
+    readonly inCallProposals: number;
+  },
+  reader?: MeetingOutcomeReader  ,
+): Promise<{ readonly organiser: string; readonly others: string }> {
+  // Two readings side by side: the other side's from the shared lines only.
+  const [mine, theirs] = await Promise.all([
+    proposeMeetingOutcome(input, reader),
+    proposeMeetingOutcome(
+      { agreements: input.agreements, followUps: [] },
+      reader,
+    ),
+  ]);
   return {
     organiser: howDidItGo({
-      proposal: proposeMeetingOutcome(input),
+      proposal: mine,
       followUps: input.followUps.length,
       inCallProposals: input.inCallProposals,
     }),
     others: howDidItGo({
-      proposal: proposeMeetingOutcome({
-        agreements: input.agreements,
-        followUps: [],
-      }),
+      proposal: theirs,
       followUps: 0,
       inCallProposals: 0,
     }),

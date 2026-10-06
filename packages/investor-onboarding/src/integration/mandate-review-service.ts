@@ -107,6 +107,21 @@ export type MandateReviewServiceDependencies = {
     ) => Promise<MandateSynthesis>;
   };
   readonly taxonomy: MandateTaxonomyResolver;
+  /**
+   * Founder brief J7: whether each named red flag is ruled out, avoided or
+   * neither, read by meaning (PREFERENCE_POLARITY) through the Model
+   * Gateway. Absent or failing: no flag is added from the narrative.
+   */
+  readonly polarity?:
+    | ((
+        who: { readonly tenantId: string; readonly userId: string | null },
+        mentions: readonly {
+          readonly id: string;
+          readonly term: string;
+          readonly sentence: string;
+        }[],
+      ) => Promise<ReadonlyMap<string, string> | null>)
+    | undefined;
   /** The onboarding runtime's internal, never-browser-reachable creation. */
   readonly createSuggestion: (command: {
     readonly sessionId: string;
@@ -633,13 +648,19 @@ export function createMandateReview(
       });
     }
 
-    // A deterministic pass over the investor's own words, beside the
-    // model's reading: "never show me gambling" and "I don't love hardware"
-    // are recognised from the published red-flag vocabulary whether or not
-    // the model flagged them, so a firm exclusion is never lost to a quiet
-    // reading. Still a proposal (AVOID) or a question (exclusion) — never a
-    // written hard exclusion.
-    for (const flag of narrativeFlags(narrative)) {
+    // A second pass over the investor's own words, beside the synthesis:
+    // each red flag they name is read for whether they rule it out or
+    // would rather avoid it (J7), so a firm exclusion is never lost to a
+    // quiet synthesis. Unread: nothing added. Still a proposal (AVOID) or a
+    // question (exclusion) -- never a written hard exclusion.
+    const mentions = narrativeMentions(narrative);
+    const polarity =
+      mentions.length === 0 || dependencies.polarity === undefined
+        ? null
+        : await dependencies
+            .polarity({ tenantId, userId: null }, mentions)
+            .catch(() => null);
+    for (const flag of narrativeFlags(mentions, polarity)) {
       if (flag.kind === "EXCLUSION") {
         if (!exclusionFlags.some((existing) => existing.code === flag.code)) {
           exclusionFlags.push({ code: flag.code, quote: flag.quote });
@@ -825,21 +846,17 @@ export function createMandateReview(
 }
 
 /**
- * Firm and soft negatives in the investor's own words, against the
- * published red-flag vocabulary (CQ-PRE-REC-001 §24). "never", "no",
- * "exclude", "hard no" and "not at all" read as an exclusion to confirm;
- * "don't love", "avoid", "not keen", "prefer not" and "less" read as AVOID.
- * A flag word with no negative around it is left to the model's reading.
+ * Each red flag from the published vocabulary (CQ-PRE-REC-001 §24) the
+ * investor names in their own words, with the clause it is in, for the
+ * reading of meaning (founder brief J7, PREFERENCE_POLARITY). Whether the
+ * clause rules it out ("never show me gambling"), would rather avoid it
+ * ("I don't love hardware") or neither is read, not matched against lists
+ * of negative words.
  */
-const FIRM_NEGATIVE =
-  /\b(?:never|no|not at all|exclude|excluded|hard (?:no|pass)|under no circumstances|won't (?:touch|do|look at)|will not (?:touch|do|look at)|do not show|don't show|never show)\b/i;
-const SOFT_NEGATIVE =
-  /\b(?:don't love|do not love|not (?:keen|fond|big) on|avoid|steer clear|prefer not|less (?:keen|interested)|not (?:really )?(?:our|my) thing|wary of|shy away|dislike|not a fan)\b/i;
-
-export function narrativeFlags(
+export function narrativeMentions(
   narrative: string,
-): readonly { code: string; kind: "AVOID" | "EXCLUSION"; quote: string }[] {
-  const found: { code: string; kind: "AVOID" | "EXCLUSION"; quote: string }[] =
+): readonly { id: string; code: string; term: string; sentence: string }[] {
+  const found: { id: string; code: string; term: string; sentence: string }[] =
     [];
   const clauses = narrative
     .split(/[.;\n]|,\s+(?:and|but)\s+|\s+(?:and|but)\s+/i)
@@ -847,14 +864,9 @@ export function narrativeFlags(
     .filter((clause) => clause.length > 0);
   for (const clause of clauses) {
     const lower = clause.toLowerCase();
-    const firm = FIRM_NEGATIVE.test(lower);
-    const soft = SOFT_NEGATIVE.test(lower);
-    if (!firm && !soft) {
-      continue;
-    }
     for (const [code, aliases] of Object.entries(RED_FLAG_ALIASES)) {
-      const named = aliases.some((alias) => {
-        const needle = alias.toLowerCase();
+      const alias = aliases.find((one) => {
+        const needle = one.toLowerCase();
         const at = lower.indexOf(needle);
         if (at < 0) {
           return false;
@@ -863,16 +875,46 @@ export function narrativeFlags(
         const after = lower[at + needle.length] ?? " ";
         return !/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after);
       });
-      if (named && !found.some((flag) => flag.code === code)) {
+      if (alias !== undefined && !found.some((one) => one.code === code)) {
         found.push({
+          id: String(found.length),
           code,
-          kind: firm ? "EXCLUSION" : "AVOID",
-          quote: clause.slice(0, 160),
+          term: alias,
+          sentence: clause.slice(0, 160),
         });
       }
     }
   }
-  return found;
+  return found.slice(0, 40);
+}
+
+/** The flags a polarity reading gives: ruled out, or avoided. */
+export function narrativeFlags(
+  mentions: readonly { id: string; code: string; sentence: string }[],
+  polarity: ReadonlyMap<string, string> | null,
+): readonly { code: string; kind: "AVOID" | "EXCLUSION"; quote: string }[] {
+  if (polarity === null) return [];
+  type Flag = { code: string; kind: "AVOID" | "EXCLUSION"; quote: string };
+  return mentions.flatMap((mention): Flag[] => {
+    const read = polarity.get(mention.id);
+    return read === "EXCLUDED"
+      ? [
+          {
+            code: mention.code,
+            kind: "EXCLUSION" as const,
+            quote: mention.sentence,
+          },
+        ]
+      : read === "AVOIDED"
+        ? [
+            {
+              code: mention.code,
+              kind: "AVOID" as const,
+              quote: mention.sentence,
+            },
+          ]
+        : [];
+  });
 }
 
 /** The step an ambiguity is settled on. Dimensions with no step are not asked. */

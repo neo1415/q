@@ -110,6 +110,8 @@ export type OnboardingServiceOptions = {
    * phrases. Recognition only; the definition still validates the answer.
    */
   readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
+  /** Founder brief J7: a short reply's move, read by meaning. */
+  readonly moveReader?: OnboardingRuntimeDependencies["moveReader"];
   /** Figures and exclusions a journey declares for the interview (CQ-Q-VOICE-001 A). */
   readonly interviewCues?: InterviewCues | undefined;
   /** Capital Q's taxonomy classifier for category phrases (CQ-Q-VOICE-001 A). */
@@ -153,6 +155,7 @@ export function createOnboardingService(
       options.repositories?.interviewTurns ??
       createPostgresOnboardingInterviewTurnRepository(),
     utteranceAliases: options.utteranceAliases,
+    moveReader: options.moveReader,
     interviewCues: options.interviewCues,
     taxonomy: options.taxonomy,
     revisableSteps: options.revisableSteps,

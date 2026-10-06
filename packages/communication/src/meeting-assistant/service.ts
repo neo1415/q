@@ -399,6 +399,23 @@ export function createMeetingAssistantService(dependencies: {
   readonly composer: MeetingNotesComposer;
   /** The organiser's display name, for the record. */
   readonly nameOf: (userId: string) => Promise<string | null>;
+  /**
+   * Founder brief J7: what a call's agreed lines led to, read by meaning
+   * (MEETING_OUTCOME_READER). Absent or failing: no proposal; Q just asks.
+   */
+  readonly outcomeReader?:
+    | ((
+        who: { readonly tenantId: string; readonly userId: string },
+        lines: readonly string[],
+      ) => Promise<
+        | "DILIGENCE"
+        | "FOLLOW_UP_MEETING"
+        | "MATERIALS_REQUESTED"
+        | "INTRODUCTIONS"
+        | "NONE"
+        | null
+      >)
+    | undefined;
   /** The call happened: marked on the relationship's history. */
   readonly onHeld?:
     | ((meeting: {
@@ -963,11 +980,20 @@ export function createMeetingAssistantService(dependencies: {
        where meeting_id = ${row.meeting_id} and kind = 'PROPOSAL'`
       .then((rows) => rows[0]?.n ?? 0)
       .catch(() => 0);
-    const questions = notesQuestions({
-      agreements: notes.agreements,
-      followUps: notes.followUps,
-      inCallProposals,
-    });
+    const questions = await notesQuestions(
+      {
+        agreements: notes.agreements,
+        followUps: notes.followUps,
+        inCallProposals,
+      },
+      dependencies.outcomeReader === undefined
+        ? undefined
+        : (lines) =>
+            dependencies.outcomeReader?.(
+              { tenantId: row.tenant_id, userId: row.user_id },
+              lines,
+            ) ?? Promise.resolve(null),
+    );
     const ask = questions.organiser;
     // A notice's link is a plain path: the notifications check allows no
     // fragment or query (an outcome fragment failed it live, 2026-10-04).

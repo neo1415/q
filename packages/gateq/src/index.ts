@@ -29,6 +29,8 @@ export { publicProjectionOf } from "./domain/public-projection.js";
 export { generateGatewayPublicId } from "./domain/public-id.js";
 export {
   readMandate,
+  mandateMentions,
+  type MentionPolarity,
   MANDATE_READER_VERSION,
   MANDATE_TEXT_MAX_CHARS,
   SECTOR_VOCABULARY,

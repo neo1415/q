@@ -699,14 +699,31 @@ export const DISPLAY_NAME_NOTE =
  * name became a proposal to clear the company's name: a value the model
  * had to invent, and the one it invented was nothing. A missing value is
  * a question for the person, never a change.
+ *
+ * Whether the words ask to clear it is read by meaning (founder brief J7,
+ * UTTERANCE_CHECK), not matched against a list of words; unread, or not
+ * clearly yes, nothing is cleared.
  */
-export function clearsOnPurpose(update: {
-  readonly value: string | null;
+export type ClearCheck = (input: {
   readonly quote: string;
-}): boolean {
+  readonly tenantId: string;
+}) => Promise<"YES" | "NO" | "UNSURE" | null>;
+
+export const CLEAR_QUESTION =
+  "Do these words ask Capital Q to clear, remove or delete this value from their profile, leaving it empty?";
+
+export async function clearsOnPurpose(
+  update: {
+    readonly value: string | null;
+    readonly quote: string;
+  },
+  check: ClearCheck | undefined,
+  tenantId: string,
+): Promise<boolean> {
   if (update.value !== null && update.value.trim().length > 0) return true;
-  return /\b(?:clear|remove|delete|blank|empty|take (?:it|that) off|get rid of)\b/i.test(
-    update.quote,
+  if (check === undefined || update.quote.trim().length === 0) return false;
+  return (
+    (await check({ quote: update.quote, tenantId }).catch(() => null)) === "YES"
   );
 }
 
@@ -1116,6 +1133,8 @@ export type ModelGatewayQAnswerDependencies = {
    * approves, the owning context writes.
    */
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
+  /** J7: whether a quote asks to clear a field, read by meaning. */
+  readonly clearCheck?: ClearCheck | undefined;
   /** Changing a document Q already prepared (ADR 0013). */
   readonly artifacts?: QArtifactReviser | undefined;
   /**
@@ -3329,13 +3348,17 @@ export function createModelGatewayQAnswer(
         const readUpdates = z
           .array(ProfileUpdateSchema)
           .safeParse(analyst.profileUpdates);
-        const profileUpdates = readUpdates.success
-          ? readUpdates.data.filter(
-              (update) =>
-                said.includes(update.quote.toLowerCase()) &&
-                clearsOnPurpose(update),
+        const quoted = readUpdates.success
+          ? readUpdates.data.filter((update) =>
+              said.includes(update.quote.toLowerCase()),
             )
           : [];
+        const kept = await Promise.all(
+          quoted.map((update) =>
+            clearsOnPurpose(update, dependencies.clearCheck, request.tenantId),
+          ),
+        );
+        const profileUpdates = quoted.filter((_, index) => kept[index]);
         const proposed =
           dependencies.profileUpdates !== undefined &&
           ownCompany !== undefined &&

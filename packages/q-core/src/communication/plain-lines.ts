@@ -12,6 +12,11 @@
  * and tells them nothing they can act on. The rule is checkable now, and
  * a test checks it.
  *
+ * Founder brief J7: kept as a deterministic check because it reads only
+ * Capital Q's OWN sentences (never a person's words) for forbidden
+ * content -- vendor names, machine codes -- and a hit changes wording,
+ * never what anyone may do.
+ *
  * It is a wording rule, not a security control. Nothing here decides what
  * may be disclosed; the Context Firewall does that, long before a sentence
  * is written.

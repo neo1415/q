@@ -541,7 +541,15 @@ export const MESSAGE_PROBLEMS = [
 ] as const;
 export type MessageProblem = (typeof MESSAGE_PROBLEMS)[number];
 
-/** History Q does not have, claimed: never, in any message it writes. */
+/**
+ * History Q does not have, claimed: never, in any message it writes.
+ *
+ * Founder brief J7: kept as a deterministic guard. It reads Q's OWN draft,
+ * never a person's words, and blocks a forbidden claim (invented shared
+ * history) before anything is sent; a miss here is caught again by the
+ * reviewer's GROUNDED rule, and a false hit only sends the draft back for
+ * a redraft, never sends or decides anything.
+ */
 const FALSE_HISTORY =
   /\b(?:i(?:'|’)?ve|i have|we(?:'|’)?ve|we have)\s+been\s+(?:following|watching|tracking|keeping (?:an )?eye on)\b|\bbeen following\b|\bas (?:we|i) (?:discussed|mentioned|spoke)\b|\b(?:great|good|nice|lovely) (?:to|speaking|talking|chatting) (?:again|with you again)\b|\b(?:when|since) we (?:last )?(?:met|spoke|talked)\b|\bour (?:last|previous|earlier|recent) (?:call|chat|conversation|meeting)\b|\bfollowing up on our\b|\b(?:good|great) to reconnect\b|\bwe(?:'|’)?ve (?:met|spoken)\b/iu;
 
@@ -559,6 +567,10 @@ const MEETING =
  * slot, "find a time" -- each in its scheduling sense, not "how do you
  * meet demand?".
  */
+// Founder brief J7: kept, as FALSE_HISTORY above -- it checks Q's OWN
+// draft for an ask the grant forbids (a meeting before they replied),
+// beside the planner's typed field and the reviewer's ASK_TIMING; a hit
+// only refuses or redrafts the message, it never acts.
 const MEETING_ASK = new RegExp(
   [
     String.raw`\btimes?\b[^?]{0,40}\b(?:work|works|suit|suits|convenient|free|good|best|available|open)\b`,

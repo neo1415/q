@@ -45,6 +45,7 @@ import {
   DISPLAY_NAME_NOTE,
   NEXT_STEP_NOTE,
   clearsOnPurpose,
+  type ClearCheck,
   withoutActionTalk,
   requestedChangeValues,
   type QMemoryRecall,
@@ -139,6 +140,8 @@ export type CompanyIntelligenceDependencies = {
   readonly statements?: QUserStatementRecorder | undefined;
   /** Where a requested profile change is noted for the action proposer (ADR 0011). */
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
+  /** J7: whether a quote asks to clear a field, read by meaning. */
+  readonly clearCheck?: ClearCheck | undefined;
   /** What Capital Q remembers about the person (ADR 0012). Absent: nothing is. */
   readonly memory?: QMemoryRecall | undefined;
   readonly registry?: PromptRegistry | undefined;
@@ -896,13 +899,21 @@ export function createCompanyIntelligenceSpecialist(
       const readUpdates = z
         .array(ProfileUpdateSchema)
         .safeParse(analyst?.profileUpdates);
-      const profileUpdates = readUpdates.success
-        ? readUpdates.data.filter(
-            (update) =>
-              askedFor.includes(update.quote.toLowerCase()) &&
-              clearsOnPurpose(update),
+      const quoted = readUpdates.success
+        ? readUpdates.data.filter((update) =>
+            askedFor.includes(update.quote.toLowerCase()),
           )
         : [];
+      const kept = await Promise.all(
+        quoted.map((update) =>
+          clearsOnPurpose(
+            update,
+            dependencies.clearCheck,
+            context.actor.tenantId,
+          ),
+        ),
+      );
+      const profileUpdates = quoted.filter((_, index) => kept[index]);
       // A profile change needs a profile: none is proposed for a company
       // Capital Q holds no record of.
       const proposedChange =

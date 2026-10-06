@@ -151,6 +151,7 @@ import {
   monthOf,
 } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
+import { createWordsReaders } from "@capital-q/model-gateway/q";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 
@@ -524,6 +525,32 @@ if (gateqProviderSecrets.openai !== undefined) {
   );
 }
 
+/**
+ * Founder brief J7: people's words read by meaning (a setup reply's move,
+ * whether a mandate wants or rules out a term), through the same gateway
+ * and providers, on the cheap FAST_CLASSIFICATION class. Without a provider
+ * nothing is read, and each caller keeps its safe default.
+ */
+const wordsReaders =
+  gateqModelProviders.length === 0
+    ? undefined
+    : createWordsReaders({
+        gateway: createModelGateway({
+          catalog: createPostgresModelCatalog({ sql: database.sql }),
+          registry: createModelProviderRegistry(gateqModelProviders),
+          usage: createPostgresModelUsageRepository({ sql: database.sql }),
+          health: createProcessLocalProviderHealth(),
+          syntheticDemo: createSyntheticDemoRoutingAllowance({
+            operatorEnabled: gateqProviderSecrets.syntheticDemoRouting,
+            environment: config.runtime.deploymentEnvironment,
+            databaseUrl: databaseConfig.secrets.url,
+          }),
+          logger: createLogger(apiServiceIdentity(config), {
+            level: config.observability.logLevel,
+          }),
+        }),
+      });
+
 const gateqApply =
   gateqModelProviders.length === 0
     ? undefined
@@ -634,6 +661,15 @@ const onboarding = createOnboardingService({
     ...FOUNDER_UTTERANCE_ALIASES,
     ...INVESTOR_UTTERANCE_ALIASES,
   },
+  // J7: a short reply's move (skip, why, a plain yes), read by meaning.
+  moveReader:
+    wordsReaders === undefined
+      ? undefined
+      : (input) =>
+          wordsReaders.onboardingMove(
+            { tenantId: input.tenantId, userId: input.userId },
+            input,
+          ),
   // Where each journey's figures and exclusions live in a sentence, and
   // Capital Q's own taxonomy classifier for category phrases
   // (CQ-Q-VOICE-001 A): one sentence may answer many questions, each
@@ -1875,6 +1911,14 @@ const { app, logger } = createApp(config, security, {
         sql: database.sql,
       }),
       vocabulary: mandateVocabularyFrom(),
+      // J7: wanted or ruled out, read by meaning; none: nothing proposed
+      // from a mention whose meaning could not be read.
+      ...(wordsReaders === undefined
+        ? {}
+        : {
+            polarity: (who, mentions) =>
+              wordsReaders.preferencePolarity(who, mentions),
+          }),
     });
     return {
       extract: (command) =>

@@ -34,6 +34,11 @@
  *
  * So this sits on the last surface before a person reads the text.
  *
+ * Founder brief J7: kept as a deterministic guard because it reads only
+ * Q's OWN answer, never a person's words, and only removes a forbidden
+ * claim (an invented score, rank or percentage); a model judging that
+ * would be the very thing it guards against.
+ *
  * It removes the sentence rather than rewriting it. A rewritten explanation
  * is one nobody wrote, and Capital Q would still be the author of a claim it
  * cannot support. Removing is blunt and occasionally costs an honest
