@@ -1683,6 +1683,11 @@ export function createInstructionEngine(
                 : people.find((person) => person.relationshipId === subject)
                     ?.name) ?? "them";
             const factsText = [
+              // Where this message is written, as a fact the reviewer may
+              // ground on (autopilot P1, live 2026-10-06: drafts scoring
+              // 75-97 were held as ungrounded for saying the sender came
+              // across them on Capital Q, which is simply where they are).
+              `Platform: ${principalName} writes inside Capital Q, where ${counterpartName} has a Capital Q profile; "Their" facts come from that profile and "Sender" facts are ${principalName}'s own declared mandate and profile.`,
               ...(material?.sender.facts ?? []).map(
                 (fact) => `Sender ${fact.label}: ${fact.text}`,
               ),

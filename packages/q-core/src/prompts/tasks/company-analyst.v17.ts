@@ -45,7 +45,8 @@ export const COMPANY_ANALYST_V17: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V16,
   version: 17,
-  status: "ACTIVE",
+  // Deprecated by v18 (fit out of 10 and sharper advice, 2026-10-06).
+  status: "DEPRECATED",
   changeDescription:
     "Founder brief 2026-10-05 (C1-C5, C9): answerCards for a top N, a comparison or research parts, with a level per measure from which code computes fit and order; the answer text a short spoken walk-through; no table of the same things and no file unless asked.",
   effectiveFrom: "2026-10-05",

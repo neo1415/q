@@ -1685,6 +1685,34 @@ describe("a firing with the reviewer on", () => {
     });
   });
 
+  it("autopilot P1: the reviewer is told the message is written inside Capital Q, so saying so is grounded", async () => {
+    ran.length = 0;
+    const store = createInMemoryWorkforceStore();
+    const materials: string[] = [];
+    const review = createOutwardReview({
+      store,
+      models: {
+        review: (_who, _trace, variables) => {
+          materials.push(variables.material);
+          return Promise.resolve(passing);
+        },
+        redraft: () => Promise.resolve(null),
+      },
+    });
+    const { engine, row } = world(
+      [{ steps: [chat("I came across your Capital Q profile.")], cannot: [] }],
+      true,
+      IN_HOURS,
+      "0",
+      { review, principalName: () => Promise.resolve("Ada Obi") },
+    );
+    await engine.fire(row.id, "run-review-platform");
+    expect(materials).toHaveLength(1);
+    expect(materials[0]).toMatch(
+      /^Platform: Ada Obi writes inside Capital Q, where .+ has a Capital Q profile/u,
+    );
+  });
+
   it("never sends or offers a draft that does not pass", async () => {
     ran.length = 0;
     const { store, review } = reviewer([failing], null);

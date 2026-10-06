@@ -21,6 +21,7 @@ import {
 import { actorWideScope } from "../plan.js";
 import type { RelationshipIntelligencePort } from "../ports.js";
 import {
+  CHAT_MESSAGE_SEND,
   ChatProposalOutputSchema,
   exactlyOne,
   MEETING_CANCEL,
@@ -332,9 +333,9 @@ const GUIDANCE: Readonly<Record<string, string>> = {
   NOT_CONNECTED:
     "Calls open once they are connected with them: interest expressed and accepted.",
   CALENDAR_NOT_CONNECTED:
-    "Their Google Calendar is not connected. Capital Q says why and how to fix it (`says`); add nothing about booking, and do not promise a time.",
+    "Their Google Calendar is not connected. Capital Q says why and how to fix it (`says`). It is not a dead end: ask which time suits them (or take the one they named) and prepare it with propose_meeting, which proposes that time to the other side in the chat. Promise no invite.",
   CALENDAR_REVOKED:
-    "Their Google Calendar connection expired. Capital Q says why and how to fix it (`says`); add nothing about booking, and do not promise a time.",
+    "Their Google Calendar connection expired. Capital Q says why and how to fix it (`says`). It is not a dead end: ask which time suits them (or take the one they named) and prepare it with propose_meeting, which proposes that time to the other side in the chat. Promise no invite.",
   UNAVAILABLE: "Their calendar could not be read just now; try again shortly.",
 };
 
@@ -423,6 +424,26 @@ function createFindMeetingTimesTool(
       };
     },
   });
+}
+
+/**
+ * The chat message that proposes a call when no calendar invite can be
+ * sent (autopilot P1). Plain, in the person's voice; the time in their
+ * zone, or UTC said as UTC when no zone is known.
+ */
+export function meetingProposalBody(input: {
+  readonly purpose: string;
+  readonly durationMinutes: number;
+  readonly iso: string;
+  readonly timeZone: string | undefined;
+}): string {
+  const instant = new Date(input.iso);
+  const when =
+    input.timeZone === undefined
+      ? `${localLabel(instant, "UTC")} UTC`
+      : `${localLabel(instant, input.timeZone)} (${input.timeZone})`;
+  const purpose = input.purpose.trim().replace(/[.\s]+$/u, "");
+  return `Would ${when} work for a ${String(input.durationMinutes)}-minute call${purpose === "" ? "" : ` about ${purpose}`}? If another time suits you better, suggest one here and I'll send an invite.`;
 }
 
 // --- propose_meeting --------------------------------------------------------
@@ -705,7 +726,7 @@ export function createScheduleTools(
       id: PROPOSE_MEETING,
       providerName: "propose_meeting",
       description:
-        "Prepares a call with the other side of one connected relationship at one exact time, for the person to approve. On approval it becomes a Google Calendar invite with a Meet link, sent from their calendar to the other side's people. Use find_meeting_times first unless they named a time.",
+        "Prepares a call with the other side of one connected relationship at one exact time, for the person to approve. On approval it becomes a Google Calendar invite with a Meet link, sent from their calendar to the other side's people. Without their Google Calendar connected, it prepares a chat message proposing that time to the other side instead (never a dead end). Use find_meeting_times first unless they named a time.",
       supportedPurposes: [...PURPOSES],
       requiredScopeKinds: [...SCOPES],
       input: ProposeMeetingInputSchema,
@@ -740,17 +761,55 @@ export function createScheduleTools(
             : await schedule
                 .canSchedule(context.actor, grant.relationshipId)
                 .catch(() => "OK" as const);
+        const at = await instantOf(input, context);
         if (isCalendarBlock(bookable)) {
-          // meetfix-57: the real reason and the fix, typed, in Capital Q's
-          // words -- never a generic "couldn't".
+          // Autopilot P1 (live 2026-10-04: "I can't set up or book a Google
+          // Meet from here. Your meeting with Nixo is still not arranged"):
+          // a missing calendar is never a dead end. No invite can be sent,
+          // so the time is proposed to them in the relationship's chat --
+          // a card the person approves like any message -- and the
+          // calendar fix is said beside it (meetfix-57's words).
+          const status = prepare(
+            context,
+            {
+              actionType: CHAT_MESSAGE_SEND,
+              payload: {
+                relationshipId: grant.relationshipId,
+                counterpartName: grant.counterpartName,
+                body: meetingProposalBody({
+                  purpose: input.purpose,
+                  durationMinutes: input.durationMinutes,
+                  iso: at.iso,
+                  timeZone: at.timeZone,
+                }),
+              },
+            },
+            labelled(
+              `Propose a call to ${grant.counterpartName}`,
+              at.iso,
+              at.timeZone,
+            ),
+          );
+          const fix = await blockedSays(
+            schedule,
+            context.actor,
+            bookable,
+            grant,
+          );
+          // The status stays the calendar's (said in Capital Q's words by
+          // the answer seam); the card, when one was made, is the message.
           return {
             status: bookable,
-            awaitingApprovalOf:
-              "Nothing prepared: their Google Calendar is not available, so no invite can be sent. Capital Q says why and how to fix it.",
-            says: await blockedSays(schedule, context.actor, bookable, grant),
+            awaitingApprovalOf: status.awaitingApprovalOf,
+            says:
+              status.status === "PREPARED"
+                ? `${fix} Meanwhile I've drafted a message proposing the time to ${grant.counterpartName}; approve it and they can confirm in the chat.`.slice(
+                    0,
+                    600,
+                  )
+                : fix,
           };
         }
-        const at = await instantOf(input, context);
         return prepare(
           context,
           {

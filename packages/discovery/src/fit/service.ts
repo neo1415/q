@@ -4,6 +4,7 @@ import {
   FIT_OUTCOME_LABELS,
   FIT_PARAMETER_LABELS,
   FIT_PARAMETERS,
+  fitScoreOutOf10,
   FitComparisonDtoSchema,
   type FitCandidateSource,
   type FitComparisonDto,
@@ -298,7 +299,10 @@ export function buildFitComparison(input: {
 
 /** One profile, as plain text (Q's fallback where cards are not rendered). */
 export function fitProfileText(name: string, profile: FitProfileDto): string {
-  const head = `${name}: ${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}.`;
+  // ADR 0059: the score out of 10 beside the words, computed here from the
+  // rows below (never by a model); none when too little is known.
+  const score = fitScoreOutOf10(profile);
+  const head = `${name}: ${score === null ? "" : `${score}/10 · `}${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}.`;
   const rows = profile.parameters.map(
     (p) =>
       `- ${FIT_PARAMETER_LABELS[p.parameter]}: ${p.applicable ? FIT_OUTCOME_LABELS[p.outcome] : "No preference"}. ${p.reason}`,

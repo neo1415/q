@@ -13,7 +13,6 @@ import {
   createPromptRegistry,
   PRIVATE_CHARTER_MARKER,
   PROMPT_DEFINITIONS,
-  Q_SYSTEM_V1,
   SYNTHETIC_COMPANY_FACTS,
   type CompanyAnalystResult,
 } from "@capital-q/q-core";
@@ -247,7 +246,7 @@ describe("Q answer seam over the Prompt Registry", () => {
       return;
     }
     expect(outcome.promptBundleVersion).toBe(
-      "q-system.v1_company-analyst.v17_comm.v1",
+      "q-system.v2_company-analyst.v18_comm.v1",
     );
     expect(outcome.modelPolicyVersion).toBe("normal_dialogue.v1");
     expect(messages.at(-1)?.role).toBe("Q");
@@ -313,10 +312,10 @@ describe("Q answer seam over the Prompt Registry", () => {
   it("never lets a charter marker reach the stored message or the logs, whatever the model echoes", async () => {
     const marked = createPromptRegistry(
       PROMPT_DEFINITIONS.map((d) =>
-        d.id === "Q_SYSTEM"
+        d.id === "Q_SYSTEM" && d.status === "ACTIVE"
           ? {
-              ...Q_SYSTEM_V1,
-              template: `${Q_SYSTEM_V1.template}\nINTERNAL TEST MARKER: ${PRIVATE_CHARTER_MARKER}`,
+              ...d,
+              template: `${d.template}\nINTERNAL TEST MARKER: ${PRIVATE_CHARTER_MARKER}`,
             }
           : d,
       ),

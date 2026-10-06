@@ -6,6 +6,7 @@ import {
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   type PermittedContextPlan,
+  MODEL_TOOL_CALLS_MAX,
 } from "@capital-q/contracts";
 import type { CompanyAnalystResult } from "@capital-q/q-core";
 import type {
@@ -656,23 +657,33 @@ describe("answer seam tool loop", () => {
 
   it("bounds rounds and calls, then finishes with one structured call without tools", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
-    const many: FakeBehaviour = {
+    // Each round proposes as many calls as a reply may carry; together
+    // they propose more than the turn's budget.
+    const many = (round: string): FakeBehaviour => ({
       kind: "TOOL_CALLS",
-      calls: Array.from({ length: Q_TOOL_LOOP_MAX_CALLS + 2 }, (_v, i) => ({
-        callId: `c${String(i)}`,
+      calls: Array.from({ length: MODEL_TOOL_CALLS_MAX }, (_v, i) => ({
+        callId: `${round}${String(i)}`,
         name: "get_company",
         arguments: {},
       })),
-    };
+    });
+    expect(MODEL_TOOL_CALLS_MAX * Q_TOOL_LOOP_MAX_ROUNDS).toBeGreaterThan(
+      Q_TOOL_LOOP_MAX_CALLS,
+    );
     const { seam, alpha, request } = build({
-      script: [many, { kind: "JSON", value: analystResult("bounded") }],
+      script: [
+        ...Array.from({ length: Q_TOOL_LOOP_MAX_ROUNDS }, (_v, i) =>
+          many(`m${String(i)}`),
+        ),
+        { kind: "JSON", value: analystResult("bounded") },
+      ],
       tools,
     });
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
-    // The round proposed more than the budget: the surplus is never executed.
+    // The rounds proposed more than the budget: the surplus is never executed.
     expect(tools.executed).toHaveLength(Q_TOOL_LOOP_MAX_CALLS);
-    expect(alpha.calls).toHaveLength(2);
+    expect(alpha.calls).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS + 1);
     const finalCall = alpha.calls.at(-1)?.request;
     expect(finalCall?.output.kind).toBe("STRUCTURED");
     expect(finalCall?.tools).toEqual([]);
@@ -693,6 +704,40 @@ describe("answer seam tool loop", () => {
     expect(perRound.executed).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS);
     expect(rounds.alpha.calls).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS + 1);
     expect(rounds.alpha.calls.at(-1)?.request.output.kind).toBe("STRUCTURED");
+  });
+
+  it("autopilot P1: a look-up may follow a look-up in the same turn, and the second round may answer at once", async () => {
+    expect(Q_TOOL_LOOP_MAX_ROUNDS).toBeGreaterThanOrEqual(2);
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, alpha, request, messages } = build({
+      script: [
+        call("first", { companyId: "a" }),
+        call("second", { companyId: "b" }),
+        { kind: "JSON", value: analystResult("chained") },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed.map((one) => one.arguments)).toEqual([
+      { companyId: "a" },
+      { companyId: "b" },
+    ]);
+    // The second round still held the tools: it was a real chained step.
+    expect(alpha.calls[1]?.request.tools.length).toBeGreaterThan(0);
+    expect(messages.at(-1)?.content).toBe("chained");
+
+    // Answered in the second round: no extra tool-less call is paid.
+    const quick = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const once = build({
+      script: [
+        call("only"),
+        { kind: "JSON", value: analystResult("answered in round two") },
+      ],
+      tools: quick,
+    });
+    expect((await once.seam.answer(once.request)).kind).toBe("ANSWERED");
+    expect(once.alpha.calls).toHaveLength(2);
   });
 
   it("repairs a non-JSON text answer with a final structured call", async () => {

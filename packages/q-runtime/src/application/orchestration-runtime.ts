@@ -122,6 +122,15 @@ export type QOrchestrationRuntime = {
   ) => Promise<QLifecycleOutcome>;
   /** CANCEL_REQUESTED → CANCELLED, with the terminal event. */
   readonly finishCancellation: (ref: QRunRef) => Promise<QLifecycleOutcome>;
+  /**
+   * A run paused for a person (AWAITING_APPROVAL / AWAITING_INPUT) whose
+   * wait ran out → EXPIRED. Nothing failed: the person did not answer in
+   * time, and the lifecycle says so rather than calling it a failure.
+   */
+  readonly expire: (
+    ref: QRunRef,
+    diagnosticCode: "APPROVAL_EXPIRED" | "RUN_EXPIRED",
+  ) => Promise<QLifecycleOutcome>;
 };
 
 type Move = {
@@ -307,6 +316,18 @@ export function createQOrchestrationRuntime(
                 ...(notice === undefined ? {} : { notice }),
               },
             ),
+          },
+        }),
+      }),
+    expire: (ref, diagnosticCode) =>
+      move(ref, {
+        to: "EXPIRED",
+        failureCode: diagnosticCode,
+        event: (run) => ({
+          type: "q.run.failed",
+          data: {
+            status: "EXPIRED",
+            failure: toPublicQFailure({ diagnosticCode }, { runId: run.id }),
           },
         }),
       }),

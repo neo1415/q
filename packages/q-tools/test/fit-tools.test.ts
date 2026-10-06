@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { fitScoreOutOf10 } from "@capital-q/contracts";
 import {
   createFitService,
   type FitCandidate,
@@ -164,6 +165,17 @@ describe("fit tools", () => {
     expect(serialised).not.toMatch(
       /"value"|"score"|confidenceScore|coverage|\d%/,
     );
+    // ADR 0059 / autopilot P2: each entry's score out of 10 is the one code
+    // computes from its rows, said beside its words; the model is told to
+    // repeat it, never to make one.
+    for (const entry of data.comparison?.entries ?? []) {
+      const score = fitScoreOutOf10(entry.profile);
+      expect(data.text).toContain(
+        score === null ? `${entry.name}: ` : `${entry.name}: ${score}/10 · `,
+      );
+    }
+    expect(data.guidance).toContain("score out of 10");
+    expect(data.guidance).toContain("never a score of your own");
   });
 
   it("a founder, or anyone without an investor side, gets nothing", async () => {

@@ -349,7 +349,7 @@ describe("schedule tools", () => {
       );
     });
 
-    it("says Calendar is not connected before anything is prepared", async () => {
+    it("autopilot P1: without Calendar, no invite is prepared -- the time is proposed in the chat instead, never a dead end", async () => {
       const { executor, prepared } = world({ calendarConnected: false });
       const outcome = await executor.execute(
         meetingAt({ day: "tomorrow", time: "14:00" }),
@@ -361,11 +361,21 @@ describe("schedule tools", () => {
           ),
         ),
       );
-      expect(prepared).toEqual([]);
-      expect(outcome.result).toMatchObject({
-        ok: true,
-        data: { status: "CALENDAR_NOT_CONNECTED" },
-      });
+      // No calendar invite: a chat message proposing the time, for approval.
+      expect(prepared.map((one) => one.actionType)).toEqual([
+        "chat.message.send",
+      ]);
+      const body = (prepared[0]?.payload as { body: string }).body;
+      expect(body).toMatch(
+        /^Would .+ \(Europe\/London\) work for a 30-minute call/u,
+      );
+      expect(body).toContain("suggest one here");
+      const data = (
+        outcome.result as { data: { status: string; says: string } }
+      ).data;
+      expect(data.status).toBe("CALENDAR_NOT_CONNECTED");
+      expect(data.says).toContain("Your Google Calendar isn't connected");
+      expect(data.says).toContain("drafted a message proposing the time");
     });
 
     it("says a revoked calendar plainly, with the reconnect link and the paste-a-link alternative (meetfix-57)", async () => {
@@ -380,7 +390,9 @@ describe("schedule tools", () => {
           ),
         ),
       );
-      expect(prepared).toEqual([]);
+      expect(prepared.map((one) => one.actionType)).toEqual([
+        "chat.message.send",
+      ]);
       const data = (
         outcome.result as { data: { status: string; says: string } }
       ).data;
@@ -390,7 +402,9 @@ describe("schedule tools", () => {
         "Your Google Calendar connection expired, so I can't create the Meet link.",
       );
       expect(first).toContain(`(${GOOGLE_RECONNECT_PATH})`);
-      expect(second).toBe("Or paste a Meet link and I'll set it up and join.");
+      expect(second).toMatch(
+        /^Or paste a Meet link and I'll set it up and join\. Meanwhile I've drafted a message proposing the time/u,
+      );
     });
 
     it("offers that the other side host when their calendar is connected (meetfix-57)", async () => {

@@ -36,7 +36,8 @@ ENVIRONMENT
 export const Q_SYSTEM_VOICE_V1: PromptDefinition<QSystemVariables, never> = {
   id: "Q_SYSTEM_VOICE",
   version: 1,
-  status: "ACTIVE",
+  // Deprecated by v2 (Q's own personality, autopilot P3 2026-10-06).
+  status: "DEPRECATED",
   kind: "CHARTER",
   owner: "q-core",
   changeDescription:

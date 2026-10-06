@@ -209,10 +209,13 @@ describe("registry", () => {
     expect(() =>
       createPromptRegistry([Q_SYSTEM_V1, Q_SYSTEM_V1] as PromptDefinition[]),
     ).toThrow(/duplicate/);
-    const v2 = { ...Q_SYSTEM_V1, version: 2 } as PromptDefinition;
-    expect(() =>
-      createPromptRegistry([Q_SYSTEM_V1 as PromptDefinition, v2]),
-    ).toThrow(/ACTIVE/);
+    const v2 = {
+      ...Q_SYSTEM_V1,
+      version: 2,
+      status: "ACTIVE",
+    } as PromptDefinition;
+    const v1 = { ...Q_SYSTEM_V1, status: "ACTIVE" } as PromptDefinition;
+    expect(() => createPromptRegistry([v1, v2])).toThrow(/ACTIVE/);
     const bad = {
       ...Q_SYSTEM_V1,
       version: 3,
@@ -270,7 +273,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v17_comm.v1",
+      "q-system.v2_company-analyst.v18_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -375,7 +378,11 @@ describe("renderer", () => {
     // 3,850 since company-analyst/v16 (prompt cache, 2026-10-02): ~45
     // tokens of section labels and pointers that move this turn's values to
     // the end, so the instructions before them are one cacheable prefix.
-    expect(rendered.characters / 4).toBeLessThan(3_850);
+    // 4,050 since q-system/v2 + company-analyst/v18 (autopilot P2/P3,
+    // 2026-10-06, founder approved): ~200 tokens -- how Q sounds, fit as
+    // the computed score out of 10, and advice that leads with a
+    // recommendation. All in the cached prefix; no extra call.
+    expect(rendered.characters / 4).toBeLessThan(4_050);
   });
 });
 
