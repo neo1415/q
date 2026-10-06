@@ -80,6 +80,7 @@ export function ExploreReview({
       forceLoading={view !== "search" && state === "loading"}
       limitedOrganisation={state === "limited" ? "Northbound Capital" : null}
       startOnRequest
+      posterOnly
       openOnArrival={
         view === "feed"
           ? { index: 0, at: 0 }

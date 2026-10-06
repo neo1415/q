@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell/app-shell";
-import { PageContainer } from "@/components/app-shell/page-container";
 import { searchTabOf } from "@/features/explore/explore-search-view";
 import { ExploreReview } from "@/features/explore/explore-review";
 
@@ -10,6 +9,9 @@ export const metadata: Metadata = {
   title: "Explore (design review)",
   robots: { index: false },
 };
+
+// Read per request: the preview gate is a runtime setting, never baked in at build.
+export const dynamic = "force-dynamic";
 
 const VIEWS = ["grid", "feed", "related", "search"] as const;
 const STATES = ["full", "loading", "empty", "error", "limited"] as const;
@@ -47,14 +49,14 @@ export default async function ExploreReviewPage({
         label: "Northbound Capital (fictional)",
       }}
     >
-      <PageContainer className="flex flex-col gap-4">
+      <div className="flex w-full flex-col gap-4 px-4 pt-4 pb-[calc(var(--cq-bottom-nav-height)+88px)] sm:px-6 lg:px-8 lg:pt-7 lg:pb-16">
         <h1 className="cq-title-md lg:sr-only">Explore</h1>
         <ExploreReview
           view={view}
           state={state}
           tab={searchTabOf(one("tab"))}
         />
-      </PageContainer>
+      </div>
     </AppShell>
   );
 }

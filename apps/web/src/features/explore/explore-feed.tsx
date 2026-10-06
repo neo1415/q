@@ -108,6 +108,7 @@ export function ExploreFeed({
   onHide,
   onClose,
   startOnRequest = false,
+  posterOnly = false,
   initialIndex = 0,
 }: {
   /** Where the feed starts (design review of "related next"). */
@@ -127,6 +128,8 @@ export function ExploreFeed({
   readonly onClose: () => void;
   /** Poster first and nothing played until Play (fixtures, reduced data). */
   readonly startOnRequest?: boolean;
+  /** Design review with fixtures: posters only, no player at all. */
+  readonly posterOnly?: boolean;
 }) {
   const anchor = items[0];
   const [active, setActive] = useState(0);
@@ -241,7 +244,7 @@ export function ExploreFeed({
               {...(at === active ? { "data-feed-active": "" } : {})}
             >
               <div className="cq-explore-stage">
-                {policy === "NONE" ? (
+                {policy === "NONE" || posterOnly ? (
                   posters[item.pitch.mediaAssetId] === undefined ? null : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

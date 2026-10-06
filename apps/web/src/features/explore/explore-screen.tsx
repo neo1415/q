@@ -145,6 +145,7 @@ export function ExploreScreen({
   sectors = [],
   limitedOrganisation = null,
   startOnRequest = false,
+  posterOnly = false,
   openOnArrival = null,
 }: {
   /** Design review: open this tile's feed on arrival, at this position. */
@@ -163,6 +164,8 @@ export function ExploreScreen({
   /** Pitches for verified investors only are not shown to this viewer. */
   readonly limitedOrganisation?: string | null;
   readonly startOnRequest?: boolean;
+  /** Design review only: the opened feed shows posters, never a player. */
+  readonly posterOnly?: boolean;
 }) {
   const columns = useColumns();
   const sectorLabels = useMemo(
@@ -458,6 +461,7 @@ export function ExploreScreen({
         onHide={onHide}
         onClose={close}
         startOnRequest={startOnRequest}
+        posterOnly={posterOnly}
         initialIndex={openOnArrival?.at ?? 0}
       />
     );

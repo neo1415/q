@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 
 import { exploreSlate, listTaxonomyNodes } from "@capital-q/api-client";
 
-import { PageContainer } from "@/components/app-shell/page-container";
 import { loadExploreSearch } from "@/features/explore/explore-search";
 import { searchTabOf } from "@/features/explore/explore-search-view";
 import { ExploreScreen } from "@/features/explore/explore-screen";
@@ -53,7 +52,7 @@ export default async function ExplorePage({
       sectors,
     }).catch(() => undefined);
     return (
-      <PageContainer className="flex flex-col gap-4">
+      <div className="flex w-full flex-col gap-4 px-4 pt-4 pb-[calc(var(--cq-bottom-nav-height)+88px)] sm:px-6 lg:px-8 lg:pt-7 lg:pb-16">
         <h1 className="cq-title-md lg:sr-only">Explore</h1>
         <ExploreScreen
           search={
@@ -73,16 +72,16 @@ export default async function ExplorePage({
           }
           sectors={sectors}
         />
-      </PageContainer>
+      </div>
     );
   }
 
   const initial =
     session === null ? null : await exploreSlate(session, {}).catch(() => null);
   return (
-    <PageContainer className="flex flex-col gap-4">
+    <div className="flex w-full flex-col gap-4 px-4 pt-4 pb-[calc(var(--cq-bottom-nav-height)+88px)] sm:px-6 lg:px-8 lg:pt-7 lg:pb-16">
       <h1 className="cq-title-md lg:sr-only">Explore</h1>
       <ExploreScreen initial={initial} sectors={sectors} />
-    </PageContainer>
+    </div>
   );
 }
