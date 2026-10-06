@@ -983,6 +983,16 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "MEDIA",
     "Reads the part of a pitch video they are watching.",
   ),
+  tool(
+    "explore_pitches_like",
+    "MEDIA",
+    "Finds pitches on the network like a company's (same founder, sector, stage or country), as Explore shows them.",
+  ),
+  tool(
+    "search_network",
+    "RECORDS",
+    "Searches companies and pitches on the network, as Explore's search does; each opens its profile.",
+  ),
   tool("get_company", "RECORDS", "Reads a company's profile on Capital Q."),
   tool(
     "get_capital_objective",

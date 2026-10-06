@@ -1,3 +1,4 @@
+import type { ExploreToolPort } from "./tools/explore.js";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
 import type {
@@ -377,6 +378,8 @@ export type QToolPorts = {
   readonly profileGaps?: ProfileGapsPort | undefined;
   /** A pitch's transcript around a moment (R18); absent means no pitch tool. */
   readonly pitchMoments?: PitchMomentPort | undefined;
+  /** Explore (ADR 0055): pitches like X and network search; absent means no Explore tools. */
+  readonly explore?: ExploreToolPort | undefined;
   /** Who can see what (CQ-BIZ-003); absent means no visibility tool exists. */
   readonly visibility?: VisibilityIntelligencePort | undefined;
   /**

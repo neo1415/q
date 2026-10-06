@@ -50,6 +50,7 @@ import {
 import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
+import { createExploreTools } from "./tools/explore.js";
 import { createVisibilityTools } from "./tools/visibility.js";
 import { createQDailyTools } from "./tools/daily.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
@@ -172,6 +173,8 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.pitchMoments === undefined
       ? []
       : [createGetPitchMomentTool(ports.pitchMoments)]),
+    // Explore (ADR 0055): "pitches like X" and "search the network".
+    ...(ports.explore === undefined ? [] : createExploreTools(ports.explore)),
     // CQ-BIZ-003: who can see what, and sharing, prepared for approval.
     ...(ports.visibility === undefined
       ? []
