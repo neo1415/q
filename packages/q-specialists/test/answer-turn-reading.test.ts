@@ -873,6 +873,9 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           expect.objectContaining({ destination: "VERIFICATION" }),
           // GateQ: an investor sets up their gateway from their mandate.
           expect.objectContaining({ destination: "GATEWAY" }),
+          // F3/F4: the GateQ inbox's approved words, and Find my startup.
+          expect.objectContaining({ destination: "GATEWAY" }),
+          expect.objectContaining({ destination: "GATEWAY" }),
         ],
       },
     ]);

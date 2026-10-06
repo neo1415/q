@@ -58,6 +58,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('identity', 'organisation_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('core', 'companies',                    'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'company_creation_requests',    'INTERNAL_SERVER_ONLY', '{}'),
+  -- F3 (Find my startup): server-only, suite 810.
+  ('core', 'company_claim_requests',       'INTERNAL_SERVER_ONLY', '{}'),
   ('core', 'company_members',              'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'founder_profiles',             'RLS_REQUIRED',         '{SELECT}'),
   -- Overnight A7: a founder's own facts and background (own-row select).

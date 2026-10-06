@@ -524,12 +524,7 @@ describe("the download pack (F4)", () => {
       body: "SECRET internal view",
       clientRequestId: "note-0000001",
     });
-    const pack = await service.pack(
-      actor(MEMBER),
-      GATEWAY,
-      APP_FIT,
-      "Sara Kamau",
-    );
+    const pack = await service.pack(actor(MEMBER), GATEWAY, APP_FIT);
     if (!("bytes" in pack)) throw new Error("refused");
     expect(pack.fileName).toBe("Sunline-2026-10-06.zip");
     const entries = zipEntries(pack.bytes);
