@@ -1305,3 +1305,8 @@ export * from "./reviews-kyb.js";
 export * from "./etiquette.js";
 // MATCH block (ADR 0052): fit with your mandate, Q's view, top N.
 export * from "./fit.js";
+// PROFILE block (overnight A1-A8): data room, pitch deck, founder as a person.
+export * from "./data-room.js";
+export * from "./deck.js";
+export * from "./founder-person.js";
+// end PROFILE block

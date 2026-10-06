@@ -151,12 +151,12 @@ const FOUNDER_VIEW: CompanyProfileDto = {
 
 function renderProfile(
   profile: CompanyProfileDto,
-  tab: "overview" | "videos" = "overview",
+  tab: "overview" | "elevator" = "overview",
 ) {
   return render(
     <CompanyProfileView
       profile={profile}
-      tab={profile.overview === null ? "videos" : tab}
+      tab={profile.overview === null ? "elevator" : tab}
       interest={null}
       connected={false}
       sectorLabels={["Energy storage"]}
@@ -210,14 +210,17 @@ describe("the avatar over a Discover pitch", () => {
 });
 
 describe("the profile, for an investor", () => {
-  it("has Overview and Videos, the dossier, and the decisions", () => {
+  it("has Overview, Elevator, Data room, Pitch deck and Team, the dossier, and the decisions", () => {
     renderProfile(investorProfile());
     expect(
       screen.getByRole("heading", { level: 1, name: "Kivu Grid" }),
     ).toBeTruthy();
     const tabs = screen.getByRole("navigation", { name: "Kivu Grid profile" });
     expect(tabs.textContent).toContain("Overview");
-    expect(tabs.textContent).toContain("Videos");
+    expect(tabs.textContent).toContain("Elevator");
+    for (const name of ["Data room", "Pitch deck", "Team"]) {
+      expect(tabs.textContent).toContain(name);
+    }
     expect(
       screen
         .getByRole("link", { name: "Overview" })
@@ -380,7 +383,9 @@ describe("the profile, for a founder viewing another company", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Overview" })).toBeNull();
     expect(
-      screen.getByRole("link", { name: /Videos/ }).getAttribute("aria-current"),
+      screen
+        .getByRole("link", { name: /Elevator/ })
+        .getAttribute("aria-current"),
     ).toBe("page");
     expect(screen.queryByRole("button", { name: "Pass" })).toBeNull();
     expect(screen.queryByRole("button", { name: /interest/i })).toBeNull();
@@ -395,9 +400,9 @@ describe("the profile, for a founder viewing another company", () => {
   });
 });
 
-describe("the Videos tab", () => {
+describe("the Elevator tab (A2: replaces Videos)", () => {
   it("signs nothing until Play, then exactly the pressed video, one player at a time", async () => {
-    const { container } = renderProfile(investorProfile(), "videos");
+    const { container } = renderProfile(investorProfile(), "elevator");
     expect(screen.getAllByRole("button", { name: /^Play / })).toHaveLength(2);
     expect(authorisePlaybackAction).not.toHaveBeenCalled();
     expect(container.querySelector("video")).toBeNull();

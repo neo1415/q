@@ -991,6 +991,22 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Reads the part of a pitch video they are watching.",
   ),
   tool("get_company", "RECORDS", "Reads a company's profile on Capital Q."),
+  // Overnight A8: the profile's Pitch deck and Data room tabs, as shown.
+  tool(
+    "read_company_deck",
+    "RECORDS",
+    "Reads a company's pitch deck in twelve sections, as its Pitch deck tab shows it.",
+  ),
+  tool(
+    "read_company_data_room",
+    "RECORDS",
+    "Lists a company's data room as its Data room tab shows it.",
+  ),
+  tool(
+    "coach_my_deck",
+    "RECORDS",
+    "Reads the coaching on their own pitch deck: scores, gaps and how to improve.",
+  ),
   tool(
     "get_capital_objective",
     "RECORDS",

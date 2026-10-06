@@ -149,6 +149,8 @@ describe("relationship event registry", () => {
       "relationship_progressed",
       "document_requested",
       "document_shared",
+      "data_room_access_requested",
+      "data_room_access_granted",
     ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",

@@ -35,6 +35,8 @@ import type {
   RelationshipOutcomeService,
 } from "@capital-q/network";
 import type {
+  CompanyDeckService,
+  DataRoomService,
   DiligenceService,
   VisibilityCentre,
 } from "@capital-q/permissions";
@@ -210,6 +212,13 @@ export type AppActionPorts = {
         "view" | "share" | "revoke" | "request" | "uploadAndFulfil"
       >
     | undefined;
+  /** The data room (overnight A3): levels, requests and answers. */
+  readonly dataRoom?:
+    | Pick<DataRoomService, "view" | "setLevel" | "requestAccess" | "decide">
+    | undefined;
+  /** The pitch-deck tab (overnight A4-A6): the deck, Q's reading, coaching. */
+  readonly companyDeck?:
+    Pick<CompanyDeckService, "view" | "confirm"> | undefined;
   /** Post-meeting outcomes (2026-10-02): Network's outcome service. */
   readonly outcomes?:
     | Pick<

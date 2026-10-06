@@ -440,3 +440,15 @@ export {
   saveMyEtiquetteGuide,
 } from "./etiquette.js";
 export * from "./fit.js";
+// PROFILE block (overnight A1-A8)
+export {
+  confirmDeckReading,
+  decideDataRoomRequest,
+  getCompanyDataRoom,
+  getCompanyDeck,
+  getCompanyFounder,
+  openCompanyDeck,
+  openDataRoomDocument,
+  requestDataRoomAccess,
+  setDataRoomLevel,
+} from "./profile-material.js";

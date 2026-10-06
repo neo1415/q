@@ -2,7 +2,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type {
+  CompanyDeckView,
   CompanyProfileDto,
+  DataRoomView,
   CompanyProfileTeamMember,
   InterestDto,
   RelationshipStateV2,
@@ -31,6 +33,10 @@ import {
 import { countryLabel, stageLabel } from "./declared-labels";
 import { moneyText } from "./money-text";
 import { ReadMore } from "./read-more";
+import { InvestorDataRoom, OwnerDataRoom } from "./material/data-room";
+import { DeckCoach, DeckForReaders } from "./material/deck";
+import { FitPanelSlot } from "./material/fit-panel-slot";
+import { TeamTab } from "./material/team";
 
 /**
  * A company's profile (founder request 2026-10-02): an identity header,
@@ -48,7 +54,24 @@ import { ReadMore } from "./read-more";
  * never zeros.
  */
 
-export type ProfileTab = "overview" | "videos";
+export type ProfileTab = "overview" | "elevator" | "dataroom" | "deck" | "team";
+
+/** `?tab=` as the URL says it; "videos" is the old name of Elevator. */
+export function profileTabOf(requested: string | undefined): ProfileTab | null {
+  switch (requested) {
+    case "overview":
+    case "elevator":
+    case "dataroom":
+    case "deck":
+    case "team":
+      return requested;
+    case "videos":
+      return "elevator";
+    case undefined:
+    default:
+      return null;
+  }
+}
 
 /** What the company shared with this reader in diligence, by title. */
 export type DiligenceShared = {
@@ -176,6 +199,9 @@ export function CompanyProfileView({
   sectorLabels,
   relationshipState = null,
   diligence = null,
+  dataRoom = null,
+  deck = null,
+  previewAsInvestor = false,
 }: {
   readonly profile: CompanyProfileDto;
   readonly tab: ProfileTab;
@@ -188,6 +214,12 @@ export function CompanyProfileView({
    * the diligence area (its own authorisation) says the company shared.
    */
   readonly diligence?: DiligenceShared | null;
+  /** The Data room tab's read (the API decides the reader); null: not available. */
+  readonly dataRoom?: DataRoomView | null;
+  /** The Pitch deck tab's read; null: not available. */
+  readonly deck?: CompanyDeckView | null;
+  /** The owner looking at their own deck as investors see it. */
+  readonly previewAsInvestor?: boolean;
 }) {
   const { overview } = profile;
   const investor = profile.viewer === "INVESTOR";
@@ -209,289 +241,381 @@ export function CompanyProfileView({
     headquartersCountry: profile.headquartersCountry,
   };
 
+  const visibleDocuments = dataRoom === null ? null : dataRoom.documents.length;
+  const tabs: readonly (readonly [ProfileTab, string, number | null])[] =
+    overview === null
+      ? [["elevator", "Elevator", profile.videos.length]]
+      : [
+          ["overview", "Overview", null],
+          ["elevator", "Elevator", profile.videos.length],
+          ["dataroom", "Data room", visibleDocuments],
+          ["deck", "Pitch deck", null],
+          [
+            "team",
+            "Team",
+            overview.team.length === 0 ? null : overview.team.length,
+          ],
+        ];
+
   return (
     <article
-      className="flex flex-col gap-6"
+      className={
+        investor
+          ? "grid grid-cols-1 gap-6 [grid-template-areas:'head'_'fit'_'tabs'_'body'] lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-x-10 lg:[grid-template-areas:'head_fit'_'tabs_fit'_'body_fit']"
+          : "grid grid-cols-1 gap-6 [grid-template-areas:'head'_'tabs'_'body']"
+      }
       aria-labelledby="company-name"
       data-company-profile={profile.viewer}
     >
-      {typeof profile.coverUrl === "string" ? (
-        // Only a cover the card's own scope shows this reader.
-        <EntityCover src={profile.coverUrl} className="rounded-xl" />
-      ) : null}
-      <header className="flex items-start gap-4">
-        <CompanyAvatar
-          companyId={profile.companyId}
-          photoUrl={profile.photoUrl}
-          size={72}
-        />
-        <div className="flex min-w-0 flex-col gap-1">
-          <h1
-            id="company-name"
-            className="cq-title-lg text-(--cq-text-primary)"
-          >
-            {profile.canonicalName}
-          </h1>
-          {profile.shortDescription === null ? null : (
-            <p className="cq-body line-clamp-3 text-(--cq-text-primary) sm:line-clamp-none">
-              {profile.shortDescription}
-            </p>
-          )}
-          {line === "" ? null : (
-            <p className="cq-caption text-(--cq-text-secondary)">{line}</p>
-          )}
-          {overview?.organisationVerified === true ? (
-            <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
-              <ShieldCheck size={ICON_SIZE.compact} aria-hidden="true" />
-              Organisation verified by Capital Q
-            </p>
-          ) : null}
-        </div>
-      </header>
+      <div className="flex min-w-0 flex-col gap-6 [grid-area:head]">
+        {typeof profile.coverUrl === "string" ? (
+          // Only a cover the card's own scope shows this reader.
+          <EntityCover src={profile.coverUrl} className="rounded-xl" />
+        ) : null}
+        <header className="flex items-start gap-4">
+          <CompanyAvatar
+            companyId={profile.companyId}
+            photoUrl={profile.photoUrl}
+            size={72}
+          />
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1
+              id="company-name"
+              className="cq-title-lg text-(--cq-text-primary)"
+            >
+              {profile.canonicalName}
+            </h1>
+            {profile.shortDescription === null ? null : (
+              <p className="cq-body line-clamp-3 text-(--cq-text-primary) sm:line-clamp-none">
+                {profile.shortDescription}
+              </p>
+            )}
+            {line === "" ? null : (
+              <p className="cq-caption text-(--cq-text-secondary)">{line}</p>
+            )}
+            {overview?.organisationVerified === true ? (
+              <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
+                <ShieldCheck size={ICON_SIZE.compact} aria-hidden="true" />
+                Organisation verified by Capital Q
+              </p>
+            ) : null}
+          </div>
+        </header>
 
-      {investor ? (
-        /*
+        {investor ? (
+          /*
           The decisions, apart from each other on purpose: Interest is
           server-confirmed (CQ-NET-010), Pass is optimistic and undoable,
           and Interest ≠ Save ≠ Pass.
         */
-        <div className="flex flex-wrap items-start gap-3" data-profile-actions>
-          <ExpressInterest
-            companyId={profile.companyId}
-            companyName={profile.canonicalName}
-            surface="COMPANY_PROFILE"
-            initialInterest={interest}
-            relationshipState={relationshipState}
-          />
-          <ProfilePass
-            companyId={profile.companyId}
-            companyName={profile.canonicalName}
-          />
-          <Link
-            href={`/relationships/company/${encodeURIComponent(profile.companyId)}`}
-            className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+          <div
+            className="flex flex-wrap items-start gap-3"
+            data-profile-actions
           >
-            Your relationship
-            <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
-          </Link>
+            <ExpressInterest
+              companyId={profile.companyId}
+              companyName={profile.canonicalName}
+              surface="COMPANY_PROFILE"
+              initialInterest={interest}
+              relationshipState={relationshipState}
+            />
+            <ProfilePass
+              companyId={profile.companyId}
+              companyName={profile.canonicalName}
+            />
+            <Link
+              href={`/relationships/company/${encodeURIComponent(profile.companyId)}`}
+              className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+            >
+              Your relationship
+              <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
+            </Link>
+          </div>
+        ) : null}
+      </div>
+
+      {investor ? (
+        <div className="[grid-area:fit] lg:sticky lg:top-6">
+          <FitPanelSlot
+            companyId={profile.companyId}
+            companyName={profile.canonicalName}
+          />
         </div>
       ) : null}
 
       <nav
         aria-label={`${profile.canonicalName} profile`}
-        className="flex gap-6 border-b border-(--cq-border-subtle)"
+        className="flex gap-5 overflow-x-auto border-b border-(--cq-border-subtle) [grid-area:tabs] sm:gap-6"
       >
-        {overview === null ? null : (
+        {tabs.map(([value, label, count]) => (
           <Link
-            href={base}
-            aria-current={tab === "overview" ? "page" : undefined}
-            className={tabClass(tab === "overview")}
-            data-profile-tab="overview"
+            key={value}
+            href={value === "overview" ? base : `${base}?tab=${value}`}
+            aria-current={tab === value ? "page" : undefined}
+            className={`${tabClass(tab === value)} shrink-0`}
+            data-profile-tab={value}
           >
-            Overview
+            {label}
+            {count === null ? null : (
+              <span className="cq-caption ml-1.5 text-(--cq-text-tertiary)">
+                {count}
+              </span>
+            )}
           </Link>
-        )}
-        <Link
-          href={`${base}?tab=videos`}
-          aria-current={tab === "videos" ? "page" : undefined}
-          className={tabClass(tab === "videos")}
-          data-profile-tab="videos"
-        >
-          Videos
-          <span className="cq-caption ml-1.5 text-(--cq-text-tertiary)">
-            {profile.videos.length}
-          </span>
-        </Link>
+        ))}
       </nav>
 
-      {tab === "videos" || overview === null ? (
-        <CompanyVideos company={company} videos={profile.videos} />
-      ) : (
-        <div className="flex flex-col gap-8" data-profile-overview>
-          {/*
+      <div className="min-w-0 [grid-area:body]">
+        {tab === "elevator" || overview === null ? (
+          <section
+            className="flex flex-col gap-4"
+            aria-label="Elevator"
+            data-profile-elevator
+          >
+            {profile.videos.length === 0 ? null : (
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                {profile.videos.length === 1
+                  ? "1 video"
+                  : `${String(profile.videos.length)} videos`}{" "}
+                and pitches from the founders.
+              </p>
+            )}
+            <CompanyVideos company={company} videos={profile.videos} />
+          </section>
+        ) : tab === "dataroom" ? (
+          dataRoom === null ? (
+            <p className="cq-body py-6 text-(--cq-text-secondary)">
+              The data room isn&rsquo;t available to you.
+            </p>
+          ) : dataRoom.viewer === "OWNER" ? (
+            <OwnerDataRoom companyId={profile.companyId} view={dataRoom} />
+          ) : (
+            <InvestorDataRoom
+              companyId={profile.companyId}
+              companyName={profile.canonicalName}
+              view={dataRoom}
+            />
+          )
+        ) : tab === "deck" ? (
+          deck === null ? (
+            <p className="cq-body py-6 text-(--cq-text-secondary)">
+              The deck isn&rsquo;t available to you.
+            </p>
+          ) : deck.viewer === "OWNER" &&
+            deck.coaching !== null &&
+            !previewAsInvestor ? (
+            <DeckCoach
+              companyId={profile.companyId}
+              view={deck}
+              coaching={deck.coaching}
+            />
+          ) : (
+            <DeckForReaders
+              companyId={profile.companyId}
+              companyName={profile.canonicalName}
+              view={deck}
+            />
+          )
+        ) : tab === "team" ? (
+          <TeamTab
+            companyId={profile.companyId}
+            team={overview.team}
+            fromDeck={
+              deck?.extraction?.sections.find(
+                (section) => section.section === "TEAM",
+              )?.facts ?? []
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-8" data-profile-overview>
+            {/*
             Key facts first: declared values only, one hairline strip -- not
             a metric-card grid, no score. Unknown stays a word, never a zero.
           */}
-          <dl
-            className="flex flex-wrap gap-x-8 gap-y-3 border-y border-(--cq-border-subtle) py-4"
-            data-profile-key-facts
-          >
-            {(
-              [
+            <dl
+              className="flex flex-wrap gap-x-8 gap-y-3 border-y border-(--cq-border-subtle) py-4"
+              data-profile-key-facts
+            >
+              {(
                 [
-                  "Stage",
-                  stageLabel(profile.currentStageCode) ?? "Not declared",
-                ],
-                [
-                  "Raising",
-                  overview.raise !== null
-                    ? moneyText(overview.raise)
-                    : diligence === null
-                      ? "Not shared"
-                      : "Not shared yet",
-                ],
-                [
-                  "Founded",
-                  // A declared ISO date; the strip shows its year only.
-                  /^\d{4}/.exec(overview.foundedDate ?? "")?.[0] ??
-                    "Not declared",
-                ],
-                ["Where", place === "" ? "Not declared" : place],
-                ...(overview.team.length === 0
-                  ? []
-                  : ([
-                      ["Team", `${String(overview.team.length)} named`],
-                    ] as const)),
-              ] as const
-            ).map(([term, value]) => (
-              <div key={term} className="flex min-w-0 flex-col gap-0.5">
-                <dt className="cq-caption text-(--cq-text-secondary)">
-                  {term}
-                </dt>
-                <dd className="cq-title-sm cq-numeric text-(--cq-text-primary)">
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
+                  [
+                    "Stage",
+                    stageLabel(profile.currentStageCode) ?? "Not declared",
+                  ],
+                  [
+                    "Raising",
+                    overview.raise !== null
+                      ? moneyText(overview.raise)
+                      : diligence === null
+                        ? "Not shared"
+                        : "Not shared yet",
+                  ],
+                  [
+                    "Founded",
+                    // A declared ISO date; the strip shows its year only.
+                    /^\d{4}/.exec(overview.foundedDate ?? "")?.[0] ??
+                      "Not declared",
+                  ],
+                  ["Where", place === "" ? "Not declared" : place],
+                  ...(overview.team.length === 0
+                    ? []
+                    : ([
+                        ["Team", `${String(overview.team.length)} named`],
+                      ] as const)),
+                ] as const
+              ).map(([term, value]) => (
+                <div key={term} className="flex min-w-0 flex-col gap-0.5">
+                  <dt className="cq-caption text-(--cq-text-secondary)">
+                    {term}
+                  </dt>
+                  <dd className="cq-title-sm cq-numeric text-(--cq-text-primary)">
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
 
-          {overview.primaryDescription === null ? null : (
+            {overview.primaryDescription === null ? null : (
+              <section
+                className="flex flex-col gap-2"
+                aria-labelledby="company-words"
+              >
+                <h2
+                  id="company-words"
+                  className="cq-title-sm text-(--cq-text-primary)"
+                >
+                  In their words
+                </h2>
+                <ReadMore text={overview.primaryDescription} />
+              </section>
+            )}
+
+            <TeamList team={overview.team} />
+
             <section
-              className="flex flex-col gap-2"
-              aria-labelledby="company-words"
+              className="flex max-w-(--cq-layout-narrow) flex-col gap-1"
+              aria-labelledby="company-raise"
             >
               <h2
-                id="company-words"
+                id="company-raise"
                 className="cq-title-sm text-(--cq-text-primary)"
               >
-                In their words
+                The raise
               </h2>
-              <ReadMore text={overview.primaryDescription} />
-            </section>
-          )}
-
-          <TeamList team={overview.team} />
-
-          <section
-            className="flex max-w-(--cq-layout-narrow) flex-col gap-1"
-            aria-labelledby="company-raise"
-          >
-            <h2
-              id="company-raise"
-              className="cq-title-sm text-(--cq-text-primary)"
-            >
-              The raise
-            </h2>
-            <ProfileRows
-              rows={[
-                // The raise is founder-private until shared with this
-                // reader; "not shared" never says whether one exists.
-                [
-                  "Raising",
-                  overview.raise !== null ? (
-                    moneyText(overview.raise)
-                  ) : diligence === null ? (
-                    "Not shared with you"
-                  ) : (
-                    <NotSharedYet href={diligence.href} />
-                  ),
-                ],
-                // A deck is named only where it was shared with them.
-                ...(investor && overview.deck === null
-                  ? ([
-                      [
-                        "Pitch deck",
-                        diligence === null ? (
-                          "Not shared with you"
-                        ) : (
-                          <NotSharedYet href={diligence.href} />
-                        ),
-                      ],
-                    ] as const)
-                  : overview.deck === null
-                    ? []
-                    : ([["Pitch deck", overview.deck.title]] as const)),
-                ...(diligence !== null && diligence.titles.length > 0
-                  ? ([
-                      [
-                        "Shared in diligence",
-                        <Link
-                          key="shared"
-                          href={diligence.href}
-                          className="underline underline-offset-4"
-                        >
-                          {diligence.titles.join(", ")}
-                        </Link>,
-                      ],
-                    ] as const)
-                  : []),
-              ]}
-            />
-            {/* The deck is downloaded where it is named (design-48 v2: the
+              <ProfileRows
+                rows={[
+                  // The raise is founder-private until shared with this
+                  // reader; "not shared" never says whether one exists.
+                  [
+                    "Raising",
+                    overview.raise !== null ? (
+                      moneyText(overview.raise)
+                    ) : diligence === null ? (
+                      "Not shared with you"
+                    ) : (
+                      <NotSharedYet href={diligence.href} />
+                    ),
+                  ],
+                  // A deck is named only where it was shared with them.
+                  ...(investor && overview.deck === null
+                    ? ([
+                        [
+                          "Pitch deck",
+                          diligence === null ? (
+                            "Not shared with you"
+                          ) : (
+                            <NotSharedYet href={diligence.href} />
+                          ),
+                        ],
+                      ] as const)
+                    : overview.deck === null
+                      ? []
+                      : ([["Pitch deck", overview.deck.title]] as const)),
+                  ...(diligence !== null && diligence.titles.length > 0
+                    ? ([
+                        [
+                          "Shared in diligence",
+                          <Link
+                            key="shared"
+                            href={diligence.href}
+                            className="underline underline-offset-4"
+                          >
+                            {diligence.titles.join(", ")}
+                          </Link>,
+                        ],
+                      ] as const)
+                    : []),
+                ]}
+              />
+              {/* The deck is downloaded where it is named (design-48 v2: the
                 decision row keeps Interest and Pass only). */}
-            {!investor || overview.deck === null ? null : (
-              <div className="pt-2">
-                <DeckDownload
-                  companyId={profile.companyId}
-                  title={overview.deck.title}
-                  scanned={overview.deck.scanned}
-                />
-              </div>
-            )}
-          </section>
+              {!investor || overview.deck === null ? null : (
+                <div className="pt-2">
+                  <DeckDownload
+                    companyId={profile.companyId}
+                    title={overview.deck.title}
+                    scanned={overview.deck.scanned}
+                  />
+                </div>
+              )}
+            </section>
 
-          <PhoneFold id="company-details" title="Company details">
-            <ProfileRows
-              rows={[
-                [
-                  "Sector",
-                  sectorLabels.length === 0
-                    ? "Not declared"
-                    : sectorLabels.join(", "),
-                ],
-                [
-                  "Founded",
-                  overview.foundedDate === null
-                    ? "Not declared"
-                    : formatLongDay(overview.foundedDate),
-                ],
-                ["Legal name", overview.legalName ?? "Not declared"],
-                [
-                  "Verification",
-                  overview.organisationVerified
-                    ? "Organisation verified by Capital Q"
-                    : "Not verified by Capital Q yet",
-                ],
-                ...(overview.websiteUrl === null
-                  ? []
-                  : ([
-                      [
-                        "Website",
-                        <span
-                          key="web"
-                          className="flex items-center gap-1.5 break-all"
-                        >
-                          <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-                          {overview.websiteUrl}
-                        </span>,
-                      ],
-                    ] as const)),
-              ]}
-            />
-          </PhoneFold>
+            <PhoneFold id="company-details" title="Company details">
+              <ProfileRows
+                rows={[
+                  [
+                    "Sector",
+                    sectorLabels.length === 0
+                      ? "Not declared"
+                      : sectorLabels.join(", "),
+                  ],
+                  [
+                    "Founded",
+                    overview.foundedDate === null
+                      ? "Not declared"
+                      : formatLongDay(overview.foundedDate),
+                  ],
+                  ["Legal name", overview.legalName ?? "Not declared"],
+                  [
+                    "Verification",
+                    overview.organisationVerified
+                      ? "Organisation verified by Capital Q"
+                      : "Not verified by Capital Q yet",
+                  ],
+                  ...(overview.websiteUrl === null
+                    ? []
+                    : ([
+                        [
+                          "Website",
+                          <span
+                            key="web"
+                            className="flex items-center gap-1.5 break-all"
+                          >
+                            <Globe
+                              size={ICON_SIZE.compact}
+                              aria-hidden="true"
+                            />
+                            {overview.websiteUrl}
+                          </span>,
+                        ],
+                      ] as const)),
+                ]}
+              />
+            </PhoneFold>
 
-          {/*
+            {/*
             What is known on the three evidence axes, and why it is in the
             reader's feed (CQ-WEB-024): from the same projection as above.
           */}
-          <CompanyDeeperView
-            companyId={profile.companyId}
-            companyName={profile.canonicalName}
-            facts={overview.facts}
-            connected={connected}
-          />
-        </div>
-      )}
+            <CompanyDeeperView
+              companyId={profile.companyId}
+              companyName={profile.canonicalName}
+              facts={overview.facts}
+              connected={connected}
+            />
+          </div>
+        )}
+      </div>
     </article>
   );
 }

@@ -1,4 +1,12 @@
 import type { CapitalRoundService } from "@capital-q/capital";
+import type {
+  CompanyDeckService,
+  DataRoomService,
+} from "@capital-q/permissions";
+import {
+  registerCompanyMaterialRoutes,
+  type CompanyMaterialRoutesDependencies,
+} from "./http/company-material.js";
 import { pitchSummary } from "@capital-q/media";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
@@ -259,6 +267,10 @@ export type ApiModules = {
   /** Diligence (2026-10-02). Absent: those routes do not register. */
   readonly diligence?:
     NetworkInterestRoutesDependencies["diligence"] | undefined;
+  /** Overnight A3-A7: the profile's data room, deck and founder pages. */
+  readonly dataRoom?: DataRoomService | undefined;
+  readonly companyDeck?: CompanyDeckService | undefined;
+  readonly founderPerson?: CompanyMaterialRoutesDependencies["founderPerson"];
   /** Post-meeting outcomes (2026-10-02). Absent: those routes do not register. */
   readonly outcomes?: NetworkInterestRoutesDependencies["outcomes"] | undefined;
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
@@ -537,6 +549,10 @@ export function createApp(
       ...(modules.diligence === undefined
         ? {}
         : { diligence: modules.diligence }),
+      ...(modules.dataRoom === undefined ? {} : { dataRoom: modules.dataRoom }),
+      ...(modules.companyDeck === undefined
+        ? {}
+        : { companyDeck: modules.companyDeck }),
       ...(modules.chat === undefined ? {} : { chat: modules.chat }),
       ...(modules.schedule === undefined ? {} : { schedule: modules.schedule }),
       ...(modules.media === undefined ? {} : { pitchUploads: modules.media }),
@@ -678,6 +694,18 @@ export function createApp(
       commitments: modules.commitments,
       capital: modules.capital,
       capitalRounds: modules.capitalRounds,
+    });
+  }
+
+  // Overnight A3-A7: the profile's data room, deck and founder pages (reads;
+  // their changes are declared app actions above).
+  if (modules.dataRoom !== undefined && modules.companyDeck !== undefined) {
+    registerCompanyMaterialRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      dataRoom: modules.dataRoom,
+      companyDeck: modules.companyDeck,
+      founderPerson: modules.founderPerson,
     });
   }
 

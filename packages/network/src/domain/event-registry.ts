@@ -553,6 +553,48 @@ export const DocumentSharedRelationshipEvent = defineRelationshipEvent({
 });
 
 /**
+ * Data room (overnight A3, 2026-10-06): the investor asked for an
+ * on-request document (or all of them), and the founder granted access
+ * until a date. Activity only, both sides read it; the grant itself is the
+ * disclosure policy, revocable and expiring on its own.
+ */
+export const DataRoomAccessRequestedPayloadSchema = z
+  .object({
+    requestId: UuidSchema,
+    /** Absent: every on-request document. */
+    documentId: UuidSchema.optional(),
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED =
+  "data_room_access_requested" as const;
+export const DataRoomAccessRequestedRelationshipEvent = defineRelationshipEvent(
+  {
+    type: RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED,
+    payloadSchema: DataRoomAccessRequestedPayloadSchema,
+    allowedVisibilityScopes: ["relationship_shared"],
+    description: "The investor asked for access to a data-room document.",
+  },
+);
+
+export const DataRoomAccessGrantedPayloadSchema = z
+  .object({
+    requestId: UuidSchema,
+    documentIds: z.array(UuidSchema).min(1).max(200),
+    disclosurePolicyIds: z.array(UuidSchema).min(1).max(200),
+    expiresAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_GRANTED =
+  "data_room_access_granted" as const;
+export const DataRoomAccessGrantedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_GRANTED,
+  payloadSchema: DataRoomAccessGrantedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The company granted this relationship access to data-room documents until a date. Revocable; the disclosure policy holds the grant.",
+});
+
+/**
  * Production registry: `discovered` (CQ-NET-001), `interest_expressed`
  * (CQ-NET-010), `connection_accepted` and `interest_declined` (CQ-NET-011).
  */
@@ -585,4 +627,6 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     RelationshipProgressedRelationshipEvent,
     DocumentRequestedRelationshipEvent,
     DocumentSharedRelationshipEvent,
+    DataRoomAccessRequestedRelationshipEvent,
+    DataRoomAccessGrantedRelationshipEvent,
   ];

@@ -195,3 +195,9 @@ export {
   type TeamProjectionSource,
 } from "./domain/team-projection.js";
 export { createPostgresCompanyTeamProjection } from "./infrastructure/postgres-team-projection.js";
+export {
+  ageFrom,
+  projectFounderPerson,
+  type FounderPersonSource,
+} from "./domain/founder-person.js";
+export { createPostgresFounderPersonSource } from "./infrastructure/postgres-founder-person.js";

@@ -175,3 +175,28 @@ export {
   type DiligenceService,
   type DiligenceView,
 } from "./application/diligence.js";
+export {
+  activeGrants,
+  checklistFor,
+  createDataRoomService,
+  fileKind,
+  projectForInvestor,
+  stageRank,
+  type DataRoomChecklistEntry,
+  type DataRoomCompany,
+  type DataRoomDocument,
+  type DataRoomOutcome,
+  type DataRoomRefusal,
+  type DataRoomRequestRecord,
+  type DataRoomService,
+  type DataRoomStore,
+} from "./application/data-room.js";
+export {
+  createCompanyDeckService,
+  type CompanyDeckReading,
+  type CompanyDeckRecord,
+  type CompanyDeckRefusal,
+  type CompanyDeckService,
+  type CompanyDeckStore,
+} from "./application/company-deck.js";
+export { createPostgresProfileMaterialPorts } from "./infrastructure/postgres-profile-material-ports.js";

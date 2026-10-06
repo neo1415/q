@@ -132,6 +132,21 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/company-profile.ts GET `${base}${COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT}`":
     DOWNLOAD,
 
+  // Overnight A3-A7: the profile's Data room and Pitch deck tabs, read by Q
+  // with its own read tools; opening a file is a signed read.
+  "api/http/company-material.ts GET `${base}${COMPANY_DATA_ROOM_SEGMENT}`": cap(
+    "tool.read_company_data_room",
+  ),
+  "api/http/company-material.ts GET `${base}${COMPANY_DATA_ROOM_OPEN_SEGMENT}`":
+    DOWNLOAD,
+  "api/http/company-material.ts GET `${base}${COMPANY_DECK_SEGMENT}`": cap(
+    "tool.read_company_deck",
+  ),
+  "api/http/company-material.ts GET `${base}${COMPANY_DECK_OPEN_SEGMENT}`":
+    DOWNLOAD,
+  "api/http/company-material.ts GET `${base}${COMPANY_FOUNDER_SEGMENT}`":
+    cap("tool.get_company"),
+
   "api/http/company-team.ts GET `${base}${COMPANY_TEAM_ME_SUFFIX}`": cap(
     "tool.read_my_record",
   ),
@@ -696,6 +711,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/q-presence": exempt("development-only page"),
   "/dev/ui": exempt("development-only page"),
   "/dev/daily": exempt("development-only page"),
+  "/dev/profile": exempt(
+    "development-only page (design review, fictional data)",
+  ),
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
@@ -806,6 +824,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // end REHEARSE block
   "/pitch/[mediaAssetId]": cap("navigate.PITCH"),
   "/company/[companyId]": cap("tool.open_page"),
+  // Overnight A7: a founder as a person, from the Team tab.
+  "/company/[companyId]/founder/[position]": cap("tool.open_page"),
   "/relationships/company/[companyId]": cap("tool.open_page"),
   "/relationships/investor/[investorOrganisationId]": cap("tool.open_page"),
   "/relationships/company/[companyId]/messages": cap("tool.open_page"),

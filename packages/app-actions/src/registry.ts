@@ -13,6 +13,7 @@ import { MEDIA_ACTIONS } from "./actions/media.js";
 import { ONBOARDING_ACTIONS } from "./actions/onboarding.js";
 import { OUTCOME_ACTIONS } from "./actions/outcomes.js";
 import { DILIGENCE_ACTIONS } from "./actions/diligence.js";
+import { DATA_ROOM_ACTIONS } from "./actions/data-room.js";
 import { SET_PITCH_SHARING } from "./actions/pitch.js";
 import { PROFILE_IMAGE_ACTIONS } from "./actions/profile-images.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
@@ -50,6 +51,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...ETIQUETTE_ACTIONS,
   ...WORK_ACTIONS,
   ...GATEQ_ACTIONS,
+  ...DATA_ROOM_ACTIONS,
 ]);
 
 /**

@@ -97,6 +97,8 @@ export const PROMPT_IDS = [
   "UTTERANCE_CHECK",
   /** Founder brief B4 2026-10-05 (ADR 0052): Q's view beside a computed fit. */
   "FIT_Q_VIEW",
+  /** Overnight A5 2026-10-06: a pitch deck into the twelve standard sections. */
+  "DECK_EXTRACTION",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -127,6 +129,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INVESTOR_RESEARCH_READER: "investor-research-reader",
   ERRAND_REPLY: "errand-reply",
   DILIGENCE_DOCUMENT_SUMMARY: "diligence-document-summary",
+  DECK_EXTRACTION: "deck-extraction",
   INVESTOR_PERSONA: "investor-persona",
   INVESTOR_TWIN_TURN: "investor-twin-turn",
   REHEARSAL_SCORE: "rehearsal-score",

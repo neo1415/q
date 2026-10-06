@@ -1166,3 +1166,14 @@ export {
   type ReplyStance,
   type ReplyTone,
 } from "./prompts/schemas/workforce.js";
+// PROFILE block (overnight A5): the deck into twelve sections.
+export { DECK_EXTRACTION_V1 } from "./prompts/tasks/deck-extraction.v1.js";
+export {
+  DECK_EXTRACTION_SCHEMA_NAME,
+  DECK_EXTRACTION_SCHEMA_VERSION,
+  DECK_EXTRACTION_UNTRUSTED,
+  DeckExtractionResultSchema,
+  DeckExtractionVariablesSchema,
+  type DeckExtractionResult,
+  type DeckExtractionVariables,
+} from "./prompts/schemas/deck-extraction.js";

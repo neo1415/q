@@ -262,6 +262,11 @@ describe("the action registry", () => {
       ["q.work.suggestion.dismiss", "offer.work_suggestions", "INSTANT"],
       // P7: GateQ rules drafted from a mandate, confirmed on the Gateway page.
       ["gateway.policy.read_mandate", "offer.gateway_mandate", "INSTANT"],
+      // Overnight A3/A5: the data room and Q's reading of the deck.
+      ["data_room.document.level.set", "set_data_room_level", "CONSEQUENTIAL"],
+      ["data_room.access.request", "request_data_room_access", "CONSEQUENTIAL"],
+      ["data_room.request.decide", "answer_data_room_request", "CONSEQUENTIAL"],
+      ["deck.extraction.confirm", "confirm_deck_reading", "CONSEQUENTIAL"],
     ]);
   });
 });
