@@ -14,8 +14,8 @@ import {
  * One dynamic for everything:
  *
  * 1. Each particle's target blends from the old figure to the new one
- *    with smootherstep easing over a duration chosen per change (shorter
- *    for a gesture, longer for a drift back to rest), staggered per
+ *    with smootherstep easing over a fixed duration per destination
+ *    (longer for a drift back to rest), staggered per
  *    particle so the swarm flows rather than marching in step, and
  *    swirls aside on the way (a detour that is zero at both ends: K1,
  *    "morphing", never a straight slide). A change mid-change starts from
@@ -50,12 +50,17 @@ const GESTURE_FIGURES: ReadonlySet<FigureKind> = new Set([
   "HANDS",
 ]);
 
-/** Seconds a change of figure takes: variable, always bounded. */
-export function morphSeconds(to: FigureKind, roll: number): number {
-  if (GESTURE_FIGURES.has(to)) return 0.55 + roll * 0.35;
-  if (to === "CLOUD" || to === "ATTENTIVE") return 0.95 + roll * 0.65;
-  if (to === "FACE") return 1.1 + roll * 0.3;
-  return 0.85 + roll * 0.5;
+/**
+ * Seconds a change of figure takes: fixed per destination (P11), so the
+ * same change always takes the same time. Settling back to rest is the
+ * slowest; the face forms a little slower than a shape so it reads as
+ * arriving, not snapping in.
+ */
+export function morphSeconds(to: FigureKind): number {
+  if (GESTURE_FIGURES.has(to)) return 0.8;
+  if (to === "CLOUD" || to === "ATTENTIVE") return 1.2;
+  if (to === "FACE") return 1.3;
+  return 1;
 }
 
 /** smootherstep: zero velocity and acceleration at both ends. */
@@ -249,8 +254,9 @@ export function createPresenceSim(options: {
     fromFlow = flowAmp;
     current = kind;
     started = t;
-    duration = morphSeconds(kind, random());
-    for (let i = 0; i < count; i += 1) stagger[i] = random() * STAGGER;
+    // Each particle keeps the stagger it was seeded with: one change flows
+    // the same way as the last, never re-rolled.
+    duration = morphSeconds(kind);
   };
 
   let pending: FigureKind | null = null;

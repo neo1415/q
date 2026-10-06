@@ -360,7 +360,6 @@ export function QDock() {
         size={36}
         inputLevel={voice?.client.inputLevel}
         outputLevel={voice?.client.outputLevel}
-        travels
       />
     </ViewTransition>
   );

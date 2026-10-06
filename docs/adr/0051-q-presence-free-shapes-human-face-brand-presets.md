@@ -61,3 +61,11 @@ The research for K1 to K3 (`docs/research/2026-10-06/presence-brand.md` on `buil
 - The voice choice (female or male) no longer changes the presence. The single face belongs to Q, not to the voice.
 - A tenant override row keeps working. It now also names a preset (default black and gold).
 - Classic blue's own token pairs are tested in the same suite. Its field borders (`--cq-border-strong` on cards) were already below 3:1, so the border pair is asserted for black and gold only. This is a known gap in classic blue and is not changed here.
+
+## Amendment, 2026-10-06 (P11): a deliberate, state-driven presence
+
+The founder: "the Q presence is still very random... didn't even see the face, and what I did see was random at random times."
+
+Root causes: the Q page's in-conversation presence (200 px, the one Q speaks from) never set `face`, so the face could only show before a conversation began; and the answer's gestures, the wake "!", the ready Q mark and the arrival ribbon each took over on their own timers, replacing the face mid-speech.
+
+Change: the figure is now a pure function of the surface's state (`presenceFor` in `presence-machine.ts`): idle, done or error is the cloud (error dimmed), listening the lean, thinking the spiral, working the ring, speaking the face (Q page, 160 px or more) or else the wave, asking or approval the "?", and resting with answer cards up the Q mark. The shape changes only when the state does. Answer gestures no longer drive the presence (the event is still announced and validated, and the gesture figures remain for a later, state-bound use); wake, ready and arrival flourishes are removed. Morph durations are fixed per destination and each particle keeps its seeded stagger, so a change looks the same every time. Decision 2's surface rule is unchanged.

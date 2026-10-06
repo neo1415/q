@@ -60,8 +60,8 @@ export type QApertureProps = {
   readonly detail?: string | undefined;
   /** The Q page's own presence: it may show Q's face while Q speaks (ADR 0051). */
   readonly face?: boolean | undefined;
-  /** Q travels to this surface between the dock and the stage. */
-  readonly travels?: boolean | undefined;
+  /** Answer cards are on screen beside this presence (P11: the Q mark). */
+  readonly showing?: boolean | undefined;
   readonly className?: string | undefined;
 };
 
@@ -93,7 +93,7 @@ export function QAperture({
   label,
   detail,
   face = false,
-  travels = false,
+  showing = false,
   className,
 }: QApertureProps) {
   const stage = useStageApertureSize();
@@ -126,7 +126,7 @@ export function QAperture({
           inputLevel={inputLevel}
           outputLevel={outputLevel}
           face={face}
-          travels={travels}
+          showing={showing}
         />
       </div>
       {text !== undefined || detail !== undefined ? (

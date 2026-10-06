@@ -289,4 +289,30 @@ describe("the component: fallback and pause", () => {
     expect(frames.size).toBe(0);
     expect(canvas?.dataset["qFigure"]).toBe("CLOUD");
   });
+
+  it("shows the face on the Q page's 200 px stage while Q speaks, and lets it go when speech ends (P11)", async () => {
+    window.localStorage.setItem(Q_MOTION_STORAGE_KEY, "calm");
+    const { container, rerender } = render(
+      <QSwarm state="LISTENING" pixels={200} face />,
+    );
+    const canvas = container.querySelector("canvas");
+    await waitFor(() => expect(canvas?.dataset["qRenderer"]).toBe("2d"));
+    act(() => runFrames(1));
+    expect(canvas?.dataset["qFigure"]).toBe("ATTENTIVE");
+    // No timer: the still presence changes only because the state did.
+    rerender(<QSwarm state="SPEAKING" pixels={200} face />);
+    act(() => runFrames(1));
+    expect(canvas?.dataset["qFigure"]).toBe("FACE");
+    act(() => runFrames(20));
+    expect(canvas?.dataset["qFigure"]).toBe("FACE");
+    rerender(<QSwarm state="IDLE" pixels={200} face />);
+    act(() => runFrames(1));
+    expect(canvas?.dataset["qFigure"]).toBe("CLOUD");
+    // Under 160 px, or off the Q page, the same speech has no face.
+    const small = render(<QSwarm state="SPEAKING" pixels={120} face />);
+    act(() => runFrames(1));
+    expect(small.container.querySelector("canvas")?.dataset["qFigure"]).toBe(
+      "WAVE",
+    );
+  });
 });
