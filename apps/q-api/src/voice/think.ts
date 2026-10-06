@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import type { ServerResponse } from "node:http";
+
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -9,6 +11,7 @@ import type { VoiceSessionBindings } from "./bindings.js";
 import { voiceTokenFingerprint } from "./session-token.js";
 import { withoutContinueSignal } from "./navigation.js";
 import { sentences } from "./speech.js";
+import { createThinkGate, type ThinkGate } from "./think-gate.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import { turnFailureLine, turnSucceeded } from "./turn-failure.js";
 import type { VoiceTurnHandler } from "./turn.js";
@@ -60,7 +63,33 @@ export type VoiceThinkDependencies = {
   readonly bindings: VoiceSessionBindings;
   readonly turn: VoiceTurnHandler;
   readonly logger: Logger;
+  /** When a think may start work (think-gate.ts); a default one otherwise. */
+  readonly gate?: ThinkGate | undefined;
 };
+
+/** One response stream to the provider; a turn may move to a newer one. */
+type ThinkSink = {
+  readonly raw: ServerResponse;
+  readonly id: string;
+  open: boolean;
+};
+
+/** The turn answering a line, and the stream it is currently heard on. */
+type LiveThink = {
+  /** The words it answers, exactly as asked. */
+  readonly key: string;
+  readonly controller: AbortController;
+  sink: ThinkSink;
+  done: Promise<void>;
+};
+
+function finishSink(sink: ThinkSink): void {
+  if (!sink.open) return;
+  sink.open = false;
+  sink.raw.write(chunk(sink.id, {}, "stop"));
+  sink.raw.write("data: [DONE]\n\n");
+  sink.raw.end();
+}
 
 function contentText(content: unknown): string {
   if (typeof content === "string") return content;
@@ -107,8 +136,14 @@ export function registerVoiceThinkRoute(
    * words are obsolete: it is ended here, which aborts its turn exactly as
    * the provider dropping it would (hosted, 2026-09-24: five requests for
    * one question, four answered).
+   *
+   * Except when the newer request asks about exactly the same words: then
+   * nothing the turn in flight is saying is obsolete, and it carries on,
+   * heard on the newer stream (L1 latency sweep, 2026-10-06: a re-sent
+   * question used to restart from nothing, model calls included).
    */
-  const inFlight = new Map<string, AbortController>();
+  const inFlight = new Map<string, LiveThink>();
+  const gate = dependencies.gate ?? createThinkGate();
   const handler = async (request: FastifyRequest, reply: FastifyReply) => {
     const header = request.headers.authorization;
     const token =
@@ -189,25 +224,64 @@ export function registerVoiceThinkRoute(
     }
 
     const id = `chatcmpl-${randomUUID()}`;
-    const controller = new AbortController();
     const line = binding.voiceSessionId;
-    inFlight.get(line)?.abort();
-    inFlight.set(line, controller);
+    const key = JSON.stringify(transcript);
     reply.hijack();
     const raw = reply.raw;
-    // The response closing before it finished is the provider dropping
-    // the request: the person spoke over Q. (The request stream's own
-    // close fires as soon as its body is read, so it is not the signal.)
-    raw.on("close", () => {
-      if (!raw.writableFinished) controller.abort();
-    });
     raw.writeHead(200, {
       "content-type": "text/event-stream",
       "cache-control": "no-cache, no-transform",
       connection: "keep-alive",
     });
     raw.write(chunk(id, { role: "assistant" }, null));
-    let open = true;
+    const sink: ThinkSink = { raw, id, open: true };
+
+    const current = inFlight.get(line);
+    if (
+      current !== undefined &&
+      current.key === key &&
+      !current.controller.signal.aborted &&
+      current.sink.open
+    ) {
+      // The same words again: the turn in flight answers them here. The
+      // older stream is closed cleanly, which is not an interruption.
+      const older = current.sink;
+      current.sink = sink;
+      finishSink(older);
+      raw.on("close", () => {
+        if (!raw.writableFinished && current.sink === sink) {
+          current.controller.abort();
+        }
+      });
+      logger.info(
+        { qVoiceSessionId: line },
+        "voice think asked again with the same words; the turn in flight answers it",
+      );
+      await current.done.catch(() => undefined);
+      finishSink(sink);
+      return reply;
+    }
+
+    const controller = new AbortController();
+    current?.controller.abort();
+    let resolveDone: () => void = () => undefined;
+    const live: LiveThink = {
+      key,
+      controller,
+      sink,
+      done: new Promise<void>((resolve) => {
+        resolveDone = resolve;
+      }),
+    };
+    inFlight.set(line, live);
+    // The response closing before it finished is the provider dropping
+    // the request: the person spoke over Q. (The request stream's own
+    // close fires as soon as its body is read, so it is not the signal.)
+    // A stream the turn has moved on from closing is not that.
+    raw.on("close", () => {
+      if (!raw.writableFinished && live.sink === sink) controller.abort();
+    });
+    const isOpen = () => live.sink.open && !controller.signal.aborted;
     let wroteContent = false;
     let timedOut = false;
     /**
@@ -222,10 +296,10 @@ export function registerVoiceThinkRoute(
      * own guard, and only the turn's late words are dropped.
      */
     const write = (text: string, force = false) => {
-      if (!open || controller.signal.aborted) return;
+      if (!isOpen()) return;
       if (timedOut && !force) return;
       wroteContent = true;
-      raw.write(chunk(id, { content: text }, null));
+      live.sink.raw.write(chunk(live.sink.id, { content: text }, null));
     };
     // A long turn (research, a document being read) must not look like a
     // dead line to the provider: an empty delta keeps the stream open.
@@ -235,25 +309,25 @@ export function registerVoiceThinkRoute(
     const keepAlive = setInterval(() => {
       // An empty delta rather than an SSE comment: every OpenAI-shaped
       // parser accepts it, and the provider's is not ours to test.
-      if (open && !controller.signal.aborted) {
-        raw.write(chunk(id, { content: "" }, null));
+      if (isOpen()) {
+        live.sink.raw.write(chunk(live.sink.id, { content: "" }, null));
       }
     }, KEEP_ALIVE_MS);
     // Our own deadline, ahead of the provider's. The line is written
     // before the turn is cancelled, because cancelling closes writing.
     const deadline = setTimeout(() => {
-      if (!open || controller.signal.aborted) {
+      if (!isOpen()) {
         return;
       }
-      const line = wroteContent ? TURN_CUT_SHORT : TURN_TOO_LONG;
+      const said = wroteContent ? TURN_CUT_SHORT : TURN_TOO_LONG;
       timedOut = true;
-      write(line, true);
+      write(said, true);
       controller.abort();
     }, TURN_DEADLINE_MS);
     const speaker: VoiceSpeaker = {
       providerConversationId: binding.providerConversationId,
       get isOpen() {
-        return open && !controller.signal.aborted;
+        return isOpen();
       },
       speak: async (response) => {
         if (typeof response === "string") {
@@ -270,13 +344,17 @@ export function registerVoiceThinkRoute(
         }
       },
       close: () => {
-        open = false;
-        raw.end();
+        finishSink(live.sink);
       },
     };
     try {
-      await turn(binding, transcript, controller.signal, speaker);
-      turnSucceeded(binding);
+      // In a burst of re-asks, wait a moment to see whether another
+      // follows before creating anything (think-gate.ts).
+      const admitted = await gate.admit(line, controller.signal);
+      if (admitted !== "DROPPED") {
+        await turn(binding, transcript, controller.signal, speaker);
+        turnSucceeded(binding);
+      }
     } catch (error: unknown) {
       logger.error(
         { err: error, qVoiceSessionId: binding.voiceSessionId },
@@ -289,15 +367,11 @@ export function registerVoiceThinkRoute(
         write(turnFailureLine(binding, error));
       }
     } finally {
-      if (inFlight.get(line) === controller) inFlight.delete(line);
+      if (inFlight.get(line) === live) inFlight.delete(line);
       clearInterval(keepAlive);
       clearTimeout(deadline);
-      if (open) {
-        raw.write(chunk(id, {}, "stop"));
-        raw.write("data: [DONE]\n\n");
-        raw.end();
-        open = false;
-      }
+      finishSink(live.sink);
+      resolveDone();
     }
     return reply;
   };
