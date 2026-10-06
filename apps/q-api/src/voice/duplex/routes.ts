@@ -7,10 +7,13 @@ import type {
 import {
   parseContract,
   Q_VOICE_DUPLEX_END_PATH,
+  Q_VOICE_DUPLEX_NARRATION_PATH,
   Q_VOICE_DUPLEX_REJOIN_PATH,
   Q_VOICE_DUPLEX_TOOL_PATH,
   Q_VOICE_DUPLEX_USAGE_PATH,
   QVoiceDuplexEndSchema,
+  QVoiceDuplexNarrationRequestSchema,
+  QVoiceDuplexNarrationResultSchema,
   QVoiceDuplexRejoinResultSchema,
   QVoiceDuplexRejoinSchema,
   QVoiceDuplexToolCallSchema,
@@ -98,6 +101,34 @@ export function registerDuplexVoiceRoutes(
         .code(200)
         .header("Cache-Control", "no-store")
         .send(QVoiceDuplexUsageResultSchema.parse(result));
+    },
+  );
+
+  // ADR 0062: the silence ladder's beats while ask_q works (long poll).
+  app.post(
+    Q_VOICE_DUPLEX_NARRATION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const body = parseContract(
+        QVoiceDuplexNarrationRequestSchema,
+        request.body ?? {},
+        "That narration request is not valid.",
+      );
+      const controller = new AbortController();
+      reply.raw.once("close", () => {
+        if (!reply.raw.writableFinished) controller.abort();
+      });
+      const result = await broker.narration({
+        actor: actorOf(request),
+        voiceSessionId: idOf(request.params),
+        after: body.after,
+        signal: controller.signal,
+      });
+      if (result === null) return gone(reply);
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(QVoiceDuplexNarrationResultSchema.parse(result));
     },
   );
 

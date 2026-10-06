@@ -10,13 +10,16 @@ import {
   qVoiceTurnPath,
   qVoiceScreenPath,
   qVoiceDuplexEndPath,
+  qVoiceDuplexNarrationPath,
   qVoiceDuplexRejoinPath,
   qVoiceDuplexToolPath,
   qVoiceDuplexUsagePath,
+  QVoiceDuplexNarrationResultSchema,
   QVoiceDuplexRejoinResultSchema,
   QVoiceDuplexToolResultSchema,
   QVoiceDuplexUsageResultSchema,
   type QVoiceDuplexEnd,
+  type QVoiceDuplexNarrationRequest,
   type QVoiceDuplexRejoin,
   type QVoiceDuplexToolCall,
   type QVoiceDuplexUsageReport,
@@ -281,6 +284,21 @@ export function rejoinQVoiceDuplex(
     "POST",
     qVoiceDuplexRejoinPath(voiceSessionId),
     QVoiceDuplexRejoinResultSchema,
+    { body: input },
+  );
+}
+
+/** ADR 0062: the silence ladder's beats while ask_q works (long poll). */
+export function pollQVoiceDuplexNarration(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexNarrationRequest,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexNarrationPath(voiceSessionId),
+    QVoiceDuplexNarrationResultSchema,
     { body: input },
   );
 }
