@@ -43,8 +43,8 @@ import {
   publicSourceBlockFields,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV15Result,
-  CompanyAnalystV15ResultSchema,
+  type CompanyAnalystV17Result,
+  CompanyAnalystV17ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -197,7 +197,7 @@ export {
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV15Result → Q message + bundle version on the run
+ *   CompanyAnalystV17Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -460,6 +460,9 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
   "recommendation",
+  // A malformed card set loses the cards, never the answer (ADR 0053).
+  "answerCards",
+  "comparisonCards",
 ];
 
 export const SAY_DO_NOTE: ModelMessage = {
@@ -1255,7 +1258,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV15Result;
+  readonly result: CompanyAnalystV17Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -2469,9 +2472,9 @@ export function createModelGatewayQAnswer(
         }
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV15Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV17Result> = {
         signal: request.signal,
-        schema: CompanyAnalystV15ResultSchema,
+        schema: CompanyAnalystV17ResultSchema,
         onTextDelta,
         // The analyst's lists are independent readings: one statement with
         // a malformed knowledge key must not throw away the profile change
@@ -2772,12 +2775,12 @@ export function createModelGatewayQAnswer(
       }
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV15Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV17Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV15Result | undefined;
+        let analyst: CompanyAnalystV17Result | undefined;
 
         if (offered.length > 0) {
           took("prepare");
@@ -2810,10 +2813,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV15Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV17Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV15Result>(
+              result = await gateway.execute<CompanyAnalystV17Result>(
                 {
                   ...base,
                   messages,
@@ -2881,7 +2884,7 @@ export function createModelGatewayQAnswer(
              * is not a gap.
              */
             const saidInsteadOfDone = (
-              value: CompanyAnalystV15Result,
+              value: CompanyAnalystV17Result,
               dropped: readonly string[] | undefined,
             ): boolean =>
               (value.actionTalk.length > 0 ||
@@ -2914,7 +2917,7 @@ export function createModelGatewayQAnswer(
              */
             const screenNote = screenSubjectNote(plan.screen);
             const askedWhatScreenShows = (
-              value: CompanyAnalystV15Result,
+              value: CompanyAnalystV17Result,
             ): boolean =>
               screenNote !== null &&
               value.clarifyingQuestions.length > 0 &&
@@ -2971,7 +2974,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystV15ResultSchema,
+                CompanyAnalystV17ResultSchema,
                 {
                   invalidListItems: "DROP",
                   lenientFields: ANALYST_LENIENT_FIELDS,
@@ -3253,7 +3256,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV15Result>(
+          final = await gateway.execute<CompanyAnalystV17Result>(
             { ...base, messages, output: rendered.output },
             options,
           );

@@ -41,7 +41,8 @@ export const TURN_READER_V42: PromptDefinition<
 > = {
   ...TURN_READER_V41,
   version: 42,
-  status: "ACTIVE",
+  // Deprecated by v43 (no file unless asked, 2026-10-05).
+  status: "DEPRECATED",
   changeDescription:
     "voiceq-63 (founder 2026-10-04): MESSY WORDS -- typos, speech slips, fragments, run-ons and pidgin read for their most plausible meaning from the conversation and screen; LOW confidence only for a real ambiguity.",
   effectiveFrom: "2026-10-04",

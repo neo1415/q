@@ -35,6 +35,7 @@ import { COMPANY_ANALYST_V13 } from "./tasks/company-analyst.v13.js";
 import { COMPANY_ANALYST_V14 } from "./tasks/company-analyst.v14.js";
 import { COMPANY_ANALYST_V15 } from "./tasks/company-analyst.v15.js";
 import { COMPANY_ANALYST_V16 } from "./tasks/company-analyst.v16.js";
+import { COMPANY_ANALYST_V17 } from "./tasks/company-analyst.v17.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -90,6 +91,7 @@ import { TURN_READER_V39 } from "./tasks/turn-reader.v39.js";
 import { TURN_READER_V40 } from "./tasks/turn-reader.v40.js";
 import { TURN_READER_V41 } from "./tasks/turn-reader.v41.js";
 import { TURN_READER_V42 } from "./tasks/turn-reader.v42.js";
+import { TURN_READER_V43 } from "./tasks/turn-reader.v43.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
 import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
@@ -356,6 +358,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V14,
     COMPANY_ANALYST_V15,
     COMPANY_ANALYST_V16,
+    COMPANY_ANALYST_V17,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,
@@ -406,6 +409,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V40,
     TURN_READER_V41,
     TURN_READER_V42,
+    TURN_READER_V43,
     MEMORY_EXTRACTOR_V1,
     MEETING_NOTES_V1,
     MEETING_NOTES_V2,

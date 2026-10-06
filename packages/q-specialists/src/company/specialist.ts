@@ -26,7 +26,7 @@ import {
   citePublicSources,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV15ResultSchema,
+  CompanyAnalystV17ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -785,7 +785,7 @@ export function createCompanyIntelligenceSpecialist(
             // refused every answer that filled it (live 2026-09-30).
             // Kept at the active version: v14's gestures and v15's
             // proposalStatus were refused the same way by v12's schema.
-            schema: CompanyAnalystV15ResultSchema,
+            schema: CompanyAnalystV17ResultSchema,
             // Independent readings: one malformed statement must not throw
             // away the change beside it (CQ-QX-007 A5).
             invalidListItems: "DROP",

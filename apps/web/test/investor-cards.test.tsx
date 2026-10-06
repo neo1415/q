@@ -6,7 +6,7 @@ import { DiscoveredInvestorDtoSchema } from "@capital-q/contracts";
 
 const askAbout = vi.fn();
 vi.mock("@/components/app-shell/global-q", () => ({
-  useGlobalQ: () => ({ askAbout }),
+  useGlobalQ: () => ({ askAbout, askNow: askAbout }),
 }));
 vi.mock("@/features/q-aperture", () => ({ QAperture: () => null }));
 

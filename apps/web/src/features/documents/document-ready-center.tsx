@@ -235,7 +235,7 @@ export function DocumentReadyCenter({
   const open = useViewingDocument();
   const setOpen = openDocumentViewer;
   const pathname = usePathname();
-  const { askAbout } = useGlobalQ();
+  const { askNow } = useGlobalQ();
   const stack = useRef<HTMLDivElement | null>(null);
   useDockAvoid(stack, ready.length > 0);
 
@@ -280,7 +280,7 @@ export function DocumentReadyCenter({
                 : {
                     onEditWithQ: (title: string) => {
                       setOpen(null);
-                      askAbout(
+                      askNow(
                         `Edit "${title}" with me — what would you change first?`,
                       );
                     },

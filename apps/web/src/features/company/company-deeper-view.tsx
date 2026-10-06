@@ -109,7 +109,7 @@ function displayValue(
 }
 
 /**
- * The draft question a fact opens Q with. The person's to edit or send;
+ * The question a fact opens Q with, run at once (C8: one tap, no resend);
  * it restates only what this page already shows them.
  */
 export function factQuestion(
@@ -347,7 +347,7 @@ function WhatIsKnown({
   readonly companyName: string;
   readonly facts: readonly CompanyNetworkFact[];
 }) {
-  const { askAbout } = useGlobalQ();
+  const { askNow } = useGlobalQ();
   return (
     <Disclosure
       title="What is known, and how well supported"
@@ -364,7 +364,7 @@ function WhatIsKnown({
           <FactRow
             key={fact.key}
             fact={fact}
-            onAsk={() => askAbout(factQuestion(companyName, fact))}
+            onAsk={() => askNow(factQuestion(companyName, fact))}
           />
         ))}
       </ul>

@@ -151,9 +151,12 @@ function FirstRunWelcome({ name }: { readonly name: string | null }) {
 
 export async function HomeScreen({
   conversationId = null,
+  openBoard = false,
 }: {
   /** The conversation the URL names, resolved on the server. */
   readonly conversationId?: string | null | undefined;
+  /** Arrived from the answer chip's Board (C6): open on the Board. */
+  readonly openBoard?: boolean | undefined;
 } = {}) {
   const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
   // Which subject Q's questions are about, if Capital Q knows of one. A
@@ -258,6 +261,7 @@ export async function HomeScreen({
           connected={qConnected}
           context={surfaceContext(context)}
           conversationId={conversationId}
+          openBoard={openBoard}
           welcome={welcome}
           welcomeLine={welcomeLine}
           welcomeLead={welcomeLead}

@@ -110,7 +110,7 @@ describe("deck sharing", () => {
 describe("Documents page order (design-48 v2; P3)", () => {
   it("shows the library first, with the brand folded after it", async () => {
     vi.doMock("../src/components/app-shell/global-q", () => ({
-      useGlobalQ: () => ({ askAbout: vi.fn() }),
+      useGlobalQ: () => ({ askAbout: vi.fn(), askNow: vi.fn() }),
     }));
     vi.doMock("../src/features/documents/brand-kit-panel", () => ({
       BrandKitPanel: () => <p>brand panel</p>,

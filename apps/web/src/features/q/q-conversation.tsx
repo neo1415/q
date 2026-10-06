@@ -23,7 +23,6 @@ import {
   Mic,
   MicOff,
   Square,
-  X,
 } from "@capital-q/ui/icons";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { DialogRoot, DialogViewerContent } from "@capital-q/ui/dialog";
@@ -57,10 +56,12 @@ import { QSwarm } from "@/features/q-swarm/q-swarm";
 import { plainFromMarkdown, QMarkdown } from "./markdown";
 import { HideFromQ } from "./hide-from-q";
 import { QAnswer } from "./q-answer";
-import { QBoard } from "./q-board";
+import { boardTimeline } from "./board-timeline";
+import { QBoardTimeline } from "./q-board-timeline";
+import { useBoardMarks } from "./q-board";
 import { QHistorySheet } from "./q-history-sheet";
 import { QNow } from "./q-now";
-import { QPresenceStage } from "./q-presence-stage";
+import { QPresenceStage, showOnStage } from "./q-presence-stage";
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
@@ -108,6 +109,8 @@ export type QSurfaceContext = {
 export type QConversationPanelProps = {
   /** False when this build has no Q API configured. */
   readonly connected: boolean;
+  /** Open on the Board (from the answer chip on another page, C6). */
+  readonly openBoard?: boolean | undefined;
   readonly context: QSurfaceContext;
   /** The conversation the URL names, resolved on the server (QX-003A). */
   readonly conversationId?: string | null | undefined;
@@ -260,6 +263,7 @@ export function QConversationPanel({
   welcomeLine,
   welcomeLead,
   briefing,
+  openBoard = false,
 }: QConversationPanelProps) {
   const session = useQSession();
   const { q, turns, voice, spoken, spokenOnly, presence } = session;
@@ -489,12 +493,14 @@ export function QConversationPanel({
   );
   const chooseView = writeStageView;
   const latestAnswer = turns.findLast((turn) => turn.kind === "Q");
+  // Cards stay wide while Q talks over them or works on a follow-up.
   const showingCards =
-    !voice.active &&
-    !q.working &&
     latestAnswer?.kind === "Q" &&
     !latestAnswer.streaming &&
-    latestAnswer.blocks.some((block) => block.kind === "COMPARISON_CARDS");
+    latestAnswer.blocks.some(
+      (block) =>
+        block.kind === "COMPARISON_CARDS" || block.kind === "ANSWER_CARDS",
+    );
   // Presence view is Q's presence only (founder request 2026-10-03): a
   // laid-out answer is shown over it (QPresenceStage), not as a thread.
   const bigPresence = !conversing || view === "presence";
@@ -529,8 +535,22 @@ export function QConversationPanel({
   const wide = useWide();
   // The Board is closed until its icon is pressed: what Q makes is in the
   // thread, inline (founder direction A, 2026-09-28).
-  const [boardOpen, setBoardOpen] = useState(false);
+  // The Board opens from the answer chip on other pages (?board=1, C6).
+  const [boardOpen, setBoardOpen] = useState(openBoard);
   const boardDocked = wide && boardOpen;
+  const boardMarks = useBoardMarks(q.conversationId);
+  // C4: what the Board holds, less the answer still on the stage; it
+  // counts up as an answer flies into it.
+  const boardCount = Math.max(
+    0,
+    boardTimeline(turns).filter(
+      (entry) => !boardMarks.dismissed.includes(entry.id),
+    ).length - (objectShown ? 1 : 0),
+  );
+  const [boardBump, setBoardBump] = useState(0);
+  const onBoardLanded = useCallback(() => {
+    setBoardBump((n) => n + 1);
+  }, []);
 
   const stage = workingLabel(q.state);
   const documentStage =
@@ -671,6 +691,7 @@ export function QConversationPanel({
       >
         <section
           aria-label="Q"
+          hidden={boardDocked}
           className="flex min-h-0 min-w-0 flex-1 flex-col"
           data-q-workspace
           data-q-stage={voice.active ? "voice" : "ready"}
@@ -767,20 +788,24 @@ export function QConversationPanel({
                 onChoose={(choice) => void voice.chooseVoice(choice)}
               />
               <button
+                key={`board-${String(boardBump)}`}
                 type="button"
-                className={
-                  boardOpen ? "cq-stage-quiet is-active" : "cq-stage-quiet"
-                }
+                className={`${boardOpen ? "cq-stage-quiet is-active" : "cq-stage-quiet"}${boardBump > 0 ? " cq-board-bump" : ""}`}
                 aria-expanded={boardOpen}
+                aria-label={`Board, ${String(boardCount)} ${boardCount === 1 ? "item" : "items"}`}
                 onClick={() => setBoardOpen((current) => !current)}
                 data-q-control="board"
+                data-q-board-count={String(boardCount)}
               >
                 <PanelRight
                   aria-hidden="true"
                   size={ICON_SIZE.compact}
                   strokeWidth={ICON_STROKE}
                 />
-                <span className="max-sm:sr-only">Board</span>
+                <span aria-hidden="true">Board</span>
+                <span className="cq-board-count" aria-hidden="true">
+                  {boardCount}
+                </span>
               </button>
               <button
                 type="button"
@@ -828,16 +853,16 @@ export function QConversationPanel({
           >
             {conversing ? (
               <div
-                className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-5xl" : "max-w-2xl"}`}
+                className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-[1180px]" : "max-w-2xl"}`}
                 data-q-cards-layout={showingCards ? "aside" : undefined}
               >
                 {bigPresence ? (
                   <QPresenceStage
-                    presence={(compact) => (
-                      <div
-                        className="flex flex-col items-center gap-2 pt-2"
-                        data-q-presence="stage"
-                      >
+                    live={voice.active}
+                    onBoardLanded={onBoardLanded}
+                    onPin={boardMarks.pin}
+                    presence={(compact, mini) =>
+                      mini === true ? (
                         <ViewTransition
                           name="q-aperture"
                           share="cq-q-morph"
@@ -845,23 +870,41 @@ export function QConversationPanel({
                         >
                           <QAperture
                             state={presence.state}
-                            size={compact ? 64 : 200}
+                            size={44}
                             inputLevel={client.inputLevel}
                             outputLevel={client.outputLevel}
                           />
                         </ViewTransition>
-                        {!compact &&
-                        thread.length > latestExchange(thread).length ? (
-                          <button
-                            type="button"
-                            className="cq-stage-quiet"
-                            onClick={() => chooseView("chat")}
+                      ) : (
+                        <div
+                          className="flex flex-col items-center gap-2 pt-2"
+                          data-q-presence="stage"
+                        >
+                          <ViewTransition
+                            name="q-aperture"
+                            share="cq-q-morph"
+                            default="none"
                           >
-                            Earlier in this conversation
-                          </button>
-                        ) : null}
-                      </div>
-                    )}
+                            <QAperture
+                              state={presence.state}
+                              size={compact ? 64 : 200}
+                              inputLevel={client.inputLevel}
+                              outputLevel={client.outputLevel}
+                            />
+                          </ViewTransition>
+                          {!compact &&
+                          thread.length > latestExchange(thread).length ? (
+                            <button
+                              type="button"
+                              className="cq-stage-quiet"
+                              onClick={() => chooseView("chat")}
+                            >
+                              Earlier in this conversation
+                            </button>
+                          ) : null}
+                        </div>
+                      )
+                    }
                     onShowingChange={setObjectShown}
                     turns={turns}
                     captions={captions}
@@ -1242,32 +1285,31 @@ export function QConversationPanel({
 
         {wide ? (
           boardOpen ? (
+            // C7: on a desktop the Board takes the page (the stage stays
+            // mounted underneath, so the conversation keeps its place).
             <aside
-              aria-label="Now and Board"
-              className="cq-q-aside flex w-[400px] flex-none flex-col gap-6 overflow-y-auto border-l border-(--cq-border-subtle) px-5 py-5"
+              aria-label="Board"
+              className="cq-q-aside flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto"
               data-q-aside
             >
-              <div className="-mt-2 -mr-2 flex justify-end">
-                <button
-                  type="button"
-                  className="cq-stage-quiet"
-                  aria-label="Close the Board"
-                  onClick={() => setBoardOpen(false)}
-                  data-q-control="board-close"
-                >
-                  <X
-                    aria-hidden="true"
-                    size={ICON_SIZE.compact}
-                    strokeWidth={ICON_STROKE}
-                  />
-                </button>
+              <div className="mx-auto w-full max-w-[1180px] px-6 pt-4">
+                <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
               </div>
-              <QNow session={session} onAct={sayOrAsk} />
-              <QBoard
+              <QBoardTimeline
                 conversationId={q.conversationId}
                 turns={turns}
-                onAsk={sayOrAsk}
+                onClose={() => setBoardOpen(false)}
+                onShow={(answerId) => {
+                  setBoardOpen(false);
+                  chooseView("presence");
+                  showOnStage(answerId);
+                }}
                 onOpenArtifact={showArtifact}
+                onAsk={(question) => {
+                  setBoardOpen(false);
+                  sayOrAsk(question);
+                }}
+                suggestions={context.suggestions.slice(0, 2)}
               />
             </aside>
           ) : null
@@ -1275,7 +1317,7 @@ export function QConversationPanel({
           <SheetRoot open={boardOpen} onOpenChange={setBoardOpen}>
             {boardOpen ? (
               <SheetContent side="bottom" title="Board">
-                <QBoard
+                <QBoardTimeline
                   conversationId={q.conversationId}
                   turns={turns}
                   onAsk={(question) => {
@@ -1286,6 +1328,7 @@ export function QConversationPanel({
                     setBoardOpen(false);
                     showArtifact(artifactId);
                   }}
+                  suggestions={context.suggestions.slice(0, 2)}
                 />
               </SheetContent>
             ) : null}
