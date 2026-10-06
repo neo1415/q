@@ -47,7 +47,7 @@ const NOW = Date.parse("2026-10-05T21:40:00.000Z");
 const { KORA, HARVEST, FREIGHTLY, SUNLINE, TOP3, FITS, VIEWS } = fixtures;
 
 describe("the fit score", () => {
-  it("is the band and confidence in words, never a number", () => {
+  it("is the score out of 10 beside the band and confidence in words, never a percentage (ADR 0059)", () => {
     const { container } = render(
       <FitScore
         name="Kora Health"
@@ -56,11 +56,11 @@ describe("the fit score", () => {
       />,
     );
     const button = screen.getByRole("button", {
-      name: /Good fit, medium confidence, 1 unknown/,
+      name: /\d+(\.\d)? out of 10, Good fit, medium confidence, 1 unknown/,
     });
-    expect(button.textContent).toContain("Good fit");
+    expect(button.textContent).toMatch(/\d+(\.\d)?\/10 · Good fit/);
     expect(button.textContent).toContain("Medium confidence");
-    expect(container.textContent).not.toMatch(/\d+\s*%|\/\s*10|score/i);
+    expect(container.textContent).not.toMatch(/\d+\s*%|\/\s*100|score/i);
     expect(container.querySelectorAll("[data-fit-glyph]")).toHaveLength(9);
   });
 

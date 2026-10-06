@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 import {
-  FIT_BAND_LABELS,
   FIT_CONFIDENCE_LABELS,
   FIT_PARAMETER_LABELS,
   Q_VIEW_VERDICT_LABELS,
@@ -20,6 +19,7 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 
+import { fitHeadline } from "./fit-breakdown";
 import { FitGlyph, glyphKindOf } from "./fit-glyph";
 import { QViewMark, useQViews, type QViewPort } from "./q-view-note";
 
@@ -231,7 +231,7 @@ export function FitComparisonView({
               </span>
               <span className="flex items-baseline gap-2">
                 <span className="cq-title-md text-(--cq-text-primary)">
-                  {FIT_BAND_LABELS[e.profile.band]}
+                  {fitHeadline(e.profile)}
                 </span>
                 <span className="cq-caption text-(--cq-text-secondary)">
                   {FIT_CONFIDENCE_LABELS[e.profile.confidence]}
@@ -306,7 +306,7 @@ export function FitComparisonView({
                     {e.name}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {FIT_BAND_LABELS[e.profile.band]} ·{" "}
+                    {fitHeadline(e.profile)} ·{" "}
                     {FIT_CONFIDENCE_LABELS[e.profile.confidence].toLowerCase()}
                   </span>
                 </span>

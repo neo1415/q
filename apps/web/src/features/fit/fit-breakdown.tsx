@@ -7,6 +7,7 @@ import {
   FIT_BAND_LABELS,
   FIT_CONFIDENCE_LABELS,
   FIT_PARAMETER_LABELS,
+  fitScoreOutOf10,
   type FitProfileDto,
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
@@ -20,14 +21,23 @@ import { FitGlyph, FitPips, glyphKindOf, outcomeWord } from "./fit-glyph";
  * The fit score and its breakdown (ADR 0052; mockups match.html and
  * company.html). The score is a button: the band in words, the nine
  * glyphs, the confidence in words. It opens every parameter with its word
- * and reason. No number anywhere.
+ * and reason. ADR 0059: the score out of 10 sits beside the band, never
+ * alone and never as a percentage.
  */
+
+/** "7.5/10 · Good fit", or the band alone when there is no score. */
+export function fitHeadline(profile: FitProfileDto): string {
+  const score = fitScoreOutOf10(profile);
+  const band = FIT_BAND_LABELS[profile.band];
+  return score === null ? band : `${score}/10 · ${band}`;
+}
 
 export function fitSummaryLabel(profile: FitProfileDto): string {
   const unknown = profile.parameters.filter(
     (p) => p.applicable && p.outcome === "UNKNOWN",
   ).length;
-  return `${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}${unknown > 0 ? `, ${String(unknown)} unknown` : ""}. Show why`;
+  const score = fitScoreOutOf10(profile);
+  return `${score === null ? "" : `${score} out of 10, `}${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}${unknown > 0 ? `, ${String(unknown)} unknown` : ""}. Show why`;
 }
 
 export function FitScoreButton({
@@ -49,7 +59,7 @@ export function FitScoreButton({
     >
       <span className="flex flex-col gap-1">
         <span className="text-[15px] font-semibold whitespace-nowrap text-(--cq-text-primary)">
-          {FIT_BAND_LABELS[profile.band]}
+          {fitHeadline(profile)}
         </span>
         <FitPips parameters={profile.parameters} />
         <span className="text-xs whitespace-nowrap text-(--cq-text-tertiary)">

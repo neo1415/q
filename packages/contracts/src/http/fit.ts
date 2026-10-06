@@ -276,6 +276,34 @@ export const FIT_BAND_LABELS: Readonly<Record<FitBand, string>> = {
   OUTSIDE_MANDATE: "Outside your mandate",
 };
 
+/**
+ * ADR 0059: fit shown as a score out of 10 beside its band in words, the
+ * same scale as Q's answer cards (ADR 0053). Derived only from the outcomes
+ * the reader already sees: STRONG 10, PARTIAL 4, MISMATCH 0, UNKNOWN left
+ * out. No score when a declared rule excludes the company or too little is
+ * known, so absence never reads as a low number. Never a percentage.
+ */
+const FIT_SCORE_POINTS: Readonly<Record<FitOutcome, number | null>> = {
+  STRONG: 10,
+  PARTIAL: 4,
+  MISMATCH: 0,
+  UNKNOWN: null,
+};
+
+export function fitScoreOutOf10(profile: {
+  readonly band: FitBand;
+  readonly parameters: readonly { readonly outcome: FitOutcome }[];
+}): string | null {
+  if (profile.band === "OUTSIDE_MANDATE") return null;
+  if (profile.band === "NOT_ENOUGH_INFORMATION") return null;
+  const known = profile.parameters
+    .map((parameter) => FIT_SCORE_POINTS[parameter.outcome])
+    .filter((points): points is number => points !== null);
+  if (known.length < 3) return null;
+  const mean = known.reduce((sum, points) => sum + points, 0) / known.length;
+  return (Math.round(mean * 10) / 10).toFixed(1).replace(/\.0$/, "");
+}
+
 export const FIT_CONFIDENCE_LABELS: Readonly<Record<FitConfidence, string>> = {
   HIGH: "High confidence",
   MEDIUM: "Medium confidence",

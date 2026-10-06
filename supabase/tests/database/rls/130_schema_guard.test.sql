@@ -50,6 +50,10 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('identity', 'tenant_organisations',     'INTERNAL_SERVER_ONLY', '{}'),
   ('identity', 'organisation_memberships', 'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'user_active_contexts',     'RLS_REQUIRED',         '{SELECT}'),
+  -- G (ADR 0057): invitations, join requests, ownership offers; suite 800.
+  ('identity', 'organisation_invitations',      'RLS_REQUIRED',    '{SELECT}'),
+  ('identity', 'organisation_join_requests',    'RLS_REQUIRED',    '{SELECT}'),
+  ('identity', 'organisation_ownership_offers', 'RLS_REQUIRED',    '{SELECT}'),
   ('identity', 'membership_roles',         'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'organisation_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('core', 'companies',                    'RLS_REQUIRED',         '{SELECT}'),
