@@ -827,7 +827,6 @@ export function createApp(
       claimable: modules.companyClaims?.search,
       identities: security.identities,
       claims: modules.companyClaims,
-      admitClaim: modules.team?.admitClaim,
       myApplications: modules.gateqMyApplications,
       publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,

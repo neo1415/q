@@ -85,6 +85,19 @@ export function createCompanyClaims(options: {
   readonly codeMailer?: ClaimCodeMailer | undefined;
   /** Test seam: a known code. */
   readonly newCode?: (() => string) | undefined;
+  /**
+   * P14: admission once a claim is approved (the organisations context's
+   * own command, composed by the app). Absent: decisions record only.
+   */
+  readonly admit?:
+    | ((input: {
+        readonly organisationId: string;
+        readonly userId: string;
+        readonly role: "OWNER" | "MEMBER";
+        readonly decidedByUserId: string;
+        readonly claimRequestId: string;
+      }) => Promise<unknown>)
+    | undefined;
 }) {
   const { sql } = options;
   const newCode =
@@ -141,7 +154,7 @@ export function createCompanyClaims(options: {
     requested: row.requested,
   });
 
-  return {
+  const claims = {
     search: async (
       actor: ClaimSearcher,
       text: string,
@@ -387,6 +400,45 @@ export function createCompanyClaims(options: {
         companyId: row.company_id,
         unclaimed: row.unclaimed,
       };
+    },
+  };
+
+  return {
+    ...claims,
+    /**
+     * P14: a company admin's decision (the declared action's run): only an
+     * admin or owner of that company, only a claim on it; approval admits
+     * the requester as a Member. Null: nothing they may decide.
+     */
+    decideAsMember: async (
+      actor: { readonly userId: string },
+      companyId: string,
+      requestId: string,
+      input: {
+        readonly approve: boolean;
+        readonly reason?: string | undefined;
+      },
+    ): Promise<ClaimDecisionResultDto | null> => {
+      if (!(await claims.isCompanyAdmin(actor.userId, companyId))) return null;
+      const decided = await claims.decide({
+        requestId,
+        approve: input.approve,
+        deciderUserId: actor.userId,
+        via: "COMPANY_MEMBER",
+        companyId,
+        reason: input.reason,
+      });
+      if (decided === null) return null;
+      if (decided.status === "APPROVED" && options.admit !== undefined) {
+        await options.admit({
+          organisationId: decided.organisationId,
+          userId: decided.requesterUserId,
+          role: "MEMBER",
+          decidedByUserId: actor.userId,
+          claimRequestId: requestId,
+        });
+      }
+      return { status: decided.status };
     },
   };
 }

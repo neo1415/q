@@ -2184,6 +2184,13 @@ const { app, logger } = createApp(config, security, {
   }),
   companyClaims: createCompanyClaims({
     sql: database.sql,
+    // P14: an approved claim admits the requester through the team's own
+    // command (membership, roles, active context, audit, event).
+    admit: (input) =>
+      team.admitClaim({
+        ...input,
+        correlationId: CorrelationIdSchema.parse(`cor_${crypto.randomUUID()}`),
+      }),
     // P14: the one-time code to the work email, through the app sender,
     // outcome logged with the domain only.
     codeMailer: async ({ to, companyName, code, expiresInMinutes }) => {
