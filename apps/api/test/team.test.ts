@@ -117,7 +117,11 @@ function world() {
 type World = ReturnType<typeof world>;
 
 /** The app as `userId`, whose context is their own active membership. */
-function appAs(w: World, userId: string) {
+function appAs(
+  w: World,
+  userId: string,
+  extra: Partial<Parameters<typeof createApp>[2]> = {},
+) {
   return createApp(
     parseApiConfig({ NODE_ENV: "test" }),
     {
@@ -161,7 +165,7 @@ function appAs(w: World, userId: string) {
           }),
       },
     },
-    { team: w.team },
+    { team: w.team, ...extra },
   ).app;
 }
 
@@ -194,6 +198,44 @@ const membershipOf = (w: World, userId: string, organisationId = ORG) =>
   )?.id ?? "";
 
 describe("team routes", () => {
+  it("P14: each teammate's photo rides with their name as a signed URL; none is initials", async () => {
+    const w = world();
+    const asked: unknown[] = [];
+    const app = appAs(w, ADMIN, {
+      namedPhotos: {
+        photos: (subjects) => {
+          asked.push(subjects);
+          return Promise.resolve(
+            new Map([
+              [`PERSON:${ADMIN}`, "https://storage.example/signed/a.webp?t=1"],
+            ]),
+          );
+        },
+        images: () => Promise.resolve(new Map()),
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/team",
+      headers: { authorization: "Bearer test" },
+    });
+    const members = (
+      JSON.parse(response.body) as {
+        members: { userId: string; avatarUrl: string | null }[];
+      }
+    ).members;
+    expect(members.find((m) => m.userId === ADMIN)?.avatarUrl).toBe(
+      "https://storage.example/signed/a.webp?t=1",
+    );
+    expect(
+      members
+        .filter((m) => m.userId !== ADMIN)
+        .every((m) => m.avatarUrl === null),
+    ).toBe(true);
+    // Only the people this response names are asked about.
+    expect((asked[0] as unknown[]).length).toBe(members.length);
+  });
+
   it("GET /v1/team answers the caller's own team; invitations only for admins", async () => {
     const w = world();
     await call(w, ADMIN, "POST", "/v1/team/invitations", {

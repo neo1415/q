@@ -533,6 +533,7 @@ export function createApp(
       resolver: security.resolver,
       identities: security.identities,
       team: modules.team,
+      namedPhotos: modules.namedPhotos,
     });
   }
 

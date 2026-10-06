@@ -45,7 +45,11 @@ export async function ProfileTeamSection() {
             key={member.membershipId}
             className="flex items-center gap-3 py-1.5"
           >
-            <Avatar name={member.name} size="sm" />
+            <Avatar
+              name={member.name}
+              size="sm"
+              src={member.avatarUrl ?? undefined}
+            />
             <span className="min-w-0 flex-1 truncate cq-body-sm text-(--cq-text-primary)">
               {member.name}
               {member.isYou ? (

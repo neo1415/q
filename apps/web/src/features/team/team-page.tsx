@@ -630,7 +630,12 @@ function MemberRow({
       className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-(--cq-border-subtle) py-3"
       data-team-member
     >
-      <Avatar name={member.name} size="md" className="size-11!" />
+      <Avatar
+        name={member.name}
+        size="md"
+        className="size-11!"
+        src={member.avatarUrl ?? undefined}
+      />
       <span className="flex min-w-0 flex-col">
         <span className="truncate cq-body font-medium text-(--cq-text-primary)">
           {member.name}

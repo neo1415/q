@@ -90,6 +90,11 @@ export const TeamMemberDtoSchema = z
     role: TeamRoleSchema,
     isYou: z.boolean(),
     joinedAt: z.string(),
+    /**
+     * P14: their profile photo, as a short-lived signed read URL minted for
+     * this response (never a storage key). Absent or null: initials.
+     */
+    avatarUrl: z.string().url().max(4096).nullable().optional(),
   })
   .strict();
 export type TeamMemberDto = z.infer<typeof TeamMemberDtoSchema>;
