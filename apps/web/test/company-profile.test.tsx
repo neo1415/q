@@ -383,7 +383,9 @@ describe("the profile, for a founder viewing another company", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Overview" })).toBeNull();
     expect(
-      screen.getByRole("link", { name: /Elevator/ }).getAttribute("aria-current"),
+      screen
+        .getByRole("link", { name: /Elevator/ })
+        .getAttribute("aria-current"),
     ).toBe("page");
     expect(screen.queryByRole("button", { name: "Pass" })).toBeNull();
     expect(screen.queryByRole("button", { name: /interest/i })).toBeNull();

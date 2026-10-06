@@ -9,14 +9,21 @@ import type { FounderPersonSource } from "../domain/founder-person.js";
  * decided the reader may see the company's team (ADR 0041) and projects it
  * through `projectFounderPerson`.
  */
-export function createPostgresFounderPersonSource(options: { readonly sql: DatabaseExecutor }) {
+export function createPostgresFounderPersonSource(options: {
+  readonly sql: DatabaseExecutor;
+}) {
   return {
     founderAt: async (company: {
       readonly tenantId: string;
       readonly companyId: string;
       readonly position: number;
     }): Promise<FounderPersonSource | null> => {
-      if (!Number.isInteger(company.position) || company.position < 1 || company.position > 20) return null;
+      if (
+        !Number.isInteger(company.position) ||
+        company.position < 1 ||
+        company.position > 20
+      )
+        return null;
       const rows = await options.sql<
         {
           user_id: string;

@@ -217,7 +217,8 @@ export type AppActionPorts = {
     | Pick<DataRoomService, "view" | "setLevel" | "requestAccess" | "decide">
     | undefined;
   /** The pitch-deck tab (overnight A4-A6): the deck, Q's reading, coaching. */
-  readonly companyDeck?: Pick<CompanyDeckService, "view" | "confirm"> | undefined;
+  readonly companyDeck?:
+    Pick<CompanyDeckService, "view" | "confirm"> | undefined;
   /** Post-meeting outcomes (2026-10-02): Network's outcome service. */
   readonly outcomes?:
     | Pick<

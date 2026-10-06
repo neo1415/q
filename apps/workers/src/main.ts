@@ -791,7 +791,11 @@ const withDiligenceSummary = (
 const deckReader =
   modelProviders.length === 0
     ? undefined
-    : createDeckReader({ gateway: modelGateway, logger, dataPosture: demoDataPosture });
+    : createDeckReader({
+        gateway: modelGateway,
+        logger,
+        dataPosture: demoDataPosture,
+      });
 const withDeckReading = (
   inner: Parameters<typeof withDeckReadings>[0],
 ): Parameters<typeof withDeckReadings>[0] =>

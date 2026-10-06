@@ -84,7 +84,8 @@ export function projectFounderPerson(
         title: line.title,
         detail: line.detail,
         evidence:
-          line.supportingDocumentId !== null && context.openDocumentIds.has(line.supportingDocumentId)
+          line.supportingDocumentId !== null &&
+          context.openDocumentIds.has(line.supportingDocumentId)
             ? "MATCHES_SHARED_DOCUMENT"
             : "FOUNDERS_CLAIM",
       })),

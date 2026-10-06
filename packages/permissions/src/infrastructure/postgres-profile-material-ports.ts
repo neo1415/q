@@ -8,9 +8,12 @@ import type { DataRoomCompany } from "../application/data-room.js";
  * access: the services do, after reading these.
  */
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function createPostgresProfileMaterialPorts(options: { readonly sql: DatabaseExecutor }) {
+export function createPostgresProfileMaterialPorts(options: {
+  readonly sql: DatabaseExecutor;
+}) {
   const { sql } = options;
   return {
     company: async (companyId: string): Promise<DataRoomCompany | null> => {
@@ -54,7 +57,10 @@ export function createPostgresProfileMaterialPorts(options: { readonly sql: Data
     },
 
     /** The canonical relationship of the pair, if it exists (never created here). */
-    relationshipOf: async (companyId: string, investorOrganisationId: string): Promise<string | null> => {
+    relationshipOf: async (
+      companyId: string,
+      investorOrganisationId: string,
+    ): Promise<string | null> => {
       const rows = await sql<{ id: string }[]>`
         select id from network.relationships
          where company_id = ${companyId} and investor_organisation_id = ${investorOrganisationId}`;

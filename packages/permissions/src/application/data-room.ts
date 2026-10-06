@@ -17,7 +17,11 @@ import {
   type DataRoomOwnerView,
   type UtcTimestamp,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor, TransactionContext, TransactionManager } from "@capital-q/database";
+import type {
+  DatabaseExecutor,
+  TransactionContext,
+  TransactionManager,
+} from "@capital-q/database";
 import {
   RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_GRANTED,
   RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED,
@@ -26,7 +30,11 @@ import {
 } from "@capital-q/network";
 import type { ActorContext } from "@capital-q/security";
 
-import { actorPrincipal, isPolicyActiveAt, type DisclosurePolicy } from "../contracts/index.js";
+import {
+  actorPrincipal,
+  isPolicyActiveAt,
+  type DisclosurePolicy,
+} from "../contracts/index.js";
 import type { DisclosureAccessService } from "./access-service.js";
 import type { DisclosurePolicyManager } from "./policy-manager.js";
 import type { DisclosurePolicyRepository } from "./ports.js";
@@ -52,7 +60,9 @@ import type { DisclosurePolicyRepository } from "./ports.js";
  */
 
 const LEVEL_CHANGED = AuditActionTypeSchema.parse("data_room.level_changed");
-const ACCESS_REQUESTED = AuditActionTypeSchema.parse("data_room.access_requested");
+const ACCESS_REQUESTED = AuditActionTypeSchema.parse(
+  "data_room.access_requested",
+);
 const ACCESS_DECIDED = AuditActionTypeSchema.parse("data_room.access_decided");
 const RESOURCE_DOCUMENT = AuditResourceTypeSchema.parse("document");
 const RESOURCE_RELATIONSHIP = AuditResourceTypeSchema.parse("relationship");
@@ -105,10 +115,20 @@ export type DataRoomRequestRecord = {
 
 /** Structural: `createPostgresDataRoom()` from Evidence satisfies it. */
 export type DataRoomStore = {
-  readonly folders: (executor: DatabaseExecutor) => Promise<readonly { code: string; label: string }[]>;
-  readonly checklist: (executor: DatabaseExecutor) => Promise<readonly DataRoomChecklistEntry[]>;
-  readonly documentsOf: (executor: DatabaseExecutor, companyId: string) => Promise<readonly DataRoomDocument[]>;
-  readonly document: (executor: DatabaseExecutor, documentId: string) => Promise<DataRoomDocument | null>;
+  readonly folders: (
+    executor: DatabaseExecutor,
+  ) => Promise<readonly { code: string; label: string }[]>;
+  readonly checklist: (
+    executor: DatabaseExecutor,
+  ) => Promise<readonly DataRoomChecklistEntry[]>;
+  readonly documentsOf: (
+    executor: DatabaseExecutor,
+    companyId: string,
+  ) => Promise<readonly DataRoomDocument[]>;
+  readonly document: (
+    executor: DatabaseExecutor,
+    documentId: string,
+  ) => Promise<DataRoomDocument | null>;
   readonly setLevel: (
     tx: TransactionContext,
     input: {
@@ -135,7 +155,10 @@ export type DataRoomStore = {
   ) => Promise<{ readonly id: string; readonly created: boolean }>;
   readonly requests: (
     executor: DatabaseExecutor,
-    filter: { readonly companyId: string; readonly relationshipId?: string | undefined },
+    filter: {
+      readonly companyId: string;
+      readonly relationshipId?: string | undefined;
+    },
   ) => Promise<readonly DataRoomRequestRecord[]>;
   readonly insertDecision: (
     tx: TransactionContext,
@@ -162,8 +185,14 @@ export type DataRoomStore = {
     investorOrganisationId: string,
   ) => Promise<ReadonlyMap<string, string>>;
   /** The company a request was made to, or null. */
-  readonly requestCompany: (executor: DatabaseExecutor, requestId: string) => Promise<string | null>;
-  readonly openedByCounts: (executor: DatabaseExecutor, companyId: string) => Promise<ReadonlyMap<string, number>>;
+  readonly requestCompany: (
+    executor: DatabaseExecutor,
+    requestId: string,
+  ) => Promise<string | null>;
+  readonly openedByCounts: (
+    executor: DatabaseExecutor,
+    companyId: string,
+  ) => Promise<ReadonlyMap<string, number>>;
 };
 
 export type DataRoomCompany = {
@@ -218,7 +247,9 @@ export function checklistFor(
     )
     .map((item) => ({
       ...item,
-      words: (countryCode === null ? undefined : item.countryLabels[countryCode]) ?? item.label,
+      words:
+        (countryCode === null ? undefined : item.countryLabels[countryCode]) ??
+        item.label,
     }));
 }
 
@@ -254,7 +285,8 @@ export function projectForInvestor(
     const access: DataRoomInvestorDocument["access"] =
       granted || document.level === "PUBLIC"
         ? "OPEN"
-        : context.openRequests.has(document.documentId) || context.openRequests.has("*")
+        : context.openRequests.has(document.documentId) ||
+            context.openRequests.has("*")
           ? "REQUESTED"
           : "REQUESTABLE";
     return [
@@ -263,7 +295,11 @@ export function projectForInvestor(
         title: document.title,
         folderCode: document.folderCode,
         shownAs:
-          document.level === "PUBLIC" ? "PUBLIC" : granted ? "SHARED" : "ON_REQUEST",
+          document.level === "PUBLIC"
+            ? "PUBLIC"
+            : granted
+              ? "SHARED"
+              : "ON_REQUEST",
         access,
         kind: fileKind(document.mimeType),
         pageCount: document.pageCount,
@@ -271,7 +307,9 @@ export function projectForInvestor(
         validUntil: document.validUntil,
         openedAt: context.views.get(document.documentId) ?? null,
         accessEndsAt:
-          document.level === "PUBLIC" ? null : (context.grants.get(document.documentId) ?? null),
+          document.level === "PUBLIC"
+            ? null
+            : (context.grants.get(document.documentId) ?? null),
       },
     ];
   });
@@ -284,13 +322,16 @@ export function activeGrants(
 ): Map<string, string | null> {
   const grants = new Map<string, string | null>();
   for (const policy of policies) {
-    if (policy.resource.type !== "document" || !isPolicyActiveAt(policy, now)) continue;
+    if (policy.resource.type !== "document" || !isPolicyActiveAt(policy, now))
+      continue;
     const previous = grants.get(policy.resource.id);
     // The longest-lasting grant wins; no expiry beats any expiry.
     if (
       !grants.has(policy.resource.id) ||
       policy.expiresAt === null ||
-      (previous !== null && previous !== undefined && policy.expiresAt > previous)
+      (previous !== null &&
+        previous !== undefined &&
+        policy.expiresAt > previous)
     ) {
       grants.set(policy.resource.id, policy.expiresAt);
     }
@@ -308,12 +349,24 @@ export function createDataRoomService(dependencies: {
   /** The actor's own investor organisation, or null when they are not an investor. */
   readonly investorOf: (
     actor: ActorContext,
-  ) => Promise<{ readonly investorOrganisationId: string; readonly name: string } | null>;
+  ) => Promise<{
+    readonly investorOrganisationId: string;
+    readonly name: string;
+  } | null>;
   /** ADR 0041's pitch rule: the company is viewable to this investor now. */
-  readonly investorMayFind: (actor: ActorContext, companyId: string) => Promise<boolean>;
+  readonly investorMayFind: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<boolean>;
   /** The actor may manage this company's data room (owner org + data_room.share). */
-  readonly ownerMayManage: (actor: ActorContext, company: DataRoomCompany) => Promise<boolean>;
-  readonly relationshipOf: (companyId: string, investorOrganisationId: string) => Promise<string | null>;
+  readonly ownerMayManage: (
+    actor: ActorContext,
+    company: DataRoomCompany,
+  ) => Promise<boolean>;
+  readonly relationshipOf: (
+    companyId: string,
+    investorOrganisationId: string,
+  ) => Promise<string | null>;
   /** The canonical relationship, created on first contact (never a parallel record). */
   readonly ensureRelationship: (command: {
     readonly actor: ActorContext;
@@ -322,10 +375,15 @@ export function createDataRoomService(dependencies: {
     readonly correlationId: CorrelationId;
   }) => Promise<string>;
   readonly policies: Pick<DisclosurePolicyManager, "grant">;
-  readonly policyRepository: Pick<DisclosurePolicyRepository, "findUnrevokedForRecipient">;
+  readonly policyRepository: Pick<
+    DisclosurePolicyRepository,
+    "findUnrevokedForRecipient"
+  >;
   readonly access: Pick<DisclosureAccessService, "canDisclose">;
   /** A short-lived signed, inline read of the document's current, unblocked version. */
-  readonly signedInline: (document: DataRoomDocument) => Promise<{ readonly url: string; readonly expiresAt: string }>;
+  readonly signedInline: (
+    document: DataRoomDocument,
+  ) => Promise<{ readonly url: string; readonly expiresAt: string }>;
   /** The reader's own name, for the watermark. */
   readonly nameOf: (actor: ActorContext) => Promise<string | null>;
   readonly appender: RelationshipEventAppender;
@@ -343,13 +401,21 @@ export function createDataRoomService(dependencies: {
   readonly now?: (() => UtcTimestamp) | undefined;
 }) {
   const { sql, store, transactions } = dependencies;
-  const now = dependencies.now ?? (() => new Date().toISOString() as UtcTimestamp);
-  const refused = <T>(code: DataRoomRefusal): DataRoomOutcome<T> => ({ outcome: "REFUSED", code });
-  const quietly = <T>(promise: Promise<T>, fallback: T) => promise.catch(() => fallback);
-  const notifyQuietly = (input: Parameters<NonNullable<typeof dependencies.notify>>[0]) =>
-    dependencies.notify?.(input).catch(() => undefined);
+  const now =
+    dependencies.now ?? (() => new Date().toISOString());
+  const refused = <T>(code: DataRoomRefusal): DataRoomOutcome<T> => ({
+    outcome: "REFUSED",
+    code,
+  });
+  const quietly = <T>(promise: Promise<T>, fallback: T) =>
+    promise.catch(() => fallback);
+  const notifyQuietly = (
+    input: Parameters<NonNullable<typeof dependencies.notify>>[0],
+  ) => dependencies.notify?.(input).catch(() => undefined);
 
-  async function grantsOf(relationshipId: string | null): Promise<Map<string, string | null>> {
+  async function grantsOf(
+    relationshipId: string | null,
+  ): Promise<Map<string, string | null>> {
     const find = dependencies.policyRepository.findUnrevokedForRecipient;
     if (relationshipId === null || find === undefined) return new Map();
     const policies = await find(sql, {
@@ -370,7 +436,10 @@ export function createDataRoomService(dependencies: {
     }
     const investor = await quietly(dependencies.investorOf(actor), null);
     if (investor === null) return null;
-    if (!(await quietly(dependencies.investorMayFind(actor, company.id), false))) return null;
+    if (
+      !(await quietly(dependencies.investorMayFind(actor, company.id), false))
+    )
+      return null;
     const relationshipId = await quietly(
       dependencies.relationshipOf(company.id, investor.investorOrganisationId),
       null,
@@ -379,7 +448,10 @@ export function createDataRoomService(dependencies: {
   }
 
   const investorView = async (
-    reader: Extract<NonNullable<Awaited<ReturnType<typeof readerOf>>>, { kind: "INVESTOR" }>,
+    reader: Extract<
+      NonNullable<Awaited<ReturnType<typeof readerOf>>>,
+      { kind: "INVESTOR" }
+    >,
   ): Promise<DataRoomInvestorView> => {
     const { company, investor, relationshipId } = reader;
     const [folders, documents, grants, requests, views] = await Promise.all([
@@ -389,12 +461,22 @@ export function createDataRoomService(dependencies: {
       relationshipId === null
         ? Promise.resolve([] as readonly DataRoomRequestRecord[])
         : store.requests(sql, { companyId: company.id, relationshipId }),
-      store.viewsByOrganisation(sql, company.id, investor.investorOrganisationId),
+      store.viewsByOrganisation(
+        sql,
+        company.id,
+        investor.investorOrganisationId,
+      ),
     ]);
     const openRequests = new Set(
-      requests.filter((r) => r.decision === null).map((r) => r.documentId ?? "*"),
+      requests
+        .filter((r) => r.decision === null)
+        .map((r) => r.documentId ?? "*"),
     );
-    const visible = projectForInvestor(documents, { grants, openRequests, views });
+    const visible = projectForInvestor(documents, {
+      grants,
+      openRequests,
+      views,
+    });
     const used = new Set(visible.map((document) => document.folderCode));
     return {
       viewer: "INVESTOR",
@@ -404,7 +486,9 @@ export function createDataRoomService(dependencies: {
     };
   };
 
-  const ownerView = async (company: DataRoomCompany): Promise<DataRoomOwnerView> => {
+  const ownerView = async (
+    company: DataRoomCompany,
+  ): Promise<DataRoomOwnerView> => {
     const [folders, items, documents, requests, opened] = await Promise.all([
       store.folders(sql),
       store.checklist(sql),
@@ -413,15 +497,25 @@ export function createDataRoomService(dependencies: {
       store.openedByCounts(sql, company.id),
     ]);
     // Who has it now: active grants across every relationship that asked.
-    const relationships = [...new Set(requests.map((request) => request.relationshipId))];
+    const relationships = [
+      ...new Set(requests.map((request) => request.relationshipId)),
+    ];
     const sharedWith = new Map<string, number>();
-    for (const grants of await Promise.all(relationships.map((id) => grantsOf(id)))) {
+    for (const grants of await Promise.all(
+      relationships.map((id) => grantsOf(id)),
+    )) {
       for (const documentId of grants.keys()) {
         sharedWith.set(documentId, (sharedWith.get(documentId) ?? 0) + 1);
       }
     }
-    const checklist = checklistFor(items, company.stageCode, company.countryCode);
-    const filed = new Set(documents.map((document) => document.checklistItemCode));
+    const checklist = checklistFor(
+      items,
+      company.stageCode,
+      company.countryCode,
+    );
+    const filed = new Set(
+      documents.map((document) => document.checklistItemCode),
+    );
     return {
       viewer: "OWNER",
       companyId: company.id,
@@ -460,7 +554,11 @@ export function createDataRoomService(dependencies: {
         note: request.note,
         requestedAt: request.createdAt,
         status:
-          request.decision === null ? "OPEN" : request.decision === "APPROVED" ? "APPROVED" : "DECLINED",
+          request.decision === null
+            ? "OPEN"
+            : request.decision === "APPROVED"
+              ? "APPROVED"
+              : "DECLINED",
         accessEndsAt: request.expiresAt,
       })),
     };
@@ -474,7 +572,9 @@ export function createDataRoomService(dependencies: {
     ): Promise<DataRoomInvestorView | DataRoomOwnerView | null> => {
       const reader = await readerOf(actor, companyId);
       if (reader === null) return null;
-      return reader.kind === "OWNER" ? ownerView(reader.company) : investorView(reader);
+      return reader.kind === "OWNER"
+        ? ownerView(reader.company)
+        : investorView(reader);
     },
 
     /** The founder sets one document's level (and, optionally, its folder). */
@@ -486,17 +586,38 @@ export function createDataRoomService(dependencies: {
       readonly checklistItemCode?: string | null | undefined;
       readonly expectedVersion?: number | undefined;
       readonly correlationId?: CorrelationId | undefined;
-    }): Promise<DataRoomOutcome<{ readonly documentId: string; readonly level: DataRoomLevel; readonly version: number }>> => {
-      const document = await quietly(store.document(sql, command.documentId), null);
+    }): Promise<
+      DataRoomOutcome<{
+        readonly documentId: string;
+        readonly level: DataRoomLevel;
+        readonly version: number;
+      }>
+    > => {
+      const document = await quietly(
+        store.document(sql, command.documentId),
+        null,
+      );
       if (document === null) return refused("NOT_FOUND");
       const reader = await readerOf(command.actor, document.companyId);
       if (reader === null) return refused("NOT_FOUND");
       if (reader.kind !== "OWNER") return refused("OWNER_ONLY");
-      const correlationId = command.correlationId ?? dependencies.newCorrelationId();
+      const correlationId =
+        command.correlationId ?? dependencies.newCorrelationId();
       const expected = command.expectedVersion ?? document.version;
-      if (document.version > 0 && document.level === command.level &&
-          (command.folderCode === undefined || command.folderCode === document.folderCode)) {
-        return { outcome: "OK", value: { documentId: document.documentId, level: document.level, version: document.version } };
+      if (
+        document.version > 0 &&
+        document.level === command.level &&
+        (command.folderCode === undefined ||
+          command.folderCode === document.folderCode)
+      ) {
+        return {
+          outcome: "OK",
+          value: {
+            documentId: document.documentId,
+            level: document.level,
+            version: document.version,
+          },
+        };
       }
       const changed = await transactions.run(async (tx) => {
         const saved = await store.setLevel(tx, {
@@ -504,7 +625,9 @@ export function createDataRoomService(dependencies: {
           level: command.level,
           folderCode: command.folderCode ?? document.folderCode,
           checklistItemCode:
-            command.checklistItemCode === undefined ? document.checklistItemCode : command.checklistItemCode,
+            command.checklistItemCode === undefined
+              ? document.checklistItemCode
+              : command.checklistItemCode,
           expectedVersion: expected,
           userId: command.actor.userId,
         });
@@ -517,13 +640,24 @@ export function createDataRoomService(dependencies: {
           resourceId: document.documentId,
           occurredAt: occurredNow(),
           outcome: "SUCCEEDED",
-          metadata: { from: document.level, to: command.level, visibilityScope: DATA_ROOM_LEVEL_SCOPE[command.level] },
+          metadata: {
+            from: document.level,
+            to: command.level,
+            visibilityScope: DATA_ROOM_LEVEL_SCOPE[command.level],
+          },
           correlationId,
         });
         return saved;
       });
       if (changed === null) return refused("VERSION_CONFLICT");
-      return { outcome: "OK", value: { documentId: document.documentId, level: command.level, version: changed.version } };
+      return {
+        outcome: "OK",
+        value: {
+          documentId: document.documentId,
+          level: command.level,
+          version: changed.version,
+        },
+      };
     },
 
     /** The investor asks for one on-request document, or all of them. */
@@ -534,22 +668,29 @@ export function createDataRoomService(dependencies: {
       readonly note?: string | null | undefined;
       readonly idempotencyKey: string;
       readonly correlationId?: CorrelationId | undefined;
-    }): Promise<DataRoomOutcome<{ readonly requestId: string; readonly status: "OPEN" }>> => {
+    }): Promise<
+      DataRoomOutcome<{ readonly requestId: string; readonly status: "OPEN" }>
+    > => {
       const reader = await readerOf(command.actor, command.companyId);
       if (reader === null) return refused("NOT_FOUND");
       if (reader.kind !== "INVESTOR") return refused("INVESTOR_ONLY");
       const documents = await store.documentsOf(sql, reader.company.id);
-      const requestable = documents.filter((document) => document.level === "ON_REQUEST");
+      const requestable = documents.filter(
+        (document) => document.level === "ON_REQUEST",
+      );
       // Only a title they can already see can be asked for: asking can never
       // confirm that an unlisted document exists.
       if (
         requestable.length === 0 ||
         (command.documentId !== null &&
-          !requestable.some((document) => document.documentId === command.documentId))
+          !requestable.some(
+            (document) => document.documentId === command.documentId,
+          ))
       ) {
         return refused("NOT_REQUESTABLE");
       }
-      const correlationId = command.correlationId ?? dependencies.newCorrelationId();
+      const correlationId =
+        command.correlationId ?? dependencies.newCorrelationId();
       const relationshipId =
         reader.relationshipId ??
         (await dependencies.ensureRelationship({
@@ -559,7 +700,9 @@ export function createDataRoomService(dependencies: {
           correlationId,
         }));
       const note =
-        command.note === undefined || command.note === null ? null : command.note.trim().slice(0, 1000) || null;
+        command.note === undefined || command.note === null
+          ? null
+          : command.note.trim().slice(0, 1000) || null;
       const made = await transactions.run(async (tx) => {
         const inserted = await store.insertRequest(tx, {
           tenantId: reader.company.tenantId,
@@ -580,7 +723,9 @@ export function createDataRoomService(dependencies: {
             visibilityScope: "relationship_shared",
             payload: {
               requestId: inserted.id,
-              ...(command.documentId === null ? {} : { documentId: command.documentId }),
+              ...(command.documentId === null
+                ? {}
+                : { documentId: command.documentId }),
             },
             correlationId,
           });
@@ -592,7 +737,10 @@ export function createDataRoomService(dependencies: {
             resourceId: relationshipId,
             occurredAt: occurredNow(),
             outcome: "SUCCEEDED",
-            metadata: { requestId: inserted.id, documentId: command.documentId },
+            metadata: {
+              requestId: inserted.id,
+              documentId: command.documentId,
+            },
             correlationId,
           });
         }
@@ -602,7 +750,8 @@ export function createDataRoomService(dependencies: {
         const title =
           command.documentId === null
             ? "everything on request"
-            : (requestable.find((d) => d.documentId === command.documentId)?.title ?? "a document");
+            : (requestable.find((d) => d.documentId === command.documentId)
+                ?.title ?? "a document");
         await notifyQuietly({
           relationshipId,
           actingSide: "INVESTOR",
@@ -629,21 +778,34 @@ export function createDataRoomService(dependencies: {
       readonly decision: "APPROVE" | "DECLINE";
       readonly days?: number | undefined;
       readonly correlationId?: CorrelationId | undefined;
-    }): Promise<DataRoomOutcome<{ readonly requestId: string; readonly status: "APPROVED" | "DECLINED" }>> => {
+    }): Promise<
+      DataRoomOutcome<{
+        readonly requestId: string;
+        readonly status: "APPROVED" | "DECLINED";
+      }>
+    > => {
       // Find the request among the actor's own companies only.
-      const ownCompanyId = await quietly(store.requestCompany(sql, command.requestId), null);
+      const ownCompanyId = await quietly(
+        store.requestCompany(sql, command.requestId),
+        null,
+      );
       if (ownCompanyId === null) return refused("NOT_FOUND");
       const reader = await readerOf(command.actor, ownCompanyId);
-      if (reader === null || reader.kind !== "OWNER") return refused("NOT_FOUND");
-      const request = (await store.requests(sql, { companyId: ownCompanyId })).find(
-        (candidate) => candidate.id === command.requestId,
-      );
+      if (reader === null || reader.kind !== "OWNER")
+        return refused("NOT_FOUND");
+      const request = (
+        await store.requests(sql, { companyId: ownCompanyId })
+      ).find((candidate) => candidate.id === command.requestId);
       if (request === undefined) return refused("NOT_FOUND");
-      if (command.relationshipId !== undefined && command.relationshipId !== request.relationshipId) {
+      if (
+        command.relationshipId !== undefined &&
+        command.relationshipId !== request.relationshipId
+      ) {
         return refused("NOT_FOUND");
       }
       if (request.decision !== null) return refused("ALREADY_DECIDED");
-      const correlationId = command.correlationId ?? dependencies.newCorrelationId();
+      const correlationId =
+        command.correlationId ?? dependencies.newCorrelationId();
 
       if (command.decision === "DECLINE") {
         const recorded = await transactions.run(async (tx) => {
@@ -670,16 +832,22 @@ export function createDataRoomService(dependencies: {
           return inserted;
         });
         return recorded
-          ? { outcome: "OK", value: { requestId: request.id, status: "DECLINED" } }
+          ? {
+              outcome: "OK",
+              value: { requestId: request.id, status: "DECLINED" },
+            }
           : refused("ALREADY_DECIDED");
       }
 
       const days = command.days ?? 30;
-      const expiresAt = new Date(Date.parse(now()) + days * DAY_MS).toISOString() as UtcTimestamp;
+      const expiresAt = new Date(
+        Date.parse(now()) + days * DAY_MS,
+      ).toISOString();
       const documents = (await store.documentsOf(sql, ownCompanyId)).filter(
         (document) =>
           document.level === "ON_REQUEST" &&
-          (request.documentId === null || document.documentId === request.documentId),
+          (request.documentId === null ||
+            document.documentId === request.documentId),
       );
       if (documents.length === 0) return refused("NOT_REQUESTABLE");
       // Grants first (each its own audited policy); the decision, event and
@@ -731,7 +899,12 @@ export function createDataRoomService(dependencies: {
           resourceId: request.relationshipId,
           occurredAt: occurredNow(),
           outcome: "SUCCEEDED",
-          metadata: { requestId: request.id, decision: "APPROVED", expiresAt, documents: documents.length },
+          metadata: {
+            requestId: request.id,
+            decision: "APPROVED",
+            expiresAt,
+            documents: documents.length,
+          },
           correlationId,
         });
         return true;
@@ -740,11 +913,18 @@ export function createDataRoomService(dependencies: {
       await notifyQuietly({
         relationshipId: request.relationshipId,
         actingSide: "COMPANY",
-        title: `{actor} shared ${request.documentTitle ?? "their on-request documents"} with you`.slice(0, 200),
+        title:
+          `{actor} shared ${request.documentTitle ?? "their on-request documents"} with you`.slice(
+            0,
+            200,
+          ),
         key: request.id,
         priority: "UPDATE",
       });
-      return { outcome: "OK", value: { requestId: request.id, status: "APPROVED" } };
+      return {
+        outcome: "OK",
+        value: { requestId: request.id, status: "APPROVED" },
+      };
     },
 
     /**
@@ -760,8 +940,15 @@ export function createDataRoomService(dependencies: {
     }): Promise<DataRoomOpenDto | null> => {
       const reader = await readerOf(query.actor, query.companyId);
       if (reader === null) return null;
-      const document = await quietly(store.document(sql, query.documentId), null);
-      if (document === null || document.companyId !== reader.company.id || document.currentVersionId === null) {
+      const document = await quietly(
+        store.document(sql, query.documentId),
+        null,
+      );
+      if (
+        document === null ||
+        document.companyId !== reader.company.id ||
+        document.currentVersionId === null
+      ) {
         return null;
       }
       if (reader.kind === "INVESTOR") {
@@ -783,7 +970,12 @@ export function createDataRoomService(dependencies: {
       let watermark: string | null = null;
       if (reader.kind === "INVESTOR") {
         const name = await quietly(dependencies.nameOf(query.actor), null);
-        watermark = [name, reader.investor.name, now().slice(0, 10), "view only"]
+        watermark = [
+          name,
+          reader.investor.name,
+          now().slice(0, 10),
+          "view only",
+        ]
           .filter((part): part is string => part !== null && part !== "")
           .join(" · ")
           .slice(0, 200);
@@ -796,7 +988,12 @@ export function createDataRoomService(dependencies: {
           })
           .catch(() => undefined);
       }
-      return { url: link.url, expiresAt: link.expiresAt, downloadable: false, watermark };
+      return {
+        url: link.url,
+        expiresAt: link.expiresAt,
+        downloadable: false,
+        watermark,
+      };
     },
   };
 }

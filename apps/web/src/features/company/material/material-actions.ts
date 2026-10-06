@@ -14,7 +14,10 @@ import {
   setDataRoomLevel,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
-import { DATA_ROOM_GRANT_DAYS, DataRoomLevelSchema } from "@capital-q/contracts";
+import {
+  DATA_ROOM_GRANT_DAYS,
+  DataRoomLevelSchema,
+} from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
 
@@ -35,10 +38,15 @@ export type MaterialResult<T = undefined> =
 async function session() {
   const { apiBaseUrl } = loadWebServerConfig();
   const accessToken = await getSessionAccessToken();
-  return apiBaseUrl === undefined || accessToken === null ? null : { baseUrl: apiBaseUrl, accessToken };
+  return apiBaseUrl === undefined || accessToken === null
+    ? null
+    : { baseUrl: apiBaseUrl, accessToken };
 }
 
-const failed = <T>(message: string): MaterialResult<T> => ({ ok: false, message });
+const failed = <T>(message: string): MaterialResult<T> => ({
+  ok: false,
+  message,
+});
 
 export type OpenedFile = {
   readonly url: string;
@@ -46,26 +54,51 @@ export type OpenedFile = {
   readonly watermark: string | null;
 };
 
-export async function openDocumentAction(rawCompanyId: string, rawDocumentId: string): Promise<MaterialResult<OpenedFile>> {
+export async function openDocumentAction(
+  rawCompanyId: string,
+  rawDocumentId: string,
+): Promise<MaterialResult<OpenedFile>> {
   const companyId = Id.safeParse(rawCompanyId);
   const documentId = Id.safeParse(rawDocumentId);
   const api = await session();
-  if (!companyId.success || !documentId.success || api === null) return failed("That couldn't be opened. Try again.");
+  if (!companyId.success || !documentId.success || api === null)
+    return failed("That couldn't be opened. Try again.");
   try {
-    const link = await openDataRoomDocument(api, companyId.data, documentId.data);
-    return { ok: true, value: { url: link.url, downloadable: link.downloadable, watermark: link.watermark } };
+    const link = await openDataRoomDocument(
+      api,
+      companyId.data,
+      documentId.data,
+    );
+    return {
+      ok: true,
+      value: {
+        url: link.url,
+        downloadable: link.downloadable,
+        watermark: link.watermark,
+      },
+    };
   } catch {
     return failed("That couldn't be opened. Try again.");
   }
 }
 
-export async function openDeckAction(rawCompanyId: string): Promise<MaterialResult<OpenedFile>> {
+export async function openDeckAction(
+  rawCompanyId: string,
+): Promise<MaterialResult<OpenedFile>> {
   const companyId = Id.safeParse(rawCompanyId);
   const api = await session();
-  if (!companyId.success || api === null) return failed("The deck couldn't be opened. Try again.");
+  if (!companyId.success || api === null)
+    return failed("The deck couldn't be opened. Try again.");
   try {
     const link = await openCompanyDeck(api, companyId.data);
-    return { ok: true, value: { url: link.url, downloadable: link.downloadable, watermark: link.watermark } };
+    return {
+      ok: true,
+      value: {
+        url: link.url,
+        downloadable: link.downloadable,
+        watermark: link.watermark,
+      },
+    };
   } catch {
     return failed("The deck couldn't be opened. Try again.");
   }
@@ -78,18 +111,27 @@ export async function requestAccessAction(input: {
   readonly idempotencyKey: string;
 }): Promise<MaterialResult> {
   const companyId = Id.safeParse(input.companyId);
-  const documentId = input.documentId === null ? null : Id.safeParse(input.documentId);
+  const documentId =
+    input.documentId === null ? null : Id.safeParse(input.documentId);
   const note = input.note.trim().slice(0, 1000);
   const key = z.string().min(8).max(200).safeParse(input.idempotencyKey);
   const api = await session();
-  if (!companyId.success || (documentId !== null && !documentId.success) || !key.success || api === null) {
+  if (
+    !companyId.success ||
+    (documentId !== null && !documentId.success) ||
+    !key.success ||
+    api === null
+  ) {
     return failed("The request wasn't sent. Try again.");
   }
   try {
     await requestDataRoomAccess(
       api,
       companyId.data,
-      { documentId: documentId === null ? null : (documentId.data ?? null), ...(note === "" ? {} : { note }) },
+      {
+        documentId: documentId === null ? null : (documentId.data ?? null),
+        ...(note === "" ? {} : { note }),
+      },
       key.data,
     );
     revalidatePath(`/company/${companyId.data}`);
@@ -107,13 +149,18 @@ export async function decideRequestAction(input: {
 }): Promise<MaterialResult> {
   const requestId = Id.safeParse(input.requestId);
   const api = await session();
-  if (!requestId.success || api === null) return failed("That didn't go through. Try again.");
-  const days = (DATA_ROOM_GRANT_DAYS as readonly number[]).includes(input.days) ? input.days : 30;
+  if (!requestId.success || api === null)
+    return failed("That didn't go through. Try again.");
+  const days = (DATA_ROOM_GRANT_DAYS as readonly number[]).includes(input.days)
+    ? input.days
+    : 30;
   try {
     await decideDataRoomRequest(
       api,
       requestId.data,
-      input.decision === "APPROVE" ? { decision: "APPROVE", days } : { decision: "DECLINE" },
+      input.decision === "APPROVE"
+        ? { decision: "APPROVE", days }
+        : { decision: "DECLINE" },
     );
     revalidatePath(`/company/${input.companyId}`);
     return { ok: true, value: undefined };
@@ -131,13 +178,19 @@ export async function setLevelAction(input: {
   const documentId = Id.safeParse(input.documentId);
   const level = DataRoomLevelSchema.safeParse(input.level);
   const api = await session();
-  if (!documentId.success || !level.success || api === null) return failed("That didn't save. Try again.");
+  if (!documentId.success || !level.success || api === null)
+    return failed("That didn't save. Try again.");
   try {
-    await setDataRoomLevel(api, documentId.data, { level: level.data, expectedVersion: input.version });
+    await setDataRoomLevel(api, documentId.data, {
+      level: level.data,
+      expectedVersion: input.version,
+    });
     revalidatePath(`/company/${input.companyId}`);
     return { ok: true, value: undefined };
   } catch {
-    return failed("That didn't save. Someone may have changed it; refresh and try again.");
+    return failed(
+      "That didn't save. Someone may have changed it; refresh and try again.",
+    );
   }
 }
 
@@ -146,15 +199,20 @@ export async function confirmReadingAction(input: {
   readonly documentId: string;
   readonly extractionId: string;
 }): Promise<MaterialResult> {
-  const ids = z.tuple([Id, Id, Id]).safeParse([input.companyId, input.documentId, input.extractionId]);
+  const ids = z
+    .tuple([Id, Id, Id])
+    .safeParse([input.companyId, input.documentId, input.extractionId]);
   const api = await session();
-  if (!ids.success || api === null) return failed("That didn't go through. Try again.");
+  if (!ids.success || api === null)
+    return failed("That didn't go through. Try again.");
   try {
     await confirmDeckReading(api, ids.data[0], ids.data[1], ids.data[2]);
     revalidatePath(`/company/${ids.data[0]}`);
     return { ok: true, value: undefined };
   } catch {
-    return failed("That reading is out of date. Refresh to see Q's newest read.");
+    return failed(
+      "That reading is out of date. Refresh to see Q's newest read.",
+    );
   }
 }
 

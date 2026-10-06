@@ -89,7 +89,12 @@ export function normaliseDeckReading(
         pages: [],
         facts: [],
         confidence: "LOW",
-        criteria: { clear: false, strong: false, exceptional: false, note: null },
+        criteria: {
+          clear: false,
+          strong: false,
+          exceptional: false,
+          note: null,
+        },
       };
     }
     const notCovered = found.status === "NOT_IN_DECK";
@@ -102,15 +107,23 @@ export function normaliseDeckReading(
         ...fact,
         pages: fact.pages.filter(inDeck),
         // Unknown has no value; a value is never also unknown.
-        unknownReason: fact.value === null ? (fact.unknownReason ?? "NOT_IN_DECK") : null,
+        unknownReason:
+          fact.value === null ? (fact.unknownReason ?? "NOT_IN_DECK") : null,
       })),
       criteria: notCovered
-        ? { clear: false, strong: false, exceptional: false, note: found.criteria.note }
+        ? {
+            clear: false,
+            strong: false,
+            exceptional: false,
+            note: found.criteria.note,
+          }
         : {
             ...found.criteria,
             strong: found.criteria.clear && found.criteria.strong,
             exceptional:
-              found.criteria.clear && found.criteria.strong && found.criteria.exceptional,
+              found.criteria.clear &&
+              found.criteria.strong &&
+              found.criteria.exceptional,
           },
     };
   });
@@ -165,7 +178,9 @@ export function createDeckReader(dependencies: {
         const parsed = DeckExtractionResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
-        return parsed.success ? normaliseDeckReading(parsed.data, input.pages) : null;
+        return parsed.success
+          ? normaliseDeckReading(parsed.data, input.pages)
+          : null;
       } catch (error: unknown) {
         logger.warn({ err: error }, "a pitch deck was not read");
         return null;

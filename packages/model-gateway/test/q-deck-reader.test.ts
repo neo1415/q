@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import { DECK_SECTIONS, DeckSectionsSchema } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 
-import { createDeckReader, deckText, normaliseDeckReading } from "../src/q/index.js";
+import {
+  createDeckReader,
+  deckText,
+  normaliseDeckReading,
+} from "../src/q/index.js";
 
 /**
  * Overnight A5: Q reads a deck into twelve sections. The model is faked:
@@ -30,7 +34,10 @@ describe("deck reader", () => {
       logger,
       gateway: {
         execute: (request) => {
-          sent.push({ sensitivity: request.sensitivity, text: JSON.stringify(request.messages) });
+          sent.push({
+            sensitivity: request.sensitivity,
+            text: JSON.stringify(request.messages),
+          });
           return Promise.resolve({
             output: {
               kind: "STRUCTURED",
@@ -90,7 +97,10 @@ describe("deck reader", () => {
     const all = sections ?? [];
     // Twelve, in the standard order, whatever order the model used.
     expect(all.map((section) => section.section)).toEqual([...DECK_SECTIONS]);
-    expect(DeckSectionsSchema.safeParse(all.map(({ criteria: _c, ...s }) => s)).success).toBe(true);
+    expect(
+      DeckSectionsSchema.safeParse(all.map(({ criteria: _c, ...s }) => s))
+        .success,
+    ).toBe(true);
     const traction = all.find((section) => section.section === "TRACTION");
     expect(traction?.pages).toEqual([7]); // slide 99 is past the end
     expect(traction?.facts[0]?.unknownReason).toBeNull(); // a value is never also unknown
@@ -122,14 +132,23 @@ describe("deck reader", () => {
               },
             ],
             confidence: "LOW",
-            criteria: { clear: true, strong: true, exceptional: true, note: null },
+            criteria: {
+              clear: true,
+              strong: true,
+              exceptional: true,
+              note: null,
+            },
           },
         ],
       },
       10,
     );
     expect(first?.summary).toBeNull();
-    expect(first?.criteria).toMatchObject({ clear: false, strong: false, exceptional: false });
+    expect(first?.criteria).toMatchObject({
+      clear: false,
+      strong: false,
+      exceptional: false,
+    });
     expect(first?.facts[0]?.unknownReason).toBe("NOT_IN_DECK");
     const [skip] = normaliseDeckReading(
       {
@@ -141,7 +160,12 @@ describe("deck reader", () => {
             pages: [],
             facts: [],
             confidence: "LOW",
-            criteria: { clear: false, strong: true, exceptional: true, note: null },
+            criteria: {
+              clear: false,
+              strong: true,
+              exceptional: true,
+              note: null,
+            },
           },
         ],
       },
@@ -156,8 +180,27 @@ describe("deck reader", () => {
       logger,
       gateway: { execute: () => Promise.reject(new Error("down")) },
     });
-    expect(await failing.read({ title: "x", pages: null, passages: [{ content: " ", slide: 1 }], attribution })).toBeNull();
-    expect(await failing.read({ title: "x", pages: null, passages: [{ content: "text", slide: 1 }], attribution })).toBeNull();
-    expect(deckText([{ content: "a", slide: null }, { content: "b", slide: 3 }])).toBe("a\n[Slide 3]\nb");
+    expect(
+      await failing.read({
+        title: "x",
+        pages: null,
+        passages: [{ content: " ", slide: 1 }],
+        attribution,
+      }),
+    ).toBeNull();
+    expect(
+      await failing.read({
+        title: "x",
+        pages: null,
+        passages: [{ content: "text", slide: 1 }],
+        attribution,
+      }),
+    ).toBeNull();
+    expect(
+      deckText([
+        { content: "a", slide: null },
+        { content: "b", slide: 3 },
+      ]),
+    ).toBe("a\n[Slide 3]\nb");
   });
 });

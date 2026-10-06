@@ -1468,14 +1468,17 @@ const profileMaterial = createProfileMaterial({
     slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
   investorMayFind: async (actor, companyId) => {
     const investor =
-      await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor);
+      await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+        actor,
+      );
     if (investor === null) return false;
     const mandate = await slateRead.eligibilityPorts.mandates.activeMandate({
       tenantId: actor.tenantId,
       investorOrganisationId: investor.investorOrganisationId,
       mandateId: null,
     });
-    if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE") return false;
+    if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE")
+      return false;
     const parsed = CompanyIdSchema.safeParse(companyId);
     if (!parsed.success) return false;
     const evaluation = await slateRead.eligibility.evaluate({
@@ -1486,7 +1489,8 @@ const profileMaterial = createProfileMaterial({
       companyIds: [parsed.data],
     });
     return evaluation.results.some(
-      (result) => result.companyId === parsed.data && result.decision === "ELIGIBLE",
+      (result) =>
+        result.companyId === parsed.data && result.decision === "ELIGIBLE",
     );
   },
   notify: (input) =>
@@ -2215,8 +2219,10 @@ const qTools = createQTools({
     },
     // Overnight A8: a company's deck and data room, as the tabs show them.
     profileMaterial: {
-      dataRoom: (actor, companyId) => profileMaterial.dataRoom.view(actor, companyId),
-      deck: (actor, companyId) => profileMaterial.companyDeck.view(actor, companyId),
+      dataRoom: (actor, companyId) =>
+        profileMaterial.dataRoom.view(actor, companyId),
+      deck: (actor, companyId) =>
+        profileMaterial.companyDeck.view(actor, companyId),
       ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
     },
     ownRecords: {

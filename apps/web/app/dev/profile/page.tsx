@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell/app-shell";
 import { PageContainer } from "@/components/app-shell/page-container";
-import { CompanyProfileView, profileTabOf } from "@/features/company/company-profile-view";
+import {
+  CompanyProfileView,
+  profileTabOf,
+} from "@/features/company/company-profile-view";
 import { FounderPerson } from "@/features/company/material/team";
 import {
   reviewDeck,
@@ -34,19 +37,33 @@ export default async function ProfileReviewPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (process.env.NODE_ENV === "production" && process.env["CQ_REVIEW_PAGES"] !== "1") {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env["CQ_REVIEW_PAGES"] !== "1"
+  ) {
     notFound();
   }
   const params = await searchParams;
   const side = params["side"] === "owner" ? "OWNER" : "INVESTOR";
-  const state = params["state"] === "empty" ? "empty" : params["state"] === "downloadable" ? "downloadable" : "full";
-  const tab = profileTabOf(typeof params["tab"] === "string" ? params["tab"] : undefined) ?? "overview";
+  const state =
+    params["state"] === "empty"
+      ? "empty"
+      : params["state"] === "downloadable"
+        ? "downloadable"
+        : "full";
+  const tab =
+    profileTabOf(
+      typeof params["tab"] === "string" ? params["tab"] : undefined,
+    ) ?? "overview";
   const empty = state === "empty";
   return (
     <AppShell
       context={{
         scope: side === "OWNER" ? "founder_private" : "investor_private",
-        label: side === "OWNER" ? "Kora Health (fictional)" : "Northbound Capital (fictional)",
+        label:
+          side === "OWNER"
+            ? "Kora Health (fictional)"
+            : "Northbound Capital (fictional)",
         admin: false,
       }}
     >
@@ -60,7 +77,11 @@ export default async function ProfileReviewPage({
             interest={null}
             connected={false}
             sectorLabels={["Health insurance software"]}
-            dataRoom={side === "OWNER" ? reviewOwnerRoom(empty) : reviewInvestorRoom(empty)}
+            dataRoom={
+              side === "OWNER"
+                ? reviewOwnerRoom(empty)
+                : reviewInvestorRoom(empty)
+            }
             deck={reviewDeck(side, state)}
             previewAsInvestor={params["as"] === "investor"}
           />

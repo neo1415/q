@@ -5,7 +5,10 @@ import {
   createPostgresFounderPersonSource,
   projectFounderPerson,
 } from "@capital-q/companies";
-import { CorrelationIdSchema, type FounderPersonDto } from "@capital-q/contracts";
+import {
+  CorrelationIdSchema,
+  type FounderPersonDto,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
 import {
@@ -65,7 +68,10 @@ export function createProfileMaterial(dependencies: {
   readonly investorOrganisationFor: (
     actor: ActorContext,
   ) => Promise<{ readonly investorOrganisationId: string } | null>;
-  readonly investorMayFind: (actor: ActorContext, companyId: string) => Promise<boolean>;
+  readonly investorMayFind: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<boolean>;
   readonly notify?:
     | ((input: {
         readonly relationshipId: string;
@@ -80,7 +86,8 @@ export function createProfileMaterial(dependencies: {
   const store = createPostgresDataRoom();
   const reads = createPostgresProfileMaterialPorts({ sql });
   const policyRepository = createPostgresDisclosurePolicyRepository();
-  const newCorrelationId = () => CorrelationIdSchema.parse(createCorrelationId());
+  const newCorrelationId = () =>
+    CorrelationIdSchema.parse(createCorrelationId());
   const downloads =
     dependencies.storage === undefined
       ? undefined
@@ -89,7 +96,11 @@ export function createProfileMaterial(dependencies: {
           storage: dependencies.storage,
           serveUnscanned: dependencies.serveUnscanned,
         });
-  const inline = async (document: { tenantId: string; documentId: string; versionId: string }) => {
+  const inline = async (document: {
+    tenantId: string;
+    documentId: string;
+    versionId: string;
+  }) => {
     if (downloads === undefined) throw new DocumentNotFoundError();
     const link = await downloads.authorizeSharedVersion({
       documentTenantId: document.tenantId,
@@ -99,7 +110,10 @@ export function createProfileMaterial(dependencies: {
     });
     return { url: link.url, expiresAt: link.expiresAt };
   };
-  const ownerMayManage = async (actor: ActorContext, company: DataRoomCompany) =>
+  const ownerMayManage = async (
+    actor: ActorContext,
+    company: DataRoomCompany,
+  ) =>
     (
       await dependencies.authorization.authorize({
         actor,
@@ -125,7 +139,10 @@ export function createProfileMaterial(dependencies: {
     const found = await dependencies.investorOrganisationFor(actor);
     return found === null
       ? null
-      : { investorOrganisationId: found.investorOrganisationId, name: await reads.investorName(found.investorOrganisationId) };
+      : {
+          investorOrganisationId: found.investorOrganisationId,
+          name: await reads.investorName(found.investorOrganisationId),
+        };
   };
 
   const dataRoom = createDataRoomService({
@@ -142,7 +159,9 @@ export function createProfileMaterial(dependencies: {
         await network.ensureRelationship({
           actor: command.actor,
           companyId: CompanyIdSchema.parse(command.companyId),
-          investorOrganisationId: InvestorOrganisationIdSchema.parse(command.investorOrganisationId),
+          investorOrganisationId: InvestorOrganisationIdSchema.parse(
+            command.investorOrganisationId,
+          ),
           source: { type: "DISCOVER" },
           // The investor's own first contact: private to them until the
           // request (relationship_shared) is appended.
@@ -155,7 +174,11 @@ export function createProfileMaterial(dependencies: {
     access: dependencies.access,
     signedInline: (document) => {
       if (document.currentVersionId === null) throw new DocumentNotFoundError();
-      return inline({ tenantId: document.tenantId, documentId: document.documentId, versionId: document.currentVersionId });
+      return inline({
+        tenantId: document.tenantId,
+        documentId: document.documentId,
+        versionId: document.currentVersionId,
+      });
     },
     nameOf: (actor) => reads.personName(actor.userId),
     appender: createRelationshipEventAppender({
@@ -175,18 +198,27 @@ export function createProfileMaterial(dependencies: {
     transactions: dependencies.transactions,
     store,
     company: reads.company,
-    isInvestor: async (actor) => (await dependencies.investorOrganisationFor(actor)) !== null,
+    isInvestor: async (actor) =>
+      (await dependencies.investorOrganisationFor(actor)) !== null,
     investorMayFind: dependencies.investorMayFind,
     ownerMayManage,
     sharedWithActor: async (actor, companyId, documentId) => {
       const view = await dataRoom.view(actor, companyId);
       return (
         view?.viewer === "INVESTOR" &&
-        view.documents.some((document) => document.documentId === documentId && document.access === "OPEN")
+        view.documents.some(
+          (document) =>
+            document.documentId === documentId && document.access === "OPEN",
+        )
       );
     },
     coach: coachDeck,
-    signedInline: (deck) => inline({ tenantId: deck.tenantId, documentId: deck.documentId, versionId: deck.versionId }),
+    signedInline: (deck) =>
+      inline({
+        tenantId: deck.tenantId,
+        documentId: deck.documentId,
+        versionId: deck.versionId,
+      }),
     nameOf: (actor) => reads.personName(actor.userId),
     audit: dependencies.audit,
     newCorrelationId,
@@ -202,13 +234,27 @@ export function createProfileMaterial(dependencies: {
     const company = await reads.company(companyId);
     if (company === null) return null;
     const owner = company.organisationId === actor.organisationId;
-    if (!owner && !(await dependencies.investorMayFind(actor, company.id).catch(() => false))) return null;
-    const source = await founders.founderAt({ tenantId: company.tenantId, companyId: company.id, position });
+    if (
+      !owner &&
+      !(await dependencies
+        .investorMayFind(actor, company.id)
+        .catch(() => false))
+    )
+      return null;
+    const source = await founders.founderAt({
+      tenantId: company.tenantId,
+      companyId: company.id,
+      position,
+    });
     if (source === null) return null;
-    const room = owner ? null : await dataRoom.view(actor, company.id).catch(() => null);
+    const room = owner
+      ? null
+      : await dataRoom.view(actor, company.id).catch(() => null);
     const open =
       room?.viewer === "INVESTOR"
-        ? room.documents.filter((document) => document.access === "OPEN").map((document) => document.documentId)
+        ? room.documents
+            .filter((document) => document.access === "OPEN")
+            .map((document) => document.documentId)
         : [];
     return projectFounderPerson(source, {
       companyId: company.id,

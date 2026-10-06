@@ -16,7 +16,11 @@ import {
   type DeckSectionReading,
   type UtcTimestamp,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor, TransactionContext, TransactionManager } from "@capital-q/database";
+import type {
+  DatabaseExecutor,
+  TransactionContext,
+  TransactionManager,
+} from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
 import type { DataRoomCompany } from "./data-room.js";
@@ -67,11 +71,21 @@ export type CompanyDeckReading = {
 
 /** Structural: `createPostgresDataRoom()` from Evidence satisfies it. */
 export type CompanyDeckStore = {
-  readonly currentDeck: (executor: DatabaseExecutor, companyId: string) => Promise<CompanyDeckRecord | null>;
-  readonly extractionFor: (executor: DatabaseExecutor, documentVersionId: string) => Promise<CompanyDeckReading | null>;
+  readonly currentDeck: (
+    executor: DatabaseExecutor,
+    companyId: string,
+  ) => Promise<CompanyDeckRecord | null>;
+  readonly extractionFor: (
+    executor: DatabaseExecutor,
+    documentVersionId: string,
+  ) => Promise<CompanyDeckReading | null>;
   readonly confirmExtraction: (
     tx: TransactionContext,
-    input: { readonly extractionId: string; readonly tenantId: string; readonly userId: string },
+    input: {
+      readonly extractionId: string;
+      readonly tenantId: string;
+      readonly userId: string;
+    },
   ) => Promise<boolean>;
 };
 
@@ -83,22 +97,39 @@ export function createCompanyDeckService(dependencies: {
   readonly store: CompanyDeckStore;
   readonly company: (companyId: string) => Promise<DataRoomCompany | null>;
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
-  readonly investorMayFind: (actor: ActorContext, companyId: string) => Promise<boolean>;
-  readonly ownerMayManage: (actor: ActorContext, company: DataRoomCompany) => Promise<boolean>;
+  readonly investorMayFind: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<boolean>;
+  readonly ownerMayManage: (
+    actor: ActorContext,
+    company: DataRoomCompany,
+  ) => Promise<boolean>;
   /** An active disclosure grant of this document to the actor's relationship. */
-  readonly sharedWithActor: (actor: ActorContext, companyId: string, documentId: string) => Promise<boolean>;
+  readonly sharedWithActor: (
+    actor: ActorContext,
+    companyId: string,
+    documentId: string,
+  ) => Promise<boolean>;
   /** The deterministic rubric (Evidence's coachDeck). */
-  readonly coach: (sections: readonly DeckSectionReading[], pageCount: number | null) => DeckCoaching;
+  readonly coach: (
+    sections: readonly DeckSectionReading[],
+    pageCount: number | null,
+  ) => DeckCoaching;
   /** A short-lived signed, inline read of exactly that version. */
-  readonly signedInline: (deck: CompanyDeckRecord) => Promise<{ readonly url: string; readonly expiresAt: string }>;
+  readonly signedInline: (
+    deck: CompanyDeckRecord,
+  ) => Promise<{ readonly url: string; readonly expiresAt: string }>;
   readonly nameOf: (actor: ActorContext) => Promise<string | null>;
   readonly audit: MaterialActionAuditWriter;
   readonly newCorrelationId: () => CorrelationId;
   readonly now?: (() => UtcTimestamp) | undefined;
 }) {
   const { sql, store } = dependencies;
-  const quietly = <T>(promise: Promise<T>, fallback: T) => promise.catch(() => fallback);
-  const now = dependencies.now ?? (() => new Date().toISOString() as UtcTimestamp);
+  const quietly = <T>(promise: Promise<T>, fallback: T) =>
+    promise.catch(() => fallback);
+  const now =
+    dependencies.now ?? (() => new Date().toISOString());
 
   async function readerOf(actor: ActorContext, companyId: string) {
     const company = await quietly(dependencies.company(companyId), null);
@@ -109,33 +140,55 @@ export function createCompanyDeckService(dependencies: {
         : null;
     }
     if (!(await quietly(dependencies.isInvestor(actor), false))) return null;
-    if (!(await quietly(dependencies.investorMayFind(actor, company.id), false))) return null;
+    if (
+      !(await quietly(dependencies.investorMayFind(actor, company.id), false))
+    )
+      return null;
     return { viewer: "INVESTOR", company } as const;
   }
 
-  async function deckFor(actor: ActorContext, reader: NonNullable<Awaited<ReturnType<typeof readerOf>>>) {
+  async function deckFor(
+    actor: ActorContext,
+    reader: NonNullable<Awaited<ReturnType<typeof readerOf>>>,
+  ) {
     const deck = await quietly(store.currentDeck(sql, reader.company.id), null);
     if (deck === null) return null;
     if (reader.viewer === "OWNER") return deck;
     const open =
       deck.level === "PUBLIC" ||
       deck.downloadAudience === "INVESTORS" ||
-      (await quietly(dependencies.sharedWithActor(actor, reader.company.id, deck.documentId), false));
+      (await quietly(
+        dependencies.sharedWithActor(actor, reader.company.id, deck.documentId),
+        false,
+      ));
     return open ? deck : null;
   }
 
   return {
-    view: async (actor: ActorContext, companyId: string): Promise<CompanyDeckView | null> => {
+    view: async (
+      actor: ActorContext,
+      companyId: string,
+    ): Promise<CompanyDeckView | null> => {
       const reader = await readerOf(actor, companyId);
       if (reader === null) return null;
       const deck = await deckFor(actor, reader);
       if (deck === null) {
-        return { viewer: reader.viewer, companyId: reader.company.id, deck: null, extraction: null, coaching: null };
+        return {
+          viewer: reader.viewer,
+          companyId: reader.company.id,
+          deck: null,
+          extraction: null,
+          coaching: null,
+        };
       }
-      const reading = await quietly(store.extractionFor(sql, deck.versionId), null);
+      const reading = await quietly(
+        store.extractionFor(sql, deck.versionId),
+        null,
+      );
       const owner = reader.viewer === "OWNER";
       // The Write Gate: an investor sees only what the founder confirmed.
-      const shown = reading !== null && (owner || reading.confirmed) ? reading : null;
+      const shown =
+        reading !== null && (owner || reading.confirmed) ? reading : null;
       return {
         viewer: reader.viewer,
         companyId: reader.company.id,
@@ -157,9 +210,14 @@ export function createCompanyDeckService(dependencies: {
                 versionNumber: deck.versionNumber,
                 confirmed: shown.confirmed,
                 // The rubric never leaves for anyone: stripped here for all.
-                sections: orderDeckSections(shown.sections.map(deckSectionForReaders)),
+                sections: orderDeckSections(
+                  shown.sections.map(deckSectionForReaders),
+                ),
               },
-        coaching: owner && reading !== null ? dependencies.coach(reading.sections, reading.pageCount) : null,
+        coaching:
+          owner && reading !== null
+            ? dependencies.coach(reading.sections, reading.pageCount)
+            : null,
       };
     },
 
@@ -167,14 +225,23 @@ export function createCompanyDeckService(dependencies: {
     open: async (
       actor: ActorContext,
       companyId: string,
-    ): Promise<{ url: string; expiresAt: string; downloadable: boolean; watermark: string | null } | null> => {
+    ): Promise<{
+      url: string;
+      expiresAt: string;
+      downloadable: boolean;
+      watermark: string | null;
+    } | null> => {
       const reader = await readerOf(actor, companyId);
       if (reader === null) return null;
       const deck = await deckFor(actor, reader);
       if (deck === null) return null;
       const link = await dependencies.signedInline(deck);
-      const downloadable = reader.viewer === "OWNER" || deck.downloadAudience === "INVESTORS";
-      const name = reader.viewer === "INVESTOR" ? await quietly(dependencies.nameOf(actor), null) : null;
+      const downloadable =
+        reader.viewer === "OWNER" || deck.downloadAudience === "INVESTORS";
+      const name =
+        reader.viewer === "INVESTOR"
+          ? await quietly(dependencies.nameOf(actor), null)
+          : null;
       return {
         url: link.url,
         expiresAt: link.expiresAt,
@@ -182,7 +249,9 @@ export function createCompanyDeckService(dependencies: {
         watermark:
           reader.viewer === "OWNER" || downloadable
             ? null
-            : [name, now().slice(0, 10), "view only"].filter((part) => part !== null).join(" · "),
+            : [name, now().slice(0, 10), "view only"]
+                .filter((part) => part !== null)
+                .join(" · "),
       };
     },
 
@@ -194,18 +263,28 @@ export function createCompanyDeckService(dependencies: {
       readonly companyId: string;
       readonly correlationId?: CorrelationId | undefined;
     }): Promise<
-      | { readonly outcome: "OK"; readonly value: { readonly extractionId: string; readonly confirmed: true } }
+      | {
+          readonly outcome: "OK";
+          readonly value: {
+            readonly extractionId: string;
+            readonly confirmed: true;
+          };
+        }
       | { readonly outcome: "REFUSED"; readonly code: CompanyDeckRefusal }
     > => {
       const reader = await readerOf(command.actor, command.companyId);
-      if (reader === null || reader.viewer !== "OWNER") return { outcome: "REFUSED", code: "NOT_FOUND" };
+      if (reader === null || reader.viewer !== "OWNER")
+        return { outcome: "REFUSED", code: "NOT_FOUND" };
       const deck = await store.currentDeck(sql, reader.company.id);
-      if (deck === null || deck.documentId !== command.documentId) return { outcome: "REFUSED", code: "NOT_FOUND" };
+      if (deck === null || deck.documentId !== command.documentId)
+        return { outcome: "REFUSED", code: "NOT_FOUND" };
       const reading = await store.extractionFor(sql, deck.versionId);
       // Approval binds to the exact reading on screen: a newer one needs its own.
-      if (reading === null || reading.id !== command.extractionId) return { outcome: "REFUSED", code: "STALE" };
+      if (reading === null || reading.id !== command.extractionId)
+        return { outcome: "REFUSED", code: "STALE" };
       if (!reading.confirmed) {
-        const correlationId = command.correlationId ?? dependencies.newCorrelationId();
+        const correlationId =
+          command.correlationId ?? dependencies.newCorrelationId();
         await dependencies.transactions.run(async (tx) => {
           const made = await store.confirmExtraction(tx, {
             extractionId: reading.id,
@@ -221,13 +300,19 @@ export function createCompanyDeckService(dependencies: {
               resourceId: deck.documentId,
               occurredAt: occurredNow(),
               outcome: "SUCCEEDED",
-              metadata: { extractionId: reading.id, documentVersionId: deck.versionId },
+              metadata: {
+                extractionId: reading.id,
+                documentVersionId: deck.versionId,
+              },
               correlationId,
             });
           }
         });
       }
-      return { outcome: "OK", value: { extractionId: reading.id, confirmed: true } };
+      return {
+        outcome: "OK",
+        value: { extractionId: reading.id, confirmed: true },
+      };
     },
   };
 }

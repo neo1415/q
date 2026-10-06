@@ -120,7 +120,9 @@ export default async function CompanyPage({
   // A founder viewing another company has only the Elevator; anyone else
   // opens on the overview, or the tab the URL names (A1).
   const query = await searchParams;
-  const requested = profileTabOf(typeof query?.tab === "string" ? query.tab : undefined);
+  const requested = profileTabOf(
+    typeof query?.tab === "string" ? query.tab : undefined,
+  );
   const tab: ProfileTab =
     profile.overview === null ? "elevator" : (requested ?? "overview");
   // Each tab's read is the API's, for this reader; only the open tab (and

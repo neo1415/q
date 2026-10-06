@@ -104,7 +104,9 @@ export const DeckSectionsSchema = z
   .length(DECK_SECTIONS.length)
   .refine(
     (sections) =>
-      sections.every((section, index) => section.section === DECK_SECTIONS[index]),
+      sections.every(
+        (section, index) => section.section === DECK_SECTIONS[index],
+      ),
     { message: "The twelve sections must be in the standard order." },
   );
 
@@ -113,7 +115,14 @@ export function unknownDeckSection(
   section: DeckSectionCode,
   status: "NOT_IN_DECK" | "UNCLEAR" = "NOT_IN_DECK",
 ): DeckSection {
-  return { section, status, summary: null, pages: [], facts: [], confidence: "LOW" };
+  return {
+    section,
+    status,
+    summary: null,
+    pages: [],
+    facts: [],
+    confidence: "LOW",
+  };
 }
 
 /**
@@ -161,7 +170,12 @@ export type DeckCoachingSection = z.infer<typeof DeckCoachingSectionSchema>;
 
 export const DeckCoachingCheckSchema = z
   .object({
-    code: z.enum(["UNDATED_FIGURES", "CONTRADICTIONS", "ASK_COMPLETE", "LENGTH"]),
+    code: z.enum([
+      "UNDATED_FIGURES",
+      "CONTRADICTIONS",
+      "ASK_COMPLETE",
+      "LENGTH",
+    ]),
     passed: z.boolean(),
     words: z.string().max(240),
   })
@@ -265,7 +279,9 @@ export const DeckSectionReadingSchema = DeckSectionSchema.extend({
 export type DeckSectionReading = z.infer<typeof DeckSectionReadingSchema>;
 
 /** The investor-facing section: the reading without the rubric. */
-export function deckSectionForReaders(reading: DeckSectionReading): DeckSection {
+export function deckSectionForReaders(
+  reading: DeckSectionReading,
+): DeckSection {
   const { criteria: _criteria, ...section } = reading;
   return section;
 }

@@ -12,7 +12,12 @@ import {
 import type { ActorContext } from "@capital-q/security";
 import { capability } from "@capital-q/security";
 
-import { allow, defineQTool, deny, type AnyQToolDefinition } from "../definition.js";
+import {
+  allow,
+  defineQTool,
+  deny,
+  type AnyQToolDefinition,
+} from "../definition.js";
 import type { QToolExecutionContext } from "@capital-q/q-runtime";
 import { actorWideScope, boundScopeFor } from "../plan.js";
 
@@ -32,26 +37,48 @@ export const READ_COMPANY_DATA_ROOM = "company.data_room.read" as const;
 export const COACH_MY_DECK = "deck.coaching.read" as const;
 
 export type ProfileMaterialPort = {
-  readonly dataRoom: (actor: ActorContext, companyId: string) => Promise<DataRoomView | null>;
-  readonly deck: (actor: ActorContext, companyId: string) => Promise<CompanyDeckView | null>;
+  readonly dataRoom: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<DataRoomView | null>;
+  readonly deck: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<CompanyDeckView | null>;
   /** The actor's own company, from their membership on the server. */
   readonly ownCompanyId: (actor: ActorContext) => Promise<string | null>;
 };
 
 const CompanyInputSchema = z
   .object({
-    companyId: UuidSchema.describe("The canonical company identifier (UUID), as given in the conversation context."),
+    companyId: UuidSchema.describe(
+      "The canonical company identifier (UUID), as given in the conversation context.",
+    ),
   })
   .strict();
 type CompanyInput = z.infer<typeof CompanyInputSchema>;
 
 /** The plan admits this company: bound to it, a subject of the run, or the actor-wide network scope. */
-function planAdmits(context: QToolExecutionContext, companyId: string): boolean {
+function planAdmits(
+  context: QToolExecutionContext,
+  companyId: string,
+): boolean {
   const { plan } = context;
-  if (boundScopeFor(plan, "COMPANY_PROFILE", (filter) => filter.companyId === companyId) !== undefined) {
+  if (
+    boundScopeFor(
+      plan,
+      "COMPANY_PROFILE",
+      (filter) => filter.companyId === companyId,
+    ) !== undefined
+  ) {
     return true;
   }
-  if (plan.subjects.some((subject) => subject.kind === "COMPANY" && subject.companyId === companyId)) {
+  if (
+    plan.subjects.some(
+      (subject) =>
+        subject.kind === "COMPANY" && subject.companyId === companyId,
+    )
+  ) {
     return true;
   }
   return actorWideScope(plan, "NETWORK_VISIBLE_DATA") !== undefined;
@@ -68,8 +95,14 @@ const DeckOutputSchema = z
   })
   .strict();
 
-export function createReadCompanyDeckTool(port: ProfileMaterialPort): AnyQToolDefinition {
-  return defineQTool<CompanyInput, z.infer<typeof DeckOutputSchema>, CompanyDeckView>({
+export function createReadCompanyDeckTool(
+  port: ProfileMaterialPort,
+): AnyQToolDefinition {
+  return defineQTool<
+    CompanyInput,
+    z.infer<typeof DeckOutputSchema>,
+    CompanyDeckView
+  >({
     id: READ_COMPANY_DECK,
     version: 1,
     status: "ACTIVE",
@@ -95,7 +128,9 @@ export function createReadCompanyDeckTool(port: ProfileMaterialPort): AnyQToolDe
     output: DeckOutputSchema,
     authorize: async (input, context) => {
       if (!planAdmits(context, input.companyId)) return deny("NOT_AVAILABLE");
-      const view = await port.deck(context.actor, input.companyId).catch(() => null);
+      const view = await port
+        .deck(context.actor, input.companyId)
+        .catch(() => null);
       if (view === null || view.deck === null) return deny("NOT_AVAILABLE");
       return allow("CONFIDENTIAL", CompanyDeckViewSchema.parse(view));
     },
@@ -129,8 +164,14 @@ const DataRoomOutputSchema = z
   })
   .strict();
 
-export function createReadCompanyDataRoomTool(port: ProfileMaterialPort): AnyQToolDefinition {
-  return defineQTool<CompanyInput, z.infer<typeof DataRoomOutputSchema>, DataRoomView>({
+export function createReadCompanyDataRoomTool(
+  port: ProfileMaterialPort,
+): AnyQToolDefinition {
+  return defineQTool<
+    CompanyInput,
+    z.infer<typeof DataRoomOutputSchema>,
+    DataRoomView
+  >({
     id: READ_COMPANY_DATA_ROOM,
     version: 1,
     status: "ACTIVE",
@@ -156,24 +197,39 @@ export function createReadCompanyDataRoomTool(port: ProfileMaterialPort): AnyQTo
     output: DataRoomOutputSchema,
     authorize: async (input, context) => {
       if (!planAdmits(context, input.companyId)) return deny("NOT_AVAILABLE");
-      const view = await port.dataRoom(context.actor, input.companyId).catch(() => null);
-      return view === null ? deny("NOT_AVAILABLE") : allow("CONFIDENTIAL", DataRoomViewSchema.parse(view));
+      const view = await port
+        .dataRoom(context.actor, input.companyId)
+        .catch(() => null);
+      return view === null
+        ? deny("NOT_AVAILABLE")
+        : allow("CONFIDENTIAL", DataRoomViewSchema.parse(view));
     },
     execute: (_input, _context, view) => {
       const folder = new Map(view.folders.map((f) => [f.code, f.label]));
       if (view.viewer === "INVESTOR") {
-        const words = { OPEN: "open to you", REQUESTABLE: "on request", REQUESTED: "you asked; waiting" } as const;
+        const words = {
+          OPEN: "open to you",
+          REQUESTABLE: "on request",
+          REQUESTED: "you asked; waiting",
+        } as const;
         return Promise.resolve({
           viewer: "INVESTOR" as const,
           documents: view.documents.map((d) => ({
             title: d.title,
             folder: folder.get(d.folderCode) ?? d.folderCode,
-            status: d.shownAs === "SHARED" ? "shared with you" : words[d.access],
+            status:
+              d.shownAs === "SHARED" ? "shared with you" : words[d.access],
           })),
-          openRequests: view.documents.filter((d) => d.access === "REQUESTED").length,
+          openRequests: view.documents.filter((d) => d.access === "REQUESTED")
+            .length,
         });
       }
-      const levels = { PUBLIC: "public", ON_REQUEST: "on request", SHARED_ONLY: "shared only", PRIVATE: "private" } as const;
+      const levels = {
+        PUBLIC: "public",
+        ON_REQUEST: "on request",
+        SHARED_ONLY: "shared only",
+        PRIVATE: "private",
+      } as const;
       return Promise.resolve({
         viewer: "OWNER" as const,
         documents: view.documents.map((d) => ({
@@ -196,8 +252,14 @@ const CoachOutputSchema = z
   })
   .strict();
 
-export function createCoachMyDeckTool(port: ProfileMaterialPort): AnyQToolDefinition {
-  return defineQTool<Record<string, never>, z.infer<typeof CoachOutputSchema>, { title: string; coaching: z.infer<typeof DeckCoachingSchema> }>({
+export function createCoachMyDeckTool(
+  port: ProfileMaterialPort,
+): AnyQToolDefinition {
+  return defineQTool<
+    Record<string, never>,
+    z.infer<typeof CoachOutputSchema>,
+    { title: string; coaching: z.infer<typeof DeckCoachingSchema> }
+  >({
     id: COACH_MY_DECK,
     version: 1,
     status: "ACTIVE",
@@ -207,30 +269,54 @@ export function createCoachMyDeckTool(port: ProfileMaterialPort): AnyQToolDefini
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [capability("company.view")],
-    supportedPurposes: ["OWN_COMPANY_QUESTION", "GENERAL_QUESTION", "ACTION_PREPARATION"],
+    supportedPurposes: [
+      "OWN_COMPANY_QUESTION",
+      "GENERAL_QUESTION",
+      "ACTION_PREPARATION",
+    ],
     requiredScopeKinds: ["COMPANY_PROFILE"],
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
     visibleStage: "REVIEWING_COMPANY",
-    input: z.object({}).strict() as unknown as z.ZodType<Record<string, never>>,
+    input: z.object({}).strict(),
     output: CoachOutputSchema,
     authorize: async (_input, context) => {
-      const companyId = await port.ownCompanyId(context.actor).catch(() => null);
+      const companyId = await port
+        .ownCompanyId(context.actor)
+        .catch(() => null);
       if (companyId === null) return deny("NOT_AVAILABLE");
       const view = await port.deck(context.actor, companyId).catch(() => null);
-      if (view === null || view.viewer !== "OWNER" || view.deck === null || view.coaching === null) {
+      if (
+        view === null ||
+        view.viewer !== "OWNER" ||
+        view.deck === null ||
+        view.coaching === null
+      ) {
         return deny("NOT_AVAILABLE", "Q hasn't read a deck of yours yet.");
       }
-      return allow("CONFIDENTIAL", { title: view.deck.title, coaching: view.coaching });
+      return allow("CONFIDENTIAL", {
+        title: view.deck.title,
+        coaching: view.coaching,
+      });
     },
     execute: (_input, _context, grant) =>
-      Promise.resolve({ deckTitle: grant.title, coaching: grant.coaching, privateToYou: true as const }),
+      Promise.resolve({
+        deckTitle: grant.title,
+        coaching: grant.coaching,
+        privateToYou: true as const,
+      }),
   });
 }
 
-export function createProfileMaterialTools(port: ProfileMaterialPort | undefined): readonly AnyQToolDefinition[] {
+export function createProfileMaterialTools(
+  port: ProfileMaterialPort | undefined,
+): readonly AnyQToolDefinition[] {
   return port === undefined
     ? []
-    : [createReadCompanyDeckTool(port), createReadCompanyDataRoomTool(port), createCoachMyDeckTool(port)];
+    : [
+        createReadCompanyDeckTool(port),
+        createReadCompanyDataRoomTool(port),
+        createCoachMyDeckTool(port),
+      ];
 }

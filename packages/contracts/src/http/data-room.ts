@@ -55,9 +55,7 @@ export const DATA_ROOM_LISTED_LEVELS: readonly DataRoomLevel[] = [
 ];
 
 /** Folder and checklist codes are reference data (evidence.data_room_*). */
-export const DataRoomCodeSchema = z
-  .string()
-  .regex(/^[a-z][a-z0-9_]{1,63}$/);
+export const DataRoomCodeSchema = z.string().regex(/^[a-z][a-z0-9_]{1,63}$/);
 
 /** Approval lengths the founder picks from; the default is 30 days. */
 export const DATA_ROOM_GRANT_DAYS = [7, 14, 30, 90] as const;
@@ -238,9 +236,12 @@ export const DecideDataRoomRequestSchema = z.discriminatedUnion("decision", [
       days: z
         .number()
         .int()
-        .refine((days) => (DATA_ROOM_GRANT_DAYS as readonly number[]).includes(days), {
-          message: "Choose 7, 14, 30 or 90 days.",
-        }),
+        .refine(
+          (days) => (DATA_ROOM_GRANT_DAYS as readonly number[]).includes(days),
+          {
+            message: "Choose 7, 14, 30 or 90 days.",
+          },
+        ),
     })
     .strict(),
   z.object({ decision: z.literal("DECLINE") }).strict(),
@@ -258,7 +259,10 @@ export const DataRoomLevelResultSchema = z
 export type DataRoomLevelResult = z.infer<typeof DataRoomLevelResultSchema>;
 
 export const DataRoomRequestResultSchema = z
-  .object({ requestId: UuidSchema, status: z.enum(["OPEN", "APPROVED", "DECLINED"]) })
+  .object({
+    requestId: UuidSchema,
+    status: z.enum(["OPEN", "APPROVED", "DECLINED"]),
+  })
   .strict();
 export type DataRoomRequestResult = z.infer<typeof DataRoomRequestResultSchema>;
 

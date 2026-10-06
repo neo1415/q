@@ -2,7 +2,10 @@ import { DECK_EXTRACTION_SCHEMA_VERSION } from "@capital-q/q-core";
 import type { EventRegistry } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { PostgresDataRoom } from "@capital-q/evidence";
-import { DECK_READER_PROMPT_VERSION, type DeckReader } from "@capital-q/model-gateway/q";
+import {
+  DECK_READER_PROMPT_VERSION,
+  type DeckReader,
+} from "@capital-q/model-gateway/q";
 
 import type { RunnerLogger } from "../outbox-runner.js";
 import type { QueueMessage } from "../queue/pgmq.js";
@@ -23,7 +26,8 @@ import type { MessageOutcome } from "../queue/runner.js";
 const READY_EVENT = "evidence.document.ready";
 /** Passages read: a long deck read from the top. */
 const PASSAGES_MAX = 120;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type DeckReadingChunks = {
   readonly listActiveByVersion: (
@@ -45,7 +49,8 @@ export type DeckReadingChunks = {
 
 /** Which document a ready message names, if any. */
 export function readyDocumentOf(type: string, data: unknown): string | null {
-  if (type !== READY_EVENT || typeof data !== "object" || data === null) return null;
+  if (type !== READY_EVENT || typeof data !== "object" || data === null)
+    return null;
   const id = (data as Record<string, unknown>)["documentId"];
   return typeof id === "string" && UUID.test(id) ? id : null;
 }
@@ -64,12 +69,20 @@ export function withDeckReadings(
   return async (message) => {
     const parsed = options.registry.parse(message.message);
     if (!parsed.ok) return inner(message);
-    const documentId = readyDocumentOf(parsed.message.type, parsed.message.data);
+    const documentId = readyDocumentOf(
+      parsed.message.type,
+      parsed.message.data,
+    );
     if (documentId === null) return inner(message);
     try {
       const target = (
         await options.sql<
-          { tenant_id: string; company_id: string; title: string; version_id: string }[]
+          {
+            tenant_id: string;
+            company_id: string;
+            title: string;
+            version_id: string;
+          }[]
         >`
           select d.tenant_id, d.company_id, d.title, v.id as version_id
             from evidence.documents d
@@ -88,13 +101,22 @@ export function withDeckReadings(
       )[0];
       if (target !== undefined) {
         const chunks = (
-          await options.chunks.listActiveByVersion(options.sql, target.tenant_id, target.version_id)
+          await options.chunks.listActiveByVersion(
+            options.sql,
+            target.tenant_id,
+            target.version_id,
+          )
         )
           .toSorted((a, b) => a.chunkIndex - b.chunkIndex)
           .slice(0, PASSAGES_MAX);
         const pages = chunks.reduce(
           (most, chunk) =>
-            Math.max(most, chunk.locator.slide ?? 0, chunk.locator.pageEnd ?? 0, chunk.locator.pageStart ?? 0),
+            Math.max(
+              most,
+              chunk.locator.slide ?? 0,
+              chunk.locator.pageEnd ?? 0,
+              chunk.locator.pageStart ?? 0,
+            ),
           0,
         );
         const sections =
@@ -130,7 +152,10 @@ export function withDeckReadings(
         }
       }
     } catch (error: unknown) {
-      options.logger.warn({ msgId: message.msgId, err: error }, "deck reading not written; retrying");
+      options.logger.warn(
+        { msgId: message.msgId, err: error },
+        "deck reading not written; retrying",
+      );
       return { kind: "RETRY", errorCode: "DECK_READING_FAILED" };
     }
     return inner(message);

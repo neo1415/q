@@ -1,5 +1,8 @@
 import type { CapitalRoundService } from "@capital-q/capital";
-import type { CompanyDeckService, DataRoomService } from "@capital-q/permissions";
+import type {
+  CompanyDeckService,
+  DataRoomService,
+} from "@capital-q/permissions";
 import {
   registerCompanyMaterialRoutes,
   type CompanyMaterialRoutesDependencies,

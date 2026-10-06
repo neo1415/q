@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { DECK_SECTIONS, type CompanyDeckView, type DataRoomView, type DeckCoaching } from "@capital-q/contracts";
+import {
+  DECK_SECTIONS,
+  type CompanyDeckView,
+  type DataRoomView,
+} from "@capital-q/contracts";
 
 import {
   createCoachMyDeckTool,
@@ -8,7 +12,14 @@ import {
   createReadCompanyDeckTool,
   type ProfileMaterialPort,
 } from "../src/index.js";
-import { actorA, actorB, COMPANY_A, COMPANY_B_NETWORK, contextFor, planFor } from "./support.js";
+import {
+  actorA,
+  actorB,
+  COMPANY_A,
+  COMPANY_B_NETWORK,
+  contextFor,
+  planFor,
+} from "./support.js";
 
 /**
  * Overnight A8: Q reads a company's deck and data room exactly as the
@@ -44,7 +55,16 @@ const deckView = (viewer: "INVESTOR" | "OWNER"): CompanyDeckView => ({
     confirmed: true,
     sections,
   },
-  coaching: viewer === "OWNER" ? ({ rubricVersion: 1, sections: [], checks: [], sectionsAtStandard: 0, atMinimumStandard: false } as unknown as DeckCoaching) : null,
+  coaching:
+    viewer === "OWNER"
+      ? ({
+          rubricVersion: 1,
+          sections: [],
+          checks: [],
+          sectionsAtStandard: 0,
+          atMinimumStandard: false,
+        })
+      : null,
 });
 const roomView: DataRoomView = {
   viewer: "INVESTOR",
@@ -71,10 +91,16 @@ function port(): ProfileMaterialPort {
   return {
     deck: (actor, companyId) =>
       Promise.resolve(
-        companyId === COMPANY_B_NETWORK ? deckView(actor.userId === actorB.userId ? "OWNER" : "INVESTOR") : null,
+        companyId === COMPANY_B_NETWORK
+          ? deckView(actor.userId === actorB.userId ? "OWNER" : "INVESTOR")
+          : null,
       ),
-    dataRoom: (_actor, companyId) => Promise.resolve(companyId === COMPANY_B_NETWORK ? roomView : null),
-    ownCompanyId: (actor) => Promise.resolve(actor.userId === actorB.userId ? COMPANY_B_NETWORK : null),
+    dataRoom: (_actor, companyId) =>
+      Promise.resolve(companyId === COMPANY_B_NETWORK ? roomView : null),
+    ownCompanyId: (actor) =>
+      Promise.resolve(
+        actor.userId === actorB.userId ? COMPANY_B_NETWORK : null,
+      ),
   };
 }
 
@@ -82,13 +108,24 @@ describe("profile material tools", () => {
   it("reads a deck's sections for a company the plan admits, as the service returned them", async () => {
     const tool = createReadCompanyDeckTool(port());
     const plan = planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
-      { kind: "COMPANY_PROFILE", companyId: COMPANY_B_NETWORK, sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        companyId: COMPANY_B_NETWORK,
+        sensitivity: "CONFIDENTIAL",
+      },
     ]);
     const context = contextFor(actorA, plan);
-    const decision = await tool.authorize({ companyId: COMPANY_B_NETWORK }, context);
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK },
+      context,
+    );
     expect(decision.outcome).toBe("ALLOW");
     if (decision.outcome !== "ALLOW") return;
-    const out = (await tool.execute({ companyId: COMPANY_B_NETWORK }, context, decision.grant)) as {
+    const out = (await tool.execute(
+      { companyId: COMPANY_B_NETWORK },
+      context,
+      decision.grant,
+    )) as {
       sections: unknown[];
       truthClass: string;
     };
@@ -107,9 +144,16 @@ describe("profile material tools", () => {
       },
     });
     const plan = planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
-      { kind: "COMPANY_PROFILE", companyId: COMPANY_A, sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        companyId: COMPANY_A,
+        sensitivity: "CONFIDENTIAL",
+      },
     ]);
-    const decision = await tool.authorize({ companyId: COMPANY_B_NETWORK }, contextFor(actorA, plan));
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK },
+      contextFor(actorA, plan),
+    );
     expect(decision.outcome).toBe("DENY");
     expect(asked).toBe(false);
   });
@@ -117,14 +161,33 @@ describe("profile material tools", () => {
   it("lists the data room in words, titles only, as the investor's tab does", async () => {
     const tool = createReadCompanyDataRoomTool(port());
     const plan = planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
-      { kind: "COMPANY_PROFILE", companyId: COMPANY_B_NETWORK, sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        companyId: COMPANY_B_NETWORK,
+        sensitivity: "CONFIDENTIAL",
+      },
     ]);
     const context = contextFor(actorA, plan);
-    const decision = await tool.authorize({ companyId: COMPANY_B_NETWORK }, context);
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK },
+      context,
+    );
     if (decision.outcome !== "ALLOW") throw new Error("allowed");
-    expect(await tool.execute({ companyId: COMPANY_B_NETWORK }, context, decision.grant)).toEqual({
+    expect(
+      await tool.execute(
+        { companyId: COMPANY_B_NETWORK },
+        context,
+        decision.grant,
+      ),
+    ).toEqual({
       viewer: "INVESTOR",
-      documents: [{ title: "Cap table summary", folder: "Cap table and equity", status: "you asked; waiting" }],
+      documents: [
+        {
+          title: "Cap table summary",
+          folder: "Cap table and equity",
+          status: "you asked; waiting",
+        },
+      ],
       openRequests: 1,
     });
   });
@@ -132,12 +195,24 @@ describe("profile material tools", () => {
   it("coaches only the person's own deck", async () => {
     const tool = createCoachMyDeckTool(port());
     const own = planFor(actorB, "OWN_COMPANY_QUESTION", [
-      { kind: "COMPANY_PROFILE", companyId: COMPANY_B_NETWORK, sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        companyId: COMPANY_B_NETWORK,
+        sensitivity: "CONFIDENTIAL",
+      },
     ]);
-    expect((await tool.authorize({}, contextFor(actorB, own))).outcome).toBe("ALLOW");
+    expect((await tool.authorize({}, contextFor(actorB, own))).outcome).toBe(
+      "ALLOW",
+    );
     const other = planFor(actorA, "OWN_COMPANY_QUESTION", [
-      { kind: "COMPANY_PROFILE", companyId: COMPANY_A, sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        companyId: COMPANY_A,
+        sensitivity: "CONFIDENTIAL",
+      },
     ]);
-    expect((await tool.authorize({}, contextFor(actorA, other))).outcome).toBe("DENY");
+    expect((await tool.authorize({}, contextFor(actorA, other))).outcome).toBe(
+      "DENY",
+    );
   });
 });

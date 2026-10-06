@@ -22,7 +22,10 @@ export const dynamic = "force-dynamic";
 export default async function FounderPage({
   params,
 }: {
-  readonly params: Promise<{ readonly companyId: string; readonly position: string }>;
+  readonly params: Promise<{
+    readonly companyId: string;
+    readonly position: string;
+  }>;
 }) {
   const { companyId, position } = await params;
   const session = await apiSession();

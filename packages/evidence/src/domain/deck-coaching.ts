@@ -45,7 +45,10 @@ const LEVELS: readonly DeckRubricLevel[] = [
 
 /** The rubric's own words for reaching the next rung, per section (§4). */
 const NEXT_RUNG: Readonly<
-  Record<DeckSectionCode, readonly [clear: string, strong: string, exceptional: string]>
+  Record<
+    DeckSectionCode,
+    readonly [clear: string, strong: string, exceptional: string]
+  >
 > = {
   PROBLEM: [
     "Name who has the problem and what it costs them.",
@@ -126,17 +129,26 @@ function coachSection(reading: DeckSectionReading): DeckCoachingSection {
   const required = MINIMUM_STANDARD_SECTIONS.includes(reading.section);
   const rungs = NEXT_RUNG[reading.section];
   const improve =
-    score >= 5 ? null : score < 3 ? rungs[0] : score === 3 ? rungs[1] : rungs[2];
+    score >= 5
+      ? null
+      : score < 3
+        ? rungs[0]
+        : score === 3
+          ? rungs[1]
+          : rungs[2];
   const gaps: string[] = [];
   if (reading.status === "NOT_IN_DECK") {
     gaps.push("This isn't in the deck yet.");
   } else if (reading.status === "CONTRADICTORY") {
-    gaps.push("The deck gives different numbers for this; say which is current.");
+    gaps.push(
+      "The deck gives different numbers for this; say which is current.",
+    );
   } else if (reading.status === "UNCLEAR") {
     gaps.push("Q couldn't read this part clearly.");
   }
   const undated = reading.facts.filter(
-    (fact) => fact.kind === "FIGURE" && fact.value !== null && fact.asOf === null,
+    (fact) =>
+      fact.kind === "FIGURE" && fact.value !== null && fact.asOf === null,
   );
   if (undated.length > 0) {
     gaps.push(
@@ -167,7 +179,8 @@ function checksOf(
 ): DeckCoachingCheck[] {
   const undated = readings.flatMap((reading) =>
     reading.facts.filter(
-      (fact) => fact.kind === "FIGURE" && fact.value !== null && fact.asOf === null,
+      (fact) =>
+        fact.kind === "FIGURE" && fact.value !== null && fact.asOf === null,
     ),
   );
   const undatedPages = undated.flatMap((fact) => fact.pages);
@@ -179,21 +192,37 @@ function checksOf(
   const ask = readings.find((reading) => reading.section === "THE_ASK");
   const checks: DeckCoachingCheck[] = [
     contradictory.length === 0
-      ? { code: "CONTRADICTIONS", passed: true, words: "No conflicting numbers in your deck" }
+      ? {
+          code: "CONTRADICTIONS",
+          passed: true,
+          words: "No conflicting numbers in your deck",
+        }
       : {
           code: "CONTRADICTIONS",
           passed: false,
-          words: `Conflicting numbers in: ${contradictory.map((r) => r.section.toLowerCase().replaceAll("_", " ")).join(", ")}`.slice(0, 240),
+          words:
+            `Conflicting numbers in: ${contradictory.map((r) => r.section.toLowerCase().replaceAll("_", " ")).join(", ")}`.slice(
+              0,
+              240,
+            ),
         },
     undated.length === 0
-      ? { code: "UNDATED_FIGURES", passed: true, words: "Every number has a date" }
+      ? {
+          code: "UNDATED_FIGURES",
+          passed: true,
+          words: "Every number has a date",
+        }
       : {
           code: "UNDATED_FIGURES",
           passed: false,
           words: `${String(undated.length)} ${undated.length === 1 ? "number has" : "numbers have"} no date${undatedPages.length > 0 ? `: ${slideList(undatedPages)}` : ""}`,
         },
     ask?.criteria.strong === true
-      ? { code: "ASK_COMPLETE", passed: true, words: "The ask says how much and what the money is for" }
+      ? {
+          code: "ASK_COMPLETE",
+          passed: true,
+          words: "The ask says how much and what the money is for",
+        }
       : {
           code: "ASK_COMPLETE",
           passed: false,
@@ -229,7 +258,12 @@ export function coachDeck(
         pages: [],
         facts: [],
         confidence: "LOW" as const,
-        criteria: { clear: false, strong: false, exceptional: false, note: null },
+        criteria: {
+          clear: false,
+          strong: false,
+          exceptional: false,
+          note: null,
+        },
       }
     );
   });

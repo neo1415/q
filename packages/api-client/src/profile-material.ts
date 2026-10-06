@@ -28,13 +28,23 @@ import { call, type ApiSession } from "./request.js";
  * declared app action's own route (ADR 0040).
  */
 
-const company = (companyId: string) => `${COMPANIES_PATH}/${encodeURIComponent(companyId)}`;
+const company = (companyId: string) =>
+  `${COMPANIES_PATH}/${encodeURIComponent(companyId)}`;
 
 export function getCompanyDataRoom(session: ApiSession, companyId: string) {
-  return call(session, "GET", `${company(companyId)}${COMPANY_DATA_ROOM_SEGMENT}`, DataRoomViewSchema);
+  return call(
+    session,
+    "GET",
+    `${company(companyId)}${COMPANY_DATA_ROOM_SEGMENT}`,
+    DataRoomViewSchema,
+  );
 }
 
-export function openDataRoomDocument(session: ApiSession, companyId: string, documentId: string) {
+export function openDataRoomDocument(
+  session: ApiSession,
+  companyId: string,
+  documentId: string,
+) {
   return call(
     session,
     "GET",
@@ -44,14 +54,28 @@ export function openDataRoomDocument(session: ApiSession, companyId: string, doc
 }
 
 export function getCompanyDeck(session: ApiSession, companyId: string) {
-  return call(session, "GET", `${company(companyId)}${COMPANY_DECK_SEGMENT}`, CompanyDeckViewSchema);
+  return call(
+    session,
+    "GET",
+    `${company(companyId)}${COMPANY_DECK_SEGMENT}`,
+    CompanyDeckViewSchema,
+  );
 }
 
 export function openCompanyDeck(session: ApiSession, companyId: string) {
-  return call(session, "GET", `${company(companyId)}${COMPANY_DECK_OPEN_SEGMENT}`, DataRoomOpenDtoSchema);
+  return call(
+    session,
+    "GET",
+    `${company(companyId)}${COMPANY_DECK_OPEN_SEGMENT}`,
+    DataRoomOpenDtoSchema,
+  );
 }
 
-export function getCompanyFounder(session: ApiSession, companyId: string, position: number) {
+export function getCompanyFounder(
+  session: ApiSession,
+  companyId: string,
+  position: number,
+) {
   return call(
     session,
     "GET",
@@ -60,11 +84,18 @@ export function getCompanyFounder(session: ApiSession, companyId: string, positi
   );
 }
 
-export function setDataRoomLevel(session: ApiSession, documentId: string, request: SetDataRoomLevelRequest) {
+export function setDataRoomLevel(
+  session: ApiSession,
+  documentId: string,
+  request: SetDataRoomLevelRequest,
+) {
   return call(
     session,
     "POST",
-    DATA_ROOM_DOCUMENT_LEVEL_PATH.replace(":documentId", encodeURIComponent(documentId)),
+    DATA_ROOM_DOCUMENT_LEVEL_PATH.replace(
+      ":documentId",
+      encodeURIComponent(documentId),
+    ),
     DataRoomLevelResultSchema,
     { body: request },
   );
@@ -80,17 +111,27 @@ export function requestDataRoomAccess(
   return call(
     session,
     "POST",
-    COMPANY_DATA_ROOM_REQUESTS_PATH.replace(":companyId", encodeURIComponent(companyId)),
+    COMPANY_DATA_ROOM_REQUESTS_PATH.replace(
+      ":companyId",
+      encodeURIComponent(companyId),
+    ),
     DataRoomRequestResultSchema,
     { body: request, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
   );
 }
 
-export function decideDataRoomRequest(session: ApiSession, requestId: string, request: DecideDataRoomRequest) {
+export function decideDataRoomRequest(
+  session: ApiSession,
+  requestId: string,
+  request: DecideDataRoomRequest,
+) {
   return call(
     session,
     "POST",
-    DATA_ROOM_REQUEST_DECISION_PATH.replace(":requestId", encodeURIComponent(requestId)),
+    DATA_ROOM_REQUEST_DECISION_PATH.replace(
+      ":requestId",
+      encodeURIComponent(requestId),
+    ),
     DataRoomRequestResultSchema,
     { body: request },
   );
@@ -105,10 +146,10 @@ export function confirmDeckReading(
   return call(
     session,
     "POST",
-    DECK_EXTRACTION_CONFIRM_PATH.replace(":documentId", encodeURIComponent(documentId)).replace(
-      ":extractionId",
-      encodeURIComponent(extractionId),
-    ),
+    DECK_EXTRACTION_CONFIRM_PATH.replace(
+      ":documentId",
+      encodeURIComponent(documentId),
+    ).replace(":extractionId", encodeURIComponent(extractionId)),
     DeckExtractionConfirmResultSchema,
     { body: { companyId } },
   );

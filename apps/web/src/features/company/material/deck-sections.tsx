@@ -1,10 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 
-import { DECK_SECTION_LABELS, type DeckSection, type DeckSectionCode } from "@capital-q/contracts";
-import { ChevronLeft, ChevronRight, CircleAlert, FileText, ICON_SIZE, Search, UserRound } from "@capital-q/ui/icons";
+import {
+  DECK_SECTION_LABELS,
+  type DeckSection,
+} from "@capital-q/contracts";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  FileText,
+  ICON_SIZE,
+  Search,
+  UserRound,
+} from "@capital-q/ui/icons";
 
 /**
  * Q's read of the deck, as twelve sub-tabs in the same order for every
@@ -30,17 +47,33 @@ function slides(pages: readonly number[]): string | null {
   if (unique.length === 0) return null;
   const first = unique[0] ?? 0;
   const last = unique.at(-1) ?? first;
-  return first === last ? `Slide ${String(first)}` : `Slides ${String(first)}–${String(last)}`;
+  return first === last
+    ? `Slide ${String(first)}`
+    : `Slides ${String(first)}–${String(last)}`;
 }
 
-export function StatusMark({ status }: { readonly status: DeckSection["status"] }) {
+export function StatusMark({
+  status,
+}: {
+  readonly status: DeckSection["status"];
+}) {
   // Shape and word together: never colour alone.
   return status === "PRESENT" ? (
-    <span aria-hidden="true" className="inline-block size-3.5 shrink-0 rounded-full bg-(--cq-positive)" />
+    <span
+      aria-hidden="true"
+      className="inline-block size-3.5 shrink-0 rounded-full bg-(--cq-positive)"
+    />
   ) : status === "NOT_IN_DECK" ? (
-    <span aria-hidden="true" className="inline-block size-3.5 shrink-0 rounded-full border border-dashed border-(--cq-text-tertiary)" />
+    <span
+      aria-hidden="true"
+      className="inline-block size-3.5 shrink-0 rounded-full border border-dashed border-(--cq-text-tertiary)"
+    />
   ) : (
-    <CircleAlert size={ICON_SIZE.compact} aria-hidden="true" className="shrink-0 text-(--cq-warning)" />
+    <CircleAlert
+      size={ICON_SIZE.compact}
+      aria-hidden="true"
+      className="shrink-0 text-(--cq-warning)"
+    />
   );
 }
 
@@ -58,16 +91,26 @@ export function DeckReadSummary({
   readonly onPick: (index: number) => void;
   readonly current: number;
 }) {
-  const present = sections.filter((section) => section.status === "PRESENT").length;
-  const missing = sections.filter((section) => section.status === "NOT_IN_DECK").map((s) => DECK_SECTION_LABELS[s.section].toLowerCase());
+  const present = sections.filter(
+    (section) => section.status === "PRESENT",
+  ).length;
+  const missing = sections
+    .filter((section) => section.status === "NOT_IN_DECK")
+    .map((s) => DECK_SECTION_LABELS[s.section].toLowerCase());
   return (
-    <section className="flex flex-col gap-3 rounded-lg bg-(--cq-surface-subtle) p-4" aria-labelledby="deck-read-title" data-deck-read>
+    <section
+      className="flex flex-col gap-3 rounded-lg bg-(--cq-surface-subtle) p-4"
+      aria-labelledby="deck-read-title"
+      data-deck-read
+    >
       <h3 id="deck-read-title" className="cq-title-sm text-(--cq-text-primary)">
         Q&rsquo;s read of the deck
       </h3>
       <p className="cq-body-sm text-(--cq-text-primary)">
         {present} of 12 sections are in the deck.
-        {missing.length === 0 ? "" : ` Not in the deck yet: ${missing.join(", ")}.`}
+        {missing.length === 0
+          ? ""
+          : ` Not in the deck yet: ${missing.join(", ")}.`}
       </p>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {sections.map((section, index) => (
@@ -85,7 +128,9 @@ export function DeckReadSummary({
               }`}
             >
               <StatusMark status={section.status} />
-              <span className="min-w-0">{DECK_SECTION_LABELS[section.section]}</span>
+              <span className="min-w-0">
+                {DECK_SECTION_LABELS[section.section]}
+              </span>
               <span className="sr-only">: {STATUS_WORDS[section.status]}</span>
             </button>
           </li>
@@ -104,8 +149,13 @@ export function DeckReadSummary({
       </p>
       <p className="cq-caption text-(--cq-text-secondary)">
         Read by Q on{" "}
-        {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(readAt))}, from
-        version {versionNumber}. Figures are the company&rsquo;s own claims.
+        {new Intl.DateTimeFormat("en-GB", {
+          day: "numeric",
+          month: "short",
+          timeZone: "UTC",
+        }).format(new Date(readAt))}
+        , from version {versionNumber}. Figures are the company&rsquo;s own
+        claims.
       </p>
     </section>
   );
@@ -146,18 +196,31 @@ function SectionCard({
       {section.facts.length === 0 ? null : (
         <dl className="flex flex-col divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)">
           {section.facts.map((fact) => (
-            <div key={`${fact.label}-${fact.pages.join(",")}`} className="flex items-start justify-between gap-4 py-3">
+            <div
+              key={`${fact.label}-${fact.pages.join(",")}`}
+              className="flex items-start justify-between gap-4 py-3"
+            >
               <dt className="flex min-w-0 flex-col gap-1">
-                <span className="cq-body-sm text-(--cq-text-primary)">{fact.label}</span>
+                <span className="cq-body-sm text-(--cq-text-primary)">
+                  {fact.label}
+                </span>
                 <span className="cq-caption inline-flex flex-wrap items-center gap-1 text-(--cq-text-secondary)">
                   <UserRound size={ICON_SIZE.compact} aria-hidden="true" />
-                  {fact.truthClass === "Q_INFERENCE" ? "Q's inference" : "Founder's claim"}
-                  {slides(fact.pages) === null ? "" : ` · ${slides(fact.pages) ?? ""}`}
+                  {fact.truthClass === "Q_INFERENCE"
+                    ? "Q's inference"
+                    : "Founder's claim"}
+                  {slides(fact.pages) === null
+                    ? ""
+                    : ` · ${slides(fact.pages) ?? ""}`}
                   {fact.asOf === null ? "" : ` · as of ${fact.asOf}`}
                 </span>
               </dt>
               <dd className="cq-title-sm cq-numeric text-right text-(--cq-text-primary)">
-                {fact.value ?? <span className="cq-body-sm text-(--cq-text-secondary)">Not in the deck</span>}
+                {fact.value ?? (
+                  <span className="cq-body-sm text-(--cq-text-secondary)">
+                    Not in the deck
+                  </span>
+                )}
               </dd>
             </div>
           ))}
@@ -167,14 +230,16 @@ function SectionCard({
         {where === null ? null : (
           <p className="cq-caption inline-flex items-center gap-1 text-(--cq-text-secondary)">
             <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-            {where} · {downloadable ? "deck can be downloaded" : "deck is view only"}
+            {where} ·{" "}
+            {downloadable ? "deck can be downloaded" : "deck is view only"}
           </p>
         )}
         <Link
           href={`/q?ask=${encodeURIComponent(`About ${companyName}'s ${label.toLowerCase()}: `)}`}
           className="cq-body-sm inline-flex min-h-11 items-center gap-2 text-(--cq-text-primary) hover:underline"
         >
-          <Search size={ICON_SIZE.compact} aria-hidden="true" /> Ask Q about {label.toLowerCase()}
+          <Search size={ICON_SIZE.compact} aria-hidden="true" /> Ask Q about{" "}
+          {label.toLowerCase()}
         </Link>
       </footer>
     </article>
@@ -203,15 +268,22 @@ export function DeckCarousel({
   const chips = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(index);
 
-  const go = useCallback((next: number) => {
-    const clamped = Math.max(0, Math.min(sections.length - 1, next));
-    const card = track.current?.children[clamped];
-    const root = track.current;
-    if (card instanceof HTMLElement && root !== null && typeof root.scrollTo === "function") {
-      root.scrollTo({ left: card.offsetLeft, behavior: "smooth" });
-    }
-    onIndex(clamped);
-  }, [sections.length, onIndex]);
+  const go = useCallback(
+    (next: number) => {
+      const clamped = Math.max(0, Math.min(sections.length - 1, next));
+      const card = track.current?.children[clamped];
+      const root = track.current;
+      if (
+        card instanceof HTMLElement &&
+        root !== null &&
+        typeof root.scrollTo === "function"
+      ) {
+        root.scrollTo({ left: card.offsetLeft, behavior: "smooth" });
+      }
+      onIndex(clamped);
+    },
+    [sections.length, onIndex],
+  );
 
   // Only an outside pick (the summary grid) moves the track here.
   const shown = useRef(visible);
@@ -229,12 +301,16 @@ export function DeckCarousel({
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            const at = Array.prototype.indexOf.call(root.children, entry.target);
+            const at = Array.prototype.indexOf.call(
+              root.children,
+              entry.target,
+            );
             if (at >= 0) {
               setVisible(at);
               onIndex(at);
               const chip = chips.current?.children[at];
-              if (chip instanceof HTMLElement) chip.scrollIntoView({ block: "nearest", inline: "nearest" });
+              if (chip instanceof HTMLElement)
+                chip.scrollIntoView({ block: "nearest", inline: "nearest" });
             }
           }
         }
@@ -256,8 +332,18 @@ export function DeckCarousel({
   };
 
   return (
-    <section className="flex flex-col gap-3" aria-roledescription="carousel" aria-label="The deck, section by section" data-deck-carousel>
-      <div ref={chips} className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Sections">
+    <section
+      className="flex flex-col gap-3"
+      aria-roledescription="carousel"
+      aria-label="The deck, section by section"
+      data-deck-carousel
+    >
+      <div
+        ref={chips}
+        className="flex gap-2 overflow-x-auto pb-1"
+        role="tablist"
+        aria-label="Sections"
+      >
         {sections.map((section, at) => (
           <button
             key={section.section}
@@ -271,7 +357,7 @@ export function DeckCarousel({
                 : "border-(--cq-border) text-(--cq-text-primary)"
             }`}
           >
-            {DECK_SECTION_LABELS[section.section as DeckSectionCode]}
+            {DECK_SECTION_LABELS[section.section]}
           </button>
         ))}
       </div>
@@ -291,7 +377,11 @@ export function DeckCarousel({
               aria-roledescription="slide"
               aria-label={`${String(at + 1)} of ${String(sections.length)}`}
             >
-              <SectionCard section={section} downloadable={downloadable} companyName={companyName} />
+              <SectionCard
+                section={section}
+                downloadable={downloadable}
+                companyName={companyName}
+              />
             </div>
           ))}
         </div>

@@ -567,12 +567,14 @@ export const DataRoomAccessRequestedPayloadSchema = z
   .strict();
 export const RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED =
   "data_room_access_requested" as const;
-export const DataRoomAccessRequestedRelationshipEvent = defineRelationshipEvent({
-  type: RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED,
-  payloadSchema: DataRoomAccessRequestedPayloadSchema,
-  allowedVisibilityScopes: ["relationship_shared"],
-  description: "The investor asked for access to a data-room document.",
-});
+export const DataRoomAccessRequestedRelationshipEvent = defineRelationshipEvent(
+  {
+    type: RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED,
+    payloadSchema: DataRoomAccessRequestedPayloadSchema,
+    allowedVisibilityScopes: ["relationship_shared"],
+    description: "The investor asked for access to a data-room document.",
+  },
+);
 
 export const DataRoomAccessGrantedPayloadSchema = z
   .object({

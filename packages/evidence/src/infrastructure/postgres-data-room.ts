@@ -97,9 +97,11 @@ const toDoc = (row: DocRow): DataRoomDocumentRow => ({
   documentType: row.document_type,
   level: row.level ?? "PRIVATE",
   folderCode:
-    row.folder_code ?? (row.document_type === "PITCH_DECK" ? "fundraising" : "other"),
+    row.folder_code ??
+    (row.document_type === "PITCH_DECK" ? "fundraising" : "other"),
   checklistItemCode:
-    row.checklist_item_code ?? (row.document_type === "PITCH_DECK" ? "pitch_deck" : null),
+    row.checklist_item_code ??
+    (row.document_type === "PITCH_DECK" ? "pitch_deck" : null),
   validUntil: day(row.valid_until),
   pageCount: row.page_count,
   mimeType: row.mime_type,
@@ -256,7 +258,10 @@ export function createPostgresDataRoom() {
 
     requests: async (
       executor: DatabaseExecutor,
-      filter: { readonly companyId: string; readonly relationshipId?: string | undefined },
+      filter: {
+        readonly companyId: string;
+        readonly relationshipId?: string | undefined;
+      },
     ): Promise<readonly DataRoomRequestRow[]> => {
       const rows = await executor<
         {
@@ -506,7 +511,11 @@ export function createPostgresDataRoom() {
 
     confirmExtraction: async (
       tx: TransactionContext,
-      input: { readonly extractionId: string; readonly tenantId: string; readonly userId: string },
+      input: {
+        readonly extractionId: string;
+        readonly tenantId: string;
+        readonly userId: string;
+      },
     ): Promise<boolean> => {
       const made = await tx.sql<{ extraction_id: string }[]>`
         insert into evidence.deck_extraction_confirmations (extraction_id, tenant_id, confirmed_by_user_id)

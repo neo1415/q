@@ -41,18 +41,31 @@ export function FileViewer({
   readonly onClose: () => void;
 }) {
   return (
-    <SheetRoot open={file !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
+    <SheetRoot
+      open={file !== null}
+      onOpenChange={(open) => (open ? undefined : onClose())}
+    >
       {file === null ? null : (
-        <SheetContent title={title} side="full" description={file.downloadable ? undefined : "View only"}>
+        <SheetContent
+          title={title}
+          side="full"
+          description={file.downloadable ? undefined : "View only"}
+        >
           <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4">
             <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border border-(--cq-border-subtle) bg-(--cq-surface)">
               <iframe
-                src={file.downloadable ? file.url : `${file.url}#toolbar=0&navpanes=0`}
+                src={
+                  file.downloadable
+                    ? file.url
+                    : `${file.url}#toolbar=0&navpanes=0`
+                }
                 title={title}
                 className="h-full min-h-[60dvh] w-full"
                 referrerPolicy="no-referrer"
               />
-              {file.watermark === null ? null : <Watermark words={file.watermark} />}
+              {file.watermark === null ? null : (
+                <Watermark words={file.watermark} />
+              )}
             </div>
             <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
               {file.downloadable ? (
@@ -61,7 +74,8 @@ export function FileViewer({
                   download
                   className="inline-flex min-h-11 items-center gap-1.5 underline underline-offset-4"
                 >
-                  <Download size={ICON_SIZE.compact} aria-hidden="true" /> Download
+                  <Download size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+                  Download
                 </a>
               ) : (
                 <>
