@@ -77,6 +77,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'capital_objective_events',      'RLS_REQUIRED',         '{SELECT}'),
   -- Capital rounds (2026-10-04): the company's organisation reads them (suite 760).
   ('core', 'capital_rounds',                'RLS_REQUIRED',         '{SELECT}'),
+  -- Round history (P8, 2026-10-06): append-only, the company's organisation reads it (suite 765).
+  ('core', 'capital_round_events',          'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'human_reviews',                 'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'kyb_submissions',               'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'identity_submissions',          'RLS_REQUIRED',         '{SELECT}'),
