@@ -199,3 +199,4 @@ export {
   type CompanyDeckService,
   type CompanyDeckStore,
 } from "./application/company-deck.js";
+export { createPostgresProfileMaterialPorts } from "./infrastructure/postgres-profile-material-ports.js";

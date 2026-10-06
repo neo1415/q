@@ -40,6 +40,7 @@ import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { connectedCompanies } from "./http/your-companies.js";
+import { createProfileMaterial } from "./profile-material.js";
 import {
   createCorrelationId,
   createLogger,
@@ -1289,6 +1290,34 @@ const diligence = createDiligenceService({
     }),
   newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
 });
+// Overnight A3-A7: the profile's data room, pitch deck and founder pages,
+// each through the rule that already governs it (profile-material.ts).
+const profileMaterial = createProfileMaterial({
+  sql: database.sql,
+  transactions: database.transactions,
+  storage,
+  serveUnscanned,
+  authorization,
+  policies: permissions.policies,
+  access: disclosure,
+  audit,
+  outbox,
+  investorOrganisationFor: (actor) =>
+    slates.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
+  investorMayFind: async (actor, companyId) =>
+    (await resolveViewableCompany(actor, companyId)) !== null,
+  notify: (input) =>
+    createCounterpartNotices(database.sql).notify({
+      relationshipId: input.relationshipId,
+      actingSide: input.actingSide,
+      kind: "DILIGENCE",
+      title: input.title,
+      body: null,
+      target: "DILIGENCE",
+      key: input.key,
+      priority: input.priority,
+    }),
+});
 const visibility = createVisibilityCentre({
   access: permissions.access,
   inspect: permissions.inspectResourceDisclosure,
@@ -1746,6 +1775,10 @@ const { app, logger } = createApp(config, security, {
   capitalRounds,
   outcomes,
   diligence,
+  // Overnight A3-A7: data room, pitch deck, founder pages.
+  dataRoom: profileMaterial.dataRoom,
+  companyDeck: profileMaterial.companyDeck,
+  founderPerson: profileMaterial.founderPerson,
   // BILLING block (ADR 0034)
   billing: {
     entitlements,

@@ -551,6 +551,7 @@ import {
 import { withSuspension } from "./composition/suspension.js";
 import { createOwnCalls } from "./composition/own-calls.js";
 import { createOwnDiligence } from "./composition/own-diligence.js";
+import { createProfileMaterial } from "./composition/profile-material.js";
 // end ADMIN block
 // ADMIN-3 block
 import {
@@ -1448,6 +1449,59 @@ const permissionsService = createPermissionsService({
   relationshipParties,
 });
 /**
+ * Overnight A3-A8: the profile's data room and pitch deck, for Q's tools and
+ * approved actions, through the same services as the screens. Q never opens
+ * a file here (no storage is composed): it reads listings and sections.
+ * "Who can find the company" is the pitch rule (ADR 0041), as media uses it.
+ */
+const profileMaterial = createProfileMaterial({
+  sql: database.sql,
+  transactions: database.transactions,
+  storage: undefined,
+  serveUnscanned: false,
+  authorization,
+  policies: permissionsService.policies,
+  access: disclosure,
+  audit: createPostgresMaterialActionAuditWriter(),
+  outbox: createOutboxWriter({ registry: createEventRegistry(NETWORK_EVENTS) }),
+  investorOrganisationFor: (actor) =>
+    slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
+  investorMayFind: async (actor, companyId) => {
+    const investor =
+      await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor);
+    if (investor === null) return false;
+    const mandate = await slateRead.eligibilityPorts.mandates.activeMandate({
+      tenantId: actor.tenantId,
+      investorOrganisationId: investor.investorOrganisationId,
+      mandateId: null,
+    });
+    if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE") return false;
+    const parsed = CompanyIdSchema.safeParse(companyId);
+    if (!parsed.success) return false;
+    const evaluation = await slateRead.eligibility.evaluate({
+      actor,
+      mode: "INVESTOR_DISCOVER",
+      purpose: "VIEW",
+      mandateId: mandate.mandate.mandateId,
+      companyIds: [parsed.data],
+    });
+    return evaluation.results.some(
+      (result) => result.companyId === parsed.data && result.decision === "ELIGIBLE",
+    );
+  },
+  notify: (input) =>
+    createCounterpartNotices(database.sql).notify({
+      relationshipId: input.relationshipId,
+      actingSide: input.actingSide,
+      kind: "DILIGENCE",
+      title: input.title,
+      body: null,
+      target: "DILIGENCE",
+      key: input.key,
+      priority: input.priority,
+    }),
+});
+/**
  * Diligence (2026-10-02): Q prepares shares, revokes and requests through
  * the same service as the relationship page, approved on a card first. Q
  * never downloads a document.
@@ -1707,6 +1761,8 @@ const appActionPorts: OwnReadPorts = {
   pitchUploads: pitchMedia,
   outcomes: outcomeService,
   diligence: diligenceService,
+  dataRoom: profileMaterial.dataRoom,
+  companyDeck: profileMaterial.companyDeck,
   diligenceAreas: createOwnDiligence({
     interests: interestService,
     diligence: diligenceService,
@@ -2156,6 +2212,12 @@ const qTools = createQTools({
     // the services their screens call.
     recordChanges: {
       prepare: (entry) => recordChangeBoard.prepare(entry),
+    },
+    // Overnight A8: a company's deck and data room, as the tabs show them.
+    profileMaterial: {
+      dataRoom: (actor, companyId) => profileMaterial.dataRoom.view(actor, companyId),
+      deck: (actor, companyId) => profileMaterial.companyDeck.view(actor, companyId),
+      ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
     },
     ownRecords: {
       read: (actor, query) => ownRecords.read(actor, query),
