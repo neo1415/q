@@ -96,6 +96,7 @@ import { speculationGate } from "./speculation.js";
 
 export type { QOwnIndex } from "./own-standing.js";
 export { readinessLeadLines } from "./own-readiness.js";
+export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { onScreenCompanyFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
