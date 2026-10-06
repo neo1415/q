@@ -83,6 +83,7 @@ import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
+import { createRunCompanies, withCardSubjects } from "./card-subjects.js";
 import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -1462,7 +1463,20 @@ export function createModelGatewayQAnswer(
     dependencies;
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const context = dependencies.context ?? noAuthorisedContext;
-  const tools = dependencies.tools ?? createUnconfiguredQTools();
+  const baseTools = dependencies.tools ?? createUnconfiguredQTools();
+  // R0: the companies each run's tools returned, so an answer card can
+  // carry the record its name means (never an id the model wrote).
+  const runCompanies = createRunCompanies();
+  const available = baseTools.available;
+  const tools: QToolPort = {
+    offer: (toolContext) => baseTools.offer(toolContext),
+    ...(available === undefined ? {} : { available }),
+    execute: async (proposal, toolContext) => {
+      const outcome = await baseTools.execute(proposal, toolContext);
+      runCompanies.note(toolContext.runId, outcome);
+      return outcome;
+    },
+  };
   const sensitivityPolicy = dependencies.sensitivity ?? { kind: "FROM_PLAN" };
   const dataPosture: ModelDataPosture =
     dependencies.dataPosture ?? "REAL_CUSTOMER";
@@ -3790,6 +3804,7 @@ export function createModelGatewayQAnswer(
                   );
                   return null;
                 });
+        const companiesRead = runCompanies.take(request.runId);
         const analystBlocks = analystResultBlocks({
           result: analyst,
           // The run's own authorised subjects, never anything the model
@@ -3797,7 +3812,11 @@ export function createModelGatewayQAnswer(
           // run to be about. Their own firm, carried as context for a fit
           // question, is not what they asked about (CQ-QX-007).
           subjects: askedSubjects(request.subjects, plan),
-        });
+        })?.map((block) =>
+          block.kind === "ANSWER_CARDS"
+            ? withCardSubjects(block, companiesRead)
+            : block,
+        );
         // An answer that was nothing but talk about acting leaves Capital
         // Q's own lines — the revision below, the action's own narration —
         // to say what happened. Alone, it is acknowledged and no more.
