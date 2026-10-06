@@ -137,7 +137,7 @@ export default async function SettingsPage({
             <SettingRow term="Password">
               <RowLink href="/auth/update-password">Change</RowLink>
             </SettingRow>
-            <SettingRow term="This device" hint="Ends your session here">
+            <SettingRow term="This device" hint="Signs you out on this device">
               <SignOutButton />
             </SettingRow>
           </SettingsCard>

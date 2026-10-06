@@ -223,7 +223,7 @@ function rows(review: InvestorReviewContext): readonly Row[] {
     },
     {
       id: "context",
-      label: "Additional context",
+      label: "Anything else",
       value: m.rawTextRecorded ? "Recorded" : NONE,
       editStepId: "context",
     },
@@ -313,8 +313,9 @@ export function MandateReviewStep({
                   {list(review.mandate.hardExclusions)}
                 </dd>
                 <dd className="cq-caption text-(--cq-text-tertiary)">
-                  Not shown in standard discovery, whatever the discovery style.
-                  Different from “rather not see”, which only ranks lower.
+                  Not shown in your recommendations, whatever your discovery
+                  style. Different from “rather not see”, which only ranks
+                  lower.
                 </dd>
               </div>
               <Button

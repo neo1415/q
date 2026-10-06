@@ -807,7 +807,7 @@ function buildCapitalObjective(
   const useOfFunds = multi(state, S.useOfFunds);
   return {
     ...base(group, "capital_objective", state),
-    help: "The raise is its own object, separate from the company profile. You can recalibrate it any time.",
+    help: "Your raise is kept separate from your company profile. You can change it any time.",
     raisingOptions: optionsOf(S.raising),
     instrumentOptions: optionsOf(S.instrument),
     timeframeOptions: optionsOf(S.timeframe),
@@ -1001,7 +1001,7 @@ function snapshotSections(snapshot: FounderSnapshotContext): SnapshotSection[] {
       title: "Materials you have",
       items:
         snapshot.materials === null || snapshot.materials.length === 0
-          ? item("none", "None declared yet")
+          ? item("none", "None added yet")
           : snapshot.materials.map((m) => ({
               id: m.key,
               text: m.label,

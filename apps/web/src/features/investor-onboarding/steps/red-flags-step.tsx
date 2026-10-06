@@ -104,7 +104,7 @@ export function RedFlagsStep({
           id="red-flags-hard"
           name="hard"
           legend="Never show me"
-          description="A hard exclusion. Opportunities matching these are not shown in standard discovery, whatever the discovery style."
+          description="A hard exclusion. Companies that match these are not shown in your recommendations, whatever your discovery style."
           options={step.options}
           values={hard}
           disabled={busy}
@@ -122,7 +122,7 @@ export function RedFlagsStep({
           Sectors to exclude outright
         </legend>
         <InlineNotice tone="info" title="Hard exclusion">
-          Companies in these categories are not shown in standard discovery.
+          Companies in these categories are not shown in your recommendations.
           This is not a preference: excluding a sector you listed as a
           preference moves it here.
         </InlineNotice>

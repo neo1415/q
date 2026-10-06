@@ -73,7 +73,11 @@ export async function readPassAction(
   relationshipId: string,
 ): Promise<OutcomeActionResult<RelationshipPassResponseDto>> {
   const id = Id.safeParse(relationshipId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => getRelationshipPass(session, id.data));
 }
 
@@ -85,7 +89,11 @@ export async function passAction(
   const id = Id.safeParse(relationshipId);
   const key = Key.safeParse(idempotencyKey);
   const body = PassRelationshipRequestSchema.safeParse(request);
-  if (!id.success || !key.success) return { ok: false, message: "Not found." };
+  if (!id.success || !key.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   if (!body.success)
     return { ok: false, message: "Check the reason and note." };
   return run((session) =>
@@ -97,7 +105,11 @@ export async function pauseAction(
   relationshipId: string,
 ): Promise<OutcomeActionResult<RelationshipOutcomeResultDto>> {
   const id = Id.safeParse(relationshipId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => pauseRelationship(session, id.data));
 }
 
@@ -105,7 +117,11 @@ export async function resumeAction(
   relationshipId: string,
 ): Promise<OutcomeActionResult<RelationshipOutcomeResultDto>> {
   const id = Id.safeParse(relationshipId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => resumeRelationship(session, id.data));
 }
 
@@ -115,6 +131,10 @@ export async function meetingOutcomeAction(
 ): Promise<OutcomeActionResult<RelationshipOutcomeResultDto>> {
   const id = Id.safeParse(relationshipId);
   const body = RecordMeetingOutcomeRequestSchema.safeParse(request);
-  if (!id.success || !body.success) return { ok: false, message: "Not found." };
+  if (!id.success || !body.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => recordMeetingOutcome(session, id.data, body.data));
 }

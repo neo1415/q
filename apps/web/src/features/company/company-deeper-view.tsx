@@ -409,7 +409,7 @@ function FactRow({
       {state === "unknown" ? (
         <div className="flex flex-col gap-0.5">
           <p className="cq-body text-(--cq-text-primary)">Unknown</p>
-          <p className="cq-caption text-(--cq-text-tertiary)">Not declared.</p>
+          <p className="cq-caption text-(--cq-text-tertiary)">Not stated.</p>
         </div>
       ) : state === "stated" && fact.statements[0] !== undefined ? (
         <Statement factKey={fact.key} statement={fact.statements[0]} />

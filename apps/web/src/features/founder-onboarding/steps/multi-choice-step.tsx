@@ -56,7 +56,7 @@ export function MultiChoiceStep({
       />
       <ContextIndicator
         scope="organisation_private"
-        detail="Your files stay private to your company. Uploading arrives in a later release; nothing is collected here."
+        detail="Your files stay private to your company. You can't upload files here yet, so nothing is collected."
       />
     </form>
   );

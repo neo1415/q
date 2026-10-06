@@ -95,8 +95,8 @@ export function CapitalObjectiveStep({
       {raising ? (
         <>
           {step.existingObjective !== undefined ? (
-            <InlineNotice tone="info" title="Recalibrating your raise">
-              Your current objective is {step.existingObjective.currency}{" "}
+            <InlineNotice tone="info" title="Updating your raise">
+              Your current raise is {step.existingObjective.currency}{" "}
               {step.existingObjective.amount}. Saving updates it; it never
               creates a second one.
             </InlineNotice>

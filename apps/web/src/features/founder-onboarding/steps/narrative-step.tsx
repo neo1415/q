@@ -66,7 +66,7 @@ export function NarrativeStep({
           className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)"
           data-follow-up-questions={0}
         >
-          Nothing I still need from you. Everything material is answered or
+          Nothing I still need from you. Everything important is answered or
           waiting on your review.
         </p>
       ) : null}
@@ -108,7 +108,7 @@ function FollowUpQuestions({
   if (questions.length === 0) {
     return (
       <InlineNotice tone="info" title="Nothing I still need from you">
-        Everything material is answered or waiting on your review. Add anything
+        Everything important is answered or waiting on your review. Add anything
         else below, or continue.
       </InlineNotice>
     );

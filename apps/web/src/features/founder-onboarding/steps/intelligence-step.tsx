@@ -51,7 +51,7 @@ export function IntelligenceStep({ step }: StepProps<"snapshot">) {
         />
         <span>
           <span>Investors don&apos;t see this.</span> Private to your company.
-          Becoming discoverable is a separate step later, with its own readiness
+          Letting investors find you is a separate step later, with its own
           checks and verification.
         </span>
       </p>

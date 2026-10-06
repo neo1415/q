@@ -50,7 +50,7 @@ export function QNow({
       <h2 className="cq-label text-(--cq-text-secondary)">Now</h2>
       {nothing ? (
         <p className="cq-body-sm text-(--cq-text-tertiary)">
-          Nothing is running, and nothing needs you.
+          Q isn&apos;t working on anything, and nothing needs you.
         </p>
       ) : null}
 

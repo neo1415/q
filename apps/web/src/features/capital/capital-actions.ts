@@ -84,9 +84,16 @@ export async function closeRoundAction(
   roundId: string,
 ): Promise<CapitalResult> {
   if (!Id.safeParse(roundId).success)
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   const companyId = await ownCompanyId();
-  if (companyId === null) return { ok: false, message: "Not found." };
+  if (companyId === null)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => closeCapitalRound(session, companyId, roundId));
 }
 
@@ -100,7 +107,10 @@ export async function confirmAmountAction(
     (roundId !== null && !Id.safeParse(roundId).success) ||
     !Key.safeParse(key).success
   ) {
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   }
   return run((session) =>
     confirmCommitmentAmount(
@@ -135,7 +145,10 @@ export async function confirmReceivedAction(
     !Id.safeParse(commitmentId).success ||
     (roundId !== null && !Id.safeParse(roundId).success)
   ) {
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   }
   return run((session) =>
     confirmCommitmentReceived(
@@ -151,6 +164,9 @@ export async function notRightAction(
   commitmentId: string,
 ): Promise<CapitalResult> {
   if (!Id.safeParse(commitmentId).success)
-    return { ok: false, message: "Not found." };
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run((session) => disputeCommitment(session, commitmentId));
 }

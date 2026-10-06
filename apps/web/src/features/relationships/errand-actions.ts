@@ -54,7 +54,11 @@ export async function readErrandsAction(
   relationshipId: string,
 ): Promise<ErrandResult<readonly QErrandDto[]>> {
   const id = Id.safeParse(relationshipId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run(
     async (session) =>
       (await listRelationshipErrands(session, id.data)).errands,
@@ -65,7 +69,11 @@ export async function stopErrandAction(
   errandId: string,
 ): Promise<ErrandResult<true>> {
   const id = Id.safeParse(errandId);
-  if (!id.success) return { ok: false, message: "Not found." };
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
   return run(async (session) => {
     await stopErrand(session, id.data);
     return true as const;

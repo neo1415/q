@@ -53,8 +53,7 @@ export function MandateSelectStep({
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       {step.candidates.length === 0 ? (
         <InlineNotice tone="info">
-          No mandate is available yet. Go back one step so a draft can be
-          created.
+          There is no mandate to choose yet. Go back one step to create a draft.
         </InlineNotice>
       ) : only !== undefined ? (
         <InlineNotice tone="info">
@@ -73,7 +72,7 @@ export function MandateSelectStep({
             description:
               candidate.status === "DRAFT"
                 ? "Draft — not active yet"
-                : "Active — changes recalibrate it",
+                : "Active — your changes update it",
           }))}
           value={mandateId}
           error={error}

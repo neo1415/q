@@ -148,7 +148,7 @@ export async function CapitalScreen() {
             emptySentence={
               context.kind === "INVESTOR"
                 ? "No company relationships yet. Expressing interest from Discover starts one."
-                : "No investor relationships yet. When an investor organisation expresses interest, it appears here."
+                : "No investor relationships yet. When an investor expresses interest, it appears here."
             }
           />
         )}

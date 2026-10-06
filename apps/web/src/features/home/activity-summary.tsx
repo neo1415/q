@@ -9,11 +9,11 @@ import { PageSection } from "@/components/app-shell/page-container";
  */
 export function ActivitySummary() {
   return (
-    <PageSection id="activity" title="Recent intelligence">
+    <PageSection id="activity" title="Recent updates">
       <EmptyState
         compact
-        title="Nothing material yet."
-        description="Material changes, relationship activity and intelligence updates appear here as they happen. Not everything, just what matters."
+        title="Nothing important yet."
+        description="Important changes, relationship news and new findings from Q appear here as they happen. Not everything, just what matters."
       />
     </PageSection>
   );

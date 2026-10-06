@@ -68,7 +68,10 @@ export async function enablePush(): Promise<{
 }> {
   const key = await pushKeyAction();
   if (!key.ok || key.value === null) {
-    return { ok: false, message: "Capital Q can't send pushes just now." };
+    return {
+      ok: false,
+      message: "Capital Q can't send notifications just now.",
+    };
   }
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
@@ -76,7 +79,7 @@ export async function enablePush(): Promise<{
       ok: false,
       message:
         permission === "denied"
-          ? "Pushes are blocked for Capital Q in this browser's settings."
+          ? "Notifications are blocked for Capital Q in this browser's settings."
           : null,
     };
   }

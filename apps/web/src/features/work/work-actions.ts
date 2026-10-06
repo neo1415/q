@@ -206,7 +206,7 @@ export async function subscribePushAction(
       await subscribePush(session, parsed.data);
       return null;
     },
-    "Pushes couldn't be turned on. Try again.",
+    "Notifications couldn't be turned on. Try again.",
   );
 }
 
@@ -221,7 +221,7 @@ export async function unsubscribePushAction(
       await unsubscribePush(session, parsed.data);
       return null;
     },
-    "Pushes couldn't be turned off. Try again.",
+    "Notifications couldn't be turned off. Try again.",
   );
 }
 

@@ -117,13 +117,13 @@ const AXIS_LOCK = 12;
 
 const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
   NO_ACTIVE_MANDATE:
-    "You have no active mandate yet, so nothing here is matched to you. Finish your mandate and Q will match on what you declared.",
+    "You have no active mandate yet, so nothing here is matched to you. Finish your mandate and Q will match on what you told it.",
   MANDATE_HAS_NO_PREFERENCES:
     "Your mandate does not name a stage, sector or geography yet. Adding them is what turns this into a shortlist.",
   NO_DISCOVERABLE_COUNTERPARTS:
     "Nobody has made themselves discoverable yet. This fills as founders choose to be found.",
   RANKED_ON_DECLARED_PROFILE_ONLY:
-    "Ordered by what each company has declared. Nothing private is read to build this.",
+    "Ordered by what each company says about itself. Nothing private is used to build this.",
   RECOMMENDATIONS_REFRESHING:
     "Your recommendations are being prepared. Check back in a moment.",
   SLATE_RESTARTED:
@@ -1017,7 +1017,7 @@ function InvestorFeed({
       <div className="flex flex-col gap-4">
         <EmptyState
           title="Finish your mandate to see companies."
-          description="Discover ranks companies against what you declared. Your mandate isn't active yet, so there is nothing to rank them against."
+          description="Discover ranks companies against what you told Q. Your mandate isn't active yet, so there is nothing to rank them against."
           action={
             <div className="flex flex-wrap items-center gap-2">
               <Link
