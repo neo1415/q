@@ -22,6 +22,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // P9: the sidebar prefetches a whole page on hover. A hover-prefetched
+    // page is reused for 30 seconds, not the default five minutes, so a
+    // click long after a hover never shows an inbox that old.
+    staleTimes: { static: 30 },
+  },
   // `/@handle` is the Q Card's public address (BIZ-004). An `@` segment is
   // a parallel-route slot in the App Router, so the page lives at
   // `/u/[handle]` and the public address is a rewrite onto it. The vCard
@@ -88,6 +94,18 @@ const nextConfig: NextConfig = {
         // must not be served to anyone else by a CDN or proxy.
         source: "/auth/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }],
+      },
+      {
+        // P9: PWA icons change only with a deploy that renames nothing, so
+        // a day of freshness plus background revalidation keeps repeat
+        // visits on a bad network from re-asking for them.
+        source: "/icons/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
       },
       {
         // The service worker must never be cached indefinitely, or an old

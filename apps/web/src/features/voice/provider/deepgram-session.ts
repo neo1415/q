@@ -1,6 +1,6 @@
 "use client";
 
-import { AgentMicrophone } from "@deepgram/agents";
+import type { AgentMicrophone as AgentMicrophoneClass } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Q_VOICE_THINKING_BEATS } from "@capital-q/contracts";
 
@@ -124,7 +124,7 @@ const newId = () => `dg-${String(Date.now())}-${String((counter += 1))}`;
 
 type Live = {
   readonly session: AgentSocket;
-  readonly microphone: AgentMicrophone;
+  readonly microphone: AgentMicrophoneClass;
   readonly player: PcmPlayer;
 };
 
@@ -221,6 +221,17 @@ export function useDeepgramVoiceSession(
     async ({ credential }: VoiceSessionStart) => {
       const settings = credential.deepgram;
       if (credential.provider !== "deepgram" || settings === undefined) {
+        setState("ERROR");
+        eventsRef.current.onError?.(PLAIN_ERRORS.generic);
+        return;
+      }
+      // P9: the SDK loads when a call starts, not with every page; it was
+      // part of the shell's largest chunk. Awaited before teardown so the
+      // rest of the start stays synchronous as before.
+      let AgentMicrophone: typeof AgentMicrophoneClass;
+      try {
+        ({ AgentMicrophone } = await import("@deepgram/agents"));
+      } catch {
         setState("ERROR");
         eventsRef.current.onError?.(PLAIN_ERRORS.generic);
         return;

@@ -2966,6 +2966,51 @@
   .cq-explore-cell {
     position: absolute;
   }
+  /* P9: before hydration the grid carries every breakpoint's layout and
+     CSS picks one (breakpoints match columnsForWidth in masonry.ts). */
+  .cq-explore-masonry[data-columns="auto"] {
+    --cq-col: var(--cq-col-2);
+    height: var(--cq-h-2);
+  }
+  .cq-explore-masonry[data-columns="auto"] > .cq-explore-cell {
+    left: var(--l2);
+    top: var(--t2);
+    width: var(--cq-col);
+    height: var(--h2);
+  }
+  @media (min-width: 640px) {
+    .cq-explore-masonry[data-columns="auto"] {
+      --cq-col: var(--cq-col-3);
+      height: var(--cq-h-3);
+    }
+    .cq-explore-masonry[data-columns="auto"] > .cq-explore-cell {
+      left: var(--l3);
+      top: var(--t3);
+      height: var(--h3);
+    }
+  }
+  @media (min-width: 1024px) {
+    .cq-explore-masonry[data-columns="auto"] {
+      --cq-col: var(--cq-col-4);
+      height: var(--cq-h-4);
+    }
+    .cq-explore-masonry[data-columns="auto"] > .cq-explore-cell {
+      left: var(--l4);
+      top: var(--t4);
+      height: var(--h4);
+    }
+  }
+  @media (min-width: 1400px) {
+    .cq-explore-masonry[data-columns="auto"] {
+      --cq-col: var(--cq-col-5);
+      height: var(--cq-h-5);
+    }
+    .cq-explore-masonry[data-columns="auto"] > .cq-explore-cell {
+      left: var(--l5);
+      top: var(--t5);
+      height: var(--h5);
+    }
+  }
   .cq-explore-tile {
     display: flex;
     width: 100%;

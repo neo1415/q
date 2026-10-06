@@ -18,6 +18,8 @@ import type {
 } from "@capital-q/contracts";
 
 import { authorisePlaybackViaAction } from "../discover/feed/action-feed-transport";
+import { authorisePostersAction } from "../discover/feed/playback-source";
+import { retryWithBackoff } from "@/pwa/resilient";
 import { recordDecisionAction } from "../discover/feed/feed-actions";
 
 import {
@@ -59,6 +61,16 @@ export type ExploreDataSource = {
     companyId: string,
     mediaAssetId: string,
   ) => Promise<PlaybackAuthorizationDto>;
+  /**
+   * Posters for many tiles in one round trip (P9). Optional: a source
+   * without it is asked tile by tile through `authorize`.
+   */
+  readonly posters?: (
+    items: readonly {
+      readonly companyId: string;
+      readonly mediaAssetId: string;
+    }[],
+  ) => Promise<Readonly<Record<string, string>>>;
   readonly save: (
     companyId: string,
     save: boolean,
@@ -77,6 +89,7 @@ export const LIVE_EXPLORE_SOURCE: ExploreDataSource = {
   loadPage: (mode, cursor) => loadExplorePageAction(mode, cursor),
   loadRelated: (id) => loadExploreRelatedAction(id),
   authorize: authorisePlaybackViaAction,
+  posters: authorisePostersAction,
   save: async (companyId, save) => {
     const result = await recordDecisionAction({
       companyId,
@@ -147,7 +160,10 @@ export function ExploreScreen({
   startOnRequest = false,
   posterOnly = false,
   openOnArrival = null,
+  initialPosters = {},
 }: {
+  /** Posters the server already authorised for the first screen (P9). */
+  readonly initialPosters?: Readonly<Record<string, string>>;
   /** Design review: open this tile's feed on arrival, at this position. */
   readonly openOnArrival?: {
     readonly index: number;
@@ -183,7 +199,8 @@ export function ExploreScreen({
   const [upToDate, setUpToDate] = useState(initial?.upToDate ?? false);
   const [error, setError] = useState(initialError);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [posters, setPosters] = useState<Readonly<Record<string, string>>>({});
+  const [posters, setPosters] =
+    useState<Readonly<Record<string, string>>>(initialPosters);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
   // Design review can open a pitch on arrival (search: at once; the grid:
@@ -212,24 +229,29 @@ export function ExploreScreen({
     let cancelled = false;
     setTiles(null);
     setError(false);
-    void source.loadPage(mode, null).then((result) => {
-      if (cancelled) return;
-      if (!result.ok) {
-        setError(true);
-        return;
-      }
-      setTiles(result.value.items);
-      setCursor(result.value.nextCursor);
-      setUpToDate(result.value.upToDate);
-      const anchor =
-        openOnArrival === null || arrived.current
-          ? undefined
-          : result.value.items[openOnArrival.index];
-      if (anchor !== undefined) {
-        arrived.current = true;
-        setOpened({ items: [anchor], loading: true });
-      }
-    });
+    // P9: a dropped connection is retried with backoff; one that never
+    // comes back ends in the error state with its Retry, never a skeleton
+    // that waits forever.
+    void retryWithBackoff(() => source.loadPage(mode, null))
+      .catch(() => ({ ok: false as const, message: "" }))
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.ok) {
+          setError(true);
+          return;
+        }
+        setTiles(result.value.items);
+        setCursor(result.value.nextCursor);
+        setUpToDate(result.value.upToDate);
+        const anchor =
+          openOnArrival === null || arrived.current
+            ? undefined
+            : result.value.items[openOnArrival.index];
+        if (anchor !== undefined) {
+          arrived.current = true;
+          setOpened({ items: [anchor], loading: true });
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -238,7 +260,12 @@ export function ExploreScreen({
   const loadMore = useCallback(async () => {
     if (cursor === null || loadingMore) return;
     setLoadingMore(true);
-    const result = await source.loadPage(mode, cursor);
+    const result = await retryWithBackoff(() =>
+      source.loadPage(mode, cursor),
+    ).catch(() => ({
+      ok: false as const,
+      message: "Couldn't load more. Check your connection and scroll again.",
+    }));
     setLoadingMore(false);
     if (!result.ok) {
       setToast(result.message);
@@ -271,7 +298,17 @@ export function ExploreScreen({
   }, [cursor, loadMore]);
 
   // Posters are signed grants, asked for a batch at a time as tiles arrive.
-  const asked = useRef(new Set<string>());
+  // The first screen's came with the page. A grant still in flight when the
+  // tiles change is kept, not dropped: each tile is asked for once, so a
+  // dropped answer used to leave its box empty for good.
+  const asked = useRef(new Set<string>(Object.keys(initialPosters)));
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const posterTiles = useMemo(
     () => [
       ...(tiles ?? []),
@@ -281,24 +318,43 @@ export function ExploreScreen({
     [tiles, search, opened],
   );
   useEffect(() => {
-    let cancelled = false;
     const next = posterTiles
       .filter((t) => !asked.current.has(t.pitch.mediaAssetId))
       .slice(0, POSTER_BATCH * 3);
+    if (next.length === 0) return;
+    for (const tile of next) asked.current.add(tile.pitch.mediaAssetId);
+    const keep = (found: Readonly<Record<string, string>>) => {
+      if (!mounted.current || Object.keys(found).length === 0) return;
+      setPosters((known) => ({ ...known, ...found }));
+    };
+    // A batch that fails is forgotten, so the next change asks again.
+    const forget = (batch: readonly ExploreTileDto[]) => {
+      for (const tile of batch) asked.current.delete(tile.pitch.mediaAssetId);
+    };
+    const batchPosters = source.posters;
+    if (batchPosters !== undefined) {
+      for (let at = 0; at < next.length; at += POSTER_BATCH) {
+        const batch = next.slice(at, at + POSTER_BATCH);
+        retryWithBackoff(() =>
+          batchPosters(
+            batch.map((t) => ({
+              companyId: t.companyId,
+              mediaAssetId: t.pitch.mediaAssetId,
+            })),
+          ),
+        ).then(keep, () => forget(batch));
+      }
+      return;
+    }
     for (const tile of next) {
-      asked.current.add(tile.pitch.mediaAssetId);
       source.authorize(tile.companyId, tile.pitch.mediaAssetId).then(
         (grant) => {
           const url = grant.posterUrl;
-          if (cancelled || url === null) return;
-          setPosters((known) => ({ ...known, [tile.pitch.mediaAssetId]: url }));
+          if (url !== null) keep({ [tile.pitch.mediaAssetId]: url });
         },
         () => undefined,
       );
     }
-    return () => {
-      cancelled = true;
-    };
   }, [posterTiles, source]);
 
   useEffect(() => {
@@ -534,7 +590,7 @@ export function ExploreScreen({
           what="Explore"
           onRetry={() => setReload((n) => n + 1)}
         />
-      ) : tiles === null || columns === null || forceLoading ? (
+      ) : tiles === null || forceLoading ? (
         <ExploreGridSkeleton columns={columns ?? 2} />
       ) : tiles.length === 0 ? (
         <ExploreState

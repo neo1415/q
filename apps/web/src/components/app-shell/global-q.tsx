@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -25,7 +26,6 @@ import {
   type QMomentSource,
 } from "@/features/q/q-moment";
 import { AnswerChip } from "@/features/q/answer-chip";
-import { QSheetConversation } from "@/features/q/q-sheet";
 import { setScreenFocusSource } from "@/features/q/screen";
 import { QSessionProvider, useQSessionOptional } from "@/features/q/q-session";
 import {
@@ -35,6 +35,42 @@ import {
 } from "@/features/q/q-subject";
 import { QSounds } from "@/features/q-sound/q-sounds";
 import { WakeWord } from "@/features/wake/wake-word";
+
+/**
+ * P9: the side panel's conversation is code most page views never run,
+ * so it is not in every page's first download. It is fetched when the
+ * person reaches for Q (pointer or focus on the trigger) or, failing that,
+ * once the page has gone quiet, so opening it later is still immediate.
+ */
+const loadQSheet = () => import("@/features/q/q-sheet");
+const QSheetConversation = dynamic(
+  () => loadQSheet().then((m) => m.QSheetConversation),
+  { ssr: false, loading: () => <QSheetPending /> },
+);
+let qSheetRequested = false;
+function preloadQSheet(): void {
+  if (qSheetRequested) return;
+  qSheetRequested = true;
+  // A failed preload is retried by the real open (next/dynamic imports again).
+  loadQSheet().catch(() => {
+    qSheetRequested = false;
+  });
+}
+
+/** Holds the panel's shape while its code arrives; no spinner. */
+function QSheetPending() {
+  return (
+    <div
+      className="flex flex-1 flex-col gap-3 p-4"
+      aria-busy="true"
+      aria-label="Opening Q"
+    >
+      <div className="h-4 w-2/3 rounded-sm bg-(--cq-surface-subtle)" />
+      <div className="h-4 w-1/2 rounded-sm bg-(--cq-surface-subtle)" />
+      <div className="mt-auto h-12 w-full rounded-md bg-(--cq-surface-subtle)" />
+    </div>
+  );
+}
 
 /**
  * Q, present on every page (ADR 0017 F1): the one conversation store, the
@@ -187,6 +223,24 @@ export function GlobalQProvider({
     return () => window.removeEventListener("keydown", onKey);
   }, [openWith]);
 
+  // P9: off the Q page, fetch the panel's code once the page has settled,
+  // so a later open is immediate even on a slow line. Never on Save-Data.
+  useEffect(() => {
+    if (onQPage) return;
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean } }
+    ).connection;
+    if (connection?.saveData === true) return;
+    const timer = window.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(preloadQSheet, { timeout: 4000 });
+      } else {
+        preloadQSheet();
+      }
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [onQPage]);
+
   const value = useMemo<GlobalQValue>(
     () => ({
       open,
@@ -309,6 +363,8 @@ export function GlobalQTrigger({
       type="button"
       aria-label="Ask Q"
       aria-expanded={open}
+      onPointerEnter={preloadQSheet}
+      onFocus={preloadQSheet}
       onClick={() => setOpen(true)}
       className={buttonClassName(
         "secondary",

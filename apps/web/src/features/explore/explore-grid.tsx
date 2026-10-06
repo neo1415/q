@@ -76,6 +76,9 @@ export function ExploreTile({
               src={poster}
               alt=""
               loading={index < 6 ? "eager" : "lazy"}
+              // The first row is the likely LCP: ask for it ahead of the
+              // rest of the page's images (P9).
+              fetchPriority={index < 2 ? "high" : "auto"}
               decoding="async"
               className="cq-explore-img"
             />
@@ -108,6 +111,39 @@ export function ExploreTile({
   );
 }
 
+/** Every column count the grid can take, widest breakpoint last. */
+const COLUMN_COUNTS = [2, 3, 4, 5] as const;
+
+/**
+ * Before the browser has said how wide it is (the server render, and the
+ * first paint before hydration) the grid is laid out for every column
+ * count at once, as custom properties, and CSS picks the one matching the
+ * viewport (the same breakpoints as `columnsForWidth`). The tiles are
+ * therefore on screen from the first byte, and hydration swaps those
+ * properties for the identical inline values: no skeleton, no shift (P9).
+ */
+function responsiveStyles(ratios: readonly number[]): {
+  readonly host: React.CSSProperties;
+  readonly cells: readonly React.CSSProperties[];
+} {
+  const host: Record<string, string> = {};
+  const cells: Record<string, string>[] = ratios.map(() => ({}));
+  for (const count of COLUMN_COUNTS) {
+    const layout = placeMasonry(ratios, count);
+    host[`--cq-col-${String(count)}`] = columnWidth(count);
+    host[`--cq-h-${String(count)}`] = containerHeight(layout);
+    for (const placement of layout.placements) {
+      const style = placementStyle(placement, count);
+      const cell = cells[placement.index];
+      if (cell === undefined) continue;
+      cell[`--l${String(count)}`] = style.left;
+      cell[`--t${String(count)}`] = style.top;
+      cell[`--h${String(count)}`] = style.height;
+    }
+  }
+  return { host, cells };
+}
+
 export function ExploreGrid({
   tiles,
   posters,
@@ -118,15 +154,41 @@ export function ExploreGrid({
 }: {
   readonly tiles: readonly ExploreTileDto[];
   readonly posters: Readonly<Record<string, string>>;
-  readonly columns: number;
+  /** Null until the browser has measured: every breakpoint, chosen by CSS. */
+  readonly columns: number | null;
   readonly sectorLabels: ReadonlyMap<string, string>;
   readonly onOpen: (index: number) => void;
   readonly label?: string;
 }) {
-  const layout = placeMasonry(
-    tiles.map((tile, index) => tileRatioAt(tile.pitch.aspectRatio, index)),
-    columns,
+  const ratios = tiles.map((tile, index) =>
+    tileRatioAt(tile.pitch.aspectRatio, index),
   );
+  if (columns === null) {
+    const responsive = responsiveStyles(ratios);
+    return (
+      <div className="cq-explore-masonry-host">
+        <ul
+          className="cq-explore-masonry"
+          aria-label={label}
+          data-columns="auto"
+          style={responsive.host}
+        >
+          {tiles.map((tile, index) => (
+            <ExploreTile
+              key={tile.pitch.mediaAssetId}
+              tile={tile}
+              index={index}
+              poster={posters[tile.pitch.mediaAssetId] ?? null}
+              sectorLabels={sectorLabels}
+              onOpen={() => onOpen(index)}
+              style={responsive.cells[index]}
+            />
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  const layout = placeMasonry(ratios, columns);
   return (
     <div className="cq-explore-masonry-host">
       <ul

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Conversation, type VoiceConversation } from "@elevenlabs/react";
+import type { VoiceConversation } from "@elevenlabs/react";
 
 import {
   transcriptLineFor,
@@ -109,6 +109,10 @@ export function useElevenLabsVoiceSession(
         return;
       }
       try {
+        // P9: the SDK (and its WebRTC stack) loads when a call starts, not
+        // with every page; it was the shell's largest chunk. A failed load
+        // lands in the same plain error as a failed connect below.
+        const { Conversation } = await import("@elevenlabs/react");
         const conversation = await Conversation.startSession({
           conversationToken: credential.token,
           connectionType: "webrtc",
