@@ -5,6 +5,7 @@ import {
   type QScreenActIntent,
   type QRecordPage,
   type QSetDiscoverFiltersIntent,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 
 import { applyTheme, storeTheme } from "@/features/appearance/theme";
@@ -75,6 +76,35 @@ export function recordPagePath(page: QRecordPage, id: string): string {
     case "COMPANY_PITCH":
       return `/discover?tab=yours&company=${safe}`;
   }
+}
+
+/**
+ * The page a card's subject opens on, or null when it has none (R0, live
+ * 2026-10-06: a card's "Open profile" was never wired and went nowhere).
+ * The page itself authorises the read as the person; this only maps.
+ */
+export function subjectPagePath(subject: QSubjectRef): string | null {
+  switch (subject.kind) {
+    case "COMPANY":
+      return recordPagePath("COMPANY", subject.companyId);
+    case "INVESTOR_ORGANISATION":
+      return recordPagePath("INVESTOR", subject.investorOrganisationId);
+    case "DOCUMENT":
+      return recordPagePath("DOCUMENT", subject.documentId);
+    default:
+      return null;
+  }
+}
+
+/** Opens a card subject's page through the app's router; false if none. */
+export function openSubjectPage(
+  subject: QSubjectRef,
+  goTo: (path: string) => void = (path) => BROWSER_EFFECTS.goTo(path),
+): boolean {
+  const path = subjectPagePath(subject);
+  if (path === null) return false;
+  goTo(path);
+  return true;
 }
 
 /**

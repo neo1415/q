@@ -27,6 +27,7 @@ import {
   fitWords,
   LEVEL_WORD,
 } from "./answer-canvas-logic";
+import { openSubjectPage, subjectPagePath } from "./client-actions";
 
 /**
  * Q's answer as cards on the Q page (C1-C3; mockup answer-canvas.html).
@@ -244,13 +245,25 @@ function AnswerCard({
               </p>
             )}
             <div className="cq-ac-actions">
-              {card.subject !== null && actions.onOpenProfile !== undefined ? (
+              {/* Wired by default (R0, live 2026-10-06: no surface passed
+                  a handler, so the button never opened anything). */}
+              {card.subject !== null &&
+              subjectPagePath(card.subject) !== null ? (
                 <button
                   type="button"
                   className="cq-ac-btn"
-                  onClick={() => actions.onOpenProfile?.(card)}
+                  data-ac-open-profile
+                  onClick={() => {
+                    if (actions.onOpenProfile !== undefined) {
+                      actions.onOpenProfile(card);
+                    } else if (card.subject !== null) {
+                      openSubjectPage(card.subject);
+                    }
+                  }}
                 >
-                  Open profile
+                  {card.subject.kind === "DOCUMENT"
+                    ? "Open document"
+                    : "Open profile"}
                 </button>
               ) : null}
               {actions.onAsk === undefined ? null : (

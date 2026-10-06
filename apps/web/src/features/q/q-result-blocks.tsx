@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   QWebsiteUrlSchema,
   type QSubjectRef,
+  type QUiCompanySection,
   type QUiIntent,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -68,17 +69,29 @@ const INTENT_ROUTES: Readonly<
       | "OPEN_SETUP"
       | "SET_DISCOVER_FILTERS"
       | "SCREEN_ACT"
+      | "OPEN_COMPANY"
+      | "FOCUS_SECTION"
     >,
     string | null
   >
 > = {
-  OPEN_COMPANY: null,
-  FOCUS_SECTION: null,
   SHOW_COMPARISON: null,
   SHOW_EVIDENCE: null,
 };
 
-function intentHref(intent: QUiIntent): string | null {
+/** The company page's tab for a section, or null for its default view. */
+const COMPANY_SECTION_TABS: Readonly<Record<QUiCompanySection, string | null>> =
+  {
+    OVERVIEW: "overview",
+    TEAM: "team",
+    PITCH: "elevator",
+    FINANCIALS: null,
+    CAPITAL_OBJECTIVE: null,
+    EVIDENCE: null,
+    DOCUMENTS: "dataroom",
+  };
+
+export function intentHref(intent: QUiIntent): string | null {
   // A named surface, through the same route map spoken navigation uses.
   if (intent.kind === "NAVIGATE") {
     return destinationPath(intent.destination);
@@ -100,6 +113,17 @@ function intentHref(intent: QUiIntent): string | null {
   if (intent.kind === "OPEN_RECORD_PAGE") {
     return recordPagePath(intent.page, intent.id);
   }
+  // The company page exists now (CQ-WEB-022) and authorises the read as
+  // the person; an OPEN_COMPANY card that went nowhere was R0 (live
+  // 2026-10-06). A section opens the page's matching tab where it has one.
+  if (intent.kind === "OPEN_COMPANY") {
+    return recordPagePath("COMPANY", intent.companyId);
+  }
+  if (intent.kind === "FOCUS_SECTION") {
+    const tab = COMPANY_SECTION_TABS[intent.section];
+    const page = recordPagePath("COMPANY", intent.companyId);
+    return tab === null ? page : `${page}?tab=${tab}`;
+  }
   if (intent.kind === "OPEN_SETUP") {
     return setupPath(intent.journey);
   }
@@ -112,9 +136,6 @@ function intentHref(intent: QUiIntent): string | null {
     return null;
   }
   switch (intent.kind) {
-    case "OPEN_COMPANY":
-    case "FOCUS_SECTION":
-      return `${route}?companyId=${encodeURIComponent(intent.companyId)}`;
     case "SHOW_COMPARISON":
       return `${route}?compare=${intent.companyIds.map(encodeURIComponent).join(",")}`;
     case "SHOW_EVIDENCE":
@@ -293,16 +314,21 @@ export function QResultBlocks({
         const key = `${block.kind}-${String(index)}`;
         switch (block.kind) {
           case "COMPANY_REFERENCE":
-            // No company detail surface exists yet, so the only real
-            // action is the one that works: keep asking Q, in this
-            // thread. An "Open" button to nowhere would be worse than
-            // the absence of one.
+            // The company page authorises the read as this person; a
+            // company they may not see is its plain not-found.
             return (
               <QResultCard
                 key={key}
                 label="Company"
                 actions={
-                  onAsk === undefined ? undefined : (
+                  <>
+                    <Link
+                      href={recordPagePath("COMPANY", block.companyId)}
+                      className={buttonClassName("secondary", "compact")}
+                    >
+                      Open the company
+                    </Link>
+                    {onAsk === undefined ? null : (
                     <button
                       type="button"
                       className={buttonClassName("quiet", "compact")}
@@ -312,7 +338,8 @@ export function QResultBlocks({
                     >
                       Ask Q about it
                     </button>
-                  )
+                    )}
+                  </>
                 }
               >
                 {/* The company's picture through its gated photo route;

@@ -21,6 +21,8 @@ import {
 } from "../src/index.js";
 import {
   COMPANY_A,
+  COMPANY_B_NETWORK,
+  COMPANY_B_PRIVATE,
   actorA,
   actorB,
   contextFor,
@@ -171,6 +173,33 @@ describe("opening a record's page", () => {
     expect(
       QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
     ).toEqual({ kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: COMPANY_A });
+  });
+
+  it("opens a network-visible company in another tenant, by id or by name (R0, Zino live 2026-10-06)", async () => {
+    for (const args of [
+      { page: "COMPANY", id: COMPANY_B_NETWORK },
+      { page: "COMPANY", name: "Beacon Analytics" },
+    ]) {
+      const outcome = await executor.execute(
+        call("open_page", args),
+        contextFor(actorA, ownPlan()),
+      );
+      expect(
+        QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+      ).toEqual({
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: COMPANY_B_NETWORK,
+      });
+    }
+  });
+
+  it("never opens another tenant's private company, even by its id", async () => {
+    const outcome = await executor.execute(
+      call("open_page", { page: "COMPANY", id: COMPANY_B_PRIVATE }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
   });
 
   it("refuses a name in place of an id", async () => {

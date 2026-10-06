@@ -612,7 +612,18 @@ export function createOpenPageTool(
               .findCanonicalCompanyProfile(id.data)
               .catch(() => null)
           : null;
-        openable = profile !== null && profile.tenantId === actor.tenantId;
+        // Their own company, or one they can already reach by hand: their
+        // relationships, Saves, feed, or the network (R0, live 2026-10-06:
+        // an investor's "open Halyard Security" -- first in his Discover --
+        // was refused because only the actor's own tenant counted). The
+        // company page authorises the read again as them.
+        const wanted = recordId;
+        openable =
+          profile !== null &&
+          (profile.tenantId === actor.tenantId ||
+            (await candidates(actor, kind, profile.canonicalName)).some(
+              (candidate) => candidate.id.toLowerCase() === wanted,
+            ));
       } else if (
         input.page === "INVESTOR" ||
         input.page === "INVESTOR_REHEARSAL"

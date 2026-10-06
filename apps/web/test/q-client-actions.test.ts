@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { QTurn } from "../src/features/q/conversation";
 import {
+  openSubjectPage,
   performClientAction,
+  subjectPagePath,
   type ClientActionEffects,
 } from "../src/features/q/client-actions";
+import { intentHref } from "../src/features/q/q-result-blocks";
 import { followOfTurns } from "../src/features/q/follow-navigation";
 import { currentScreen, setOpenDocument } from "../src/features/q/screen";
 
@@ -240,5 +243,40 @@ describe("the screen includes the document open in Q's viewer (R21)", () => {
     setOpenDocument("not-a-uuid");
     const { timeZone: _tz, ...screen } = currentScreen("/profile") ?? {};
     expect(screen).toEqual({ route: "PROFILE" });
+  });
+});
+
+describe("card and intent links to a record's page (R0, live 2026-10-06)", () => {
+  const COMPANY = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  it("a card's company or investor opens its page; other subjects open nothing", () => {
+    const went: string[] = [];
+    expect(
+      openSubjectPage({ kind: "COMPANY", companyId: COMPANY }, (path) =>
+        went.push(path),
+      ),
+    ).toBe(true);
+    expect(went).toEqual([`/company/${COMPANY}`]);
+    expect(
+      subjectPagePath({
+        kind: "INVESTOR_ORGANISATION",
+        investorOrganisationId: COMPANY,
+      }),
+    ).toBe(`/investors/${COMPANY}`);
+    expect(
+      subjectPagePath({ kind: "RELATIONSHIP", relationshipId: COMPANY }),
+    ).toBeNull();
+  });
+
+  it("OPEN_COMPANY and FOCUS_SECTION intents link to the company page", () => {
+    expect(intentHref({ kind: "OPEN_COMPANY", companyId: COMPANY })).toBe(
+      `/company/${COMPANY}`,
+    );
+    expect(
+      intentHref({
+        kind: "FOCUS_SECTION",
+        companyId: COMPANY,
+        section: "DOCUMENTS",
+      }),
+    ).toBe(`/company/${COMPANY}?tab=dataroom`);
   });
 });
