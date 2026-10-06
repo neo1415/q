@@ -19,7 +19,8 @@ import {
  * Q room R1: Q sees the whole page (sections below the fold, the tab, the
  * filters, any open window), and only what the person's own reads return.
  */
-const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const id = (n: number) =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const ALL = new Set([
   "get_company",
   "list_my_relationships",
@@ -131,13 +132,15 @@ describe("the page on their screen", () => {
       [`get_company:${id(2)}`, company(2, "Ledgerline")],
       // id(3) was refused by get_company for this person: no entry.
       [
-        'list_pending_approvals:{}',
+        "list_pending_approvals:{}",
         { items: [{ id: id(50), summary: "Express interest in Ledgerline" }] },
       ],
     ]);
     const facts = manifestFacts(discover(), results);
     const text = facts.map((fact) => fact.statement).join("\n");
-    expect(text).toMatch(/On top, an open window: a company preview, showing Ledgerline/u);
+    expect(text).toMatch(
+      /On top, an open window: a company preview, showing Ledgerline/u,
+    );
     expect(text).toContain("Clearwater Pay (seed)");
     expect(text).toContain("12 items");
     expect(text).toContain("Filters set: sector fintech");
@@ -145,7 +148,9 @@ describe("the page on their screen", () => {
     expect(text).toMatch(/further down the page/u);
     expect(text).not.toContain(id(3));
     for (const fact of facts) {
-      expect(AuthorisedFactSchema.safeParse({ ...fact, ref: "F1" }).success).toBe(true);
+      expect(
+        AuthorisedFactSchema.safeParse({ ...fact, ref: "F1" }).success,
+      ).toBe(true);
     }
   });
 
@@ -223,15 +228,22 @@ describe("the page on their screen", () => {
     const total = facts.reduce((sum, fact) => sum + fact.statement.length, 0);
     expect(total).toBeLessThanOrEqual(MANIFEST_CAP_CHARS + 400);
     expect(facts.length).toBeLessThanOrEqual(2);
-    for (const fact of facts) expect(fact.statement.length).toBeLessThanOrEqual(8_000);
+    for (const fact of facts)
+      expect(fact.statement.length).toBeLessThanOrEqual(8_000);
     // The section in view is listed first and expanded.
     const first = facts[0]?.statement ?? "";
-    expect(first.indexOf("in view now")).toBeLessThan(first.indexOf("further down"));
+    expect(first.indexOf("in view now")).toBeLessThan(
+      first.indexOf("further down"),
+    );
   });
 
   it("tells the model the whole page is in the facts", () => {
     const lines = screenLines({ route: "DISCOVER", manifest: discover() });
-    expect(lines.join("\n")).toMatch(/including below the fold and any open window/u);
-    expect(screenLines({ route: "DISCOVER" }).join("\n")).not.toMatch(/below the fold/u);
+    expect(lines.join("\n")).toMatch(
+      /including below the fold and any open window/u,
+    );
+    expect(screenLines({ route: "DISCOVER" }).join("\n")).not.toMatch(
+      /below the fold/u,
+    );
   });
 });

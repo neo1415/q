@@ -58,9 +58,16 @@ export function QRoomHarness() {
     const detail = await fetchRecord();
     if (detail !== null) setMessages(detail.messages);
   }, []);
+  // The conversation is read once as the page opens.
   useEffect(() => {
-    void read();
-  }, [read]);
+    let live = true;
+    void fetchRecord().then((detail) => {
+      if (live && detail !== null) setMessages(detail.messages);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   useQDialog(
     previewOpen,
     "preview",
@@ -121,12 +128,19 @@ export function QRoomHarness() {
             Two changes wait for you.
           </p>
         </QSection>
-        <pre className="cq-caption break-all whitespace-pre-wrap" data-harness-wire>
+        <pre
+          className="cq-caption break-all whitespace-pre-wrap"
+          data-harness-wire
+        >
           {wire}
         </pre>
       </main>
       {previewOpen ? (
-        <div role="dialog" aria-label="Clearwater preview" className="fixed inset-x-4 bottom-4 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) p-4">
+        <div
+          role="dialog"
+          aria-label="Clearwater preview"
+          className="fixed inset-x-4 bottom-4 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) p-4"
+        >
           Clearwater Pay: a seed round.
         </div>
       ) : null}

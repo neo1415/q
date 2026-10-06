@@ -162,13 +162,23 @@ describe("deep links (R2)", () => {
 
   it("follows OPEN_SETTINGS and leaves SHOW_IN_Q_ROOM to the stage", () => {
     const went: string[] = [];
-    const effects = { goTo: (path: string) => went.push(path) } as unknown as ClientActionEffects;
+    const effects = {
+      goTo: (path: string) => went.push(path),
+    } as unknown as ClientActionEffects;
     expect(
-      performClientAction({ kind: "OPEN_SETTINGS", section: "connections" }, effects),
+      performClientAction(
+        { kind: "OPEN_SETTINGS", section: "connections" },
+        effects,
+      ),
     ).toBe(true);
     expect(
       performClientAction(
-        { kind: "SHOW_IN_Q_ROOM", object: "DATA_ROOM", id: LEDGERLINE, title: "Ledgerline" },
+        {
+          kind: "SHOW_IN_Q_ROOM",
+          object: "DATA_ROOM",
+          id: LEDGERLINE,
+          title: "Ledgerline",
+        },
         effects,
       ),
     ).toBe(true);
@@ -231,7 +241,9 @@ describe("cards close when the conversation moves on (R4)", () => {
       answer(2, "Clearwater made £41k in September."),
     ]);
     expect(stage.open).toBeNull();
-    expect(stage.note?.text).toBe("Closed Ledgerline's data room as we moved on");
+    expect(stage.note?.text).toBe(
+      "Closed Ledgerline's data room as we moved on",
+    );
     expect(stage.closed.map((card) => card.intent)).toEqual([dataRoom]);
   });
 
@@ -255,7 +267,9 @@ describe("cards close when the conversation moves on (R4)", () => {
       answer(2, "Opening your chat with Tobenna.", chat),
     ]);
     expect(stage.open?.intent).toEqual(chat);
-    expect(stage.note?.text).toBe("Closed Ledgerline's data room as we moved on");
+    expect(stage.note?.text).toBe(
+      "Closed Ledgerline's data room as we moved on",
+    );
   });
 
   it("'close it' closes it, quietly", () => {
@@ -284,6 +298,8 @@ describe("cards close when the conversation moves on (R4)", () => {
 
   it("links each card to its record's page", () => {
     expect(roomCardHref(dataRoom)).toBe(`/company/${LEDGERLINE}?tab=dataroom`);
-    expect(roomCardHref(chat)).toBe(`/relationships/investor/${TOBENNA}/messages`);
+    expect(roomCardHref(chat)).toBe(
+      `/relationships/investor/${TOBENNA}/messages`,
+    );
   });
 });

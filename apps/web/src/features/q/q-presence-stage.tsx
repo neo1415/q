@@ -317,7 +317,9 @@ export function QPresenceStage({
       <QRoomStage
         open={roomOpen}
         note={room.note}
-        onClose={(card) => setClosedByHand({ key: card.key, at: card.openedAt })}
+        onClose={(card) =>
+          setClosedByHand({ key: card.key, at: card.openedAt })
+        }
         load={loadRoomCard}
       />
 

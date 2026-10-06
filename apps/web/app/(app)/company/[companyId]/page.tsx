@@ -172,7 +172,11 @@ export default async function CompanyPage({
               : []
           }
           total={dataRoom.documents.length}
-          label={tab === "dataroom" ? `data room, ${String(dataRoom.documents.length)} files` : undefined}
+          label={
+            tab === "dataroom"
+              ? `data room, ${String(dataRoom.documents.length)} files`
+              : undefined
+          }
         />
       )}
       <BackToDiscover />

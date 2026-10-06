@@ -278,7 +278,7 @@ export function screenLines(
     ...(screen.manifest === undefined
       ? []
       : [
-          "Everything on the page they are on, including below the fold and any open window, is under ON THEIR SCREEN in the facts: answer \"what's on my screen\", \"in this window\" or \"further down\" from it, and never say you can only see part of the page.",
+          'Everything on the page they are on, including below the fold and any open window, is under ON THEIR SCREEN in the facts: answer "what\'s on my screen", "in this window" or "further down" from it, and never say you can only see part of the page.',
         ]),
     ...(name === null ? [] : [HERE_LINE]),
     ...(screen.route === "DAILY" ? [DAILY_HERE_LINE] : []),

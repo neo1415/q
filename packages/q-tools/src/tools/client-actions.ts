@@ -331,9 +331,11 @@ export function createSignOutTool(): AnyQToolDefinition {
 
 export const OpenPageInputSchema = z
   .object({
-    page: z.enum([...Q_RECORD_PAGES, "SETTINGS"]).describe(
-      "COMPANY: a company's page (its Overview tab). COMPANY_ELEVATOR / COMPANY_DATA_ROOM / COMPANY_DECK / COMPANY_TEAM: that company profile's Elevator pitch, Data room, Pitch deck or Team tab ('open Ledgerline's data room'). WORK_ITEM: one of Q's work items for them, by its goal as they said it. CAPITAL_ROUND: one of their rounds on Capital, by its name ('the seed round'). GATEQ_APPLICATION: for an investor, one founder's application in their GateQ inbox, by the company's name. SETTINGS: one part of their settings, named in section. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it. COMPANY_PITCH: for an investor, a company of theirs (connected, interested or saved) in Discover's Your companies tab, with its pitch when the company shares it ('show me Nixo's pitch').",
-    ),
+    page: z
+      .enum([...Q_RECORD_PAGES, "SETTINGS"])
+      .describe(
+        "COMPANY: a company's page (its Overview tab). COMPANY_ELEVATOR / COMPANY_DATA_ROOM / COMPANY_DECK / COMPANY_TEAM: that company profile's Elevator pitch, Data room, Pitch deck or Team tab ('open Ledgerline's data room'). WORK_ITEM: one of Q's work items for them, by its goal as they said it. CAPITAL_ROUND: one of their rounds on Capital, by its name ('the seed round'). GATEQ_APPLICATION: for an investor, one founder's application in their GateQ inbox, by the company's name. SETTINGS: one part of their settings, named in section. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it. COMPANY_PITCH: for an investor, a company of theirs (connected, interested or saved) in Discover's Your companies tab, with its pitch when the company shares it ('show me Nixo's pitch').",
+      ),
     id: z
       .string()
       .uuid()
@@ -719,14 +721,18 @@ export async function ownRecord(
   ports: Pick<QToolPorts, "work" | "appActions">,
   actor: ActorContext,
   kind: OwnRecordKind,
-  wanted: { readonly id?: string | undefined; readonly name?: string | undefined },
+  wanted: {
+    readonly id?: string | undefined;
+    readonly name?: string | undefined;
+  },
 ): Promise<{ readonly id: string; readonly title: string } | null> {
-  let listed: { id: string; name: string }[] = [];
+  let listed: { id: string; name: string }[];
   if (kind === "WORK_ITEM") {
     const items = await ports.work?.list(actor).catch(() => null);
     listed = (items ?? []).map((item) => ({
       id: item.id,
-      name: item.goal ?? item.summary ?? item.kind.toLowerCase().replace(/_/g, " "),
+      name:
+        item.goal ?? item.summary ?? item.kind.toLowerCase().replace(/_/g, " "),
     }));
   } else if (kind === "CAPITAL_ROUND") {
     if (ports.appActions === undefined) return null;
@@ -751,7 +757,9 @@ export async function ownRecord(
   if (wanted.name === undefined) return null;
   const id = matchCounterpart(wanted.name, listed);
   const hit = listed.find((item) => item.id === id);
-  return hit === undefined ? null : { id: hit.id.toLowerCase(), title: hit.name };
+  return hit === undefined
+    ? null
+    : { id: hit.id.toLowerCase(), title: hit.name };
 }
 
 export const SHOW = "client.q_room.show" as const;
@@ -765,7 +773,9 @@ export const ShowInputSchema = z
       .string()
       .uuid()
       .optional()
-      .describe("The record's id exactly as a tool or the screen gave it. Never guessed."),
+      .describe(
+        "The record's id exactly as a tool or the screen gave it. Never guessed.",
+      ),
     name: z
       .string()
       .min(1)
@@ -798,7 +808,11 @@ export function createShowTool(
     | "appActions"
   >,
 ): AnyQToolDefinition {
-  return defineQTool<ShowInput, QClientActionToolResult, QClientActionToolResult>({
+  return defineQTool<
+    ShowInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
     ...COMMON,
     id: SHOW,
     providerName: "show",
@@ -810,7 +824,11 @@ export function createShowTool(
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
       if (input.object === "SOURCES") {
-        return allowed({ kind: "SHOW_IN_Q_ROOM", object: "SOURCES", title: "Sources" });
+        return allowed({
+          kind: "SHOW_IN_Q_ROOM",
+          object: "SOURCES",
+          title: "Sources",
+        });
       }
       const found = await roomRecord(ports, actor, input);
       return found === null
@@ -857,7 +875,8 @@ async function roomRecord(
         .catch(() => null);
       if (standing === null) return null;
       const title =
-        named.find((item) => item.id.toLowerCase() === id)?.name ?? "the investor";
+        named.find((item) => item.id.toLowerCase() === id)?.name ??
+        "the investor";
       return { id, title };
     }
     case "COMPANY_PROFILE":
@@ -883,7 +902,9 @@ async function roomRecord(
         const standing =
           ports.relationships === undefined
             ? null
-            : await ports.relationships.withCompany(actor, id).catch(() => null);
+            : await ports.relationships
+                .withCompany(actor, id)
+                .catch(() => null);
         if (standing === null) return null;
       }
       return { id, title: profile.canonicalName };

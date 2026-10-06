@@ -87,7 +87,12 @@ async function read(
         facts: [
           ...(profile.currentStageCode === null
             ? []
-            : [{ label: "Stage", value: profile.currentStageCode.replace(/_/g, " ") }]),
+            : [
+                {
+                  label: "Stage",
+                  value: profile.currentStageCode.replace(/_/g, " "),
+                },
+              ]),
           ...(profile.headquartersCountry === null
             ? []
             : [
@@ -217,7 +222,12 @@ async function read(
       return {
         heading: detail.work.goal ?? intent.title,
         lead: detail.work.summary,
-        facts: [{ label: "Status", value: detail.work.status.toLowerCase().replace(/_/g, " ") }],
+        facts: [
+          {
+            label: "Status",
+            value: detail.work.status.toLowerCase().replace(/_/g, " "),
+          },
+        ],
         items: lanes.slice(0, ITEMS_MAX).map((lane) => ({
           id: lane.id,
           title: lane.counterpartName,
@@ -241,10 +251,22 @@ async function read(
         lead: round.isCurrent ? "Your current round." : null,
         facts: [
           { label: "Target", value: money(round.target) ?? "" },
-          { label: "Raised", value: `${round.target.currency} ${round.sums.raised}` },
-          { label: "Confirmed", value: `${round.target.currency} ${round.sums.confirmed}` },
-          { label: "Pledged", value: `${round.target.currency} ${round.sums.pledged}` },
-          { label: "Status", value: round.status.toLowerCase().replace(/_/g, " ") },
+          {
+            label: "Raised",
+            value: `${round.target.currency} ${round.sums.raised}`,
+          },
+          {
+            label: "Confirmed",
+            value: `${round.target.currency} ${round.sums.confirmed}`,
+          },
+          {
+            label: "Pledged",
+            value: `${round.target.currency} ${round.sums.pledged}`,
+          },
+          {
+            label: "Status",
+            value: round.status.toLowerCase().replace(/_/g, " "),
+          },
         ],
         items: [],
         more: 0,
@@ -277,9 +299,15 @@ async function read(
         heading: item.companyName,
         lead: item.oneLiner,
         facts: [
-          ...(item.stage === null ? [] : [{ label: "Stage", value: item.stage }]),
-          ...(item.sector === null ? [] : [{ label: "Sector", value: item.sector }]),
-          ...(item.country === null ? [] : [{ label: "Country", value: item.country }]),
+          ...(item.stage === null
+            ? []
+            : [{ label: "Stage", value: item.stage }]),
+          ...(item.sector === null
+            ? []
+            : [{ label: "Sector", value: item.sector }]),
+          ...(item.country === null
+            ? []
+            : [{ label: "Country", value: item.country }]),
           { label: "Fit", value: item.fit.toLowerCase() },
           {
             label: "Rules met",

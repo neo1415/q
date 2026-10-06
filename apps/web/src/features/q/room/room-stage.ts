@@ -96,7 +96,8 @@ function has(text: string, phrase: string): boolean {
 export function mentions(text: string, intent: QShowInQRoomIntent): boolean {
   const { names, kinds } = subjectWords(intent);
   return (
-    names.some((name) => has(text, name)) || kinds.some((kind) => has(text, kind))
+    names.some((name) => has(text, name)) ||
+    kinds.some((kind) => has(text, kind))
   );
 }
 
@@ -186,10 +187,12 @@ export function roomStage(turns: readonly QTurn[]): RoomStage {
       const back = [...known.values()]
         .reverse()
         .find(
-          (card) =>
-            card.key !== open?.key && mentions(turn.text, card.intent),
+          (card) => card.key !== open?.key && mentions(turn.text, card.intent),
         );
-      if (back !== undefined && (open === null || !mentions(turn.text, open.intent))) {
+      if (
+        back !== undefined &&
+        (open === null || !mentions(turn.text, open.intent))
+      ) {
         if (open !== null) note = movedOn(open, turn.id);
         open = { ...back, openedAt: index };
         known.set(back.key, open);

@@ -99,7 +99,14 @@ const work = {
   list: (actor: { userId: string }) =>
     Promise.resolve(
       actor.userId === actorA.userId
-        ? [{ id: WORK, kind: "STANDING_INSTRUCTION", goal: "Follow up with every founder", summary: null }]
+        ? [
+            {
+              id: WORK,
+              kind: "STANDING_INSTRUCTION",
+              goal: "Follow up with every founder",
+              summary: null,
+            },
+          ]
         : [],
     ),
 } as never;

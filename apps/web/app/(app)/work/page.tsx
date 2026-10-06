@@ -62,13 +62,13 @@ async function WorkLists() {
           label="what needs you"
         />
       )}
-    <WorkPage
-      suggestions={suggestions?.ok === true ? suggestions.value : null}
-      approvals={approvals?.ok === true ? approvals.value : null}
-      work={work?.ok === true ? work.value : null}
-      done={done?.ok === true ? done.value : null}
-      workforce={workforce}
-    />
+      <WorkPage
+        suggestions={suggestions?.ok === true ? suggestions.value : null}
+        approvals={approvals?.ok === true ? approvals.value : null}
+        work={work?.ok === true ? work.value : null}
+        done={done?.ok === true ? done.value : null}
+        workforce={workforce}
+      />
     </>
   );
 }

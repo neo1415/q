@@ -1,12 +1,12 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import type { QScreenRoute } from "@capital-q/contracts";
 import { Eye, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
-import { manifestVersion, seeingNow, subscribeManifest } from "./manifest";
+import { seeingNow, subscribeManifest } from "./manifest";
 import { screenOf } from "./screen";
 
 /**
@@ -43,7 +43,8 @@ export function seeingLine(
   parts: readonly string[],
   window: string | null,
 ): string {
-  const shown = parts.length === 0 && route === "HOME" ? ["nothing open"] : parts;
+  const shown =
+    parts.length === 0 && route === "HOME" ? ["nothing open"] : parts;
   return [
     ROUTE_WORDS[route],
     ...shown.slice(0, 3),
@@ -52,23 +53,27 @@ export function seeingLine(
   ].join(" · ");
 }
 
+function subscribeSeeing(onChange: () => void): () => void {
+  const stop = subscribeManifest(onChange);
+  const timer = window.setInterval(onChange, WINDOW_LOOK_MS);
+  return () => {
+    stop();
+    window.clearInterval(timer);
+  };
+}
+
 export function QCanSee({ className }: { readonly className?: string }) {
   const pathname = usePathname();
-  const version = useSyncExternalStore(
-    subscribeManifest,
-    manifestVersion,
-    () => -1,
+  // The line is a string, so React compares it by value: it re-renders
+  // only when what Q can see has changed. Nothing on the server render.
+  const line = useSyncExternalStore(
+    subscribeSeeing,
+    () => {
+      const now = seeingNow();
+      return seeingLine(screenOf(pathname).route, now.parts, now.window);
+    },
+    () => null,
   );
-  const [look, setLook] = useState(0);
-  const [line, setLine] = useState<string | null>(null);
-  useEffect(() => {
-    const timer = window.setInterval(() => setLook((n) => n + 1), WINDOW_LOOK_MS);
-    return () => window.clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    const now = seeingNow();
-    setLine(seeingLine(screenOf(pathname).route, now.parts, now.window));
-  }, [pathname, version, look]);
   if (line === null) return null;
   return (
     <p
@@ -76,7 +81,12 @@ export function QCanSee({ className }: { readonly className?: string }) {
       data-q-self
       data-q-can-see
     >
-      <Eye aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} className="flex-none" />
+      <Eye
+        aria-hidden="true"
+        size={ICON_SIZE.compact}
+        strokeWidth={ICON_STROKE}
+        className="flex-none"
+      />
       <span className="flex-none">Q can see:</span>
       <span className="min-w-0 truncate">{line}</span>
     </p>

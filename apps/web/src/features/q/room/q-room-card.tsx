@@ -32,40 +32,36 @@ const EASE = [0.2, 0, 0, 1] as const;
 /** Loaded views, per card, for this tab: a reopened card is instant. */
 const loaded = new Map<string, RoomCardResult>();
 
-export type RoomCardLoader = (intent: QShowInQRoomIntent) => Promise<RoomCardResult>;
+export type RoomCardLoader = (
+  intent: QShowInQRoomIntent,
+) => Promise<RoomCardResult>;
 
 function useCardView(
   card: RoomCard,
   load: RoomCardLoader,
 ): RoomCardResult | null {
-  const [result, setResult] = useState<RoomCardResult | null>(
-    () => loaded.get(card.key) ?? null,
-  );
+  const [read, setRead] = useState<{
+    readonly key: string;
+    readonly result: RoomCardResult;
+  } | null>(null);
+  const cached = loaded.get(card.key);
   useEffect(() => {
-    if (card.intent.object === "SOURCES") return;
-    const known = loaded.get(card.key);
-    if (known !== undefined) {
-      setResult(known);
-      return;
-    }
-    setResult(null);
+    if (card.intent.object === "SOURCES" || loaded.has(card.key)) return;
     let live = true;
     void load(card.intent)
-      .catch(
-        (): RoomCardResult => ({
-          ok: false,
-          message: "This couldn't load. Ask again in a moment.",
-        }),
-      )
+      .catch((): RoomCardResult => ({
+        ok: false,
+        message: "This couldn't load. Ask again in a moment.",
+      }))
       .then((next) => {
         if (next.ok) loaded.set(card.key, next);
-        if (live) setResult(next);
+        if (live) setRead({ key: card.key, result: next });
       });
     return () => {
       live = false;
     };
   }, [card.key, card.intent, load]);
-  return result;
+  return cached ?? (read?.key === card.key ? read.result : null);
 }
 
 export function QRoomStage({
@@ -80,12 +76,12 @@ export function QRoomStage({
   readonly load?: RoomCardLoader | undefined;
 }) {
   const reduced = useReducedMotion() === true;
-  const [noteShown, setNoteShown] = useState<RoomNote | null>(null);
   // The note shows once per moving on, for a few seconds.
+  const [noteDone, setNoteDone] = useState<string | null>(null);
+  const noteShown = note !== null && noteDone !== note.id ? note : null;
   useEffect(() => {
     if (note === null) return;
-    setNoteShown(note);
-    const timer = window.setTimeout(() => setNoteShown(null), 4_000);
+    const timer = window.setTimeout(() => setNoteDone(note.id), 4_000);
     return () => window.clearTimeout(timer);
   }, [note]);
 
@@ -96,13 +92,19 @@ export function QRoomStage({
           <m.section
             key={open.key}
             layout={!reduced}
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
+            initial={
+              reduced ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }
+            }
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: reduced ? 0 : 0.24, ease: EASE }}
             className="w-full"
           >
-            <RoomCardBody card={open} load={load} onClose={() => onClose(open)} />
+            <RoomCardBody
+              card={open}
+              load={load}
+              onClose={() => onClose(open)}
+            />
           </m.section>
         )}
       </AnimatePresence>
@@ -121,7 +123,11 @@ export function QRoomStage({
               className="cq-body-sm flex items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 py-2.5 text-(--cq-text-secondary)"
               data-q-room-note
             >
-              <X aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+              <X
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
               {noteShown.text}
             </m.p>
           )}
@@ -141,7 +147,12 @@ function RoomCardBody({
   readonly onClose: () => void;
 }) {
   const result = useCardView(card, load);
-  const title = card.intent.object === "SOURCES" ? "Sources" : (result?.ok === true ? result.view.heading : card.intent.title);
+  const title =
+    card.intent.object === "SOURCES"
+      ? "Sources"
+      : result?.ok === true
+        ? result.view.heading
+        : card.intent.title;
   // R1: the open card is part of what Q sees on this page.
   const ref = cardRef(card.intent);
   useQSection(
@@ -170,14 +181,22 @@ function RoomCardBody({
           onClick={onClose}
           data-q-room-close
         >
-          <X aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+          <X
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
         </button>
       </div>
       <div className="min-h-0 overflow-y-auto p-4" data-q-room-body>
         {card.intent.object === "SOURCES" ? (
           <SourceCards sources={card.sources} />
         ) : result === null ? (
-          <div className="flex flex-col gap-2" aria-busy="true" data-q-room-loading>
+          <div
+            className="flex flex-col gap-2"
+            aria-busy="true"
+            data-q-room-loading
+          >
             <div className="h-4 w-2/3 rounded bg-(--cq-surface-subtle)" />
             <div className="h-4 w-1/2 rounded bg-(--cq-surface-subtle)" />
             <div className="h-4 w-3/5 rounded bg-(--cq-surface-subtle)" />
@@ -185,7 +204,9 @@ function RoomCardBody({
         ) : result.ok ? (
           <CardView view={result.view} />
         ) : (
-          <p className="cq-body-sm text-(--cq-text-secondary)">{result.message}</p>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {result.message}
+          </p>
         )}
       </div>
     </div>
@@ -224,8 +245,12 @@ function CardView({ view }: { readonly view: RoomCardView }) {
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
           {view.facts.map((fact) => (
             <div key={fact.label} className="flex flex-col">
-              <dt className="cq-caption text-(--cq-text-tertiary)">{fact.label}</dt>
-              <dd className="cq-body-sm text-(--cq-text-primary)">{fact.value}</dd>
+              <dt className="cq-caption text-(--cq-text-tertiary)">
+                {fact.label}
+              </dt>
+              <dd className="cq-body-sm text-(--cq-text-primary)">
+                {fact.value}
+              </dd>
             </div>
           ))}
         </dl>
@@ -234,9 +259,13 @@ function CardView({ view }: { readonly view: RoomCardView }) {
         <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
           {view.items.map((item) => (
             <li key={item.id} className="flex flex-col gap-0.5 py-2">
-              <span className="cq-body-sm text-(--cq-text-primary)">{item.title}</span>
+              <span className="cq-body-sm text-(--cq-text-primary)">
+                {item.title}
+              </span>
               {item.meta === null || item.meta === "" ? null : (
-                <span className="cq-caption text-(--cq-text-secondary)">{item.meta}</span>
+                <span className="cq-caption text-(--cq-text-secondary)">
+                  {item.meta}
+                </span>
               )}
             </li>
           ))}
@@ -280,8 +309,12 @@ function SourceCards({
             rel="noopener noreferrer"
             className="flex min-h-11 flex-col gap-0.5 rounded-(--cq-radius-md) border border-(--cq-border-subtle) px-3 py-2 hover:bg-(--cq-surface-subtle)"
           >
-            <span className="cq-body-sm text-(--cq-text-primary)">{source.title}</span>
-            <span className="cq-caption text-(--cq-text-secondary)">{source.domain}</span>
+            <span className="cq-body-sm text-(--cq-text-primary)">
+              {source.title}
+            </span>
+            <span className="cq-caption text-(--cq-text-secondary)">
+              {source.domain}
+            </span>
           </a>
         </li>
       ))}

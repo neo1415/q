@@ -80,8 +80,16 @@ async function serve(page: Page) {
           lead: "3 documents you can see.",
           facts: [],
           items: [
-            { id: uuid(51), title: "Certificate of incorporation", meta: "Open to you" },
-            { id: uuid(52), title: "Bank statements, September", meta: "On request" },
+            {
+              id: uuid(51),
+              title: "Certificate of incorporation",
+              meta: "Open to you",
+            },
+            {
+              id: uuid(52),
+              title: "Bank statements, September",
+              meta: "On request",
+            },
             { id: uuid(53), title: "Cap table", meta: "On request" },
           ],
           more: 0,
@@ -98,7 +106,11 @@ async function serve(page: Page) {
 
 const T1 = [
   asked(1, "Open Ledgerline's data room"),
-  answered(1, "Here's Ledgerline's data room. Three files are shared with you.", true),
+  answered(
+    1,
+    "Here's Ledgerline's data room. Three files are shared with you.",
+    true,
+  ),
 ];
 const T2 = [
   ...T1,

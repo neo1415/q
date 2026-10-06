@@ -61,13 +61,7 @@ export function useQSection(
   useEffect(() => {
     const [entryId, entryKind, entryRefs, entryTotal, entryLabel] = JSON.parse(
       key,
-    ) as [
-      string,
-      QManifestSectionKind,
-      QManifestRef[],
-      number,
-      string | null,
-    ];
+    ) as [string, QManifestSectionKind, QManifestRef[], number, string | null];
     return registerQSection({
       id: entryId,
       kind: entryKind,
