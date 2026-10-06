@@ -527,7 +527,9 @@ export {
 // P5 block: brand theming
 export {
   createBrandThemeStore,
+  isBrandReset,
   type BrandTheme,
+  type BrandThemeChange,
   type BrandThemeStore,
 } from "./brand-theme.js";
 // end P5 block

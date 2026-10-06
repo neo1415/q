@@ -1,5 +1,5 @@
 import type { PresenceSim } from "./presence-dynamics";
-import { DEPTH_UNITS } from "./presence-figures";
+import { DEPTH_UNITS } from "./presence-kit";
 import { presenceCounters, type Rgb } from "./presence-gl";
 import type { PresenceUniforms } from "./presence-uniforms";
 
@@ -34,6 +34,8 @@ uniform float uDepth;
 uniform float uKeep;
 uniform float uFade;
 uniform float uScale;
+uniform float uFloor;
+uniform float uLift;
 out float vA;
 out float vCore;
 void main(){
@@ -51,7 +53,7 @@ void main(){
   gl_PointSize=uPoint*aS.x*(.6+.7*near)*s*uScale;
   float r=length(q)/.8;
   vCore=1.-smoothstep(0.,1.,r);
-  vA=clamp((.38+.62*aP.w)*(.55+.45*near)*(.8+.6*vCore),0.,1.)*uFade;
+  vA=clamp((uFloor+(1.-uFloor)*aP.w)*(.55+.45*near)*(.8+uLift*vCore),0.,1.)*uFade;
 }`;
 
 const FRAGMENT = `#version 300 es
@@ -92,6 +94,8 @@ const UNIFORMS = [
   "uKeep",
   "uFade",
   "uScale",
+  "uFloor",
+  "uLift",
   "uC",
   "uW",
   "uWhite",
@@ -263,6 +267,8 @@ export function drawPresence3d(
   gl.uniform1f(g.u["uKeep"] ?? null, u.keep);
   gl.uniform1f(g.u["uFade"] ?? null, u.fade * (options.dark ? 1 : 1.25));
   gl.uniform1f(g.u["uScale"] ?? null, u.pointScale);
+  gl.uniform1f(g.u["uFloor"] ?? null, u.floor);
+  gl.uniform1f(g.u["uLift"] ?? null, u.lift);
   gl.uniform3f(g.u["uC"] ?? null, r, gr, b);
   gl.uniform3f(g.u["uW"] ?? null, 1, 0.97, 0.91);
   gl.uniform1f(g.u["uWhite"] ?? null, white * Math.max(0.5, u.core));

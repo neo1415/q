@@ -725,6 +725,7 @@ export function QConversationPanel({
                       size={40}
                       inputLevel={client.inputLevel}
                       outputLevel={client.outputLevel}
+                      travels
                     />
                   </ViewTransition>
                   <span className="cq-caption text-(--cq-text-secondary) max-sm:sr-only">
@@ -873,6 +874,8 @@ export function QConversationPanel({
                             size={44}
                             inputLevel={client.inputLevel}
                             outputLevel={client.outputLevel}
+                            face
+                            travels
                           />
                         </ViewTransition>
                       ) : (
@@ -1109,6 +1112,8 @@ export function QConversationPanel({
                     size="stage"
                     inputLevel={client.inputLevel}
                     outputLevel={client.outputLevel}
+                    face
+                    travels
                   />
                 </ViewTransition>
                 <div className="flex flex-col items-center gap-1" role="status">

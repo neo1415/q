@@ -1,7 +1,6 @@
 import {
   buildFigure,
   createFigureFrame,
-  type FaceVoice,
   type Figure,
   type FigureFrame,
   type FigureKind,
@@ -17,9 +16,10 @@ import {
  * 1. Each particle's target blends from the old figure to the new one
  *    with smootherstep easing over a duration chosen per change (shorter
  *    for a gesture, longer for a drift back to rest), staggered per
- *    particle so the swarm flows rather than marching in step. A change
- *    mid-change starts from where the targets are, never from the old
- *    figure.
+ *    particle so the swarm flows rather than marching in step, and
+ *    swirls aside on the way (a detour that is zero at both ends: K1,
+ *    "morphing", never a straight slide). A change mid-change starts from
+ *    where the targets are, never from the old figure.
  * 2. A divergence-free flow field (the curl of a moving potential) is
  *    added under every figure; its strength eases between figures, so the
  *    current never switches on or off.
@@ -47,23 +47,53 @@ const GESTURE_FIGURES: ReadonlySet<FigureKind> = new Set([
   "BUILDINGS",
   "CHART_UP",
   "CLAP",
-  "LAUGH",
-  "THINK_TILT",
-  "NOD",
-  "HANDS_EXPLAIN",
+  "HANDS",
 ]);
 
 /** Seconds a change of figure takes: variable, always bounded. */
 export function morphSeconds(to: FigureKind, roll: number): number {
   if (GESTURE_FIGURES.has(to)) return 0.55 + roll * 0.35;
   if (to === "CLOUD" || to === "ATTENTIVE") return 0.95 + roll * 0.65;
-  return 0.7 + roll * 0.5;
+  if (to === "FACE") return 1.1 + roll * 0.3;
+  return 0.85 + roll * 0.5;
 }
 
 /** smootherstep: zero velocity and acceleration at both ends. */
-function ease(x: number): number {
+export function ease(x: number): number {
   const t = x <= 0 ? 0 : x >= 1 ? 1 : x;
   return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+/** How far a change carries a particle sideways at its midpoint, frame units. */
+export const DETOUR = 0.2;
+
+/**
+ * One particle's weight through a change: 0 until its staggered start,
+ * then eased to 1. `progress` runs 0..1+STAGGER over the change.
+ */
+export function morphWeight(progress: number, stagger: number): number {
+  return ease((progress - stagger) / (1 - STAGGER));
+}
+
+/**
+ * A particle's target part-way through a change: the straight blend plus
+ * a swirl that grows and dies away (sin(pi w)), keyed to where the
+ * particle came from, so neighbours curl together like smoke. Zero
+ * detour at w = 0 and w = 1: a change starts and lands exactly.
+ */
+export function morphPoint(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  w: number,
+  t: number,
+  phase: number,
+  out: { x: number; y: number },
+): void {
+  const bell = Math.sin(Math.PI * Math.min(1, Math.max(0, w)));
+  out.x = ax + (bx - ax) * w + DETOUR * bell * Math.sin(ay * 3 + t * 2 + phase);
+  out.y = ay + (by - ay) * w + DETOUR * bell * Math.cos(ax * 3 - t * 1.7);
 }
 
 /** The flow field's potential: three travelling waves. */
@@ -121,31 +151,26 @@ export type PresenceSim = {
     t: number,
     levels: PresenceLevels,
   ) => void;
-  /** The voice the face follows. */
-  readonly setVoice: (voice: FaceVoice) => void;
 };
 
 export function createPresenceSim(options: {
   readonly count: number;
-  readonly voice: FaceVoice;
   readonly initial?: FigureKind | undefined;
   readonly seed?: number | undefined;
 }): PresenceSim {
   const count = options.count;
-  let voice = options.voice;
   let seed = (options.seed ?? 7) >>> 0;
   const random = () => {
     seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
     return seed / 4_294_967_296;
   };
 
-  const figures = new Map<string, Figure>();
+  const figures = new Map<FigureKind, Figure>();
   const figureOf = (kind: FigureKind): Figure => {
-    const key = `${kind}:${voice}`;
-    let figure = figures.get(key);
+    let figure = figures.get(kind);
     if (figure === undefined) {
-      figure = buildFigure(kind, voice, count);
-      figures.set(key, figure);
+      figure = buildFigure(kind, count);
+      figures.set(kind, figure);
     }
     return figure;
   };
@@ -179,6 +204,7 @@ export function createPresenceSim(options: {
   let nextBlink = 2 + random() * 3;
   let blinkStart = -1;
   const flow = { fx: 0, fy: 0 };
+  const blended = { x: 0, y: 0 };
 
   // Start on the figure, so the first frame is already a presence.
   figureOf(current).evaluate({ t: 0, input: 0, output: 0, blink: 0 }, toFrame);
@@ -238,9 +264,6 @@ export function createPresenceSim(options: {
     z,
     b,
     figure: () => pending ?? current,
-    setVoice: (next) => {
-      voice = next;
-    },
     setFigure: (kind) => {
       if (kind === (pending ?? current)) return;
       pending = kind;
@@ -299,10 +322,19 @@ export function createPresenceSim(options: {
         let tz = toFrame.z[i] ?? 0;
         let tb = toFrame.b[i] ?? 0;
         if (source !== null) {
-          const s = stagger[i] ?? 0;
-          const w = ease((progress - s) / (1 - STAGGER));
-          tx = (source.x[i] ?? 0) + (tx - (source.x[i] ?? 0)) * w;
-          ty = (source.y[i] ?? 0) + (ty - (source.y[i] ?? 0)) * w;
+          const w = morphWeight(progress, stagger[i] ?? 0);
+          morphPoint(
+            source.x[i] ?? 0,
+            source.y[i] ?? 0,
+            tx,
+            ty,
+            w,
+            t,
+            phase[i] ?? 0,
+            blended,
+          );
+          tx = blended.x;
+          ty = blended.y;
           tz = (source.z[i] ?? 0) + (tz - (source.z[i] ?? 0)) * w;
           tb = (source.b[i] ?? 0) + (tb - (source.b[i] ?? 0)) * w;
         }

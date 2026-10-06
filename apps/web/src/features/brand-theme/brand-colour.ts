@@ -140,6 +140,22 @@ function oklchToHex(colour: Oklch): string {
   return rgbToHex({ r: r ?? 0, g: g ?? 0, b: b ?? 0 });
 }
 
+/**
+ * A CSS `oklch(L C H)` colour (no alpha) as hex, for checking tokens.css's
+ * own values; null for anything else.
+ */
+export function oklchCssToHex(css: string): string | null {
+  const match = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)$/u.exec(
+    css.trim(),
+  );
+  if (match === null) return null;
+  return oklchToHex({
+    l: Number(match[1]),
+    c: Number(match[2]),
+    h: Number(match[3]),
+  });
+}
+
 // --- WCAG 2 contrast ---------------------------------------------------------
 
 function luminance(rgb: Rgb): number {
@@ -260,7 +276,10 @@ const HEX_ONLY = /^#[0-9a-f]{6}$/u;
  * The style sheet that applies a palette, overriding the accent tokens with
  * the same selectors tokens.css uses so it wins by source order (it is
  * rendered after the stylesheets). Q's own light (--cq-q-*) and the stage
- * accent are deliberately untouched (ADR 0017 F2: Q keeps its colour).
+ * accent are deliberately untouched (ADR 0017 F2: Q keeps its colour; a
+ * preset, not a custom colour, sets Q's light -- ADR 0051). The dark
+ * accent also becomes the menu bar's accent, since a preset's menu bar is
+ * dark in both themes.
  *
  * Every value is re-checked as a plain hex before it is written, so nothing
  * but a colour can ever reach the style element.
@@ -271,11 +290,12 @@ export function brandStyleSheet(palette: BrandPalette): string {
     if (!values.every((v) => HEX_ONLY.test(v))) return "";
     return `--cq-accent:${p.accent};--cq-accent-hover:${p.hover};--cq-accent-soft:${p.soft};`;
   };
+  const nav = palette.dark.accent;
   const light = block(palette.light);
   const dark = block(palette.dark);
-  if (light === "" || dark === "") return "";
+  if (light === "" || dark === "" || !HEX_ONLY.test(nav)) return "";
   return [
-    `:root{${light}}`,
+    `:root{${light}--cq-nav-accent:${nav};}`,
     `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dark}}}`,
     `:root[data-theme="dark"]{${dark}}`,
   ].join("\n");

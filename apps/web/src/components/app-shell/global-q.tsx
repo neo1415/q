@@ -33,6 +33,7 @@ import {
   useQSubject,
   type QSubject,
 } from "@/features/q/q-subject";
+import { QSounds } from "@/features/q-sound/q-sounds";
 
 /**
  * Q, present on every page (ADR 0017 F1): the one conversation store, the
@@ -214,6 +215,7 @@ export function GlobalQProvider({
           <GlobalQSheet />
           <GlobalQRunner />
           <AnswerChip />
+          <QSounds />
           {dock}
         </GlobalQContext.Provider>
       </QSessionProvider>

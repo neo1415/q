@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 
 import { useQMotion } from "../q-aperture/q-motion";
 import type { QApertureState } from "../q-aperture/aperture-state";
-import { useVoicePreference } from "../voice/voice-preference";
-import { createPresenceMachine } from "./presence-machine";
+import { FINE_FIGURES } from "./presence-figures";
+import { createPresenceMachine, faceAllowed } from "./presence-machine";
 import { createPresenceSim, MAX_DT } from "./presence-dynamics";
 import {
   budgetSettings,
@@ -34,10 +34,14 @@ export { particleCount } from "./presence-budget";
  * is missing, or the device asks for light work, the 2D swarm draws the
  * same particles flat.
  *
- * The face follows the chosen voice: female voice, female face. Below
- * 72 px a face cannot be read, so small sizes keep to the cloud, the
- * listening lean and the orbit. Reduced motion draws each figure still,
- * in one turned pose. Off screen or in a hidden tab, nothing runs.
+ * The free shapes (K1) carry Q's state: cloud, spiral, ring, wave, the
+ * Q mark in knots of light, a ribbon on arrival. The human face (K2,
+ * ADR 0051) shows only while Q speaks, and only where the caller says the
+ * surface is the Q page's own presence (`face`) at 160 px or more; every
+ * other surface has no face. Below 72 px only the cloud, the listening
+ * lean, the spiral and the ring are drawn. Reduced motion draws each
+ * figure still, in one turned pose. Off screen or in a hidden tab,
+ * nothing runs.
  */
 
 type Renderer = "pending" | "3d" | "2d";
@@ -48,23 +52,36 @@ export function QSwarm({
   pixels,
   inputLevel,
   outputLevel,
+  face = false,
+  travels = false,
 }: {
   readonly state: QApertureState;
   readonly pixels: number;
   readonly inputLevel?: (() => number) | undefined;
   readonly outputLevel?: (() => number) | undefined;
+  /** This surface is the Q page's own presence: it may show the face. */
+  readonly face?: boolean | undefined;
+  /** Q travels to this surface (dock, Q page): a ribbon on arrival. */
+  readonly travels?: boolean | undefined;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const face = useVoicePreference();
   const environment = useQMotion();
   const { motion, bloom } = environment;
   // Motion Off still deserves the 3D still; only a device asking for
   // light work (Save-Data, low memory, forced colours) keeps to 2D.
   const allow3d = environment.gpu || motion === "off";
-  const live = useRef({ state, inputLevel, outputLevel, face, motion, bloom });
+  const showsFace = faceAllowed({ face, pixels });
+  const live = useRef({
+    state,
+    inputLevel,
+    outputLevel,
+    showsFace,
+    motion,
+    bloom,
+  });
   useEffect(() => {
-    live.current = { state, inputLevel, outputLevel, face, motion, bloom };
-  }, [state, inputLevel, outputLevel, face, motion, bloom]);
+    live.current = { state, inputLevel, outputLevel, showsFace, motion, bloom };
+  }, [state, inputLevel, outputLevel, showsFace, motion, bloom]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -81,11 +98,11 @@ export function QSwarm({
     };
     fit(1);
     const small = pixels < 72;
-    const machine = createPresenceMachine();
+    const machine = createPresenceMachine({ arrive: travels });
     const sim = createPresenceSim({
       count: scaledParticleCount(pixels, navigator.hardwareConcurrency),
-      voice: live.current.face,
-      initial: "CLOUD",
+      // Small surfaces never show the ribbon: they start as the cloud.
+      initial: travels && !small ? "RIBBON" : "CLOUD",
       seed: pixels * 7 + 3,
     });
 
@@ -148,8 +165,12 @@ export function QSwarm({
     const frame = (now: number) => {
       const began = performance.now();
       const current = live.current;
-      sim.setVoice(current.face);
-      const view = machine.step({ state: current.state, small, now });
+      const view = machine.step({
+        state: current.state,
+        small,
+        now,
+        face: current.showsFace,
+      });
       const moving = current.motion === "full";
       const interval = last === 0 ? 0 : now - last;
       if (moving) {
@@ -205,7 +226,12 @@ export function QSwarm({
         if (!drawn) setRenderer("2d");
       }
       if (renderer === "2d") {
-        drawPresence(context, sim, { pixels: device, colour, dim: view.dim });
+        drawPresence(context, sim, {
+          pixels: device,
+          colour,
+          dim: view.dim,
+          fine: FINE_FIGURES.has(sim.figure()),
+        });
       }
       if (moving && renderer !== "pending") {
         const before = budget.level;
@@ -307,7 +333,7 @@ export function QSwarm({
       visibility.disconnect();
       document.removeEventListener("visibilitychange", onHidden);
     };
-  }, [pixels, allow3d]);
+  }, [pixels, allow3d, travels]);
 
   // A state or motion change restarts a stopped loop (reduced motion, or
   // after a hidden tab).

@@ -17,6 +17,7 @@ import { SignOutButton } from "@/features/auth";
 import { GmailConnection } from "@/features/integrations/gmail-connection";
 import { QEmailAddress } from "@/features/integrations/q-email-address";
 import { QMotionToggle } from "@/features/q-aperture";
+import { SoundSetting } from "@/features/q-sound/sound-setting";
 import { DailySetting } from "@/features/daily/daily-setting";
 import { MyGuide } from "@/features/etiquette/my-guide";
 import {
@@ -146,10 +147,13 @@ export default async function SettingsPage({
             <SettingRow term="Q motion" hint="How much Q's light moves">
               <QMotionToggle size="touch" />
             </SettingRow>
+            <SettingRow term="Sounds" hint="Q's small sounds on this device">
+              <SoundSetting />
+            </SettingRow>
             {canBrand ? (
               <SettingRow
-                term="Brand colour"
-                hint="For everyone on Capital Q · admins only"
+                term="Brand"
+                hint="Black and gold or blue, for everyone · admins only"
               >
                 <RowLink href="/admin/brand">Customise</RowLink>
               </SettingRow>
