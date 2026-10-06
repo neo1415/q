@@ -510,10 +510,13 @@ export async function stepPitch(page, c) {
     await R.getByRole("button", { name: "Save" }).click();
     await page.waitForTimeout(5000);
   }
-  const sw = R.getByRole("switch", { name: "Let investors download my pitch" });
+  // Fresh page so the switch saves on the version the title save produced.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(7000);
+  const sw = page.getByRole("region", { name: "Who sees it" }).getByRole("switch", { name: "Let investors download my pitch" });
   if ((await sw.getAttribute("aria-checked")) !== "true") {
     await sw.click();
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(5000);
   }
   const after = (await lib.call(lib.API, token, "GET", `/v1/companies/${s.companyId}/pitch`)).body.pitch;
   log(c, `pitch ${after.status} ${after.playbackPolicy} ${after.audience} downloadable=${after.downloadable}`);

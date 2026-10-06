@@ -65,6 +65,11 @@ export async function addSectorCategories(page, names) {
       continue;
     }
     const box = d.getByRole("textbox", { name: "Add" });
+    // Eight is the cap: the search box disappears when it is reached.
+    if (!(await box.isVisible().catch(() => false))) {
+      out.push(`${name}: skipped (8 max)`);
+      continue;
+    }
     await box.fill(name);
     await page.waitForTimeout(1800);
     const pick = d.getByRole("button", { name, exact: true }).first();
@@ -94,8 +99,13 @@ export async function uploadImage(page, buttonName, file) {
   await page.waitForTimeout(2500);
   const d = page.getByRole("dialog").first();
   await d.getByRole("button", { name: /^Save/ }).click();
-  await page.waitForTimeout(6000);
-  return (await page.getByRole("status").allInnerTexts()).filter(Boolean).join(" | ");
+  let text = "";
+  for (let i = 0; i < 20; i += 1) {
+    await page.waitForTimeout(2000);
+    text = (await page.getByRole("status").allInnerTexts()).filter(Boolean).join(" | ");
+    if (/updated/i.test(text) && !/Saving/i.test(text)) break;
+  }
+  return text;
 }
 
 /** The welcome screen: choose typing and the founder journey (no voice). */

@@ -209,7 +209,10 @@
         "capital": true,
         "documents": true,
         "q": true,
-        "team": true
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "profile": true
       },
       "team": [
         {
@@ -227,13 +230,43 @@
           "userId": "854707ab-c15b-49da-a29a-fa4d10599d8f",
           "role": "MEMBER"
         }
-      ]
+      ],
+      "pitchId": "d93bb9a2-124b-4426-800d-ca35da8ef601",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     },
     "07": {
       "company": "Portside",
       "founderUserId": "e88832b0-7cf5-4be9-ac11-0663ad1a903a",
       "deckViaOnboarding": true,
-      "founderCount": 1
+      "founderCount": 1,
+      "companyId": "7b62eab6-39b9-4cb6-884a-878301f6928f",
+      "organisationId": "a1622b44-1f15-4658-b781-3fb570022dec",
+      "done": {
+        "onboarding": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "pitch": true,
+        "profile": true
+      },
+      "team": [
+        {
+          "name": "Folake Adeyemi",
+          "userId": "24e091a7-58cf-42af-8837-43bf01da8336",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Tunde Balogun",
+          "userId": "e02c2021-9434-4934-bb43-7a8962e70495",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "6446ecd8-59c6-40df-b704-6b8e2f0a5be8",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     }
   }
 }
