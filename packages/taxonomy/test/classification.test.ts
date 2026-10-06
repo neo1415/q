@@ -219,7 +219,7 @@ describe("contracts (§181)", () => {
     ).toBe(false);
     expect(TAXONOMY_CLASSIFIER_PROVIDER).toBe("capital_q");
     expect(TAXONOMY_CLASSIFIER_MODEL).toBe("deterministic_lexical");
-    expect(TAXONOMY_CLASSIFIER_VERSION).toBe("taxonomy-lexical-v1");
+    expect(TAXONOMY_CLASSIFIER_VERSION).toBe("taxonomy-lexical-v2");
     expect(policy.version).toBe(TAXONOMY_CLASSIFIER_VERSION);
   });
 
@@ -353,6 +353,20 @@ describe("scoring formula taxonomy-lexical-v1 (§37-39)", () => {
       policy,
     );
     expect(short.score).toBe(0);
+    // v2 (F1): no query token in the candidate and weak similarity is not a
+    // suggestion ("Education" for an invoicing description).
+    const unrelated = lexicalScore(
+      {
+        queryTokens: ["invoice", "vat", "returns"],
+        candidateTokens: ["education"],
+        candidateText: "education",
+        wordSimilarity: 0.4,
+        field: "display_name",
+      },
+      policy,
+    );
+    expect(unrelated.matchedTokens).toBe(0);
+    expect(unrelated.score).toBeLessThan(policy.lexical.candidateMinimumScore);
     expect(
       lexicalScore(
         {

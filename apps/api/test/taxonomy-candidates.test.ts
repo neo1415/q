@@ -137,7 +137,7 @@ describe("POST /v1/taxonomy/candidates", () => {
     expect(body.classifier).toEqual({
       provider: "capital_q",
       model: "deterministic_lexical",
-      version: "taxonomy-lexical-v1",
+      version: "taxonomy-lexical-v2",
     });
     expect(calls).toEqual([
       {

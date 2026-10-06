@@ -31,6 +31,13 @@ export function TaxonomyStep({
     step.selected,
   );
   const [error, setError] = useState<string | undefined>(undefined);
+  // F2: a founder whose description does not use a category's words
+  // searches for it; the same deterministic classifier answers.
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [found, setFound] = useState<
+    readonly TaxonomyCandidateView[] | undefined
+  >(undefined);
   const { sourceText } = step;
   const { findTaxonomyCandidates } = actions;
 
@@ -59,6 +66,19 @@ export function TaxonomyStep({
       cancelled = true;
     };
   }, [sourceText, findTaxonomyCandidates]);
+
+  async function search() {
+    const text = query.trim();
+    if (text.length < 2) return;
+    setSearching(true);
+    try {
+      setFound(await findTaxonomyCandidates(text));
+    } catch {
+      setFound([]);
+    } finally {
+      setSearching(false);
+    }
+  }
 
   const isSelected = (nodeId: string) =>
     selected.some((item) => item.nodeId === nodeId);
@@ -94,6 +114,9 @@ export function TaxonomyStep({
     ...selected,
     ...(candidates ?? []).filter((candidate) => !isSelected(candidate.nodeId)),
   ];
+  const searchResults = (found ?? []).filter(
+    (candidate) => !offered.some((item) => item.nodeId === candidate.nodeId),
+  );
 
   return (
     <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -144,6 +167,82 @@ export function TaxonomyStep({
             Up to {step.maxItems}. Suggestions come from the words you used;
             only what you keep is recorded.
           </p>
+          <div className="flex flex-col gap-2" data-taxonomy-search>
+            <label
+              htmlFor="taxonomy-search"
+              className="cq-label text-(--cq-text-primary)"
+            >
+              Search for a category
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="taxonomy-search"
+                type="search"
+                value={query}
+                maxLength={200}
+                placeholder="For example: fintech, tax, insurance"
+                className="min-h-11 flex-1 rounded-[10px] border border-(--cq-border-strong) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary)"
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  // Enter searches; it never submits the step.
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void search();
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="regular"
+                disabled={busy || searching || query.trim().length < 2}
+                onClick={() => void search()}
+              >
+                Search
+              </Button>
+            </div>
+            {found === undefined ? null : searchResults.length === 0 ? (
+              <p
+                className="cq-body-sm text-(--cq-text-secondary)"
+                role="status"
+              >
+                {searching ? "Searching…" : "No other categories matched."}
+              </p>
+            ) : (
+              <ul
+                className="flex flex-wrap gap-2"
+                aria-label="Categories found"
+              >
+                {searchResults.map((candidate) => (
+                  <li key={candidate.nodeId}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="compact"
+                      aria-pressed={false}
+                      disabled={busy || selected.length >= step.maxItems}
+                      onClick={() => toggle(candidate)}
+                      title={candidate.reason}
+                    >
+                      {candidate.label}
+                      <span className="sr-only">
+                        , {candidate.vocabularyLabel}
+                      </span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {selected.length >= step.maxItems ? (
+              <p
+                className="cq-caption text-(--cq-text-secondary)"
+                role="status"
+              >
+                That&apos;s the most you can keep ({step.maxItems}). Remove one
+                to add another.
+              </p>
+            ) : null}
+          </div>
         </fieldset>
       )}
       {loadError !== undefined ? (

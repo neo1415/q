@@ -1,13 +1,15 @@
 import type { TaxonomyClassificationPolicy } from "./policy.js";
 
 /**
- * The lexical scoring formula of taxonomy-lexical-v1, in one place.
+ * The lexical scoring formula of taxonomy-lexical-v2, in one place.
  *
  *   coverage = credited candidate tokens / candidate tokens
  *              (exact token = 1; prefix of length >= minPrefixLength either
  *               way = prefixTokenCredit)
  *   blend    = tokenWeight * coverage + similarityWeight * wordSimilarity
- *   score    = fieldWeight * max(blend, wordSimilarity)
+ *   score    = fieldWeight * max(blend, standalone)
+ *   standalone = wordSimilarity, when a query token matched or
+ *                wordSimilarity >= unmatchedSimilarityFloor; else 0 (v2)
  *
  * wordSimilarity is pg_trgm word_similarity(candidate, query): how well the
  * candidate label appears anywhere in the query, typo-tolerant. Taking the
@@ -85,7 +87,13 @@ export function lexicalScore(
   const blend =
     policy.lexical.tokenWeight * coverage +
     policy.lexical.similarityWeight * similarity;
-  const score = fieldWeight * Math.max(blend, similarity);
+  // v2 (F1): with no query token in the candidate, similarity stands on its
+  // own only when strong; otherwise only the blend counts.
+  const standalone =
+    matched > 0 || similarity >= policy.lexical.unmatchedSimilarityFloor
+      ? similarity
+      : 0;
+  const score = fieldWeight * Math.max(blend, standalone);
   return {
     score: round4(clamp01(score)),
     matchedTokens: matched,
