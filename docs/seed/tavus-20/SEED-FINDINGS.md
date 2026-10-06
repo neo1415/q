@@ -99,3 +99,7 @@ Found while seeding the 20 fictional companies into production through the real 
 - The only raise-sharing control is per relationship (`shareRaiseAction(companyId, relationshipId)` on `/company/visibility`), and the page states "Your raise: Private to your company ... it is never shown to the network or the public." There is no network-wide raise share in the product or API. Making the raise network-visible would change a founder-private disclosure rule (CLAUDE.md: founder-private information never silently reaches investors); it needs an ADR / PADL decision, not a seed workaround. Seed leaves raises private; investors see "Raising: Not shared" until a founder shares it with a relationship.
 - Pitches: switched to audience "Everyone on Capital Q" (NETWORK) through the pitch editor, since Explore lists only NETWORK pitches.
 
+### Note (tooling, not a product bug): non-ASCII file names
+- In this environment Playwright does not deliver a file whose name contains "ã" to the browser's file input (no change event), so the upload silently never starts. Verified the product accepts the same file under an ASCII name. Seed uploads such files under their ASCII spelling and renames them in Documents → Rename to the true title (e.g. "Key customer contract summary: São Paulo construtora (name withheld)").
+- Also not a product bug: one Ferrolith setup save said "Your session ended" because the seed reset that account's password (lead's request) mid-run, which ends its sessions.
+

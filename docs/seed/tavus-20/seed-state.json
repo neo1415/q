@@ -39,7 +39,41 @@
     },
     "11": {
       "company": "Ferrolith",
-      "founderUserId": "d46121b6-b34e-4b84-be94-1109558297a3"
+      "founderUserId": "d46121b6-b34e-4b84-be94-1109558297a3",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "742e15e5-db75-4a55-b4b6-1c87ffb252d6",
+      "organisationId": "ec2d6a07-5fdb-44ee-b0f1-0ba5b7d26a3e",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Dr Anna Weber",
+          "userId": "875e0742-e554-4368-9de0-4643c7635125",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Lukas Hoffmann",
+          "userId": "2c2127df-2800-4ddd-a4a2-42530ed08000",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Sabine Richter",
+          "userId": "b7e9b290-9d5c-4009-a1d7-488d132c62c3",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "f67359f7-eaed-460a-9045-5184c1418a17",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     },
     "12": {
       "company": "Shiftwell",
@@ -351,7 +385,39 @@
       "company": "MedTrail",
       "founderUserId": "3545fbda-98be-4055-af13-065289a8a993",
       "deckViaOnboarding": true,
-      "founderCount": 2
+      "founderCount": 2,
+      "companyId": "b5280fd1-c2ee-4824-8658-09529453f7be",
+      "organisationId": "c565d83a-726c-4941-86d2-7aac0a7c1e3a",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Ngozi Okeke",
+          "userId": "2978513d-191a-497b-a17d-2d654c40477d",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Yetunde Fashola",
+          "userId": "73b5c061-4322-4325-a431-047881e7cc13",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Samuel Etim",
+          "userId": "e8caf117-e403-4d8c-98de-c5d6bd92c6d6",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "0b18f34f-e22d-432d-88c4-e4d1b19e65fe",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     },
     "09": {
       "company": "Baridi",

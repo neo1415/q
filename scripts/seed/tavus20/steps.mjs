@@ -123,7 +123,7 @@ async function onboardingForm(page, c) {
     } else if (/What do you already have/.test(head)) {
       const deck = join(lib.assetDir(c), "deck.pdf");
       if (!deckDone.v && existsSync(deck)) {
-        const staged = stageFile(c, deck, `${c.company} deck.pdf`);
+        const staged = stageFile(c, deck, `${ascii(c.company)} deck.pdf`);
         await page.getByRole("combobox", { name: "What is this?" }).selectOption({ label: "Pitch deck" });
         await page.locator("main input[type=file]").first().setInputFiles(staged);
         deckDone.v = true;
@@ -224,6 +224,8 @@ function growthBand(c) {
   const g = a / b - 1;
   return g >= 1 ? "More than doubled" : g >= 0.5 ? "Grew 50–100%" : g > 0 ? "Grew under 50%" : "Flat or down";
 }
+
+const ascii = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "-");
 
 function stageFile(c, src, name) {
   const dir = join(STAGE_DIR, nn(c));
@@ -400,7 +402,7 @@ export async function stepDocuments(page, c) {
   const deckTitle = `${c.company} ${plan.STAGE_LABEL[c.currentStageCode].toLowerCase()} deck (Oct 2026)`;
   const deckDoc = (dr0.documents ?? []).find((d) => d.kind && /deck/i.test(d.title));
   if (!deckDoc && !have.has(deckTitle)) {
-    const staged = stageFile(c, join(lib.assetDir(c), "deck.pdf"), `${deckTitle}.pdf`);
+    const staged = stageFile(c, join(lib.assetDir(c), "deck.pdf"), `${ascii(deckTitle)}.pdf`);
     const [fc] = await Promise.all([
       page.waitForEvent("filechooser", { timeout: 15000 }),
       page.getByRole("button", { name: "Upload" }).first().click(),
@@ -414,7 +416,10 @@ export async function stepDocuments(page, c) {
   const todo = [];
   c.dataRoom.forEach((d, i) => {
     const title = d.title.replace(/[/\\]/g, "-");
-    if (!have.has(title.normalize("NFC")) && files[i]) todo.push(stageFile(c, join(drDir, files[i]), `${title}.pdf`));
+    // Playwright cannot hand a non-ASCII file name to the browser here, so
+    // such a file goes up under its ASCII spelling and is renamed in the UI.
+    if (!have.has(title.normalize("NFC")) && !have.has(ascii(title)) && files[i])
+      todo.push(stageFile(c, join(drDir, files[i]), `${ascii(title)}.pdf`));
   });
   if (todo.length) {
     await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
@@ -427,6 +432,21 @@ export async function stepDocuments(page, c) {
     await page.waitForTimeout(8000 + todo.length * 2500);
   }
   log(c, `documents: uploaded ${todo.length} data-room files`);
+  for (const d of c.dataRoom) {
+    const title = d.title.replace(/[/\\]/g, "-");
+    if (ascii(title) === title) continue;
+    await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(6000);
+    const actions = page.getByRole("button", { name: `Actions for ${ascii(title)}` });
+    if (!(await actions.count())) continue;
+    await actions.first().click();
+    await page.getByRole("menuitem", { name: "Rename…" }).click();
+    const dlg = page.getByRole("dialog").first();
+    await dlg.getByRole("textbox").first().fill(title);
+    await dlg.getByRole("button", { name: "Save name" }).click();
+    await page.waitForTimeout(3000);
+    log(c, `renamed to ${title}`);
+  }
   // Deck: rename (onboarding uploads keep the file name) and make it downloadable.
   await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
