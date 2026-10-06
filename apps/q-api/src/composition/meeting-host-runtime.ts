@@ -290,6 +290,9 @@ type Session = {
   ticker: NodeJS.Timeout | null;
   lastEventAt: number;
   proposals: number;
+  /** Counts only, for the logs: lines heard, and turns addressed to Q. */
+  utterances: number;
+  addressed: number;
 };
 
 const LINES_KEPT = 200;
@@ -415,6 +418,8 @@ export function createMeetingHostRuntime(dependencies: {
           ticker: null,
           lastEventAt: now(),
           proposals: 0,
+          utterances: 0,
+          addressed: 0,
         };
         sessions.set(meetingId, session);
         const every =
@@ -444,6 +449,17 @@ export function createMeetingHostRuntime(dependencies: {
 
   function close(session: Session): void {
     if (session.ticker !== null) clearInterval(session.ticker);
+    // Counts, never words: whether Q heard the call and was asked anything.
+    logger?.info?.(
+      {
+        meetingId: session.meetingId,
+        utterances: session.utterances,
+        addressed: session.addressed,
+        modelCalls: session.host.modelCalls(),
+        spokenChars: session.host.spentChars(),
+      },
+      "meeting host session closed",
+    );
     sessions.delete(session.meetingId);
     void saveHeard(session, true);
   }
@@ -677,20 +693,31 @@ export function createMeetingHostRuntime(dependencies: {
         return;
       case "COMPOSE": {
         const askedAt = now();
-        const result = await composer.turn(attribution(session), {
-          mode: "ANSWER",
-          meeting: sharedMeetingText(session.context),
-          roster: session.host
-            .roster()
-            .map(
-              (r) =>
-                `- ${r.name}${r.organisation === null ? "" : `, ${r.organisation}`}`,
-            )
-            .join("\n"),
-          transcript: session.lines.join("\n").slice(-24_000),
-          speaker: action.speaker.slice(0, 200),
-          utterance: action.utterance.slice(0, 2_000),
-        });
+        session.addressed += 1;
+        // P4: a turn that throws (the etiquette read, the gateway) must never
+        // leave the host "composing" forever -- Q would never answer again.
+        const result = await composer
+          .turn(attribution(session), {
+            mode: "ANSWER",
+            meeting: sharedMeetingText(session.context),
+            roster: session.host
+              .roster()
+              .map(
+                (r) =>
+                  `- ${r.name}${r.organisation === null ? "" : `, ${r.organisation}`}`,
+              )
+              .join("\n"),
+            transcript: session.lines.join("\n").slice(-24_000),
+            speaker: action.speaker.slice(0, 200),
+            utterance: action.utterance.slice(0, 2_000),
+          })
+          .catch((error: unknown) => {
+            logger?.warn(
+              { err: error, meetingId: session.meetingId },
+              "meeting host turn threw",
+            );
+            return null;
+          });
         // A decline or a proposal is spoken in Capital Q's fixed words,
         // never the model's; a proposal is noted for the organiser to
         // approve after the call and never acted on in it.
@@ -810,6 +837,10 @@ export function createMeetingHostRuntime(dependencies: {
       if (session === null) return;
       session.lastEventAt = now();
       if (event.kind === "UTTERANCE") {
+        session.utterances += 1;
+        if (session.utterances === 1) {
+          logger?.info?.({ meetingId }, "meeting host hears the call's words");
+        }
         session.lines.push(`${event.participant.name}: ${event.text}`);
         if (session.lines.length > LINES_KEPT) session.lines.shift();
         // Q's own voice is recorded from what it said, not the captions.

@@ -196,6 +196,7 @@ export {
   HOST_REFUSAL,
   HOST_UNAVAILABLE,
   matchParty,
+  onlyCallsQ,
   type CallParticipant,
   type HostAction,
   type HostContext,
