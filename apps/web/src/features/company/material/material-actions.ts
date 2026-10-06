@@ -17,6 +17,7 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   DATA_ROOM_GRANT_DAYS,
   DataRoomLevelSchema,
+  SetDataRoomLevelRequestSchema,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -174,16 +175,29 @@ export async function setLevelAction(input: {
   readonly documentId: string;
   readonly level: string;
   readonly version: number;
+  /** F10: file it in a folder, and (optionally) as a checklist item. */
+  readonly folderCode?: string | undefined;
+  readonly checklistItemCode?: string | null | undefined;
 }): Promise<MaterialResult> {
   const documentId = Id.safeParse(input.documentId);
   const level = DataRoomLevelSchema.safeParse(input.level);
+  const filing = SetDataRoomLevelRequestSchema.pick({
+    folderCode: true,
+    checklistItemCode: true,
+  }).safeParse({
+    ...(input.folderCode === undefined ? {} : { folderCode: input.folderCode }),
+    ...(input.checklistItemCode === undefined
+      ? {}
+      : { checklistItemCode: input.checklistItemCode }),
+  });
   const api = await session();
-  if (!documentId.success || !level.success || api === null)
+  if (!documentId.success || !level.success || !filing.success || api === null)
     return failed("That didn't save. Try again.");
   try {
     await setDataRoomLevel(api, documentId.data, {
       level: level.data,
       expectedVersion: input.version,
+      ...filing.data,
     });
     revalidatePath(`/company/${input.companyId}`);
     return { ok: true, value: undefined };
