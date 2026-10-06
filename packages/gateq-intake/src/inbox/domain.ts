@@ -417,7 +417,10 @@ export function suggestedReason(read: QualificationRead): GateqPassReason {
     RAISE_SIZE: "CHEQUE_DOES_NOT_FIT",
     CHEQUE_COMPATIBILITY: "CHEQUE_DOES_NOT_FIT",
   };
-  return (missed === undefined ? undefined : byDimension[missed.dimension]) ?? "OTHER";
+  return (
+    (missed === undefined ? undefined : byDimension[missed.dimension]) ??
+    "OTHER"
+  );
 }
 
 /**

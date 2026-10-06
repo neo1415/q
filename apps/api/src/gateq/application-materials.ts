@@ -23,6 +23,16 @@ export type ApplicationMaterialsDependencies = {
     readonly token: string;
     readonly documentId: string;
   }) => Promise<void>;
+  /**
+   * F2: record that this signed-in founder sent the application, so their
+   * GateQ page can show where it stands. Absent: no link is kept.
+   */
+  readonly link?:
+    | ((input: {
+        readonly token: string;
+        readonly actor: ActorContext;
+      }) => Promise<void>)
+    | undefined;
 };
 
 export class MaterialNotSharableError extends Error {
@@ -53,6 +63,10 @@ export function createApplicationMaterials(
       for (const documentId of unique) {
         await dependencies.attach({ token: input.sessionToken, documentId });
       }
+      await dependencies.link?.({
+        token: input.sessionToken,
+        actor: input.actor,
+      });
       return { attached: unique.length };
     },
   };

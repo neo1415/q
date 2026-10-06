@@ -438,3 +438,4 @@ export {
   removeMyEtiquetteGuide,
   saveMyEtiquetteGuide,
 } from "./etiquette.js";
+export * from "./gateq-inbox.js";

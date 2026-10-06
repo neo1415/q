@@ -132,3 +132,8 @@ export {
   ownGatewayIdFrom,
 } from "./inbox/compose.js";
 export { createStartupAlerts, type StartupAlerts } from "./find/alerts.js";
+export {
+  createPostgresApplicationFounders,
+  type ApplicationFounders,
+  type FounderApplication,
+} from "./infrastructure/postgres-application-founders.js";

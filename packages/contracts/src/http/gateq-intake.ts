@@ -150,7 +150,8 @@ export const ShareApplicationMaterialsRequestSchema = z
   .object({
     /** The application's guest credential, from the form's memory. */
     sessionToken: z.string().min(16).max(128),
-    documentIds: z.array(z.string().uuid()).min(1).max(10),
+    /** May be empty: Send still links the application to the signed-in founder. */
+    documentIds: z.array(z.string().uuid()).max(10),
   })
   .strict();
 export type ShareApplicationMaterialsRequest = z.infer<

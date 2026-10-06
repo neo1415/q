@@ -31,10 +31,17 @@ const TYPE_WORDS: Readonly<Record<string, string>> = {
 export async function founderFormContext(): Promise<FounderFormContext> {
   const user = await getSessionUser().catch(() => null);
   if (user === null) {
-    return { signedIn: false, prefill: null, needsCompany: false, materials: [] };
+    return {
+      signedIn: false,
+      prefill: null,
+      needsCompany: false,
+      materials: [],
+    };
   }
   const session = await apiSession();
-  const context = await resolveOwnContext().catch(() => ({ kind: "NONE" as const }));
+  const context = await resolveOwnContext().catch(() => ({
+    kind: "NONE" as const,
+  }));
   if (session === null || context.kind !== "FOUNDER") {
     // An investor or a person with no company applies like anyone else.
     return {

@@ -304,3 +304,26 @@ export const GateqInboxChangedDtoSchema = z
   .object({ changed: z.number().int().min(0), deduplicated: z.boolean() })
   .strict();
 export type GateqInboxChangedDto = z.infer<typeof GateqInboxChangedDtoSchema>;
+
+/** F2: a signed-in founder's own GateQ applications. */
+export const GATEQ_MY_APPLICATIONS_PATH = "/v1/gateq/my-applications" as const;
+
+export const FounderApplicationDtoSchema = z
+  .object({
+    applicationId: z.string().uuid(),
+    fund: z.string().max(200),
+    sentAt: z.string(),
+    /** Only what the investor sent back; never whether they opened it. */
+    status: z.enum(["SENT", "REPLIED", "PASSED"]),
+    reasonCode: GateqPassReasonSchema.nullable(),
+    message: z.string().max(2000).nullable(),
+  })
+  .strict();
+export type FounderApplicationDto = z.infer<typeof FounderApplicationDtoSchema>;
+
+export const FounderApplicationListDtoSchema = z
+  .object({ applications: z.array(FounderApplicationDtoSchema).max(100) })
+  .strict();
+export type FounderApplicationListDto = z.infer<
+  typeof FounderApplicationListDtoSchema
+>;

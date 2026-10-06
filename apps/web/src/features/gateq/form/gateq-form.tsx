@@ -81,7 +81,11 @@ import {
  * lean on.
  */
 
-const icon = { size: ICON_SIZE.compact, strokeWidth: ICON_STROKE, "aria-hidden": true } as const;
+const icon = {
+  size: ICON_SIZE.compact,
+  strokeWidth: ICON_STROKE,
+  "aria-hidden": true,
+} as const;
 
 const GLYPH: Readonly<Record<RuleStanding, GlyphKind>> = {
   MEETS: "fit",
@@ -149,7 +153,9 @@ export function GateQForm({
   const [application, setApplication] = useState<ApplicationSummaryDto | null>(
     preview?.application ?? null,
   );
-  const [problem, setProblem] = useState<string | null>(preview?.problem ?? null);
+  const [problem, setProblem] = useState<string | null>(
+    preview?.problem ?? null,
+  );
   const [pending, startTransition] = useTransition();
   const token = useRef<string | null>(null);
   const submitKey = useRef<string>("");
@@ -167,7 +173,10 @@ export function GateQForm({
     heading.current?.focus();
   }, [step]);
 
-  const set = <K extends keyof FormAnswers>(field: K, value: FormAnswers[K]) => {
+  const set = <K extends keyof FormAnswers>(
+    field: K,
+    value: FormAnswers[K],
+  ) => {
     setAnswers((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
@@ -185,7 +194,9 @@ export function GateQForm({
 
   const next = (from: FormStep): FormStep => {
     const index = FORM_STEPS.indexOf(from as (typeof FORM_STEPS)[number]);
-    return index === FORM_STEPS.length - 1 ? "check" : (FORM_STEPS[index + 1] ?? "check");
+    return index === FORM_STEPS.length - 1
+      ? "check"
+      : (FORM_STEPS[index + 1] ?? "check");
   };
 
   const onContinue = () => {
@@ -199,7 +210,10 @@ export function GateQForm({
     startTransition(async () => {
       const credential = await ensureToken();
       if (credential === null) return;
-      const saved = await saveAnswersAction(credential, requestFor(step, answers));
+      const saved = await saveAnswersAction(
+        credential,
+        requestFor(step, answers),
+      );
       if (!saved.ok) {
         setProblem(saved.message);
         return;
@@ -220,9 +234,13 @@ export function GateQForm({
     startTransition(async () => {
       const credential = token.current;
       if (credential === null) return;
-      if (!anonymous && answers.materials.length > 0) {
-        // Only what the founder ticked; the API checks each is theirs.
-        const shared = await shareMaterialsAction(credential, answers.materials);
+      if (!anonymous) {
+        // Only what the founder ticked (maybe nothing); the API checks each
+        // is theirs and links the application to them for their GateQ page.
+        const shared = await shareMaterialsAction(
+          credential,
+          answers.materials,
+        );
         if (!shared.ok) {
           setProblem(shared.message);
           return;
@@ -245,19 +263,33 @@ export function GateQForm({
     if (index > 0) setStep(FORM_STEPS[index - 1] ?? "company");
   };
 
-  const n = step === "check" || step === "sent" ? 5 : FORM_STEPS.indexOf(step) + 1;
-  const showResults = step === "check" || step === "sent" || application !== null;
+  const n =
+    step === "check" || step === "sent" ? 5 : FORM_STEPS.indexOf(step) + 1;
+  const showResults =
+    step === "check" || step === "sent" || application !== null;
   const shell = `gq-form${compact ? " gq-compact" : ""}${inApp ? " gq-in-app" : ""}`;
 
   if (preview?.loading === true) {
     return (
       <div className={shell} aria-busy="true">
-        <div className="gq-sk" style={{ width: "100%", height: 300, borderRadius: 14 }} />
+        <div
+          className="gq-sk"
+          style={{ width: "100%", height: 300, borderRadius: 14 }}
+        />
         <div className="flex flex-col gap-3.5">
           <div className="gq-sk" style={{ width: "40%", height: 24 }} />
-          <div className="gq-sk" style={{ width: "100%", height: 44, borderRadius: 22 }} />
-          <div className="gq-sk" style={{ width: "100%", height: 44, borderRadius: 22 }} />
-          <div className="gq-sk" style={{ width: "70%", height: 44, borderRadius: 22 }} />
+          <div
+            className="gq-sk"
+            style={{ width: "100%", height: 44, borderRadius: 22 }}
+          />
+          <div
+            className="gq-sk"
+            style={{ width: "100%", height: 44, borderRadius: 22 }}
+          />
+          <div
+            className="gq-sk"
+            style={{ width: "70%", height: 44, borderRadius: 22 }}
+          />
         </div>
       </div>
     );
@@ -267,7 +299,10 @@ export function GateQForm({
     <GateCard
       gateway={gateway}
       lines={lines}
-      showResults={showResults && (step === "check" || step === "sent" || verdict === "NOT_A_FIT")}
+      showResults={
+        showResults &&
+        (step === "check" || step === "sent" || verdict === "NOT_A_FIT")
+      }
       openByDefault={!compact}
     />
   );
@@ -301,7 +336,9 @@ export function GateQForm({
           <span className="gq-state-ic">
             <CircleAlert {...icon} size={ICON_SIZE.prominent} />
           </span>
-          <h2 className="cq-title-sm">{fund} isn&apos;t taking applications right now</h2>
+          <h2 className="cq-title-sm">
+            {fund} isn&apos;t taking applications right now
+          </h2>
           <p className="cq-body-sm gq-t2">
             Their gate is closed. You can still read what they look for.
           </p>
@@ -333,7 +370,11 @@ export function GateQForm({
               type="button"
               className="underline underline-offset-4"
               onClick={() =>
-                setStep(miss === undefined ? "company" : stepForDimension(miss.dimension))
+                setStep(
+                  miss === undefined
+                    ? "company"
+                    : stepForDimension(miss.dimension),
+                )
               }
             >
               Change your answer
@@ -342,9 +383,12 @@ export function GateQForm({
           </p>
           <div className="flex flex-wrap gap-2">
             {compact ? null : (
-              <a href="/discover?tab=investors" className={buttonClassName("primary")}>
-            Find investors who fit
-          </a>
+              <a
+                href="/discover?tab=investors"
+                className={buttonClassName("primary")}
+              >
+                Find investors who fit
+              </a>
             )}
             <Button variant="quiet" onClick={onBack}>
               Back
@@ -378,8 +422,8 @@ export function GateQForm({
           <div className="gq-banner gq-banner-err" role="alert">
             <CircleAlert {...icon} />
             <span>
-              <b>{step === "check" ? "Not sent." : "Not saved."}</b> {problem} Your
-              answers are still here.{" "}
+              <b>{step === "check" ? "Not sent." : "Not saved."}</b> {problem}{" "}
+              Your answers are still here.{" "}
               <Button
                 size="compact"
                 className="ml-1.5"
@@ -402,7 +446,12 @@ export function GateQForm({
           />
         ) : null}
         {step === "round" ? (
-          <RoundStep headingRef={heading} answers={answers} errors={errors} set={set} />
+          <RoundStep
+            headingRef={heading}
+            answers={answers}
+            errors={errors}
+            set={set}
+          />
         ) : null}
         {step === "share" ? (
           <ShareStep
@@ -456,8 +505,8 @@ export function GateQForm({
             {inApp ? (
               <div className="flex flex-wrap gap-2">
                 <a href="/gateq" className={buttonClassName("primary")}>
-            See your applications
-          </a>
+                  See your applications
+                </a>
               </div>
             ) : null}
           </div>
@@ -487,7 +536,11 @@ export function GateQForm({
                 onClick={onContinue}
                 disabled={pending}
               >
-                {pending ? "Checking…" : step === "note" ? "Check my fit" : "Continue"}
+                {pending
+                  ? "Checking…"
+                  : step === "note"
+                    ? "Check my fit"
+                    : "Continue"}
               </Button>
             )}
           </div>
@@ -512,9 +565,15 @@ function GateCard({
 }) {
   const fund = gateway.organisationDisplayName;
   return (
-    <aside className="gq-card gq-gatecard" aria-label={`What ${fund} looks for`}>
+    <aside
+      className="gq-card gq-gatecard"
+      aria-label={`What ${fund} looks for`}
+    >
       <div className="flex items-center gap-3">
-        <span className="gq-logo" style={{ width: 44, height: 44, borderRadius: "50%" }}>
+        <span
+          className="gq-logo"
+          style={{ width: 44, height: 44, borderRadius: "50%" }}
+        >
           {gateway.organisationPhotoUrl ? (
             // Signed URL from the API; the investor's own public card image.
             // eslint-disable-next-line @next/next/no-img-element
@@ -560,19 +619,29 @@ function GateCard({
                     </span>
                   )}
                   <span>
-                    <b className="font-medium">{dimensionWord(line.dimension)}</b>
-                    {line.required ? "" : <span className="gq-t3"> · preferred</span>}
+                    <b className="font-medium">
+                      {dimensionWord(line.dimension)}
+                    </b>
+                    {line.required ? (
+                      ""
+                    ) : (
+                      <span className="gq-t3"> · preferred</span>
+                    )}
                     <br />
                     <span className="gq-t2">{line.label}</span>
                     {showResults && line.standing !== null ? (
-                      <span className="sr-only">: {STANDING_WORDS[line.standing]}</span>
+                      <span className="sr-only">
+                        : {STANDING_WORDS[line.standing]}
+                      </span>
                     ) : null}
                   </span>
                 </li>
               ))}
             </ul>
           )}
-          <p className="cq-caption gq-t3">Nothing is sent until you press Send.</p>
+          <p className="cq-caption gq-t3">
+            Nothing is sent until you press Send.
+          </p>
         </div>
       </details>
     </aside>
@@ -599,7 +668,10 @@ function ResultLines({ lines }: { readonly lines: readonly RuleLine[] }) {
   );
 }
 
-type SetAnswer = <K extends keyof FormAnswers>(field: K, value: FormAnswers[K]) => void;
+type SetAnswer = <K extends keyof FormAnswers>(
+  field: K,
+  value: FormAnswers[K],
+) => void;
 
 function FromProfile() {
   return (
@@ -620,7 +692,10 @@ function Options({
   badge,
 }: {
   readonly label: string;
-  readonly options: readonly { readonly value: string; readonly label: string }[];
+  readonly options: readonly {
+    readonly value: string;
+    readonly label: string;
+  }[];
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly error?: string | undefined;
@@ -634,18 +709,20 @@ function Options({
         {badge === true ? <FromProfile /> : null}
       </p>
       <div className="gq-opts" role="radiogroup" aria-labelledby={id}>
-        {[...options, { value: DECLINED, label: "I'd rather not say" }].map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={value === option.value}
-            className={`gq-opt${option.value === DECLINED ? " gq-skip" : ""}`}
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
+        {[...options, { value: DECLINED, label: "I'd rather not say" }].map(
+          (option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={value === option.value}
+              className={`gq-opt${option.value === DECLINED ? " gq-skip" : ""}`}
+              onClick={() => onChange(option.value)}
+            >
+              {option.label}
+            </button>
+          ),
+        )}
       </div>
       {error === undefined ? null : <p className="gq-err">{error}</p>}
     </div>
@@ -700,11 +777,14 @@ function CompanyStep({
               onChange={(e) => set("companyName", e.target.value)}
               aria-invalid={errors.companyName !== undefined}
             />
-            {errors.companyName ? <p className="gq-err">{errors.companyName}</p> : null}
+            {errors.companyName ? (
+              <p className="gq-err">{errors.companyName}</p>
+            ) : null}
           </div>
           <div className="gq-field">
             <label className="gq-label" htmlFor="gq-line">
-              What it does, in one line <span className="gq-t3">(optional)</span>
+              What it does, in one line{" "}
+              <span className="gq-t3">(optional)</span>
             </label>
             <input
               id="gq-line"
@@ -726,7 +806,11 @@ function CompanyStep({
               <span className="cq-body-sm gq-t2 block">{answers.oneLiner}</span>
             ) : null}
           </span>
-          <Button variant="quiet" size="compact" onClick={() => setEditing(true)}>
+          <Button
+            variant="quiet"
+            size="compact"
+            onClick={() => setEditing(true)}
+          >
             Edit
           </Button>
         </div>
@@ -805,7 +889,9 @@ function CompanyStep({
       <div className="gq-q">
         <p className="gq-label" id={countryId}>
           Where is the company based?
-          {fromProfile.has("country") && answers.country !== "" ? <FromProfile /> : null}
+          {fromProfile.has("country") && answers.country !== "" ? (
+            <FromProfile />
+          ) : null}
         </p>
         <div className="gq-opts" role="radiogroup" aria-labelledby={countryId}>
           {COUNTRY_CHOICES.map((choice) => (
@@ -852,7 +938,9 @@ function CompanyStep({
           <select
             className="gq-input"
             aria-label="Country"
-            value={inList || answers.country === DECLINED ? "" : answers.country}
+            value={
+              inList || answers.country === DECLINED ? "" : answers.country
+            }
             onChange={(e) => set("country", e.target.value)}
           >
             <option value="">Choose a country</option>
@@ -875,7 +963,9 @@ function RoundStep({ headingRef, answers, errors, set }: StepProps) {
       <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
         Your round
       </h1>
-      <p className="cq-body gq-t2">Rough numbers are fine. You can say you&apos;d rather not.</p>
+      <p className="cq-body gq-t2">
+        Rough numbers are fine. You can say you&apos;d rather not.
+      </p>
       <div className="gq-q">
         <Options
           label="How much are you raising?"
@@ -919,10 +1009,12 @@ function RoundStep({ headingRef, answers, errors, set }: StepProps) {
           </div>
         )}
         {errors.amount ? <p className="gq-err">{errors.amount}</p> : null}
-        {answers.band !== "" && answers.band !== DECLINED && answers.amount.trim() === "" ? (
+        {answers.band !== "" &&
+        answers.band !== DECLINED &&
+        answers.amount.trim() === "" ? (
           <p className="cq-caption gq-t3">
-            Add the exact amount so the round-size rule can be checked. Without it, that
-            rule stays unanswered.
+            Add the exact amount so the round-size rule can be checked. Without
+            it, that rule stays unanswered.
           </p>
         ) : null}
       </div>
@@ -930,7 +1022,9 @@ function RoundStep({ headingRef, answers, errors, set }: StepProps) {
         label="How are you raising?"
         options={INSTRUMENT_CHOICES}
         value={answers.instrument}
-        onChange={(value) => set("instrument", value as FormAnswers["instrument"])}
+        onChange={(value) =>
+          set("instrument", value as FormAnswers["instrument"])
+        }
       />
       <Options
         label="Do you have a lead investor?"
@@ -1021,10 +1115,13 @@ function ShareStep({
               aria-invalid={errors.contactEmail !== undefined}
               onChange={(e) => set("contactEmail", e.target.value)}
             />
-            {errors.contactEmail ? <p className="gq-err">{errors.contactEmail}</p> : null}
+            {errors.contactEmail ? (
+              <p className="gq-err">{errors.contactEmail}</p>
+            ) : null}
           </div>
           <p className="cq-caption gq-t3">
-            Have a Capital Q account? Sign in on the gate&apos;s page to share your deck too.
+            Have a Capital Q account? Sign in on the gate&apos;s page to share
+            your deck too.
           </p>
         </div>
       ) : null}
@@ -1046,7 +1143,10 @@ function NoteStep({
         A short note
       </h1>
       <p className="cq-body gq-t2">
-        Optional. {fromProfile ? "A first draft from your profile; it's yours to change." : "A line or two about why them."}
+        Optional.{" "}
+        {fromProfile
+          ? "A first draft from your profile; it's yours to change."
+          : "A line or two about why them."}
       </p>
       <div className="gq-field">
         <label className="gq-label" htmlFor="gq-msg">
@@ -1090,8 +1190,12 @@ function CheckStep({
   readonly replyWithinDays: number | null;
   readonly onAnswer: (dimension: string) => void;
 }) {
-  const unanswered = lines.filter((line) => line.standing === "NOT_ANSWERED" && line.required);
-  const shared = materials.filter((m) => answers.materials.includes(m.id)).map((m) => m.name.toLowerCase());
+  const unanswered = lines.filter(
+    (line) => line.standing === "NOT_ANSWERED" && line.required,
+  );
+  const shared = materials
+    .filter((m) => answers.materials.includes(m.id))
+    .map((m) => m.name.toLowerCase());
   const amount = normaliseAmount(answers.amount);
   return (
     <div className="gq-card gq-result">
@@ -1107,8 +1211,10 @@ function CheckStep({
           <CircleAlert {...icon} />
           <span>
             Unanswered isn&apos;t a no, but this gate needs{" "}
-            {unanswered.map((line) => dimensionWord(line.dimension).toLowerCase()).join(" and ")} to
-            decide.{" "}
+            {unanswered
+              .map((line) => dimensionWord(line.dimension).toLowerCase())
+              .join(" and ")}{" "}
+            to decide.{" "}
             <button
               type="button"
               className="underline underline-offset-4"
@@ -1121,10 +1227,14 @@ function CheckStep({
       ) : null}
       <p className="cq-body-sm gq-t2">
         Sending shares: {answers.companyName || "your company"}, your answers
-        {amount !== null ? ` (raising ${formatMoney(amount, answers.currency)})` : ""}
+        {amount !== null
+          ? ` (raising ${formatMoney(amount, answers.currency)})`
+          : ""}
         {shared.length > 0 ? `, ${shared.join(", ")}` : ""}
         {answers.note.trim() !== "" ? " and your note" : ""}.
-        {replyWithinDays ? ` ${fund} promises a reply within ${replyWithinDays} working days.` : ""}
+        {replyWithinDays
+          ? ` ${fund} promises a reply within ${replyWithinDays} working days.`
+          : ""}
       </p>
     </div>
   );

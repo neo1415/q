@@ -6,6 +6,8 @@ import {
   GATEQ_GATEWAY_APPLICATIONS_PATH,
   GATEQ_APPLY_MATERIALS_PATH,
   COMPANY_CLAIMABLE_PATH,
+  FounderApplicationListDtoSchema,
+  GATEQ_MY_APPLICATIONS_PATH,
   ClaimableCompanyListDtoSchema,
   type ClaimableCompanyDto,
   GATEQ_INBOX_ITEM_PATH,
@@ -47,6 +49,7 @@ import {
 } from "@capital-q/gateq";
 import {
   IntakeRefusedError,
+  type FounderApplication,
   type InboxService,
   type SubmissionInbox,
 } from "@capital-q/gateq-intake";
@@ -91,6 +94,12 @@ import {
 
 export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly gateq: GateQService;
+  /** F2: the signed-in founder's own applications, as the investor answered them. */
+  readonly myApplications?:
+    | ((
+        actor: ReturnType<typeof getActorContext>,
+      ) => Promise<readonly FounderApplication[]>)
+    | undefined;
   /** F3: companies a founder may find and claim (what they may already see). */
   readonly claimable?:
     | ((
@@ -267,6 +276,28 @@ export function registerGateQRoutes(
       return { gateways: gateways.map(gatewayDto) };
     },
   );
+
+  const myApplications = dependencies.myApplications;
+  if (myApplications !== undefined) {
+    app.get(
+      GATEQ_MY_APPLICATIONS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const rows = await myApplications(getActorContext(request));
+        void reply.header("Cache-Control", "no-store");
+        return FounderApplicationListDtoSchema.parse({
+          applications: rows.map((row) => ({
+            applicationId: row.applicationId,
+            fund: row.fund,
+            sentAt: row.sentAt,
+            status: row.status,
+            reasonCode: row.reasonCode,
+            message: row.message,
+          })),
+        });
+      },
+    );
+  }
 
   const claimable = dependencies.claimable;
   if (claimable !== undefined) {

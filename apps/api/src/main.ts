@@ -144,6 +144,7 @@ import {
   createGateqInbox,
   createPostgresInboxRepository,
   createStartupAlerts,
+  createPostgresApplicationFounders,
   gateqInboxActionsPort,
   ownGatewayIdFrom,
 } from "@capital-q/gateq-intake";
@@ -1933,7 +1934,19 @@ const { app, logger } = createApp(config, security, {
               : Promise.resolve(false);
           },
           attach: (input) => gateqApply.intake.attachDocument(input),
+          link: async ({ token, actor }) => {
+            const guest = await gateqApply.intake.authorise(token);
+            await createPostgresApplicationFounders({ sql: database.sql }).link(
+              {
+                applicationId: guest.application.id,
+                tenantId: guest.application.tenantId,
+                actor,
+              },
+            );
+          },
         }),
+  gateqMyApplications: (actor) =>
+    createPostgresApplicationFounders({ sql: database.sql }).listFor(actor),
   gateqPolicyExtraction: (() => {
     const service = createPolicyExtractionService({
       gateq,

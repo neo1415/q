@@ -291,6 +291,7 @@ export type ApiModules = {
     GateQRoutesDependencies["inboxService"] | undefined;
   /** F3: find and claim a company; an investor's saved startup search. */
   readonly companyClaims?: CompanyClaims | undefined;
+  readonly gateqMyApplications?: GateQRoutesDependencies["myApplications"];
   readonly startupAlerts?: StartupAlerts | undefined;
   /** F4: the inbox as the declared actions reach it (ADR 0040). */
   readonly gateqInboxActions?: AppActionPorts["gateqInbox"];
@@ -758,6 +759,7 @@ export function createApp(
       materials: modules.gateqMaterials,
       inboxService: modules.gateqInboxService,
       claimable: modules.companyClaims?.search,
+      myApplications: modules.gateqMyApplications,
       publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,
       publicImages: modules.gateqPublicImages,
