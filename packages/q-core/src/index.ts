@@ -66,6 +66,11 @@ export {
 } from "./prompts/charter/q-system.v1.js";
 export { Q_SYSTEM_VOICE_V1 } from "./prompts/charter/q-system-voice.v1.js";
 export {
+  Q_SYSTEM_VOICE_V2,
+  VOICE_V2_MANNER,
+} from "./prompts/charter/q-system-voice.v2.js";
+export { Q_SYSTEM_V2, Q_VOICE_SECTION } from "./prompts/charter/q-system.v2.js";
+export {
   Q_PERSONALITIES,
   Q_PERSONALITY_CODES,
   personalityOf,
@@ -668,6 +673,12 @@ export {
   COMPANY_ANALYST_V17,
   V17_CARDS_LINE,
 } from "./prompts/tasks/company-analyst.v17.js";
+export {
+  COMPANY_ANALYST_V18,
+  V18_ADVICE_LINE,
+  V18_MANDATE_LINE,
+  V18_NO_SCORE,
+} from "./prompts/tasks/company-analyst.v18.js";
 export {
   COMPANY_ANALYST_V16,
   COMPANY_ANALYST_V16_TURN,

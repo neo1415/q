@@ -101,7 +101,7 @@ describe("prompt assembly with the guides", () => {
   it("leaves a prompt without guides exactly as it was", () => {
     const plain = render();
     expect(plain.bundle.bundleVersion).toBe(
-      "q-system.v1_instruction-plan.v6_comm.v1",
+      "q-system.v2_instruction-plan.v6_comm.v1",
     );
     expect(plain.messages[0]?.content).not.toContain("BUSINESS ETIQUETTE");
   });
@@ -115,7 +115,7 @@ describe("prompt assembly with the guides", () => {
     });
     const system = rendered.messages[0]?.content ?? "";
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_instruction-plan.v6_comm.v2",
+      "q-system.v2_instruction-plan.v6_comm.v2",
     );
     const house = system.indexOf(
       '<<<UNTRUSTED_CONTENT source="house-etiquette-guide built-in/v1">>>',
