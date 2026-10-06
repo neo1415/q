@@ -216,7 +216,7 @@ export function PitchDetails({
           aria-checked={record.downloadable}
           aria-labelledby={`${id}-downloads`}
           aria-describedby={`${id}-downloads-help`}
-          disabled={savingDownloads}
+          disabled={savingDownloads || saving}
           onClick={() => void setDownloads(!record.downloadable)}
           className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
           data-pitch-downloadable
@@ -234,7 +234,7 @@ export function PitchDetails({
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="primary"
-          disabled={!changed || saving}
+          disabled={!changed || saving || savingDownloads}
           onClick={() => void save()}
         >
           {saving ? "Saving…" : "Save"}

@@ -75,4 +75,28 @@ describe("AnswerEditor", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Save" }));
     expect(revise).not.toHaveBeenCalled();
   });
+
+  it("F18: at the category limit, says so instead of silently hiding search", async () => {
+    const ids = Array.from(
+      { length: 8 },
+      (_, n) => `00000000-0000-4000-8000-00000000000${String(n)}`,
+    );
+    render(
+      <AnswerEditor
+        journey="founder"
+        title="Sector"
+        stepKeys={["F1.categories"]}
+        responses={{
+          "F1.categories": {
+            type: "RESOURCE_REFERENCE",
+            resourceType: "TAXONOMY_NODE",
+            resourceIds: ids,
+          },
+        }}
+        labels={{}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit sector" }));
+    expect(await screen.findByText(/most you can keep \(8\)/u)).toBeTruthy();
+  });
 });

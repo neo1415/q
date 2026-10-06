@@ -8,6 +8,8 @@ import {
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
+import { QMarkdown } from "@/features/q/markdown";
+
 import { removeMyGuideAction, saveMyGuideAction } from "./etiquette-actions";
 import { EMPTY_DRAFT, GuideInput, type GuideDraft } from "./guide-input";
 
@@ -143,8 +145,9 @@ export function MyGuide({
               Version {guide.version} · saved {savedOn(guide.savedAt)}
               {guide.fileName === null ? "" : ` · from ${guide.fileName}`}
             </p>
-            <div className="cq-body-sm max-h-64 overflow-y-auto rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3 whitespace-pre-wrap text-(--cq-text-primary)">
-              {guide.text}
+            {/* F13: a guide written in Markdown reads as formatted text. */}
+            <div className="cq-body-sm max-h-64 overflow-y-auto rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3 text-(--cq-text-primary)">
+              <QMarkdown text={guide.text} />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={startEditing} disabled={pending}>
