@@ -8,9 +8,13 @@
  * organisation_memberships, membership_roles, user_active_contexts, plus the
  * creation-idempotency record this packet adds.
  *
+ * G1/G2 adds the organisation as a TEAM: invitations, join requests,
+ * Owner/Admin/Member roles over the existing role templates, removal,
+ * leaving, ownership hand-over and the switcher's list (team-service.ts).
+ *
  * Does not own: persons (identity.user_profiles, auth.users), the permission
  * engine, companies, investor organisations, mandates, capital objectives,
- * invitations, verification or claiming. It consumes security, audit and
+ * verification or claiming. It consumes security, audit and
  * eventing through their existing ports and never publishes to a queue.
  *
  * Invariant kept in code and rows alike:
@@ -98,5 +102,57 @@ export {
   createPostgresRoleTemplateRepository,
   createPostgresTenantRepository,
 } from "./infrastructure/postgres-repositories.js";
+
+export {
+  abilitiesOf,
+  canChangeRole,
+  canLeave,
+  canOfferOwnership,
+  canRemove,
+  createInvitationToken,
+  hashInvitationToken,
+  invitationState,
+  normaliseEmail,
+  splitEmails,
+  teamKindOf,
+  teamRoleOf,
+  teamWord,
+  ADMIN_ROLE_CODE,
+  MEMBER_ROLE_CODE,
+  OWNER_ROLE_CODE,
+  ROLE_CODES_FOR,
+  type TeamAbilities,
+  type TeamRefusal,
+  type TeamVerdict,
+} from "./domain/team.js";
+export type {
+  InvitationEmail,
+  InvitationMailer,
+  InvitationRecord,
+  JoinRequestRecord,
+  MyOrganisationRecord,
+  OwnershipOfferRecord,
+  TeamJournal,
+  TeamJournalEntry,
+  TeamMemberRecord,
+  TeamOrganisationRecord,
+  TeamStore,
+} from "./application/team-ports.js";
+export {
+  createTeamService,
+  type TeamActor,
+  type TeamOutcome,
+  type TeamService,
+  type TeamServiceDependencies,
+} from "./application/team-service.js";
+export {
+  createPostgresTeamJournal,
+  createPostgresTeamStore,
+} from "./infrastructure/postgres-team-store.js";
+export {
+  createInvitationMailer,
+  renderInvitationEmail,
+  type OutboundEmailSender,
+} from "./infrastructure/invitation-mailer.js";
 
 export const PACKAGE_NAME = "@capital-q/organisations" as const;

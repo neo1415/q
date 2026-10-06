@@ -1402,6 +1402,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/email':
+        specifier: workspace:*
+        version: link:../email
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../eventing
