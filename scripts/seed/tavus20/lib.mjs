@@ -3,7 +3,7 @@
 // the Supabase management API into this process's memory only; nothing here
 // ever prints or writes a key, password or token.
 import { randomBytes } from "node:crypto";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -187,6 +187,12 @@ export function saveState(state) {
 }
 export const assetDir = (c) =>
   join(ASSETS, `${String(c.n).padStart(2, "0")}-${slugOf(c.company)}`);
-export const videoFile = (c) =>
-  join(VIDEOS, `${String(c.n).padStart(2, "0")}-${slugOf(c.company)}-9x16.mp4`);
+/** The final 9:16 cut, found by number (one file name spells "Orphéa" as "orph-a"). */
+export const videoFile = (c) => {
+  const nn = String(c.n).padStart(2, "0");
+  const hit = existsSync(VIDEOS)
+    ? readdirSync(VIDEOS).find((f) => f.startsWith(`${nn}-`) && f.endsWith("-9x16.mp4"))
+    : undefined;
+  return join(VIDEOS, hit ?? `${nn}-${slugOf(c.company)}-9x16.mp4`);
+};
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

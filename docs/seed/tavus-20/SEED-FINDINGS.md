@@ -79,3 +79,10 @@ Found while seeding the 20 fictional companies into production through the real 
 - Pitch editor: "Save" stays enabled while the download switch's own save is in flight; pressing it then fails with "The pitch changed since this page was opened".
 - Onboarding "Where is the company based?" lists 16 countries; Vietnam and Mexico (dataset n14, n15) must pick "Somewhere else". Raise currency lists lack BRL, INR (round form), MXN, VND, EGP.
 
+### F15. Resuming an unfinished founder setup opens live voice by default (S2)
+- Steps: leave the setup form part-way; sign in again. `/home` redirects to `/onboarding/founder?talk=1`, which starts the voice room ("Voice paused · Q can't hear you: the microphone isn't available") although the founder chose "Prefer to type" and the form before. Expected: resume in the mode last used (the form), voice only on request. It also opens a voice session nobody asked for.
+
+### F16. Series A setup asks for traction numbers; seed and pre-seed do not (S3, refines F7)
+- For `series_a` the "Business and traction" step asks revenue shape, paying customers and six-month growth; for seed / pre-seed it is a single signal radio with no numbers.
+- "A few things I still need" sometimes has nothing to ask ("Nothing I still need from you") but is still a step to click through.
+

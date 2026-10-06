@@ -82,6 +82,158 @@
       "pitchId": "f891a735-ed8e-44ff-902c-248344e2fa7c",
       "visibility": "network_visible",
       "readiness": "marketplace_ready"
+    },
+    "03": {
+      "company": "Clearwater Assurance",
+      "founderUserId": "329e7564-2d9a-4470-aece-819d4cb3fd1f",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "6ed1da85-cddc-4015-b5c2-86a95a48cfc8",
+      "organisationId": "1506007e-21b5-483f-8c35-37e7200bb248",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Rohan Mehta",
+          "userId": "ede1a31f-ac86-4bbb-ba44-0f2ed0418b0e",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Siobhan Gallagher",
+          "userId": "ac5f0dea-8ce6-4f44-bb04-0532f20c3058",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Tom Ashworth",
+          "userId": "dbfd0ddf-d005-4c28-a5b0-2871f5bb2c24",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "918b81b8-62b4-4d59-96ba-4381809ba367",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "04": {
+      "company": "Tensorgate",
+      "founderUserId": "d068e858-01b6-49b5-8b57-901c29ff32e8",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "bf55d6e1-567a-470b-954d-054ae05990e2",
+      "organisationId": "de87e975-b868-41d7-98a6-f6dc1da8e649",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Laura Bennett",
+          "userId": "6bb7b735-e0e6-4503-b029-37ddd1e81298",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Marcus Delgado",
+          "userId": "453e0032-34e2-4617-ab9e-edc01007a58b",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Jordan Whitfield",
+          "userId": "c78fd451-8c08-4030-b214-8101a14897e5",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "278ec231-a070-4540-b599-396b0d6e68b3",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "05": {
+      "company": "Drishti Health",
+      "founderUserId": "dcffd7c4-4474-43e1-99e1-ccdc7f0d80b2",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "ba7189d9-6aab-44ef-8f02-d82c386527ed",
+      "organisationId": "1c0d4808-f1f4-4a72-880b-acd62ee9a0c6",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Aditya Kulkarni",
+          "userId": "96254f07-2c3f-4db9-84fc-2af752d08c05",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Sneha Deshpande",
+          "userId": "ad54ecde-6099-416a-b8a6-b6c029601724",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Dr Farhan Qureshi",
+          "userId": "870058b2-d186-4449-bde5-3161d3d23c08",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "2914f664-8edd-4490-8dbe-0a2459a2794b",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "06": {
+      "company": "Silo Credit",
+      "founderUserId": "cc295a40-4190-4bf9-af49-437b2b5d1d7f",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "fbff8cff-e09b-4a2c-9aa6-97cb68432613",
+      "organisationId": "b20c649d-1556-402a-aa02-b93b5f723de1",
+      "done": {
+        "onboarding": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true
+      },
+      "team": [
+        {
+          "name": "Abdullahi Sani",
+          "userId": "eb2bb3e3-a17b-4993-98ba-7ef8bf5b830d",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Aisha Yusuf",
+          "userId": "e9fe6d57-60ca-4e3c-a512-2b4b0851b5a2",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Chinedu Obi",
+          "userId": "854707ab-c15b-49da-a29a-fa4d10599d8f",
+          "role": "MEMBER"
+        }
+      ]
+    },
+    "07": {
+      "company": "Portside",
+      "founderUserId": "e88832b0-7cf5-4be9-ac11-0663ad1a903a",
+      "deckViaOnboarding": true,
+      "founderCount": 1
     }
   }
 }

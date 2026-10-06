@@ -71,14 +71,24 @@ async function onboardingForm(page, c) {
   const deckDone = { v: false };
   for (let i = 0; i < 30; i += 1) {
     if (page.url().includes("/verification") || page.url().includes("/home")) return;
-    const form = page.getByRole("button", { name: "Use the form" });
+    const form = page
+      .getByRole("button", { name: "Use the form" })
+      .or(page.getByRole("link", { name: "Use the form" }))
+      .first();
     if (await form.isVisible().catch(() => false)) {
       await form.click();
       await page.waitForTimeout(3000);
     }
     const head = await h1(page);
     log(c, "onboarding:", head || page.url());
-    if (/^Your company$/.test(head)) {
+    if (/What brings you/.test(head) || head === "") {
+      // The conversational opener; the form switch appears once it settles.
+      const raising = page.getByRole("button", { name: "I'm raising for a company" });
+      if (await raising.isEnabled().catch(() => false)) {
+        await raising.click();
+        await page.waitForTimeout(6000);
+      } else await page.waitForTimeout(5000);
+    } else if (/^Your company$/.test(head)) {
       await page.getByRole("textbox", { name: "Company name" }).fill(c.company);
       await page.getByRole("textbox", { name: "Website" }).fill(c.websiteUrl);
       const country = plan.COUNTRY_LABEL[c.headquarters.country] ?? "Somewhere else";
@@ -98,7 +108,7 @@ async function onboardingForm(page, c) {
       const chips = await page.getByRole("list", { name: "Suggested categories" }).getByRole("button").all();
       let picked = 0;
       for (const chip of chips) {
-        const name = ((await chip.getAttribute("aria-label")) ?? (await chip.innerText())).split(",")[0].trim();
+        const name = ((await chip.getAttribute("aria-label")) ?? (await chip.innerText())).split(/[,\n]/)[0].trim();
         if (wanted.has(name)) {
           await chip.click();
           picked += 1;
@@ -144,7 +154,18 @@ async function onboardingForm(page, c) {
       mark(c, { founderCount: founders });
       await clickContinue(page);
     } else if (/Business and traction/.test(head)) {
-      await page.getByRole("radio", { name: SIGNAL[c.n] ?? "Paying customers" }).check();
+      const revenue = page.getByRole("radio", { name: "Recurring and growing" });
+      if (await revenue.isVisible().catch(() => false)) {
+        // Later-stage variant: revenue shape, paying customers, growth.
+        await revenue.check();
+        const n = payingCustomers(c);
+        const box = page.getByRole("textbox", { name: "Paying customers" });
+        if (n !== null && (await box.isVisible().catch(() => false))) await box.fill(String(n));
+        else await page.getByRole("checkbox", { name: "Not sure / not tracked" }).first().check();
+        await page.getByRole("radio", { name: growthBand(c) }).check();
+      } else {
+        await page.getByRole("radio", { name: SIGNAL[c.n] ?? "Paying customers" }).check();
+      }
       await page.waitForTimeout(800);
       await clickContinue(page);
     } else if (/raising now/.test(head)) {
@@ -159,8 +180,10 @@ async function onboardingForm(page, c) {
       await clickContinue(page);
     } else if (/few things I still need/.test(head)) {
       const box = page.getByRole("textbox", { name: "A few things I still need" });
-      const names = Object.values(c.tags).flat().map((code) => TAXONOMY[code]).filter(Boolean);
-      await box.fill(`Categories: ${names.join(", ")}.`);
+      if (await box.isVisible().catch(() => false)) {
+        const names = Object.values(c.tags).flat().map((code) => TAXONOMY[code]).filter(Boolean);
+        await box.fill(`Categories: ${names.join(", ")}.`);
+      }
       await clickContinue(page);
     } else if (/what we have so far/.test(head)) {
       await page.waitForTimeout(5000);
@@ -175,6 +198,25 @@ async function onboardingForm(page, c) {
     }
   }
   throw new Error("onboarding did not finish in 30 steps");
+}
+
+/** Last count of the customer-like KPI, or null when the data has none. */
+function payingCustomers(c) {
+  const re = /customer|business|client|agenc|bank|corporate|school|site|distributor|hospital|trust|grower|partner|pharmac|railroad|yard|member/;
+  const kpi = c.metrics.kpis.find((k) => k.unit === "count" && re.test(k.code));
+  const last = c.metrics.points.at(-1)?.values ?? {};
+  return kpi && Number.isFinite(last[kpi.code]) ? Math.round(last[kpi.code]) : null;
+}
+
+/** Six-month growth band of the first KPI (Apr→Sep 2026 in the dataset). */
+function growthBand(c) {
+  const code = c.metrics.kpis[0]?.code;
+  const pts = c.metrics.points;
+  const a = pts.at(-1)?.values?.[code];
+  const b = pts.at(-7)?.values?.[code] ?? pts[0]?.values?.[code];
+  if (!(a > 0 && b > 0)) return "Grew under 50%";
+  const g = a / b - 1;
+  return g >= 1 ? "More than doubled" : g >= 0.5 ? "Grew 50–100%" : g > 0 ? "Grew under 50%" : "Flat or down";
 }
 
 function stageFile(c, src, name) {
@@ -196,7 +238,8 @@ export async function stepOnboarding(page, c) {
   if (isDone(c, "onboarding")) return;
   await login(page, email, "/home");
   if (page.url().includes("/welcome")) await ui.welcomeAsFounder(page);
-  if (!page.url().includes("/onboarding")) {
+  // A resumed journey lands in live voice (?talk=1); open the form instead.
+  if (!page.url().includes("/onboarding") || page.url().includes("talk=1")) {
     await page.goto(`${lib.WEB}/onboarding/founder`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(6000);
   }
