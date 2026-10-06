@@ -5,7 +5,7 @@ Amends: the capital-objective classification note in `packages/permissions` reso
 
 ## Context
 
-The raise (capital objective: target, instrument, stage, close date) is `founder_private` by classification and could only be shared with one relationship at a time. Seed finding "raise shared with the network" asked for a way to show it to every investor, because investors otherwise see "Raising: Not shared" and Discover's raise filters cannot match a company. CLAUDE.md's release-blocking invariant forbids founder-private information from *silently* reaching investor-facing reads or ranking where the investor is not authorised.
+The raise (capital objective: target, instrument, stage, close date) is `founder_private` by classification and could only be shared with one relationship at a time. Seed finding "raise shared with the network" asked for a way to show it to every investor, because investors otherwise see "Raising: Not shared" and Discover's raise filters cannot match a company. CLAUDE.md's release-blocking invariant forbids founder-private information from _silently_ reaching investor-facing reads or ranking where the investor is not authorised.
 
 ## Decision
 
