@@ -108,7 +108,10 @@ export function ExploreFeed({
   onHide,
   onClose,
   startOnRequest = false,
+  initialIndex = 0,
 }: {
+  /** Where the feed starts (design review of "related next"). */
+  readonly initialIndex?: number;
   /** The opened pitch first, then the related ones. */
   readonly items: readonly ExploreFeedItem[];
   readonly loadingMore?: boolean;
@@ -164,6 +167,20 @@ export function ExploreFeed({
   useEffect(() => {
     backButton.current?.focus({ preventScroll: true });
   }, []);
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || initialIndex === 0 || items.length <= initialIndex) {
+      return;
+    }
+    started.current = true;
+    scroller.current
+      ?.querySelector<HTMLElement>(
+        `[data-feed-index="${String(initialIndex)}"]`,
+      )
+      ?.scrollIntoView({ behavior: "auto" });
+    setActive(initialIndex);
+  }, [initialIndex, items.length]);
 
   const go = useCallback(
     (to: number) => {

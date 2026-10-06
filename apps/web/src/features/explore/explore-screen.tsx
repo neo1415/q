@@ -145,7 +145,13 @@ export function ExploreScreen({
   sectors = [],
   limitedOrganisation = null,
   startOnRequest = false,
+  openOnArrival = null,
 }: {
+  /** Design review: open this tile's feed on arrival, at this position. */
+  readonly openOnArrival?: {
+    readonly index: number;
+    readonly at: number;
+  } | null;
   readonly source?: ExploreDataSource;
   readonly initial?: ExplorePageDto | null;
   readonly initialError?: boolean;
@@ -329,6 +335,15 @@ export function ExploreScreen({
     returnFocus.current?.focus({ preventScroll: true });
   }, []);
 
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (openOnArrival === null || arrived.current) return;
+    const list = search?.pitches ?? tiles;
+    if (list === null || list.length === 0) return;
+    arrived.current = true;
+    open(list, openOnArrival.index);
+  }, [openOnArrival, open, search, tiles]);
+
   useEffect(() => {
     const onPop = () => setOpened(null);
     window.addEventListener("popstate", onPop);
@@ -426,6 +441,7 @@ export function ExploreScreen({
         onHide={onHide}
         onClose={close}
         startOnRequest={startOnRequest}
+        initialIndex={openOnArrival?.at ?? 0}
       />
     );
   const toastNode =
