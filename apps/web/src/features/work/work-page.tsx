@@ -109,6 +109,10 @@ type Props = {
    * this month's cost. Absent: the section is not shown; null: it failed.
    */
   readonly workforce?: WorkforceView | null | undefined;
+  /** The view shown first (the design review page picks one). */
+  readonly initialView?: WorkView | undefined;
+  /** False: never read the team again (the design review page). */
+  readonly liveReads?: boolean | undefined;
 };
 
 export function WorkPage({
@@ -118,6 +122,8 @@ export function WorkPage({
   done,
   prepared,
   workforce,
+  initialView,
+  liveReads = true,
 }: Props) {
   const running = (work ?? []).filter((item) => item.status === "ACTIVE");
   const timeLanes = running.flatMap((item) =>
@@ -143,13 +149,19 @@ export function WorkPage({
   // The first screen shows what matters (founder, demo 2026-10-06: the page
   // "just flows down forever"): what waits on them, else what runs.
   const [view, setView] = useState<WorkView>(
-    needsCount > 0 ? "needs" : running.length > 0 ? "progress" : "done",
+    initialView ??
+      (needsCount > 0
+        ? "needs"
+        : running.length > 0 || (workforce?.overview.jobs.open ?? 0) > 0
+          ? "progress"
+          : "done"),
   );
   // Q's team, read again while the page is visible (P7): In progress,
   // Team and Cost share one reader so they never disagree.
   const live = useWorkforceLive(
     workforce,
     view === "team" || view === "progress",
+    liveReads,
   );
   const now = useClock();
   const team = live.data;

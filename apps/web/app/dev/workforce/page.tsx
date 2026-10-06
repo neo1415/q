@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell/app-shell";
-import { PageContainer } from "@/components/app-shell/page-container";
+import {
+  PageContainer,
+  PageHeader,
+} from "@/components/app-shell/page-container";
+import { WorkPage } from "@/features/work/work-page";
 import { WorkforcePanel } from "@/features/work/workforce-panel";
 
-import { FIXTURE_IDS, workforceFixtures } from "./fixtures";
+import { FIXTURE_IDS, workforceAllStates, workforceFixtures } from "./fixtures";
 
 // Per request: the preview flag and the fixtures' clock are read at runtime.
 export const dynamic = "force-dynamic";
@@ -40,6 +44,42 @@ export default async function WorkforceReviewPage({
     notFound();
   }
   const params = await searchParams;
+  // P7: the whole Work page with every agent state, on the chosen tab.
+  const view = params["view"];
+  if (
+    view === "team" ||
+    view === "cost" ||
+    view === "progress" ||
+    view === "needs" ||
+    view === "done"
+  ) {
+    const all = workforceAllStates(reviewClock(), {
+      budgetPaused: params["pause"] === "budget",
+      hours: params["pause"] === "hours",
+    });
+    return (
+      <AppShell
+        context={{
+          scope: "investor_private",
+          label: "Harbour Lane Capital (fictional)",
+          admin: false,
+        }}
+      >
+        <PageContainer>
+          <PageHeader title="Work" />
+          <WorkPage
+            suggestions={[]}
+            approvals={[]}
+            work={[...all.work]}
+            done={null}
+            workforce={{ overview: all.overview, jobs: all.jobs }}
+            initialView={view}
+            liveReads={false}
+          />
+        </PageContainer>
+      </AppShell>
+    );
+  }
   const tab =
     params["tab"] === "team" || params["tab"] === "cost"
       ? params["tab"]

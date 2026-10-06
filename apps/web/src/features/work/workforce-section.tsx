@@ -30,6 +30,7 @@ export type LiveWorkforce = {
 export function useWorkforceLive(
   initial: WorkforceView | null | undefined,
   focused: boolean,
+  reads = true,
 ): LiveWorkforce {
   return useLive<WorkforceView>({
     initial: initial ?? null,
@@ -40,7 +41,7 @@ export function useWorkforceLive(
         (job) => job.job.status === "RUNNING" || job.job.status === "PLANNING",
       ),
     focused,
-    enabled: initial !== undefined,
+    enabled: reads && initial !== undefined,
   });
 }
 

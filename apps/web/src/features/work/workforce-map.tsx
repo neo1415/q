@@ -150,7 +150,6 @@ export function AgentRing({
   readonly node: Pick<AgentNode, "state" | "mono" | "lead">;
   readonly size?: number;
 }) {
-  const reduced = useReducedMotion() === true;
   const tone = RING_TONE[node.state];
   return (
     <span
@@ -179,12 +178,14 @@ export function AgentRing({
             : {}),
         }}
       />
-      {node.state === "working" && !reduced ? (
-        <span className="absolute -inset-1 animate-[spin_2.4s_linear_infinite] rounded-full border-2 border-transparent border-t-(--cq-surface-raised)" />
+      {/* Motion only for real state, and none under reduced motion (CSS,
+          so the server's markup and the browser's agree). */}
+      {node.state === "working" ? (
+        <span className="absolute -inset-1 rounded-full border-2 border-transparent border-t-(--cq-surface-raised) motion-safe:animate-[spin_2.4s_linear_infinite] motion-reduce:hidden" />
       ) : null}
-      {node.state === "thinking" && !reduced ? (
+      {node.state === "thinking" ? (
         <span
-          className="absolute -inset-1 animate-pulse rounded-full border-2 border-dashed"
+          className="absolute -inset-1 rounded-full border-2 border-dashed motion-safe:animate-pulse motion-reduce:hidden"
           style={{ borderColor: tone }}
         />
       ) : null}
@@ -655,8 +656,12 @@ function TeamMap({
                           : undefined
                     }
                   />
-                  {link.kind === "live" && !reduced ? (
-                    <circle r={3.5} fill="var(--cq-accent)">
+                  {link.kind === "live" ? (
+                    <circle
+                      r={3.5}
+                      fill="var(--cq-accent)"
+                      className="motion-reduce:hidden"
+                    >
                       <animateMotion
                         dur="2.6s"
                         repeatCount="indefinite"
@@ -734,8 +739,8 @@ function TeamMap({
                   >
                     <span
                       className={cx(
-                        "block truncate leading-tight font-semibold",
-                        level === "far" ? "text-[13px]" : "text-[15.5px]",
+                        "block leading-tight font-semibold [overflow-wrap:anywhere]",
+                        level === "far" ? "text-[13px]" : "text-[15px]",
                       )}
                     >
                       {node.name}

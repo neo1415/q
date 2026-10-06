@@ -280,8 +280,8 @@ function candidatesOf(
           state: "asking",
           now:
             to === null
-              ? "Wants to send a message. Nothing is sent until you approve it."
-              : `Wants to send a message to ${to}. Nothing is sent until you approve it.`,
+              ? "Wants to send a message."
+              : `Wants to send a message to ${to}.`,
           job,
           since: draft.createdAt,
           approval: { approvalId: outcome.approvalId, draftId: draft.id },
