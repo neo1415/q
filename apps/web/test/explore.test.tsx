@@ -28,6 +28,7 @@ import {
   columnsForWidth,
   placeMasonry,
   tileRatio,
+  tileRatioAt,
 } from "../src/features/explore/masonry";
 
 /**
@@ -57,15 +58,28 @@ afterEach(() => {
 });
 
 describe("masonry layout math", () => {
-  it("clamps tile heights between 4:5 and 9:16 and reads both spellings", () => {
-    expect(tileRatio("9:16")).toBeCloseTo(16 / 9);
-    expect(tileRatio("9/16")).toBeCloseTo(16 / 9);
-    expect(tileRatio("1:1")).toBe(TILE_RATIO_MIN);
+  it("clamps tile heights between 4:3 and 2:3 and reads both spellings", () => {
+    expect(tileRatio("9:16")).toBe(TILE_RATIO_MAX);
+    expect(tileRatio("9/16")).toBe(TILE_RATIO_MAX);
+    expect(tileRatio("4:5")).toBeCloseTo(5 / 4);
+    expect(tileRatio("1:1")).toBe(1);
     expect(tileRatio("16:9")).toBe(TILE_RATIO_MIN);
     expect(tileRatio("9:21")).toBe(TILE_RATIO_MAX);
     // Unknown is the portrait default, never a zero-height box.
     expect(tileRatio(null)).toBe(TILE_RATIO_MAX);
     expect(tileRatio("nonsense")).toBe(TILE_RATIO_MAX);
+  });
+
+  it("varies equal portrait tiles by rank, never above 2:3 or below 4:3", () => {
+    const ratios = Array.from({ length: 7 }, (_, index) =>
+      tileRatioAt("9:16", index),
+    );
+    expect(new Set(ratios.map((r) => r.toFixed(3))).size).toBeGreaterThan(3);
+    for (const ratio of ratios) {
+      expect(ratio).toBeLessThanOrEqual(TILE_RATIO_MAX);
+      expect(ratio).toBeGreaterThanOrEqual(TILE_RATIO_MIN);
+    }
+    expect(tileRatioAt("16:9", 1)).toBe(TILE_RATIO_MIN);
   });
 
   it("uses 2 columns on a phone and 4-5 on a desktop", () => {

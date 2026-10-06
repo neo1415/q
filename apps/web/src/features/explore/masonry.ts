@@ -9,9 +9,12 @@
  * width as CSS, so the browser lays them out with no measuring script.
  */
 
-/** Height ÷ width, clamped: no tile is a sliver (4:5) or a tower (9:16). */
-export const TILE_RATIO_MIN = 5 / 4;
-export const TILE_RATIO_MAX = 16 / 9;
+/**
+ * Height ÷ width, clamped: a landscape pitch is a short 4:3 tile, nothing
+ * is taller than 2:3 (founder, demo 2026-10-06: "the boxes are too long").
+ */
+export const TILE_RATIO_MIN = 3 / 4;
+export const TILE_RATIO_MAX = 3 / 2;
 const DEFAULT_RATIO = TILE_RATIO_MAX;
 
 /** The two-line "why" under each poster, in px; fixed so heights are known. */
@@ -30,6 +33,23 @@ export function tileRatio(aspectRatio: string | null | undefined): number {
   const height = match === null ? 0 : Number(match[2]);
   const ratio = width > 0 && height > 0 ? height / width : DEFAULT_RATIO;
   return Math.min(TILE_RATIO_MAX, Math.max(TILE_RATIO_MIN, ratio));
+}
+
+/**
+ * Most pitches are the same portrait shape, so the stored ratio alone
+ * gives equal boxes that read as a grid, not a masonry. A fixed rhythm by
+ * rank varies the heights (posters are cropped to cover, never stretched)
+ * and stays deterministic, so server and client agree and nothing shifts.
+ */
+const RHYTHM = [1, 0.82, 0.9, 1, 0.78, 0.94, 0.86] as const;
+
+/** The clamped ratio for the tile at this rank, with the rhythm applied. */
+export function tileRatioAt(
+  aspectRatio: string | null | undefined,
+  index: number,
+): number {
+  const beat = RHYTHM[Math.abs(Math.trunc(index)) % RHYTHM.length] ?? 1;
+  return Math.max(TILE_RATIO_MIN, tileRatio(aspectRatio) * beat);
 }
 
 /** 2 columns on phone, 3 on tablet, 4 on a laptop, 5 on a wide screen. */
