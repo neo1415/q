@@ -231,7 +231,7 @@ export async function HomeScreen({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/*
         The Q surface. Deliberately not a PageHeader and a card: a heading
         reading "Home" above a boxed chat is the dashboard composition
@@ -250,11 +250,15 @@ export async function HomeScreen({
         otherwise, so Home stays Q first).
       */}
       {qConnected && !headed ? (
-        <div className="mx-auto w-full max-w-(--cq-layout-reading) px-(--cq-page-gutter) pt-4">
+        <div className="mx-auto max-h-[35dvh] w-full max-w-(--cq-layout-reading) flex-none overflow-y-auto px-(--cq-page-gutter) pt-4">
           <WorkPanel variant="home" />
         </div>
       ) : null}
-      <section aria-label="Ask Q" className="flex flex-col" data-q-surface>
+      <section
+        aria-label="Ask Q"
+        className="flex min-h-0 flex-1 flex-col"
+        data-q-surface
+      >
         {/* A conversation view still has a page heading (R30 #34). */}
         {headed ? null : <h1 className="sr-only">Q</h1>}
         <QConversationPanel

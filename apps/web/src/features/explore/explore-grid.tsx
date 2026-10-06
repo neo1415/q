@@ -15,7 +15,7 @@ import {
   containerHeight,
   placeMasonry,
   placementStyle,
-  tileRatio,
+  tileRatioAt,
 } from "./masonry";
 
 /**
@@ -61,7 +61,7 @@ export function ExploreTile({
         <span
           className="cq-explore-poster"
           style={{
-            aspectRatio: `1 / ${tileRatio(tile.pitch.aspectRatio).toFixed(4)}`,
+            aspectRatio: `1 / ${tileRatioAt(tile.pitch.aspectRatio, index).toFixed(4)}`,
           }}
         >
           {poster === null ? (
@@ -124,7 +124,7 @@ export function ExploreGrid({
   readonly label?: string;
 }) {
   const layout = placeMasonry(
-    tiles.map((tile) => tileRatio(tile.pitch.aspectRatio)),
+    tiles.map((tile, index) => tileRatioAt(tile.pitch.aspectRatio, index)),
     columns,
   );
   return (
@@ -164,18 +164,9 @@ export function ExploreGrid({
 
 /** The loading grid: the same boxes, reserved, so nothing jumps on arrival. */
 export function ExploreGridSkeleton({ columns }: { readonly columns: number }) {
-  const ratios = [
-    16 / 9,
-    16 / 9,
-    5 / 4,
-    1.25,
-    16 / 9,
-    5 / 4,
-    16 / 9,
-    16 / 9,
-    1.25,
-    16 / 9,
-  ];
+  const ratios = Array.from({ length: 10 }, (_, index) =>
+    tileRatioAt(null, index),
+  );
   const layout = placeMasonry(ratios, columns);
   return (
     <div

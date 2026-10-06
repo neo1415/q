@@ -570,6 +570,30 @@
     overflow: hidden;
   }
   /*
+   * The stage takes whatever the shell leaves, not a computed height: a
+   * network notice, the wake line or the verify nudge above main used to
+   * push the composer below the fold, where the hidden overflow lost it
+   * (demo 2026-10-06). The shell is the viewport; main is the rest of it
+   * (its padding still clears the phone navigation); the stage fills main.
+   */
+  .cq-shell:has(.cq-q-home) {
+    height: 100dvh;
+    min-height: 0;
+  }
+  .cq-shell:has(.cq-q-home) .cq-shell-body {
+    min-height: 0;
+  }
+  .cq-shell:has(.cq-q-home) .cq-shell-main {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+  .cq-shell-main .cq-q-home {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+  }
+  /*
    * The composer's strip. On a phone the bottom navigation beneath it
    * already clears the home indicator; on a wide screen nothing does, so
    * the strip keeps the safe-area inset itself.

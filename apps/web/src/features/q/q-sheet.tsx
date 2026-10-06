@@ -234,7 +234,7 @@ export function QSheetConversation({
         ) : null}
       </div>
 
-      <div className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-surface-raised) pt-2">
+      <div className="sticky bottom-0 z-(--cq-z-sticky) flex flex-col gap-2 bg-(--cq-surface-raised) pt-2 pb-[max(8px,var(--cq-safe-bottom))]">
         <QComposer
           // A new draft is a new starting point, not an edit of the last.
           key={seed ?? ""}
