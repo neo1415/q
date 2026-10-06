@@ -81,7 +81,8 @@ export const VisibilityShareDtoSchema = z
   .object({
     policyId: UuidSchema,
     object: VisibilityObjectSchema,
-    relationshipId: UuidSchema,
+    /** Null for the network-wide share (P14). */
+    relationshipId: UuidSchema.nullable(),
     /** The investor organisation's name; null when it cannot be resolved. */
     recipientName: z.string().min(1).max(200).nullable(),
     accessLevel: z.enum(["view", "view_download"]),
@@ -109,6 +110,15 @@ export const VisibilityStateDtoSchema = z
     objects: z.array(VisibilityObjectStateDtoSchema).max(8),
     shares: z.array(VisibilityShareDtoSchema).max(200),
     relationships: z.array(VisibilityRelationshipDtoSchema).max(200),
+    /**
+     * P14 (ADR 0060): the raise shown to every investor on the network, by
+     * the founder's own choice; null when it is not. Revoked by policyId.
+     */
+    networkRaiseShare: z
+      .object({ policyId: UuidSchema, createdAt: UtcTimestampSchema })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict();
 export type VisibilityStateDto = z.infer<typeof VisibilityStateDtoSchema>;
@@ -168,13 +178,23 @@ export const AudiencePreviewDtoSchema = z
   .strict();
 export type AudiencePreviewDto = z.infer<typeof AudiencePreviewDtoSchema>;
 
-/** Share the object with one relationship's investor organisation. Idempotency-Key required. */
+/**
+ * Share the object with one relationship's investor organisation, or (P14,
+ * ADR 0060) with every investor on the network: the founder's explicit,
+ * revocable choice. Exactly one of the two. Idempotency-Key required.
+ */
 export const CreateVisibilityShareRequestSchema = z
   .object({
     object: z.literal("CAPITAL_OBJECTIVE"),
-    relationshipId: UuidSchema,
+    relationshipId: UuidSchema.optional(),
+    audience: z.literal("NETWORK").optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      (input.relationshipId === undefined) !== (input.audience === undefined),
+    { message: "Share with one relationship or with the network, not both." },
+  );
 export type CreateVisibilityShareRequest = z.infer<
   typeof CreateVisibilityShareRequestSchema
 >;

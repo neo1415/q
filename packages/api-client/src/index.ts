@@ -235,6 +235,7 @@ export {
   getAudiencePreview,
   getVisibilityState,
   revokeVisibilityShare,
+  shareRaiseWithNetwork,
   shareWithRelationship,
 } from "./visibility.js";
 

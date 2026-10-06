@@ -290,18 +290,28 @@ const SHARE_RAISE = defineAppAction<
       companyId: input.companyId,
       object: input.input.object,
       relationshipId: input.input.relationshipId,
+      audience: input.input.audience,
       correlationId: context.correlationId,
     }),
   targets: onCompany,
-  card: (input) => ({
-    summary: `Share your raise with ${input.recipientName ?? "this investor"}`,
-    preview:
-      "They will see your raise's target, instrument, stage and close date. Not your use of funds.",
-  }),
+  card: (input) =>
+    input.input.audience === "NETWORK"
+      ? {
+          summary: "Show your raise to every investor on Capital Q",
+          preview:
+            "Investors on Capital Q who can see your company will see your raise's target, instrument, stage and close date, and Discover's raise filters use it. Not your use of funds. You can stop it at any time.",
+        }
+      : {
+          summary: `Share your raise with ${input.recipientName ?? "this investor"}`,
+          preview:
+            "They will see your raise's target, instrument, stage and close date. Not your use of funds.",
+        },
   done: (out, input) =>
     out.outcome === "REDUNDANT"
       ? "They can already see your raise; nothing new was shared."
-      : `Done. ${input.recipientName ?? "They"} can now see your raise.`,
+      : input.input.audience === "NETWORK"
+        ? "Done. Investors on Capital Q can now see your raise."
+        : `Done. ${input.recipientName ?? "They"} can now see your raise.`,
   http: {
     method: "POST",
     path: COMPANY_SHARES_PATH,
@@ -364,6 +374,12 @@ const SHARE_RAISE = defineAppAction<
         )
       ) {
         return "Your company has no raise to share yet: set one up first.";
+      }
+      if (input.input.audience === "NETWORK") {
+        return state.networkRaiseShare === null ||
+          state.networkRaiseShare === undefined
+          ? null
+          : "Investors on Capital Q can already see your raise.";
       }
       return state.shares.some(
         (share) =>
