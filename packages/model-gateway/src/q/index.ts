@@ -83,6 +83,10 @@ import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
+import {
+  createScreenClaimGuard,
+  withoutUnbackedScreenClaims,
+} from "./screen-claims.js";
 import { ownProfileFact } from "./own-profile.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
@@ -2526,6 +2530,10 @@ export function createModelGatewayQAnswer(
           text: `${text} `,
         });
       };
+      // Backed only by a screen move a tool of this run authorised.
+      const screenClaims = createScreenClaimGuard(() =>
+        clientActionBlocks.some((block) => block.kind === "UI_INTENT"),
+      );
       const onTextDelta = (fragment: string): void => {
         seenText += fragment;
         const fresh = partial.push(seenText);
@@ -2539,12 +2547,17 @@ export function createModelGatewayQAnswer(
           // is published.
           // Fact labels are rewritten before a sentence goes out, not only
           // in the stored answer: on a voice call it is said aloud (H3b).
-          const guarded = guardSentence(
+          const sentenceGuarded = guardSentence(
             citeAuthorisedFacts(sentence, facts),
             firstSentence,
             recommendationGrounds,
           );
           firstSentence = false;
+          // Nothing is "on your screen" unless a tool put it there (R0).
+          const guarded =
+            sentenceGuarded === null
+              ? null
+              : screenClaims.sentence(sentenceGuarded);
           if (guarded === null || guarded.length === 0) {
             continue;
           }
@@ -3796,10 +3809,25 @@ export function createModelGatewayQAnswer(
             block.kind === "UI_INTENT" &&
             block.intent.kind === "OPEN_RECORD_PAGE",
         );
+        // R0 (Zino live 2026-10-06, run d6377e69): "now in view" with
+        // nothing opened. The stored answer follows the spoken rule.
+        const screenSafe = withoutUnbackedScreenClaims(
+          content,
+          openedOnScreen ||
+            [...(analystBlocks ?? []), ...clientActionBlocks].some(
+              (block) => block.kind === "UI_INTENT",
+            ),
+        );
+        if (screenSafe.removed > 0) {
+          logger?.warn(
+            { qRunId: request.runId, removed: screenSafe.removed },
+            "an answer said something was on screen that no tool opened; corrected",
+          );
+        }
         const reply =
           revisedArtifact === null
-            ? content.length > 0
-              ? content
+            ? screenSafe.text.length > 0
+              ? screenSafe.text
               : openedOnScreen
                 ? CLIENT_ACTION_DONE_LINE
                 : "Understood."
