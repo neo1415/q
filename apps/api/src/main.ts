@@ -12,7 +12,9 @@ import { loadDatabaseConfig } from "@capital-q/config/database";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeGoogleIntegrations,
+  createBrevoApiEmailSender,
   createInboundEmailService,
+  createSmtpAppEmailSender,
   unavailableAppEmailSender,
   createGoogleKeySource,
   platformGoogleHttp,
@@ -33,6 +35,7 @@ import {
   createBrandThemeStore,
   createEtiquetteGuideAdminStore,
   createPlatformAdmin,
+  recordingEmailSender,
 } from "@capital-q/platform-admin";
 import { houseEtiquetteOf } from "@capital-q/q-core";
 import { createPostgresEtiquetteGuideStore } from "@capital-q/q-runtime";
@@ -115,7 +118,11 @@ import {
   systemDisclosureClock,
 } from "@capital-q/permissions";
 import {
+  createInvitationMailer,
   createOrganisationService,
+  createPostgresTeamJournal,
+  createPostgresTeamStore,
+  createTeamService,
   createPostgresOrganisationQueryPort,
 } from "@capital-q/organisations";
 import {
@@ -379,6 +386,37 @@ const organisations = createOrganisationService({
   outbox,
   audit,
   securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
+});
+
+// G1/G2: the company or firm as a team. Invitation email goes through
+// Capital Q's outbound email adapter (Brevo API or SMTP), recorded like
+// every app email; with neither configured, invitations are still made and
+// the screen offers Resend.
+const teamEmailConfig = loadAppEmailConfig(process.env);
+const teamEmail =
+  teamEmailConfig.brevoApi !== undefined
+    ? recordingEmailSender(createBrevoApiEmailSender(teamEmailConfig.brevoApi), {
+        sql: database.sql,
+        source: "api.team_invitation",
+        provider: "BREVO_API",
+      })
+    : teamEmailConfig.smtp === undefined
+      ? unavailableAppEmailSender
+      : recordingEmailSender(createSmtpAppEmailSender(teamEmailConfig.smtp), {
+          sql: database.sql,
+          source: "api.team_invitation",
+          provider: "SMTP",
+        });
+const team = createTeamService({
+  store: createPostgresTeamStore({
+    sql: database.sql,
+    transactions: database.transactions,
+  }),
+  journal: createPostgresTeamJournal({ audit, outbox }),
+  mailer: createInvitationMailer(teamEmail),
+  webOrigin:
+    process.env["CQ_WEB_ORIGIN"] ??
+    "https://capital-qweb-production.up.railway.app",
 });
 
 // Companies reach organisations only through the public query port.
@@ -1785,6 +1823,8 @@ const { app, logger } = createApp(config, security, {
   // end BILLING block
   // ADMIN block (ADR 0033)
   admin: platformAdmin,
+  // G1/G2: teams.
+  team,
   // ADR 0050: business etiquette guides (a person's own; the console's).
   etiquette: (() => {
     const adminStore = createEtiquetteGuideAdminStore({

@@ -29,6 +29,8 @@ export const config = {
     "/onboarding/:path*",
     "/relationships/:path*",
     "/settings/:path*",
+    // G1/G2: an invitation's link.
+    "/join/:path*",
     // AUTO (ADR 0030): Q's work.
     "/work/:path*",
     // DAILY: The Q Daily reader.

@@ -10,6 +10,7 @@ import { ICON_SIZE, ICON_STROKE, PanelLeft, Search } from "@capital-q/ui/icons";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { ThemeMenu } from "@/features/appearance/theme-menu";
+import { SidebarOrganisationSwitcher } from "@/features/team/org-switcher";
 import { SignOutControl } from "@/features/auth";
 import { NotificationCenter } from "@/features/work/notification-center";
 import { useHomeHref } from "@/features/q/active-conversation";
@@ -98,6 +99,16 @@ export function DesktopSidebar({
           </button>
         </Tooltip>
       </div>
+
+      {/* G2: who they act for, when they have two or more. */}
+      {(context.organisations?.length ?? 0) < 2 ? null : (
+        <div className={collapsed ? "flex justify-center px-2 pb-2" : "px-3 pb-2"}>
+          <SidebarOrganisationSwitcher
+            organisations={context.organisations ?? []}
+            compact={collapsed}
+          />
+        </div>
+      )}
 
       {/* Search is a field, not a section (WORK-58). */}
       <div className={collapsed ? "px-2 pb-2" : "px-3 pb-2"}>

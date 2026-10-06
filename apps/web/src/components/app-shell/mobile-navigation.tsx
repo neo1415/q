@@ -14,9 +14,11 @@ import {
   Search,
 } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
+import type { MyOrganisationDto } from "@capital-q/contracts";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
+import { MoreOrganisationSwitcher } from "@/features/team/org-switcher";
 import { useHomeHref } from "@/features/q/active-conversation";
 import { useNotices } from "@/features/work/notice-store";
 import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
@@ -50,7 +52,9 @@ export function MobileNavigation({
   scope = "unset",
   admin = false,
   verifyNudge = null,
+  organisations = [],
 }: {
+  readonly organisations?: readonly MyOrganisationDto[] | undefined;
   readonly scope?: ContextScope | undefined;
   /** A platform admin: the More sheet adds the Admin group. */
   readonly admin?: boolean | undefined;
@@ -113,6 +117,7 @@ export function MobileNavigation({
         })}
         <li className="min-w-0">
           <MoreSheet
+            organisations={organisations}
             scope={scope}
             admin={admin}
             pathname={pathname}
@@ -131,11 +136,13 @@ export function MobileNavigation({
  * at the foot, worded, so it is reachable without the header icon.
  */
 function MoreSheet({
+  organisations,
   scope,
   admin,
   pathname,
   verifyNudge,
 }: {
+  readonly organisations: readonly MyOrganisationDto[];
   readonly scope: ContextScope;
   readonly admin: boolean;
   readonly pathname: string;
@@ -184,6 +191,8 @@ function MoreSheet({
         </button>
       </SheetTrigger>
       <SheetContent title="More">
+        {/* G2: who they act for, first, when they have two or more. */}
+        <MoreOrganisationSwitcher organisations={organisations} onPicked={close} />
         <nav aria-label="More sections">
           {/* Profile heads the sheet; Search is its field (WORK-58). */}
           <Link

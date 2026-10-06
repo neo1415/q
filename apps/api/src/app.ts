@@ -139,6 +139,8 @@ import { registerBrandThemeRoutes } from "./http/brand-theme.js";
 import type { EtiquetteGuidePort } from "@capital-q/app-actions";
 import type { EtiquetteGuideAdminStore } from "@capital-q/platform-admin";
 import { registerEtiquetteRoutes } from "./http/etiquette.js";
+import { registerTeamRoutes } from "./http/team.js";
+import type { TeamService } from "@capital-q/organisations";
 // end P5 block
 // BILLING block (ADR 0034)
 import {
@@ -246,6 +248,8 @@ export type ApiModules = {
         readonly adminStore?: EtiquetteGuideAdminStore | undefined;
       }
     | undefined;
+  /** G1/G2: the company or firm as a team. Absent: no team route registers. */
+  readonly team?: TeamService | undefined;
   // ADMIN block (ADR 0033)
   readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
   readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
@@ -483,6 +487,16 @@ export function createApp(
     });
   }
 
+  // G1/G2: the team page's reads; its changes are declared actions below.
+  if (modules.team !== undefined) {
+    registerTeamRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identities: security.identities,
+      team: modules.team,
+    });
+  }
+
   // ADR 0040 (Proposed): the routes of the app's declared actions, each on
   // its own path, through the services composed above.
   const push = modules.push;
@@ -591,6 +605,7 @@ export function createApp(
       ...(modules.gateqPolicyExtraction === undefined
         ? {}
         : { gateqPolicyExtraction: modules.gateqPolicyExtraction }),
+      ...(modules.team === undefined ? {} : { team: modules.team }),
     },
   });
   // ADR 0040: person-scoped routes (onboarding), under the onboarding actor.
@@ -606,6 +621,7 @@ export function createApp(
         ? {}
         : { onboardingNudges: modules.onboardingNudges }),
       ...(security.people === undefined ? {} : { people: security.people }),
+      ...(modules.team === undefined ? {} : { team: modules.team }),
     },
   });
 

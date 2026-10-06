@@ -436,3 +436,5 @@ export {
   removeMyEtiquetteGuide,
   saveMyEtiquetteGuide,
 } from "./etiquette.js";
+// G1/G2 block: teams.
+export * from "./team.js";
