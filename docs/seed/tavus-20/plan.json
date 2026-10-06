@@ -1,0 +1,598 @@
+{
+  "version": 1,
+  "status": "PROPOSED — no Tavus credits spent",
+  "notes": [
+    "All twenty companies and founders are fictional. Faces are Tavus stock actors playing fictional characters; every video and profile carries the AI-actor disclosure.",
+    "Voices are each stock actor's own Tavus voice. Tavus lists 40 stock voices with no accent or nationality tags; none is Nigerian English (see limitations).",
+    "zinoFit marks companies that sit inside Zino Aviation's active mandate (pre-seed to Series A; B2B SaaS, enterprise and consumer customers strong; fintech and enterprise software; Africa, UK, US; insurance excluded).",
+    "Scripts 2-20 are trimmed to their target length after video 1 measures the real Tavus speaking pace, so the total stays inside the allowance."
+  ],
+  "companies": [
+    {
+      "n": 1,
+      "company": "Ledgerline",
+      "oneLiner": "E-invoicing and VAT compliance on autopilot for Nigerian SMEs.",
+      "sector": "Fintech / RegTech — tax compliance SaaS",
+      "geography": "Lagos, Nigeria",
+      "stage": "seed",
+      "model": "B2B SaaS, per-entity monthly subscription",
+      "traction": "1,140 paying businesses; ₦38m monthly recurring revenue; 96% logo retention over 6 months",
+      "raise": "Raising $1.8m seed",
+      "zinoFit": true,
+      "founder": {
+        "name": "Tobenna Okafor",
+        "role": "Co-founder & CEO",
+        "age": 34,
+        "nationality": "Nigerian",
+        "bio": "Former tax manager at a Big Four firm in Lagos; spent seven years filing VAT returns by hand for clients before building Ledgerline.",
+        "temperament": "Warm, credible, measured"
+      },
+      "face": {
+        "replica": "Darius - Outdoor",
+        "replicaId": "rccbeedfc684",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "Nigerian English (Tavus voice is the actor's own; likely General American)",
+      "style": "Polished founder interview: stable medium shot, lower third (name, role, company) at 0:02, clean subtitles, two product cutaways",
+      "targetSeconds": 57,
+      "script": "Hi, I'm Tobenna Okafor, co-founder and CEO of Ledgerline. For seven years I was a tax manager in Lagos, and honestly, most of the job was copying numbers between spreadsheets. Thousands of small businesses here pay accountants just to file VAT, and they still get penalised, because the invoice data was wrong from day one. With FIRS bringing in e-invoicing, that problem is about to get much bigger. Ledgerline sits where the invoice is created. It connects to the tools businesses already use, checks every invoice, and files the return for them. Nobody re-types anything. We have just over eleven hundred paying businesses, about thirty-eight million naira in monthly recurring revenue, and almost nobody leaves. We're raising a one point eight million dollar seed. Look, compliance isn't exciting. But done right, small businesses stop being afraid of the taxman."
+    },
+    {
+      "n": 2,
+      "company": "Termly",
+      "oneLiner": "School-fee instalments for Nigerian parents, paid directly to schools.",
+      "sector": "Fintech — consumer credit / education payments",
+      "geography": "Lagos, Nigeria",
+      "stage": "pre_seed",
+      "model": "B2B2C: schools pay a platform fee, parents pay a small instalment fee",
+      "traction": "212 partner schools; 9,400 families on plans; 1.6% default rate",
+      "raise": "Raising $600k pre-seed",
+      "zinoFit": true,
+      "founder": {
+        "name": "Adaeze Nwosu",
+        "role": "Founder & CEO",
+        "age": 29,
+        "nationality": "Nigerian",
+        "bio": "Ran collections at a Lagos microfinance bank; started Termly after watching her older sister borrow from three people every September.",
+        "temperament": "Energetic, direct, funny"
+      },
+      "face": {
+        "replica": "Destiny",
+        "replicaId": "r38a383b0173",
+        "model": "phoenix-3"
+      },
+      "intendedAccent": "Nigerian English (Tavus voice is the actor's own)",
+      "style": "Social/selfie energy: tighter crop, fast hook in the first second, punchy word-by-word captions, one jump cut",
+      "targetSeconds": 48,
+      "script": "Okay, quick question. How much do you think a Lagos parent pays in school fees every September? For a lot of families it's more than three months of salary, due on one day. So they borrow. From friends, from loan apps, from anybody. I'm Adaeze, and I built Termly. Schools sign up with us, parents spread the fees across the term, and the school gets paid in full on day one. Parents don't chase loans, and schools stop chasing parents. Two hundred and twelve schools are already on it. Almost ninety-four hundred families. And our default rate is one point six percent, because people really don't miss a payment for their child's school. We're raising six hundred thousand dollars to get to a thousand schools. If you're a parent, you already get it. If you're an investor, come and talk to me."
+    },
+    {
+      "n": 3,
+      "company": "Clearwater Assurance",
+      "oneLiner": "Independent model-risk validation for UK banks' AI and credit models.",
+      "sector": "Enterprise software / RegTech — model risk management",
+      "geography": "London, United Kingdom",
+      "stage": "series_a",
+      "model": "B2B SaaS, annual enterprise licence",
+      "traction": "£2.4m ARR; 7 UK banks and building societies; 132% net revenue retention",
+      "raise": "Raising £9m Series A",
+      "zinoFit": true,
+      "founder": {
+        "name": "Helena Marsh",
+        "role": "Co-founder & CEO",
+        "age": 46,
+        "nationality": "British",
+        "bio": "Twelve years in model validation at a FTSE 100 bank and two years at the regulator on supervisory model reviews.",
+        "temperament": "Composed, precise, quietly confident"
+      },
+      "face": {
+        "replica": "Julia - Business",
+        "replicaId": "rd27826c12a6",
+        "model": "phoenix-4"
+      },
+      "intendedAccent": "British English (Tavus voice likely General American)",
+      "style": "High-end investor pitch: premium restrained look, serif lower third, slow push-in, metrics shown as quiet captions",
+      "targetSeconds": 58,
+      "script": "I'm Helena Marsh, and I run Clearwater Assurance. I spent twelve years validating credit models inside a large UK bank, and then two years on the other side of the table at the regulator. What I learned is that banks now have hundreds of models in production, a growing number of them machine learning, and the validation process hasn't changed since spreadsheets. It's slow, it's manual, and the new supervisory expectations make it a board-level issue. Clearwater runs independent validation continuously. We test each model against its own documentation, monitor drift, and produce the evidence a supervisor actually asks for. Seven UK banks and building societies use us today. We're at two point four million pounds in annual recurring revenue, and our customers expand their spend by about a third every year. We're raising a nine million pound Series A to take the product into Europe. Good model risk isn't a cost centre. It's the reason a bank can use AI at all."
+    },
+    {
+      "n": 4,
+      "company": "Tensorgate",
+      "oneLiner": "A confidential-computing gateway that lets regulated enterprises run LLMs on sensitive data.",
+      "sector": "AI infrastructure / Cybersecurity",
+      "geography": "Austin, United States",
+      "stage": "seed",
+      "model": "B2B SaaS, usage-based with an enterprise floor",
+      "traction": "4 design partners in banking and healthcare; 2 converted to $180k contracts; 31m requests served",
+      "raise": "Raising $4m seed",
+      "zinoFit": true,
+      "founder": {
+        "name": "Daniel Park",
+        "role": "Co-founder & CTO",
+        "age": 31,
+        "nationality": "American",
+        "bio": "Built secure-enclave infrastructure at a hyperscaler; previously a security researcher who published on side-channel attacks.",
+        "temperament": "Technically precise, dry humour"
+      },
+      "face": {
+        "replica": "Lee",
+        "replicaId": "r8495a788aa1",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "General American",
+      "style": "Technical/product-led: architecture diagram and console cutaways, monospace captions, whiteboard-like overlays",
+      "targetSeconds": 55,
+      "script": "I'm Daniel Park, CTO of Tensorgate. Here's the technical problem. A bank wants to use a large language model on customer data, but the moment that data leaves their environment, compliance says no. And they're right to. So what we built is a gateway that runs inside a hardware enclave. The prompt is decrypted only inside the enclave, the model runs there, and we generate a cryptographic attestation for every single request, so the security team can prove exactly what code touched the data. The hard part, honestly, was latency. Enclaves used to add seconds. We got the overhead down to about forty milliseconds by batching attestation and pinning memory. Four design partners in banking and healthcare, two already on paid contracts, thirty-one million requests served. We're raising a four million dollar seed. The insight's simple: if you can prove where the data went, regulated companies can finally say yes."
+    },
+    {
+      "n": 5,
+      "company": "Drishti Health",
+      "oneLiner": "Diabetic eye screening at neighbourhood pharmacies, read by AI in under a minute.",
+      "sector": "Health — AI diagnostics",
+      "geography": "Pune, India",
+      "stage": "seed",
+      "model": "Per-screen fee paid by pharmacy chains and insurers' wellness programmes",
+      "traction": "380 pharmacies; 210,000 screenings; 6,900 people referred early",
+      "raise": "Raising $3m seed",
+      "zinoFit": false,
+      "founder": {
+        "name": "Priya Raman",
+        "role": "Founder & CEO",
+        "age": 38,
+        "nationality": "Indian",
+        "bio": "Ophthalmologist who ran rural eye camps for a decade before moving into health technology.",
+        "temperament": "Thoughtful, unhurried, warm"
+      },
+      "face": {
+        "replica": "Priya - Office",
+        "replicaId": "r4dc9377a68e",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "Indian English (Tavus voice likely General American)",
+      "style": "Story-led: opens on a patient story with no name or logo, slower pacing, soft natural captions, company named only at 0:25",
+      "targetSeconds": 56,
+      "script": "A man came into one of my eye camps a few years ago. Fifty-two, a driver, diabetic for ten years. He came because he'd started missing road signs. By then, there wasn't much I could do. And the thing is, it was completely preventable. A simple photo of the back of his eye, five years earlier, would have caught it. India has more than a hundred million people with diabetes, and most of them will never see an eye specialist. But almost all of them visit a pharmacy every month. So that's where we went. I'm Priya Raman, and at Drishti Health we put a small retinal camera in neighbourhood pharmacies. Our AI reads the image in under a minute, and anyone at risk is referred the same day. We're in three hundred and eighty pharmacies, we've done over two hundred thousand screenings, and nearly seven thousand people were caught early. Now cameras are cheap enough and the models are good enough. The only question left is how fast we can get there."
+    },
+    {
+      "n": 6,
+      "company": "Silo Credit",
+      "oneLiner": "Warehouse-receipt finance for grain traders in Northern Nigeria.",
+      "sector": "Fintech / Agriculture — commodity-backed lending",
+      "geography": "Kano, Nigeria",
+      "stage": "seed",
+      "model": "Lending spread plus warehouse management fees",
+      "traction": "14 certified warehouses; ₦2.1bn financed; 0.4% loss rate",
+      "raise": "Raising $2.5m seed (equity) alongside a debt facility",
+      "zinoFit": true,
+      "founder": {
+        "name": "Halima Bello",
+        "role": "Co-founder & CEO",
+        "age": 41,
+        "nationality": "Nigerian",
+        "bio": "Grew up in her family's grain business in Dawanau market; later an agricultural lending officer at a development bank.",
+        "temperament": "Calm, understated, authoritative"
+      },
+      "face": {
+        "replica": "Celine - Studio",
+        "replicaId": "r4f5b5ef55c8",
+        "model": "phoenix-4"
+      },
+      "intendedAccent": "Nigerian English (Tavus voice is the actor's own)",
+      "style": "Documentary-calm: wide-to-medium framing, muted captions, B-roll stills of warehouses and grain bags",
+      "targetSeconds": 54,
+      "script": "My name is Halima Bello. I grew up in Dawanau, which is one of the biggest grain markets in West Africa, so I've watched this problem my whole life. At harvest, prices are at their lowest, and that's exactly when farmers and small traders have to sell, because they need cash. Three months later, the same maize is worth almost double. The difference goes to whoever can afford to wait. Silo Credit lets them wait. We certify warehouses, we grade and insure the grain when it comes in, and we issue a digital receipt the trader can borrow against immediately. When they sell later, the loan is repaid automatically. We work with fourteen warehouses, we've financed about two point one billion naira, and our losses are under half a percent. We're raising two and a half million dollars of equity, alongside a debt facility. For us, the grain is the collateral. That's why it works."
+    },
+    {
+      "n": 7,
+      "company": "Portside",
+      "oneLiner": "Customs-clearance software for Nigerian clearing agents at Apapa and Tin Can ports.",
+      "sector": "Logistics / B2B SaaS",
+      "geography": "Lagos, Nigeria",
+      "stage": "seed",
+      "model": "B2B SaaS per-container fee plus seat licences",
+      "traction": "63 clearing agencies; 41,000 containers processed; average clearance down from 19 to 8 days",
+      "raise": "Raising $2m seed",
+      "zinoFit": true,
+      "founder": {
+        "name": "Karim Haddad",
+        "role": "Founder & CEO",
+        "age": 36,
+        "nationality": "Nigerian (Lebanese-Nigerian, born in Lagos)",
+        "bio": "Third generation in his family's Lagos import business; spent six years clearing containers at Apapa before building Portside.",
+        "temperament": "Charismatic, sales-oriented, quick"
+      },
+      "face": {
+        "replica": "Carter",
+        "replicaId": "rca8a38779a8",
+        "model": "phoenix-3"
+      },
+      "intendedAccent": "Nigerian English (Tavus voice likely General American)",
+      "style": "Fast B2B explainer: handheld-feel crop, bold numeric callouts (19 → 8 days), port photo cutaways",
+      "targetSeconds": 50,
+      "script": "If you've ever imported anything into Nigeria, you know Apapa. A container can sit at the port for three weeks, and every day it sits there, someone's paying demurrage. My family has been importing into Lagos for three generations, and I spent six years clearing containers myself, so believe me, I know where the days go. Paper. Duplicate documents, missing forms, and nobody knows which step is stuck. Portside is the software clearing agents run their whole process on. Every document, every duty payment, every agency sign-off, in one place, with alerts before a delay happens, not after. Sixty-three agencies use it, forty-one thousand containers have gone through, and average clearance has dropped from nineteen days to eight. We're raising two million dollars to expand to Onne and Port Harcourt. Eleven days back, on every container. That's real money."
+    },
+    {
+      "n": 8,
+      "company": "MedTrail",
+      "oneLiner": "Drug traceability and recall software for Nigerian pharmaceutical distributors.",
+      "sector": "Health / B2B SaaS — supply-chain compliance",
+      "geography": "Lagos, Nigeria",
+      "stage": "seed",
+      "model": "B2B SaaS, per-warehouse subscription plus per-scan fees",
+      "traction": "27 distributors; 18m packs serialised; first NAFDAC-recognised recall run in 4 hours",
+      "raise": "Raising $1.5m seed",
+      "zinoFit": true,
+      "founder": {
+        "name": "Vikram Chandiramani",
+        "role": "Co-founder & CEO",
+        "age": 43,
+        "nationality": "Nigerian (Indian-Nigerian, born in Lagos)",
+        "bio": "Born and raised in Lagos; ran operations at his family's pharmaceutical distribution company for fifteen years.",
+        "temperament": "Steady, experienced, plain-spoken"
+      },
+      "face": {
+        "replica": "Raj - Business",
+        "replicaId": "re6220ec0195",
+        "model": "phoenix-4"
+      },
+      "intendedAccent": "Nigerian English (Tavus voice likely General American)",
+      "style": "Boardroom-straight: suit, centred framing, minimal captions, one data card",
+      "targetSeconds": 52,
+      "script": "I've spent fifteen years distributing medicines in Nigeria. I was born in Lagos, my family's been in this business since the seventies, and the problem that keeps me up at night is very simple. When a batch of medicine is recalled, nobody can tell you where it went. It could be in a hospital in Abuja or a market stall in Onitsha. That's how fake and expired drugs survive. MedTrail serialises every pack at the distributor and tracks each one as it moves. When a recall comes, we know exactly who has it, within minutes. Twenty-seven distributors use us, we've tracked eighteen million packs, and we just ran a recall end to end in four hours. Normally that takes weeks. We're raising a one and a half million dollar seed. I'm Vikram Chandiramani, and frankly, this should have existed a long time ago."
+    },
+    {
+      "n": 9,
+      "company": "Baridi",
+      "oneLiner": "Pay-as-you-go solar cold rooms for fish traders around Lake Victoria.",
+      "sector": "Climate / Energy access — productive-use solar",
+      "geography": "Kisumu, Kenya",
+      "stage": "seed",
+      "model": "Cooling-as-a-service, per-crate daily fee via mobile money",
+      "traction": "46 cold rooms; 3,800 traders; post-harvest fish loss cut from 30% to 6%",
+      "raise": "Raising $2.2m seed plus asset finance",
+      "zinoFit": false,
+      "founder": {
+        "name": "Anjali Shah",
+        "role": "Co-founder & CEO",
+        "age": 35,
+        "nationality": "Kenyan",
+        "bio": "Kenyan-born engineer from a Kisumu family; previously led field operations at a solar home-system company across East Africa.",
+        "temperament": "Practical, upbeat, field-tested"
+      },
+      "face": {
+        "replica": "Mary - Office",
+        "replicaId": "red9211eea81",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "Kenyan English (Tavus voice likely General American)",
+      "style": "Bright field-report feel: daylight grade, location lower third (Kisumu), on-screen units (tonnes, %, KES)",
+      "targetSeconds": 52,
+      "script": "So here's a number that surprised me when I moved back to Kisumu. Almost a third of the fish caught on Lake Victoria is lost before it's sold. Not stolen, just spoiled, because there's no cold storage at the landing beaches. And the people losing it are mostly women traders who bought the fish that morning. I'm Anjali Shah, co-founder of Baridi. We build solar-powered cold rooms right at the beach. Traders don't buy anything. They pay per crate, per day, on mobile money, a few shillings at a time. We now run forty-six cold rooms with about thirty-eight hundred traders, and spoilage has gone from thirty percent down to around six. That's income that stays in the community. We're raising two point two million dollars, plus asset finance for the next hundred rooms. Cold storage sounds boring until you've watched someone throw away a day's profit."
+    },
+    {
+      "n": 10,
+      "company": "Prumo",
+      "oneLiner": "AI cost control for Brazilian construction sites, from site photos to budget alerts.",
+      "sector": "Construction tech / B2B SaaS",
+      "geography": "São Paulo, Brazil",
+      "stage": "series_a",
+      "model": "B2B SaaS, per-project subscription",
+      "traction": "R$11m ARR; 410 active sites; budget overruns cut by 38% on average",
+      "raise": "Raising $12m Series A",
+      "zinoFit": false,
+      "founder": {
+        "name": "Rafael Moreira",
+        "role": "Co-founder & CEO",
+        "age": 37,
+        "nationality": "Brazilian",
+        "bio": "Civil engineer who ran residential projects for a São Paulo developer for nine years.",
+        "temperament": "Confident, animated, story-teller"
+      },
+      "face": {
+        "replica": "Mateo",
+        "replicaId": "rbb3d627a705",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "Brazilian Portuguese-accented English (Tavus voice likely General American)",
+      "style": "Construction-site energy: warm high-contrast grade, yellow accent captions, before/after budget chart",
+      "targetSeconds": 50,
+      "script": "Every construction project in Brazil has the same ending. It's late, and it's over budget. I know, because I was the engineer explaining that to the client, nine years in a row. The reason isn't bad people. It's that the budget lives in a spreadsheet, and the site lives in WhatsApp. Nobody connects the two until it's too late. I'm Rafael Moreira, and Prumo connects them. Site teams just take photos and send updates the way they already do. Prumo reads them, tracks progress against the budget, and warns the manager when a line is drifting, weeks before it becomes a problem. We're on four hundred and ten sites, eleven million reais in recurring revenue, and our clients cut overruns by thirty-eight percent on average. We're raising a twelve million dollar Series A. A building is the biggest purchase most families ever make. It should arrive on time."
+    },
+    {
+      "n": 11,
+      "company": "Ferrolith",
+      "oneLiner": "Sodium-ion battery cells for stationary storage, made without lithium, cobalt or nickel.",
+      "sector": "Deep tech / Climate — battery materials",
+      "geography": "Munich, Germany",
+      "stage": "series_a",
+      "model": "Cell sales and licensing to storage integrators",
+      "traction": "Pilot line at 40 MWh/yr; 3 offtake LOIs totalling 1.2 GWh; 4,000-cycle validated cells",
+      "raise": "Raising €25m Series A",
+      "zinoFit": false,
+      "founder": {
+        "name": "Matthias Krüger",
+        "role": "Co-founder & CEO",
+        "age": 52,
+        "nationality": "German",
+        "bio": "Electrochemist; twenty years in battery R&D, most recently head of cell development at a European automotive supplier.",
+        "temperament": "Deliberate, deeply technical, understated"
+      },
+      "face": {
+        "replica": "Thomas",
+        "replicaId": "rff4f230c435",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "German-accented English (Tavus voice likely General American)",
+      "style": "Lab-industrial: cool grade, clean sans captions, cell cross-section diagram cutaway",
+      "targetSeconds": 55,
+      "script": "I've worked on batteries for twenty years, and for most of that time the answer to every storage question was lithium. That made sense for cars, where weight matters. But a battery sitting next to a solar farm doesn't care about weight. It cares about cost, safety, and how many times it can cycle. So we asked a different question. What's the best chemistry for a battery that never moves? Our answer is sodium-ion. No lithium, no cobalt, no nickel. The materials are abundant, and the cells are much harder to set on fire. I'm Matthias Krüger, and at Ferrolith we've validated our cells past four thousand cycles. We have a pilot line producing forty megawatt-hours a year, and letters of intent for one point two gigawatt-hours. We're raising twenty-five million euros to build our first production line. The grid needs storage that Europe can actually make itself. That's the opportunity."
+    },
+    {
+      "n": 12,
+      "company": "Shiftwell",
+      "oneLiner": "Scheduling, payroll and compliance for US home-care agencies in one system.",
+      "sector": "Enterprise software / Healthcare workforce SaaS",
+      "geography": "Columbus, Ohio, United States",
+      "stage": "series_a",
+      "model": "B2B SaaS, per-caregiver monthly",
+      "traction": "$4.1m ARR; 290 agencies; 38,000 caregivers paid through the platform",
+      "raise": "Raising $15m Series A",
+      "zinoFit": true,
+      "founder": {
+        "name": "Megan Holloway",
+        "role": "Founder & CEO",
+        "age": 39,
+        "nationality": "American",
+        "bio": "Ran a home-care agency with 400 caregivers in Ohio for eight years; sold it before founding Shiftwell.",
+        "temperament": "Operator, brisk, no-nonsense"
+      },
+      "face": {
+        "replica": "Samantha - Office",
+        "replicaId": "r37a25df750d",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "General American (Midwest)",
+      "style": "Operator walk-through: office setting, checklist-style captions, product screenshots of a schedule and a pay run",
+      "targetSeconds": 50,
+      "script": "I ran a home-care agency for eight years. Four hundred caregivers, and I used five different pieces of software to schedule them, pay them, and keep us compliant with Medicaid. None of them talked to each other. So every two weeks my team spent three days fixing payroll by hand. I'm Megan Holloway, and Shiftwell is the system I wish I'd had. One place for scheduling, electronic visit verification, payroll and billing. When a caregiver clocks in at a client's home, everything downstream just happens. We're at four point one million in annual recurring revenue, with two hundred and ninety agencies and about thirty-eight thousand caregivers getting paid through us. We're raising a fifteen million dollar Series A. Caregivers are some of the hardest-working people in America. The least we can do is pay them right, and on time."
+    },
+    {
+      "n": 13,
+      "company": "Halyard Security",
+      "oneLiner": "Passkey rollout and phishing-resistant sign-in for NHS trusts and UK councils.",
+      "sector": "Cybersecurity / Public-sector SaaS",
+      "geography": "Edinburgh, United Kingdom",
+      "stage": "seed",
+      "model": "B2B SaaS, per-user annual licence",
+      "traction": "11 NHS trusts and councils; 64,000 staff enrolled; zero successful phishing takeovers on enrolled accounts",
+      "raise": "Raising £3m seed",
+      "zinoFit": true,
+      "founder": {
+        "name": "Callum Reid",
+        "role": "Co-founder & CEO",
+        "age": 33,
+        "nationality": "British (Scottish)",
+        "bio": "Former incident responder at the national cyber security centre; led response to two ransomware attacks on public bodies.",
+        "temperament": "Calm under pressure, dryly funny"
+      },
+      "face": {
+        "replica": "Nathan - Bookshelf",
+        "replicaId": "rbf278df2604",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "Scottish English (Tavus voice likely General American)",
+      "style": "Incident-room straight talk: dark cool grade, terminal-style captions used sparingly, one attack-chain diagram",
+      "targetSeconds": 52,
+      "script": "I've been in the room after a hospital gets hit by ransomware. Operations cancelled, staff writing notes on paper, and almost every time it started the same way. Someone typed a password into a fake login page. I'm Callum Reid, and I spent years doing incident response for public bodies before starting Halyard Security. The fix is actually known. Passkeys. They can't be phished. The problem is rolling them out to forty thousand nurses, porters and admin staff, on shared computers, in a single trust. That's what Halyard does. We handle enrolment, shared workstations, lost devices, all of it. Eleven NHS trusts and councils, sixty-four thousand staff enrolled, and not one enrolled account has been taken over by phishing. We're raising a three million pound seed. Passwords had a good run. It's time."
+    },
+    {
+      "n": 14,
+      "company": "Hui",
+      "oneLiner": "Digital rotating savings groups for Vietnam's informal workers.",
+      "sector": "Fintech — consumer savings",
+      "geography": "Ho Chi Minh City, Vietnam",
+      "stage": "pre_seed",
+      "model": "Small fee per completed savings cycle; partner bank interest share",
+      "traction": "52,000 members; 7,300 active groups; ₫190bn saved",
+      "raise": "Raising $900k pre-seed",
+      "zinoFit": false,
+      "founder": {
+        "name": "Minh Tran",
+        "role": "Co-founder & CEO",
+        "age": 27,
+        "nationality": "Vietnamese",
+        "bio": "Former product manager at a Vietnamese e-wallet; grew up watching his mother run a hụi savings group at her market stall.",
+        "temperament": "Curious, youthful, earnest"
+      },
+      "face": {
+        "replica": "Zane",
+        "replicaId": "r0df0ace1c0a",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "Vietnamese-accented English (Tavus voice likely General American)",
+      "style": "Street-level selfie vlog: handheld feel, bright colours, playful captions, market-stall stills",
+      "targetSeconds": 46,
+      "script": "My mum sold fruit at a market in Saigon for twenty years, and she ran a hụi. That's a savings group. Ten women put in a little money every week, and each week one of them takes the whole pot. It's how she paid for my school. The problem is it all runs on trust and a notebook, and sometimes the person holding the notebook just disappears. So we made it digital. I'm Minh, and Hui lets people run the same savings group in an app, with the money held by a partner bank, so nobody can run off with it. Fifty-two thousand members already, over seven thousand groups. We're raising nine hundred thousand dollars. People in Vietnam have saved like this for generations. We just made it safe."
+    },
+    {
+      "n": 15,
+      "company": "Cosecha Labs",
+      "oneLiner": "Soil-moisture sensing and precision irrigation for avocado growers in Mexico.",
+      "sector": "Agriculture / Climate — water efficiency",
+      "geography": "Guadalajara, Mexico",
+      "stage": "seed",
+      "model": "Hardware-enabled SaaS, per-hectare annual subscription",
+      "traction": "9,200 hectares under management; 31% water saved; 140 growers",
+      "raise": "Raising $3.5m seed",
+      "zinoFit": false,
+      "founder": {
+        "name": "Santiago Ruiz",
+        "role": "Co-founder & CEO",
+        "age": 32,
+        "nationality": "Mexican",
+        "bio": "Agronomist from a Michoacán farming family; previously built IoT products at a Guadalajara hardware startup.",
+        "temperament": "Grounded, friendly, practical"
+      },
+      "face": {
+        "replica": "Diego - Office V2",
+        "replicaId": "r044d76f4490",
+        "model": "phoenix-3"
+      },
+      "intendedAccent": "Mexican Spanish-accented English (Tavus voice likely General American)",
+      "style": "Earthy outdoor tones, green accent captions, field map overlay",
+      "targetSeconds": 50,
+      "script": "Avocados need a lot of water. Something like a thousand litres for a single kilo, depending on who you ask. And in Michoacán, where my family farms, the aquifers are dropping every year. Most growers irrigate by habit, the same schedule, every week, whether the soil needs it or not. I'm Santiago Ruiz from Cosecha Labs. We put low-cost moisture sensors in the orchard and tell growers exactly when and how much to irrigate, block by block, on their phone. Across nine thousand two hundred hectares, our growers use about thirty-one percent less water, and their yields hold steady. A hundred and forty growers pay for it every year. We're raising a three and a half million dollar seed. The water is running out. Farming smarter isn't optional anymore."
+    },
+    {
+      "n": 16,
+      "company": "Mizan",
+      "oneLiner": "Shariah-compliant SME financing infrastructure for banks and fintechs in Egypt.",
+      "sector": "Fintech — lending infrastructure API",
+      "geography": "Cairo, Egypt",
+      "stage": "seed",
+      "model": "B2B API, per-financing fee",
+      "traction": "3 bank partners live; EGP 640m originated; 0.9% non-performing",
+      "raise": "Raising $4m seed",
+      "zinoFit": true,
+      "founder": {
+        "name": "Youssef Kamal",
+        "role": "Co-founder & CEO",
+        "age": 34,
+        "nationality": "Egyptian",
+        "bio": "Former product lead in an Egyptian bank's SME division; designed its first digital murabaha product.",
+        "temperament": "Articulate, thoughtful, persuasive"
+      },
+      "face": {
+        "replica": "Daniel - Library",
+        "replicaId": "rc39f215e8cb",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "Egyptian Arabic-accented English (Tavus voice likely General American)",
+      "style": "Library-scholarly: warm grade, elegant captions, simple API flow diagram",
+      "targetSeconds": 52,
+      "script": "In Egypt, a lot of small business owners won't take a conventional loan. Not because they can't, but because it conflicts with their faith. So they borrow from family, or they don't grow at all. Banks know this, and they'd like to offer Islamic financing to small businesses. But building those products is slow, expensive, and every contract has to be structured correctly. I'm Youssef Kamal, and Mizan is the infrastructure for that. Banks and fintechs plug into our API, and we handle the structuring, the Shariah review workflow, the documentation and the repayments. Three banks are live with us. We've originated six hundred and forty million Egyptian pounds, and our non-performing rate is under one percent. We're raising a four million dollar seed to launch in Morocco and Saudi Arabia. There are millions of businesses waiting for financing they can actually say yes to."
+    },
+    {
+      "n": 17,
+      "company": "Rand Treasury",
+      "oneLiner": "FX risk management software for South African mid-market companies.",
+      "sector": "Fintech / Enterprise software — treasury",
+      "geography": "Cape Town, South Africa",
+      "stage": "series_a",
+      "model": "B2B SaaS subscription plus execution fee",
+      "traction": "R48m ARR; 160 corporates; R14bn in hedged exposure",
+      "raise": "Raising $8m Series A",
+      "zinoFit": true,
+      "founder": {
+        "name": "Elize van der Merwe",
+        "role": "Co-founder & CEO",
+        "age": 49,
+        "nationality": "South African",
+        "bio": "Former head of corporate FX sales at a South African bank; chartered accountant.",
+        "temperament": "Seasoned, crisp, commercially sharp"
+      },
+      "face": {
+        "replica": "Janet",
+        "replicaId": "ra60269d91d3",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "South African English (Tavus voice likely General American)",
+      "style": "Executive briefing: navy and white, ticker-style figure captions, one hedging chart",
+      "targetSeconds": 52,
+      "script": "The rand can move ten percent in a month. If you're a large South African company, you have a treasury team to deal with that. If you're a mid-sized manufacturer importing machinery from Germany, you probably have your financial director and a phone call to the bank. I sold FX hedging to companies like that for fifteen years, and most of them were either unprotected or overpaying. I'm Elize van der Merwe, and Rand Treasury gives those companies proper treasury tools. We connect to their accounting system, see their exposures automatically, recommend a hedging policy, and they can execute with any bank. A hundred and sixty companies use us. We look after fourteen billion rand of exposure, and we're at forty-eight million rand in recurring revenue. We're raising an eight million dollar Series A. Currency risk shouldn't be a luxury problem only big companies get to solve."
+    },
+    {
+      "n": 18,
+      "company": "Orphéa Genomics",
+      "oneLiner": "Faster rare-disease diagnosis for children through whole-genome analysis.",
+      "sector": "Biotech — genomic diagnostics",
+      "geography": "Paris, France",
+      "stage": "seed",
+      "model": "Per-case fee paid by hospital genetics departments",
+      "traction": "9 university hospitals; 2,300 cases analysed; diagnostic yield 41% vs 25% baseline",
+      "raise": "Raising €6m seed",
+      "zinoFit": false,
+      "founder": {
+        "name": "Camille Laurent",
+        "role": "Co-founder & CEO",
+        "age": 36,
+        "nationality": "French",
+        "bio": "Clinical geneticist at a Paris children's hospital; PhD in bioinformatics.",
+        "temperament": "Compassionate, exact, quietly intense"
+      },
+      "face": {
+        "replica": "Margo",
+        "replicaId": "r78c9b897fbc",
+        "model": "phoenix-4"
+      },
+      "intendedAccent": "French-accented English (Tavus voice likely General American)",
+      "style": "Intimate clinical: soft light, generous white space, captions in a thin serif, no music",
+      "targetSeconds": 55,
+      "script": "The average family with a child who has a rare disease waits around five years for a diagnosis. Five years of specialists, tests, and not knowing. I'm a clinical geneticist, and I've sat with a lot of those parents. Often the answer is in the child's genome. The problem is that finding it means looking through millions of variants, and most hospitals simply don't have enough geneticists to do it. I'm Camille Laurent, and at Orphéa Genomics we built software that does the heavy part of that analysis, and ranks the variants most likely to explain the child's symptoms, with the evidence for each one. Nine university hospitals use us. We've analysed twenty-three hundred cases, and we find a diagnosis in forty-one percent of them, compared with about twenty-five percent before. We're raising a six million euro seed. For these families, an answer changes everything."
+    },
+    {
+      "n": 19,
+      "company": "Akshar",
+      "oneLiner": "Voice-based reading assessment for government primary schools in India.",
+      "sector": "Education — AI assessment",
+      "geography": "Bengaluru, India",
+      "stage": "pre_seed",
+      "model": "State education department contracts, per-student annual fee",
+      "traction": "1,900 schools across 2 states; 410,000 students assessed",
+      "raise": "Raising $1.2m pre-seed",
+      "zinoFit": false,
+      "founder": {
+        "name": "Meera Iyer",
+        "role": "Co-founder & CEO",
+        "age": 30,
+        "nationality": "Indian",
+        "bio": "Former government school teacher through a teaching fellowship; then a speech-AI researcher.",
+        "temperament": "Bright, idealistic, articulate"
+      },
+      "face": {
+        "replica": "Ruby - Office",
+        "replicaId": "rf90eb925bd8",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "Indian English (Tavus voice likely General American)",
+      "style": "Classroom-bright: warm daylight, hand-drawn style caption accents, a child-reading waveform graphic",
+      "targetSeconds": 48,
+      "script": "When I taught in a government school, I had fifty-two children in my class. Can you guess how often I heard each of them read aloud? Maybe once a term. You can't help a child read if you don't know where they're stuck. So that's what Akshar does. A child reads a short passage into a phone, in Kannada, Hindi, or English, and in a few seconds the teacher sees exactly which sounds and words they're struggling with. I'm Meera Iyer, and we're now in nineteen hundred schools across two states. Over four hundred thousand children have been assessed. We're raising a one point two million dollar pre-seed. Reading is where every other subject starts. We just want every teacher to finally be able to hear it."
+    },
+    {
+      "n": 20,
+      "company": "Railhead Robotics",
+      "oneLiner": "Autonomous drones that inspect freight rail yards and track every night.",
+      "sector": "Mobility / Robotics — rail infrastructure",
+      "geography": "Seattle, United States",
+      "stage": "series_a",
+      "model": "Robotics-as-a-service, per-yard annual contract",
+      "traction": "2 Class I railroads; 17 yards; 1,100 track defects found before failure",
+      "raise": "Raising $18m Series A",
+      "zinoFit": false,
+      "founder": {
+        "name": "Kenji Moriyama",
+        "role": "Co-founder & CEO",
+        "age": 48,
+        "nationality": "American",
+        "bio": "Twenty years in rail operations, most recently director of track maintenance for a western freight railroad.",
+        "temperament": "Veteran, plain-spoken, patient"
+      },
+      "face": {
+        "replica": "Victor - Office",
+        "replicaId": "rb1d65103218",
+        "model": "phoenix-4.5"
+      },
+      "intendedAccent": "General American",
+      "style": "Industrial-veteran: night-blue grade, large condensed captions, drone footage stills",
+      "targetSeconds": 50,
+      "script": "I spent twenty years keeping freight trains on the track. And the honest truth is, most rail yards are still inspected by a person walking the line with a flashlight. They do a great job, but a person can only see so much in one shift. When something gets missed, you get a derailment. I'm Kenji Moriyama, and at Railhead Robotics we fly autonomous drones over the yard every night. They capture every rail, tie and switch, and our models flag cracks and wear long before they become failures. We work with two of the major freight railroads across seventeen yards, and we've caught over eleven hundred defects early. We're raising an eighteen million dollar Series A. Railroads move a huge share of America's freight. Making them safer is worth doing properly."
+    }
+  ],
+  "estimatedTavusSeconds": 1052,
+  "limitations": [
+    "No Nigerian-accented Tavus voice exists on this account: the 40 stock voices carry no accent tags and appear to be General American. Nigerian founders will speak with their actor's own voice.",
+    "Only three distinct Black stock actors exist on Tavus (Darius, Celine, Destiny). The other two Nigerian founders are written as a Lebanese-Nigerian and an Indian-Nigerian founder, both born in Lagos, which matches real Lagos communities.",
+    "Tavus stock videos render 16:9; vertical 9:16 versions are made by a centred crop in post-production, with captions and lower thirds added locally (no other voice provider used)."
+  ]
+}
