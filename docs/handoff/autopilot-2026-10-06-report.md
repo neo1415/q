@@ -1,0 +1,37 @@
+# Autopilot brief, report (6 October 2026, evening)
+
+All fifteen items from the afternoon brief were worked, merged and deployed. The hosted database has 162 migrations with none missing. Every merge ran the package build, all four app typechecks, the targeted test suites and a production web build before deploying; new database tables ran their pgTAP suites locally.
+
+| Id | Ask | Result |
+|---|---|---|
+| P1 | Q never fails at Capital Q work | Done. Seven failure classes found in production and fixed with a test each: instruction runs swept as failed, unanswered approvals logged as failures, meetings without a calendar were a dead end (now proposed in chat for approval), the reviewer held good drafts, one tool round per turn (now two rounds, ten calls), approvals for messages that could never send, duplicate cards per run. |
+| P2 | Advice and numeric scores | Done. Rankings and comparisons carry the code-computed score ("7.5/10 · Good fit"). Advice opens with a recommendation, two or three reasons, the biggest risk and the next step. Answer cards are required for top, list and compare questions. |
+| P3 | Q's personality and rehearsal personas | Done. Q's voice is warm, sharp and human in text and voice; the personality setting changes tone, not substance. Six distinct rehearsal investor styles. |
+| P4 | Meeting Q stopped responding | Fixed. Recall's streaming transcriber sends lowercase text with no punctuation, so Q never thought it was addressed. Q now hears its name without punctuation, joins "hey q" with the next line, and its answer budget went from 16 to 60 calls per meeting. Answers take about 4 s. |
+| P5 | Q sees camera and shared screens | Rehearsals: per-slide coaching notes. Meetings: Q looks at shared screens (not cameras) every 15 s at most and keeps private notes that participants never receive. Switched on (`RECALL_SCREEN_VISION=on`, a more expensive Recall bot); not yet tried on a real call. No screen in the app shows the private notes yet; ask Q. |
+| P6 | Autopilot on seeded accounts | Every founder's guide is uploaded. Ledgerline, Clearwater, Tensorgate and Shiftwell accepted Zino's requests and messaged him. Zino's only standing instruction is "express interest", so his agents won't reply or propose meetings until he gives Q an instruction for that. A check-in runs at 08:30 UTC tomorrow, inside his working hours. |
+| P7 | Agent workforce view | Done. Research, a design with every state (phone, desktop, light, dark, black and gold) and a video, then the build: a zoomable Team map of Q's specialists in nine states, hover and click detail, inline approve, a list view, live refresh with honest offline state, and a Cost tab. |
+| P8 | Multiple funding rounds | Done. A full round lifecycle (planned, open, first close, closed, cancelled, reopened, bridges), terms, an append-only correction history, a past-now-next timeline, warnings for edge cases, and investor views by round with ownership estimates. |
+| P9 | Speed and bad networks | Done. On a throttled Slow 4G phone, content appears in about 3.2–3.6 s instead of 7.1–8.4 s on every main page, with zero layout shift. Voice libraries load only when a call starts, retries end in a clear "try again" instead of a spinner, and sidebar links prefetch on hover. |
+| P10 | Answer cards appear and disappear | Fixed. Spoken answers' cards were missed because the screen only checked three times; it now checks until the answer is complete. Playwright tests cover appear, focus, move to the Board, close and the chip on other pages. |
+| P11 | Presence not random | Fixed. Every state maps to one fixed shape, and the face shows on the Q page while Q speaks, including mid-conversation. Model gestures no longer move the presence. |
+| P12 | Organisations and accounts | Done. 76 seeded accounts across the 20 companies with teams. The organisation switcher now works, a member who joins lands on Home, and anyone can ask to join a company. |
+| P13 | Real companies and search | Done. Duplo, Bumpa, Anchor, Koolboks, HoneyCoin, MoneyHash, Tangible, ekko, Mintlify and F2 are unclaimed public profiles with 46 sourced claims, none verified. One shared search handles misspellings, websites and described queries ("Nigerian fintech seed": 0% to 93% right first time). |
+| P14 | Every leftover | Done, except: three onboarding findings that need a versioned onboarding definition change (F6, F16, setup country list and target close answer), and the personality set (your decision). |
+| P15 | Organisation emails | The api service now sends through the Brevo API (SMTP was blocked). Invites, join answers and ownership offers email, with a "copy the invite link" fallback when sending fails. Not yet confirmed with a real send. |
+
+## Decisions for you
+
+1. **Raise shown to the network** (ADR 0060, proposed): founders can show their raise to every signed-in investor who can see the company, off by default. It is not limited to verified investors.
+2. **Splash and prefetch:** the splash is shorter on slow connections and skippable; hovering a sidebar link now renders that page on the server in advance. Watch server load.
+3. **Real companies** each have their own empty organisation, so a claim on one never covers the others.
+4. **Model gestures** no longer drive the presence; they can come back tied to states.
+5. **Zino's instruction for replies:** tell Q, for example, "Reply to founders who accept, follow up when they go quiet, and propose meetings; ask me first for anything important."
+
+## Known limits
+
+- Q can't offer free times without a connected calendar; it proposes a time in chat instead.
+- The web still loads Zod on every page (about 340 KB); moving it out is its own task.
+- Explore posters are full-size images; tile-sized posters are the next speed win.
+- A web test (`break-fixes`) failed once under load and passed alone; it needs a look.
+- Twelve "no binding for token" errors on the fast voice line in production need investigating.
