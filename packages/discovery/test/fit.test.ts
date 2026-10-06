@@ -8,6 +8,7 @@ import {
   FitProfileDtoSchema,
   type FitOutcome,
   type FitParameter,
+  fitScoreOutOf10,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -557,9 +558,18 @@ describe("top N side by side", () => {
         (e) => !e.bestOn.includes("ROUND_TERMS") || e.position !== 2,
       ),
     ).toBe(true);
+    // ADR 0059 / autopilot P2: the computed score out of 10 leads the words.
     expect(fitComparisonText(comparison)).toMatch(
-      /^1\. Company 1: Strong fit, high confidence\./,
+      /^1\. Company 1: (?:\d+(?:\.\d)?\/10 · )?Strong fit, high confidence\./,
     );
+    const first = comparison.entries[0];
+    const score = first === undefined ? null : fitScoreOutOf10(first.profile);
+    if (score !== null) {
+      expect(fitComparisonText(comparison)).toContain(
+        `Company 1: ${score}/10 · Strong fit`,
+      );
+    }
+    expect(fitComparisonText(comparison)).not.toMatch(/%/);
     expect(fitComparisonText(comparison)).toMatch(/fit rules version 4/);
   });
 

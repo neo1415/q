@@ -45,8 +45,11 @@ import type { QToolPorts } from "../ports.js";
 export const FIT_PROFILE = "fit.profile" as const;
 export const FIT_TOP_CANDIDATES = "fit.top_candidates" as const;
 
+// ADR 0059 (autopilot P2): the score out of 10 is Capital Q's, computed in
+// code from the rows (`text` carries it as "7.5/10 · Good fit"); the model
+// repeats it, never makes one.
 const GUIDANCE =
-  "Show this as it is: the band and confidence in words, each parameter's word and reason. Never give a percentage, a number out of anything, or your own score. Unknown means not known yet, never bad. Q's view, if you give one, is labelled as your view and does not change the fit. Do not make a document or PDF unless the person asked for a file.";
+  "Say each company's fit as the score out of 10 given in text beside its band in words (\"7.5/10 · Good fit\"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q's view, if you give one, is labelled as your view and does not change the fit. Do not make a document or PDF unless the person asked for a file.";
 
 const STATUSES = [
   "OK",
@@ -155,7 +158,7 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
     id: FIT_PROFILE,
     providerName: "fit_profile",
     description:
-      "Reads how well one company fits this investor's own mandate, as Capital Q computed it: a band and a confidence in words, and for each of nine parameters (stage, sector, geography, cheque size, business model, traction, team, thesis, round terms) an outcome and a reason. Call it whenever an investor asks how a company fits, whether it matches their mandate, or what is unknown about it. Do not work out a fit yourself.",
+      "Reads how well one company fits this investor's own mandate, as Capital Q computed it: a score out of 10 (when enough is known), a band and a confidence in words, and for each of nine parameters (stage, sector, geography, cheque size, business model, traction, team, thesis, round terms) an outcome and a reason. Call it whenever an investor asks how a company fits, whether it matches their mandate, or what is unknown about it. Do not work out a fit yourself.",
     input: FitProfileInputSchema,
     output: FitProfileOutputSchema,
     authorize,
@@ -192,7 +195,7 @@ export function createFitTopCandidatesTool(
     id: FIT_TOP_CANDIDATES,
     providerName: "fit_top_candidates",
     description:
-      "Ranks this investor's own candidates (their relationships, the company requests sent to them, and their feed) by fit with their mandate, and returns the top N side by side: each company's band, confidence and nine parameter rows with reasons, which row each is best on, and how many were left out and why. Call it for 'give me the top three', 'compare my best matches', or 'which should I look at first'. The order is the platform's; explain it, never reorder it. Show it on screen; it is not a document.",
+      "Ranks this investor's own candidates (their relationships, the company requests sent to them, and their feed) by fit with their mandate, and returns the top N side by side: each company's score out of 10 (when enough is known), band, confidence and nine parameter rows with reasons, which row each is best on, and how many were left out and why. Call it for 'give me the top three', 'compare my best matches', or 'which should I look at first'. The order is the platform's; explain it, never reorder it. Show it on screen; it is not a document.",
     input: FitTopCandidatesInputSchema,
     output: FitTopCandidatesOutputSchema,
     authorize,
