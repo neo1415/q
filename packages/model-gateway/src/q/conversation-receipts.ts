@@ -274,6 +274,12 @@ export function screenLines(
       name === null ? "a Capital Q screen without a name here" : `on ${name}`
     }${shown.length === 0 ? "" : `, showing ${shown.join(" and ")}`}. You know what screen they are on: when they ask where they are or what they are looking at, say it plainly (for example "You're on your profile."); never say you cannot see their screen.`,
     ...(shown.length === 0 ? [] : [POINTING_LINE]),
+    // Q room R1: the whole page, read back for them, is a fact.
+    ...(screen.manifest === undefined
+      ? []
+      : [
+          "Everything on the page they are on, including below the fold and any open window, is under ON THEIR SCREEN in the facts: answer \"what's on my screen\", \"in this window\" or \"further down\" from it, and never say you can only see part of the page.",
+        ]),
     ...(name === null ? [] : [HERE_LINE]),
     ...(screen.route === "DAILY" ? [DAILY_HERE_LINE] : []),
     ...localTimeLines(screen.timeZone, now),

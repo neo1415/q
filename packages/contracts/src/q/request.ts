@@ -8,6 +8,7 @@ import {
 } from "./context.js";
 import { UuidSchema } from "../common/ids.js";
 import { QConversationIdSchema, QRunIdSchema } from "./ids.js";
+import { QPageManifestSchema } from "./screen-manifest.js";
 import { QSubjectRefsSchema } from "./subject.js";
 import { QContractVersionSchema } from "./version.js";
 
@@ -109,6 +110,13 @@ export const QScreenContextSchema = z
       .regex(/^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/)
       .max(64)
       .optional(),
+    /**
+     * Q room R1: what the whole page shows (sections, tab, filters, open
+     * dialogs), as ids and closed kinds only. Read back on the server
+     * through each record's own service, as the asker; a ref that does not
+     * resolve for them is dropped silently. It grants nothing.
+     */
+    manifest: QPageManifestSchema.optional(),
   })
   .strict();
 export type QScreenContext = z.infer<typeof QScreenContextSchema>;

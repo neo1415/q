@@ -191,9 +191,14 @@ function screenWithin(
     documentId,
     timeZone,
     artifactId,
+    manifest,
   } = screen;
   return {
     route: screen.route,
+    // Q room R1: what the whole page shows, as ids and closed kinds only.
+    // It grants nothing: each ref is read through its own read tool under
+    // this plan, as the asker, and a refused one is dropped unread.
+    ...(manifest === undefined ? {} : { manifest }),
     // The person's own clock, not data about anyone.
     ...(timeZone === undefined ? {} : { timeZone }),
     // voiceq-63: the document Q made for them that is open on this tab, as

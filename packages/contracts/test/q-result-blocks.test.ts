@@ -259,6 +259,13 @@ describe("QUiIntent", () => {
     SIGN_OUT: { kind: "SIGN_OUT" },
     OPEN_RECORD_PAGE: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: UUID },
     OPEN_SETUP: { kind: "OPEN_SETUP", journey: "investor" },
+    OPEN_SETTINGS: { kind: "OPEN_SETTINGS", section: "notifications" },
+    SHOW_IN_Q_ROOM: {
+      kind: "SHOW_IN_Q_ROOM",
+      object: "DATA_ROOM",
+      id: "00000000-0000-4000-8000-000000000001",
+      title: "Ledgerline",
+    },
   };
 
   it("parses every supported intent", () => {

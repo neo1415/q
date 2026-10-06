@@ -417,11 +417,16 @@ function screenKept(
 ): NonNullable<CreateQRunRequest["screen"]> {
   const has = (ref: QSubjectRef) =>
     refs.some((known) => JSON.stringify(known) === JSON.stringify(ref));
-  const { companyId, investorOrganisationId, documentId, timeZone } = screen;
+  const { companyId, investorOrganisationId, documentId, timeZone, manifest } =
+    screen;
   return {
     route: screen.route,
     // The person's own clock: not an entity, nothing to resolve.
     ...(timeZone === undefined ? {} : { timeZone }),
+    // Q room R1: the page's manifest, ids and closed kinds only. Kept as
+    // asked; every ref is read back as the asker before the model sees
+    // anything, and one that does not resolve is dropped there.
+    ...(manifest === undefined ? {} : { manifest }),
     ...(companyId !== undefined && has({ kind: "COMPANY", companyId })
       ? { companyId }
       : {}),

@@ -99,6 +99,7 @@ export { readinessLeadLines } from "./own-readiness.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { onScreenCompanyFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
+import { manifestFacts, manifestReads } from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
 import { companiesNamedIn, knownCompaniesOf } from "./named-companies.js";
@@ -1823,6 +1824,45 @@ export function createModelGatewayQAnswer(
       }
     })();
     /**
+     * Q room R1: the whole page on their screen (sections, tab, filters,
+     * open windows), sent as ids only and read back here through the read
+     * tools the model could call, under the same plan, as the asker. A ref
+     * whose read is refused is dropped unread; nothing the browser wrote
+     * reaches the model.
+     */
+    let onScreenPage: readonly AuthorisedFact[] = [];
+    const onScreenPageCalls: QToolCallObservation[] = [];
+    const pageRead = (async (): Promise<void> => {
+      const manifest = plan.screen?.manifest;
+      if (manifest === undefined) return;
+      const reads = manifestReads(manifest, prefetchTools);
+      const results = new Map<string, unknown>();
+      await Promise.all(
+        reads.map(async (read, index) => {
+          const outcome = await tools
+            .execute(
+              {
+                callId: `q-on-screen-page-${String(index)}`,
+                name: read.name,
+                arguments: { ...read.arguments },
+              },
+              toolContext,
+            )
+            .catch(() => null);
+          if (outcome === null) return;
+          onScreenPageCalls.push({
+            toolName: outcome.toolName,
+            providerName: read.name,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+          if (outcome.result.ok) results.set(read.key, outcome.result.data);
+        }),
+      );
+      onScreenPage = manifestFacts(manifest, results);
+    })();
+    /**
      * Their day: now in their zone, calls and reminders for 7 days, what
      * waits for their approval, Q's work for them, their last rehearsals
      * (founder demo 2026-10-02). Own records only, through the tools the
@@ -2012,6 +2052,7 @@ export function createModelGatewayQAnswer(
       namedRead,
       dailyRead,
       documentRead,
+      pageRead,
       dayRead,
     ]);
     return {
@@ -2039,6 +2080,8 @@ export function createModelGatewayQAnswer(
       onScreenDailyCall,
       onScreenDocument,
       onScreenDocumentCall,
+      onScreenPage,
+      onScreenPageCalls,
       ownDay,
       ownDayCalls,
       asked,
@@ -2144,6 +2187,8 @@ export function createModelGatewayQAnswer(
         onScreenDailyCall,
         onScreenDocument,
         onScreenDocumentCall,
+        onScreenPage,
+        onScreenPageCalls,
         ownDay,
         ownDayCalls,
         ownStanding,
@@ -2340,6 +2385,7 @@ export function createModelGatewayQAnswer(
         ...namedCompanies,
         ...(onScreenDaily === null ? [] : [onScreenDaily]),
         ...(onScreenDocument === null ? [] : [onScreenDocument]),
+        ...onScreenPage,
         ...(ownDay === null ? [] : [ownDay]),
         ...(relationship === null ? [] : [relationship]),
         ...(ownStanding === null ? [] : [ownStanding]),
@@ -2907,6 +2953,7 @@ export function createModelGatewayQAnswer(
       if (onScreenDocumentCall !== null) {
         toolCalls.push(onScreenDocumentCall);
       }
+      toolCalls.push(...onScreenPageCalls);
       if (onScreenDailyCall !== null) {
         toolCalls.push(onScreenDailyCall);
       }
