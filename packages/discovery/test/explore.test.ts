@@ -14,6 +14,7 @@ import {
   relatedPitches,
   type ExploreCompanyFacts,
   type ExplorePoolItem,
+  type ExploreSlatePage,
   type ExploreSignals,
 } from "../src/index.js";
 
@@ -221,9 +222,9 @@ describe("explore cursor", () => {
     const seen: string[] = [];
     let cursor: string | null = null;
     let pages = 0;
-    let upToDate = false;
+    let upToDate: boolean;
     do {
-      const page = exploreSlatePage({
+      const page: ExploreSlatePage<ExplorePoolItem> = exploreSlatePage({
         pool,
         signals: signals(),
         now: NOW,

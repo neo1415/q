@@ -123,7 +123,7 @@ function useColumns(): number | null {
 type Topic =
   | { readonly kind: "FOR_YOU" }
   | { readonly kind: "EVERYTHING" }
-  | { readonly kind: "NEW" }
+  | { readonly kind: "NEW"; readonly since: number }
   | {
       readonly kind: "SECTOR";
       readonly nodeId: string;
@@ -183,7 +183,16 @@ export function ExploreScreen({
   const [posters, setPosters] = useState<Readonly<Record<string, string>>>({});
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
-  const [opened, setOpened] = useState<Opened | null>(null);
+  // Design review can open a pitch on arrival (search: at once; the grid:
+  // when its first page lands).
+  const searchAnchor =
+    openOnArrival === null ? undefined : search?.pitches[openOnArrival.index];
+  const arrived = useRef(searchAnchor !== undefined);
+  const [opened, setOpened] = useState<Opened | null>(
+    searchAnchor === undefined
+      ? null
+      : { items: [searchAnchor], loading: true },
+  );
   const [toast, setToast] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const loadedFor = useRef<string | null>(
@@ -209,11 +218,19 @@ export function ExploreScreen({
       setTiles(result.value.items);
       setCursor(result.value.nextCursor);
       setUpToDate(result.value.upToDate);
+      const anchor =
+        openOnArrival === null || arrived.current
+          ? undefined
+          : result.value.items[openOnArrival.index];
+      if (anchor !== undefined) {
+        arrived.current = true;
+        setOpened({ items: [anchor], loading: true });
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [mode, reload, search, source, forceLoading]);
+  }, [mode, reload, search, source, forceLoading, openOnArrival]);
 
   const loadMore = useCallback(async () => {
     if (cursor === null || loadingMore) return;
@@ -287,47 +304,49 @@ export function ExploreScreen({
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const open = useCallback(
-    (list: readonly ExploreTileDto[], index: number) => {
-      const anchor = list[index];
-      if (anchor === undefined) return;
-      returnFocus.current =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
-      setOpened({ items: [anchor], loading: true });
-      try {
-        window.history.pushState(
-          { exploreOpen: anchor.pitch.mediaAssetId },
-          "",
-        );
-      } catch {
-        // History is a convenience; the back button works without it.
-      }
-      void source.loadRelated(anchor.pitch.mediaAssetId).then((result) => {
-        setOpened((current) =>
-          current === null ||
-          current.items[0]?.pitch.mediaAssetId !== anchor.pitch.mediaAssetId
-            ? current
-            : {
-                items: result.ok
-                  ? [
-                      anchor,
-                      ...result.value.items.filter(
-                        (i) => !hidden.has(i.companyId),
-                      ),
-                    ]
-                  : [anchor],
-                loading: false,
-              },
-        );
+  const open = useCallback((list: readonly ExploreTileDto[], index: number) => {
+    const anchor = list[index];
+    if (anchor === undefined) return;
+    returnFocus.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setOpened({ items: [anchor], loading: true });
+    try {
+      window.history.pushState({ exploreOpen: anchor.pitch.mediaAssetId }, "");
+    } catch {
+      // History is a convenience; the back button works without it.
+    }
+  }, []);
+
+  // The related feed for whatever was opened: read once per anchor.
+  const anchorId = opened?.items[0]?.pitch.mediaAssetId ?? null;
+  const relatedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (anchorId === null || relatedFor.current === anchorId) return;
+    relatedFor.current = anchorId;
+    void source.loadRelated(anchorId).then((result) => {
+      setOpened((current) => {
+        const anchor = current?.items[0];
+        if (current === null || anchor?.pitch.mediaAssetId !== anchorId) {
+          return current;
+        }
+        return {
+          items: result.ok
+            ? [
+                anchor,
+                ...result.value.items.filter((i) => !hidden.has(i.companyId)),
+              ]
+            : [anchor],
+          loading: false,
+        };
       });
-    },
-    [hidden, source],
-  );
+    });
+  }, [anchorId, hidden, source]);
 
   const close = useCallback(() => {
     setOpened(null);
+    relatedFor.current = null;
     const state: unknown = window.history.state;
     if (typeof state === "object" && state !== null && "exploreOpen" in state) {
       window.history.back();
@@ -335,17 +354,11 @@ export function ExploreScreen({
     returnFocus.current?.focus({ preventScroll: true });
   }, []);
 
-  const arrived = useRef(false);
   useEffect(() => {
-    if (openOnArrival === null || arrived.current) return;
-    const list = search?.pitches ?? tiles;
-    if (list === null || list.length === 0) return;
-    arrived.current = true;
-    open(list, openOnArrival.index);
-  }, [openOnArrival, open, search, tiles]);
-
-  useEffect(() => {
-    const onPop = () => setOpened(null);
+    const onPop = () => {
+      setOpened(null);
+      relatedFor.current = null;
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -391,8 +404,7 @@ export function ExploreScreen({
   const shown = useMemo(() => {
     const list = (tiles ?? []).filter((t) => !hidden.has(t.companyId));
     if (topic.kind === "NEW") {
-      const cutOff = Date.now() - FRESH_DAYS * 86_400_000;
-      return list.filter((t) => Date.parse(t.postedAt) >= cutOff);
+      return list.filter((t) => Date.parse(t.postedAt) >= topic.since);
     }
     if (topic.kind === "SECTOR") {
       return list.filter((t) => t.sectorNodeIds.includes(topic.nodeId));
@@ -413,11 +425,16 @@ export function ExploreScreen({
     return out;
   }, [tiles, sectorLabels]);
 
-  const choose = (next: Topic) => {
-    setTopic(next);
+  const choose = useCallback((next: Topic) => {
+    // "This week" is decided when it is tapped, not on every render.
+    setTopic(
+      next.kind === "NEW"
+        ? { kind: "NEW", since: Date.now() - FRESH_DAYS * 86_400_000 }
+        : next,
+    );
     if (next.kind === "FOR_YOU") setMode("FOR_YOU");
     if (next.kind === "EVERYTHING") setMode("EVERYTHING");
-  };
+  }, []);
   const topicOn = (t: Topic) =>
     t.kind === topic.kind &&
     (t.kind !== "SECTOR" ||
@@ -475,7 +492,7 @@ export function ExploreScreen({
   const topics: readonly (Topic & { readonly label: string })[] = [
     { kind: "FOR_YOU", label: "For you" },
     { kind: "EVERYTHING", label: "Everything" },
-    { kind: "NEW", label: "New this week" },
+    { kind: "NEW", since: 0, label: "New this week" },
     ...sectorTopics.map((s) => ({
       kind: "SECTOR" as const,
       nodeId: s.nodeId,
