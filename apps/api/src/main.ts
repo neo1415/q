@@ -422,6 +422,9 @@ const teamEmail =
           source: "api.team_invitation",
           provider: "SMTP",
         });
+const teamLogger = createLogger(apiServiceIdentity(config), {
+  level: config.observability.logLevel,
+});
 const team = createTeamService({
   store: createPostgresTeamStore({
     sql: database.sql,
@@ -429,6 +432,29 @@ const team = createTeamService({
   }),
   journal: createPostgresTeamJournal({ audit, outbox }),
   mailer: createInvitationMailer(teamEmail),
+  // P15: every team email's outcome in the service log, with the
+  // recipient's domain only; a provider error is named, never echoed (it
+  // can carry the address).
+  onEmail: (event) => {
+    const fields = {
+      event: "team.email",
+      kind: event.kind,
+      outcome: event.outcome,
+      recipientDomain: event.recipientDomain,
+      provider:
+        teamEmailConfig.brevoApi !== undefined
+          ? "BREVO_API"
+          : teamEmailConfig.smtp !== undefined
+            ? "SMTP"
+            : "NONE",
+      ...(event.error instanceof Error ? { errorName: event.error.name } : {}),
+    };
+    if (event.outcome === "SENT") {
+      teamLogger.info(fields, "team email sent");
+    } else {
+      teamLogger.warn(fields, "team email not sent");
+    }
+  },
   webOrigin:
     process.env["CQ_WEB_ORIGIN"] ??
     "https://capital-qweb-production.up.railway.app",

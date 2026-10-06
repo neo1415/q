@@ -7,11 +7,12 @@ import {
   getCompany,
   getCurrentInvestorOrganisation,
   getCurrentOnboardingSession,
+  getMyOrganisations,
   getQStanding,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
-import type { QStandingDto } from "@capital-q/contracts";
+import type { MyOrganisationDto, QStandingDto } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
 
@@ -157,14 +158,67 @@ type ContextLookups = {
 const defaultWait = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+/** The person's organisations, or null when they could not be read. */
+type OrganisationsReader = (
+  session: ApiSession,
+) => Promise<readonly MyOrganisationDto[] | null>;
+
+const readNoOrganisations: OrganisationsReader = () => Promise.resolve(null);
+
+const readMyOrganisations: OrganisationsReader = (session) =>
+  getMyOrganisations(session)
+    .then((mine) => mine.items)
+    .catch(() => null);
+
+/**
+ * F11/F23: the company a person works in through a membership, whatever
+ * journey made them a member. The one they act for (the active context)
+ * wins; with none active, their only company. `FIRM` means they act for
+ * an investment firm now, so no company is their context. Null: their
+ * memberships do not decide it.
+ */
+export function companyFromMemberships(
+  mine: readonly MyOrganisationDto[] | null,
+): { readonly companyId: string; readonly label: string } | "FIRM" | null {
+  if (mine === null || mine.length === 0) return null;
+  const active = mine.find((organisation) => organisation.active);
+  if (active !== undefined) {
+    if (active.companyId !== null) {
+      return { companyId: active.companyId, label: active.name };
+    }
+    return active.kind === "FIRM" ? "FIRM" : null;
+  }
+  const companies = mine.filter((organisation) => organisation.companyId);
+  const only = companies.length === 1 ? companies[0] : undefined;
+  return only === undefined || only.companyId === null
+    ? null
+    : { companyId: only.companyId, label: only.name };
+}
+
 function founderLookup(
   wait: (ms: number) => Promise<void>,
+  readOrganisations: OrganisationsReader,
 ): ContextLookups["founder"] {
   return async (session) => {
-    const journey = await lookup(
-      () => getCurrentOnboardingSession(session, "founder"),
-      wait,
-    );
+    const [journey, mine] = await Promise.all([
+      lookup(() => getCurrentOnboardingSession(session, "founder"), wait),
+      readOrganisations(session),
+    ]);
+    // F11: a member who joined (rather than onboarded) has no journey
+    // subject; their membership is their context. The server still
+    // authorises every read of that company.
+    const member = companyFromMemberships(mine);
+    if (member === "FIRM") return { status: "ABSENT" };
+    if (member !== null) {
+      return {
+        status: "FOUND",
+        value: {
+          kind: "FOUNDER",
+          companyId: member.companyId,
+          label: member.label,
+        },
+      };
+    }
     if (journey.status !== "FOUND") {
       return journey;
     }
@@ -218,7 +272,7 @@ function investorLookup(
 export async function resolveOwnContextWith(
   session: ApiSession | null,
   lookups: ContextLookups = {
-    founder: founderLookup(defaultWait),
+    founder: founderLookup(defaultWait, readMyOrganisations),
     investor: investorLookup(defaultWait),
   },
 ): Promise<OwnContext> {
@@ -248,9 +302,22 @@ export async function resolveOwnContextWith(
 /** Test seam: the lookups with an injectable pause. */
 export function createContextLookups(
   wait: (ms: number) => Promise<void>,
+  readOrganisations: OrganisationsReader = readNoOrganisations,
 ): ContextLookups {
-  return { founder: founderLookup(wait), investor: investorLookup(wait) };
+  return {
+    founder: founderLookup(wait, readOrganisations),
+    investor: investorLookup(wait),
+  };
 }
+
+/** The person's companies and firms, read once per render (switcher + context). */
+export const resolveMyOrganisations = cache(
+  async (): Promise<readonly MyOrganisationDto[]> => {
+    const session = await apiSession();
+    if (session === null) return [];
+    return (await readMyOrganisations(session)) ?? [];
+  },
+);
 
 /**
  * Both journeys' current sessions, asked side by side and once per render
@@ -331,7 +398,16 @@ export const resolveOnboardingState = cache(
         failed = true;
       }
     }
-    if (active !== null) return { kind: "UNFINISHED", journey: active };
+    if (active !== null) {
+      // F11: someone let in to a team they did not create (a Member or an
+      // Admin there) has somewhere to work; a setup they once started does
+      // not send them back to it.
+      const mine = await resolveMyOrganisations();
+      if (mine.some((organisation) => organisation.role !== "OWNER")) {
+        return { kind: "DONE" };
+      }
+      return { kind: "UNFINISHED", journey: active };
+    }
     if (failed) return { kind: "UNKNOWN" };
     const context = await resolveOwnContext();
     return context.kind === "NONE" ? { kind: "NEW" } : { kind: "DONE" };
@@ -347,5 +423,9 @@ export function onboardingPath(state: OnboardingState): string | null {
 }
 
 export const resolveOwnContext = cache(async (): Promise<OwnContext> =>
-  resolveOwnContextWith(await apiSession()),
+  resolveOwnContextWith(await apiSession(), {
+    // The switcher's own read, shared within the render.
+    founder: founderLookup(defaultWait, () => resolveMyOrganisations()),
+    investor: investorLookup(defaultWait),
+  }),
 );

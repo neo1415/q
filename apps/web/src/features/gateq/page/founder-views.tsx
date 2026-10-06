@@ -28,6 +28,8 @@ import {
 } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
+import { askToJoinAction } from "@/features/team/team-actions";
+
 import { claimAction, searchClaimableAction } from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
 
@@ -392,7 +394,12 @@ function ClaimSheet({
     hasMembers ? "ASK_MEMBERS" : "WORK_EMAIL",
   );
   const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  // F8: a company with members lets people in from its Team page; asking
+  // is a team join request to its organisation, not a claim.
+  const joinOrganisation =
+    hasMembers && company !== null ? company.organisationId : null;
   const [pending, startTransition] = useTransition();
   const methods: readonly (readonly [
     CompanyClaimMethod,
@@ -482,6 +489,21 @@ function ClaimSheet({
                 />
               </div>
             ) : null}
+            {joinOrganisation !== null ? (
+              <div className="gq-field">
+                <label className="gq-label" htmlFor="gq-join-note">
+                  A note for the admins (optional)
+                </label>
+                <input
+                  id="gq-join-note"
+                  className="gq-input"
+                  value={note}
+                  maxLength={500}
+                  placeholder="I lead product, joined in May"
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </div>
+            ) : null}
             {problem === null ? null : (
               <div className="gq-banner gq-banner-err" role="alert">
                 <CircleAlert {...icon} />
@@ -496,6 +518,13 @@ function ClaimSheet({
               onClick={() => {
                 setProblem(null);
                 startTransition(async () => {
+                  if (joinOrganisation !== null) {
+                    const asked = await askToJoinAction(joinOrganisation, note);
+                    if (!asked.ok) return setProblem(asked.message);
+                    return onDone(
+                      `Asked. ${company.name}'s admins let you in from their Team page; you'll get an email when they decide.`,
+                    );
+                  }
                   const done = await claimAction(company.companyId, {
                     method,
                     ...(method === "WORK_EMAIL"

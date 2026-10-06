@@ -7,6 +7,17 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
 /**
+ * F8: who is searching. A person with no organisation yet (exactly who
+ * joins a team) searches too; their own organisation, when they have one,
+ * adds their own company.
+ */
+export type ClaimSearcher = {
+  readonly userId: string;
+  readonly tenantId?: string | undefined;
+  readonly organisationId?: string | undefined;
+};
+
+/**
  * F3 (2026-10-06): "Find my startup". A founder finds their company among
  * the companies they may already see, and asks to claim it, or to join it
  * when it already has members.
@@ -16,8 +27,12 @@ import type { ActorContext } from "@capital-q/security";
  *
  * What a founder may find is what they may already see: companies shared
  * with the network (network_visible / public_external, ADR-001) and their
- * own organisation's. An organisation-private company never appears, so a
- * search cannot become a way to learn that a private company exists.
+ * own organisation's. An organisation-private company never appears to a
+ * partial search, so a search cannot become a way to list private
+ * companies. F8: a teammate who types the company's exact website domain
+ * already knows it exists; that exact match finds it (name, city and
+ * website only, which they typed), so they can ask its members to let them
+ * in before it is verified.
  */
 
 const VISIBLE = ["network_visible", "public_external"];
@@ -50,6 +65,7 @@ export function createCompanyClaims(options: {
   type Row = {
     id: string;
     tenant_id: string;
+    organisation_id: string | null;
     canonical_name: string;
     website_url: string | null;
     headquarters_city: string | null;
@@ -59,10 +75,12 @@ export function createCompanyClaims(options: {
     requested: boolean;
   };
 
-  const visible = (actor: ActorContext, where: ReturnType<typeof sql>) => sql<
-    Row[]
-  >`
-    select c.id, c.tenant_id, c.canonical_name, c.website_url, c.headquarters_city,
+  const visible = (
+    actor: ClaimSearcher,
+    where: ReturnType<typeof sql>,
+    exactHost: string | null = null,
+  ) => sql<Row[]>`
+    select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.website_url, c.headquarters_city,
            c.headquarters_country,
            (select count(*)::int from identity.organisation_memberships m
              where m.organisation_id = c.organisation_id and m.membership_status = 'active') as members,
@@ -75,13 +93,17 @@ export function createCompanyClaims(options: {
       from core.companies c
      where c.company_status = 'active'
        and (c.marketplace_visibility = any(${VISIBLE}::text[])
-            or (c.organisation_id = ${actor.organisationId ?? null}::uuid and c.tenant_id = ${actor.tenantId}))
+            or (c.organisation_id = ${actor.organisationId ?? null}::uuid
+                and c.tenant_id = ${actor.tenantId ?? null}::uuid)
+            or (${exactHost}::text is not null
+                and lower(regexp_replace(c.website_url, '^https?://(www\.)?([^/:?#]+).*$', '\2')) = ${exactHost}::text))
        and ${where}
      order by c.canonical_name
      limit 20`;
 
   const toDto = (row: Row): ClaimableCompanyDto => ({
     companyId: row.id,
+    organisationId: row.organisation_id,
     name: row.canonical_name,
     website: row.website_url,
     city: row.headquarters_city,
@@ -93,17 +115,21 @@ export function createCompanyClaims(options: {
 
   return {
     search: async (
-      actor: ActorContext,
+      actor: ClaimSearcher,
       text: string,
     ): Promise<readonly ClaimableCompanyDto[]> => {
       const query = text.trim().slice(0, 120);
       if (query.length < 2) return [];
       const like = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
       const host = hostOf(query.includes("://") ? query : `https://${query}`);
+      // Only a query that looks like a domain can match a private company,
+      // and only exactly.
+      const exactHost = host !== null && host.includes(".") ? host : null;
       const rows = await visible(
         actor,
         sql`(c.canonical_name ilike ${like} or c.legal_name ilike ${like}
              or (${host}::text is not null and c.website_url ilike ${`%${host ?? ""}%`}))`,
+        exactHost,
       );
       return rows.map(toDto);
     },

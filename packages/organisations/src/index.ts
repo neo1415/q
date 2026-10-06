@@ -136,10 +136,13 @@ export type {
   TeamJournalEntry,
   TeamMemberRecord,
   TeamOrganisationRecord,
+  TeamNoticeEmail,
   TeamStore,
 } from "./application/team-ports.js";
 export {
   createTeamService,
+  recipientDomainOf,
+  type TeamEmailEvent,
   type TeamActor,
   type TeamOutcome,
   type TeamService,
@@ -152,6 +155,7 @@ export {
 export {
   createInvitationMailer,
   renderInvitationEmail,
+  renderTeamNoticeEmail,
   type OutboundEmailSender,
 } from "./infrastructure/invitation-mailer.js";
 

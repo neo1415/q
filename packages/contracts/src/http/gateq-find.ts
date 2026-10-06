@@ -19,6 +19,11 @@ export const GATEQ_STARTUP_ALERTS_PATH = "/v1/gateq/startup-alerts" as const;
 export const ClaimableCompanyDtoSchema = z
   .object({
     companyId: z.string().uuid(),
+    /**
+     * F8: the company's organisation, for "Ask to join" (a team join
+     * request names the organisation). Null: nobody has claimed it.
+     */
+    organisationId: z.string().uuid().nullable(),
     name: z.string().max(200),
     website: z.string().max(2048).nullable(),
     city: z.string().max(120).nullable(),

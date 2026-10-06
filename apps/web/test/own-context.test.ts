@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiSession } from "@capital-q/api-client";
+import type { MyOrganisationDto } from "@capital-q/contracts";
 
 vi.mock("@/auth/session", () => ({
   getSessionAccessToken: () => Promise.resolve(null),
 }));
 
 import {
+  companyFromMemberships,
   createContextLookups,
   resolveOwnContextWith,
 } from "@/features/q/context";
@@ -189,5 +191,62 @@ describe("resolveOwnContext composes the two lookups honestly", () => {
     await expect(
       resolveOwnContextWith(null, { founder: unavailable, investor }),
     ).resolves.toEqual({ kind: "NONE" });
+  });
+});
+
+describe("F11/F23: a member's company comes from their memberships", () => {
+  const org = (over: Partial<MyOrganisationDto>): MyOrganisationDto => ({
+    organisationId: "00000000-0000-4000-8000-0000000000a1",
+    name: "Ledgerline",
+    kind: "COMPANY",
+    organisationType: "company",
+    role: "MEMBER",
+    memberCount: 4,
+    active: false,
+    companyId: "00000000-0000-4000-8000-0000000000c1",
+    ...over,
+  });
+
+  it("a member with no setup of their own lands in the company they joined", async () => {
+    const lookups = createContextLookups(noWait, () =>
+      Promise.resolve([org({})]),
+    );
+    // Founder journey: none (404). Investor: none (404).
+    const session = sessionAnswering([
+      problem(404, "RESOURCE_NOT_FOUND"),
+      problem(404, "RESOURCE_NOT_FOUND"),
+    ]);
+    await expect(resolveOwnContextWith(session, lookups)).resolves.toEqual({
+      kind: "FOUNDER",
+      companyId: "00000000-0000-4000-8000-0000000000c1",
+      label: "Ledgerline",
+    });
+  });
+
+  it("the organisation they switched to wins; a firm means no company context", () => {
+    const termly = org({
+      organisationId: "00000000-0000-4000-8000-0000000000a2",
+      name: "Termly",
+      active: true,
+      companyId: "00000000-0000-4000-8000-0000000000c2",
+    });
+    expect(companyFromMemberships([org({}), termly])).toEqual({
+      companyId: "00000000-0000-4000-8000-0000000000c2",
+      label: "Termly",
+    });
+    expect(
+      companyFromMemberships([
+        org({}),
+        org({ kind: "FIRM", companyId: null, active: true }),
+      ]),
+    ).toBe("FIRM");
+    // Two companies and none active: memberships do not decide.
+    expect(
+      companyFromMemberships([
+        org({}),
+        org({ companyId: "00000000-0000-4000-8000-0000000000c3" }),
+      ]),
+    ).toBeNull();
+    expect(companyFromMemberships(null)).toBeNull();
   });
 });

@@ -20,6 +20,8 @@ import { buttonClassName } from "@capital-q/ui/button";
 import {
   Check,
   ChevronDown,
+  CircleAlert,
+  Copy,
   ICON_SIZE,
   ICON_STROKE,
   Lock,
@@ -74,6 +76,8 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
   const [team, setTeam] = useState(initial);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // P15: invitations whose email did not go, with their one-time links.
+  const [unsent, setUnsent] = useState<readonly UnsentInvite[]>([]);
   const [query, setQuery] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -392,6 +396,12 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
 
   return (
     <div className="flex flex-col gap-6" data-team-page>
+      <UnsentInvites
+        items={unsent}
+        onDismiss={() => {
+          setUnsent([]);
+        }}
+      />
       {body}
 
       <SheetRoot
@@ -413,6 +423,13 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                 }
                 setTeam(out.value.team);
                 setSheet(null);
+                setUnsent(
+                  out.value.invited.flatMap((i) =>
+                    !i.emailed && i.link !== undefined
+                      ? [{ email: i.email, link: i.link }]
+                      : [],
+                  ),
+                );
                 const sent = out.value.invited.length;
                 const notEmailed = out.value.invited.filter(
                   (i) => !i.emailed,
@@ -425,7 +442,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                       ? "They're already invited. Resend from the list."
                       : "Nobody new to invite."
                     : notEmailed > 0
-                      ? `${String(sent)} invited. The email didn't go; use Resend.`
+                      ? "Couldn't send the email. Copy the invite link."
                       : `${String(sent)} ${sent === 1 ? "invitation" : "invitations"} sent. They expire in 7 days.`,
                 );
               });
@@ -1243,5 +1260,84 @@ function TransferSheet({
         </div>
       </div>
     </SheetContent>
+  );
+}
+
+type UnsentInvite = { readonly email: string; readonly link: string };
+
+/**
+ * P15: when an invitation email did not go, the admin who sent it passes
+ * the link on themselves. The link is shown once, here, and never listed
+ * again (the server keeps only its hash); Resend makes a new one.
+ */
+export function UnsentInvites({
+  items,
+  onDismiss,
+}: {
+  readonly items: readonly UnsentInvite[];
+  readonly onDismiss: () => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+  if (items.length === 0) return null;
+  return (
+    <section
+      role="status"
+      aria-label="Invitations not emailed"
+      className="flex flex-col gap-3 rounded-[14px] border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-4"
+      data-team-unsent
+    >
+      <p className="flex items-center gap-2 cq-body-sm font-medium text-(--cq-text-primary)">
+        <CircleAlert
+          aria-hidden="true"
+          size={ICON_SIZE.compact}
+          strokeWidth={ICON_STROKE}
+        />
+        Couldn&apos;t send the email — copy the invite link
+      </p>
+      <ul className="flex flex-col gap-2">
+        {items.map((item) => (
+          <li
+            key={item.link}
+            className="flex min-h-11 items-center justify-between gap-3"
+          >
+            <span className="min-w-0 truncate cq-body-sm text-(--cq-text-secondary)">
+              {item.email}
+            </span>
+            <button
+              type="button"
+              className={buttonClassName("secondary", "compact", "gap-1.5")}
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(item.link)
+                  .then(() => {
+                    setCopied(item.link);
+                  })
+                  .catch(() => {
+                    setCopied(null);
+                  });
+              }}
+              data-team-copy-link
+            >
+              <Copy
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+              {copied === item.link ? "Copied" : "Copy invite link"}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="cq-caption text-(--cq-text-tertiary)">
+        Each link works once, for 7 days, for the person it was made for.{" "}
+        <button
+          type="button"
+          className="underline underline-offset-2"
+          onClick={onDismiss}
+        >
+          Done
+        </button>
+      </p>
+    </section>
   );
 }

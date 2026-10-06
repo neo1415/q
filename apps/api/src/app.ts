@@ -816,6 +816,7 @@ export function createApp(
       materials: modules.gateqMaterials,
       inboxService: modules.gateqInboxService,
       claimable: modules.companyClaims?.search,
+      identities: security.identities,
       myApplications: modules.gateqMyApplications,
       publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,

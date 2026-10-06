@@ -206,5 +206,6 @@ export { createPostgresFounderPersonSource } from "./infrastructure/postgres-fou
 export {
   createCompanyClaims,
   emailAtCompany,
+  type ClaimSearcher,
   type CompanyClaims,
 } from "./claims/company-claims.js";

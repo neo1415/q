@@ -190,6 +190,11 @@ export const InviteResultDtoSchema = z
           email: z.string(),
           /** False: the invitation exists but the email did not go; resend it. */
           emailed: z.boolean(),
+          /**
+           * P15: only when the email did not go, the accept link for the
+           * inviting admin to pass on themselves. Never listed again.
+           */
+          link: z.string().url().max(2048).optional(),
         })
         .strict(),
     ),
@@ -242,6 +247,11 @@ export const MyOrganisationDtoSchema = z
     role: TeamRoleSchema,
     memberCount: z.number().int().min(0),
     active: z.boolean(),
+    /**
+     * F11: the canonical company this organisation is, when it is one. A
+     * member who joined (rather than onboarded) finds their company here.
+     */
+    companyId: UuidSchema.nullable(),
   })
   .strict();
 export type MyOrganisationDto = z.infer<typeof MyOrganisationDtoSchema>;

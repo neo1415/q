@@ -109,6 +109,7 @@ const MyOrganisationRow = z.object({
   role_codes: z.array(z.string()),
   member_count: z.coerce.number(),
   active: z.boolean(),
+  company_id: z.string().nullable(),
 });
 
 const IdRow = z.object({ id: z.string() });
@@ -515,7 +516,12 @@ export function createPostgresTeamStore(options: {
                (select count(*) from identity.organisation_memberships x
                  where x.organisation_id = o.id and x.membership_status = 'active') as member_count,
                exists (select 1 from identity.user_active_contexts c
-                        where c.user_id = m.user_id and c.membership_id = m.id) as active
+                        where c.user_id = m.user_id and c.membership_id = m.id) as active,
+               -- F11: the one canonical company this organisation is (an id
+               -- only; the company context still authorises every read).
+               (select co.id from core.companies co
+                 where co.organisation_id = o.id and co.tenant_id = o.tenant_id
+                 order by co.created_at limit 1) as company_id
           from identity.organisation_memberships m
           join identity.organisations o
             on o.id = m.organisation_id and o.tenant_id = m.tenant_id and o.status = 'active'
@@ -532,6 +538,7 @@ export function createPostgresTeamStore(options: {
           roleCodes: r.role_codes,
           memberCount: r.member_count,
           active: r.active,
+          companyId: r.company_id,
         };
       });
     },

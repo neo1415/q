@@ -75,6 +75,7 @@ export type MyOrganisationRecord = {
   readonly roleCodes: readonly string[];
   readonly memberCount: number;
   readonly active: boolean;
+  readonly companyId: string | null;
 };
 
 export type TeamStore<Tx> = {
@@ -299,8 +300,25 @@ export type InvitationEmail = {
   readonly expiresInDays: number;
 };
 
+/**
+ * P15: what a person hears about their team by email besides an invitation:
+ * an admin's answer to their request to join, or an offer of ownership.
+ */
+export type TeamNoticeEmail = {
+  readonly to: string;
+  readonly kind: "JOIN_APPROVED" | "JOIN_DECLINED" | "OWNERSHIP_OFFERED";
+  readonly organisationName: string;
+  readonly word: "company" | "firm";
+  /** Who decided or offered, by name. */
+  readonly actorName: string;
+  /** Where to go next (the app; never a token). */
+  readonly link: string;
+};
+
 /** Sends through the app's outbound email adapter; tests pass a fake. */
 export type InvitationMailer = {
+  /** P15: notices; absent means this deployment sends only invitations. */
+  readonly notify?: ((notice: TeamNoticeEmail) => Promise<void>) | undefined;
   readonly available: boolean;
   /** Throws on failure; the invitation stays and can be resent. */
   readonly send: (email: InvitationEmail) => Promise<void>;

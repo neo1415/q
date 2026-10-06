@@ -1959,6 +1959,18 @@ const team = createTeamService({
             provider: "SMTP",
           }),
   ),
+  // P15: outcome per email, recipient domain only (never the address).
+  onEmail: (event) => {
+    const fields = {
+      event: "team.email",
+      kind: event.kind,
+      outcome: event.outcome,
+      recipientDomain: event.recipientDomain,
+      ...(event.error instanceof Error ? { errorName: event.error.name } : {}),
+    };
+    if (event.outcome === "SENT") logger.info(fields, "team email sent");
+    else logger.warn(fields, "team email not sent");
+  },
   webOrigin:
     process.env["CQ_WEB_ORIGIN"] ??
     "https://capital-qweb-production.up.railway.app",

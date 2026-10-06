@@ -64,6 +64,11 @@ import {
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import {
+  getOnboardingActor,
+  requireOnboardingActorHook,
+} from "../security/onboarding-actor.js";
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 import { sendEntitlementRequired } from "./billing.js";
 import {
   MaterialNotSharableError,
@@ -103,10 +108,19 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
   /** F3: companies a founder may find and claim (what they may already see). */
   readonly claimable?:
     | ((
-        actor: ReturnType<typeof getActorContext>,
+        actor: {
+          readonly userId: string;
+          readonly tenantId?: string | undefined;
+          readonly organisationId?: string | undefined;
+        },
         text: string,
       ) => Promise<readonly ClaimableCompanyDto[]>)
     | undefined;
+  /**
+   * F8: the person lookup, so "Find my startup" also answers a person with
+   * no organisation yet (exactly who joins a team). Absent: context only.
+   */
+  readonly identities?: ApplicationIdentityLookup | undefined;
   /** F4: the organisation's GateQ inbox (its writes are declared app actions). */
   readonly inboxService?: InboxService | undefined;
   /** F4: the gateway's published reply promise, for its public page. */
@@ -302,13 +316,31 @@ export function registerGateQRoutes(
   const claimable = dependencies.claimable;
   if (claimable !== undefined) {
     // F3: "Find my startup". Only companies the caller may already see.
+    // F8: a person action, so someone with no organisation yet can find the
+    // company they are joining; their context, when present, adds theirs.
+    const identities = dependencies.identities;
+    const withPerson =
+      identities === undefined
+        ? null
+        : requireOnboardingActorHook({ ...dependencies, identities });
     app.get(
       COMPANY_CLAIMABLE_PATH,
-      { onRequest: withContext },
+      { onRequest: withPerson ?? withContext },
       async (request, reply) => {
         const q = (request.query as { q?: unknown }).q;
         const text = typeof q === "string" ? q.slice(0, 120) : "";
-        const companies = await claimable(getActorContext(request), text);
+        const searcher =
+          withPerson === null
+            ? getActorContext(request)
+            : (() => {
+                const person = getOnboardingActor(request);
+                return {
+                  userId: person.userId,
+                  tenantId: person.context?.tenantId,
+                  organisationId: person.context?.organisationId,
+                };
+              })();
+        const companies = await claimable(searcher, text);
         void reply.header("Cache-Control", "no-store");
         return ClaimableCompanyListDtoSchema.parse({ companies });
       },

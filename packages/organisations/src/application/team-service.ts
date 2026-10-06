@@ -36,6 +36,7 @@ import {
 import type {
   InvitationMailer,
   InvitationRecord,
+  TeamNoticeEmail,
   TeamJournal,
   TeamMemberRecord,
   TeamOrganisationRecord,
@@ -81,7 +82,25 @@ export type TeamServiceDependencies<Tx> = {
   readonly newToken?:
     (() => { readonly token: string; readonly hash: string }) | undefined;
   readonly onWarning?: ((message: string, error: unknown) => void) | undefined;
+  /**
+   * P15: every team email's outcome, for the service log. Carries the
+   * recipient's domain only, never the address.
+   */
+  readonly onEmail?: ((event: TeamEmailEvent) => void) | undefined;
 };
+
+export type TeamEmailEvent = {
+  readonly kind: "INVITATION" | TeamNoticeEmail["kind"];
+  readonly outcome: "SENT" | "FAILED" | "UNAVAILABLE";
+  readonly recipientDomain: string;
+  readonly error?: unknown;
+};
+
+/** The part of an address after the last @, lower case; never the address. */
+export function recipientDomainOf(email: string): string {
+  const at = email.lastIndexOf("@");
+  return at < 0 ? "unknown" : email.slice(at + 1).toLowerCase();
+}
 
 export type TeamService = {
   readonly team: (actor: TeamActor) => Promise<TeamOutcome<TeamDto>>;
@@ -348,7 +367,15 @@ export function createTeamService<Tx>(
     readonly role: InvitableRole;
     readonly message: string | null;
   }): Promise<boolean> {
-    if (!mailer.available) return false;
+    const recipientDomain = recipientDomainOf(input.to);
+    if (!mailer.available) {
+      dependencies.onEmail?.({
+        kind: "INVITATION",
+        outcome: "UNAVAILABLE",
+        recipientDomain,
+      });
+      return false;
+    }
     try {
       await mailer.send({
         to: input.to,
@@ -360,10 +387,55 @@ export function createTeamService<Tx>(
         link: acceptLink(input.token),
         expiresInDays: INVITATION_TTL_DAYS,
       });
+      dependencies.onEmail?.({
+        kind: "INVITATION",
+        outcome: "SENT",
+        recipientDomain,
+      });
       return true;
     } catch (error: unknown) {
       dependencies.onWarning?.("team invitation email failed", error);
+      dependencies.onEmail?.({
+        kind: "INVITATION",
+        outcome: "FAILED",
+        recipientDomain,
+        error,
+      });
       return false;
+    }
+  }
+
+  /**
+   * P15: a notice after its decision committed. A failed send never undoes
+   * the decision; it is logged (domain only) and the app shows the state.
+   */
+  async function sendNotice(notice: TeamNoticeEmail | null): Promise<void> {
+    if (notice === null) return;
+    const recipientDomain = recipientDomainOf(notice.to);
+    const notify = mailer.notify;
+    if (!mailer.available || notify === undefined) {
+      dependencies.onEmail?.({
+        kind: notice.kind,
+        outcome: "UNAVAILABLE",
+        recipientDomain,
+      });
+      return;
+    }
+    try {
+      await notify(notice);
+      dependencies.onEmail?.({
+        kind: notice.kind,
+        outcome: "SENT",
+        recipientDomain,
+      });
+    } catch (error: unknown) {
+      dependencies.onWarning?.("team notice email failed", error);
+      dependencies.onEmail?.({
+        kind: notice.kind,
+        outcome: "FAILED",
+        recipientDomain,
+        error,
+      });
     }
   }
 
@@ -483,10 +555,8 @@ export function createTeamService<Tx>(
         planned.value;
       // After commit: one email each, never inside the transaction.
       const invited = await Promise.all(
-        created.map(async (item) => ({
-          invitationId: item.invitationId,
-          email: item.email,
-          emailed: await sendInvitation({
+        created.map(async (item) => {
+          const emailed = await sendInvitation({
             invitationId: item.invitationId,
             to: item.email,
             token: item.token,
@@ -494,8 +564,19 @@ export function createTeamService<Tx>(
             inviterName,
             role: input.role,
             message,
-          }),
-        })),
+          });
+          // P15: when the email did not go, the admin who made the
+          // invitation gets its link to pass on themselves. Only to them,
+          // only now: the token is never stored and never listed again.
+          return emailed
+            ? { invitationId: item.invitationId, email: item.email, emailed }
+            : {
+                invitationId: item.invitationId,
+                email: item.email,
+                emailed,
+                link: acceptLink(item.token),
+              };
+        }),
       );
       const team = await store.transaction(async (tx) => {
         const s = await scope(tx, actor, false);
@@ -727,8 +808,9 @@ export function createTeamService<Tx>(
         };
       }),
 
-    offerOwnership: (actor, membershipId, correlationId) =>
-      inTeam(actor, async (tx, s) => {
+    offerOwnership: async (actor, membershipId, correlationId) => {
+      const box: { notice: TeamNoticeEmail | null } = { notice: null };
+      const outcome = await inTeam(actor, async (tx, s) => {
         const target = s.members.find(
           (member) => member.membershipId === membershipId,
         );
@@ -755,8 +837,22 @@ export function createTeamService<Tx>(
           metadata: { toMembershipId: target.membershipId },
           correlationId,
         });
+        box.notice =
+          target.email === null
+            ? null
+            : {
+                to: target.email,
+                kind: "OWNERSHIP_OFFERED",
+                organisationName: s.organisation.name,
+                word: teamWord(teamKindOf(s.organisation.type)),
+                actorName: displayName(s.me.name, s.me.email),
+                link: `${origin}/settings/team`,
+              };
         return null;
-      }),
+      });
+      if (outcome.ok) await sendNotice(box.notice);
+      return outcome;
+    },
 
     respondToOwnershipOffer: (actor, offerId, accept, correlationId) =>
       inTeam(actor, async (tx, s) => {
@@ -804,8 +900,9 @@ export function createTeamService<Tx>(
         return null;
       }),
 
-    decideJoinRequest: (actor, requestId, approve, correlationId) =>
-      inTeam(actor, async (tx, s) => {
+    decideJoinRequest: async (actor, requestId, approve, correlationId) => {
+      const box: { notice: TeamNoticeEmail | null } = { notice: null };
+      const outcome = await inTeam(actor, async (tx, s) => {
         if (!abilitiesOf(s.myRole).invite) {
           return refuse("NOT_ALLOWED", "Only admins can let people in.");
         }
@@ -832,6 +929,15 @@ export function createTeamService<Tx>(
             await store.setRoles(tx, membershipId, ROLE_CODES_FOR.MEMBER);
           }
         }
+        // F11: a person let in with nowhere active yet acts for this one
+        // now (as accepting an invitation does); someone already working
+        // elsewhere keeps their context and switches when they choose.
+        if (
+          membershipId !== null &&
+          (await store.activeContextOf(tx, request.userId)) === null
+        ) {
+          await store.setActiveContext(tx, request.userId, membershipId);
+        }
         await store.decideJoinRequest(tx, request.id, {
           status: approve ? "approved" : "declined",
           decidedByUserId: actor.userId,
@@ -857,8 +963,22 @@ export function createTeamService<Tx>(
                 },
               }),
         });
+        box.notice =
+          request.email === null
+            ? null
+            : {
+                to: request.email,
+                kind: approve ? "JOIN_APPROVED" : "JOIN_DECLINED",
+                organisationName: s.organisation.name,
+                word: teamWord(teamKindOf(s.organisation.type)),
+                actorName: displayName(s.me.name, s.me.email),
+                link: `${origin}/home`,
+              };
         return null;
-      }),
+      });
+      if (outcome.ok) await sendNotice(box.notice);
+      return outcome;
+    },
 
     myOrganisations: async (userId) => {
       const rows = await store.myOrganisations(userId);
@@ -871,6 +991,7 @@ export function createTeamService<Tx>(
           role: teamRoleOf(row.roleCodes),
           memberCount: row.memberCount,
           active: row.active,
+          companyId: row.companyId,
         })),
       };
     },
