@@ -151,10 +151,12 @@ export {
 export {
   APPROVE_PENDING_TOOL,
   approvalStatusLine,
+  CAPABILITY_NOTE_MAX_CHARS,
   capabilityNote,
   collectReceipts,
   DAILY_HERE_LINE,
   HERE_LINE,
+  NAVIGATION_LINE,
   proposalStatusLine,
   PLAIN_KNOWING_LINE,
   POINTING_LINE,
