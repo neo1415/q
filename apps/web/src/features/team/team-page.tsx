@@ -134,7 +134,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
   };
 
   const head = (
-    <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div className="flex min-w-0 flex-col gap-1">
         <h1 className="cq-title-lg text-(--cq-text-primary)">Team</h1>
         <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -146,7 +146,11 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
       {can.invite ? (
         <button
           type="button"
-          className={buttonClassName("primary")}
+          className={buttonClassName(
+            "primary",
+            "regular",
+            "shrink-0 self-start",
+          )}
           onClick={() => {
             setSheet({ kind: "invite" });
           }}
