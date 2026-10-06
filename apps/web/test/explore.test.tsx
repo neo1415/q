@@ -234,8 +234,8 @@ describe("the screen", () => {
         },
       }),
     ),
-    loadRelated: vi.fn(() => new Promise(() => undefined)),
-    authorize: vi.fn(() => new Promise(() => undefined)),
+    loadRelated: vi.fn(() => new Promise<never>(() => undefined)),
+    authorize: vi.fn(() => new Promise<never>(() => undefined)),
     save: vi.fn(() => Promise.resolve({ ok: true })),
   });
 
