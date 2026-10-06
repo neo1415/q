@@ -204,6 +204,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // F4: the GateQ inbox. Q reads it through its triage tool.
   "api/http/gateq.ts GET GATEQ_INBOX_PATH": cap("tool.gateq_inbox_triage"),
   "api/http/gateq.ts GET GATEQ_INBOX_ITEM_PATH": cap("tool.gateq_inbox_triage"),
+  "api/http/gateq.ts GET COMPANY_CLAIMABLE_PATH": cap("offer.find_my_startup"),
   "api/http/gateq.ts GET GATEQ_INBOX_PACK_PATH": exempt(
     "a zip file the investor downloads to their own device; Q has no device to save it to",
   ),

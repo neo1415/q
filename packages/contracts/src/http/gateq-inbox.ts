@@ -182,16 +182,25 @@ export const GateqInboxDetailDtoSchema = z
     /** Everything the founder answered, labelled; their words, not facts. */
     answers: z
       .array(
-        z.object({ label: z.string().max(60), value: z.string().max(2000) }).strict(),
+        z
+          .object({ label: z.string().max(60), value: z.string().max(2000) })
+          .strict(),
       )
       .max(40),
     note: z.string().max(2000).nullable(),
     contact: z
-      .object({ name: z.string().max(200).nullable(), email: z.string().max(254).nullable() })
+      .object({
+        name: z.string().max(200).nullable(),
+        email: z.string().max(254).nullable(),
+      })
       .strict(),
     /** Only what the founder ticked and sent. */
     shared: z
-      .array(z.object({ documentId: z.string().uuid(), title: z.string().max(200) }).strict())
+      .array(
+        z
+          .object({ documentId: z.string().uuid(), title: z.string().max(200) })
+          .strict(),
+      )
       .max(20),
     notes: z
       .array(
@@ -272,13 +281,23 @@ export const GateqInboxSettingsRequestSchema = z
   .strict();
 
 export type GateqInboxStarRequest = z.infer<typeof GateqInboxStarRequestSchema>;
-export type GateqInboxArchiveRequest = z.infer<typeof GateqInboxArchiveRequestSchema>;
-export type GateqInboxLabelRequest = z.infer<typeof GateqInboxLabelRequestSchema>;
-export type GateqInboxAssignRequest = z.infer<typeof GateqInboxAssignRequestSchema>;
+export type GateqInboxArchiveRequest = z.infer<
+  typeof GateqInboxArchiveRequestSchema
+>;
+export type GateqInboxLabelRequest = z.infer<
+  typeof GateqInboxLabelRequestSchema
+>;
+export type GateqInboxAssignRequest = z.infer<
+  typeof GateqInboxAssignRequestSchema
+>;
 export type GateqInboxNoteRequest = z.infer<typeof GateqInboxNoteRequestSchema>;
 export type GateqInboxPassRequest = z.infer<typeof GateqInboxPassRequestSchema>;
-export type GateqInboxReplyRequest = z.infer<typeof GateqInboxReplyRequestSchema>;
-export type GateqInboxSettingsRequest = z.infer<typeof GateqInboxSettingsRequestSchema>;
+export type GateqInboxReplyRequest = z.infer<
+  typeof GateqInboxReplyRequestSchema
+>;
+export type GateqInboxSettingsRequest = z.infer<
+  typeof GateqInboxSettingsRequestSchema
+>;
 
 /** How many rows a bulk action changed; the same shape for every one. */
 export const GateqInboxChangedDtoSchema = z

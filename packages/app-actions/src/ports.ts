@@ -44,6 +44,10 @@ import type { DeckAudiencePort } from "./actions/deck.js";
 import type { DocumentChangePort } from "./actions/document-manage.js";
 import type { GateQPolicyExtractionPort } from "./actions/gateq.js";
 import type { GateqInboxPort } from "./actions/gateq-inbox.js";
+import type {
+  CompanyClaimsPort,
+  StartupAlertsPort,
+} from "./actions/gateq-find.js";
 import type { QWorkPagePort } from "./actions/work.js";
 import type { EtiquetteGuidePort } from "./actions/etiquette.js";
 
@@ -66,6 +70,10 @@ export type AppActionPorts = {
   readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
   /** F4: an investor organisation's GateQ inbox (gateq-intake's inbox service). */
   readonly gateqInbox?: GateqInboxPort | undefined;
+  /** F3: a founder's request to claim or join a canonical company. */
+  readonly companyClaims?: CompanyClaimsPort | undefined;
+  /** F3: an investor's saved "Find a startup" search. */
+  readonly startupAlerts?: StartupAlertsPort | undefined;
   /** ADR 0041: who may download a pitch deck (the Evidence service). */
   readonly deckAudience?: DeckAudiencePort | undefined;
   /** P3: rename and delete (archive) their own documents (Evidence). */

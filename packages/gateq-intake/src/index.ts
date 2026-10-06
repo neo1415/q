@@ -131,3 +131,4 @@ export {
   gateqInboxAuthority,
   ownGatewayIdFrom,
 } from "./inbox/compose.js";
+export { createStartupAlerts, type StartupAlerts } from "./find/alerts.js";

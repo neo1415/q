@@ -45,6 +45,8 @@ import {
   registerDocumentRoutes,
   type DocumentRoutesDependencies,
 } from "./http/documents.js";
+import type { CompanyClaims } from "@capital-q/companies";
+import type { StartupAlerts } from "@capital-q/gateq-intake";
 import type {
   AppActionPorts,
   GateQPolicyExtractionPort,
@@ -287,6 +289,9 @@ export type ApiModules = {
   readonly gateqMaterials?: GateQRoutesDependencies["materials"] | undefined;
   readonly gateqInboxService?:
     GateQRoutesDependencies["inboxService"] | undefined;
+  /** F3: find and claim a company; an investor's saved startup search. */
+  readonly companyClaims?: CompanyClaims | undefined;
+  readonly startupAlerts?: StartupAlerts | undefined;
   /** F4: the inbox as the declared actions reach it (ADR 0040). */
   readonly gateqInboxActions?: AppActionPorts["gateqInbox"];
   readonly gateqPublicReplyPromise?:
@@ -602,6 +607,12 @@ export function createApp(
       ...(modules.gateqInboxActions === undefined
         ? {}
         : { gateqInbox: modules.gateqInboxActions }),
+      ...(modules.companyClaims === undefined
+        ? {}
+        : { companyClaims: modules.companyClaims }),
+      ...(modules.startupAlerts === undefined
+        ? {}
+        : { startupAlerts: modules.startupAlerts }),
     },
   });
   // ADR 0040: person-scoped routes (onboarding), under the onboarding actor.
@@ -746,6 +757,7 @@ export function createApp(
       inbox: modules.gateqInbox,
       materials: modules.gateqMaterials,
       inboxService: modules.gateqInboxService,
+      claimable: modules.companyClaims?.search,
       publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,
       publicImages: modules.gateqPublicImages,

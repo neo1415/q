@@ -195,3 +195,10 @@ export {
   type TeamProjectionSource,
 } from "./domain/team-projection.js";
 export { createPostgresCompanyTeamProjection } from "./infrastructure/postgres-team-projection.js";
+
+// F3: "Find my startup": find a visible company and ask to claim or join it.
+export {
+  createCompanyClaims,
+  emailAtCompany,
+  type CompanyClaims,
+} from "./claims/company-claims.js";

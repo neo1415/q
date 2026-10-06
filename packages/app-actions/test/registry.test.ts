@@ -274,6 +274,9 @@ describe("the action registry", () => {
       ["gateq.inbox.triage", "gateq_inbox_triage", "READ"],
       ["gateq.inbox.draft_pass", "gateq_inbox_draft_pass", "READ"],
       ["gateq.inbox.summarise", "gateq_inbox_summarise", "READ"],
+      // F3: find my startup (claim on screen) and a saved startup search.
+      ["company.claim.request", "offer.find_my_startup", "INSTANT"],
+      ["gateq.startup_alert.save", "save_startup_alert", "INSTANT"],
     ]);
   });
 });

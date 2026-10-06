@@ -7,6 +7,7 @@
  * import business logic from domain packages rather than defining it here.
  */
 
+import { createCompanyClaims } from "@capital-q/companies";
 import { createApplicationMaterials } from "./gateq/application-materials.js";
 import { sharedDocumentsPort } from "./gateq/inbox.js";
 import { loadApiConfig } from "@capital-q/config/api";
@@ -142,6 +143,7 @@ import {
   createPostgresSubmissionInbox,
   createGateqInbox,
   createPostgresInboxRepository,
+  createStartupAlerts,
   gateqInboxActionsPort,
   ownGatewayIdFrom,
 } from "@capital-q/gateq-intake";
@@ -1890,6 +1892,9 @@ const { app, logger } = createApp(config, security, {
   },
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
+  // F3: "Find my startup": claim requests and saved startup searches.
+  companyClaims: createCompanyClaims({ sql: database.sql }),
+  startupAlerts: createStartupAlerts({ sql: database.sql }),
   // F4: the investor's GateQ inbox. Reads here; writes are declared actions.
   gateqInboxService: gateqInboxService,
   gateqInboxActions: gateqInboxActionsPort(

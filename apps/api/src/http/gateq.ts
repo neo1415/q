@@ -5,6 +5,9 @@ import {
   ApplicationSummaryDtoSchema,
   GATEQ_GATEWAY_APPLICATIONS_PATH,
   GATEQ_APPLY_MATERIALS_PATH,
+  COMPANY_CLAIMABLE_PATH,
+  ClaimableCompanyListDtoSchema,
+  type ClaimableCompanyDto,
   GATEQ_INBOX_ITEM_PATH,
   GATEQ_INBOX_PACK_PATH,
   GATEQ_INBOX_PATH,
@@ -88,6 +91,13 @@ import {
 
 export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly gateq: GateQService;
+  /** F3: companies a founder may find and claim (what they may already see). */
+  readonly claimable?:
+    | ((
+        actor: ReturnType<typeof getActorContext>,
+        text: string,
+      ) => Promise<readonly ClaimableCompanyDto[]>)
+    | undefined;
   /** F4: the organisation's GateQ inbox (its writes are declared app actions). */
   readonly inboxService?: InboxService | undefined;
   /** F4: the gateway's published reply promise, for its public page. */
@@ -257,6 +267,22 @@ export function registerGateQRoutes(
       return { gateways: gateways.map(gatewayDto) };
     },
   );
+
+  const claimable = dependencies.claimable;
+  if (claimable !== undefined) {
+    // F3: "Find my startup". Only companies the caller may already see.
+    app.get(
+      COMPANY_CLAIMABLE_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const q = (request.query as { q?: unknown }).q;
+        const text = typeof q === "string" ? q.slice(0, 120) : "";
+        const companies = await claimable(getActorContext(request), text);
+        void reply.header("Cache-Control", "no-store");
+        return ClaimableCompanyListDtoSchema.parse({ companies });
+      },
+    );
+  }
 
   const inboxService = dependencies.inboxService;
   if (inboxService !== undefined) {

@@ -21,8 +21,10 @@ import {
   createPostgresGatewayRepository,
   createPostgresGatewayVersionRepository,
 } from "@capital-q/gateq";
+import { createCompanyClaims } from "@capital-q/companies";
 import {
   createGateqInbox,
+  createStartupAlerts,
   gateqInboxActionsPort,
   ownGatewayIdFrom,
 } from "@capital-q/gateq-intake";
@@ -1740,6 +1742,9 @@ const gateqInbox = gateqInboxActionsPort(
 const appActionPorts: OwnReadPorts = {
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
+  // F3: "Find my startup": claim requests and saved startup searches.
+  companyClaims: createCompanyClaims({ sql: database.sql }),
+  startupAlerts: createStartupAlerts({ sql: database.sql }),
   // ADR 0050: their own speaking guide, saved or removed by asking Q.
   etiquetteGuides,
   media: pitchMedia,
