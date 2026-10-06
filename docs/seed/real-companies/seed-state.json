@@ -1,0 +1,151 @@
+{
+  "seedKey": "p13-real-companies-v1",
+  "companies": {
+    "Duplo": {
+      "tenantId": "eb4f85a2-6e06-57a1-b66e-66f6f854d5e8",
+      "organisationId": "8717443f-9343-5a80-812d-6476e4c31a9b",
+      "companyId": "a9d8d2de-7165-59bb-8bfc-92c19f39e156",
+      "sources": 2,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "funding.total_raised:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_1:USER_CLAIM/SELF_REPORTED"
+      ],
+      "taxonomy": 7,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "Bumpa": {
+      "tenantId": "339286cb-e088-5017-bf56-7a6cfe58fb90",
+      "organisationId": "9938e616-1190-5487-b41e-6734bd94f988",
+      "companyId": "ad7aab5e-547e-5763-956d-7abfe3bd80b1",
+      "sources": 2,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED"
+      ],
+      "taxonomy": 5,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "Anchor": {
+      "tenantId": "8fe84aa3-cfc6-5a7d-aba6-6d5161213591",
+      "organisationId": "0dbcb05a-f41c-5083-b80f-1c080806d863",
+      "companyId": "af3549d6-858b-5e93-8686-df7052ac004b",
+      "sources": 3,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "traction.public_metric_1:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_2:USER_CLAIM/SELF_REPORTED",
+        "company.headquarters:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "company.founded_year:USER_CLAIM/DOCUMENT_SUPPORTED"
+      ],
+      "taxonomy": 7,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "Koolboks": {
+      "tenantId": "0b62a3b3-b5c0-5f47-8f3c-0fe31024dda1",
+      "organisationId": "f1c63d0b-3a70-5a39-8db0-afa1434baacd",
+      "companyId": "b2cb07a4-483d-5b45-a262-d82072a3265b",
+      "sources": 3,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "funding.total_raised:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_1:USER_CLAIM/SELF_REPORTED",
+        "company.headquarters:USER_CLAIM/DOCUMENT_SUPPORTED"
+      ],
+      "taxonomy": 8,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "HoneyCoin": {
+      "tenantId": "f0e1956d-fdd8-51ff-9bf4-66e3ad115fd0",
+      "organisationId": "d4e8b6ae-381e-5f20-b210-73c32aa284c2",
+      "companyId": "d2a9bebc-2b15-55a1-bc10-4bd2313c9087",
+      "sources": 4,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "traction.public_metric_1:USER_CLAIM/SELF_REPORTED",
+        "company.headquarters:USER_CLAIM/SELF_REPORTED"
+      ],
+      "taxonomy": 8,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "MoneyHash": {
+      "tenantId": "10cbb3ec-cb39-52bb-a0a5-2ef1cb86e8c0",
+      "organisationId": "ab55de8a-c89f-50a2-8793-d613f591a47f",
+      "companyId": "8b1c25b2-7e8b-5e78-9f51-c307e6b869e8",
+      "sources": 2,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "funding.total_raised:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_1:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_2:USER_CLAIM/SELF_REPORTED"
+      ],
+      "taxonomy": 8,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "Tangible": {
+      "tenantId": "9a6c38ad-dffa-5cb4-be59-5112ead2faa1",
+      "organisationId": "6f1e6d98-d150-5664-afaf-40b2287bc09b",
+      "companyId": "bff322f5-ea98-506d-b0ed-dd51033e19b3",
+      "sources": 3,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "funding.total_raised:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_1:USER_CLAIM/SELF_REPORTED",
+        "company.headquarters:USER_CLAIM/DOCUMENT_SUPPORTED"
+      ],
+      "taxonomy": 6,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "ekko": {
+      "tenantId": "4a242704-ed57-5adf-bb5c-185770a8fc61",
+      "organisationId": "15716522-d9ac-53ca-8111-98dbf0b83bc3",
+      "companyId": "20752c5e-419c-543f-a5c1-fc0ddc5180f0",
+      "sources": 2,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "company.headquarters:USER_CLAIM/DOCUMENT_SUPPORTED"
+      ],
+      "taxonomy": 6,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "Mintlify": {
+      "tenantId": "06f61410-fafe-55ed-949b-084b3decb51d",
+      "organisationId": "a340d002-a0e1-5ce1-ac6c-683e6d2f4859",
+      "companyId": "4dc6c776-8904-5869-ac75-1b6863f20f3b",
+      "sources": 3,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "funding.total_raised:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_1:USER_CLAIM/SELF_REPORTED",
+        "company.headquarters:USER_CLAIM/DOCUMENT_SUPPORTED"
+      ],
+      "taxonomy": 6,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    },
+    "F2": {
+      "tenantId": "0bc9c883-220e-5da6-aa73-b71b35a33e87",
+      "organisationId": "06c288f6-e12f-50ba-93ed-8b3320a71335",
+      "companyId": "c6305feb-0cf8-52ab-977a-87569c3b2916",
+      "sources": 4,
+      "claims": [
+        "team.founders:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "funding.latest_round:USER_CLAIM/MULTI_SOURCE_SUPPORTED",
+        "funding.total_raised:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_1:USER_CLAIM/SELF_REPORTED",
+        "traction.public_metric_2:USER_CLAIM/SELF_REPORTED",
+        "company.headquarters:USER_CLAIM/DOCUMENT_SUPPORTED",
+        "company.founded_year:USER_CLAIM/DOCUMENT_SUPPORTED"
+      ],
+      "taxonomy": 7,
+      "seededAt": "2026-10-06T19:03:25.851Z"
+    }
+  }
+}

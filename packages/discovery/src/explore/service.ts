@@ -1,3 +1,4 @@
+import { parseCompanySearch, scoreCompanySearch } from "@capital-q/companies";
 import type { ExploreMode } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -252,18 +253,30 @@ export function createExploreService<R extends ExploreNetworkRow>(
       const text = normaliseExploreText(query.text);
       const sectors = new Set(query.sectorNodeIds ?? []);
       if (text.length === 0 && sectors.size === 0) return [];
+      const parsed = text.length === 0 ? null : parseCompanySearch(text);
+      if (text.length > 0 && parsed === null) return [];
       const items = await pool(actor);
-      return items.filter(
+      const inSectors = items.filter(
         (item) =>
-          (sectors.size === 0 ||
-            item.sectorNodeIds.some((id) => sectors.has(id))) &&
-          (text.length === 0 ||
-            matchesExploreText(
-              item.company,
-              text,
-              declaredWords(item.company),
-            )),
+          sectors.size === 0 ||
+          item.sectorNodeIds.some((id) => sectors.has(id)),
       );
+      if (parsed === null) return inSectors;
+      // P13: the same reading and ranking as every company search (exact
+      // name, sound-alike, prefix, misspelling, or a described match on
+      // place, stage and words), best first; ties keep the pool's order.
+      // Only what the network view shows is matched.
+      const scored = inSectors.flatMap((item, index) => {
+        const score = scoreCompanySearch(parsed, {
+          name: item.company.canonicalName,
+          shortDescription: item.company.shortDescription,
+          country: item.company.headquartersCountry,
+          stage: item.company.currentStageCode,
+        });
+        return score === null ? [] : [{ item, score, index }];
+      });
+      scored.sort((a, b) => b.score - a.score || a.index - b.index);
+      return scored.map((entry) => entry.item);
     },
   };
 }

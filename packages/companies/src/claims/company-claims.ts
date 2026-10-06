@@ -11,6 +11,9 @@ import type {
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
+import { parseCompanySearch } from "../domain/company-search.js";
+import { companySearchJoins } from "../infrastructure/company-search-sql.js";
+
 /**
  * F8: who is searching. A person with no organisation yet (exactly who
  * joins a team) searches too; their own organisation, when they have one,
@@ -161,17 +164,39 @@ export function createCompanyClaims(options: {
     ): Promise<readonly ClaimableCompanyDto[]> => {
       const query = text.trim().slice(0, 120);
       if (query.length < 2) return [];
+      const parsed = parseCompanySearch(query);
+      if (parsed === null) return [];
+      // P13: the same reading and ranking as every company search (exact,
+      // website, sound-alike, prefix, contains, close misspelling, described),
+      // best first; the legal name still finds a company by its own text.
       const like = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
       const host = hostOf(query.includes("://") ? query : `https://${query}`);
       // Only a query that looks like a domain can match a private company,
-      // and only exactly.
+      // and only exactly (P14).
       const exactHost = host !== null && host.includes(".") ? host : null;
-      const rows = await visible(
-        actor,
-        sql`(c.canonical_name ilike ${like} or c.legal_name ilike ${like}
-             or (${host}::text is not null and c.website_url ilike ${`%${host ?? ""}%`}))`,
-        exactHost,
-      );
+      const rows = await sql<Row[]>`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.website_url, c.headquarters_city,
+               c.headquarters_country,
+               (select count(*)::int from identity.organisation_memberships m
+                 where m.organisation_id = c.organisation_id and m.membership_status = 'active') as members,
+               exists (select 1 from identity.organisation_memberships m
+                        where m.organisation_id = c.organisation_id and m.user_id = ${actor.userId}
+                          and m.membership_status = 'active') as yours,
+               exists (select 1 from core.company_claim_requests r
+                        where r.company_id = c.id and r.requester_user_id = ${actor.userId}
+                          and r.status = 'PENDING') as requested
+          from core.companies c
+          ${companySearchJoins(sql, parsed)}
+         where c.company_status = 'active'
+           and (c.marketplace_visibility = any(${VISIBLE}::text[])
+                or (c.organisation_id = ${actor.organisationId ?? null}::uuid
+                    and c.tenant_id = ${actor.tenantId ?? null}::uuid)
+                or (${exactHost}::text is not null
+                    and lower(regexp_replace(c.website_url, '^https?://(www\.)?([^/:?#]+).*$', '\2')) = ${exactHost}::text))
+           and (s.score > 0 or c.legal_name ilike ${like})
+         order by greatest(s.score, case when c.legal_name ilike ${like} then 640 else 0 end) desc,
+                  c.canonical_name, c.id
+         limit 20`;
       return rows.map(toDto);
     },
 
