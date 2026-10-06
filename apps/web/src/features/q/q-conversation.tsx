@@ -725,7 +725,7 @@ export function QConversationPanel({
                       size={40}
                       inputLevel={client.inputLevel}
                       outputLevel={client.outputLevel}
-                      travels
+                      showing={showingCards}
                     />
                   </ViewTransition>
                   <span className="cq-caption text-(--cq-text-secondary) max-sm:sr-only">
@@ -874,8 +874,7 @@ export function QConversationPanel({
                             size={44}
                             inputLevel={client.inputLevel}
                             outputLevel={client.outputLevel}
-                            face
-                            travels
+                            showing={showingCards}
                           />
                         </ViewTransition>
                       ) : (
@@ -893,6 +892,8 @@ export function QConversationPanel({
                               size={compact ? 64 : 200}
                               inputLevel={client.inputLevel}
                               outputLevel={client.outputLevel}
+                              face
+                              showing={compact || showingCards}
                             />
                           </ViewTransition>
                           {!compact &&
@@ -1113,7 +1114,6 @@ export function QConversationPanel({
                     inputLevel={client.inputLevel}
                     outputLevel={client.outputLevel}
                     face
-                    travels
                   />
                 </ViewTransition>
                 <div className="flex flex-col items-center gap-1" role="status">

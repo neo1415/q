@@ -11,6 +11,7 @@ import { ICON_SIZE, ICON_STROKE, PanelRight, X } from "@capital-q/ui/icons";
 import { QAperture } from "@/features/q-aperture";
 
 import { answerChipFor, type AnswerChipContent } from "./answer-canvas-logic";
+import type { QTurn } from "./conversation";
 import { useQSessionOptional } from "./q-session";
 
 const Q_PAGE = "/home";
@@ -24,26 +25,52 @@ const Q_PAGE = "/home";
 export function AnswerChip() {
   const pathname = usePathname();
   const session = useQSessionOptional();
-  const turns = session?.turns;
-  // Answers already there when this page opened are not news.
+  if (session === null) return null;
+  return (
+    <AnswerChipFor
+      pathname={pathname}
+      turns={session.turns}
+      loading={session.q.loading}
+      conversationId={session.q.conversationId}
+    />
+  );
+}
+
+/**
+ * The chip for a session's turns on a page. Split from the session so the
+ * appear / open / dismiss behaviour is exercised in a browser with a
+ * recorded conversation (e2e/answer-cards.spec.ts).
+ */
+export function AnswerChipFor({
+  pathname,
+  turns,
+  loading,
+  conversationId,
+}: {
+  readonly pathname: string;
+  readonly turns: readonly QTurn[];
+  /** The conversation is still being read: its turns are not news yet. */
+  readonly loading: boolean;
+  readonly conversationId: string | null;
+}) {
+  // Answers already there when this page opened are not news. Taken once
+  // the conversation has been read: taken while it loads, an empty list
+  // made the newest old answer with cards look new (P10).
   const [before, setBefore] = useState<ReadonlySet<string> | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
   const [seenPath, setSeenPath] = useState(pathname);
-  if (turns !== undefined && (before === null || seenPath !== pathname)) {
+  if (!loading && (before === null || seenPath !== pathname)) {
     setBefore(new Set(turns.map((turn) => turn.id)));
     setSeenPath(pathname);
   }
   const chip = useMemo(
-    () =>
-      turns === undefined || before === null
-        ? null
-        : answerChipFor(turns, before, dismissed),
+    () => (before === null ? null : answerChipFor(turns, before, dismissed)),
     [turns, before, dismissed],
   );
-  if (pathname === Q_PAGE || chip === null || session === null) return null;
-  const conversation = session.q.conversationId;
+  if (pathname === Q_PAGE || chip === null) return null;
+  const conversation = conversationId;
   const home =
     conversation === null
       ? Q_PAGE

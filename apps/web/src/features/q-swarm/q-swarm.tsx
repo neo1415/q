@@ -5,7 +5,12 @@ import { useEffect, useRef } from "react";
 import { useQMotion } from "../q-aperture/q-motion";
 import type { QApertureState } from "../q-aperture/aperture-state";
 import { FINE_FIGURES } from "./presence-figures";
-import { createPresenceMachine, faceAllowed } from "./presence-machine";
+import {
+  faceAllowed,
+  figureForState,
+  presenceFor,
+  SMALL_PIXELS,
+} from "./presence-machine";
 import { createPresenceSim, MAX_DT } from "./presence-dynamics";
 import {
   budgetSettings,
@@ -16,15 +21,16 @@ import {
 } from "./presence-budget";
 import { drawPresence, resolveColour, type Rgb } from "./presence-gl";
 import { presenceUniforms, stepLean, type Lean } from "./presence-uniforms";
-import { gesturesDetail, Q_GESTURES_EVENT } from "./q-gestures";
 
 export { particleCount } from "./presence-budget";
 
 /**
  * Q's presence as particles (founder direction 2026-09-29, reworked
  * 2026-10-01 -- PRESENCE spec; 3D since ADR 0049). What the particles form
- * follows real signals only: the surface's Q state, the microphone and
- * the speaker, and the gestures Q's answer asked for (`cq:q-gestures`).
+ * follows Q's state only, through one fixed mapping (presenceFor in
+ * presence-machine.ts; P11): a shape changes when the state does, never
+ * on a timer or a roll of the dice. The microphone and the speaker move
+ * the particles within a shape, never choose one.
  * How they move is one continuous, bounded dynamic (presence-dynamics.ts),
  * so a change of figure is a flow, never a snap.
  *
@@ -34,8 +40,8 @@ export { particleCount } from "./presence-budget";
  * is missing, or the device asks for light work, the 2D swarm draws the
  * same particles flat.
  *
- * The free shapes (K1) carry Q's state: cloud, spiral, ring, wave, the
- * Q mark in knots of light, a ribbon on arrival. The human face (K2,
+ * The free shapes (K1) carry Q's state: cloud, spiral, ring, wave, and
+ * the Q mark in knots of light while answer cards are up. The human face (K2,
  * ADR 0051) shows only while Q speaks, and only where the caller says the
  * surface is the Q page's own presence (`face`) at 160 px or more; every
  * other surface has no face. Below 72 px only the cloud, the listening
@@ -53,7 +59,7 @@ export function QSwarm({
   inputLevel,
   outputLevel,
   face = false,
-  travels = false,
+  showing = false,
 }: {
   readonly state: QApertureState;
   readonly pixels: number;
@@ -61,8 +67,8 @@ export function QSwarm({
   readonly outputLevel?: (() => number) | undefined;
   /** This surface is the Q page's own presence: it may show the face. */
   readonly face?: boolean | undefined;
-  /** Q travels to this surface (dock, Q page): a ribbon on arrival. */
-  readonly travels?: boolean | undefined;
+  /** Answer cards are on screen beside this presence: the Q mark. */
+  readonly showing?: boolean | undefined;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const environment = useQMotion();
@@ -76,12 +82,21 @@ export function QSwarm({
     inputLevel,
     outputLevel,
     showsFace,
+    showing,
     motion,
     bloom,
   });
   useEffect(() => {
-    live.current = { state, inputLevel, outputLevel, showsFace, motion, bloom };
-  }, [state, inputLevel, outputLevel, showsFace, motion, bloom]);
+    live.current = {
+      state,
+      inputLevel,
+      outputLevel,
+      showsFace,
+      showing,
+      motion,
+      bloom,
+    };
+  }, [state, inputLevel, outputLevel, showsFace, showing, motion, bloom]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -97,12 +112,15 @@ export function QSwarm({
       canvas.height = device;
     };
     fit(1);
-    const small = pixels < 72;
-    const machine = createPresenceMachine({ arrive: travels });
+    const small = pixels < SMALL_PIXELS;
     const sim = createPresenceSim({
       count: scaledParticleCount(pixels, navigator.hardwareConcurrency),
-      // Small surfaces never show the ribbon: they start as the cloud.
-      initial: travels && !small ? "RIBBON" : "CLOUD",
+      // A surface opens already in its state's shape: no flourish on mount.
+      initial: figureForState(
+        live.current.state,
+        small,
+        live.current.showsFace,
+      ),
       seed: pixels * 7 + 3,
     });
 
@@ -165,11 +183,11 @@ export function QSwarm({
     const frame = (now: number) => {
       const began = performance.now();
       const current = live.current;
-      const view = machine.step({
+      const view = presenceFor({
         state: current.state,
         small,
-        now,
         face: current.showsFace,
+        showing: current.showing,
       });
       const moving = current.motion === "full";
       const interval = last === 0 ? 0 : now - last;
@@ -276,16 +294,6 @@ export function QSwarm({
       attributes: true,
       attributeFilter: ["data-theme", "data-q-mood"],
     });
-    const onGestures = (event: Event) => {
-      const detail = gesturesDetail(event);
-      if (detail === null) return;
-      machine.schedule(
-        { gestures: detail.gestures, spoken: detail.spoken, text: detail.text },
-        performance.now(),
-      );
-      redraw();
-    };
-    window.addEventListener(Q_GESTURES_EVENT, onGestures);
     const onPointer = (event: PointerEvent) => {
       pointer = { x: event.clientX, y: event.clientY };
     };
@@ -300,13 +308,6 @@ export function QSwarm({
     window.addEventListener("pointerup", onPointerGone, { passive: true });
     window.addEventListener("pointercancel", onPointerGone, { passive: true });
     document.addEventListener("pointerout", onPointerGone, { passive: true });
-    // Reduced motion still changes figure with the state and with the
-    // gestures' timing: a quiet timer looks four times a second.
-    const stillTimer = window.setInterval(() => {
-      if (live.current.motion !== "full" && onScreen && !document.hidden) {
-        redraw();
-      }
-    }, 250);
     const visibility = new IntersectionObserver((entries) => {
       onScreen = entries.some((entry) => entry.isIntersecting);
       if (onScreen) redraw();
@@ -320,7 +321,6 @@ export function QSwarm({
     redraw();
     return () => {
       disposed = true;
-      window.removeEventListener(Q_GESTURES_EVENT, onGestures);
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("pointerup", onPointerGone);
@@ -328,18 +328,18 @@ export function QSwarm({
       document.removeEventListener("pointerout", onPointerGone);
       canvas.removeEventListener("cq:redraw", redraw);
       cancelAnimationFrame(raf);
-      window.clearInterval(stillTimer);
       themeWatch.disconnect();
       visibility.disconnect();
       document.removeEventListener("visibilitychange", onHidden);
     };
-  }, [pixels, allow3d, travels]);
+  }, [pixels, allow3d]);
 
-  // A state or motion change restarts a stopped loop (reduced motion, or
-  // after a hidden tab).
+  // A state, face, cards or motion change restarts a stopped loop (reduced
+  // motion, or after a hidden tab): with no timers, this is the only way a
+  // still presence changes shape, and it is exactly when it should.
   useEffect(() => {
     canvasRef.current?.dispatchEvent(new Event("cq:redraw"));
-  }, [state, motion, bloom]);
+  }, [state, showsFace, showing, motion, bloom]);
 
   return (
     <canvas

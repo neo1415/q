@@ -36,6 +36,7 @@ import { resumableConversation } from "./resume-conversation";
 import { setOpenDocument } from "./screen";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation, type QConversation } from "./use-q-conversation";
+import { rereadUntilSettled } from "./voice-reread";
 
 /**
  * One Q conversation for the whole signed-in app (ADR 0017 F1; spec §6.4).
@@ -106,8 +107,6 @@ export function useQSession(): QSessionValue {
 /** How long the settle after an answer, and the sweep of an action, show. */
 const SUCCESS_MS = 900;
 const ACTION_MS = 700;
-/** A second read of the record after a voice turn, once its run is surely stored. */
-const VOICE_REREAD_MS = 2_500;
 
 const Q_PAGE = "/home";
 
@@ -240,25 +239,30 @@ export function QSessionProvider({
    * "here's your mandate, download the PDF from the card" -- but it
    * arrives here only as speech and transcript text. Without reading the
    * record back, the card it names never reached the stage or the Board
-   * (founder bug on 164fc5c). So each completed voice turn reads the
-   * conversation again, once when the turn completes and once more after
-   * Q has finished saying it, by which time the run has certainly been
-   * recorded.
+   * (founder bug on 164fc5c). So each voice turn the board reports, and
+   * each time Q stops speaking, reads the conversation until the record
+   * holds the run as finished (P10: a fixed second read came too early for
+   * a ranked list, whose cards then never appeared). One reading at a
+   * time: a newer trigger replaces the one under way.
    */
   const voiceSequence = voice.turn?.sequence ?? 0;
   const qRefresh = q.refresh;
+  const stopReread = useRef<(() => void) | null>(null);
+  const reread = useCallback(() => {
+    stopReread.current?.();
+    stopReread.current = rereadUntilSettled({ read: qRefresh });
+  }, [qRefresh]);
+  useEffect(() => () => stopReread.current?.(), []);
   useEffect(() => {
     if (voiceSequence === 0) return;
-    void qRefresh();
-    const again = window.setTimeout(() => void qRefresh(), VOICE_REREAD_MS);
-    return () => window.clearTimeout(again);
-  }, [voiceSequence, qRefresh]);
+    reread();
+  }, [voiceSequence, reread]);
   const voiceSpeaking = voice.client.state === "Q_SPEAKING";
   const wasSpeaking = useRef(false);
   useEffect(() => {
-    if (wasSpeaking.current && !voiceSpeaking) void qRefresh();
+    if (wasSpeaking.current && !voiceSpeaking) reread();
     wasSpeaking.current = voiceSpeaking;
-  }, [voiceSpeaking, qRefresh]);
+  }, [voiceSpeaking, reread]);
 
   const open = useCallback((next: string | null) => {
     setConversationId((current) => {

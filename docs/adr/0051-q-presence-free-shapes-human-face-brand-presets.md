@@ -27,6 +27,7 @@ The research for K1 to K3 (`docs/research/2026-10-06/presence-brand.md` on `buil
    - ribbon: briefly, when Q arrives on a surface it travels to.
 
    A change of shape is a staggered flow along a swirl. The swirl is zero at both ends, so a change starts and lands exactly. It is not a cut and not a straight slide. The existing bounds on speed and acceleration still hold. Reduced motion draws each shape still. The frame budget still lowers the particle count and DPR on slow devices.
+
 2. **A human face only while Q speaks (K2).** The portrait-sampled face is removed: its data, its head, its tilt and its nod. The replacement is design B's option B, a warm human face drawn in particles:
    - an evenly lit skin surface with a painted tone map;
    - thin, dim lines of light for the lids, brows and lips;
@@ -38,6 +39,7 @@ The research for K1 to K3 (`docs/research/2026-10-06/presence-brand.md` on `buil
    It renders in finer points with a near-dark floor, so shade reads as shade.
 
    **ADR 0017's "no face" rule is amended for this case only.** The face shows only while Q is speaking, only on the Q page's own presence (the caller marks that surface), and only at 160 px or more. Every other surface and state has no face (option A). This includes the dock, the panel, inline marks, the landing hero, onboarding and every glyph or gesture. The face-borne gestures became shapes or hands: laugh is the ribbon, think-tilt the spiral, nod the Q mark, and explaining is two hands.
+
 3. **Brand presets (K3).** A preset layer sits over the brand theme. A preset sets the page, the surfaces, the menu bar, the accent and Q's light together. The admin's own accent can still go on top.
    - **Black and gold** follows design B's brand board. Light theme: ivory paper and near-black text. Dark theme: near-black and ivory. The menu bar is black in both. Gold is a fill or a deep bronze for text: `#C9A227` on dark, and `#8A6A12` (hover `#6E5410`) on light, because classic gold fails on white at 2.4:1.
    - **Capital Q blue** is `tokens.css` unchanged.
@@ -45,6 +47,7 @@ The research for K1 to K3 (`docs/research/2026-10-06/presence-brand.md` on `buil
    Black and gold is the platform default. A missing row means black and gold, and migration `20261207100000_brand_presets.sql` adds `platform_ops.brand_themes.preset_key` with default `black_gold`. The admin switches back at `/admin/brand` in two clicks, under the same permission and step-up as the brand colour, and every change is audited. Only the preset's key is stored. The palettes are code. Each preset's token pairs are tested against WCAG AA in both themes, and the style sheet is written only from values that re-check as hex.
 
    Q's light is the one exception to ADR 0017 F2's "Q keeps its colour". A preset may set it, and a custom accent never does.
+
 4. **Sounds (I2).** Small sounds synthesised with WebAudio, with no audio files. They follow design B's sound board: wake, listening on and off, a thinking hum, a result ping, needs you, error, and sent. Rules:
    - sounds play only on real state changes;
    - never while Q speaks, and never in Discover's swipe path;
@@ -61,3 +64,11 @@ The research for K1 to K3 (`docs/research/2026-10-06/presence-brand.md` on `buil
 - The voice choice (female or male) no longer changes the presence. The single face belongs to Q, not to the voice.
 - A tenant override row keeps working. It now also names a preset (default black and gold).
 - Classic blue's own token pairs are tested in the same suite. Its field borders (`--cq-border-strong` on cards) were already below 3:1, so the border pair is asserted for black and gold only. This is a known gap in classic blue and is not changed here.
+
+## Amendment, 2026-10-06 (P11): a deliberate, state-driven presence
+
+The founder: "the Q presence is still very random... didn't even see the face, and what I did see was random at random times."
+
+Root causes: the Q page's in-conversation presence (200 px, the one Q speaks from) never set `face`, so the face could only show before a conversation began; and the answer's gestures, the wake "!", the ready Q mark and the arrival ribbon each took over on their own timers, replacing the face mid-speech.
+
+Change: the figure is now a pure function of the surface's state (`presenceFor` in `presence-machine.ts`): idle, done or error is the cloud (error dimmed), listening the lean, thinking the spiral, working the ring, speaking the face (Q page, 160 px or more) or else the wave, asking or approval the "?", and resting with answer cards up the Q mark. The shape changes only when the state does. Answer gestures no longer drive the presence (the event is still announced and validated, and the gesture figures remain for a later, state-bound use); wake, ready and arrival flourishes are removed. Morph durations are fixed per destination and each particle keeps its seeded stagger, so a change looks the same every time. Decision 2's surface rule is unchanged.

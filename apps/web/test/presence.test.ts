@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { Q_PRESENCE_GESTURES } from "@capital-q/contracts";
-
 import { Q_APERTURE_STATES } from "../src/features/q-aperture/aperture-state";
 import {
   createPresenceSim,
@@ -24,21 +22,13 @@ import {
   createFigureFrame,
   FACE_FIGURES,
   FIGURE_KINDS,
-  HAND_FIGURES,
   type FigureKind,
 } from "../src/features/q-swarm/presence-figures";
 import {
-  ARRIVE_MS,
-  createPresenceMachine,
   FACE_MIN_PIXELS,
   faceAllowed,
   figureForState,
-  gestureOffsets,
-  GESTURE_FIGURE,
-  GESTURE_MS,
-  READY_MS,
-  sentenceStarts,
-  WAKE_MS,
+  presenceFor,
 } from "../src/features/q-swarm/presence-machine";
 import {
   gesturesDetail,
@@ -51,254 +41,120 @@ import {
  * then a bounce into a shape.
  */
 
-describe("which figure, from real signals", () => {
-  it("gives every state its free shape (K1), and no face anywhere by default", () => {
+describe("which figure: one fixed mapping from Q's state (P11)", () => {
+  const everyInput = () =>
+    Q_APERTURE_STATES.flatMap((state) =>
+      [false, true].flatMap((small) =>
+        [false, true].flatMap((face) =>
+          [false, true].map((showing) => ({ state, small, face, showing })),
+        ),
+      ),
+    );
+
+  it("gives every state its own shape, and no face anywhere by default", () => {
     for (const state of Q_APERTURE_STATES) {
       expect(FACE_FIGURES.has(figureForState(state, false))).toBe(false);
     }
-    expect(figureForState("IDLE", false)).toBe("CLOUD");
-    expect(figureForState("LISTENING", false)).toBe("ATTENTIVE");
-    expect(figureForState("THINKING", false)).toBe("SPIRAL");
-    expect(figureForState("WORKING", false)).toBe("RING");
-    expect(figureForState("SPEAKING", false)).toBe("WAVE");
-    expect(figureForState("NEEDS_INPUT", false)).toBe("QUESTION");
+    const shape = (state: (typeof Q_APERTURE_STATES)[number]) =>
+      presenceFor({ state, small: false }).figure;
+    expect(shape("IDLE")).toBe("CLOUD");
+    expect(shape("LISTENING")).toBe("ATTENTIVE");
+    expect(shape("THINKING")).toBe("SPIRAL");
+    expect(shape("WORKING")).toBe("RING");
+    expect(shape("SPEAKING")).toBe("WAVE");
+    expect(shape("NEEDS_INPUT")).toBe("QUESTION");
+    expect(shape("NEEDS_APPROVAL")).toBe("QUESTION");
+    expect(shape("COMPLETE")).toBe("CLOUD");
+    expect(shape("ERROR")).toBe("CLOUD");
+    expect(presenceFor({ state: "ERROR", small: false }).dim).toBe(true);
+    expect(presenceFor({ state: "IDLE", small: false }).dim).toBe(false);
   });
 
-  it("shows the human face only while Q speaks on the Q page at 160 px or more (ADR 0051)", () => {
+  it("is deterministic: the same inputs always give the same figure, with no clock", () => {
+    const first = everyInput().map((input) => presenceFor(input));
+    for (let round = 0; round < 5; round += 1) {
+      expect(everyInput().map((input) => presenceFor(input))).toEqual(first);
+    }
+    // Nothing a figure depends on is hidden: the view is its inputs' only.
+    expect(Object.keys(first[0] ?? {}).sort()).toEqual(["dim", "figure"]);
+  });
+
+  it("changes figure only when an input changes", () => {
+    // A long stretch of one state, frame by frame, is one figure throughout.
+    for (const input of everyInput()) {
+      const figures = new Set(
+        Array.from({ length: 600 }, () => presenceFor(input).figure),
+      );
+      expect(figures.size).toBe(1);
+    }
+  });
+
+  it("shows the human face whenever Q speaks on the Q page at 160 px or more (ADR 0051)", () => {
     expect(faceAllowed({ face: true, pixels: FACE_MIN_PIXELS })).toBe(true);
+    expect(faceAllowed({ face: true, pixels: 200 })).toBe(true);
     expect(faceAllowed({ face: true, pixels: 360 })).toBe(true);
     expect(faceAllowed({ face: true, pixels: FACE_MIN_PIXELS - 1 })).toBe(
       false,
     );
     // Any other surface, however large, has no face.
     expect(faceAllowed({ face: false, pixels: 520 })).toBe(false);
-    expect(figureForState("SPEAKING", false, true)).toBe("FACE");
-    for (const state of Q_APERTURE_STATES) {
-      if (state === "SPEAKING") continue;
-      expect(figureForState(state, false, true)).not.toBe("FACE");
-    }
-    const machine = createPresenceMachine();
     expect(
-      machine.step({ state: "SPEAKING", small: false, now: 0, face: true })
-        .figure,
+      presenceFor({ state: "SPEAKING", small: false, face: true }),
+    ).toEqual({ figure: "FACE", dim: false });
+    // Cards on screen do not take the face away while Q is speaking.
+    expect(
+      presenceFor({
+        state: "SPEAKING",
+        small: false,
+        face: true,
+        showing: true,
+      }).figure,
     ).toBe("FACE");
-    expect(
-      machine.step({ state: "SPEAKING", small: false, now: 10, face: false })
-        .figure,
-    ).toBe("WAVE");
-    expect(
-      machine.step({ state: "SPEAKING", small: true, now: 20, face: true })
-        .figure,
-    ).toBe("CLOUD");
-  });
-
-  it("shows the Q mark in knots of light once when an answer is ready, then the cloud", () => {
-    const machine = createPresenceMachine();
-    machine.step({ state: "SPEAKING", small: false, now: 0 });
-    expect(
-      machine.step({ state: "COMPLETE", small: false, now: 100 }),
-    ).toMatchObject({ figure: "CONSTELLATION", cause: "READY" });
-    expect(
-      machine.step({ state: "COMPLETE", small: false, now: 100 + READY_MS })
-        .figure,
-    ).toBe("CLOUD");
-    // A surface that opens on a finished answer shows the cloud at once.
-    expect(
-      createPresenceMachine().step({ state: "COMPLETE", small: false, now: 0 })
-        .figure,
-    ).toBe("CLOUD");
-  });
-
-  it("arrives on a surface Q travels to as a ribbon, then takes its state's shape", () => {
-    const machine = createPresenceMachine({ arrive: true });
-    expect(
-      machine.step({ state: "IDLE", small: false, now: 5_000 }),
-    ).toMatchObject({ figure: "RIBBON", cause: "ARRIVE" });
-    expect(
-      machine.step({ state: "IDLE", small: false, now: 5_000 + ARRIVE_MS })
-        .figure,
-    ).toBe("CLOUD");
-    expect(
-      createPresenceMachine().step({ state: "IDLE", small: false, now: 0 })
-        .figure,
-    ).toBe("CLOUD");
-  });
-
-  it("never shows a face or a gesture on a surface too small to read one", () => {
-    const machine = createPresenceMachine();
-    machine.schedule(
-      { gestures: [{ sentence: 0, gesture: "MONEY" }], spoken: false },
-      0,
-    );
-    for (const state of [
-      "IDLE",
-      "LISTENING",
-      "THINKING",
-      "WORKING",
-      "SPEAKING",
-      "NEEDS_INPUT",
-      "NEEDS_APPROVAL",
-      "COMPLETE",
-      "ERROR",
-    ] as const) {
-      const view = machine.step({ state, small: true, now: 10 });
-      expect(FACE_FIGURES.has(view.figure)).toBe(false);
-      expect(view.cause).toBe("STATE");
+    // The face is for speaking only: every other state, no face.
+    for (const input of everyInput()) {
+      if (input.state === "SPEAKING") continue;
+      expect(FACE_FIGURES.has(presenceFor(input).figure)).toBe(false);
     }
-  });
-
-  it("answers 'Hey Q' from rest with a '!', then leans in to listen", () => {
-    const machine = createPresenceMachine();
-    machine.step({ state: "IDLE", small: false, now: 0 });
+    // Speech ends: the face gives way to the listening lean or the cloud.
     expect(
-      machine.step({ state: "LISTENING", small: false, now: 100 }),
-    ).toMatchObject({
-      figure: "EXCLAIM",
-      cause: "WAKE",
-    });
-    expect(
-      machine.step({ state: "LISTENING", small: false, now: 100 + WAKE_MS + 1 })
-        .figure,
+      presenceFor({ state: "LISTENING", small: false, face: true }).figure,
     ).toBe("ATTENTIVE");
-  });
-
-  it("does not wake between turns of a live conversation", () => {
-    const machine = createPresenceMachine();
-    machine.step({ state: "SPEAKING", small: false, now: 0 });
     expect(
-      machine.step({ state: "LISTENING", small: false, now: 50 }).figure,
-    ).toBe("ATTENTIVE");
+      presenceFor({ state: "IDLE", small: false, face: true }).figure,
+    ).toBe("CLOUD");
   });
 
-  it("dims on error", () => {
-    const machine = createPresenceMachine();
-    expect(machine.step({ state: "ERROR", small: false, now: 0 }).dim).toBe(
-      true,
-    );
+  it("shows the Q mark while answer cards are up and Q is resting, and only then", () => {
+    expect(
+      presenceFor({ state: "IDLE", small: false, showing: true }).figure,
+    ).toBe("CONSTELLATION");
+    expect(
+      presenceFor({ state: "COMPLETE", small: false, showing: true }).figure,
+    ).toBe("CONSTELLATION");
+    // Q at work over the cards shows the work, not the mark.
+    expect(
+      presenceFor({ state: "THINKING", small: false, showing: true }).figure,
+    ).toBe("SPIRAL");
+    expect(
+      presenceFor({ state: "LISTENING", small: false, showing: true }).figure,
+    ).toBe("ATTENTIVE");
+    expect(
+      presenceFor({ state: "IDLE", small: false, showing: false }).figure,
+    ).toBe("CLOUD");
+  });
+
+  it("never shows a face, a wave, a '?' or the Q mark on a surface too small to read one", () => {
+    for (const input of everyInput()) {
+      if (!input.small) continue;
+      expect(["CLOUD", "ATTENTIVE", "SPIRAL", "RING"]).toContain(
+        presenceFor(input).figure,
+      );
+    }
   });
 });
 
-describe("gestures from the answer, timed to what is said", () => {
-  it("maps every contract gesture to its own figure", () => {
-    for (const gesture of Q_PRESENCE_GESTURES) {
-      expect(FIGURE_KINDS).toContain(GESTURE_FIGURE[gesture]);
-      expect(GESTURE_MS[gesture]).toBeGreaterThan(1000);
-    }
-    expect(GESTURE_FIGURE.MONEY).toBe("MONEY");
-    expect(GESTURE_FIGURE.CLAP).toBe("CLAP");
-    expect(HAND_FIGURES.has("CLAP")).toBe(true);
-    expect(HAND_FIGURES.has(GESTURE_FIGURE.HANDS_EXPLAIN)).toBe(true);
-    // The old face's gestures are shapes now: no gesture shows a face.
-    for (const gesture of Q_PRESENCE_GESTURES) {
-      expect(FACE_FIGURES.has(GESTURE_FIGURE[gesture])).toBe(false);
-    }
-  });
-
-  it("times spoken gestures at their sentence's share of the reply", () => {
-    const text =
-      "Revenue doubled. They own offices in Lagos and Accra. Well done.";
-    const starts = sentenceStarts(text);
-    expect(starts).toHaveLength(3);
-    const offsets = gestureOffsets({
-      spoken: true,
-      text,
-      gestures: [
-        { sentence: 0, gesture: "MONEY" },
-        { sentence: 2, gesture: "CLAP" },
-      ],
-    });
-    expect(offsets[0]).toBe(0);
-    expect(offsets[1]).toBeGreaterThan(2_000);
-    // Typed: one after another.
-    const typed = gestureOffsets({
-      spoken: false,
-      gestures: [
-        { sentence: 0, gesture: "MONEY" },
-        { sentence: 2, gesture: "CLAP" },
-      ],
-    });
-    expect(typed[1]).toBeGreaterThanOrEqual(GESTURE_MS.MONEY);
-  });
-
-  it("plays a spoken answer's gestures against Q's voice, then returns to the wave", () => {
-    const machine = createPresenceMachine();
-    machine.step({ state: "THINKING", small: false, now: 0 });
-    machine.schedule(
-      {
-        spoken: true,
-        gestures: [
-          { sentence: 0, gesture: "BUILDINGS" },
-          { sentence: 1, gesture: "LAUGH" },
-        ],
-      },
-      100,
-    );
-    // Waiting for the voice: still thinking.
-    expect(
-      machine.step({ state: "THINKING", small: false, now: 500 }).figure,
-    ).toBe("SPIRAL");
-    expect(
-      machine.step({ state: "SPEAKING", small: false, now: 1_000 }).figure,
-    ).toBe("BUILDINGS");
-    const afterFirst = 1_000 + GESTURE_MS.BUILDINGS + 10;
-    // The second is due at one sentence in (no text: SENTENCE_MS).
-    const view = machine.step({
-      state: "SPEAKING",
-      small: false,
-      now: afterFirst + 300,
-    });
-    expect(view.figure).toBe(GESTURE_FIGURE.LAUGH);
-    expect(
-      machine.step({
-        state: "SPEAKING",
-        small: false,
-        now: afterFirst + 300 + GESTURE_MS.LAUGH + 10,
-      }).figure,
-    ).toBe("WAVE");
-  });
-
-  it("drops what was not said yet when the person interrupts", () => {
-    const machine = createPresenceMachine();
-    machine.step({ state: "SPEAKING", small: false, now: 0 });
-    machine.schedule(
-      {
-        spoken: true,
-        gestures: [
-          { sentence: 0, gesture: "NOD" },
-          { sentence: 3, gesture: "MONEY" },
-        ],
-      },
-      10,
-    );
-    expect(
-      machine.step({ state: "SPEAKING", small: false, now: 20 }),
-    ).toMatchObject({ figure: GESTURE_FIGURE.NOD, cause: "GESTURE" });
-    expect(
-      machine.step({ state: "LISTENING", small: false, now: 400 }).figure,
-    ).toBe("ATTENTIVE");
-    expect(machine.waiting()).toBe(0);
-  });
-
-  it("plays a typed answer's gestures as it lands, and forgets stale ones", () => {
-    const machine = createPresenceMachine();
-    machine.schedule(
-      { spoken: false, gestures: [{ sentence: 0, gesture: "CHART_UP" }] },
-      0,
-    );
-    expect(
-      machine.step({ state: "COMPLETE", small: false, now: 1 }).figure,
-    ).toBe("CHART_UP");
-    machine.schedule(
-      { spoken: false, gestures: [{ sentence: 0, gesture: "EXCLAIM" }] },
-      0,
-    );
-    // Long after it was due, it is no longer about anything.
-    expect(
-      machine.step({ state: "IDLE", small: false, now: 20_000 }).figure,
-    ).toBe("CLOUD");
-  });
-
-  it("reads only well-formed gesture events", () => {
+describe("gesture events", () => {
+  it("still validates the gesture event for the surfaces that announce it", () => {
     const good = new CustomEvent(Q_GESTURES_EVENT, {
       detail: {
         answerId: "a1",
@@ -394,7 +250,7 @@ describe("figures", () => {
   it("brings the hands into the frame when Q explains", () => {
     const count = 800;
     const frame = createFigureFrame(count);
-    buildFigure(GESTURE_FIGURE.HANDS_EXPLAIN, count).evaluate(input, frame);
+    buildFigure("HANDS", count).evaluate(input, frame);
     const sides = Array.from(frame.x).filter((x) => Math.abs(x) > 0.3);
     expect(sides.length).toBeGreaterThan(count * 0.5);
   });
@@ -526,16 +382,29 @@ describe("motion: continuous, never a snap", () => {
     }
   });
 
-  it("changes figure at a variable but bounded pace, quicker into a gesture", () => {
-    for (const roll of [0, 0.5, 0.999]) {
-      expect(morphSeconds("MONEY", roll)).toBeLessThan(
-        morphSeconds("CLOUD", roll),
-      );
-      for (const kind of all) {
-        expect(morphSeconds(kind, roll)).toBeGreaterThanOrEqual(0.55);
-        expect(morphSeconds(kind, roll)).toBeLessThanOrEqual(1.6);
-      }
+  it("changes figure at a fixed, bounded pace per destination (P11)", () => {
+    expect(morphSeconds("MONEY")).toBeLessThan(morphSeconds("CLOUD"));
+    for (const kind of all) {
+      expect(morphSeconds(kind)).toBe(morphSeconds(kind));
+      expect(morphSeconds(kind)).toBeGreaterThanOrEqual(0.8);
+      expect(morphSeconds(kind)).toBeLessThanOrEqual(1.3);
     }
+  });
+
+  it("moves identically on every run: seeded, never random", () => {
+    const trace = () => {
+      const sim = createPresenceSim({ count: 120, initial: "CLOUD", seed: 9 });
+      let t = 0;
+      for (const kind of ["SPIRAL", "FACE", "CLOUD"] as const) {
+        sim.setFigure(kind);
+        for (let f = 0; f < 40; f += 1) {
+          t += 1 / 60;
+          sim.step(t, 1 / 60, { input: 0, output: 0.3 });
+        }
+      }
+      return [Array.from(sim.x), Array.from(sim.y)];
+    };
+    expect(trace()).toEqual(trace());
   });
 
   it("flows between shapes along a swirl that starts and lands exactly", () => {
