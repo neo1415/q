@@ -10,6 +10,7 @@ import {
 import {
   CorrelationIdSchema,
   InstructionGrantSchema,
+  isMatchedRelationshipState,
   Q_INSTRUCTION_GRANT,
   type InstructionGrant,
   type InstructionWorkingHours,
@@ -134,6 +135,8 @@ export const REFUSAL_CODES = [
   "MEETING_BEFORE_RAPPORT",
   // Founder brief J2: the reviewer held the message below the bar.
   "BELOW_THE_BAR",
+  // Founder rule 2026-10-06: no message before they accept.
+  "NOT_CONNECTED_YET",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -221,7 +224,37 @@ export const REFUSAL_WORDS: Readonly<
     instead:
       "the draft, its grade and what to change are on your workforce page",
   },
+  NOT_CONNECTED_YET: {
+    reason:
+      "they haven't accepted your interest yet, so a message would be unsolicited",
+    instead: "I'll express interest instead, and write only once they accept",
+  },
 };
+
+/**
+ * Founder rule (2026-10-06): before the other side accepts (the
+ * relationship is CONNECTED or later), the only outward move is expressing
+ * interest. Messages, follow-ups and meetings wait for the match, whatever
+ * the grant or the planner says. Code decides; the planner is only told.
+ */
+export const NEEDS_CONNECTION: ReadonlySet<string> = new Set([
+  "chat.message.send",
+  "schedule.meeting.book",
+]);
+
+/** Whether this person's relationship is open for messages (matched). */
+export function connectedFor(
+  people: readonly InstructionPerson[],
+  relationshipId: string | null,
+): boolean {
+  if (relationshipId === null) return false;
+  const state = people.find(
+    (person) => person.relationshipId === relationshipId,
+  )?.state;
+  return (
+    state !== null && state !== undefined && isMatchedRelationshipState(state)
+  );
+}
 
 /** Why a granted AUTO step is asked instead, in plain words. */
 export const ASK_WORDS: Readonly<Record<string, string>> = {
@@ -496,6 +529,19 @@ export function validateStep(
         person.counterpartId === companyId,
     )?.relationshipId ??
     null;
+
+  // Founder rule: nothing but interest before they accept -- not sent,
+  // not offered as a card.
+  if (
+    NEEDS_CONNECTION.has(action.name) &&
+    !connectedFor(context.people, subject)
+  ) {
+    return {
+      verdict: "REFUSED",
+      code: "NOT_CONNECTED_YET",
+      relationshipId: subject,
+    };
+  }
 
   // What Q writes is checked before it is sent or asked (QA run 8a1d57b9):
   // a card with a generic message is no better than sending one.
@@ -912,7 +958,9 @@ export type InstructionEngineDependencies = {
     | "addSpend"
     | "pause"
     | "notify"
-  >;
+  > &
+    // Optional: a store without it (older doubles) waits on nothing.
+    Partial<Pick<InstructionStore, "waitingCards">>;
   readonly actions: readonly AnyAppAction[];
   readonly ports: AppActionPorts;
   /** The person, resolved now; null when they can no longer act. */
@@ -1078,6 +1126,12 @@ function peopleLines(
           ? `${person.counterpartKind === "COMPANY" ? "companyId" : "investorOrganisationId"} ${person.counterpartId} (no relationship yet)`
           : `relationshipId ${person.relationshipId}, ${person.counterpartKind === "COMPANY" ? "companyId" : "investorOrganisationId"} ${person.counterpartId}`,
         person.state === null ? null : `state ${person.state}`,
+        // Founder rule: before they accept, interest is the only move.
+        person.state !== null && isMatchedRelationshipState(person.state)
+          ? null
+          : person.state === "INTEREST_EXPRESSED"
+            ? "not connected yet (interest expressed, not accepted): no messages, follow-ups or meetings; wait for them to accept"
+            : "not connected yet: no messages, follow-ups or meetings; the only outward step is relationship.interest.express",
         person.relationshipId === null
           ? null
           : `Q messages sent ${String(sent.get(person.relationshipId) ?? 0)}`,
@@ -1285,6 +1339,23 @@ export function createInstructionEngine(
       const people = await dependencies.people(actor).catch(() => []);
       const sentBefore = await store.messagesSent(row.id);
       const history = await store.history(row.id);
+      // Cards still waiting on the person: never drafted again. A store
+      // without the read (older doubles) waits on nothing.
+      const cardsWaiting = await Promise.resolve()
+        .then(() => store.waitingCards?.(row.id) ?? [])
+        .catch(() => []);
+      const isWaiting = (
+        action: string,
+        relationshipId: string | null,
+        words: string,
+      ): boolean =>
+        cardsWaiting.some(
+          (card) =>
+            card.action === action &&
+            (relationshipId === null
+              ? card.relationship_id === null && card.words === words
+              : card.relationship_id === relationshipId),
+        );
       const keyOf = (index: number) =>
         `instr:${row.id}:${runKey}:${String(index)}`;
 
@@ -1435,8 +1506,8 @@ export function createInstructionEngine(
               introduced,
               { paces, now: at, timeZone: grant.data.workingHours.timeZone },
             ),
-            history:
-              history.length === 0
+            history: (
+              (history.length === 0
                 ? "Nothing yet."
                 : history
                     .map(
@@ -1444,7 +1515,17 @@ export function createInstructionEngine(
                         `${step.created_at.toISOString()} ${step.status} ${step.action}: ${step.words}`,
                     )
                     .join("\n")
-                    .slice(-6_000),
+                    .slice(-6_000)) +
+              (cardsWaiting.length === 0
+                ? ""
+                : `\nStill waiting for their approval (plan none of these again):\n${cardsWaiting
+                    .map(
+                      (card) =>
+                        `${card.action}${card.relationship_id === null ? "" : ` relationshipId ${card.relationship_id}`}: ${card.words}`,
+                    )
+                    .join("\n")
+                    .slice(0, 2_000)}`)
+            ).slice(-6_000),
             refusals,
           },
           { maxCostUsd: left / 1_000_000 },
@@ -1717,6 +1798,15 @@ export function createInstructionEngine(
           return;
         }
         if (verdict.verdict === "REFUSED") {
+          if (verdict.code === "NOT_CONNECTED_YET") {
+            // Founder rule: a message to someone who hasn't accepted is not
+            // even recorded as a step on their page; the replan was told.
+            logger?.info(
+              { instructionId: row.id, action: step.action },
+              "instruction step dropped: not connected yet",
+            );
+            return;
+          }
           refusedCount += 1;
           const words = REFUSAL_WORDS[verdict.code];
           await record({
@@ -1796,7 +1886,15 @@ export function createInstructionEngine(
           }
           return;
         }
-        // ASK: the card the person's own request would prepare.
+        // ASK: the card the person's own request would prepare -- unless
+        // the same card already waits on them.
+        if (isWaiting(step.action, verdict.relationshipId, step.words)) {
+          logger?.info(
+            { instructionId: row.id, action: step.action },
+            "instruction card not drafted again: one already waits",
+          );
+          return;
+        }
         const card = await dependencies
           .ask(actor, {
             instructionId: row.id,

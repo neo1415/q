@@ -503,6 +503,9 @@ const MATERIAL_OVERRIDE: { value: InstructionMaterial | null } = {
 };
 /** QA run 8a1d57b9: what the quarantined reader returns, when a case sets it. */
 const THREAD_OVERRIDE: { value: ThreadRead | null } = { value: null };
+const WAITING_OVERRIDE: {
+  value: { action: string; relationship_id: string | null; words: string }[];
+} = { value: [] };
 
 function world(
   plans: readonly (Omit<InstructionPlanResult, "cannot"> & {
@@ -568,6 +571,7 @@ function world(
     stepDone: (key: string) => Promise.resolve(steps.has(key)),
     messagesSent: () => Promise.resolve(new Map<string, number>()),
     history: () => Promise.resolve([]),
+    waitingCards: () => Promise.resolve(WAITING_OVERRIDE.value),
     addSpend: (_id: string, amount: number) => {
       spends.push(amount);
       return Promise.resolve();
@@ -1692,5 +1696,104 @@ describe("a firing with the reviewer on", () => {
         offered?.q_action_id ?? "",
       ),
     ).toBe(offered?.draft_id);
+  });
+});
+
+describe("founder rule 2026-10-06: nothing but interest before they accept", () => {
+  const notYet = (state: string | null): InstructionPerson[] =>
+    PEOPLE.map((person, index) =>
+      index === 0 ? { ...person, state } : person,
+    );
+  it.each(["INTEREST_EXPRESSED", "DISCOVERED", null])(
+    "a message to someone %s is refused, never a card",
+    (state) => {
+      const result = validateStep(chat("Hello from Ada's Q."), {
+        grant: grant(),
+        actions: ACTIONS,
+        people: notYet(state),
+        sent: new Map<string, number>(),
+        now: IN_HOURS,
+        stepKey: "instr:test:run:0",
+      });
+      expect(verdictOf(result)).toBe("REFUSED:NOT_CONNECTED_YET");
+    },
+  );
+  it("a grant that says ASK for messages still never offers the card", () => {
+    const asking = grant();
+    const result = validateStep(chat("Hello from Ada's Q."), {
+      grant: {
+        ...asking,
+        actions: asking.actions.map((entry) => ({
+          ...entry,
+          mode: "ASK" as const,
+        })),
+      },
+      actions: ACTIONS,
+      people: notYet("INTEREST_EXPRESSED"),
+      sent: new Map<string, number>(),
+      now: IN_HOURS,
+      stepKey: "instr:test:run:0",
+    });
+    expect(verdictOf(result)).toBe("REFUSED:NOT_CONNECTED_YET");
+  });
+  it("connected (or later) still writes", () => {
+    for (const state of ["CONNECTED", "MEETING_HELD", "IN_DILIGENCE"]) {
+      const result = validateStep(chat("Hello from Ada's Q."), {
+        grant: grant(),
+        actions: ACTIONS,
+        people: notYet(state),
+        sent: new Map<string, number>(),
+        now: IN_HOURS,
+        stepKey: "instr:test:run:0",
+      });
+      expect(verdictOf(result)).toBe("AUTO");
+    }
+  });
+  it("a firing drops the message step without a card or a recorded step", async () => {
+    PEOPLE_OVERRIDE.value = notYet("INTEREST_EXPRESSED");
+    try {
+      const { engine, row, asked, steps } = world(
+        [{ steps: [chat("Hello from Ada's Q.")], cannot: [] }],
+        false,
+      );
+      await engine.fire(row.id, "run-nc01");
+      expect(asked).toEqual([]);
+      expect(
+        [...steps.values()].some((step) => step.action === "chat.message.send"),
+      ).toBe(false);
+    } finally {
+      PEOPLE_OVERRIDE.value = null;
+    }
+  });
+});
+
+describe("a card still waiting is never drafted again (founder, 13:34 and 13:54)", () => {
+  it("skips an ASK whose card for the same person still waits", async () => {
+    WAITING_OVERRIDE.value = [
+      {
+        action: "chat.message.send",
+        relationship_id: REL,
+        words: "Say hello to Acme.",
+      },
+    ];
+    try {
+      const { engine, row, asked } = world(
+        [
+          {
+            steps: [
+              chat("Hello from Ada's Q."),
+              chat("Hello Beta.", {}, OTHER_REL),
+            ],
+            cannot: [],
+          },
+        ],
+        false,
+      );
+      await engine.fire(row.id, "run-dup1");
+      // Autonomy off: both would be cards; only Beta's is new.
+      expect(asked).toHaveLength(1);
+    } finally {
+      WAITING_OVERRIDE.value = [];
+    }
   });
 });

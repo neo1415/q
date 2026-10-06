@@ -692,6 +692,28 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
            limit ${limit}`
       ).reverse(),
 
+    /**
+     * Cards Q asked under this instruction that still wait on the person
+     * (founder, 2026-10-06: the same five were drafted again 20 minutes
+     * later). A waiting card is never offered a second time.
+     */
+    waitingCards: async (
+      instructionId: string,
+    ): Promise<
+      readonly {
+        action: string;
+        relationship_id: string | null;
+        words: string;
+      }[]
+    > =>
+      sql<{ action: string; relationship_id: string | null; words: string }[]>`
+        select t.action, t.relationship_id, t.words
+          from q_runtime.instruction_steps t
+          join q_runtime.actions a on a.id = t.q_action_id
+         where t.instruction_id = ${instructionId} and t.status = 'ASKED'
+           and a.status in ('PROPOSED', 'AWAITING_APPROVAL')
+         limit 100`,
+
     /** The person's own time zone, when they set one. */
     timeZoneOf: async (owner: Owner): Promise<string | null> =>
       (
