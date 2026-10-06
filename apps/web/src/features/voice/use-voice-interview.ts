@@ -331,14 +331,23 @@ export function useVoiceInterview(
       // the person hears no switch. Bounded, so a line that cannot stay up
       // still lands on the standard voice. The server still decides: past
       // the daily cap the new session is issued as the standard one.
+      // Any line that drops (a network blip, a server restart that forgot
+      // the line, the length limit) is renewed as a fresh fast line too
+      // (founder 2026-10-06: "the voice dropped to the slow one" during a
+      // deploy). Only the daily cap, or a line that keeps failing, lands on
+      // the standard voice.
+      // A line that never connected is not retried here: on a network
+      // that blocks the fast line the standard voice must come quickly.
       const renew =
-        cause === "MAX_LENGTH" &&
-        notice === null &&
+        cause !== undefined &&
+        cause !== "CAP" &&
+        cause !== "CONNECT" &&
+        (cause === "MAX_LENGTH" ? notice === null : true) &&
         renewals.current < MAX_DUPLEX_RENEWALS;
       if (renew) renewals.current += 1;
       else duplexOff.current = true;
-      // A lost line is said at once; the standard voice is on its way.
-      const weak = notice === LINE_LOST_NOTICE;
+      // A lost line is said at once when the standard voice is on its way.
+      const weak = !renew && notice === LINE_LOST_NOTICE;
       if (weak) setLinkStatus(LINE_LOST_NOTICE);
       const last = lastStart.current;
       const again = talkRef.current;

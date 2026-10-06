@@ -325,7 +325,7 @@ const DOCUMENT_NAMES: Readonly<Record<string, string>> = {
  * 5,000 characters cut the browser-actions line once ~100 tools were
  * listed ahead of it, and Q said it could not navigate or scroll.
  */
-export const CAPABILITY_NOTE_MAX_CHARS = 16_000;
+export const CAPABILITY_NOTE_MAX_CHARS = 7_000;
 
 /** Said whenever navigation or page control is offered (always: core). */
 export const NAVIGATION_LINE =

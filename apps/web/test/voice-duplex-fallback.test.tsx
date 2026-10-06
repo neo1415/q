@@ -158,6 +158,22 @@ describe("falling back from a duplex line", () => {
     expect(result.current.notice).toBeNull();
   });
 
+  it("renews a line that dropped (network or a server restart) as a fresh fast line, not the slow voice (founder 2026-10-06)", async () => {
+    const { result } = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await result.current.talk({ thread: { conversationId: CONVERSATION } });
+    });
+    await act(async () => {
+      events.onFallback?.(LINE_LOST_NOTICE, "NETWORK");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const call = startVoiceSessionAction.mock.calls[1]?.[0] as
+      Record<string, unknown> | undefined;
+    expect(call).toMatchObject({ conversationId: CONVERSATION, resume: true });
+    expect(call).not.toHaveProperty("duplex");
+  });
+
   it("falls back silently when there is nothing to say", async () => {
     const { result } = renderHook(() => useVoiceInterview());
     await act(async () => {
