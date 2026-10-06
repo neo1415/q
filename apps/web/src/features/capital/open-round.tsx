@@ -21,6 +21,12 @@ const CURRENCIES = [
   { code: "KES", label: "KES" },
   { code: "GHS", label: "GHS" },
   { code: "ZAR", label: "ZAR" },
+  // F13: currencies the seeded companies raise in.
+  { code: "EGP", label: "EGP" },
+  { code: "BRL", label: "BRL" },
+  { code: "INR", label: "INR" },
+  { code: "MXN", label: "MXN" },
+  { code: "VND", label: "VND" },
 ] as const;
 
 const INSTRUMENTS: readonly {

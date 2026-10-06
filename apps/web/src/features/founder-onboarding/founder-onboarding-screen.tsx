@@ -54,17 +54,21 @@ export function FounderOnboardingScreen({
   const [state, actions] = useFounderOnboarding(client);
   // Q leads by default (CQ-PRE-REC-001 §16); the structured screens remain
   // for direct editing (§30) and as the fallback when a step needs them.
-  const [mode, setMode] = useState<"conversation" | "form">("conversation");
   // F15: a founder who chose the form resumes in the form; voice opens only
   // when asked for (`?talk=1` or "Talk with Q"). A per-browser convenience.
-  useEffect(() => {
-    if (startTalking) return;
+  // Read once at first render: the screen shows a skeleton until the
+  // session loads, so the server's render never depends on it.
+  const [mode, setMode] = useState<"conversation" | "form">(() => {
+    if (startTalking || typeof window === "undefined") return "conversation";
     try {
-      if (window.localStorage.getItem(MODE_KEY) === "form") setMode("form");
+      return window.localStorage.getItem(MODE_KEY) === "form"
+        ? "form"
+        : "conversation";
     } catch {
       // Storage unavailable: Q leads, as before.
+      return "conversation";
     }
-  }, [startTalking]);
+  });
   useEffect(() => {
     try {
       window.localStorage.setItem(MODE_KEY, mode);

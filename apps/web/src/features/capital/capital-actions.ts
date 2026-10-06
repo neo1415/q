@@ -10,11 +10,13 @@ import {
   disputeCommitment,
   markCommitmentSent,
   openCapitalRound,
+  updateCapitalObjective,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
   MarkTransferSentRequestSchema,
   OpenCapitalRoundRequestSchema,
+  UpdateCapitalObjectiveRequestSchema,
   type OpenCapitalRoundRequest,
 } from "@capital-q/contracts";
 
@@ -169,4 +171,28 @@ export async function notRightAction(
       message: "We couldn't find that. Refresh the page and try again.",
     };
   return run((session) => disputeCommitment(session, commitmentId));
+}
+
+/**
+ * F5: the raise's terms (instrument, valuation, minimum cheque, close
+ * date, use of funds), saved onto the founder's own current raise with the
+ * version the page read. The API decides whose raise it is.
+ */
+export async function saveRaiseTermsAction(
+  capitalObjectiveId: string,
+  input: unknown,
+): Promise<CapitalResult> {
+  const parsed = UpdateCapitalObjectiveRequestSchema.safeParse(input);
+  if (!Id.safeParse(capitalObjectiveId).success || !parsed.success) {
+    return {
+      ok: false,
+      message: "Check the amounts (above zero) and the date, then save again.",
+    };
+  }
+  const companyId = await ownCompanyId();
+  if (companyId === null)
+    return { ok: false, message: "Only founders set their raise's terms." };
+  return run((session) =>
+    updateCapitalObjective(session, companyId, capitalObjectiveId, parsed.data),
+  );
 }

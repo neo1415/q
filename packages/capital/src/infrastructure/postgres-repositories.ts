@@ -4,6 +4,7 @@ import { CompanyIdSchema } from "@capital-q/companies";
 import {
   CapitalObjectiveStatusSchema,
   CapitalObjectiveTypeSchema,
+  RaiseValuationKindSchema,
   UtcTimestampSchema,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
@@ -56,6 +57,9 @@ const Row = z.object({
   instrument_code: z.string().nullable(),
   target_close_date: z.iso.date().nullable(),
   use_of_funds_summary: z.string().nullable(),
+  valuation_kind: RaiseValuationKindSchema.nullable(),
+  valuation_amount: z.string().nullable(),
+  minimum_cheque_amount: z.string().nullable(),
   started_at: Timestamp,
   closed_at: Timestamp.nullable(),
   created_by_user_id: UserIdSchema,
@@ -77,6 +81,11 @@ function toObjective(row: unknown): CapitalObjective {
     instrumentCode: r.instrument_code,
     targetCloseDate: r.target_close_date,
     useOfFundsSummary: r.use_of_funds_summary,
+    valuation:
+      r.valuation_kind === null || r.valuation_amount === null
+        ? null
+        : { kind: r.valuation_kind, amount: r.valuation_amount },
+    minimumCheque: r.minimum_cheque_amount,
     startedAt: r.started_at,
     closedAt: r.closed_at,
     createdByUserId: r.created_by_user_id,
@@ -92,7 +101,8 @@ function objectiveSelect(executor: DatabaseExecutor) {
     select o.id, o.tenant_id, o.company_id, o.objective_type, o.status,
            o.target_amount::text as target_amount, o.currency_code, o.target_stage,
            o.instrument_code, o.target_close_date::text as target_close_date,
-           o.use_of_funds_summary, o.started_at, o.closed_at, o.created_by_user_id, o.version,
+           o.use_of_funds_summary, o.valuation_kind, o.valuation_amount::text as valuation_amount,
+           o.minimum_cheque_amount::text as minimum_cheque_amount, o.started_at, o.closed_at, o.created_by_user_id, o.version,
            to_char(o.created_at at time zone 'UTC', ${CURSOR_TIME_FORMAT}) as created_at,
            o.updated_at
       from core.capital_objectives o`;
@@ -104,11 +114,14 @@ export function createPostgresCapitalObjectiveRepository(): CapitalObjectiveRepo
       const rows = await tx.sql`
         insert into core.capital_objectives
           (tenant_id, company_id, objective_type, target_amount, currency_code, target_stage,
-           instrument_code, target_close_date, use_of_funds_summary, created_by_user_id)
+           instrument_code, target_close_date, use_of_funds_summary,
+           valuation_kind, valuation_amount, minimum_cheque_amount, created_by_user_id)
         values
           (${input.tenantId}, ${input.companyId}, ${input.objectiveType},
            ${input.target.amount}::text::numeric, ${input.target.currency}, ${input.targetStage},
            ${input.instrumentCode}, ${input.targetCloseDate}::text::date, ${input.useOfFundsSummary},
+           ${input.valuation?.kind ?? null}, ${input.valuation?.amount ?? null}::text::numeric,
+           ${input.minimumCheque}::text::numeric,
            ${input.createdByUserId})
         returning id`;
       const inserted = z
@@ -178,6 +191,9 @@ export function createPostgresCapitalObjectiveRepository(): CapitalObjectiveRepo
                instrument_code = case when ${c.instrumentCode !== undefined} then ${c.instrumentCode ?? null} else o.instrument_code end,
                target_close_date = case when ${c.targetCloseDate !== undefined} then ${c.targetCloseDate ?? null}::text::date else o.target_close_date end,
                use_of_funds_summary = case when ${c.useOfFundsSummary !== undefined} then ${c.useOfFundsSummary ?? null} else o.use_of_funds_summary end,
+               valuation_kind = case when ${c.valuation !== undefined} then ${c.valuation?.kind ?? null} else o.valuation_kind end,
+               valuation_amount = case when ${c.valuation !== undefined} then ${c.valuation?.amount ?? null}::text::numeric else o.valuation_amount end,
+               minimum_cheque_amount = case when ${c.minimumCheque !== undefined} then ${c.minimumCheque ?? null}::text::numeric else o.minimum_cheque_amount end,
                version = o.version + 1
          where o.id = ${input.capitalObjectiveId}
            and o.tenant_id = ${input.tenantId}

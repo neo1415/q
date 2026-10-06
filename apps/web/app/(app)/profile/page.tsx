@@ -36,6 +36,7 @@ import {
   displayValue,
   type FieldSpec,
 } from "@/features/profile/profile-fields";
+import { FounderBackgroundSection } from "@/features/profile/founder-background-section";
 import { ProfileHero } from "@/features/profile/profile-header";
 import { ProfileImageEditor } from "@/features/profile/profile-image-editor";
 import { QCardSection } from "@/features/q-card/q-card-section";
@@ -405,6 +406,12 @@ export default async function ProfilePage() {
                   }
                 />
               )}
+              {/* F4: title, previous roles and education, in their words. */}
+              {journey === "founder" && company !== null ? (
+                <Suspense fallback={null}>
+                  <FounderBackgroundSection companyId={company.id} />
+                </Suspense>
+              ) : null}
             </EditableSection>
           )}
 
