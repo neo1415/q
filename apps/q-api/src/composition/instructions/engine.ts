@@ -137,6 +137,8 @@ export const REFUSAL_CODES = [
   "BELOW_THE_BAR",
   // Founder rule 2026-10-06: no message before they accept.
   "NOT_CONNECTED_YET",
+  // Live seed: chat needs both sides to have agreed to connect.
+  "NOT_CONNECTED",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -167,6 +169,10 @@ export const REFUSAL_WORDS: Readonly<
   OUTSIDE_HOURS: {
     reason: "it's outside the working hours you set",
     instead: "I'll pick it up in your working hours",
+  },
+  NOT_CONNECTED: {
+    reason: "they haven't accepted your interest yet, so chat isn't open",
+    instead: "I'll write once they accept",
   },
   UNGROUNDED_MESSAGE: {
     reason:
@@ -389,6 +395,12 @@ export type ValidationContext = {
   readonly pace?: ReadonlyMap<string, ThreadPace> | undefined;
   /** ADR 0050: messages to each person already passed in this sitting. */
   readonly sitting?: Map<string, number> | undefined;
+  /**
+   * Live seed (tavus-20, Zino): relationships where a card this
+   * instruction asked about still waits on the person. A new message to
+   * them waits too, so runs do not stack seven cards for one company.
+   */
+  readonly awaiting?: ReadonlySet<string> | undefined;
 };
 
 const Args = z.record(z.string(), z.unknown());
@@ -547,6 +559,29 @@ export function validateStep(
   // a card with a generic message is no better than sending one.
   let factReply = false;
   if (action.name === "chat.message.send") {
+    // Chat opens only once both sides agreed to connect (ADR 0019). A card
+    // to someone who has not accepted is approved, then refused on send
+    // (live seed: three approved cards failed APP_ACTION_REFUSED).
+    const state =
+      subject === null
+        ? null
+        : (context.people.find((person) => person.relationshipId === subject)
+            ?.state ?? null);
+    if (state !== null && !isMatchedRelationshipState(state)) {
+      return {
+        verdict: "REFUSED",
+        code: "NOT_CONNECTED",
+        relationshipId: subject,
+      };
+    }
+    if (subject !== null && context.awaiting?.has(subject) === true) {
+      return {
+        verdict: "HOLD",
+        code: "ALREADY_ASKED",
+        relationshipId: subject,
+        reason: "A message to them is already waiting for your yes.",
+      };
+    }
     const checked = messageProblem(parsed.data, subject, context, step);
     if (checked.problem !== null) {
       return {
@@ -963,6 +998,9 @@ export type InstructionEngineDependencies = {
     Partial<Pick<InstructionStore, "waitingCards">>;
   readonly actions: readonly AnyAppAction[];
   readonly ports: AppActionPorts;
+  /** Relationships with a card still waiting on the person (store read). */
+  readonly awaitingAnswer?:
+    ((instructionId: string) => Promise<ReadonlySet<string>>) | undefined;
   /** The person, resolved now; null when they can no longer act. */
   readonly actorFor: (row: InstructionRow) => Promise<ActorContext | null>;
   readonly people: (
@@ -1338,6 +1376,10 @@ export function createInstructionEngine(
       }
       const people = await dependencies.people(actor).catch(() => []);
       const sentBefore = await store.messagesSent(row.id);
+      // Unreadable is not "nothing waiting": no hold is added, as before.
+      const awaiting = await dependencies
+        .awaitingAnswer?.(row.id)
+        .catch(() => undefined);
       const history = await store.history(row.id);
       // Cards still waiting on the person: never drafted again. A store
       // without the read (older doubles) waits on nothing.
@@ -1553,6 +1595,7 @@ export function createInstructionEngine(
             introduced,
             pace: paces,
             sitting,
+            awaiting,
           }),
         );
         const refused = verdicts
@@ -1610,6 +1653,7 @@ export function createInstructionEngine(
           material,
           introduced,
           pace: paces,
+          awaiting,
         };
         const reviewedPlan = plan;
         verdicts = await Promise.all(

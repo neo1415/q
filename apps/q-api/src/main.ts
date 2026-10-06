@@ -3992,6 +3992,7 @@ instructionEngine.current = createInstructionEngine({
   // "the person".
   principalName: (actor) => workforceDisplayName(actor.userId),
   store: instructionStore,
+  awaitingAnswer: (id) => instructionStore.awaitingAnswer(id),
   autoEnabled: instructionsAuto,
   actions: APP_ACTIONS,
   ports: appActionPorts,

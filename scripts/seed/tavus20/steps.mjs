@@ -573,9 +573,12 @@ export async function stepPitch(page, c) {
 
 // -------------------------------------------------------------- Q settings
 
+const hasGuide = async (email) =>
+  (await lib.call(lib.API, await lib.accessToken(email), "GET", "/v1/me/etiquette-guide")).body?.guide != null;
+
 export async function stepQ(page, c) {
-  if (isDone(c, "q")) return;
   const email = lib.emailFor(c.founderPerson.name, c.company);
+  if (isDone(c, "q") && (await hasGuide(email))) return;
   await login(page, email, "/settings");
   await page.goto(`${lib.WEB}/settings#q`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(8000);
@@ -596,6 +599,7 @@ export async function stepQ(page, c) {
     await page.waitForTimeout(4000);
   }
   log(c, "Q:", (await R.getByRole("status").allInnerTexts()).filter(Boolean).join(" "));
+  if (!(await hasGuide(email))) throw new Error("guide not saved");
   done(c, "q");
 }
 
