@@ -6,8 +6,14 @@
     "hq_country": "Nigeria",
     "founded_year": 2021,
     "founders": [
-      { "name": "Yele Oyekola", "title": "CEO and co-founder" },
-      { "name": "Tunde Akinnuwa", "title": "Chief Product Officer (co-founder)" }
+      {
+        "name": "Yele Oyekola",
+        "title": "CEO and co-founder"
+      },
+      {
+        "name": "Tunde Akinnuwa",
+        "title": "Chief Product Officer (co-founder)"
+      }
     ],
     "sector": "Fintech",
     "subsector": "B2B payments",
@@ -18,13 +24,27 @@
       "amount": 4300000,
       "currency": "USD",
       "date": "2022-08-31",
-      "lead_investors": ["Liquid2 Ventures", "Soma Capital", "Tribe Capital", "Commerce Ventures", "Basecamp Fund", "Y Combinator"]
+      "lead_investors": [
+        "Liquid2 Ventures",
+        "Soma Capital",
+        "Tribe Capital",
+        "Commerce Ventures",
+        "Basecamp Fund",
+        "Y Combinator"
+      ]
     },
-    "total_raised": { "amount": 5600000, "currency": "USD", "as_of": "2022-08-31" },
+    "total_raised": {
+      "amount": 5600000,
+      "currency": "USD",
+      "as_of": "2022-08-31"
+    },
     "short_description": "Duplo is a Lagos-based platform that helps African businesses collect and make payments to each other.",
-    "long_description": "Duplo is a business-to-business payments platform for African companies. It helps FMCG distributors onboard retailers and automate vendor payments, and gives finance teams tools for invoicing, bill processing, collections and reconciliation. It went through Y Combinator and announced a seed round in August 2022 after an earlier pre-seed led by Oui Capital. The profile reflects the latest round found in public coverage; later rounds, if any, were not verified.",
+    "long_description": "Duplo is a business-to-business payments platform for African companies. It helps FMCG distributors onboard retailers and automate vendor payments, and gives finance teams tools for invoicing, bill processing, collections and reconciliation. It went through Y Combinator and announced a seed round in August 2022 after an earlier pre-seed led by Oui Capital.",
     "notable_public_metrics": [
-      { "metric": "Total Payment Volume up 4200% in five months (to Aug 2022, company-reported)", "source": "https://thecondia.com/duplo-4-3-million-seed" }
+      {
+        "metric": "Total Payment Volume up 4200% in five months (to Aug 2022, company-reported)",
+        "source": "https://thecondia.com/duplo-4-3-million-seed"
+      }
     ],
     "sources": [
       "https://thecondia.com/duplo-4-3-million-seed",
@@ -34,13 +54,19 @@
   },
   {
     "name": "Bumpa",
-    "website": null,
+    "website": "https://www.getbumpa.com",
     "hq_city": null,
     "hq_country": "Nigeria",
-    "founded_year": 2021,
+    "founded_year": null,
     "founders": [
-      { "name": "Kelvin Umechukwu", "title": "CEO and co-founder" },
-      { "name": "Adetunji Opayele", "title": "CTO and co-founder" }
+      {
+        "name": "Kelvin Umechukwu",
+        "title": "CEO and co-founder"
+      },
+      {
+        "name": "Adetunji Opayele",
+        "title": "CTO and co-founder"
+      }
     ],
     "sector": "Software",
     "subsector": "Commerce enablement for SMEs",
@@ -51,15 +77,26 @@
       "amount": 4000000,
       "currency": "USD",
       "date": "2022-10-19",
-      "lead_investors": ["Base10 Partners"]
+      "lead_investors": [
+        "Base10 Partners"
+      ]
     },
     "total_raised": null,
     "short_description": "Bumpa lets small businesses in Africa set up and run an online store from a phone.",
-    "long_description": "Bumpa is a Nigerian software company that describes itself as a Shopify for Africa. It lets merchants without technical skills build an e-commerce store and manage sales from a smartphone. The founders previously worked together on a web hosting company. It raised a pre-seed in 2021 and a seed round in October 2022 with participation from Plug & Play Ventures, SHL Capital, Magic Fund, Jedar Capital, DFS Labs, FirstCheck Africa and others. Later rounds were not verified.",
+    "long_description": "Bumpa is a Nigerian software company that describes itself as a Shopify for Africa. It lets merchants without technical skills build an e-commerce store and manage sales from a smartphone. The founders previously worked together on a web hosting company. It raised a pre-seed in 2021 and a seed round in October 2022 with participation from Plug & Play Ventures, SHL Capital, Magic Fund, Jedar Capital, DFS Labs, FirstCheck Africa and others.",
     "notable_public_metrics": [],
     "sources": [
       "https://techpoint.africa/2022/10/19/nigerian-bumpa-4mseed",
-      "https://techcabal.com/2022/10/19/nigerian-social-commerce-startup-bumpa-raises-4-million-seed-round/"
+      "https://techcabal.com/2022/10/19/nigerian-social-commerce-startup-bumpa-raises-4-million-seed-round/",
+      "https://www.getbumpa.com",
+      "https://techpoint.africa/2021/09/02/bumpa-digitise-thousands-businesses/"
+    ],
+    "fact_sources": {
+      "website": "https://www.getbumpa.com"
+    },
+    "gap_notes": [
+      "Founding year dropped: Techpoint (2021-09-02) says Bumpa relaunched in Feb 2021 from SalesCabal, begun around 2018; sources conflict.",
+      "HQ city not stated by a reputable source; left unknown."
     ]
   },
   {
@@ -67,11 +104,20 @@
     "website": "https://www.getanchor.co",
     "hq_city": "Lagos",
     "hq_country": "Nigeria",
-    "founded_year": null,
+    "founded_year": 2022,
     "founders": [
-      { "name": "Segun Adeyemi", "title": "CEO and co-founder" },
-      { "name": "Olamide Sobowale", "title": "Co-founder" },
-      { "name": "Gbekeloluwa Olufotebi", "title": "Co-founder" }
+      {
+        "name": "Segun Adeyemi",
+        "title": "CEO and co-founder"
+      },
+      {
+        "name": "Olamide Sobowale",
+        "title": "Co-founder"
+      },
+      {
+        "name": "Gbekeloluwa Olufotebi",
+        "title": "Co-founder"
+      }
     ],
     "sector": "Fintech",
     "subsector": "Banking-as-a-service / financial infrastructure APIs",
@@ -82,30 +128,49 @@
       "amount": 2400000,
       "currency": "USD",
       "date": "2023-09-04",
-      "lead_investors": ["Goat Capital"]
+      "lead_investors": [
+        "Goat Capital"
+      ]
     },
     "total_raised": null,
     "short_description": "Anchor offers APIs that let businesses build and launch banking and payment products in Nigeria.",
-    "long_description": "Anchor is a financial infrastructure company whose APIs cover accounts, payments, cards, credit and savings, delivered through partner banks. It states it is a technology company and not a bank. It came out of stealth in 2022 with a pre-seed and announced a $2.4M seed round in September 2023 led by Goat Capital with FoundersX, Rebel Fund, Y Combinator and Byld Ventures. Later rounds were not verified.",
+    "long_description": "Anchor is a financial infrastructure company whose APIs cover accounts, payments, cards, credit and savings, delivered through partner banks. It states it is a technology company and not a bank. It came out of stealth in 2022 with a pre-seed and announced a $2.4M seed round in September 2023 led by Goat Capital with FoundersX, Rebel Fund, Y Combinator and Byld Ventures.",
     "notable_public_metrics": [
-      { "metric": "About 270 customers, up from 30 at 2022 launch (company-reported, Sept 2023)", "source": "https://techpoint.africa/2023/09/04/anchor-gets-seed-funding/" },
-      { "metric": "$550 million annualised total transaction volume (company-reported, Sept 2023)", "source": "https://techpoint.africa/2023/09/04/anchor-gets-seed-funding/" }
+      {
+        "metric": "About 270 customers, up from 30 at 2022 launch (company-reported, Sept 2023)",
+        "source": "https://techpoint.africa/2023/09/04/anchor-gets-seed-funding/"
+      },
+      {
+        "metric": "$550 million annualised total transaction volume (company-reported, Sept 2023)",
+        "source": "https://techpoint.africa/2023/09/04/anchor-gets-seed-funding/"
+      }
     ],
     "sources": [
       "https://techpoint.africa/2023/09/04/anchor-gets-seed-funding/",
       "https://www.getanchor.co",
-      "https://ibsintelligence.com/ibsi-news/nigerian-baas-platform-anchor-secures-2-4m-to-boost-expansion"
-    ]
+      "https://ibsintelligence.com/ibsi-news/nigerian-baas-platform-anchor-secures-2-4m-to-boost-expansion",
+      "https://www.ycombinator.com/companies/anchor"
+    ],
+    "fact_sources": {
+      "founded_year": "https://www.ycombinator.com/companies/anchor",
+      "hq_city": "https://www.ycombinator.com/companies/anchor"
+    }
   },
   {
     "name": "Koolboks",
-    "website": null,
-    "hq_city": null,
+    "website": "https://www.koolboks.com",
+    "hq_city": "Lagos",
     "hq_country": "Nigeria",
     "founded_year": 2018,
     "founders": [
-      { "name": "Ayoola Dominic", "title": "Co-founder and CEO" },
-      { "name": "Deborah Gaël", "title": "Co-founder" }
+      {
+        "name": "Ayoola Dominic",
+        "title": "Co-founder and CEO"
+      },
+      {
+        "name": "Deborah Gaël",
+        "title": "Co-founder"
+      }
     ],
     "sector": "Climate",
     "subsector": "Solar-powered refrigeration, cooling-as-a-service",
@@ -116,28 +181,48 @@
       "amount": 11000000,
       "currency": "USD",
       "date": "2025-09-04",
-      "lead_investors": ["KawiSafi Ventures", "Aruwa Capital", "All On"]
+      "lead_investors": [
+        "KawiSafi Ventures",
+        "Aruwa Capital",
+        "All On"
+      ]
     },
-    "total_raised": { "amount": 15400000, "currency": "USD", "as_of": "2025-09" },
+    "total_raised": {
+      "amount": 15400000,
+      "currency": "USD",
+      "as_of": "2025-09"
+    },
     "short_description": "Koolboks makes solar-powered freezers and refrigerators sold across Africa.",
-    "long_description": "Koolboks is a cleantech company, described in press as Nigeria- and France-based, that builds solar-powered freezers and sells cooling-as-a-service. Its September 2025 Series A of $11M was co-led by KawiSafi Ventures and Aruwa Capital, with debt from FFEM and Bpifrance, and is meant to fund a first local assembly plant in Nigeria. The company says it has deployed freezers in 25 countries. It is hardware-led climate, so it sits outside a SaaS, fintech or enterprise-software mandate.",
+    "long_description": "Koolboks is a cleantech company, described in press as Lagos-based, that builds solar-powered freezers and sells cooling-as-a-service. Its September 2025 Series A of $11M was co-led by KawiSafi Ventures and Aruwa Capital, with debt from FFEM and Bpifrance, and is meant to fund a first local assembly plant in Nigeria. The company says it has deployed freezers in 25 countries.",
     "notable_public_metrics": [
-      { "metric": "More than 10,000 solar freezers deployed across 25 countries (company-reported, Sept 2025)", "source": "https://www.africaprivateequitynews.com/p/refrigeration-company-raises-11m" }
+      {
+        "metric": "More than 10,000 solar freezers deployed across 25 countries (company-reported, Sept 2025)",
+        "source": "https://www.africaprivateequitynews.com/p/refrigeration-company-raises-11m"
+      }
     ],
     "sources": [
       "https://www.africaprivateequitynews.com/p/refrigeration-company-raises-11m",
       "https://www.intellinews.com/nigeria-s-koolboks-secures-11mn-to-expand-local-assembly-and-cut-prices-402909",
-      "https://techcabal.com/?p=166974"
-    ]
+      "https://techcabal.com/?p=166974",
+      "https://www.koolboks.com",
+      "https://nextbillion.net/news/nigerias-koolboks-raises-11-million-to-scale-solar-powered-refrigeration-across-africa"
+    ],
+    "fact_sources": {
+      "website": "https://www.koolboks.com",
+      "hq_city": "https://nextbillion.net/news/nigerias-koolboks-raises-11-million-to-scale-solar-powered-refrigeration-across-africa"
+    }
   },
   {
     "name": "HoneyCoin",
-    "website": null,
+    "website": "https://honeycoin.app",
     "hq_city": "Nairobi",
     "hq_country": "Kenya",
     "founded_year": null,
     "founders": [
-      { "name": "David Nandwa", "title": "Founder and CEO" }
+      {
+        "name": "David Nandwa",
+        "title": "Founder and CEO"
+      }
     ],
     "sector": "Fintech",
     "subsector": "Cross-border B2B payments, stablecoin rails",
@@ -148,29 +233,48 @@
       "amount": 4900000,
       "currency": "USD",
       "date": "2025-08-13",
-      "lead_investors": ["Flourish Ventures"]
+      "lead_investors": [
+        "Flourish Ventures"
+      ]
     },
     "total_raised": null,
     "short_description": "HoneyCoin provides stablecoin and fiat payment infrastructure for businesses moving money across borders.",
-    "long_description": "HoneyCoin is a Nairobi-based cross-border payments company that lets businesses collect, convert and settle funds using fiat and stablecoin rails, with wallets, virtual accounts and APIs. Its August 2025 seed round of $4.9M was led by Flourish Ventures with TLcom Capital, Stellar Development Foundation, Lava, Musha Ventures, 4DX Ventures, Antler and Visa Ventures. Sources differ on founding year (2019 per investor, 2020 per press), so it is left null.",
+    "long_description": "HoneyCoin is a Nairobi-based cross-border payments company that lets businesses collect, convert and settle funds using fiat and stablecoin rails, with wallets, virtual accounts and APIs. Its August 2025 seed round of $4.9M was led by Flourish Ventures with TLcom Capital, Stellar Development Foundation, Lava, Musha Ventures, 4DX Ventures, Antler and Visa Ventures.",
     "notable_public_metrics": [
-      { "metric": "Processes $150 million in transactions monthly; 350 enterprise clients (company-reported, Aug 2025)", "source": "https://citizen.digital/tech/fintech-start-up-honeycoin-raises-ksh632m-in-seed-capital-n367896" }
+      {
+        "metric": "Processes $150 million in transactions monthly; 350 enterprise clients (company-reported, Aug 2025)",
+        "source": "https://citizen.digital/tech/fintech-start-up-honeycoin-raises-ksh632m-in-seed-capital-n367896"
+      }
     ],
     "sources": [
       "https://citizen.digital/tech/fintech-start-up-honeycoin-raises-ksh632m-in-seed-capital-n367896",
       "https://flourishventures.com/perspectives/why-we-invested-in-honeycoin/",
-      "https://www.intellinews.com/kenya-s-honeycoin-raises-4-9mn-to-expand-stablecoin-payment-infrastructure-across-emerging-markets-396063"
+      "https://www.intellinews.com/kenya-s-honeycoin-raises-4-9mn-to-expand-stablecoin-payment-infrastructure-across-emerging-markets-396063",
+      "https://honeycoin.app"
+    ],
+    "fact_sources": {
+      "website": "https://honeycoin.app",
+      "hq_city": "https://honeycoin.app"
+    },
+    "gap_notes": [
+      "Founding year left unknown: sources conflict."
     ]
   },
   {
     "name": "MoneyHash",
-    "website": null,
-    "hq_city": "Cairo",
+    "website": "https://moneyhash.io",
+    "hq_city": null,
     "hq_country": "Egypt",
     "founded_year": null,
     "founders": [
-      { "name": "Nader Abdelrazik", "title": "CEO and co-founder" },
-      { "name": "Mustafa Eid", "title": "Co-founder" }
+      {
+        "name": "Nader Abdelrazik",
+        "title": "CEO and co-founder"
+      },
+      {
+        "name": "Mustafa Eid",
+        "title": "Co-founder"
+      }
     ],
     "sector": "Fintech",
     "subsector": "Payment orchestration APIs",
@@ -181,30 +285,59 @@
       "amount": 5200000,
       "currency": "USD",
       "date": "2025-01-21",
-      "lead_investors": ["Flourish Ventures"]
+      "lead_investors": [
+        "Flourish Ventures"
+      ]
     },
-    "total_raised": { "amount": 12700000, "currency": "USD", "as_of": "2025-01-21" },
+    "total_raised": {
+      "amount": 12700000,
+      "currency": "USD",
+      "as_of": "2025-01-21"
+    },
     "short_description": "MoneyHash offers a single API for businesses in the Middle East and Africa to manage online payments.",
-    "long_description": "MoneyHash is a Cairo-based payments orchestration company. Merchants connect once and route payments across many providers and markets. In January 2025 it raised a $5.2M pre-Series A led by Flourish Ventures with Vision Ventures, Arab Bank's Xelerate Fund and Emurgo Kepple Ventures. It also raised a 2024 seed and a 2022 pre-seed. Founding year is reported variously (2020 or 2021), so it is left null.",
+    "long_description": "MoneyHash is an Egyptian payments orchestration company. Merchants connect once and route payments across many providers and markets. In January 2025 it raised a $5.2M pre-Series A led by Flourish Ventures with Vision Ventures, Arab Bank's Xelerate Fund and Emurgo Kepple Ventures. It also raised a 2024 seed and a 2022 pre-seed.",
     "notable_public_metrics": [
-      { "metric": "4x processing volume and 3x revenue over the prior year (company-reported, Jan 2025)", "source": "https://techcrunch.com/2025/01/21/moneyhash-provides-single-access-to-payment-services-in-mena/" },
-      { "metric": "Over 300 pre-integrated APIs covering 100+ markets (company-reported)", "source": "https://techcrunch.com/2025/01/21/moneyhash-provides-single-access-to-payment-services-in-mena/" }
+      {
+        "metric": "4x processing volume and 3x revenue over the prior year (company-reported, Jan 2025)",
+        "source": "https://techcrunch.com/2025/01/21/moneyhash-provides-single-access-to-payment-services-in-mena/"
+      },
+      {
+        "metric": "Over 300 pre-integrated APIs covering 100+ markets (company-reported)",
+        "source": "https://techcrunch.com/2025/01/21/moneyhash-provides-single-access-to-payment-services-in-mena/"
+      }
     ],
     "sources": [
       "https://techcrunch.com/2025/01/21/moneyhash-provides-single-access-to-payment-services-in-mena/",
-      "https://techcabal.com/2025/01/21/egyptian-fintech-moneyhash-raises-5-2-million/"
+      "https://techcabal.com/2025/01/21/egyptian-fintech-moneyhash-raises-5-2-million/",
+      "https://moneyhash.io"
+    ],
+    "fact_sources": {
+      "website": "https://moneyhash.io"
+    },
+    "gap_notes": [
+      "Founding year left unknown: sources conflict.",
+      "HQ city dropped: Wamda (2022) describes MoneyHash as an Egyptian startup based in the US; Cairo is not confirmed."
     ]
   },
   {
     "name": "Tangible",
-    "website": null,
+    "website": "https://www.tangible.finance",
     "hq_city": "London",
     "hq_country": "United Kingdom",
     "founded_year": 2021,
     "founders": [
-      { "name": "William Godfrey", "title": "Co-founder and CEO" },
-      { "name": "Aishwarya Dahanukar", "title": "Co-founder" },
-      { "name": "Sebastian Abdy Saboune", "title": "Co-founder" }
+      {
+        "name": "William Godfrey",
+        "title": "Co-founder and CEO"
+      },
+      {
+        "name": "Aishwarya Dahanukar",
+        "title": "Co-founder"
+      },
+      {
+        "name": "Sebastian Abdy Saboune",
+        "title": "Co-founder"
+      }
     ],
     "sector": "Fintech",
     "subsector": "Structured debt for hardtech companies",
@@ -215,48 +348,72 @@
       "amount": 4300000,
       "currency": "USD",
       "date": "2026-02-12",
-      "lead_investors": ["Pale Blue Dot"]
+      "lead_investors": [
+        "Pale Blue Dot"
+      ]
     },
-    "total_raised": { "amount": 9750000, "currency": "USD", "as_of": "2026-02-12" },
+    "total_raised": {
+      "amount": 9750000,
+      "currency": "USD",
+      "as_of": "2026-02-12"
+    },
     "short_description": "Tangible helps hardtech companies such as robotics and climate firms arrange and manage debt financing.",
     "long_description": "Tangible is a London fintech with an AI-assisted platform and finance experts that standardise the data, documentation and reporting lenders need. Its customers are hardtech companies in robotics, climate, mobility and data centres. In February 2026 it raised a $4.3M seed led by Pale Blue Dot with MMC, Future Positive Capital, Unruly, SDAC, Prototype Capital and Aperture. It reported 13 employees at the time.",
     "notable_public_metrics": [
-      { "metric": "13 employees (Feb 2026)", "source": "https://tech.eu/2026/02/12/london-fintech-tangible-raises-4-3m-in-seed-funding/" }
+      {
+        "metric": "13 employees (Feb 2026)",
+        "source": "https://tech.eu/2026/02/12/london-fintech-tangible-raises-4-3m-in-seed-funding/"
+      }
     ],
     "sources": [
       "https://tech.eu/2026/02/12/london-fintech-tangible-raises-4-3m-in-seed-funding/",
       "https://fintech.global/2026/02/16/tangible-secures-4-3m-seed-to-scale-hardtech-debt/",
       "https://www.crowdfundinsider.com/2026/02/262128-london-based-startup-tangible-secures-4-3m-seed-round-to-enable-ai-driven-debt-solutions/"
-    ]
+    ],
+    "fact_sources": {
+      "website": "https://tech.eu/2026/02/12/london-fintech-tangible-raises-4-3m-in-seed-funding/",
+      "hq_city": "https://tech.eu/2026/02/12/london-fintech-tangible-raises-4-3m-in-seed-funding/"
+    }
   },
   {
     "name": "ekko",
-    "website": null,
+    "website": "https://www.ekko.earth",
     "hq_city": "London",
     "hq_country": "United Kingdom",
     "founded_year": null,
     "founders": [
-      { "name": "Oli Cook", "title": "Co-founder and CEO" }
+      {
+        "name": "Oli Cook",
+        "title": "Co-founder and CEO"
+      }
     ],
     "sector": "Fintech",
     "subsector": "Climate fintech / embedded sustainability",
     "business_model": "B2B platform and API",
     "customer_type": "enterprise (banks, fintechs, payment providers)",
-    "stage": "seed",
+    "stage": null,
     "latest_round": {
       "amount": 2500000,
       "currency": "USD",
       "date": "2024-05-16",
-      "lead_investors": ["Fuel Ventures"]
+      "lead_investors": [
+        "Fuel Ventures"
+      ]
     },
     "total_raised": null,
     "short_description": "ekko lets banks, fintechs and payment providers build climate and sustainability actions into their financial products.",
-    "long_description": "ekko is a London climate fintech whose platform lets financial institutions integrate carbon compensation, reforestation, conservation and ocean plastic prevention into their products. In May 2024 it announced a $2.5M round led by Fuel Ventures with Sorven Partners, Mishcon de Reya and existing investors. The round is labelled seed here as an assumption from its size and context; the source does not name the stage, so confirm before display. Later rounds were not verified.",
+    "long_description": "ekko is a London climate fintech whose platform lets financial institutions integrate carbon compensation, reforestation, conservation and ocean plastic prevention into their products. In May 2024 it announced a $2.5M round led by Fuel Ventures with Sorven Partners, Mishcon de Reya and existing investors.",
     "notable_public_metrics": [],
     "sources": [
-      "https://ffnews.com/newsarticle/funding/global-climate-fintech-leader-ekko-secures-2-5-million-funding-round/"
+      "https://ffnews.com/newsarticle/funding/global-climate-fintech-leader-ekko-secures-2-5-million-funding-round/",
+      "https://www.ekko.earth",
+      "https://www.retailbankerinternational.com/news/ekko-closes-a-2-5-million-funding-round/"
     ],
-    "data_quality_note": "Only one source found; stage label unverified. Add a second source before seeding or drop."
+    "data_quality_note": "Round ($2.5M led by Fuel Ventures, May 2024) and London base confirmed by a second source (Retail Banker International, 2024-05-16). Stage label dropped: no source names it.",
+    "fact_sources": {
+      "website": "https://www.ekko.earth",
+      "hq_city": "https://www.retailbankerinternational.com/news/ekko-closes-a-2-5-million-funding-round/"
+    }
   },
   {
     "name": "Mintlify",
@@ -265,8 +422,14 @@
     "hq_country": "United States",
     "founded_year": null,
     "founders": [
-      { "name": "Han Wang", "title": "Co-founder" },
-      { "name": "Hahnbee Lee", "title": "Co-founder" }
+      {
+        "name": "Han Wang",
+        "title": "Co-founder"
+      },
+      {
+        "name": "Hahnbee Lee",
+        "title": "Co-founder"
+      }
     ],
     "sector": "Developer tools / enterprise software",
     "subsector": "Documentation and knowledge platform",
@@ -277,28 +440,48 @@
       "amount": 45000000,
       "currency": "USD",
       "date": "2026-04-17",
-      "lead_investors": ["a16z", "Salesforce Ventures"]
+      "lead_investors": [
+        "a16z",
+        "Salesforce Ventures"
+      ]
     },
-    "total_raised": { "amount": 67000000, "currency": "USD", "as_of": "2026-04-17" },
+    "total_raised": {
+      "amount": 67000000,
+      "currency": "USD",
+      "as_of": "2026-04-17"
+    },
     "short_description": "Mintlify is a documentation platform for software companies that is also aimed at AI agents.",
-    "long_description": "Mintlify provides a platform for companies to create and host structured product documentation, including API references and knowledge bases, designed to be usable by developers and AI agents. It was founded by Han Wang and Hahnbee Lee, who met at Cornell. A $18M Series A led by Andreessen Horowitz was announced in September 2024, and a $45M Series B led by a16z and Salesforce Ventures followed in April 2026. Founding year is reported as 2021 or 2022, so it is left null. It is Series B, outside the pre-seed to Series A mandate.",
+    "long_description": "Mintlify provides a platform for companies to create and host structured product documentation, including API references and knowledge bases, designed to be usable by developers and AI agents. It was founded by Han Wang and Hahnbee Lee, who met at Cornell. A $18M Series A led by Andreessen Horowitz was announced in September 2024, and a $45M Series B led by a16z and Salesforce Ventures followed in April 2026.",
     "notable_public_metrics": [
-      { "metric": "Powers documentation for more than 20,000 companies (company-reported, Apr 2026)", "source": "https://www.builtinsf.com/articles/mintlify-raises-45m-series-b-20260417" }
+      {
+        "metric": "Powers documentation for more than 20,000 companies (company-reported, Apr 2026)",
+        "source": "https://www.builtinsf.com/articles/mintlify-raises-45m-series-b-20260417"
+      }
     ],
     "sources": [
       "https://www.mintlify.com/blog/series-a",
       "https://www.builtinsf.com/articles/mintlify-raises-45m-series-b-20260417",
-      "https://raising.fi/news/mintlify-series-b-april-2026"
-    ]
+      "https://raising.fi/news/mintlify-series-b-april-2026",
+      "https://www.ycombinator.com/companies/mintlify"
+    ],
+    "gap_notes": [
+      "Founding year left unknown: sources conflict."
+    ],
+    "fact_sources": {
+      "hq_city": "https://www.ycombinator.com/companies/mintlify"
+    }
   },
   {
     "name": "F2",
-    "website": null,
-    "hq_city": null,
+    "website": "https://f2.ai",
+    "hq_city": "New York",
     "hq_country": "United States",
-    "founded_year": null,
+    "founded_year": 2025,
     "founders": [
-      { "name": "Don Muir", "title": "Founder and CEO" }
+      {
+        "name": "Don Muir",
+        "title": "Founder and CEO"
+      }
     ],
     "sector": "Fintech",
     "subsector": "AI workflow software for private credit and banks",
@@ -309,19 +492,38 @@
       "amount": 14000000,
       "currency": "USD",
       "date": "2026-06-10",
-      "lead_investors": ["HighlandX"]
+      "lead_investors": [
+        "HighlandX"
+      ]
     },
-    "total_raised": { "amount": 24000000, "currency": "USD", "as_of": "2026-06-10", "note": "Total equity capital including the seed, per press release coverage" },
+    "total_raised": {
+      "amount": 24000000,
+      "currency": "USD",
+      "as_of": "2026-06-10",
+      "note": "Total equity capital including the seed, per press release coverage"
+    },
     "short_description": "F2 builds AI workflow software that automates deal screening, underwriting and monitoring for private credit funds and banks.",
-    "long_description": "F2 spun out of Arc, a banking and capital markets platform co-founded by CEO Don Muir. Its software automates screening, underwriting and monitoring for lenders and runs on a spreadsheet engine that preserves formulas and data lineage. In June 2026 it announced $24M of equity capital, including a $14M seed led by HighlandX with Left Lane Capital, NFX, Y Combinator and Torch Capital. HQ city and founding year were not stated in the sources reviewed.",
+    "long_description": "F2 spun out of Arc, a banking and capital markets platform co-founded by CEO Don Muir. Its software automates screening, underwriting and monitoring for lenders and runs on a spreadsheet engine that preserves formulas and data lineage. In June 2026 it announced $24M of equity capital, including a $14M seed led by HighlandX with Left Lane Capital, NFX, Y Combinator and Torch Capital.",
     "notable_public_metrics": [
-      { "metric": "95.25% accuracy on SpreadsheetBench (company-reported, June 2026)", "source": "https://alleywatch.com/2026/06/f2-f2-ai-private-credit-markets-deal-underwriting-analysis-platform-don-muir/" },
-      { "metric": "Deployed across 100+ funds and banks (company-reported, June 2026)", "source": "https://alleywatch.com/2026/06/f2-f2-ai-private-credit-markets-deal-underwriting-analysis-platform-don-muir/" }
+      {
+        "metric": "95.25% accuracy on SpreadsheetBench (company-reported, June 2026)",
+        "source": "https://alleywatch.com/2026/06/f2-f2-ai-private-credit-markets-deal-underwriting-analysis-platform-don-muir/"
+      },
+      {
+        "metric": "Deployed across 100+ funds and banks (company-reported, June 2026)",
+        "source": "https://alleywatch.com/2026/06/f2-f2-ai-private-credit-markets-deal-underwriting-analysis-platform-don-muir/"
+      }
     ],
     "sources": [
       "https://alleywatch.com/2026/06/f2-f2-ai-private-credit-markets-deal-underwriting-analysis-platform-don-muir/",
       "https://www.businesswire.com/news/home/20260610638134/en/F2-Raises-$24M-to-Deploy-LLM-Agnostic-Operating-System-across-Private-Credit-Commercial-Banks",
-      "https://raising.fi/news/f2-seed-june-2026"
-    ]
+      "https://raising.fi/news/f2-seed-june-2026",
+      "https://www.ycombinator.com/companies/f2"
+    ],
+    "fact_sources": {
+      "website": "https://www.ycombinator.com/companies/f2",
+      "hq_city": "https://www.ycombinator.com/companies/f2",
+      "founded_year": "https://www.ycombinator.com/companies/f2"
+    }
   }
 ]
