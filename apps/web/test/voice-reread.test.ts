@@ -37,7 +37,13 @@ function harness(answers: readonly boolean[]) {
     next?.();
     await flush();
   };
-  return { stop, tick, flush, reads: () => reads, waiting: () => timers.length };
+  return {
+    stop,
+    tick,
+    flush,
+    reads: () => reads,
+    waiting: () => timers.length,
+  };
 }
 
 describe("reading a voice turn's answer back", () => {

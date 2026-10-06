@@ -42,7 +42,7 @@ export function rereadUntilSettled(options: Reread): () => void {
   let reads = 0;
   const once = async () => {
     reads += 1;
-    let settled = false;
+    let settled: boolean;
     try {
       settled = await options.read();
     } catch {

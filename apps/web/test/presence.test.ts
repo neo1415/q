@@ -98,13 +98,17 @@ describe("which figure: one fixed mapping from Q's state (P11)", () => {
     );
     // Any other surface, however large, has no face.
     expect(faceAllowed({ face: false, pixels: 520 })).toBe(false);
-    expect(presenceFor({ state: "SPEAKING", small: false, face: true })).toEqual(
-      { figure: "FACE", dim: false },
-    );
+    expect(
+      presenceFor({ state: "SPEAKING", small: false, face: true }),
+    ).toEqual({ figure: "FACE", dim: false });
     // Cards on screen do not take the face away while Q is speaking.
     expect(
-      presenceFor({ state: "SPEAKING", small: false, face: true, showing: true })
-        .figure,
+      presenceFor({
+        state: "SPEAKING",
+        small: false,
+        face: true,
+        showing: true,
+      }).figure,
     ).toBe("FACE");
     // The face is for speaking only: every other state, no face.
     for (const input of everyInput()) {
@@ -115,9 +119,9 @@ describe("which figure: one fixed mapping from Q's state (P11)", () => {
     expect(
       presenceFor({ state: "LISTENING", small: false, face: true }).figure,
     ).toBe("ATTENTIVE");
-    expect(presenceFor({ state: "IDLE", small: false, face: true }).figure).toBe(
-      "CLOUD",
-    );
+    expect(
+      presenceFor({ state: "IDLE", small: false, face: true }).figure,
+    ).toBe("CLOUD");
   });
 
   it("shows the Q mark while answer cards are up and Q is resting, and only then", () => {
