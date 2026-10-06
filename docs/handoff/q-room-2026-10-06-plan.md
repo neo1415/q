@@ -15,3 +15,10 @@ Founder vision: the Q page is "the god room". Everything in Capital Q, for inves
 | R8 | Document and pitch-deck creation: research how Claude, Gemini and ChatGPT create documents (design, fonts, downloads); a multi-agent pipeline (writer, designer, auditor, asset finder) iterating until right; image generation (Gemini image models through the Model Gateway if the current key allows); placeholders plus a floating upload button in the Q room; endless edit rounds by voice. During onboarding, Q offers to create the pitch deck. |
 | R9 | Speed: everything above is fast and works on weak networks. |
 | R10 | Research first (technical and executive, enterprise-grade on a small budget), then design pictures and video, then build. |
+
+## Founder clarifications (6 October, night)
+
+- **Cards close when the conversation moves on.** A card stays only while we are on its subject; on a topic change Q closes it straight away, and opens it again if the subject comes back. The person can also say "close it". A document being read stays while we are on that document. (This replaces the research doc's "stays on screen until closed" proposal for ADR 0044.)
+- **Documents are found by meaning, not exact name.** "This company's incorporation document" resolves by company, document type, folder, title and text; Q suggests the likely match ("Is this the one?") when unsure, then opens it.
+- **Stock photos come from Pexels** (`PEXELS_API` is already set on q-api and workers), not Unsplash.
+- **Gemini billing:** the founder may add about $5. Check periodically whether image generation works; keep live tests to the minimum and log each call's cost.
