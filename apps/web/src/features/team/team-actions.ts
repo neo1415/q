@@ -13,6 +13,7 @@ import {
   removeTeamMember,
   resendTeamInvitation,
   respondToTeamOwnership,
+  decideCompanyClaim,
   requestToJoin,
   revokeTeamInvitation,
   switchOrganisation,
@@ -175,4 +176,14 @@ export async function acceptInvitationAction(token: string) {
   const out = await run((s) => acceptInvitation(s, token));
   if (out.ok) revalidatePath("/", "layout");
   return out;
+}
+
+/** P14: a company admin lets in (as a Member) or declines a claim. */
+export async function decideCompanyClaimAction(
+  companyId: string,
+  requestId: string,
+  approve: boolean,
+): Promise<TeamActionResult<{ readonly status: "APPROVED" | "DECLINED" }>> {
+  if (!id(companyId) || !id(requestId)) return BAD;
+  return run((s) => decideCompanyClaim(s, companyId, requestId, approve));
 }

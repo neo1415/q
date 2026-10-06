@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 
-import { getTeam } from "@capital-q/api-client";
+import { getTeam, listCompanyClaims } from "@capital-q/api-client";
 
 import { PageContainer } from "@/components/app-shell/page-container";
-import { apiSession } from "@/features/q/context";
+import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { CompanyClaims } from "@/features/team/company-claims";
 import { SettingsNav, TeamError } from "@/features/team/settings-nav";
 import { TeamPage } from "@/features/team/team-page";
 
@@ -17,14 +18,28 @@ export const dynamic = "force-dynamic";
  */
 export default async function TeamSettingsPage() {
   const session = await apiSession();
-  const team =
-    session === null ? null : await getTeam(session).catch(() => null);
+  const context = await resolveOwnContext();
+  const [team, claims] =
+    session === null
+      ? [null, []]
+      : await Promise.all([
+          getTeam(session).catch(() => null),
+          // P14: claims on their company; the API answers only its admins.
+          context.kind === "FOUNDER"
+            ? listCompanyClaims(session, context.companyId)
+                .then((out) => out.claims)
+                .catch(() => [])
+            : Promise.resolve([]),
+        ]);
   return (
     <PageContainer>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
         <SettingsNav current="team" />
         <div className="max-w-[52rem] min-w-0">
           {team === null ? <TeamError /> : <TeamPage initial={team} />}
+          <div className="pt-6">
+            <CompanyClaims initial={claims} />
+          </div>
         </div>
       </div>
     </PageContainer>
