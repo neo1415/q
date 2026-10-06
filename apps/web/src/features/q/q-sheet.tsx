@@ -33,6 +33,7 @@ import { failureMessage, recoveryHint } from "./conversation";
 import { useFollowNewest } from "./follow-newest";
 import { QAnswer } from "./q-answer";
 import { QNow } from "./q-now";
+import { QCanSee } from "./q-can-see";
 import { QBoard } from "./q-board";
 import { viewingOf, type QMoment } from "./q-moment";
 import { useQSession } from "./q-session";
@@ -109,6 +110,8 @@ export function QSheetConversation({
             scope={subject.scope}
             detail={subject.kind === "NONE" ? undefined : subject.label}
           />
+          {/* Q room R1: what Q sees of the page behind the dock. */}
+          <QCanSee />
         </div>
         {connected ? (
           <Tooltip content={voice.active ? "End voice" : "Talk with Q"}>

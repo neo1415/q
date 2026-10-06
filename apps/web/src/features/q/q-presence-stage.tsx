@@ -21,6 +21,8 @@ import { firstWords } from "./board-timeline";
 import { useAnswerPlayback } from "./use-answer-playback";
 import { plainFromMarkdown } from "./markdown";
 import { QResultBlocks } from "./q-result-blocks";
+import { QRoomStage } from "./room/q-room-card";
+import { roomStage } from "./room/room-stage";
 import {
   answersIn,
   onStage,
@@ -112,6 +114,22 @@ export function QPresenceStage({
     topicMovedOn(turns, staged.id);
   const shown = movedOn ? null : staged;
   const recent = shownRecently(items);
+  // Q room R4: the card Q brought into the room, open while the
+  // conversation stays on its subject (room-stage), or until closed here.
+  const room = useMemo(() => roomStage(turns), [turns]);
+  const [closedByHand, setClosedByHand] = useState<{
+    readonly key: string;
+    readonly at: number;
+  } | null>(null);
+  const roomOpen =
+    room.open !== null &&
+    !(
+      closedByHand !== null &&
+      closedByHand.key === room.open.key &&
+      closedByHand.at >= room.open.openedAt
+    )
+      ? room.open
+      : null;
   const latestQ = turns.findLast(
     (turn): turn is Extract<QTurn, { kind: "Q" }> => turn.kind === "Q",
   );
@@ -182,7 +200,7 @@ export function QPresenceStage({
     return () => window.removeEventListener(SHOW_ON_STAGE, onShow);
   }, [answers]);
 
-  const showing = shown !== null;
+  const showing = shown !== null || roomOpen !== null;
   useEffect(() => {
     onShowingChange?.(showing);
   }, [showing, onShowingChange]);
@@ -292,6 +310,12 @@ export function QPresenceStage({
           </div>
         </section>
       )}
+
+      <QRoomStage
+        open={roomOpen}
+        note={room.note}
+        onClose={(card) => setClosedByHand({ key: card.key, at: card.openedAt })}
+      />
 
       {waiting}
 

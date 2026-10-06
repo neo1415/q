@@ -16,7 +16,8 @@ import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
 import { ComparisonCards } from "./comparison-cards";
 import { StaticAnswerCards } from "./static-answer-cards";
-import { recordPagePath, setupPath } from "./client-actions";
+import { recordPagePath, settingsPath, setupPath } from "./client-actions";
+import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
 
 /**
@@ -68,6 +69,8 @@ const INTENT_ROUTES: Readonly<
       | "OPEN_SETUP"
       | "SET_DISCOVER_FILTERS"
       | "SCREEN_ACT"
+      | "OPEN_SETTINGS"
+      | "SHOW_IN_Q_ROOM"
     >,
     string | null
   >
@@ -102,6 +105,13 @@ function intentHref(intent: QUiIntent): string | null {
   }
   if (intent.kind === "OPEN_SETUP") {
     return setupPath(intent.journey);
+  }
+  if (intent.kind === "OPEN_SETTINGS") {
+    return settingsPath(intent.section);
+  }
+  // Q room R4: the card is on the Q page; its link is the record's page.
+  if (intent.kind === "SHOW_IN_Q_ROOM") {
+    return intent.object === "SOURCES" ? null : roomCardHref(intent);
   }
   // The filters are applied as the answer arrives; the card opens the feed.
   if (intent.kind === "SET_DISCOVER_FILTERS") {
@@ -167,7 +177,8 @@ function intentLabel(intent: QUiIntent): string {
                 ? "Rehearse the meeting"
                 : intent.page.endsWith("_MESSAGES")
                   ? "Open the chat"
-                  : "Open the relationship";
+                  : (RECORD_PAGE_LABELS[intent.page] ??
+                    "Open the relationship");
     case "SCREEN_ACT":
       return "On this page";
     case "OPEN_SETUP":
@@ -176,8 +187,23 @@ function intentLabel(intent: QUiIntent): string {
         : "Continue setup";
     case "SET_DISCOVER_FILTERS":
       return "Open Discover";
+    case "OPEN_SETTINGS":
+      return "Open Settings";
+    case "SHOW_IN_Q_ROOM":
+      return `Open ${intent.title}`;
   }
 }
+
+/** Q room R2: the deep links' own words. */
+const RECORD_PAGE_LABELS: Readonly<Partial<Record<string, string>>> = {
+  COMPANY_ELEVATOR: "Open the elevator pitch",
+  COMPANY_DATA_ROOM: "Open the data room",
+  COMPANY_DECK: "Open the pitch deck",
+  COMPANY_TEAM: "Open the team",
+  WORK_ITEM: "Open the work",
+  CAPITAL_ROUND: "Open the round",
+  GATEQ_APPLICATION: "Open the application",
+};
 
 const DESTINATION_LABELS: Readonly<
   Record<Extract<QUiIntent, { kind: "NAVIGATE" }>["destination"], string>
