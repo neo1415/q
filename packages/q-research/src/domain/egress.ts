@@ -28,6 +28,12 @@ export type EgressInput = {
   readonly requestedQuery: string;
   /** The person's latest message in this conversation. Their explicit wording. */
   readonly userText: string;
+  /**
+   * The person's own earlier messages in this conversation, most recent
+   * last (web search 2026-10-06: "look her up" after naming Mai Soli a
+   * turn before had nothing to search for). Their words too, never Q's.
+   */
+  readonly earlierUserText?: readonly string[] | undefined;
   /** Public identity terms policy has authorised for this subject, if any. */
   readonly publicIdentity: readonly string[];
   /**
@@ -149,7 +155,7 @@ export function tokenise(text: string): readonly string[] {
 
 function allowedSet(input: EgressInput): ReadonlySet<string> {
   const allowed = new Set<string>(CONNECTIVES);
-  for (const token of tokenise(input.userText)) {
+  for (const token of personTokens(input)) {
     if (!FIGURE_LIKE.test(token)) {
       allowed.add(token);
     }
@@ -161,6 +167,103 @@ function allowedSet(input: EgressInput): ReadonlySet<string> {
   }
   return allowed;
 }
+
+/** Every word the person wrote this turn and in their earlier messages. */
+function personTokens(input: EgressInput): readonly string[] {
+  return [input.userText, ...(input.earlierUserText ?? [])].flatMap((text) =>
+    tokenise(text),
+  );
+}
+
+/**
+ * Words that ask rather than describe: "can you find me", "please look up",
+ * "search the internet for". A search index does better without them.
+ */
+const FILLER = new Set([
+  "a",
+  "an",
+  "the",
+  "can",
+  "could",
+  "would",
+  "will",
+  "you",
+  "please",
+  "pls",
+  "me",
+  "i",
+  "i'm",
+  "im",
+  "find",
+  "show",
+  "tell",
+  "give",
+  "look",
+  "lookup",
+  "up",
+  "search",
+  "google",
+  "check",
+  "online",
+  "internet",
+  "web",
+  "want",
+  "need",
+  "know",
+  "let",
+  "let's",
+  "get",
+  "help",
+  "hey",
+  "hi",
+  "q",
+  "ok",
+  "okay",
+  "just",
+  "quickly",
+  "some",
+  "any",
+  "anything",
+  "everything",
+  "out",
+  "there",
+  "say",
+  "says",
+  "what's",
+  "whats",
+]);
+
+/**
+ * The person's sentence as a search phrase: their own words, in their
+ * order, without the asking. Never adds a word they did not write, and
+ * drops figures exactly as composition does.
+ */
+export function searchPhrase(text: string): string {
+  const kept = tokenise(text).filter(
+    (token) =>
+      !FILLER.has(token) && !PRONOUNS.has(token) && !FIGURE_LIKE.test(token),
+  );
+  // "look it up" names nothing: no phrase rather than a query of glue words.
+  if (kept.every((token) => CONNECTIVES.has(token))) return "";
+  return kept.join(" ").slice(0, RESEARCH_BOUNDS.maxQueryChars).trim();
+}
+
+/** Words that point at something said before; alone they search for nothing. */
+const PRONOUNS = new Set([
+  "it",
+  "them",
+  "they",
+  "her",
+  "him",
+  "she",
+  "he",
+  "this",
+  "that",
+  "these",
+  "those",
+  "one",
+  "ones",
+]);
 
 /**
  * Compose the query that may leave. Preserves the order of the surviving
@@ -197,7 +300,7 @@ export function composeEgressQuery(input: EgressInput): EgressOutcome {
     input.publicIdentity.some((term) =>
       tokenise(term).every((token) => survivors.includes(token)),
     );
-  const userTokens = new Set(tokenise(input.userText));
+  const userTokens = new Set(personTokens(input));
   const informative = survivors.filter(
     (token) => userTokens.has(token) || identityTokens.has(token),
   );

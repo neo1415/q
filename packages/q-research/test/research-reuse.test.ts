@@ -77,23 +77,31 @@ describe("research reuse within a run", () => {
       run,
       "What does the public web say about Kobo360?",
     );
+    const searchedOnce = h.provider.searches.length;
     const second = await h.research(
       run,
       "What does the public web say about Kobo360?",
     );
     expect(first.status).toBe("OK");
     expect(second).toBe(first);
-    // One research: the search and its parallel past-month twin.
-    expect(h.provider.searches).toHaveLength(2);
+    // One research: its planned queries and the past-month twin, once.
+    expect(searchedOnce).toBeGreaterThanOrEqual(2);
+    expect(h.provider.searches).toHaveLength(searchedOnce);
     expect(h.provider.extracts).toHaveLength(1);
     expect(h.registered).toHaveLength(1);
   });
 
   it("researches again for a different run or a different question", async () => {
     const h = harness();
+    const counts: number[] = [];
     await h.research("90000000-0000-4000-8000-000000000001", "Kobo360 markets");
+    counts.push(h.provider.searches.length);
     await h.research("90000000-0000-4000-8000-000000000002", "Kobo360 markets");
+    counts.push(h.provider.searches.length);
     await h.research("90000000-0000-4000-8000-000000000002", "Kobo360 funding");
-    expect(h.provider.searches).toHaveLength(6);
+    counts.push(h.provider.searches.length);
+    expect(counts[0]).toBeGreaterThan(0);
+    expect(counts[1]).toBeGreaterThan(counts[0] ?? 0);
+    expect(counts[2]).toBeGreaterThan(counts[1] ?? 0);
   });
 });

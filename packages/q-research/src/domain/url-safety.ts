@@ -195,6 +195,34 @@ export function publicDomainOf(
   return verdict.ok ? verdict.domain : null;
 }
 
+/** Query parameters that only track a visit; the page is the same without them. */
+const TRACKING_PARAMETER =
+  /^(?:utm_|fbclid$|gclid$|mc_[ce]id$|ref$|ref_src$)/iu;
+
+/**
+ * One key per page, whichever index surfaced it (web search 2026-10-06:
+ * Tavily and SerpApi return the same article as "http://www.x.com/a/" and
+ * "https://x.com/a?utm_source=..."). Scheme, "www.", a trailing slash, the
+ * fragment and tracking parameters do not make a different page. For
+ * de-duplication only; the URL that is read and cited is the one found.
+ */
+export function canonicalUrlKey(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url.trim().toLowerCase();
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^www\./u, "");
+  const path = parsed.pathname.replace(/\/+$/u, "");
+  const kept = [...parsed.searchParams.entries()]
+    .filter(([name]) => !TRACKING_PARAMETER.test(name))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, value]) => `${name}=${value}`)
+    .join("&");
+  return `${host}${path}${kept.length === 0 ? "" : `?${kept}`}`;
+}
+
 /**
  * A web address as a person writes it, as the URLs to try (lead
  * 2026-10-04: "zinoaviation.com", "www.x.com", "HTTP://X.COM/About/",

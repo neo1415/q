@@ -13,12 +13,22 @@ import {
   type ComparisonNote,
   type TemporalClass,
 } from "../domain/comparison.js";
-import { composeEgressQuery } from "../domain/egress.js";
+import { composeEgressQuery, searchPhrase } from "../domain/egress.js";
 import {
   boundExcerpt,
   type InstructionRiskCategory,
 } from "../domain/excerpt.js";
-import { mentionedCountries } from "../domain/geography.js";
+import { countryName, mentionedCountries } from "../domain/geography.js";
+import {
+  mergePlannedHits,
+  matchOf,
+  rankForReading,
+  resolveEntity,
+  type EntityResolution,
+  type FoundHit,
+  type NamedEntity,
+  type SubjectMatch,
+} from "../domain/ranking.js";
 import {
   judgePublicUrl,
   normaliseWebAddress,
@@ -69,6 +79,23 @@ export type ResearchCommand = {
   readonly requestedQuery: string;
   /** The person's latest message. Their explicit wording. */
   readonly userText: string;
+  /**
+   * The person's own earlier messages, most recent last (at most a few).
+   * Their words; a query may use them like the latest message.
+   */
+  readonly earlierUserText?: readonly string[] | undefined;
+  /**
+   * Other phrasings of the same request the model proposes (web search
+   * 2026-10-06: one query missed what a second wording found). Untrusted;
+   * each is composed before egress exactly like `requestedQuery`.
+   */
+  readonly alsoQueries?: readonly string[] | undefined;
+  /**
+   * The company or person being looked up by name, as the person named it,
+   * when the subject is not a Capital Q record. Used only when every word
+   * of it is the person's own; it decides which pages are about them.
+   */
+  readonly entityName?: string | undefined;
   readonly subject: ResearchSubject | null;
   readonly freshness?: PublicWebFreshness | undefined;
   /**
@@ -102,6 +129,8 @@ export type ResearchedSource = {
   readonly isSubjectWebsite: boolean;
   readonly mentionedCountries: readonly string[];
   readonly instructionRisk: readonly InstructionRiskCategory[];
+  /** Whether the page is about the named subject; null when nothing was named. */
+  readonly subjectMatch: SubjectMatch | null;
   /** Set when the source was recorded as the subject's evidence. */
   readonly evidenceSourceId: string | null;
   readonly evidenceItemId: string | null;
@@ -120,7 +149,11 @@ export type ResearchOutcome =
       readonly status: "OK";
       /** The query that left Capital Q: composed from allowed terms only. */
       readonly query: string;
+      /** Every query that left Capital Q this turn, the first being `query`. */
+      readonly queries: readonly string[];
       readonly queryMinimised: boolean;
+      /** Whether the pages settle which organisation a name refers to. */
+      readonly entityResolution: EntityResolution;
       readonly sources: readonly ResearchedSource[];
       readonly comparison: readonly ComparisonNote[];
       readonly budget: ResearchBudgetUsed;
@@ -230,7 +263,7 @@ const MAX_PER_DOMAIN = 2;
 const PROVIDER_UNAVAILABLE_MESSAGE =
   "Public sources couldn't be checked right now. Capital Q's own information is still available.";
 const NO_IDENTITY_MESSAGE =
-  "Nothing about this subject is authorised for public research yet: the company is private to its organisation and has no declared website. Ask the person which public name or website to search for.";
+  "There was nothing in the person's words to search for yet. Ask them which name (a company or a person) to look up; a name is enough, no website is needed.";
 
 /**
  * A company subject is what the conversation is about, so its name leads
@@ -259,32 +292,54 @@ function identityTerms(subject: ResearchSubject | null): readonly string[] {
     if (domain !== null) {
       terms.push(domain);
     }
+    // Name + country tells one organisation from another of the same name.
+    const country = countryName(subject.headquartersCountry);
+    if (country !== null) {
+      terms.push(country);
+    }
   }
   return terms;
 }
 
-function selectForExtraction(
-  hits: readonly PublicWebSearchHit[],
-  count: number,
-): readonly PublicWebSearchHit[] {
-  const perDomain = new Map<string, number>();
-  const chosen: PublicWebSearchHit[] = [];
-  const ordered = [...hits].sort(
-    (a, b) => (b.relevance ?? 0) - (a.relevance ?? 0),
-  );
-  for (const hit of ordered) {
-    const domain = publicDomainOf(hit.url) ?? hit.url;
-    const used = perDomain.get(domain) ?? 0;
-    if (used >= MAX_PER_DOMAIN || chosen.some((c) => c.url === hit.url)) {
-      continue;
-    }
-    perDomain.set(domain, used + 1);
-    chosen.push(hit);
-    if (chosen.length >= count) {
-      break;
-    }
+/**
+ * The organisation (or person) the pages should be about: the authorised
+ * subject, else the name the person gave — only when every word of it is
+ * theirs, so a model cannot name somebody to look up.
+ */
+function namedEntityOf(command: ResearchCommand): NamedEntity | null {
+  const subject = command.subject;
+  // The subject leads only where its name may lead the query: an
+  // investor's own organisation is never the subject of a search about
+  // somebody else (§9).
+  const fromSubject: NamedEntity | null =
+    subject !== null &&
+    subject.identityAuthorised &&
+    prependIdentityFor(subject, command.aboutThemselves === true)
+      ? subject.kind === "COMPANY"
+        ? {
+            name: subject.name,
+            domain: publicDomainOf(subject.websiteUrl),
+            country: subject.headquartersCountry,
+          }
+        : { name: subject.name, domain: null, country: null }
+      : null;
+  const named = command.entityName?.trim() ?? "";
+  if (named.length < 2) return fromSubject;
+  if (
+    fromSubject !== null &&
+    named.toLowerCase() === fromSubject.name.toLowerCase()
+  ) {
+    return fromSubject;
   }
-  return chosen;
+  const composed = composeEgressQuery({
+    requestedQuery: named,
+    userText: command.userText,
+    earlierUserText: command.earlierUserText,
+    publicIdentity: [],
+  });
+  return composed.ok && composed.droppedTokens === 0
+    ? { name: composed.query, domain: null, country: null }
+    : fromSubject;
 }
 
 export function createPublicWebResearchService(
@@ -436,6 +491,7 @@ export function createPublicWebResearchService(
     page: { title: string | null; text: string } | undefined,
     subject: ResearchSubject | null,
     now: Date,
+    entity: NamedEntity | null = null,
   ): {
     source: Omit<ResearchedSource, "evidenceSourceId" | "evidenceItemId">;
     sha256: string;
@@ -444,21 +500,30 @@ export function createPublicWebResearchService(
     const domain = publicDomainOf(hit.url) ?? "";
     const ownDomain =
       subject?.kind === "COMPANY" ? publicDomainOf(subject.websiteUrl) : null;
+    const countries = mentionedCountries(bounded.text);
+    const title = page?.title ?? hit.title;
     return {
       sha256: bounded.sha256,
       source: {
         index,
         url: hit.url,
         domain,
-        title: page?.title ?? hit.title,
+        title,
         publishedAt: hit.publishedAt,
         retrievedAt: now.toISOString(),
         temporal: temporalClassOf(hit.publishedAt, now),
         excerpt: bounded.text,
         extracted: page !== undefined,
         isSubjectWebsite: ownDomain !== null && ownDomain === domain,
-        mentionedCountries: mentionedCountries(bounded.text),
+        mentionedCountries: countries,
         instructionRisk: bounded.instructionRisk,
+        subjectMatch:
+          entity === null
+            ? null
+            : matchOf(
+                { url: hit.url, domain, title, text: bounded.text, countries },
+                entity,
+              ),
       },
     };
   };
@@ -487,23 +552,71 @@ export function createPublicWebResearchService(
     research: async (command) => {
       metrics.requested.add(1, { operation: "research" });
       const identity = identityTerms(command.subject);
-      const egress = composeEgressQuery({
-        requestedQuery: command.requestedQuery,
-        userText: command.userText,
-        publicIdentity: identity,
-        prependIdentity: prependIdentityFor(
-          command.subject,
-          command.aboutThemselves === true,
-        ),
-      });
-      if (!egress.ok) {
+      const entity = namedEntityOf(command);
+      // Someone else named by the person: the conversation's own subject
+      // is not put in front of a search about them.
+      const aboutSomeoneElse =
+        entity !== null &&
+        (command.subject === null ||
+          entity.name.toLowerCase() !== command.subject.name.toLowerCase());
+      const compose = (requestedQuery: string) =>
+        composeEgressQuery({
+          requestedQuery,
+          userText: command.userText,
+          earlierUserText: command.earlierUserText,
+          publicIdentity: identity,
+          prependIdentity:
+            !aboutSomeoneElse &&
+            prependIdentityFor(
+              command.subject,
+              command.aboutThemselves === true,
+            ),
+        });
+      const egress = compose(command.requestedQuery);
+      // Plan 2-4 differently-worded queries (web search 2026-10-06: one
+      // query, the person's whole sentence, found "general background on
+      // YC" and nothing that answered). Every one is composed through the
+      // same egress policy: the model's phrasings, the person's own
+      // sentence without the asking, and the subject's name with its
+      // country. Nothing here can add a word the policy would not.
+      const planned: string[] = [];
+      let dropped = 0;
+      let fellBack = false;
+      const plan = (candidate: string) => {
+        if (planned.length >= RESEARCH_BOUNDS.maxPlannedQueries) return;
+        if (candidate.trim().length === 0) return;
+        const composed = compose(candidate);
+        if (!composed.ok) return;
+        if (
+          planned.some(
+            (existing) =>
+              existing.toLowerCase() === composed.query.toLowerCase(),
+          )
+        ) {
+          return;
+        }
+        dropped += composed.droppedTokens;
+        fellBack ||= composed.fellBackToIdentity;
+        planned.push(composed.query);
+      };
+      plan(command.requestedQuery);
+      for (const also of command.alsoQueries ?? []) plan(also);
+      plan(searchPhrase(command.userText));
+      if (entity !== null) {
+        const country = identity.includes(countryName(entity.country) ?? "")
+          ? countryName(entity.country)
+          : null;
+        plan([entity.name, country ?? ""].join(" "));
+      }
+      const primary = planned[0];
+      if (primary === undefined) {
         return { status: "NO_PUBLIC_IDENTITY", message: NO_IDENTITY_MESSAGE };
       }
       // One successful bounded research per run and query (CQ-Q-VOICE-001
       // R4): a model round, the deterministic seam call and an answer retry
       // that ask the same question in the same run get the same result
       // back, with no second provider call and no second evidence write.
-      const reuseKey = `${command.actor.tenantId}:${command.runId}:${egress.query}`;
+      const reuseKey = `${command.actor.tenantId}:${command.runId}:${primary}`;
       const reused = completed.get(reuseKey);
       if (reused !== undefined) {
         metrics.reused.add(1, { operation: "research" });
@@ -534,63 +647,72 @@ export function createPublicWebResearchService(
         freshRead: command.freshRead === true,
       };
 
-      let searchCalls = 0;
-      let hits: readonly PublicWebSearchHit[];
-      try {
+      const freshness = command.freshness ?? "ANY";
+      // The planned queries side by side, and the first one again over the
+      // past month (founder direction 2026-09-29: recent coverage is what a
+      // general ranking buries). A query that fails costs only its own
+      // hits; the turn fails only when every one did.
+      const requests = [
+        ...planned.map((query) => ({
+          query,
+          maxResults: RESEARCH_BOUNDS.maxSearchResults,
+          freshness,
+          includeDomains,
+        })),
+        ...(freshness === "ANY"
+          ? [
+              {
+                query: primary,
+                maxResults: RESEARCH_BOUNDS.maxRecentResults,
+                freshness: "PAST_MONTH" as const,
+                includeDomains,
+              },
+            ]
+          : []),
+      ].slice(0, RESEARCH_BOUNDS.maxSearchCalls - 1);
+      let searchCalls = requests.length;
+      const settled = await Promise.allSettled(
+        requests.map((request) => provider.search(request, context)),
+      );
+      const lists: (readonly PublicWebSearchHit[])[] = [];
+      let failure: ResearchProviderFailure | null = null;
+      for (const outcome of settled) {
+        if (outcome.status === "fulfilled") {
+          metrics.searchLatency.record(outcome.value.latencyMs, {
+            provider: provider.code,
+          });
+          lists.push(outcome.value.hits);
+        } else if (isResearchProviderFailure(outcome.reason)) {
+          failure = outcome.reason;
+        } else {
+          throw outcome.reason;
+        }
+      }
+      if (lists.length === 0 && failure !== null) {
+        providerUnavailable(failure, "search");
+        return {
+          status: "PROVIDER_UNAVAILABLE",
+          failureClass: failure.failureClass,
+          message: PROVIDER_UNAVAILABLE_MESSAGE,
+        };
+      }
+      let hits: readonly FoundHit[] = mergePlannedHits(lists);
+      // One refinement, only when every planned query found nothing and the
+      // subject's public identity alone is a different, allowed query.
+      const identityQuery = identity.join(" ").trim();
+      if (
+        hits.length === 0 &&
+        identityQuery.length > 0 &&
+        !planned.includes(identityQuery) &&
+        searchCalls < RESEARCH_BOUNDS.maxSearchCalls
+      ) {
         searchCalls += 1;
-        // The same query restricted to the past month, started alongside
-        // the main search (founder direction 2026-09-29: wider search, no
-        // added wait). Recent coverage is what a general ranking buries;
-        // its failure costs only its own hits, never the answer.
-        const wantsRecent = (command.freshness ?? "ANY") === "ANY";
-        if (wantsRecent) searchCalls += 1;
-        const [first, recent] = await Promise.all([
-          provider.search(
-            {
-              query: egress.query,
-              maxResults: RESEARCH_BOUNDS.maxSearchResults,
-              freshness: command.freshness ?? "ANY",
-              includeDomains,
-            },
-            context,
-          ),
-          wantsRecent
-            ? provider
-                .search(
-                  {
-                    query: egress.query,
-                    maxResults: RESEARCH_BOUNDS.maxRecentResults,
-                    freshness: "PAST_MONTH",
-                    includeDomains,
-                  },
-                  context,
-                )
-                .catch(() => null)
-            : Promise.resolve(null),
-        ]);
-        metrics.searchLatency.record(first.latencyMs, {
-          provider: provider.code,
-        });
-        const seen = new Set(first.hits.map((hit) => hit.url));
-        hits = [
-          ...first.hits,
-          ...(recent?.hits ?? []).filter((hit) => !seen.has(hit.url)),
-        ];
-        // One refinement, only when the composed query found nothing and the
-        // subject's public identity alone is a different, allowed query.
-        const identityQuery = identity.join(" ").trim();
-        if (
-          hits.length === 0 &&
-          identityQuery.length > 0 &&
-          identityQuery !== egress.query &&
-          searchCalls < RESEARCH_BOUNDS.maxSearchCalls
-        ) {
-          searchCalls += 1;
+        try {
           const second = await provider.search(
             {
               query: identityQuery,
               maxResults: RESEARCH_BOUNDS.maxSearchResults,
-              freshness: command.freshness ?? "ANY",
+              freshness,
               includeDomains,
             },
             context,
@@ -598,18 +720,11 @@ export function createPublicWebResearchService(
           metrics.searchLatency.record(second.latencyMs, {
             provider: provider.code,
           });
-          hits = second.hits;
-        }
-      } catch (error: unknown) {
-        if (isResearchProviderFailure(error)) {
+          hits = mergePlannedHits([second.hits]);
+        } catch (error: unknown) {
+          if (!isResearchProviderFailure(error)) throw error;
           providerUnavailable(error, "search");
-          return {
-            status: "PROVIDER_UNAVAILABLE",
-            failureClass: error.failureClass,
-            message: PROVIDER_UNAVAILABLE_MESSAGE,
-          };
         }
-        throw error;
       }
 
       const safeHits = hits.filter((hit) => judgePublicUrl(hit.url).ok);
@@ -617,7 +732,12 @@ export function createPublicWebResearchService(
         command.runId,
         safeHits.map((hit) => hit.url),
       );
-      const chosen = selectForExtraction(safeHits, extractCount);
+      const chosen = rankForReading(
+        safeHits,
+        extractCount,
+        clock(),
+        MAX_PER_DOMAIN,
+      );
       let pages = new Map<string, { title: string | null; text: string }>();
       let extractCalls = 0;
       if (chosen.length > 0) {
@@ -654,6 +774,7 @@ export function createPublicWebResearchService(
           pages.get(hit.url),
           command.subject,
           now,
+          entity,
         );
         const persisted =
           command.subject?.kind === "COMPANY" &&
@@ -671,6 +792,16 @@ export function createPublicWebResearchService(
           evidenceItemId: persisted.itemId,
         });
       }
+      const entityResolution = resolveEntity(
+        sources.map((source) => ({
+          url: source.url,
+          domain: source.domain,
+          title: source.title,
+          text: source.excerpt,
+          countries: source.mentionedCountries,
+        })),
+        entity,
+      );
       const comparison = compareSourcesWithSubject(
         command.subject?.kind === "COMPANY"
           ? {
@@ -685,20 +816,31 @@ export function createPublicWebResearchService(
                 websiteUrl: null,
                 headquartersCountry: null,
               },
-        sources.map((source) => ({
-          index: source.index,
-          url: source.url,
-          text: source.excerpt,
-          publishedAt: source.publishedAt,
-        })),
+        // Only pages about this subject are compared with its record: a
+        // namesake's country is not a contradiction.
+        sources
+          .filter(
+            (source) =>
+              source.subjectMatch !== "NONE" &&
+              source.subjectMatch !== "POSSIBLE",
+          )
+          .map((source) => ({
+            index: source.index,
+            url: source.url,
+            text: source.excerpt,
+            publishedAt: source.publishedAt,
+          })),
         now,
       );
       metrics.sourcesRetained.add(sources.length, { provider: provider.code });
       metrics.comparisons.add(comparison.length, { provider: provider.code });
+      const queryMinimised =
+        dropped > 0 || fellBack || (egress.ok && egress.droppedTokens > 0);
       logger?.info(
         {
           runId: command.runId,
           provider: provider.code,
+          plannedQueries: planned.length,
           searchCalls,
           resultsConsidered: safeHits.length,
           extractCalls,
@@ -706,7 +848,8 @@ export function createPublicWebResearchService(
           sourcesRetained: sources.length,
           persisted: sources.filter((s) => s.evidenceSourceId !== null).length,
           comparisonNotes: comparison.length,
-          queryMinimised: egress.droppedTokens > 0 || egress.fellBackToIdentity,
+          entityResolution: entityResolution.status,
+          queryMinimised,
           instructionRiskSources: sources.filter(
             (s) => s.instructionRisk.length > 0,
           ).length,
@@ -715,8 +858,10 @@ export function createPublicWebResearchService(
       );
       const outcome: Extract<ResearchOutcome, { status: "OK" }> = {
         status: "OK",
-        query: egress.query,
-        queryMinimised: egress.droppedTokens > 0 || egress.fellBackToIdentity,
+        query: primary,
+        queries: planned,
+        queryMinimised,
+        entityResolution,
         sources,
         comparison,
         budget: {

@@ -13,16 +13,26 @@ import { z } from "zod";
 
 /** Per Q research turn (§8, §36). */
 export const RESEARCH_BOUNDS = {
-  /** Search calls a single research turn may make, including a refinement. */
-  maxSearchCalls: 3,
+  /**
+   * Search calls a single research turn may make: up to four planned
+   * queries, the past-month companion of the first, and one refinement.
+   * Each call may fan out to every configured index in parallel.
+   */
+  maxSearchCalls: 6,
+  /** Distinct queries one research turn plans (web search 2026-10-06). */
+  maxPlannedQueries: 4,
+  /** Hits one search call may return after merging every index's results. */
+  maxMergedResults: 12,
+  /** Each index's own deadline inside a parallel search, in milliseconds. */
+  searchTimeoutMs: 9_000,
   /** Search results considered per turn. */
   maxSearchResults: 6,
   /** Results from the parallel past-month search, merged after the main ones. */
   maxRecentResults: 4,
   /** Sources extracted by default. */
-  defaultExtractCount: 4,
-  /** Hard upper bound on sources extracted per turn. */
-  maxExtractCount: 5,
+  defaultExtractCount: 5,
+  /** Hard upper bound on sources (pages) read per turn. */
+  maxExtractCount: 6,
   /** Characters of extracted text kept per source (fits an evidence item summary). */
   maxExcerptChars: 2_000,
   /** Characters of a search snippet kept. */
@@ -90,7 +100,7 @@ export const PublicWebSearchResultSchema = z
   .object({
     hits: z
       .array(PublicWebSearchHitSchema)
-      .max(RESEARCH_BOUNDS.maxSearchResults),
+      .max(RESEARCH_BOUNDS.maxMergedResults),
     /** Milliseconds the provider took, for telemetry. */
     latencyMs: z.number().int().min(0),
   })
