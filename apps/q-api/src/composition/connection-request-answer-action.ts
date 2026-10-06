@@ -14,12 +14,12 @@ import { connectionAnswerSummary } from "@capital-q/q-tools";
 import type { ChatService } from "@capital-q/communication";
 
 /**
- * An investor's answer to a founder's Connection Request, with Q's opening
+ * An investor's answer to a company's Connection Request, with Q's opening
  * message, as ONE approval (live 2026-10-02, Zino: "accept their connection
  * and send them a message").
  *
  * The answer is the Network context's own respondToConnectionRequest -- the
- * command the Founder requests screen calls, with its investor capability,
+ * command the Company requests screen calls, with its investor capability,
  * idempotency and history event -- executed as the approver. On acceptance
  * the approved message, word for word, is then posted on the now-connected
  * relationship through the same chat send the person's own Send uses. The
@@ -88,7 +88,7 @@ export function createConnectionRequestAnswerAction(dependencies: {
     riskClass: "CONFIRM_REQUIRED",
     owner: "q-api",
     description:
-      "Accepts or declines one founder's Connection Request to the approver's investor organisation and, on acceptance, posts the approved opening message on that relationship, exactly as approved.",
+      "Accepts or declines one company's Connection Request (Company requests) to the approver's investor organisation and, on acceptance, posts the approved opening message on that relationship, exactly as approved.",
     payload: ConnectionRequestAnswerPayloadSchema,
     result: ConnectionRequestAnswerResultSchema,
     targets: (payload): readonly QSubjectRef[] => [

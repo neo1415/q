@@ -197,7 +197,7 @@ export async function actOnHandOver(
 ): Promise<HandOverOutcome> {
   let subject: HandOverSubject | null = null;
   const onScreen = handOverSubjectOf(request);
-  // A founder's request waiting on this investor comes first: handing it
+  // A company request waiting on this investor comes first: handing it
   // over means accepting it and opening the conversation. Who it is: the
   // name they gave, else the company on screen, else (one waiting) that
   // one, else they are asked once, by name. A name or company that is not

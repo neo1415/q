@@ -36,6 +36,7 @@ const EVERY_PORT: QToolPorts = {
   investorFeed: STUB,
   discovery: STUB,
   recommendationExplanations: STUB,
+  fit: STUB,
   research: STUB,
   profiles: STUB,
   relationships: {

@@ -1303,3 +1303,5 @@ export * from "./reviews-kyb.js";
 // end ADMIN-3 block
 // ETIQUETTE block (ADR 0050): how Q conducts business.
 export * from "./etiquette.js";
+// MATCH block (ADR 0052): fit with your mandate, Q's view, top N.
+export * from "./fit.js";

@@ -3,6 +3,7 @@ import type { CompanyQueryPort } from "@capital-q/companies";
 import type {
   CurrentSlateExplanationService,
   DiscoveryService,
+  FitService,
 } from "@capital-q/discovery";
 import type {
   InvestorMandateQueryPort,
@@ -357,6 +358,12 @@ export type QToolPorts = {
    */
   readonly recommendationExplanations?:
     CurrentSlateExplanationService | undefined;
+  /**
+   * Fit with the investor's own mandate (ADR 0052): one company's fit
+   * profile and the top N of their own candidates. Absent: the fit tools
+   * are not offered.
+   */
+  readonly fit?: FitService | undefined;
   readonly research?: PublicWebResearchService | undefined;
   /** Public LinkedIn pages by URL; absent means the lookup tool does not exist. */
   readonly profiles?: PublicProfileLookupProvider | undefined;

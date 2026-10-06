@@ -166,7 +166,7 @@ export function prepareConnectionAnswer(
     return {
       status: "NO_PENDING_REQUESTS",
       awaitingApprovalOf:
-        "No founder's connection request is waiting for your answer, so there is nothing to accept.",
+        "No company request is waiting for your answer, so there is nothing to accept.",
     };
   }
   const names = pending.map((item) => item.companyName);
@@ -247,7 +247,7 @@ export function createProposeConnectionRequestAnswerTool(
     status: "ACTIVE",
     providerName: "propose_connection_request_answer",
     description:
-      "For an investor: prepares the answer to a founder's Connection Request to their investor organisation -- accept (both sides connect) or decline -- and, on acceptance, the opening message you drafted, as ONE approval. Use it whenever they want a pending connection request (a founder's request, a company waiting for their answer) accepted, answered or handled, with or without a message. Name the company as they did; it is matched against their own pending requests. It does nothing until they approve exactly what is shown. If the result is not PREPARED, tell them its words as they are.",
+      "For an investor: prepares the answer to a company's Connection Request (Company requests) to their investor organisation -- accept (both sides connect) or decline -- and, on acceptance, the opening message you drafted, as ONE approval. Use it whenever they want a pending connection request (a company request, a company waiting for their answer) accepted, answered or handled, with or without a message. Name the company as they did; it is matched against their own pending requests. It does nothing until they approve exactly what is shown. If the result is not PREPARED, tell them its words as they are.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [capability("investor.connection.respond")],

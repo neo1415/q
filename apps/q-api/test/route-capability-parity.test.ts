@@ -659,6 +659,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/q-runs.ts GET runPath": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_CANCEL_SUFFIX}`": Q_TRANSPORT,
+  // MATCH block (ADR 0052): fit with the reader's own mandate.
+  "q-api/http/fit.ts GET FIT_COMPANIES_PATH": cap("tool.fit_profile"),
+  "q-api/http/fit.ts GET FIT_COMPANY_PATH": cap("tool.fit_profile"),
+  "q-api/http/fit.ts GET FIT_Q_VIEW_PATH": cap("tool.fit_profile"),
+  "q-api/http/fit.ts GET FIT_TOP_PATH": cap("tool.fit_top_candidates"),
   "q-api/http/recommendation-explanations.ts GET DISCOVERY_EXPLANATION_PATH":
     cap("tool.recommendation_explanation"),
   "q-api/voice/interview-route.ts POST dependencies.path": Q_TRANSPORT,
@@ -699,6 +704,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/results": exempt("development-only page"),
   "/dev/rehearsals": exempt("development-only page"),
   "/dev/gateq": exempt("development-only page"),
+  "/dev/match": exempt("development-only page"),
   "/u/[handle]": PUBLIC,
   // GateQ: a gateway's public page and the embed another site frames.
   "/g/[publicId]": PUBLIC,
@@ -777,6 +783,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/pitch/new": cap("navigate.PITCH"),
   // ADR 0023: investors for a founder, founders' requests for an investor.
   "/investors": cap("offer.connection_request"),
+  "/investors/top": cap("tool.fit_top_candidates"),
   // Founder design 2026-09-28: a Q Card by its whole @handle.
   "/find": exempt("the old address of Search; it only redirects"),
   "/search": exempt(

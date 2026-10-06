@@ -699,6 +699,16 @@ export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-
 export { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./prompts/tasks/investor-mandate-synthesis.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./prompts/tasks/investor-mandate-synthesis.v3.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
+export { FIT_Q_VIEW_V1 } from "./prompts/tasks/fit-q-view.v1.js";
+export {
+  FIT_Q_VIEW_SCHEMA_NAME,
+  FIT_Q_VIEW_SCHEMA_VERSION,
+  FIT_Q_VIEW_VERDICTS,
+  FitQViewResultSchema,
+  FitQViewVariablesSchema,
+  type FitQViewResult,
+  type FitQViewVariables,
+} from "./prompts/schemas/fit-q-view.js";
 
 export {
   AuthorisedFactSchema,

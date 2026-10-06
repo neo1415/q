@@ -251,7 +251,7 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   PASSED:
     "Opens Passed: the companies they passed on in Discover, to look back at or undo a pass.",
   INVESTORS:
-    "Opens Investors: for a founder, the discoverable investors to request a connection with; for an investor, the connection requests founders sent them.",
+    "Opens Investors: for a founder, the discoverable investors to request a connection with; for an investor, Company requests: the companies that asked to connect with them.",
   SEARCH: "Opens Search: people by name or handle, and pitch videos.",
   GATEWAY:
     "Opens their GateQ gateway: its public link, QR code, website snippet and the applications that came in.",
@@ -452,7 +452,7 @@ const OFFERS: readonly QCapability[] = [
   offer(
     "connection_request_answer",
     "RELATIONSHIP",
-    "Accept or decline founders' Connection Requests to their investor organisation (Founder requests, linked from Relationships)",
+    "Accept or decline Company requests (companies' Connection Requests to their investor organisation, linked from Relationships)",
     "RELATIONSHIPS",
     "Accepting or declining is the investor's own decision about a founder; Q prepares it for their approval and never answers a request without it.",
     false,
@@ -801,7 +801,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "propose_connection_request_answer",
     "RELATIONSHIP",
-    "For an investor: accepts or declines a founder's Connection Request and, on acceptance, sends the opening message Q drafted -- one approval for both.",
+    "For an investor: accepts or declines a company's Connection Request (Company requests) and, on acceptance, sends the opening message Q drafted -- one approval for both.",
     {
       approval: "PREPARE_APPROVE",
       executes: ["relationship.connection_request.respond"],
@@ -1016,6 +1016,17 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "recommendation_explanation",
     "RECORDS",
     "Explains why a company was recommended to them.",
+  ),
+  // MATCH block (ADR 0052): the fit the cards and profile show, by asking.
+  tool(
+    "fit_profile",
+    "RECORDS",
+    "Reads how well a company fits their mandate, parameter by parameter.",
+  ),
+  tool(
+    "fit_top_candidates",
+    "RECORDS",
+    "Ranks their own candidates by fit and puts the top ones side by side.",
   ),
   tool(
     "research_public_web",

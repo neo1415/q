@@ -760,7 +760,7 @@ function createProposeInterestAnswerTool(
     status: "ACTIVE",
     providerName: "propose_interest_answer",
     description:
-      "Prepares the person's company's answer to an investor organisation's interest -- accept (both sides agree to connect) or decline (not taken forward, no reason shared) -- for their own approval, when they have said which. Name the investor as they did; it is matched against the interest waiting in their own inbox. It answers nothing by itself: the person approves or declines what is shown. If the result is not PREPARED, tell them its words as they are. For an investor answering a founder's Connection Request, use propose_connection_request_answer instead.",
+      "Prepares the person's company's answer to an investor organisation's interest -- accept (both sides agree to connect) or decline (not taken forward, no reason shared) -- for their own approval, when they have said which. Name the investor as they did; it is matched against the interest waiting in their own inbox. It answers nothing by itself: the person approves or declines what is shown. If the result is not PREPARED, tell them its words as they are. For an investor answering a company's Connection Request (Company requests), use propose_connection_request_answer instead.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [capability("company.interest.respond")],

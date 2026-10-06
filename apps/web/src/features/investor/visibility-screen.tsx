@@ -359,7 +359,7 @@ const INBOUND_CHOICES = [
 
 /**
  * How founders may reach the organisation (ADR 0023). The investor's own
- * choice; not stated takes no requests. A founder's request is the only
+ * choice; not stated takes no requests. A company request is the only
  * way in, never a cold message.
  */
 function InboundPreference({
@@ -389,7 +389,7 @@ function InboundPreference({
         onError(result.message);
         return;
       }
-      await onSaved("Founders' requests now follow your new choice.");
+      await onSaved("Company requests now follow your new choice.");
     } finally {
       setBusy(false);
     }

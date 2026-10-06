@@ -38,6 +38,7 @@
     "draft-review/v1": "3cd31cb7716095a5cb6fb7d239521dae89526498f6856e76971af0dd4b51b112",
     "errand-reply/v1": "02d0f83f8b554adf58e13e7e9a110529f2708c7fe95693655ddeeab2df90665d",
     "fit-explanation/v1": "3d552b0e5bdb9497ae2259ea56d21acdbf9df2920ea3f64481b633ec2006cc85",
+    "fit-q-view/v1": "5c0d094bd86e0e989aff1c19a5b3806ce8ab0f92a6a2922cdb653b85346c5289",
     "founder-onboarding-extraction/v1": "98295baebb0cd8b62f008291c9c4d5947193d0122e706feb4ea67de3c87b3380",
     "founder-onboarding-extraction/v2": "d32307876b2b71bca7193fecc1d1e6c8c5fcb4235609921d9f50ee4678bc4b5a",
     "founder-research-reader/v1": "44b4530961c690fc5582a5ef28ca5a4ac9fa23483b5b56a6ef460e6a6c63e214",

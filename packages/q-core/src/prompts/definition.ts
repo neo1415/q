@@ -95,6 +95,8 @@ export const PROMPT_IDS = [
   "PREFERENCE_POLARITY",
   "MEETING_OUTCOME_READER",
   "UTTERANCE_CHECK",
+  /** Founder brief B4 2026-10-05 (ADR 0052): Q's view beside a computed fit. */
+  "FIT_Q_VIEW",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -108,6 +110,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INVESTOR_MANDATE_SYNTHESIS: "investor-mandate-synthesis",
   COMPANY_ANALYST: "company-analyst",
   FIT_EXPLANATION: "fit-explanation",
+  FIT_Q_VIEW: "fit-q-view",
   PRESENCE_READER: "presence-reader",
   DECISION_READER: "decision-reader",
   MEMORY_EXTRACTOR: "memory-extractor",

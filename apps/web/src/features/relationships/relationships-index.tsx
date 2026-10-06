@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type {
+  FitProfileDto,
   NotificationDto,
   RelationshipSummaryDto,
   ReminderDto,
@@ -30,7 +31,10 @@ export function RelationshipsIndex({
   notices = [],
   reminders = [],
   now = readClock(),
+  fits,
 }: {
+  /** Fit with the investor's own mandate by company id (ADR 0052; B3). */
+  readonly fits?: Readonly<Record<string, FitProfileDto | null>> | undefined;
   readonly side: "INVESTOR" | "COMPANY" | "NONE";
   readonly digests?: Readonly<Record<string, RelationshipDigest>> | undefined;
   readonly items: readonly RelationshipSummaryDto[] | undefined;
@@ -88,6 +92,7 @@ export function RelationshipsIndex({
         first.next === null || last === undefined ? null : cursorOf(last)
       }
       now={now}
+      fits={fits}
     />
   );
 }

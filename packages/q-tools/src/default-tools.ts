@@ -20,6 +20,10 @@ import {
   type QToolGate,
 } from "./tools/plan.js";
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
+import {
+  createFitProfileTool,
+  createFitTopCandidatesTool,
+} from "./tools/fit.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
 import {
@@ -114,6 +118,10 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.recommendationExplanations === undefined
       ? []
       : [createRecommendationExplanationTool(ports)]),
+    // MATCH block (ADR 0052): fit with the investor's own mandate.
+    ...(ports.fit === undefined
+      ? []
+      : [createFitProfileTool(ports), createFitTopCandidatesTool(ports)]),
     ...(research === undefined
       ? []
       : [

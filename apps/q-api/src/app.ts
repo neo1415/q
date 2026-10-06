@@ -33,6 +33,7 @@ import {
   type QDocumentRoutesDependencies,
 } from "./http/q-documents.js";
 import type { ArtifactService } from "@capital-q/q-artifacts";
+import { registerFitRoutes, type FitRoutesDependencies } from "./http/fit.js";
 import {
   registerRecommendationExplanationRoutes,
   type RecommendationExplanationRoutesDependencies,
@@ -135,6 +136,8 @@ export type QApiModules = {
    */
   readonly recommendationExplanations?:
     RecommendationExplanationRoutesDependencies["explanations"] | undefined;
+  /** MATCH block (ADR 0052): fit with the reader's own mandate, and Q's view. */
+  readonly fit?: Pick<FitRoutesDependencies, "fit" | "qViews"> | undefined;
   /** What Q remembers about the person, for them to read and correct. */
   readonly memory?: MemoryRoutesDependencies["memory"] | undefined;
   /** Errands: the person's own, read and stopped. */
@@ -398,6 +401,18 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       explanations: modules.recommendationExplanations,
+    });
+  }
+
+  if (modules.fit !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error("q-api: fit routes require an actor context resolver");
+    }
+    registerFitRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      fit: modules.fit.fit,
+      qViews: modules.fit.qViews,
     });
   }
 

@@ -110,7 +110,7 @@ export async function requestConnectionAction(input: {
   }
 }
 
-/** The investor's answer to a founder's request. */
+/** The investor's answer to a company request. */
 export async function answerConnectionRequestAction(input: {
   readonly interestId: string;
   readonly decision: "ACCEPTED" | "DECLINED";
@@ -138,7 +138,7 @@ export async function answerConnectionRequestAction(input: {
     return refusal(
       error,
       "Your answer was not recorded. Try again.",
-      "Your role in this organisation doesn't include answering founders' requests.",
+      "Your role in this organisation doesn't include answering company requests.",
       "This request isn't available to answer any more.",
     );
   }

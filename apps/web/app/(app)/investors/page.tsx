@@ -3,10 +3,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
+  getFitProfiles,
   listConnectionRequests,
   listInvestorRelationships,
 } from "@capital-q/api-client";
-import { isMatchedRelationshipState } from "@capital-q/contracts";
+import {
+  FIT_IDS_MAX,
+  isMatchedRelationshipState,
+  type FitCompanyDto,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -14,8 +19,13 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
+import { QViewMark } from "@/features/fit/q-view-note";
 import { ConnectionRequestsInbox } from "@/features/network/connection-requests-inbox";
-import { apiSession, resolveOwnContext } from "@/features/q/context";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+} from "@/features/q/context";
 
 export const metadata: Metadata = { title: "Investors" };
 export const dynamic = "force-dynamic";
@@ -47,12 +57,28 @@ export default async function InvestorsPage() {
         )
         .map((item) => item.counterpart.id),
     );
+    // Fit with their own mandate (ADR 0052), read beside the inbox: a
+    // request without a fit is still a request, so a failed read is none.
+    const fits = await requestFits(
+      (inbox?.items ?? []).map((item) => item.companyId),
+    );
     return (
       <PageContainer>
         <PageHeader
-          title="Founder requests"
-          description="Accepting connects you. It isn’t an investment."
-        />
+          title="Company requests"
+          description={`Companies that asked to connect with ${context.label ?? "you"}. Accepting connects you; it isn’t an investment.`}
+        >
+          {inbox === null || inbox.items.length === 0 ? null : (
+            <Link
+              href="/investors/top"
+              className={buttonClassName("secondary")}
+              data-top-three
+            >
+              <QViewMark />
+              Q, give me the top three
+            </Link>
+          )}
+        </PageHeader>
         {inbox === null ? (
           <EmptyState
             title="Requests couldn't load."
@@ -67,6 +93,7 @@ export default async function InvestorsPage() {
           <ConnectionRequestsInbox
             items={inbox.items}
             matchedCompanyIds={matchedCompanyIds}
+            fits={fits}
           />
         )}
         <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -111,4 +138,18 @@ export default async function InvestorsPage() {
   // A founder's investor list is Discover's Investors tab (demo audit
   // 2026-10-03: the same list lived at two addresses). Old links land there.
   redirect("/discover");
+}
+
+async function requestFits(
+  companyIds: readonly string[],
+): Promise<ReadonlyMap<string, FitCompanyDto>> {
+  const session = await qApiSession();
+  const ids = [...new Set(companyIds)].slice(0, FIT_IDS_MAX);
+  if (session === null || ids.length === 0) return new Map();
+  try {
+    const { items } = await getFitProfiles(session, ids);
+    return new Map(items.map((item) => [item.companyId, item]));
+  } catch {
+    return new Map();
+  }
 }
