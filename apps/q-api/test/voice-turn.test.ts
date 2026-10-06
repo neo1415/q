@@ -222,6 +222,21 @@ const event = (type: string, data: Record<string, unknown>): QStreamEvent =>
     data,
   }) as unknown as QStreamEvent;
 
+/** The fake model's reading of a reply's kind (DECISION_READER v2, J7). */
+const PLAIN_REPLY = { onlyDecision: true, explicit: true } as const;
+function replyKind(utterance: string) {
+  const plain: Readonly<Record<string, object>> = {
+    "Yes, go ahead.": PLAIN_REPLY,
+    "Approve it.": { ...PLAIN_REPLY, pointsAtIt: true },
+    "Yes, please do.": PLAIN_REPLY,
+    "No, cancel that.": { ...PLAIN_REPLY, pointsAtIt: true },
+    "Okay, go ahead then, sounds right.": PLAIN_REPLY,
+    "Yeah, go ahead and take it, Tunde.": PLAIN_REPLY,
+    "Don't proceed.": { explicit: true, asksSomethingElse: true },
+  };
+  return plain[utterance] ?? { asksSomethingElse: true };
+}
+
 describe("latestUtterance", () => {
   it("takes the person's last line only, bounded", () => {
     expect(
@@ -568,7 +583,7 @@ describe("a spoken category confirmation", () => {
         read: (input) =>
           Promise.resolve(
             input.question.startsWith("Q suggested categories")
-              ? { decision: "YES" as const, remainder: null }
+              ? { decision: "YES" as const, remainder: null, ...PLAIN_REPLY }
               : { decision: "UNRELATED" as const, remainder: null },
           ),
       },
@@ -1507,7 +1522,7 @@ describe("a spoken question for Q", () => {
         read: (input) =>
           Promise.resolve(
             input.question.includes("Shall I go ahead")
-              ? { decision: "YES" as const, remainder: null }
+              ? { decision: "YES" as const, remainder: null, ...PLAIN_REPLY }
               : { decision: "UNRELATED" as const, remainder: null },
           ),
       },
@@ -1596,6 +1611,7 @@ describe("a spoken question for Q", () => {
           return Promise.resolve({
             decision: "YES" as const,
             remainder: "what's the weather like?",
+            explicit: true,
           });
         },
       },
@@ -1682,8 +1698,14 @@ describe("a spoken question for Q", () => {
           },
         },
         // The decision reader always hears a decision: the gate is the turn.
+        // What kind of reply it is is the fake model's reading (J7).
         decisions: {
-          read: () => Promise.resolve({ decision, remainder: null }),
+          read: (input) =>
+            Promise.resolve({
+              decision,
+              remainder: null,
+              ...replyKind(input.utterance),
+            }),
         },
         turns: {
           read: (input) => {

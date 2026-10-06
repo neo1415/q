@@ -20,6 +20,85 @@ type Proposal = {
   status: PendingDecisionStatus;
 };
 
+/**
+ * What a model reads the kind of reply to be (DECISION_READER v2, J7):
+ * the fake model of these tests, by the words. Words not listed read as
+ * nothing more than the decision the case gives.
+ */
+const ONLY = { onlyDecision: true } as const;
+const CLEAR = { onlyDecision: true, explicit: true } as const;
+const POINTED = {
+  onlyDecision: true,
+  explicit: true,
+  pointsAtIt: true,
+} as const;
+const OWN_REQUEST = { asksSomethingElse: true } as const;
+const MEANING: Readonly<
+  Record<
+    string,
+    Partial<NonNullable<Awaited<ReturnType<PendingDecisionPort["read"]>>>>
+  >
+> = {
+  yes: ONLY,
+  "yes, go ahead": CLEAR,
+  "go ahead": CLEAR,
+  "approve it": POINTED,
+  "Yes, send it to them": POINTED,
+  "Okay. I give the approval. Go ahead.": CLEAR,
+  "approve the Nixon one": { explicit: true, pointsAtIt: true },
+  no: ONLY,
+  "No thanks.": ONLY,
+  "no, leave it": CLEAR,
+  "cancel that": POINTED,
+  "Cancel that.": POINTED,
+  "scrap it": POINTED,
+  "cancel the meeting": POINTED,
+  "don't do it": POINTED,
+  "no, scrap the Ajopot one": { explicit: true, pointsAtIt: true },
+  "Cancel the call with Nixo.": { explicit: true, pointsAtIt: true },
+  "yes, and what is next for Nixo?": { explicit: false },
+  "go ahead and share it with Savanna Seed, approved": {
+    explicit: true,
+    pointsAtIt: true,
+  },
+  "yes but make it 30 minutes instead": OWN_REQUEST,
+  "Yes, approve the meeting with Nixo for the next five minutes.": {
+    explicit: true,
+    pointsAtIt: true,
+  },
+  "Yes, confirm the meeting with Nixo in the next five minutes.": {
+    explicit: true,
+    pointsAtIt: true,
+  },
+  "Book another one with Nixo for the next five minutes.": {
+    pointsAtIt: true,
+    ...OWN_REQUEST,
+  },
+  "Yes, approve the meeting with Nixo but move it to three.": {
+    explicit: true,
+    pointsAtIt: true,
+    ...OWN_REQUEST,
+  },
+  "Book a meeting with Nixo in the next five minutes.": {
+    pointsAtIt: true,
+    ...OWN_REQUEST,
+  },
+  "We've decided not to proceed with Ledgefold for now.": OWN_REQUEST,
+  "We're starting diligence with Ledgerfold.": OWN_REQUEST,
+  "Make Ajopot seed deck private to my organisation again": OWN_REQUEST,
+  "don't proceed": OWN_REQUEST,
+  "let's proceed with the pass": OWN_REQUEST,
+  "Let's proceed with the pass on Ledgerfold.": OWN_REQUEST,
+  "share my raise with Savanna Seed": { pointsAtIt: true, ...OWN_REQUEST },
+  "just handle it": OWN_REQUEST,
+};
+/** Questions about something else read as nothing to decide. */
+const UNRELATED_WORDS: ReadonlySet<string> = new Set([
+  "what is Nixo raising?",
+  "what's my runway?",
+  "what's Nixo's runway?",
+]);
+
 function port(options: {
   readonly proposals: readonly Proposal[];
   readonly reading: Awaited<ReturnType<PendingDecisionPort["read"]>>;
@@ -28,9 +107,16 @@ function port(options: {
   const calls = { read: 0, approve: [] as string[], decline: [] as string[] };
   const value: PendingDecisionPort = {
     proposals: () => Promise.resolve(options.proposals),
-    read: () => {
+    read: (input) => {
       calls.read += 1;
-      return Promise.resolve(options.reading);
+      if (options.reading === null) return Promise.resolve(null);
+      if (UNRELATED_WORDS.has(input.utterance)) {
+        return Promise.resolve({ decision: "UNRELATED", remainder: null });
+      }
+      return Promise.resolve({
+        ...options.reading,
+        ...(MEANING[input.utterance] ?? {}),
+      });
     },
     approve: (_context, proposalId) => {
       calls.approve.push(proposalId);
@@ -119,11 +205,11 @@ describe("a typed decision on a waiting change", () => {
       line: "Already approved and done: Done change.",
     });
     expect(calls.approve).toEqual([]);
-    // Words with no yes in them are not read at all.
+    // Words about something else are read as such (J7), and decide nothing.
     expect(await decidePending(value, turn("what is Nixo raising?"))).toEqual({
       kind: "NONE",
     });
-    expect(calls.read).toBe(1);
+    expect(calls.read).toBe(2);
   });
 
   it("asks whether to go ahead with exactly this, unchanged, so a yes that changes it is not approved ('yes but change the time')", async () => {
@@ -440,8 +526,8 @@ describe("a yes in a new conversation to a change asked for elsewhere (live 2026
       remainder: null,
     });
     const outcome = await decidePending(value, turn("yes, go ahead"));
-    // A plain approval of the only change waiting needs no reading.
-    expect(asked).toEqual([]);
+    // Read by meaning (J7): a clear approval of the only change waiting.
+    expect(asked).toHaveLength(1);
     expect(calls.approve).toEqual(["b23ff5cc"]);
     expect(outcome).toEqual({
       kind: "REPLY",
@@ -616,22 +702,30 @@ describe("the founder's lines, live 2026-10-02 (Zino)", () => {
     status: "PENDING",
   };
 
-  it('"Okay. I give the approval. Go ahead." approves the one change waiting, with no name and no reading', async () => {
+  it('"Okay. I give the approval. Go ahead." approves the one change waiting, with no name', async () => {
     const { value, calls } = port({
       proposals: [ERRAND],
-      // A reader that would not have said YES: code does not ask it.
-      reading: { decision: "UNRELATED", remainder: null },
+      reading: { decision: "YES", remainder: null },
     });
     const outcome = await decidePending(
       value,
       turn("Okay. I give the approval. Go ahead."),
     );
-    expect(calls.read).toBe(0);
+    expect(calls.read).toBe(1);
     expect(calls.approve).toEqual(["e1"]);
     expect(outcome).toEqual({
       kind: "REPLY",
       line: "Done: Q looks after Nixo for you.",
     });
+  });
+
+  it("when the words cannot be read, nothing is approved or declined (the safe fallback)", async () => {
+    const { value, calls } = port({ proposals: [ERRAND], reading: null });
+    expect(
+      await decidePending(value, turn("Okay. I give the approval. Go ahead.")),
+    ).toEqual({ kind: "NONE" });
+    expect(calls.approve).toEqual([]);
+    expect(calls.decline).toEqual([]);
   });
 
   it('with two waiting, "approve the Nixon one" picks Nixo by the same name matcher', async () => {

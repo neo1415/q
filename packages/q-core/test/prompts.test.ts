@@ -104,6 +104,11 @@ describe("registry", () => {
         "DILIGENCE_DOCUMENT_SUMMARY",
         // ADR 0011: a yes, a no or neither, read from the person's words.
         "DECISION_READER",
+        // Founder brief J7: people's words read by meaning.
+        "ONBOARDING_MOVE_READER",
+        "PREFERENCE_POLARITY",
+        "MEETING_OUTCOME_READER",
+        "UTTERANCE_CHECK",
         // ADR 0012: what a conversation taught Q about the person.
         "MEMORY_EXTRACTOR",
         // Founder direction 2026-09-29: Q's notes on a call it attended.

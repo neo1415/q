@@ -20,6 +20,8 @@ import { TaskFrameSchema } from "./common.js";
 
 export const DECISION_READER_SCHEMA_NAME = "DecisionReaderResult";
 export const DECISION_READER_SCHEMA_VERSION = 1;
+/** v2 (founder brief J7): what the reply is, beside the decision. */
+export const DECISION_READER_SCHEMA_VERSION_V2 = 2;
 
 export const DecisionReaderVariablesSchema = z
   .object({
@@ -56,6 +58,20 @@ export const DecisionReaderResultSchema = z
      * null. Never a paraphrase: the runtime checks it against the words.
      */
     remainder: z.string().trim().max(1_000).nullable().default(null),
+    /**
+     * v2 (J7): the reply is nothing but the decision (a "yes", "go ahead",
+     * "no thanks"), holding no request of its own. Absent (v1): false.
+     */
+    onlyDecision: z.boolean().default(false),
+    /**
+     * v2: it decides in clear words ("approve it", "go ahead", "cancel
+     * that"), not a bare "ok" or "yes" that could answer anything.
+     */
+    explicit: z.boolean().default(false),
+    /** v2: it points at the change Q asked about (by name, "that", "it"). */
+    pointsAtIt: z.boolean().default(false),
+    /** v2: it asks for something new or different from what was asked. */
+    asksSomethingElse: z.boolean().default(false),
   })
   .strict();
 export type DecisionReaderResult = z.infer<typeof DecisionReaderResultSchema>;

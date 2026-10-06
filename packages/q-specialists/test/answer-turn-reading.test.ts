@@ -999,7 +999,15 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
           status: "PENDING",
         },
       ]),
-    read: () => Promise.resolve({ decision: "YES", remainder: null }),
+    // The decision reader's reading (J7): a fake model, by the words.
+    read: (input) =>
+      Promise.resolve({
+        decision: "YES",
+        remainder: null,
+        ...(input.utterance === "yes, go ahead"
+          ? { onlyDecision: true, explicit: true }
+          : { asksSomethingElse: true }),
+      }),
     approve: (_context, proposalId) => {
       approved.push(proposalId);
       return Promise.resolve({ status: "SAVED" });
@@ -1007,7 +1015,7 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     decline: () => Promise.resolve({ status: "DECLINED" }),
   });
 
-  it("is approved by code and answered with the engine's status; the model is not asked", async () => {
+  it("is approved by code and answered with the engine's status; the answering model is not asked", async () => {
     const approved: string[] = [];
     const { answer, stored, delegated, reads } = seam({
       said: "yes, go ahead",
@@ -1021,7 +1029,9 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
       "Done: Reminder: Send Savanna the updated deck.",
     ]);
     expect(delegated()).toBe(0);
-    expect(reads()).toBe(0);
+    // The turn is read (J7: no word list stands in for the reading); the
+    // unread turn's plain decision still decides it.
+    expect(reads()).toBeGreaterThanOrEqual(1);
   });
 
   it("run ad0b0067: 'We've decided not to proceed with Ledgefold for now.' read as a request approves nothing", async () => {
@@ -1176,6 +1186,8 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
           Promise.resolve({
             decision: "NO",
             remainder: "change the time to 3pm",
+            explicit: true,
+            asksSomethingElse: true,
           }),
         decline: (_context, proposalId) => {
           declined.push(proposalId);
@@ -1201,6 +1213,8 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
           Promise.resolve({
             decision: "NO",
             remainder: "change the time to 3pm",
+            explicit: true,
+            asksSomethingElse: true,
           }),
         decline: (_context, proposalId) => {
           declined.push(proposalId);

@@ -161,6 +161,11 @@ import {
   type QReceiptPort,
 } from "./conversation-receipts.js";
 export {
+  createWordsReaders,
+  type WordsReaders,
+  type WordsWho,
+} from "./words-readers.js";
+export {
   createQDelegationReader,
   NO_TURN_AUTHORITY,
   type QDelegationReader,

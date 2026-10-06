@@ -164,6 +164,15 @@ export {
   type InterviewAgentVariables,
 } from "./prompts/schemas/interview-agent.js";
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
+export { DECISION_READER_V2 } from "./prompts/tasks/decision-reader.v2.js";
+// Founder brief J7: people's words read by meaning.
+export {
+  MEETING_OUTCOME_READER_V1,
+  ONBOARDING_MOVE_READER_V1,
+  PREFERENCE_POLARITY_V1,
+  UTTERANCE_CHECK_V1,
+} from "./prompts/tasks/words-readers.v1.js";
+export * from "./prompts/schemas/words-readers.js";
 export { TURN_READER_V1 } from "./prompts/tasks/turn-reader.v1.js";
 export { TURN_READER_V2 } from "./prompts/tasks/turn-reader.v2.js";
 export { TURN_READER_V3 } from "./prompts/tasks/turn-reader.v3.js";

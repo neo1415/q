@@ -34,6 +34,14 @@ export type DecisionReading = {
   readonly decision: Decision;
   /** What they said beyond deciding, verbatim, when there was more. */
   readonly remainder: string | null;
+  /** J7 (DECISION_READER v2): nothing but the decision. */
+  readonly onlyDecision: boolean;
+  /** Decides in clear words, not a bare "ok" that answers anything. */
+  readonly explicit: boolean;
+  /** Points at the waiting change (its name, "that", "it"). */
+  readonly pointsAtIt: boolean;
+  /** Asks for something new or different. */
+  readonly asksSomethingElse: boolean;
 };
 
 export type DecisionReader = {
@@ -69,8 +77,17 @@ function literal(utterance: string): DecisionReading | null {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, "")
     .trim();
-  if (word === "yes") return { decision: "YES", remainder: null };
-  if (word === "no") return { decision: "NO", remainder: null };
+  // The one-word reply is the decision itself by definition: no reading
+  // can add to it, and it is the commonest reply on a live line.
+  const bare = {
+    remainder: null,
+    onlyDecision: true,
+    explicit: false,
+    pointsAtIt: false,
+    asksSomethingElse: false,
+  } as const;
+  if (word === "yes") return { decision: "YES", ...bare };
+  if (word === "no") return { decision: "NO", ...bare };
   return null;
 }
 
@@ -152,6 +169,10 @@ export function createDecisionReader(
         return {
           decision: parsed.data.decision,
           remainder: remainderOf(parsed.data, input.utterance),
+          onlyDecision: parsed.data.onlyDecision,
+          explicit: parsed.data.explicit,
+          pointsAtIt: parsed.data.pointsAtIt,
+          asksSomethingElse: parsed.data.asksSomethingElse,
         };
       } catch (error: unknown) {
         if (isModelGatewayError(error) && error.failureClass === "CANCELLED") {

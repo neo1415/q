@@ -122,8 +122,6 @@ import type { TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
   decidePending,
-  plainApproval,
-  plainRefusal,
   type PendingDecisionPort,
   type PendingTurnReading,
 } from "./pending-decision.js";
@@ -1870,17 +1868,10 @@ export function createSpecialistQAnswer(
             }
             return null;
           };
-    // Words that are nothing but a yes or a no hold no request of their
-    // own, so they are a reply whatever the reading: decided before it.
-    let decideAfterReading = decide;
-    if (
-      decide !== undefined &&
-      (plainApproval(latest.content) || plainRefusal(latest.content))
-    ) {
-      const line = await decide(null);
-      if (line !== null) return recordAnswer(request, conversationId, line);
-      decideAfterReading = undefined;
-    }
+    // Decided after the turn is read (J7): whether the words are a reply
+    // at all is the decision reader's and the turn reader's reading, never
+    // a list of yes and no words. The two readings are made per turn.
+    const decideAfterReading = decide;
     const outcome = await answerTurnRead(
       request,
       history,

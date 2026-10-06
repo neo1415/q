@@ -39,6 +39,13 @@ import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
 import { DECISION_READER_V1 } from "./tasks/decision-reader.v1.js";
+import { DECISION_READER_V2 } from "./tasks/decision-reader.v2.js";
+import {
+  MEETING_OUTCOME_READER_V1,
+  ONBOARDING_MOVE_READER_V1,
+  PREFERENCE_POLARITY_V1,
+  UTTERANCE_CHECK_V1,
+} from "./tasks/words-readers.v1.js";
 import { TURN_READER_V1 } from "./tasks/turn-reader.v1.js";
 import { TURN_READER_V2 } from "./tasks/turn-reader.v2.js";
 import { TURN_READER_V3 } from "./tasks/turn-reader.v3.js";
@@ -356,6 +363,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     PRESENCE_READER_V1,
     INVESTOR_RESEARCH_READER_V1,
     DECISION_READER_V1,
+    DECISION_READER_V2,
     TURN_READER_V1,
     TURN_READER_V2,
     TURN_READER_V3,
@@ -407,6 +415,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DRAFT_REDRAFT_V1,
     REPLY_READER_V1,
     JOB_PLAN_V1,
+    ONBOARDING_MOVE_READER_V1,
+    PREFERENCE_POLARITY_V1,
+    MEETING_OUTCOME_READER_V1,
+    UTTERANCE_CHECK_V1,
     INVESTOR_PERSONA_V1,
     INVESTOR_TWIN_TURN_V1,
     REHEARSAL_SCORE_V1,

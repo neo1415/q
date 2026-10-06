@@ -61,6 +61,26 @@ export type PendingDecisionContext = {
   readonly userId: string;
 };
 
+/**
+ * One reading of their reply (DECISION_READER v2, founder brief J7): the
+ * decision and what kind of reply it is, read by meaning. Code decides
+ * from these fields what a reply may do; no list of approval or refusal
+ * words decides it. A field the reader did not give is false: the reading
+ * that does nothing.
+ */
+export type DecisionReading = {
+  readonly decision: "YES" | "NO" | "UNRELATED";
+  readonly remainder: string | null;
+  /** Nothing but the decision ("yes, go ahead", "no thanks"). */
+  readonly onlyDecision?: boolean | undefined;
+  /** Decides in clear words ("approve it", "cancel that"). */
+  readonly explicit?: boolean | undefined;
+  /** Points at the waiting change (its name, "that", "it"). */
+  readonly pointsAtIt?: boolean | undefined;
+  /** Asks for something new or different from what was asked. */
+  readonly asksSomethingElse?: boolean | undefined;
+};
+
 export type PendingDecisionPort = {
   /** Every proposal of this run's conversation, with its CURRENT status. */
   readonly proposals: (context: PendingDecisionContext) => Promise<
@@ -80,10 +100,7 @@ export type PendingDecisionPort = {
     }[];
     readonly context: PendingDecisionContext;
     readonly signal?: AbortSignal | undefined;
-  }) => Promise<{
-    readonly decision: "YES" | "NO" | "UNRELATED";
-    readonly remainder: string | null;
-  } | null>;
+  }) => Promise<DecisionReading | null>;
   readonly approve: (
     context: PendingDecisionContext,
     proposalId: string,
@@ -138,33 +155,76 @@ const REPLY_KINDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * A reply to the card: words that are nothing but a yes or a no ("yes,
- * go ahead", "approve it", "no thanks"), which hold no request of their
- * own, or a turn the reader read as a reply. An unread turn is not one.
+ * The reply restates the card it decides (voiceq-63: "Yes, approve the
+ * meeting with Nixo for the next five minutes"): it points at the waiting
+ * change and asks for nothing new, so there is no rest to answer.
+ */
+export function restatesCard(read: DecisionReading | null): boolean {
+  return (
+    read !== null &&
+    read.decision !== "UNRELATED" &&
+    read.pointsAtIt === true &&
+    read.asksSomethingElse !== true
+  );
+}
+
+/**
+ * A reply to the card: words that are nothing but a decision, a decision
+ * that restates the card, or a turn the turn reader read as a reply. An
+ * unread turn, or an unread decision, is not one.
  */
 export function isReplyToCard(
-  utterance: string,
+  read: DecisionReading | null,
   turn: PendingTurnReading | null,
-  cards: readonly { readonly summary: string }[] = [],
+  options: {
+    /**
+     * Whether a turn the turn reader could not read may still be a reply
+     * when the words are nothing but the decision. Typed: yes. On a live
+     * line an unread turn may be the room, not the person: no.
+     */
+    readonly unreadMayReply?: boolean | undefined;
+  } = {},
 ): boolean {
-  if (plainApproval(utterance) || plainRefusal(utterance)) return true;
-  if (pointedRefusal(utterance) || restatesCard(utterance, cards)) return true;
-  // "Approved. And what's the weather like?": a reply first, then more.
-  // Only a first sentence that is nothing but a yes or a no counts; "We've
-  // decided not to proceed…" is no such sentence.
-  const first = /^[^.!?]+[.!?]/u.exec(utterance.trim())?.[0];
-  if (
-    first !== undefined &&
-    first.trim().length < utterance.trim().length &&
-    (plainApproval(first) || plainRefusal(first))
-  ) {
-    return true;
+  if (read === null) return false;
+  // Overheard: said to someone in the room, never to Q.
+  if (turn !== null && !turn.addressedToQ) return false;
+  if (read.onlyDecision === true || restatesCard(read)) {
+    return turn !== null || options.unreadMayReply !== false;
   }
+  return turn !== null && !turn.namesAction && REPLY_KINDS.has(turn.kind);
+}
+
+/**
+ * A yes that approves this card as it is: nothing but the decision, a
+ * decision in clear words, or a yes followed by something else to answer
+ * ("yes, and what's next?") -- never one asking for something different.
+ */
+export function approvesByWords(read: DecisionReading | null): boolean {
   return (
-    turn !== null &&
-    turn.addressedToQ &&
-    !turn.namesAction &&
-    REPLY_KINDS.has(turn.kind)
+    read?.decision === "YES" &&
+    read.asksSomethingElse !== true &&
+    (read.onlyDecision === true ||
+      read.explicit === true ||
+      read.remainder !== null)
+  );
+}
+
+/**
+ * A no that declines this card: nothing but a no, a no in clear words, a
+ * no pointing at it, or one naming its counterpart. A new request, even
+ * read NO, is none.
+ */
+export function declinesByWords(
+  read: DecisionReading | null,
+  utterance: string,
+  card: { readonly summary: string },
+): boolean {
+  if (read?.decision !== "NO") return false;
+  return (
+    read.onlyDecision === true ||
+    read.explicit === true ||
+    read.pointsAtIt === true ||
+    namedIn(utterance, [card]) !== null
   );
 }
 
@@ -237,7 +297,7 @@ export async function decidePending(
     readonly signal?: AbortSignal | undefined;
     /**
      * The turn reader's reading of this turn; null when it was not read.
-     * Absent (callers without a reader): read as a reply, as before.
+     * Absent (callers without a reader): the decision reading alone.
      */
     readonly turn?: PendingTurnReading | null | undefined;
   },
@@ -256,26 +316,45 @@ export async function decidePending(
   if (pending.length === 0) {
     return answeredAlready(port, input, all);
   }
-  // Only a reply decides; the words are a second must-have, never what
-  // grants it. A request or a statement in its own right, even one that
-  // restates the card, approves and declines nothing.
+  // Several: a name they said picks one ("Nixon" for Nixo). Elsewhere, the
+  // words must point to the card: its counterpart named, or the first
+  // words of a conversation opened to answer it.
+  const chosen = namedIn(input.utterance, pending);
+  const namedElsewhere = elsewhere && chosen !== null;
+  if (chosen !== null && (elsewhere || pending.length > 1)) pending = [chosen];
+  const only = pending.length === 1 ? pending[0] : undefined;
+  const question =
+    only === undefined
+      ? whichLine(pending.map((proposal) => proposal.summary))
+      : // "Exactly this, unchanged": a yes that asks for something
+        // different ("yes, but at 3") is not a yes to this payload.
+        `${named(only.summary)}. Shall I go ahead with exactly this, unchanged?`;
+  // One reading of meaning decides it (J7): never a list of words.
+  const heard = await port.read({
+    question,
+    utterance: input.utterance,
+    recentTurns: input.recentTurns,
+    context: input.context,
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
+  });
+  // A decision that restates the card carries nothing more to answer.
+  const read =
+    heard !== null && restatesCard(heard)
+      ? { ...heard, remainder: null }
+      : heard;
+  if (read === null || read.decision === "UNRELATED") {
+    return { kind: "NONE" };
+  }
+  // Only a reply decides; a request or a statement in its own right, even
+  // one that restates the card, approves and declines nothing.
   const reply =
     input.turn === undefined
-      ? true
-      : isReplyToCard(input.utterance, input.turn, pending);
-  // A decision that restates the card carries nothing more to answer: the
-  // restatement is the card itself, never a second request.
-  const restated = restatesCard(input.utterance, pending);
+      ? read.onlyDecision === true ||
+        restatesCard(read) ||
+        read.asksSomethingElse !== true
+      : isReplyToCard(read, input.turn);
   // A new request is never a reply to a card from another conversation
-  // (QA 2026-10-03, run 528f4c4e: "just handle it" in a fresh
-  // conversation was read as a yes to Express interest in Clinicrest,
-  // waiting in another, so it was answered "That's ready…" and the
-  // standing instruction it asked for was never set up). By the reader's
-  // reading, never by words: a request to act, a declared action, a
-  // hand-over, or a question is answered as itself; only the same request
-  // again, naming the card's counterpart, is told the card is ready. In
-  // this conversation a request already decides nothing (only a reply
-  // does) and the card's status follows the answer.
+  // (QA 2026-10-03, run 528f4c4e): by the turn reader's reading.
   const reading = input.turn ?? null;
   const newRequest =
     elsewhere &&
@@ -285,65 +364,14 @@ export async function decidePending(
       reading.kind === "TOOL_REQUEST" ||
       reading.kind === "QUESTION_TO_Q" ||
       reading.kind === "RESEARCH_REQUEST");
-  if (newRequest && namedIn(input.utterance, pending) === null) {
-    return { kind: "NONE" };
-  }
-  // Approval binds to words that approve. Asking for the same thing again
-  // is not a yes: with no approval word, a reading that it is about this
-  // change says it is ready and waiting, and nothing is approved.
-  const approves = reply && approvalCue(input.utterance);
-  // Elsewhere, the words must also point to this card: its counterpart
-  // named, or the first words of a conversation opened to answer it
-  // (live 2026-10-01: "yes, go ahead" after a reload).
-  let points = !elsewhere;
-  let namedElsewhere = false;
-  if (elsewhere) {
-    const chosen = namedIn(input.utterance, pending);
-    if (chosen !== null) pending = [chosen];
-    namedElsewhere = chosen !== null;
-    points = chosen !== null || input.recentTurns.length === 0;
-  }
-  // What may approve by words: an approval word, and elsewhere an explicit
-  // one ("approve", "go ahead") that points to this card.
+  if (newRequest && !namedElsewhere) return { kind: "NONE" };
+  const points = !elsewhere || namedElsewhere || input.recentTurns.length === 0;
+  // What may approve: a reply that approves by its words, and elsewhere an
+  // explicit one that points to this card.
   const mayApprove =
-    approves && (!elsewhere || (points && explicitApproval(input.utterance)));
-  // A plain approval of the one change waiting needs no reading and no
-  // name (live 2026-10-02: "Okay. I give the approval. Go ahead.").
-  if (pending.length === 1 && pending[0] !== undefined) {
-    if (reply && plainApproval(input.utterance) && mayApprove) {
-      const { status } = await port.approve(
-        input.context,
-        pending[0].proposalId,
-      );
-      return { kind: "REPLY", line: statusLine(status, pending[0].summary) };
-    }
-  } else {
-    // Several: a name they said picks one ("Nixon" for Nixo).
-    const chosen = namedIn(input.utterance, pending);
-    if (chosen !== null) pending = [chosen];
-  }
-  const only = pending.length === 1 ? pending[0] : undefined;
-  const question =
-    only === undefined
-      ? `${whichLine(pending.map((proposal) => proposal.summary))}`
-      : // "Exactly this, unchanged": a yes that asks for something
-        // different ("yes, but at 3") is not a yes to this payload, and
-        // the reader says so from meaning (live 2026-10-01: with a plain
-        // "Shall I go ahead?", "yes, go ahead" came back with a remainder
-        // and could not be told apart from a change).
-        `${named(only.summary)}. Shall I go ahead with exactly this, unchanged?`;
-  const heard = await port.read({
-    question,
-    utterance: input.utterance,
-    recentTurns: input.recentTurns,
-    context: input.context,
-    ...(input.signal === undefined ? {} : { signal: input.signal }),
-  });
-  const read =
-    heard !== null && restated ? { ...heard, remainder: null } : heard;
-  if (read === null || read.decision === "UNRELATED") {
-    return { kind: "NONE" };
-  }
+    reply &&
+    approvesByWords(read) &&
+    (!elsewhere || (points && read.explicit === true));
   if (only === undefined) {
     // A request of its own is answered as one, not asked "which one?".
     if (!reply) return { kind: "NONE" };
@@ -352,25 +380,19 @@ export async function decidePending(
       line: whichLine(pending.map((proposal) => proposal.summary)),
     };
   }
-  // Elsewhere, "it's ready" is said only to the same request again, which
-  // names the card; words that neither approve it nor name it are
-  // answered as themselves (run 528f4c4e).
   if (read.decision === "YES" && !mayApprove && elsewhere && !namedElsewhere) {
     return { kind: "NONE" };
   }
   if (read.decision === "YES" && !mayApprove) {
-    // The same request again, or a yes elsewhere that does not approve
-    // this card by name: it is ready and waits for theirs. Nothing is
-    // approved and nothing new is prepared.
+    // A yes in meaning that does not approve this card by its words: it
+    // is ready and waits for theirs. Nothing is approved or prepared.
     return { kind: "REPLY", line: readyLine(only.summary) };
   }
-  // A no declines only when the words refuse and point to this card: a
-  // plain "no", "cancel that", or a refusal naming its counterpart (QA
-  // 2026-10-03, runs 9355dc4f, 5010f6bf, 3af14042: a new, different
-  // request was read NO and declined the card). Otherwise the card stays
-  // pending and is mentioned after the answer.
   if (read.decision === "NO" && !points) return { kind: "NONE" };
-  if (read.decision === "NO" && (!reply || !declines(input.utterance, only))) {
+  if (
+    read.decision === "NO" &&
+    (!reply || !declinesByWords(read, input.utterance, only))
+  ) {
     return {
       kind: "ANSWER_THEN",
       before: null,
@@ -394,209 +416,9 @@ export async function decidePending(
     : { kind: "ANSWER_THEN", before: line, after: null };
 }
 
-/** Words that open by deciding: an approval or a refusal, before anything else. */
-const OPENS_DECIDING =
-  /^\s*(?:(?:yes|yeah|yep|ok(?:ay)?|sure|no|nope|please)[\s,.!]+)*(?:approve|confirm|go ahead(?: with)?|proceed with|cancel|decline|reject|scrap|drop)\b/iu;
-/** Words that ask for something new or different, not this card again. */
-const ASKS_ANEW =
-  /\b(?:another|new|second|again|one more|instead|but|change|move|different|also|and then|as well)\b/iu;
-
-/**
- * An explicit decision that restates the card it decides (voiceq-63, live
- * 2026-10-04): "Yes, approve the meeting with Nixo for the next five
- * minutes" opened with "approve", named the card's counterpart and asked
- * for nothing new, yet the reader read it as a request; it was answered as
- * one and prepared a second card, then a third for "Yes, confirm…". Words
- * that open by deciding and point to one waiting card by its counterpart
- * are a reply to it, unless they ask for something new or different.
- */
-export function restatesCard(
-  utterance: string,
-  cards: readonly { readonly summary: string }[],
-): boolean {
-  if (cards.length === 0) return false;
-  if (!OPENS_DECIDING.test(utterance) || ASKS_ANEW.test(utterance)) {
-    return false;
-  }
-  return namedIn(utterance, cards) !== null;
-}
-
-/**
- * A refusal that is all pointing at the card ("cancel that", "scrap it",
- * "cancel the meeting"): a reply however the reader read it (voiceq-63:
- * "cancel that" must decline the waiting card by voice).
- */
-export function pointedRefusal(utterance: string): boolean {
-  if (!POINTED.test(utterance)) return false;
-  const words = utterance
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}'\s]/gu, " ")
-    .split(/\s+/u)
-    .filter((word) => word.length > 0);
-  return words.every(
-    (word) =>
-      REFUSAL_WORDS.includes(word) || FILLER.has(word) || CARD_WORDS.has(word),
-  );
-}
-const CARD_WORDS: ReadonlySet<string> = new Set([
-  "meeting",
-  "call",
-  "booking",
-  "request",
-  "email",
-  "message",
-  "reminder",
-  "please",
-]);
-
 /** Said when the same change is asked for again: ready, waiting for a yes. */
 export function readyLine(summary: string): string {
   return `That's ready: ${named(summary)}. It's waiting for your yes. Tap Approve on the card, or tell me to go ahead.`;
-}
-
-/** Refusal words: without one, nothing is declined. */
-const REFUSAL =
-  /\b(?:no|nope|nah|don'?t|do not|cancel\w*|declin\w*|reject\w*|scrap|stop|never ?mind|forget (?:it|that)|not (?:that|this|it|now))\b/iu;
-/** Words that point to the card in front of them. */
-const POINTED =
-  /\b(?:cancel|decline|scrap|drop|forget|reject|stop|don'?t do|do not do|not)\s+(?:that|this|it|the (?:card|change|proposal|one|meeting|call|booking|request|email|message|reminder)|that one)\b/iu;
-/** "No," or "Nope." opening what they say: an explicit no. */
-const OPENING_NO = /^\s*(?:no|nope|nah)\b[\s,.!;:-]/iu;
-const REFUSAL_WORDS = [
-  "no",
-  "nope",
-  "nah",
-  "don't",
-  "dont",
-  "do",
-  "not",
-  "cancel",
-  "decline",
-  "reject",
-  "scrap",
-  "stop",
-  "never",
-  "mind",
-  "nevermind",
-  "forget",
-  "thanks",
-  "one",
-  "card",
-  "change",
-  "proposal",
-  "actually",
-  "wait",
-];
-
-/**
- * A no that declines this card: a refusal that is all refusal ("no",
- * "no thanks"), one that opens with "no,", one that points at it ("cancel
- * that", "don't do it"), or one that names its counterpart. A new request, even read NO, is none.
- */
-export function declines(
-  utterance: string,
-  card: { readonly summary: string },
-): boolean {
-  if (!REFUSAL.test(utterance)) return false;
-  const words = utterance
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}'\s]/gu, " ")
-    .split(/\s+/u)
-    .filter((word) => word.length > 0);
-  if (words.every((word) => REFUSAL_WORDS.includes(word) || FILLER.has(word)))
-    return true;
-  if (POINTED.test(utterance) || OPENING_NO.test(`${utterance} `)) return true;
-  return namedIn(utterance, [card]) !== null;
-}
-
-/** Words that are nothing but a no ("no", "no thanks", "nope"). */
-export function plainRefusal(utterance: string): boolean {
-  const words = utterance
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}'\s]/gu, " ")
-    .split(/\s+/u)
-    .filter((word) => word.length > 0);
-  return (
-    words.length > 0 &&
-    words.some((word) => word === "no" || word === "nope" || word === "nah") &&
-    words.every((word) => REFUSAL_WORDS.includes(word) || FILLER.has(word))
-  );
-}
-
-/** Any word that can approve; without one, nothing is approved. */
-export function approvalCue(utterance: string): boolean {
-  return /\b(?:yes|yeah|yep|yup|ok|okay|sure|alright|all right|sounds good|please do|absolutely|definitely|approv\w*|go ahead|proceed|confirm\w*|do it|send it|agreed?)\b/iu.test(
-    utterance,
-  );
-}
-
-/** An approval that says so: not a bare "yes" or "ok", which answer anything. */
-function explicitApproval(utterance: string): boolean {
-  return /\b(?:approv\w*|go ahead|proceed|confirm\w*|do it|send it)\b/iu.test(
-    utterance,
-  );
-}
-
-/**
- * Approval words only, and nothing that names or changes anything: "yes",
- * "go ahead", "Okay. I give the approval. Go ahead.", "approve it". A
- * sentence with anything more is left to the decision reader.
- */
-const APPROVAL_PHRASES: readonly RegExp[] = [
-  /\bgo ahead\b/g,
-  /\bdo it\b/g,
-  /\bsend it\b/g,
-  /\b(?:yes|yeah|yep|yup|ok|okay|sure|approved?|approval|approving|proceed|confirm(?:ed)?)\b/g,
-];
-const FILLER_LIST = [
-  "i",
-  "give",
-  "gave",
-  "you",
-  "the",
-  "my",
-  "it",
-  "that",
-  "this",
-  "please",
-  "now",
-  "then",
-  "so",
-  "and",
-  "just",
-  "q",
-  "thanks",
-  "thank",
-  "have",
-  "has",
-  "is",
-  "here",
-  "your",
-  "fine",
-  "good",
-  "great",
-  "you're",
-  "youre",
-  "of",
-  "with",
-  "a",
-];
-const FILLER: ReadonlySet<string> = new Set(FILLER_LIST);
-
-export function plainApproval(utterance: string): boolean {
-  let text = utterance.toLowerCase().replace(/[^\p{L}\p{N}'\s]/gu, " ");
-  let approved = false;
-  for (const phrase of APPROVAL_PHRASES) {
-    text = text.replace(phrase, () => {
-      approved = true;
-      return " ";
-    });
-  }
-  if (!approved) return false;
-  return text
-    .split(/\s+/u)
-    .filter((word) => word.length > 0)
-    .every((word) => FILLER.has(word));
 }
 
 /** Words in a change's summary that are not names (titles, days, months). */
@@ -638,7 +460,7 @@ function namedIn<T extends { readonly summary: string }>(
 
 /**
  * Nothing waits, and they say yes to a change already decided: where it
- * really stands, never an argument. Only for words that read as a yes.
+ * really stands, never an argument. Only for a reply read as a yes.
  */
 async function answeredAlready(
   port: PendingDecisionPort,
@@ -661,35 +483,24 @@ async function answeredAlready(
   const latest = all.at(-1);
   if (latest === undefined) return { kind: "NONE" };
   // A request of its own is answered as one, never as "already done".
-  if (input.turn !== undefined && !isReplyToCard(input.utterance, input.turn)) {
+  const turn = input.turn;
+  if (
+    turn !== undefined &&
+    turn !== null &&
+    (!turn.addressedToQ || turn.namesAction || !REPLY_KINDS.has(turn.kind))
+  ) {
     return { kind: "NONE" };
   }
-  // An explicit approval needs no reading; a bare "ok" or "yes" might
-  // answer anything, so the reader decides whether it is about this one.
-  let yes =
-    plainApproval(input.utterance) &&
-    /\b(?:approv|go ahead|proceed|confirm|do it|send it)/i.test(
-      input.utterance,
-    );
-  if (!yes) {
-    // A cheap gate before the reader: no approval word, no reading.
-    if (
-      !/\b(?:yes|go ahead|approv|ok|okay|proceed|confirm|do it)/i.test(
-        input.utterance,
-      )
-    ) {
-      return { kind: "NONE" };
-    }
-    const read = await port.read({
-      question: `${named(latest.summary)}. Shall I go ahead?`,
-      utterance: input.utterance,
-      recentTurns: input.recentTurns,
-      context: input.context,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-    });
-    yes = read?.decision === "YES" && read.remainder === null;
+  const read = await port.read({
+    question: `${named(latest.summary)}. Shall I go ahead?`,
+    utterance: input.utterance,
+    recentTurns: input.recentTurns,
+    context: input.context,
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
+  });
+  if (!approvesByWords(read) || read?.remainder != null) {
+    return { kind: "NONE" };
   }
-  if (!yes) return { kind: "NONE" };
   const progress =
     port.progress === undefined
       ? null

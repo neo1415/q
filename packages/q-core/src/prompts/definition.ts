@@ -90,6 +90,11 @@ export const PROMPT_IDS = [
   "DRAFT_REDRAFT",
   "REPLY_READER",
   "JOB_PLAN",
+  /** Founder brief J7 2026-10-06: people's words read by meaning. */
+  "ONBOARDING_MOVE_READER",
+  "PREFERENCE_POLARITY",
+  "MEETING_OUTCOME_READER",
+  "UTTERANCE_CHECK",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -142,6 +147,11 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   DRAFT_REDRAFT: "draft-redraft",
   REPLY_READER: "reply-reader",
   JOB_PLAN: "job-plan",
+  // Founder brief J7.
+  ONBOARDING_MOVE_READER: "onboarding-move-reader",
+  PREFERENCE_POLARITY: "preference-polarity",
+  MEETING_OUTCOME_READER: "meeting-outcome-reader",
+  UTTERANCE_CHECK: "utterance-check",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

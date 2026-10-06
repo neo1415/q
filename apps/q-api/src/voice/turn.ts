@@ -67,13 +67,20 @@ import {
 } from "./speech.js";
 import { utteranceRefOf } from "./utterance.js";
 import { isEcho, isFragment } from "./approval-reply.js";
+/** Not read: the reading that decides nothing. */
+const UNREAD: DecisionReading = {
+  decision: "UNRELATED",
+  remainder: null,
+  onlyDecision: false,
+  explicit: false,
+  pointsAtIt: false,
+  asksSomethingElse: false,
+};
 import {
-  approvalCue,
-  declines,
+  approvesByWords,
+  declinesByWords,
   isReplyToCard,
   restatesCard,
-  plainApproval,
-  plainRefusal,
   statusLine,
   type PendingTurnReading,
 } from "@capital-q/q-specialists";
@@ -1660,7 +1667,7 @@ export function createVoiceTurnHandler(
       if (read !== null) return read;
     }
     // No reading: nothing is decided from the words themselves.
-    return { decision: "UNRELATED", remainder: null };
+    return UNREAD;
   };
 
   /** The turn reader's reading of a reply to a waiting card; null unread. */
@@ -1804,38 +1811,40 @@ export function createVoiceTurnHandler(
       const summary =
         approvalWaiting.summary ??
         "I've prepared something that needs your approval.";
-      const plain = plainApproval(text) || plainRefusal(text);
+      // Both readings side by side (J7): the decision, with what kind of
+      // reply it is, and whether the turn is a reply at all. Neither waits
+      // on the other, and no list of yes or no words stands in for them.
       const [heard, reading] = fragment
         ? [null, null]
         : await Promise.all([
             decide(binding, `${summary} Shall I go ahead?`, text, signal),
-            plain || dependencies.turns === undefined
+            dependencies.turns === undefined
               ? Promise.resolve(null)
               : readTurnForCard(binding, text, signal),
           ]);
-      // Without a turn reader composed, the decision reading is all there
-      // is, as before; with one, an unread turn is no reply.
-      const card = [{ summary }];
       // "Yes, approve the meeting with Nixo for the next five minutes":
       // the rest restates the card, so there is no rest to answer.
       const read =
-        heard !== null && restatesCard(text, card)
+        heard !== null && restatesCard(heard)
           ? { ...heard, remainder: null }
           : heard;
+      // Without a turn reader composed, the decision reading is all there
+      // is; with one, an unread turn is a reply only if the words are
+      // nothing but the decision.
       const reply =
         read !== null &&
-        (plain ||
-          dependencies.turns === undefined ||
-          isReplyToCard(text, reading, card));
+        (dependencies.turns === undefined
+          ? read.onlyDecision || restatesCard(read) || !read.asksSomethingElse
+          : isReplyToCard(read, reading, { unreadMayReply: false }));
       const decision =
         read === null || !reply
           ? "UNRELATED"
           : read.decision === "YES"
-            ? approvalCue(text)
+            ? approvesByWords(read)
               ? "APPROVE"
               : "WAITING"
             : read.decision === "NO"
-              ? declines(text, { summary })
+              ? declinesByWords(read, text, { summary })
                 ? "REJECT"
                 : "UNRELATED"
               : "UNRELATED";
@@ -1854,7 +1863,7 @@ export function createVoiceTurnHandler(
       if (decision === "APPROVE" || decision === "REJECT") {
         pendingApproval.delete(binding);
         return carryOn(
-          read ?? { decision: "UNRELATED", remainder: null },
+          read ?? UNREAD,
           await decideApproval(
             binding,
             approvalWaiting,
