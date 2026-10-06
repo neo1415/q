@@ -138,10 +138,15 @@ describe("the orphaned run sweep, against local PostgreSQL", () => {
         });
 
         const failed: string[] = [];
+        const expired: string[] = [];
         const cancelled: string[] = [];
         const runtime = {
           fail: (ref: { runId: string }) => {
             failed.push(ref.runId);
+            return Promise.resolve({ kind: "ADVANCED" });
+          },
+          expire: (ref: { runId: string }) => {
+            expired.push(ref.runId);
             return Promise.resolve({ kind: "ADVANCED" });
           },
           finishCancellation: (ref: { runId: string }) => {
@@ -165,7 +170,9 @@ describe("the orphaned run sweep, against local PostgreSQL", () => {
           abandoned,
         ]);
         const failedHere = failed.filter((id) => ours.has(id)).sort();
-        expect(failedHere).toEqual([orphan, abandoned].sort());
+        expect(failedHere).toEqual([orphan]);
+        // A pause whose wait ran out expires; it is not a failure.
+        expect(expired.filter((id) => ours.has(id))).toEqual([abandoned]);
         expect(cancelled.filter((id) => ours.has(id))).toEqual([stuckCancel]);
         expect(failed).not.toContain(justStarted);
         expect(failed).not.toContain(longButAlive);

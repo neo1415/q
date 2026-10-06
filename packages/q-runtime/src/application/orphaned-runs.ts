@@ -46,6 +46,8 @@ export type OrphanedRunSweepDependencies = {
 export type OrphanedRunSweepResult = {
   readonly examined: number;
   readonly failed: number;
+  /** Paused runs whose wait ran out: EXPIRED, not FAILED. */
+  readonly expired: number;
   readonly cancelled: number;
   readonly untouched: number;
 };
@@ -71,6 +73,7 @@ export function createOrphanedRunSweep(
         limit: SWEEP_LIMIT,
       });
       let failed = 0;
+      let expired = 0;
       let cancelled = 0;
       let untouched = 0;
       for (const run of orphaned) {
@@ -79,6 +82,27 @@ export function createOrphanedRunSweep(
             const outcome = await runtime.finishCancellation(runRef(run));
             if (outcome.kind === "ADVANCED") {
               cancelled += 1;
+            } else {
+              untouched += 1;
+            }
+            continue;
+          }
+          // A run that waited on a person (an approval card, a question)
+          // did not fail: its wait ran out (autopilot P1, live 2026-10-06:
+          // 24 standing-instruction cards a day were closed as FAILED
+          // RUN_EXPIRED). It ends EXPIRED, with the approval's own reason.
+          if (
+            run.status === "AWAITING_APPROVAL" ||
+            run.status === "AWAITING_INPUT"
+          ) {
+            const outcome = await runtime.expire(
+              runRef(run),
+              run.status === "AWAITING_APPROVAL"
+                ? "APPROVAL_EXPIRED"
+                : "RUN_EXPIRED",
+            );
+            if (outcome.kind === "ADVANCED") {
+              expired += 1;
             } else {
               untouched += 1;
             }
@@ -101,10 +125,16 @@ export function createOrphanedRunSweep(
         }
       }
       logger?.info(
-        { examined: orphaned.length, failed, cancelled, untouched },
+        { examined: orphaned.length, failed, expired, cancelled, untouched },
         "orphaned q runs swept",
       );
-      return { examined: orphaned.length, failed, cancelled, untouched };
+      return {
+        examined: orphaned.length,
+        failed,
+        expired,
+        cancelled,
+        untouched,
+      };
     },
   };
 }

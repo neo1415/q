@@ -34,7 +34,7 @@ export function createInstructionAsk(dependencies: {
   readonly runtime: Pick<QRuntimeService, "createRun">;
   readonly orchestration: Pick<
     QOrchestrationRuntime,
-    "begin" | "advanceThrough" | "fail"
+    "begin" | "advanceThrough" | "fail" | "complete"
   >;
   readonly actions: Pick<QActionService, "propose">;
   readonly store: Pick<InstructionStore, "own" | "setConversation">;
@@ -82,19 +82,19 @@ export function createInstructionAsk(dependencies: {
       );
     }
     const ref = runRef(created.run);
-    if (created.created) {
-      await dependencies.orchestration.begin(
-        ref,
-        INSTRUCTION_ORCHESTRATION_VERSION,
-      );
-      await dependencies.orchestration.advanceThrough(ref, [
-        "CONTEXT_RESOLUTION",
-        "POLICY_CHECK",
-        "PLANNING",
-        "SYNTHESIS",
-      ]);
-    }
     try {
+      if (created.created) {
+        await dependencies.orchestration.begin(
+          ref,
+          INSTRUCTION_ORCHESTRATION_VERSION,
+        );
+        await dependencies.orchestration.advanceThrough(ref, [
+          "CONTEXT_RESOLUTION",
+          "POLICY_CHECK",
+          "PLANNING",
+          "SYNTHESIS",
+        ]);
+      }
       const proposed = await dependencies.actions.propose({
         actor,
         runId: created.run.id,
@@ -102,6 +102,16 @@ export function createInstructionAsk(dependencies: {
         actionType: card.actionType,
         payload: card.payload,
       });
+      // The same card already waits on them (its own run waits on it), or
+      // the change is already done: nothing waits on THIS run, so it ends
+      // now. Left open it sat in SYNTHESIS until the orphan sweep failed
+      // it as RUN_EXPIRED (autopilot P1, live 2026-10-06: three a firing).
+      if (
+        created.created &&
+        (proposed.existing === true || proposed.alreadyDone !== undefined)
+      ) {
+        await dependencies.orchestration.complete(ref).catch(() => undefined);
+      }
       return { qActionId: proposed.action.id };
     } catch (error: unknown) {
       // Nothing waits on this run: it ends rather than lingering.
