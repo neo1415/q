@@ -28,8 +28,8 @@
 -- is widened by it (ADR 0041 §3; Q Knowledge ≠ Data Room disclosure).
 --
 -- Server-only like the rest of evidence: RLS on, no policies, no client
--- grants. The server decides the reader and the projection; the reference
--- data is readable by signed-in clients because it is not tenant data.
+-- grants. The server decides the reader and the projection, and serves the
+-- reference data inside its own views.
 
 -- 1. Reference data ------------------------------------------------------------
 
@@ -128,13 +128,12 @@ insert into evidence.data_room_checklist_items
   -- Country-specific additions
   ('scuml_certificate', 'kyc_kyb', 'SCUML certificate (where it applies)', '{}', 2, '{NG}', 'ON_REQUEST', 590);
 
+-- Server-only like the rest of evidence (clients have no usage on the
+-- schema): the server reads the reference data and returns it in its views.
 alter table evidence.data_room_folders enable row level security;
 alter table evidence.data_room_checklist_items enable row level security;
-create policy data_room_folders_read on evidence.data_room_folders
-  for select to authenticated using (true);
-create policy data_room_checklist_items_read on evidence.data_room_checklist_items
-  for select to authenticated using (true);
-grant select on evidence.data_room_folders, evidence.data_room_checklist_items to authenticated;
+revoke all on evidence.data_room_folders, evidence.data_room_checklist_items
+  from anon, authenticated;
 
 -- 2. A document's level ----------------------------------------------------
 

@@ -83,11 +83,11 @@ select throws_ok(
 select throws_ok(
   $$ insert into evidence.data_room_entries (document_id, tenant_id, company_id, folder_code, level, updated_by_user_id)
      values ('00000000-0000-4000-8000-0000000080d3', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-0000000080c1', 'legal_ip', 'PUBLIC', pg_temp.rls_id('user_a')) $$,
-  '23503', null, 'cross-tenant: another tenant''s document cannot enter this room');
+  '23514', null, 'cross-tenant: another tenant''s document cannot enter this room');
 select throws_ok(
   $$ insert into evidence.data_room_entries (document_id, tenant_id, company_id, folder_code, level, updated_by_user_id)
      values ('00000000-0000-4000-8000-0000000080d3', pg_temp.rls_id('tenant_r'), '00000000-0000-4000-8000-0000000080c1', 'legal_ip', 'PUBLIC', pg_temp.rls_id('user_r')) $$,
-  '23503', null, 'cross-tenant: a document cannot be filed under another company');
+  '23514', null, 'cross-tenant: a document cannot be filed under another company');
 
 -- Requests, decisions, views.
 select lives_ok(
@@ -160,8 +160,8 @@ select throws_ok($$ select * from evidence.data_room_entries $$, '42501', null,
   'an investor never reads the levels (or titles) directly');
 select throws_ok($$ select * from evidence.deck_extractions $$, '42501', null,
   'an investor never reads an extraction directly');
-select ok((select count(*) from evidence.data_room_folders) > 0,
-  'signed-in clients read the folder reference data');
+select throws_ok($$ select * from evidence.data_room_folders $$, '42501', null,
+  'even the reference data is served by the server only');
 select pg_temp.act_as_user_b();
 select is((select count(*)::int from core.founder_person_facts), 0,
   'another person never reads a founder''s facts directly (age included)');
