@@ -23,7 +23,7 @@ export function QSounds() {
   const session = useQSessionOptional();
   const pathname = usePathname();
   const mode = useSoundPreference();
-  const state = session?.presence.state ?? "IDLE";
+  const state = session?.presence?.state ?? "IDLE";
   // What the person just sent: the newest of their turns the server has
   // not confirmed yet. A conversation loaded from the server sends nothing.
   const sending = session?.turns.findLast(

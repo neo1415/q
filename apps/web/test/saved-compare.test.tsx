@@ -15,7 +15,12 @@ import {
  */
 const askAbout = vi.fn();
 vi.mock("@/components/app-shell/global-q", () => ({
-  useGlobalQ: () => ({ open: false, setOpen: vi.fn(), askAbout }),
+  useGlobalQ: () => ({
+    open: false,
+    setOpen: vi.fn(),
+    askAbout,
+    askNow: askAbout,
+  }),
 }));
 
 afterEach(() => {
@@ -48,7 +53,7 @@ describe("saved-compare helpers", () => {
 });
 
 describe("SavedCompanies", () => {
-  it("opens Q with the comparison drafted once two are ticked", async () => {
+  it("asks Q for the comparison in one tap once two are ticked", async () => {
     const { SavedCompanies } =
       await import("../src/features/discover/saved-companies");
     render(

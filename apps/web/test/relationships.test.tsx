@@ -32,7 +32,12 @@ vi.mock("next/navigation", () => ({
 
 const askAbout = vi.fn();
 vi.mock("@/components/app-shell/global-q", () => ({
-  useGlobalQ: () => ({ askAbout, open: false, setOpen: () => undefined }),
+  useGlobalQ: () => ({
+    askAbout,
+    askNow: askAbout,
+    open: false,
+    setOpen: () => undefined,
+  }),
 }));
 
 const expressInterestAction = vi.fn<(input: unknown) => Promise<unknown>>();
@@ -468,7 +473,7 @@ describe("relationship actions", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("Ask Q opens Q with the relationship as the drafted question", () => {
+  it("Ask Q asks about the relationship in one tap", () => {
     // jsdom has no matchMedia; the Aperture reads reduced motion from it.
     vi.stubGlobal(
       "matchMedia",

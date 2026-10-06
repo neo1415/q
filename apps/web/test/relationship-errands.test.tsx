@@ -18,6 +18,7 @@ vi.mock("../src/features/relationships/errand-actions", () => ({
 vi.mock("../src/components/app-shell/global-q", () => ({
   useGlobalQ: () => ({
     askAbout: (seed: string) => seeded.push(seed),
+    askNow: (seed: string) => seeded.push(seed),
     setOpen: (open: boolean) => opened.push(open),
   }),
 }));
@@ -69,7 +70,7 @@ describe("Let Q handle this", () => {
     expect(seeded).toEqual([]);
   });
 
-  it("leaves the words in the composer when there is no live session", async () => {
+  it("asks Q in one tap when there is no live session", async () => {
     withSession = false;
     render(
       <RelationshipErrands
