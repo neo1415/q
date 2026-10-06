@@ -189,6 +189,14 @@ export function createPostgresTeamStore(options: {
       return rows.length === 0 ? null : toOrganisation(rows[0]);
     },
 
+    organisation: async (tx, organisationId) => {
+      const rows = await tx.sql`
+        select id, tenant_id, organisation_type, display_name, status
+          from identity.organisations
+         where id = ${organisationId}`;
+      return rows.length === 0 ? null : toOrganisation(rows[0]);
+    },
+
     members: async (tx, organisationId) => {
       const rows = await tx.sql`
         select m.id as membership_id, m.user_id,

@@ -88,6 +88,11 @@ export type TeamStore<Tx> = {
     tx: Tx,
     organisationId: string,
   ) => Promise<TeamOrganisationRecord | null>;
+  /** The same, without the lock: for reads (the team page, Q's index). */
+  readonly organisation: (
+    tx: Tx,
+    organisationId: string,
+  ) => Promise<TeamOrganisationRecord | null>;
   /** Active members with their current roles. */
   readonly members: (
     tx: Tx,

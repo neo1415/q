@@ -69,6 +69,7 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
     ],
     uploads: ["Which files have I uploaded?", "Have I uploaded my deck?"],
     capital: ["How much have I raised?", "What's left in my current round?"],
+    team: ["Who's on my team?", "Who are the admins at my firm?"],
     diligence: [
       "What documents have they asked for in diligence?",
       "Which diligence requests are still open?",

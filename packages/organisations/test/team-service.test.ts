@@ -103,6 +103,7 @@ class FakeTeamDb {
         }
       },
       lockOrganisation: (_tx, id) => Promise.resolve(db.organisations.get(id) ?? null),
+      organisation: (_tx, id) => Promise.resolve(db.organisations.get(id) ?? null),
       members: (_tx, organisationId) =>
         Promise.resolve(
           db.memberships

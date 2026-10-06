@@ -577,6 +577,9 @@ importers:
       '@capital-q/onboarding':
         specifier: workspace:*
         version: link:../onboarding
+      '@capital-q/organisations':
+        specifier: workspace:*
+        version: link:../organisations
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../permissions

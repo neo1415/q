@@ -348,6 +348,22 @@ const OFFERS: readonly QCapability[] = [
     "SETTINGS",
     "Google's OAuth consent is given by the person in Google's own window; no tool may hold or grant it.",
   ),
+  // G1/G2: who someone works with is their own decision. Q invites and
+  // changes roles on a card (its tools); the rest happens on the Team page.
+  offer(
+    "team_manage",
+    "SETTINGS",
+    "Resend or cancel an invitation, remove a teammate, leave their company or firm, make someone an owner or answer that request, or let in someone who asked to join (Settings → Team)",
+    "SETTINGS",
+    "Who works for a company or firm, and who owns it, is decided by its people themselves on the Team page; Q never removes, hands over or lets anyone in on its own reading.",
+  ),
+  offer(
+    "team_join",
+    "SETTINGS",
+    "Accept an invitation to join a company or firm (from the email's link), or ask to join one",
+    "SETTINGS",
+    "Joining is the person's own consent, signed in as the invited email, from the invitation's link; Q cannot accept it for them.",
+  ),
   offer(
     "q_email_address",
     "SETTINGS",
@@ -507,6 +523,8 @@ export const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   work: "RELATIONSHIP",
   // P7: the investor's GateQ gateway, set up from their mandate.
   gateway: "SETTINGS",
+  // G1/G2: their company or firm as a team.
+  team: "SETTINGS",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([

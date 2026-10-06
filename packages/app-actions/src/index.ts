@@ -90,3 +90,11 @@ export {
   type EtiquetteGuidePort,
   type HouseEtiquette,
 } from "./actions/etiquette.js";
+// G1/G2 block: the company or firm as a team.
+export {
+  TEAM_ACTIONS,
+  TEAM_PERSON_ACTIONS,
+  findTeammate,
+  teamItems,
+  type TeamPort,
+} from "./actions/team.js";

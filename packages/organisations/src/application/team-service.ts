@@ -195,9 +195,15 @@ export function createTeamService<Tx>(
   };
 
   /** The actor's own organisation, locked, with them as an active member. */
-  async function scope(tx: Tx, actor: TeamActor): Promise<Scope | null> {
+  async function scope(
+    tx: Tx,
+    actor: TeamActor,
+    lock: boolean = true,
+  ): Promise<Scope | null> {
     if (actor.organisationId === undefined) return null;
-    const organisation = await store.lockOrganisation(tx, actor.organisationId);
+    const organisation = lock
+      ? await store.lockOrganisation(tx, actor.organisationId)
+      : await store.organisation(tx, actor.organisationId);
     if (
       organisation === null ||
       organisation.tenantId !== actor.tenantId ||
@@ -370,7 +376,7 @@ export function createTeamService<Tx>(
   return {
     team: (actor) =>
       store.transaction(async (tx) => {
-        const s = await scope(tx, actor);
+        const s = await scope(tx, actor, false);
         return s === null
           ? NOT_FOUND
           : { ok: true as const, value: await teamDto(tx, s) };
@@ -498,7 +504,7 @@ export function createTeamService<Tx>(
         })),
       );
       const team = await store.transaction(async (tx) => {
-        const s = await scope(tx, actor);
+        const s = await scope(tx, actor, false);
         return s === null ? null : teamDto(tx, s);
       });
       if (team === null) return NOT_FOUND;
@@ -866,7 +872,7 @@ export function createTeamService<Tx>(
         if (invitation === null) {
           return refuse("NOT_FOUND", "This invitation link isn't valid.");
         }
-        const organisation = await store.lockOrganisation(
+        const organisation = await store.organisation(
           tx,
           invitation.organisationId,
         );

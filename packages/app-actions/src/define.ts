@@ -466,6 +466,7 @@ const FEATURES: Readonly<Partial<Record<keyof AppActionPorts, string>>> = {
   kyb: "Business verification",
   onboarding: "Setup",
   onboardingNudges: "Setup reminders",
+  team: "Teams",
 };
 
 /** An action's service is not composed on this deployment. */
