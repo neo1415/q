@@ -105,6 +105,7 @@ import {
   createRelationshipOutcomeService,
   createConnectionService,
   createInterestService,
+  createNetworkService,
   createRelationshipEventAppender,
   createPostgresDiligenceRequests,
   createRelationshipEventRegistry,
@@ -929,6 +930,17 @@ const discoverFilterFacts = createDiscoverFilterFacts({
   pitches: () => discoverablePitches,
 });
 // F4: the investor's GateQ inbox, under GateQ's own gateway authority.
+// P14: a founder's GateQ application joins the canonical company-investor
+// relationship through Network's own command (never a parallel record).
+const gateqNetwork = createNetworkService({
+  sql: database.sql,
+  transactions: database.transactions,
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  investors: createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),
+  outbox,
+  audit,
+});
+
 // P14: a founder hears a pass or a reply by email, through the same app
 // sender as team email, recorded like every app email; outcome logged with
 // the recipient's domain only.
@@ -2235,13 +2247,39 @@ const { app, logger } = createApp(config, security, {
           attach: (input) => gateqApply.intake.attachDocument(input),
           link: async ({ token, actor }) => {
             const guest = await gateqApply.intake.authorise(token);
-            await createPostgresApplicationFounders({ sql: database.sql }).link(
-              {
-                applicationId: guest.application.id,
-                tenantId: guest.application.tenantId,
-                actor,
-              },
-            );
+            const founders = createPostgresApplicationFounders({
+              sql: database.sql,
+            });
+            const pair = await founders.link({
+              applicationId: guest.application.id,
+              tenantId: guest.application.tenantId,
+              actor,
+            });
+            // P14: the application joins the ONE canonical company-investor
+            // relationship (Network's own command, source GATEQ; both sides
+            // know of it, so relationship_shared), never a parallel record.
+            if (pair !== null) {
+              const companyId = CompanyIdSchema.safeParse(pair.companyId);
+              const investorId = InvestorOrganisationIdSchema.safeParse(
+                pair.investorOrganisationId,
+              );
+              if (companyId.success && investorId.success) {
+                const ensured = await gateqNetwork.ensureRelationship({
+                  actor,
+                  companyId: companyId.data,
+                  investorOrganisationId: investorId.data,
+                  source: { type: "GATEQ", id: guest.application.id },
+                  visibilityScope: "relationship_shared",
+                  correlationId: CorrelationIdSchema.parse(
+                    `cor_${crypto.randomUUID()}`,
+                  ),
+                });
+                await founders.setRelationship({
+                  applicationId: guest.application.id,
+                  relationshipId: ensured.relationship.id,
+                });
+              }
+            }
           },
         }),
   gateqMyApplications: (actor) =>
