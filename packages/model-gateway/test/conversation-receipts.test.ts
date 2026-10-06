@@ -4,8 +4,11 @@ import type { QResultBlock } from "@capital-q/contracts";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
+  asksAboutQWork,
+  CAPABILITY_NOTE_MAX_CHARS,
   capabilityNote,
   DAILY_HERE_LINE,
+  NAVIGATION_LINE,
   HERE_LINE,
   screenLines,
   collectReceipts,
@@ -350,4 +353,65 @@ describe("pending and declined changes are never described as done", () => {
       expect(status_).not.toMatch(/\bis saved\b|\bdone\b|already/iu);
     },
   );
+});
+
+describe("navigation and page actions are never cut (founder 2026-10-06)", () => {
+  const many = Array.from({ length: 120 }, (_, index) => ({
+    name: `read_thing_${String(index)}`,
+    description:
+      `Reads thing ${String(index)} with a long description that fills the budget quickly. More words follow here.`.repeat(
+        2,
+      ),
+    classification: "READ_ONLY",
+  }));
+  const nav = [
+    {
+      name: "open_page",
+      description: "Opens a Capital Q screen.",
+      classification: "SIDE_EFFECT",
+    },
+    {
+      name: "control_screen",
+      description: "Scrolls and works the page.",
+      classification: "SIDE_EFFECT",
+    },
+  ];
+  it("says Q can navigate and scroll even with 120 other tools offered", () => {
+    const note = capabilityNote(undefined, [...many, ...nav], []).content;
+    expect(note).toContain(NAVIGATION_LINE);
+    expect(note).toContain("open_page (Opens a Capital Q screen.)");
+    expect(note).toContain("control_screen (Scrolls and works the page.)");
+    expect(note.length).toBeLessThanOrEqual(CAPABILITY_NOTE_MAX_CHARS);
+    // The browser's actions come before the long list of reads.
+    expect(note.indexOf("control_screen")).toBeLessThan(
+      note.indexOf("read_thing_0"),
+    );
+  });
+  it("never tells Q it cannot navigate or scroll", () => {
+    const note = capabilityNote(undefined, [...many, ...nav], []).content;
+    // Only the never-say-can't line itself names it.
+    expect(note.replace(NAVIGATION_LINE, "")).not.toMatch(
+      /(cannot|can't) (navigate|scroll|open pages)/iu,
+    );
+  });
+});
+
+describe("'what are you doing?' opens Work with the cards (founder 2026-10-06)", () => {
+  it.each([
+    "What are you doing?",
+    "what are you working on",
+    "Q, what are u up to right now",
+    "What's Q working on?",
+    "what is waiting for me",
+    "What needs my approval?",
+  ])("reads %s as a question about Q's work", (text) => {
+    expect(asksAboutQWork(text)).toBe(true);
+  });
+  it.each([
+    "What is Nsuo Labs doing in fish trading?",
+    "what are their margins",
+    "Take me to Discover",
+  ])("leaves %s alone", (text) => {
+    expect(asksAboutQWork(text)).toBe(false);
+  });
 });

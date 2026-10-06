@@ -151,10 +151,13 @@ export {
 export {
   APPROVE_PENDING_TOOL,
   approvalStatusLine,
+  asksAboutQWork,
+  CAPABILITY_NOTE_MAX_CHARS,
   capabilityNote,
   collectReceipts,
   DAILY_HERE_LINE,
   HERE_LINE,
+  NAVIGATION_LINE,
   proposalStatusLine,
   PLAIN_KNOWING_LINE,
   POINTING_LINE,
@@ -166,9 +169,11 @@ export {
 import {
   APPROVE_PENDING_TOOL,
   approvalStatusLine,
+  asksAboutQWork,
   capabilityNote,
   collectReceipts,
   proposalStatusLine,
+  Q_WORK_LINE,
   type QReceiptPort,
 } from "./conversation-receipts.js";
 export {
@@ -2581,6 +2586,19 @@ export function createModelGatewayQAnswer(
       // UI_INTENT blocks on the answer, which the screen performs once as
       // it arrives. Only from a tool's own authorised result, never words.
       const clientActionBlocks: QResultBlock[] = [];
+      // "What are you doing?": their Work page, with the cards waiting for
+      // them, opens with the answer (founder 2026-10-06). Code's reading of
+      // their own words, and only where this run may open Work.
+      const workQuestion =
+        latest !== undefined &&
+        asksAboutQWork(latest.content) &&
+        (request.capabilities?.navigate ?? []).includes("WORK");
+      if (workQuestion) {
+        clientActionBlocks.push({
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "WORK" },
+        });
+      }
       const collectClientAction = (outcome: QToolCallOutcome): void => {
         if (!outcome.result.ok) return;
         const read = QClientActionToolResultSchema.safeParse(
@@ -2826,10 +2844,13 @@ export function createModelGatewayQAnswer(
         receipts,
         plan.screen,
       );
+      const workNote: readonly ModelMessage[] = workQuestion
+        ? [{ role: "SYSTEM", content: Q_WORK_LINE }]
+        : [];
       let messages: ModelMessage[] =
         offered.length === 0
-          ? [...rendered.messages, capabilities]
-          : [...rendered.messages, capabilities, TOOLS_FIRST_NOTE];
+          ? [...rendered.messages, capabilities, ...workNote]
+          : [...rendered.messages, capabilities, ...workNote, TOOLS_FIRST_NOTE];
 
       if (ownProfileCall !== null) {
         toolCalls.push(ownProfileCall);

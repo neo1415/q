@@ -320,6 +320,33 @@ const DOCUMENT_NAMES: Readonly<Record<string, string>> = {
  * The manifest and the receipts, as one trusted note. Tools are named by
  * what the model is actually offered this turn.
  */
+/**
+ * The capability note's budget (founder 2026-10-06 authorised raising it):
+ * 5,000 characters cut the browser-actions line once ~100 tools were
+ * listed ahead of it, and Q said it could not navigate or scroll.
+ */
+export const CAPABILITY_NOTE_MAX_CHARS = 16_000;
+
+/** Said whenever navigation or page control is offered (always: core). */
+export const NAVIGATION_LINE =
+  "- You CAN navigate and work the page: open_page takes them to any Capital Q screen and control_screen scrolls, goes back, shows a section or works the page they are on. Never say you cannot navigate, open pages or scroll; call the tool.";
+
+/**
+ * Founder 2026-10-06: "what are you doing?" answered in prose and no cards
+ * appeared. Code reads the question (never the model): Capital Q opens
+ * their Work page, where the cards waiting for their approval are, and Q
+ * says in a few sentences what it is working on.
+ */
+const Q_WORK_QUESTION =
+  /\bwhat\s+(?:are|r)\s+(?:you|u|q)\s+(?:doing|working\s+on|up\s+to|busy\s+with)\b|\bwhat(?:'s|\s+is)\s+q\s+(?:doing|working\s+on|up\s+to)\b|\bwhat\s+have\s+you\s+been\s+(?:doing|working\s+on)\b|\bwhat(?:'s|\s+is)\s+waiting\s+(?:for|on)\s+me\b|\bwhat\s+needs\s+my\s+approval\b/iu;
+
+export function asksAboutQWork(text: string): boolean {
+  return Q_WORK_QUESTION.test(text.slice(0, 500));
+}
+
+export const Q_WORK_LINE =
+  "THEY ASKED WHAT YOU ARE DOING: Capital Q is opening their Work page with this answer, where every card waiting for their approval is shown to approve or decline. Answer in two or three short sentences from OWN DAY: what you are working on for them now, and how many cards wait for their approval (say they are on the Work page). Never list every card in prose, and never say you cannot show them.";
+
 export function capabilityNote(
   manifest: QCapabilityManifest | undefined,
   offeredTools: readonly {
@@ -373,17 +400,27 @@ export function capabilityNote(
   const canApprove = offeredTools.some(
     (tool) => tool.name === APPROVE_PENDING_TOOL,
   );
+  // Founder 2026-10-06 ("Q says it cannot navigate pages or scroll"): the
+  // browser's own actions come first, so no budget below ever cuts them,
+  // and the never-say-can't line is code's, not the model's to infer.
+  if (clientActions.length > 0) {
+    lines.push(
+      `- Do these in their browser at once when they ask, by calling the tool (it happens as your answer arrives; say it in a few words): ${named(clientActions)}.`,
+    );
+  }
+  if (
+    offeredTools.some(
+      (tool) => tool.name === "open_page" || tool.name === "control_screen",
+    )
+  ) {
+    lines.push(NAVIGATION_LINE);
+  }
   if (reads.length > 0) {
     lines.push(`- Read and look things up with these tools: ${named(reads)}.`);
   }
   if (changes.length > 0) {
     lines.push(
       `- Prepare these changes when they ask, for their approval (nothing changes until they approve; until a status or tool result says saved, it is not saved yet): ${named(changes)}.`,
-    );
-  }
-  if (clientActions.length > 0) {
-    lines.push(
-      `- Do these in their browser at once when they ask, by calling the tool (it happens as your answer arrives; say it in a few words): ${named(clientActions)}.`,
     );
   }
   if (instant.length > 0) {
@@ -448,7 +485,10 @@ export function capabilityNote(
       ),
     );
   }
-  return { role: "SYSTEM", content: lines.join("\n").slice(0, 5_000) };
+  return {
+    role: "SYSTEM",
+    content: lines.join("\n").slice(0, CAPABILITY_NOTE_MAX_CHARS),
+  };
 }
 
 /** The part of `approve_pending_proposal`'s result a status line reads. */
