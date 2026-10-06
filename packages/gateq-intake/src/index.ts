@@ -26,6 +26,7 @@ export {
   applicationProjection,
   type ResolvedClassification,
 } from "./domain/projection.js";
+export { factsFromAnswers } from "./domain/form-answers.js";
 export {
   createGuestThrottle,
   GATEQ_GUEST_OPERATIONS,
@@ -94,3 +95,45 @@ export {
 } from "./infrastructure/postgres-submission-inbox.js";
 
 export const PACKAGE_NAME = "@capital-q/gateq-intake" as const;
+
+// F4: the investor's GateQ inbox.
+export * from "./inbox/domain.js";
+export {
+  buildPack,
+  crc32,
+  packFileName,
+  PACK_SCHEMA_VERSION,
+  summaryPdf,
+  zipEntries,
+  type PackFile,
+  type PackInput,
+} from "./inbox/pack.js";
+export type {
+  InboxActivity,
+  InboxActivityKind,
+  InboxAuthority,
+  InboxFolder,
+  InboxGateway,
+  InboxRepository,
+  InboxRow,
+  SharedDocumentPort,
+} from "./inbox/ports.js";
+export {
+  createInboxService,
+  type InboxChanged,
+  type InboxRefused,
+  type InboxService,
+} from "./inbox/service.js";
+export { createPostgresInboxRepository } from "./infrastructure/postgres-inbox.js";
+export {
+  createGateqInbox,
+  gateqInboxActionsPort,
+  gateqInboxAuthority,
+  ownGatewayIdFrom,
+} from "./inbox/compose.js";
+export { createStartupAlerts, type StartupAlerts } from "./find/alerts.js";
+export {
+  createPostgresApplicationFounders,
+  type ApplicationFounders,
+  type FounderApplication,
+} from "./infrastructure/postgres-application-founders.js";

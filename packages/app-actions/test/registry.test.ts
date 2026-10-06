@@ -278,6 +278,21 @@ describe("the action registry", () => {
       ["team.ownership.offer", "offer.team_manage", "CONSEQUENTIAL"],
       ["team.ownership.respond", "offer.team_manage", "CONSEQUENTIAL"],
       ["team.join_request.decide", "offer.team_manage", "CONSEQUENTIAL"],
+      // F4: the GateQ inbox. Words to a founder are approved on its screen.
+      ["gateq.inbox.star", "gateq_inbox_star", "INSTANT"],
+      ["gateq.inbox.archive", "gateq_inbox_archive", "INSTANT"],
+      ["gateq.inbox.label", "gateq_inbox_label", "INSTANT"],
+      ["gateq.inbox.assign", "gateq_inbox_assign", "INSTANT"],
+      ["gateq.inbox.note", "gateq_inbox_note", "INSTANT"],
+      ["gateq.inbox.reply_promise", "gateq_reply_promise", "INSTANT"],
+      ["gateq.inbox.pass", "offer.gateq_inbox", "CONSEQUENTIAL"],
+      ["gateq.inbox.reply", "offer.gateq_inbox", "CONSEQUENTIAL"],
+      ["gateq.inbox.triage", "gateq_inbox_triage", "READ"],
+      ["gateq.inbox.draft_pass", "gateq_inbox_draft_pass", "READ"],
+      ["gateq.inbox.summarise", "gateq_inbox_summarise", "READ"],
+      // F3: find my startup (claim on screen) and a saved startup search.
+      ["company.claim.request", "offer.find_my_startup", "INSTANT"],
+      ["gateq.startup_alert.save", "save_startup_alert", "INSTANT"],
     ]);
   });
 });

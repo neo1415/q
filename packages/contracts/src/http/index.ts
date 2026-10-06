@@ -905,6 +905,19 @@ export {
 
 // CQ-GATE-002 -- the public applicant surface: anonymous, credential-scoped.
 export {
+  ApplicationAnswersRequestSchema,
+  ApplicationAnswersResponseSchema,
+  GATEQ_APPLY_ANSWERS_PATH,
+  GATEQ_APPLY_MATERIALS_PATH,
+  ShareApplicationMaterialsRequestSchema,
+  ShareApplicationMaterialsResponseSchema,
+  type ShareApplicationMaterialsRequest,
+  GATEQ_DECLINED,
+  GATEQ_INSTRUMENTS,
+  GATEQ_LEAD_STATUSES,
+  GATEQ_NOTE_MAX_CHARS,
+  type ApplicationAnswersRequest,
+  type ApplicationAnswersResponse,
   ApplicationFactDtoSchema,
   ApplicationSummaryDtoSchema,
   ApplicationTurnRequestSchema,
@@ -1315,3 +1328,5 @@ export * from "./founder-person.js";
 export * from "./explore.js";
 // G1/G2 block: organisations as teams.
 export * from "./team.js";
+export * from "./gateq-inbox.js";
+export * from "./gateq-find.js";

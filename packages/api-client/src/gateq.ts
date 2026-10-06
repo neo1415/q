@@ -2,6 +2,11 @@ import { z } from "zod";
 
 import {
   ApplicationTurnResponseSchema,
+  ApplicationAnswersResponseSchema,
+  GATEQ_APPLY_ANSWERS_PATH,
+  GATEQ_APPLY_MATERIALS_PATH,
+  ShareApplicationMaterialsResponseSchema,
+  type ApplicationAnswersRequest,
   GATEQ_APPLY_START_PATH,
   GATEQ_APPLY_SUBMIT_PATH,
   GATEQ_APPLY_TURN_PATH,
@@ -114,13 +119,35 @@ export function getPublicGateway(baseUrl: string, publicId: string) {
 }
 
 /** Anonymous: starts an application; the reply carries its session token. */
-export function startApplication(baseUrl: string, gatewayPublicId: string) {
+export function startApplication(
+  baseUrl: string,
+  gatewayPublicId: string,
+  mode?: "conversation" | "form",
+) {
   return call(
     { baseUrl, accessToken: "" },
     "POST",
     GATEQ_APPLY_START_PATH,
     StartApplicationResponseSchema,
-    { body: { gatewayPublicId } },
+    {
+      body:
+        mode === undefined ? { gatewayPublicId } : { gatewayPublicId, mode },
+    },
+  );
+}
+
+/** F1: the GateQ form's answers; the engine's answer comes back. */
+export function saveApplicationAnswers(
+  baseUrl: string,
+  sessionToken: string,
+  answers: ApplicationAnswersRequest,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_ANSWERS_PATH,
+    ApplicationAnswersResponseSchema,
+    { body: answers },
   );
 }
 
@@ -176,6 +203,23 @@ export function extractGatewayPolicy(
     "POST",
     path(GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH, { gatewayId }),
     PolicyExtractionDtoSchema,
+    { body: input },
+  );
+}
+
+/** F1: a signed-in founder shares their own documents with an application. */
+export function shareApplicationMaterials(
+  session: ApiSession,
+  input: {
+    readonly sessionToken: string;
+    readonly documentIds: readonly string[];
+  },
+) {
+  return call(
+    session,
+    "POST",
+    GATEQ_APPLY_MATERIALS_PATH,
+    ShareApplicationMaterialsResponseSchema,
     { body: input },
   );
 }

@@ -21,7 +21,8 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   INVESTORS: "/investors",
   // Search lives at the top of Explore now (ADR 0055).
   SEARCH: "/explore",
-  GATEWAY: "/gateway",
+  // GateQ has its own page (F2); /gateway redirects there.
+  GATEWAY: "/gateq",
   MEMORY: "/settings/memory",
   USAGE: "/settings/usage",
   NEW_PITCH: "/pitch/new",

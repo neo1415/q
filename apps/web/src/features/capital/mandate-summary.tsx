@@ -184,7 +184,7 @@ export async function MandateSummary({
         <Link href="/discover/saved" className={buttonClassName("quiet")}>
           Saved companies
         </Link>
-        <Link href="/gateway" className={buttonClassName("quiet")}>
+        <Link href="/gateq?tab=gate" className={buttonClassName("quiet")}>
           Your gateway
         </Link>
       </div>

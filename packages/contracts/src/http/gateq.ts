@@ -252,6 +252,12 @@ export const PublicGatewayDtoSchema = z
      */
     organisationPhotoUrl: z.string().url().nullable().optional(),
     organisationCoverUrl: z.string().url().nullable().optional(),
+    /**
+     * F4: the investor's published promise to founders, "we reply to every
+     * qualified application within N working days". Absent or null: no
+     * promise was made, and none is implied.
+     */
+    replyWithinDays: z.number().int().min(1).max(60).nullable().optional(),
   })
   .strict();
 export type PublicGatewayDto = z.infer<typeof PublicGatewayDtoSchema>;

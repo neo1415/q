@@ -197,6 +197,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq-apply.ts GET GATEQ_APPLY_SESSION_PATH": PUBLIC,
   "api/http/gateq-apply.ts POST GATEQ_APPLY_TURN_PATH": PUBLIC,
   "api/http/gateq-apply.ts POST GATEQ_APPLY_SUBMIT_PATH": PUBLIC,
+  // F1: the GateQ form, the same anonymous applicant surface.
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_ANSWERS_PATH": PUBLIC,
   ...Object.fromEntries(
     [
       "POST GATEQ_GATEWAYS_PATH",
@@ -215,8 +217,21 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     ]),
   ),
   "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_PATH": PUBLIC,
+  "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH": exempt(
+    "the founder ticking their own documents in the GateQ form, at the moment they press Send; consent belongs on that screen",
+  ),
   "api/http/gateq.ts GET GATEQ_GATEWAY_APPLICATIONS_PATH": exempt(
     "the organisation reading applications submitted to its own gateway, on its gateway page",
+  ),
+  // F4: the GateQ inbox. Q reads it through its triage tool.
+  "api/http/gateq.ts GET GATEQ_INBOX_PATH": cap("tool.gateq_inbox_triage"),
+  "api/http/gateq.ts GET GATEQ_INBOX_ITEM_PATH": cap("tool.gateq_inbox_triage"),
+  "api/http/gateq.ts GET COMPANY_CLAIMABLE_PATH": cap("offer.find_my_startup"),
+  "api/http/gateq.ts GET GATEQ_MY_APPLICATIONS_PATH": exempt(
+    "the founder's own GateQ applications and the investors' answers, listed on their GateQ page",
+  ),
+  "api/http/gateq.ts GET GATEQ_INBOX_PACK_PATH": exempt(
+    "a zip file the investor downloads to their own device; Q has no device to save it to",
   ),
 
   // Capital Q's own operators; never Q's to act on, never a tenant's.
@@ -731,6 +746,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
+  "/dev/gateq-v2": exempt("development-only page"),
   "/dev/canvas": exempt("development-only page"),
   "/dev/relationships": exempt("development-only page"),
   "/dev/brand-preview": exempt("development-only page"),
@@ -771,6 +787,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "Capital Q's admin console: platform operators only, never a place Q sends anyone",
   ),
   "/gateway": cap("navigate.GATEWAY"),
+  // F2: GateQ's own page; /gateway now redirects to its "Your gate" tab.
+  "/gateq": cap("navigate.GATEWAY"),
   "/onboarding/founder": exempt(
     "the founder interview: Q's own onboarding loop (voice INTERVIEW_FOUNDER)",
   ),
@@ -934,6 +952,18 @@ const LEGACY_MUTATION_ROUTES_MAX = 77;
  * action, so never declarable as one. Named here one by one rather than
  * lifting the legacy ceiling; pending the lead's decision.
  */
+/**
+ * F1 (2026-10-06): the GateQ form's two writes. Both are authorised by an
+ * applicant's guest credential that exists only in the founder's browser
+ * memory (the embed is a third-party frame): no actor holds it, so neither
+ * Q nor a declared action can ever carry it. Named one by one rather than
+ * lifting the legacy ceiling; pending the lead's decision.
+ */
+const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_ANSWERS_PATH",
+  "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH",
+]);
+
 const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH",
@@ -987,6 +1017,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
       (key) =>
         / (POST|PUT|PATCH|DELETE) /.test(key) &&
         !Q_TRANSPORT_NOT_ACTIONS.has(key) &&
+        !GATEQ_GUEST_NOT_ACTIONS.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act
         // on), so its writes are not legacy waiting to migrate.
         ROUTE_COVERAGE[key] !== OPERATIONS_CONSOLE,

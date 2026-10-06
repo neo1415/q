@@ -24,6 +24,8 @@ import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
 import { WORK_ACTIONS } from "./actions/work.js";
 import { GATEQ_ACTIONS } from "./actions/gateq.js";
 import { TEAM_ACTIONS, TEAM_PERSON_ACTIONS } from "./actions/team.js";
+import { GATEQ_INBOX_ACTIONS } from "./actions/gateq-inbox.js";
+import { GATEQ_FIND_ACTIONS } from "./actions/gateq-find.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -55,6 +57,8 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...DATA_ROOM_ACTIONS,
   // G1/G2: the company or firm as a team.
   ...TEAM_ACTIONS,
+  ...GATEQ_INBOX_ACTIONS,
+  ...GATEQ_FIND_ACTIONS,
 ]);
 
 /**

@@ -5,6 +5,7 @@ import {
   CircleUser,
   FileText,
   Compass,
+  DoorOpen,
   Gauge,
   Handshake,
   LayoutDashboard,
@@ -49,7 +50,8 @@ export type NavigationItem = {
     | "/settings/usage"
     | "/documents"
     | "/work"
-    | "/admin";
+    | "/admin"
+    | "/gateq";
   readonly label: string;
   readonly icon: ComponentType<{
     readonly size?: number;
@@ -153,6 +155,17 @@ export const DAILY_NAVIGATION: NavigationItem = {
 };
 
 /**
+ * GateQ (F2, 2026-10-06): its own page. A founder checks their fit against
+ * investors' gates and finds their company; an investor works their gate's
+ * inbox, finds startups and runs the gate.
+ */
+export const GATEQ_NAVIGATION: NavigationItem = {
+  href: "/gateq",
+  label: "GateQ",
+  icon: DoorOpen,
+};
+
+/**
  * Q's work (WORK-58): what Q suggests, what waits for their yes, what it
  * runs and what it finished. Reached from the bell before; now a section.
  */
@@ -234,6 +247,7 @@ export function navigationGroupsFor(
     {
       label: "Workspace",
       items: [
+        ...(founder || investor ? [GATEQ_NAVIGATION] : []),
         WORK_NAVIGATION,
         ...(founder ? [FOUNDER_MEDIA_NAVIGATION] : []),
         ...(investor ? [COMPANY_REQUESTS_NAVIGATION] : []),

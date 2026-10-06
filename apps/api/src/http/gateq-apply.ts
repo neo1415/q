@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  ApplicationAnswersRequestSchema,
+  ApplicationAnswersResponseSchema,
+  GATEQ_APPLY_ANSWERS_PATH,
   ApplicationSummaryDtoSchema,
   ApplicationTurnRequestSchema,
   ApplicationTurnResponseSchema,
@@ -15,6 +18,7 @@ import {
   SubmitApplicationResponseSchema,
 } from "@capital-q/contracts";
 import {
+  factsFromAnswers,
   IntakeRefusedError,
   type ApplicantTurnResult,
   type ConversationService,
@@ -189,10 +193,14 @@ export function registerGateQApplyRoutes(
       const started = await intake.start({
         gatewayPublicId: input.gatewayPublicId,
       });
-      const opening = await conversation.openingFor({
-        token: started.token,
-        correlationId: randomUUID(),
-      });
+      // F1: the form needs no opening line, so it reaches no model.
+      const opening =
+        input.mode === "form"
+          ? ""
+          : await conversation.openingFor({
+              token: started.token,
+              correlationId: randomUUID(),
+            });
       const summary = await conversation.summary(started.token);
       void reply.code(201).header("Cache-Control", "no-store");
       return StartApplicationResponseSchema.parse({
@@ -243,6 +251,32 @@ export function registerGateQApplyRoutes(
         reply: outcome.reply,
         deduplicated: outcome.deduplicated,
         application: summaryDto(outcome),
+      });
+    } catch (error: unknown) {
+      return refuse(error, reply);
+    }
+  });
+
+  /**
+   * F1: the GateQ form's answers. Recorded as applicant-provided facts, then
+   * the deterministic answer comes back, exactly as after a turn -- but no
+   * model is reached. A founder's "I'd rather not say" arrives as DECLINED
+   * and is recorded as asked-and-unknown, never as a no.
+   */
+  app.post(GATEQ_APPLY_ANSWERS_PATH, async (request, reply) => {
+    const input = parseContract(
+      ApplicationAnswersRequestSchema,
+      request.body,
+      "The answers are not valid.",
+    );
+    const token = credential(request);
+    try {
+      await charge(token, "ANSWERS");
+      await intake.recordFacts({ token, facts: factsFromAnswers(input) });
+      const summary = await conversation.summary(token);
+      void reply.header("Cache-Control", "no-store");
+      return ApplicationAnswersResponseSchema.parse({
+        application: summaryDto(summary),
       });
     } catch (error: unknown) {
       return refuse(error, reply);

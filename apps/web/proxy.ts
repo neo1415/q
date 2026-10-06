@@ -37,6 +37,7 @@ export const config = {
     // DAILY: The Q Daily reader.
     "/daily/:path*",
     "/gateway/:path*",
+    "/gateq/:path*",
     "/rehearsals/:path*",
     "/results/:path*",
     "/reviews/:path*",

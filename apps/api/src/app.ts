@@ -53,7 +53,10 @@ import {
   registerDocumentRoutes,
   type DocumentRoutesDependencies,
 } from "./http/documents.js";
+import type { CompanyClaims } from "@capital-q/companies";
+import type { StartupAlerts } from "@capital-q/gateq-intake";
 import type {
+  AppActionPorts,
   GateQPolicyExtractionPort,
   QWorkPagePort,
 } from "@capital-q/app-actions";
@@ -305,6 +308,17 @@ export type ApiModules = {
     NetworkInterestRoutesDependencies["connections"] | undefined;
   /** A gateway's submitted applications, for its organisation. */
   readonly gateqInbox?: GateQRoutesDependencies["inbox"] | undefined;
+  readonly gateqMaterials?: GateQRoutesDependencies["materials"] | undefined;
+  readonly gateqInboxService?:
+    GateQRoutesDependencies["inboxService"] | undefined;
+  /** F3: find and claim a company; an investor's saved startup search. */
+  readonly companyClaims?: CompanyClaims | undefined;
+  readonly gateqMyApplications?: GateQRoutesDependencies["myApplications"];
+  readonly startupAlerts?: StartupAlerts | undefined;
+  /** F4: the inbox as the declared actions reach it (ADR 0040). */
+  readonly gateqInboxActions?: AppActionPorts["gateqInbox"];
+  readonly gateqPublicReplyPromise?:
+    GateQRoutesDependencies["publicReplyPromise"] | undefined;
   /** P7: an investor's mandate read into DRAFT gateway rules (ADR 0040 port). */
   readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
   /** CQ-GATE-001: the investor organisation's inbound gateway. */
@@ -635,6 +649,15 @@ export function createApp(
         ? {}
         : { gateqPolicyExtraction: modules.gateqPolicyExtraction }),
       ...(modules.team === undefined ? {} : { team: modules.team }),
+      ...(modules.gateqInboxActions === undefined
+        ? {}
+        : { gateqInbox: modules.gateqInboxActions }),
+      ...(modules.companyClaims === undefined
+        ? {}
+        : { companyClaims: modules.companyClaims }),
+      ...(modules.startupAlerts === undefined
+        ? {}
+        : { startupAlerts: modules.startupAlerts }),
     },
   });
   // ADR 0040: person-scoped routes (onboarding), under the onboarding actor.
@@ -790,6 +813,11 @@ export function createApp(
       resolver: security.resolver,
       gateq: modules.gateq,
       inbox: modules.gateqInbox,
+      materials: modules.gateqMaterials,
+      inboxService: modules.gateqInboxService,
+      claimable: modules.companyClaims?.search,
+      myApplications: modules.gateqMyApplications,
+      publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,
       publicImages: modules.gateqPublicImages,
     });

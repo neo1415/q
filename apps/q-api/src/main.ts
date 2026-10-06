@@ -16,6 +16,19 @@
  */
 
 import { createFitComposition } from "./composition/fit.js";
+import {
+  createGateQService,
+  createPostgresGatewayPolicyPort,
+  createPostgresGatewayRepository,
+  createPostgresGatewayVersionRepository,
+} from "@capital-q/gateq";
+import { createCompanyClaims } from "@capital-q/companies";
+import {
+  createGateqInbox,
+  createStartupAlerts,
+  gateqInboxActionsPort,
+  ownGatewayIdFrom,
+} from "@capital-q/gateq-intake";
 import { createCounterpartNames } from "./composition/counterpart-names.js";
 import { createWaitingLines } from "./composition/waiting-lines.js";
 import { randomUUID } from "node:crypto";
@@ -1945,7 +1958,47 @@ const team = createTeamService({
     process.env["CQ_WEB_ORIGIN"] ??
     "https://capital-qweb-production.up.railway.app",
 });
+// F4: the investor's GateQ inbox, for Q's tools and approved actions. GateQ
+// is composed here only for its gateway authority (who may see a gateway,
+// who may act for the firm); the inbox reads no company projection, and
+// qualification stays the API's.
+const gateqForInbox = createGateQService({
+  gateways: createPostgresGatewayRepository({ sql: database.sql }),
+  versions: createPostgresGatewayVersionRepository({ sql: database.sql }),
+  policies: createPostgresGatewayPolicyPort({ sql: database.sql }),
+  companies: { projectionFor: () => Promise.resolve(null) },
+  organisations: {
+    displayNameFor: async (query) =>
+      (
+        await investors.getCanonicalInvestorOrganisation(
+          TenantIdSchema.parse(query.tenantId),
+          InvestorOrganisationIdSchema.parse(query.investorOrganisationId),
+        )
+      )?.displayName ?? null,
+  },
+  authorization,
+  transactions: database.transactions,
+  audit: createPostgresMaterialActionAuditWriter(),
+});
+const gateqInbox = gateqInboxActionsPort(
+  createGateqInbox({
+    sql: database.sql,
+    transactions: database.transactions,
+    gateq: gateqForInbox,
+  }),
+  ownGatewayIdFrom({
+    gateq: gateqForInbox,
+    ownInvestorOrganisationId: (actor) =>
+      runtimeDependencies.ownInvestorOrganisation(actor),
+  }),
+);
+
 const appActionPorts: OwnReadPorts = {
+  // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
+  gateqInbox,
+  // F3: "Find my startup": claim requests and saved startup searches.
+  companyClaims: createCompanyClaims({ sql: database.sql }),
+  startupAlerts: createStartupAlerts({ sql: database.sql }),
   // ADR 0050: their own speaking guide, saved or removed by asking Q.
   etiquetteGuides,
   // G1/G2: inviting a colleague, changing a role, reading the team.

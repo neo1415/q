@@ -489,6 +489,22 @@ const OFFERS: readonly QCapability[] = [
     false,
   ),
   offer(
+    "find_my_startup",
+    "SETTINGS",
+    "Find their company on Capital Q and claim it, or ask to join it",
+    "GATEWAY",
+    "Claiming a company is the founder's own act on the GateQ Find tab, where they show it is theirs with a work email, a registry document or the members' yes.",
+    false,
+  ),
+  offer(
+    "gateq_inbox",
+    "SETTINGS",
+    "Pass on or reply to a founder in their GateQ inbox: Q drafts the words, they read, change and send them there",
+    "GATEWAY",
+    "Words to a founder are sent from the inbox screen, where the investor approves exactly what goes; Q drafts them and opens it.",
+    false,
+  ),
+  offer(
     "gateway_mandate",
     "SETTINGS",
     "Set up their GateQ gateway from their mandate: paste or upload it, Q drafts the rules, they confirm and publish, then copy the website snippet",

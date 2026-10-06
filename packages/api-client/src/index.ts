@@ -329,6 +329,8 @@ export {
   listGatewayApplications,
   listGateways,
   publishGatewayVersion,
+  saveApplicationAnswers,
+  shareApplicationMaterials,
   startApplication,
   submitApplication,
 } from "./gateq.js";
@@ -456,3 +458,4 @@ export {
 export { exploreRelated, exploreSearch, exploreSlate } from "./explore.js";
 // G1/G2 block: teams.
 export * from "./team.js";
+export * from "./gateq-inbox.js";

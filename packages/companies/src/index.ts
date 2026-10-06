@@ -201,3 +201,10 @@ export {
   type FounderPersonSource,
 } from "./domain/founder-person.js";
 export { createPostgresFounderPersonSource } from "./infrastructure/postgres-founder-person.js";
+
+// F3: "Find my startup": find a visible company and ask to claim or join it.
+export {
+  createCompanyClaims,
+  emailAtCompany,
+  type CompanyClaims,
+} from "./claims/company-claims.js";

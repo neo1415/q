@@ -1,9 +1,9 @@
 /*
- * Capital Q - GateQ "Do we fit? Ask Q" launcher. Paste once, anywhere on a page:
+ * Capital Q - GateQ "Check your fit" launcher (F1: opens the GateQ form). Paste once, anywhere on a page:
  *
  *   <script src="https://<capital-q>/gateq.js" data-gate="gq_..." async></script>
  *
- * Optional: data-label="Do we fit? Ask Q"  data-position="left|right"
+ * Optional: data-label="Check your fit"  data-position="left|right"
  *           data-theme="light|dark" (defaults to the visitor's preference)
  *
  * What it does: draws one small button in a closed shadow root (so the host
@@ -27,7 +27,7 @@
   window.__capitalQGateQ = true;
 
   var origin = new URL(script.src).origin;
-  var label = (script.getAttribute("data-label") || "Do we fit? Ask Q").slice(
+  var label = (script.getAttribute("data-label") || "Check your fit").slice(
     0,
     40,
   );
@@ -84,7 +84,7 @@
     '<button class="launch" type="button" aria-haspopup="dialog" aria-expanded="false">' +
     '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 19 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>' +
     '<span class="text"></span></button>' +
-    '<div class="panel" role="dialog" aria-modal="false" aria-label="Fit check with Q" hidden>' +
+    '<div class="panel" role="dialog" aria-modal="false" aria-label="Check your fit" hidden>' +
     '<button class="close" type="button" aria-label="Close"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>';
 
   var launch = root.querySelector(".launch");

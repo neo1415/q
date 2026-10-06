@@ -39,6 +39,8 @@ export const PROTECTED_PATH_PREFIXES = [
   // DAILY: The Q Daily reader.
   "/daily",
   "/gateway",
+  // F2: GateQ's own page (founder applications, investor inbox and gate).
+  "/gateq",
   "/rehearsals",
   "/results",
   "/reviews",

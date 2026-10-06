@@ -122,6 +122,19 @@ export type GateQService = {
     readonly organisationId: string;
     readonly limit?: number | undefined;
   }) => Promise<readonly Gateway[]>;
+  /**
+   * F4: whether the actor may see this gateway (refuses exactly as for one
+   * that does not exist) and whether they may act for the organisation on
+   * it (investor.gateway.edit), with the organisation's public name.
+   */
+  readonly gatewayAccess: (command: {
+    readonly actor: ActorContext;
+    readonly gatewayId: GatewayId;
+  }) => Promise<{
+    readonly gateway: Gateway;
+    readonly canEdit: boolean;
+    readonly organisationDisplayName: string | null;
+  }>;
   readonly getPolicy: (command: {
     readonly actor: ActorContext;
     readonly gatewayId: GatewayId;
@@ -296,6 +309,35 @@ export function createGateQService(
         investorOrganisationId: command.investorOrganisationId,
         limit: Math.min(50, Math.max(1, command.limit ?? 20)),
       });
+    },
+
+    gatewayAccess: async (command) => {
+      const gateway = await authorised(
+        command.actor,
+        command.gatewayId,
+        GATEWAY_VIEW,
+      );
+      const canEdit = await authorization
+        .requireCapability({
+          actor: command.actor,
+          capability: GATEWAY_EDIT,
+          resource: ResourceScopeSchema.parse({
+            kind: "RESOURCE",
+            tenantId: gateway.tenantId,
+            organisationId: gateway.organisationId,
+            resourceType: "investor_gateway",
+            resourceId: gateway.id,
+          }),
+        })
+        .then(() => true)
+        .catch(() => false);
+      const organisationDisplayName = await organisations
+        .displayNameFor({
+          tenantId: gateway.tenantId,
+          investorOrganisationId: gateway.investorOrganisationId,
+        })
+        .catch(() => null);
+      return { gateway, canEdit, organisationDisplayName };
     },
 
     getPolicy: async (command) => {
