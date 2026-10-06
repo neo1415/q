@@ -174,6 +174,7 @@ import { withInterestNotices } from "./network/interest-notice-handler.js";
 import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
 import { withCommitmentNotices } from "./network/commitment-notice-handler.js";
 import { newlyReadyCompanyOf } from "./network/newly-ready-company.js";
+import { createStartupAlertWatcher } from "./network/startup-alert-watcher.js";
 import { withDiligenceSummaries } from "./network/diligence-summary-handler.js";
 import { withDeckReadings } from "./evidence/deck-reading-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
@@ -246,6 +247,8 @@ const logger = createLogger(
 // The publisher writes outbox bookkeeping and the queue: ordinary server
 // access, no elevation required.
 const database = createRequestDatabaseClient(databaseConfig);
+// P14: saved startup alerts, matched when a company becomes ready.
+const startupAlertWatcher = createStartupAlertWatcher({ sql: database.sql });
 const registry = createProductionEventRegistry();
 const queues = createPgmqQueueClient(database.sql);
 
@@ -889,6 +892,30 @@ const documentEvents = createQueueRunner({
                           const ready = newlyReadyCompanyOf(event);
                           if (ready !== null) {
                             await database.sql`select pg_notify(${Q_INSTRUCTION_NEW_COMPANY_CHANNEL}, ${ready})`;
+                            // P14: saved startup alerts it matches tell
+                            // their investors (notice, pushed and emailed
+                            // by the delivery ticker). Never fails the event.
+                            await startupAlertWatcher(ready)
+                              .then((told) => {
+                                if (told > 0) {
+                                  logger.info(
+                                    { event: "gateq.startup_alert", told },
+                                    "startup alert notices created",
+                                  );
+                                }
+                              })
+                              .catch((error: unknown) => {
+                                logger.warn(
+                                  {
+                                    event: "gateq.startup_alert",
+                                    errorName:
+                                      error instanceof Error
+                                        ? error.name
+                                        : "unknown",
+                                  },
+                                  "startup alert matching failed",
+                                );
+                              });
                           }
                           return applied;
                         },

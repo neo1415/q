@@ -397,3 +397,76 @@ export function parseStartupDescription(
     },
   };
 }
+
+/** What a saved alert asked for, as stored (filters plus loose words). */
+export type StoredAlertFilters = {
+  readonly sectorNodeIds?: readonly string[] | undefined;
+  readonly stageCodes?: readonly string[] | undefined;
+  readonly countryCodes?: readonly string[] | undefined;
+  readonly raise?: unknown;
+  readonly raiseDisclosedOnly?: boolean | undefined;
+  readonly words?: readonly string[] | undefined;
+};
+
+/** The company as the network sees it: declared, network-level facts only. */
+export type AlertCompanyFacts = {
+  readonly name: string;
+  readonly description: string | null;
+  readonly stageCode: string | null;
+  readonly countryCode: string | null;
+  /** Its sector nodes and every ancestor of them. */
+  readonly sectorNodeIds: readonly string[];
+};
+
+/**
+ * P14: does a newly ready company match a saved alert? Deterministic, over
+ * network-level facts only. An alert that asks about the raise is never
+ * matched here: whether this investor may see a raise is the disclosure
+ * evaluator's to say, so it waits for Discover (a skipped match, never a
+ * guess). Unknown is not a match: a company with no stage never matches a
+ * stage filter. An alert with nothing to match on matches nothing.
+ */
+export function alertMatches(
+  filters: StoredAlertFilters,
+  company: AlertCompanyFacts,
+): boolean {
+  if (filters.raise !== null && filters.raise !== undefined) return false;
+  if (filters.raiseDisclosedOnly === true) return false;
+  const stages = filters.stageCodes ?? [];
+  const countries = filters.countryCodes ?? [];
+  const sectors = filters.sectorNodeIds ?? [];
+  const words = (filters.words ?? [])
+    .map((word) => word.trim().toLowerCase())
+    .filter((word) => word.length >= 3);
+  if (
+    stages.length === 0 &&
+    countries.length === 0 &&
+    sectors.length === 0 &&
+    words.length === 0
+  ) {
+    return false;
+  }
+  if (
+    stages.length > 0 &&
+    (company.stageCode === null || !stages.includes(company.stageCode))
+  ) {
+    return false;
+  }
+  if (
+    countries.length > 0 &&
+    (company.countryCode === null || !countries.includes(company.countryCode))
+  ) {
+    return false;
+  }
+  if (
+    sectors.length > 0 &&
+    !sectors.some((id) => company.sectorNodeIds.includes(id))
+  ) {
+    return false;
+  }
+  if (words.length > 0) {
+    const text = `${company.name} ${company.description ?? ""}`.toLowerCase();
+    if (!words.some((word) => text.includes(word))) return false;
+  }
+  return true;
+}
