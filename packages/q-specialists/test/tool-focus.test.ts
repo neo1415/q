@@ -95,8 +95,13 @@ describe("toolFocusOf", () => {
     ).toEqual({ areas: ["Relationships"], tools: [], widen: true });
     // Nothing to act on and nothing it is about: the purpose's list.
     expect(focus(reading({ kind: "TOOL_REQUEST" }), [])).toBeNull();
-    // A question that names nothing is unchanged.
-    expect(focus(reading({}), ["INVESTOR_ORGANISATION"])).toBeNull();
+    // A question that names nothing keeps the purpose's list, with the
+    // public-web tools leading (web search 2026-10-06).
+    expect(focus(reading({}), ["INVESTOR_ORGANISATION"])).toEqual({
+      areas: [],
+      tools: [...RESEARCH_TOOLS],
+      widen: true,
+    });
   });
 
   describe("research and web reading are guaranteed (run 13955ca2)", () => {
@@ -127,10 +132,31 @@ describe("toolFocusOf", () => {
             ?.tools,
         ).toEqual(RESEARCH);
       }
+      // A question to Q holds them under any research mode: offered,
+      // never forced (web search 2026-10-06, "three YC-backed companies").
+      for (const research of ["NEVER", "ONLY_IF_EMPTY", null]) {
+        for (const questionKind of [
+          "THEIR_OWN_RECORDS",
+          "OPTIONS",
+          "PROGRESS",
+          null,
+        ]) {
+          expect(
+            focus(reading({ questionKind, research }))?.tools,
+            `${String(questionKind)} ${String(research)}`,
+          ).toEqual(RESEARCH);
+        }
+      }
+      // A request to act that does not ask for the web does not get it.
       for (const research of ["NEVER", "ONLY_IF_EMPTY", null]) {
         expect(
-          focus(reading({ questionKind: "THEIR_OWN_RECORDS", research }))
-            ?.tools,
+          focus(
+            reading({
+              kind: "TOOL_REQUEST",
+              questionKind: "THEIR_OWN_RECORDS",
+              research,
+            }),
+          )?.tools,
         ).toEqual([]);
       }
     });
@@ -151,7 +177,10 @@ describe("toolFocusOf", () => {
         "what is my runway?",
         "e.g. the board pack",
       ]) {
-        expect(focus(reading({ text }))?.tools ?? [], text).toEqual([]);
+        expect(
+          focus(reading({ kind: "TOOL_REQUEST", text }))?.tools ?? [],
+          text,
+        ).toEqual([]);
       }
     });
 
@@ -208,6 +237,6 @@ describe("toolFocusOf", () => {
       areas: ["Screens"],
       tools: [],
     });
-    expect(focus(reading({}))).toBeNull();
+    expect(focus(reading({ kind: "TOOL_REQUEST" }))).toBeNull();
   });
 });

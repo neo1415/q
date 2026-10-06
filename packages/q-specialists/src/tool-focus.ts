@@ -60,6 +60,8 @@ export const RESEARCH_TOOLS: readonly string[] = [
  */
 const RESEARCH_ASKED = "EXPLICIT";
 const RESEARCH_OFFERED = "OFFERED";
+/** A question put to Q (the turn reader's kind). */
+const QUESTION = "QUESTION_TO_Q";
 
 /**
  * A web address in what they wrote: a scheme, "www.", or a bare domain
@@ -213,7 +215,15 @@ function focusOf(input: {
   // is about (lead 2026-10-03, run d396af2f: "Ask Ledgerfold for their
   // management accounts" named no tool, and diligence_documents was not
   // offered).
+  // Any question to Q keeps the web within reach (web search 2026-10-06:
+  // "three YC-backed companies that fit my mandate" was read as OPTIONS,
+  // focused on Records, and Q answered from what little it held). The
+  // tools lead the offer; nothing forces a search.
+  const asks = reading.kind === QUESTION;
   if (areas.size === 0 && tools.size === 0) {
+    if (asks) {
+      return { areas: [], tools: [...RESEARCH_TOOLS], widen: true };
+    }
     if (reading.kind !== "TOOL_REQUEST" || subjectAreas.length === 0) {
       return null;
     }
@@ -224,7 +234,7 @@ function focusOf(input: {
     };
   }
   for (const area of subjectAreas) areas.add(area);
-  if (reading.research === RESEARCH_OFFERED) {
+  if (reading.research === RESEARCH_OFFERED || asks) {
     for (const tool of RESEARCH_TOOLS) tools.add(tool);
   }
   return { areas: [...areas].sort(), tools: [...tools].sort() };
