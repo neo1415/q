@@ -92,6 +92,7 @@ import {
   type QOwnIndex,
 } from "./own-standing.js";
 import { afterLeadLines, ownReadinessFact } from "./own-readiness.js";
+import { speculationGate } from "./speculation.js";
 
 export type { QOwnIndex } from "./own-standing.js";
 export { readinessLeadLines } from "./own-readiness.js";
@@ -2080,7 +2081,19 @@ export function createModelGatewayQAnswer(
       // Prepared while the turn was being read, when the caller warmed it
       // (speed sweep 2026-10-01); otherwise now.
       const warmed = warming.get(request.runId);
-      warming.delete(request.runId);
+      // A speculative answer leaves the warmed reads where they are: if it
+      // is cancelled, the turn's own answer takes them up (they only read).
+      const gate = speculationGate(request.speculation);
+      if (gate === null) warming.delete(request.runId);
+      else
+        void request.speculation?.decided.then(
+          (adopted) => {
+            if (adopted && warming.get(request.runId) === warmed) {
+              warming.delete(request.runId);
+            }
+          },
+          () => undefined,
+        );
       const prepared = await (warmed ?? prepareTurn(request));
       if (prepared === null) {
         return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
@@ -2182,6 +2195,38 @@ export function createModelGatewayQAnswer(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );
       /**
+       * Every tool call this answer makes. While the answer is speculative
+       * only a READ_ONLY tool runs; any other (or one not known to be
+       * READ_ONLY) waits until the turn is read and the answer adopted, and
+       * never runs if it is cancelled.
+       */
+      const classificationOf = (name: string) =>
+        (
+          offered.find((tool) => tool.definition.name === name) ??
+          (availableForRun ?? offeredForRun).find(
+            (tool) => tool.definition.name === name,
+          )
+        )?.classification;
+      const callTool: QToolPort["execute"] = async (proposal, context) => {
+        if (
+          gate !== null &&
+          !gate.adopted() &&
+          classificationOf(proposal.name) !== "READ_ONLY"
+        ) {
+          logger?.info(
+            { qRunId: request.runId, tool: proposal.name },
+            "a speculative answer's tool call is held until the turn is read",
+          );
+          await gate.ready();
+        }
+        return tools.execute(proposal, context);
+      };
+      /** A visible stage: held with the answer's text while speculative. */
+      const stageShown = async (stage: QVisibleStage): Promise<void> => {
+        if (gate === null) await showStage(request, stage);
+        else gate.emit(() => showStage(request, stage));
+      };
+      /**
        * A setup reminder (founder directive 2026-09-27), only at a natural
        * pause: never while Q is putting a series of questions to them and
        * never on a turn that could not be read. Due-ness is the policy's,
@@ -2226,16 +2271,14 @@ export function createModelGatewayQAnswer(
           request.questionKind === "THEIR_OWN_RECORDS") &&
         prefetchable.has("read_my_record")
       ) {
-        const outcome = await tools
-          .execute(
-            {
-              callId: "q-own-readiness",
-              name: "read_my_record",
-              arguments: { record: "MARKETPLACE_READINESS" },
-            },
-            toolContext,
-          )
-          .catch(() => null);
+        const outcome = await callTool(
+          {
+            callId: "q-own-readiness",
+            name: "read_my_record",
+            arguments: { record: "MARKETPLACE_READINESS" },
+          },
+          toolContext,
+        ).catch(() => null);
         if (outcome?.result.ok === true) {
           const data = outcome.result.data as {
             data?: { companyId?: unknown };
@@ -2423,6 +2466,11 @@ export function createModelGatewayQAnswer(
       let leadListOpen = request.leadLines !== undefined;
       /** When the person got the first sentence, from the seam's start. */
       let firstPublishedMs: number | null = null;
+      /** Out now, or held with the speculation until it is adopted. */
+      const send = (delta: Parameters<QLiveDeltaBus["publish"]>[0]): void => {
+        if (gate === null) deltas?.publish(delta);
+        else gate.emit(() => deltas?.publish(delta));
+      };
       const publish = (text: string): void => {
         // Code's opening lines come first on every surface that listens to
         // the stream (voice parity, lead 2026-10-03: a spoken "what should
@@ -2434,7 +2482,7 @@ export function createModelGatewayQAnswer(
             const said = line.trim();
             if (said.length === 0) continue;
             streamedText += `${said} `;
-            deltas?.publish({
+            send({
               runId: request.runId,
               tenantId: request.tenantId,
               messageId,
@@ -2444,7 +2492,7 @@ export function createModelGatewayQAnswer(
         }
         firstPublishedMs ??= Date.now() - startedAt;
         streamedText += `${text} `;
-        deltas?.publish({
+        send({
           runId: request.runId,
           tenantId: request.tenantId,
           messageId,
@@ -2563,7 +2611,7 @@ export function createModelGatewayQAnswer(
       // Public sources this run read, attached to the answer as structured
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.
       const publicSources: PublicSourceLike[] = [];
-      const persistAnswer = (
+      const persistAnswer = async (
         content: string,
         /**
          * What the analyst produced beside the prose, as blocks
@@ -2592,6 +2640,8 @@ export function createModelGatewayQAnswer(
           ...clientActionBlocks,
         ];
         const blocks = carried.length === 0 ? undefined : carried;
+        // Nothing of a speculative answer is stored until it is adopted.
+        if (gate !== null) await gate.ready();
         return transactions.run(async (tx) => {
           const stored = await repositories.messages.insert(tx, {
             id: messageId,
@@ -3060,9 +3110,9 @@ export function createModelGatewayQAnswer(
                 tool?.visibleStage !== undefined &&
                 tool.visibleStage !== null
               ) {
-                await showStage(request, tool.visibleStage);
+                await stageShown(tool.visibleStage);
               }
-              const outcome = await tools.execute(
+              const outcome = await callTool(
                 {
                   callId: call.callId,
                   name: call.name,
@@ -3227,7 +3277,7 @@ export function createModelGatewayQAnswer(
             researchTool.visibleStage !== undefined &&
             researchTool.visibleStage !== null
           ) {
-            await showStage(request, researchTool.visibleStage);
+            await stageShown(researchTool.visibleStage);
           }
           const call = {
             callId: "q-research",
@@ -3240,7 +3290,7 @@ export function createModelGatewayQAnswer(
             },
           };
           took("beforeResearch");
-          const outcome = await tools.execute(call, toolContext);
+          const outcome = await callTool(call, toolContext);
           took("research");
           toolCalls.push({
             toolName: outcome.toolName,
@@ -3294,6 +3344,9 @@ export function createModelGatewayQAnswer(
         // announces the checking is either redundant or untrue. The
         // charter forbids writing one and a prompt is not a boundary, so
         // it is removed here rather than hoped for.
+        // A speculative answer stops here until the turn is read: what
+        // follows records statements, notes changes and stores the answer.
+        if (gate !== null) await gate.ready();
         took("answer");
         // What the analyst said about acting is Capital Q's to say, from
         // the action it actually holds (CQ-QX-007): the sentences the

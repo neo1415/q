@@ -7,7 +7,15 @@ import {
   type QAppActionPrepared,
   type TurnAppAction,
 } from "./app-action-turn.js";
-import { toolFocusOf } from "./tool-focus.js";
+import { namesWebAddress, toolFocusOf } from "./tool-focus.js";
+import {
+  readingMisfit,
+  SPECULATIVE_READING,
+  speculationMisfit,
+  startSpeculation,
+  type QSpeculationEvent,
+  type Speculation,
+} from "./speculation.js";
 
 /**
  * The investor organisation's own visibility action (app action
@@ -437,6 +445,18 @@ export type SpecialistQAnswerDependencies = {
    * is resolved and the reading is used as said.
    */
   readonly ownRecords?: QOwnRecordsPort | undefined;
+  /**
+   * Voice speculation (latency2): a spoken turn's answer starts at once
+   * under a conservative default reading, beside the turn reader, and is
+   * adopted only where the turn's own path arrives at the same answer
+   * (see speculation.ts). Absent or `spoken: false`: never.
+   */
+  readonly speculation?:
+    | {
+        readonly spoken: boolean;
+        readonly observe?: ((event: QSpeculationEvent) => void) | undefined;
+      }
+    | undefined;
 };
 
 /** What one requested document came to: a line, and its card when made. */
@@ -1802,6 +1822,11 @@ export function createSpecialistQAnswer(
     // takes them up if the turn goes there (speed sweep 2026-10-01: the
     // reading's ~1 s and those reads' ~0.5-1 s ran one after the other).
     delegate.warm?.(request);
+    // What this run can do, read beside the conversation rather than after
+    // it (latency2): the turn reader is told its actions, so the reading
+    // could not start until both were in.
+    const capabilitiesRead = capabilitiesOf(request);
+    capabilitiesRead.catch(() => undefined);
     const history = await repositories.messages.listRecentForConversationOfRun(
       sql,
       request.tenantId,
@@ -1886,15 +1911,21 @@ export function createSpecialistQAnswer(
     // at all is the decision reader's and the turn reader's reading, never
     // a list of yes and no words. The two readings are made per turn.
     const decideAfterReading = decide;
+    const speculative: { current: Speculation | null } = { current: null };
     const outcome = await answerTurnRead(
       request,
       history,
       conversationId,
       latest,
+      capabilitiesRead,
+      speculative,
       decideAfterReading,
     ).finally(() => {
       // A path that never asked: the reading in flight is not wanted.
       if (!concluded) pending?.cancel();
+      // Any path that did not adopt the speculation drops it (a no-op once
+      // adopted): nothing of it is said, stored or done.
+      speculative.current?.cancel("ACTED");
     });
     // One status per card per answer: a card this turn handed to the
     // engine is named by the engine's own line, never also "still waiting".
@@ -1931,6 +1962,9 @@ export function createSpecialistQAnswer(
     history: readonly QConversationMessage[],
     conversationId: QConversationMessage["conversationId"],
     latest: QConversationMessage,
+    capabilitiesRead: Promise<readonly QCapability[]>,
+    /** The speculative answer started for a spoken turn, if one was. */
+    speculative: { current: Speculation | null },
     /** A waiting change, decided from this turn's reading; a line ends the turn. */
     decide?: (turn: PendingTurnReading | null) => Promise<string | null>,
   ): Promise<QAnswerOutcome> => {
@@ -1951,7 +1985,7 @@ export function createSpecialistQAnswer(
     // What this run can do, from the capability registry (R20), once per
     // turn and cached by composition. The reader is told the actions the
     // answer's model takes, or "make a Q card" reads as a document.
-    const capabilities = await capabilitiesOf(request);
+    const capabilities = await capabilitiesRead;
     // R20/R33: every tool that changes something is an action to the
     // reader (a Prepare → Approve change, the app's own action in their
     // browser, a Save or Pass): "reload the page" is not a screen.
@@ -2007,6 +2041,51 @@ export function createSpecialistQAnswer(
       const oldest = saidInRun.keys().next().value;
       if (oldest === undefined) break;
       saidInRun.delete(oldest);
+    }
+    // Voice speculation (latency2): a spoken question's answer starts now,
+    // under the default reading, beside the reading below. Only where the
+    // conversational path answers it whatever the reading (no company in
+    // question, or a pitch being watched), and never for a turn the
+    // default cannot be: a web address is research, setup and a question
+    // series carry their own notes.
+    const speculativeResearch = researchDirectiveFor(
+      state,
+      readingFromTurnReader(SPECULATIVE_READING),
+      { available: dependencies.researchAvailable ?? true },
+    );
+    if (
+      dependencies.speculation?.spoken === true &&
+      spoken &&
+      request.speculation === undefined &&
+      request.signal?.aborted !== true &&
+      (request.plan.viewing !== undefined ||
+        !request.subjects.some((subject) => subject.kind === "COMPANY")) &&
+      !namesWebAddress(latest.content) &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      !sequences.has(conversationId)
+    ) {
+      speculative.current = startSpeculation({
+        request: {
+          ...request,
+          research: Promise.resolve(speculativeResearch),
+          capabilities: manifestOf(capabilities),
+          turnKind: SPECULATIVE_READING.kind,
+        },
+        answer: (shaped) => delegate.answer(shaped),
+        observe: (event) => {
+          logger?.info(
+            {
+              qRunId: event.runId,
+              speculation:
+                event.outcome === "ADOPTED" ? "adopted" : "cancelled",
+              reason: event.reason,
+              decidedAfterMs: event.decidedAfterMs,
+            },
+            "q voice speculation",
+          );
+          dependencies.speculation?.observe?.(event);
+        },
+      });
     }
     const readTurn = () =>
       turns.read(
@@ -2080,6 +2159,10 @@ export function createSpecialistQAnswer(
         "q turn read",
       );
     }
+    // A reading the speculation cannot be is known now: stop it at once
+    // rather than at the end of the path.
+    const misread = readingMisfit(read);
+    if (misread !== null) speculative.current?.cancel(misread);
     if (decide !== undefined) {
       const line = await decide(
         read === null
@@ -2684,39 +2767,55 @@ export function createSpecialistQAnswer(
         if (oldest !== undefined) focuses.delete(oldest);
       }
     }
-    const outcome = await answerOnce(
-      {
-        ...request,
-        research,
-        capabilities: manifestOf(capabilities),
-        ...(turnUnread ? { turnUnread: true } : {}),
-        ...(read === null ? {} : { turnKind: read.kind }),
-        ...(read?.question?.kind === undefined
-          ? {}
-          : { questionKind: read.question.kind }),
-        ...(readinessLead === null ? {} : { leadLines: readinessLead }),
-        // Only a name the reader was given counts (ADR 0040 parity).
-        ...(read?.askedAction === undefined ||
-        read.askedAction === null ||
-        !actions.some((action) => action.name === read.askedAction)
-          ? {}
-          : { askedAction: read.askedAction }),
-        ...(writingDocument ? { writingDocument: true } : {}),
-        ...(series.step === null ? {} : { questionSequence: series.step }),
-        ...(toolFocus === null ? {} : { toolFocus }),
-      },
-      {
-        ownRecords,
-        reading:
-          read === null
-            ? null
-            : {
-                kind: read.kind,
-                questionKind: read.question?.kind ?? null,
-                aboutNamedOther: read.aboutNamedOther,
-              },
-      },
-    );
+    const finalRequest: QAnswerRequest = {
+      ...request,
+      research,
+      capabilities: manifestOf(capabilities),
+      ...(turnUnread ? { turnUnread: true } : {}),
+      ...(read === null ? {} : { turnKind: read.kind }),
+      ...(read?.question?.kind === undefined
+        ? {}
+        : { questionKind: read.question.kind }),
+      ...(readinessLead === null ? {} : { leadLines: readinessLead }),
+      // Only a name the reader was given counts (ADR 0040 parity).
+      ...(read?.askedAction === undefined ||
+      read.askedAction === null ||
+      !actions.some((action) => action.name === read.askedAction)
+        ? {}
+        : { askedAction: read.askedAction }),
+      ...(writingDocument ? { writingDocument: true } : {}),
+      ...(series.step === null ? {} : { questionSequence: series.step }),
+      ...(toolFocus === null ? {} : { toolFocus }),
+    };
+    const finalRoute = {
+      ownRecords,
+      reading:
+        read === null
+          ? null
+          : {
+              kind: read.kind,
+              questionKind: read.question?.kind ?? null,
+              aboutNamedOther: read.aboutNamedOther,
+            },
+    };
+    // The turn's own path has arrived at its answer: the speculation is
+    // adopted only when that answer is the one it is already writing.
+    const speculation = speculative.current;
+    const misfit =
+      speculation === null
+        ? null
+        : speculationMisfit({
+            final: finalRequest,
+            finalResearch: await research,
+            ownRecords,
+            speculative: speculation.request,
+            speculativeResearch,
+          });
+    if (misfit !== null) speculation?.cancel(misfit);
+    const outcome =
+      speculation !== null && misfit === null
+        ? await speculation.adopt()
+        : await answerOnce(finalRequest, finalRoute);
     if (writingDocument && outcome.kind === "ANSWERED") {
       await fileWrittenAnswer(
         request,

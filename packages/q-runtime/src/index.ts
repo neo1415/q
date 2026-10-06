@@ -145,6 +145,8 @@ export {
   createUnconfiguredQRetrieval,
   createUnconfiguredQTools,
   neverPause,
+  QSpeculationCancelledError,
+  type QAnswerSpeculation,
   type ContextFirewallDecision,
   type ContextFirewallPort,
   type ContextFirewallRequest,
