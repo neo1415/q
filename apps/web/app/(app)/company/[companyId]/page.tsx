@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
+  getCompanyDataRoom,
+  getCompanyDeck,
   getCompanyProfile,
   getDiligence,
   getOwnInterest,
@@ -18,6 +20,7 @@ import { EmptyState } from "@capital-q/ui/states";
 import { PageContainer } from "@/components/app-shell/page-container";
 import {
   CompanyProfileView,
+  profileTabOf,
   type ProfileTab,
 } from "@/features/company/company-profile-view";
 import { apiSession } from "@/features/q/context";
@@ -48,7 +51,10 @@ export default async function CompanyPage({
   searchParams,
 }: {
   readonly params: Promise<{ readonly companyId: string }>;
-  readonly searchParams?: Promise<{ readonly tab?: string | string[] }>;
+  readonly searchParams?: Promise<{
+    readonly tab?: string | string[];
+    readonly as?: string | string[];
+  }>;
 }) {
   const { companyId } = await params;
   const session = await apiSession();
@@ -111,10 +117,22 @@ export default async function CompanyPage({
       }
     : null;
 
-  // A founder has only the videos; anyone else opens on the overview.
-  const requested = (await searchParams)?.tab;
+  // A founder viewing another company has only the Elevator; anyone else
+  // opens on the overview, or the tab the URL names (A1).
+  const query = await searchParams;
+  const requested = profileTabOf(typeof query?.tab === "string" ? query.tab : undefined);
   const tab: ProfileTab =
-    profile.overview === null || requested === "videos" ? "videos" : "overview";
+    profile.overview === null ? "elevator" : (requested ?? "overview");
+  // Each tab's read is the API's, for this reader; only the open tab (and
+  // the deck, whose team facts the Team tab shows) is fetched.
+  const [dataRoom, deck] = await Promise.all([
+    profile.overview !== null
+      ? getCompanyDataRoom(session, profile.companyId).catch(() => null)
+      : null,
+    profile.overview !== null && (tab === "deck" || tab === "team")
+      ? getCompanyDeck(session, profile.companyId).catch(() => null)
+      : null,
+  ]);
 
   return (
     <PageContainer className="flex flex-col gap-6">
@@ -136,6 +154,9 @@ export default async function CompanyPage({
         )}
         sectorLabels={sectorLabels}
         diligence={diligence}
+        dataRoom={dataRoom}
+        deck={deck}
+        previewAsInvestor={query?.as === "investor"}
         relationshipState={
           RelationshipStateV2Schema.safeParse(standing?.relationship?.state)
             .data ?? null

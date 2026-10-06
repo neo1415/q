@@ -2,7 +2,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type {
+  CompanyDeckView,
   CompanyProfileDto,
+  DataRoomView,
   CompanyProfileTeamMember,
   InterestDto,
   RelationshipStateV2,
@@ -31,6 +33,10 @@ import {
 import { countryLabel, stageLabel } from "./declared-labels";
 import { moneyText } from "./money-text";
 import { ReadMore } from "./read-more";
+import { InvestorDataRoom, OwnerDataRoom } from "./material/data-room";
+import { DeckCoach, DeckForReaders } from "./material/deck";
+import { FitPanelSlot } from "./material/fit-panel-slot";
+import { TeamTab } from "./material/team";
 
 /**
  * A company's profile (founder request 2026-10-02): an identity header,
@@ -48,7 +54,23 @@ import { ReadMore } from "./read-more";
  * never zeros.
  */
 
-export type ProfileTab = "overview" | "videos";
+export type ProfileTab = "overview" | "elevator" | "dataroom" | "deck" | "team";
+
+/** `?tab=` as the URL says it; "videos" is the old name of Elevator. */
+export function profileTabOf(requested: string | undefined): ProfileTab | null {
+  switch (requested) {
+    case "overview":
+    case "elevator":
+    case "dataroom":
+    case "deck":
+    case "team":
+      return requested;
+    case "videos":
+      return "elevator";
+    default:
+      return null;
+  }
+}
 
 /** What the company shared with this reader in diligence, by title. */
 export type DiligenceShared = {
@@ -176,6 +198,9 @@ export function CompanyProfileView({
   sectorLabels,
   relationshipState = null,
   diligence = null,
+  dataRoom = null,
+  deck = null,
+  previewAsInvestor = false,
 }: {
   readonly profile: CompanyProfileDto;
   readonly tab: ProfileTab;
@@ -188,6 +213,12 @@ export function CompanyProfileView({
    * the diligence area (its own authorisation) says the company shared.
    */
   readonly diligence?: DiligenceShared | null;
+  /** The Data room tab's read (the API decides the reader); null: not available. */
+  readonly dataRoom?: DataRoomView | null;
+  /** The Pitch deck tab's read; null: not available. */
+  readonly deck?: CompanyDeckView | null;
+  /** The owner looking at their own deck as investors see it. */
+  readonly previewAsInvestor?: boolean;
 }) {
   const { overview } = profile;
   const investor = profile.viewer === "INVESTOR";
@@ -209,12 +240,26 @@ export function CompanyProfileView({
     headquartersCountry: profile.headquartersCountry,
   };
 
+  const visibleDocuments =
+    dataRoom === null ? null : dataRoom.documents.length;
+  const tabs: readonly (readonly [ProfileTab, string, number | null])[] =
+    overview === null
+      ? [["elevator", "Elevator", profile.videos.length]]
+      : [
+          ["overview", "Overview", null],
+          ["elevator", "Elevator", profile.videos.length],
+          ["dataroom", "Data room", visibleDocuments],
+          ["deck", "Pitch deck", null],
+          ["team", "Team", overview.team.length === 0 ? null : overview.team.length],
+        ];
+
   return (
     <article
-      className="flex flex-col gap-6"
+      className="grid grid-cols-1 gap-6 [grid-template-areas:'head'_'fit'_'tabs'_'body'] lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-x-10 lg:[grid-template-areas:'head_fit'_'tabs_fit'_'body_fit']"
       aria-labelledby="company-name"
       data-company-profile={profile.viewer}
     >
+      <div className="flex min-w-0 flex-col gap-6 [grid-area:head]">
       {typeof profile.coverUrl === "string" ? (
         // Only a cover the card's own scope shows this reader.
         <EntityCover src={profile.coverUrl} className="rounded-xl" />
@@ -277,35 +322,66 @@ export function CompanyProfileView({
         </div>
       ) : null}
 
+      </div>
+
+      {investor ? (
+        <div className="[grid-area:fit] lg:sticky lg:top-6">
+          <FitPanelSlot companyId={profile.companyId} companyName={profile.canonicalName} />
+        </div>
+      ) : null}
+
       <nav
         aria-label={`${profile.canonicalName} profile`}
-        className="flex gap-6 border-b border-(--cq-border-subtle)"
+        className="flex gap-5 overflow-x-auto border-b border-(--cq-border-subtle) [grid-area:tabs] sm:gap-6"
       >
-        {overview === null ? null : (
+        {tabs.map(([value, label, count]) => (
           <Link
-            href={base}
-            aria-current={tab === "overview" ? "page" : undefined}
-            className={tabClass(tab === "overview")}
-            data-profile-tab="overview"
+            key={value}
+            href={value === "overview" ? base : `${base}?tab=${value}`}
+            aria-current={tab === value ? "page" : undefined}
+            className={`${tabClass(tab === value)} shrink-0`}
+            data-profile-tab={value}
           >
-            Overview
+            {label}
+            {count === null ? null : (
+              <span className="cq-caption ml-1.5 text-(--cq-text-tertiary)">{count}</span>
+            )}
           </Link>
-        )}
-        <Link
-          href={`${base}?tab=videos`}
-          aria-current={tab === "videos" ? "page" : undefined}
-          className={tabClass(tab === "videos")}
-          data-profile-tab="videos"
-        >
-          Videos
-          <span className="cq-caption ml-1.5 text-(--cq-text-tertiary)">
-            {profile.videos.length}
-          </span>
-        </Link>
+        ))}
       </nav>
 
-      {tab === "videos" || overview === null ? (
-        <CompanyVideos company={company} videos={profile.videos} />
+      <div className="min-w-0 [grid-area:body]">
+      {tab === "elevator" || overview === null ? (
+        <section className="flex flex-col gap-4" aria-label="Elevator" data-profile-elevator>
+          {profile.videos.length === 0 ? null : (
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {profile.videos.length === 1 ? "1 video" : `${String(profile.videos.length)} videos`} and pitches from the founders.
+            </p>
+          )}
+          <CompanyVideos company={company} videos={profile.videos} />
+        </section>
+      ) : tab === "dataroom" ? (
+        dataRoom === null ? (
+          <p className="cq-body py-6 text-(--cq-text-secondary)">The data room isn&rsquo;t available to you.</p>
+        ) : dataRoom.viewer === "OWNER" ? (
+          <OwnerDataRoom companyId={profile.companyId} view={dataRoom} />
+        ) : (
+          <InvestorDataRoom companyId={profile.companyId} companyName={profile.canonicalName} view={dataRoom} />
+        )
+      ) : tab === "deck" ? (
+        deck === null ? (
+          <p className="cq-body py-6 text-(--cq-text-secondary)">The deck isn&rsquo;t available to you.</p>
+        ) : deck.viewer === "OWNER" && deck.coaching !== null && !previewAsInvestor ? (
+          <DeckCoach companyId={profile.companyId} view={deck} coaching={deck.coaching} />
+        ) : (
+          <DeckForReaders companyId={profile.companyId} companyName={profile.canonicalName} view={deck} />
+        )
+      ) : tab === "team" ? (
+        <TeamTab
+          companyId={profile.companyId}
+          team={overview.team}
+          fromDeck={deck?.extraction?.sections.find((section) => section.section === "TEAM")?.facts ?? []}
+        />
       ) : (
         <div className="flex flex-col gap-8" data-profile-overview>
           {/*
@@ -492,6 +568,7 @@ export function CompanyProfileView({
           />
         </div>
       )}
+      </div>
     </article>
   );
 }
