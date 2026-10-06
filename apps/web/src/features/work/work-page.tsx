@@ -129,59 +129,148 @@ export function WorkPage({
     timeLanes.length === 0 &&
     (done === null || (done.items.length === 0 && done.thisWeek === 0));
 
+  const needsCount =
+    pending.length + timeLanes.length + notices.length + cards.length;
+  const doneCount = done?.thisWeek ?? 0;
+  // The first screen shows what matters (founder, demo 2026-10-06: the page
+  // "just flows down forever"): what waits on them, else what runs.
+  const [view, setView] = useState<WorkView>(
+    needsCount > 0 ? "needs" : running.length > 0 ? "progress" : "done",
+  );
+  const views: readonly (readonly [WorkView, string, number])[] = [
+    ["needs", "Needs you", needsCount],
+    ["progress", "In progress", running.length],
+    ["done", "Done", doneCount],
+  ];
+
   return (
-    <div className="flex flex-col gap-7 lg:gap-8" data-work-page>
+    <div
+      className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-5"
+      data-work-page
+    >
       <TaskComposer />
-      {/*
-       * One column on a phone, in the approved order (what waits on them
-       * before what runs); two on a desktop. The column wrappers dissolve
-       * on a phone (display: contents) so each section is rendered once.
-       */}
-      <div className="flex flex-col gap-7 lg:grid lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-12">
-        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-7">
-          <div className="order-1 empty:hidden lg:order-none">
-            <Suggestions
-              items={cards}
-              prepared={prepared}
-              failed={suggestions === null}
-              onGone={(key) => {
-                setCards((now) => now.filter((card) => card.key !== key));
-              }}
-            />
-          </div>
-          <div className="order-3 empty:hidden lg:order-none">
-            <Running items={running} failed={work === null} />
-          </div>
-        </div>
-        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-7">
-          <div className="order-2 empty:hidden lg:order-none">
-            <NeedsYou
-              approvals={pending}
-              lanes={timeLanes}
-              notices={notices}
-              onDecided={(id) => {
-                setPending((now) => now.filter((a) => a.approvalId !== id));
-              }}
-            />
-          </div>
-          <div className="order-4 empty:hidden lg:order-none">
-            {nothingElse ? (
-              <p className="cq-body-sm text-(--cq-text-tertiary)">
-                Nothing running yet.
-              </p>
-            ) : (
-              <Done initial={done} />
+      <div
+        role="tablist"
+        aria-label="Work"
+        className="sticky top-[calc(var(--cq-header-height)+var(--cq-safe-top))] z-(--cq-z-sticky) -mx-1 flex gap-1 border-b border-(--cq-border-subtle) bg-(--cq-canvas) px-1 lg:top-0"
+        data-work-views
+      >
+        {views.map(([key, label, count]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            id={`work-tab-${key}`}
+            aria-selected={view === key}
+            aria-controls={`work-view-${key}`}
+            onClick={() => setView(key)}
+            className={cx(
+              "-mb-px flex min-h-11 items-center gap-1.5 border-b-2 px-3 cq-label motion-safe:transition-colors motion-safe:duration-(--cq-motion-fast)",
+              view === key
+                ? "border-(--cq-text-primary) text-(--cq-text-primary)"
+                : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
             )}
-          </div>
-        </div>
+          >
+            {label}
+            <span className="cq-numeric font-normal text-(--cq-text-tertiary)">
+              {count}
+            </span>
+          </button>
+        ))}
       </div>
-      {workforce === undefined ? null : (
-        <WorkforcePanel
-          overview={workforce?.overview ?? null}
-          jobs={workforce?.jobs ?? null}
+      <div
+        role="tabpanel"
+        id="work-view-needs"
+        aria-labelledby="work-tab-needs"
+        hidden={view !== "needs"}
+        className="flex flex-col gap-7"
+      >
+        <NeedsYou
+          approvals={pending}
+          lanes={timeLanes}
+          notices={notices}
+          onDecided={(id) => {
+            setPending((now) => now.filter((a) => a.approvalId !== id));
+          }}
         />
-      )}
+        <Suggestions
+          items={cards}
+          prepared={prepared}
+          failed={suggestions === null}
+          onGone={(key) => {
+            setCards((now) => now.filter((card) => card.key !== key));
+          }}
+        />
+        {needsCount === 0 ? (
+          <p className="cq-body-sm text-(--cq-text-tertiary)">
+            Nothing waits on you.
+          </p>
+        ) : null}
+      </div>
+      <div
+        role="tabpanel"
+        id="work-view-progress"
+        aria-labelledby="work-tab-progress"
+        hidden={view !== "progress"}
+        className="flex flex-col gap-7"
+      >
+        <Running items={running} failed={work === null} />
+        {nothingElse ? (
+          <p className="cq-body-sm text-(--cq-text-tertiary)">
+            Nothing running yet.
+          </p>
+        ) : null}
+        {workforce === undefined ? null : (
+          <WorkforcePanel
+            overview={workforce?.overview ?? null}
+            jobs={workforce?.jobs ?? null}
+          />
+        )}
+      </div>
+      <div
+        role="tabpanel"
+        id="work-view-done"
+        aria-labelledby="work-tab-done"
+        hidden={view !== "done"}
+      >
+        {nothingElse ? (
+          <p className="cq-body-sm text-(--cq-text-tertiary)">
+            Nothing finished yet.
+          </p>
+        ) : (
+          <Done initial={done} defaultOpen />
+        )}
+      </div>
     </div>
+  );
+}
+
+type WorkView = "needs" | "progress" | "done";
+
+/** Rows shown before "Show N more" in a long group. */
+const GROUP_PREVIEW = 5;
+
+function ShowMore({
+  hidden,
+  onShow,
+}: {
+  readonly hidden: number;
+  readonly onShow: () => void;
+}) {
+  if (hidden <= 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onShow}
+      className="mt-1 inline-flex min-h-11 items-center gap-1 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+    >
+      Show {hidden} more
+      <ChevronDown
+        aria-hidden="true"
+        size={ICON_SIZE.compact}
+        strokeWidth={ICON_STROKE}
+      />
+    </button>
   );
 }
 
@@ -924,14 +1013,49 @@ function NeedsYou({
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
+  const [all, setAll] = useState(false);
   const left = lanes.filter((item) => !answered.has(item.lane.id));
   const count = approvals.length + left.length + notices.length;
   if (count === 0) return null;
+  // Times to pick first (someone is waiting on a reply), then approvals,
+  // then notices; past the preview, one "Show N more".
+  const shownLanes = all ? left : left.slice(0, GROUP_PREVIEW);
+  const roomA = Math.max(0, GROUP_PREVIEW - shownLanes.length);
+  const shownApprovals = all ? approvals : approvals.slice(0, roomA);
+  const roomN = Math.max(0, roomA - shownApprovals.length);
+  const shownNotices = all ? notices : notices.slice(0, roomN);
+  const hiddenCount =
+    count - shownLanes.length - shownApprovals.length - shownNotices.length;
   return (
     <section aria-labelledby="work-needs-you" data-work-needs-you>
       <SectionHead id="work-needs-you" title="Needs you" count={count} />
       <ul className="border-t border-(--cq-border-subtle)">
-        {approvals.map((item) => (
+        {shownLanes.map(({ work, lane }) => (
+          <li key={lane.id} className="border-b border-(--cq-border-subtle)">
+            <NeedRow
+              Icon={CalendarDays}
+              named={lane.counterpart}
+              namedName={lane.counterpartName}
+              title={`Pick a time with ${lane.counterpartName}`}
+              meta={`${String(lane.offered.length)} ${lane.offered.length === 1 ? "time" : "times"} offered`}
+              open={open === lane.id}
+              onReview={() =>
+                setOpen((now) => (now === lane.id ? null : lane.id))
+              }
+            />
+            {open === lane.id ? (
+              <TimePicker
+                work={work}
+                lane={lane}
+                onAnswered={() => {
+                  setOpen(null);
+                  setAnswered((now) => new Set([...now, lane.id]));
+                }}
+              />
+            ) : null}
+          </li>
+        ))}
+        {shownApprovals.map((item) => (
           <li
             key={item.approvalId}
             className="border-b border-(--cq-border-subtle)"
@@ -969,37 +1093,13 @@ function NeedsYou({
             ) : null}
           </li>
         ))}
-        {left.map(({ work, lane }) => (
-          <li key={lane.id} className="border-b border-(--cq-border-subtle)">
-            <NeedRow
-              Icon={CalendarDays}
-              named={lane.counterpart}
-              namedName={lane.counterpartName}
-              title={`Pick a time with ${lane.counterpartName}`}
-              meta={`${String(lane.offered.length)} ${lane.offered.length === 1 ? "time" : "times"} offered`}
-              open={open === lane.id}
-              onReview={() =>
-                setOpen((now) => (now === lane.id ? null : lane.id))
-              }
-            />
-            {open === lane.id ? (
-              <TimePicker
-                work={work}
-                lane={lane}
-                onAnswered={() => {
-                  setOpen(null);
-                  setAnswered((now) => new Set([...now, lane.id]));
-                }}
-              />
-            ) : null}
-          </li>
-        ))}
-        {notices.map((group) => (
+        {shownNotices.map((group) => (
           <li key={group.key} className="border-b border-(--cq-border-subtle)">
             <NoticeRow group={group} />
           </li>
         ))}
       </ul>
+      <ShowMore hidden={hiddenCount} onShow={() => setAll(true)} />
     </section>
   );
 }
@@ -1218,6 +1318,7 @@ function Running({
   readonly failed: boolean;
 }) {
   const [rows, setRows] = useState(items);
+  const [all, setAll] = useState(false);
   if (failed) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
@@ -1241,7 +1342,7 @@ function Running({
         aside={anySpend ? `${dollars(month)} this month` : undefined}
       />
       <ul className="border-t border-(--cq-border-subtle)">
-        {rows.map((item) => (
+        {(all ? rows : rows.slice(0, GROUP_PREVIEW)).map((item) => (
           <li key={item.id} className="border-b border-(--cq-border-subtle)">
             <RunningRow
               item={item}
@@ -1256,6 +1357,10 @@ function Running({
           </li>
         ))}
       </ul>
+      <ShowMore
+        hidden={all ? 0 : rows.length - GROUP_PREVIEW}
+        onShow={() => setAll(true)}
+      />
     </section>
   );
 }
@@ -1460,8 +1565,14 @@ function StateMark({
 // Done: collapsed by default, paged
 // ---------------------------------------------------------------------------
 
-function Done({ initial }: { readonly initial: QWorkDonePageDto | null }) {
-  const [open, setOpen] = useState(false);
+function Done({
+  initial,
+  defaultOpen = false,
+}: {
+  readonly initial: QWorkDonePageDto | null;
+  readonly defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const [items, setItems] = useState(initial?.items ?? []);
   const [cursor, setCursor] = useState(initial?.nextCursor ?? null);
   const [pending, startTransition] = useTransition();

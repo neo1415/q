@@ -344,9 +344,14 @@ describe("Work (WORK-58)", () => {
     await settle();
     expect(paused).toHaveBeenCalledWith(instruction.id, true);
     expect(screen.getByText("Paused")).toBeTruthy();
-    // Done stays collapsed until asked.
-    const done = screen.getByRole("button", { name: /Done/ });
-    expect(done.getAttribute("aria-expanded")).toBe("false");
+    // Done is its own view, one tap away, not a section under the rest.
+    const done = screen.getByRole("tab", { name: /Done/ });
+    expect(done.getAttribute("aria-selected")).toBe("false");
+    expect(
+      screen
+        .getByRole("tab", { name: /In progress/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
   });
 
   it("lays a grant out as what Q does alone and what it asks, keeping the full text", () => {
