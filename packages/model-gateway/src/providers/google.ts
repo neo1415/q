@@ -70,10 +70,19 @@ export type GoogleModelProviderOptions = {
  */
 export const GENERATED_CALL_ID_PREFIX = "gen_";
 
-function thinkingLevel(level: ModelReasoningLevel): ThinkingLevel | undefined {
+/**
+ * Gemini 3 cannot switch thinking off, and left unset it thinks at its
+ * default (dynamic) level before a one-line answer. NONE is the caller
+ * asking for no thought, so it gets the least Gemini allows (L1 latency
+ * sweep: FAST_CLASSIFICATION readers that never asked for reasoning were
+ * paying for it on every call).
+ */
+export function thinkingLevel(
+  level: ModelReasoningLevel,
+): ThinkingLevel | undefined {
   switch (level) {
     case "NONE":
-      return undefined;
+      return ThinkingLevel.MINIMAL;
     case "LOW":
       return ThinkingLevel.LOW;
     case "MEDIUM":
@@ -433,6 +442,15 @@ export function schemaForGemini(node: unknown): unknown {
 
 /** How long a rate-limited key is set aside when the provider says nothing. */
 const KEY_COOLDOWN_MS = 60_000;
+/**
+ * How long a key the provider refused (401/403) is set aside. A refused
+ * key is the key's fault, not the request's: hosted 2026-10-05 12:12, one
+ * Gemini key answered AUTHENTICATION six times in thirty seconds, and each
+ * turn fell back to another provider's model at 3.5-5 s instead of asking
+ * the second key, which answered in ~1.2 s. Long, because a revoked or
+ * mis-scoped key does not heal by itself; the next deploy re-reads it.
+ */
+const REFUSED_KEY_COOLDOWN_MS = 10 * 60_000;
 
 /** Gemini refuses a request deadline below this and returns HTTP 400. */
 export const GEMINI_MIN_DEADLINE_MS = 10_000;
@@ -493,15 +511,19 @@ export function createGoogleModelProvider(
         return value;
       } catch (error: unknown) {
         const failure = normalizeError(error);
-        if (
-          spoke() ||
-          failure.failureClass !== "RATE_LIMIT" ||
-          clients.length === 1
-        ) {
+        const keyScoped =
+          failure.failureClass === "RATE_LIMIT" ||
+          failure.failureClass === "AUTHENTICATION";
+        if (spoke() || !keyScoped || clients.length === 1) {
           throw failure;
         }
-        // This key is spent for now; the next one takes the same request.
-        blockedUntil[index] = Date.now() + KEY_COOLDOWN_MS;
+        // This key is spent or refused for now; the next one takes the
+        // same request.
+        blockedUntil[index] =
+          Date.now() +
+          (failure.failureClass === "AUTHENTICATION"
+            ? REFUSED_KEY_COOLDOWN_MS
+            : KEY_COOLDOWN_MS);
         lastFailure = failure;
       }
     }
@@ -527,7 +549,10 @@ export function createGoogleModelProvider(
       context: ModelExecutionContext,
     ): Promise<ModelProviderResult> => {
       const { systemInstruction, contents } = toContents(request.messages);
-      const level = thinkingLevel(request.reasoning);
+      // Thinking levels are Gemini 3's; a 2.x model refuses the field.
+      const level = /^gemini-2\./.test(request.modelCode)
+        ? undefined
+        : thinkingLevel(request.reasoning);
       const config: GenerateContentConfig = {
         abortSignal: context.signal,
         // The gateway owns retry and its own timeout; the SDK gets one shot.

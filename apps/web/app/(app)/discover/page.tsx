@@ -44,8 +44,10 @@ export default async function DiscoverPage({
     readonly company?: string | string[];
   }>;
 } = {}) {
-  const context = await resolveOwnContext();
-  const session = await apiSession();
+  const [context, session] = await Promise.all([
+    resolveOwnContext(),
+    apiSession(),
+  ]);
 
   if (context.kind === "NONE" && context.unavailable === true) {
     /*

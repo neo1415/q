@@ -248,23 +248,23 @@ export function registerDiscoveryRoutes(
       // which companies this viewer may see (doc 20 §78). Only a
       // publishable pitch comes back, and it carries no provider id and no
       // URL: the client asks `/playback` for each item it activates.
-      const pitches =
-        dependencies.pitches === undefined || served.items.length === 0
+      const companyIds = served.items.map((item) => item.companyId);
+      // The page's four batched reads, side by side (L1 latency sweep,
+      // 2026-10-06: they ran pitches, then states, then the rest; hosted
+      // GET /v1/discovery/companies p50 624 ms). Each is about the
+      // companies the reader has ALREADY decided this viewer may see.
+      const [pitches, states, summaries, photos] = await Promise.all([
+        dependencies.pitches === undefined || companyIds.length === 0
           ? new Map<string, DiscoverablePitchSet>()
-          : await dependencies.pitches.findDiscoverablePitches(
-              served.items.map((item) => item.companyId),
-            );
-      const states =
-        dependencies.interactions === undefined || served.items.length === 0
+          : dependencies.pitches.findDiscoverablePitches(companyIds),
+        dependencies.interactions === undefined || companyIds.length === 0
           ? null
-          : await dependencies.interactions
+          : dependencies.interactions
               .stateForCompanies({
                 actor: getActorContext(request),
-                companyIds: served.items.map((item) => item.companyId),
+                companyIds,
               })
-              .catch(() => null);
-      const companyIds = served.items.map((item) => item.companyId);
-      const [summaries, photos] = await Promise.all([
+              .catch(() => null),
         dependencies.feedSummaries === undefined || companyIds.length === 0
           ? null
           : dependencies

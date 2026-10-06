@@ -121,7 +121,7 @@ import {
 import type { TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
-  decidePending,
+  startPendingDecision,
   type PendingDecisionPort,
   type PendingTurnReading,
 } from "./pending-decision.js";
@@ -1828,11 +1828,15 @@ export function createSpecialistQAnswer(
     let afterAbout: string | null = null;
     let afterAboutId: string | null = null;
     const pendingDecisions = dependencies.pendingDecisions;
-    const decide =
+    // Begun now, beside the turn reading (L1 latency sweep): the decision
+    // reader's call no longer waits for the turn reader's; both are judged
+    // together once the turn has been read, exactly as before.
+    const pending =
       pendingDecisions === undefined
         ? undefined
-        : async (turn: PendingTurnReading | null): Promise<string | null> => {
-            const decided = await decidePending(pendingDecisions, {
+        : startPendingDecision(
+            pendingDecisions,
+            {
               context: {
                 actor: request.actor,
                 runId: request.runId,
@@ -1848,15 +1852,25 @@ export function createSpecialistQAnswer(
                   role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
                   text: m.content,
                 })),
-              turn,
               signal: request.signal,
-            }).catch((error: unknown) => {
-              logger?.warn(
-                { err: error, qRunId: request.runId },
-                "a decision on a waiting change was not read; answering normally",
-              );
-              return { kind: "NONE" } as const;
-            });
+            },
+            { speculative: true },
+          );
+    let concluded = false;
+    const decide =
+      pending === undefined
+        ? undefined
+        : async (turn: PendingTurnReading | null): Promise<string | null> => {
+            concluded = true;
+            const decided = await pending
+              .conclude(turn)
+              .catch((error: unknown) => {
+                logger?.warn(
+                  { err: error, qRunId: request.runId },
+                  "a decision on a waiting change was not read; answering normally",
+                );
+                return { kind: "NONE" } as const;
+              });
             if (decided.kind === "REPLY") return decided.line;
             if (decided.kind === "ANSWER_THEN") {
               if (decided.before !== null) {
@@ -1878,7 +1892,10 @@ export function createSpecialistQAnswer(
       conversationId,
       latest,
       decideAfterReading,
-    );
+    ).finally(() => {
+      // A path that never asked: the reading in flight is not wanted.
+      if (!concluded) pending?.cancel();
+    });
     // One status per card per answer: a card this turn handed to the
     // engine is named by the engine's own line, never also "still waiting".
     const prepared = preparedThisRun.get(request.runId);

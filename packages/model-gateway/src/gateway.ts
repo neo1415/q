@@ -224,6 +224,8 @@ export function createModelGateway(
     failures: meter.createCounter("q.model.failures"),
     attempts: meter.createCounter("q.model.attempts"),
     fallbacks: meter.createCounter("q.model.fallbacks"),
+    /** Requests that also asked the next model after hedgeAfterMs (L1). */
+    hedges: meter.createCounter("q.model.hedges"),
     rateLimits: meter.createCounter("q.model.rate_limits"),
     /** Failures that arrived after part of the answer had already gone out. */
     spokenFailures: meter.createCounter("q.model.spoken_failures"),
@@ -679,6 +681,7 @@ export function createModelGateway(
       });
     }
     span.setAttribute("q.model.routing_policy", policy.code);
+    const hedgeAfterMs = policy.hedgeAfterMs ?? null;
     const tenantPolicy =
       request.tenantPolicy ??
       (await tenantPolicies.policyFor(request.attribution.tenantId));
@@ -810,32 +813,116 @@ export function createModelGateway(
         attemptNumber += 1;
         attemptsOnCandidate += 1;
         const spoke = { spoke: false };
-        const outcome = await attempt(
-          request,
-          candidate,
-          provider,
-          policy.id,
-          attemptNumber,
-          schema,
-          callerSignal,
-          room.ranOut,
-          onTextDelta,
-          spoke,
-          timeoutMs,
-          accept,
-        );
-        attempts.push(outcome.record);
+        const run = (
+          which: EligibleCandidate,
+          whichProvider: ModelProvider,
+          number: number,
+          signal: AbortSignal,
+          ms: number,
+        ) =>
+          attempt(
+            request,
+            which,
+            whichProvider,
+            policy.id,
+            number,
+            schema,
+            signal,
+            room.ranOut,
+            onTextDelta,
+            spoke,
+            ms,
+            accept,
+          );
+        // A hedge (L1): the first attempt of a request nobody is listening
+        // to word by word, with the policy's hedge configured and a second
+        // model eligible, asks that model too once hedgeAfterMs has passed.
+        const hedgeTo =
+          attemptNumber === 1 &&
+          onTextDelta === undefined &&
+          hedgeAfterMs !== null &&
+          request.budget.maxAttempts >= 2
+            ? plan.eligible.find(
+                (other) =>
+                  other.candidateIndex > candidate.candidateIndex &&
+                  dependencies.registry.get(other.provider.code) !==
+                    undefined &&
+                  spentUsd +
+                    candidate.estimatedAttemptCostUsd +
+                    other.estimatedAttemptCostUsd <=
+                    request.budget.maxEstimatedCostUsd,
+              )
+            : undefined;
+        const hedgeProvider =
+          hedgeTo === undefined
+            ? undefined
+            : dependencies.registry.get(hedgeTo.provider.code);
+        const settled =
+          hedgeTo === undefined ||
+          hedgeProvider === undefined ||
+          hedgeAfterMs === null
+            ? {
+                outcome: await run(
+                  candidate,
+                  provider,
+                  attemptNumber,
+                  callerSignal,
+                  timeoutMs,
+                ),
+                served: candidate,
+                extra: [] as ModelAttemptRecord[],
+              }
+            : await hedged({
+                first: (signal) =>
+                  run(candidate, provider, attemptNumber, signal, timeoutMs),
+                second: (signal) =>
+                  run(
+                    hedgeTo,
+                    hedgeProvider,
+                    attemptNumber + 1,
+                    signal,
+                    request.budget.attemptTimeoutMs,
+                  ),
+                firstCandidate: candidate,
+                secondCandidate: hedgeTo,
+                hedgeAfterMs,
+                callerSignal,
+                onHedge: () => {
+                  attemptNumber += 1;
+                  metrics.hedges.add(1, {
+                    task_class: request.taskClass,
+                    provider: hedgeTo.provider.code,
+                  });
+                  logger?.info(
+                    {
+                      taskClass: request.taskClass,
+                      routingPolicy: policy.code,
+                      first: `${candidate.provider.code}/${candidate.model.modelCode}`,
+                      second: `${hedgeTo.provider.code}/${hedgeTo.model.modelCode}`,
+                      hedgeAfterMs,
+                      qRunId: request.attribution.qRunId,
+                    },
+                    "model request hedged",
+                  );
+                },
+              });
+        const outcome = settled.outcome;
+        const served = settled.served;
+        attempts.push(outcome.record, ...settled.extra);
         spentUsd +=
-          outcome.record.cost?.amount ?? candidate.estimatedAttemptCostUsd;
+          outcome.record.cost?.amount ?? served.estimatedAttemptCostUsd;
+        for (const record of settled.extra) {
+          spentUsd += record.cost?.amount ?? 0;
+        }
 
         if (outcome.kind === "SUCCESS") {
           metrics.successes.add(1, {
             task_class: request.taskClass,
-            provider: candidate.provider.code,
-            model: candidate.model.modelCode,
+            provider: served.provider.code,
+            model: served.model.modelCode,
           });
           const fallbackUsed =
-            candidate.candidateIndex !== plan.eligible[0]?.candidateIndex;
+            served.candidateIndex !== plan.eligible[0]?.candidateIndex;
           const result: ModelGatewayResult<T> = {
             ...outcome.result,
             routingPolicyCode: policy.code,
@@ -845,7 +932,7 @@ export function createModelGateway(
               routingPolicyCode: policy.code,
               routingPolicyVersion: policy.version,
               candidates: [...plan.decisions],
-              selectedCandidateIndex: candidate.candidateIndex,
+              selectedCandidateIndex: served.candidateIndex,
               fallbackUsed,
             },
           };
@@ -853,8 +940,8 @@ export function createModelGateway(
           logger?.info(
             {
               taskClass: request.taskClass,
-              provider: candidate.provider.code,
-              model: candidate.model.modelCode,
+              provider: served.provider.code,
+              model: served.model.modelCode,
               routingPolicy: policy.code,
               dataPosture: request.dataPosture,
               attempts: attempts.length,
@@ -969,6 +1056,100 @@ export function createModelGateway(
   }
 
   return { execute };
+}
+
+type Attempted<T> = AttemptOutcome<T> & {
+  readonly record: ModelAttemptRecord;
+};
+
+/**
+ * A hedged first attempt (L1 latency sweep, 2026-10-06).
+ *
+ * The first model is asked; if it has not settled after `hedgeAfterMs`,
+ * the second is asked too, WITHOUT stopping the first. The first success
+ * is the answer and the other attempt is cancelled (its own record lands
+ * in the usage ledger as CANCELLED). If both fail, the first's failure is
+ * returned for the loop to judge as before, with the second's record kept.
+ *
+ * Only for requests that stream nothing (the caller checks): two models
+ * must never both be heard.
+ */
+async function hedged<T>(input: {
+  readonly first: (signal: AbortSignal) => Promise<Attempted<T>>;
+  readonly second: (signal: AbortSignal) => Promise<Attempted<T>>;
+  readonly firstCandidate: EligibleCandidate;
+  readonly secondCandidate: EligibleCandidate;
+  readonly hedgeAfterMs: number;
+  readonly callerSignal: AbortSignal;
+  readonly onHedge: () => void;
+}): Promise<{
+  readonly outcome: Attempted<T>;
+  readonly served: EligibleCandidate;
+  readonly extra: ModelAttemptRecord[];
+}> {
+  const firstStop = new AbortController();
+  const first = input.first(
+    AbortSignal.any([input.callerSignal, firstStop.signal]),
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const hedgeTime = new Promise<"HEDGE">((resolve) => {
+    timer = setTimeout(() => {
+      resolve("HEDGE");
+    }, input.hedgeAfterMs);
+  });
+  const early = await Promise.race([first, hedgeTime]);
+  clearTimeout(timer);
+  if (early !== "HEDGE" || input.callerSignal.aborted) {
+    return {
+      outcome: early === "HEDGE" ? await first : early,
+      served: input.firstCandidate,
+      extra: [],
+    };
+  }
+  input.onHedge();
+  const secondStop = new AbortController();
+  const second = input.second(
+    AbortSignal.any([input.callerSignal, secondStop.signal]),
+  );
+  const winner = await new Promise<"FIRST" | "SECOND" | null>((resolve) => {
+    let failed = 0;
+    const settle = (which: "FIRST" | "SECOND", success: boolean) => {
+      if (success) {
+        resolve(which);
+        return;
+      }
+      failed += 1;
+      if (failed === 2) resolve(null);
+    };
+    first.then(
+      (outcome) => {
+        settle("FIRST", outcome.kind === "SUCCESS");
+      },
+      () => {
+        settle("FIRST", false);
+      },
+    );
+    second.then(
+      (outcome) => {
+        settle("SECOND", outcome.kind === "SUCCESS");
+      },
+      () => {
+        settle("SECOND", false);
+      },
+    );
+  });
+  if (winner === "FIRST") {
+    secondStop.abort();
+    second.catch(() => undefined);
+    return { outcome: await first, served: input.firstCandidate, extra: [] };
+  }
+  if (winner === "SECOND") {
+    firstStop.abort();
+    first.catch(() => undefined);
+    return { outcome: await second, served: input.secondCandidate, extra: [] };
+  }
+  const [a, b] = await Promise.all([first, second]);
+  return { outcome: a, served: input.firstCandidate, extra: [b.record] };
 }
 
 function stripOutput<T>(

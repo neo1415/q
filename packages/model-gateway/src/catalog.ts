@@ -89,6 +89,12 @@ export const RoutingPolicyRecordSchema = z
     sensitivityClass: ModelSensitivitySchema,
     qualityFloor: ModelQualityClassSchema,
     latencyTargetMs: z.number().int().positive().nullable(),
+    /**
+     * Hedged requests (L1): after this long without an answer from the
+     * first model, a non-streaming request also asks the next eligible one.
+     * Absent or null: no hedge.
+     */
+    hedgeAfterMs: z.number().int().positive().max(60_000).nullable().optional(),
     costCeilingUsd: z.number().positive().nullable(),
     preferredModels: z.array(UuidSchema).min(1).max(8),
     fallbackModels: z.array(UuidSchema).max(8),

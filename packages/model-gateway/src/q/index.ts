@@ -2121,6 +2121,45 @@ export function createModelGatewayQAnswer(
       // Grows only by what use_capability loads (lead 2026-10-04).
       let toolContext = preparedToolContext;
       took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
+      // The person's settings for this answer, read side by side with the
+      // reading wait, the setup reminder and the readiness read below (L1
+      // latency sweep: these three were read one after another, ~40-180 ms
+      // of the "prepare" phase hosted). Never a rejection: a failed read
+      // is simply no setting.
+      const personalityRead =
+        dependencies.personalityOf === undefined
+          ? Promise.resolve(null)
+          : dependencies
+              .personalityOf({
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+              })
+              .catch(() => null);
+      const askerRead =
+        dependencies.askerOf === undefined
+          ? Promise.resolve(null)
+          : dependencies
+              .askerOf({
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+                firstAnswer: !earlier.some((message) => message.role === "Q"),
+              })
+              .catch(() => null);
+      const receiptsRead =
+        dependencies.receipts === undefined
+          ? Promise.resolve([])
+          : collectReceipts(history, dependencies.receipts, request.actor);
+      // Awaited where it is used; a failure still fails the answer there.
+      receiptsRead.catch(() => undefined);
+      const etiquetteRead =
+        dependencies.etiquetteOf === undefined
+          ? Promise.resolve(null)
+          : dependencies
+              .etiquetteOf({
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+              })
+              .catch(() => null);
       /**
        * Whether this turn may reach the public web (CQ-QX-005), decided by
        * the conversation core from its reading of the turn, which has been
@@ -2172,8 +2211,6 @@ export function createModelGatewayQAnswer(
           }
         }
       })();
-      await nudgeRead;
-      took("nudge");
       /**
        * "What should I do next?" (ADVICE): their own readiness leads the
        * answer (QA 2026-10-03, run 2cba241a). Read through read_my_record,
@@ -2221,6 +2258,9 @@ export function createModelGatewayQAnswer(
         }
         took("own-readiness");
       }
+      // Read beside the readiness read above, not before it (L1).
+      await nudgeRead;
+      took("nudge");
       const facts: readonly AuthorisedFact[] = [
         // Their readiness first when it leads this answer.
         ...(ownReadiness === null ? [] : [ownReadiness]),
@@ -2260,25 +2300,8 @@ export function createModelGatewayQAnswer(
         // Filled below, once the notes are composed.
         turnNotes: "",
       };
-      const personality =
-        dependencies.personalityOf === undefined
-          ? null
-          : await dependencies
-              .personalityOf({
-                tenantId: request.tenantId,
-                userId: request.actorUserId,
-              })
-              .catch(() => null);
-      const asker =
-        dependencies.askerOf === undefined
-          ? null
-          : await dependencies
-              .askerOf({
-                tenantId: request.tenantId,
-                userId: request.actorUserId,
-                firstAnswer: !earlier.some((message) => message.role === "Q"),
-              })
-              .catch(() => null);
+      const personality = await personalityRead;
+      const asker = await askerRead;
       const noteParts = environmentNoteParts(facts, offered, request.subjects, {
         // Only when the firewall actually granted it. The plan has
         // said so all along; nothing was reading it.
@@ -2304,15 +2327,7 @@ export function createModelGatewayQAnswer(
       const environmentNotes = notesInTail
         ? noteParts.standing
         : joinedNoteParts(noteParts);
-      const etiquetteGuides =
-        dependencies.etiquetteOf === undefined
-          ? null
-          : await dependencies
-              .etiquetteOf({
-                tenantId: request.tenantId,
-                userId: request.actorUserId,
-              })
-              .catch(() => null);
+      const etiquetteGuides = await etiquetteRead;
       const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
         task: "COMPANY_ANALYST",
         ...(etiquetteGuides === null
@@ -2736,14 +2751,7 @@ export function createModelGatewayQAnswer(
       // What this run can do and what the conversation already produced,
       // as facts: the model claims neither more nor less (CQ-QX-008).
       // Right after the prompt, so the tools-first note stays last.
-      const receipts =
-        dependencies.receipts === undefined
-          ? []
-          : await collectReceipts(
-              history,
-              dependencies.receipts,
-              request.actor,
-            );
+      const receipts = await receiptsRead;
       const capabilities = capabilityNote(
         request.capabilities,
         offered.map((tool) => ({

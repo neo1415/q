@@ -51,21 +51,24 @@ export default async function RelationshipsPage() {
     unreadByRelationship(),
     noticesAndReminders(),
   ]);
-  // The first page's cards are read in full; later pages by cursor.
-  const digests =
-    items === undefined
-      ? {}
-      : await relationshipDigests(
-          context,
-          pageAfter(items.toSorted(listOrder), null).items,
-        );
-  const now = readClock();
   const side =
     context.kind === "FOUNDER"
       ? "COMPANY"
       : context.kind === "INVESTOR"
         ? "INVESTOR"
         : "NONE";
+  // The first page's cards are read in full (later pages by cursor), beside
+  // the investor's fit read: both need only the list (L1 latency sweep).
+  const [digests, fits] = await Promise.all([
+    items === undefined
+      ? {}
+      : relationshipDigests(
+          context,
+          pageAfter(items.toSorted(listOrder), null).items,
+        ),
+    side === "INVESTOR" ? relationshipFits(items) : undefined,
+  ]);
+  const now = readClock();
 
   return (
     <PageContainer className="flex flex-col gap-4">
@@ -106,7 +109,7 @@ export default async function RelationshipsPage() {
         notices={needs.notices}
         reminders={needs.reminders}
         now={now}
-        fits={side === "INVESTOR" ? await relationshipFits(items) : undefined}
+        fits={fits}
       />
     </PageContainer>
   );

@@ -273,13 +273,27 @@ export function registerCompanyProfileRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       const actor = getActorContext(request);
-      const company = await companyFor(actor, companyIdParam(request));
-      const viewer = await viewerOf(actor, company);
+      const companyId = companyIdParam(request);
+      // Who is reading and whether the pitch rule admits them are asked
+      // beside the company read, not after it (L1 latency sweep: hosted
+      // p50 1038 ms, three reads in series before any content). Both are
+      // checks about this viewer; nothing is shown unless the company read
+      // below succeeds, and each is used exactly as before.
+      const investorRead = quietly(profile.viewerIsInvestor(actor), false);
+      const mayFindRead = quietly(
+        profile.investorMayFind(actor, companyId),
+        false,
+      );
+      const company = await companyFor(actor, companyId);
+      const viewer: CompanyProfileViewer =
+        company.organisationId === actor.organisationId
+          ? "OWNER"
+          : (await investorRead)
+            ? "INVESTOR"
+            : "FOUNDER";
       const projection = projectCompanyForNetwork(company);
       const full = viewer !== "FOUNDER";
-      const findable =
-        viewer === "INVESTOR" &&
-        (await quietly(profile.investorMayFind(actor, company.id), false));
+      const findable = viewer === "INVESTOR" && (await mayFindRead);
 
       const [images, videos, raise, verified, sectors, deck, team] =
         await Promise.all([

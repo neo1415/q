@@ -134,6 +134,29 @@ export type RelationshipListing = RelationshipStatus & {
 
 const LIST_LIMIT = 200;
 
+/**
+ * Each relationship's reads, several relationships at a time and in list
+ * order (L1 latency sweep, 2026-10-06: the list read three queries per
+ * relationship one relationship after another; hosted GET
+ * /v1/network/relationships p50 727 ms). Bounded so one list never takes
+ * the whole connection pool.
+ */
+const LIST_READ_CONCURRENCY = 8;
+
+export async function inBatches<T, R>(
+  items: readonly T[],
+  read: (item: T) => Promise<R>,
+  concurrency: number = LIST_READ_CONCURRENCY,
+): Promise<R[]> {
+  const out: R[] = [];
+  for (let start = 0; start < items.length; start += concurrency) {
+    out.push(
+      ...(await Promise.all(items.slice(start, start + concurrency).map(read))),
+    );
+  }
+  return out;
+}
+
 /** An investor organisation's own relationships, each folded for its side. */
 export function createListRelationshipsForInvestor(
   dependencies: ExpressInterestDependencies,
@@ -168,31 +191,28 @@ export function createListRelationshipsForInvestor(
         investorOrganisationId,
         LIST_LIMIT,
       );
-    const out: RelationshipListing[] = [];
-    for (const relationship of relationships) {
+    const listed = await inBatches(relationships, async (relationship) => {
       // The same rule as the single read: a company that has since gone
-      // out of this investor's sight is not listed.
+      // out of this investor's sight is not listed, and nothing more of it
+      // is read.
       if (
         !(await dependencies.companyVisibility.isVisibleToInvestor(
           actor,
           relationship.companyId,
         ))
       ) {
-        continue;
+        return null;
       }
-      const company = await dependencies.companies.findCanonicalCompany(
-        relationship.companyId,
-      );
-      const view = viewOf(
-        relationship,
-        await readHistory(dependencies, relationship.id),
-        "INVESTOR",
-      );
-      if (company !== null && view !== null) {
-        out.push({ ...view, counterpartName: company.canonicalName });
-      }
-    }
-    return out;
+      const [company, history] = await Promise.all([
+        dependencies.companies.findCanonicalCompany(relationship.companyId),
+        readHistory(dependencies, relationship.id),
+      ]);
+      const view = viewOf(relationship, history, "INVESTOR");
+      return company !== null && view !== null
+        ? { ...view, counterpartName: company.canonicalName }
+        : null;
+    });
+    return listed.filter((listing) => listing !== null);
   };
 }
 
@@ -237,24 +257,23 @@ export function createListRelationshipsForCompany(
         company.id,
         LIST_LIMIT,
       );
-    const out: RelationshipListing[] = [];
-    for (const relationship of relationships) {
+    const listed = await inBatches(relationships, async (relationship) => {
       const view = viewOf(
         relationship,
         await readHistory(dependencies, relationship.id),
         "COMPANY",
       );
       // Nothing visible to the company: an investor's private discovery.
-      if (view === null) continue;
+      if (view === null) return null;
       const investor =
         await dependencies.investors.findCanonicalInvestorOrganisation(
           relationship.investorOrganisationId,
         );
-      if (investor !== null) {
-        out.push({ ...view, counterpartName: investor.displayName });
-      }
-    }
-    return out;
+      return investor === null
+        ? null
+        : { ...view, counterpartName: investor.displayName };
+    });
+    return listed.filter((listing) => listing !== null);
   };
 }
 

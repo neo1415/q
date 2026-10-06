@@ -214,6 +214,8 @@ export {
 export {
   approvesByWords,
   decidePending,
+  startPendingDecision,
+  type PendingDecisionStart,
   declinesByWords,
   isReplyToCard,
   readyLine,
