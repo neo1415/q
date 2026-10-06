@@ -44,6 +44,44 @@
       ],
       "visibility": "network_visible",
       "readiness": "marketplace_ready"
+    },
+    "02": {
+      "company": "Termly",
+      "founderUserId": "1d51e988-f11f-4fb6-93a4-18f6e42366c8",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "1d243b5e-fe0d-4be5-9549-cb60e28652e6",
+      "organisationId": "68f801e2-21c7-458e-b9be-b0b2e0e43005",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Oluwaseun Bakare",
+          "userId": "4a229b66-87f4-4745-ad54-5d65cd2dca91",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Chiamaka Eze",
+          "userId": "d796cec2-1b25-4428-a7d3-7f2c22eda92e",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Ibrahim Musa",
+          "userId": "a165c2f6-1340-4e8e-ae29-859e3c502849",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "f891a735-ed8e-44ff-902c-248344e2fa7c",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     }
   }
 }
