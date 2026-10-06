@@ -417,7 +417,9 @@ export const resolveOnboardingState = cache(
 /** Where somebody who has not finished onboarding continues it, with Q. */
 export function onboardingPath(state: OnboardingState): string | null {
   if (state.kind === "UNFINISHED") {
-    return `/onboarding/${state.journey}?talk=1`;
+    // F15: resuming opens the screen they were on (the form), never live
+    // voice nobody asked for; "Talk it through" is the explicit way in.
+    return `/onboarding/${state.journey}?from=home`;
   }
   return state.kind === "NEW" ? "/welcome" : null;
 }

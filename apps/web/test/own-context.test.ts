@@ -10,6 +10,7 @@ vi.mock("@/auth/session", () => ({
 import {
   companyFromMemberships,
   createContextLookups,
+  onboardingPath,
   resolveOwnContextWith,
 } from "@/features/q/context";
 
@@ -248,5 +249,15 @@ describe("F11/F23: a member's company comes from their memberships", () => {
       ]),
     ).toBeNull();
     expect(companyFromMemberships(null)).toBeNull();
+  });
+});
+
+describe("F15: resuming setup", () => {
+  it("goes back to the screen they were on, never live voice", () => {
+    expect(onboardingPath({ kind: "UNFINISHED", journey: "founder" })).toBe(
+      "/onboarding/founder?from=home",
+    );
+    expect(onboardingPath({ kind: "NEW" })).toBe("/welcome");
+    expect(onboardingPath({ kind: "DONE" })).toBeNull();
   });
 });

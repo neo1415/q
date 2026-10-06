@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 
+import { friendlyDetail } from "./problem-words";
+
 import {
   ApiProblemError,
   answerOnboardingQuestion,
@@ -90,7 +92,12 @@ function isSession(
 /** Problem details → a frontend outcome. Server-authored detail only. */
 function translate(error: unknown): ActionResult<never> {
   if (error instanceof ApiProblemError) {
-    const detail = error.problem?.detail ?? error.message;
+    const friendly = friendlyDetail(error.problem?.detail ?? error.message);
+    const detail = friendly.text;
+    if (friendly.reason === "REQUIRED_STEPS_INCOMPLETE") {
+      // Waiting is the fix, so the screen offers "Try again".
+      return failure("NETWORK", detail);
+    }
     if (error.code === "VERSION_CONFLICT") {
       return failure(
         "CONFLICT",
