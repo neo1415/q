@@ -7,6 +7,9 @@ import { WorkforcePanel } from "@/features/work/workforce-panel";
 
 import { FIXTURE_IDS, workforceFixtures } from "./fixtures";
 
+// Per request: the preview flag and the fixtures' clock are read at runtime.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Q’s team (design review)",
   robots: { index: false },
@@ -29,7 +32,11 @@ export default async function WorkforceReviewPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (process.env.NODE_ENV === "production") {
+  // Production serves it only to a local preview that asks (screenshots).
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env["CQ_DEV_PREVIEW"] !== "1"
+  ) {
     notFound();
   }
   const params = await searchParams;
