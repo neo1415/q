@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { z } from "zod";
 
@@ -20,7 +21,24 @@ import { useGlobalQ } from "@/components/app-shell/global-q";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 import { ArtifactDownloads } from "@/features/q/artifact-download";
 import { artifactTypeLabel } from "@/features/q/artifact-type";
-import { ArtifactViewer } from "@/features/q/artifact-viewer";
+
+/**
+ * P9: the viewer (pages, slides, pictures) is code a page view rarely runs;
+ * it loads when a document is opened, not with every page of the shell.
+ */
+const ArtifactViewer = dynamic(
+  () => import("@/features/q/artifact-viewer").then((m) => m.ArtifactViewer),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="min-h-[60vh] w-full rounded-md bg-(--cq-surface-subtle)"
+        aria-busy="true"
+        aria-label="Opening the document"
+      />
+    ),
+  },
+);
 
 import {
   announceDocument,
@@ -54,6 +72,7 @@ const RESTING_MS = 30_000;
 const WATCHING_MS = 4_000;
 /** How long a card stays when nobody is looking at it. */
 const AUTO_DISMISS_MS = 12_000;
+const FIRST_CHECK_DELAY_MS = 2_000;
 
 const RecentSchema = z.object({
   items: z
@@ -98,6 +117,8 @@ export function useDocumentWatch(connected: boolean): void {
     let timer: number | undefined;
     const check = async () => {
       if (document.visibilityState !== "visible") return;
+      // Offline: nothing to ask; the next tick (or `online`) asks again.
+      if (navigator.onLine === false) return;
       const items = await listRecent();
       if (!alive || items === null) return;
       const changes = readyChanges(known.current, items, openedAt.current);
@@ -120,14 +141,25 @@ export function useDocumentWatch(connected: boolean): void {
     const onVisible = () => {
       if (document.visibilityState === "visible") void check();
     };
-    void check().finally(() => {
-      if (alive) schedule();
-    });
+    // P9: the first check waits for the page to settle, unless something
+    // is being watched (a document Q is preparing right now), so the
+    // shell's poll never competes with the page's own first reads.
+    const first = window.setTimeout(
+      () => {
+        void check().finally(() => {
+          if (alive) schedule();
+        });
+      },
+      watching() ? 0 : FIRST_CHECK_DELAY_MS,
+    );
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onVisible);
     return () => {
       alive = false;
+      window.clearTimeout(first);
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onVisible);
     };
     // `signal` restarts the loop at the fast pace when watching begins.
   }, [connected, signal]);

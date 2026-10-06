@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { IntentLink } from "./intent-link";
+
 import { cx } from "@capital-q/ui";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { ICON_SIZE, ICON_STROKE, PanelLeft } from "@capital-q/ui/icons";
@@ -219,8 +221,9 @@ function SidebarLink({
   const name =
     waiting === null ? label : `${label}, ${String(waiting)} waiting for you`;
   const link = (
-    <Link
+    <IntentLink
       href={href}
+      // P9: loading shell in view, the whole page on intent.
       aria-current={active ? "page" : undefined}
       aria-label={compact || waiting !== null ? name : undefined}
       className={cx(
@@ -253,7 +256,7 @@ function SidebarLink({
           {waiting}
         </span>
       )}
-    </Link>
+    </IntentLink>
   );
   return compact ? (
     <Tooltip content={label} side="right">

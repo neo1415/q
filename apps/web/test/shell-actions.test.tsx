@@ -16,15 +16,20 @@ const { NotificationCenter } =
 const { resetNoticeStore } = await import("../src/features/work/notice-store");
 
 beforeEach(() => {
+  // P9: the first read waits for the page to settle, so time is driven.
+  vi.useFakeTimers();
   resetNoticeStore();
   list.mockReset();
   list.mockResolvedValue({ ok: true, value: { items: [], unread: 2 } });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const settle = () =>
   act(async () => {
-    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(3_000);
   });
 
 /**

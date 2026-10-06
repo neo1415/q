@@ -5,6 +5,8 @@ import { SignOutControl } from "@/features/auth";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { IntentLink } from "./intent-link";
+
 import { cx } from "@capital-q/ui";
 import {
   ChevronRight,
@@ -70,7 +72,7 @@ export function MobileNavigation({
           const Icon = item.icon;
           return (
             <li key={item.href} className="min-w-0">
-              <Link
+              <IntentLink
                 href={item.href === "/home" ? home : item.href}
                 aria-current={active ? "page" : undefined}
                 data-active={active ? "" : undefined}
@@ -109,7 +111,7 @@ export function MobileNavigation({
                   />
                 )}
                 <span className="truncate">{item.label}</span>
-              </Link>
+              </IntentLink>
             </li>
           );
         })}
@@ -285,7 +287,7 @@ function MoreLink({
   const Icon = item.icon;
   const waiting = count !== undefined && count > 0 ? count : null;
   return (
-    <Link
+    <IntentLink
       href={item.href}
       aria-current={active ? "page" : undefined}
       aria-label={
@@ -319,6 +321,6 @@ function MoreLink({
       {active ? (
         <span className="cq-caption text-(--cq-text-secondary)">Current</span>
       ) : null}
-    </Link>
+    </IntentLink>
   );
 }

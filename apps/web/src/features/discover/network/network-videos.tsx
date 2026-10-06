@@ -22,8 +22,11 @@ import { formatDay } from "@/components/date-format";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import { countryLabel, stageLabel } from "../../company/declared-labels";
+import { retryWithBackoff } from "@/pwa/resilient";
+
 import { authorisePlaybackViaAction } from "../feed/action-feed-transport";
 import { loadNetworkPitchesAction } from "../feed/feed-actions";
+import { authorisePostersAction } from "../feed/playback-source";
 import { attachHlsOrNativeSource } from "../player/hls-source";
 import { PitchPlayer } from "../player/pitch-player";
 import { prefersReducedMotion } from "../player/use-pitch-playback";
@@ -118,28 +121,41 @@ export function NetworkVideos({
     setCursor(result.value.nextCursor);
   }, [cursor, text]);
 
-  // Posters are minted grants: asked for once per video, a page at a time.
+  // Posters are minted grants: asked for once per video, a page at a time,
+  // in one round trip (P9: server actions queue one at a time, so a grant
+  // per tile cost a round trip per tile on a slow line). A grant still in
+  // flight when the list grows is kept; a failed batch is asked again.
   const asked = useRef(new Set<string>());
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     if (items === null) return;
-    let cancelled = false;
     const next = items
       .filter((item) => !asked.current.has(item.pitch.mediaAssetId))
       .slice(0, POSTER_BUDGET);
-    for (const item of next) {
-      asked.current.add(item.pitch.mediaAssetId);
-      authorisePlaybackViaAction(item.companyId, item.pitch.mediaAssetId).then(
-        (grant) => {
-          const url = grant.posterUrl;
-          if (cancelled || url === null) return;
-          setPosters((known) => ({ ...known, [item.pitch.mediaAssetId]: url }));
-        },
-        () => undefined,
-      );
-    }
-    return () => {
-      cancelled = true;
-    };
+    if (next.length === 0) return;
+    for (const item of next) asked.current.add(item.pitch.mediaAssetId);
+    retryWithBackoff(() =>
+      authorisePostersAction(
+        next.map((item) => ({
+          companyId: item.companyId,
+          mediaAssetId: item.pitch.mediaAssetId,
+        })),
+      ),
+    ).then(
+      (found) => {
+        if (!mounted.current || Object.keys(found).length === 0) return;
+        setPosters((known) => ({ ...known, ...found }));
+      },
+      () => {
+        for (const item of next) asked.current.delete(item.pitch.mediaAssetId);
+      },
+    );
   }, [items]);
 
   if (error !== null && items === null) {

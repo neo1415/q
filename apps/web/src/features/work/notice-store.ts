@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 
 import type { NotificationDto } from "@capital-q/contracts";
 
+import { retryWithBackoff } from "@/pwa/resilient";
+
 import { listNoticesAction } from "./work-actions";
 
 /**
@@ -20,6 +22,12 @@ import { listNoticesAction } from "./work-actions";
 
 const POLL_MS = 60_000;
 const FRESH_MS = 5_000;
+/**
+ * P9: the first read waits for the page to settle. Server actions queue
+ * one at a time, so a bell read sent with the first paint sat in front of
+ * the page's own reads on a slow line.
+ */
+const FIRST_READ_DELAY_MS = 1_500;
 
 export type NoticeState = {
   readonly items: readonly NotificationDto[] | null;
@@ -44,7 +52,12 @@ function emit(next: NoticeState): void {
 export function refreshNotices(force = false): Promise<void> {
   if (inFlight !== null) return inFlight;
   if (!force && Date.now() - loadedAt < FRESH_MS) return Promise.resolve();
-  inFlight = listNoticesAction()
+  // A dropped connection is retried with backoff (and waits while the
+  // browser is offline); what was shown stays shown meanwhile.
+  inFlight = retryWithBackoff(() => listNoticesAction(), {
+    attempts: 3,
+    timeoutMs: 20_000,
+  })
     // A thrown action (deploy skew, signed-out tab) is a failed load,
     // never an unhandled rejection.
     .catch(() => null)
@@ -93,22 +106,37 @@ export function noticesRead(count: number): void {
 }
 
 const onVisible = () => {
-  if (document.visibilityState === "visible") void refreshNotices();
+  if (document.visibilityState === "visible" && navigator.onLine !== false) {
+    void refreshNotices();
+  }
 };
+const onOnline = () => void refreshNotices(true);
+let firstRead: number | undefined;
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   if (listeners.size === 1) {
-    void refreshNotices();
+    firstRead = window.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(() => void refreshNotices(), {
+          timeout: 2_000,
+        });
+      } else {
+        void refreshNotices();
+      }
+    }, FIRST_READ_DELAY_MS);
     timer = window.setInterval(onVisible, POLL_MS);
     window.addEventListener("focus", onVisible);
+    window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);
   }
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0) {
+      window.clearTimeout(firstRead);
       window.clearInterval(timer);
       window.removeEventListener("focus", onVisible);
+      window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
     }
   };

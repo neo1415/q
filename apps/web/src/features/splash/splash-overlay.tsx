@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { CapitalWordmark } from "./capital-wordmark";
 import { createCapitalQSplash, type SplashController } from "./splash-engine";
 import {
+  SPLASH_DEADLINE_MS,
   SPLASH_DONE_EVENT,
+  SPLASH_FORMATION_MS,
   SPLASH_SEEN_KEY,
   splashWasSkipped,
 } from "./splash-policy";
@@ -48,6 +50,17 @@ export function SplashOverlay() {
         window.dispatchEvent(new Event(SPLASH_DONE_EVENT));
       }, 320);
     };
+    // P9: the splash's time is counted from the page's start, not from
+    // hydration. On a slow line the code can arrive seconds after the first
+    // paint; playing the whole animation then would hold the page behind
+    // it for twice as long. Too little time left to form the Q: it leaves
+    // now (CSS may already have faded it).
+    const left = SPLASH_DEADLINE_MS - performance.now();
+    if (left < SPLASH_FORMATION_MS) {
+      leave();
+      return;
+    }
+    element.dataset["live"] = "true";
     const theme = document.documentElement.dataset["theme"];
     element.dataset["theme"] =
       theme === "light" || theme === "dark" ? theme : "system";
@@ -55,10 +68,12 @@ export function SplashOverlay() {
       // The formed Q holds for a beat before it hands over.
       onComplete: () => window.setTimeout(leave, 250),
     });
+    const deadline = window.setTimeout(leave, left);
     const skip = () => leave();
     window.addEventListener("keydown", skip, { once: true });
     element.addEventListener("pointerdown", skip, { once: true });
     return () => {
+      window.clearTimeout(deadline);
       window.removeEventListener("keydown", skip);
       element.removeEventListener("pointerdown", skip);
       controller.current?.destroy();

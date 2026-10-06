@@ -25,9 +25,34 @@ const SKIPPED_PATHS = [
   "/api/",
 ];
 
+/**
+ * How long the formation takes on screen (demo audit 2026-10-03: the
+ * splash held the sign-in form for ~6.5 s; the whole splash, hold and
+ * fade included, now stays under 2 s).
+ */
+export const SPLASH_FORMATION_MS = 1_300;
+
+/**
+ * P9: the latest the splash may still be on screen, counted from the
+ * page's start rather than from when its code ran. On a slow line the
+ * code arrives seconds after the first paint, and the splash used to
+ * start only then, holding a page that was already there. The overlay
+ * enforces this once its code runs (and skips the animation when too
+ * little time is left to form the Q); before that, CSS does
+ * (`cq-splash-expire` in globals.css, timed from the splash's first paint).
+ */
+export const SPLASH_DEADLINE_MS = 2_400;
+
+/*
+ * Before the page's code arrives (seconds, on a slow line) a tap or a key
+ * still skips the splash: the boot rule listens until the overlay takes
+ * over (`data-live`), then leaves it to the overlay's own fade.
+ */
 export const SPLASH_BOOT_SCRIPT = `try{var p=location.pathname;if(sessionStorage.getItem(${JSON.stringify(
   SPLASH_SEEN_KEY,
-)})||${JSON.stringify(SKIPPED_PATHS)}.some(function(s){return p.indexOf(s)===0})){document.documentElement.setAttribute("data-splash","off")}}catch(e){document.documentElement.setAttribute("data-splash","off")}`;
+)})||${JSON.stringify(SKIPPED_PATHS)}.some(function(s){return p.indexOf(s)===0})){document.documentElement.setAttribute("data-splash","off")}else{var k=function(){if(document.querySelector(".cq-splash[data-live]"))return;document.documentElement.setAttribute("data-splash","off");try{sessionStorage.setItem(${JSON.stringify(
+  SPLASH_SEEN_KEY,
+)},"1")}catch(e){}};addEventListener("pointerdown",k,{capture:true,once:true});addEventListener("keydown",k,{capture:true,once:true})}}catch(e){document.documentElement.setAttribute("data-splash","off")}`;
 
 /**
  * The boot rule, as a function: the script above is this, inlined so it

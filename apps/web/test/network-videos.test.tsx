@@ -25,6 +25,20 @@ vi.mock("../src/features/discover/feed/action-feed-transport", () => ({
     }),
   ),
 }));
+// P9: posters for the grid come in one batched action.
+vi.mock("../src/features/discover/feed/playback-source", () => ({
+  authorisePostersAction: vi.fn(
+    (items: readonly { readonly mediaAssetId: string }[]) =>
+      Promise.resolve(
+        Object.fromEntries(
+          items.map((item) => [
+            item.mediaAssetId,
+            "https://video.example/p.jpg",
+          ]),
+        ),
+      ),
+  ),
+}));
 
 const item = (n: number): NetworkPitchItemDto => ({
   companyId: `c0000000-0000-4000-8000-00000000000${String(n)}`,

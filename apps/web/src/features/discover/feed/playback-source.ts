@@ -64,6 +64,51 @@ export async function authorisePlaybackAction(
   }
 }
 
+const PosterBatchInput = z
+  .array(
+    z.object({ companyId: z.string().uuid(), mediaAssetId: z.string().uuid() }),
+  )
+  .max(24);
+
+/**
+ * Posters for a batch of tiles, in one round trip (P9).
+ *
+ * Server actions run one at a time from a page, so a grid that asked for
+ * each poster separately waited one network round trip per tile -- tens of
+ * seconds on a slow line. This authorises each tile exactly as
+ * `authorisePlaybackAction` does (per viewer, per asset, every time), side
+ * by side, and returns only the poster URLs that were granted. A refused or
+ * failed tile is simply absent: the grid keeps its reserved box.
+ */
+export async function authorisePostersAction(
+  items: readonly {
+    readonly companyId: string;
+    readonly mediaAssetId: string;
+  }[],
+): Promise<Readonly<Record<string, string>>> {
+  const parsed = PosterBatchInput.safeParse(items);
+  if (!parsed.success || parsed.data.length === 0) return {};
+  const session = await apiSession();
+  if (session === null) return {};
+  const settled = await Promise.allSettled(
+    parsed.data.map(async ({ companyId, mediaAssetId }) => {
+      const grant = await authorisePitchPlayback(
+        session,
+        companyId,
+        mediaAssetId,
+      );
+      return [mediaAssetId, grant.posterUrl] as const;
+    }),
+  );
+  const posters: Record<string, string> = {};
+  for (const outcome of settled) {
+    if (outcome.status === "fulfilled" && outcome.value[1] !== null) {
+      posters[outcome.value[0]] = outcome.value[1];
+    }
+  }
+  return posters;
+}
+
 export type DownloadActionResult =
   | { readonly ok: true; readonly value: PitchDownloadDto }
   | { readonly ok: false; readonly message: string };

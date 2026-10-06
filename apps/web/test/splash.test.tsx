@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   SPLASH_BOOT_SCRIPT,
+  SPLASH_DEADLINE_MS,
   SPLASH_DONE_EVENT,
   SPLASH_SEEN_KEY,
   splashSkippedFor,
@@ -47,14 +48,19 @@ function boot(path: string) {
   return document.documentElement.dataset["splash"];
 }
 
+let pageAge = 100;
 beforeEach(() => {
   sessionStorage.clear();
   vi.useFakeTimers();
   complete = undefined;
+  // P9: the splash's time counts from the page's start.
+  pageAge = 100;
+  vi.spyOn(performance, "now").mockImplementation(() => pageAge);
 });
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("when the splash shows", () => {
@@ -107,6 +113,39 @@ describe("the splash", () => {
       vi.advanceTimersByTime(600);
     });
     expect(container.querySelector(".cq-splash")).toBeNull();
+  });
+
+  it("never holds a page whose code arrived late (slow line)", () => {
+    boot("/discover");
+    pageAge = SPLASH_DEADLINE_MS - 500;
+    const done = vi.fn();
+    window.addEventListener(SPLASH_DONE_EVENT, done);
+    const { container } = render(<SplashOverlay />);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    // Too little time left to form the Q: it left without playing.
+    expect(complete).toBeUndefined();
+    expect(container.querySelector(".cq-splash")).toBeNull();
+    expect(done).toHaveBeenCalledTimes(1);
+    window.removeEventListener(SPLASH_DONE_EVENT, done);
+  });
+
+  it("leaves by its deadline even if the Q has not formed", () => {
+    boot("/discover");
+    const { container } = render(<SplashOverlay />);
+    expect(
+      container.querySelector(".cq-splash")?.getAttribute("data-live"),
+    ).toBe("true");
+    act(() => {
+      vi.advanceTimersByTime(SPLASH_DEADLINE_MS + 400);
+    });
+    expect(container.querySelector(".cq-splash")).toBeNull();
+  });
+
+  it("can be skipped before its code arrives (boot rule)", () => {
+    expect(SPLASH_BOOT_SCRIPT).toContain("pointerdown");
+    expect(SPLASH_BOOT_SCRIPT).toContain(".cq-splash[data-live]");
   });
 
   it("is skipped at once by a key", () => {

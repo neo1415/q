@@ -1,3 +1,5 @@
+import { SPLASH_FORMATION_MS } from "./splash-policy";
+
 /**
  * Capital Q splash, "Living Convergence" (founder handoff revision 3,
  * 2026-09-29): scattered particles spiral into the Q (formed in 1.3 s since
@@ -39,12 +41,9 @@ type Particle = {
 
 /** The founder's choreography, in its own time units. */
 export const SPLASH_DURATION_MS = 4_800;
-/**
- * How long the formation takes on screen (demo audit 2026-10-03: the
- * splash held the sign-in form for ~6.5 s; the whole splash, hold and
- * fade included, now stays under 2 s).
- */
-export const SPLASH_FORMATION_MS = 1_300;
+// How long the formation takes on screen; defined with the show policy so
+// the overlay's deadline and the engine's pace cannot drift.
+export { SPLASH_FORMATION_MS };
 const SPEED = SPLASH_DURATION_MS / SPLASH_FORMATION_MS;
 const TAU = Math.PI * 2;
 
