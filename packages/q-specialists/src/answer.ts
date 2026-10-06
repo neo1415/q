@@ -2036,6 +2036,24 @@ export function createSpecialistQAnswer(
     // What Q showed and last did, for "that one" and "try again".
     const shown = shownItems(history);
     const lastAction = lastActed.get(conversationId) ?? null;
+    // A bare screen command ("scroll down", "go back") is done at once in
+    // code, like the wake words: it needs no reading, no model and no view
+    // of the screen (founder 2026-10-06: Q said it could not scroll
+    // because it could not see the page). Anything more than the command
+    // goes to the normal path.
+    const screenAct = screenActOf(latest.content);
+    if (screenAct !== null) {
+      logger?.info(
+        { qRunId: request.runId, act: screenAct.act },
+        "q is working the screen",
+      );
+      return recordAnswer(request, conversationId, screenAct.said, [
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "SCREEN_ACT", act: screenAct.act },
+        },
+      ]);
+    }
     saidInRun.set(request.runId, latest.content);
     while (saidInRun.size > PREREADS_MAX) {
       const oldest = saidInRun.keys().next().value;
@@ -3128,4 +3146,49 @@ ${line}`;
       return notice;
     },
   };
+}
+
+/**
+ * The few bare screen commands done in code (scroll, top, bottom, back).
+ * Deliberately narrow: the whole message must be the command, optionally
+ * with "Q", "please" or "the page", so a question never matches.
+ */
+export function screenActOf(
+  text: string,
+): {
+  readonly act:
+    "PAGE_DOWN" | "PAGE_UP" | "SCROLL_TOP" | "SCROLL_BOTTOM" | "GO_BACK";
+  readonly said: string;
+} | null {
+  const t = text
+    .toLowerCase()
+    .replace(/[^a-z ]+/g, " ")
+    .replace(/\b(hey|ok|okay|hi|hello)\s+q\b/g, " ")
+    .replace(
+      /\b(please|q|can you|could you|now|for me|a bit|a little|the page|this page|on this page|on the page)\b/g,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+  if (
+    /^(scroll|go|move) down( more)?$|^(scroll|page) down$|^keep scrolling$|^scroll$/.test(
+      t,
+    )
+  ) {
+    return { act: "PAGE_DOWN", said: "Scrolling down." };
+  }
+  if (/^(scroll|go|move|page) up$/.test(t))
+    return { act: "PAGE_UP", said: "Scrolling up." };
+  if (
+    /^(scroll |go |take me )?(to )?(the )?top$|^back to (the )?top$/.test(t)
+  ) {
+    return { act: "SCROLL_TOP", said: "Back to the top." };
+  }
+  if (/^(scroll |go |take me )?(to )?(the )?bottom$/.test(t)) {
+    return { act: "SCROLL_BOTTOM", said: "To the bottom." };
+  }
+  if (/^go back$|^back$|^go to the previous page$/.test(t)) {
+    return { act: "GO_BACK", said: "Going back." };
+  }
+  return null;
 }
