@@ -139,12 +139,12 @@ What is **not** finished, plainly:
 | L1 | Partly | Pages: the app layout, Discover, onboarding checks, relationships and profile now load in parallel. Q answers: settings reads run in parallel. Voice: the decision reader runs alongside the turn reader, a refused Gemini key fails over to the other key (this removes the 3.5–5 s stalls), classifiers are hedged after 2 s, bursts are debounced and the answer starts speculatively. Estimated p50 about 3–3.5 s, from 5.1 s; not measured live. The 1.5 s target is not reached. |
 | M1 | Done | 12 research files in `docs/research/2026-10-06/` (data room, pitch deck, matching, Explore, GateQ inbox, organisations, wake word, voice resilience, agent workforce, UX writing, sound, presence and brand), each ending with gaps and recommendations, which the builders followed. |
 | N1 | Done | 580 + 107 mockup screenshots (phone and desktop, light, dark and gold) and 17 videos; the curated set is in the gallery. |
-| N2 | Done, with limits | Built to the mockups, with screenshot comparisons per area. Tests: the full unit suite (about 9,300 tests), database RLS suites for every new table, typecheck and a production web build. Not done: e2e and live browser trials with a real microphone. |
+| N2 | Done, with limits | Built to the mockups, with screenshot comparisons per area. Tests: the full unit suite (about 9,400 tests), database RLS suites for every new table, typecheck and a production web build. Not done: e2e and live browser trials with a real microphone. |
 | N3 | Done | Deployed and healthy; this report. |
 
 ## Technical detail
 
-**Deployed commit:** `a38e1222` on `recovery/2026-09-12` (deploy), `recovery/2026-09-12-8y2j4w` and `claude/rana-account-setup-8esh9e`. The later `18759407` (fit panel on the profile) is pushed to the backup branch and goes out with the next deploy.
+**Deployed commit:** `225b779d` on `recovery/2026-09-12` (deploy), `recovery/2026-09-12-8y2j4w` and `claude/rana-account-setup-8esh9e`; deployed at 07:29 UTC, all four services SUCCESS.
 
 **Hosted migrations added tonight (156 total, none missing):**
 - 20261206140000 and 20261206150000: wake and etiquette guides;
@@ -158,8 +158,7 @@ What is **not** finished, plainly:
 **Checks run, exact:**
 - Package build: 51/51 tasks.
 - Typecheck: root, web, api, q-api and workers, 0 errors.
-- Full vitest (`--maxWorkers=1`) before the last merges: 9,292 passed, 8 failed, all in `fit-ui`. They were caused by the in-progress score change and were fixed after rebuilding contracts.
-- Targeted runs after the GateQ and wording merges: 428/428, plus 126/126 on the manifest test and 27/27 on profile and fit.
+- Full vitest (`--maxWorkers=1`) after every merge: 9,429 passed, 1 skipped, 1 failed. The failure was the Company requests rename guard catching the old wording in a code comment; it was fixed (2/2 on rerun) and redeployed.
 - pgTAP:
   - organisations: 38/38;
   - GateQ inbox: 26/26;
