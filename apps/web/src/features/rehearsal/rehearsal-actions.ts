@@ -168,7 +168,7 @@ export async function shareScreenFrameAction(
     .safeParse(image);
   const which = z.enum(["SCREEN", "CAMERA"]).safeParse(kind);
   if (!id.success || !frame.success || !which.success) {
-    return { ok: false, message: "That frame was too large to share." };
+    return { ok: false, message: "That camera image was too large to share." };
   }
   return run(async (session) => {
     await sendRehearsalScreen(session, id.data, frame.data, which.data);
