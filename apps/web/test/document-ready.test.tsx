@@ -168,9 +168,12 @@ describe("the document-ready card, on any page", () => {
     });
     readQArtifactAction.mockResolvedValue({ ok: false, message: "Not now." });
     render(<DocumentReadyCenter connected />);
-    const card = await screen.findByRole("status", {
-      name: /Investor deck: Northstar — investor deck\. Ready\./i,
-    });
+    // P9: the first check waits ~2 s for the page to settle.
+    const card = await screen.findByRole(
+      "status",
+      { name: /Investor deck: Northstar — investor deck\. Ready\./i },
+      { timeout: 4_000 },
+    );
     expect(card.textContent).toContain("Northstar — investor deck");
     expect(screen.getByRole("button", { name: "Open" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /download/i })).toBeTruthy();
@@ -238,6 +241,9 @@ describe("the document-ready card, on any page", () => {
   it("checks closely while a document is being prepared", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     render(<DocumentReadyCenter connected />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
     await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
     act(() => expectDocument());
     // The loop restarts at the watching pace (seconds, not half a minute).

@@ -2767,6 +2767,19 @@
   html[data-splash="off"] .cq-splash {
     display: none;
   }
+  /* P9: if the page's code has not taken the splash over by its deadline
+     (SPLASH_DEADLINE_MS in splash-policy.ts), it fades on its own, so a
+     slow line never holds the page behind it. */
+  .cq-splash:not([data-live]) {
+    animation: cq-splash-expire 320ms var(--cq-ease) 2400ms forwards;
+  }
+  @keyframes cq-splash-expire {
+    to {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+  }
   .cq-splash[data-theme="light"] {
     --cq-splash-bg: #edf2f9;
     --cq-splash-ink: #112c54;
