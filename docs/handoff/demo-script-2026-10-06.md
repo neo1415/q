@@ -52,11 +52,11 @@ Go to **Work**. Show the standing instruction: *"As soon as any company matches 
 
 Say: *"When a new founder is verified and matches, Q expresses interest for me within about a minute and a half. Anything that speaks for me waits for my approval."* Show an approval card and approve one.
 
-Then ask Q: **"What are you working on?"** *(if fixed: the approval cards appear right in the answer.)*
+Then ask Q: **"What are you working on?"** Q says what it is doing in two or three sentences and opens Work, where the "Needs you" tab holds the approval cards.
 
 ## 7. Explore (1 min, on the phone)
 
-Open **Explore**: a masonry grid of every pitch on the network. Tap one; scroll up to see related pitches, TikTok-style, with a back button. *(if fixed: the improved masonry.)*
+Open **Explore**: a masonry grid of every pitch on the network. Tap one; scroll up to see related pitches, TikTok-style, with a back button. (More pitches appear as the seeded founders open theirs to the network.)
 
 ## 8. GateQ (1 min)
 
@@ -77,4 +77,4 @@ Close: *"Evidence before opinion, the investor stays in control, and Q does the 
 ## Don't show today
 
 - Founder sign-up from scratch (seeding is still running).
-- Asking Q to message a founder who hasn't accepted interest (being fixed now).
+- Old message cards to founders who haven't accepted yet: decline them on Work first (Q no longer drafts new ones).
