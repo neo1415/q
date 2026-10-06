@@ -7,6 +7,7 @@ import type { QToolPorts } from "./ports.js";
 import { createQToolRegistry, type QToolRegistry } from "./registry.js";
 import { createGetCapitalObjectiveTool } from "./tools/get-capital-objective.js";
 import { createGetCompanyTool } from "./tools/get-company.js";
+import { createProfileMaterialTools } from "./tools/profile-material.js";
 import { createExtractPublicWebTool } from "./tools/extract-public-web.js";
 import { createGetInvestorMandateTool } from "./tools/get-investor-mandate.js";
 import { createLookupPublicProfileTool } from "./tools/lookup-public-profile.js";
@@ -138,6 +139,8 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
         ]),
     // Inbound email: what arrived at their own Q address, read as fields.
     ...createInboundEmailTools(ports.inboundEmail),
+    // Overnight A8: a company's deck and data room, and deck coaching.
+    ...createProfileMaterialTools(ports.profileMaterial),
     // R34: the relationship chat, read and prepared for approval.
     ...(ports.chat === undefined || ports.relationships === undefined
       ? []

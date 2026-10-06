@@ -578,3 +578,13 @@ export {
   matchCapabilities,
   type UseCapabilityOutput,
 } from "./tools/use-capability.js";
+export {
+  COACH_MY_DECK,
+  createCoachMyDeckTool,
+  createProfileMaterialTools,
+  createReadCompanyDataRoomTool,
+  createReadCompanyDeckTool,
+  READ_COMPANY_DATA_ROOM,
+  READ_COMPANY_DECK,
+  type ProfileMaterialPort,
+} from "./tools/profile-material.js";

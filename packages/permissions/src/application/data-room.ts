@@ -452,6 +452,7 @@ export function createDataRoomService(dependencies: {
       })),
       requests: requests.map((request) => ({
         requestId: request.id,
+        relationshipId: request.relationshipId,
         documentId: request.documentId,
         documentTitle: request.documentTitle,
         requesterName: request.requestedByName,
@@ -623,6 +624,8 @@ export function createDataRoomService(dependencies: {
     decide: async (command: {
       readonly actor: ActorContext;
       readonly requestId: string;
+      /** When given, the request must have come through this relationship. */
+      readonly relationshipId?: string | undefined;
       readonly decision: "APPROVE" | "DECLINE";
       readonly days?: number | undefined;
       readonly correlationId?: CorrelationId | undefined;
@@ -636,6 +639,9 @@ export function createDataRoomService(dependencies: {
         (candidate) => candidate.id === command.requestId,
       );
       if (request === undefined) return refused("NOT_FOUND");
+      if (command.relationshipId !== undefined && command.relationshipId !== request.relationshipId) {
+        return refused("NOT_FOUND");
+      }
       if (request.decision !== null) return refused("ALREADY_DECIDED");
       const correlationId = command.correlationId ?? dependencies.newCorrelationId();
 

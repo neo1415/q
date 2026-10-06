@@ -1,3 +1,4 @@
+import type { ProfileMaterialPort } from "./tools/profile-material.js";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
 import type {
@@ -415,6 +416,8 @@ export type QToolPorts = {
   readonly recordChanges?: RecordChangePort | undefined;
   /** R33: reads of their own records. */
   readonly ownRecords?: OwnRecordsPort | undefined;
+  /** Overnight A8: a company's deck and data room, as the person's tabs show them. */
+  readonly profileMaterial?: ProfileMaterialPort | undefined;
   /** R33: their organisation's uploaded documents (metadata). */
   readonly evidenceDocuments?: EvidenceDocumentsPort | undefined;
   /** R33 / BIZ-007: a relationship's email thread. */

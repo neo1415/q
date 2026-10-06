@@ -168,6 +168,8 @@ export type DataRoomChecklistItem = z.infer<typeof DataRoomChecklistItemSchema>;
 export const DataRoomRequestSchema = z
   .object({
     requestId: UuidSchema,
+    /** The canonical relationship it came through. */
+    relationshipId: UuidSchema,
     /** Null: everything on request. */
     documentId: UuidSchema.nullable(),
     documentTitle: z.string().max(200).nullable(),
