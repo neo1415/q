@@ -1,0 +1,18 @@
+{
+  "companies": {
+    "01": {
+      "company": "Ledgerline",
+      "companyId": "6f075a0b-8372-4458-9060-09afd73a9c37",
+      "founderUserId": "0fe3a13c-f464-4516-a0c6-23c0212347d0",
+      "onboarding": "completed",
+      "profile": {
+        "about": true,
+        "company": true,
+        "sector": true,
+        "headline": true,
+        "founderSummaries": true,
+        "teamFacts": true
+      }
+    }
+  }
+}

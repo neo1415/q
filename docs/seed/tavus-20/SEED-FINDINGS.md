@@ -1,0 +1,54 @@
+# Tavus-20 production seed: bugs and UX gaps
+
+Found while seeding the 20 fictional companies into production through the real UI (Playwright, Chromium), 2026-10-06. Each entry: where, steps, expected, actual, severity (S1 blocks a founder, S2 wrong or lossy, S3 friction or polish).
+
+## Log
+
+### F1. Onboarding "How would you categorise the company?" suggests unrelated categories (S2)
+- Where: web `/onboarding/founder` form, step "Company 5 of 7"; `POST /v1/taxonomy/candidates`; `packages/taxonomy/src/classification/domain/scoring.ts` `lexicalScore`.
+- Steps: founder form, describe Ledgerline ("checks every invoice at creation and files VAT returns for Nigerian SMEs ... FIRS e-invoicing").
+- Expected: Fintech (or nothing). Actual: the only industry chip is **Education** ("0/1 tokens, similarity 0.40"). "regtech tax compliance" returns Agritech, France, Edtech, HR Technology before Fintech, all with 0 matched tokens.
+- Cause: `score = max(blend, similarity)` lets a pure pg_trgm word similarity of 0.40 with zero matched tokens clear `candidateMinimumScore` 0.35.
+- Proposed fix (classifier version bump + taxonomy eval re-run, so not done here): when `matchedTokens === 0`, require similarity >= 0.6 (or drop the `max(...)` and use the blend only).
+
+### F2. Category step has no way to search or add a category (S2)
+- Where: same step. Only the lexical suggestions are offered; a founder whose description does not literally contain a taxonomy word ("VAT", "e-invoicing", "SME") gets a wrong chip or none, and can only "Skip for now".
+- Expected: a search box over taxonomy v1 (the endpoint already accepts free text), or a short list of top industries.
+
+### F3. Profile: saving in one section makes the next section's save fail with a version conflict (S2)
+- Where: `/profile`. Steps: Edit About → save "In one line" and "Description"; then Edit Company → save City.
+- Expected: City saves. Actual: alert "This profile changed since the page was opened, perhaps through Q. Reload to see the latest" on every Company field until a full reload. Saves inside one section chain correctly; only the version held by the other section goes stale.
+
+### F4. No UI for the founder's own background (S2, data gap)
+- Where: `/profile` "You and your team" only edits Name and Headline. `PATCH /v1/companies/:id/founder-profile/me` (professional summary, background summary) and `PUT /v1/companies/:id/team/me` (business title, e.g. "Co-founder & CEO" vs the onboarding radio "CEO") are only reachable via Q record-change actions; no web form calls them. Seed used the API.
+- Education, previous roles, languages and city of a person have no field anywhere in the product (no data model), so a founder cannot state their track record except in prose.
+
+### F5. Capital: raise terms are lost or have nowhere to go (S2)
+- Onboarding "Target close: Within 3 months" is not stored (`capital-objectives/current.targetCloseDate` stays null).
+- `/capital` has no editor for target close date or use-of-funds detail (the objective supports both); seed used `PATCH /v1/companies/:id/capital-objectives/:id`.
+- No field anywhere for valuation cap / pre-money, minimum cheque, previous rounds, existing investors, cash, burn or runway. Investors only see these via the deck and data room.
+- After onboarding says "Raising USD 1,800,000", `/capital` still shows "No round open"; the founder must re-enter the same raise in "Open a round".
+
+### F6. Profile "Edit sector" cannot add geography or "other" categories (S3)
+- Typing "Nigeria", "West Africa", "Africa" or "Regulated Financial Services" in the sector dialog finds nothing, though they are taxonomy v1 nodes the dataset assigns. Only industry / business model / customer type / technology are searchable.
+
+### F7. Onboarding traction step records only a signal type (S3)
+- "Paying customers" is a radio; there is no way to give the number (1,140 businesses, ₦38m MRR) in the form, and no metrics editor elsewhere in the founder UI.
+
+### F8. A new team member cannot ask to join their company from the UI (S1 for teams)
+- Where: new account → welcome → founder journey offers only "raising / preparing / exploring" (continuing would create a duplicate company). GateQ → "Find my startup" (`GET /v1/companies/claimable`) answers 400 "You're not working inside an organisation yet" for a person with no organisation, which is exactly who joins a team; the page says "Search didn't load. The connection dropped" (wrong words for a 400). Even with an organisation, the search only returns companies the caller can already see, so a private (pre-verification) company is never findable.
+- The person-level `POST /v1/join-requests {organisationId}` works without an organisation, but nothing in the web app calls it, and a person cannot know the organisation id.
+- Invitations email a one-time link (the raw token exists only in the email), so the email path is the only UI path today.
+- Proposed fix: on the welcome screen add "I'm joining my team" → search by company name or website among all companies (name + city only, no profile data), and send `POST /v1/join-requests`; let `/v1/companies/claimable` run as a person action without organisation context. Seed workaround: API join request, owner approves on Team page (UI).
+
+### F9. Data room: the first level change on any uploaded document always fails (S1) — FIXED in build/seed-fixes
+- Where: `/company/:id?tab=dataroom`, "Who can see <doc>" radios; `POST /v1/data-room/documents/:id/level`; `packages/permissions/src/application/data-room.ts` `setLevel`.
+- Steps: upload a PDF in Documents; open the data room; pick "Public".
+- Expected: saved. Actual: "That didn't save. Someone may have changed it; refresh and try again." on every document that has never been filed (all new uploads). API: `expectedVersion: 1` → 409; `0` → 422 (contract min 1).
+- Cause: the owner view reports `Math.max(document.version, 1)` for a document with no `data_room_entries` row, so the screen sends 1; the store then runs the UPDATE path (`version = 1`), finds no row and returns a conflict. The INSERT path (expected 0) is unreachable from the screen.
+- Fix: a document with no entry (version 0) is always a first filing (insert, which keeps its own `on conflict do nothing` guard). Test added in `packages/permissions/test/data-room.test.ts`.
+
+### F10. Data room: no way to file a document in a folder (S2)
+- Every upload that is not a pitch deck lands in "Other documents"; the checklist ("Certificate of incorporation (CAC)", "Cap table", ...) stays "Usually expected" even after the exact document is uploaded. `POST .../level` accepts `folderCode` and `checklistItemCode`, but no UI sends them, and Q's reading does not file them. Seed filed folders through the API.
+- Also: Documents → Share → "Who can download it" (deck "Investors who can find us") and the data room level ("Private") are two separate controls for the same deck and can disagree.
+

@@ -111,6 +111,8 @@ function world() {
       const current = documents[index];
       if (current === undefined || current.version !== input.expectedVersion)
         return Promise.resolve(null);
+      // Like the Postgres store: expected 0 inserts the first entry at
+      // version 1; otherwise the entry's version moves on by one.
       documents[index] = {
         ...current,
         level: input.level,
@@ -275,7 +277,16 @@ function world() {
     newCorrelationId: () => "cor_test",
     now: () => NOW,
   });
-  return { service, requests, policies, events, audits, views, notices };
+  return {
+    service,
+    documents,
+    requests,
+    policies,
+    events,
+    audits,
+    views,
+    notices,
+  };
 }
 
 const titles = (view: unknown) =>
@@ -630,6 +641,37 @@ describe("levels", () => {
         expectedVersion: 1,
       }),
     ).toEqual({ outcome: "REFUSED", code: "VERSION_CONFLICT" });
+  });
+
+  it("files a never-filed document on the first change, though the screen saw the reported version 1", async () => {
+    const { service, documents } = world();
+    const index = documents.findIndex(
+      (d) => d.documentId === PRIVATE_DOC.documentId,
+    );
+    // No data-room entry yet: the store reads version 0; the owner view
+    // reports it as 1, which is what the screen sends back.
+    documents[index] = { ...PRIVATE_DOC, version: 0 };
+    const view = await service.view(founder, COMPANY);
+    if (view?.viewer !== "OWNER") throw new Error("owner view");
+    expect(
+      view.documents.find((d) => d.documentId === PRIVATE_DOC.documentId)
+        ?.version,
+    ).toBe(1);
+    expect(
+      await service.setLevel({
+        actor: founder,
+        documentId: PRIVATE_DOC.documentId,
+        level: "PUBLIC",
+        expectedVersion: 1,
+      }),
+    ).toEqual({
+      outcome: "OK",
+      value: {
+        documentId: PRIVATE_DOC.documentId,
+        level: "PUBLIC",
+        version: 1,
+      },
+    });
   });
 
   it("never opens a private document for an investor, even one who can find the company", async () => {
