@@ -365,6 +365,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // 2026-10-04: the Capital page's book, read by read_my("capital").
   "api/http/commitments.ts GET COMPANY_CAPITAL_LEDGER_PATH":
     cap("tool.read_my"),
+  // P8: a round's correction history, read with the same capital capability.
+  "api/http/commitments.ts GET COMPANY_CAPITAL_ROUND_HISTORY_PATH":
+    cap("tool.read_my"),
   "api/http/commitments.ts GET NETWORK_MY_COMMITMENTS_PATH":
     cap("tool.read_my"),
   "api/http/commitments.ts GET NETWORK_COMPANY_FUNDRAISING_PATH": exempt(
