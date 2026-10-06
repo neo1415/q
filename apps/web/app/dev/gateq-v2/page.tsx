@@ -32,6 +32,9 @@ import { CopyLink, InboxView } from "@/features/gateq/page/inbox-view";
 import { FindView, GateView } from "@/features/gateq/page/investor-views";
 import { qrSvg } from "@/features/q-card/qr";
 
+// Rendered per request: a production build serves it only under CQ_DEV_PREVIEW.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "GateQ (design review)",
   robots: { index: false },
