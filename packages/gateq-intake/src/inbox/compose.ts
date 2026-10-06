@@ -77,6 +77,7 @@ export function gateqInboxActionsPort(
     reply: service.reply,
     setReplyPromise: service.setReplyPromise,
     triage: service.triage,
+    list: service.list,
     detail: service.detail,
     draftPass: service.draftPass,
     findApplication: service.findApplication,

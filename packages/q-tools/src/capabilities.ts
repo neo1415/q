@@ -764,7 +764,13 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "open_page",
     "NAVIGATION",
-    "Opens one company's page, their relationship with a company or an investor, the chat with them, or a rehearsal of their meeting with them (Q plays that person), by id or by the name they said.",
+    "Opens a company's page or tab (elevator, data room, deck, team), a relationship, a chat, a rehearsal, one of Q's work items, a round, a GateQ application or a settings section, by id or by the name they said.",
+    { acts: true },
+  ),
+  tool(
+    "show",
+    "NAVIGATION",
+    "Shows one thing in the Q room as a card while Q talks (a company's profile, data room or deck, a chat, a work plan, a round, a GateQ application, the sources read), closing by itself when the conversation moves on.",
     { acts: true },
   ),
   tool(

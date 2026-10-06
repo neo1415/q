@@ -6,7 +6,9 @@ import {
   Q_TASK_CLASSES,
   QClientActionToolResultSchema,
   QMotionChoiceSchema,
-  QRecordPageSchema,
+  Q_RECORD_PAGES,
+  QRoomObjectSchema,
+  QSettingsSectionSchema,
   QScreenActSchema,
   QScreenSectionSchema,
   QThemeChoiceSchema,
@@ -15,6 +17,7 @@ import {
   type QClientActionIntent,
   type QClientActionToolResult,
 } from "@capital-q/contracts";
+import { readOwn } from "@capital-q/app-actions";
 import { CompanyIdSchema } from "@capital-q/companies";
 import type { ActorContext } from "@capital-q/security";
 
@@ -328,8 +331,8 @@ export function createSignOutTool(): AnyQToolDefinition {
 
 export const OpenPageInputSchema = z
   .object({
-    page: QRecordPageSchema.describe(
-      "COMPANY: a company's page. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it. COMPANY_PITCH: for an investor, a company of theirs (connected, interested or saved) in Discover's Your companies tab, with its pitch when the company shares it ('show me Nixo's pitch').",
+    page: z.enum([...Q_RECORD_PAGES, "SETTINGS"]).describe(
+      "COMPANY: a company's page (its Overview tab). COMPANY_ELEVATOR / COMPANY_DATA_ROOM / COMPANY_DECK / COMPANY_TEAM: that company profile's Elevator pitch, Data room, Pitch deck or Team tab ('open Ledgerline's data room'). WORK_ITEM: one of Q's work items for them, by its goal as they said it. CAPITAL_ROUND: one of their rounds on Capital, by its name ('the seed round'). GATEQ_APPLICATION: for an investor, one founder's application in their GateQ inbox, by the company's name. SETTINGS: one part of their settings, named in section. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it. COMPANY_PITCH: for an investor, a company of theirs (connected, interested or saved) in Discover's Your companies tab, with its pitch when the company shares it ('show me Nixo's pitch').",
     ),
     id: z
       .string()
@@ -346,6 +349,9 @@ export const OpenPageInputSchema = z
       .describe(
         "Instead of id: the company's or investor's name, or the document's title, as they said it, even misheard or cut short ('young field agro', 'the questions for Priya'). It is matched against the records they can already see.",
       ),
+    section: QSettingsSectionSchema.optional().describe(
+      "For SETTINGS: account, team, appearance, q (Q's personality), speaking (their speaking guide), notifications, connections (Google), billing, privacy, usage, memory, plan.",
+    ),
   })
   .strict();
 export type OpenPageInput = z.infer<typeof OpenPageInputSchema>;
@@ -558,6 +564,8 @@ export function createOpenPageTool(
     | "discovery"
     | "investorFeed"
     | "documents"
+    | "work"
+    | "appActions"
   >,
 ): AnyQToolDefinition {
   const candidates = (
@@ -587,8 +595,30 @@ export function createOpenPageTool(
           ? deny<QClientActionToolResult>("NOT_AVAILABLE")
           : allowed({ kind: "OPEN_RECORD_PAGE", page: "DOCUMENT", id });
       }
+      // Q room R2: a part of their own settings; nothing is read.
+      if (input.page === "SETTINGS") {
+        return input.section === undefined
+          ? deny<QClientActionToolResult>("NOT_AVAILABLE")
+          : allowed({ kind: "OPEN_SETTINGS", section: input.section });
+      }
+      // Q room R2: their own work, rounds and GateQ applications, found
+      // only among what their own pages list for them.
+      if (
+        input.page === "WORK_ITEM" ||
+        input.page === "CAPITAL_ROUND" ||
+        input.page === "GATEQ_APPLICATION"
+      ) {
+        const found = await ownRecord(ports, actor, input.page, input);
+        return found === null
+          ? deny<QClientActionToolResult>("NOT_AVAILABLE")
+          : allowed({
+              kind: "OPEN_RECORD_PAGE",
+              page: input.page,
+              id: found.id,
+            });
+      }
       const companySide =
-        input.page === "COMPANY" ||
+        COMPANY_TABS.has(input.page) ||
         input.page === "COMPANY_PITCH" ||
         input.page === "COMPANY_REHEARSAL" ||
         input.page === "RELATIONSHIP_COMPANY" ||
@@ -605,7 +635,7 @@ export function createOpenPageTool(
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
       let openable = false;
-      if (input.page === "COMPANY") {
+      if (COMPANY_TABS.has(input.page)) {
         const id = CompanyIdSchema.safeParse(recordId);
         const profile = id.success
           ? await ports.companies
@@ -666,6 +696,199 @@ export function createOpenPageTool(
         : deny<QClientActionToolResult>("NOT_AVAILABLE");
     },
   });
+}
+
+/** A company profile and its tabs: opened under the same rule as the profile. */
+const COMPANY_TABS: ReadonlySet<string> = new Set([
+  "COMPANY",
+  "COMPANY_ELEVATOR",
+  "COMPANY_DATA_ROOM",
+  "COMPANY_DECK",
+  "COMPANY_TEAM",
+]);
+
+type OwnRecordKind = "WORK_ITEM" | "CAPITAL_ROUND" | "GATEQ_APPLICATION";
+
+/**
+ * One of their own work items, rounds or GateQ applications, by id or by
+ * the name they said, among exactly what their own pages list for them
+ * (Q's work, read_my capital, the GateQ inbox under its gateway authority).
+ * Nothing someone else owns is a candidate, so a name opens nothing more.
+ */
+export async function ownRecord(
+  ports: Pick<QToolPorts, "work" | "appActions">,
+  actor: ActorContext,
+  kind: OwnRecordKind,
+  wanted: { readonly id?: string | undefined; readonly name?: string | undefined },
+): Promise<{ readonly id: string; readonly title: string } | null> {
+  let listed: { id: string; name: string }[] = [];
+  if (kind === "WORK_ITEM") {
+    const items = await ports.work?.list(actor).catch(() => null);
+    listed = (items ?? []).map((item) => ({
+      id: item.id,
+      name: item.goal ?? item.summary ?? item.kind.toLowerCase().replace(/_/g, " "),
+    }));
+  } else if (kind === "CAPITAL_ROUND") {
+    if (ports.appActions === undefined) return null;
+    const items = await readOwn(ports.appActions, actor, "capital").catch(
+      () => null,
+    );
+    listed = (items ?? [])
+      .filter((item) => !item.id.startsWith("total-"))
+      .map((item) => ({ id: item.id, name: item.title }));
+  } else {
+    if (ports.appActions === undefined) return null;
+    const items = await readOwn(ports.appActions, actor, "gateq").catch(
+      () => null,
+    );
+    listed = (items ?? []).map((item) => ({ id: item.id, name: item.title }));
+  }
+  if (wanted.id !== undefined) {
+    const id = wanted.id.toLowerCase();
+    const hit = listed.find((item) => item.id.toLowerCase() === id);
+    return hit === undefined ? null : { id, title: hit.name };
+  }
+  if (wanted.name === undefined) return null;
+  const id = matchCounterpart(wanted.name, listed);
+  const hit = listed.find((item) => item.id === id);
+  return hit === undefined ? null : { id: hit.id.toLowerCase(), title: hit.name };
+}
+
+export const SHOW = "client.q_room.show" as const;
+
+export const ShowInputSchema = z
+  .object({
+    object: QRoomObjectSchema.describe(
+      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name).",
+    ),
+    id: z
+      .string()
+      .uuid()
+      .optional()
+      .describe("The record's id exactly as a tool or the screen gave it. Never guessed."),
+    name: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe(
+        "Instead of id: the company's, investor's, work item's, round's or applicant's name as they said it, even misheard.",
+      ),
+  })
+  .strict();
+export type ShowInput = z.infer<typeof ShowInputSchema>;
+
+/**
+ * Q room R4: bring one thing into the Q room as a card while Q talks,
+ * without leaving the page. The model names only the kind and the record;
+ * this step finds it among what the person can already open, exactly as
+ * open_page does, and the card's content is read by the screen through
+ * the page's own reads as the person. The title is the record's own name
+ * from its service, never the model's words.
+ */
+export function createShowTool(
+  ports: Pick<
+    QToolPorts,
+    | "companies"
+    | "relationships"
+    | "disclosure"
+    | "discovery"
+    | "investorFeed"
+    | "work"
+    | "appActions"
+  >,
+): AnyQToolDefinition {
+  return defineQTool<ShowInput, QClientActionToolResult, QClientActionToolResult>({
+    ...COMMON,
+    id: SHOW,
+    providerName: "show",
+    description:
+      "Shows one thing in the Q room as a card while you talk, without leaving the page: a company's profile, data room or pitch deck, the chat with a company or investor, one of Q's work items with its plan, a capital round, a GateQ application, or the news and web sources this answer read. Use it when they ask to see, show, pull up or bring up something here; use open_page only when they ask to be taken to its page. The card closes by itself when the conversation moves on.",
+    input: ShowInputSchema,
+    authorize: async (input, { actor, plan }) => {
+      if (!ownConversation(actor, plan)) {
+        return deny<QClientActionToolResult>("NOT_AVAILABLE");
+      }
+      if (input.object === "SOURCES") {
+        return allowed({ kind: "SHOW_IN_Q_ROOM", object: "SOURCES", title: "Sources" });
+      }
+      const found = await roomRecord(ports, actor, input);
+      return found === null
+        ? deny<QClientActionToolResult>("NOT_AVAILABLE")
+        : allowed({
+            kind: "SHOW_IN_Q_ROOM",
+            object: input.object,
+            id: found.id,
+            title: found.title.slice(0, 120),
+          });
+    },
+  });
+}
+
+/** The record a show names, under the same rules open_page applies. */
+async function roomRecord(
+  ports: Parameters<typeof createShowTool>[0],
+  actor: ActorContext,
+  input: ShowInput,
+): Promise<{ readonly id: string; readonly title: string } | null> {
+  switch (input.object) {
+    case "WORK_PLAN":
+      return ownRecord(ports, actor, "WORK_ITEM", input);
+    case "CAPITAL_ROUND":
+      return ownRecord(ports, actor, "CAPITAL_ROUND", input);
+    case "GATEQ_APPLICATION":
+      return ownRecord(ports, actor, "GATEQ_APPLICATION", input);
+    case "SOURCES":
+      return null;
+    case "CHAT_WITH_INVESTOR": {
+      if (ports.relationships === undefined) return null;
+      const named = await nameableRecords(
+        ports,
+        actor,
+        "INVESTOR_ORGANISATION",
+        input.name ?? null,
+      );
+      const id =
+        input.id?.toLowerCase() ??
+        (input.name === undefined ? null : matchCounterpart(input.name, named));
+      if (id === null) return null;
+      const standing = await ports.relationships
+        .withInvestor(actor, id)
+        .catch(() => null);
+      if (standing === null) return null;
+      const title =
+        named.find((item) => item.id.toLowerCase() === id)?.name ?? "the investor";
+      return { id, title };
+    }
+    case "COMPANY_PROFILE":
+    case "DATA_ROOM":
+    case "PITCH_DECK":
+    case "CHAT_WITH_COMPANY": {
+      let id = input.id?.toLowerCase() ?? null;
+      if (id === null && input.name !== undefined) {
+        id = matchCounterpart(
+          input.name,
+          await nameableRecords(ports, actor, "COMPANY", input.name),
+        );
+      }
+      if (id === null) return null;
+      const parsed = CompanyIdSchema.safeParse(id);
+      const profile = parsed.success
+        ? await ports.companies
+            .findCanonicalCompanyProfile(parsed.data)
+            .catch(() => null)
+        : null;
+      if (profile === null || profile.tenantId !== actor.tenantId) return null;
+      if (input.object === "CHAT_WITH_COMPANY") {
+        const standing =
+          ports.relationships === undefined
+            ? null
+            : await ports.relationships.withCompany(actor, id).catch(() => null);
+        if (standing === null) return null;
+      }
+      return { id, title: profile.canonicalName };
+    }
+  }
 }
 
 export const CONTROL_SCREEN = "client.screen.control" as const;
@@ -840,6 +1063,8 @@ export function createClientActionTools(
     | "discovery"
     | "investorFeed"
     | "documents"
+    | "work"
+    | "appActions"
   >,
 ): readonly AnyQToolDefinition[] {
   return [
@@ -852,5 +1077,6 @@ export function createClientActionTools(
     createOpenPageTool(ports),
     createControlScreenTool(),
     createSetDiscoverFiltersTool(),
+    createShowTool(ports),
   ];
 }

@@ -345,7 +345,7 @@ export const READ_MY = "app.own.read" as const;
 export const ReadMyInputSchema = z
   .object({
     kind: OwnReadKindSchema.describe(
-      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call), uploads (the files their company uploaded: pitch deck, financials and the like, with type and status), diligence (their relationships' diligence areas: requests, which are answered, shared documents), capital (their rounds and commitments), team (the people in their company or firm, each one's role, and invitations waiting).",
+      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call), uploads (the files their company uploaded: pitch deck, financials and the like, with type and status), diligence (their relationships' diligence areas: requests, which are answered, shared documents), capital (their rounds and commitments), team (the people in their company or firm, each one's role, and invitations waiting), gateq (for an investor, the founders' applications in their GateQ inbox: company, fit, rules met, read or unread, reply due).",
     ),
     text: z
       .string()
