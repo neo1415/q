@@ -95,13 +95,10 @@ describe("toolFocusOf", () => {
     ).toEqual({ areas: ["Relationships"], tools: [], widen: true });
     // Nothing to act on and nothing it is about: the purpose's list.
     expect(focus(reading({ kind: "TOOL_REQUEST" }), [])).toBeNull();
-    // A question that names nothing keeps the purpose's list, with the
-    // public-web tools leading (web search 2026-10-06).
-    expect(focus(reading({}), ["INVESTOR_ORGANISATION"])).toEqual({
-      areas: [],
-      tools: [...RESEARCH_TOOLS],
-      widen: true,
-    });
+    // A question that names nothing keeps the whole offer, navigation
+    // included; the gateway keeps the web tool on such turns (founder
+    // 2026-10-06: Q said it could not scroll when this was narrowed).
+    expect(focus(reading({}), ["INVESTOR_ORGANISATION"])).toBeNull();
   });
 
   describe("research and web reading are guaranteed (run 13955ca2)", () => {
@@ -141,10 +138,14 @@ describe("toolFocusOf", () => {
           "PROGRESS",
           null,
         ]) {
-          expect(
-            focus(reading({ questionKind, research }))?.tools,
-            `${String(questionKind)} ${String(research)}`,
-          ).toEqual(RESEARCH);
+          const tools = focus(reading({ questionKind, research }))?.tools;
+          // No focus at all is the whole offer, which holds the web tools.
+          if (tools !== undefined) {
+            expect(
+              tools,
+              `${String(questionKind)} ${String(research)}`,
+            ).toEqual(RESEARCH);
+          }
         }
       }
       // A request to act that does not ask for the web does not get it.

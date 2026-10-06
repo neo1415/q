@@ -221,9 +221,10 @@ function focusOf(input: {
   // tools lead the offer; nothing forces a search.
   const asks = reading.kind === QUESTION;
   if (areas.size === 0 && tools.size === 0) {
-    if (asks) {
-      return { areas: [], tools: [...RESEARCH_TOOLS], widen: true };
-    }
+    // A question that names nothing keeps the full offer (navigation,
+    // page actions and the web alike): narrowing it to the research tools
+    // let the bound cut navigation, and Q said it could not scroll
+    // (founder 2026-10-06). The gateway keeps the web tool on such turns.
     if (reading.kind !== "TOOL_REQUEST" || subjectAreas.length === 0) {
       return null;
     }
