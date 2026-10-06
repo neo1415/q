@@ -81,6 +81,9 @@ const PolicyRow = z.object({
   sensitivity_class: z.string(),
   quality_floor: z.string(),
   latency_target_ms: z.number().int().nullable(),
+  // Absent before 20261207163000; a catalog read against an older schema
+  // simply has no hedge.
+  hedge_after_ms: z.number().int().nullable().optional(),
   cost_ceiling_usd: NullableNumeric,
   preferred_models: z.array(z.string()),
   fallback_models: z.array(z.string()),
@@ -110,9 +113,12 @@ export async function loadModelCatalogSnapshot(
     sql`select id, model_id, pricing_region, currency, input_per_million, cached_input_per_million,
                output_per_million, effective_from, effective_to
           from ai_ops.model_prices order by effective_from`,
-    sql`select id, code, task_class, sensitivity_class, quality_floor, latency_target_ms, cost_ceiling_usd,
+    // hedge_after_ms read through to_jsonb so a service deployed before
+    // its migration (20261207163000) still loads its catalog, unhedged.
+    sql`select id, code, task_class, sensitivity_class, quality_floor, latency_target_ms,
+               (to_jsonb(rp) ->> 'hedge_after_ms')::integer as hedge_after_ms, cost_ceiling_usd,
                preferred_models, fallback_models, allow_free_router, status, version
-          from ai_ops.routing_policies order by task_class, version`,
+          from ai_ops.routing_policies rp order by task_class, version`,
   ]);
 
   return ModelCatalogSnapshotSchema.parse({
@@ -177,6 +183,7 @@ export async function loadModelCatalogSnapshot(
         sensitivityClass: r.sensitivity_class,
         qualityFloor: r.quality_floor,
         latencyTargetMs: r.latency_target_ms,
+        hedgeAfterMs: r.hedge_after_ms ?? null,
         costCeilingUsd: r.cost_ceiling_usd,
         preferredModels: r.preferred_models,
         fallbackModels: r.fallback_models,

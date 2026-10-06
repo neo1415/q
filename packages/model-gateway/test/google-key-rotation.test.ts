@@ -1,4 +1,3 @@
-import { ApiError, ThinkingLevel } from "@google/genai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -38,6 +37,8 @@ vi.mock("@google/genai", async (importOriginal) => {
   return { ...actual, GoogleGenAI: FakeGoogleGenAI };
 });
 
+// The mocked module keeps the SDK's own error class: a 403 as the SDK raises it.
+const { ApiError } = await import("@google/genai");
 const { createGoogleModelProvider } =
   await import("../src/providers/google.js");
 
@@ -107,7 +108,7 @@ describe("Gemini keys", () => {
     const provider = createGoogleModelProvider({ apiKey: "k" });
     await provider.generate(REQUEST, CONTEXT);
     expect(behaviour.calls[0]?.config).toMatchObject({
-      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      thinkingConfig: { thinkingLevel: "MINIMAL" },
     });
   });
 });
