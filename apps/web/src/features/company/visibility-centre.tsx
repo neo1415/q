@@ -14,7 +14,7 @@ import type {
   VisibilityStateDto,
 } from "@capital-q/contracts";
 import { instrumentLabel } from "@capital-q/founder-onboarding";
-import { Button } from "@capital-q/ui/button";
+import { Button, buttonClassName } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 import { Select } from "@capital-q/ui/select";
@@ -26,6 +26,7 @@ import {
   loadVisibilityStateAction,
   revokeShareAction,
   shareRaiseAction,
+  shareRaiseWithNetworkAction,
 } from "./visibility-actions";
 import { formatLongDay } from "@/components/date-format";
 
@@ -91,7 +92,7 @@ const OBJECT_WORDS: Readonly<
   CAPITAL_OBJECTIVE: {
     name: "Your raise",
     scopeWords: () =>
-      "Private to your company. You can share it with an investor you have a relationship with; it is never shown to the network or the public.",
+      "Private to your company unless you share it: with an investor you have a relationship with, or with every investor on Capital Q (below). Never public.",
   },
 };
 
@@ -228,6 +229,43 @@ function WhoSeesWhat({
     }
   };
 
+  const networkShare = state.networkRaiseShare ?? null;
+  const networkKey = useRef<string | null>(null);
+  const setNetwork = async (on: boolean) => {
+    setBusy(true);
+    try {
+      if (on) {
+        networkKey.current ??= `share-network:${crypto.randomUUID()}`;
+        const result = await shareRaiseWithNetworkAction(
+          companyId,
+          networkKey.current,
+        );
+        if (!result.ok) {
+          onError(result.message);
+          return;
+        }
+        networkKey.current = null;
+        await onChanged(
+          "Investors on Capital Q can now see your raise: target, instrument, stage and close date. Not your use of funds.",
+        );
+      } else if (networkShare !== null) {
+        const result = await revokeShareAction(
+          companyId,
+          networkShare.policyId,
+        );
+        if (!result.ok) {
+          onError(result.message);
+          return;
+        }
+        await onChanged(
+          "Your raise is no longer shown to the network. Investors you shared it with one by one still see it; what others already saw can't be recalled.",
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const revoke = async (policyId: string, name: string) => {
     setBusy(true);
     try {
@@ -292,6 +330,46 @@ function WhoSeesWhat({
         </p>
       ) : (
         <div className="flex max-w-(--cq-layout-reading) flex-col gap-3">
+          {/* P14 (ADR 0060): the network-wide share, off unless chosen. */}
+          <div
+            className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-(--cq-border-subtle) p-3"
+            data-network-raise-share={networkShare === null ? "off" : "on"}
+          >
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span
+                id="network-raise-label"
+                className="cq-label text-(--cq-text-primary)"
+              >
+                Show my raise to every investor on Capital Q
+              </span>
+              <span
+                id="network-raise-help"
+                className="cq-body-sm text-(--cq-text-secondary)"
+              >
+                {networkShare === null
+                  ? "Off. Only investors you share it with below can see your raise."
+                  : "On. Investors on Capital Q who can see your company see your raise's target, instrument, stage and close date, and Discover's raise filters can match you. Never your use of funds, never the public."}{" "}
+                You can turn it off at any time; what was already seen
+                can&apos;t be recalled.
+              </span>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={networkShare !== null}
+              aria-labelledby="network-raise-label"
+              aria-describedby="network-raise-help"
+              disabled={busy}
+              onClick={() => void setNetwork(networkShare === null)}
+              className={buttonClassName(
+                networkShare === null ? "secondary" : "primary",
+                "regular",
+                "min-h-11",
+              )}
+            >
+              {networkShare === null ? "Turn on" : "On · turn off"}
+            </button>
+          </div>
           <h3 className="cq-label text-(--cq-text-primary)">
             Shared with investors
           </h3>

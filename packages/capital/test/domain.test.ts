@@ -265,7 +265,52 @@ describe("history payloads", () => {
       "INSTRUMENT",
       "TIMELINE",
       "USE_OF_FUNDS",
+      "VALUATION",
+      "MINIMUM_CHEQUE",
     ]);
+  });
+
+  it("F5: raise terms are exact, complete and never zero; old history still reads", () => {
+    expect(
+      UpdateCapitalObjectiveRequestSchema.safeParse({
+        expectedVersion: 1,
+        valuation: { kind: "CAP", amount: "12000000" },
+        minimumCheque: "25000",
+      }).success,
+    ).toBe(true);
+    expect(
+      UpdateCapitalObjectiveRequestSchema.safeParse({
+        expectedVersion: 1,
+        minimumCheque: "0",
+      }).success,
+    ).toBe(false);
+    expect(
+      UpdateCapitalObjectiveRequestSchema.safeParse({
+        expectedVersion: 1,
+        valuation: { kind: "GUESS", amount: "1" },
+      }).success,
+    ).toBe(false);
+    // Clearing is explicit null, distinct from "unchanged".
+    expect(
+      UpdateCapitalObjectiveRequestSchema.safeParse({
+        expectedVersion: 2,
+        valuation: null,
+      }).success,
+    ).toBe(true);
+    expect(() =>
+      serializeHistoryPayload({
+        kind: "RECALIBRATED",
+        changedFields: ["valuation", "minimumCheque"],
+        changeKinds: ["VALUATION", "MINIMUM_CHEQUE"],
+        previous: { valuation: null, minimumCheque: null },
+        next: {
+          valuation: { kind: "PRE_MONEY", amount: "8000000" },
+          minimumCheque: "50000",
+        },
+        previousVersion: 1,
+        newVersion: 2,
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -301,6 +346,8 @@ describe("DTO and snapshot", () => {
     instrumentCode: "safe",
     targetCloseDate: "2026-12-01",
     useOfFundsSummary: "PRIVATE-USE-OF-FUNDS-DO-NOT-EMIT",
+    valuation: { kind: "CAP", amount: "12000000" },
+    minimumCheque: "25000",
     startedAt: NOW,
     closedAt: null,
     createdByUserId: USER,
@@ -319,6 +366,10 @@ describe("DTO and snapshot", () => {
     const snapshot = toCapitalObjectiveSnapshot(objective);
     expect(snapshot.target).toEqual(TARGET);
     expect(snapshot).not.toHaveProperty("useOfFundsSummary");
+    // F5: the terms are the company's own; the permission-neutral snapshot
+    // other contexts read never carries them.
+    expect(snapshot).not.toHaveProperty("valuation");
+    expect(snapshot).not.toHaveProperty("minimumCheque");
   });
 });
 

@@ -12,6 +12,7 @@ import {
   getVisibilityState,
   revokeVisibilityShare,
   setCompanyVisibility,
+  shareRaiseWithNetwork,
   shareWithRelationship,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -304,6 +305,24 @@ export async function shareRaiseAction(
       relationshipId.data,
       key.data,
     ),
+  );
+}
+
+/** P14 (ADR 0060): show the current raise to every investor on the network. */
+export async function shareRaiseWithNetworkAction(
+  rawCompanyId: string,
+  rawIdempotencyKey: string,
+): Promise<VisibilityActionResult<VisibilityShareResultDto>> {
+  const companyId = CompanyIdInput.safeParse(rawCompanyId);
+  const key = z.string().min(8).max(255).safeParse(rawIdempotencyKey);
+  if (!companyId.success || !key.success) {
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
+  }
+  return withSession((current) =>
+    shareRaiseWithNetwork(current, companyId.data, key.data),
   );
 }
 

@@ -23,11 +23,19 @@ export function createPostgresApplicationFounders(options: {
 }) {
   const { sql } = options;
   return {
+    /**
+     * Links the founder; returns the canonical pair the application names
+     * (their company and the gateway's investor organisation), or null
+     * when they have no company. Network ensures the relationship.
+     */
     link: async (input: {
       readonly applicationId: string;
       readonly tenantId: string;
       readonly actor: ActorContext;
-    }): Promise<void> => {
+    }): Promise<{
+      readonly companyId: string;
+      readonly investorOrganisationId: string;
+    } | null> => {
       // Their own company, when they act for one; an application is never
       // turned into a company record here.
       const companies = await sql<{ id: string }[]>`
@@ -40,6 +48,35 @@ export function createPostgresApplicationFounders(options: {
         insert into gateq.application_founders (application_id, tenant_id, founder_user_id, company_id)
         values (${input.applicationId}, ${input.tenantId}, ${input.actor.userId}, ${companies[0]?.id ?? null})
         on conflict (application_id) do nothing`;
+      const pairs = await sql<
+        { company_id: string; investor_organisation_id: string }[]
+      >`
+        select f.company_id, g.investor_organisation_id
+          from gateq.application_founders f
+          join gateq.applications a on a.id = f.application_id
+          join gateq.gateways g on g.id = a.gateway_id
+         where f.application_id = ${input.applicationId}
+           and f.founder_user_id = ${input.actor.userId}
+           and f.company_id is not null`;
+      const pair = pairs[0];
+      return pair === undefined
+        ? null
+        : {
+            companyId: pair.company_id,
+            investorOrganisationId: pair.investor_organisation_id,
+          };
+    },
+
+    /** P14: the canonical relationship the application joined. */
+    setRelationship: async (input: {
+      readonly applicationId: string;
+      readonly relationshipId: string;
+    }): Promise<void> => {
+      await sql`
+        update gateq.application_founders
+           set relationship_id = ${input.relationshipId}
+         where application_id = ${input.applicationId}
+           and relationship_id is null`;
     },
 
     listFor: async (

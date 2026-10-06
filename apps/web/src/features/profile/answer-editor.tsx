@@ -407,7 +407,17 @@ function CategoryField({
           </span>
         ))}
       </div>
-      {ids.length >= maxItems ? null : (
+      {ids.length >= maxItems ? (
+        // F18: say why the search went away instead of hiding it silently.
+        <p
+          className="cq-caption text-(--cq-text-secondary)"
+          role="status"
+          data-answer-limit
+        >
+          That&apos;s the most you can keep ({maxItems}). Remove one to add
+          another.
+        </p>
+      ) : (
         <Input
           id={`answer-${stepKey.replace(/\W+/g, "-")}-search`}
           label="Add"

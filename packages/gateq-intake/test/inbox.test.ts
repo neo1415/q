@@ -1,3 +1,4 @@
+import type { GateqEmailEvent, GateqOutboundSender } from "../src/index.js";
 import { describe, expect, it } from "vitest";
 
 import type { ActorContext } from "@capital-q/security";
@@ -74,6 +75,11 @@ const snapshot = (name: string, documentIds: string[] = []) => ({
       value: { kind: "TEXT", text: "Amara Obi" },
       provenance: "APPLICANT_PROVIDED",
     },
+    {
+      dimension: "contact.email",
+      value: { kind: "TEXT", text: "amara@sunline.example" },
+      provenance: "APPLICANT_PROVIDED",
+    },
   ],
   documentIds,
 });
@@ -106,7 +112,13 @@ type State = {
   promise: number | null;
 };
 
-function harness(options: { readonly now?: string } = {}) {
+function harness(
+  options: {
+    readonly now?: string;
+    readonly mail?: GateqOutboundSender;
+  } = {},
+) {
+  const emailEvents: GateqEmailEvent[] = [];
   const submitted = new Map<
     string,
     { gateway: string; at: string; snapshot: unknown; qualification: unknown }
@@ -336,6 +348,10 @@ function harness(options: { readonly now?: string } = {}) {
     authority,
     transactions,
     clock: () => new Date(options.now ?? "2026-10-06T10:00:00.000Z"),
+    founderMail: options.mail,
+    onEmail: (event) => {
+      emailEvents.push(event);
+    },
     documents: {
       titles: (ids) =>
         Promise.resolve(
@@ -354,7 +370,7 @@ function harness(options: { readonly now?: string } = {}) {
       },
     },
   });
-  return { service, state, fetched };
+  return { service, state, fetched, emailEvents };
 }
 
 describe("reading the inbox (F4)", () => {
@@ -489,6 +505,50 @@ describe("acting on applications (F4)", () => {
     expect(state.folder.get(APP_PARTIAL)).toBe("PASSED");
     const passed = await service.list(actor(ADMIN), GATEWAY, "PASSED");
     expect("items" in passed && passed.items[0]?.replyState).toBe("ANSWERED");
+  });
+
+  it("P14: the founder gets the approved words by email, once; a failed send keeps the answer", async () => {
+    const sent: { to: string; subject: string; text: string }[] = [];
+    const { service, emailEvents } = harness({
+      mail: {
+        available: true,
+        send: (message) => {
+          sent.push(message);
+          return Promise.resolve();
+        },
+      },
+    });
+    const input = {
+      reasonCode: "TIMING" as const,
+      message: "Not this year, thank you.",
+      clientRequestId: "pass-0000002",
+    };
+    await service.pass(actor(ADMIN), GATEWAY, APP_PARTIAL, input);
+    await service.pass(actor(ADMIN), GATEWAY, APP_PARTIAL, input);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.to).toBe("amara@sunline.example");
+    expect(sent[0]?.text).toContain("Not this year, thank you.");
+    expect(emailEvents).toEqual([
+      { kind: "PASS", outcome: "SENT", recipientDomain: "sunline.example" },
+    ]);
+    const failing = harness({
+      mail: {
+        available: true,
+        send: () => Promise.reject(new Error("relay down")),
+      },
+    });
+    expect(
+      await failing.service.reply(actor(ADMIN), GATEWAY, APP_PARTIAL, {
+        message: "Can you send the cap table?",
+        clientRequestId: "reply-000001",
+      }),
+    ).toMatchObject({ ok: true, deduplicated: false });
+    expect(failing.state.messages).toHaveLength(1);
+    expect(failing.emailEvents[0]).toMatchObject({
+      kind: "REPLY",
+      outcome: "FAILED",
+      recipientDomain: "sunline.example",
+    });
   });
 
   it("drafts a pass with a reason from the rules, and drafting sends nothing", async () => {

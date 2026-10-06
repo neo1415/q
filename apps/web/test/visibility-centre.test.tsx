@@ -123,6 +123,7 @@ const actions = vi.hoisted(() => ({
   loadVisibilityStateAction: vi.fn<ActionMock>(),
   loadAudiencePreviewAction: vi.fn<ActionMock>(),
   shareRaiseAction: vi.fn<ActionMock>(),
+  shareRaiseWithNetworkAction: vi.fn<ActionMock>(),
   revokeShareAction: vi.fn<ActionMock>(),
 }));
 vi.mock("../src/features/company/visibility-actions", () => actions);
@@ -150,6 +151,48 @@ function setUp() {
 }
 
 describe("VisibilityCentre", () => {
+  it("P14: the network-wide raise share is off by default, turns on, and turns off by revoking", async () => {
+    setUp();
+    const toggle = await screen.findByRole("switch", {
+      name: "Show my raise to every investor on Capital Q",
+    });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    actions.shareRaiseWithNetworkAction.mockResolvedValue({
+      ok: true,
+      value: { outcome: "CREATED", share: null },
+    });
+    actions.loadVisibilityStateAction.mockResolvedValue({
+      ok: true,
+      value: {
+        ...STATE,
+        networkRaiseShare: {
+          policyId: "00000000-0000-4000-8000-0000000000fe",
+          createdAt: "2026-10-06T10:00:00.000Z",
+        },
+      },
+    });
+    fireEvent.click(toggle);
+    await screen.findByText(/Investors on Capital Q can now see your raise/u);
+    expect(actions.shareRaiseWithNetworkAction).toHaveBeenCalledWith(
+      COMPANY,
+      expect.stringMatching(/^share-network:/u),
+    );
+    const on = await screen.findByRole("switch", {
+      name: "Show my raise to every investor on Capital Q",
+    });
+    expect(on.getAttribute("aria-checked")).toBe("true");
+    actions.revokeShareAction.mockResolvedValue({
+      ok: true,
+      value: { outcome: "REVOKED" },
+    });
+    fireEvent.click(on);
+    await screen.findByText(/no longer shown to the network/u);
+    expect(actions.revokeShareAction).toHaveBeenCalledWith(
+      COMPANY,
+      "00000000-0000-4000-8000-0000000000fe",
+    );
+  });
+
   it("shows each audience exactly what the server returned for it", async () => {
     setUp();
     const panel = await screen.findByRole("tabpanel");

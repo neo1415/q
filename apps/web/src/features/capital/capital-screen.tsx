@@ -22,6 +22,7 @@ import {
   investorCommitments,
 } from "./capital-book";
 import { MandateSummary } from "./mandate-summary";
+import { RaiseTerms } from "./raise-terms";
 import { ReadinessBlueprintEntry } from "./readiness-blueprint-entry";
 
 /**
@@ -141,6 +142,12 @@ export async function CapitalScreen() {
                   : [],
               )}
             />
+          )}
+          {/* F5: the raise's terms, when there is a raise to set them on. */}
+          {objective === null ? null : (
+            <div className="pt-6">
+              <RaiseTerms objective={objective} />
+            </div>
           )}
           <div className="pt-6">
             <AskQChips asks={asks} />

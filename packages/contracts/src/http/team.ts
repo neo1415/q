@@ -90,6 +90,11 @@ export const TeamMemberDtoSchema = z
     role: TeamRoleSchema,
     isYou: z.boolean(),
     joinedAt: z.string(),
+    /**
+     * P14: their profile photo, as a short-lived signed read URL minted for
+     * this response (never a storage key). Absent or null: initials.
+     */
+    avatarUrl: z.string().url().max(4096).nullable().optional(),
   })
   .strict();
 export type TeamMemberDto = z.infer<typeof TeamMemberDtoSchema>;
@@ -190,6 +195,11 @@ export const InviteResultDtoSchema = z
           email: z.string(),
           /** False: the invitation exists but the email did not go; resend it. */
           emailed: z.boolean(),
+          /**
+           * P15: only when the email did not go, the accept link for the
+           * inviting admin to pass on themselves. Never listed again.
+           */
+          link: z.string().url().max(2048).optional(),
         })
         .strict(),
     ),
@@ -242,6 +252,11 @@ export const MyOrganisationDtoSchema = z
     role: TeamRoleSchema,
     memberCount: z.number().int().min(0),
     active: z.boolean(),
+    /**
+     * F11: the canonical company this organisation is, when it is one. A
+     * member who joined (rather than onboarded) finds their company here.
+     */
+    companyId: UuidSchema.nullable(),
   })
   .strict();
 export type MyOrganisationDto = z.infer<typeof MyOrganisationDtoSchema>;

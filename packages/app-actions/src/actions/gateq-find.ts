@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import {
+  COMPANY_CLAIM_DECISION_PATH,
   COMPANY_CLAIM_REQUESTS_PATH,
+  ClaimDecisionRequestSchema,
+  ClaimDecisionResultDtoSchema,
+  type ClaimDecisionResultDto,
   CompanyClaimRequestSchema,
   CompanyClaimResultDtoSchema,
   GATEQ_STARTUP_ALERTS_PATH,
@@ -33,6 +37,21 @@ export type CompanyClaimsPort = {
     companyId: string,
     input: CompanyClaimRequest,
   ) => Promise<CompanyClaimResultDto | null>;
+  /**
+   * P14: a company admin decides a claim on their own company; approval
+   * admits the requester as a Member. Null: nothing they may decide.
+   */
+  readonly decideAsMember?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+        requestId: string,
+        input: {
+          readonly approve: boolean;
+          readonly reason?: string | undefined;
+        },
+      ) => Promise<ClaimDecisionResultDto | null>)
+    | undefined;
 };
 
 export type StartupAlertsPort = {
@@ -159,4 +178,60 @@ const SAVE_ALERT = defineAppAction<
   },
 });
 
-export const GATEQ_FIND_ACTIONS: readonly AnyAppAction[] = [CLAIM, SAVE_ALERT];
+const Decide = z
+  .object({
+    companyId: UuidSchema,
+    requestId: UuidSchema,
+    input: ClaimDecisionRequestSchema,
+  })
+  .strict();
+type DecideOut = ClaimDecisionResultDto | null;
+
+/**
+ * P14: a company's admin lets a claimant in (as a Member) or declines,
+ * from Settings → Team. Their own decision on their own team's screen; Q
+ * offers that screen and never decides who joins.
+ */
+const DECIDE_CLAIM = defineAppAction<z.infer<typeof Decide>, DecideOut>({
+  name: "company.claim.decide",
+  short: "answer a company claim",
+  area: "team",
+  classification: "CONSEQUENTIAL",
+  does: "Lets someone who claimed their company in as a Member, or declines them.",
+  input: Decide,
+  output: z.custom<DecideOut>(),
+  authorize: serviceDecides,
+  run: (ports, context, input) => {
+    const decide =
+      (ports.companyClaims ?? portMissing("companyClaims")).decideAsMember ??
+      portMissing("companyClaims");
+    return decide(context.actor, input.companyId, input.requestId, input.input);
+  },
+  targets: () => [],
+  card: () => ({ summary: "Answer a company claim", preview: "" }),
+  done: (out) =>
+    out === null
+      ? "That claim isn't one you can answer."
+      : out.status === "APPROVED"
+        ? "Let in as a Member."
+        : "Declined.",
+  succeeded: (out) => out !== null,
+  http: {
+    method: "POST",
+    path: COMPANY_CLAIM_DECISION_PATH,
+    fromRequest: (params, body) => ({
+      companyId: params["companyId"],
+      requestId: params["requestId"],
+      input: body,
+    }),
+    respond: (out) => ClaimDecisionResultDtoSchema.parse(out),
+    notFound: (out) => out === null,
+  },
+  qCapability: "offer.team_manage",
+});
+
+export const GATEQ_FIND_ACTIONS: readonly AnyAppAction[] = [
+  CLAIM,
+  SAVE_ALERT,
+  DECIDE_CLAIM,
+];

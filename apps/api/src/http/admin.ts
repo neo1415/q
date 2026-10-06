@@ -1,5 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
+import type {
+  CompanyClaims,
+  PlatformCompanyPublishing,
+} from "@capital-q/companies";
+import type { TeamService } from "@capital-q/organisations";
+
 import {
   ADMIN_ACCOUNT_PATH,
   ADMIN_ACCOUNT_SUSPENSION_PATH,
@@ -9,6 +15,14 @@ import {
   ADMIN_BREAK_GLASS_CHAT_PATH,
   ADMIN_BREAK_GLASS_DECISION_PATH,
   ADMIN_BREAK_GLASS_PATH,
+  ADMIN_COMPANY_CLAIM_DECISION_PATH,
+  ADMIN_COMPANY_CLAIMS_PATH,
+  ADMIN_COMPANY_PUBLISH_PATH,
+  AdminClaimDecisionRequestSchema,
+  AdminCompanyPublishRequestSchema,
+  AdminCompanyPublishResultDtoSchema,
+  ClaimDecisionResultDtoSchema,
+  PendingClaimListDtoSchema,
   ADMIN_DISPUTES_PATH,
   ADMIN_EMAIL_PATH,
   ADMIN_FLAG_PATH,
@@ -152,6 +166,15 @@ export type AdminRoutesDependencies = ActorContextDependencies & {
       }) => Promise<{ readonly url: string; readonly expiresAt: string }>)
     | undefined;
   // end ADMIN-3 block
+  /**
+   * P14: claims on companies nobody holds (a platform admin decides, and an
+   * approval admits the requester as owner), and making such a company's
+   * profile public. Absent: those routes answer not found after the guard.
+   */
+  readonly companyClaims?:
+    Pick<CompanyClaims, "pending" | "decide"> | undefined;
+  readonly admitClaim?: TeamService["admitClaim"] | undefined;
+  readonly publishCompany?: PlatformCompanyPublishing | undefined;
 };
 
 function send(
@@ -891,6 +914,114 @@ export function registerAdminRoutes(
         reply,
         await admin.revokeTeamRole(grant, { userId, reason: input.reason }),
       );
+    },
+  );
+
+  // --- P14: company claims and publishing ---------------------------------
+
+  app.get(
+    ADMIN_COMPANY_CLAIMS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "claims.read");
+      if (grant === null) return reply;
+      const claims = dependencies.companyClaims;
+      return PendingClaimListDtoSchema.parse({
+        claims:
+          claims === undefined ? [] : await claims.pending({ unclaimed: true }),
+      });
+    },
+  );
+
+  app.post(
+    ADMIN_COMPANY_CLAIM_DECISION_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "claims.decide");
+      if (grant === null) return reply;
+      const requestId = param(request, "requestId");
+      const claims = dependencies.companyClaims;
+      if (requestId === null || claims === undefined) {
+        return notFound(request, reply);
+      }
+      const input = await body(request, reply, AdminClaimDecisionRequestSchema);
+      if (input === null) return reply;
+      // Only a claim on a company nobody holds; anything else is not found.
+      const decided = await claims.decide({
+        requestId,
+        approve: input.approve,
+        deciderUserId: grant.userId,
+        via: "PLATFORM_ADMIN",
+        reason: input.reason,
+      });
+      if (decided === null) return notFound(request, reply);
+      const correlationId = correlation();
+      if (decided.status === "APPROVED" && dependencies.admitClaim) {
+        await dependencies.admitClaim({
+          organisationId: decided.organisationId,
+          userId: decided.requesterUserId,
+          role: "OWNER",
+          decidedByUserId: grant.userId,
+          claimRequestId: requestId,
+          correlationId,
+        });
+      }
+      await admin.recordAction(grant, {
+        actionType:
+          decided.status === "APPROVED" ? "claim.approved" : "claim.declined",
+        resourceType: "company_claim",
+        resourceId: requestId,
+        reason: input.reason,
+        metadata: { companyId: decided.companyId },
+      });
+      return ClaimDecisionResultDtoSchema.parse({ status: decided.status });
+    },
+  );
+
+  app.post(
+    ADMIN_COMPANY_PUBLISH_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "companies.publish");
+      if (grant === null) return reply;
+      const companyId = param(request, "companyId");
+      const publish = dependencies.publishCompany;
+      if (companyId === null || publish === undefined) {
+        return notFound(request, reply);
+      }
+      const input = await body(
+        request,
+        reply,
+        AdminCompanyPublishRequestSchema,
+      );
+      if (input === null) return reply;
+      const outcome = await publish({
+        actor: getActorContext(request),
+        companyId,
+        publicExternal: input.publicExternal,
+        reason: input.reason,
+        correlationId: correlation(),
+      });
+      if (outcome === "NOT_FOUND") return notFound(request, reply);
+      if (outcome === "CHANGED") {
+        await admin.recordAction(grant, {
+          actionType: input.publicExternal
+            ? "company.made_public_external"
+            : "company.returned_to_network",
+          resourceType: "company",
+          resourceId: companyId,
+          reason: input.reason,
+        });
+      }
+      return AdminCompanyPublishResultDtoSchema.parse({
+        outcome,
+        visibility:
+          outcome === "CLAIMED"
+            ? null
+            : input.publicExternal
+              ? "public_external"
+              : "network_visible",
+      });
     },
   );
 }

@@ -227,6 +227,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq.ts GET GATEQ_INBOX_PATH": cap("tool.gateq_inbox_triage"),
   "api/http/gateq.ts GET GATEQ_INBOX_ITEM_PATH": cap("tool.gateq_inbox_triage"),
   "api/http/gateq.ts GET COMPANY_CLAIMABLE_PATH": cap("offer.find_my_startup"),
+  // P14: the claim's work-email code, and the claims waiting on a company.
+  "api/http/gateq.ts POST COMPANY_CLAIM_CONFIRM_PATH": exempt(
+    "a one-time code from the claimant's own inbox, typed on the claim screen; Q never holds it",
+  ),
+  "api/http/gateq.ts GET COMPANY_CLAIM_REQUESTS_PATH": exempt(
+    "a company's admins reading who claimed their company, on Settings → Team",
+  ),
   "api/http/gateq.ts GET GATEQ_MY_APPLICATIONS_PATH": exempt(
     "the founder's own GateQ applications and the investors' answers, listed on their GateQ page",
   ),
@@ -320,6 +327,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/admin.ts GET ADMIN_AUDIT_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts GET ADMIN_FLAGS_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts POST ADMIN_FLAG_PATH": OPERATIONS_CONSOLE,
+  // P14: claims on unclaimed companies, and public company profiles.
+  "api/http/admin.ts GET ADMIN_COMPANY_CLAIMS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_COMPANY_CLAIM_DECISION_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/admin.ts POST ADMIN_COMPANY_PUBLISH_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts GET ADMIN_EMAIL_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts GET ADMIN_TEAM_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts POST ADMIN_TEAM_PATH": OPERATIONS_CONSOLE,
@@ -778,6 +790,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/admin/q/runs/[runId]": OPERATIONS_CONSOLE,
   "/admin/audit": OPERATIONS_CONSOLE,
   "/admin/flags": OPERATIONS_CONSOLE,
+  "/admin/claims": OPERATIONS_CONSOLE,
   "/admin/billing": OPERATIONS_CONSOLE,
   "/admin/email": OPERATIONS_CONSOLE,
   "/admin/team": OPERATIONS_CONSOLE,
@@ -966,6 +979,9 @@ const LEGACY_MUTATION_ROUTES_MAX = 77;
 const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "api/http/gateq-apply.ts POST GATEQ_APPLY_ANSWERS_PATH",
   "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH",
+  // P14: authorised by a one-time code only the claimant's inbox holds; no
+  // actor carries it, so no declared action can. Pending the lead's decision.
+  "api/http/gateq.ts POST COMPANY_CLAIM_CONFIRM_PATH",
 ]);
 
 const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([

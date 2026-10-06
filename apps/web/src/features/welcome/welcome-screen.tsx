@@ -329,6 +329,16 @@ export function WelcomeScreen({
             >
               Prefer to type?
             </button>
+            {/* F8: someone joining a team that is already here asks its
+                admins to let them in; setting up would make a second
+                company. */}
+            <a
+              href="/gateq?tab=claim"
+              className="cq-stage-quiet"
+              data-q-welcome-join
+            >
+              Joining your team? Find your company
+            </a>
           </div>
         )}
       </div>

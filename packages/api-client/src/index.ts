@@ -235,6 +235,7 @@ export {
   getAudiencePreview,
   getVisibilityState,
   revokeVisibilityShare,
+  shareRaiseWithNetwork,
   shareWithRelationship,
 } from "./visibility.js";
 
@@ -462,3 +463,4 @@ export { exploreRelated, exploreSearch, exploreSlate } from "./explore.js";
 // G1/G2 block: teams.
 export * from "./team.js";
 export * from "./gateq-inbox.js";
+export * from "./company-claims.js";

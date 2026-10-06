@@ -38,6 +38,8 @@ export class MemoryTeamDb {
       type: "company" | "investment_firm";
       name: string;
       status: "active";
+      /** F11: the canonical company this organisation is, when known. */
+      companyId?: string | null;
     }
   >();
   people = new Map<string, MemoryPerson>();
@@ -336,6 +338,7 @@ function memoryTeamStore(db: MemoryTeamDb): TeamStore<MemoryTeamDb> {
                   x.status === "active",
               ).length,
               active: db.contexts.get(userId) === m.id,
+              companyId: organisation?.companyId ?? null,
             };
           }),
       ),

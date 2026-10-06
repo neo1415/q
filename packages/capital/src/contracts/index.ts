@@ -8,6 +8,7 @@ import {
   type CapitalObjectiveType,
   type CapitalTarget,
   type LocalDate,
+  type RaiseValuation,
   type UtcTimestamp,
 } from "@capital-q/contracts";
 import type { TenantId, UserId } from "@capital-q/security";
@@ -47,6 +48,9 @@ export type CapitalObjective = {
   readonly instrumentCode: string | null;
   readonly targetCloseDate: LocalDate | null;
   readonly useOfFundsSummary: string | null;
+  /** F5: in the target's currency; null when unstated. */
+  readonly valuation: RaiseValuation | null;
+  readonly minimumCheque: string | null;
   readonly startedAt: UtcTimestamp;
   readonly closedAt: UtcTimestamp | null;
   readonly createdByUserId: UserId;
@@ -89,6 +93,8 @@ export function toCapitalObjectiveDto(
     instrumentCode: objective.instrumentCode,
     targetCloseDate: objective.targetCloseDate,
     useOfFundsSummary: objective.useOfFundsSummary,
+    valuation: objective.valuation,
+    minimumCheque: objective.minimumCheque,
     startedAt: objective.startedAt,
     closedAt: objective.closedAt,
     version: objective.version,

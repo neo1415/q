@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition, type ComponentType } from "react";
 import {
   DATA_ROOM_GRANT_DAYS,
   DATA_ROOM_GRANT_DEFAULT_DAYS,
+  type DataRoomChecklistItem,
   type DataRoomFolder,
   type DataRoomInvestorDocument,
   type DataRoomInvestorView,
@@ -595,8 +596,15 @@ export function OwnerDataRoom({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const present = view.checklist.filter((item) => item.present).length;
-  const missing = view.checklist.filter((item) => !item.present);
+  // F10: an item filed here in this visit counts as present at once.
+  const filedAs = (code: string) =>
+    documents.some((d) => d.checklistItemCode === code);
+  const present = view.checklist.filter(
+    (item) => item.present || filedAs(item.code),
+  ).length;
+  const missing = view.checklist.filter(
+    (item) => !item.present && !filedAs(item.code),
+  );
   const stage = stageLabel(view.stageCode) ?? "your";
   const waiting = view.requests.filter(
     (request) =>
@@ -625,6 +633,41 @@ export function OwnerDataRoom({
         documentId: document.documentId,
         level,
         version: document.version,
+      });
+      if (!result.ok) {
+        setDocuments(before);
+        setMessage(result.message);
+      } else {
+        setDocuments((current) =>
+          current.map((d) =>
+            d.documentId === document.documentId
+              ? { ...d, version: d.version + 1 }
+              : d,
+          ),
+        );
+      }
+    });
+  };
+
+  // F10: file a document in a folder (or as a checklist item); its level
+  // stays what it is.
+  const fileAs = (document: DataRoomOwnerDocument, choice: string) => {
+    const filing = filingOf(choice, view.checklist);
+    if (filing === null) return;
+    const before = documents;
+    setDocuments((current) =>
+      current.map((d) =>
+        d.documentId === document.documentId ? { ...d, ...filing } : d,
+      ),
+    );
+    start(async () => {
+      const result = await setLevelAction({
+        companyId,
+        documentId: document.documentId,
+        level: document.level,
+        version: document.version,
+        folderCode: filing.folderCode,
+        checklistItemCode: filing.checklistItemCode,
       });
       if (!result.ok) {
         setDocuments(before);
@@ -887,6 +930,13 @@ export function OwnerDataRoom({
                             </p>
                           </div>
                         </div>
+                        <FolderControl
+                          document={document}
+                          folders={view.folders}
+                          checklist={view.checklist}
+                          disabled={pending}
+                          onChange={(choice) => fileAs(document, choice)}
+                        />
                         <LevelControl
                           document={document}
                           disabled={pending}
@@ -933,5 +983,75 @@ export function OwnerDataRoom({
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * F10: "File in": a checklist item (which names its folder) or a folder
+ * alone. Encoded as `item:<code>` / `folder:<code>`; null for anything else.
+ */
+export function filingOf(
+  choice: string,
+  checklist: readonly DataRoomChecklistItem[],
+): {
+  readonly folderCode: string;
+  readonly checklistItemCode: string | null;
+} | null {
+  if (choice.startsWith("item:")) {
+    const item = checklist.find((entry) => entry.code === choice.slice(5));
+    return item === undefined
+      ? null
+      : { folderCode: item.folderCode, checklistItemCode: item.code };
+  }
+  if (choice.startsWith("folder:")) {
+    const code = choice.slice(7);
+    return code === "" ? null : { folderCode: code, checklistItemCode: null };
+  }
+  return null;
+}
+
+function FolderControl({
+  document,
+  folders,
+  checklist,
+  disabled,
+  onChange,
+}: {
+  readonly document: DataRoomOwnerDocument;
+  readonly folders: readonly DataRoomFolder[];
+  readonly checklist: readonly DataRoomChecklistItem[];
+  readonly disabled: boolean;
+  readonly onChange: (choice: string) => void;
+}) {
+  const value =
+    document.checklistItemCode === null
+      ? `folder:${document.folderCode}`
+      : `item:${document.checklistItemCode}`;
+  return (
+    <label className="cq-caption flex items-center gap-1 text-(--cq-text-secondary)">
+      <span className="sr-only">File {document.title} in</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        className="cq-body-sm min-h-11 max-w-56 rounded-md border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
+        data-folder-control
+      >
+        {folders.map((folder) => (
+          <optgroup key={folder.code} label={folder.label}>
+            {checklist
+              .filter((item) => item.folderCode === folder.code)
+              .map((item) => (
+                <option key={item.code} value={`item:${item.code}`}>
+                  {item.label}
+                </option>
+              ))}
+            <option value={`folder:${folder.code}`}>
+              Other in {folder.label}
+            </option>
+          </optgroup>
+        ))}
+      </select>
+    </label>
   );
 }

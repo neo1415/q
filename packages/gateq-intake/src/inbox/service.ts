@@ -38,6 +38,12 @@ import type {
   InboxRow,
   SharedDocumentPort,
 } from "./ports.js";
+import {
+  renderGateqAnswerEmail,
+  sendLogged,
+  type GateqEmailEvent,
+  type GateqOutboundSender,
+} from "./founder-mail.js";
 
 /**
  * F4: the investor's GateQ inbox.
@@ -83,8 +89,60 @@ export function createInboxService(dependencies: {
   readonly transactions: TransactionManager;
   readonly documents?: SharedDocumentPort | undefined;
   readonly clock?: (() => Date) | undefined;
+  /** P14: the founder hears a pass or a reply by email (after commit). */
+  readonly founderMail?: GateqOutboundSender | undefined;
+  readonly onEmail?: ((event: GateqEmailEvent) => void) | undefined;
 }) {
   const { repository, authority, transactions } = dependencies;
+
+  /**
+   * P14: after the answer committed, the founder's contact (from what they
+   * submitted) gets the approved words. A failed send never undoes the
+   * answer; it is logged with the recipient's domain only.
+   */
+  const mailFounder = async (
+    actor: ActorContext,
+    gateway: {
+      readonly tenantId: string;
+      readonly gatewayId: string;
+      readonly fund: string;
+    },
+    applicationId: string,
+    kind: "PASS" | "REPLY",
+    body: string,
+  ): Promise<void> => {
+    if (dependencies.founderMail === undefined) return;
+    const row = await repository
+      .one({
+        tenantId: gateway.tenantId,
+        gatewayId: gateway.gatewayId,
+        userId: actor.userId,
+        applicationId,
+      })
+      .catch(() => null);
+    if (row === null) return;
+    const submitted = readSnapshot(row.snapshot);
+    const profile = profileOf(submitted);
+    const rendered = renderGateqAnswerEmail({
+      kind,
+      fund: gateway.fund,
+      companyName: profile.companyName,
+      reference: submitted.reference === "" ? null : submitted.reference,
+      body,
+    });
+    await sendLogged(
+      dependencies.founderMail,
+      dependencies.onEmail,
+      kind,
+      profile.contactEmail,
+      {
+        subject: rendered.subject,
+        text: rendered.text,
+        html: rendered.html,
+        fromName: `${gateway.fund} via Capital Q`,
+      },
+    );
+  };
   const clock = dependencies.clock ?? (() => new Date());
 
   const memberDto = (member: {
@@ -561,6 +619,9 @@ export function createInboxService(dependencies: {
         }
         return added;
       });
+      if (!result.deduplicated) {
+        await mailFounder(actor, gateway, applicationId, "PASS", body);
+      }
       return {
         ok: true,
         changed: result.deduplicated ? 0 : 1,
@@ -600,6 +661,9 @@ export function createInboxService(dependencies: {
         }
         return added;
       });
+      if (!result.deduplicated) {
+        await mailFounder(actor, gateway, applicationId, "REPLY", body);
+      }
       return {
         ok: true,
         changed: result.deduplicated ? 0 : 1,

@@ -176,6 +176,7 @@ const ORGS: readonly MyOrganisationDto[] = [
     role: "OWNER",
     memberCount: 6,
     active: true,
+    companyId: null,
   },
   {
     organisationId: IDS(2),
@@ -185,6 +186,7 @@ const ORGS: readonly MyOrganisationDto[] = [
     role: "OWNER",
     memberCount: 1,
     active: false,
+    companyId: null,
   },
   {
     organisationId: IDS(3),
@@ -194,6 +196,7 @@ const ORGS: readonly MyOrganisationDto[] = [
     role: "MEMBER",
     memberCount: 14,
     active: false,
+    companyId: null,
   },
 ];
 

@@ -442,6 +442,25 @@ const ROUTES: readonly Route[] = [
     permission: "verification.read",
   },
   // end ADMIN-3 block
+  // P14: claims on unclaimed companies, and publishing their profiles.
+  {
+    method: "GET",
+    url: "/v1/admin/company-claims",
+    permission: "claims.read",
+    listOk: true,
+  },
+  {
+    method: "POST",
+    url: `/v1/admin/company-claims/${SOME_ID}/decision`,
+    permission: "claims.decide",
+    body: { approve: true, reason: "Registry document matches the name" },
+  },
+  {
+    method: "POST",
+    url: `/v1/admin/companies/${SOME_ID}/public-external`,
+    permission: "companies.publish",
+    body: { publicExternal: true, reason: "Public real-company profile" },
+  },
 ];
 
 const USERS = {

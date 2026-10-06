@@ -11,6 +11,7 @@ import {
   TeamDtoSchema,
 } from "@capital-q/contracts";
 import type { TeamService } from "@capital-q/organisations";
+import { photoLookup } from "@capital-q/public-identity";
 
 import {
   getActorContext,
@@ -21,6 +22,7 @@ import {
   requireOnboardingActorHook,
   type OnboardingActorDependencies,
 } from "../security/onboarding-actor.js";
+import type { NamedPhotos } from "./named-photos.js";
 
 /**
  * G1/G2: the team's reads. Every change is a declared app action
@@ -41,6 +43,12 @@ export type TeamRoutesDependencies = OnboardingActorDependencies & {
     TeamService,
     "team" | "myOrganisations" | "previewInvitation"
   >;
+  /**
+   * P14: teammates' photos. A teammate's name is already on this response
+   * (the caller's own team), so their photo goes with it (the named-image
+   * rule). Absent: initials.
+   */
+  readonly namedPhotos?: NamedPhotos | undefined;
 };
 
 export function registerTeamRoutes(
@@ -58,7 +66,20 @@ export function registerTeamRoutes(
       return undefined;
     }
     void reply.header("Cache-Control", "no-store");
-    return TeamDtoSchema.parse(out.value);
+    const photoOf = await photoLookup(
+      dependencies.namedPhotos,
+      out.value.members.map((member) => ({
+        subjectType: "PERSON" as const,
+        subjectId: member.userId,
+      })),
+    );
+    return TeamDtoSchema.parse({
+      ...out.value,
+      members: out.value.members.map((member) => ({
+        ...member,
+        avatarUrl: photoOf({ subjectType: "PERSON", subjectId: member.userId }),
+      })),
+    });
   });
 
   app.get(

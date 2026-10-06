@@ -19,6 +19,11 @@ export const GATEQ_STARTUP_ALERTS_PATH = "/v1/gateq/startup-alerts" as const;
 export const ClaimableCompanyDtoSchema = z
   .object({
     companyId: z.string().uuid(),
+    /**
+     * F8: the company's organisation, for "Ask to join" (a team join
+     * request names the organisation). Null: nobody has claimed it.
+     */
+    organisationId: z.string().uuid().nullable(),
     name: z.string().max(200),
     website: z.string().max(2048).nullable(),
     city: z.string().max(120).nullable(),
@@ -73,9 +78,107 @@ export const CompanyClaimResultDtoSchema = z
       "ALREADY_YOURS",
       "EMAIL_NOT_AT_COMPANY",
     ]),
+    /** P14: a work-email claim: whether its one-time code was emailed. */
+    codeSent: z.boolean().optional(),
   })
   .strict();
 export type CompanyClaimResultDto = z.infer<typeof CompanyClaimResultDtoSchema>;
+
+// ---------------------------------------------------------------------------
+// P14: confirming a work-email code, and deciding a claim
+// ---------------------------------------------------------------------------
+
+export const COMPANY_CLAIM_CONFIRM_PATH =
+  "/v1/companies/:companyId/claim-requests/confirm" as const;
+export const COMPANY_CLAIM_DECISION_PATH =
+  "/v1/companies/:companyId/claim-requests/:requestId/decision" as const;
+export const ADMIN_COMPANY_CLAIMS_PATH = "/v1/admin/company-claims" as const;
+export const ADMIN_COMPANY_CLAIM_DECISION_PATH =
+  "/v1/admin/company-claims/:requestId/decision" as const;
+
+export const ConfirmClaimCodeRequestSchema = z
+  .object({ code: z.string().regex(/^\d{6}$/u) })
+  .strict();
+export type ConfirmClaimCodeRequest = z.infer<
+  typeof ConfirmClaimCodeRequestSchema
+>;
+
+export const ConfirmClaimCodeResultDtoSchema = z
+  .object({
+    status: z.enum(["CONFIRMED", "WRONG_CODE", "EXPIRED", "NOT_FOUND"]),
+  })
+  .strict();
+export type ConfirmClaimCodeResultDto = z.infer<
+  typeof ConfirmClaimCodeResultDtoSchema
+>;
+
+export const ClaimDecisionRequestSchema = z
+  .object({
+    approve: z.boolean(),
+    reason: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+export type ClaimDecisionRequest = z.infer<typeof ClaimDecisionRequestSchema>;
+
+export const ClaimDecisionResultDtoSchema = z
+  .object({ status: z.enum(["APPROVED", "DECLINED"]) })
+  .strict();
+export type ClaimDecisionResultDto = z.infer<
+  typeof ClaimDecisionResultDtoSchema
+>;
+
+/** A pending claim, for whoever may decide it. Name and how, never the code. */
+export const PendingClaimDtoSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    companyId: z.string().uuid(),
+    companyName: z.string().max(200),
+    requesterName: z.string().max(200).nullable(),
+    method: CompanyClaimMethodSchema,
+    /** WORK_EMAIL only: the domain (never the address) and whether its code was confirmed. */
+    workEmailDomain: z.string().max(254).nullable(),
+    emailConfirmed: z.boolean(),
+    requestedAt: z.string(),
+  })
+  .strict();
+export type PendingClaimDto = z.infer<typeof PendingClaimDtoSchema>;
+
+export const PendingClaimListDtoSchema = z
+  .object({ claims: z.array(PendingClaimDtoSchema).max(200) })
+  .strict();
+export type PendingClaimListDto = z.infer<typeof PendingClaimListDtoSchema>;
+
+/** P14 item 7: an unclaimed company's profile, public or back to the network. */
+export const ADMIN_COMPANY_PUBLISH_PATH =
+  "/v1/admin/companies/:companyId/public-external" as const;
+
+export const AdminCompanyPublishRequestSchema = z
+  .object({
+    publicExternal: z.boolean(),
+    reason: z.string().trim().min(3).max(500),
+  })
+  .strict();
+export type AdminCompanyPublishRequest = z.infer<
+  typeof AdminCompanyPublishRequestSchema
+>;
+
+export const AdminCompanyPublishResultDtoSchema = z
+  .object({
+    outcome: z.enum(["CHANGED", "UNCHANGED", "CLAIMED"]),
+    /** What it is now; public_external and network_visible stay distinct. */
+    visibility: z.enum(["public_external", "network_visible"]).nullable(),
+  })
+  .strict();
+export type AdminCompanyPublishResultDto = z.infer<
+  typeof AdminCompanyPublishResultDtoSchema
+>;
+
+export const AdminClaimDecisionRequestSchema = z
+  .object({
+    approve: z.boolean(),
+    reason: z.string().trim().min(3).max(500),
+  })
+  .strict();
 
 export const StartupAlertRequestSchema = z
   .object({
@@ -293,4 +396,77 @@ export function parseStartupDescription(
       hasPitch: false,
     },
   };
+}
+
+/** What a saved alert asked for, as stored (filters plus loose words). */
+export type StoredAlertFilters = {
+  readonly sectorNodeIds?: readonly string[] | undefined;
+  readonly stageCodes?: readonly string[] | undefined;
+  readonly countryCodes?: readonly string[] | undefined;
+  readonly raise?: unknown;
+  readonly raiseDisclosedOnly?: boolean | undefined;
+  readonly words?: readonly string[] | undefined;
+};
+
+/** The company as the network sees it: declared, network-level facts only. */
+export type AlertCompanyFacts = {
+  readonly name: string;
+  readonly description: string | null;
+  readonly stageCode: string | null;
+  readonly countryCode: string | null;
+  /** Its sector nodes and every ancestor of them. */
+  readonly sectorNodeIds: readonly string[];
+};
+
+/**
+ * P14: does a newly ready company match a saved alert? Deterministic, over
+ * network-level facts only. An alert that asks about the raise is never
+ * matched here: whether this investor may see a raise is the disclosure
+ * evaluator's to say, so it waits for Discover (a skipped match, never a
+ * guess). Unknown is not a match: a company with no stage never matches a
+ * stage filter. An alert with nothing to match on matches nothing.
+ */
+export function alertMatches(
+  filters: StoredAlertFilters,
+  company: AlertCompanyFacts,
+): boolean {
+  if (filters.raise !== null && filters.raise !== undefined) return false;
+  if (filters.raiseDisclosedOnly === true) return false;
+  const stages = filters.stageCodes ?? [];
+  const countries = filters.countryCodes ?? [];
+  const sectors = filters.sectorNodeIds ?? [];
+  const words = (filters.words ?? [])
+    .map((word) => word.trim().toLowerCase())
+    .filter((word) => word.length >= 3);
+  if (
+    stages.length === 0 &&
+    countries.length === 0 &&
+    sectors.length === 0 &&
+    words.length === 0
+  ) {
+    return false;
+  }
+  if (
+    stages.length > 0 &&
+    (company.stageCode === null || !stages.includes(company.stageCode))
+  ) {
+    return false;
+  }
+  if (
+    countries.length > 0 &&
+    (company.countryCode === null || !countries.includes(company.countryCode))
+  ) {
+    return false;
+  }
+  if (
+    sectors.length > 0 &&
+    !sectors.some((id) => company.sectorNodeIds.includes(id))
+  ) {
+    return false;
+  }
+  if (words.length > 0) {
+    const text = `${company.name} ${company.description ?? ""}`.toLowerCase();
+    if (!words.some((word) => text.includes(word))) return false;
+  }
+  return true;
 }

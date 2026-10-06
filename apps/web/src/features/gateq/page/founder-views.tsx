@@ -28,7 +28,13 @@ import {
 } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
-import { claimAction, searchClaimableAction } from "./gateq-actions";
+import { askToJoinAction } from "@/features/team/team-actions";
+
+import {
+  claimAction,
+  confirmClaimCodeAction,
+  searchClaimableAction,
+} from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
 
 /**
@@ -392,7 +398,15 @@ function ClaimSheet({
     hasMembers ? "ASK_MEMBERS" : "WORK_EMAIL",
   );
   const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+  // P14: after a work-email claim, the code from that email.
+  const [awaitingCode, setAwaitingCode] = useState(false);
+  const [code, setCode] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  // F8: a company with members lets people in from its Team page; asking
+  // is a team join request to its organisation, not a claim.
+  const joinOrganisation =
+    hasMembers && company !== null ? company.organisationId : null;
   const [pending, startTransition] = useTransition();
   const methods: readonly (readonly [
     CompanyClaimMethod,
@@ -482,6 +496,62 @@ function ClaimSheet({
                 />
               </div>
             ) : null}
+            {awaitingCode ? (
+              <div className="gq-field" data-claim-code>
+                <label className="gq-label" htmlFor="gq-claim-code">
+                  The six-digit code we emailed to {email.trim()}
+                </label>
+                <input
+                  id="gq-claim-code"
+                  className="gq-input"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+                <Button
+                  variant="primary"
+                  disabled={pending || code.trim().length < 6}
+                  onClick={() => {
+                    setProblem(null);
+                    startTransition(async () => {
+                      const out = await confirmClaimCodeAction(
+                        company?.companyId ?? "",
+                        code,
+                      );
+                      if (!out.ok) return setProblem(out.message);
+                      if (out.value === "WRONG_CODE")
+                        return setProblem("That code isn't right. Try again.");
+                      if (out.value !== "CONFIRMED")
+                        return setProblem(
+                          "That code has expired. Close this and ask again for a new one.",
+                        );
+                      onDone(
+                        "Email confirmed. Capital Q checks your claim and lets you know.",
+                      );
+                    });
+                  }}
+                >
+                  Confirm code
+                </Button>
+              </div>
+            ) : null}
+            {joinOrganisation !== null ? (
+              <div className="gq-field">
+                <label className="gq-label" htmlFor="gq-join-note">
+                  A note for the admins (optional)
+                </label>
+                <input
+                  id="gq-join-note"
+                  className="gq-input"
+                  value={note}
+                  maxLength={500}
+                  placeholder="I lead product, joined in May"
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </div>
+            ) : null}
             {problem === null ? null : (
               <div className="gq-banner gq-banner-err" role="alert">
                 <CircleAlert {...icon} />
@@ -496,6 +566,13 @@ function ClaimSheet({
               onClick={() => {
                 setProblem(null);
                 startTransition(async () => {
+                  if (joinOrganisation !== null) {
+                    const asked = await askToJoinAction(joinOrganisation, note);
+                    if (!asked.ok) return setProblem(asked.message);
+                    return onDone(
+                      `Asked. ${company.name}'s admins let you in from their Team page; you'll get an email when they decide.`,
+                    );
+                  }
                   const done = await claimAction(company.companyId, {
                     method,
                     ...(method === "WORK_EMAIL"
@@ -508,6 +585,14 @@ function ClaimSheet({
                     return setProblem(
                       `Use an email at ${domain ?? "your company's website"}.`,
                     );
+                  }
+                  if (
+                    method === "WORK_EMAIL" &&
+                    done.value.status === "REQUESTED" &&
+                    done.value.codeSent === true
+                  ) {
+                    setAwaitingCode(true);
+                    return undefined;
                   }
                   onDone(
                     done.value.status === "ALREADY_YOURS"

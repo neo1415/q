@@ -19,6 +19,8 @@ import {
   setAdminFlag,
   setAdminOrganisationSuspension,
   type ApiSession,
+  decideAdminCompanyClaim,
+  publishCompanyAsAdmin,
 } from "@capital-q/api-client";
 import type { AdminQErrorsDto } from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
@@ -450,3 +452,67 @@ export async function kybDocumentAction(
     .catch(() => null);
 }
 // end ADMIN-3 block
+
+/** P14: decide a claim on a company nobody holds; approval makes them owner. */
+export async function decideCompanyClaimAction(input: {
+  readonly requestId: string;
+  readonly approve: boolean;
+  readonly reason: string;
+}): Promise<ConsoleResult> {
+  const reason = Reason.safeParse(input.reason);
+  if (!Id.safeParse(input.requestId).success || !reason.success)
+    return { ok: false, message: "Give a reason of at least 3 characters." };
+  return run(
+    (session) =>
+      decideAdminCompanyClaim(session, input.requestId, {
+        approve: input.approve,
+        reason: reason.data,
+      }),
+    input.approve
+      ? "Approved. They now own the company on Capital Q."
+      : "Declined.",
+  );
+}
+
+/**
+ * P14 item 7: an unclaimed company's profile made public at an external
+ * URL (public_external), or back to the network (network_visible).
+ */
+export async function publishCompanyAction(input: {
+  readonly companyId: string;
+  readonly publicExternal: boolean;
+  readonly reason: string;
+}): Promise<ConsoleResult> {
+  const reason = Reason.safeParse(input.reason);
+  const companyId = Id.safeParse(input.companyId.trim());
+  if (!companyId.success)
+    return { ok: false, message: "Paste the company's id (from its URL)." };
+  if (!reason.success)
+    return { ok: false, message: "Give a reason of at least 3 characters." };
+  let outcome: string | null = null;
+  const result = await run(async (session) => {
+    outcome = (
+      await publishCompanyAsAdmin(session, companyId.data, {
+        publicExternal: input.publicExternal,
+        reason: reason.data,
+      })
+    ).outcome;
+  }, "");
+  if (!result.ok) return result;
+  if (outcome === "CLAIMED") {
+    return {
+      ok: false,
+      message:
+        "Someone holds this company: only its own people choose who sees it.",
+    };
+  }
+  return {
+    ok: true,
+    message:
+      outcome === "UNCHANGED"
+        ? "It already was."
+        : input.publicExternal
+          ? "Public: anyone with the link can see its profile."
+          : "Back to the network: only people on Capital Q see it.",
+  };
+}

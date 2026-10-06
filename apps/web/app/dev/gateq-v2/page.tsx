@@ -337,6 +337,7 @@ function inboxFixture(
 const CLAIMABLE: readonly ClaimableCompanyDto[] = [
   {
     companyId: id(501),
+    organisationId: id(601),
     name: "Kora Health Technologies Ltd",
     website: "https://korahealth.ng",
     city: "Lagos",
@@ -347,6 +348,7 @@ const CLAIMABLE: readonly ClaimableCompanyDto[] = [
   },
   {
     companyId: id(502),
+    organisationId: null,
     name: "Kora Foods",
     website: "https://korafoods.com",
     city: "Accra",

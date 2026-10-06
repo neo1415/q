@@ -9,6 +9,11 @@ import {
   FounderApplicationListDtoSchema,
   GATEQ_MY_APPLICATIONS_PATH,
   ClaimableCompanyListDtoSchema,
+  COMPANY_CLAIM_CONFIRM_PATH,
+  COMPANY_CLAIM_REQUESTS_PATH,
+  ConfirmClaimCodeRequestSchema,
+  ConfirmClaimCodeResultDtoSchema,
+  PendingClaimListDtoSchema,
   type ClaimableCompanyDto,
   GATEQ_INBOX_ITEM_PATH,
   GATEQ_INBOX_PACK_PATH,
@@ -64,6 +69,12 @@ import {
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import {
+  getOnboardingActor,
+  requireOnboardingActorHook,
+} from "../security/onboarding-actor.js";
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
+import type { CompanyClaims } from "@capital-q/companies";
 import { sendEntitlementRequired } from "./billing.js";
 import {
   MaterialNotSharableError,
@@ -103,9 +114,26 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
   /** F3: companies a founder may find and claim (what they may already see). */
   readonly claimable?:
     | ((
-        actor: ReturnType<typeof getActorContext>,
+        actor: {
+          readonly userId: string;
+          readonly tenantId?: string | undefined;
+          readonly organisationId?: string | undefined;
+        },
         text: string,
       ) => Promise<readonly ClaimableCompanyDto[]>)
+    | undefined;
+  /**
+   * F8: the person lookup, so "Find my startup" also answers a person with
+   * no organisation yet (exactly who joins a team). Absent: context only.
+   */
+  readonly identities?: ApplicationIdentityLookup | undefined;
+  /**
+   * P14: confirming a claim's work-email code, and the claims waiting on a
+   * company for its admins (deciding is the declared action
+   * company.claim.decide).
+   */
+  readonly claims?:
+    | Pick<CompanyClaims, "confirmCode" | "pending" | "isCompanyAdmin">
     | undefined;
   /** F4: the organisation's GateQ inbox (its writes are declared app actions). */
   readonly inboxService?: InboxService | undefined;
@@ -302,15 +330,88 @@ export function registerGateQRoutes(
   const claimable = dependencies.claimable;
   if (claimable !== undefined) {
     // F3: "Find my startup". Only companies the caller may already see.
+    // F8: a person action, so someone with no organisation yet can find the
+    // company they are joining; their context, when present, adds theirs.
+    const identities = dependencies.identities;
+    const withPerson =
+      identities === undefined
+        ? null
+        : requireOnboardingActorHook({ ...dependencies, identities });
     app.get(
       COMPANY_CLAIMABLE_PATH,
-      { onRequest: withContext },
+      { onRequest: withPerson ?? withContext },
       async (request, reply) => {
         const q = (request.query as { q?: unknown }).q;
         const text = typeof q === "string" ? q.slice(0, 120) : "";
-        const companies = await claimable(getActorContext(request), text);
+        const searcher =
+          withPerson === null
+            ? getActorContext(request)
+            : (() => {
+                const person = getOnboardingActor(request);
+                return {
+                  userId: person.userId,
+                  tenantId: person.context?.tenantId,
+                  organisationId: person.context?.organisationId,
+                };
+              })();
+        const companies = await claimable(searcher, text);
         void reply.header("Cache-Control", "no-store");
         return ClaimableCompanyListDtoSchema.parse({ companies });
+      },
+    );
+  }
+
+  const claims = dependencies.claims;
+  if (claims !== undefined) {
+    const companyIdOf = (request: FastifyRequest) =>
+      parseContract(
+        UuidSchema,
+        (request.params as Record<string, string | undefined>)["companyId"],
+        "The id is not valid.",
+      );
+    const identities = dependencies.identities;
+    const withPerson =
+      identities === undefined
+        ? withContext
+        : requireOnboardingActorHook({ ...dependencies, identities });
+    // P14: the requester confirms the code from their work email.
+    app.post(
+      COMPANY_CLAIM_CONFIRM_PATH,
+      { onRequest: withPerson },
+      async (request, reply) => {
+        const input = parseContract(
+          ConfirmClaimCodeRequestSchema,
+          request.body,
+          "Enter the six-digit code from the email.",
+        );
+        const userId =
+          identities === undefined
+            ? getActorContext(request).userId
+            : getOnboardingActor(request).userId;
+        const out = await claims.confirmCode(
+          { userId },
+          companyIdOf(request),
+          input.code,
+        );
+        void reply.header("Cache-Control", "no-store");
+        return ConfirmClaimCodeResultDtoSchema.parse(out);
+      },
+    );
+    // P14: the claims waiting on a company, for its admins only.
+    app.get(
+      COMPANY_CLAIM_REQUESTS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const companyId = companyIdOf(request);
+        const actor = getActorContext(request);
+        if (!(await claims.isCompanyAdmin(actor.userId, companyId))) {
+          reply.callNotFound();
+          return undefined;
+        }
+        void reply.header("Cache-Control", "no-store");
+        return PendingClaimListDtoSchema.parse({
+          claims: await claims.pending({ companyId }),
+        });
       },
     );
   }

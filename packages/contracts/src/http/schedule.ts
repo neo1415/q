@@ -246,6 +246,8 @@ export const NotificationKindSchema = z.enum([
   "CHAT_MESSAGE",
   // 2026-10-04: a commitment moved a step (amount, sent, received).
   "COMMITMENT",
+  // P14 (20261209132000): a new company matches a saved startup alert.
+  "STARTUP_ALERT",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

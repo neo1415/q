@@ -10,6 +10,8 @@ import {
   teamRoleOf,
   type InvitationEmail,
   type InvitationMailer,
+  type TeamEmailEvent,
+  type TeamNoticeEmail,
   type TeamActor,
 } from "../src/index.js";
 import { MemoryTeamDb } from "../src/testing/memory-team-store.js";
@@ -28,6 +30,8 @@ const correlation = CorrelationIdSchema.parse(
 type World = {
   readonly db: MemoryTeamDb;
   readonly sent: InvitationEmail[];
+  readonly notices: TeamNoticeEmail[];
+  readonly emailEvents: TeamEmailEvent[];
   readonly service: ReturnType<typeof createTeamService<MemoryTeamDb>>;
   readonly actorOf: (userId: string, organisationId?: string) => TeamActor;
   readonly tokens: string[];
@@ -106,10 +110,14 @@ function world(options: { readonly mailer?: InvitationMailer } = {}): World {
     "2026-01-01T00:00:00.000Z",
   );
   const sent: InvitationEmail[] = [];
+  const notices: TeamNoticeEmail[] = [];
+  const emailEvents: TeamEmailEvent[] = [];
   const tokens: string[] = [];
   const w: World = {
     db,
     sent,
+    notices,
+    emailEvents,
     tokens,
     clock: new Date("2026-10-06T10:00:00.000Z"),
     actorOf: (userId, organisationId = ORG) => {
@@ -140,8 +148,15 @@ function world(options: { readonly mailer?: InvitationMailer } = {}): World {
         sent.push(email);
         return Promise.resolve();
       },
+      notify: (notice) => {
+        notices.push(notice);
+        return Promise.resolve();
+      },
     },
     webOrigin: "https://app.capitalq.example/",
+    onEmail: (event) => {
+      emailEvents.push(event);
+    },
     now: () => w.clock,
     newToken: () => {
       n += 1;
@@ -498,6 +513,44 @@ describe("invitation lifecycle", () => {
     expect(b.invited[0]?.emailed).toBe(false);
     expect(failing.db.invitations).toHaveLength(1);
   });
+
+  it("P15: a failed send hands the inviting admin the link, and logs the domain only", async () => {
+    const failing = world({
+      mailer: {
+        available: true,
+        send: () => Promise.reject(new Error("relay down")),
+      },
+    });
+    const out = ok(
+      await failing.service.invite(
+        failing.actorOf(SARA),
+        { emails: ["peter@northbound.example"], role: "MEMBER" },
+        correlation,
+      ),
+    );
+    expect(out.invited[0]?.link).toBe(
+      `https://app.capitalq.example/join/${failing.tokens[0] ?? ""}`,
+    );
+    expect(failing.emailEvents).toEqual([
+      expect.objectContaining({
+        kind: "INVITATION",
+        outcome: "FAILED",
+        recipientDomain: "northbound.example",
+      }),
+    ]);
+    expect(JSON.stringify(failing.emailEvents)).not.toContain("peter@");
+    // A sent invitation never carries its link back.
+    const sentWorld = world();
+    const sent = ok(
+      await sentWorld.service.invite(
+        sentWorld.actorOf(SARA),
+        { emails: ["peter@northbound.example"], role: "MEMBER" },
+        correlation,
+      ),
+    );
+    expect(sent.invited[0]).not.toHaveProperty("link");
+    expect(sentWorld.emailEvents[0]?.outcome).toBe("SENT");
+  });
 });
 
 describe("role enforcement on the server", () => {
@@ -619,6 +672,10 @@ describe("the last owner (in code; the database refuses it too)", () => {
       await w.service.offerOwnership(w.actorOf(DANIEL), sara, correlation),
     );
     expect(offered.ownershipOffers[0]?.direction).toBe("FROM_YOU");
+    // P15: Sara hears about the offer by email; nothing changes until she accepts.
+    expect(w.notices.map((n) => [n.to, n.kind, n.actorName])).toEqual([
+      ["sara@northbound.example", "OWNERSHIP_OFFERED", "Daniel Reyes"],
+    ]);
     const forSara = ok(await w.service.team(w.actorOf(SARA)));
     expect(forSara.ownershipOffers[0]?.direction).toBe("TO_YOU");
     const accepted = ok(
@@ -683,6 +740,73 @@ describe("join requests", () => {
       ),
     );
     expect(team.members.find((m) => m.userId === PETER)?.role).toBe("MEMBER");
+    // F11: let in with nowhere active, Peter now acts for Northbound.
+    expect(
+      (await w.service.myOrganisations(PETER)).items.map((o) => [
+        o.name,
+        o.active,
+      ]),
+    ).toEqual([["Northbound Capital", true]]);
+    // P15: he hears about it by email, from the admin who decided.
+    expect(w.notices).toEqual([
+      expect.objectContaining({
+        to: "peter@northbound.example",
+        kind: "JOIN_APPROVED",
+        organisationName: "Northbound Capital",
+        actorName: "Sara Kimani",
+        link: "https://app.capitalq.example/home",
+      }),
+    ]);
+  });
+
+  it("F11: someone already acting elsewhere keeps their context when let in", async () => {
+    const w = world();
+    ok(await w.service.requestToJoin(OUTSIDER, ORG, null, correlation));
+    const forAdmin = ok(await w.service.team(w.actorOf(SARA)));
+    ok(
+      await w.service.decideJoinRequest(
+        w.actorOf(SARA),
+        forAdmin.joinRequests[0]?.requestId ?? "",
+        true,
+        correlation,
+      ),
+    );
+    expect(
+      (await w.service.myOrganisations(OUTSIDER)).items.map((o) => [
+        o.name,
+        o.active,
+      ]),
+    ).toEqual([
+      ["Kora Health", true],
+      ["Northbound Capital", false],
+    ]);
+  });
+
+  it("P15: a declined request is emailed too; a failing relay never undoes the decision", async () => {
+    const w = world({
+      mailer: {
+        available: true,
+        send: () => Promise.resolve(),
+        notify: () => Promise.reject(new Error("relay down")),
+      },
+    });
+    ok(await w.service.requestToJoin(PETER, ORG, null, correlation));
+    const forAdmin = ok(await w.service.team(w.actorOf(SARA)));
+    const out = await w.service.decideJoinRequest(
+      w.actorOf(SARA),
+      forAdmin.joinRequests[0]?.requestId ?? "",
+      false,
+      correlation,
+    );
+    expect(out.ok).toBe(true);
+    expect(w.db.joinRequests[0]?.status).toBe("declined");
+    expect(w.emailEvents).toEqual([
+      expect.objectContaining({
+        kind: "JOIN_DECLINED",
+        outcome: "FAILED",
+        recipientDomain: "northbound.example",
+      }),
+    ]);
   });
 
   it("asking to join an organisation that does not exist reads the same", async () => {
@@ -699,7 +823,68 @@ describe("join requests", () => {
   });
 });
 
+describe("P14: admitting an approved company claim", () => {
+  it("makes the requester the owner of an organisation nobody holds, once", async () => {
+    const w = world();
+    const EMPTY = "00000000-0000-4000-8000-0000000000e4";
+    w.db.organisations.set(EMPTY, {
+      id: EMPTY,
+      tenantId: TENANT,
+      type: "company",
+      name: "Unclaimed Co",
+      status: "active",
+    });
+    const input = {
+      organisationId: EMPTY,
+      userId: PETER,
+      role: "OWNER" as const,
+      decidedByUserId: DANIEL,
+      claimRequestId: "00000000-0000-4000-8000-0000000000c9",
+      correlationId: correlation,
+    };
+    const first = ok(await w.service.admitClaim(input));
+    const again = ok(await w.service.admitClaim(input));
+    expect(again.membershipId).toBe(first.membershipId);
+    const mine = (await w.service.myOrganisations(PETER)).items;
+    expect(mine.map((o) => [o.name, o.role, o.active])).toEqual([
+      ["Unclaimed Co", "OWNER", true],
+    ]);
+  });
+
+  it("never makes anyone owner of a company that already has members", async () => {
+    const w = world();
+    ok(
+      await w.service.admitClaim({
+        organisationId: ORG_B,
+        userId: PETER,
+        role: "OWNER",
+        decidedByUserId: OUTSIDER,
+        claimRequestId: "00000000-0000-4000-8000-0000000000ca",
+        correlationId: correlation,
+      }),
+    );
+    const team = ok(await w.service.team(w.actorOf(OUTSIDER, ORG_B)));
+    expect(team.members.find((m) => m.userId === PETER)?.role).toBe("MEMBER");
+  });
+});
+
 describe("the switcher's list", () => {
+  it("F11: names the company an organisation is, when it is one", async () => {
+    const w = world();
+    const kora = w.db.organisations.get(ORG_B);
+    if (kora !== undefined)
+      w.db.organisations.set(ORG_B, {
+        ...kora,
+        companyId: "00000000-0000-4000-8000-0000000c0b4b",
+      });
+    expect(
+      (await w.service.myOrganisations(OUTSIDER)).items.map((o) => o.companyId),
+    ).toEqual(["00000000-0000-4000-8000-0000000c0b4b"]);
+    expect(
+      (await w.service.myOrganisations(SARA)).items.map((o) => o.companyId),
+    ).toEqual([null]);
+  });
+
   it("lists every organisation the person is in, with the one they act for", async () => {
     const w = world();
     ok(

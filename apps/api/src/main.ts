@@ -7,7 +7,10 @@
  * import business logic from domain packages rather than defining it here.
  */
 
-import { createCompanyClaims } from "@capital-q/companies";
+import {
+  createCompanyClaims,
+  createPlatformCompanyPublishing,
+} from "@capital-q/companies";
 import { createApplicationMaterials } from "./gateq/application-materials.js";
 import { sharedDocumentsPort } from "./gateq/inbox.js";
 import { loadApiConfig } from "@capital-q/config/api";
@@ -102,6 +105,7 @@ import {
   createRelationshipOutcomeService,
   createConnectionService,
   createInterestService,
+  createNetworkService,
   createRelationshipEventAppender,
   createPostgresDiligenceRequests,
   createRelationshipEventRegistry,
@@ -151,6 +155,9 @@ import {
   createPostgresApplicationSubmissionRepository,
   createPostgresSubmissionInbox,
   createGateqInbox,
+  renderClaimCodeEmail,
+  sendGateqEmailLogged,
+  type GateqEmailEvent,
   createPostgresInboxRepository,
   createStartupAlerts,
   createPostgresApplicationFounders,
@@ -422,6 +429,9 @@ const teamEmail =
           source: "api.team_invitation",
           provider: "SMTP",
         });
+const teamLogger = createLogger(apiServiceIdentity(config), {
+  level: config.observability.logLevel,
+});
 const team = createTeamService({
   store: createPostgresTeamStore({
     sql: database.sql,
@@ -429,6 +439,29 @@ const team = createTeamService({
   }),
   journal: createPostgresTeamJournal({ audit, outbox }),
   mailer: createInvitationMailer(teamEmail),
+  // P15: every team email's outcome in the service log, with the
+  // recipient's domain only; a provider error is named, never echoed (it
+  // can carry the address).
+  onEmail: (event) => {
+    const fields = {
+      event: "team.email",
+      kind: event.kind,
+      outcome: event.outcome,
+      recipientDomain: event.recipientDomain,
+      provider:
+        teamEmailConfig.brevoApi !== undefined
+          ? "BREVO_API"
+          : teamEmailConfig.smtp !== undefined
+            ? "SMTP"
+            : "NONE",
+      ...(event.error instanceof Error ? { errorName: event.error.name } : {}),
+    };
+    if (event.outcome === "SENT") {
+      teamLogger.info(fields, "team email sent");
+    } else {
+      teamLogger.warn(fields, "team email not sent");
+    }
+  },
   webOrigin:
     process.env["CQ_WEB_ORIGIN"] ??
     "https://capital-qweb-production.up.railway.app",
@@ -897,10 +930,54 @@ const discoverFilterFacts = createDiscoverFilterFacts({
   pitches: () => discoverablePitches,
 });
 // F4: the investor's GateQ inbox, under GateQ's own gateway authority.
+// P14: a founder's GateQ application joins the canonical company-investor
+// relationship through Network's own command (never a parallel record).
+const gateqNetwork = createNetworkService({
+  sql: database.sql,
+  transactions: database.transactions,
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  investors: createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),
+  outbox,
+  audit,
+});
+
+// P14: a founder hears a pass or a reply by email, through the same app
+// sender as team email, recorded like every app email; outcome logged with
+// the recipient's domain only.
+const gateqFounderMail =
+  teamEmailConfig.brevoApi !== undefined
+    ? recordingEmailSender(
+        createBrevoApiEmailSender(teamEmailConfig.brevoApi),
+        {
+          sql: database.sql,
+          source: "api.gateq_answer",
+          provider: "BREVO_API",
+        },
+      )
+    : teamEmailConfig.smtp === undefined
+      ? unavailableAppEmailSender
+      : recordingEmailSender(createSmtpAppEmailSender(teamEmailConfig.smtp), {
+          sql: database.sql,
+          source: "api.gateq_answer",
+          provider: "SMTP",
+        });
+const logGateqEmail = (event: GateqEmailEvent) => {
+  const fields = {
+    event: "gateq.email",
+    kind: event.kind,
+    outcome: event.outcome,
+    recipientDomain: event.recipientDomain,
+    ...(event.error instanceof Error ? { errorName: event.error.name } : {}),
+  };
+  if (event.outcome === "SENT") teamLogger.info(fields, "gateq email sent");
+  else teamLogger.warn(fields, "gateq email not sent");
+};
 const gateqInboxService = createGateqInbox({
   sql: database.sql,
   transactions: database.transactions,
   gateq,
+  founderMail: gateqFounderMail,
+  onEmail: logGateqEmail,
   documents: sharedDocumentsPort({
     sql: database.sql,
     authorizeVersion:
@@ -2104,7 +2181,44 @@ const { app, logger } = createApp(config, security, {
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
   // F3: "Find my startup": claim requests and saved startup searches.
-  companyClaims: createCompanyClaims({ sql: database.sql }),
+  // P14 item 7: a platform admin makes an unclaimed company's profile
+  // public (or returns it to the network); the console authorises.
+  adminPublishCompany: createPlatformCompanyPublishing({
+    transactions: database.transactions,
+    outbox,
+    audit,
+  }),
+  companyClaims: createCompanyClaims({
+    sql: database.sql,
+    // P14: an approved claim admits the requester through the team's own
+    // command (membership, roles, active context, audit, event).
+    admit: (input) =>
+      team.admitClaim({
+        ...input,
+        correlationId: CorrelationIdSchema.parse(`cor_${crypto.randomUUID()}`),
+      }),
+    // P14: the one-time code to the work email, through the app sender,
+    // outcome logged with the domain only.
+    codeMailer: async ({ to, companyName, code, expiresInMinutes }) => {
+      const rendered = renderClaimCodeEmail({
+        companyName,
+        code,
+        expiresInMinutes,
+      });
+      return sendGateqEmailLogged(
+        gateqFounderMail,
+        logGateqEmail,
+        "CLAIM_CODE",
+        to,
+        {
+          subject: rendered.subject,
+          text: rendered.text,
+          html: rendered.html,
+          fromName: "Capital Q",
+        },
+      );
+    },
+  }),
   startupAlerts: createStartupAlerts({ sql: database.sql }),
   // F4: the investor's GateQ inbox. Reads here; writes are declared actions.
   gateqInboxService: gateqInboxService,
@@ -2146,13 +2260,39 @@ const { app, logger } = createApp(config, security, {
           attach: (input) => gateqApply.intake.attachDocument(input),
           link: async ({ token, actor }) => {
             const guest = await gateqApply.intake.authorise(token);
-            await createPostgresApplicationFounders({ sql: database.sql }).link(
-              {
-                applicationId: guest.application.id,
-                tenantId: guest.application.tenantId,
-                actor,
-              },
-            );
+            const founders = createPostgresApplicationFounders({
+              sql: database.sql,
+            });
+            const pair = await founders.link({
+              applicationId: guest.application.id,
+              tenantId: guest.application.tenantId,
+              actor,
+            });
+            // P14: the application joins the ONE canonical company-investor
+            // relationship (Network's own command, source GATEQ; both sides
+            // know of it, so relationship_shared), never a parallel record.
+            if (pair !== null) {
+              const companyId = CompanyIdSchema.safeParse(pair.companyId);
+              const investorId = InvestorOrganisationIdSchema.safeParse(
+                pair.investorOrganisationId,
+              );
+              if (companyId.success && investorId.success) {
+                const ensured = await gateqNetwork.ensureRelationship({
+                  actor,
+                  companyId: companyId.data,
+                  investorOrganisationId: investorId.data,
+                  source: { type: "GATEQ", id: guest.application.id },
+                  visibilityScope: "relationship_shared",
+                  correlationId: CorrelationIdSchema.parse(
+                    `cor_${crypto.randomUUID()}`,
+                  ),
+                });
+                await founders.setRelationship({
+                  applicationId: guest.application.id,
+                  relationshipId: ensured.relationship.id,
+                });
+              }
+            }
           },
         }),
   gateqMyApplications: (actor) =>

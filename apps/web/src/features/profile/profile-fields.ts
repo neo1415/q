@@ -56,8 +56,8 @@ const STAGES = STAGE_OPTIONS.filter(
 ).map((option) => ({ value: option.optionKey, label: option.label }));
 
 /** Option keys are lowercase ISO codes; profiles store them uppercase. */
-const SHORT_LIST = COUNTRY_OPTIONS.filter(
-  (option) => /^[a-z]{2}$/.test(option.optionKey),
+const SHORT_LIST = COUNTRY_OPTIONS.filter((option) =>
+  /^[a-z]{2}$/.test(option.optionKey),
 ).map((option) => ({
   value: option.optionKey.toUpperCase(),
   label: option.label,
@@ -84,7 +84,8 @@ export const COUNTRIES: readonly { value: string; label: string }[] = (() => {
       const code = String.fromCharCode(a, b);
       if (listed.has(code) || NOT_COUNTRIES.has(code)) continue;
       const label = names.of(code);
-      if (label !== undefined && label !== code) rest.push({ value: code, label });
+      if (label !== undefined && label !== code)
+        rest.push({ value: code, label });
     }
   }
   rest.sort((x, y) => x.label.localeCompare(y.label, "en"));

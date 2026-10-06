@@ -168,6 +168,8 @@ function canonicalValues(objective: CapitalObjective): CapitalCanonicalValues {
     instrumentCode: objective.instrumentCode,
     targetCloseDate: objective.targetCloseDate,
     useOfFundsSummary: objective.useOfFundsSummary,
+    valuation: objective.valuation,
+    minimumCheque: objective.minimumCheque,
   };
 }
 
@@ -211,6 +213,8 @@ async function establishObjective(
     instrumentCode: request.instrumentCode ?? null,
     targetCloseDate: request.targetCloseDate ?? null,
     useOfFundsSummary: request.useOfFundsSummary ?? null,
+    valuation: request.valuation ?? null,
+    minimumCheque: request.minimumCheque ?? null,
     createdByUserId: actor.userId,
   });
   await dependencies.repositories.history.append(tx, {
@@ -566,6 +570,28 @@ export function createUpdateCapitalObjective(
           previous[field] = current[field];
           next[field] = value;
         }
+      }
+      // F5: the valuation is one fact (kind + amount); compared whole.
+      if (
+        input.valuation !== undefined &&
+        (input.valuation?.kind !== current.valuation?.kind ||
+          input.valuation?.amount !== current.valuation?.amount)
+      ) {
+        changes.valuation = input.valuation;
+        changedFields.push("valuation");
+        kinds.add("VALUATION");
+        previous.valuation = current.valuation;
+        next.valuation = input.valuation;
+      }
+      if (
+        input.minimumCheque !== undefined &&
+        input.minimumCheque !== current.minimumCheque
+      ) {
+        changes.minimumCheque = input.minimumCheque;
+        changedFields.push("minimumCheque");
+        kinds.add("MINIMUM_CHEQUE");
+        previous.minimumCheque = current.minimumCheque;
+        next.minimumCheque = input.minimumCheque;
       }
       if (changedFields.length === 0) {
         return current;

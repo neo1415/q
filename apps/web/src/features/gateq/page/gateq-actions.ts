@@ -16,6 +16,7 @@ import {
   setGateqReplyPromise,
   starGateqApplications,
   discoverCompanies,
+  confirmClaimCode,
 } from "@capital-q/api-client";
 import {
   CompanyClaimRequestSchema,
@@ -287,5 +288,22 @@ export async function saveAlertAction(input: unknown): Promise<Done> {
     return { ok: false, message: "Describe the company in a few words." };
   return withSession(
     async (s) => (await saveStartupAlert(s, parsed.data), null),
+  );
+}
+
+/** P14: the six-digit code from the work email, confirming the address. */
+export async function confirmClaimCodeAction(
+  companyId: string,
+  code: string,
+): Promise<Done<"CONFIRMED" | "WRONG_CODE" | "EXPIRED" | "NOT_FOUND">> {
+  const digits = z
+    .string()
+    .regex(/^\d{6}$/u)
+    .safeParse(code.replace(/\s+/gu, ""));
+  if (!Id.safeParse(companyId).success || !digits.success) {
+    return { ok: false, message: "Enter the six-digit code from the email." };
+  }
+  return withSession(
+    async (s) => (await confirmClaimCode(s, companyId, digits.data)).status,
   );
 }

@@ -38,7 +38,8 @@ export default async function WelcomePage({
   const state = await resolveOnboardingState();
   if (params["again"] !== "1") {
     if (state.kind === "UNFINISHED") {
-      redirect(`/onboarding/${state.journey}?talk=1&from=home`);
+      // F15: back to the screen they were on, not live voice.
+      redirect(`/onboarding/${state.journey}?from=home`);
     }
     if (state.kind === "DONE") redirect("/home");
   }

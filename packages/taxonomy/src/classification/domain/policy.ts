@@ -36,6 +36,13 @@ export type TaxonomyClassificationPolicy = {
      * exact token only, otherwise nonsense input collides with them.
      */
     readonly similarityMinCandidateLength: number;
+    /**
+     * v2 (seed finding F1): similarity alone carries a candidate only when
+     * it is at least this strong. A candidate with no query token in it
+     * ("Education" for an invoicing description, similarity 0.40) is noise
+     * below it; a misspelt label ("paymnt", "insurers") is above it.
+     */
+    readonly unmatchedSimilarityFloor: number;
     /** Below this score a lexical hit is not offered (LOW_CONFIDENCE). */
     readonly candidateMinimumScore: number;
     /** Two same-vocabulary hits at/above this and within the margin are AMBIGUOUS. */
@@ -65,6 +72,7 @@ export const TAXONOMY_CLASSIFICATION_POLICY_V1: TaxonomyClassificationPolicy = {
     minTokenLength: 2,
     retrievalSimilarityFloor: 0.3,
     similarityMinCandidateLength: 6,
+    unmatchedSimilarityFloor: 0.5,
     candidateMinimumScore: 0.35,
     strongScore: 0.6,
     ambiguityMargin: 0.02,

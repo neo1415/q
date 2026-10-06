@@ -6,6 +6,7 @@ import {
   CapitalObjectiveTypeSchema,
   CapitalTargetSchema,
   InstrumentCodeSchema,
+  RaiseValuationSchema,
   LocalDateSchema,
   StageCodeSchema,
   USE_OF_FUNDS_MAX_LENGTH,
@@ -40,6 +41,8 @@ export const CAPITAL_CHANGE_KINDS = [
   "INSTRUMENT",
   "TIMELINE",
   "USE_OF_FUNDS",
+  "VALUATION",
+  "MINIMUM_CHEQUE",
 ] as const;
 export const CapitalChangeKindSchema = z.enum(CAPITAL_CHANGE_KINDS);
 export type CapitalChangeKind = z.infer<typeof CapitalChangeKindSchema>;
@@ -53,6 +56,9 @@ const CanonicalValuesSchema = z
     instrumentCode: InstrumentCodeSchema.nullable(),
     targetCloseDate: LocalDateSchema.nullable(),
     useOfFundsSummary: z.string().max(USE_OF_FUNDS_MAX_LENGTH).nullable(),
+    // F5: optional so history written before the terms existed still reads.
+    valuation: RaiseValuationSchema.nullable().optional(),
+    minimumCheque: z.string().nullable().optional(),
   })
   .strict();
 export type CapitalCanonicalValues = z.infer<typeof CanonicalValuesSchema>;

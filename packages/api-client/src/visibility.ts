@@ -65,6 +65,27 @@ export function shareWithRelationship(
   );
 }
 
+/**
+ * P14 (ADR 0060): show the current raise to every investor on the network,
+ * the founder's explicit choice; revoked like any share.
+ */
+export function shareRaiseWithNetwork(
+  session: ApiSession,
+  companyId: string,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    companyPath(COMPANY_SHARES_PATH, companyId),
+    VisibilityShareResultDtoSchema,
+    {
+      body: { object: "CAPITAL_OBJECTIVE", audience: "NETWORK" },
+      headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+    },
+  );
+}
+
 /** `POST …/visibility/shares/:policyId/revoke` — future access removed. */
 export function revokeVisibilityShare(
   session: ApiSession,

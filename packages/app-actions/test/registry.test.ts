@@ -296,6 +296,7 @@ describe("the action registry", () => {
       // F3: find my startup (claim on screen) and a saved startup search.
       ["company.claim.request", "offer.find_my_startup", "INSTANT"],
       ["gateq.startup_alert.save", "save_startup_alert", "INSTANT"],
+      ["company.claim.decide", "offer.team_manage", "CONSEQUENTIAL"],
     ]);
   });
 });

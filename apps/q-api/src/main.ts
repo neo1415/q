@@ -1959,6 +1959,18 @@ const team = createTeamService({
             provider: "SMTP",
           }),
   ),
+  // P15: outcome per email, recipient domain only (never the address).
+  onEmail: (event) => {
+    const fields = {
+      event: "team.email",
+      kind: event.kind,
+      outcome: event.outcome,
+      recipientDomain: event.recipientDomain,
+      ...(event.error instanceof Error ? { errorName: event.error.name } : {}),
+    };
+    if (event.outcome === "SENT") logger.info(fields, "team email sent");
+    else logger.warn(fields, "team email not sent");
+  },
   webOrigin:
     process.env["CQ_WEB_ORIGIN"] ??
     "https://capital-qweb-production.up.railway.app",
@@ -1990,6 +2002,40 @@ const gateqInbox = gateqInboxActionsPort(
     sql: database.sql,
     transactions: database.transactions,
     gateq: gateqForInbox,
+    // P14: an approved pass or reply reaches the founder by email too.
+    founderMail:
+      teamEmailConfig.brevoApi !== undefined
+        ? recordingEmailSender(
+            createBrevoApiEmailSender(teamEmailConfig.brevoApi),
+            {
+              sql: database.sql,
+              source: "q_api.gateq_answer",
+              provider: "BREVO_API",
+            },
+          )
+        : teamEmailConfig.smtp === undefined
+          ? unavailableAppEmailSender
+          : recordingEmailSender(
+              createSmtpAppEmailSender(teamEmailConfig.smtp),
+              {
+                sql: database.sql,
+                source: "q_api.gateq_answer",
+                provider: "SMTP",
+              },
+            ),
+    onEmail: (event) => {
+      const fields = {
+        event: "gateq.email",
+        kind: event.kind,
+        outcome: event.outcome,
+        recipientDomain: event.recipientDomain,
+        ...(event.error instanceof Error
+          ? { errorName: event.error.name }
+          : {}),
+      };
+      if (event.outcome === "SENT") logger.info(fields, "gateq email sent");
+      else logger.warn(fields, "gateq email not sent");
+    },
   }),
   ownGatewayIdFrom({
     gateq: gateqForInbox,

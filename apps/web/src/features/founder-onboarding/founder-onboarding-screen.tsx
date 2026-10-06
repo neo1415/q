@@ -25,6 +25,11 @@ const STEP_FORM_ID = "founder-onboarding-step";
  * one session through the adapter, and renders whichever screen the session
  * says is current. Nothing about the journey lives here.
  */
+const MODE_KEY = "cq.onboarding.founder.mode";
+/** F17: how long "Go to Home" waits for Q's first reading, in tries. */
+const FINISH_TRIES = 8;
+const FINISH_WAIT_MS = 2500;
+
 export function FounderOnboardingScreen({
   adapter,
   seed,
@@ -49,7 +54,30 @@ export function FounderOnboardingScreen({
   const [state, actions] = useFounderOnboarding(client);
   // Q leads by default (CQ-PRE-REC-001 §16); the structured screens remain
   // for direct editing (§30) and as the fallback when a step needs them.
-  const [mode, setMode] = useState<"conversation" | "form">("conversation");
+  // F15: a founder who chose the form resumes in the form; voice opens only
+  // when asked for (`?talk=1` or "Talk with Q"). A per-browser convenience.
+  // Read once at first render: the screen shows a skeleton until the
+  // session loads, so the server's render never depends on it.
+  const [mode, setMode] = useState<"conversation" | "form">(() => {
+    if (startTalking || typeof window === "undefined") return "conversation";
+    try {
+      return window.localStorage.getItem(MODE_KEY) === "form"
+        ? "form"
+        : "conversation";
+    } catch {
+      // Storage unavailable: Q leads, as before.
+      return "conversation";
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      // Nothing to remember it in; harmless.
+    }
+  }, [mode]);
+  // F17: "Go to Home" waits for Q's first reading instead of failing.
+  const [finishing, setFinishing] = useState(false);
   // Set when the person asks for Q's voice from the form: the workspace
   // opens already talking, then this is cleared so it happens once.
   const [talkOnOpen, setTalkOnOpen] = useState(startTalking);
@@ -240,45 +268,61 @@ export function FounderOnboardingScreen({
     </div>
   );
 
-  const notice =
-    state.errorMessage !== undefined ? (
-      <InlineNotice
-        tone="danger"
-        title="Couldn't save"
-        action={
-          state.canRetry ? (
-            <Button
-              variant="secondary"
-              size="compact"
-              onClick={() => void actions.retry()}
-            >
-              Try again
-            </Button>
-          ) : undefined
-        }
-      >
-        {state.errorMessage} Your answers on this screen are kept.
-      </InlineNotice>
-    ) : state.conflictNotice !== undefined ? (
-      <InlineNotice tone="info" title="Updated elsewhere">
-        {state.conflictNotice}
-      </InlineNotice>
-    ) : session.source.synthetic ? (
-      <p className="cq-caption text-(--cq-text-tertiary)">
-        Development preview: synthetic data from {session.source.adapter}.
-        Nothing is sent or stored outside this browser tab.
-      </p>
-    ) : undefined;
+  const notice = finishing ? (
+    <InlineNotice tone="info" title="Almost there">
+      Q is finishing its first reading of your company. This takes a few
+      seconds; you&apos;ll go on by yourself.
+    </InlineNotice>
+  ) : state.errorMessage !== undefined ? (
+    <InlineNotice
+      tone="danger"
+      title="Couldn't save"
+      action={
+        state.canRetry ? (
+          <Button
+            variant="secondary"
+            size="compact"
+            onClick={() => void actions.retry()}
+          >
+            Try again
+          </Button>
+        ) : undefined
+      }
+    >
+      {state.errorMessage} Your answers on this screen are kept.
+    </InlineNotice>
+  ) : state.conflictNotice !== undefined ? (
+    <InlineNotice tone="info" title="Updated elsewhere">
+      {state.conflictNotice}
+    </InlineNotice>
+  ) : session.source.synthetic ? (
+    <p className="cq-caption text-(--cq-text-tertiary)">
+      Development preview: synthetic data from {session.source.adapter}. Nothing
+      is sent or stored outside this browser tab.
+    </p>
+  ) : undefined;
 
   const finish = async () => {
     // Confirm the snapshot, then mark the journey complete. Completion is
     // journey completion only; Home decides what comes next.
-    await actions.submit({ kind: "snapshot", confirmed: true });
-    if (await actions.complete()) {
-      // ADMIN-4 block (founder direction 2026-10-02): straight into
-      // "Verify you and <company>", skippable; skipping goes on to the
-      // profile, where the founder checks what Q put together (2026-09-30).
-      router.push("/verification?from=setup&next=profile");
+    setFinishing(true);
+    try {
+      await actions.submit({ kind: "snapshot", confirmed: true });
+      // F17: while Q's first reading runs, completing is refused for a few
+      // seconds. Wait it out here, with a calm line on screen, rather than
+      // showing the refusal.
+      for (let attempt = 0; attempt < FINISH_TRIES; attempt += 1) {
+        if (await actions.complete()) {
+          // ADMIN-4 block (founder direction 2026-10-02): straight into
+          // "Verify you and <company>", skippable; skipping goes on to the
+          // profile, where the founder checks what Q put together.
+          router.push("/verification?from=setup&next=profile");
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, FINISH_WAIT_MS));
+      }
+    } finally {
+      setFinishing(false);
     }
   };
 
@@ -292,7 +336,12 @@ export function FounderOnboardingScreen({
       notice={notice}
       primaryAction={
         isFinal
-          ? { label: "Go to Home", onClick: () => void finish() }
+          ? {
+              label: finishing ? "Preparing your analysis…" : "Go to Home",
+              onClick: () => {
+                if (!finishing) void finish();
+              },
+            }
           : {
               label: step.primaryActionLabel ?? "Continue",
               formId: STEP_FORM_ID,

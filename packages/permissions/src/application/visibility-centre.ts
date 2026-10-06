@@ -107,7 +107,9 @@ export type VisibilityCentre = {
     readonly actor: ActorContext;
     readonly companyId: string;
     readonly object: "CAPITAL_OBJECTIVE";
-    readonly relationshipId: string;
+    /** Exactly one: a relationship, or the whole network (ADR 0060). */
+    readonly relationshipId?: string | undefined;
+    readonly audience?: "NETWORK" | undefined;
     readonly correlationId: CorrelationId;
   }) => Promise<VisibilityShareResultDto>;
   readonly revoke: (command: {
@@ -271,6 +273,32 @@ export function createVisibilityCentre(
     return shares;
   };
 
+  /**
+   * P14 (ADR 0060): the founder's network-wide share of the raise, as the
+   * disclosure layer holds it (an ACTIVE network_visible policy with no
+   * recipient on the capital objective). The objective itself stays
+   * founder_private; this policy is the only thing that widens it.
+   */
+  const networkRaiseShareOf = async (
+    actor: ActorContext,
+    company: OwnCompany,
+  ): Promise<{ policyId: string; createdAt: string } | null> => {
+    if (company.objective === null) return null;
+    const inspection = await ports.inspect({
+      actor,
+      resource: { type: "capital_objective", id: company.objective.id },
+    });
+    const policy = inspection.policies.find(
+      (candidate) =>
+        candidate.status === "ACTIVE" &&
+        candidate.recipient === null &&
+        candidate.scopeType === "network_visible",
+    );
+    return policy === undefined
+      ? null
+      : { policyId: policy.id, createdAt: policy.createdAt };
+  };
+
   return {
     state: async ({ actor, companyId }) => {
       const company = await own(actor, companyId);
@@ -292,7 +320,8 @@ export function createVisibilityCentre(
           object: "CAPITAL_OBJECTIVE",
           resourceId: company.objective.id,
           // The resolver's classification: a raise is never automatically
-          // network-visible (permissions resolvers).
+          // network-visible (permissions resolvers). The founder's own
+          // network share (ADR 0060) is a policy, shown as networkRaiseShare.
           scope: "founder_private",
           choices: [],
           shareable: true,
@@ -303,6 +332,7 @@ export function createVisibilityCentre(
         objects,
         shares: await sharesOf(actor, company, relationships),
         relationships: [...relationships],
+        networkRaiseShare: await networkRaiseShareOf(actor, company),
       };
     },
 
@@ -353,10 +383,47 @@ export function createVisibilityCentre(
       };
     },
 
-    share: async ({ actor, companyId, relationshipId, correlationId }) => {
+    share: async ({
+      actor,
+      companyId,
+      relationshipId,
+      audience,
+      correlationId,
+    }) => {
       const company = await own(actor, companyId);
       if (company.objective === null) {
         throw new CapitalObjectiveNotFoundError();
+      }
+      if (audience === "NETWORK" && relationshipId === undefined) {
+        // ADR 0060: the founder's explicit choice, through the same policy
+        // manager (disclosure.manage on the objective) as any share; every
+        // investor read already asks the evaluator, so this is the one
+        // switch. Revoking it is the ordinary revoke of this policy.
+        const result = await ports.policies.grant({
+          actor,
+          resource: { type: "capital_objective", id: company.objective.id },
+          scopeType: "network_visible",
+          accessLevel: "view",
+          correlationId,
+        });
+        if (result.outcome === "REDUNDANT") {
+          return { outcome: "REDUNDANT", share: null };
+        }
+        return {
+          outcome: result.outcome,
+          share: {
+            policyId: result.policy.id,
+            object: "CAPITAL_OBJECTIVE",
+            relationshipId: null,
+            recipientName: null,
+            accessLevel: result.policy.accessLevel,
+            createdAt: result.policy.createdAt,
+            expiresAt: result.policy.expiresAt,
+          },
+        };
+      }
+      if (relationshipId === undefined) {
+        throw new CompanyNotFoundError();
       }
       // Only a relationship the company can see: a private discovery is
       // not something the company knows of, so it cannot share into it.

@@ -13,6 +13,8 @@ import {
   removeTeamMember,
   resendTeamInvitation,
   respondToTeamOwnership,
+  decideCompanyClaim,
+  requestToJoin,
   revokeTeamInvitation,
   switchOrganisation,
 } from "@capital-q/api-client";
@@ -146,6 +148,22 @@ export async function decideJoinAction(requestId: string, approve: boolean) {
 }
 
 /** Switching: the server sets who they act for, from their own membership. */
+/**
+ * F8: ask a company's admins to let them in, from "Find my startup". A
+ * person action: it works before they belong anywhere. The answer is the
+ * same whether or not the organisation exists; admins decide on Team.
+ */
+export async function askToJoinAction(
+  organisationId: string,
+  message: string,
+): Promise<TeamActionResult<{ readonly requested: true }>> {
+  if (!id(organisationId)) return BAD;
+  const note = message.trim().slice(0, 500);
+  return run((s) =>
+    requestToJoin(s, organisationId, note === "" ? undefined : note),
+  );
+}
+
 export async function switchOrganisationAction(organisationId: string) {
   if (!id(organisationId)) return BAD;
   const out = await run((s) => switchOrganisation(s, organisationId));
@@ -158,4 +176,14 @@ export async function acceptInvitationAction(token: string) {
   const out = await run((s) => acceptInvitation(s, token));
   if (out.ok) revalidatePath("/", "layout");
   return out;
+}
+
+/** P14: a company admin lets in (as a Member) or declines a claim. */
+export async function decideCompanyClaimAction(
+  companyId: string,
+  requestId: string,
+  approve: boolean,
+): Promise<TeamActionResult<{ readonly status: "APPROVED" | "DECLINED" }>> {
+  if (!id(companyId) || !id(requestId)) return BAD;
+  return run((s) => decideCompanyClaim(s, companyId, requestId, approve));
 }

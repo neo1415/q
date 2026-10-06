@@ -53,7 +53,10 @@ import {
   registerDocumentRoutes,
   type DocumentRoutesDependencies,
 } from "./http/documents.js";
-import type { CompanyClaims } from "@capital-q/companies";
+import type {
+  CompanyClaims,
+  PlatformCompanyPublishing,
+} from "@capital-q/companies";
 import type { StartupAlerts } from "@capital-q/gateq-intake";
 import type {
   AppActionPorts,
@@ -369,6 +372,8 @@ export type ApiModules = {
    * decision 2026-10-04). Absent: those lists read as initials.
    */
   readonly namedPhotos?: NamedPhotos | undefined;
+  /** P14 item 7: a platform admin publishes an unclaimed company's profile. */
+  readonly adminPublishCompany?: PlatformCompanyPublishing | undefined;
 };
 
 /**
@@ -533,6 +538,7 @@ export function createApp(
       resolver: security.resolver,
       identities: security.identities,
       team: modules.team,
+      namedPhotos: modules.namedPhotos,
     });
   }
 
@@ -686,6 +692,9 @@ export function createApp(
       decideVerification: modules.adminVerificationDecider,
       closeKyb: modules.adminCloseKyb,
       kybDownload: modules.adminKybDownload,
+      companyClaims: modules.companyClaims,
+      admitClaim: modules.team?.admitClaim,
+      publishCompany: modules.adminPublishCompany,
     });
     // ADMIN-3 block: the person's side of reviews and KYB.
     if (modules.kyb !== undefined) {
@@ -816,6 +825,8 @@ export function createApp(
       materials: modules.gateqMaterials,
       inboxService: modules.gateqInboxService,
       claimable: modules.companyClaims?.search,
+      identities: security.identities,
+      claims: modules.companyClaims,
       myApplications: modules.gateqMyApplications,
       publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,
