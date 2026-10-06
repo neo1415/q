@@ -31,6 +31,7 @@ import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
 import { performClientAction, registerClientRouter } from "./client-actions";
 import { followOfTurns } from "./follow-navigation";
+import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
 import { setOpenDocument } from "./screen";
@@ -498,6 +499,7 @@ export function QSessionProvider({
   return (
     <QSessionContext.Provider value={value}>
       {children}
+      <QMaterialViewer turns={turns} />
     </QSessionContext.Provider>
   );
 }

@@ -111,7 +111,7 @@ export function intentHref(intent: QUiIntent): string | null {
     return null;
   }
   if (intent.kind === "OPEN_RECORD_PAGE") {
-    return recordPagePath(intent.page, intent.id);
+    return recordPagePath(intent.page, intent.id, intent.companyId);
   }
   // The company page exists now (CQ-WEB-022) and authorises the read as
   // the person; an OPEN_COMPANY card that went nowhere was R0 (live
@@ -175,7 +175,7 @@ function intentLabel(intent: QUiIntent): string {
     case "SIGN_OUT":
       return "Sign out";
     case "OPEN_RECORD_PAGE":
-      return intent.page === "DOCUMENT"
+      return intent.page === "DOCUMENT" || intent.page === "DATA_ROOM_DOCUMENT"
         ? "Open the document"
         : intent.page === "COMPANY_PITCH"
           ? "Watch the pitch"
