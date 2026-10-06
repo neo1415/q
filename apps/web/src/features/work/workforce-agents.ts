@@ -84,7 +84,9 @@ export const STATE_WORDS: Readonly<Record<AgentState, string>> = {
 };
 
 /** The node's label: the state, with the pause's reason or who it waits on. */
-export function stateLabel(node: Pick<AgentNode, "state" | "pause" | "waitingOn">): string {
+export function stateLabel(
+  node: Pick<AgentNode, "state" | "pause" | "waitingOn">,
+): string {
   if (node.state === "paused") {
     return node.pause === "budget"
       ? "Paused: monthly limit"
@@ -201,7 +203,12 @@ function candidatesOf(
         if (!recent(run.endedAt ?? run.startedAt)) break;
         out.push([
           run.role,
-          { state: "done", now: words, job, since: run.endedAt ?? run.startedAt },
+          {
+            state: "done",
+            now: words,
+            job,
+            since: run.endedAt ?? run.startedAt,
+          },
         ]);
         break;
       case "HELD":
@@ -212,7 +219,10 @@ function candidatesOf(
     }
   }
 
-  if (job.job.status === "PLANNING" && !job.agents.some((r) => r.role === "LEAD" && r.status === "RUNNING")) {
+  if (
+    job.job.status === "PLANNING" &&
+    !job.agents.some((r) => r.role === "LEAD" && r.status === "RUNNING")
+  ) {
     out.push([
       "LEAD",
       {
@@ -240,7 +250,10 @@ function candidatesOf(
     if (outcome === null) continue;
     if (outcome.outcome === "HELD" && !ended) {
       const replied = draft.feedback.some(
-        (one) => one.kind === "APPROVED" || one.kind === "REJECTED" || one.kind === "EDITED",
+        (one) =>
+          one.kind === "APPROVED" ||
+          one.kind === "REJECTED" ||
+          one.kind === "EDITED",
       );
       if (replied) continue;
       out.push([
@@ -360,7 +373,8 @@ export function agentNodes(input: {
     best.set(role, better(best.get(role), candidate));
   };
   for (const job of jobs) {
-    for (const [role, candidate] of candidatesOf(job, now)) offer(role, candidate);
+    for (const [role, candidate] of candidatesOf(job, now))
+      offer(role, candidate);
   }
   for (const [role, candidate] of workCandidates(input.work ?? [])) {
     offer(role, candidate);
@@ -386,11 +400,7 @@ export function agentNodes(input: {
       };
     }
     // The month's limit pauses whatever would be running.
-    if (
-      overview.paused &&
-      candidate !== undefined &&
-      isLive(candidate.state)
-    ) {
+    if (overview.paused && candidate !== undefined && isLive(candidate.state)) {
       candidate = {
         ...candidate,
         state: "paused",
@@ -515,10 +525,19 @@ export function clampZoom(scale: number): number {
   return Math.min(ZOOM.max, Math.max(ZOOM.min, scale));
 }
 
-export type View = { readonly scale: number; readonly x: number; readonly y: number };
+export type View = {
+  readonly scale: number;
+  readonly x: number;
+  readonly y: number;
+};
 
 /** Zoom about a point in the viewport, keeping that point still. */
-export function zoomAbout(view: View, next: number, px: number, py: number): View {
+export function zoomAbout(
+  view: View,
+  next: number,
+  px: number,
+  py: number,
+): View {
   const scale = clampZoom(next);
   const k = scale / view.scale;
   return { scale, x: px - (px - view.x) * k, y: py - (py - view.y) * k };
@@ -530,7 +549,10 @@ export function fitView(
   world: { readonly width: number; readonly height: number },
 ): View {
   const scale = clampZoom(
-    Math.min(viewport.width / (world.width + 40), viewport.height / (world.height + 30)),
+    Math.min(
+      viewport.width / (world.width + 40),
+      viewport.height / (world.height + 30),
+    ),
   );
   return {
     scale,

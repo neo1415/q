@@ -36,7 +36,10 @@ export function WorkforceCost({
           aria-labelledby="cost-month"
           className="rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
         >
-          <h2 id="cost-month" className="m-0 text-[13px] font-normal text-(--cq-text-secondary)">
+          <h2
+            id="cost-month"
+            className="m-0 text-[13px] font-normal text-(--cq-text-secondary)"
+          >
             This month
           </h2>
           <p className="cq-numeric my-2 font-(family-name:--cq-font-editorial) text-[34px] leading-none font-medium">
@@ -84,7 +87,10 @@ export function WorkforceCost({
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.name}>
-                    <th scope="row" className="w-[120px] py-1.5 text-left font-normal lg:w-[140px]">
+                    <th
+                      scope="row"
+                      className="w-[120px] py-1.5 text-left font-normal lg:w-[140px]"
+                    >
                       {row.name}
                     </th>
                     <td className="py-1.5 align-middle">
@@ -95,7 +101,9 @@ export function WorkforceCost({
                         />
                       </div>
                     </td>
-                    <td className="cq-numeric w-16 py-1.5 text-right">{dollars(row.usd)}</td>
+                    <td className="cq-numeric w-16 py-1.5 text-right">
+                      {dollars(row.usd)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -118,7 +126,9 @@ export function WorkforceCost({
                 className="flex justify-between gap-3 border-t border-(--cq-border-subtle) py-3 text-[14px] first:border-t-0"
               >
                 <span className="min-w-0">
-                  <span className="block truncate">{jobTitle(job.job.goal)}</span>
+                  <span className="block truncate">
+                    {jobTitle(job.job.goal)}
+                  </span>
                   <span className="text-[13px] text-(--cq-text-secondary)">
                     {dollars(job.job.budgetUsd)} budget
                   </span>

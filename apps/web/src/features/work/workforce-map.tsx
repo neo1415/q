@@ -63,7 +63,13 @@ type Role = AgentNode["role"];
 
 const ICON = { size: 12, strokeWidth: 2.25, "aria-hidden": true } as const;
 
-function StateGlyph({ state, size = 12 }: { readonly state: AgentState; readonly size?: number }) {
+function StateGlyph({
+  state,
+  size = 12,
+}: {
+  readonly state: AgentState;
+  readonly size?: number;
+}) {
   const props = { ...ICON, size };
   switch (state) {
     case "working":
@@ -167,14 +173,14 @@ export function AgentRing({
         style={{
           borderColor: tone,
           ...(node.state === "asking"
-            ? { boxShadow: `0 0 0 3px var(--cq-surface-raised), 0 0 0 5px ${tone}` }
+            ? {
+                boxShadow: `0 0 0 3px var(--cq-surface-raised), 0 0 0 5px ${tone}`,
+              }
             : {}),
         }}
       />
       {node.state === "working" && !reduced ? (
-        <span
-          className="absolute -inset-1 animate-[spin_2.4s_linear_infinite] rounded-full border-2 border-transparent border-t-(--cq-surface-raised)"
-        />
+        <span className="absolute -inset-1 animate-[spin_2.4s_linear_infinite] rounded-full border-2 border-transparent border-t-(--cq-surface-raised)" />
       ) : null}
       {node.state === "thinking" && !reduced ? (
         <span
@@ -192,7 +198,10 @@ export function AgentRing({
           height: Math.max(16, size * 0.45),
         }}
       >
-        <StateGlyph state={node.state} size={Math.max(10, Math.round(size * 0.27))} />
+        <StateGlyph
+          state={node.state}
+          size={Math.max(10, Math.round(size * 0.27))}
+        />
       </span>
     </span>
   );
@@ -239,7 +248,11 @@ export function WorkforceTeam({
   const counts = stateCounts(nodes);
 
   return (
-    <section aria-labelledby="workforce-team-heading" className="flex flex-col gap-3" data-workforce-team>
+    <section
+      aria-labelledby="workforce-team-heading"
+      className="flex flex-col gap-3"
+      data-workforce-team
+    >
       <h2 id="workforce-team-heading" className="sr-only">
         Q’s team
       </h2>
@@ -310,7 +323,10 @@ export function WorkforceTeam({
           .sort((a, b) => stateRank(a.state) - stateRank(b.state))
           .filter((node) => filter === null || node.state === filter)
           .map((node) => (
-            <li key={node.role} className="[&+&]:border-t [&+&]:border-(--cq-border-subtle)">
+            <li
+              key={node.role}
+              className="[&+&]:border-t [&+&]:border-(--cq-border-subtle)"
+            >
               <button
                 type="button"
                 onClick={() => onOpen(node.role)}
@@ -319,14 +335,18 @@ export function WorkforceTeam({
               >
                 <AgentRing node={node} size={38} />
                 <span className="min-w-0">
-                  <span className="mr-2 text-[14.5px] font-semibold">{node.name}</span>
+                  <span className="mr-2 text-[14.5px] font-semibold">
+                    {node.name}
+                  </span>
                   <StateLabel node={node} />
                   <span className="block truncate text-[13px] text-(--cq-text-secondary)">
                     {node.now}
                   </span>
                 </span>
                 <span className="cq-numeric text-right text-[12.5px] text-(--cq-text-tertiary)">
-                  <span suppressHydrationWarning>{ago(node.since, now) ?? ""}</span>
+                  <span suppressHydrationWarning>
+                    {ago(node.since, now) ?? ""}
+                  </span>
                   <br />
                   {dollars(node.monthUsd)}
                 </span>
@@ -352,11 +372,17 @@ function Legend() {
     "idle",
   ];
   return (
-    <div aria-hidden="true" className="hidden flex-wrap gap-x-4 gap-y-1.5 text-[12.5px] text-(--cq-text-secondary) lg:flex">
+    <div
+      aria-hidden="true"
+      className="hidden flex-wrap gap-x-4 gap-y-1.5 text-[12.5px] text-(--cq-text-secondary) lg:flex"
+    >
       {order.map((state) => (
         <span key={state} className="inline-flex items-center gap-1.5">
           <span
-            className={cx("inline-block h-3 w-3 rounded-full border-2", LEGEND_STYLE[state])}
+            className={cx(
+              "inline-block h-3 w-3 rounded-full border-2",
+              LEGEND_STYLE[state],
+            )}
             style={{ borderColor: RING_TONE[state] }}
           />
           {STATE_WORDS[state]}
@@ -387,7 +413,11 @@ function TeamMap({
   const [view, setView] = useState<View>({ scale: 1, x: 0, y: 0 });
   const [eased, setEased] = useState(false);
   const touched = useRef(false);
-  const [hover, setHover] = useState<{ role: Role; left: number; top: number } | null>(null);
+  const [hover, setHover] = useState<{
+    role: Role;
+    left: number;
+    top: number;
+  } | null>(null);
 
   const compact = size !== null && size.width < 600;
   const layout = mapLayout(
@@ -448,7 +478,12 @@ function TeamMap({
       if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
       const rect = el.getBoundingClientRect();
-      zoomBy(Math.exp(-event.deltaY * 0.01), event.clientX - rect.left, event.clientY - rect.top, false);
+      zoomBy(
+        Math.exp(-event.deltaY * 0.01),
+        event.clientX - rect.left,
+        event.clientY - rect.top,
+        false,
+      );
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -460,13 +495,22 @@ function TeamMap({
   const [dragging, setDragging] = useState(false);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if ((event.target as Element).closest("[data-map-controls],[data-map-action]")) return;
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (
+      (event.target as Element).closest("[data-map-controls],[data-map-action]")
+    )
+      return;
+    pointers.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
     moved.current = 0;
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
       if (a !== undefined && b !== undefined) {
-        pinch.current = { distance: Math.hypot(a.x - b.x, a.y - b.y), scale: view.scale };
+        pinch.current = {
+          distance: Math.hypot(a.x - b.x, a.y - b.y),
+          scale: view.scale,
+        };
       }
     }
   };
@@ -475,7 +519,10 @@ function TeamMap({
     if (last === undefined) return;
     const dx = event.clientX - last.x;
     const dy = event.clientY - last.y;
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    pointers.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
     const rect = event.currentTarget.getBoundingClientRect();
     if (pointers.current.size === 2 && pinch.current !== null) {
       const [a, b] = [...pointers.current.values()];
@@ -486,7 +533,8 @@ function TeamMap({
       setView((now) =>
         zoomAbout(
           now,
-          (start.scale * Math.hypot(a.x - b.x, a.y - b.y)) / Math.max(1, start.distance),
+          (start.scale * Math.hypot(a.x - b.x, a.y - b.y)) /
+            Math.max(1, start.distance),
           (a.x + b.x) / 2 - rect.left,
           (a.y + b.y) / 2 - rect.top,
         ),
@@ -564,7 +612,8 @@ function TeamMap({
         <div
           className={cx(
             "absolute top-0 left-0 origin-top-left will-change-transform",
-            eased && "transition-transform duration-(--cq-motion-base) ease-out",
+            eased &&
+              "transition-transform duration-(--cq-motion-base) ease-out",
             size === null && "invisible",
           )}
           style={{
@@ -591,10 +640,20 @@ function TeamMap({
                     y1={a.y}
                     x2={b.x}
                     y2={b.y}
-                    stroke={link.kind === "plain" || link.kind === "peer" ? "var(--cq-border)" : "var(--cq-accent)"}
+                    stroke={
+                      link.kind === "plain" || link.kind === "peer"
+                        ? "var(--cq-border)"
+                        : "var(--cq-accent)"
+                    }
                     strokeWidth={link.kind === "ask" ? 2 : 1.6}
                     strokeOpacity={link.kind === "live" ? 0.7 : 1}
-                    strokeDasharray={link.kind === "ask" ? "2 5" : link.kind === "peer" ? "4 5" : undefined}
+                    strokeDasharray={
+                      link.kind === "ask"
+                        ? "2 5"
+                        : link.kind === "peer"
+                          ? "4 5"
+                          : undefined
+                    }
                   />
                   {link.kind === "live" && !reduced ? (
                     <circle r={3.5} fill="var(--cq-accent)">
@@ -626,7 +685,9 @@ function TeamMap({
                     : cx(
                         "border bg-(--cq-surface-raised) p-3 pl-3.5 hover:border-(--cq-border-strong) hover:shadow-[0_6px_24px_-10px_rgb(0_0_0/0.25)]",
                         node.lead ? "w-[248px]" : "w-[224px]",
-                        node.state === "asking" ? "border-(--cq-accent)" : "border-(--cq-border-subtle)",
+                        node.state === "asking"
+                          ? "border-(--cq-accent)"
+                          : "border-(--cq-border-subtle)",
                       ),
                   dim && "opacity-30",
                 )}
@@ -641,8 +702,13 @@ function TeamMap({
                   const right = rect.right + 292 < window.innerWidth;
                   setHover({
                     role: node.role,
-                    left: right ? rect.right + 12 : Math.max(8, rect.left - 292),
-                    top: Math.max(8, Math.min(window.innerHeight - 200, rect.top)),
+                    left: right
+                      ? rect.right + 12
+                      : Math.max(8, rect.left - 292),
+                    top: Math.max(
+                      8,
+                      Math.min(window.innerHeight - 200, rect.top),
+                    ),
                   });
                 }}
                 onPointerLeave={() => setHover(null)}
@@ -663,7 +729,9 @@ function TeamMap({
                   )}
                 >
                   <AgentRing node={node} size={level === "far" ? 40 : 44} />
-                  <span className={cx("min-w-0", level === "far" && "text-center")}>
+                  <span
+                    className={cx("min-w-0", level === "far" && "text-center")}
+                  >
                     <span
                       className={cx(
                         "block truncate leading-tight font-semibold",
@@ -672,13 +740,22 @@ function TeamMap({
                     >
                       {node.name}
                     </span>
-                    <StateLabel node={node} className={level === "far" ? "justify-center text-[11.5px]" : undefined} />
+                    <StateLabel
+                      node={node}
+                      className={
+                        level === "far"
+                          ? "justify-center text-[11.5px]"
+                          : undefined
+                      }
+                    />
                   </span>
                   {level === "far" ? null : (
                     <span
                       className={cx(
                         "col-span-2 mt-1.5 overflow-hidden text-[13.5px] leading-snug text-(--cq-text-secondary) [-webkit-box-orient:vertical] [display:-webkit-box]",
-                        level === "near" ? "[-webkit-line-clamp:4]" : "[-webkit-line-clamp:2]",
+                        level === "near"
+                          ? "[-webkit-line-clamp:4]"
+                          : "[-webkit-line-clamp:2]",
                       )}
                     >
                       {node.now}
@@ -688,24 +765,32 @@ function TeamMap({
                     <span className="col-span-2 mt-2 flex flex-col gap-1 border-t border-(--cq-border-subtle) pt-2 text-[12.5px] text-(--cq-text-tertiary)">
                       <span className="flex justify-between gap-2">
                         <span>Job</span>
-                        <span className="truncate text-(--cq-text-primary)">{node.job ?? "—"}</span>
+                        <span className="truncate text-(--cq-text-primary)">
+                          {node.job ?? "—"}
+                        </span>
                       </span>
                       <span className="flex justify-between gap-2">
                         <span>Since</span>
-                        <span className="cq-numeric text-(--cq-text-primary)" suppressHydrationWarning>
+                        <span
+                          className="cq-numeric text-(--cq-text-primary)"
+                          suppressHydrationWarning
+                        >
                           {since ?? "—"}
                         </span>
                       </span>
                       <span className="flex justify-between gap-2">
                         <span>This month</span>
                         <span className="cq-numeric text-(--cq-text-primary)">
-                          {node.runs} {node.runs === 1 ? "run" : "runs"} today · {dollars(node.monthUsd)}
+                          {node.runs} {node.runs === 1 ? "run" : "runs"} today ·{" "}
+                          {dollars(node.monthUsd)}
                         </span>
                       </span>
                     </span>
                   ) : null}
                 </button>
-                {node.state === "asking" && node.approval !== null && level !== "far" ? (
+                {node.state === "asking" &&
+                node.approval !== null &&
+                level !== "far" ? (
                   <div className="mt-2 flex flex-wrap gap-1.5" data-map-action>
                     {approve(node)}
                   </div>
@@ -723,7 +808,10 @@ function TeamMap({
           <MapButton label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>
             <Minus size={18} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </MapButton>
-          <span className="cq-numeric min-w-12 text-center text-[13px] text-(--cq-text-secondary)" aria-live="polite">
+          <span
+            className="cq-numeric min-w-12 text-center text-[13px] text-(--cq-text-secondary)"
+            aria-live="polite"
+          >
             {Math.round(view.scale * 100)}%
           </span>
           <MapButton label="Zoom in" onClick={() => zoomBy(1.25)}>
@@ -746,14 +834,22 @@ function TeamMap({
         >
           <b className="block text-[14px]">{hovered.name}</b>
           <StateLabel node={hovered} />
-          <p className="mt-1.5 mb-0 text-(--cq-text-secondary)">{hovered.now}</p>
+          <p className="mt-1.5 mb-0 text-(--cq-text-secondary)">
+            {hovered.now}
+          </p>
           <dl className="mt-2 mb-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-(--cq-text-tertiary)">
             <dt>Job</dt>
-            <dd className="m-0 truncate text-right text-(--cq-text-primary)">{hovered.job ?? "—"}</dd>
+            <dd className="m-0 truncate text-right text-(--cq-text-primary)">
+              {hovered.job ?? "—"}
+            </dd>
             <dt>Since</dt>
-            <dd className="cq-numeric m-0 text-right text-(--cq-text-primary)">{ago(hovered.since, now) ?? "—"}</dd>
+            <dd className="cq-numeric m-0 text-right text-(--cq-text-primary)">
+              {ago(hovered.since, now) ?? "—"}
+            </dd>
             <dt>This month</dt>
-            <dd className="cq-numeric m-0 text-right text-(--cq-text-primary)">{dollars(hovered.monthUsd)}</dd>
+            <dd className="cq-numeric m-0 text-right text-(--cq-text-primary)">
+              {dollars(hovered.monthUsd)}
+            </dd>
           </dl>
         </div>
       )}

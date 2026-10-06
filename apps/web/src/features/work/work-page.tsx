@@ -221,7 +221,8 @@ export function WorkPage({
           </button>
         ))}
       </div>
-      {hasTeam && (view === "team" || view === "progress" || view === "cost") ? (
+      {hasTeam &&
+      (view === "team" || view === "progress" || view === "cost") ? (
         <div className="-mt-3 flex justify-end">
           <LiveLine live={live} now={now} />
         </div>

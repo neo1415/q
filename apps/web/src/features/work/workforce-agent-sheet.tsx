@@ -77,12 +77,11 @@ export function AgentSheet({
       }}
     >
       {node === null ? null : (
-        <SheetContent
-          side="side"
-          title={node.name}
-          className="flex flex-col"
-        >
-          <div className="flex flex-col gap-4 pb-4" data-agent-sheet={node.role}>
+        <SheetContent side="side" title={node.name} className="flex flex-col">
+          <div
+            className="flex flex-col gap-4 pb-4"
+            data-agent-sheet={node.role}
+          >
             <div className="flex items-center gap-3.5">
               <AgentRing node={node} size={44} />
               <StateLabel node={node} className="text-[14px]" />
@@ -114,18 +113,26 @@ export function AgentSheet({
               <dt className="text-(--cq-text-tertiary)">Job</dt>
               <dd className="m-0 text-right">{node.job ?? "—"}</dd>
               <dt className="text-(--cq-text-tertiary)">Since</dt>
-              <dd className="cq-numeric m-0 text-right" suppressHydrationWarning>
+              <dd
+                className="cq-numeric m-0 text-right"
+                suppressHydrationWarning
+              >
                 {since ?? "—"}
               </dd>
               <dt className="text-(--cq-text-tertiary)">Runs today</dt>
               <dd className="cq-numeric m-0 text-right">{node.runs}</dd>
               <dt className="text-(--cq-text-tertiary)">This month</dt>
-              <dd className="cq-numeric m-0 text-right">{dollars(node.monthUsd)}</dd>
+              <dd className="cq-numeric m-0 text-right">
+                {dollars(node.monthUsd)}
+              </dd>
             </dl>
 
             {lines.length === 0 ? null : (
               <section aria-labelledby="agent-sheet-log">
-                <h3 id="agent-sheet-log" className="mb-1.5 text-[14px] font-semibold">
+                <h3
+                  id="agent-sheet-log"
+                  className="mb-1.5 text-[14px] font-semibold"
+                >
                   What happened
                 </h3>
                 <ol className="m-0 list-none p-0">
@@ -136,15 +143,25 @@ export function AgentSheet({
                         className="relative grid grid-cols-[18px_minmax(0,1fr)_auto] gap-2.5 py-1.5 text-[13.5px]"
                       >
                         {index === lines.length - 1 ? null : (
-                          <span aria-hidden="true" className="absolute top-[22px] -bottom-2 left-2 w-px bg-(--cq-border-subtle)" />
+                          <span
+                            aria-hidden="true"
+                            className="absolute top-[22px] -bottom-2 left-2 w-px bg-(--cq-border-subtle)"
+                          />
                         )}
                         <span
-                          className={cx("mt-[5px] ml-1 h-2.5 w-2.5 rounded-full border-2", DOT[line.state])}
+                          className={cx(
+                            "mt-[5px] ml-1 h-2.5 w-2.5 rounded-full border-2",
+                            DOT[line.state],
+                          )}
                         >
-                          <span className="sr-only">{DOT_WORDS[line.state]}</span>
+                          <span className="sr-only">
+                            {DOT_WORDS[line.state]}
+                          </span>
                         </span>
                         <span className="min-w-0">
-                          <span className="text-(--cq-text-tertiary)">{line.who}: </span>
+                          <span className="text-(--cq-text-tertiary)">
+                            {line.who}:{" "}
+                          </span>
                           {line.title}
                         </span>
                         <time
@@ -152,7 +169,11 @@ export function AgentSheet({
                           dateTime={line.at ?? undefined}
                           suppressHydrationWarning
                         >
-                          {line.at === null ? (line.state === "you" ? "now" : "") : clock(line.at)}
+                          {line.at === null
+                            ? line.state === "you"
+                              ? "now"
+                              : ""
+                            : clock(line.at)}
                         </time>
                       </li>
                     ) : null,
@@ -242,7 +263,10 @@ function Actions({
   if (node.state === "asking" && node.approval !== null) {
     return (
       <div className="flex flex-wrap gap-2">
-        <ApproveButton approvalId={node.approval.approvalId} onDone={onDecided} />
+        <ApproveButton
+          approvalId={node.approval.approvalId}
+          onDone={onDecided}
+        />
         {read}
         <Button variant="quiet" onClick={onClose}>
           Not now
@@ -250,7 +274,10 @@ function Actions({
       </div>
     );
   }
-  if (node.state === "held") return read === null ? null : <div className="flex flex-wrap gap-2">{read}</div>;
+  if (node.state === "held")
+    return read === null ? null : (
+      <div className="flex flex-wrap gap-2">{read}</div>
+    );
   if (node.state === "paused" && node.pause === "budget") {
     return (
       <div className="flex flex-wrap gap-2">

@@ -135,7 +135,8 @@ export function WorkforceTeamView({
     readonly job: WorkforceJobDetailDto;
     readonly draftId: string;
   } | null>(null);
-  const node = open === null ? null : (nodes.find((one) => one.role === open) ?? null);
+  const node =
+    open === null ? null : (nodes.find((one) => one.role === open) ?? null);
   const job =
     node?.jobId == null
       ? null

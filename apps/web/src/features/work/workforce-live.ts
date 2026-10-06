@@ -34,7 +34,8 @@ export function freshness(updatedAt: number, now: number): string {
   const seconds = Math.max(0, Math.round((now - updatedAt) / 1000));
   if (seconds < 10) return "updated just now";
   if (seconds < 60) return `updated ${String(seconds)} s ago`;
-  if (seconds < 3600) return `updated ${String(Math.floor(seconds / 60))} min ago`;
+  if (seconds < 3600)
+    return `updated ${String(Math.floor(seconds / 60))} min ago`;
   return `updated at ${new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",

@@ -52,6 +52,14 @@ vi.mock("../src/features/work/work-actions", () => ({
   markReadAction: () => Promise.resolve({ ok: true, value: null }),
 }));
 
+// Q's team is read again on the server; the page's tests never call it.
+const loadWorkforce = vi.fn<() => Promise<unknown>>(() =>
+  Promise.resolve(null),
+);
+vi.mock("../src/features/work/workforce-actions", () => ({
+  loadWorkforceAction: () => loadWorkforce(),
+}));
+
 // What the bell (and the Work count) holds; each test sets its own.
 const noticeItems: { current: NotificationDto[] } = { current: [] };
 vi.mock("../src/features/work/notice-store", () => ({
@@ -362,5 +370,47 @@ describe("Work (WORK-58)", () => {
     expect(plan.asks).toBe("book a meeting");
     expect(plan.rest).toContain("Budget: $5.00 a month");
     expect(readPlan("Hi Ama").quote).toBe("Hi Ama");
+  });
+});
+
+describe("Work's Team and Cost tabs (P7)", () => {
+  it("shows Q's team as a map with every specialist, and the month's cost", async () => {
+    globalThis.ResizeObserver ??= class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    // jsdom does no layout; a tab scrolls itself into view in a browser.
+    Element.prototype.scrollIntoView = () => undefined;
+    const { workforceFixtures } = await import("../app/dev/workforce/fixtures");
+    const fixtures = workforceFixtures(Date.now());
+    render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[]}
+        work={[]}
+        done={null}
+        workforce={{ overview: fixtures.overview, jobs: fixtures.jobs }}
+      />,
+    );
+    const team = screen.getByRole("tab", { name: /Team/ });
+    fireEvent.click(team);
+    expect(team.getAttribute("aria-selected")).toBe("true");
+    const panel = document.getElementById("work-view-team");
+    expect(panel?.hidden).toBe(false);
+    expect(panel?.querySelectorAll("[data-agent]").length).toBe(9);
+    expect(screen.getByRole("status").textContent).toMatch(/Live/u);
+
+    fireEvent.click(screen.getByRole("tab", { name: /Cost/ }));
+    expect(screen.getByRole("heading", { name: "By specialist" })).toBeTruthy();
+    expect(screen.getByRole("meter", { name: /monthly limit/u })).toBeTruthy();
+    // Nothing read from the server during the test.
+    expect(loadWorkforce).not.toHaveBeenCalled();
+  });
+
+  it("leaves the tabs out where the page has no team", () => {
+    render(<WorkPage suggestions={[]} approvals={[]} work={[]} done={null} />);
+    expect(screen.queryByRole("tab", { name: /Team/ })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /Cost/ })).toBeNull();
   });
 });
