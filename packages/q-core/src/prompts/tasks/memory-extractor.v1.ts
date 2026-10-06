@@ -63,7 +63,7 @@ export const MEMORY_EXTRACTOR_V1: PromptDefinition<
 > = {
   id: "MEMORY_EXTRACTOR",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",

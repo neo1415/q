@@ -24,6 +24,8 @@ export const Q_MEMORY_KINDS = [
   "preference",
   "correction",
   "pronunciation",
+  // ADR 0062: what the person mentioned in passing; kept 90 days.
+  "small_talk",
 ] as const;
 
 export const QMemoryItemDtoSchema = z

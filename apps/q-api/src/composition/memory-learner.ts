@@ -15,10 +15,10 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  MemoryExtractorResultSchema,
+  MemoryExtractorResultV2Schema,
   renderPrompt,
-  type MemoryExtractItem,
-  type MemoryExtractorResult,
+  type MemoryExtractItemV2,
+  type MemoryExtractorResultV2,
   type MemoryExtractorVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -95,7 +95,7 @@ const TRANSCRIPT_TURNS = 24;
 const TURN_MAX_CHARS = 4_000;
 
 function candidateOf(
-  item: MemoryExtractItem,
+  item: MemoryExtractItemV2,
   companyId: string | undefined,
 ): MemoryCandidate {
   switch (item.type) {
@@ -146,6 +146,19 @@ function candidateOf(
             ? null
             : { subjectType: "COMPANY", subjectId: companyId },
         structuredValue: {},
+      };
+    case "SMALL_TALK":
+      // ADR 0062: its own namespace, so it never supersedes a fact or a
+      // preference, and the question Q may ask later rides with it. The
+      // Write Gate refuses it without one.
+      return {
+        memoryType: "small_talk",
+        memoryKey: `small_talk.${item.key.split(".").pop() ?? "thread"}`,
+        content: item.content,
+        quote: item.quote,
+        subject: null,
+        structuredValue:
+          item.followUp === null ? {} : { followUp: item.followUp },
       };
   }
 }
@@ -219,7 +232,7 @@ export function createMemoryLearner(
       | "environmentNotes"
     >,
     runId: string,
-  ): Promise<MemoryExtractorResult | null> {
+  ): Promise<MemoryExtractorResultV2 | null> {
     const rendered = renderPrompt<MemoryExtractorVariables>(registry, {
       task: "MEMORY_EXTRACTOR",
       operatingMode: "ASSESSMENT",
@@ -229,7 +242,7 @@ export function createMemoryLearner(
       variables,
     });
     try {
-      const response = await gateway.execute<MemoryExtractorResult>(
+      const response = await gateway.execute<MemoryExtractorResultV2>(
         {
           taskClass: "STRUCTURED_EXTRACTION",
           sensitivity: "CONFIDENTIAL",
@@ -246,10 +259,10 @@ export function createMemoryLearner(
             correlationId: `cor_${runId}`,
           },
         },
-        { schema: MemoryExtractorResultSchema },
+        { schema: MemoryExtractorResultV2Schema },
       );
       if (response.output.kind !== "STRUCTURED") return null;
-      const parsed = MemoryExtractorResultSchema.safeParse(
+      const parsed = MemoryExtractorResultV2Schema.safeParse(
         (response.output as { readonly value: unknown }).value,
       );
       return parsed.success ? parsed.data : null;

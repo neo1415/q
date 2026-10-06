@@ -7,7 +7,9 @@ import type { ActorContext } from "@capital-q/security";
 import { quoteOccursIn } from "../q/statement-recorder.js";
 import {
   MemoryCandidateSchema,
+  SMALL_TALK_RETENTION_DAYS,
   type MemoryBundle,
+  type SmallTalkThread,
   type MemoryCandidate,
   type MemoryItem,
   type MemoryOwner,
@@ -64,6 +66,8 @@ export type MemoryServiceDependencies = {
   /** Conversation working memory, read from the runtime's own store. */
   readonly conversations?: MemoryConversationDigestPort | undefined;
   readonly logger?: Logger | undefined;
+  /** The clock small talk's lapse is measured on; injected for tests. */
+  readonly now?: (() => number) | undefined;
 };
 
 export type RecallQuery = {
@@ -107,7 +111,28 @@ export type MemoryService = {
   readonly list: (actor: ActorContext) => Promise<readonly MemoryItem[]>;
   readonly remember: (command: RememberCommand) => Promise<MemoryWriteResult>;
   readonly forget: (command: ForgetCommand) => Promise<MemoryItem | null>;
+  /**
+   * ADR 0062: one thread of the person's own small talk for Q to bring
+   * back in a long wait, newest first, skipping any already used. Only
+   * ever the actor's own memory, only for Q's conversation with them; it
+   * is not part of `recall`, so no prompt, assessment or other person's
+   * purpose ever reads it.
+   */
+  readonly smallTalkThread?: (
+    actor: ActorContext,
+    used: ReadonlySet<string>,
+  ) => Promise<SmallTalkThread | null>;
 };
+
+/** Small talk's question, from its structured value; null when it has none. */
+export function smallTalkFollowUp(item: {
+  readonly structuredValue: Readonly<Record<string, unknown>>;
+}): string | null {
+  const value = item.structuredValue["followUp"];
+  if (typeof value !== "string") return null;
+  const line = value.replace(/\s+/g, " ").trim();
+  return line.length >= 3 && line.length <= 120 ? line : null;
+}
 
 /** The owner of everything a person says about themselves: the person. */
 export function personOwner(actor: ActorContext): MemoryOwner {
@@ -147,10 +172,38 @@ export function createMemoryService(
   dependencies: MemoryServiceDependencies,
 ): MemoryService {
   const { sql, transactions, repository, logger } = dependencies;
+  const now = dependencies.now ?? (() => Date.now());
+  const lapsed = (item: MemoryItem) =>
+    item.memoryType === "small_talk" &&
+    (item.validTo === null || Date.parse(item.validTo) <= now());
 
   return {
-    list: (actor) =>
-      repository.listLive(sql, actor.tenantId, personOwner(actor), 200),
+    smallTalkThread: async (actor, used) => {
+      if (actor.actorType !== "HUMAN") return null;
+      const items = await repository.listLive(
+        sql,
+        actor.tenantId,
+        personOwner(actor),
+        200,
+      );
+      for (const item of items) {
+        if (item.memoryType !== "small_talk" || lapsed(item)) continue;
+        if (used.has(item.id)) continue;
+        const followUp = smallTalkFollowUp(item);
+        if (followUp === null) continue;
+        void repository
+          .markUsed(sql, actor.tenantId, [item.id])
+          .catch((error: unknown) => {
+            logger?.debug({ err: error }, "small talk use was not recorded");
+          });
+        return { memoryItemId: item.id, followUp };
+      }
+      return null;
+    },
+    list: async (actor) =>
+      (
+        await repository.listLive(sql, actor.tenantId, personOwner(actor), 200)
+      ).filter((item) => !lapsed(item)),
     recall: async (query) => {
       const owner = personOwner(query.actor);
       const limit = Math.min(Math.max(query.limit ?? RECALL_DEFAULT, 1), 200);
@@ -161,9 +214,12 @@ export function createMemoryService(
         limit,
       );
       const companyIds = new Set(query.companyIds ?? []);
+      // Small talk never reaches a prompt through recall (ADR 0062): it is
+      // for the silence ladder's one remembered thread, nothing else.
       const person = items.filter(
         (item) =>
-          item.subject === null || item.subject.subjectType === "PERSON",
+          item.memoryType !== "small_talk" &&
+          (item.subject === null || item.subject.subjectType === "PERSON"),
       );
       const company = items.filter(
         (item) =>
@@ -223,6 +279,18 @@ export function createMemoryService(
       // Only a person remembers things about themselves through this path.
       if (command.actor.actorType !== "HUMAN") {
         return { outcome: "REFUSED", reason: "NOT_ALLOWED" };
+      }
+      // Small talk (ADR 0062) is only ever the person's own words about
+      // themselves: never a platform write, never about a company, and
+      // never without the question Q may ask about it later.
+      if (candidate.memoryType === "small_talk") {
+        if (
+          command.writeMode === "AUTOMATIC_SYSTEM" ||
+          candidate.subject !== null ||
+          smallTalkFollowUp(candidate) === null
+        ) {
+          return { outcome: "REFUSED", reason: "INVALID_CANDIDATE" };
+        }
       }
       if (command.writeMode !== "AUTOMATIC_SYSTEM") {
         if (candidate.quote === null) {
@@ -292,6 +360,15 @@ export function createMemoryService(
           // outright; a platform fact likewise. Nothing reaches `candidate`
           // today because nothing writes without one of those two.
           status: "active",
+          // Small talk lapses after 90 days (ADR 0062); everything else is
+          // kept until it is replaced or forgotten.
+          ...(candidate.memoryType === "small_talk"
+            ? {
+                validTo: new Date(
+                  now() + SMALL_TALK_RETENTION_DAYS * 86_400_000,
+                ).toISOString(),
+              }
+            : {}),
         });
         if (earlier !== null) {
           await repository.supersede(
