@@ -99,6 +99,40 @@ export async function capitalItems(
         confirmed: moneyText(sum?.confirmed ?? "0", round.target.currency),
         pledged: moneyText(sum?.pledged ?? "0", round.target.currency),
         instrument: round.instrument,
+        // P8: terms and closes; null is "not said", never zero.
+        firstClosedOn: round.firstClosedOn,
+        closedOn: round.closedOn,
+        cancelledOn: round.cancelledOn,
+        targetCloseOn: round.terms.targetCloseOn,
+        valuation:
+          round.terms.valuation === null
+            ? null
+            : `${moneyText(round.terms.valuation.amount, round.target.currency)} ${round.terms.valuation.basis === "POST_MONEY" ? "post-money" : "pre-money"}`,
+        valuationCap:
+          round.terms.valuationCap === null
+            ? null
+            : moneyText(round.terms.valuationCap, round.target.currency),
+        discountPercent: round.terms.discountPercent,
+        hardCap:
+          round.terms.hardCap === null
+            ? null
+            : moneyText(round.terms.hardCap, round.target.currency),
+        proRataRights: round.terms.proRataRights,
+        lead:
+          round.terms.lead === null
+            ? null
+            : round.terms.lead.kind === "NAMED"
+              ? round.terms.lead.name
+              : "one of your investor relationships",
+        extends:
+          rounds.find((other) => other.id === round.terms.extendsRoundId)
+            ?.name ?? null,
+        reportedRaisedOutsideCapitalQ:
+          round.terms.reportedRaised === null
+            ? null
+            : `${moneyText(round.terms.reportedRaised, round.target.currency)} (founder-reported)`,
+        closesRecorded: round.closes.length,
+        corrections: round.corrections,
       },
     });
   }

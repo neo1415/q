@@ -101,6 +101,9 @@ describe("the action registry", () => {
       // 2026-10-04: rounds join the raise's tool; the money's steps are one family.
       ["capital.round.open", "via:change_my_raise", "CONSEQUENTIAL"],
       ["capital.round.close", "via:change_my_raise", "CONSEQUENTIAL"],
+      // P8 (2026-10-06): a round's steps and corrections, same tool.
+      ["capital.round.step", "via:change_my_raise", "CONSEQUENTIAL"],
+      ["capital.round.revise", "via:change_my_raise", "CONSEQUENTIAL"],
       ["capital.commitment.step", "commitment_step", "CONSEQUENTIAL"],
       [
         "capital.commitment.confirm_amount",
