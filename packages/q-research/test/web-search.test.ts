@@ -168,7 +168,7 @@ describe("open-web search: an open question", () => {
     const outcome = await service.research({
       actor,
       runId: "run-yc",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "YC fintech companies 2026",
       alsoQueries: ["Y Combinator fintech batch 2026"],
       userText:
@@ -217,7 +217,7 @@ describe("open-web search: an open question", () => {
     const ok = await service.research({
       actor,
       runId: "run-down",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "YC fintech",
       userText: "YC fintech companies",
       subject: null,
@@ -236,7 +236,7 @@ describe("open-web search: an open question", () => {
     const failed = await both.research({
       actor,
       runId: "run-down-2",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "YC fintech",
       userText: "YC fintech companies",
       subject: null,
@@ -278,7 +278,7 @@ describe("open-web search: a company or person by name, no website", () => {
     const outcome = await service.research({
       actor,
       runId: "run-mai",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "Mai Soli Foundation",
       entityName: "Mai Soli Foundation",
       userText: "Can you look up Mai Soli Foundation online?",
@@ -302,7 +302,7 @@ describe("open-web search: a company or person by name, no website", () => {
     const outcome = await service.research({
       actor,
       runId: "run-earlier",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "Aria Mustary",
       entityName: "Aria Mustary",
       userText: "Can you look her up?",
@@ -338,7 +338,7 @@ describe("open-web search: a company or person by name, no website", () => {
     const outcome = await service.research({
       actor,
       runId: "run-zenith",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "Zenith Pay",
       entityName: "Zenith Pay",
       userText: "What do you know about Zenith Pay?",
@@ -364,7 +364,7 @@ describe("open-web search: a company or person by name, no website", () => {
     const outcome = await service.research({
       actor,
       runId: "run-none",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "Qwertyzx Labs",
       entityName: "Qwertyzx Labs",
       userText: "Find Qwertyzx Labs",
@@ -387,7 +387,7 @@ describe("open-web search: a company or person by name, no website", () => {
     const outcome = await service.research({
       actor,
       runId: "run-own",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "Mai Soli Foundation",
       userText: "Can you look us up online?",
       aboutThemselves: true,
@@ -429,7 +429,7 @@ describe("open-web search: the firewall", () => {
     const outcome = await service.research({
       actor,
       runId: "run-fw",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "logistics startups CQ_PRIVATE_OTHER_CO_77 Shoprite",
       alsoQueries: [
         "logistics 1.8m burn",
@@ -462,7 +462,7 @@ describe("open-web search: the firewall", () => {
     await service.research({
       actor,
       runId: "run-inv",
-      correlationId: "cor_test" as never,
+      correlationId: "cor_test",
       requestedQuery: "Kobo360 funding",
       userText: "What has Kobo360 raised?",
       subject: {
