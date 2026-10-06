@@ -202,6 +202,14 @@ Conduct, after the first live transcripts:
   model/API/memory step. The line never contains words.
   `railway logs --service @capital-q/q-api --json | node scripts/voice-timings.mjs`
   summarises it.
+- **Speculation (latency2).** A spoken question to Q (no company subject,
+  no web address, not onboarding, no question series) starts its answer
+  under a default reading beside the turn reader. The answer seam holds its
+  sentences and stages, stores nothing and runs only READ_ONLY tools until
+  the turn's own path arrives at the same answer request; then it is
+  adopted, otherwise cancelled unsaid and unstored. `voice turn timed`
+  carries `speculation` (adopted | cancelled | null), `speculationReason`
+  and `speculationDecidedMs`; the counter is `q.voice.speculation`.
 - **Size.** A live turn renders the `Q_SYSTEM_VOICE` charter (a third of
   `Q_SYSTEM`) and a compact open-steps list (full options for the first
   three open steps, ten and a count for the rest): about 3k tokens a turn
