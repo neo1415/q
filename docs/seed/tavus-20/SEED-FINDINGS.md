@@ -4,6 +4,17 @@ Found while seeding the 20 fictional companies into production through the real 
 
 ## Log
 
+## Checkpoint 1: Ledgerline (n1) end to end, 12:35 UTC
+
+- Accounts: founder Tobenna Okafor + Funmilayo Adebayo (Admin), Emeka Chukwu, Zainab Lawal (Members); all `adedaniel502+cq-<first>-ledgerline@gmail.com`, created by the admin API (`fictional_demo`, synthetic), signed in with one-time admin magic-link tokens through `/auth/callback` (no email sent).
+- UI: founder onboarding (form), profile About / Company / Sector / headline, logo + company cover + cover + profile photo (crop dialogs), Capital "Open a round", Documents upload (deck + 11 data-room PDFs), deck rename + "Investors who can find us", pitch upload in Pitch & media (READY 50 s 9:16, title, audience Investors, download on), Q personality Warm + guide upload, Team page "Let in" x3 + Funmilayo → Admin, members' name / headline / photo, Visibility "Make visible to investors".
+- API (no UI control; see F4, F5, F8, F9, F10, F11): founder summaries, team/me titles, team facts, capital objective close date + use of funds, join requests, data-room levels + folders, member organisation activation.
+- Verification: requested automatically at onboarding completion and decided by the synthetic decider (`SYNTHETIC_DEMO_ATTESTATION`, accounts marked synthetic), so no platform-admin step was needed. The only account with `verification.decide` is the founder's own (platform_owner); it was not used.
+- Result: `network_visible` + `marketplace_ready` at 12:30:52. Zino's standing instruction (`includeNewCompanies`) was woken: next run fired 12:32:25 (+90 s). That run proposed messages on four existing relationships and created nothing for Ledgerline (see F14).
+
+### F14. The newly-ready wake runs Zino's instruction, but the run does not look at the new company (S2, to confirm)
+- The worker sends only `pg_notify(company id)`; q-api `wakeForNewCompany` just pulls `next_fire_at` forward, and the run ("express interest immediately when a company matches my mandate") re-reads everything. At 12:32 it produced four "Waiting for your yes" messages on existing relationships and no relationship or interest for Ledgerline (`network.relationships` has none for it). Either Ledgerline is outside Zino Aviation's mandate (aviation vs fintech), or the run does not consider newly-ready companies specifically. Suggest passing the woken company id into the run so it is assessed first, and recording "considered, not a fit" when it is not.
+
 ### F1. Onboarding "How would you categorise the company?" suggests unrelated categories (S2)
 - Where: web `/onboarding/founder` form, step "Company 5 of 7"; `POST /v1/taxonomy/candidates`; `packages/taxonomy/src/classification/domain/scoring.ts` `lexicalScore`.
 - Steps: founder form, describe Ledgerline ("checks every invoice at creation and files VAT returns for Nigerian SMEs ... FIRS e-invoicing").
@@ -51,4 +62,20 @@ Found while seeding the 20 fictional companies into production through the real 
 ### F10. Data room: no way to file a document in a folder (S2)
 - Every upload that is not a pitch deck lands in "Other documents"; the checklist ("Certificate of incorporation (CAC)", "Cap table", ...) stays "Usually expected" even after the exact document is uploaded. `POST .../level` accepts `folderCode` and `checklistItemCode`, but no UI sends them, and Q's reading does not file them. Seed filed folders through the API.
 - Also: Documents → Share → "Who can download it" (deck "Investors who can find us") and the data room level ("Private") are two separate controls for the same deck and can disagree.
+
+### F11. A team member who joined (request or invitation) is locked out of the app (S1 for teams)
+- Where: `apps/web/src/features/q/context.ts` `resolveOnboardingState` / `founderLookup`.
+- Steps: owner lets Emeka in (Team page); Emeka signs in and opens `/home`.
+- Expected: Ledgerline's home. Actual: redirected to `/welcome` (founder onboarding), which would create a second "Ledgerline". `/profile` says "You haven't set one up yet". The founder context is derived only from the person's own founder onboarding session subject; a joined member has none. `GET /v1/me` says `CONTEXT_REQUIRED` and `/v1/me/organisations` lists Ledgerline with `active:false`, but the web has no organisation switcher (no caller of `listMyOrganisations` / `activateOrganisation`).
+- Knock-on: profile photo upload fails with "You're not working inside an organisation yet" until the organisation is activated. Seed activated it via `POST /v1/organisations/:id/activate` (API) for each member.
+- Proposed fix: (1) add `companyId` to `MyOrganisationDto` (join `core.companies` on `organisation_id`); (2) in `founderLookup`, when there is no onboarding subject, fall back to the active (or only) COMPANY membership; (3) `resolveOnboardingState` returns DONE for a person with any membership; (4) activate the organisation on join/accept, and add a switcher for people in more than one.
+- Display name: members whose identity profile was first created by an API call show their email local part as their name on the owner's Team page ("adedaniel502+cq-emeka-ledgerline") until they set a name, although `user_metadata.display_name` was set at sign-up (S3).
+
+### F12. Q personality options do not match the documented set (S3)
+- Settings → Q → Personality offers Auto, Warm, Witty, Sharp, Calm. The dataset (and earlier specs) use WARM, WITTY, DIRECT, FORMAL, AUTO; there is no "Formal". Seed mapped DIRECT → Sharp and FORMAL → Calm.
+
+### F13. Small display issues (S3)
+- Settings → "How Q speaks for you": an uploaded Markdown guide is shown as one paragraph of raw Markdown (`#`, `**`, numbered list run together).
+- Pitch editor: "Save" stays enabled while the download switch's own save is in flight; pressing it then fails with "The pitch changed since this page was opened".
+- Onboarding "Where is the company based?" lists 16 countries; Vietnam and Mexico (dataset n14, n15) must pick "Somewhere else". Raise currency lists lack BRL, INR (round form), MXN, VND, EGP.
 

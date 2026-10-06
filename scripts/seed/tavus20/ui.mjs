@@ -77,6 +77,41 @@ export async function addSectorCategories(page, names) {
   return out;
 }
 
+/** Profile image: pick the file, accept the crop dialog, return the toast text. */
+export async function uploadImage(page, buttonName, file) {
+  const chooser = page.waitForEvent("filechooser", { timeout: 15000 }).catch(() => null);
+  await page.getByRole("button", { name: buttonName }).click();
+  // An image already set opens "Upload new / Remove" instead: keep it.
+  const menu = page.getByRole("button", { name: "Upload new" });
+  if (await menu.isVisible({ timeout: 2500 }).catch(() => false)) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(800);
+    return "already set";
+  }
+  const fc = await chooser;
+  if (fc === null) throw new Error(`no file chooser for ${buttonName}`);
+  await fc.setFiles(file);
+  await page.waitForTimeout(2500);
+  const d = page.getByRole("dialog").first();
+  await d.getByRole("button", { name: /^Save/ }).click();
+  await page.waitForTimeout(6000);
+  return (await page.getByRole("status").allInnerTexts()).filter(Boolean).join(" | ");
+}
+
+/** The welcome screen: choose typing and the founder journey (no voice). */
+export async function welcomeAsFounder(page) {
+  const type = page.getByRole("button", { name: "Prefer to type?" });
+  if (await type.isVisible().catch(() => false)) {
+    await type.click();
+    await page.waitForTimeout(2500);
+  }
+  const raising = page.getByRole("radio", { name: /Raising capital/ });
+  if (await raising.isVisible().catch(() => false)) {
+    await raising.click();
+    await page.waitForTimeout(6000);
+  }
+}
+
 export function escape(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

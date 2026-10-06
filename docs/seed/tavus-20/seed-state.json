@@ -12,7 +12,38 @@
         "headline": true,
         "founderSummaries": true,
         "teamFacts": true
-      }
+      },
+      "organisationId": "eefcc624-c466-44e8-af8a-b5eb5025a526",
+      "pitchId": "dd29efcc-fe71-4abf-aee8-25462dc7b782",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "pitch": true,
+        "visible": true,
+        "team": true
+      },
+      "team": [
+        {
+          "name": "Funmilayo Adebayo",
+          "userId": "82ee97da-ebaf-45f0-b65e-477997862717",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Emeka Chukwu",
+          "userId": "4ad3fcf2-904e-49a8-b8b8-767c50b1fdfd",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Zainab Lawal",
+          "userId": "cb71839b-5de7-4189-a6e3-33ca5665db6f",
+          "role": "MEMBER"
+        }
+      ],
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     }
   }
 }
