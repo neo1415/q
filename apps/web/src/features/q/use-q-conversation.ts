@@ -80,6 +80,13 @@ const FINISHED_STATUSES = new Set([
   "EXPIRED",
 ]);
 
+/** The record holds its newest run's outcome: nothing more will land. */
+export function recordSettled(
+  latestRun: { readonly status: string } | null,
+): boolean {
+  return latestRun === null || FINISHED_STATUSES.has(latestRun.status);
+}
+
 export type QConversation = {
   /** The current run's stream state, with the conversation's earlier turns folded in. */
   readonly state: QStreamState;
@@ -110,8 +117,13 @@ export type QConversation = {
    * never carried, so their result blocks (a document card, companies)
    * reach the stage and the Board. Does nothing while a typed run is
    * still streaming: that stream is the source of truth for it.
+   *
+   * Resolves true once the record holds the conversation's newest run as
+   * finished (its answer, and the answer's cards, are in what was read);
+   * false when it could not read, or the run is still going, so a voice
+   * turn's caller knows to read again (P10).
    */
-  readonly refresh: () => Promise<void>;
+  readonly refresh: () => Promise<boolean>;
   /** Decide on what Q has prepared and is waiting for (CQ-Q-008). */
   readonly approve: () => Promise<void>;
   readonly decline: () => Promise<void>;
@@ -633,19 +645,20 @@ export function useQConversation(
   }, [follow]);
   const decline = useCallback(() => decide("REJECT"), [decide]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     const id = conversationId.current;
-    if (id === null || !finished.current) return;
+    if (id === null || !finished.current) return false;
     const result = await readQConversationAction(id);
     // Only if nothing moved while the read was out: same conversation, and
     // no typed run started in the meantime.
     if (!result.ok || conversationId.current !== id || !finished.current) {
-      return;
+      return false;
     }
     setHistory(result.value.messages);
     // Every finished run's messages are in the record now; keeping the
     // streamed copy as well would show them twice.
     setRunState(createQStreamState());
+    return recordSettled(result.value.latestRun);
   }, []);
 
   return {
