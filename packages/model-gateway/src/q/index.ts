@@ -297,8 +297,15 @@ const ANSWER_LIMIT_CHARS = 32_000;
  * Sequential look-ups (search, then profile) wait for a provider that
  * accepts JSON output alongside tools; the loop below already supports
  * more rounds when this constant is raised.
+ *
+ * Raised to 2 (autopilot P1, 2026-10-06, founder approved): a second
+ * tool-bearing round lets a look-up follow a look-up (search, then the
+ * profile it found) instead of answering "I couldn't find it". It costs no
+ * extra call when the model answers in that round (the answer is accepted
+ * there, exactly as the tool-less call below would accept it); only a
+ * turn that genuinely chains pays one more call.
  */
-export const Q_TOOL_LOOP_MAX_ROUNDS = 1;
+export const Q_TOOL_LOOP_MAX_ROUNDS = 2;
 
 /**
  * The on-demand loader (q-tools `use_capability`, lead 2026-10-04). Its
@@ -322,7 +329,8 @@ function loadCapabilities(
       names.has(tool.definition.name) && !offered.has(tool.definition.name),
   );
 }
-export const Q_TOOL_LOOP_MAX_CALLS = 6;
+/** Calls in total per turn (raised from 6, autopilot P1 2026-10-06). */
+export const Q_TOOL_LOOP_MAX_CALLS = 10;
 
 export function taskClassForCapability(
   capability: QCapability,
@@ -2746,6 +2754,40 @@ export function createModelGatewayQAnswer(
         if (found === 0) platformLookupFoundNothing = true;
       };
 
+      // The public-web research hop's tool and trigger (below the loop),
+      // also read inside it so a chained round never pre-empts it.
+      const researchToolNow = (): QOfferedTool | undefined =>
+        offeredByName.get("research_public_web") ??
+        (prospectsThin && research?.fallback === true
+          ? offeredForRun.find(
+              (tool) => tool.definition.name === "research_public_web",
+            )
+          : undefined);
+      const researchHopDue = (): boolean =>
+        // An empty platform lookup earns a trip to the public web only
+        // when the words name something to look up. A lookup comes back
+        // empty for "what's up" too, and small talk was being followed
+        // by three seconds on the web for nothing.
+        (research?.mode === "EXPLICIT" ||
+          (research?.mode === "ONLY_IF_EMPTY" &&
+            platformLookupFoundNothing &&
+            // An empty search is not an empty answer when the companies
+            // the turn is about are already among the facts (live
+            // 2026-10-01: 11-21 s on the public web for companies
+            // Capital Q holds).
+            onScreenCompany === null &&
+            namedCompanies.length === 0) ||
+          // The model asked the platform who might invest; it holds too
+          // few. Investors exist in the world, so the world is asked too.
+          (prospectsThin &&
+            (research?.mode !== "NEVER" || research.fallback === true))) &&
+        !toolCalls.some(
+          (call) =>
+            call.providerName === "research_public_web" ||
+            // Filling the profile's gaps already searched.
+            call.providerName === FILL_PROFILE_GAPS_TOOL,
+        );
+
       // What the ranking engine produced for this turn, if the model asked
       // (CQ-REC-007R B). It is the recommendation guard's licence: with
       // these dimensions in hand, saying a company was surfaced and why is
@@ -2904,9 +2946,22 @@ export function createModelGatewayQAnswer(
           // model calls it in the next step of the same turn.
           let loadRounds = 0;
           let textRound = false;
+          /**
+           * The chained look-up rounds beyond the first
+           * (Q_TOOL_LOOP_MAX_ROUNDS). Never after public-web content was
+           * read (D/E: a retrieved page is data; the round after it holds
+           * no tools), and never in place of the research hop below: when
+           * the platform came back empty, the world is asked before Q
+           * answers.
+           */
+          const chainedRoundAllowed = (): boolean =>
+            !toolCalls.some(
+              (call) => call.providerName === "research_public_web",
+            ) && !(researchToolNow() !== undefined && researchHopDue());
           while (
             rounds <
-              Q_TOOL_LOOP_MAX_ROUNDS +
+              1 +
+                (chainedRoundAllowed() ? Q_TOOL_LOOP_MAX_ROUNDS - 1 : 0) +
                 recoveryRounds +
                 sayDoRounds +
                 gapsRounds +
@@ -3275,39 +3330,11 @@ export function createModelGatewayQAnswer(
         // research tool; the prospects fallback is code's decision, from
         // the platform's own thin result, so code takes it from the run's
         // offer.
-        const researchTool =
-          offeredByName.get("research_public_web") ??
-          (prospectsThin && research?.fallback === true
-            ? offeredForRun.find(
-                (tool) => tool.definition.name === "research_public_web",
-              )
-            : undefined);
+        const researchTool = researchToolNow();
         if (
           analyst === undefined &&
           researchTool !== undefined &&
-          // An empty platform lookup earns a trip to the public web only
-          // when the words name something to look up. A lookup comes back
-          // empty for "what's up" too, and small talk was being followed
-          // by three seconds on the web for nothing.
-          (research?.mode === "EXPLICIT" ||
-            (research?.mode === "ONLY_IF_EMPTY" &&
-              platformLookupFoundNothing &&
-              // An empty search is not an empty answer when the companies
-              // the turn is about are already among the facts (live
-              // 2026-10-01: 11-21 s on the public web for companies
-              // Capital Q holds).
-              onScreenCompany === null &&
-              namedCompanies.length === 0) ||
-            // The model asked the platform who might invest; it holds too
-            // few. Investors exist in the world, so the world is asked too.
-            (prospectsThin &&
-              (research?.mode !== "NEVER" || research.fallback === true))) &&
-          !toolCalls.some(
-            (call) =>
-              call.providerName === "research_public_web" ||
-              // Filling the profile's gaps already searched.
-              call.providerName === FILL_PROFILE_GAPS_TOOL,
-          )
+          researchHopDue()
         ) {
           if (
             researchTool.visibleStage !== undefined &&
