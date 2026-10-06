@@ -285,23 +285,46 @@ function whichLine(summaries: readonly string[]): string {
   return `${String(summaries.length)} changes are waiting for your approval: ${list}. Which one do you mean?`;
 }
 
-export async function decidePending(
+type PendingDecisionInput = {
+  readonly context: PendingDecisionContext;
+  readonly utterance: string;
+  readonly recentTurns: readonly {
+    readonly role: "USER" | "Q";
+    readonly text: string;
+  }[];
+  readonly signal?: AbortSignal | undefined;
+};
+
+type DecisionProposal = {
+  readonly proposalId: string;
+  readonly summary: string;
+  readonly status: PendingDecisionStatus;
+};
+
+/**
+ * What can be known before the turn reader has spoken: which cards wait,
+ * which one the words name, and the question the decision reader is asked.
+ */
+type PendingStage =
+  | { readonly kind: "NOTHING" }
+  | {
+      readonly kind: "ALREADY";
+      readonly latest: DecisionProposal;
+      readonly question: string;
+    }
+  | {
+      readonly kind: "WAITING";
+      readonly pending: readonly DecisionProposal[];
+      readonly only: DecisionProposal | undefined;
+      readonly elsewhere: boolean;
+      readonly namedElsewhere: boolean;
+      readonly question: string;
+    };
+
+async function stagePending(
   port: PendingDecisionPort,
-  input: {
-    readonly context: PendingDecisionContext;
-    readonly utterance: string;
-    readonly recentTurns: readonly {
-      readonly role: "USER" | "Q";
-      readonly text: string;
-    }[];
-    readonly signal?: AbortSignal | undefined;
-    /**
-     * The turn reader's reading of this turn; null when it was not read.
-     * Absent (callers without a reader): the decision reading alone.
-     */
-    readonly turn?: PendingTurnReading | null | undefined;
-  },
-): Promise<PendingDecisionOutcome> {
+  input: PendingDecisionInput,
+): Promise<PendingStage> {
   const all = await port.proposals(input.context);
   let pending = all.filter((proposal) => proposal.status === "PENDING");
   // Waiting in another of their conversations: not on the screen in front
@@ -314,7 +337,14 @@ export async function decidePending(
     elsewhere = pending.length > 0;
   }
   if (pending.length === 0) {
-    return answeredAlready(port, input, all);
+    const latest = all.at(-1);
+    return latest === undefined
+      ? { kind: "NOTHING" }
+      : {
+          kind: "ALREADY",
+          latest,
+          question: `${named(latest.summary)}. Shall I go ahead?`,
+        };
   }
   // Several: a name they said picks one ("Nixon" for Nixo). Elsewhere, the
   // words must point to the card: its counterpart named, or the first
@@ -329,14 +359,113 @@ export async function decidePending(
       : // "Exactly this, unchanged": a yes that asks for something
         // different ("yes, but at 3") is not a yes to this payload.
         `${named(only.summary)}. Shall I go ahead with exactly this, unchanged?`;
-  // One reading of meaning decides it (J7): never a list of words.
-  const heard = await port.read({
+  return {
+    kind: "WAITING",
+    pending,
+    only,
+    elsewhere,
+    namedElsewhere,
     question,
-    utterance: input.utterance,
-    recentTurns: input.recentTurns,
-    context: input.context,
-    ...(input.signal === undefined ? {} : { signal: input.signal }),
-  });
+  };
+}
+
+/**
+ * A decision on a waiting change, begun before the turn reader has spoken.
+ *
+ * Voice latency sweep (L1, 2026-10-06): the decision reader used to be
+ * asked only after the turn reader had answered, so a turn with any card
+ * on record paid two FAST_CLASSIFICATION calls one after the other (about
+ * 1.2 s each in the hosted ledger) before Q's answer could start. Neither
+ * reading needs the other's result to be MADE, only to be JUDGED: with
+ * `speculative`, the decision reading starts at once beside the turn
+ * reading, and `conclude` judges both exactly as before. A reading the
+ * turn makes moot (a request of its own) is aborted, never acted on.
+ * Nothing is approved or declined until `conclude`.
+ */
+export type PendingDecisionStart = {
+  readonly conclude: (
+    turn?: PendingTurnReading | null,
+  ) => Promise<PendingDecisionOutcome>;
+  /** The turn went elsewhere: stop the reading in flight, if any. */
+  readonly cancel: () => void;
+};
+
+export function startPendingDecision(
+  port: PendingDecisionPort,
+  input: PendingDecisionInput,
+  options: { readonly speculative?: boolean } = {},
+): PendingDecisionStart {
+  const controller = new AbortController();
+  const signal =
+    input.signal === undefined
+      ? controller.signal
+      : AbortSignal.any([input.signal, controller.signal]);
+  const staged = stagePending(port, input);
+  let reading: Promise<DecisionReading | null> | undefined;
+  const readFor = (question: string): Promise<DecisionReading | null> => {
+    reading ??= port.read({
+      question,
+      utterance: input.utterance,
+      recentTurns: input.recentTurns,
+      context: input.context,
+      signal,
+    });
+    return reading;
+  };
+  if (options.speculative === true) {
+    // Never an unhandled rejection: conclude re-awaits the same promises.
+    staged
+      .then((stage) => {
+        if (stage.kind !== "NOTHING") readFor(stage.question).catch(() => null);
+      })
+      .catch(() => undefined);
+  }
+  return {
+    cancel: () => {
+      controller.abort();
+    },
+    conclude: async (turn) => {
+      const stage = await staged;
+      if (stage.kind === "NOTHING") return { kind: "NONE" };
+      if (stage.kind === "ALREADY") {
+        const outcome = await answeredAlready(
+          port,
+          input,
+          stage,
+          turn,
+          readFor,
+        );
+        if (outcome.kind === "NONE") controller.abort();
+        return outcome;
+      }
+      return concludeWaiting(port, input, stage, turn, readFor);
+    },
+  };
+}
+
+export async function decidePending(
+  port: PendingDecisionPort,
+  input: PendingDecisionInput & {
+    /**
+     * The turn reader's reading of this turn; null when it was not read.
+     * Absent (callers without a reader): the decision reading alone.
+     */
+    readonly turn?: PendingTurnReading | null | undefined;
+  },
+): Promise<PendingDecisionOutcome> {
+  return startPendingDecision(port, input).conclude(input.turn);
+}
+
+async function concludeWaiting(
+  port: PendingDecisionPort,
+  input: PendingDecisionInput,
+  stage: Extract<PendingStage, { kind: "WAITING" }>,
+  turn: PendingTurnReading | null | undefined,
+  readFor: (question: string) => Promise<DecisionReading | null>,
+): Promise<PendingDecisionOutcome> {
+  const { pending, only, elsewhere, namedElsewhere } = stage;
+  // One reading of meaning decides it (J7): never a list of words.
+  const heard = await readFor(stage.question);
   // A decision that restates the card carries nothing more to answer.
   const read =
     heard !== null && restatesCard(heard)
@@ -348,14 +477,14 @@ export async function decidePending(
   // Only a reply decides; a request or a statement in its own right, even
   // one that restates the card, approves and declines nothing.
   const reply =
-    input.turn === undefined
+    turn === undefined
       ? read.onlyDecision === true ||
         restatesCard(read) ||
         read.asksSomethingElse !== true
-      : isReplyToCard(read, input.turn);
+      : isReplyToCard(read, turn);
   // A new request is never a reply to a card from another conversation
   // (QA 2026-10-03, run 528f4c4e): by the turn reader's reading.
-  const reading = input.turn ?? null;
+  const reading = turn ?? null;
   const newRequest =
     elsewhere &&
     reading !== null &&
@@ -464,26 +593,13 @@ function namedIn<T extends { readonly summary: string }>(
  */
 async function answeredAlready(
   port: PendingDecisionPort,
-  input: {
-    readonly context: PendingDecisionContext;
-    readonly utterance: string;
-    readonly recentTurns: readonly {
-      readonly role: "USER" | "Q";
-      readonly text: string;
-    }[];
-    readonly signal?: AbortSignal | undefined;
-    readonly turn?: PendingTurnReading | null | undefined;
-  },
-  all: readonly {
-    readonly proposalId: string;
-    readonly summary: string;
-    readonly status: PendingDecisionStatus;
-  }[],
+  input: PendingDecisionInput,
+  stage: Extract<PendingStage, { kind: "ALREADY" }>,
+  turn: PendingTurnReading | null | undefined,
+  readFor: (question: string) => Promise<DecisionReading | null>,
 ): Promise<PendingDecisionOutcome> {
-  const latest = all.at(-1);
-  if (latest === undefined) return { kind: "NONE" };
+  const latest = stage.latest;
   // A request of its own is answered as one, never as "already done".
-  const turn = input.turn;
   if (
     turn !== undefined &&
     turn !== null &&
@@ -491,13 +607,7 @@ async function answeredAlready(
   ) {
     return { kind: "NONE" };
   }
-  const read = await port.read({
-    question: `${named(latest.summary)}. Shall I go ahead?`,
-    utterance: input.utterance,
-    recentTurns: input.recentTurns,
-    context: input.context,
-    ...(input.signal === undefined ? {} : { signal: input.signal }),
-  });
+  const read = await readFor(stage.question);
   if (!approvesByWords(read) || read?.remainder != null) {
     return { kind: "NONE" };
   }

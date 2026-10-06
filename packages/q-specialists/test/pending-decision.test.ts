@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   decidePending,
+  startPendingDecision,
   statusLine,
   type PendingDecisionPort,
   type PendingDecisionStatus,
@@ -842,5 +843,130 @@ describe("an explicit decision that restates its card (voiceq-63, live 2026-10-0
     });
     await decidePending(value, said(words));
     expect(calls.approve).toEqual([]);
+  });
+});
+
+/**
+ * L1 latency sweep (2026-10-06): the decision reader no longer waits for
+ * the turn reader. Hosted, each was ~1.2 s, one after the other, before
+ * Q's answer could start. Measured here on a fake clock: 1200 ms per read.
+ */
+describe("a decision begun beside the turn reading (speculative)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const READ_MS = 1_200;
+  const slowPort = (proposals: readonly Proposal[]) => {
+    const seen = { read: 0, aborted: 0, approve: [] as string[] };
+    const value: PendingDecisionPort = {
+      proposals: () => Promise.resolve(proposals),
+      read: (input) => {
+        seen.read += 1;
+        return new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            resolve({ decision: "YES", remainder: null, onlyDecision: true });
+          }, READ_MS);
+          input.signal?.addEventListener("abort", () => {
+            seen.aborted += 1;
+            clearTimeout(timer);
+            resolve(null);
+          });
+        });
+      },
+      approve: (_context, proposalId) => {
+        seen.approve.push(proposalId);
+        return Promise.resolve({ status: "SAVED" });
+      },
+      decline: () => Promise.resolve({ status: "DECLINED" }),
+    };
+    return { value, seen };
+  };
+  const replyTurn: PendingTurnReading = {
+    kind: "ANSWER",
+    addressedToQ: true,
+    namesAction: false,
+  };
+  /** The turn reader's reading, arriving after READ_MS. */
+  const turnReading = (reading: PendingTurnReading) =>
+    new Promise<PendingTurnReading>((resolve) =>
+      setTimeout(() => {
+        resolve(reading);
+      }, READ_MS),
+    );
+
+  it("before: read after the turn reading, the two cost 2400 ms; after: 1200 ms, same outcome", async () => {
+    vi.useFakeTimers();
+    const before = slowPort([REMINDER]);
+    const started = Date.now();
+    const serial = (async () =>
+      decidePending(before.value, {
+        ...turn("yes, go ahead"),
+        turn: await turnReading(replyTurn),
+      }))();
+    await vi.advanceTimersByTimeAsync(2 * READ_MS);
+    const serialOutcome = await serial;
+    const serialMs = Date.now() - started;
+
+    const after = slowPort([REMINDER]);
+    const begun = Date.now();
+    const decision = startPendingDecision(after.value, turn("yes, go ahead"), {
+      speculative: true,
+    });
+    const parallel = (async () =>
+      decision.conclude(await turnReading(replyTurn)))();
+    await vi.advanceTimersByTimeAsync(READ_MS);
+    const parallelOutcome = await parallel;
+    const parallelMs = Date.now() - begun;
+
+    expect(serialMs).toBe(2 * READ_MS);
+    expect(parallelMs).toBe(READ_MS);
+    expect(parallelOutcome).toEqual(serialOutcome);
+    expect(after.seen.approve).toEqual(["p1"]);
+  });
+
+  it("approves nothing before the turn has been read", async () => {
+    vi.useFakeTimers();
+    const { value, seen } = slowPort([REMINDER]);
+    const decision = startPendingDecision(value, turn("yes, go ahead"), {
+      speculative: true,
+    });
+    await vi.advanceTimersByTimeAsync(5 * READ_MS);
+    expect(seen.read).toBe(1);
+    expect(seen.approve).toEqual([]);
+    decision.cancel();
+  });
+
+  it("stops the reading in flight when the turn is a request of its own", async () => {
+    vi.useFakeTimers();
+    const { value, seen } = slowPort([{ ...REMINDER, status: "SAVED" }]);
+    const decision = startPendingDecision(value, turn("book a call"), {
+      speculative: true,
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    const outcome = await decision.conclude({
+      kind: "TOOL_REQUEST",
+      addressedToQ: true,
+      namesAction: true,
+    });
+    expect(outcome).toEqual({ kind: "NONE" });
+    expect(seen.aborted).toBe(1);
+  });
+
+  it("cancel aborts a reading nobody concluded", async () => {
+    vi.useFakeTimers();
+    const { value, seen } = slowPort([REMINDER]);
+    const decision = startPendingDecision(value, turn("yes"), {
+      speculative: true,
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    decision.cancel();
+    expect(seen.aborted).toBe(1);
+  });
+
+  it("without speculation, nothing is read until it is concluded", async () => {
+    const { value, seen } = slowPort([REMINDER]);
+    startPendingDecision(value, turn("yes"));
+    await Promise.resolve();
+    expect(seen.read).toBe(0);
   });
 });
