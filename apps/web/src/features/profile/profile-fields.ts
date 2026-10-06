@@ -56,10 +56,40 @@ const STAGES = STAGE_OPTIONS.filter(
 ).map((option) => ({ value: option.optionKey, label: option.label }));
 
 /** Option keys are lowercase ISO codes; profiles store them uppercase. */
-const COUNTRIES = COUNTRY_OPTIONS.map((option) => ({
+const SHORT_LIST = COUNTRY_OPTIONS.filter(
+  (option) => /^[a-z]{2}$/.test(option.optionKey),
+).map((option) => ({
   value: option.optionKey.toUpperCase(),
   label: option.label,
 }));
+
+/** Region codes Intl names that are not countries a company is based in. */
+const NOT_COUNTRIES = new Set(["EU", "EZ", "UN", "QO", "XA", "XB", "ZZ"]);
+
+/**
+ * The setup's short list first, then every other ISO 3166-1 alpha-2
+ * country by name. Setup offers "Somewhere else" for the rest and stores
+ * no country; without this a company in Vietnam or Mexico could never say
+ * where it is based, which readiness requires. The API accepts any code.
+ */
+export const COUNTRIES: readonly { value: string; label: string }[] = (() => {
+  const names = new Intl.DisplayNames(["en"], {
+    type: "region",
+    fallback: "none",
+  });
+  const listed = new Set(SHORT_LIST.map((c) => c.value));
+  const rest: { value: string; label: string }[] = [];
+  for (let a = 65; a <= 90; a += 1) {
+    for (let b = 65; b <= 90; b += 1) {
+      const code = String.fromCharCode(a, b);
+      if (listed.has(code) || NOT_COUNTRIES.has(code)) continue;
+      const label = names.of(code);
+      if (label !== undefined && label !== code) rest.push({ value: code, label });
+    }
+  }
+  rest.sort((x, y) => x.label.localeCompare(y.label, "en"));
+  return [...SHORT_LIST, ...rest];
+})();
 
 const INVESTOR_TYPE_LABELS: Readonly<Record<InvestorType, string>> = {
   ANGEL: "Angel investor",

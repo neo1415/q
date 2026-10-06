@@ -282,9 +282,18 @@ export async function stepProfile(page, c) {
   out.push(await ui.setField(page, "Company", "City", c.headquarters.city));
   out.push(await ui.setField(page, "Company", "Legal name", c.legalName));
   if (!plan.COUNTRY_LABEL[c.headquarters.country]) {
-    // Setup offered "Somewhere else" only; the profile can name the country.
-    const name = new Intl.DisplayNames(["en"], { type: "region" }).of(c.headquarters.country);
-    out.push(`country ${name}: ${await ui.setField(page, "Company", "Country", name)}`);
+    // F19: neither setup nor profile lists this country (fixed on the
+    // branch); production takes it only through the company API.
+    const t = await lib.accessToken(email);
+    const co = await lib.call(lib.API, t, "GET", `/v1/companies/${s.companyId}`);
+    const r = await lib.call(lib.API, t, "PATCH", `/v1/companies/${s.companyId}`, {
+      expectedVersion: co.body.version,
+      headquartersCountry: c.headquarters.country,
+    });
+    out.push(`country ${c.headquarters.country} via API: ${r.status}`);
+    await ui.closeRegion(page, "Company");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(7000);
   }
   {
     const r = await ui.openRegion(page, "Company");

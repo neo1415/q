@@ -103,3 +103,8 @@ Found while seeding the 20 fictional companies into production through the real 
 - In this environment Playwright does not deliver a file whose name contains "ã" to the browser's file input (no change event), so the upload silently never starts. Verified the product accepts the same file under an ASCII name. Seed uploads such files under their ASCII spelling and renames them in Documents → Rename to the true title (e.g. "Key customer contract summary: São Paulo construtora (name withheld)").
 - Also not a product bug: one Ferrolith setup save said "Your session ended" because the seed reset that account's password (lead's request) mid-run, which ends its sessions.
 
+### F19. A company outside 16 countries can never say where it is based (S1 for those founders) — FIXED in build/seed-fixes (profile)
+- Where: setup "Where is the company based?" and `/profile` Company → Country both use the same 16-entry `COUNTRY_OPTIONS`; setup's "Somewhere else" stores no country, and the profile list has no Vietnam, Mexico, etc. (Its "Somewhere else" entry even mapped to the invalid code "OTHER".)
+- Effect: Hui (Ho Chi Minh City) and Cosecha Labs (Guadalajara) have no HQ country; readiness requires "where you are based", and Hui's verification was never auto-requested ("Not requested").
+- Fix (web): `apps/web/src/features/profile/profile-fields.ts` offers the short list first, then every ISO 3166-1 alpha-2 country by name (`Intl.DisplayNames`); the API already accepts any code. Test in `apps/web/test/profile-editing.test.tsx`. Setup's own list is unchanged (suggest the same treatment there). Seed set VN/MX via `PATCH /v1/companies/:id` until deployed.
+

@@ -86,7 +86,7 @@ const { EditableProfile } =
   await import("../src/features/profile/editable-profile");
 const { ProfileFindings, SignalsAndVerification } =
   await import("../src/features/profile/profile-enrichment");
-const { COMPANY_FIELDS, PERSON_FIELDS, normaliseDraft } =
+const { COMPANY_FIELDS, COUNTRIES, PERSON_FIELDS, normaliseDraft } =
   await import("../src/features/profile/profile-fields");
 
 configure({ asyncUtilTimeout: 10_000 });
@@ -353,6 +353,20 @@ describe("editing a profile field", () => {
     const alert = await within(row("headline")).findByRole("alert");
     expect(alert.textContent).toContain("administrator");
     expect((input as HTMLInputElement).value).toBe("Angel investor");
+  });
+});
+
+describe("company country", () => {
+  it("offers every country, the setup's short list first, and only ISO codes", () => {
+    const values = COUNTRIES.map((c) => c.value);
+    expect(values[0]).toBe("NG");
+    expect(values).toContain("VN");
+    expect(values).toContain("MX");
+    expect(COUNTRIES.find((c) => c.value === "VN")?.label).toBe("Vietnam");
+    expect(values.every((v) => /^[A-Z]{2}$/.test(v))).toBe(true);
+    expect(new Set(values).size).toBe(values.length);
+    expect(values).not.toContain("EU");
+    expect(values.length).toBeGreaterThan(200);
   });
 });
 
