@@ -21,7 +21,7 @@ import { firstWords } from "./board-timeline";
 import { useAnswerPlayback } from "./use-answer-playback";
 import { plainFromMarkdown } from "./markdown";
 import { QResultBlocks } from "./q-result-blocks";
-import { QRoomStage } from "./room/q-room-card";
+import { QRoomStage, type RoomCardLoader } from "./room/q-room-card";
 import { roomStage } from "./room/room-stage";
 import {
   answersIn,
@@ -71,6 +71,7 @@ export function QPresenceStage({
   live = false,
   onBoardLanded,
   onPin,
+  loadRoomCard,
 }: {
   /** A live voice line is open: Q's own lines drive which card is open. */
   readonly live?: boolean | undefined;
@@ -78,6 +79,8 @@ export function QPresenceStage({
   readonly onBoardLanded?: (() => void) | undefined;
   /** Pin an answer to the Board. */
   readonly onPin?: ((answerId: string) => void) | undefined;
+  /** Q room R4: how a card reads its content (the dev harness serves it). */
+  readonly loadRoomCard?: RoomCardLoader | undefined;
   /**
    * Q's presence: full size, or small and pinned at the top while an
    * object is shown (lead 2026-10-03: the presence never leaves the screen).
@@ -315,6 +318,7 @@ export function QPresenceStage({
         open={roomOpen}
         note={room.note}
         onClose={(card) => setClosedByHand({ key: card.key, at: card.openedAt })}
+        load={loadRoomCard}
       />
 
       {waiting}
