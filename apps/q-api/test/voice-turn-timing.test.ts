@@ -240,3 +240,48 @@ describe("route shapes in the timing line", () => {
     expect(routeShape("/v1/things/123456/x")).toBe("/v1/things/:id/x");
   });
 });
+
+describe("speculation on the voice turn timing line (latency2)", () => {
+  it("records whether the answer started before the reading was adopted, why not, and when it was decided", async () => {
+    for (const note of [
+      { outcome: "ADOPTED" as const, reason: null, decidedAfterMs: 1_200 },
+      { outcome: "CANCELLED" as const, reason: "KIND", decidedAfterMs: 900 },
+    ]) {
+      const { logger, timed } = capture();
+      let now = 0;
+      const timings = createVoiceTurnTimings({ logger, now: () => now });
+      const turn = timedVoiceTurns(async (_b, _t, _s, out) => {
+        now += 1_300;
+        timings.speculated(note);
+        now += 200;
+        await out.speak("Here is what I can do.");
+        return { kind: "SPOKEN", path: "Q" };
+      }, timings);
+      await turn(binding, [], new AbortController().signal, speaker([]));
+      timings.speech("vs-1", 20)?.firstByte();
+      expect(timed()[0]).toMatchObject({
+        speculation: note.outcome === "ADOPTED" ? "adopted" : "cancelled",
+        speculationReason: note.reason,
+        speculationDecidedMs: 1_300,
+        firstTextMs: 1_500,
+      });
+    }
+  });
+
+  it("a turn that was not speculated says so plainly", async () => {
+    const { logger, timed } = capture();
+    const timings = createVoiceTurnTimings({ logger, now: () => 0 });
+    const turn = timedVoiceTurns(
+      () => Promise.resolve({ kind: "NOTHING" }),
+      timings,
+    );
+    await turn(binding, [], new AbortController().signal, speaker([]));
+    // The next turn closes this one's line.
+    timings.begin("vs-1");
+    expect(timed()[0]).toMatchObject({
+      speculation: null,
+      speculationReason: null,
+      speculationDecidedMs: null,
+    });
+  });
+});

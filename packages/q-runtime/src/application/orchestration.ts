@@ -261,7 +261,28 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly askedAction?: string | undefined;
   /** What the turn is about, for the tool offer (QToolFocus). */
   readonly toolFocus?: QToolFocus | undefined;
+  /**
+   * This answer was started before its turn was read (voice speculation,
+   * latency2). Until `decided` settles true nothing it produces may leave
+   * the answer: live text is held, nothing is stored, and only READ_ONLY
+   * tools run. Settled false, it is dropped unsaid and unstored. Absent:
+   * an ordinary answer.
+   */
+  readonly speculation?: QAnswerSpeculation | undefined;
 };
+
+export type QAnswerSpeculation = {
+  /** True: adopted as the turn's answer. False: cancelled. */
+  readonly decided: Promise<boolean>;
+};
+
+/** A speculative answer reached a side effect and was then cancelled. */
+export class QSpeculationCancelledError extends Error {
+  constructor() {
+    super("speculative answer cancelled");
+    this.name = "QSpeculationCancelledError";
+  }
+}
 
 export type QCapabilityManifest = {
   readonly navigate: readonly QNavigateDestination[];

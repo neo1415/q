@@ -273,9 +273,10 @@ export function buildQGraph(
     state: QGraphState,
   ): Promise<Partial<QGraphState>> => {
     // POLICY_CHECK was taken with CONTEXT_RESOLUTION; this still stops a
-    // run cancelled or ended since.
-    await boundary(state);
-    const decision = await plan(state);
+    // run cancelled or ended since. The run's read and the firewall's
+    // evaluation are independent, so they run side by side (latency2): a
+    // run that turns out cancelled throws here and its plan is never used.
+    const [, decision] = await Promise.all([boundary(state), plan(state)]);
     if (decision.outcome === "DENIED") {
       livePlans.delete(state.runId);
       answer.discard?.(state.runId);
@@ -306,7 +307,8 @@ export function buildQGraph(
     state: QGraphState,
   ): Promise<Partial<QGraphState>> => {
     // The move itself refuses a cancelled or ended run (honour), so no
-    // separate read of the run first.
+    // separate read of the run first. It is awaited before anything is
+    // retrieved: retrieval never runs for a run that has ended.
     await advance(state, "RETRIEVAL");
     const held = livePlans.get(state.runId);
     const reusable =

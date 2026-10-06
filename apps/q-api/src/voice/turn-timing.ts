@@ -8,7 +8,7 @@ import type {
   ModelGateway,
   ModelGatewayExecuteOptions,
 } from "@capital-q/model-gateway";
-import type { Logger } from "@capital-q/observability";
+import { getMeter, type Logger } from "@capital-q/observability";
 
 import type { VoiceSpeaker } from "./provider.js";
 import type { VoiceTurnHandler } from "./turn.js";
@@ -27,6 +27,10 @@ import type { VoiceTurnHandler } from "./turn.js";
  *   endMs             the turn finished
  *   ttsRequestMs      the provider asked the speak relay for the first audio
  *   firstAudioMs      the first audio byte came back from the voice vendor
+ *   speculation       adopted | cancelled | null: whether Q's answer was
+ *                     started before the turn was read and then taken up
+ *                     (latency2), with speculationReason when cancelled and
+ *                     speculationDecidedMs when the reading decided it
  *
  * Each model call, application-API call and memory recall is listed with
  * its own start and duration, so that "slow" can be traced to its cause
@@ -66,8 +70,17 @@ export type SpeechTiming = {
   readonly served: (engine: string, fallback: boolean) => void;
 };
 
+/** What became of a speculative answer (q-specialists' QSpeculationEvent). */
+export type VoiceSpeculationNote = {
+  readonly outcome: "ADOPTED" | "CANCELLED";
+  readonly reason: string | null;
+  readonly decidedAfterMs: number;
+};
+
 export type VoiceTurnTimings = {
   readonly now: () => number;
+  /** The current turn's speculative answer was adopted or cancelled. */
+  readonly speculated: (note: VoiceSpeculationNote) => void;
   readonly begin: (voiceSessionId: string) => VoiceTurnTiming;
   readonly run: <T>(
     timing: VoiceTurnTiming,
@@ -118,6 +131,9 @@ type Open = {
   /** The engine that voiced each utterance, in order. */
   engines: string[];
   ttsFallbacks: number;
+  speculation?: "adopted" | "cancelled";
+  speculationReason?: string | null;
+  speculationDecided?: number;
   cues: Set<string>;
   steps: Step[];
   done: boolean;
@@ -166,6 +182,9 @@ export function createVoiceTurnTimings(options: {
         ttsChars: open.ttsChars,
         ttsEngines: open.engines,
         ttsFallbacks: open.ttsFallbacks,
+        speculation: open.speculation ?? null,
+        speculationReason: open.speculationReason ?? null,
+        speculationDecidedMs: rel(open, open.speculationDecided),
         cues: [...open.cues],
         modelCalls: models.length,
         modelMs: models.reduce((n, s) => n + s.ms, 0),
@@ -232,9 +251,25 @@ export function createVoiceTurnTimings(options: {
     return h;
   };
   const opens = new WeakMap<VoiceTurnTiming, Open>();
+  const speculations = getMeter("@capital-q/q-api").createCounter(
+    "q.voice.speculation",
+    {
+      description:
+        "Spoken answers started before the turn was read, by outcome and reason",
+    },
+  );
 
   return {
     now,
+    speculated: (note) => {
+      const outcome = note.outcome === "ADOPTED" ? "adopted" : "cancelled";
+      speculations.add(1, { outcome, reason: note.reason ?? "none" });
+      const open = storage.getStore();
+      if (open === undefined || open.done) return;
+      open.speculation = outcome;
+      open.speculationReason = note.reason;
+      open.speculationDecided = now();
+    },
     begin: (voiceSessionId) => {
       // A new turn closes the last one's line: whatever it had is all it
       // is going to get.
