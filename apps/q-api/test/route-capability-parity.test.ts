@@ -699,6 +699,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/q-presence": exempt("development-only page"),
   "/dev/ui": exempt("development-only page"),
   "/dev/daily": exempt("development-only page"),
+  "/dev/profile": exempt("development-only page (design review, fictional data)"),
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
   "/dev/relationships": exempt("development-only page"),
@@ -805,6 +806,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // end REHEARSE block
   "/pitch/[mediaAssetId]": cap("navigate.PITCH"),
   "/company/[companyId]": cap("tool.open_page"),
+  // Overnight A7: a founder as a person, from the Team tab.
+  "/company/[companyId]/founder/[position]": cap("tool.open_page"),
   "/relationships/company/[companyId]": cap("tool.open_page"),
   "/relationships/investor/[investorOrganisationId]": cap("tool.open_page"),
   "/relationships/company/[companyId]/messages": cap("tool.open_page"),

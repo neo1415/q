@@ -206,8 +206,9 @@ export function DeckCarousel({
   const go = useCallback((next: number) => {
     const clamped = Math.max(0, Math.min(sections.length - 1, next));
     const card = track.current?.children[clamped];
-    if (card instanceof HTMLElement) {
-      track.current?.scrollTo({ left: card.offsetLeft, behavior: "smooth" });
+    const root = track.current;
+    if (card instanceof HTMLElement && root !== null && typeof root.scrollTo === "function") {
+      root.scrollTo({ left: card.offsetLeft, behavior: "smooth" });
     }
     onIndex(clamped);
   }, [sections.length, onIndex]);
