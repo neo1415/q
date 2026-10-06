@@ -1012,7 +1012,15 @@ export class DuplexLine {
     if (this.#idleTimer !== null) this.#env.clearTimeout(this.#idleTimer);
     this.#idleTimer = this.#env.setTimeout(() => {
       // Never while Q is talking, a turn is working or the line rejoins.
-      if (this.#speaking || this.#responseActive || this.#rejoining) {
+      // A tool in flight is a turn working: ask_q can take 30 s and more,
+      // and the line ended IDLE under the person mid-answer (live,
+      // 2026-10-06 21:21:53 and 21:29:49, each ~4 s before Q answered).
+      if (
+        this.#speaking ||
+        this.#responseActive ||
+        this.#toolsInFlight > 0 ||
+        this.#rejoining
+      ) {
         this.#touch();
         return;
       }

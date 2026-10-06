@@ -83,6 +83,11 @@ import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
+import { createRunCompanies, withCardSubjects } from "./card-subjects.js";
+import {
+  createScreenClaimGuard,
+  withoutUnbackedScreenClaims,
+} from "./screen-claims.js";
 import { ownProfileFact } from "./own-profile.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
@@ -1458,7 +1463,20 @@ export function createModelGatewayQAnswer(
     dependencies;
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const context = dependencies.context ?? noAuthorisedContext;
-  const tools = dependencies.tools ?? createUnconfiguredQTools();
+  const baseTools = dependencies.tools ?? createUnconfiguredQTools();
+  // R0: the companies each run's tools returned, so an answer card can
+  // carry the record its name means (never an id the model wrote).
+  const runCompanies = createRunCompanies();
+  const available = baseTools.available;
+  const tools: QToolPort = {
+    offer: (toolContext) => baseTools.offer(toolContext),
+    ...(available === undefined ? {} : { available }),
+    execute: async (proposal, toolContext) => {
+      const outcome = await baseTools.execute(proposal, toolContext);
+      runCompanies.note(toolContext.runId, outcome);
+      return outcome;
+    },
+  };
   const sensitivityPolicy = dependencies.sensitivity ?? { kind: "FROM_PLAN" };
   const dataPosture: ModelDataPosture =
     dependencies.dataPosture ?? "REAL_CUSTOMER";
@@ -2526,6 +2544,10 @@ export function createModelGatewayQAnswer(
           text: `${text} `,
         });
       };
+      // Backed only by a screen move a tool of this run authorised.
+      const screenClaims = createScreenClaimGuard(() =>
+        clientActionBlocks.some((block) => block.kind === "UI_INTENT"),
+      );
       const onTextDelta = (fragment: string): void => {
         seenText += fragment;
         const fresh = partial.push(seenText);
@@ -2539,12 +2561,17 @@ export function createModelGatewayQAnswer(
           // is published.
           // Fact labels are rewritten before a sentence goes out, not only
           // in the stored answer: on a voice call it is said aloud (H3b).
-          const guarded = guardSentence(
+          const sentenceGuarded = guardSentence(
             citeAuthorisedFacts(sentence, facts),
             firstSentence,
             recommendationGrounds,
           );
           firstSentence = false;
+          // Nothing is "on your screen" unless a tool put it there (R0).
+          const guarded =
+            sentenceGuarded === null
+              ? null
+              : screenClaims.sentence(sentenceGuarded);
           if (guarded === null || guarded.length === 0) {
             continue;
           }
@@ -3777,6 +3804,7 @@ export function createModelGatewayQAnswer(
                   );
                   return null;
                 });
+        const companiesRead = runCompanies.take(request.runId);
         const analystBlocks = analystResultBlocks({
           result: analyst,
           // The run's own authorised subjects, never anything the model
@@ -3784,7 +3812,11 @@ export function createModelGatewayQAnswer(
           // run to be about. Their own firm, carried as context for a fit
           // question, is not what they asked about (CQ-QX-007).
           subjects: askedSubjects(request.subjects, plan),
-        });
+        })?.map((block) =>
+          block.kind === "ANSWER_CARDS"
+            ? withCardSubjects(block, companiesRead)
+            : block,
+        );
         // An answer that was nothing but talk about acting leaves Capital
         // Q's own lines — the revision below, the action's own narration —
         // to say what happened. Alone, it is acknowledged and no more.
@@ -3796,10 +3828,25 @@ export function createModelGatewayQAnswer(
             block.kind === "UI_INTENT" &&
             block.intent.kind === "OPEN_RECORD_PAGE",
         );
+        // R0 (Zino live 2026-10-06, run d6377e69): "now in view" with
+        // nothing opened. The stored answer follows the spoken rule.
+        const screenSafe = withoutUnbackedScreenClaims(
+          content,
+          openedOnScreen ||
+            [...(analystBlocks ?? []), ...clientActionBlocks].some(
+              (block) => block.kind === "UI_INTENT",
+            ),
+        );
+        if (screenSafe.removed > 0) {
+          logger?.warn(
+            { qRunId: request.runId, removed: screenSafe.removed },
+            "an answer said something was on screen that no tool opened; corrected",
+          );
+        }
         const reply =
           revisedArtifact === null
-            ? content.length > 0
-              ? content
+            ? screenSafe.text.length > 0
+              ? screenSafe.text
               : openedOnScreen
                 ? CLIENT_ACTION_DONE_LINE
                 : "Understood."

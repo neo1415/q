@@ -137,6 +137,36 @@ describe("the card Q is talking about (C2)", () => {
 });
 
 describe("the canvas (C1, C3)", () => {
+  it("offers Open profile on a card with a company behind it, and opens it (R0)", () => {
+    const block = demoTop(2);
+    const companyId = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+    const withSubject = {
+      ...block,
+      cards: block.cards.map((card, index) =>
+        index === 0
+          ? { ...card, subject: { kind: "COMPANY" as const, companyId } }
+          : card,
+      ),
+    };
+    const opened: string[] = [];
+    render(
+      <AnswerCanvas
+        block={withSubject}
+        focus={0}
+        said=""
+        onOpenProfile={(card) => {
+          if (card.subject?.kind === "COMPANY") {
+            opened.push(card.subject.companyId);
+          }
+        }}
+      />,
+    );
+    const buttons = document.querySelectorAll("[data-ac-open-profile]");
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0] as Element);
+    expect(opened).toEqual([companyId]);
+  });
+
   it("opens the focused card with its reasons, fit in words and measure words", () => {
     render(
       <AnswerCanvas block={demoTop(3)} focus={0} said="Norrland fits best." />,

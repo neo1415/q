@@ -8,7 +8,10 @@ import type {
   VoiceSessionBindings,
 } from "../src/voice/bindings.js";
 import { createDeepgramVoiceProvider } from "../src/voice/providers/deepgram.js";
-import { registerVoiceThinkRoute } from "../src/voice/think.js";
+import {
+  registerVoiceThinkRoute,
+  VOICE_THINK_PROBE_HEADER,
+} from "../src/voice/think.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
 
 /**
@@ -190,6 +193,45 @@ describe("the think route", () => {
     });
     expect(wrong.statusCode).toBe(401);
     expect(ran).toBe(false);
+    await server.close();
+  });
+
+  it("still refuses the boot reachability probe, without logging it as a refused line", async () => {
+    const bound = binding("secret-think-token");
+    const lines: string[] = [];
+    const server = Fastify({
+      logger: {
+        level: "debug",
+        stream: { write: (line: string) => void lines.push(line) },
+      },
+    });
+    let ran = false;
+    registerVoiceThinkRoute(server, {
+      path: "/v1/q/voice/think",
+      bindings: fakeBindings(bound),
+      turn: () => {
+        ran = true;
+        return Promise.resolve({ kind: "NOTHING" });
+      },
+      logger,
+    });
+    await server.ready();
+    const probe = await server.inject({
+      method: "POST",
+      url: "/v1/q/voice/think/chat/completions",
+      headers: { [VOICE_THINK_PROBE_HEADER]: "reachability" },
+      payload: { messages: [] },
+    });
+    expect(probe.statusCode).toBe(401);
+    expect(ran).toBe(false);
+    expect(lines.some((l) => l.includes("NO_BINDING_FOR_TOKEN"))).toBe(false);
+    // A real tokenless request is still reported as a refusal.
+    await server.inject({
+      method: "POST",
+      url: "/v1/q/voice/think/chat/completions",
+      payload: { messages: [] },
+    });
+    expect(lines.some((l) => l.includes("NO_BINDING_FOR_TOKEN"))).toBe(true);
     await server.close();
   });
 });

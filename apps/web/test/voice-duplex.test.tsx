@@ -474,6 +474,30 @@ describe("the line's own limits", () => {
     expect(h.track.stop).toHaveBeenCalled();
   });
 
+  it("does not end idle while Q is still working on a request", async () => {
+    let answer: (value: QVoiceDuplexToolResult | null) => void = () => {};
+    const h = harness({
+      tool: () =>
+        new Promise<QVoiceDuplexToolResult | null>((resolve) => {
+          answer = resolve;
+        }),
+    });
+    await h.line.open();
+    h.channel().emit({
+      type: "response.function_call_arguments.done",
+      call_id: "call_slow",
+      name: "ask_q",
+      arguments: JSON.stringify({ request: "Compare the two companies" }),
+    });
+    await settle();
+    vi.advanceTimersByTime(CREDENTIAL.idleMs * 2);
+    expect(h.events.onEnded).not.toHaveBeenCalled();
+    answer({ output: JSON.stringify({ ok: true }), approvalPending: false });
+    await settle();
+    vi.advanceTimersByTime(CREDENTIAL.idleMs * 2);
+    expect(h.events.onEnded).toHaveBeenCalledWith("IDLE");
+  });
+
   it("hands over at its maximum length when it cannot rejoin", async () => {
     const h = harness();
     await h.line.open();

@@ -340,6 +340,7 @@ export function openingLine(
   const what = name === undefined ? null : `"${name.slice(0, 80)}"`;
   switch (page) {
     case "DOCUMENT":
+    case "DATA_ROOM_DOCUMENT":
       return what === null ? "Opening the document." : `Opening ${what}.`;
     case "RELATIONSHIP_COMPANY_MESSAGES":
     case "RELATIONSHIP_INVESTOR_MESSAGES":

@@ -5,6 +5,7 @@ import {
   type QScreenActIntent,
   type QRecordPage,
   type QSetDiscoverFiltersIntent,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 
 import { applyTheme, storeTheme } from "@/features/appearance/theme";
@@ -38,7 +39,23 @@ export type ClientActionEffects = {
   readonly setDiscoverFilters: (intent: QSetDiscoverFiltersIntent) => void;
   /** Works the page on screen: scroll, back, a section, a dialog. */
   readonly screen: (intent: QScreenActIntent) => void;
+  /**
+   * R0: one data-room document, opened in the viewer where they are. The
+   * viewer asks the API for a signed read as them; this only names it.
+   */
+  readonly openMaterial: (document: QMaterialDocumentRef) => void;
 };
+
+/** A data-room document Q opened on screen (R0). */
+export type QMaterialDocumentRef = {
+  readonly companyId: string;
+  readonly documentId: string;
+  readonly title: string | null;
+};
+
+/** The viewer listens for these; nothing else is carried on them. */
+export const Q_MATERIAL_OPEN_EVENT = "cq:q-material-open";
+export const Q_MATERIAL_CLOSE_EVENT = "cq:q-material-close";
 
 /** Their own unfinished setup, from the fixed route map. */
 export function setupPath(journey: "founder" | "investor"): string {
@@ -48,9 +65,19 @@ export function setupPath(journey: "founder" | "investor"): string {
 }
 
 /** R33: a record's own page, from its kind and a validated id only. */
-export function recordPagePath(page: QRecordPage, id: string): string {
+export function recordPagePath(
+  page: QRecordPage,
+  id: string,
+  companyId?: string,
+): string {
   const safe = encodeURIComponent(id.toLowerCase());
   switch (page) {
+    // As a link: the company's Data room tab, where it is listed. Q's own
+    // move opens it in the viewer where they are (openMaterial, R0).
+    case "DATA_ROOM_DOCUMENT":
+      return companyId === undefined
+        ? "/documents"
+        : `/company/${encodeURIComponent(companyId.toLowerCase())}?tab=dataroom`;
     case "COMPANY":
       return `/company/${safe}`;
     case "RELATIONSHIP_COMPANY":
@@ -75,6 +102,39 @@ export function recordPagePath(page: QRecordPage, id: string): string {
     case "COMPANY_PITCH":
       return `/discover?tab=yours&company=${safe}`;
   }
+}
+
+/**
+ * The page a card's subject opens on, or null when it has none (R0, live
+ * 2026-10-06: a card's "Open profile" was never wired and went nowhere).
+ * The page itself authorises the read as the person; this only maps.
+ */
+export function subjectPagePath(subject: QSubjectRef): string | null {
+  switch (subject.kind) {
+    case "COMPANY":
+      return recordPagePath("COMPANY", subject.companyId);
+    case "INVESTOR_ORGANISATION":
+      return recordPagePath("INVESTOR", subject.investorOrganisationId);
+    case "DOCUMENT":
+      return recordPagePath("DOCUMENT", subject.documentId);
+    // No page of their own a card can open by this id alone.
+    case "RELATIONSHIP":
+    case "CAPITAL_OBJECTIVE":
+    case "USER":
+    case "ORGANISATION":
+      return null;
+  }
+}
+
+/** Opens a card subject's page through the app's router; false if none. */
+export function openSubjectPage(
+  subject: QSubjectRef,
+  goTo: (path: string) => void = (path) => BROWSER_EFFECTS.goTo(path),
+): boolean {
+  const path = subjectPagePath(subject);
+  if (path === null) return false;
+  goTo(path);
+  return true;
 }
 
 /**
@@ -171,6 +231,13 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
     else window.location.assign(path);
   },
   screen: screenAct,
+  openMaterial: (document) => {
+    window.dispatchEvent(
+      new CustomEvent<QMaterialDocumentRef>(Q_MATERIAL_OPEN_EVENT, {
+        detail: document,
+      }),
+    );
+  },
   setDiscoverFilters: (intent) => {
     queueDiscoverFiltersIntent(intent);
     // Elsewhere, Discover takes the queued intent when it opens.
@@ -213,6 +280,15 @@ export function performClientAction(
       effects.signOut();
       return true;
     case "OPEN_RECORD_PAGE":
+      if (action.page === "DATA_ROOM_DOCUMENT") {
+        if (action.companyId === undefined) return false;
+        effects.openMaterial({
+          companyId: action.companyId,
+          documentId: action.id,
+          title: action.title ?? null,
+        });
+        return true;
+      }
       effects.goTo(recordPagePath(action.page, action.id));
       return true;
     case "OPEN_SETUP":

@@ -72,6 +72,30 @@ export function setOpenDocument(documentId: string | null): void {
 }
 
 /**
+ * R0: a company's data-room document Q opened in the viewer on this tab.
+ * On screen like the company it belongs to; the server resolves both for
+ * the asker as it would any named subject, and drops what does not.
+ */
+let materialDocument: {
+  readonly companyId: string;
+  readonly documentId: string;
+} | null = null;
+
+export function setMaterialDocument(
+  document: { readonly companyId: string; readonly documentId: string } | null,
+): void {
+  materialDocument =
+    document !== null &&
+    UUID.test(document.companyId) &&
+    UUID.test(document.documentId)
+      ? {
+          companyId: document.companyId.toLowerCase(),
+          documentId: document.documentId.toLowerCase(),
+        }
+      : null;
+}
+
+/**
  * The document open in the app's document viewer on this tab (the
  * Documents page and the ready toast open it; voiceq-63: Q opened the prep
  * PDF there and could not read it). This tab only: never another tab or
@@ -128,6 +152,13 @@ export function currentScreen(
     UUID.test(focus.companyId)
   ) {
     screen = { ...screen, companyId: focus.companyId.toLowerCase() };
+  }
+  if (materialDocument !== null) {
+    screen = {
+      ...screen,
+      companyId: materialDocument.companyId,
+      documentId: materialDocument.documentId,
+    };
   }
   const zone = deviceTimeZone();
   if (zone !== undefined) screen = { ...screen, timeZone: zone };

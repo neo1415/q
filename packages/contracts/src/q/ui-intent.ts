@@ -262,6 +262,10 @@ export const Q_RECORD_PAGES = [
   // follow-55: one company's item in Discover's "Your companies" tab, its
   // pitch when the company shares it with them.
   "COMPANY_PITCH",
+  // R0 (Zino live 2026-10-06: "open the certificate of incorporation"):
+  // one document in a company's data room, by its document id, opened in
+  // the viewer where they are; `companyId` names the company.
+  "DATA_ROOM_DOCUMENT",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;
@@ -271,8 +275,17 @@ export const QOpenRecordPageIntentSchema = z
     kind: z.literal("OPEN_RECORD_PAGE"),
     page: QRecordPageSchema,
     id: UuidSchema,
+    /** DATA_ROOM_DOCUMENT: the company whose data room holds it. */
+    companyId: UuidSchema.optional(),
+    /** DATA_ROOM_DOCUMENT: its title, as the data room lists it. */
+    title: z.string().trim().min(1).max(200).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (intent) =>
+      intent.page !== "DATA_ROOM_DOCUMENT" || intent.companyId !== undefined,
+    { message: "a data-room document names its company", path: ["companyId"] },
+  );
 
 /**
  * Setup reminders (founder directive 2026-09-27): take the person back to

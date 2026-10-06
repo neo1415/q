@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { QTurn } from "../src/features/q/conversation";
 import {
+  openSubjectPage,
   performClientAction,
+  subjectPagePath,
   type ClientActionEffects,
 } from "../src/features/q/client-actions";
+import { intentHref } from "../src/features/q/q-result-blocks";
+import { materialShouldClose } from "../src/features/q/material-viewer-logic";
 import { followOfTurns } from "../src/features/q/follow-navigation";
 import { currentScreen, setOpenDocument } from "../src/features/q/screen";
 
@@ -33,6 +37,8 @@ function effects() {
       ),
     screen: (intent) =>
       done.push(`screen:${intent.act}:${intent.section ?? ""}`),
+    openMaterial: (document) =>
+      done.push(`material:${document.companyId}:${document.documentId}`),
   };
   return { port, done };
 }
@@ -240,5 +246,109 @@ describe("the screen includes the document open in Q's viewer (R21)", () => {
     setOpenDocument("not-a-uuid");
     const { timeZone: _tz, ...screen } = currentScreen("/profile") ?? {};
     expect(screen).toEqual({ route: "PROFILE" });
+  });
+});
+
+describe("card and intent links to a record's page (R0, live 2026-10-06)", () => {
+  const COMPANY = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  it("a card's company or investor opens its page; other subjects open nothing", () => {
+    const went: string[] = [];
+    expect(
+      openSubjectPage({ kind: "COMPANY", companyId: COMPANY }, (path) =>
+        went.push(path),
+      ),
+    ).toBe(true);
+    expect(went).toEqual([`/company/${COMPANY}`]);
+    expect(
+      subjectPagePath({
+        kind: "INVESTOR_ORGANISATION",
+        investorOrganisationId: COMPANY,
+      }),
+    ).toBe(`/investors/${COMPANY}`);
+    expect(
+      subjectPagePath({ kind: "RELATIONSHIP", relationshipId: COMPANY }),
+    ).toBeNull();
+  });
+
+  it("a data-room document opens in the viewer where they are, never without its company", () => {
+    const { port, done } = effects();
+    const DOC = "1a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+    expect(
+      performClientAction(
+        {
+          kind: "OPEN_RECORD_PAGE",
+          page: "DATA_ROOM_DOCUMENT",
+          id: DOC,
+          companyId: COMPANY,
+          title: "Certificate of Incorporation",
+        },
+        port,
+      ),
+    ).toBe(true);
+    expect(
+      performClientAction(
+        { kind: "OPEN_RECORD_PAGE", page: "DATA_ROOM_DOCUMENT", id: DOC },
+        port,
+      ),
+    ).toBe(false);
+    expect(done).toEqual([`material:${COMPANY}:${DOC}`]);
+  });
+
+  it("OPEN_COMPANY and FOCUS_SECTION intents link to the company page", () => {
+    expect(intentHref({ kind: "OPEN_COMPANY", companyId: COMPANY })).toBe(
+      `/company/${COMPANY}`,
+    );
+    expect(
+      intentHref({
+        kind: "FOCUS_SECTION",
+        companyId: COMPANY,
+        section: "DOCUMENTS",
+      }),
+    ).toBe(`/company/${COMPANY}?tab=dataroom`);
+  });
+});
+
+describe("the opened data-room document closes when the topic moves on (R0)", () => {
+  const DOC = "1a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  const person = (text: string): QTurn => ({
+    kind: "PERSON",
+    id: `p-${text}`,
+    text,
+    unconfirmed: false,
+  });
+  it("stays while they talk about it, closes when asked or when Q moves on", () => {
+    expect(
+      materialShouldClose(
+        [
+          person("what does it say about the registered office?"),
+          qTurn("q1", [
+            {
+              kind: "UI_INTENT",
+              intent: {
+                kind: "OPEN_RECORD_PAGE",
+                page: "DATA_ROOM_DOCUMENT",
+                id: DOC,
+                companyId: DOC,
+              },
+            },
+          ]),
+        ],
+        DOC,
+      ),
+    ).toBe(false);
+    expect(materialShouldClose([person("ok, close it")], DOC)).toBe(true);
+    expect(
+      materialShouldClose(
+        [
+          qTurn("q2", [
+            {
+              kind: "UI_INTENT",
+              intent: { kind: "NAVIGATE", destination: "DISCOVER" },
+            },
+          ]),
+        ],
+        DOC,
+      ),
+    ).toBe(true);
   });
 });

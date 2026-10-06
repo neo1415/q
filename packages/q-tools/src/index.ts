@@ -610,8 +610,18 @@ export {
   createReadCompanyDeckTool,
   READ_COMPANY_DATA_ROOM,
   READ_COMPANY_DECK,
+  type MaterialDocument,
   type ProfileMaterialPort,
 } from "./tools/profile-material.js";
+export {
+  createCompanyDocumentTools,
+  createOpenCompanyDocumentTool,
+  createReadCompanyDocumentTool,
+  documentScore,
+  matchDocument,
+  OPEN_COMPANY_DOCUMENT,
+  READ_COMPANY_DOCUMENT,
+} from "./tools/company-documents.js";
 // Explore (E1-E5, ADR 0055).
 export {
   EXPLORE_PITCHES_LIKE,

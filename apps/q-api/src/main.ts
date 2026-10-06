@@ -120,6 +120,7 @@ import {
   createPostgresMeetingScreenStore,
 } from "./composition/meeting-screen-vision.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
+import { VOICE_THINK_PROBE_HEADER } from "./voice/think.js";
 import { createScout } from "./composition/scout.js";
 // AUTO block (ADR 0030): Q's delegated work.
 import {
@@ -599,6 +600,7 @@ import { withSuspension } from "./composition/suspension.js";
 import { createOwnCalls } from "./composition/own-calls.js";
 import { createOwnDiligence } from "./composition/own-diligence.js";
 import { createProfileMaterial } from "./composition/profile-material.js";
+import { createMaterialDocumentReads } from "./composition/material-documents.js";
 // end ADMIN block
 // ADMIN-3 block
 import {
@@ -2542,6 +2544,13 @@ const qTools = createQTools({
       deck: (actor, companyId) =>
         profileMaterial.companyDeck.view(actor, companyId),
       ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
+      // R0: a document found by meaning, and its text, as the data room
+      // authorises them for this person.
+      ...createMaterialDocumentReads({
+        sql: database.sql,
+        view: (actor, companyId) =>
+          profileMaterial.dataRoom.view(actor, companyId),
+      }),
     },
     ownRecords: {
       read: (actor, query) => ownRecords.read(actor, query),
@@ -5374,7 +5383,10 @@ if (deepgramProvider !== undefined) {
         `${origin}${Q_VOICE_THINK_PATH}/chat/completions`,
         {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            [VOICE_THINK_PROBE_HEADER]: "reachability",
+          },
           body: JSON.stringify({ messages: [] }),
           signal: AbortSignal.timeout(10_000),
         },
