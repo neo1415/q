@@ -481,6 +481,8 @@ export const CapitalLedgerDtoSchema = z
             )
             .max(20),
           notices: z.array(CapitalRoundNoticeSchema).max(6),
+          /** The lifecycle steps this round can take now (the server decides). */
+          steps: z.array(CapitalRoundStepSchema).max(6),
         }).strict(),
       )
       .max(50),

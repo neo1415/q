@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   CapitalObjectiveNotFoundError,
+  availableRoundSteps,
   isRoundNotFound,
   ownershipEstimate,
   roundNotices,
@@ -338,6 +339,7 @@ export function registerCommitmentRoutes(
             ...round,
             sums,
             otherCurrencies,
+            steps: availableRoundSteps(round.status),
             notices: roundNotices({
               round: {
                 id: round.id,
