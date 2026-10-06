@@ -376,9 +376,10 @@
         "temperament": "Calm under pressure, dryly funny"
       },
       "face": {
-        "replica": "Nathan - Bookshelf",
-        "replicaId": "rbf278df2604",
-        "model": "phoenix-4.5"
+        "replica": "Lucas - Studio",
+        "replicaId": "r3f4182ef554",
+        "model": "phoenix-4.5",
+        "note": "Recast: Nathan - Bookshelf failed twice on Tavus with a generic generation error."
       },
       "intendedAccent": "Scottish English (Tavus voice likely General American)",
       "style": "Incident-room straight talk: dark cool grade, terminal-style captions used sparingly, one attack-chain diagram",
