@@ -11,7 +11,6 @@ import {
   ICON_SIZE,
   ICON_STROKE,
   MoreHorizontal,
-  Search,
 } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
 import type { ContextScope } from "@capital-q/ui/tokens";
@@ -23,7 +22,6 @@ import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
 import type { VerifyNudge } from "@/features/verification/verify-state";
 
 import {
-  FIND_NAVIGATION,
   isActiveRoute,
   MOBILE_CENTRE_HREF,
   MOBILE_NAVIGATION,
@@ -185,7 +183,7 @@ function MoreSheet({
       </SheetTrigger>
       <SheetContent title="More">
         <nav aria-label="More sections">
-          {/* Profile heads the sheet; Search is its field (WORK-58). */}
+          {/* Profile heads the sheet (WORK-58); search lives in Explore. */}
           <Link
             href={PROFILE_NAVIGATION.href}
             aria-current={profileActive ? "page" : undefined}
@@ -207,21 +205,6 @@ function MoreSheet({
               strokeWidth={ICON_STROKE}
               className="text-(--cq-text-tertiary)"
             />
-          </Link>
-          <Link
-            href={FIND_NAVIGATION.href}
-            aria-current={
-              isActiveRoute(pathname, FIND_NAVIGATION.href) ? "page" : undefined
-            }
-            onClick={close}
-            className="mt-2 flex min-h-11 items-center gap-3 rounded-md bg-(--cq-surface-subtle) px-3 cq-body text-(--cq-text-tertiary)"
-          >
-            <Search
-              aria-hidden="true"
-              size={ICON_SIZE.regular}
-              strokeWidth={ICON_STROKE}
-            />
-            <span>{FIND_NAVIGATION.label}</span>
           </Link>
           {groups.map((group) => (
             <div

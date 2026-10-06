@@ -24,6 +24,7 @@ export const config = {
     "/investors/:path*",
     "/find/:path*",
     "/search/:path*",
+    "/explore/:path*",
     "/verification/:path*",
     "/profile/:path*",
     "/onboarding/:path*",

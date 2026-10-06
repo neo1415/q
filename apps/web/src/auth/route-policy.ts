@@ -27,6 +27,8 @@ export const PROTECTED_PATH_PREFIXES = [
   "/investors",
   "/find",
   "/search",
+  // Explore (ADR 0055): what Search became.
+  "/explore",
   "/verification",
   "/profile",
   "/onboarding",

@@ -7,8 +7,8 @@ import {
   Compass,
   Gauge,
   Handshake,
+  LayoutDashboard,
   ListChecks,
-  Search,
   Landmark,
   Newspaper,
   Play,
@@ -35,6 +35,7 @@ export type NavigationItem = {
   readonly href:
     | "/home"
     | "/discover"
+    | "/explore"
     | "/capital"
     | "/relationships"
     | "/profile"
@@ -60,6 +61,9 @@ export type NavigationItem = {
 
 export const PRIMARY_NAVIGATION: readonly NavigationItem[] = [
   { href: "/discover", label: "Discover", icon: Compass },
+  // Explore (E1-E5, ADR 0055): what "Search" became -- every pitch on the
+  // network, with search at its top.
+  { href: "/explore", label: "Explore", icon: LayoutDashboard },
   { href: "/home", label: "Q", icon: QNavIcon },
   { href: "/capital", label: "Capital", icon: Landmark },
   // Every canonical relationship of the person's side (R27).
@@ -175,26 +179,28 @@ export const ADMIN_NAVIGATION: NavigationItem = {
   icon: Wrench,
 };
 
-/** Search people by @handle and founders' videos (founder design 2026-09-29). */
+/**
+ * Explore (ADR 0055) replaced the Search field: search lives at the top of
+ * Explore. Kept under this name for the shell's "find" affordances.
+ */
 export const FIND_NAVIGATION: NavigationItem = {
-  href: "/search",
-  label: "Search",
-  icon: Search,
+  href: "/explore",
+  label: "Explore",
+  icon: LayoutDashboard,
 };
 
 /**
- * The phone's tab bar (founder directive, 2026-09-27): Discover first, Q in
- * the centre. There is no separate Chats area -- a person's conversations
- * with Q live on the Q page and their relationship threads under
- * Relationships. The fifth slot is More (founder report, 2026-10-01: the
- * phone could not reach Rehearsals, Results, Documents and the rest), which
- * opens every other section, Profile first.
+ * The phone's tab bar (founder directive, 2026-09-27; Explore design
+ * 2026-10-06): Discover, Explore, Q in the centre, Relationships, then
+ * More. Explore takes Capital's place; Capital stays in the sidebar and
+ * the More sheet. There is no separate Chats area. More (founder report,
+ * 2026-10-01) opens every other section, Profile first.
  */
 export const MOBILE_NAVIGATION: readonly NavigationItem[] = [
   byHref("/discover"),
-  byHref("/relationships"),
+  byHref("/explore"),
   byHref("/home"),
-  byHref("/capital"),
+  byHref("/relationships"),
 ];
 
 /** Profile and Settings: the person's own pages, on every side. */
@@ -252,8 +258,8 @@ export function navigationGroupsFor(
 
 /**
  * Every section a person in this context can reach, in the sidebar's
- * order, Profile and Settings aside (ACCOUNT_NAVIGATION). Search is the
- * sidebar's search field and the More sheet's, so it is listed here too.
+ * order, Profile and Settings aside (ACCOUNT_NAVIGATION). Explore, where
+ * search lives, is one of the main areas.
  */
 export function sectionsFor(
   scope: ContextScope,
@@ -264,13 +270,12 @@ export function sectionsFor(
     ...navigationGroupsFor(scope, options)
       .flatMap((group) => group.items)
       .filter((item) => !account.has(item.href)),
-    FIND_NAVIGATION,
   ];
 }
 
 /**
  * What the More sheet lists, in groups: everything not on a tab. Profile
- * heads the sheet; Search is its field.
+ * heads the sheet.
  */
 export function moreGroupsFor(
   scope: ContextScope,
@@ -287,14 +292,13 @@ export function moreGroupsFor(
     .filter((group) => group.items.length > 0);
 }
 
-/** What the More sheet lists, flat: Profile, Search, then every group's. */
+/** What the More sheet lists, flat: Profile, then every group's. */
 export function moreSectionsFor(
   scope: ContextScope,
   options: { readonly admin?: boolean | undefined } = {},
 ): readonly NavigationItem[] {
   return [
     PROFILE_NAVIGATION,
-    FIND_NAVIGATION,
     ...moreGroupsFor(scope, options).flatMap((group) => group.items),
   ];
 }

@@ -32,6 +32,7 @@ describe("the sidebar's groups", () => {
     expect(new Set(hrefs).size).toBe(hrefs.length);
     expect(hrefs).toEqual([
       "/discover",
+      "/explore",
       "/home",
       "/capital",
       "/relationships",
@@ -52,6 +53,6 @@ describe("the sidebar's groups", () => {
     expect(founder).toContain("/pitch");
     expect(founder).not.toContain("/investors");
     expect(founder).not.toContain("/admin");
-    expect(sectionsFor("unset").map((item) => item.href)).toContain("/search");
+    expect(sectionsFor("unset").map((item) => item.href)).toContain("/explore");
   });
 });

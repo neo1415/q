@@ -26,9 +26,9 @@ describe("MobileNavigation", () => {
     const links = nav.querySelectorAll("a");
     expect([...links].map((link) => link.textContent)).toEqual([
       "Discover",
-      "Relationships",
+      "Explore",
       "Q",
-      "Capital",
+      "Relationships",
     ]);
     expect(within(nav).getByRole("button", { name: "More" })).toBeTruthy();
   });
@@ -83,7 +83,7 @@ describe("MobileNavigation", () => {
     expect(
       screen.getByRole("button", { name: "More" }).hasAttribute("aria-current"),
     ).toBe(false);
-    for (const name of ["Q", "Capital", "Relationships"]) {
+    for (const name of ["Q", "Explore", "Relationships"]) {
       expect(
         screen.getByRole("link", { name }).hasAttribute("aria-current"),
       ).toBe(false);
@@ -93,11 +93,13 @@ describe("MobileNavigation", () => {
   it("treats nested routes as active without cross-matching prefixes", () => {
     expect(isActiveRoute("/capital/objectives/1", "/capital")).toBe(true);
     expect(isActiveRoute("/capitalisation", "/capital")).toBe(false);
+    // Explore takes Capital's place on the phone (ADR 0055); Capital
+    // stays in the sidebar and the More sheet.
     expect(MOBILE_NAVIGATION.map((item) => item.href)).toEqual([
       "/discover",
-      "/relationships",
+      "/explore",
       "/home",
-      "/capital",
+      "/relationships",
     ]);
   });
 });
