@@ -6,6 +6,8 @@ import {
   type QResearchDirective,
 } from "@capital-q/q-runtime";
 
+import { RESEARCH_TOOLS } from "./tool-focus.js";
+
 /**
  * Voice speculation (latency2, lead decision 2026-10-06).
  *
@@ -148,7 +150,17 @@ export function speculationMisfit(input: {
     return "RESEARCH";
   }
   const focus = final.toolFocus;
-  if (focus !== undefined && (focus.tools.length > 0 || focus.widen === true)) {
+  // The public-web tools are in every question's offer, the speculation's
+  // included (web search 2026-10-06); only another tool, or a widened offer
+  // other than the one the speculation started with, is a different answer.
+  const otherTools =
+    focus?.tools.filter((tool) => !RESEARCH_TOOLS.includes(tool)) ?? [];
+  if (
+    focus !== undefined &&
+    (otherTools.length > 0 ||
+      (focus.widen === true &&
+        JSON.stringify(focus) !== JSON.stringify(speculative.toolFocus)))
+  ) {
     return "FOCUS";
   }
   if (

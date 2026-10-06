@@ -351,7 +351,7 @@ describe("environment notes with research offered", () => {
     expect(notes.length).toBeLessThanOrEqual(ENVIRONMENT_NOTES_MAX_CHARS);
     expect(notes).toContain("PUBLIC WEB sources");
     // However tight the bound, Q is told it can search the web.
-    expect(notes).toContain("You can search the open web");
+    expect(notes).toContain("never say you cannot");
     const single = environmentNotesFor([], tools, subjects.slice(0, 1));
     expect(single.length).toBeLessThanOrEqual(ENVIRONMENT_NOTES_MAX_CHARS);
     expect(single).toContain(RESEARCH_NOTE);
