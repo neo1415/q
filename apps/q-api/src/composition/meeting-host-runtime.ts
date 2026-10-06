@@ -344,6 +344,8 @@ export type MeetingHostRuntime = {
   readonly tick: (meetingId: string) => Promise<void>;
   /** Saves what Q heard of a call now (tests; the ticker does it too). */
   readonly flush: (meetingId: string) => Promise<void>;
+  /** P5: the call's last lines said aloud, for a look at a shared screen. */
+  readonly recentWords: (meetingId: string) => string;
   /** Live sessions, for tests and status. */
   readonly sessions: () => number;
 };
@@ -375,6 +377,8 @@ export function createMeetingHostRuntime(dependencies: {
   readonly logger?: Logger;
   /** Ticks drive the "wait for quiet" rule; tests drive them by hand. */
   readonly tickEveryMs?: number | null;
+  /** P5: Q looks at shared screens in these calls; said in its greeting. */
+  readonly seesScreens?: boolean;
   /** Before leaving, let the goodbye play (tests: 0). */
   readonly leaveDelayMs?: number;
   /** A line spoken a sentence at a time (default); false: whole lines. */
@@ -409,7 +413,7 @@ export function createMeetingHostRuntime(dependencies: {
           organiserUserId: context.organiserUserId,
           context,
           host: createMeetingHost(
-            context,
+            { ...context, seesScreens: dependencies.seesScreens === true },
             dependencies.limits ?? DEFAULT_HOST_LIMITS,
             dependencies.policy ?? DEFAULT_HOST_POLICY,
           ),
@@ -861,6 +865,8 @@ export function createMeetingHostRuntime(dependencies: {
       const session = sessions.get(meetingId);
       if (session !== undefined) await saveHeard(session, true);
     },
+    recentWords: (meetingId) =>
+      (sessions.get(meetingId)?.lines ?? []).slice(-30).join("\n"),
     sessions: () => sessions.size,
   };
 }

@@ -180,6 +180,9 @@ export const HOST_EVENTS = [
   "transcript.data",
 ] as const;
 
+/** P5: shared-screen (and webcam, dropped) frames, websocket only. */
+export const SCREEN_EVENTS = ["video_separate_png.data"] as const;
+
 /** The create-bot body (Recall v1). Exported for tests; no I/O. */
 export function botRequest(input: {
   readonly meetingUrl: string;
@@ -207,9 +210,37 @@ export function botRequest(input: {
                 url: hosting.realtimeUrl,
                 events: [...HOST_EVENTS],
               },
+              // P5: per-participant PNG frames (360p, 2 fps) over a
+              // websocket, only when Q may look at shared screens; code
+              // drops every webcam frame on arrival.
+              ...(hosting.visionUrl === undefined
+                ? []
+                : [
+                    {
+                      type: "websocket",
+                      url: hosting.visionUrl,
+                      events: [...SCREEN_EVENTS],
+                    },
+                  ]),
             ],
           }),
+      ...(hosting?.visionUrl === undefined
+        ? {}
+        : {
+            video_mixed_layout: "gallery_view_v2",
+            video_separate_png: {},
+          }),
     },
+    // Recall: separate video per participant needs the 4-core bot.
+    ...(hosting?.visionUrl === undefined
+      ? {}
+      : {
+          variant: {
+            google_meet: "web_4_core",
+            zoom: "web_4_core",
+            microsoft_teams: "web_4_core",
+          },
+        }),
     ...(hosting === undefined
       ? {}
       : {
