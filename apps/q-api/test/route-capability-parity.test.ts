@@ -201,6 +201,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq.ts GET GATEQ_GATEWAY_APPLICATIONS_PATH": exempt(
     "the organisation reading applications submitted to its own gateway, on its gateway page",
   ),
+  // F4: the GateQ inbox. Q reads it through its triage tool.
+  "api/http/gateq.ts GET GATEQ_INBOX_PATH": cap("tool.gateq_inbox_triage"),
+  "api/http/gateq.ts GET GATEQ_INBOX_ITEM_PATH": cap("tool.gateq_inbox_triage"),
+  "api/http/gateq.ts GET GATEQ_INBOX_PACK_PATH": exempt(
+    "a zip file the investor downloads to their own device; Q has no device to save it to",
+  ),
 
   // Capital Q's own operators; never Q's to act on, never a tenant's.
   "api/http/admin.ts GET ADMIN_OVERVIEW_PATH": exempt(

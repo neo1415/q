@@ -400,6 +400,13 @@ export const Q_CLIENT_ACTION_TOOLS = [
  * "for approval": the answer tells a model these happen when called.
  */
 export const Q_INSTANT_ACTION_TOOLS = [
+  // F4: the investor's own triage of their GateQ inbox, reversible there.
+  "gateq_inbox_star",
+  "gateq_inbox_archive",
+  "gateq_inbox_label",
+  "gateq_inbox_assign",
+  "gateq_inbox_note",
+  "gateq_reply_promise",
   "save_company",
   "unsave_company",
   "pass_company",

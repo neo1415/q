@@ -106,6 +106,7 @@ function buildApp(options: {
         ? Promise.reject(options.created)
         : Promise.resolve(options.created ?? GATEWAY),
     listGateways: () => Promise.resolve([GATEWAY]),
+    gatewayAccess: notUnderTest,
     getPolicy: notUnderTest,
     listVersions: () => Promise.resolve([]),
     createDraft: notUnderTest,

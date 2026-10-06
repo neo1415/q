@@ -5,6 +5,12 @@ import {
   ApplicationSummaryDtoSchema,
   GATEQ_GATEWAY_APPLICATIONS_PATH,
   GATEQ_APPLY_MATERIALS_PATH,
+  GATEQ_INBOX_ITEM_PATH,
+  GATEQ_INBOX_PACK_PATH,
+  GATEQ_INBOX_PATH,
+  GateqInboxDetailDtoSchema,
+  GateqInboxDtoSchema,
+  GateqInboxViewSchema,
   ShareApplicationMaterialsRequestSchema,
   ShareApplicationMaterialsResponseSchema,
   GatewayApplicationListDtoSchema,
@@ -38,6 +44,7 @@ import {
 } from "@capital-q/gateq";
 import {
   IntakeRefusedError,
+  type InboxService,
   type SubmissionInbox,
 } from "@capital-q/gateq-intake";
 import {
@@ -81,6 +88,11 @@ import {
 
 export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly gateq: GateQService;
+  /** F4: the organisation's GateQ inbox (its writes are declared app actions). */
+  readonly inboxService?: InboxService | undefined;
+  /** F4: the gateway's published reply promise, for its public page. */
+  readonly publicReplyPromise?:
+    ((publicId: GatewayPublicId) => Promise<number | null>) | undefined;
   /** F1: a signed-in founder sharing their own documents with an application. */
   readonly materials?: ApplicationMaterials | undefined;
   /** Submitted applications, read after GateQ authorises the gateway. */
@@ -245,6 +257,82 @@ export function registerGateQRoutes(
       return { gateways: gateways.map(gatewayDto) };
     },
   );
+
+  const inboxService = dependencies.inboxService;
+  if (inboxService !== undefined) {
+    const uuidParam = (request: FastifyRequest, key: string): string =>
+      parseContract(
+        UuidSchema,
+        (request.params as Record<string, string | undefined>)[key],
+        "The id is not valid.",
+      );
+
+    // F4: the inbox, one view at a time. GateQ's gateway authority decides;
+    // a gateway that is not the caller's is the same 404 as none.
+    app.get(
+      GATEQ_INBOX_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const view = GateqInboxViewSchema.catch("INBOX").parse(
+          (request.query as { view?: string }).view,
+        );
+        const inbox = await inboxService.list(
+          getActorContext(request),
+          uuidParam(request, "gatewayId"),
+          view,
+        );
+        if (!("items" in inbox)) {
+          reply.callNotFound();
+          return undefined;
+        }
+        void reply.header("Cache-Control", "no-store");
+        return GateqInboxDtoSchema.parse(inbox);
+      },
+    );
+
+    app.get(
+      GATEQ_INBOX_ITEM_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const detail = await inboxService.detail(
+          getActorContext(request),
+          uuidParam(request, "gatewayId"),
+          uuidParam(request, "applicationId"),
+        );
+        if (!("item" in detail)) {
+          reply.callNotFound();
+          return undefined;
+        }
+        void reply.header("Cache-Control", "no-store");
+        return GateqInboxDetailDtoSchema.parse(detail);
+      },
+    );
+
+    // The download pack: only what the founder sent; audited as it is built.
+    app.get(
+      GATEQ_INBOX_PACK_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const pack = await inboxService.pack(
+          getActorContext(request),
+          uuidParam(request, "gatewayId"),
+          uuidParam(request, "applicationId"),
+        );
+        if (!("bytes" in pack)) {
+          reply.callNotFound();
+          return undefined;
+        }
+        return reply
+          .header("Cache-Control", "no-store")
+          .header("Content-Type", "application/zip")
+          .header(
+            "Content-Disposition",
+            `attachment; filename="${pack.fileName.replace(/[^\w.-]/g, "-")}"`,
+          )
+          .send(Buffer.from(pack.bytes));
+      },
+    );
+  }
 
   const materials = dependencies.materials;
   if (materials !== undefined) {
@@ -457,10 +545,17 @@ export function registerGateQRoutes(
       dependencies.publicImages === undefined
         ? null
         : await dependencies.publicImages(publicId.data).catch(() => null);
+    const replyWithinDays =
+      dependencies.publicReplyPromise === undefined
+        ? null
+        : await dependencies
+            .publicReplyPromise(publicId.data)
+            .catch(() => null);
     // Briefly cacheable, well inside the signed URLs' own lifetime.
     void reply.header("Cache-Control", "public, max-age=60");
     return PublicGatewayDtoSchema.parse({
       ...projection,
+      ...(replyWithinDays === null ? {} : { replyWithinDays }),
       ...(images === null
         ? {}
         : {

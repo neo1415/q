@@ -8,6 +8,7 @@
  */
 
 import { createApplicationMaterials } from "./gateq/application-materials.js";
+import { sharedDocumentsPort } from "./gateq/inbox.js";
 import { loadApiConfig } from "@capital-q/config/api";
 import { loadDatabaseConfig } from "@capital-q/config/database";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
@@ -139,6 +140,10 @@ import {
   createPostgresApplicationSessionRepository,
   createPostgresApplicationSubmissionRepository,
   createPostgresSubmissionInbox,
+  createGateqInbox,
+  createPostgresInboxRepository,
+  gateqInboxActionsPort,
+  ownGatewayIdFrom,
 } from "@capital-q/gateq-intake";
 import {
   createModelGateway,
@@ -808,6 +813,22 @@ const discoverFilterFacts = createDiscoverFilterFacts({
   disclosure,
   verification: () => cardVerification,
   pitches: () => discoverablePitches,
+});
+// F4: the investor's GateQ inbox, under GateQ's own gateway authority.
+const gateqInboxService = createGateqInbox({
+  sql: database.sql,
+  transactions: database.transactions,
+  gateq,
+  documents: sharedDocumentsPort({
+    sql: database.sql,
+    authorizeVersion:
+      storage === undefined
+        ? undefined
+        : (share) =>
+            createSharedDocumentDownloads({ sql: database.sql, storage })
+              .authorizeSharedVersion({ ...share, disposition: "ATTACHMENT" })
+              .then((link) => (link === null ? null : { url: link.url })),
+  }),
 });
 const slates = createSlateReadPipeline({
   sql: database.sql,
@@ -1869,6 +1890,28 @@ const { app, logger } = createApp(config, security, {
   },
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
+  // F4: the investor's GateQ inbox. Reads here; writes are declared actions.
+  gateqInboxService: gateqInboxService,
+  gateqInboxActions: gateqInboxActionsPort(
+    gateqInboxService,
+    ownGatewayIdFrom({
+      gateq,
+      ownInvestorOrganisationId: async (actor) =>
+        (
+          await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
+            actor,
+          )
+        )?.investorOrganisationId ?? null,
+    }),
+  ),
+  gateqPublicReplyPromise: async (publicId) => {
+    const gateway = await gateqGateways.findByPublicId(publicId);
+    return gateway === null
+      ? null
+      : createPostgresInboxRepository({ sql: database.sql }).replyWithinDays(
+          gateway.id,
+        );
+  },
   // F1: a signed-in founder's own documents, shared with their application.
   gateqMaterials:
     gateqApply === undefined

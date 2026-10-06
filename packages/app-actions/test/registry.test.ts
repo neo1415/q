@@ -262,6 +262,18 @@ describe("the action registry", () => {
       ["q.work.suggestion.dismiss", "offer.work_suggestions", "INSTANT"],
       // P7: GateQ rules drafted from a mandate, confirmed on the Gateway page.
       ["gateway.policy.read_mandate", "offer.gateway_mandate", "INSTANT"],
+      // F4: the GateQ inbox. Words to a founder are approved on its screen.
+      ["gateq.inbox.star", "gateq_inbox_star", "INSTANT"],
+      ["gateq.inbox.archive", "gateq_inbox_archive", "INSTANT"],
+      ["gateq.inbox.label", "gateq_inbox_label", "INSTANT"],
+      ["gateq.inbox.assign", "gateq_inbox_assign", "INSTANT"],
+      ["gateq.inbox.note", "gateq_inbox_note", "INSTANT"],
+      ["gateq.inbox.reply_promise", "gateq_reply_promise", "INSTANT"],
+      ["gateq.inbox.pass", "offer.gateq_inbox", "CONSEQUENTIAL"],
+      ["gateq.inbox.reply", "offer.gateq_inbox", "CONSEQUENTIAL"],
+      ["gateq.inbox.triage", "gateq_inbox_triage", "READ"],
+      ["gateq.inbox.draft_pass", "gateq_inbox_draft_pass", "READ"],
+      ["gateq.inbox.summarise", "gateq_inbox_summarise", "READ"],
     ]);
   });
 });

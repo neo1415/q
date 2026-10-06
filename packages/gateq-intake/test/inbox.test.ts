@@ -551,18 +551,18 @@ describe("the download pack (F4)", () => {
 
   it("records who downloaded it, and refuses another firm", async () => {
     const { service, state } = harness();
-    await service.pack(actor(ADMIN), GATEWAY, APP_FIT, "Daniel Reyes");
+    await service.pack(actor(ADMIN), GATEWAY, APP_FIT);
     expect(state.activity.at(-1)).toMatchObject({
       kind: "PACK_DOWNLOADED",
       actorUserId: ADMIN,
       applicationId: APP_FIT,
     });
-    expect(await service.pack(actor(OUTSIDER), GATEWAY, APP_FIT, "x")).toEqual({
+    expect(await service.pack(actor(OUTSIDER), GATEWAY, APP_FIT)).toEqual({
       ok: false,
     });
-    expect(await service.pack(actor(ADMIN), GATEWAY, FOREIGN_APP, "x")).toEqual(
-      { ok: false },
-    );
+    expect(await service.pack(actor(ADMIN), GATEWAY, FOREIGN_APP)).toEqual({
+      ok: false,
+    });
   });
 });
 

@@ -22,6 +22,7 @@ import { ETIQUETTE_ACTIONS } from "./actions/etiquette.js";
 import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
 import { WORK_ACTIONS } from "./actions/work.js";
 import { GATEQ_ACTIONS } from "./actions/gateq.js";
+import { GATEQ_INBOX_ACTIONS } from "./actions/gateq-inbox.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -50,6 +51,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...ETIQUETTE_ACTIONS,
   ...WORK_ACTIONS,
   ...GATEQ_ACTIONS,
+  ...GATEQ_INBOX_ACTIONS,
 ]);
 
 /**

@@ -43,6 +43,7 @@ import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 import type { DeckAudiencePort } from "./actions/deck.js";
 import type { DocumentChangePort } from "./actions/document-manage.js";
 import type { GateQPolicyExtractionPort } from "./actions/gateq.js";
+import type { GateqInboxPort } from "./actions/gateq-inbox.js";
 import type { QWorkPagePort } from "./actions/work.js";
 import type { EtiquetteGuidePort } from "./actions/etiquette.js";
 
@@ -63,6 +64,8 @@ export type AppActionPorts = {
   readonly qWork?: QWorkPagePort | undefined;
   /** P7: an investor's mandate read into DRAFT gateway rules. */
   readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
+  /** F4: an investor organisation's GateQ inbox (gateq-intake's inbox service). */
+  readonly gateqInbox?: GateqInboxPort | undefined;
   /** ADR 0041: who may download a pitch deck (the Evidence service). */
   readonly deckAudience?: DeckAudiencePort | undefined;
   /** P3: rename and delete (archive) their own documents (Evidence). */

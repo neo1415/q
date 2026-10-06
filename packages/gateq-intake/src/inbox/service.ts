@@ -665,6 +665,60 @@ export function createInboxService(dependencies: {
       };
     },
 
+    /** For Q, which has no screen: an application by the company's name as said. */
+    findApplication: async (
+      actor: ActorContext,
+      gatewayId: string,
+      companyName: string,
+    ): Promise<
+      | { readonly applicationId: string; readonly companyName: string }
+      | { readonly ambiguous: readonly string[] }
+      | null
+    > => {
+      const granted = await authority.authorise(actor, gatewayId);
+      if (granted === null) return null;
+      const rows = await repository.list({
+        tenantId: granted.gateway.tenantId,
+        gatewayId: granted.gateway.gatewayId,
+        userId: actor.userId,
+      });
+      const wanted = companyName.trim().toLowerCase();
+      const named = rows.map((row) => ({
+        applicationId: row.applicationId,
+        companyName: profileOf(readSnapshot(row.snapshot)).companyName,
+      }));
+      const exact = named.filter((n) => n.companyName.toLowerCase() === wanted);
+      const loose =
+        exact.length > 0
+          ? exact
+          : named.filter(
+              (n) =>
+                n.companyName.toLowerCase().includes(wanted) ||
+                wanted.includes(n.companyName.toLowerCase()),
+            );
+      if (loose.length === 1) return loose[0] ?? null;
+      if (loose.length > 1)
+        return { ambiguous: loose.map((n) => n.companyName).slice(0, 5) };
+      return null;
+    },
+
+    findMember: async (
+      actor: ActorContext,
+      gatewayId: string,
+      name: string,
+    ): Promise<string | null> => {
+      const granted = await authority.authorise(actor, gatewayId);
+      if (granted === null) return null;
+      const wanted = name.trim().toLowerCase();
+      const members = await membersOf(granted.gateway);
+      const matches = members.filter(
+        (m) =>
+          m.name.toLowerCase() === wanted ||
+          m.name.toLowerCase().split(/\s+/)[0] === wanted,
+      );
+      return matches.length === 1 ? (matches[0]?.userId ?? null) : null;
+    },
+
     /** Q's triage: proposals for a person to accept, one by one or together. */
     triage: async (
       actor: ActorContext,
@@ -706,7 +760,6 @@ export function createInboxService(dependencies: {
       actor: ActorContext,
       gatewayId: string,
       applicationId: string,
-      downloadedBy: string,
     ): Promise<
       | {
           readonly ok: true;
@@ -728,6 +781,10 @@ export function createInboxService(dependencies: {
       const submitted = readSnapshot(row.snapshot);
       const read = readQualification(row.qualification);
       const profile = profileOf(submitted);
+      // Every page names who downloaded it.
+      const downloadedBy =
+        (await membersOf(gateway)).find((m) => m.userId === actor.userId)
+          ?.name ?? `a member of ${gateway.fund}`;
       const shared: PackFile[] = [];
       const omitted: string[] = [];
       // Only the ids the frozen submission names: nothing else can be asked for.

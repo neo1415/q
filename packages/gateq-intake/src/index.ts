@@ -125,3 +125,9 @@ export {
   type InboxService,
 } from "./inbox/service.js";
 export { createPostgresInboxRepository } from "./infrastructure/postgres-inbox.js";
+export {
+  createGateqInbox,
+  gateqInboxActionsPort,
+  gateqInboxAuthority,
+  ownGatewayIdFrom,
+} from "./inbox/compose.js";

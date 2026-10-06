@@ -159,6 +159,7 @@ function build(options: {
       return Promise.resolve(GATEWAY);
     },
     listGateways: () => Promise.resolve([GATEWAY]),
+    gatewayAccess: notUnderTest,
     getPolicy: notUnderTest,
     listVersions: () => Promise.resolve([]),
     createDraft: notUnderTest,
