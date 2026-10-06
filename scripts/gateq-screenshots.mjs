@@ -1,3 +1,4 @@
+/* global process, console, document */
 /**
  * GateQ F1-F4 design-review screenshots: every state of the /dev/gateq-v2
  * gallery at 390 and 1440, light and dark (design 2026-10-06/a/gateq.html).

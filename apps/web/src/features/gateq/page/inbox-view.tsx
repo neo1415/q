@@ -212,8 +212,6 @@ export function InboxView({
   const searchRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
-
-
   const say = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(
@@ -1585,11 +1583,7 @@ function PassSheet({
       <p className="gq-label" id={reasonId}>
         Main reason
       </p>
-      <div
-        className="gq-opts"
-        role="radiogroup"
-        aria-labelledby={reasonId}
-      >
+      <div className="gq-opts" role="radiogroup" aria-labelledby={reasonId}>
         {PASS_REASONS.map(([code, label]) => (
           <button
             key={code}
