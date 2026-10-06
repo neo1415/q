@@ -330,6 +330,7 @@ export {
   listGateways,
   publishGatewayVersion,
   saveApplicationAnswers,
+  shareApplicationMaterials,
   startApplication,
   submitApplication,
 } from "./gateq.js";

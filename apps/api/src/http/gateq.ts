@@ -4,6 +4,9 @@ import {
   CreateGatewayRequestSchema,
   ApplicationSummaryDtoSchema,
   GATEQ_GATEWAY_APPLICATIONS_PATH,
+  GATEQ_APPLY_MATERIALS_PATH,
+  ShareApplicationMaterialsRequestSchema,
+  ShareApplicationMaterialsResponseSchema,
   GatewayApplicationListDtoSchema,
   GATEQ_GATEWAY_PATH,
   GATEQ_GATEWAY_PUBLISH_PATH,
@@ -33,7 +36,10 @@ import {
   type GateQService,
   type QualificationResult,
 } from "@capital-q/gateq";
-import type { SubmissionInbox } from "@capital-q/gateq-intake";
+import {
+  IntakeRefusedError,
+  type SubmissionInbox,
+} from "@capital-q/gateq-intake";
 import {
   billingAccountOf,
   FEATURE_GATEWAYS,
@@ -46,6 +52,10 @@ import {
   type ActorContextDependencies,
 } from "../security/actor-context.js";
 import { sendEntitlementRequired } from "./billing.js";
+import {
+  MaterialNotSharableError,
+  type ApplicationMaterials,
+} from "../gateq/application-materials.js";
 
 /**
  * `/v1/gateq` — configuring an organisation's front door, and the one
@@ -71,6 +81,8 @@ import { sendEntitlementRequired } from "./billing.js";
 
 export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly gateq: GateQService;
+  /** F1: a signed-in founder sharing their own documents with an application. */
+  readonly materials?: ApplicationMaterials | undefined;
   /** Submitted applications, read after GateQ authorises the gateway. */
   readonly inbox?: SubmissionInbox | undefined;
   // BILLING block (ADR 0034): how many gateways the account's plan allows.
@@ -233,6 +245,41 @@ export function registerGateQRoutes(
       return { gateways: gateways.map(gatewayDto) };
     },
   );
+
+  const materials = dependencies.materials;
+  if (materials !== undefined) {
+    app.post(
+      GATEQ_APPLY_MATERIALS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const input = parseContract(
+          ShareApplicationMaterialsRequestSchema,
+          request.body,
+          "The request is not valid.",
+        );
+        try {
+          const shared = await materials.share({
+            actor: getActorContext(request),
+            sessionToken: input.sessionToken,
+            documentIds: input.documentIds,
+          });
+          void reply.header("Cache-Control", "no-store");
+          return ShareApplicationMaterialsResponseSchema.parse(shared);
+        } catch (error: unknown) {
+          // A wrong credential and a document that is not theirs are one
+          // answer: neither says which applications or documents exist.
+          if (
+            error instanceof IntakeRefusedError ||
+            error instanceof MaterialNotSharableError
+          ) {
+            reply.callNotFound();
+            return undefined;
+          }
+          throw error;
+        }
+      },
+    );
+  }
 
   const inbox = dependencies.inbox;
   if (inbox !== undefined) {

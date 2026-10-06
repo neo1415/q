@@ -21,6 +21,12 @@ export const GATEQ_APPLY_START_PATH = "/v1/gateq/apply" as const;
 export const GATEQ_APPLY_SESSION_PATH = "/v1/gateq/apply/session" as const;
 export const GATEQ_APPLY_TURN_PATH = "/v1/gateq/apply/turn" as const;
 export const GATEQ_APPLY_SUBMIT_PATH = "/v1/gateq/apply/submit" as const;
+/**
+ * F1: a signed-in founder shares their own documents with the application.
+ * The one applicant route that also needs an actor: the documents must be
+ * the founder organisation's own, which only a signed-in caller can prove.
+ */
+export const GATEQ_APPLY_MATERIALS_PATH = "/v1/gateq/apply/materials" as const;
 /** F1: the founder answers a short form instead of talking to Q. */
 export const GATEQ_APPLY_ANSWERS_PATH = "/v1/gateq/apply/answers" as const;
 
@@ -82,7 +88,11 @@ export const GATEQ_INSTRUMENTS = [
   "CONVERTIBLE_NOTE",
   "NOT_DECIDED",
 ] as const;
-export const GATEQ_LEAD_STATUSES = ["HAS_LEAD", "LOOKING", "NOT_NEEDED"] as const;
+export const GATEQ_LEAD_STATUSES = [
+  "HAS_LEAD",
+  "LOOKING",
+  "NOT_NEEDED",
+] as const;
 export const GATEQ_NOTE_MAX_CHARS = 600;
 
 /**
@@ -103,7 +113,10 @@ export const ApplicationAnswersRequestSchema = z
       .optional(),
     /** Plain sector words; the taxonomy resolver maps them, never the browser. */
     sectors: z
-      .union([z.array(z.string().trim().min(1).max(120)).min(1).max(6), Declined])
+      .union([
+        z.array(z.string().trim().min(1).max(120)).min(1).max(6),
+        Declined,
+      ])
       .optional(),
     country: z.union([z.string().regex(/^[A-Z]{2}$/), Declined]).optional(),
     raise: z
@@ -112,7 +125,10 @@ export const ApplicationAnswersRequestSchema = z
           .object({
             amount: z
               .string()
-              .regex(/^(0|[1-9][0-9]{0,15})(\.[0-9]{1,2})?$/, "expected a decimal"),
+              .regex(
+                /^(0|[1-9][0-9]{0,15})(\.[0-9]{1,2})?$/,
+                "expected a decimal",
+              ),
             currency: z.string().regex(/^[A-Z]{3}$/),
           })
           .strict(),
@@ -129,6 +145,20 @@ export const ApplicationAnswersRequestSchema = z
 export type ApplicationAnswersRequest = z.infer<
   typeof ApplicationAnswersRequestSchema
 >;
+
+export const ShareApplicationMaterialsRequestSchema = z
+  .object({
+    /** The application's guest credential, from the form's memory. */
+    sessionToken: z.string().min(16).max(128),
+    documentIds: z.array(z.string().uuid()).min(1).max(10),
+  })
+  .strict();
+export type ShareApplicationMaterialsRequest = z.infer<
+  typeof ShareApplicationMaterialsRequestSchema
+>;
+export const ShareApplicationMaterialsResponseSchema = z
+  .object({ attached: z.number().int().min(0).max(10) })
+  .strict();
 
 export const SubmitApplicationRequestSchema = z
   .object({ clientRequestId: z.string().min(8).max(128) })

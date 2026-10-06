@@ -6,11 +6,15 @@ import { z } from "zod";
 import {
   ApiProblemError,
   applicationTurn,
+  saveApplicationAnswers,
   startApplication,
   submitApplication,
 } from "@capital-q/api-client";
 import type { ApplicationSummaryDto } from "@capital-q/contracts";
-import { GATEQ_TURN_MAX_CHARS } from "@capital-q/contracts";
+import {
+  ApplicationAnswersRequestSchema,
+  GATEQ_TURN_MAX_CHARS,
+} from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 /**
@@ -165,5 +169,73 @@ export async function submitApplicationAction(
     };
   } catch (error: unknown) {
     return failure(error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// F1: the GateQ form. The same anonymous, credential-scoped surface; no model.
+// ---------------------------------------------------------------------------
+
+export type FormResult =
+  | {
+      readonly ok: true;
+      readonly sessionToken: string;
+      readonly application: ApplicationSummaryDto;
+    }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly rateLimited?: boolean;
+    };
+
+function formFailure(error: unknown): FormResult {
+  const failed = failure(error);
+  return failed.ok
+    ? { ok: false, message: "Please try again." }
+    : {
+        ok: false,
+        message: failed.message,
+        ...(failed.rateLimited === true ? { rateLimited: true } : {}),
+      };
+}
+
+export async function startFormAction(publicId: string): Promise<FormResult> {
+  const id = PublicId.safeParse(publicId);
+  const url = base();
+  if (!id.success || url === null) return { ok: false, message: "Not found." };
+  if (!(await visitorMayStart())) return RATE_LIMITED;
+  try {
+    const started = await startApplication(url, id.data, "form");
+    return {
+      ok: true,
+      sessionToken: started.sessionToken,
+      application: started.application,
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+
+export async function saveAnswersAction(
+  sessionToken: string,
+  answers: unknown,
+): Promise<FormResult> {
+  const token = Token.safeParse(sessionToken);
+  // Validated here too: the API is the authority, but a malformed answer
+  // should never leave the web tier.
+  const parsed = ApplicationAnswersRequestSchema.safeParse(answers);
+  const url = base();
+  if (!token.success || !parsed.success || url === null) {
+    return { ok: false, message: "Please check your answers and try again." };
+  }
+  try {
+    const saved = await saveApplicationAnswers(url, token.data, parsed.data);
+    return {
+      ok: true,
+      sessionToken: token.data,
+      application: saved.application,
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
   }
 }

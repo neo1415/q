@@ -4,6 +4,8 @@ import {
   ApplicationTurnResponseSchema,
   ApplicationAnswersResponseSchema,
   GATEQ_APPLY_ANSWERS_PATH,
+  GATEQ_APPLY_MATERIALS_PATH,
+  ShareApplicationMaterialsResponseSchema,
   type ApplicationAnswersRequest,
   GATEQ_APPLY_START_PATH,
   GATEQ_APPLY_SUBMIT_PATH,
@@ -127,7 +129,10 @@ export function startApplication(
     "POST",
     GATEQ_APPLY_START_PATH,
     StartApplicationResponseSchema,
-    { body: mode === undefined ? { gatewayPublicId } : { gatewayPublicId, mode } },
+    {
+      body:
+        mode === undefined ? { gatewayPublicId } : { gatewayPublicId, mode },
+    },
   );
 }
 
@@ -198,6 +203,23 @@ export function extractGatewayPolicy(
     "POST",
     path(GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH, { gatewayId }),
     PolicyExtractionDtoSchema,
+    { body: input },
+  );
+}
+
+/** F1: a signed-in founder shares their own documents with an application. */
+export function shareApplicationMaterials(
+  session: ApiSession,
+  input: {
+    readonly sessionToken: string;
+    readonly documentIds: readonly string[];
+  },
+) {
+  return call(
+    session,
+    "POST",
+    GATEQ_APPLY_MATERIALS_PATH,
+    ShareApplicationMaterialsResponseSchema,
     { body: input },
   );
 }

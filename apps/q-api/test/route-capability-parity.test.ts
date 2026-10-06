@@ -195,6 +195,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     ]),
   ),
   "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_PATH": PUBLIC,
+  "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH": exempt(
+    "the founder ticking their own documents in the GateQ form, at the moment they press Send; consent belongs on that screen",
+  ),
   "api/http/gateq.ts GET GATEQ_GATEWAY_APPLICATIONS_PATH": exempt(
     "the organisation reading applications submitted to its own gateway, on its gateway page",
   ),
@@ -884,6 +887,18 @@ const LEGACY_MUTATION_ROUTES_MAX = 77;
  * action, so never declarable as one. Named here one by one rather than
  * lifting the legacy ceiling; pending the lead's decision.
  */
+/**
+ * F1 (2026-10-06): the GateQ form's two writes. Both are authorised by an
+ * applicant's guest credential that exists only in the founder's browser
+ * memory (the embed is a third-party frame): no actor holds it, so neither
+ * Q nor a declared action can ever carry it. Named one by one rather than
+ * lifting the legacy ceiling; pending the lead's decision.
+ */
+const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_ANSWERS_PATH",
+  "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH",
+]);
+
 const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH",
@@ -937,6 +952,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
       (key) =>
         / (POST|PUT|PATCH|DELETE) /.test(key) &&
         !Q_TRANSPORT_NOT_ACTIONS.has(key) &&
+        !GATEQ_GUEST_NOT_ACTIONS.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act
         // on), so its writes are not legacy waiting to migrate.
         ROUTE_COVERAGE[key] !== OPERATIONS_CONSOLE,

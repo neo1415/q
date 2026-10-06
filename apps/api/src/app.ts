@@ -283,6 +283,7 @@ export type ApiModules = {
     NetworkInterestRoutesDependencies["connections"] | undefined;
   /** A gateway's submitted applications, for its organisation. */
   readonly gateqInbox?: GateQRoutesDependencies["inbox"] | undefined;
+  readonly gateqMaterials?: GateQRoutesDependencies["materials"] | undefined;
   /** P7: an investor's mandate read into DRAFT gateway rules (ADR 0040 port). */
   readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
   /** CQ-GATE-001: the investor organisation's inbound gateway. */
@@ -733,6 +734,7 @@ export function createApp(
       resolver: security.resolver,
       gateq: modules.gateq,
       inbox: modules.gateqInbox,
+      materials: modules.gateqMaterials,
       entitlements: modules.billing?.entitlements,
       publicImages: modules.gateqPublicImages,
     });

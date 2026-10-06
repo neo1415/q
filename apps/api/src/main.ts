@@ -7,6 +7,7 @@
  * import business logic from domain packages rather than defining it here.
  */
 
+import { createApplicationMaterials } from "./gateq/application-materials.js";
 import { loadApiConfig } from "@capital-q/config/api";
 import { loadDatabaseConfig } from "@capital-q/config/database";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
@@ -1868,6 +1869,23 @@ const { app, logger } = createApp(config, security, {
   },
   gateqApply,
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
+  // F1: a signed-in founder's own documents, shared with their application.
+  gateqMaterials:
+    gateqApply === undefined
+      ? undefined
+      : createApplicationMaterials({
+          authoriseGuest: (token) => gateqApply.intake.authorise(token),
+          ownDocument: (actor, documentId) => {
+            const id = DocumentIdSchema.safeParse(documentId);
+            return id.success
+              ? evidence
+                  .getDocument({ actor, documentId: id.data })
+                  .then(() => true)
+                  .catch(() => false)
+              : Promise.resolve(false);
+          },
+          attach: (input) => gateqApply.intake.attachDocument(input),
+        }),
   gateqPolicyExtraction: (() => {
     const service = createPolicyExtractionService({
       gateq,
