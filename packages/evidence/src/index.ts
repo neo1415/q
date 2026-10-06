@@ -245,7 +245,13 @@ export {
   RecordDocumentExtractionInputSchema,
   type RecordDocumentExtractionInput,
   type RecordDocumentExtractionResult,
+  type BackfillDocumentPagesResult,
 } from "./application/extraction-use-cases.js";
+export {
+  DOCUMENT_PAGE_MAX_CHARS,
+  pagesFromBlocks,
+  type DocumentPageText,
+} from "./domain/document-pages.js";
 export {
   scanInstructionRisk,
   type InstructionRiskReport,

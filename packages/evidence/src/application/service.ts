@@ -24,6 +24,7 @@ import {
   createSetDocumentDownloadAudience,
 } from "./document-use-cases.js";
 import {
+  createBackfillDocumentPages,
   createFindDocumentExtraction,
   createRecordDocumentExtraction,
 } from "./extraction-use-cases.js";
@@ -212,6 +213,10 @@ export type DocumentProcessingService = {
   readonly findDocumentExtraction: ReturnType<
     typeof createFindDocumentExtraction
   >;
+  /** Q room W3: pages for extractions recorded before pages existed. */
+  readonly backfillDocumentPages: ReturnType<
+    typeof createBackfillDocumentPages
+  >;
 };
 
 export type DocumentProcessingServiceOptions = Omit<
@@ -237,5 +242,6 @@ export function createDocumentProcessingService(
     completeDocumentProcessing: createCompleteDocumentProcessing(dependencies),
     recordDocumentExtraction: createRecordDocumentExtraction(dependencies),
     findDocumentExtraction: createFindDocumentExtraction(dependencies),
+    backfillDocumentPages: createBackfillDocumentPages(dependencies),
   };
 }

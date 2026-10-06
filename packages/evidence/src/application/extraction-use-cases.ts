@@ -25,6 +25,7 @@ import {
   DocumentVersionNotFoundError,
   EvidenceRuleError,
 } from "../domain/errors.js";
+import { pagesFromBlocks } from "../domain/document-pages.js";
 import { scanInstructionRisk } from "../domain/instruction-risk.js";
 import type { EvidenceProcessingDependencies } from "./dependencies.js";
 
@@ -163,8 +164,9 @@ export function createRecordDocumentExtraction(
       contentType: "application/json",
     });
 
-    const extraction = await transactions.run((tx) =>
-      repositories.documentExtractions.insert(tx, {
+    const pages = pagesFromBlocks(output.blocks);
+    const extraction = await transactions.run(async (tx) => {
+      const recorded = await repositories.documentExtractions.insert(tx, {
         tenantId,
         ownerOrganisationId: document.ownerOrganisationId,
         documentId: document.id,
@@ -187,8 +189,12 @@ export function createRecordDocumentExtraction(
         visibilityScope: document.visibilityScope,
         sensitivityClass: document.sensitivityClass,
         instructionRiskSignals: risk.signals.length,
-      }),
-    );
+      });
+      // Q room W3: the same text, page by page, in the same transaction,
+      // so every paged extraction has its pages.
+      await repositories.documentExtractions.insertPages(tx, recorded, pages);
+      return recorded;
+    });
 
     return {
       extraction,
@@ -217,4 +223,69 @@ export function createFindDocumentExtraction(
       DocumentVersionIdSchema.parse(query.documentVersionId),
       PipelineVersionSchema.parse(query.pipelineVersion),
     );
+}
+
+export type BackfillDocumentPagesResult = {
+  readonly examined: number;
+  readonly pagesWritten: number;
+  readonly failed: number;
+};
+
+/**
+ * Q room W3: pages for extractions recorded before pages existed. Each is
+ * read back from its private artifact (the same bytes the extraction row
+ * names, checked against its hash), cut into pages, and written beside it.
+ * Bounded, idempotent (pages are written once), and never fatal: one
+ * unreadable artifact is counted and the rest carry on.
+ */
+export function createBackfillDocumentPages(
+  dependencies: EvidenceProcessingDependencies,
+) {
+  const { transactions, repositories } = dependencies;
+  return async (limit = 200): Promise<BackfillDocumentPagesResult> => {
+    const storage = dependencies.storage;
+    if (storage === undefined) {
+      throw new DocumentStorageUnavailableError();
+    }
+    const missing = await repositories.documentExtractions.listWithoutPages(
+      dependencies.sql,
+      Math.max(1, Math.min(limit, 1_000)),
+    );
+    let pagesWritten = 0;
+    let failed = 0;
+    for (const extraction of missing) {
+      try {
+        const stream = await storage.openObjectStream({
+          bucket: extraction.artifactBucket,
+          key: extraction.artifactKey,
+        });
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        for await (const chunk of stream.body) {
+          size += chunk.byteLength;
+          if (size > EXTRACTION_LIMITS.maxArtifactBytes) {
+            throw new EvidenceRuleError("the artifact exceeds its bound");
+          }
+          chunks.push(chunk);
+        }
+        const body = Buffer.concat(chunks);
+        if (
+          createHash("sha256").update(body).digest("hex") !==
+          extraction.artifactSha256
+        ) {
+          throw new EvidenceRuleError("the artifact does not match its hash");
+        }
+        const artifact = ExtractedDocumentSchema.parse(
+          JSON.parse(body.toString("utf8")),
+        );
+        const pages = pagesFromBlocks(artifact.blocks);
+        pagesWritten += await transactions.run((tx) =>
+          repositories.documentExtractions.insertPages(tx, extraction, pages),
+        );
+      } catch {
+        failed += 1;
+      }
+    }
+    return { examined: missing.length, pagesWritten, failed };
+  };
 }

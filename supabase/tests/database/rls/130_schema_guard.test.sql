@@ -145,6 +145,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'document_upload_sessions',  'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_upload_requests',  'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_extractions',      'INTERNAL_SERVER_ONLY', '{}'),
+  -- Q room W3 (R3): page text, read by the API after the data room
+  -- authorised the person; suite 880.
+  ('evidence', 'document_pages',            'INTERNAL_SERVER_ONLY', '{}'),
   ('media',    'media_assets',              'INTERNAL_SERVER_ONLY', '{}'),
   ('media',    'pitch_requests',            'INTERNAL_SERVER_ONLY', '{}'),
   ('media',    'pitch_transcripts',         'INTERNAL_SERVER_ONLY', '{}'),

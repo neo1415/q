@@ -6,6 +6,7 @@ import type {
   NewDocumentExtraction,
 } from "../contracts/extraction.js";
 import type { DocumentVersionId } from "../contracts/index.js";
+import type { DocumentPageText } from "../domain/document-pages.js";
 
 /**
  * Persistence for structured extraction metadata. The blocks themselves live
@@ -32,5 +33,22 @@ export type DocumentExtractionRepository = {
     executor: DatabaseExecutor,
     tenantId: TenantId,
     documentVersionId: DocumentVersionId,
+  ) => Promise<readonly DocumentExtraction[]>;
+  /**
+   * Q room W3: the extraction's pages, written once beside it (immutable;
+   * a page that already exists is left as it is).
+   */
+  readonly insertPages: (
+    tx: TransactionContext,
+    extraction: DocumentExtraction,
+    pages: readonly DocumentPageText[],
+  ) => Promise<number>;
+  /**
+   * Paged extractions (a page or slide count) with no pages yet, oldest
+   * first, bounded: the backfill's work list.
+   */
+  readonly listWithoutPages: (
+    executor: DatabaseExecutor,
+    limit: number,
   ) => Promise<readonly DocumentExtraction[]>;
 };

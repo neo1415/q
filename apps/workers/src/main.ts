@@ -168,6 +168,7 @@ import { withReadinessAfterVerification } from "./verification/readiness-handler
 import { withRelationshipProjection } from "./network/relationship-projection-handler.js";
 import { rebuildRelationshipStatesAtStart } from "./network/relationship-rebuild-at-start.js";
 import { redriveBlockedDocumentsAtStart } from "./documents/redrive.js";
+import { backfillDocumentPagesAtStart } from "./documents/page-backfill.js";
 import { withQWorkWake } from "./network/q-work-wake-handler.js";
 import { withChatMessageEvents } from "./network/chat-message-handler.js";
 import { withInterestNotices } from "./network/interest-notice-handler.js";
@@ -1268,6 +1269,20 @@ void redriveBlockedDocumentsAtStart({
   malwarePolicy: config.documents.malwarePolicy,
   logger,
 });
+
+// Q room W3 (R3): paged documents processed before page text existed get
+// their pages from their private artifacts. Bounded, idempotent, never fatal.
+if (storage !== undefined) {
+  void backfillDocumentPagesAtStart({
+    backfill: createDocumentProcessingService({
+      sql: database.sql,
+      transactions: database.transactions,
+      outbox: createOutboxWriter({ registry }),
+      storage,
+    }).backfillDocumentPages,
+    logger,
+  });
+}
 
 // The loops hold the process resident; they return only after abort, at which
 // point the pool is drained and telemetry flushed before exit.
