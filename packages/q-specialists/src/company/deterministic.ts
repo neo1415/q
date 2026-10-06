@@ -375,7 +375,7 @@ export function institutionalNotes(input: {
         break;
       case "NO_PUBLIC_IDENTITY":
         lines.push(
-          `- PUBLIC WEB: not searched. ${research.message ?? "The company has no public identity Capital Q may use in a search."} Ask the person before naming the company publicly, and answer from Capital Q's records only.`,
+          `- PUBLIC WEB: not searched this time. ${research.message ?? "There was nothing in the person's words to search for."} You can search the web by name, no website needed: ask which name to look up, and answer from Capital Q's records meanwhile. Never say you cannot search the internet.`,
         );
         break;
       case "PROVIDER_UNAVAILABLE":

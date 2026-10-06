@@ -251,11 +251,13 @@ export function composeResearch(
     securityEvents: createPostgresSecurityEventWriter({ sql }),
   });
 
-  // Search and extraction: every configured index in a row (Bright Data
-  // when its zones are named, then Tavily, then SerpApi), so one index
-  // being rate-limited costs a second search rather than the answer; and
-  // a short memory in front, so the same page asked for twice is read
-  // once. Profiles: Bright Data's LinkedIn datasets need only the key.
+  // Search: every configured index at once (Bright Data when its zones
+  // are named, Tavily, SerpApi), each under its own deadline, merged by
+  // canonical URL (web search 2026-10-06: one index alone missed what the
+  // other found), so one being rate-limited costs only its own hits.
+  // Extraction: the first index that reads pages. A short memory in
+  // front, so the same search or page asked for twice is paid once.
+  // Profiles: Bright Data's LinkedIn datasets need only the key.
   const brightData = dependencies.secrets.brightData;
   const indexes = [
     ...(brightData !== undefined &&
@@ -289,7 +291,10 @@ export function composeResearch(
     (indexes.length === 0
       ? undefined
       : createCachedResearchProvider({
-          provider: createFallbackResearchProvider({ providers: indexes }),
+          provider: createFallbackResearchProvider({
+            providers: indexes,
+            parallelSearch: true,
+          }),
         }));
   const profiles =
     brightData === undefined

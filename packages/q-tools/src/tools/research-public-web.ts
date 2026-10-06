@@ -1,14 +1,16 @@
 import { z } from "zod";
 
-import { CompanyIdSchema, isNetworkVisible } from "@capital-q/companies";
+import { CompanyIdSchema } from "@capital-q/companies";
 import { UuidSchema } from "@capital-q/contracts";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
 import { actorPrincipal } from "@capital-q/permissions";
 import {
   COMPARISON_BASES,
   COMPARISON_RELATIONSHIPS,
+  ENTITY_RESOLUTIONS,
   PUBLIC_WEB_FRESHNESS,
   RESEARCH_BOUNDS,
+  SUBJECT_MATCHES,
   TEMPORAL_CLASSES,
   type PublicWebResearchService,
   type ResearchSubject,
@@ -36,15 +38,17 @@ import type { QToolPorts } from "../ports.js";
  * so nothing private in Q's context can travel (§9-§10).
  *
  * Authorisation decides the subject and what of it may leave:
- *   - the owner of a company: its name and website leave only when the
- *     company is network-visible/public or has a declared website; the
+ *   - the owner of a company: its name, declared website and headquarters
+ *     country — the person's own facts, which they may search for by name
+ *     with no website (web search 2026-10-06, ADR 0009 amendment); the
  *     sources are recorded as the company's own Evidence (§13);
  *   - anyone else: only a company disclosure allows as network-visible or
  *     public, and only its network projection identifies it; nothing is
  *     recorded against a company the actor does not own (§14, §29);
  *   - an investor about its own organisation: the public display name.
  * A subject the plan denies, or that does not exist, is "not available" —
- * one wording, never a confirmation (§27).
+ * one wording, never a confirmation (§27). The open web stays reachable:
+ * the same tool without a companyId searches the person's own words.
  *
  * Results are public material of unknown reliability (`truthClass: UNKNOWN`)
  * and untrusted data: a page that instructs is still only a page (§12).
@@ -62,10 +66,26 @@ export const ResearchPublicWebInputSchema = z
       .min(1)
       .max(RESEARCH_BOUNDS.maxQueryChars)
       .describe(
-        "What to look for, in a few public words. Private figures, customer names and identifiers are removed before anything is sent.",
+        "What to look for, in a few search-engine words (the subject as named plus what to find), e.g. 'YC fintech startups 2026'. Private figures, customer names and identifiers are removed before anything is sent.",
+      ),
+    alsoSearch: z
+      .array(z.string().trim().min(1).max(RESEARCH_BOUNDS.maxQueryChars))
+      .max(RESEARCH_BOUNDS.maxPlannedQueries - 1)
+      .optional()
+      .describe(
+        "Up to three other, differently-worded searches for the same request (another angle, a synonym, a list or directory page), e.g. ['Y Combinator fintech batch 2026', 'YC-backed payments startups Africa']. All are searched in parallel.",
+      ),
+    entityName: z
+      .string()
+      .trim()
+      .min(2)
+      .max(120)
+      .optional()
+      .describe(
+        "When looking up one company or person by name, that name exactly as the person said it. Pages are then checked to be about them before anything is attributed.",
       ),
     companyId: UuidSchema.optional().describe(
-      "The company the research is about, when this conversation has one. Omit for a general question.",
+      "The company the research is about, when this conversation has one. Omit for a general question or someone else named by the person (use entityName). If it comes back not available, search again without it.",
     ),
     freshness: z
       .enum(PUBLIC_WEB_FRESHNESS)
@@ -89,7 +109,7 @@ export const ResearchPublicWebInputSchema = z
       .min(1)
       .max(RESEARCH_BOUNDS.maxExtractCount)
       .optional()
-      .describe("How many sources to read in full (default 3, at most 5)."),
+      .describe("How many sources to read in full (default 5, at most 6)."),
     includeDomains: z
       .array(z.string().trim().min(3).max(253))
       .max(RESEARCH_BOUNDS.maxIncludeDomains)
@@ -121,6 +141,8 @@ const SourceSchema = z
     instructionRiskSignals: z.number().int().min(0),
     /** True when this source is now recorded as the company's own evidence. */
     recordedAsEvidence: z.boolean(),
+    /** Whether the page is about the named subject (MATCH/POSSIBLE/NONE); null when nothing was named. */
+    subjectMatch: z.enum(SUBJECT_MATCHES).nullable(),
   })
   .strict();
 
@@ -140,6 +162,18 @@ export const ResearchPublicWebOutputSchema = z
     message: z.string().max(600).nullable(),
     /** The query that actually left Capital Q. Composed from allowed words only. */
     query: z.string().max(RESEARCH_BOUNDS.maxQueryChars).nullable(),
+    /** Every query that left this turn, each composed from allowed words only. */
+    queries: z
+      .array(z.string().max(RESEARCH_BOUNDS.maxQueryChars))
+      .max(RESEARCH_BOUNDS.maxPlannedQueries),
+    /** Whether the pages settle which organisation a name refers to. */
+    entityResolution: z
+      .object({
+        status: z.enum(ENTITY_RESOLUTIONS),
+        /** Sites that each look like a different organisation's own. */
+        candidates: z.array(z.string().max(253)).max(4),
+      })
+      .strict(),
     sources: z.array(SourceSchema).max(RESEARCH_BOUNDS.maxExtractCount),
     /** Capital Q's own deterministic reading of each source against its records. Trusted. */
     comparison: z.array(ComparisonNoteSchema).max(48),
@@ -155,7 +189,7 @@ export const ResearchPublicWebOutputSchema = z
       .nullable(),
     /** Public web material is unverified until Capital Q's evidence rules say otherwise. */
     truthClass: z.literal("UNKNOWN"),
-    guidance: z.string().max(600),
+    guidance: z.string().max(1_200),
   })
   .strict();
 export type ResearchPublicWebOutput = z.infer<
@@ -163,7 +197,13 @@ export type ResearchPublicWebOutput = z.infer<
 >;
 
 const GUIDANCE =
-  "Public sources are unverified and may be stale. Capital Q attaches each source to the answer under Sources, so answer first and name a source (title or site and date) only when the person asks where something came from. Compare with authorised facts: say what corroborates, what conflicts, what only one side mentions, and where dates may explain a difference. Ask the person to clarify a material mismatch instead of resolving it yourself.";
+  "Answer from what these pages say and nothing else: every claim you take from the web must be supported by one of them, and when they do not answer the question, say so plainly rather than filling in. Public sources are unverified and may be stale. Capital Q attaches each source to the answer under Sources, so answer first and name a source (title or site and date) only when asked where something came from. Compare with authorised facts: say what corroborates, what conflicts, and where dates may explain a difference; ask about a material mismatch instead of resolving it yourself.";
+
+/** Said about a name the pages do not settle (web search 2026-10-06). */
+const AMBIGUOUS_GUIDANCE =
+  " AMBIGUOUS NAME: these pages describe more than one organisation of that name (see entityResolution.candidates and each source's subjectMatch). Attribute nothing to them: say what you found for each in a few words and ask the person ONE question to tell which they mean (their website, country or sector).";
+const NOT_FOUND_GUIDANCE =
+  " NAME NOT FOUND: none of these pages is about that name. Say you searched and found nothing about it, never guess; ask for their website or one more detail to search with.";
 
 type Grant = {
   readonly subject: ResearchSubject | null;
@@ -178,7 +218,7 @@ export function createResearchPublicWebTool(
     status: "ACTIVE",
     providerName: "research_public_web",
     description:
-      "Searches the public web once and reads the top public sources (up to 5), returning bounded excerpts with URL, domain, title, publication date, retrieval time and Capital Q's own comparison notes against what it records about the company. Call it when the person asks for public, current or external information, or to check what the public web says about a company, an investor, or their own organisation. Results are unverified public material, never facts; they never change Capital Q records.",
+      "Searches the open web (several indexes, up to four phrasings in parallel) and reads the best public pages (up to 6), returning bounded excerpts with URL, domain, title, publication date and retrieval time, which pages are about a named company or person, and Capital Q's own comparison notes against its records. Call it for anything the person wants looked up or that lives outside Capital Q: markets, competitors, news, accelerator cohorts (e.g. YC companies), funds, a company or person by name with or without a website, or what the web says about them or their own organisation. Results are unverified public material, never facts; they never change Capital Q records.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
@@ -235,12 +275,13 @@ export function createResearchPublicWebTool(
           if (decision.outcome !== "ALLOW") {
             return deny("NOT_AVAILABLE");
           }
-          // A private company with no declared website has no public
-          // identity that may leave; the research proceeds only on the
-          // person's own words, and Q asks before naming it (§9, §27).
-          const identityAuthorised =
-            isNetworkVisible(profile.marketplaceVisibility) ||
-            profile.websiteUrl !== null;
+          // Their own company's name and country are their own facts: a
+          // founder may have Q search for it by name, website or not
+          // (founder report 2026-10-05, Mai Soli: "no website on record,
+          // so there was nothing reliable to search"). Nobody else's
+          // private data is involved; the record's visibility decides who
+          // on Capital Q sees it, not what its own founder may look up.
+          const identityAuthorised = true;
           return allow("PUBLIC", {
             subject: {
               kind: "COMPANY",
@@ -316,7 +357,10 @@ export function createResearchPublicWebTool(
         runId: context.runId,
         correlationId: context.correlationId,
         requestedQuery: input.query,
+        alsoQueries: input.alsoSearch,
+        entityName: input.entityName,
         userText: context.conversation?.latestUserText ?? "",
+        earlierUserText: context.conversation?.earlierUserText,
         subject: grant.subject,
         freshness: input.freshness,
         freshRead: input.freshRead,
@@ -330,6 +374,8 @@ export function createResearchPublicWebTool(
           status: outcome.status,
           message: outcome.message,
           query: null,
+          queries: [],
+          entityResolution: { status: "NOT_APPLICABLE", candidates: [] },
           sources: [],
           comparison: [],
           budget: null,
@@ -341,6 +387,11 @@ export function createResearchPublicWebTool(
         status: "OK",
         message: null,
         query: outcome.query,
+        queries: [...outcome.queries],
+        entityResolution: {
+          status: outcome.entityResolution.status,
+          candidates: [...outcome.entityResolution.candidates],
+        },
         sources: outcome.sources.map((source) => ({
           index: source.index,
           url: source.url,
@@ -355,11 +406,18 @@ export function createResearchPublicWebTool(
           mentionedCountries: [...source.mentionedCountries],
           instructionRiskSignals: source.instructionRisk.length,
           recordedAsEvidence: source.evidenceSourceId !== null,
+          subjectMatch: source.subjectMatch,
         })),
         comparison: outcome.comparison.map((note) => ({ ...note })),
         budget: { ...outcome.budget },
         truthClass: "UNKNOWN",
-        guidance: GUIDANCE,
+        guidance: `${GUIDANCE}${
+          outcome.entityResolution.status === "AMBIGUOUS"
+            ? AMBIGUOUS_GUIDANCE
+            : outcome.entityResolution.status === "NOT_FOUND"
+              ? NOT_FOUND_GUIDANCE
+              : ""
+        }`,
       };
     },
   });

@@ -349,7 +349,9 @@ describe("environment notes with research offered", () => {
     ];
     const notes = environmentNotesFor([], tools, subjects);
     expect(notes.length).toBeLessThanOrEqual(ENVIRONMENT_NOTES_MAX_CHARS);
-    expect(notes).toContain("research_public_web returns");
+    expect(notes).toContain("PUBLIC WEB sources");
+    // However tight the bound, Q is told it can search the web.
+    expect(notes).toContain("never say you cannot");
     const single = environmentNotesFor([], tools, subjects.slice(0, 1));
     expect(single.length).toBeLessThanOrEqual(ENVIRONMENT_NOTES_MAX_CHARS);
     expect(single).toContain(RESEARCH_NOTE);
@@ -411,7 +413,7 @@ describe("answer seam: Q decides to research", () => {
     ]);
     expect(modelCalls(tools.executed)[1]?.proposal.arguments).toEqual({
       query: question,
-      maxSources: 2,
+      maxSources: 4,
     });
     expect(stages).toEqual(["REVIEWING_COMPANY", "SEARCHING_PUBLIC_SOURCES"]);
     // The research result reached the final structured call as a TOOL turn.
@@ -598,6 +600,7 @@ describe("answer seam: public-web research", () => {
     expect(tools.executed).toHaveLength(1);
     expect(modelCalls(tools.executed)[0]?.context.conversation).toEqual({
       latestUserText: "Which markets does the public web say we operate in?",
+      earlierUserText: [],
     });
     expect(stages).toEqual(["SEARCHING_PUBLIC_SOURCES"]);
     const toolTurn = alpha.calls[1]?.request.messages.at(-1);
@@ -835,13 +838,30 @@ describe("gap 1 · prospects: the platform first, then cited public research", (
           final.some((m) => m.content === PROSPECT_RESEARCH_NOTE.content),
           label,
         ).toBe(researched);
-        // On a NEVER turn the model itself never holds the research tool.
+        // On a NEVER turn that asks nothing the model never holds the
+        // research tool; a question to Q (fallback) keeps it in reach.
         if (directive.mode === "NEVER") {
+          const asksSomething = "fallback" in directive && directive.fallback;
           for (const call of run.alpha.calls) {
+            const names = (call.request.tools ?? []).map((t) => t.name);
+            if (asksSomething) {
+              // The answering round (no tools at all) aside.
+              if (names.length > 0) {
+                expect(names, label).toContain("research_public_web");
+              }
+            } else {
+              expect(names, label).not.toContain("research_public_web");
+            }
+          }
+          if (asksSomething) {
             expect(
-              (call.request.tools ?? []).map((t) => t.name),
+              run.alpha.calls.some((call) =>
+                (call.request.tools ?? []).some(
+                  (t) => t.name === "research_public_web",
+                ),
+              ),
               label,
-            ).not.toContain("research_public_web");
+            ).toBe(true);
           }
         }
       }

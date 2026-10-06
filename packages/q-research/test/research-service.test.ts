@@ -145,12 +145,21 @@ describe("public web research service", () => {
     expect(outcome.queryMinimised).toBe(true);
     // Budget: the search and its parallel past-month twin, five distinct
     // results considered, three extracted (as asked), at most two per domain.
+    // Planned queries (the model's, the person's own sentence, the name
+    // with its country), each composed, plus one past-month twin.
     expect(provider.searches.map((s) => s.freshness)).toEqual([
+      "ANY",
+      "ANY",
       "ANY",
       "PAST_MONTH",
     ]);
+    expect(outcome.queries).toHaveLength(3);
+    for (const search of provider.searches) {
+      expect(search.query).not.toContain(PRIVATE_MARKER);
+    }
+    expect(outcome.entityResolution.status).toBe("RESOLVED");
     expect(outcome.budget).toEqual({
-      searchCalls: 2,
+      searchCalls: 4,
       resultsConsidered: 5,
       extractCalls: 1,
       sourcesExtracted: 3,
@@ -291,11 +300,18 @@ describe("public web research service", () => {
       includeDomains: ["nowhere.example"],
     });
     expect(outcome.status).toBe("OK");
-    // The general search and its past-month twin, then the refinement.
-    expect(provider.searches).toHaveLength(3);
-    expect(provider.searches[2]?.query).toBe(
-      "Kibo Health Systems kibohealth.example",
+    // The planned queries and the past-month twin, then one refinement.
+    expect(
+      provider.searches.filter((s) => s.freshness === "PAST_MONTH"),
+    ).toHaveLength(1);
+    expect(provider.searches.at(-1)?.query).toBe(
+      "Kibo Health Systems kibohealth.example Nigeria",
     );
+    expect(
+      provider.searches.filter(
+        (s) => s.query === "Kibo Health Systems kibohealth.example Nigeria",
+      ),
+    ).toHaveLength(1);
   });
 
   it("degrades to a plain outcome when the provider fails, with no vendor detail", async () => {

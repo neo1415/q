@@ -141,3 +141,27 @@ retrieved page text ≠ instruction
   would need an evidence subject or ownership rule the Evidence owner does not have.
 - Voice, recommendations, GateQ, connectors and Tavily Research/Crawl remain outside
   this decision.
+
+## Amendment 2026-10-06 — open-web search (proposed; founder report "Q still says it can't search the internet")
+
+- **Own company by name.** The owner of a company may have Q search for it by its
+  name and headquarters country with no website and whatever its visibility: these
+  are the person's own facts. This supersedes "a private company with no declared
+  website has no public identity that may leave" for the OWNER only; another
+  actor's view of a company is unchanged (network projection only, else not
+  available).
+- **Planned queries.** One research turn plans up to four differently-worded
+  queries (the model's query and `alsoSearch` phrasings, the person's sentence
+  without the asking, the subject's name with its country), each composed by the
+  same egress allowlist. The person's own earlier messages (last three) count as
+  their words.
+- **Parallel indexes.** In q-api every configured index is searched at once, each
+  under its own deadline, merged by canonical URL; extraction falls back in order.
+  At most six pages are read; search calls are capped at six per turn.
+- **Entity resolution.** A named subject (authorised identity, or an `entityName`
+  every word of which the person wrote) is checked against each page
+  (MATCH/POSSIBLE/NONE) and the turn reports RESOLVED, AMBIGUOUS (with candidate
+  sites), NOT_FOUND or NOT_APPLICABLE; Q asks after searching, never instead.
+- **Offer.** Every question to Q keeps the public-web tools in its offer; only a
+  turn that asks nothing loses `research_public_web`. Results stay
+  `truthClass: UNKNOWN`; page text is never instruction.

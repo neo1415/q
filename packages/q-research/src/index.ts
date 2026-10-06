@@ -66,10 +66,19 @@ export {
 export {
   composeEgressQuery,
   containsAny,
+  searchPhrase,
   tokenise,
   type EgressInput,
   type EgressOutcome,
 } from "./domain/egress.js";
+export {
+  ENTITY_RESOLUTIONS,
+  RANKING_VERSION,
+  SUBJECT_MATCHES,
+  type EntityResolution,
+  type EntityResolutionStatus,
+  type SubjectMatch,
+} from "./domain/ranking.js";
 export {
   COUNTRIES,
   countryName,

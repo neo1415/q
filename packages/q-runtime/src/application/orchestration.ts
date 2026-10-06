@@ -405,7 +405,17 @@ export type QToolExecutionContext = {
    * from these words and from authorised public identity — never from a
    * model's argument as given. Absent when a caller has no conversation.
    */
-  readonly conversation?: { readonly latestUserText: string } | undefined;
+  readonly conversation?:
+    | {
+        readonly latestUserText: string;
+        /**
+         * The person's own earlier messages, most recent last (at most a
+         * few): their words too, for a look-up that refers back ("look
+         * her up"). Never Q's words.
+         */
+        readonly earlierUserText?: readonly string[] | undefined;
+      }
+    | undefined;
   /**
    * What this turn is about, from its reading (lead 2026-10-02): the tool
    * offer narrows to the core, these capability areas and these tools.

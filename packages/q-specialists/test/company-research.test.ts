@@ -398,7 +398,10 @@ describe("company intelligence with public-web research", () => {
     });
     const prompt = promptText(h.requests);
     expect(prompt).toContain("PUBLIC WEB: not searched");
-    expect(prompt).toContain("Ask the person before naming the company");
+    expect(prompt).toContain(
+      "You can search the web by name, no website needed",
+    );
+    expect(prompt).toContain("Never say you cannot search the internet");
     expect(prompt).not.toContain("Keep the voices apart");
   });
 

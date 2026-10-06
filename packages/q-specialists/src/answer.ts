@@ -7,7 +7,7 @@ import {
   type QAppActionPrepared,
   type TurnAppAction,
 } from "./app-action-turn.js";
-import { namesWebAddress, toolFocusOf } from "./tool-focus.js";
+import { namesWebAddress, RESEARCH_TOOLS, toolFocusOf } from "./tool-focus.js";
 import {
   readingMisfit,
   SPECULATIVE_READING,
@@ -2070,6 +2070,10 @@ export function createSpecialistQAnswer(
           research: Promise.resolve(speculativeResearch),
           capabilities: manifestOf(capabilities),
           turnKind: SPECULATIVE_READING.kind,
+          // What a plain question's focus is (toolFocusOf): the purpose's
+          // list with the public-web tools leading, so the speculation
+          // holds the web exactly as the turn's own answer would.
+          toolFocus: { areas: [], tools: [...RESEARCH_TOOLS], widen: true },
         },
         answer: (shaped) => delegate.answer(shaped),
         observe: (event) => {

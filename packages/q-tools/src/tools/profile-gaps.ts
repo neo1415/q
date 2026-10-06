@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { COMPANY_EDITABLE_FIELDS } from "@capital-q/contracts";
-import { CompanyIdSchema, isNetworkVisible } from "@capital-q/companies";
+import { CompanyIdSchema } from "@capital-q/companies";
 import type { PublicWebResearchService } from "@capital-q/q-research";
 
 import {
@@ -445,9 +445,9 @@ export function createFillProfileGapsTool(
       }
 
       // First call: search, and remember what was found for this run.
-      const identityAuthorised =
-        isNetworkVisible(profile.marketplaceVisibility) ||
-        profile.websiteUrl !== null;
+      // Their own company (the grant is owner-only): its name may be
+      // searched with or without a website (ADR 0009 amendment, 2026-10-06).
+      const identityAuthorised = true;
       const outcome = await ports.research.research({
         actor: context.actor,
         runId: context.runId,
@@ -484,7 +484,7 @@ export function createFillProfileGapsTool(
           filledFields: filled.map(label),
           line:
             outcome.status === "NO_PUBLIC_IDENTITY"
-              ? `I can't search for your company until I know its public name or website; your open fields (${list(open.map(label))}) stay open.`
+              ? `Tell me the name your company goes by publicly and I'll search for it, no website needed; your open fields (${list(open.map(label))}) stay open until then.`
               : outcome.status === "OK"
                 ? `I searched public sources and found nothing for your open fields (${list(open.map(label))}); they stay open.`
                 : `Public sources couldn't be checked right now; your open fields (${list(open.map(label))}) stay open.`,

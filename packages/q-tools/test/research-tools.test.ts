@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CompanyProfileFacts } from "@capital-q/companies";
 import {
   createPublicWebResearchService,
+  RESEARCH_BOUNDS,
   type ResearchEvidenceRecorder,
 } from "@capital-q/q-research";
 import { createFakeResearchProvider } from "@capital-q/q-research/testing";
@@ -248,7 +249,16 @@ describe("public_web.search", () => {
     expect(sources.every((s) => s.recordedAsEvidence)).toBe(true);
     expect(evidence.sources.every((s) => s.companyId === COMPANY_A)).toBe(true);
     expect(result.data["truthClass"]).toBe("UNKNOWN");
-    expect(provider.searches.length).toBeLessThanOrEqual(2);
+    // Several planned phrasings, bounded; none carries a private word.
+    expect(provider.searches.length).toBeGreaterThanOrEqual(2);
+    expect(provider.searches.length).toBeLessThanOrEqual(
+      RESEARCH_BOUNDS.maxSearchCalls,
+    );
+    for (const sent of result.data["queries"] as string[]) {
+      expect(sent).not.toContain(FOUNDER_MARKER);
+      expect(sent).not.toContain("dangote");
+      expect(sent).not.toContain("2.4m");
+    }
   });
 
   it("reads Nigeria+Ghana+Kenya on the public web against a company that records only its headquarters, as a qualification for the person to settle", async () => {
@@ -290,10 +300,13 @@ describe("public_web.search", () => {
     );
   });
 
-  it("gives an own private company with no declared website no public identity: the name stays home and Q is told to ask", async () => {
+  it("searches the founder's own private company by name with no website (founder report 2026-10-05, Mai Soli), and nothing private leaves", async () => {
     const { port: p, provider, evidence } = harness();
     const outcome = await search(
-      { query: "Alpha Robotics competitors" },
+      {
+        query: `Alpha Robotics ${FOUNDER_MARKER} competitors`,
+        aboutThemselves: true,
+      },
       speaking(
         contextFor(actorA, founderPlan),
         "What does the public web say about us?",
@@ -305,14 +318,17 @@ describe("public_web.search", () => {
       ok: true;
       data: Record<string, unknown>;
     };
-    expect(result.data["status"]).toBe("NO_PUBLIC_IDENTITY");
-    expect(result.data["sources"]).toEqual([]);
-    expect(provider.searches).toHaveLength(0);
-    expect(provider.egressed()).not.toContain("Alpha");
-    expect(evidence.sources).toHaveLength(0);
+    expect(result.data["status"]).toBe("OK");
+    expect(provider.searches.length).toBeGreaterThan(0);
+    expect(provider.egressed().toLowerCase()).toContain("alpha robotics");
+    expect(provider.egressed()).not.toContain(FOUNDER_MARKER);
+    expect(provider.egressed()).not.toContain(MARKERS.founder);
+    expect(provider.egressed()).not.toContain(COMPANY_A);
+    // Read about their own company: its evidence, as with a website.
+    expect(evidence.sources.every((s) => s.companyId === COMPANY_A)).toBe(true);
   });
 
-  it("still researches the person's own public words for a private company, without naming it", async () => {
+  it("still researches the person's own public words for a private company, with one query that is their words alone", async () => {
     const { port: p, provider } = harness();
     const outcome = await search(
       { query: "warehouse robotics market Nigeria" },
@@ -328,7 +344,10 @@ describe("public_web.search", () => {
     };
     expect(result.data["status"]).toBe("OK");
     expect(provider.egressed()).toContain("robotics");
-    expect(provider.egressed()).not.toContain("Alpha");
+    expect(result.data["queries"]).toContain(
+      "warehouse robotics market nigeria",
+    );
+    expect(provider.egressed()).not.toContain(MARKERS.founder);
   });
 
   it("B: an investor about its own organisation sends the public display name and never its private constraints", async () => {
