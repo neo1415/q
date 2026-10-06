@@ -436,3 +436,5 @@ export {
   removeMyEtiquetteGuide,
   saveMyEtiquetteGuide,
 } from "./etiquette.js";
+
+export { exploreRelated, exploreSearch, exploreSlate } from "./explore.js";

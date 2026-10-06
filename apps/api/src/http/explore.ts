@@ -19,7 +19,6 @@ import {
 import {
   EXPLORE_RANKING_VERSION,
   ExploreCursorRejectedError,
-  matchesExploreText,
   normaliseExploreText,
   type ExplorePitch,
   type ExploreService,
@@ -165,18 +164,28 @@ export function registerExploreRoutes(
     DISCOVERY_EXPLORE_SEARCH_PATH,
     { onRequest: withContext },
     async (request, reply) => {
-      const raw = (request.query as { q?: unknown }).q;
-      const text = typeof raw === "string" ? normaliseExploreText(raw) : "";
+      const query = request.query as { q?: unknown; sector?: unknown };
+      const text =
+        typeof query.q === "string" ? normaliseExploreText(query.q) : "";
+      const sectorIds =
+        typeof query.sector === "string" && query.sector.length > 0
+          ? query.sector.split(",").slice(0, 8)
+          : [];
+      if (!sectorIds.every((id) => UuidSchema.safeParse(id).success)) {
+        return badRequest(request, reply);
+      }
       void reply.header("Cache-Control", "no-store");
-      if (text.length === 0) {
+      if (text.length === 0 && sectorIds.length === 0) {
         return ExploreSearchDtoSchema.parse({
           query: "",
           companies: [],
           pitches: [],
         });
       }
-      const pool = await explore.pool(getActorContext(request));
-      const pitches = pool.filter((p) => matchesExploreText(p.company, text));
+      const pitches = await explore.search(getActorContext(request), {
+        text,
+        sectorNodeIds: sectorIds,
+      });
       const companies = new Map<string, ExploreCompanyResultDto>();
       for (const p of pitches) {
         if (companies.has(p.companyId)) continue;

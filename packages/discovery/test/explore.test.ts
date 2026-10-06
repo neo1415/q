@@ -199,6 +199,19 @@ describe("explore diversity pass", () => {
   });
 });
 
+describe("explore is finite", () => {
+  it("For you leaves old exploration to Everything; Everything holds every pitch", () => {
+    const pool = [
+      pitch(1, { postedAt: day(2) }),
+      pitch(2, { sectorNodeIds: [ENERGY], postedAt: day(90) }),
+    ];
+    const forYou = exploreSlate(pool, signals(), NOW);
+    const everything = exploreSlate(pool, signals({ mode: "EVERYTHING" }), NOW);
+    expect(forYou.map((c) => c.item.companyId)).toEqual([id(1)]);
+    expect(everything).toHaveLength(2);
+  });
+});
+
 describe("explore cursor", () => {
   const pool = Array.from({ length: 7 }, (_, n) =>
     pitch(n + 1, { sectorNodeIds: [[HEALTH, ENERGY, PAY][n % 3] ?? HEALTH] }),
@@ -402,10 +415,17 @@ describe("explore pool permission boundary", () => {
 
   it("cross-tenant negative: a hidden company is neither related nor searchable", async () => {
     expect(await service.related(actor, { mediaAssetId: id(1003) })).toBeNull();
-    expect(await service.search(actor, "line")).toHaveLength(1);
+    expect(await service.search(actor, { text: "line" })).toHaveLength(1);
     expect(
-      (await service.search(actor, "line")).map((p) => p.companyId),
+      (await service.search(actor, { text: "line" })).map((p) => p.companyId),
     ).toEqual([id(1)]);
+    // Declared stage and country are searchable, in words.
+    expect(await service.search(actor, { text: "seed nigeria" })).toHaveLength(
+      1,
+    );
+    expect(
+      await service.search(actor, { text: "", sectorNodeIds: [HEALTH] }),
+    ).toHaveLength(1);
   });
 
   it("a failing disclosure read excludes rather than fails open", async () => {

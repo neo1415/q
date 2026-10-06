@@ -100,7 +100,11 @@ export type ExploreService<R extends ExploreNetworkRow> = {
   /** Pitches whose company name or line matches, among what the viewer may see. */
   readonly search: (
     actor: ActorContext,
-    text: string,
+    query: {
+      readonly text: string;
+      /** Declared industry nodes the person picked; any one matches. */
+      readonly sectorNodeIds?: readonly string[] | undefined;
+    },
   ) => Promise<readonly ExplorePitch<R>[]>;
 };
 
@@ -124,6 +128,40 @@ export function matchesExploreText(
     .join(" ")
     .toLowerCase();
   return words.every((word) => haystack.includes(word));
+}
+
+const regionNames = (() => {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" });
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * The declared facts a search may match besides the name and line: the
+ * stage ("pre seed", "series a") and the country (code and English name).
+ * Only what the network view already shows; nothing hidden is searchable.
+ */
+export function declaredWords(
+  facts: Pick<ExploreCompanyFacts, "currentStageCode" | "headquartersCountry">,
+): string[] {
+  const words: string[] = [];
+  if (facts.currentStageCode !== null) {
+    words.push(facts.currentStageCode.replace(/_/g, " "));
+    words.push(facts.currentStageCode.replace(/_/g, "-"));
+  }
+  if (facts.headquartersCountry !== null) {
+    const code = facts.headquartersCountry.toUpperCase();
+    words.push(code);
+    try {
+      const name = regionNames?.of(code);
+      if (name !== undefined) words.push(name);
+    } catch {
+      // An unknown code is just its code.
+    }
+  }
+  return words;
 }
 
 export function createExploreService<R extends ExploreNetworkRow>(
@@ -210,10 +248,22 @@ export function createExploreService<R extends ExploreNetworkRow>(
       if (anchor === undefined) return null;
       return { anchor, items: relatedPitches(anchor, items, query.limit) };
     },
-    search: async (actor, text) => {
-      if (normaliseExploreText(text).length === 0) return [];
+    search: async (actor, query) => {
+      const text = normaliseExploreText(query.text);
+      const sectors = new Set(query.sectorNodeIds ?? []);
+      if (text.length === 0 && sectors.size === 0) return [];
       const items = await pool(actor);
-      return items.filter((item) => matchesExploreText(item.company, text));
+      return items.filter(
+        (item) =>
+          (sectors.size === 0 ||
+            item.sectorNodeIds.some((id) => sectors.has(id))) &&
+          (text.length === 0 ||
+            matchesExploreText(
+              item.company,
+              text,
+              declaredWords(item.company),
+            )),
+      );
     },
   };
 }

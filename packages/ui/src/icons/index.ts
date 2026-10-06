@@ -44,6 +44,7 @@ export {
   Inbox,
   Keyboard,
   Landmark,
+  LayoutDashboard,
   LayoutGrid,
   List,
   ListChecks,

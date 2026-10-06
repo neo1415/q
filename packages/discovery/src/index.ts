@@ -753,6 +753,7 @@ export {
 export {
   EXPLORE_POOL_MAX,
   createExploreService,
+  declaredWords,
   matchesExploreText,
   normaliseExploreText,
   type ExploreCompanyFacts,

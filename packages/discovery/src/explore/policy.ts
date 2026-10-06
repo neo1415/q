@@ -41,6 +41,11 @@ export type ExploreConfig = {
   readonly explorationEvery: number;
   /** A company's pitches beyond this many go to the end of the slate. */
   readonly maxPerCompany: number;
+  /**
+   * For you is finite: exploration older than this waits under Everything,
+   * so the slate ends ("You're up to date") instead of scrolling forever.
+   */
+  readonly explorationDays: number;
 };
 
 export const EXPLORE_CONFIG_V1: ExploreConfig = {
@@ -59,6 +64,7 @@ export const EXPLORE_CONFIG_V1: ExploreConfig = {
   sectorMax: 2,
   explorationEvery: 6,
   maxPerCompany: 2,
+  explorationDays: 30,
 };
 
 /** One eligible pitch, as disclosure already lets this viewer see it. */
@@ -296,7 +302,13 @@ export function exploreSlate<T extends ExplorePoolItem>(
   now: number,
   config: ExploreConfig = EXPLORE_CONFIG_V1,
 ): ExploreCandidate<T>[] {
-  return diversify(exploreCandidates(pool, signals, now, config), config);
+  const candidates = exploreCandidates(pool, signals, now, config).filter(
+    (c) =>
+      signals.mode === "EVERYTHING" ||
+      c.source !== "EXPLORATION" ||
+      ageDays(c.item.postedAt, now) <= config.explorationDays,
+  );
+  return diversify(candidates, config);
 }
 
 // ---------------------------------------------------------------------------
