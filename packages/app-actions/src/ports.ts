@@ -73,7 +73,7 @@ export type AppActionPorts = {
   readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
   /** F4: an investor organisation's GateQ inbox (gateq-intake's inbox service). */
   readonly gateqInbox?: GateqInboxPort | undefined;
-  /** F3: a founder's request to claim or join a canonical company. */
+  /** F3: a claim to own, or a request to join, a canonical company. */
   readonly companyClaims?: CompanyClaimsPort | undefined;
   /** F3: an investor's saved "Find a startup" search. */
   readonly startupAlerts?: StartupAlertsPort | undefined;
