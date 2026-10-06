@@ -402,9 +402,11 @@ export function createDuplexBroker(
           guided,
         }),
         tools: duplexTools(
-          // A guided line answers through ask_q alone: the interview is
-          // the one voice, so no read tool can answer around it.
-          guided ? [] : direct.map((tool) => tool.definition),
+          // Every line answers through ask_q alone (founder 2026-10-06):
+          // with read tools of its own the voice model answered around Q,
+          // so the mandate, the answer cards and page navigation (which
+          // only Q's run holds) never reached the person.
+          [],
           { listening: listens },
         ),
         voice: binding.voice,

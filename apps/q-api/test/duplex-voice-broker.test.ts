@@ -384,12 +384,9 @@ describe("opening a duplex line", () => {
     });
     const mint = h.mints[0];
     expect(mint?.sensitivity).toBe("PUBLIC");
-    // ask_q, set_listening and the read-only tool; never the PREPARE one.
-    expect(mint?.tools.map((t) => t.name)).toEqual([
-      "ask_q",
-      "set_listening",
-      "get_thing",
-    ]);
+    // ask_q and set_listening only: every answer goes through Q (founder
+    // 2026-10-06), never a read tool of the voice model's own.
+    expect(mint?.tools.map((t) => t.name)).toEqual(["ask_q", "set_listening"]);
     expect(mint?.instructions.startsWith(DUPLEX_INSTRUCTIONS_PREFIX)).toBe(
       true,
     );
@@ -869,10 +866,7 @@ describe("listening like a person (BACKCHANNEL)", () => {
     const opened = await h.broker.open({ binding: binding() });
     if (opened.kind !== "DUPLEX") throw new Error("expected a duplex line");
     expect(opened.credential.listening).toBeUndefined();
-    expect(h.mints[0]?.tools.map((t) => t.name)).toEqual([
-      "ask_q",
-      "get_thing",
-    ]);
+    expect(h.mints[0]?.tools.map((t) => t.name)).toEqual(["ask_q"]);
     expect(h.mints[0]?.transcribeInput).toBeUndefined();
     expect(h.mints[0]?.instructions).not.toContain("set_listening");
     // And the tool is not there to call.
