@@ -4,6 +4,7 @@ import type { QResultBlock } from "@capital-q/contracts";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
+  asksAboutQWork,
   CAPABILITY_NOTE_MAX_CHARS,
   capabilityNote,
   DAILY_HERE_LINE,
@@ -392,5 +393,25 @@ describe("navigation and page actions are never cut (founder 2026-10-06)", () =>
     expect(note.replace(NAVIGATION_LINE, "")).not.toMatch(
       /(cannot|can't) (navigate|scroll|open pages)/iu,
     );
+  });
+});
+
+describe("'what are you doing?' opens Work with the cards (founder 2026-10-06)", () => {
+  it.each([
+    "What are you doing?",
+    "what are you working on",
+    "Q, what are u up to right now",
+    "What's Q working on?",
+    "what is waiting for me",
+    "What needs my approval?",
+  ])("reads %s as a question about Q's work", (text) => {
+    expect(asksAboutQWork(text)).toBe(true);
+  });
+  it.each([
+    "What is Nsuo Labs doing in fish trading?",
+    "what are their margins",
+    "Take me to Discover",
+  ])("leaves %s alone", (text) => {
+    expect(asksAboutQWork(text)).toBe(false);
   });
 });

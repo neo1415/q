@@ -331,6 +331,22 @@ export const CAPABILITY_NOTE_MAX_CHARS = 16_000;
 export const NAVIGATION_LINE =
   "- You CAN navigate and work the page: open_page takes them to any Capital Q screen and control_screen scrolls, goes back, shows a section or works the page they are on. Never say you cannot navigate, open pages or scroll; call the tool.";
 
+/**
+ * Founder 2026-10-06: "what are you doing?" answered in prose and no cards
+ * appeared. Code reads the question (never the model): Capital Q opens
+ * their Work page, where the cards waiting for their approval are, and Q
+ * says in a few sentences what it is working on.
+ */
+const Q_WORK_QUESTION =
+  /\bwhat\s+(?:are|r)\s+(?:you|u|q)\s+(?:doing|working\s+on|up\s+to|busy\s+with)\b|\bwhat(?:'s|\s+is)\s+q\s+(?:doing|working\s+on|up\s+to)\b|\bwhat\s+have\s+you\s+been\s+(?:doing|working\s+on)\b|\bwhat(?:'s|\s+is)\s+waiting\s+(?:for|on)\s+me\b|\bwhat\s+needs\s+my\s+approval\b/iu;
+
+export function asksAboutQWork(text: string): boolean {
+  return Q_WORK_QUESTION.test(text.slice(0, 500));
+}
+
+export const Q_WORK_LINE =
+  "THEY ASKED WHAT YOU ARE DOING: Capital Q is opening their Work page with this answer, where every card waiting for their approval is shown to approve or decline. Answer in two or three short sentences from OWN DAY: what you are working on for them now, and how many cards wait for their approval (say they are on the Work page). Never list every card in prose, and never say you cannot show them.";
+
 export function capabilityNote(
   manifest: QCapabilityManifest | undefined,
   offeredTools: readonly {
