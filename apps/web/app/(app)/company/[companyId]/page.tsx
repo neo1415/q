@@ -24,6 +24,7 @@ import {
   type ProfileTab,
 } from "@/features/company/company-profile-view";
 import { apiSession } from "@/features/q/context";
+import { QPageState, QSection } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
 import { ArrowLeft, ICON_SIZE } from "@capital-q/ui/icons";
 
@@ -146,6 +147,34 @@ export default async function CompanyPage({
           scope: "network_visible",
         }}
       />
+      {/* Q room R1: the profile, its open tab and the data room's size. */}
+      <QPageState
+        tab={tab}
+        focus={{ kind: "COMPANY", id: profile.companyId }}
+      />
+      <QSection
+        id="profile"
+        kind="COMPANY_PROFILE"
+        refs={[{ kind: "COMPANY", id: profile.companyId }]}
+        total={1}
+        label={`${profile.canonicalName} profile`}
+      />
+      {dataRoom === null ? null : (
+        <QSection
+          id="data-room"
+          kind="DATA_ROOM"
+          refs={
+            dataRoom.viewer === "OWNER"
+              ? dataRoom.documents.slice(0, 12).map((document) => ({
+                  kind: "UPLOADED_DOCUMENT" as const,
+                  id: document.documentId,
+                }))
+              : []
+          }
+          total={dataRoom.documents.length}
+          label={tab === "dataroom" ? `data room, ${String(dataRoom.documents.length)} files` : undefined}
+        />
+      )}
       <BackToDiscover />
       <CompanyProfileView
         profile={profile}

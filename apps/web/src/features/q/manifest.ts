@@ -1,4 +1,5 @@
 import {
+  QManifestRefSchema,
   QPageManifestSchema,
   Q_MANIFEST_DIALOGS_MAX,
   Q_MANIFEST_DIALOG_REFS_MAX,
@@ -130,12 +131,17 @@ function hidden(id: string): boolean {
 function inViewport(id: string): boolean {
   const element = elementOf(id);
   if (element === null || typeof window === "undefined") return false;
-  const rect = element.getBoundingClientRect();
-  return (
-    rect.bottom > 0 &&
-    rect.top < window.innerHeight &&
-    rect.right > 0 &&
-    rect.left < window.innerWidth
+  // A `display: contents` marker has no box of its own: its children do.
+  const boxes = [element, ...element.children].map((one) =>
+    one.getBoundingClientRect(),
+  );
+  return boxes.some(
+    (rect) =>
+      rect.width + rect.height > 0 &&
+      rect.bottom > 0 &&
+      rect.top < window.innerHeight &&
+      rect.right > 0 &&
+      rect.left < window.innerWidth,
   );
 }
 
@@ -168,6 +174,8 @@ function bounded(refs: readonly QManifestRef[], max: number): QManifestRef[] {
   const seen = new Set<string>();
   const out: QManifestRef[] = [];
   for (const ref of refs) {
+    // One malformed id (a raw URL segment) drops that ref, not the page.
+    if (!QManifestRefSchema.safeParse(ref).success) continue;
     const key = `${ref.kind}:${ref.id.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);

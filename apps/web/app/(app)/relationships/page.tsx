@@ -18,6 +18,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
 import { PageContainer } from "@/components/app-shell/page-container";
+import { QSection } from "@/features/q/q-section";
 import {
   apiSession,
   qApiSession,
@@ -101,16 +102,28 @@ export default async function RelationshipsPage() {
           </Link>
         )}
       </div>
-      <RelationshipsIndex
-        side={side}
-        items={items}
-        unread={unread}
-        digests={digests}
-        notices={needs.notices}
-        reminders={needs.reminders}
-        now={now}
-        fits={fits}
-      />
+      {/* Q room R1: every relationship on this page, by id, for Q. */}
+      <QSection
+        id="relationships"
+        kind="RELATIONSHIP_LIST"
+        refs={(items ?? []).slice(0, 12).map((item) => ({
+          kind: item.counterpart.kind,
+          id: item.counterpart.id,
+        }))}
+        total={items?.length ?? 0}
+        label={`${String(items?.length ?? 0)} relationships`}
+      >
+        <RelationshipsIndex
+          side={side}
+          items={items}
+          unread={unread}
+          digests={digests}
+          notices={needs.notices}
+          reminders={needs.reminders}
+          now={now}
+          fits={fits}
+        />
+      </QSection>
     </PageContainer>
   );
 }

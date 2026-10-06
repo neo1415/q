@@ -41,8 +41,10 @@ export function QSection({
   readonly children?: ReactNode;
 }) {
   useQSection(id, kind, refs, total ?? refs.length, label);
+  // `contents` by default: the marker adds no box, so wrapping a page's
+  // part (or marking an empty one) never changes its layout.
   return (
-    <div data-q-section={id} className={className}>
+    <div data-q-section={id} className={className ?? "contents"}>
       {children}
     </div>
   );
