@@ -219,6 +219,8 @@ function setup(options: { messages?: () => string } = {}) {
     /** The model's readings of their latest line, by meaning. */
     wantsToEnd: (_text: string) => false,
     onlyNoise: (_text: string) => false,
+    /** P5: what the model notes on a shared screen. */
+    screenNote: null as { shows: string; take: string } | null,
   };
   const seen = {
     personaInputs: [] as string[],
@@ -231,6 +233,7 @@ function setup(options: { messages?: () => string } = {}) {
       stance: string;
       camera: boolean;
       presenceNote: string;
+      questioning?: string;
     }[],
     webReads: 0,
     reviewTranscripts: [] as string[],
@@ -352,6 +355,7 @@ function setup(options: { messages?: () => string } = {}) {
         screen: views.screen !== null,
         material: variables.meetingMaterial,
         stance: variables.stance,
+        questioning: variables.questioning,
       });
       if (closeNext) {
         return Promise.resolve({
@@ -382,6 +386,7 @@ function setup(options: { messages?: () => string } = {}) {
         askedToSee: looks.asked(variables.rehearsal),
         wantsToEnd: looks.wantsToEnd(variables.rehearsal),
         onlyNoise: looks.onlyNoise(variables.rehearsal),
+        screenNote: views.screen === null ? null : looks.screenNote,
       });
     },
     review: (_a, variables) => {
@@ -1132,6 +1137,37 @@ describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
     expect(section.length).toBeGreaterThanOrEqual(2);
     expect(section.length).toBeLessThanOrEqual(4);
     expect(section.map((p) => p.observation).join(" ")).toContain("notes");
+  });
+
+  it("P5: notes on a shared screen reach the review as text, never the frame; P3: each turn carries a questioning style", async () => {
+    const { service, store, looks, closeNextTurn, seen } = setup();
+    const rehearsal = await startWith(service);
+    const secret = "SCREENFRAMEBYTES0123456789";
+    looks.screenNote = {
+      shows: "Slide: Market, TAM $40bn",
+      take: "The TAM has no source; add one.",
+    };
+    await service.screen(actor(FOUNDER), rehearsal.id, {
+      mediaType: "image/jpeg",
+      dataBase64: secret,
+    });
+    await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "Here's our market.",
+    });
+    expect(seen.turnInputs.at(-1)?.questioning?.length ?? 0).toBeGreaterThan(
+      40,
+    );
+    closeNextTurn();
+    await service.say(actor(FOUNDER), rehearsal.id, { text: "Thanks." });
+    const finished = await service.finish(actor(FOUNDER), rehearsal.id);
+    if (finished.kind !== "OK") throw new Error(finished.kind);
+    expect(finished.rehearsal.review?.slides).toEqual([
+      {
+        shows: "Slide: Market, TAM $40bn",
+        take: "The TAM has no source; add one.",
+      },
+    ]);
+    expect(JSON.stringify(store.rows)).not.toContain(secret);
   });
 
   it("offers each issue once, never two turns running, and only what difficulty allows", async () => {

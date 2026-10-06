@@ -254,6 +254,32 @@ export function RehearsalReview({
               </ul>
             </section>
           )}
+
+          {(review.slides ?? []).length === 0 ? null : (
+            <section className="flex flex-col gap-3">
+              <h2 className="cq-title-sm text-(--cq-text-primary)">
+                Your screen
+              </h2>
+              <p className="cq-caption text-(--cq-text-tertiary)">
+                What Q saw on the screen you shared, and what to fix. No images
+                were kept.
+              </p>
+              <ul className="flex flex-col gap-3">
+                {(review.slides ?? []).map((item) => (
+                  <li key={item.shows} className="flex flex-col gap-1">
+                    <p className="cq-body-sm text-(--cq-text-primary)">
+                      {item.shows}
+                    </p>
+                    {item.take.length === 0 ? null : (
+                      <p className="cq-body-sm text-(--cq-text-secondary)">
+                        {item.take}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
 

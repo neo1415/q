@@ -77,6 +77,8 @@ export const PROMPT_IDS = [
   "DAILY_Q_TAKE",
   // MEET-HOST block (ADR 0037): Q as a live participant in a booked call.
   "MEETING_HOST_TURN",
+  /** Founder brief P5 2026-10-06: Q's private note on a shared screen. */
+  "MEETING_SCREEN_NOTE",
   /** HARDEN P0 2026-10-02: public sources onto their profile's open fields. */
   "PROFILE_GAP_READER",
   /** HARDEN 2026-10-02 (ADR 0040): one app action's inputs from their words. */
@@ -118,6 +120,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   MEMORY_EXTRACTOR: "memory-extractor",
   MEETING_NOTES: "meeting-notes",
   MEETING_HOST_TURN: "meeting-host-turn",
+  MEETING_SCREEN_NOTE: "meeting-screen-note",
   PROFILE_GAP_READER: "profile-gap-reader",
   APP_ACTION_ARGUMENTS: "app-action-arguments",
   APP_ACTION_ROUTER: "app-action-router",

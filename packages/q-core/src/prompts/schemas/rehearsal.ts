@@ -600,3 +600,37 @@ export const RehearsalTurnV7ResultSchema = RehearsalTurnV6ResultSchema.extend({
   onlyNoise: z.boolean(),
 }).strict();
 export type RehearsalTurnV7Result = z.infer<typeof RehearsalTurnV7ResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v10 prompt (founder brief P3/P5, 2026-10-06): each investor plays to a
+// distinct questioning style composed by code (how they ask, how they
+// follow up, their habits), and a shared screen gets a private coaching
+// note for the person's review: what the slide shows and its gap.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V8_SCHEMA_VERSION = 8;
+
+export const RehearsalTurnV8VariablesSchema =
+  RehearsalTurnV6VariablesSchema.extend({
+    /** Code-composed: how this person questions and follows up. Trusted. */
+    questioning: z.string().max(2_000),
+  }).strict();
+export type RehearsalTurnV8Variables = z.infer<
+  typeof RehearsalTurnV8VariablesSchema
+>;
+
+export const RehearsalScreenNoteSchema = z
+  .object({
+    /** What the shared screen shows, as written on it. */
+    shows: z.string().trim().max(300),
+    /** Q's coaching note for the person's review: a gap, a fix. */
+    take: z.string().trim().max(300),
+  })
+  .strict();
+export type RehearsalScreenNote = z.infer<typeof RehearsalScreenNoteSchema>;
+
+export const RehearsalTurnV8ResultSchema = RehearsalTurnV7ResultSchema.extend({
+  /** Null unless a screen frame was attached and shows something new. */
+  screenNote: RehearsalScreenNoteSchema.nullable(),
+}).strict();
+export type RehearsalTurnV8Result = z.infer<typeof RehearsalTurnV8ResultSchema>;

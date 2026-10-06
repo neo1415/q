@@ -47,6 +47,11 @@ export type HostContext = {
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly parties: readonly HostParty[];
+  /**
+   * P5: Q looks at screens shared in this call (never cameras); said in
+   * the greeting so everyone knows before they share.
+   */
+  readonly seesScreens?: boolean;
 };
 
 export type CallParticipant = {
@@ -276,6 +281,9 @@ export const HOST_LEAVING = "Of course. I'm leaving the call now.";
  */
 export const HOST_INTRO =
   "I'm Q from Capital Q; I'll take notes for both sides and help when asked.";
+/** P5: added to the greeting when Q looks at shared screens. */
+export const HOST_SEES_SCREENS =
+  "I can also see screens you share, for my own notes; never your cameras.";
 
 /** Asked in the call to leave: Q stays, says why, and the ask is recorded. */
 export const HOST_STAYS =
@@ -711,7 +719,10 @@ export function createMeetingHost(
     entry.greeted = true;
     const name =
       entry.party === null ? entry.participant.name : entry.party.name;
-    queue(`Hi ${firstName(name)}, welcome. ${HOST_INTRO}`, "GREET");
+    queue(
+      `Hi ${firstName(name)}, welcome. ${HOST_INTRO}${context.seesScreens === true ? ` ${HOST_SEES_SCREENS}` : ""}`,
+      "GREET",
+    );
   }
 
   function askGuest(entry: Present): void {
