@@ -34,6 +34,9 @@ Team members: until F11 is fixed, `/home` sends a joined member to `/welcome`; o
 | 7 | Portside | Folake Adeyemi | COO (Admin) | adedaniel502+cq-folake-portside@gmail.com |
 | 7 | Portside | Tunde Balogun | Head of Product (Member) | adedaniel502+cq-tunde-portside@gmail.com |
 | 8 | MedTrail | Vikram Chandiramani | Co-founder & CEO (Owner) | adedaniel502+cq-vikram-medtrail@gmail.com |
+| 8 | MedTrail | Ngozi Okeke | Co-founder & CTO (Admin) | adedaniel502+cq-ngozi-medtrail@gmail.com |
+| 8 | MedTrail | Yetunde Fashola | Head of Regulatory Affairs (Member) | adedaniel502+cq-yetunde-medtrail@gmail.com |
+| 8 | MedTrail | Samuel Etim | Field Operations Lead (Member) | adedaniel502+cq-samuel-medtrail@gmail.com |
 | 9 | Baridi | Anjali Shah | Co-founder & CEO (Owner) | adedaniel502+cq-anjali-baridi@gmail.com |
 | 9 | Baridi | Otieno Ouma | Co-founder & COO (Admin) | adedaniel502+cq-otieno-baridi@gmail.com |
 | 9 | Baridi | Akinyi Achieng | Community Lead (Member) | adedaniel502+cq-akinyi-baridi@gmail.com |
@@ -42,3 +45,40 @@ Team members: until F11 is fixed, `/home` sends a joined member to `/welcome`; o
 | 10 | Prumo | Thiago Albuquerque | Chief Revenue Officer (Member) | adedaniel502+cq-thiago-prumo@gmail.com |
 | 10 | Prumo | Camila Rocha | Head of Customer Success (Member) | adedaniel502+cq-camila-prumo@gmail.com |
 | 11 | Ferrolith | Matthias Krüger | Co-founder & CEO (Owner) | adedaniel502+cq-matthias-ferrolith@gmail.com |
+| 11 | Ferrolith | Dr Anna Weber | Co-founder & CTO (Admin) | adedaniel502+cq-anna-ferrolith@gmail.com |
+| 11 | Ferrolith | Lukas Hoffmann | COO (Member) | adedaniel502+cq-lukas-ferrolith@gmail.com |
+| 11 | Ferrolith | Sabine Richter | CFO (Member) | adedaniel502+cq-sabine-ferrolith@gmail.com |
+| 12 | Shiftwell | Megan Holloway | Founder & CEO (Owner) | adedaniel502+cq-megan-shiftwell@gmail.com |
+| 12 | Shiftwell | Marcus Greene | CTO (Admin) | adedaniel502+cq-marcus-shiftwell@gmail.com |
+| 12 | Shiftwell | Danielle Ortiz | VP Customer Operations (Member) | adedaniel502+cq-danielle-shiftwell@gmail.com |
+| 12 | Shiftwell | Brian Kowalski | VP Sales (Member) | adedaniel502+cq-brian-shiftwell@gmail.com |
+| 13 | Halyard Security | Callum Reid | Co-founder & CEO (Owner) | adedaniel502+cq-callum-halyardsecurity@gmail.com |
+| 13 | Halyard Security | Eilidh MacLeod | Co-founder & CTO (Admin) | adedaniel502+cq-eilidh-halyardsecurity@gmail.com |
+| 13 | Halyard Security | Jamie Fraser | Head of Public Sector Partnerships (Member) | adedaniel502+cq-jamie-halyardsecurity@gmail.com |
+| 14 | Hui | Minh Tran | Co-founder & CEO (Owner) | adedaniel502+cq-minh-hui@gmail.com |
+| 14 | Hui | Nguyễn Thu Hà | Co-founder & CTO (Admin) | adedaniel502+cq-nguye-n-hui@gmail.com |
+| 14 | Hui | Lê Quốc Bảo | Head of Partnerships (Member) | adedaniel502+cq-le-hui@gmail.com |
+| 14 | Hui | Phạm Ngọc Lan | Community Lead (Member) | adedaniel502+cq-pha-m-hui@gmail.com |
+| 15 | Cosecha Labs | Santiago Ruiz | Co-founder & CEO (Owner) | adedaniel502+cq-santiago-cosechalabs@gmail.com |
+| 15 | Cosecha Labs | Valeria Castañeda | Co-founder & CTO (Admin) | adedaniel502+cq-valeria-cosechalabs@gmail.com |
+| 15 | Cosecha Labs | Diego Herrera | Field Agronomy Lead (Member) | adedaniel502+cq-diego-cosechalabs@gmail.com |
+| 16 | Mizan | Youssef Kamal | Co-founder & CEO (Owner) | adedaniel502+cq-youssef-mizan@gmail.com |
+| 16 | Mizan | Nour El-Sayed | Co-founder & CTO (Admin) | adedaniel502+cq-nour-mizan@gmail.com |
+| 16 | Mizan | Omar Farouk | Head of Bank Partnerships (Member) | adedaniel502+cq-omar-mizan@gmail.com |
+| 16 | Mizan | Mariam Hassan | Head of Compliance and Shariah Governance (Member) | adedaniel502+cq-mariam-mizan@gmail.com |
+| 17 | Rand Treasury | Elize van der Merwe | Co-founder & CEO (Owner) | adedaniel502+cq-elize-randtreasury@gmail.com |
+| 17 | Rand Treasury | Sipho Ndlovu | Co-founder & CTO (Admin) | adedaniel502+cq-sipho-randtreasury@gmail.com |
+| 17 | Rand Treasury | Ayesha Patel | Head of Treasury Advisory (Member) | adedaniel502+cq-ayesha-randtreasury@gmail.com |
+| 17 | Rand Treasury | Pieter Botha | Head of Sales (Member) | adedaniel502+cq-pieter-randtreasury@gmail.com |
+| 18 | Orphéa Genomics | Camille Laurent | Co-founder & CEO (Owner) | adedaniel502+cq-camille-orpheagenomics@gmail.com |
+| 18 | Orphéa Genomics | Dr Julien Moreau | Co-founder & CTO (Admin) | adedaniel502+cq-julien-orpheagenomics@gmail.com |
+| 18 | Orphéa Genomics | Inès Benali | Head of Clinical Partnerships (Member) | adedaniel502+cq-ine-s-orpheagenomics@gmail.com |
+| 18 | Orphéa Genomics | Thomas Lefebvre | Head of Quality and Regulatory (Member) | adedaniel502+cq-thomas-orpheagenomics@gmail.com |
+| 19 | Akshar | Meera Iyer | Co-founder & CEO (Owner) | adedaniel502+cq-meera-akshar@gmail.com |
+| 19 | Akshar | Karthik Subramanian | Co-founder & CTO (Admin) | adedaniel502+cq-karthik-akshar@gmail.com |
+| 19 | Akshar | Ananya Hegde | Programme Lead, Karnataka (Member) | adedaniel502+cq-ananya-akshar@gmail.com |
+| 19 | Akshar | Rahul Verma | State Partnerships Lead, Madhya Pradesh (Member) | adedaniel502+cq-rahul-akshar@gmail.com |
+| 20 | Railhead Robotics | Kenji Moriyama | Co-founder & CEO (Owner) | adedaniel502+cq-kenji-railheadrobotics@gmail.com |
+| 20 | Railhead Robotics | Sarah Lindqvist | Co-founder & CTO (Admin) | adedaniel502+cq-sarah-railheadrobotics@gmail.com |
+| 20 | Railhead Robotics | Tyrone Washington | VP Field Operations (Member) | adedaniel502+cq-tyrone-railheadrobotics@gmail.com |
+| 20 | Railhead Robotics | Emily Chen | Head of Machine Learning (Member) | adedaniel502+cq-emily-railheadrobotics@gmail.com |

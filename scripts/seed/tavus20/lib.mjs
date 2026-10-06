@@ -85,6 +85,19 @@ async function admin(path, init = {}) {
   });
 }
 
+/** Asset slug: accents dropped ("Orphéa" → "orphea"), titles kept out by callers. */
+export const assetSlug = (s) =>
+  s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+export const personSlug = (name) => assetSlug(name.replace(/^(Dr|Prof)\.?\s+/i, ""));
+
+// Email slug: kept exactly as first used (accents became hyphens, e.g.
+// "ine-s"), because the accounts already exist under those addresses.
 export const slugOf = (s) =>
   s
     .toLowerCase()
@@ -187,7 +200,7 @@ export function saveState(state) {
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + "\n");
 }
 export const assetDir = (c) =>
-  join(ASSETS, `${String(c.n).padStart(2, "0")}-${slugOf(c.company)}`);
+  join(ASSETS, `${String(c.n).padStart(2, "0")}-${assetSlug(c.company)}`);
 /** The final 9:16 cut, found by number (one file name spells "Orphéa" as "orph-a"). */
 export const videoFile = (c) => {
   const nn = String(c.n).padStart(2, "0");

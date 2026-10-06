@@ -15,7 +15,8 @@
         "team": true,
         "pitch": true,
         "visible": true,
-        "documents": true
+        "documents": true,
+        "photos": true
       },
       "team": [
         {
@@ -53,7 +54,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -91,7 +93,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -129,7 +132,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -160,7 +164,10 @@
         "documents": true,
         "q": true,
         "team": true,
-        "pitch": true
+        "pitch": true,
+        "profile": true,
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -181,7 +188,7 @@
       ],
       "pitchId": "fab878ce-3ff6-4139-b358-df5cd5112276",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "15": {
       "company": "Cosecha Labs",
@@ -196,7 +203,10 @@
         "documents": true,
         "q": true,
         "team": true,
-        "pitch": true
+        "pitch": true,
+        "profile": true,
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -212,7 +222,7 @@
       ],
       "pitchId": "929f7a77-e98f-4679-8888-30991b7b7bdf",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "16": {
       "company": "Mizan",
@@ -222,8 +232,191 @@
       "companyId": "d9c03bb4-fa9b-4c55-8924-038d386cc8a8",
       "organisationId": "2e35276c-dc5d-474b-bd83-845809335aca",
       "done": {
-        "onboarding": true
-      }
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Nour El-Sayed",
+          "userId": "540678dd-bd74-45f7-8026-8e6605bf8f1f",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Omar Farouk",
+          "userId": "6e2158b5-845b-418e-a012-4430b114daf2",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Mariam Hassan",
+          "userId": "e39e8751-4ea6-4ee4-98ab-42da2b91bb8e",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "1942d6c9-c712-43e5-8711-1f40a8043a02",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "17": {
+      "company": "Rand Treasury",
+      "founderUserId": "813723c6-7ef9-45d6-aac6-3579e968c508",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "f027f73e-6872-4129-b562-327160fab164",
+      "organisationId": "044c7550-48aa-40d9-ae1d-af323b5a5d5c",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Sipho Ndlovu",
+          "userId": "723e357f-8d3c-423c-b331-9188b4e74948",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ayesha Patel",
+          "userId": "ed90e226-f97d-40c4-becb-99928a1aa766",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Pieter Botha",
+          "userId": "a75be0a6-4736-454e-9b6c-542d3827d22b",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "95e52695-7c27-4079-8a4c-2606c78cd19c",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "18": {
+      "company": "Orphéa Genomics",
+      "founderUserId": "63ff6734-9a86-456e-95ad-c91e2992ec0d",
+      "founderCount": 2,
+      "companyId": "fb7bb485-017f-44d3-9a3b-bdf3b8f9c5f4",
+      "organisationId": "1913eba0-db85-4bfc-b6ac-1b3671f8cbf1",
+      "done": {
+        "onboarding": true,
+        "capital": true,
+        "team": true,
+        "pitch": true,
+        "visible": true,
+        "profile": true,
+        "documents": true,
+        "q": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Dr Julien Moreau",
+          "userId": "9299893f-ee56-4244-8ab8-dade2308c506",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Inès Benali",
+          "userId": "1e8c0092-84f7-4784-afd5-6f0b41a7898a",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Thomas Lefebvre",
+          "userId": "293a00be-67fe-40bd-80de-2636e7a31d8c",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "c508b45b-d78a-4bf1-b222-0aee4c9dd93d",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "19": {
+      "company": "Akshar",
+      "founderUserId": "30f82011-77cb-41c3-ad6e-cb6aaa1ea20f",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "71765150-4f97-4102-89a2-8c38f10334ef",
+      "organisationId": "d47343a3-94bd-4605-8a19-78743bba7a2d",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Karthik Subramanian",
+          "userId": "b25b8d01-0d3c-4f9d-9dbf-941a4fe0b299",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ananya Hegde",
+          "userId": "d3367a64-00d5-4c03-9289-9ce4a373c369",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Rahul Verma",
+          "userId": "2d2ba940-b329-4f4e-a923-b45d21c98af9",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "52e5bca7-acd4-4ea4-8687-c635bdced268",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "20": {
+      "company": "Railhead Robotics",
+      "founderUserId": "7c408104-43fe-4df6-b005-e5fe3092f228",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "c60d5fd1-25fc-4ac4-a446-41e79a0bf3d4",
+      "organisationId": "e23bd388-244a-4a04-8cba-5476f73ff705",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Sarah Lindqvist",
+          "userId": "0a738d69-1138-44f1-88f0-80933cc08566",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Tyrone Washington",
+          "userId": "478b411a-594e-4a89-9e2f-91aeb50b9319",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Emily Chen",
+          "userId": "3cfda160-d90b-4841-b783-2136577d635f",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "782410d9-ccac-4ca6-9ad4-8983f041516f",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     },
     "01": {
       "company": "Ledgerline",
@@ -248,7 +441,8 @@
         "q": true,
         "pitch": true,
         "visible": true,
-        "team": true
+        "team": true,
+        "photos": true
       },
       "team": [
         {
@@ -285,7 +479,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -323,7 +518,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -361,7 +557,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -399,7 +596,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -437,7 +635,8 @@
         "team": true,
         "pitch": true,
         "visible": true,
-        "profile": true
+        "profile": true,
+        "photos": true
       },
       "team": [
         {
@@ -475,7 +674,8 @@
         "team": true,
         "visible": true,
         "pitch": true,
-        "profile": true
+        "profile": true,
+        "photos": true
       },
       "team": [
         {
@@ -508,7 +708,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {
@@ -546,7 +747,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "visible": true
+        "visible": true,
+        "photos": true
       },
       "team": [
         {

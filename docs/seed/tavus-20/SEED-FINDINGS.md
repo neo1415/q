@@ -108,3 +108,9 @@ Found while seeding the 20 fictional companies into production through the real 
 - Effect: Hui (Ho Chi Minh City) and Cosecha Labs (Guadalajara) have no HQ country; readiness requires "where you are based", and Hui's verification was never auto-requested ("Not requested").
 - Fix (web): `apps/web/src/features/profile/profile-fields.ts` offers the short list first, then every ISO 3166-1 alpha-2 country by name (`Intl.DisplayNames`); the API already accepts any code. Test in `apps/web/test/profile-editing.test.tsx`. Setup's own list is unchanged (suggest the same treatment there). Seed set VN/MX via `PATCH /v1/companies/:id` until deployed.
 
+## Final state (16:45 UTC)
+
+All 20 companies: `network_visible` + `marketplace_ready`, both verification claims VERIFIED (auto, synthetic decider), deck PUBLIC + downloadable, 10–11 data-room documents filed by folder and level, pitch READY with audience NETWORK and download on, logo + company cover, founder and team photos, Q personality + guide, team joined with roles. 76 accounts; emails in `LOGINS.md`. `scripts/seed/tavus20/verify.mjs` prints the per-company check.
+
+F14 update: Zino's instruction kept being woken (last fired 16:42); 7 of the 20 seeded companies now have a relationship row, so the wake does reach new companies once Discover's slate includes them. The first run after Ledgerline turned ready did not, which suggests the slate refresh lags the wake.
+

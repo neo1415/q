@@ -326,7 +326,7 @@ export async function stepProfile(page, c) {
   out.push(await ui.uploadImage(page, "Change logo", join(dir, "logo.png")));
   out.push(await ui.uploadImage(page, "Change company cover", join(dir, "cover.png")));
   out.push(await ui.uploadImage(page, "Change cover photo", join(dir, "cover.png")));
-  const face = join(dir, "people", `${lib.slugOf(c.founderPerson.name)}.jpg`);
+  const face = join(dir, "people", `${lib.personSlug(c.founderPerson.name)}.jpg`);
   if (existsSync(face)) out.push(await ui.uploadImage(page, "Change profile photo", face));
   log(c, "profile:", out.join(" | "));
   // F4: no web form for these.
@@ -543,6 +543,9 @@ export async function stepPitch(page, c) {
     if (pitch?.status !== "READY") throw new Error("pitch not ready in time");
   }
   mark(c, { pitchId: pitch.mediaAssetId });
+  // Caption and transcript states keep moving the version just after READY;
+  // give them a moment so the form's first save is not stale.
+  await page.waitForTimeout(20000);
   await page.goto(`${lib.WEB}/pitch/${pitch.mediaAssetId}`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
   const R = page.getByRole("region", { name: "Who sees it" });
@@ -670,7 +673,7 @@ export async function stepTeam(page, c) {
     out.push(await ui.setField(page, "You and your team", "Name", m.name));
     out.push(await ui.setField(page, "You and your team", "Headline", `${m.title}, ${c.company}`));
     await ui.closeRegion(page, "You and your team");
-    const face = join(lib.assetDir(c), "people", `${lib.slugOf(m.name)}.jpg`);
+    const face = join(lib.assetDir(c), "people", `${lib.personSlug(m.name)}.jpg`);
     if (existsSync(face)) out.push(await ui.uploadImage(page, "Change profile photo", face));
     await page.goto(`${lib.WEB}/settings`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(6000);
@@ -717,4 +720,20 @@ export async function stepVisibility(page, c) {
   if (row.v === "network_visible" && row.r === "marketplace_ready") done(c, "visible");
 }
 
-export const STEPS = [stepOnboarding, stepProfile, stepCapital, stepDocuments, stepQ, stepTeam, stepPitch, stepVisibility];
+/** People whose photo an earlier slug missed (accents, "Dr"): add it now. */
+export async function stepPhotos(page, c) {
+  if (isDone(c, "photos")) return;
+  const people = [{ name: c.founderPerson.name }, ...c.team];
+  for (const p of people) {
+    if (lib.slugOf(p.name) === lib.personSlug(p.name)) continue;
+    const face = join(lib.assetDir(c), "people", `${lib.personSlug(p.name)}.jpg`);
+    if (!existsSync(face)) continue;
+    await login(page, lib.emailFor(p.name, c.company), "/profile");
+    await page.goto(`${lib.WEB}/profile`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(7000);
+    log(c, `photo ${p.name}: ${await ui.uploadImage(page, "Change profile photo", face)}`);
+  }
+  done(c, "photos");
+}
+
+export const STEPS = [stepOnboarding, stepProfile, stepCapital, stepDocuments, stepQ, stepTeam, stepPitch, stepPhotos, stepVisibility];
