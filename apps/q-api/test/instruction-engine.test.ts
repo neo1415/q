@@ -189,12 +189,15 @@ function validate(
     now?: Date;
     sent?: Map<string, number>;
     request?: "PREPARE" | "EXECUTE";
+    people?: readonly InstructionPerson[];
+    awaiting?: ReadonlySet<string>;
   } = {},
 ) {
   return validateStep(step, {
     grant: options.grant ?? grant(),
     actions: ACTIONS,
-    people: PEOPLE,
+    people: options.people ?? PEOPLE,
+    ...(options.awaiting === undefined ? {} : { awaiting: options.awaiting }),
     sent: options.sent ?? new Map<string, number>(),
     now: options.now ?? IN_HOURS,
     stepKey: "instr:test:run:0",
@@ -206,6 +209,32 @@ const verdictOf = (result: ReturnType<typeof validate>) =>
   result.verdict === "REFUSED"
     ? `REFUSED:${result.code}`
     : `${result.verdict}${result.code === null ? "" : `:${result.code}`}`;
+
+describe("chat only where it can be sent (live seed, Zino)", () => {
+  const body =
+    "Hello from Zino Aviation. Your pilot results caught our eye; could we compare notes on your roadmap?";
+  it("refuses a message to someone who has not accepted yet, so no card is approved only to fail", () => {
+    const people = PEOPLE.map((person) =>
+      person.relationshipId === REL
+        ? { ...person, state: "INTEREST_EXPRESSED" }
+        : person,
+    );
+    expect(verdictOf(validate(chat(body), { people }))).toBe(
+      "REFUSED:NOT_CONNECTED",
+    );
+  });
+
+  it("holds a new message while a card to the same person still waits for a yes", () => {
+    const held = validate(chat(body), { awaiting: new Set([REL]) });
+    expect(held.verdict).toBe("HOLD");
+    expect(held.verdict === "HOLD" ? held.code : null).toBe("ALREADY_ASKED");
+    // Someone else is not held by it.
+    expect(
+      validate(chat(body, {}, OTHER_REL), { awaiting: new Set([REL]) })
+        .verdict,
+    ).not.toBe("HOLD");
+  });
+});
 
 describe("working hours", () => {
   const hours = grant().workingHours;

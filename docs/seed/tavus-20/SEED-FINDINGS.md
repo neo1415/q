@@ -114,3 +114,19 @@ All 20 companies: `network_visible` + `marketplace_ready`, both verification cla
 
 F14 update: Zino's instruction kept being woken (last fired 16:42); 7 of the 20 seeded companies now have a relationship row, so the wake does reach new companies once Discover's slate includes them. The first run after Ledgerline turned ready did not, which suggests the slate refresh lags the wake.
 
+## P6: Zino's agents on autopilot (17:00–18:00 UTC)
+
+Setup: all 20 founders' Q guides verified via `GET /v1/me/etiquette-guide` (Silo Credit's was missing; re-uploaded in Settings, now present; the seed step now checks the API). Four mandate-fit founders (Ledgerline, Clearwater Assurance, Tensorgate, Shiftwell) accepted Zino Aviation's interest on `/company/interest` (Accept → confirm) at 17:20–17:22; each relationship went `interest_expressed → connection_accepted` (CONNECTED). Each founder then wrote a short first message in the relationship chat. Rand Treasury had no interest from Zino, so Shiftwell (US B2B SaaS, Series A) was used instead.
+
+### F20. Zino's instruction asks him to approve chat messages to companies that never accepted; the approved sends then fail (S1 for autopilot) — FIXED in build/seed-fixes
+- Evidence (read-only SQL, `q_runtime.actions`, proposer Zino): three `app.chat.message.send` actions with approvals APPROVED ended `FAILED / APP_ACTION_REFUSED` (08:12 Nsuo Labs, 12:32 Maji Loop, 13:54 Nsuo Labs). Both relationships are `INTEREST_EXPRESSED`; chat needs a matched state (ADR 0019, `isMatchedRelationshipState`). The founder approved a card that could never be sent.
+- Fix: `validateStep` (`apps/q-api/src/composition/instructions/engine.ts`) refuses a chat step to a relationship whose state is not matched with a new refusal code `NOT_CONNECTED` ("they haven't accepted your interest yet, so chat isn't open / I'll write once they accept"), so the planner replans instead of asking. Test in `apps/q-api/test/instruction-engine.test.ts`.
+
+### F21. Every run stacks another card for the same company (S2) — FIXED in build/seed-fixes
+- Evidence: Zino has 21 `AWAITING_APPROVAL` chat cards from one instruction: Tarmacly 7, Marketlight Grids 7, Souqsheet 6, Maji Loop 4, Nsuo Labs 3, Nixo 3. Each 4-hour (or woken) run proposed a new message while the previous card still waited.
+- Fix: the store reads relationships with a card still waiting (`awaitingAnswer`: ASKED steps whose action is PROPOSED / AWAITING_APPROVAL); `validateStep` HOLDs a new message to them (`ALREADY_ASKED`, "A message to them is already waiting for your yes."). Wired in `apps/q-api/src/main.ts`. Test added. Existing duplicate cards are Zino's to reject; the seed did not touch his account.
+
+### F22. Accepting a connection wakes Zino's instruction, but nothing on his side takes the conversation forward (S2, product gap)
+- Evidence: q-api log `q work woken ... relationshipId=aaa1a9ff… target="instructions" woken=1` (and for the other three) at 17:21–17:22; the instruction ran at 17:22:16 and recorded no steps. Its goal is only "express interest when a company matches my mandate". Zino has no instruction or delegation that replies to founders, follows up or proposes meetings, so the founders' first messages (17:25–17:30) get no answer from his Q. The only "reply to any chat" instruction belongs to another user (f042c12e…).
+- Expected for autopilot: either the interest instruction's grant covers what follows acceptance (introduce, answer, propose a time), or Q offers to extend it when a connection is accepted ("Ledgerline accepted. Shall I reply and propose a call?"). The seed does not create instructions in Zino's (the real founder's) account.
+

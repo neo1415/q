@@ -663,6 +663,23 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
            where idempotency_key = ${idempotencyKey}`
       ).length > 0,
 
+    /**
+     * Relationships where a card this instruction asked about still waits
+     * on the person (proposed or awaiting approval).
+     */
+    awaitingAnswer: async (
+      instructionId: string,
+    ): Promise<ReadonlySet<string>> => {
+      const rows = await sql<{ relationship_id: string }[]>`
+        select distinct t.relationship_id
+          from q_runtime.instruction_steps t
+          join q_runtime.actions a on a.id = t.q_action_id
+         where t.instruction_id = ${instructionId}
+           and t.status = 'ASKED' and t.relationship_id is not null
+           and a.status in ('PROPOSED', 'AWAITING_APPROVAL')`;
+      return new Set(rows.map((row) => row.relationship_id));
+    },
+
     /** Q's sent chat messages per relationship under this instruction. */
     messagesSent: async (
       instructionId: string,
