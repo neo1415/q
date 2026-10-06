@@ -357,6 +357,23 @@ export function openingLine(
     case "RELATIONSHIP_INVESTOR":
     case "INVESTOR_REHEARSAL":
     case "COMPANY_REHEARSAL":
+    case "WORK_ITEM":
+    case "CAPITAL_ROUND":
+    case "GATEQ_APPLICATION":
       return what === null ? "Opening it." : `Opening ${what}.`;
+    case "COMPANY_ELEVATOR":
+      return what === null
+        ? "Opening the elevator pitch."
+        : `Opening ${what}'s elevator pitch.`;
+    case "COMPANY_DATA_ROOM":
+      return what === null
+        ? "Opening the data room."
+        : `Opening ${what}'s data room.`;
+    case "COMPANY_DECK":
+      return what === null
+        ? "Opening the pitch deck."
+        : `Opening ${what}'s pitch deck.`;
+    case "COMPANY_TEAM":
+      return what === null ? "Opening the team." : `Opening ${what}'s team.`;
   }
 }

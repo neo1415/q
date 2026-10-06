@@ -15,6 +15,7 @@ import {
   type GatewayPolicyDto,
 } from "@capital-q/contracts";
 
+import { QPageState, QSection } from "@/features/q/q-section";
 import { PageContainer } from "@/components/app-shell/page-container";
 import { OpenGatewayButton } from "@/features/gateq/gateway-controls";
 import {
@@ -183,7 +184,12 @@ export default async function GateqPage({ searchParams }: Props) {
     gatewayId,
     view,
   ).catch(() => null);
-  const first = inbox?.items[0];
+  // Q room R2: a deep link opens one application (?item=); otherwise the
+  // newest. Only an item this inbox lists for them can be opened.
+  const wanted = one(params["item"]);
+  const first =
+    inbox?.items.find((item) => item.applicationId === wanted) ??
+    inbox?.items[0];
   const detail: GateqInboxDetailDto | null =
     first === undefined
       ? null
@@ -198,6 +204,22 @@ export default async function GateqPage({ searchParams }: Props) {
         action={action}
         unread={inbox?.counts.INBOX}
       >
+        {/* Q room R1: the inbox and the open application, by id, for Q. */}
+        <QSection
+          id="inbox"
+          kind="GATEQ_INBOX"
+          refs={(inbox?.items ?? []).slice(0, 12).map((item) => ({
+            kind: "GATEQ_APPLICATION" as const,
+            id: item.applicationId,
+          }))}
+          total={inbox?.items.length ?? 0}
+          label={`${String(inbox?.items.length ?? 0)} applications`}
+        />
+        {detail === null ? null : (
+          <QPageState
+            focus={{ kind: "GATEQ_APPLICATION", id: detail.item.applicationId }}
+          />
+        )}
         <InboxView
           inbox={inbox}
           state={

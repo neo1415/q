@@ -4,6 +4,7 @@ import type { MediaAsset } from "@capital-q/media";
 import type { ActorContext } from "@capital-q/security";
 
 import { capitalItems } from "./actions/capital-read.js";
+import { gateqItems } from "./actions/gateq-inbox.js";
 import { teamItems } from "./actions/team.js";
 import { sharingOf } from "./actions/pitch.js";
 import type { AppActionPorts } from "./ports.js";
@@ -35,6 +36,8 @@ export const OWN_READ_KINDS = [
   // G1/G2: the people in their company or firm, each one's role, and the
   // invitations waiting (admins), as Settings → Team shows them.
   "team",
+  // Q room: the investor's GateQ inbox, as the inbox lists it.
+  "gateq",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -195,6 +198,8 @@ export async function readOwn(
       return capitalItems(ports, actor);
     case "team":
       return teamItems(ports, actor);
+    case "gateq":
+      return gateqItems(ports, actor);
   }
 }
 
@@ -208,6 +213,7 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   diligence: "Diligence requests and shared documents",
   capital: "Rounds, money raised and commitments",
   team: "Their team: people, roles and invitations",
+  gateq: "Applications in their GateQ inbox",
 };
 
 /** One kind in the "what exists" index: a count and a few titles with state. */

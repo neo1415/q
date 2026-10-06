@@ -10,6 +10,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import { PageSection } from "@/components/app-shell/page-container";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 import { ownRelationships } from "@/features/relationships/relationship-data";
 import { RelationshipList } from "@/features/relationships/relationship-list";
 
@@ -125,6 +126,19 @@ export async function CapitalScreen() {
         </>
       ) : (
         <PageSection id="rounds" title="Your raise">
+          {/* Q room R1: every round on this page, by id, for Q. */}
+          {ledger === null ? null : (
+            <QSection
+              id="rounds"
+              kind="CAPITAL_ROUNDS"
+              refs={ledger.rounds.slice(0, 12).map((round) => ({
+                kind: "CAPITAL_ROUND" as const,
+                id: round.id,
+              }))}
+              total={ledger.rounds.length}
+              label={`${String(ledger.rounds.length)} round${ledger.rounds.length === 1 ? "" : "s"}`}
+            />
+          )}
           {ledger === null ? (
             <QuietEmpty sentence="Your rounds couldn't load." retry />
           ) : (

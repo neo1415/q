@@ -74,6 +74,10 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
       "What documents have they asked for in diligence?",
       "Which diligence requests are still open?",
     ],
+    gateq: [
+      "Who has applied through my GateQ?",
+      "Which GateQ applications haven't I answered yet?",
+    ],
   };
 
 export function parityCases(

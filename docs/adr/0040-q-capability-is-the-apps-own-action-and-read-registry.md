@@ -149,3 +149,5 @@ Read kinds to add to read_my, each where its page already reads:
 - [ ] verification;
 - [ ] notifications;
 - [ ] settings.
+
+Q room W2 (2026-10-06): `read_my` gains `gateq` (the investor's GateQ inbox, through the inbox service's own gateway authority). The other kinds above are already read by a dedicated read tool under the same authorisation, so Q never lacks them: relationships, saved and passed (`list_my_relationships`, the feed decisions), meetings and reminders (`list_schedule`), Q work (`list_q_work`), Q Daily (`get_q_daily`), plan and billing (`get_my_plan`), verification (`read_my_record`), notifications and settings (`set_notification_settings`'s read, Settings by `open_page`). Folding them into `read_my` (and the WHAT EXISTS index) remains open, as does step 2 for relationships, chat send and schedule: Q does all three today through its legacy tools (`propose_express_interest`, `propose_chat_message`, `propose_meeting`), Prepare → Approve, so the gap is the single declaration, not a missing capability.

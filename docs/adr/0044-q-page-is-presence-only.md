@@ -64,3 +64,7 @@ side list ("Shown recently"). Chat keeps the full transcript.
 - Open: whether captions should default on for people who use voice with
   a screen reader or reduced-motion preference. Today they are off for
   everyone, and the live region covers screen readers.
+
+## Amendment (Q room W2, founder clarification 2026-10-06)
+
+A card Q brings into the room with the `show` tool (`SHOW_IN_Q_ROOM`) stays only while the conversation is on its subject, not for `SHOWN_FOR_ANSWERS`. Code decides from the turns (`apps/web/src/features/q/room/room-stage.ts`): a new subject closes it at once with a quiet "Closed … as we moved on"; the subject coming back reopens it; "close it" closes it. Answer cards and other shown objects keep the rule above. A document being read stays while the conversation is on that document (the R3 document work, not this amendment).

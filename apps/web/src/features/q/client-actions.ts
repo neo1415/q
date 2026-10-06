@@ -6,6 +6,7 @@ import {
   type QRecordPage,
   type QSetDiscoverFiltersIntent,
   type QSubjectRef,
+  type QSettingsSection,
 } from "@capital-q/contracts";
 
 import { applyTheme, storeTheme } from "@/features/appearance/theme";
@@ -101,6 +102,41 @@ export function recordPagePath(
     // Discover's "Your companies" tab, on that company's item.
     case "COMPANY_PITCH":
       return `/discover?tab=yours&company=${safe}`;
+    // Q room R2: a company profile's own tabs.
+    case "COMPANY_ELEVATOR":
+      return `/company/${safe}?tab=elevator`;
+    case "COMPANY_DATA_ROOM":
+      return `/company/${safe}?tab=dataroom`;
+    case "COMPANY_DECK":
+      return `/company/${safe}?tab=deck`;
+    case "COMPANY_TEAM":
+      return `/company/${safe}?tab=team`;
+    case "WORK_ITEM":
+      return `/work/${safe}`;
+    case "CAPITAL_ROUND":
+      return `/capital?round=${safe}#round-${safe}`;
+    case "GATEQ_APPLICATION":
+      return `/gateq?item=${safe}`;
+  }
+}
+
+/** Q room R2: a part of Settings, from the fixed route map. */
+export function settingsPath(section: QSettingsSection): string {
+  switch (section) {
+    case "usage":
+    case "memory":
+    case "plan":
+    case "billing":
+    case "team":
+      return `/settings/${section}`;
+    case "account":
+    case "appearance":
+    case "q":
+    case "speaking":
+    case "notifications":
+    case "connections":
+    case "privacy":
+      return `/settings#${section}`;
   }
 }
 
@@ -299,6 +335,13 @@ export function performClientAction(
       return true;
     case "SCREEN_ACT":
       effects.screen(action);
+      return true;
+    case "OPEN_SETTINGS":
+      effects.goTo(settingsPath(action.section));
+      return true;
+    // Q room R4: the Q page's stage shows the card from the answer itself
+    // (it is part of the conversation); nothing moves the person.
+    case "SHOW_IN_Q_ROOM":
       return true;
   }
 }

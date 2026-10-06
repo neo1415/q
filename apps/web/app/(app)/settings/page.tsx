@@ -6,6 +6,7 @@ import {
   getQDailyPreferences,
 } from "@capital-q/api-client";
 
+import { QSection } from "@/features/q/q-section";
 import {
   PageContainer,
   PageHeader,
@@ -113,6 +114,8 @@ export default async function SettingsPage({
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
         <SettingsIndex sections={SECTIONS} />
         <div className="flex max-w-(--cq-layout-reading) min-w-0 flex-col gap-4">
+          {/* Q room R1: Q knows it is on Settings; nothing here is read. */}
+          <QSection id="settings" kind="SETTINGS" label="settings" />
           <SettingsCard id="account" title="Account">
             <SettingRow term="Profile" hint="What investors and founders see">
               <RowLink href="/profile">Edit profile</RowLink>

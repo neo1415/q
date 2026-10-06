@@ -4,6 +4,7 @@ import type {
   QViewingMoment,
 } from "@capital-q/contracts";
 
+import { currentManifest } from "./manifest";
 import { viewingOf, type QMomentSource } from "./q-moment";
 
 /**
@@ -165,7 +166,10 @@ export function currentScreen(
   // What Q's viewers show are documents Q made for them (artifacts): they
   // ride as artifactId, read on the server through read_my_document.
   const open = openDocumentId ?? viewerDocumentId;
-  return open === null ? screen : { ...screen, artifactId: open };
+  if (open !== null) screen = { ...screen, artifactId: open };
+  // Q room R1: the whole page, as ids and closed kinds only.
+  const manifest = currentManifest();
+  return manifest === undefined ? screen : { ...screen, manifest };
 }
 
 const ZONE = /^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/;

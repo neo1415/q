@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { isMatchedRelationshipState } from "@capital-q/contracts";
 
+import { QSection } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
 import { RelationshipConversation } from "@/features/relationships/relationship-conversation";
 import { RelationshipUnavailable } from "@/features/relationships/relationship-detail";
@@ -41,14 +42,23 @@ export default async function InvestorConversationPage({
           scope: "relationship_shared",
         }}
       />
-      <RelationshipConversation
-        side="INVESTOR"
-        counterpart={loaded.counterpart}
-        relationship={loaded.relationship}
-        profile={loaded.profile}
-        thread={loaded.thread}
-        basePath={`/relationships/company/${loaded.companyId}`}
-      />
+      {/* Q room R1: the chat on screen, by its counterpart. */}
+      <QSection
+        id="chat"
+        kind="CHAT"
+        refs={[{ kind: "COMPANY", id: loaded.companyId }]}
+        total={loaded.thread?.messages.length ?? 0}
+        label={`chat with ${loaded.counterpart} open`}
+      >
+        <RelationshipConversation
+          side="INVESTOR"
+          counterpart={loaded.counterpart}
+          relationship={loaded.relationship}
+          profile={loaded.profile}
+          thread={loaded.thread}
+          basePath={`/relationships/company/${loaded.companyId}`}
+        />
+      </QSection>
     </>
   );
 }

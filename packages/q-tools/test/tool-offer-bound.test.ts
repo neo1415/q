@@ -52,6 +52,8 @@ const CORE = [
   // Founder report 2026-09-30: scroll, go back, open a page's dialog.
   "control_screen",
   "set_discover_filters",
+  // Q room R4: a card in the room, asked for mid-anything.
+  "show",
   "approve_pending_proposal",
   "decline_pending_proposal",
   "list_pending_approvals",

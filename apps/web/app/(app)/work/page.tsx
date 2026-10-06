@@ -13,6 +13,7 @@ import {
   listDoneAction,
   listSuggestionsAction,
 } from "@/features/work/work-page-actions";
+import { QSection } from "@/features/q/q-section";
 import { WorkPage } from "@/features/work/work-page";
 import { loadWorkforceAction } from "@/features/work/workforce-actions";
 
@@ -34,14 +35,41 @@ async function WorkLists() {
     listDoneAction().catch(() => null),
     loadWorkforceAction().catch(() => null),
   ]);
+  const items = work?.ok === true ? work.value : [];
+  const waiting = approvals?.ok === true ? approvals.value : null;
   return (
-    <WorkPage
-      suggestions={suggestions?.ok === true ? suggestions.value : null}
-      approvals={approvals?.ok === true ? approvals.value : null}
-      work={work?.ok === true ? work.value : null}
-      done={done?.ok === true ? done.value : null}
-      workforce={workforce}
-    />
+    <>
+      {/* Q room R1: Q's work and what waits for them, by id, for Q. */}
+      <QSection
+        id="work"
+        kind="WORK_LIST"
+        refs={items.slice(0, 12).map((item) => ({
+          kind: "Q_WORK" as const,
+          id: item.id,
+        }))}
+        total={items.length}
+        label={`${String(items.length)} work items`}
+      />
+      {waiting === null ? null : (
+        <QSection
+          id="approvals"
+          kind="APPROVAL_LIST"
+          refs={waiting.slice(0, 12).map((approval) => ({
+            kind: "APPROVAL" as const,
+            id: approval.approvalId,
+          }))}
+          total={waiting.length}
+          label="what needs you"
+        />
+      )}
+      <WorkPage
+        suggestions={suggestions?.ok === true ? suggestions.value : null}
+        approvals={approvals?.ok === true ? approvals.value : null}
+        work={work?.ok === true ? work.value : null}
+        done={done?.ok === true ? done.value : null}
+        workforce={workforce}
+      />
+    </>
   );
 }
 

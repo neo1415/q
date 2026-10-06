@@ -23,6 +23,7 @@ import { DiscoverTabs } from "@/features/discover/discover-tabs";
 import { InvestorFeedScreen } from "@/features/discover/investor-feed-screen";
 import { NetworkVideos } from "@/features/discover/network/network-videos";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Discover" };
 export const dynamic = "force-dynamic";
@@ -172,6 +173,18 @@ export default async function DiscoverPage({
     // The heading is kept for assistive technology and the tab title.
     return (
       <>
+        {/* Q room R1: the whole feed, by id, for Q (the card on screen is
+            the focus, from the feed itself). */}
+        <QSection
+          id="feed"
+          kind="COMPANY_FEED"
+          refs={(slate?.items ?? []).slice(0, 12).map((item) => ({
+            kind: "COMPANY" as const,
+            id: item.companyId,
+          }))}
+          total={slate?.items.length ?? 0}
+          label={`${String(slate?.items.length ?? 0)} companies`}
+        />
         <h1 className="sr-only">Discover</h1>
         <DiscoverTabs
           initialTab={initialTab}
@@ -248,7 +261,19 @@ export default async function DiscoverPage({
           description="Nothing is wrong with your profile. Try again in a moment."
         />
       ) : (
-        <DiscoverInvestors items={slate.items} notes={slate.notes} />
+        <>
+          <QSection
+            id="investors"
+            kind="INVESTOR_LIST"
+            refs={slate.items.slice(0, 12).map((item) => ({
+              kind: "INVESTOR_ORGANISATION" as const,
+              id: item.investorOrganisationId,
+            }))}
+            total={slate.items.length}
+            label={`${String(slate.items.length)} investors`}
+          />
+          <DiscoverInvestors items={slate.items} notes={slate.notes} />
+        </>
       )}
     </PageContainer>
   );

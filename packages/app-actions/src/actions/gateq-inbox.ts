@@ -21,6 +21,7 @@ import {
   GateqPassReasonSchema,
   UuidSchema,
   type GateqInboxDetailDto,
+  type GateqInboxDto,
   type GateqPassReason,
   type QTaskClass,
 } from "@capital-q/contracts";
@@ -35,6 +36,7 @@ import {
   type AppActionRefusal,
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
+import type { OwnReadItem } from "../reads.js";
 
 /**
  * F4 (2026-10-06): the investor's GateQ inbox, declared once (ADR 0040).
@@ -153,6 +155,17 @@ export type GateqInboxPort = {
   ) => Promise<GateqInboxDetailDto | Refused>;
   /** The actor's organisation's active gateway, for Q, which has no screen. */
   readonly ownGatewayId: (actor: ActorContext) => Promise<string | null>;
+  /**
+   * Q room (read_my "gateq"): the inbox as the page lists it, under the
+   * service's own gateway authority. Optional: older compositions lack it.
+   */
+  readonly list?:
+    | ((
+        actor: ActorContext,
+        gatewayId: string,
+        view: "INBOX",
+      ) => Promise<GateqInboxDto | Refused>)
+    | undefined;
   /**
    * An application at that gateway by the company's name as said. One clear
    * match only: several are asked about, none is nothing done.
@@ -953,3 +966,44 @@ export const GATEQ_INBOX_ACTIONS: readonly AnyAppAction[] = [
   DRAFT_PASS,
   SUMMARISE,
 ];
+
+/**
+ * read_my("gateq") (Q room): the applications in the investor's GateQ
+ * inbox, as the inbox lists them, through the inbox service's own gateway
+ * authority. Applicant claims stay claims. Null where there is no inbox
+ * (a founder, or a composition without the read).
+ */
+export async function gateqItems(
+  ports: AppActionPorts,
+  actor: ActorContext,
+): Promise<readonly OwnReadItem[] | null> {
+  const inbox = ports.gateqInbox;
+  if (inbox?.list === undefined) return null;
+  const gatewayId = await inbox.ownGatewayId(actor).catch(() => null);
+  if (gatewayId === null) return null;
+  const listed = await inbox.list(actor, gatewayId, "INBOX").catch(() => null);
+  if (listed === null || "ok" in listed) return null;
+  return listed.items.slice(0, 50).map((item) => ({
+    id: item.applicationId,
+    title: item.companyName,
+    status: [
+      item.folder === "INBOX"
+        ? item.unread
+          ? "unread"
+          : "read"
+        : item.folder.toLowerCase(),
+      item.replyState.toLowerCase().replace(/_/g, " "),
+    ].join("; "),
+    at: item.submittedAt,
+    facts: {
+      oneLiner: item.oneLiner,
+      stage: item.stage,
+      sector: item.sector,
+      country: item.country,
+      fit: item.fit,
+      rulesMet: `${String(item.rules.met)} of ${String(item.rules.total)}`,
+      starred: item.starred,
+      daysLeftToReply: item.daysLeft,
+    },
+  }));
+}

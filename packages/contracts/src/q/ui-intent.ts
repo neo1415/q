@@ -39,6 +39,8 @@ export const Q_UI_INTENT_KINDS = [
   "SIGN_OUT",
   "OPEN_RECORD_PAGE",
   "OPEN_SETUP",
+  "OPEN_SETTINGS",
+  "SHOW_IN_Q_ROOM",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -266,6 +268,16 @@ export const Q_RECORD_PAGES = [
   // one document in a company's data room, by its document id, opened in
   // the viewer where they are; `companyId` names the company.
   "DATA_ROOM_DOCUMENT",
+  // Q room R2: a company profile's own tabs, by deep link.
+  "COMPANY_ELEVATOR",
+  "COMPANY_DATA_ROOM",
+  "COMPANY_DECK",
+  "COMPANY_TEAM",
+  // Q room R2: one of Q's work items (its delegation), one capital round,
+  // one GateQ application in the investor's inbox.
+  "WORK_ITEM",
+  "CAPITAL_ROUND",
+  "GATEQ_APPLICATION",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;
@@ -298,6 +310,72 @@ export const QOpenSetupIntentSchema = z
     journey: z.enum(["founder", "investor"]),
   })
   .strict();
+
+/**
+ * Q room R2: one section of Settings, or one of its own pages, by name
+ * ("open my notification settings"). A closed list; the browser maps it to
+ * its fixed route map.
+ */
+export const Q_SETTINGS_SECTIONS = [
+  "account",
+  "team",
+  "appearance",
+  "q",
+  "speaking",
+  "notifications",
+  "connections",
+  "billing",
+  "privacy",
+  "usage",
+  "memory",
+  "plan",
+] as const;
+export const QSettingsSectionSchema = z.enum(Q_SETTINGS_SECTIONS);
+export type QSettingsSection = z.infer<typeof QSettingsSectionSchema>;
+
+export const QOpenSettingsIntentSchema = z
+  .object({
+    kind: z.literal("OPEN_SETTINGS"),
+    section: QSettingsSectionSchema,
+  })
+  .strict();
+export type QOpenSettingsIntent = z.infer<typeof QOpenSettingsIntentSchema>;
+
+/**
+ * Q room R4: what Q can bring into the room as a card while it talks. The
+ * model picks only the kind and the record id; the card's content is read
+ * by the screen through the page's own reads, as the person, so a card is
+ * never model-authored UI. SOURCES is the public sources this answer read
+ * (no id): news and web results as cards.
+ */
+export const Q_ROOM_OBJECTS = [
+  "COMPANY_PROFILE",
+  "DATA_ROOM",
+  "PITCH_DECK",
+  "CHAT_WITH_COMPANY",
+  "CHAT_WITH_INVESTOR",
+  "WORK_PLAN",
+  "CAPITAL_ROUND",
+  "GATEQ_APPLICATION",
+  "SOURCES",
+] as const;
+export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
+export type QRoomObject = z.infer<typeof QRoomObjectSchema>;
+
+export const QShowInQRoomIntentSchema = z
+  .object({
+    kind: z.literal("SHOW_IN_Q_ROOM"),
+    object: QRoomObjectSchema,
+    /** The record; absent only for SOURCES. */
+    id: UuidSchema.optional(),
+    /**
+     * The record's name as its own service gave it (never the model's
+     * words), so the room can tell when the subject comes back.
+     */
+    title: z.string().trim().min(1).max(120),
+  })
+  .strict();
+export type QShowInQRoomIntent = z.infer<typeof QShowInQRoomIntentSchema>;
 
 /**
  * Discover filters, set by asking ("show me only fintech in Nigeria";
@@ -386,6 +464,8 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QSetVoiceIntentSchema,
   QSignOutIntentSchema,
   QOpenSetupIntentSchema,
+  QOpenSettingsIntentSchema,
+  QShowInQRoomIntentSchema,
 ]);
 export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
 
@@ -404,6 +484,8 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "control_screen",
   "continue_onboarding",
   "set_discover_filters",
+  // Q room R4: a card in the Q room.
+  "show",
 ] as const;
 
 /**
@@ -489,6 +571,8 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QOpenSetupIntentSchema,
   QSetDiscoverFiltersIntentSchema,
   QScreenActIntentSchema,
+  QOpenSettingsIntentSchema,
+  QShowInQRoomIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

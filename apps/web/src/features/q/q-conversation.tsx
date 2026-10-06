@@ -61,6 +61,7 @@ import { QBoardTimeline } from "./q-board-timeline";
 import { useBoardMarks } from "./q-board";
 import { QHistorySheet } from "./q-history-sheet";
 import { QNow } from "./q-now";
+import { QCanSee } from "./q-can-see";
 import { QPresenceStage, showOnStage } from "./q-presence-stage";
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
@@ -739,6 +740,8 @@ export function QConversationPanel({
                   detail={context.label}
                 />
               </div>
+              {/* Q room R1: what Q is looking at, quietly. */}
+              <QCanSee className="max-sm:hidden" />
             </div>
             <div className="flex items-center gap-1">
               {conversing ? (
