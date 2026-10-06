@@ -1,9 +1,5 @@
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
-import {
-  GatewayIdSchema,
-  type GateQService,
-  type GatewayId,
-} from "@capital-q/gateq";
+import { GatewayIdSchema, type GateQService } from "@capital-q/gateq";
 import type { ActorContext } from "@capital-q/security";
 
 import { createPostgresInboxRepository } from "../infrastructure/postgres-inbox.js";
