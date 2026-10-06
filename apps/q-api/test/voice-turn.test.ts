@@ -223,7 +223,18 @@ const event = (type: string, data: Record<string, unknown>): QStreamEvent =>
   }) as unknown as QStreamEvent;
 
 /** The fake model's reading of a reply's kind (DECISION_READER v2, J7). */
-const PLAIN_REPLY = { onlyDecision: true, explicit: true } as const;
+/** A reading's flags, all off: each fake states only what it reads. */
+const READ_DEFAULTS = {
+  onlyDecision: false,
+  explicit: false,
+  pointsAtIt: false,
+  asksSomethingElse: false,
+} as const;
+const PLAIN_REPLY = {
+  ...READ_DEFAULTS,
+  onlyDecision: true,
+  explicit: true,
+} as const;
 function replyKind(utterance: string) {
   const plain: Readonly<Record<string, object>> = {
     "Yes, go ahead.": PLAIN_REPLY,
@@ -584,7 +595,11 @@ describe("a spoken category confirmation", () => {
           Promise.resolve(
             input.question.startsWith("Q suggested categories")
               ? { decision: "YES" as const, remainder: null, ...PLAIN_REPLY }
-              : { decision: "UNRELATED" as const, remainder: null },
+              : {
+                  decision: "UNRELATED" as const,
+                  remainder: null,
+                  ...READ_DEFAULTS,
+                },
           ),
       },
       logger,
@@ -1523,7 +1538,11 @@ describe("a spoken question for Q", () => {
           Promise.resolve(
             input.question.includes("Shall I go ahead")
               ? { decision: "YES" as const, remainder: null, ...PLAIN_REPLY }
-              : { decision: "UNRELATED" as const, remainder: null },
+              : {
+                  decision: "UNRELATED" as const,
+                  remainder: null,
+                  ...READ_DEFAULTS,
+                },
           ),
       },
       logger,
@@ -1611,6 +1630,7 @@ describe("a spoken question for Q", () => {
           return Promise.resolve({
             decision: "YES" as const,
             remainder: "what's the weather like?",
+            ...READ_DEFAULTS,
             explicit: true,
           });
         },
@@ -1704,6 +1724,7 @@ describe("a spoken question for Q", () => {
             Promise.resolve({
               decision,
               remainder: null,
+              ...READ_DEFAULTS,
               ...replyKind(input.utterance),
             }),
         },
@@ -1868,7 +1889,11 @@ describe("a spoken question for Q", () => {
       },
       decisions: {
         read: () =>
-          Promise.resolve({ decision: "UNRELATED" as const, remainder: null }),
+          Promise.resolve({
+            decision: "UNRELATED" as const,
+            remainder: null,
+            ...READ_DEFAULTS,
+          }),
       },
       logger,
     });

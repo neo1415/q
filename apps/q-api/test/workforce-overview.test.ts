@@ -73,7 +73,7 @@ async function seeded() {
     jobId: job.id,
     draftId,
     reviewerRunId: reviewer,
-    grade: { ...grade, score: 62, passed: false },
+    grade: { ...grade, score: 62, passed: false, failedIntegrity: [] },
     threshold: 80,
     maxRedrafts: 2,
     rubricVersion: "rubric/v1",

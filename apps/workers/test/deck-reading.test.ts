@@ -92,7 +92,7 @@ function harness(eligible: boolean) {
     criteria: { clear: false, strong: false, exceptional: false, note: null },
   }));
   const handle = withDeckReadings(
-    () => Promise.resolve({ kind: "ACK" } as MessageOutcome),
+    () => Promise.resolve({ kind: "DONE" } as MessageOutcome),
     {
       registry,
       sql: fake as unknown as DatabaseExecutor,
@@ -144,7 +144,7 @@ describe("deck readings", () => {
 
   it("reads an eligible deck version once, in order, with slides, and stores the twelve", async () => {
     const h = harness(true);
-    expect(await h.handle(ready())).toEqual({ kind: "ACK" });
+    expect(await h.handle(ready())).toEqual({ kind: "DONE" });
     expect(h.asked).toEqual([
       {
         pages: 7,
@@ -165,7 +165,7 @@ describe("deck readings", () => {
 
   it("reads nothing for a document that is not an eligible deck", async () => {
     const h = harness(false);
-    expect(await h.handle(ready())).toEqual({ kind: "ACK" });
+    expect(await h.handle(ready())).toEqual({ kind: "DONE" });
     expect(h.asked).toHaveLength(0);
     expect(h.stored).toHaveLength(0);
   });
