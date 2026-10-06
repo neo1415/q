@@ -70,6 +70,7 @@ import {
   createDocumentProcessingService,
   createPostgresEvidenceRepositories,
   createSupabaseDocumentStorageProvider,
+  createPostgresDataRoom,
 } from "@capital-q/evidence";
 import {
   createFounderDocumentReview,
@@ -130,6 +131,7 @@ import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import {
   budgetForTaskClass,
+  createDeckReader,
   createDiligenceDocumentSummariser,
 } from "@capital-q/model-gateway/q";
 import {
@@ -172,6 +174,7 @@ import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
 import { withCommitmentNotices } from "./network/commitment-notice-handler.js";
 import { newlyReadyCompanyOf } from "./network/newly-ready-company.js";
 import { withDiligenceSummaries } from "./network/diligence-summary-handler.js";
+import { withDeckReadings } from "./evidence/deck-reading-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
@@ -781,6 +784,39 @@ const withDiligenceSummary = (
         },
         logger,
       });
+/**
+ * Overnight A5: Q reads a ready pitch deck into the twelve sections, for
+ * the founder to confirm. Composed only with a model provider.
+ */
+const deckReader =
+  modelProviders.length === 0
+    ? undefined
+    : createDeckReader({ gateway: modelGateway, logger, dataPosture: demoDataPosture });
+const withDeckReading = (
+  inner: Parameters<typeof withDeckReadings>[0],
+): Parameters<typeof withDeckReadings>[0] =>
+  deckReader === undefined
+    ? inner
+    : withDeckReadings(inner, {
+        registry,
+        sql: database.sql,
+        reader: deckReader,
+        store: createPostgresDataRoom(),
+        chunks: {
+          listActiveByVersion: (executor, tenantId, documentVersionId) =>
+            createPostgresChunkRepository().listActiveByVersion(
+              executor,
+              tenantId as never,
+              documentVersionId as never,
+            ),
+        },
+        logger,
+      });
+/** Diligence summaries and deck readings both wait on a read document. */
+const withDocumentReadings = (
+  inner: Parameters<typeof withDeckReadings>[0],
+): Parameters<typeof withDeckReadings>[0] =>
+  withDiligenceSummary(withDeckReading(inner));
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
@@ -793,7 +829,7 @@ const documentEvents = createQueueRunner({
       withQWorkWake(
         withCommitmentNotices(
           withOutcomeNotices(
-            withDiligenceSummary(
+            withDocumentReadings(
               withInterestNotices(
                 withReadinessAfterVerification(
                   withVerificationDecisions(
