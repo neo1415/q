@@ -648,9 +648,13 @@ export function createContextFirewall(
     // 3. Subjects, each on its own. One that does not resolve for this
     // actor ends the request: a request about something the actor may not
     // reach gets no plan, and no partial plan can be used to pivot.
+    // Resolved side by side (latency2), judged in request order: the first
+    // subject that does not resolve still decides the denial.
+    const resolutions = await Promise.all(
+      request.subjects.map((ref) => resolveSubject(resolution, actor, ref)),
+    );
     const subjects: ResolvedSubject[] = [];
-    for (const ref of request.subjects) {
-      const resolved = await resolveSubject(resolution, actor, ref);
+    for (const resolved of resolutions) {
       if (!resolved.ok) {
         return { outcome: "DENIED", reason: resolved.reason, denied: [] };
       }
@@ -669,8 +673,12 @@ export function createContextFirewall(
     // 5. Candidates: what this task may need at most.
     const candidates: Candidate[] = [];
     const denied: QDeniedScope[] = [];
-    for (const subject of subjects) {
-      const built = await candidatesFor(actor, request.capability, subject);
+    const builds = await Promise.all(
+      subjects.map((subject) =>
+        candidatesFor(actor, request.capability, subject),
+      ),
+    );
+    for (const built of builds) {
       candidates.push(...built.candidates);
       denied.push(...built.denied);
     }

@@ -101,6 +101,22 @@ import { MANDATE_LABELS } from "./mandate-labels.js";
 
 export type QIntelligenceDependencies = {
   readonly sql: DatabaseExecutor;
+  /**
+   * Voice speculation (latency2): a spoken question's answer starts beside
+   * the turn reader. `observe` hears whether each was adopted or cancelled
+   * (the voice turn timing). Absent: no turn is speculated.
+   */
+  readonly speculation?:
+    | {
+        readonly observe?:
+          | ((event: {
+              readonly outcome: "ADOPTED" | "CANCELLED";
+              readonly reason: string | null;
+              readonly decidedAfterMs: number;
+            }) => void)
+          | undefined;
+      }
+    | undefined;
   readonly transactions: TransactionManager;
   readonly repositories: QRuntimeRepositories;
   /** The Safe Read tools, already composed. Canonical state is read through them. */
@@ -389,6 +405,14 @@ export function composeQIntelligence(
   const answer = createSpecialistQAnswer({
     specialist,
     delegate: conversational,
+    ...(dependencies.speculation === undefined
+      ? {}
+      : {
+          speculation: {
+            spoken: true,
+            observe: dependencies.speculation.observe,
+          },
+        }),
     ...(dependencies.pendingDecisions === undefined
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),

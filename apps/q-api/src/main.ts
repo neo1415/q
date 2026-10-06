@@ -3105,6 +3105,9 @@ const qReceipts: QReceiptPort = {
   },
 };
 const qIntelligence = composeQIntelligence({
+  // Voice speculation (latency2): each spoken answer's adoption or
+  // cancellation lands on its "voice turn timed" line and the metric.
+  speculation: { observe: (event) => voiceTimings.speculated(event) },
   // ADR 0040 (HARDEN's WHAT EXISTS fact): per kind of their own records, a
   // count and up to three titles, from the read registry, every turn.
   ownIndex: async ({ actor }) => ({
