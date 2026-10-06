@@ -329,15 +329,15 @@ export function QResultBlocks({
                       Open the company
                     </Link>
                     {onAsk === undefined ? null : (
-                    <button
-                      type="button"
-                      className={buttonClassName("quiet", "compact")}
-                      onClick={() => {
-                        onAsk("Tell me more about that company.");
-                      }}
-                    >
-                      Ask Q about it
-                    </button>
+                      <button
+                        type="button"
+                        className={buttonClassName("quiet", "compact")}
+                        onClick={() => {
+                          onAsk("Tell me more about that company.");
+                        }}
+                      >
+                        Ask Q about it
+                      </button>
                     )}
                   </>
                 }

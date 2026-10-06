@@ -126,7 +126,10 @@ export function createMaterialDocumentReads(dependencies: {
       actor: ActorContext,
       companyId: string,
       documentId: string,
-    ): Promise<{ readonly text: string; readonly truncated: boolean } | null> => {
+    ): Promise<{
+      readonly text: string;
+      readonly truncated: boolean;
+    } | null> => {
       const room = await view(actor, companyId);
       if (room === null) return null;
       const id = documentId.toLowerCase();

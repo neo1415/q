@@ -71,14 +71,21 @@ const material: ProfileMaterialPort = {
     reads.push(documentId);
     return Promise.resolve(
       documentId === CERT
-        ? { text: "This is to certify that Halyard Security Ltd is incorporated.", truncated: false }
+        ? {
+            text: "This is to certify that Halyard Security Ltd is incorporated.",
+            truncated: false,
+          }
         : null,
     );
   },
 };
 
 const plan = planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
-  { kind: "COMPANY_PROFILE", companyId: COMPANY_B_NETWORK, sensitivity: "CONFIDENTIAL" },
+  {
+    kind: "COMPANY_PROFILE",
+    companyId: COMPANY_B_NETWORK,
+    sensitivity: "CONFIDENTIAL",
+  },
 ]);
 
 describe("finding a company's document by meaning", () => {
@@ -110,7 +117,10 @@ describe("open_company_document", () => {
 
   it("opens the one it means with a UI intent naming the company", async () => {
     const decision = await tool.authorize(
-      { company: "Beacon Analytics", document: "Beacon's incorporation document" },
+      {
+        company: "Beacon Analytics",
+        document: "Beacon's incorporation document",
+      },
       contextFor(actorA, plan),
     );
     expect(decision.outcome).toBe("ALLOW");
@@ -140,7 +150,11 @@ describe("open_company_document", () => {
 
   it("is refused for a company the plan does not admit", async () => {
     const other = planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
-      { kind: "COMPANY_PROFILE", companyId: COMPANY_A, sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        companyId: COMPANY_A,
+        sensitivity: "CONFIDENTIAL",
+      },
     ]);
     const decision = await tool.authorize(
       { companyId: COMPANY_B_NETWORK, document: "incorporation" },
@@ -155,7 +169,10 @@ describe("read_company_document", () => {
 
   it("reads the text of a document they may open, as the company's own material", async () => {
     const decision = await tool.authorize(
-      { companyId: COMPANY_B_NETWORK, document: "certificate of incorporation" },
+      {
+        companyId: COMPANY_B_NETWORK,
+        document: "certificate of incorporation",
+      },
       contextFor(actorA, plan),
     );
     expect(decision.outcome).toBe("ALLOW");

@@ -43,7 +43,11 @@ function reads(view: DataRoomView | null) {
   const fake = (_strings: TemplateStringsArray, ...values: unknown[]) => {
     asked.push(values);
     return Promise.resolve([
-      { id: CERT, document_type: "CERTIFICATE_OF_INCORPORATION", text: "This is to certify" },
+      {
+        id: CERT,
+        document_type: "CERTIFICATE_OF_INCORPORATION",
+        text: "This is to certify",
+      },
       { id: TAX, document_type: "TAX", text: "Secret tax words" },
     ]);
   };

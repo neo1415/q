@@ -69,7 +69,10 @@ export type ProfileMaterialPort = {
         actor: ActorContext,
         companyId: string,
         documentId: string,
-      ) => Promise<{ readonly text: string; readonly truncated: boolean } | null>)
+      ) => Promise<{
+        readonly text: string;
+        readonly truncated: boolean;
+      } | null>)
     | undefined;
 };
 

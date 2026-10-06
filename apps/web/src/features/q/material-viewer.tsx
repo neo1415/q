@@ -33,13 +33,20 @@ type Opened = QMaterialDocumentRef & {
  * of what is on screen while it is open, and closes when they say so, the
  * conversation moves on, or they leave the page.
  */
-export function QMaterialViewer({ turns }: { readonly turns: readonly QTurn[] }) {
+export function QMaterialViewer({
+  turns,
+}: {
+  readonly turns: readonly QTurn[];
+}) {
   const pathname = usePathname();
   const [opened, setOpened] = useState<Opened | null>(null);
+  // Where the conversation and the page were, read when an open arrives.
   const turnCount = useRef(turns.length);
-  turnCount.current = turns.length;
   const pathRef = useRef(pathname);
-  pathRef.current = pathname;
+  useEffect(() => {
+    turnCount.current = turns.length;
+    pathRef.current = pathname;
+  }, [turns.length, pathname]);
 
   useEffect(() => {
     const onOpen = (event: Event) => {
@@ -87,9 +94,8 @@ export function QMaterialViewer({ turns }: { readonly turns: readonly QTurn[] })
     opened !== null &&
     (pathname !== opened.path ||
       materialShouldClose(turns.slice(opened.at), opened.documentId));
-  useEffect(() => {
-    if (shouldClose) setOpened(null);
-  }, [shouldClose]);
+  // Adjusted while rendering, as React advises for state derived from props.
+  if (shouldClose) setOpened(null);
 
   return (
     <FileViewer

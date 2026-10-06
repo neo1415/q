@@ -84,7 +84,15 @@ const MEANINGS: readonly (readonly string[])[] = [
   ],
   ["cap", "captable", "shareholders", "shareholding", "equity", "ownership"],
   ["tax", "vat", "hmrc", "firs", "tin", "assurance"],
-  ["ip", "intellectual", "property", "patent", "trademark", "assignment", "deeds"],
+  [
+    "ip",
+    "intellectual",
+    "property",
+    "patent",
+    "trademark",
+    "assignment",
+    "deeds",
+  ],
   ["contract", "agreement", "customer", "msa", "order"],
   ["compliance", "security", "toolkit", "dspt", "iso", "soc", "gdpr", "policy"],
   ["team", "founder", "founders", "cv", "resume", "bios"],
@@ -310,7 +318,11 @@ async function resolve(
       ? { status: "NONE", candidates: [], say: NONE_LINE }
       : readable(found)
         ? { kind: "ONE", companyId: company.id, document: found }
-        : { status: "ON_REQUEST", candidates: [candidate(found)], say: ON_REQUEST_LINE };
+        : {
+            status: "ON_REQUEST",
+            candidates: [candidate(found)],
+            say: ON_REQUEST_LINE,
+          };
   }
   if (input.document === undefined) return null;
   // The company's own name in the request is not a clue to the document.
@@ -454,10 +466,7 @@ export function createReadCompanyDocumentTool(
         )
         .catch(() => null);
       if (read === null) {
-        return deny(
-          "NOT_AVAILABLE",
-          "That document has no readable text yet.",
-        );
+        return deny("NOT_AVAILABLE", "That document has no readable text yet.");
       }
       return allow<ReadOutput>("CONFIDENTIAL", {
         status: "READ",

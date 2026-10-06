@@ -117,7 +117,11 @@ export function subjectPagePath(subject: QSubjectRef): string | null {
       return recordPagePath("INVESTOR", subject.investorOrganisationId);
     case "DOCUMENT":
       return recordPagePath("DOCUMENT", subject.documentId);
-    default:
+    // No page of their own a card can open by this id alone.
+    case "RELATIONSHIP":
+    case "CAPITAL_OBJECTIVE":
+    case "USER":
+    case "ORGANISATION":
       return null;
   }
 }

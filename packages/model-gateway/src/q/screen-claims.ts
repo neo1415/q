@@ -13,7 +13,8 @@
  * alone.
  */
 
-export const NOT_ON_SCREEN_LINE = "I haven't been able to open that on your screen.";
+export const NOT_ON_SCREEN_LINE =
+  "I haven't been able to open that on your screen.";
 
 const CLAIMS: readonly RegExp[] = [
   // "…has appeared on your screen", "it's on your screen now"
