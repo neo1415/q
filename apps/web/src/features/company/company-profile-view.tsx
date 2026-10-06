@@ -91,8 +91,16 @@ const RELATIONSHIP_LABELS: Readonly<
 
 /** "Founder · CEO", "Advisor": declared words, never a badge. */
 export function teamRoleLine(member: CompanyProfileTeamMember): string {
+  // "Founder · Co-founder & CEO" said it twice: the title wins when it
+  // already names the founder.
+  const titled =
+    member.businessTitle !== null && /founder/i.test(member.businessTitle);
   return [
-    member.isFounder ? "Founder" : RELATIONSHIP_LABELS[member.relationshipType],
+    titled
+      ? null
+      : member.isFounder
+        ? "Founder"
+        : RELATIONSHIP_LABELS[member.relationshipType],
     member.businessTitle,
   ]
     .filter((part): part is string => part !== null && part !== "")

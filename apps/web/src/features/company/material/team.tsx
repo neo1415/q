@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 
 import type {
   CompanyProfileTeamMember,
@@ -16,6 +19,7 @@ import {
   UserRound,
 } from "@capital-q/ui/icons";
 import { buttonClassName } from "@capital-q/ui/button";
+import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { EntityAvatar } from "../../entity/entity-avatar";
 
@@ -36,6 +40,20 @@ const RELATIONSHIP_WORDS: Readonly<
   other: "Other",
 };
 
+/**
+ * A member's role in one line. The founder flag and the declared title
+ * often say the same thing ("Co-founder & CEO"), so the founder word is
+ * added only when the title does not already carry it.
+ */
+export function memberRole(member: CompanyProfileTeamMember): string {
+  const title = member.businessTitle?.trim() ?? "";
+  if (member.isFounder) {
+    if (title === "") return "Co-founder";
+    return /founder/i.test(title) ? title : `Co-founder · ${title}`;
+  }
+  return title === "" ? RELATIONSHIP_WORDS[member.relationshipType] : title;
+}
+
 export function TeamTab({
   companyId,
   team,
@@ -45,8 +63,18 @@ export function TeamTab({
   readonly team: readonly CompanyProfileTeamMember[];
   readonly fromDeck: readonly DeckFact[];
 }) {
-  const founders = team.filter((member) => member.isFounder);
-  const others = team.filter((member) => !member.isFounder);
+  const [open, setOpen] = useState<number | null>(null);
+  // Founders first, in the server's order: a founder's page is addressed
+  // by that position, so the position is kept beside each member.
+  const people = [
+    ...team
+      .filter((member) => member.isFounder)
+      .map((member, index) => ({ member, founderIndex: index + 1 })),
+    ...team
+      .filter((member) => !member.isFounder)
+      .map((member) => ({ member, founderIndex: null })),
+  ];
+  const chosen = open === null ? undefined : people[open];
   if (team.length === 0 && fromDeck.length === 0) {
     return (
       <p className="cq-body py-6 text-(--cq-text-secondary)" data-team="empty">
@@ -56,33 +84,41 @@ export function TeamTab({
   }
   return (
     <div className="flex flex-col gap-8" data-team="full">
-      {founders.length === 0 ? null : (
-        <section
-          className="flex flex-col gap-2"
-          aria-labelledby="founders-title"
-        >
-          <h2
-            id="founders-title"
-            className="cq-title-sm text-(--cq-text-primary)"
-          >
-            Founders
-          </h2>
-          <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
-            {founders.map((member, index) => (
-              <li key={`${member.name}-${String(index)}`}>
-                <Link
-                  href={`/company/${encodeURIComponent(companyId)}/founder/${String(index + 1)}`}
-                  className="flex items-start gap-4 py-4 hover:bg-(--cq-surface-subtle)"
+      {people.length === 0 ? null : (
+        <section className="flex flex-col gap-2" aria-labelledby="team-title">
+          <div className="flex items-baseline justify-between">
+            <h2
+              id="team-title"
+              className="cq-title-sm text-(--cq-text-primary)"
+            >
+              Team
+            </h2>
+            <span className="cq-caption text-(--cq-text-secondary)">
+              {people.length} {people.length === 1 ? "person" : "people"}
+            </span>
+          </div>
+          <ul className="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+            {people.map(({ member }, index) => (
+              <li
+                key={`${member.name}-${String(index)}`}
+                className="border-b border-(--cq-border-subtle)"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(index);
+                  }}
+                  className="flex min-h-11 w-full items-start gap-3 rounded-md py-4 text-left hover:bg-(--cq-surface-subtle)"
+                  data-team-member
                 >
+                  {/* A person's photo is theirs alone today: initials. */}
                   <EntityAvatar kind="person" name={member.name} decorative />
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="cq-title-sm text-(--cq-text-primary)">
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="cq-body font-medium text-(--cq-text-primary)">
                       {member.name}
                     </span>
                     <span className="cq-body-sm text-(--cq-text-secondary)">
-                      {["Co-founder", member.businessTitle]
-                        .filter(Boolean)
-                        .join(" and ")}
+                      {memberRole(member)}
                     </span>
                     {member.shortBio === null ? null : (
                       <span className="cq-body-sm line-clamp-2 text-(--cq-text-primary)">
@@ -93,48 +129,56 @@ export function TeamTab({
                   <ChevronRight
                     size={ICON_SIZE.regular}
                     aria-hidden="true"
-                    className="mt-3 text-(--cq-text-tertiary)"
+                    className="mt-2 flex-none text-(--cq-text-tertiary)"
                   />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <SheetRoot
+        open={chosen !== undefined}
+        onOpenChange={(next) => {
+          if (!next) setOpen(null);
+        }}
+      >
+        {chosen === undefined ? null : (
+          <SheetContent side="side" title={chosen.member.name}>
+            <div className="flex flex-col gap-4" data-team-member-sheet>
+              <div className="flex items-center gap-3">
+                <EntityAvatar
+                  kind="person"
+                  name={chosen.member.name}
+                  size="lg"
+                  decorative
+                />
+                <p className="cq-body text-(--cq-text-secondary)">
+                  {memberRole(chosen.member)}
+                </p>
+              </div>
+              {chosen.member.shortBio === null ? (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  No bio shared yet.
+                </p>
+              ) : (
+                <p className="cq-body text-(--cq-text-primary)">
+                  {chosen.member.shortBio}
+                </p>
+              )}
+              {chosen.founderIndex === null ? null : (
+                <Link
+                  href={`/company/${encodeURIComponent(companyId)}/founder/${String(chosen.founderIndex)}`}
+                  className={buttonClassName("secondary", "regular")}
+                >
+                  Open full profile
+                  <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
                 </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {others.length === 0 ? null : (
-        <section className="flex flex-col gap-3" aria-labelledby="team-title">
-          <div className="flex items-baseline justify-between">
-            <h2
-              id="team-title"
-              className="cq-title-sm text-(--cq-text-primary)"
-            >
-              Team
-            </h2>
-            <span className="cq-caption text-(--cq-text-secondary)">
-              {team.length} people
-            </span>
-          </div>
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {others.map((member, index) => (
-              <li
-                key={`${member.name}-${String(index)}`}
-                className="flex items-center gap-3"
-              >
-                <EntityAvatar kind="person" name={member.name} decorative />
-                <span className="flex min-w-0 flex-col">
-                  <span className="cq-body-sm text-(--cq-text-primary)">
-                    {member.name}
-                  </span>
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {member.businessTitle ??
-                      RELATIONSHIP_WORDS[member.relationshipType]}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+              )}
+            </div>
+          </SheetContent>
+        )}
+      </SheetRoot>
       {fromDeck.length === 0 ? null : (
         <section
           className="flex flex-col gap-2"
