@@ -156,6 +156,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "tool.read_my_record",
   ),
 
+  // E: Explore browses the same eligible slate as Discover.
+  "api/http/explore.ts GET DISCOVERY_EXPLORE_PATH": cap("navigate.DISCOVER"),
+  "api/http/explore.ts GET DISCOVERY_EXPLORE_RELATED_PATH":
+    cap("navigate.DISCOVER"),
+  "api/http/explore.ts GET DISCOVERY_EXPLORE_SEARCH_PATH": cap(
+    "tool.search_companies",
+  ),
   "api/http/discovery.ts GET DISCOVERY_COMPANIES_PATH": cap(
     "tool.discovery_slate",
   ),
@@ -778,6 +785,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/profile": cap("navigate.PROFILE"),
   "/capital": cap("navigate.CAPITAL"),
   "/discover": cap("navigate.DISCOVER"),
+  "/explore": cap("navigate.DISCOVER"),
+  "/dev/explore": exempt("development-only page"),
   "/discover/saved": cap("navigate.SAVED"),
   // Your companies (2026-10-02): reached from Discover's row.
   "/discover/yours": cap("navigate.DISCOVER"),

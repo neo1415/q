@@ -845,6 +845,9 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
         visibilityChange: false,
         offers: [
           expect.objectContaining({ destination: "SETTINGS" }),
+          // G: accept an invitation to a company or firm, or ask to join.
+          expect.objectContaining({ destination: "SETTINGS" }),
+          expect.objectContaining({ destination: "SETTINGS" }),
           // Their Q email address: copy it, or get a new one (inbound email).
           expect.objectContaining({ destination: "SETTINGS" }),
           // Set aside one of Q's suggestions on Work ("Not now").
