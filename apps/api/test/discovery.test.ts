@@ -595,6 +595,41 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
     ).toEqual([null, null]);
     await app.close();
   });
+
+  it("L1: reads the page's pitches and summaries side by side (before: one after another)", async () => {
+    const READ_MS = 150;
+    let inFlight = 0;
+    let most = 0;
+    const slow = <T>(value: T) => {
+      inFlight += 1;
+      most = Math.max(most, inFlight);
+      return new Promise<T>((resolve) =>
+        setTimeout(() => {
+          inFlight -= 1;
+          resolve(value);
+        }, READ_MS),
+      );
+    };
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: twoItemPage,
+      pitches: {
+        findDiscoverablePitches: () =>
+          slow(new Map<string, DiscoverablePitchSet>()),
+      },
+      feedSummaries: () => slow(new Map()),
+    });
+    const started = Date.now();
+    const response = await app.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    const took = Date.now() - started;
+    expect(response.statusCode).toBe(200);
+    expect(most).toBe(2);
+    expect(took).toBeLessThan(2 * READ_MS);
+    await app.close();
+  });
 });
 
 describe("GET /v1/discovery/network-pitches (ADR 0021)", () => {

@@ -39,6 +39,21 @@ export default async function ApplicationLayout({
   children: ReactNode;
 }): Promise<ReactNode> {
   await requireSessionUser();
+  const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
+  // Every read the shell needs, asked side by side (L1 latency sweep,
+  // 2026-10-06): context, standing, onboarding (two journeys), KYB, admin
+  // and brand were five or six API round trips one after another before
+  // any page could paint. Each is a read; what decides is unchanged below.
+  const standingRead = qConnected ? resolveQStanding() : Promise.resolve(null);
+  const onboardingRead = qConnected ? resolveOnboardingState() : null;
+  onboardingRead?.catch(() => undefined);
+  const verifyRead = loadVerifyNudge();
+  // Only awaited when it is shown; never an unhandled rejection otherwise.
+  verifyRead.catch(() => undefined);
+  const adminRead = adminContext()
+    .then((found) => found !== null)
+    .catch(() => false);
+  const brandRead = loadBrandStyle().catch(() => null);
   const context = await resolveOwnContext();
   const shell: ShellContext =
     context.kind === "FOUNDER"
@@ -63,18 +78,16 @@ export default async function ApplicationLayout({
             scope: "investor_private",
           }
         : { kind: "NONE", scope: "unset" };
-  const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
   // Founder direction 2026-09-30: nobody uses Capital Q before Q has onboarded
   // them. Until then the navigation is one way back to Q; a page Q sent them
   // to while they are not ready stays readable, nothing else is offered.
   // An account Q paused sees nothing but that it is paused, until a person
   // at Capital Q reinstates it.
-  if (qConnected && (await resolveQStanding())?.paused === true) {
+  if ((await standingRead)?.paused === true) {
     redirect("/paused");
   }
-  const unfinished = qConnected
-    ? onboardingPath(await resolveOnboardingState())
-    : null;
+  const unfinished =
+    onboardingRead === null ? null : onboardingPath(await onboardingRead);
   // ADMIN-4 block: "Verify you and <organisation>" stays in the shell until
   // both the person and the organisation are verified. A read that fails
   // shows nothing rather than a wrong state.
@@ -83,12 +96,10 @@ export default async function ApplicationLayout({
   // P5: the brand colour, read alongside so it paints with the first frame.
   const [verifyNudgeState, admin, brandCss] = await Promise.all([
     unfinished === null && context.kind !== "NONE"
-      ? loadVerifyNudge()
+      ? verifyRead
       : Promise.resolve(null),
-    adminContext()
-      .then((found) => found !== null)
-      .catch(() => false),
-    loadBrandStyle().catch(() => null),
+    adminRead,
+    brandRead,
   ]);
   return (
     <AppShell

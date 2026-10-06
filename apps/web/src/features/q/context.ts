@@ -253,6 +253,27 @@ export function createContextLookups(
 }
 
 /**
+ * Both journeys' current sessions, asked side by side and once per render
+ * (L1 latency sweep, 2026-10-06: the app layout asked founder, then
+ * investor, one after the other on every page, ~180 ms each hosted, and
+ * the setup check asked the same two again). Founder first, as before.
+ */
+const currentOnboardingViews = cache(async () => {
+  const session = await apiSession();
+  if (session === null) return null;
+  return Promise.all(
+    (["founder", "investor"] as const).map(async (journey) => {
+      try {
+        const value = await getCurrentOnboardingSession(session, journey);
+        return { journey, view: { status: "fulfilled", value } as const };
+      } catch (reason: unknown) {
+        return { journey, view: { status: "rejected", reason } as const };
+      }
+    }),
+  );
+});
+
+/**
  * The journey this person started and has not finished, if any: Home offers
  * the way back in ("Continue setup"), because once a company or investor
  * organisation exists the setup paths for a stranger are no longer shown
@@ -260,18 +281,17 @@ export function createContextLookups(
  */
 export const resolveUnfinishedSetup = cache(
   async (): Promise<"founder" | "investor" | null> => {
-    const session = await apiSession();
-    if (session === null) {
+    const views = await currentOnboardingViews();
+    if (views === null) {
       return null;
     }
-    for (const journey of ["founder", "investor"] as const) {
-      try {
-        const view = await getCurrentOnboardingSession(session, journey);
-        if (view.session.status === "ACTIVE") {
-          return journey;
-        }
-      } catch {
-        // No such journey for this person. A normal state, not an error.
+    for (const { journey, view } of views) {
+      // A rejection is no such journey for this person: a normal state.
+      if (
+        view.status === "fulfilled" &&
+        view.value.session.status === "ACTIVE"
+      ) {
+        return journey;
       }
     }
     return null;
@@ -293,23 +313,22 @@ export type OnboardingState =
 
 export const resolveOnboardingState = cache(
   async (): Promise<OnboardingState> => {
-    const session = await apiSession();
-    if (session === null) return { kind: "UNKNOWN" };
+    const views = await currentOnboardingViews();
+    if (views === null) return { kind: "UNKNOWN" };
     let active: "founder" | "investor" | null = null;
     let failed = false;
-    for (const journey of ["founder", "investor"] as const) {
-      try {
-        const view = await getCurrentOnboardingSession(session, journey);
-        if (view.session.status === "COMPLETED") return { kind: "DONE" };
-        if (view.session.status === "ACTIVE" && active === null) {
+    for (const { journey, view } of views) {
+      if (view.status === "fulfilled") {
+        if (view.value.session.status === "COMPLETED") return { kind: "DONE" };
+        if (view.value.session.status === "ACTIVE" && active === null) {
           active = journey;
         }
-      } catch (error: unknown) {
+      } else if (
         // No such journey for this person is a normal 404; anything else
         // means Capital Q was not asked successfully.
-        if (!(error instanceof ApiProblemError && error.status === 404)) {
-          failed = true;
-        }
+        !(view.reason instanceof ApiProblemError && view.reason.status === 404)
+      ) {
+        failed = true;
       }
     }
     if (active !== null) return { kind: "UNFINISHED", journey: active };
