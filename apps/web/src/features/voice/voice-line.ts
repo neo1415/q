@@ -25,6 +25,22 @@ export type VoiceLineHolder = {
 
 let holder: VoiceLineHolder | null = null;
 let queue: Promise<void> = Promise.resolve();
+const watchers = new Set<() => void>();
+
+function setHolder(next: VoiceLineHolder | null): void {
+  if (holder === next) return;
+  holder = next;
+  for (const watcher of watchers) watcher();
+}
+
+/**
+ * Be told when the tab's line is taken or given up. "Hey Q" (D2) stops
+ * listening while any surface holds the line: one microphone, one owner.
+ */
+export function watchVoiceLine(watcher: () => void): () => void {
+  watchers.add(watcher);
+  return () => watchers.delete(watcher);
+}
 
 function exclusive<T>(work: () => Promise<T>): Promise<T> {
   const run = queue.then(work);
@@ -46,11 +62,11 @@ export function openVoiceLine<T>(
 ): Promise<T> {
   return exclusive(async () => {
     const previous = holder;
-    holder = null;
+    setHolder(null);
     if (previous !== null) {
       await previous.release(previous === next).catch(() => undefined);
     }
-    holder = next;
+    setHolder(next);
     return open();
   });
 }
@@ -64,14 +80,14 @@ export function endVoiceLine(
   close: () => Promise<void>,
 ): Promise<void> {
   return exclusive(async () => {
-    if (holder === owner) holder = null;
+    if (holder === owner) setHolder(null);
     await close().catch(() => undefined);
   });
 }
 
 /** Forget `owner` without waiting: it unmounted and closed its transport. */
 export function dropVoiceLine(owner: VoiceLineHolder): void {
-  if (holder === owner) holder = null;
+  if (holder === owner) setHolder(null);
 }
 
 /** Who holds the tab's line; for tests and diagnostics only. */

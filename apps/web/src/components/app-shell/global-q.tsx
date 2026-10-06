@@ -34,6 +34,7 @@ import {
   type QSubject,
 } from "@/features/q/q-subject";
 import { QSounds } from "@/features/q-sound/q-sounds";
+import { WakeWord } from "@/features/wake/wake-word";
 
 /**
  * Q, present on every page (ADR 0017 F1): the one conversation store, the
@@ -131,6 +132,9 @@ export function GlobalQProvider({
     },
     [openWith],
   );
+  const openQ = useCallback(() => {
+    openWith(null);
+  }, [openWith]);
   const askAbout = useCallback(
     (next: string) => {
       openWith(next);
@@ -216,6 +220,8 @@ export function GlobalQProvider({
           <GlobalQRunner />
           <AnswerChip />
           <QSounds />
+          {/* D1: "Hey Q"; off by default, and nothing loads while off. */}
+          <WakeWord openQ={openQ} />
           {dock}
         </GlobalQContext.Provider>
       </QSessionProvider>
